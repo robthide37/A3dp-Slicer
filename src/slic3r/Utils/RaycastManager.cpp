@@ -76,17 +76,7 @@ void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
 std::optional<RaycastManager::Hit> RaycastManager::unproject(
     const Vec2d &mouse_pos, const Camera &camera, const ISkip *skip) const
 {
-    struct HitWithDistance: public Hit
-    {
-        double squared_distance;
-        HitWithDistance(double              squared_distance,
-                        const TrKey &       key,
-                        const SurfacePoint &surface_point)
-            : Hit(key, surface_point.position, surface_point.normal)
-            , squared_distance(squared_distance)
-        {}
-    };
-    std::optional<HitWithDistance> closest;
+    std::optional<Hit> closest;
     for (const auto &item : m_transformations) { 
         const TrKey &key = item.first;
         size_t       volume_id = key.second;
@@ -109,10 +99,68 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(
         if (closest.has_value() &&
             closest->squared_distance < squared_distance)
             continue;
-        closest = HitWithDistance(squared_distance, key, surface_point);
+        closest = Hit(key, surface_point, squared_distance);
     }
 
     //if (!closest.has_value()) return {};
+    return closest;
+}
+
+std::optional<RaycastManager::Hit> RaycastManager::unproject(const Vec3d &point, const Vec3d &direction, const ISkip *skip) const
+{
+    std::optional<Hit> closest;
+    for (const auto &item : m_transformations) { 
+        const TrKey &key = item.first;
+        size_t       volume_id = key.second;
+        if (skip != nullptr && skip->skip(volume_id)) continue;
+        const Transform3d &transformation = item.second;
+        auto raycaster_it =
+            std::find_if(m_raycasters.begin(), m_raycasters.end(),
+                         [volume_id](const RaycastManager::Raycaster &it)
+                             -> bool { return volume_id == it.first; });
+        if (raycaster_it == m_raycasters.end()) continue;
+        const MeshRaycaster &raycaster = *(raycaster_it->second);
+        const AABBMesh& mesh = raycaster.get_aabb_mesh();                
+        Transform3d tr_inv = transformation.inverse();
+        Vec3d mesh_point = tr_inv * point;
+        Vec3d mesh_direction = tr_inv.linear() * direction;
+        std::vector<AABBMesh::hit_result> hits = mesh.query_ray_hits(mesh_point, mesh_direction);
+        for (const AABBMesh::hit_result &hit : hits) {
+            double squared_distance = (mesh_point - hit.position()).squaredNorm();
+            if (closest.has_value() &&
+                closest->squared_distance < squared_distance)
+                continue;
+            SurfacePoint surface_point(hit.position().cast<float>(), hit.normal().cast<float>());
+            closest = Hit(key, surface_point, squared_distance);
+        }
+    }
+    return closest;
+}
+
+std::optional<RaycastManager::Hit> RaycastManager::closest(const Vec3d &point, const ISkip *skip) const {
+    std::optional<Hit> closest;
+    for (const auto &item : m_transformations) {
+        const TrKey &key       = item.first;
+        size_t       volume_id = key.second;
+        if (skip != nullptr && skip->skip(volume_id))
+            continue;
+        auto raycaster_it = std::find_if(m_raycasters.begin(), m_raycasters.end(), 
+            [volume_id](const RaycastManager::Raycaster &it) -> bool { return volume_id == it.first; });
+        if (raycaster_it == m_raycasters.end())
+            continue;
+        const MeshRaycaster &raycaster = *(raycaster_it->second);
+        const Transform3d &transformation = item.second;
+        Transform3d tr_inv = transformation.inverse();
+        Vec3d mesh_point_d = tr_inv * point;
+        Vec3f mesh_point_f = mesh_point_d.cast<float>();
+        Vec3f n;
+        Vec3f p = raycaster.get_closest_point(mesh_point_f, &n);
+        double squared_distance = (mesh_point_f - p).squaredNorm();
+        if (closest.has_value() && closest->squared_distance < squared_distance)
+            continue;
+        SurfacePoint surface_point(p,n);
+        closest = Hit(key, surface_point, squared_distance);
+    }
     return closest;
 }
 

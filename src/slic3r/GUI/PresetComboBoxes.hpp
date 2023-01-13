@@ -65,6 +65,7 @@ public:
 
     void edit_physical_printer();
     void add_physical_printer();
+    void open_physical_printer_url();
     bool del_physical_printer(const wxString& note_string = wxEmptyString);
     void show_modif_preset_separately() { m_show_modif_preset_separately = true; }
 
@@ -162,6 +163,8 @@ public:
     void msw_rescale() override;
     void sys_color_changed() override;
     void OnSelect(wxCommandEvent& evt) override;
+
+    std::string get_selected_ph_printer_name() const;
 
 private:
     int     m_extruder_idx = -1;

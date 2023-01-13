@@ -199,6 +199,8 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
     out << b_start << "Vendor:       " << b_end << m_vendor << line_end;
     out << b_start << "Renderer:     " << b_end << m_renderer << line_end;
     out << b_start << "GLSL version: " << b_end << m_glsl_version << line_end;
+    out << b_start << "Textures compression:       " << b_end << (are_compressed_textures_supported() ? "Enabled" : "Disabled") << line_end;
+    out << b_start << "Textures mipmap generation: " << b_end << (use_manually_generated_mipmaps() ? "Manual" : "Automatic") << line_end;
 
     {
 #if ENABLE_GL_CORE_PROFILE
@@ -255,7 +257,7 @@ std::vector<std::string> OpenGLManager::GLInfo::get_extensions_list() const
 
 OpenGLManager::GLInfo OpenGLManager::s_gl_info;
 bool OpenGLManager::s_compressed_textures_supported = false;
-bool OpenGLManager::m_use_manually_generated_mipmaps = true;
+bool OpenGLManager::s_use_manually_generated_mipmaps = true;
 OpenGLManager::EMultisampleState OpenGLManager::s_multisample = OpenGLManager::EMultisampleState::Unknown;
 OpenGLManager::EFramebufferType OpenGLManager::s_framebuffers_type = OpenGLManager::EFramebufferType::Unknown;
 
@@ -347,17 +349,11 @@ bool OpenGLManager::init_gl()
 #endif // ENABLE_GL_CORE_PROFILE
 
         m_gl_initialized = true;
-#if ENABLE_GL_CORE_PROFILE
-        if (GLEW_ARB_texture_compression)
-            s_compressed_textures_supported = true;
-        else
-            s_compressed_textures_supported = false;
-#else
+
         if (GLEW_EXT_texture_compression_s3tc)
             s_compressed_textures_supported = true;
         else
             s_compressed_textures_supported = false;
-#endif // ENABLE_GL_CORE_PROFILE
 
         if (GLEW_ARB_framebuffer_object)
             s_framebuffers_type = EFramebufferType::Arb;
@@ -416,29 +412,18 @@ bool OpenGLManager::init_gl()
 
 #ifdef _WIN32
         // Since AMD driver version 22.7.1, there is probably some bug in the driver that causes the issue with the missing
-        // texture of the bed. It seems that this issue only triggers when mipmaps are generated manually
-        // (combined with a texture compression) and when mipmaps are generated through OpenGL glGenerateMipmap is working.
-        // So, for newer drivers than 22.6.1, the last working driver version, we use mipmaps generated through OpenGL.
-        if (const auto gl_info = OpenGLManager::get_gl_info(); boost::contains(gl_info.get_vendor(), "ATI Technologies Inc.")) {
-            // WHQL drivers seem to have one more version number at the end besides non-WHQL drivers.
-            //     WHQL: 4.6.14800 Compatibility Profile Context 22.6.1 30.0.21023.1015
-            // Non-WHQL: 4.6.0 Compatibility Profile Context 22.8.1.220810
-            std::regex version_rgx(R"(Compatibility\sProfile\sContext\s(\d+)\.(\d+)\.(\d+))");
-            if (std::smatch matches; std::regex_search(gl_info.get_version_string(), matches, version_rgx) && matches.size() == 4) {
-                int version_major = std::stoi(matches[1].str());
-                int version_minor = std::stoi(matches[2].str());
-                int version_patch = std::stoi(matches[3].str());
-                BOOST_LOG_TRIVIAL(debug) << "Found AMD driver version: " << version_major << "." << version_minor << "." << version_patch;
-
-                if (version_major > 22 || (version_major == 22 && version_minor > 6) || (version_major == 22 && version_minor == 6 && version_patch > 1)) {
-                    m_use_manually_generated_mipmaps = false;
-                    BOOST_LOG_TRIVIAL(debug) << "Mipmapping through OpenGL was enabled.";
-                }
-            } else {
-                BOOST_LOG_TRIVIAL(error) << "Not recognized format of version.";
-            }
-        } else {
-            BOOST_LOG_TRIVIAL(error) << "Unable to parse version of AMD driver.";
+        // texture of the bed (see: https://github.com/prusa3d/PrusaSlicer/issues/8417).
+        // It seems that this issue only triggers when mipmaps are generated manually
+        // (combined with a texture compression) with texture size not being power of two.
+        // When mipmaps are generated through OpenGL function glGenerateMipmap() the driver works fine.
+        // There is no an easy way to detect the driver version without using Win32 API because the strings returned by OpenGL
+        // have no standardized format, only some of them contain the driver version.
+        // Until we do not know that driver will be fixed (if ever) we force the use of glGenerateMipmap() on all cards
+        // containing the string 'Radeon' in the string returned by glGetString(GL_RENDERER)
+        const auto& gl_info = OpenGLManager::get_gl_info();
+        if (boost::contains(gl_info.get_vendor(), "ATI Technologies Inc.") && boost::contains(gl_info.get_renderer(), "Radeon")) {
+            s_use_manually_generated_mipmaps = false;
+            BOOST_LOG_TRIVIAL(debug) << "Mipmapping through OpenGL was enabled.";
         }
 #endif
     }

@@ -20,6 +20,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/convert.hpp>
+#include <boost/dll/runtime_symbol_info.hpp>
 
 #include <wx/stdpaths.h>
 #include <wx/imagpng.h>
@@ -77,6 +78,7 @@
 #include "PrintHostDialogs.hpp"
 #include "DesktopIntegrationDialog.hpp"
 #include "SendSystemInfoDialog.hpp"
+#include "Downloader.hpp"
 
 #include "BitmapCache.hpp"
 #include "Notebook.hpp"
@@ -749,7 +751,9 @@ void GUI_App::post_init()
         if (! this->init_params->input_files.empty())
             this->plater()->load_gcode(wxString::FromUTF8(this->init_params->input_files[0].c_str()));
     }
-    else {
+    else if (this->init_params->start_downloader) {
+        start_download(this->init_params->download_url);
+    } else {
         if (! this->init_params->preset_substitutions.empty())
             show_substitutions_info(this->init_params->preset_substitutions);
 
@@ -776,6 +780,15 @@ void GUI_App::post_init()
                     boost::algorithm::iends_with(filename, ".amf.xml") ||
                     boost::algorithm::iends_with(filename, ".3mf"))
                     this->plater()->set_project_filename(from_u8(filename));
+            }
+            if (this->init_params->delete_after_load) {
+                for (const std::string& p : this->init_params->input_files) {
+                    boost::system::error_code ec;
+                    boost::filesystem::remove(boost::filesystem::path(p), ec);
+                    if (ec) {
+                        BOOST_LOG_TRIVIAL(error) << ec.message();
+                    }
+                } 
             }
         }
         if (! this->init_params->extra_config.empty())
@@ -826,6 +839,7 @@ GUI_App::GUI_App(EAppMode mode)
     , m_imgui(new ImGuiWrapper())
 	, m_removable_drive_manager(std::make_unique<RemovableDriveManager>())
 	, m_other_instance_message_handler(std::make_unique<OtherInstanceMessageHandler>())
+    , m_downloader(std::make_unique<Downloader>())
 {
 	//app config initializes early becasuse it is used in instance checking in PrusaSlicer.cpp
 	this->init_app_config();
@@ -1127,7 +1141,7 @@ bool GUI_App::on_init_inner()
     NppDarkMode::InitDarkMode(init_dark_color_mode, init_sys_menu_enabled);
 #endif
     // initialize label colors and fonts
-    init_label_colours();
+    init_ui_colours();
     init_fonts();
 
     std::string older_data_dir_path;
@@ -1145,8 +1159,8 @@ bool GUI_App::on_init_inner()
     if (bool new_dark_color_mode = app_config->get("dark_color_mode") == "1";
         init_dark_color_mode != new_dark_color_mode) {
         NppDarkMode::SetDarkMode(new_dark_color_mode);
-        init_label_colours();
-        update_label_colours_from_appconfig();
+        init_ui_colours();
+        update_ui_colours_from_appconfig();
     }
     if (bool new_sys_menu_enabled = app_config->get("sys_menu_enabled") == "1";
         init_sys_menu_enabled != new_sys_menu_enabled)
@@ -1258,7 +1272,8 @@ bool GUI_App::on_init_inner()
 
         Bind(EVT_SLIC3R_APP_OPEN_FAILED, [](const wxCommandEvent& evt) {
             show_error(nullptr, evt.GetString());
-        });
+        }); 
+
     }
     else {
 #ifdef __WXMSW__ 
@@ -1431,10 +1446,16 @@ const wxColour GUI_App::get_label_default_clr_modified()
     return dark_mode() ? wxColour(253, 111, 40) : wxColour(252, 77, 1);
 }
 
-void GUI_App::init_label_colours()
+const std::vector<std::string> GUI_App::get_mode_default_palette()
+{
+    return { "#7DF028", "#FFDC00", "#E70000" };
+}
+
+void GUI_App::init_ui_colours()
 {
     m_color_label_modified          = get_label_default_clr_modified();
     m_color_label_sys               = get_label_default_clr_system();
+    m_mode_palette                  = get_mode_default_palette();
 
     bool is_dark_mode = dark_mode();
 #ifdef _WIN32
@@ -1450,18 +1471,29 @@ void GUI_App::init_label_colours()
     m_color_window_default          = is_dark_mode ? wxColour(43, 43, 43)   : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 }
 
-void GUI_App::update_label_colours_from_appconfig()
+void GUI_App::update_ui_colours_from_appconfig()
 {
+    // load label colors
     if (app_config->has("label_clr_sys")) {
         auto str = app_config->get("label_clr_sys");
-        if (str != "")
+        if (!str.empty())
             m_color_label_sys = wxColour(str);
     }
 
     if (app_config->has("label_clr_modified")) {
         auto str = app_config->get("label_clr_modified");
-        if (str != "")
+        if (!str.empty())
             m_color_label_modified = wxColour(str);
+    }
+
+    // load mode markers colors
+    if (app_config->has("mode_palette")) {
+        const auto colors = app_config->get("mode_palette");
+        if (!colors.empty()) {
+            m_mode_palette.clear();
+            if (!unescape_strings_cstyle(colors, m_mode_palette))
+                m_mode_palette = get_mode_default_palette();
+        }
     }
 }
 
@@ -1647,6 +1679,39 @@ void GUI_App::set_label_clr_sys(const wxColour& clr)
     const std::string str = encode_color(ColorRGB(clr.Red(), clr.Green(), clr.Blue()));
     app_config->set("label_clr_sys", str);
     app_config->save();
+}
+
+const std::string& GUI_App::get_mode_btn_color(int mode_id)
+{
+    assert(0 <= mode_id && size_t(mode_id) < m_mode_palette.size());
+    return m_mode_palette[mode_id];
+}
+
+std::vector<wxColour> GUI_App::get_mode_palette()
+{
+    return { wxColor(m_mode_palette[0]),
+             wxColor(m_mode_palette[1]),
+             wxColor(m_mode_palette[2]) };
+}
+
+void GUI_App::set_mode_palette(const std::vector<wxColour>& palette)
+{
+    bool save = false;
+
+    for (size_t mode = 0; mode < palette.size(); ++mode) {
+        const wxColour& clr = palette[mode];
+        std::string color_str = clr == wxTransparentColour ? std::string("") : encode_color(ColorRGB(clr.Red(), clr.Green(), clr.Blue()));
+        if (m_mode_palette[mode] != color_str) {
+            m_mode_palette[mode] = color_str;
+            save = true;
+        }
+    }
+
+    if (save) {
+        mainframe->update_mode_markers();
+        app_config->set("mode_palette", escape_strings_cstyle(m_mode_palette));
+        app_config->save();
+    }
 }
 
 bool GUI_App::tabs_as_menu() const
@@ -2216,6 +2281,17 @@ bool GUI_App::load_language(wxString language, bool initial)
     // Override language at the active wxTranslations class (which is stored in the active m_wxLocale)
     // to load possibly different dictionary, for example, load Czech dictionary for Slovak language.
     wxTranslations::Get()->SetLanguage(language_dict);
+    {
+        // UKR Localization specific workaround till the wxWidgets doesn't fixed:
+        // From wxWidgets 3.1.6 calls setlocation(0, wxInfoLanguage->LocaleTag), see (https://github.com/prusa3d/wxWidgets/commit/deef116a09748796711d1e3509965ee208dcdf0b#diff-7de25e9a71c4dce61bbf76492c589623d5b93fd1bb105ceaf0662075d15f4472),
+        // where LocaleTag is a Tag of locale in BCP 47 - like notation.
+        // For Ukrainian Language LocaleTag == "uk".
+        // But setlocale(0, "uk") returns "English_United Kingdom.1252" instead of "uk",
+        // and, as a result, locales are set to English_United Kingdom        
+         
+        if (language_info->CanonicalName == "uk")
+            setlocale(0, language_info->GetCanonicalWithRegion().data());
+    }
     m_wxLocale->AddCatalog(SLIC3R_APP_KEY);
     m_imgui->set_language(into_u8(language_info->CanonicalName));
     //FIXME This is a temporary workaround, the correct solution is to switch to "C" locale during file import / export only.
@@ -2776,6 +2852,17 @@ void GUI_App::MacOpenFiles(const wxArrayString &fileNames)
             start_new_gcodeviewer(&filename);
     }
 }
+
+void GUI_App::MacOpenURL(const wxString& url)
+{
+    if (app_config && app_config->get("downloader_url_registered") != "1")
+    {
+        BOOST_LOG_TRIVIAL(error) << "Recieved command to open URL, but it is not allowed in app configuration. URL: " << url;
+        return;
+    }
+    start_download(boost::nowide::narrow(url));
+}
+
 #endif /* __APPLE */
 
 Sidebar& GUI_App::sidebar()
@@ -2823,7 +2910,7 @@ wxBookCtrlBase* GUI_App::tab_panel() const
     return mainframe->m_tabpanel;
 }
 
-NotificationManager * GUI_App::notification_manager()
+NotificationManager* GUI_App::notification_manager()
 {
     return plater_->get_notification_manager();
 }
@@ -2831,6 +2918,11 @@ NotificationManager * GUI_App::notification_manager()
 GalleryDialog* GUI_App::gallery_dialog()
 {
     return mainframe->gallery_dialog();
+}
+
+Downloader* GUI_App::downloader()
+{
+    return m_downloader.get();
 }
 
 // extruders count from selected printer preset
@@ -3278,6 +3370,24 @@ void GUI_App::app_version_check(bool from_user)
     }
     std::string version_check_url = app_config->version_check_url();
     m_app_updater->sync_version(version_check_url, from_user);
+}
+
+void GUI_App::start_download(std::string url)
+{
+    if (!plater_) {
+        BOOST_LOG_TRIVIAL(error) << "Could not start URL download: plater is nullptr.";
+        return; 
+    }
+    //lets always init so if the download dest folder was changed, new dest is used 
+        boost::filesystem::path dest_folder(app_config->get("url_downloader_dest"));
+        if (dest_folder.empty() || !boost::filesystem::is_directory(dest_folder)) {
+            std::string msg = _utf8("Could not start URL download. Destination folder is not set. Please choose destination folder in Configuration Wizard.");
+            BOOST_LOG_TRIVIAL(error) << msg;
+            show_error(nullptr, msg);
+            return;
+        } 
+    m_downloader->init(dest_folder);
+    m_downloader->start_download(url);
 }
 
 } // GUI

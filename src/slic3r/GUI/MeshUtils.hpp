@@ -168,6 +168,7 @@ public:
         : MeshRaycaster(std::make_unique<TriangleMesh>(mesh))
     {}
 
+    // DEPRICATED - use CameraUtils::ray_from_screen_pos
     static void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,
         Vec3d& point, Vec3d& direction);
 
@@ -176,15 +177,13 @@ public:
         const Vec2d& mouse_pos,
         const Transform3d& trafo, // how to get the mesh into world coords
         const Camera& camera, // current camera position
-        Vec3f& position, // where to save the positibon of the hit (mesh coords if mesh, world coords if clipping plane)
+        Vec3f& position, // where to save the positibon of the hit (mesh coords)
         Vec3f& normal, // normal of the triangle that was hit
         const ClippingPlane* clipping_plane = nullptr, // clipping plane (if active)
-        size_t* facet_idx = nullptr, // index of the facet hit
-        bool* was_clipping_plane_hit = nullptr // is the hit on the clipping place cross section?
+        size_t* facet_idx = nullptr // index of the facet hit
     ) const;
-
-    // Given a mouse position, this returns true in case it is on the mesh.
-    bool unproject_on_mesh(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera, Vec3d& position, Vec3d& normal) const;
+    
+    const AABBMesh &get_aabb_mesh() const { return m_emesh; }
 
     bool is_valid_intersection(Vec3d point, Vec3d direction, const Transform3d& trafo) const;
 

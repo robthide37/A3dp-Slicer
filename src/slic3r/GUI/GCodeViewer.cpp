@@ -643,7 +643,7 @@ const ColorRGBA GCodeViewer::Neutral_Color = ColorRGBA::DARK_GRAY();
 GCodeViewer::GCodeViewer()
 {
     m_extrusions.reset_role_visibility_flags();
-
+    m_shells.volumes.set_use_raycasters(false);
 //    m_sequential_view.skip_invisible_moves = true;
 }
 

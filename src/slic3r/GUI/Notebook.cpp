@@ -109,7 +109,14 @@ void ButtonsListCtrl::OnColorsChanged()
     for (ScalableButton* btn : m_pageButtons)
         btn->sys_color_changed();
 
+    m_mode_sizer->sys_color_changed();
+
     m_sizer->Layout();
+}
+
+void ButtonsListCtrl::UpdateModeMarkers()
+{
+    m_mode_sizer->update_mode_markers();
 }
 
 void ButtonsListCtrl::SetSelection(int sel)

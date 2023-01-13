@@ -17,6 +17,12 @@ imstb_truetype.h modification:
 
 Hot fix for open symbolic fonts on windows
 62bdfe6f8d04b88e8bd511cd613be80c0baa7f55
+Add case STBTT_MS_EID_SYMBOL to swith in file imstb_truetype.h on line 1440.
 
 Hot fix for open curved fonts mainly on MAC
 2148e49f75d82cb19dc6ec409fb7825296ed005c
+viz. https://github.com/nothings/stb/issues/1296
+In file imstb_truetype.h line 1667 change malloc size from:
+vertices = (stbtt_vertex *) STBTT_malloc((m + 1) * sizeof(vertices[0]), info->userdata);
+to:
+vertices = (stbtt_vertex *) STBTT_malloc(m * sizeof(vertices[0]), info->userdata);

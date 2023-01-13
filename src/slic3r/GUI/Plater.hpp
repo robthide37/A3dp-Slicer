@@ -84,6 +84,7 @@ public:
     void update_reslice_btn_tooltip() const;
     void msw_rescale();
     void sys_color_changed();
+    void update_mode_markers();
     void search();
     void jump_to_option(size_t selected);
     void jump_to_option(const std::string& opt_key, Preset::Type type, const std::wstring& category);
@@ -151,6 +152,8 @@ public:
     void render_project_state_debug_window() const;
 #endif // ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW
 
+    bool is_project_temp() const;
+
     Sidebar& sidebar();
     const Model& model() const;
     Model& model();
@@ -174,8 +177,10 @@ public:
     // To be called when providing a list of files to the GUI slic3r on command line.
     std::vector<size_t> load_files(const std::vector<std::string>& input_files, bool load_model = true, bool load_config = true, bool imperial_units = false);
     // to be called on drag and drop
-    bool load_files(const wxArrayString& filenames);
+    bool load_files(const wxArrayString& filenames, bool delete_after_load = false);
     void check_selected_presets_visibility(PrinterTechnology loaded_printer_technology);
+
+    bool preview_zip_archive(const boost::filesystem::path& input_file);
 
     const wxString& get_last_loaded_gcode() const { return m_last_loaded_gcode; }
 
@@ -310,6 +315,7 @@ public:
 
     void update_menus();
     void show_action_buttons(const bool is_ready_to_slice) const;
+    void show_action_buttons() const;
 
     wxString get_project_filename(const wxString& extension = wxEmptyString) const;
     void set_project_filename(const wxString& filename);

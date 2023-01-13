@@ -377,7 +377,8 @@ void GLTexture::render_sub_texture(unsigned int tex_id, float left, float right,
 
 bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECompressionType compression_type, bool apply_anisotropy)
 {
-    bool compression_enabled = (compression_type != None) && OpenGLManager::are_compressed_textures_supported();
+    const bool compression_enabled = (compression_type != None) && OpenGLManager::are_compressed_textures_supported();
+    const bool use_compressor = compression_enabled && OpenGLManager::use_manually_generated_mipmaps();
 
     // Load a PNG with an alpha channel.
     wxImage image;
@@ -447,7 +448,7 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
     }
 
     if (compression_enabled) {
-        if (compression_type == SingleThreaded)
+        if (compression_type == SingleThreaded || !use_compressor)
             glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void*)data.data()));
         else {
             // initializes the texture on GPU 
@@ -459,7 +460,7 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
     else
         glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void*)data.data()));
 
-    if (use_mipmaps) {
+    if (use_mipmaps && OpenGLManager::use_manually_generated_mipmaps()) {
         // we manually generate mipmaps because glGenerateMipmap() function is not reliable on all graphics cards
         int lod_w = m_width;
         int lod_h = m_height;
@@ -506,6 +507,10 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
             glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
         }
     }
+    else if (use_mipmaps && !OpenGLManager::use_manually_generated_mipmaps()) {
+        glsafe(::glGenerateMipmap(GL_TEXTURE_2D));
+        glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
+    }
     else {
         glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
         glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
@@ -517,7 +522,7 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
 
     m_source = filename;
 
-    if (compression_enabled && compression_type == MultiThreaded)
+    if (use_compressor && compression_type == MultiThreaded)
         // start asynchronous compression
         m_compressor.start_compressing();
 
@@ -526,7 +531,8 @@ bool GLTexture::load_from_png(const std::string& filename, bool use_mipmaps, ECo
 
 bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, bool compress, bool apply_anisotropy, unsigned int max_size_px)
 {
-    bool compression_enabled = compress && OpenGLManager::are_compressed_textures_supported();
+    const bool compression_enabled = compress && OpenGLManager::are_compressed_textures_supported();
+    const bool use_compressor = compression_enabled && OpenGLManager::use_manually_generated_mipmaps();
 
     NSVGimage* image = BitmapCache::nsvgParseFromFileWithReplace(filename.c_str(), "px", 96.0f, {});
     if (image == nullptr) {
@@ -551,7 +557,7 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
             m_height += (4 - height_rem);
     }
 
-    int n_pixels = m_width * m_height;
+    const int n_pixels = m_width * m_height;
 
     if (n_pixels <= 0) {
         reset();
@@ -582,10 +588,14 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
     }
 
     if (compression_enabled) {
-        // initializes the texture on GPU 
-        glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0));
-        // and send the uncompressed data to the compressor
-        m_compressor.add_level((unsigned int)m_width, (unsigned int)m_height, data);
+        if (use_compressor) {
+            // initializes the texture on GPU 
+            glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0));
+            // and send the uncompressed data to the compressor
+            m_compressor.add_level((unsigned int)m_width, (unsigned int)m_height, data);
+        }
+        else
+            glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void*)data.data()));
     }
     else
         glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)m_width, (GLsizei)m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void*)data.data()));
@@ -619,9 +629,12 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
             glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, level));
             glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
         }
-    } else if (use_mipmaps && !OpenGLManager::use_manually_generated_mipmaps()) {
-        glGenerateMipmap(GL_TEXTURE_2D);
-    } else {
+    }
+    else if (use_mipmaps && !OpenGLManager::use_manually_generated_mipmaps()) {
+        glsafe(::glGenerateMipmap(GL_TEXTURE_2D));
+        glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR));
+    }
+    else {
         glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
         glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
     }
@@ -632,7 +645,7 @@ bool GLTexture::load_from_svg(const std::string& filename, bool use_mipmaps, boo
 
     m_source = filename;
 
-    if (compression_enabled)
+    if (use_compressor)
         // start asynchronous compression
         m_compressor.start_compressing();
 

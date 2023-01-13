@@ -6,7 +6,6 @@ namespace Slic3r {
 TriangleSelectorWrapper::TriangleSelectorWrapper(const TriangleMesh &mesh, const Transform3d& mesh_transform) :
         mesh(mesh), mesh_transform(mesh_transform), selector(mesh), triangles_tree(
                 AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set(mesh.its.vertices, mesh.its.indices)) {
-
 }
 
 void TriangleSelectorWrapper::enforce_spot(const Vec3f &point, const Vec3f &origin, float radius) {

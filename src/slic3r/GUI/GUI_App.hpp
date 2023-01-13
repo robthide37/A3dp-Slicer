@@ -46,6 +46,7 @@ class ObjectList;
 class ObjectLayers;
 class Plater;
 class NotificationManager;
+class Downloader;
 struct GUI_InitParams;
 class GalleryDialog;
 
@@ -139,6 +140,7 @@ private:
     wxColour        m_color_selected_btn_bg;
     bool            m_force_colors_update { false };
 #endif
+    std::vector<std::string>     m_mode_palette;
 
     wxFont		    m_small_font;
     wxFont		    m_bold_font;
@@ -164,6 +166,7 @@ private:
 	std::unique_ptr <OtherInstanceMessageHandler> m_other_instance_message_handler;
     std::unique_ptr <AppUpdater> m_app_updater;
     std::unique_ptr <wxSingleInstanceChecker> m_single_instance_checker;
+    std::unique_ptr <Downloader> m_downloader;
     std::string m_instance_hash_string;
 	size_t m_instance_hash_int;
 
@@ -194,8 +197,9 @@ public:
     static bool     dark_mode();
     const wxColour  get_label_default_clr_system();
     const wxColour  get_label_default_clr_modified();
-    void            init_label_colours();
-    void            update_label_colours_from_appconfig();
+    const std::vector<std::string> get_mode_default_palette();
+    void            init_ui_colours();
+    void            update_ui_colours_from_appconfig();
     void            update_label_colours();
     // update color mode for window
     void            UpdateDarkUI(wxWindow *window, bool highlited = false, bool just_font = false);
@@ -215,6 +219,9 @@ public:
     const wxColour& get_label_clr_default() { return m_color_label_default; }
     const wxColour& get_window_default_clr(){ return m_color_window_default; }
 
+    const std::string&      get_mode_btn_color(int mode_id);
+    std::vector<wxColour>   get_mode_palette();
+    void                    set_mode_palette(const std::vector<wxColour> &palette);
 
 #ifdef _WIN32
     const wxColour& get_label_highlight_clr()   { return m_color_highlight_label_default; }
@@ -287,6 +294,7 @@ public:
     void            OSXStoreOpenFiles(const wxArrayString &files) override;
     // wxWidgets override to get an event on open files.
     void            MacOpenFiles(const wxArrayString &fileNames) override;
+    void            MacOpenURL(const wxString& url) override;
 #endif /* __APPLE */
 
     Sidebar&             sidebar();
@@ -299,6 +307,7 @@ public:
     Model&      		 model();
     NotificationManager * notification_manager();
     GalleryDialog *     gallery_dialog();
+    Downloader*          downloader();
 
     // Parameters extracted from the command line to be passed to GUI after initialization.
     GUI_InitParams* init_params { nullptr };
@@ -353,6 +362,10 @@ public:
     void            associate_gcode_files();
 #endif // __WXMSW__
 
+
+    // URL download - PrusaSlicer gets system call to open prusaslicer:// URL which should contain address of download
+    void            start_download(std::string url);
+
 private:
     bool            on_init_inner();
 	void            init_app_config();
@@ -375,6 +388,7 @@ private:
     void            app_version_check(bool from_user);
 
     bool            m_datadir_redefined { false }; 
+
 };
 
 DECLARE_APP(GUI_App)

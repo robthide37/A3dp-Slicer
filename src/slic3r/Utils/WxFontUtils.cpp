@@ -222,10 +222,11 @@ wxFont WxFontUtils::create_wxFont(const EmbossStyle &style)
         auto it = type_to_family.right.find(*fp.family);
         if (it != type_to_family.right.end()) info.Family(it->second);
     }
-    if (fp.face_name.has_value()) {
+    // Face names are not portable, so prefer to use Family() in portable code.
+    /* if (fp.face_name.has_value()) {
         wxString face_name(*fp.face_name);
         info.FaceName(face_name);
-    }
+    }*/
     if (fp.style.has_value()) {
         auto it = type_to_style.right.find(*fp.style);
         if (it != type_to_style.right.end()) info.Style(it->second);

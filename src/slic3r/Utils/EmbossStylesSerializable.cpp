@@ -19,7 +19,7 @@ const std::string EmbossStylesSerializable::APP_CONFIG_FONT_COLLECTION  = "colle
 const std::string EmbossStylesSerializable::APP_CONFIG_FONT_CHAR_GAP    = "char_gap";
 const std::string EmbossStylesSerializable::APP_CONFIG_FONT_LINE_GAP    = "line_gap";
 
-const std::string EmbossStylesSerializable::APP_CONFIG_ACTIVE_FONT      = "activ_font";
+const std::string EmbossStylesSerializable::APP_CONFIG_ACTIVE_FONT      = "active_font";
 
 std::string EmbossStylesSerializable::create_section_name(unsigned index)
 {
@@ -150,8 +150,8 @@ void EmbossStylesSerializable::store_style_index(AppConfig &cfg, unsigned index)
     // store actual font index
     cfg.clear_section(AppConfig::SECTION_EMBOSS_STYLE);
     // activ font first index is +1 to correspond with section name
-    std::string activ_font = std::to_string(index);
-    cfg.set(AppConfig::SECTION_EMBOSS_STYLE, APP_CONFIG_ACTIVE_FONT, activ_font);
+    std::string active_font = std::to_string(index);
+    cfg.set(AppConfig::SECTION_EMBOSS_STYLE, APP_CONFIG_ACTIVE_FONT, active_font);
 }
 
 std::optional<size_t> EmbossStylesSerializable::load_style_index(const AppConfig &cfg)

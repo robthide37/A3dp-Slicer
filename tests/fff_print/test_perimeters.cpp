@@ -309,6 +309,7 @@ SCENARIO("Perimeters", "[Perimeters]")
             { "perimeters",                 1 },
             { "perimeter_speed",            77 },
             { "external_perimeter_speed",   66 },
+            { "enable_dynamic_overhang_speeds", false },
             { "bridge_speed",               99 },
             { "cooling",                    "1" },
             { "fan_below_layer_time",       "0" },
@@ -530,6 +531,7 @@ SCENARIO("Perimeters3", "[Perimeters]")
         { "perimeters",             3 },
         { "layer_height",           0.4 },
         { "bridge_speed",           99 },
+        { "enable_dynamic_overhang_speeds",         false },
         // to prevent bridging over sparse infill
         { "fill_density",           0 },
         { "overhangs",              true },

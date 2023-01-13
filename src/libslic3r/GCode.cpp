@@ -1,4 +1,5 @@
 #include "libslic3r.h"
+#include "GCode/ExtrusionProcessor.hpp"
 #include "I18N.hpp"
 #include "GCode.hpp"
 #include "Exception.hpp"
@@ -2160,12 +2161,16 @@ LayerResult GCode::process_layer(
         Skirt::make_skirt_loops_per_extruder_1st_layer(print, layer_tools, m_skirt_done) :
         Skirt::make_skirt_loops_per_extruder_other_layers(print, layer_tools, m_skirt_done);
 
-    if (this->config().avoid_curled_filament_during_travels) {
-        m_avoid_curled_filaments.clear();
+    if (this->config().avoid_crossing_curled_overhangs) {
+        m_avoid_crossing_curled_overhangs.clear();
         for (const ObjectLayerToPrint &layer_to_print : layers) {
-            m_avoid_curled_filaments.add_obstacles(layer_to_print.object_layer, Point(scaled(this->origin())));
-            m_avoid_curled_filaments.add_obstacles(layer_to_print.support_layer, Point(scaled(this->origin())));
+            m_avoid_crossing_curled_overhangs.add_obstacles(layer_to_print.object_layer, Point(scaled(this->origin())));
+            m_avoid_crossing_curled_overhangs.add_obstacles(layer_to_print.support_layer, Point(scaled(this->origin())));
         }
+    }
+
+    for (const ObjectLayerToPrint &layer_to_print : layers) {
+        m_extrusion_quality_estimator.prepare_for_new_layer(layer_to_print.object_layer);
     }
 
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
@@ -2295,6 +2300,8 @@ void GCode::process_layer_single_object(
     const PrintObject &print_object = print_instance.print_object;
     const Print       &print        = *print_object.print();
 
+    m_extrusion_quality_estimator.set_current_object(&print_object);
+
     if (! print_wipe_extrusions && layer_to_print.support_layer != nullptr)
         if (const SupportLayer &support_layer = *layer_to_print.support_layer; ! support_layer.support_fills.entities.empty()) {
             ExtrusionRole   role               = support_layer.support_fills.role();
@@ -2327,7 +2334,7 @@ void GCode::process_layer_single_object(
                     interface_extruder = dontcare_extruder;
             }
             bool extrude_support   = has_support && support_extruder == extruder_id;
-            bool extrude_interface = interface_extruder && interface_extruder == extruder_id;
+            bool extrude_interface = has_interface && interface_extruder == extruder_id;
             if (extrude_support || extrude_interface) {
                 init_layer_delayed();
                 m_layer = layer_to_print.support_layer;
@@ -2845,12 +2852,12 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             acceleration = m_config.first_layer_acceleration.value;
         } else if (this->object_layer_over_raft() && m_config.first_layer_acceleration_over_raft.value > 0) {
             acceleration = m_config.first_layer_acceleration_over_raft.value;
-        } else if (m_config.perimeter_acceleration.value > 0 && is_perimeter(path.role())) {
-            acceleration = m_config.perimeter_acceleration.value;
         } else if (m_config.bridge_acceleration.value > 0 && is_bridge(path.role())) {
             acceleration = m_config.bridge_acceleration.value;
         } else if (m_config.infill_acceleration.value > 0 && is_infill(path.role())) {
             acceleration = m_config.infill_acceleration.value;
+        } else if (m_config.perimeter_acceleration.value > 0 && is_perimeter(path.role())) {
+            acceleration = m_config.perimeter_acceleration.value;
         } else {
             acceleration = m_config.default_acceleration.value;
         }
@@ -2905,6 +2912,16 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm
         );
     }
+
+    bool                        variable_speed = false;
+    std::vector<ProcessedPoint> new_points{};
+    if (this->m_config.enable_dynamic_overhang_speeds && !this->on_first_layer() && is_perimeter(path.role())) {
+        new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path, m_config.overhang_overlap_levels,
+                                                                                  m_config.dynamic_overhang_speeds,
+                                                                                  m_config.get_abs_value("external_perimeter_speed"), speed);
+        variable_speed = std::any_of(new_points.begin(), new_points.end(), [speed](const ProcessedPoint &p) { return p.speed != speed; });
+    }
+
     double F = speed * 60;  // convert mm/sec to mm/min
 
     // extrude arc or line
@@ -2966,10 +2983,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             comment += ";_EXTERNAL_PERIMETER";
     }
 
-    // F is mm per minute.
-    gcode += m_writer.set_speed(F, "", comment);
-    double path_length = 0.;
-    {
+    if (!variable_speed) {
+        // F is mm per minute.
+        gcode += m_writer.set_speed(F, "", comment);
+        double path_length = 0.;
         std::string comment;
         if (m_config.gcode_comments) {
             comment = description;
@@ -2985,7 +3002,29 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
             prev = p;
         }
+    } else {
+        std::string comment;
+        if (m_config.gcode_comments) {
+            comment = description;
+            comment += description_bridge;
+        }
+        double last_set_speed = new_points[0].speed * 60.0;
+        gcode += m_writer.set_speed(last_set_speed, "", comment);
+        Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
+        for (size_t i = 1; i < new_points.size(); i++) {
+            const ProcessedPoint& processed_point = new_points[i];
+            Vec2d p = this->point_to_gcode_quantized(processed_point.p);
+            const double line_length = (p - prev).norm();
+            gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
+            prev = p;
+            double new_speed = processed_point.speed * 60.0;
+            if (last_set_speed != new_speed) {
+                gcode += m_writer.set_speed(new_speed, "", comment);
+                last_set_speed = new_speed;
+            }
+        }
     }
+
     if (m_enable_cooling_markers)
         gcode += is_bridge(path.role()) ? ";_BRIDGE_FAN_END\n" : ";_EXTRUDE_END\n";
 
@@ -3001,10 +3040,15 @@ std::string GCode::travel_to(const Point &point, ExtrusionRole role, std::string
         this->origin in order to get G-code coordinates.  */
     Polyline travel { this->last_pos(), point };
 
-    if (this->config().avoid_curled_filament_during_travels) {
-        Point scaled_origin = Point(scaled(this->origin()));
-        travel              = m_avoid_curled_filaments.find_path(this->last_pos() + scaled_origin, point + scaled_origin);
-        travel.translate(-scaled_origin);
+    if (this->config().avoid_crossing_curled_overhangs) {
+        if (m_config.avoid_crossing_perimeters) {
+            BOOST_LOG_TRIVIAL(warning)
+                << "Option >avoid crossing curled overhangs< is not compatible with avoid crossing perimeters and it will be ignored!";
+        } else {
+            Point scaled_origin = Point(scaled(this->origin()));
+            travel              = m_avoid_crossing_curled_overhangs.find_path(this->last_pos() + scaled_origin, point + scaled_origin);
+            travel.translate(-scaled_origin);
+        }
     }
 
     // check whether a straight travel move would need retraction

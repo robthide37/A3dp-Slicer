@@ -963,10 +963,9 @@ void Bonjour::priv::resolve_perform()
 	};
 
 	std::shared_ptr< boost::asio::io_service > io_service(new boost::asio::io_service);
-
 	std::vector<ResolveSocket*> sockets;
-	
-	// resolve intefaces - from PR#6646
+
+	// resolve interfaces - from PR#6646
 	std::vector<boost::asio::ip::address> interfaces;
 	asio::ip::udp::resolver resolver(*io_service);
 	boost::system::error_code ec;

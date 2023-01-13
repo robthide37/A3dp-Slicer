@@ -179,8 +179,8 @@ void SVG::draw(const ThickLines &thicklines, const std::string &fill, const std:
 
 void SVG::draw(const ThickPolylines &polylines, const std::string &stroke, coordf_t stroke_width)
 {
-    for (ThickPolylines::const_iterator it = polylines.begin(); it != polylines.end(); ++it)
-        this->draw((Polyline)*it, stroke, stroke_width);
+    for (const ThickPolyline &pl : polylines)
+        this->draw(Polyline(pl.points), stroke, stroke_width);
 }
 
 void SVG::draw(const ThickPolylines &thickpolylines, const std::string &fill, const std::string &stroke, coordf_t stroke_width)

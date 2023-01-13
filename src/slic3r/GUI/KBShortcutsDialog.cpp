@@ -53,6 +53,15 @@ KBShortcutsDialog::KBShortcutsDialog()
     SetSizer(main_sizer);
     main_sizer->SetSizeHints(this);
     this->CenterOnParent();
+
+#ifdef __linux__
+    // workaround to correct pages layout
+    book->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [book](wxBookCtrlEvent& e) {
+        book->GetPage(e.GetSelection())->Fit();
+    });
+    const wxSize sz = this->GetBestSize();
+    this->SetSize(sz.x + 1, sz.y);
+#endif
 }
 
 void KBShortcutsDialog::on_dpi_changed(const wxRect& suggested_rect)
@@ -154,6 +163,7 @@ void KBShortcutsDialog::fill_shortcuts()
             { "L", L("Gizmo FDM paint-on supports") },
             { "P", L("Gizmo FDM paint-on seam") },
             { "N", L("Gizmo Multi Material painting") },
+            { "T", L("Gizmo Text emboss / engrave")},
             { "Esc", L("Unselect gizmo or clear selection") },
             { "K", L("Change camera type (perspective, orthographic)") },
             { "B", L("Zoom to Bed") },

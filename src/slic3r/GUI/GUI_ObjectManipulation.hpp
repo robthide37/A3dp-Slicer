@@ -132,6 +132,9 @@ private:
 
     wxCheckBox*     m_check_inch {nullptr};
 
+#if ENABLE_WORLD_COORDINATE
+    std::array<ScalableButton*, 3> m_mirror_buttons;
+#else
     // Mirroring buttons and their current state
     enum MirrorButtonState {
         mbHidden,
@@ -139,18 +142,21 @@ private:
         mbActive
     };
     std::array<std::pair<ScalableButton*, MirrorButtonState>, 3> m_mirror_buttons;
+#endif // ENABLE_WORLD_COORDINATE
 
     // Bitmaps for the mirroring buttons.
     ScalableBitmap m_mirror_bitmap_on;
+#if !ENABLE_WORLD_COORDINATE
     ScalableBitmap m_mirror_bitmap_off;
     ScalableBitmap m_mirror_bitmap_hidden;
+#endif // !ENABLE_WORLD_COORDINATE
 
     // Needs to be updated from OnIdle?
     bool            m_dirty = false;
     // Cached labels for the delayed update, not localized!
     std::string     m_new_move_label_string;
-	std::string     m_new_rotate_label_string;
-	std::string     m_new_scale_label_string;
+    std::string     m_new_rotate_label_string;
+    std::string     m_new_scale_label_string;
     Vec3d           m_new_position;
     Vec3d           m_new_rotation;
     Vec3d           m_new_scale;
@@ -167,7 +173,10 @@ private:
     choice_ctrl*    m_word_local_combo { nullptr };
 
     ScalableBitmap  m_manifold_warning_bmp;
-    wxStaticBitmap* m_fix_throught_netfab_bitmap;
+    wxStaticBitmap* m_fix_throught_netfab_bitmap{ nullptr };
+#if ENABLE_WORLD_COORDINATE
+    wxStaticBitmap* m_mirror_warning_bitmap{ nullptr };
+#endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_WORLD_COORDINATE
     // Currently focused editor (nullptr if none)

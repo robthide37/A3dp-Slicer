@@ -956,7 +956,8 @@ std::string xml_escape(std::string text, bool is_marked/* = false*/)
 }
 
 // Definition of escape symbols https://www.w3.org/TR/REC-xml/#AVNormalize
-
+// During the read of xml attribute normalization of white spaces is applied
+// Soo for not lose white space character it is escaped before store
 std::string xml_escape_double_quotes_attribute_value(std::string text)
 {
     std::string::size_type pos = 0;

@@ -70,6 +70,7 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(MachineLimitsUsage)
 
 static const t_config_enum_values s_keys_map_PrintHostType {
     { "prusalink",      htPrusaLink },
+    { "prusaconnect",   htPrusaConnect },
     { "octoprint",      htOctoPrint },
     { "duet",           htDuet },
     { "flashair",       htFlashAir },
@@ -399,10 +400,10 @@ void PrintConfigDef::init_fff_params()
 
     // Maximum extruder temperature, bumped to 1500 to support printing of glass.
     const int max_temp = 1500;
-    def = this->add("avoid_curled_filament_during_travels", coBool);
-    def->label = L("Avoid curled filament during travels");
-    def->tooltip = L("Plan travel moves such that the extruder avoids areas where filament may be curled up. "
-                   "This is mostly happening on steeper rounded overhangs and may cause crash or borken print. "
+    def = this->add("avoid_crossing_curled_overhangs", coBool);
+    def->label = L("Avoid crossing curled overhangs (Experimental)");
+    def->tooltip = L("Plan travel moves such that the extruder avoids areas where the filament may be curled up. "
+                   "This is mostly happening on steeper rounded overhangs and may cause a crash with the nozzle. "
                    "This feature slows down both the print and the G-code generation.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
@@ -527,6 +528,40 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(60));
+
+    def             = this->add("enable_dynamic_overhang_speeds", coBool);
+    def->label      = L("Enable dynamic overhang speeds (Experimental)");
+    def->category   = L("Speed");
+    def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
+    def->mode       = comAdvanced;
+    def->set_default_value(new ConfigOptionBool(true));
+
+    def             = this->add("overhang_overlap_levels", coPercents);
+    def->full_label = L("Overhang overlap levels");
+    def->category   = L("Speed");
+    def->tooltip    = L("Controls overhang levels, expressed as a percentage of overlap of the extrusion with the previous layer - "
+                        "100% represents full overlap - no overhang is present, while 0% represents full overhang (floating extrusion). "
+                        "Each overhang level then corresponds with the overhang speed below. Speeds for overhang levels in between are "
+                        "calculated via linear interpolation."
+                        "If you set multiple different speeds for the same overhang level, only the largest speed is used. "
+                        );
+    def->sidetext   = L("%");
+    def->min        = 0;
+    def->max        = 100;
+    def->mode       = comAdvanced;
+    def->set_default_value(new ConfigOptionPercents({60, 40, 20, 0}));
+
+    def             = this->add("dynamic_overhang_speeds", coFloatsOrPercents);
+    def->full_label = L("Dynamic speed on overhangs");
+    def->category   = L("Speed");
+    def->tooltip    = L("This setting controls the speed on the overhang with the overlap value set above. "
+                        "The speed of the extrusion is calculated as a linear interpolation of the speeds for higher and lower overlap. "
+                        "If set as percentage, the speed is calculated over the external perimeter speed."
+                        );
+    def->sidetext   = L("mm/s or %");
+    def->min        = 0;
+    def->mode       = comAdvanced;
+    def->set_default_value(new ConfigOptionFloatsOrPercents({{25, false}, {20, false}, {15, false}, {15, false}}));
 
     def = this->add("brim_width", coFloat);
     def->label = L("Brim width");
@@ -804,9 +839,9 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("extra_perimeters_on_overhangs", coBool);
-    def->label = L("Extra perimeters on overhangs");
+    def->label = L("Extra perimeters on overhangs (Experimental)");
     def->category = L("Layers and Perimeters");
-    def->tooltip = L("Create additional perimeter paths over steep overhangs and areas where bridges cannot be anchored. ");
+    def->tooltip = L("Create additional perimeter paths over steep overhangs and areas where bridges cannot be anchored.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -1909,6 +1944,7 @@ void PrintConfigDef::init_fff_params()
                    "the kind of the host.");
     def->enum_keys_map = &ConfigOptionEnum<PrintHostType>::get_enum_values();
     def->enum_values.push_back("prusalink");
+    def->enum_values.push_back("prusaconnect");
     def->enum_values.push_back("octoprint");
     def->enum_values.push_back("duet");
     def->enum_values.push_back("flashair");
@@ -1916,6 +1952,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_values.push_back("repetier");
     def->enum_values.push_back("mks");
     def->enum_labels.push_back("PrusaLink");
+    def->enum_labels.push_back("PrusaConnect");
     def->enum_labels.push_back("OctoPrint");
     def->enum_labels.push_back("Duet");
     def->enum_labels.push_back("FlashAir");
@@ -1924,7 +1961,7 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back("MKS");
     def->mode = comAdvanced;
     def->cli = ConfigOptionDef::nocli;
-    def->set_default_value(new ConfigOptionEnum<PrintHostType>(htOctoPrint));
+    def->set_default_value(new ConfigOptionEnum<PrintHostType>(htPrusaLink));
 
     def = this->add("only_retract_when_crossing_perimeters", coBool);
     def->label = L("Only retract when crossing perimeters");
@@ -4607,6 +4644,10 @@ CLITransformConfigDef::CLITransformConfigDef()
     def->label = L("Scale to Fit");
     def->tooltip = L("Scale to fit the given volume.");
     def->set_default_value(new ConfigOptionPoint3(Vec3d(0,0,0)));
+
+    def = this->add("delete-after-load", coString);
+    def->label = L("Delete files after loading");
+    def->tooltip = L("Delete files after loading.");
 }
 
 CLIMiscConfigDef::CLIMiscConfigDef()

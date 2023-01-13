@@ -420,7 +420,7 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
 static std::vector<std::string> s_Preset_print_options {
     "layer_height", "first_layer_height", "perimeters", "spiral_vase", "slice_closing_radius", "slicing_mode",
     "top_solid_layers", "top_solid_min_thickness", "bottom_solid_layers", "bottom_solid_min_thickness",
-    "extra_perimeters", "extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "avoid_curled_filament_during_travels", "avoid_crossing_perimeters", "thin_walls", "overhangs",
+    "extra_perimeters", "extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "avoid_crossing_curled_overhangs", "avoid_crossing_perimeters", "thin_walls", "overhangs",
     "seam_position","staggered_inner_seams", "external_perimeters_first", "fill_density", "fill_pattern", "top_fill_pattern", "bottom_fill_pattern",
     "infill_every_layers", "infill_only_where_needed", "solid_infill_every_layers", "fill_angle", "bridge_angle",
     "solid_infill_below_area", "only_retract_when_crossing_perimeters", "infill_first",
@@ -429,6 +429,7 @@ static std::vector<std::string> s_Preset_print_options {
     "fuzzy_skin", "fuzzy_skin_thickness", "fuzzy_skin_point_dist",
     "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative",
     "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "infill_speed", "solid_infill_speed",
+    "enable_dynamic_overhang_speeds", "dynamic_overhang_speeds", "overhang_overlap_levels",
     "top_solid_infill_speed", "support_material_speed", "support_material_xy_spacing", "support_material_interface_speed",
     "bridge_speed", "gap_fill_speed", "gap_fill_enabled", "travel_speed", "travel_speed_z", "first_layer_speed", "first_layer_speed_over_raft", "perimeter_acceleration", "infill_acceleration",
     "bridge_acceleration", "first_layer_acceleration", "first_layer_acceleration_over_raft", "default_acceleration", "skirts", "skirt_distance", "skirt_height", "draft_shield",
@@ -1215,18 +1216,19 @@ void add_correct_opts_to_diff(const std::string &opt_key, t_config_option_keys& 
 }
 
 // list of options with vector variable, which is independent from number of extruders
-static const std::vector<std::string> independent_from_extruder_number_options = {
+static const std::set<std::string> independent_from_extruder_number_options = {
     "bed_shape",
-    "thumbnails",
+    "compatible_printers",
+    "compatible_prints",
     "filament_ramming_parameters",
     "gcode_substitutions",
-    "compatible_prints",
-    "compatible_printers"
+    "post_process",
+    "thumbnails",
 };
 
 bool PresetCollection::is_independent_from_extruder_number_option(const std::string& opt_key)
 {
-    return std::find(independent_from_extruder_number_options.begin(), independent_from_extruder_number_options.end(), opt_key) != independent_from_extruder_number_options.end();
+    return independent_from_extruder_number_options.find(opt_key) != independent_from_extruder_number_options.end();
 }
 
 // Use deep_diff to correct return of changed options, considering individual options for each extruder.
@@ -1253,6 +1255,7 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
                 case coStrings: add_correct_opts_to_diff<ConfigOptionStrings    >(opt_key, diff, config_other, config_this);  break;
                 case coPercents:add_correct_opts_to_diff<ConfigOptionPercents   >(opt_key, diff, config_other, config_this);  break;
                 case coPoints:  add_correct_opts_to_diff<ConfigOptionPoints     >(opt_key, diff, config_other, config_this);  break;
+                case coFloatsOrPercents:    add_correct_opts_to_diff<ConfigOptionFloatsOrPercents   >(opt_key, diff, config_other, config_this);  break;
                 default:        diff.emplace_back(opt_key);     break;
                 }
             }

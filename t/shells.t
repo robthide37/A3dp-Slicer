@@ -25,6 +25,7 @@ use Slic3r::Test;
     $config->set('solid_infill_speed', 99);
     $config->set('top_solid_infill_speed', 99);
     $config->set('first_layer_speed', '100%');
+    $config->set('enable_dynamic_overhang_speeds', 0);  # prevent speed alteration
     
     my $print = Slic3r::Test::init_print('V', config => $config);
     my %layers_with_solid_infill = ();  # Z => 1
@@ -51,6 +52,7 @@ use Slic3r::Test;
     $config->set('fill_density', 0);
     $config->set('cooling', [ 0 ]);             # prevent speed alteration
     $config->set('first_layer_speed', '100%');  # prevent speed alteration
+    $config->set('enable_dynamic_overhang_speeds', 0);  # prevent speed alteration
     $config->set('layer_height', 0.4);
     $config->set('first_layer_height', $config->layer_height);
     $config->set('extrusion_width', 0.55);
@@ -74,6 +76,7 @@ use Slic3r::Test;
     $config->set('perimeters', 3);
     $config->set('cooling', [ 0 ]);             # prevent speed alteration
     $config->set('first_layer_speed', '100%');  # prevent speed alteration
+    $config->set('enable_dynamic_overhang_speeds', 0);  # prevent speed alteration
     $config->set('layer_height', 0.4);
     $config->set('first_layer_height', $config->layer_height);
     $config->set('bottom_solid_layers', 3);

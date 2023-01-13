@@ -148,7 +148,7 @@ static constexpr const char* MESH_STAT_FACETS_RESERVED      = "facets_reversed";
 static constexpr const char* MESH_STAT_BACKWARDS_EDGES      = "backwards_edges";
 
 // Store / load of TextConfiguration
-static constexpr const char *TEXT_TAG = "emboss";
+static constexpr const char *TEXT_TAG = "slic3rpe:text";
 static constexpr const char *TEXT_DATA_ATTR = "text";
 // TextConfiguration::EmbossStyle
 static constexpr const char *STYLE_NAME_ATTR      = "style_name";
@@ -3628,8 +3628,8 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     float distance = get_attribute_value_float(attributes, num_attributes, DISTANCE_ATTR);
     if (std::fabs(distance) > std::numeric_limits<float>::epsilon())
         fp.distance = distance;
-    std::string use_surface = get_attribute_value_string(attributes, num_attributes, USE_SURFACE_ATTR);
-    if (!use_surface.empty()) fp.use_surface = true;
+    int use_surface = get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR);
+    if (use_surface == 1) fp.use_surface = true;
     float angle = get_attribute_value_float(attributes, num_attributes, ANGLE_ATTR);
     if (std::fabs(angle) > std::numeric_limits<float>::epsilon())
         fp.angle = angle;

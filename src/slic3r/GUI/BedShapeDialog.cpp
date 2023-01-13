@@ -123,8 +123,8 @@ void BedShape::apply_optgroup_values(ConfigOptionsGroupShp optgroup)
         break;
     default:
         // rectangle, convex, concave...
-        optgroup->set_value("rect_size"     , new ConfigOptionPoints{ to_2d(m_build_volume.bounding_volume().size()) });
-        optgroup->set_value("rect_origin"   , new ConfigOptionPoints{ - to_2d(m_build_volume.bounding_volume().min) });
+        optgroup->set_value("rect_size"     , to_2d(m_build_volume.bounding_volume().size()));
+        optgroup->set_value("rect_origin"   , to_2d(-1 * m_build_volume.bounding_volume().min));
     }
 }
 
@@ -425,8 +425,6 @@ void BedShapePanel::set_shape(const ConfigOptionPoints& points)
         m_loaded_shape = points.values;
 
     update_shape();
-
-    return;
 }
 
 void BedShapePanel::update_preview()

@@ -46,7 +46,7 @@ public:
     /// <param name="use_modification">When true cache state will be used for store</param>
     /// <param name="use_modification">When true store activ index into configuration</param>
     /// <returns>True on succes otherwise False.</returns>
-    bool store_styles_to_app_config(bool use_modification = true, bool store_activ_index = true);
+    bool store_styles_to_app_config(bool use_modification = true, bool store_active_index = true);
 
     /// <summary>
     /// Append actual style to style list
@@ -139,7 +139,7 @@ public:
     // Extend font atlas when not in glyph range
     ImFont *get_imgui_font();
     // initialize font range by unique symbols in text
-    ImFont *create_imgui_font(const std::string& text);
+    ImFont *create_imgui_font(const std::string& text, double scale);
     
     // init truncated names of styles
     void init_trunc_names(float max_width);
@@ -185,13 +185,13 @@ public:
     };
 
     // check if exist selected font style in manager
-    bool is_activ_font();
+    bool is_active_font();
 
     // Limits for imgui loaded font size
     // Value out of limits is crop
     static float min_imgui_font_size;
     static float max_imgui_font_size;
-    static float get_imgui_font_size(const FontProp &prop, const Slic3r::Emboss::FontFile &file);
+    static float get_imgui_font_size(const FontProp &prop, const Slic3r::Emboss::FontFile &file, double scale);
 
 private:
     // erase font when not possible to load
@@ -231,11 +231,6 @@ private:
         size_t style_index = std::numeric_limits<size_t>::max();
 
     } m_style_cache;
-            
-    // extend actual imgui font when exist unknown char in text
-    // NOTE: imgui_font has to be unused
-    // return true when extend range otherwise FALSE
-    ImFont *extend_imgui_font_range(size_t font_index, const std::string &text);
 
     void make_unique_name(std::string &name);
 

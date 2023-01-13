@@ -112,7 +112,7 @@ inline double angle(const Eigen::MatrixBase<Derived> &v1, const Eigen::MatrixBas
 template<typename Derived>
 Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> to_2d(const Eigen::MatrixBase<Derived> &ptN) {
     static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) >= 3, "to_2d(): first parameter is not a 3D or higher dimensional vector");
-    return { ptN.x(), ptN.y() };
+    return ptN.template head<2>();
 }
 
 template<typename Derived>
@@ -135,6 +135,14 @@ inline std::string to_string(const Vec3d   &pt) { return std::string("[") + floa
 
 std::vector<Vec3f> transform(const std::vector<Vec3f>& points, const Transform3f& t);
 Pointf3s transform(const Pointf3s& points, const Transform3d& t);
+
+/// <summary>
+/// Check whether transformation matrix contains odd number of mirroring.
+/// NOTE: In code is sometime function named is_left_handed
+/// </summary>
+/// <param name="transform">Transformation to check</param>
+/// <returns>Is positive determinant</returns>
+inline bool has_reflection(const Transform3d &transform) { return transform.matrix().determinant() < 0; }
 
 template<int N, class T> using Vec = Eigen::Matrix<T,  N, 1, Eigen::DontAlign, N, 1>;
 
@@ -268,7 +276,7 @@ inline bool has_duplicate_successive_points_closed(const std::vector<Point> &pts
 }
 
 // Collect adjecent(duplicit points)
-Points collect_duplications(Points pts /* Copy */);
+Points collect_duplicates(Points pts /* Copy */);
 
 inline bool shorter_then(const Point& p0, const coord_t len)
 {

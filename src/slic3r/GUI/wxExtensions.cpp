@@ -416,7 +416,7 @@ static int scale()
 }
 #endif // __WXGTK2__
 
-wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name_in, int px_cnt/* = 16*/)
+wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name_in, int px_cnt/* = 16*/, const std::string& new_color/* = std::string()*/)
 {
 #ifdef __WXGTK2__
     px_cnt *= scale();
@@ -428,7 +428,7 @@ wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name_in, int px_cnt/* = 16
     boost::replace_last(bmp_name, ".png", "");
 
     // Try loading an SVG first, then PNG if SVG is not found:
-    wxBitmapBundle* bmp = cache.from_svg(bmp_name, px_cnt, px_cnt, Slic3r::GUI::wxGetApp().dark_mode());
+    wxBitmapBundle* bmp = cache.from_svg(bmp_name, px_cnt, px_cnt, Slic3r::GUI::wxGetApp().dark_mode(), new_color);
     if (bmp == nullptr) {
         bmp = cache.from_png(bmp_name, px_cnt, px_cnt);
         if (!bmp)
@@ -655,6 +655,17 @@ ModeButton::ModeButton( wxWindow*           parent,
     Init(mode);
 }
 
+ModeButton::ModeButton( wxWindow*           parent,
+                        int                 mode_id,/*ConfigOptionMode*/
+                        const wxString&     mode /*= wxEmptyString*/,
+                        int                 px_cnt /*= = 16*/) :
+    ScalableButton(parent, wxID_ANY, "", mode, wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT, px_cnt),
+    m_mode_id(mode_id)
+{
+    update_bitmap();
+    Init(mode);
+}
+
 void ModeButton::Init(const wxString &mode)
 {
     std::string mode_str = std::string(mode.ToUTF8());
@@ -684,6 +695,15 @@ void ModeButton::SetState(const bool state)
     SetToolTip(state ? m_tt_selected : m_tt_focused);
 }
 
+void ModeButton::update_bitmap()
+{
+    m_bmp = *get_bmp_bundle("mode", m_px_cnt, Slic3r::GUI::wxGetApp().get_mode_btn_color(m_mode_id));
+
+    SetBitmap(m_bmp);
+    SetBitmapCurrent(m_bmp);
+    SetBitmapPressed(m_bmp);
+}
+
 void ModeButton::focus_button(const bool focus)
 {
     const wxFont& new_font = focus ? 
@@ -709,6 +729,12 @@ void ModeButton::focus_button(const bool focus)
     Update();
 }
 
+void ModeButton::sys_color_changed()
+{
+    Slic3r::GUI::wxGetApp().UpdateDarkUI(this, m_has_border);
+    update_bitmap();
+}
+
 
 // ----------------------------------------------------------------------------
 // ModeSizer
@@ -721,21 +747,15 @@ ModeSizer::ModeSizer(wxWindow *parent, int hgap/* = 0*/) :
 {
     SetFlexibleDirection(wxHORIZONTAL);
 
-    std::vector < std::pair < wxString, std::string >> buttons = {
-        {_(L("Simple")),    "mode_simple"},
-//        {_(L("Advanced")),  "mode_advanced"},
-        {_CTX(L_CONTEXT("Advanced", "Mode"), "Mode"), "mode_advanced"},
-        {_(L("Expert")),    "mode_expert"},
-    };
-
     auto modebtnfn = [](wxCommandEvent &event, int mode_id) {
         Slic3r::GUI::wxGetApp().save_mode(mode_id);
         event.Skip();
     };
     
     m_mode_btns.reserve(3);
-    for (const auto& button : buttons) {
-        m_mode_btns.push_back(new ModeButton(parent, button.first, button.second, mode_icon_px_size()));
+    int mode_id = 0;
+    for (const wxString& label : {_L("Simple"), _CTX(L_CONTEXT("Advanced", "Mode"), "Mode"),_L("Expert")}) {
+        m_mode_btns.push_back(new ModeButton(parent, mode_id++, label, mode_icon_px_size()));
 
         m_mode_btns.back()->Bind(wxEVT_BUTTON, std::bind(modebtnfn, std::placeholders::_1, int(m_mode_btns.size() - 1)));
         Add(m_mode_btns.back());
@@ -762,8 +782,14 @@ void ModeSizer::set_items_border(int border)
 
 void ModeSizer::sys_color_changed()
 {
-    for (size_t m = 0; m < m_mode_btns.size(); m++)
-        m_mode_btns[m]->sys_color_changed();
+    for (ModeButton* btn : m_mode_btns)
+        btn->sys_color_changed();
+}
+
+void ModeSizer::update_mode_markers()
+{
+    for (ModeButton* btn : m_mode_btns)
+        btn->update_bitmap();
 }
 
 // ----------------------------------------------------------------------------

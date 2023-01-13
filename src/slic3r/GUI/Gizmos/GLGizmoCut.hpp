@@ -73,6 +73,7 @@ class GLGizmoCut3D : public GLGizmoBase
     GLModel m_angle_arc;
 
     Vec3d   m_old_center;
+    Vec3d   m_cut_normal;
 
     struct InvalidConnectorsStatistics
     {
@@ -96,7 +97,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
     bool m_hide_cut_plane{ false };
     bool m_connectors_editing{ false };
-    bool m_cut_plane_as_circle{ true };
+    bool m_cut_plane_as_circle{ false };
 
     float m_connector_depth_ratio{ 3.f };
     float m_connector_size{ 2.5f };
@@ -110,7 +111,9 @@ class GLGizmoCut3D : public GLGizmoBase
     bool  force_update_clipper_on_render{false};
 
     float m_contour_width{ 0.4f };
+    float m_cut_plane_radius_koef{ 1.5f };
     bool  m_is_contour_changed{ false };
+    float m_shortcut_label_width{ -1.f };
 
     mutable std::vector<bool> m_selected; // which pins are currently selected
     int  m_selected_count{ 0 };
@@ -155,11 +158,12 @@ public:
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
     std::string get_tooltip() const override;
-    bool unproject_on_cut_plane(const Vec2d& mouse_pos, std::pair<Vec3d, Vec3d>& pos_and_normal, Vec3d& pos_world);
+    bool unproject_on_cut_plane(const Vec2d& mouse_pos, Vec3d& pos, Vec3d& pos_world);
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
     bool is_in_editing_mode() const override { return m_connectors_editing; }
     bool is_selection_rectangle_dragging() const override { return m_selection_rectangle.is_dragging(); }
+    bool is_looking_forward() const;
 
     /// <summary>
     /// Drag of plane
@@ -197,7 +201,7 @@ protected:
     void               on_stop_dragging() override;
     void               on_render() override;
 
-    void render_debug_input_window();
+    void render_debug_input_window(float x);
     void adjust_window_position(float x, float y, float bottom_limit);
     void unselect_all_connectors();
     void select_all_connectors();
@@ -239,6 +243,7 @@ private:
     bool render_reset_button(const std::string& label_id, const std::string& tooltip) const;
     bool render_connect_type_radio_button(CutConnectorType type);
     Transform3d get_volume_transformation(const ModelVolume* volume) const;
+    bool is_outside_of_cut_contour(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos);
     bool is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos);
     void render_connectors();
 

@@ -130,6 +130,18 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
 			val = boost::any_cast<double>(value);
 			break;
 		}
+		case coFloatsOrPercents:{
+			std::string str = boost::any_cast<std::string>(value);
+			bool percent = false;
+			if (str.back() == '%') {
+				str.pop_back();
+				percent = true;
+			}
+            double val = std::stod(str); // locale-dependent (on purpose - the input is the actual content of the field)
+			ConfigOptionFloatsOrPercents* vec_new = new ConfigOptionFloatsOrPercents({ {val, percent} });
+			config.option<ConfigOptionFloatsOrPercents>(opt_key)->set_at(vec_new, opt_index, opt_index);
+			break;
+		}
 		case coPercents:{
 			ConfigOptionPercents* vec_new = new ConfigOptionPercents{ boost::any_cast<double>(value) };
 			config.option<ConfigOptionPercents>(opt_key)->set_at(vec_new, opt_index, opt_index);

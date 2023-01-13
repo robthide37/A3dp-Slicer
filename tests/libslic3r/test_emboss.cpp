@@ -201,7 +201,7 @@ ExPolygons heal_and_check(const Polygons &polygons)
 {
     Pointfs intersections_prev = intersection_points(polygons);
     Points  polygons_points    = to_points(polygons);
-    Points  duplicits_prev     = collect_duplications(polygons_points);
+    Points  duplicits_prev     = collect_duplicates(polygons_points);
 
     ExPolygons shape = Emboss::heal_shape(polygons);
 
@@ -215,7 +215,7 @@ ExPolygons heal_and_check(const Polygons &polygons)
 
     Pointfs intersections = intersection_points(shape);
     Points  shape_points  = to_points(shape);
-    Points  duplicits     = collect_duplications(shape_points);
+    Points  duplicits     = collect_duplicates(shape_points);
     //{
     //    BoundingBox bb(polygons_points);
     //    // bb.scale(svg_scale);
@@ -377,22 +377,30 @@ TEST_CASE("triangle intersection", "[]")
     CHECK(abs(i.y() - 1.) < std::numeric_limits<double>::epsilon());
 }
 
-#ifndef __APPLE__
+
+
+#if defined _WIN32
+#define FONT_DIR_PATH "C:/Windows/Fonts";
+#endif
+//#elif defined __linux__
+//#define FONT_DIR_PATH "/usr/share/fonts";
+//#elif defined __APPLE__
+//#define FONT_DIR_PATH "//System/Library/Fonts";
+//#endif
+
+#ifdef FONT_DIR_PATH
 #include <string>
 #include <iostream>
-#include <filesystem>
-namespace fs = std::filesystem;
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
+//#include <filesystem>
+//namespace fs = std::filesystem;
 // Check function Emboss::is_italic that exist some italic and some non-italic font.
 TEST_CASE("Italic check", "[Emboss]") 
 {  
+    std::string dir_path = FONT_DIR_PATH;
     std::queue<std::string> dir_paths;
-#ifdef _WIN32
-    dir_paths.push("C:/Windows/Fonts");
-#elif defined(__linux__)
-    dir_paths.push("/usr/share/fonts");
-//#elif defined(__APPLE__)
-//    dir_paths.push("//System/Library/Fonts");
-#endif
+    dir_paths.push(dir_path);
     bool exist_italic = false;
     bool exist_non_italic = false;
     while (!dir_paths.empty()) {
@@ -400,15 +408,15 @@ TEST_CASE("Italic check", "[Emboss]")
         dir_paths.pop();
         for (const auto &entry : fs::directory_iterator(dir_path)) {
             const fs::path &act_path = entry.path();
-            if (entry.is_directory()) {
-                dir_paths.push(act_path.u8string());
+            if (fs::is_directory(entry)) {
+                dir_paths.push(act_path.string());
                 continue;
             }
-            std::string ext = act_path.extension().u8string();
+            std::string ext = act_path.extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
                            [](unsigned char c) { return std::tolower(c); });
             if (ext != ".ttf") continue;
-            std::string path_str = act_path.u8string();
+            std::string path_str = act_path.string();
             auto        font_opt = Emboss::create_font_file(path_str.c_str());
             if (font_opt == nullptr) continue;
 
@@ -425,7 +433,7 @@ TEST_CASE("Italic check", "[Emboss]")
     CHECK(exist_italic);
     CHECK(exist_non_italic);
 }
-#endif // not __APPLE__
+#endif // FONT_DIR_PATH
 
 #include "libslic3r/CutSurface.hpp"
 TEST_CASE("Cut surface", "[]")

@@ -15,6 +15,7 @@
 #include "libslic3r/TriangleMeshSlicer.hpp"
 
 #include "imgui/imgui_internal.h"
+#include "slic3r/GUI/MsgDialog.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -30,6 +31,7 @@ static const ColorRGBA SELECTED_PLAG_COLOR  = ColorRGBA::GRAY();
 static const ColorRGBA SELECTED_DOWEL_COLOR = ColorRGBA::DARK_GRAY();
 static const ColorRGBA CONNECTOR_DEF_COLOR  = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
 static const ColorRGBA CONNECTOR_ERR_COLOR  = ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f);
+static const ColorRGBA HOVERED_ERR_COLOR    = ColorRGBA(1.0f, 0.3f, 0.3f, 1.0f);
 
 const unsigned int AngleResolution = 64;
 const unsigned int ScaleStepsCount = 72;
@@ -359,10 +361,19 @@ void GLGizmoCut3D::put_connectors_on_cut_plane(const Vec3d& cp_normal, double cp
     }
 }
 
+// returns true if the camera (forward) is pointing in the negative direction of the cut normal
+bool GLGizmoCut3D::is_looking_forward() const
+{
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    const double dot = camera.get_dir_forward().dot(m_cut_normal);
+    return dot < 0.05;
+}
+
 void GLGizmoCut3D::update_clipper()
 {
     BoundingBoxf3 box = bounding_box();
 
+    // update cut_normal
     Vec3d beg, end = beg = m_plane_center;
     beg[Z] = box.center().z() - m_radius;
     end[Z] = box.center().z() + m_radius;
@@ -370,14 +381,29 @@ void GLGizmoCut3D::update_clipper()
     rotate_vec3d_around_plane_center(beg);
     rotate_vec3d_around_plane_center(end);
 
-    double dist = (m_plane_center - beg).norm();
+    // calculate normal for cut plane
+    Vec3d normal = m_cut_normal = end - beg;
+    m_cut_normal.normalize();
+
+    if (!is_looking_forward()) {
+        end = beg = m_plane_center;
+        beg[Z] = box.center().z() + m_radius;
+        end[Z] = box.center().z() - m_radius;
+
+        rotate_vec3d_around_plane_center(beg);
+        rotate_vec3d_around_plane_center(end);
+
+        // recalculate normal for clipping plane, if camera is looking downward to cut plane
+        normal = end - beg;
+        if (normal == Vec3d::Zero())
+            return;
+    }
 
     // calculate normal and offset for clipping plane
-    Vec3d normal = end - beg;
-    if (normal == Vec3d::Zero())
-        return;
+    double dist = (m_plane_center - beg).norm();
     dist = std::clamp(dist, 0.0001, normal.norm());
     normal.normalize();
+    m_clp_normal = normal;
     const double offset = normal.dot(beg) + dist;
 
     m_c->object_clipper()->set_range_and_pos(normal, offset, dist);
@@ -888,7 +914,7 @@ void GLGizmoCut3D::on_register_raycasters_for_picking()
                 m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i + m_connectors_group_id, *(m_shapes[connectors[i].attribs]).mesh_raycaster, Transform3d::Identity()));
         }
     }
-    else {
+    else if (!cut_line_processing()) {
         m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, X, *m_cone.mesh_raycaster, Transform3d::Identity()));
         m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, X, *m_cone.mesh_raycaster, Transform3d::Identity()));
 
@@ -949,9 +975,6 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
         const Vec3d& instance_offset = mo->instances[inst_id]->get_offset();
         const double sla_shift = double(m_c->selection_info()->get_sla_shift());
 
-        const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
-        const Vec3d& normal = cp && cp->is_active() ? cp->get_normal() : m_clp_normal;
-
         for (size_t i = 0; i < connectors.size(); ++i) {
             const CutConnector& connector = connectors[i];
 
@@ -960,7 +983,7 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             Vec3d pos = connector.pos + instance_offset;
             if (connector.attribs.type == CutConnectorType::Dowel &&
                 connector.attribs.style == CutConnectorStyle::Prizm) {
-                pos -= height * normal;
+                pos -= height * m_clp_normal;
                 height *= 2;
             }
             pos[Z] += sla_shift;
@@ -969,7 +992,7 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             m_raycasters[i]->set_transform(translation_transform(pos) * m_rotation_m * scale_trafo);
         }
     }
-    else {
+    else if (!cut_line_processing()){
         const Transform3d trafo = translation_transform(m_plane_center) * m_rotation_m;
 
         const BoundingBoxf3 box = bounding_box();
@@ -1144,11 +1167,11 @@ void GLGizmoCut3D::dragging_grabber_xy(const GLGizmoBase::UpdateData &data)
 void GLGizmoCut3D::dragging_connector(const GLGizmoBase::UpdateData &data)
 {
     CutConnectors&          connectors = m_c->selection_info()->model_object()->cut_connectors;
-    std::pair<Vec3d, Vec3d> pos_and_normal;
+    Vec3d                   pos;
     Vec3d                   pos_world;
 
-    if (unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos_and_normal, pos_world)) {
-        connectors[m_hover_id - m_connectors_group_id].pos = pos_and_normal.first;
+    if (unproject_on_cut_plane(data.mouse_pos.cast<double>(), pos, pos_world)) {
+        connectors[m_hover_id - m_connectors_group_id].pos = pos;
         update_raycasters_for_picking_transform();
     }
 }
@@ -1354,10 +1377,14 @@ void GLGizmoCut3D::init_rendering_items()
         init_from_angle_arc(m_angle_arc, m_angle, m_grabber_connection_len);
 
     if (!m_plane.is_initialized() && !m_hide_cut_plane && !m_connectors_editing) {
+#if 1
+        m_plane.init_from(its_make_frustum_dowel((double)m_cut_plane_radius_koef * m_radius, 0.3, m_cut_plane_as_circle ? 180 : 4));
+#else
         if (m_cut_plane_as_circle)
             m_plane.init_from(its_make_frustum_dowel(2. * m_radius, 0.3, 180));
         else
             m_plane.init_from(its_make_square_plane(float(m_radius)));
+#endif
     }
 }
 
@@ -1376,6 +1403,8 @@ void GLGizmoCut3D::on_render()
         update_clipper_on_render();
         m_c->object_clipper()->set_behavior(m_connectors_editing, m_connectors_editing, 0.4);
     }
+    else
+        update_clipper();
 
     init_picking_models();
 
@@ -1395,9 +1424,14 @@ void GLGizmoCut3D::on_render()
     m_selection_rectangle.render(m_parent);
 }
 
-void GLGizmoCut3D::render_debug_input_window()
+void GLGizmoCut3D::render_debug_input_window(float x)
 {
+    return;
     m_imgui->begin(wxString("DEBUG"));
+
+    ImVec2 pos = ImGui::GetWindowPos();
+    pos.x = x;
+    ImGui::SetWindowPos(pos, ImGuiCond_Always);
 /*
     static bool  hide_clipped  = false;
     static bool  fill_cut      = false;
@@ -1410,10 +1444,18 @@ void GLGizmoCut3D::render_debug_input_window()
     m_imgui->slider_float("contour_width", &contour_width, 0.f, 3.f);
     if (auto oc = m_c->object_clipper())
         oc->set_behavior(hide_clipped || m_connectors_editing, fill_cut || m_connectors_editing, double(contour_width));
+*/
+    ImGui::PushItemWidth(0.5f * m_label_width);
+    if (auto oc = m_c->object_clipper(); oc && m_imgui->slider_float("contour_width", &m_contour_width, 0.f, 3.f))
+        oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
 
     ImGui::Separator();
-*/
+
     if (m_imgui->checkbox(_L("Render cut plane as circle"), m_cut_plane_as_circle))
+        m_plane.reset();
+
+    ImGui::PushItemWidth(0.5f * m_label_width);
+    if (m_imgui->slider_float("cut_plane_radius_koef", &m_cut_plane_radius_koef, 1.f, 2.f))
         m_plane.reset();
 
     m_imgui->end();
@@ -1457,10 +1499,19 @@ void GLGizmoCut3D::render_shortcuts()
     if (m_imgui->button("? " + (m_show_shortcuts ? wxString(ImGui::CollapseBtn) : wxString(ImGui::ExpandBtn))))
         m_show_shortcuts = !m_show_shortcuts;
 
+    if (m_shortcut_label_width < 0.f) {
+        for (const auto& shortcut : m_shortcuts) {
+            const float width = m_imgui->calc_text_size(shortcut.first).x;
+            if (m_shortcut_label_width < width)
+                m_shortcut_label_width = width;
+        }
+        m_shortcut_label_width += +m_imgui->scaled(1.f);
+    }
+
     if (m_show_shortcuts)
         for (const auto&shortcut : m_shortcuts ){
             m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, shortcut.first);
-            ImGui::SameLine(m_label_width);
+            ImGui::SameLine(m_shortcut_label_width);
             m_imgui->text(shortcut.second);
         }
 }
@@ -1534,7 +1585,6 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     ImGui::Separator();
 
     if (m_imgui->button(_L("Confirm connectors"))) {
-        m_clp_normal = m_c->object_clipper()->get_clipping_plane()->get_normal();
         unselect_all_connectors();
         set_connectors_editing(false);
     }
@@ -1542,7 +1592,6 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     ImGui::SameLine(2.75f * m_label_width);
 
     if (m_imgui->button(_L("Cancel"))) {
-        m_clp_normal = m_c->object_clipper()->get_clipping_plane()->get_normal();
         reset_connectors();
         set_connectors_editing(false);
     }
@@ -1602,8 +1651,8 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGui::AlignTextToFramePadding();
         m_imgui->text(wxString(ImGui::InfoMarkerSmall));
         ImGui::SameLine();
-        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Hold SHIFT key and connect some two points of an object to cut by line"));
-
+        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, 
+                              get_wraped_wxString(_L("Hold SHIFT key and connect some two points of an object to cut by line"), 40));
         ImGui::Separator();
 
         render_build_size();
@@ -1620,13 +1669,6 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
             reset_cut_plane();
         m_imgui->disabled_end();
 
-        ImGui::SameLine(2.25f * m_label_width);
-        ImGui::PushItemWidth(0.75f * m_label_width);
-        m_is_contour_changed = m_imgui->slider_float("contour width", &m_contour_width, 0.f, 3.f);
-
-        if (auto oc = m_c->object_clipper(); oc && m_is_contour_changed)
-            oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
-
         m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
             if (m_imgui->button(_L("Add/Edit connectors")))
                 set_connectors_editing(true);
@@ -1634,18 +1676,25 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
         ImGui::Separator();
 
-        auto render_part_action_line = [this, connectors](const wxString& label, const wxString& suffix, bool& keep_part, bool& place_on_cut_part, bool& rotate_part) {
+        float label_width = 0;
+        for (const wxString& label : {_L("Upper part"), _L("Lower part")}) {
+            const float width = m_imgui->calc_text_size(label).x + m_imgui->scaled(1.5f);
+            if (label_width < width)
+                label_width = width;
+        }
+        
+        auto render_part_action_line = [this, label_width, connectors](const wxString& label, const wxString& suffix, bool& keep_part, bool& place_on_cut_part, bool& rotate_part) {
             bool keep = true;
             ImGui::AlignTextToFramePadding();
             m_imgui->text(label);
 
-            ImGui::SameLine(m_label_width);
+            ImGui::SameLine(label_width);
 
             m_imgui->disabled_begin(!connectors.empty());
                 m_imgui->checkbox(_L("Keep") + suffix, connectors.empty() ? keep_part : keep);
             m_imgui->disabled_end();
 
-            ImGui::SameLine(2 * m_label_width);
+            ImGui::SameLine();
 
             m_imgui->disabled_begin(!keep_part);
                 if (m_imgui->checkbox(_L("Place on cut") + suffix, place_on_cut_part))
@@ -1789,7 +1838,8 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 
     m_imgui->end();
 
-    render_debug_input_window();
+    if (!m_connectors_editing) // connectors mode
+        render_debug_input_window(x);
 }
 
 // get volume transformation regarding to the "border". Border is related from the size of connectors
@@ -1824,7 +1874,7 @@ Transform3d GLGizmoCut3D::get_volume_transformation(const ModelVolume* volume) c
     return translation_transform(offset) * scale_transform(Vec3d::Ones() - border_scale) * vol_matrix;
 }
 
-bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
+bool GLGizmoCut3D::is_outside_of_cut_contour(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
 {
     // check if connector pos is out of clipping plane
     if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(cur_pos)) {
@@ -1832,16 +1882,54 @@ bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& co
         return true;
     }
 
+    // check if connector bottom contour is out of clipping plane
     const CutConnector& cur_connector = connectors[idx];
+    const CutConnectorShape shape = CutConnectorShape(cur_connector.attribs.shape);
+    const int   sectorCount = shape == CutConnectorShape::Triangle  ? 3 :
+                              shape == CutConnectorShape::Square    ? 4 :
+                              shape == CutConnectorShape::Circle    ? 60: // supposably, 60 points are enough for conflict detection
+                              shape == CutConnectorShape::Hexagon   ? 6 : 1 ;
+
+    indexed_triangle_set mesh;
+    auto& vertices = mesh.vertices;
+    vertices.reserve(sectorCount + 1);
+
+    float fa = 2 * PI / sectorCount;
+    auto vec = Eigen::Vector2f(0, cur_connector.radius);
+    for (float angle = 0; angle < 2.f * PI; angle += fa) {
+        Vec2f p = Eigen::Rotation2Df(angle) * vec;
+        vertices.emplace_back(Vec3f(p(0), p(1), 0.f));
+    }
+    its_transform(mesh, translation_transform(cur_pos) * m_rotation_m);
+
+    for (auto vertex : vertices) {
+        if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(vertex.cast<double>())) {
+            m_info_stats.outside_cut_contour++;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
+{
+    if (is_outside_of_cut_contour(idx, connectors, cur_pos))
+        return true;
+
+    const CutConnector& cur_connector = connectors[idx];    
+
     const Transform3d matrix = translation_transform(cur_pos) * m_rotation_m *
                                scale_transform(Vec3f(cur_connector.radius, cur_connector.radius, cur_connector.height).cast<double>());
     const BoundingBoxf3 cur_tbb = m_shapes[cur_connector.attribs].model.get_bounding_box().transformed(matrix);
 
+    // check if connector's bounding box is inside the object's bounding box
     if (!bounding_box().contains(cur_tbb)) {
         m_info_stats.outside_bb++;
         return true;
     }
 
+    // check if connectors are overlapping 
     for (size_t i = 0; i < connectors.size(); ++i) {
         if (i == idx)
             continue;
@@ -1881,9 +1969,6 @@ void GLGizmoCut3D::render_connectors()
     const Vec3d& instance_offset = mi->get_offset();
     const double sla_shift       = double(m_c->selection_info()->get_sla_shift());
 
-    const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane();
-    const Vec3d& normal = cp && cp->is_active() ? cp->get_normal() : m_clp_normal;
-
     m_has_invalid_connector = false;
     m_info_stats.invalidate();
 
@@ -1895,7 +1980,8 @@ void GLGizmoCut3D::render_connectors()
         Vec3d pos = connector.pos + instance_offset + sla_shift * Vec3d::UnitZ();
 
         // First decide about the color of the point.
-        if (is_conflict_for_connector(i, connectors, pos)) {
+        const bool conflict_connector = is_conflict_for_connector(i, connectors, pos);
+        if (conflict_connector) {
             m_has_invalid_connector = true;
             render_color = CONNECTOR_ERR_COLOR;
         }
@@ -1905,16 +1991,23 @@ void GLGizmoCut3D::render_connectors()
         if (!m_connectors_editing)
             render_color = CONNECTOR_ERR_COLOR;
         else if (size_t(m_hover_id - m_connectors_group_id) == i)
-            render_color = connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR  : HOVERED_PLAG_COLOR;
+            render_color = conflict_connector ? HOVERED_ERR_COLOR :
+                           connector.attribs.type == CutConnectorType::Dowel ? HOVERED_DOWEL_COLOR  : HOVERED_PLAG_COLOR;
         else if (m_selected[i])
             render_color = connector.attribs.type == CutConnectorType::Dowel ? SELECTED_DOWEL_COLOR : SELECTED_PLAG_COLOR;
 
         const Camera& camera = wxGetApp().plater()->get_camera();
         if (connector.attribs.type  == CutConnectorType::Dowel &&
             connector.attribs.style == CutConnectorStyle::Prizm) {
-            pos -= height * normal;
+            if (is_looking_forward())
+                pos -= height * m_clp_normal;
+            else
+                pos += height * m_clp_normal;
             height *= 2;
         }
+        else if (!is_looking_forward())
+            pos += 0.05 * m_clp_normal;
+
         const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(pos) * m_rotation_m * 
                                               scale_transform(Vec3f(connector.radius, connector.radius, height).cast<double>());
 
@@ -2004,44 +2097,41 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
 // Unprojects the mouse position on the mesh and saves hit point and normal of the facet into pos_and_normal
 // Return false if no intersection was found, true otherwise.
-bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, std::pair<Vec3d, Vec3d>& pos_and_normal, Vec3d& pos_world)
+bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& pos, Vec3d& pos_world)
 {
     const float sla_shift = m_c->selection_info()->get_sla_shift();
 
     const ModelObject* mo = m_c->selection_info()->model_object();
     const ModelInstance* mi = mo->instances[m_c->selection_info()->get_active_instance()];
-    const Transform3d    instance_trafo = sla_shift > 0.f ? 
-        translation_transform(sla_shift * Vec3d::UnitZ()) * mi->get_transformation().get_matrix() : mi->get_transformation().get_matrix();
     const Camera& camera = wxGetApp().plater()->get_camera();
 
-    int mesh_id = -1;
-    for (const ModelVolume* mv : mo->volumes) {
-        ++mesh_id;
-        if (!mv->is_model_part())
-            continue;
-        Vec3f normal;
-        Vec3f hit;
-        bool clipping_plane_was_hit = false;
+    // Calculate intersection with the clipping plane.
+    const ClippingPlane* cp = m_c->object_clipper()->get_clipping_plane(true);
+    Vec3d point;
+    Vec3d direction;
+    Vec3d hit;
+    MeshRaycaster::line_from_mouse_pos(mouse_position, Transform3d::Identity(), camera, point, direction);
+    Vec3d normal = -cp->get_normal().cast<double>();
+    double den = normal.dot(direction);
+    if (den != 0.) {
+        double t = (-cp->get_offset() - normal.dot(point))/den;
+        hit = (point + t * direction);
+    } else
+        return false;
+    
+    if (! m_c->object_clipper()->is_projection_inside_cut(hit))
+        return false;
 
-//        const Transform3d volume_trafo = get_volume_transformation(mv);
-        const Transform3d volume_trafo = mv->get_transformation().get_matrix();
+    // recalculate hit to object's local position
+    Vec3d hit_d = hit;
+    hit_d -= mi->get_offset();
+    hit_d[Z] -= sla_shift;
 
-        m_c->raycaster()->raycasters()[mesh_id]->unproject_on_mesh(mouse_position, instance_trafo * volume_trafo,
-            camera, hit, normal, m_c->object_clipper()->get_clipping_plane(true),
-            nullptr, &clipping_plane_was_hit);
-        if (clipping_plane_was_hit) {
-            // recalculate hit to object's local position
-            Vec3d hit_d = hit.cast<double>();
-            hit_d -= mi->get_offset();
-            hit_d[Z] -= sla_shift;
+    // Return both the point and the facet normal.
+    pos = hit_d;
+    pos_world = hit;
 
-            // Return both the point and the facet normal.
-            pos_and_normal = std::make_pair(hit_d, normal.cast<double>());
-            pos_world = hit.cast<double>();
-            return true;
-        }
-    }
-    return false;
+    return true; 
 }
 
 void GLGizmoCut3D::clear_selection()
@@ -2137,17 +2227,13 @@ bool GLGizmoCut3D::add_connector(CutConnectors& connectors, const Vec2d& mouse_p
     if (!m_connectors_editing)
         return false;
 
-    std::pair<Vec3d, Vec3d> pos_and_normal;
+    Vec3d pos;
     Vec3d pos_world;
-    if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
-        // check if pos is out of enabled clipping plane
-        if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(pos_world))
-            return true;
-
+    if (unproject_on_cut_plane(mouse_position.cast<double>(), pos, pos_world)) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Add connector"), UndoRedo::SnapshotType::GizmoAction);
         unselect_all_connectors();
 
-        connectors.emplace_back(pos_and_normal.first, m_rotation_m,
+        connectors.emplace_back(pos, m_rotation_m,
                                 m_connector_size * 0.5f, m_connector_depth_ratio,
                                 m_connector_size_tolerance, m_connector_depth_ratio_tolerance,
                                 CutConnectorAttributes( CutConnectorType(m_connector_type),
@@ -2235,19 +2321,22 @@ void GLGizmoCut3D::process_selection_rectangle(CutConnectors &connectors)
 
 bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
-    if (is_dragging() || m_connector_mode == CutConnectorMode::Auto || (!m_keep_upper || !m_keep_lower))
+    if (is_dragging() || m_connector_mode == CutConnectorMode::Auto)
         return false;
 
     if ( m_hover_id < 0 && shift_down &&  ! m_connectors_editing &&
         (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::LeftUp || action == SLAGizmoEventType::Moving) )
         return process_cut_line(action, mouse_position);
 
+    if (!m_keep_upper || !m_keep_lower)
+        return false;
+
     if (!m_connectors_editing) {
         if (0 && action == SLAGizmoEventType::LeftDown) {
             // disable / enable current contour
-            std::pair<Vec3d, Vec3d> pos_and_normal;
+            Vec3d pos;
             Vec3d pos_world;
-            if (unproject_on_cut_plane(mouse_position.cast<double>(), pos_and_normal, pos_world)) {
+            if (unproject_on_cut_plane(mouse_position.cast<double>(), pos, pos_world)) {
                 // Following would inform the clipper about the mouse click, so it can
                 // toggle the respective contour as disabled.
                 m_c->object_clipper()->pass_mouse_click(pos_world);

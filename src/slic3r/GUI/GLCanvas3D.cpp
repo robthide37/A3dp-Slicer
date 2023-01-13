@@ -81,6 +81,11 @@ static const Slic3r::ColorRGBA ERROR_BG_LIGHT_COLOR   = { 0.753f, 0.192f, 0.039f
 // Number of floats
 static constexpr const size_t MAX_VERTEX_BUFFER_SIZE     = 131072 * 6; // 3.15MB
 
+#define SHOW_IMGUI_DEMO_WINDOW
+#ifdef SHOW_IMGUI_DEMO_WINDOW
+static bool show_imgui_demo_window = false;
+#endif // SHOW_IMGUI_DEMO_WINDOW
+
 namespace Slic3r {
 namespace GUI {
 
@@ -1498,6 +1503,10 @@ void GLCanvas3D::render()
         }
 #endif // ENABLE_RAYCAST_PICKING_DEBUG
     }
+    
+#ifdef SHOW_IMGUI_DEMO_WINDOW
+    if (show_imgui_demo_window) ImGui::ShowDemoWindow();
+#endif // SHOW_IMGUI_DEMO_WINDOW    
 
     const bool is_looking_downward = camera.is_looking_downward();
 
@@ -1746,7 +1755,20 @@ std::vector<int> GLCanvas3D::load_object(const Model& model, int obj_idx)
 
 void GLCanvas3D::mirror_selection(Axis axis)
 {
+#if ENABLE_WORLD_COORDINATE
+    TransformationType transformation_type;
+    if (wxGetApp().obj_manipul()->is_local_coordinates())
+        transformation_type.set_local();
+    else if (wxGetApp().obj_manipul()->is_instance_coordinates())
+        transformation_type.set_instance();
+
+    transformation_type.set_relative();
+
+    m_selection.setup_cache();
+    m_selection.mirror(axis, transformation_type);
+#else
     m_selection.mirror(axis);
+#endif // ENABLE_WORLD_COORDINATE
     do_mirror(L("Mirror Object"));
     wxGetApp().obj_manipul()->set_dirty();
 }
@@ -2231,10 +2253,11 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
     if (!m_initialized)
         return;
 
-    // see include/wx/defs.h enum wxKeyCode
-    int keyCode = evt.GetKeyCode();
-    int ctrlMask = wxMOD_CONTROL;
-    int shiftMask = wxMOD_SHIFT;
+#ifdef SHOW_IMGUI_DEMO_WINDOW
+    static int cur = 0;
+    if (wxString("demo")[cur] == evt.GetUnicodeKey()) ++cur; else cur = 0;
+    if (cur == 4) { show_imgui_demo_window = !show_imgui_demo_window; cur = 0;}
+#endif // SHOW_IMGUI_DEMO_WINDOW
 
     auto imgui = wxGetApp().imgui();
     if (imgui->update_key_data(evt)) {
@@ -2242,6 +2265,10 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
         return;
     }
 
+    // see include/wx/defs.h enum wxKeyCode
+    int keyCode = evt.GetKeyCode();
+    int ctrlMask = wxMOD_CONTROL;
+    int shiftMask = wxMOD_SHIFT;
     if (keyCode == WXK_ESCAPE && (_deactivate_undo_redo_toolbar_items() || _deactivate_search_toolbar_item() || _deactivate_arrange_menu()))
         return;
 
@@ -3299,20 +3326,27 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         evt.Skip();
 
     // Detection of doubleclick on text to open emboss edit window
-    if (evt.LeftDClick() && m_gizmos.get_current() == nullptr && !m_hover_volume_idxs.empty()) { 
+    auto type = m_gizmos.get_current_type();
+    if (evt.LeftDClick() && !m_hover_volume_idxs.empty() && 
+        (type == GLGizmosManager::EType::Undefined ||
+         type == GLGizmosManager::EType::Move ||
+         type == GLGizmosManager::EType::Rotate ||
+         type == GLGizmosManager::EType::Scale ||
+         type == GLGizmosManager::EType::Emboss) ) {
         for (int hover_volume_id : m_hover_volume_idxs) { 
             const GLVolume &hover_gl_volume = *m_volumes.volumes[hover_volume_id];
-            const ModelObject* hover_object = m_model->objects[hover_gl_volume.object_idx()];
+            int object_idx = hover_gl_volume.object_idx();
+            if (object_idx < 0 || static_cast<size_t>(object_idx) >= m_model->objects.size()) continue;
+            const ModelObject* hover_object = m_model->objects[object_idx];
             int hover_volume_idx = hover_gl_volume.volume_idx();
+            if (hover_volume_idx < 0 || static_cast<size_t>(hover_volume_idx) >= hover_object->volumes.size()) continue;
             const ModelVolume* hover_volume = hover_object->volumes[hover_volume_idx];
-            if (hover_volume->text_configuration.has_value()) {
-                //m_selection.set_mode(Selection::EMode::Volume);
-                //m_selection.add(hover_volume_id); // add whole instance
-                m_selection.add_volumes(Selection::EMode::Volume, {(unsigned) hover_volume_id});
+            if (!hover_volume->text_configuration.has_value()) continue;
+            m_selection.add_volumes(Selection::EMode::Volume, {(unsigned) hover_volume_id});
+            if (type != GLGizmosManager::EType::Emboss)
                 m_gizmos.open_gizmo(GLGizmosManager::EType::Emboss);
-                wxGetApp().obj_list()->update_selections();
-                return;
-            }
+            wxGetApp().obj_list()->update_selections();
+            return;           
         }
     }
 
@@ -3490,7 +3524,13 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     for (const GLVolume* v : m_volumes.volumes) {
         if (v->is_wipe_tower) {
             const Vec3d offset = v->get_volume_offset();
+#if ENABLE_WORLD_COORDINATE
+            Vec3d rot_unit_x = v->get_volume_transformation().get_matrix().linear() * Vec3d::UnitX();
+            double z_rot = std::atan2(rot_unit_x.y(), rot_unit_x.x());
+            post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset.x(), offset.y(), z_rot)));
+#else
             post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset.x(), offset.y(), v->get_volume_rotation().z())));
+#endif // ENABLE_WORLD_COORDINATE
         }
         const int object_idx = v->object_idx();
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
@@ -4940,9 +4980,17 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
         const Size& cnv_size = get_canvas_size();
         _resize((unsigned int)cnv_size.get_width(), (unsigned int)cnv_size.get_height());
 
+        // When the application starts the following call to render() triggers the opengl initialization.
+        // We need to ask for an extra call to reload_scene() to force the generation of the model for wipe tower
+        // for printers using it, which is skipped by all the previous calls to reload_scene() because m_initialized == false
+        const bool requires_reload_scene = !m_initialized;
+
         // Because of performance problems on macOS, where PaintEvents are not delivered
         // frequently enough, we call render() here directly when we can.
         render();
+        assert(m_initialized);
+        if (requires_reload_scene)
+            reload_scene(true);
     }
 }
 
@@ -5470,6 +5518,10 @@ void GLCanvas3D::_render_selection()
 
     if (!m_gizmos.is_running())
         m_selection.render(scale_factor);
+
+#if ENABLE_WORLD_COORDINATE_DEBUG
+    m_selection.render_debug_window();
+#endif // ENABLE_WORLD_COORDINATE_DEBUG
 }
 
 void GLCanvas3D::_render_sequential_clearance()
@@ -5504,10 +5556,10 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     if (wxGetApp().plater()->is_preview_shown())
         return;
 
-    float scale = wxGetApp().toolbar_icon_scale();
-    Size cnv_size = get_canvas_size();
+    const float scale = wxGetApp().toolbar_icon_scale();
+    const Size cnv_size = get_canvas_size();
 
-    float size = GLToolbar::Default_Icons_Size * scale;
+    int size = int(GLToolbar::Default_Icons_Size * scale);
 
     // Set current size for all top toolbars. It will be used for next calculations
     GLToolbar& collapse_toolbar = wxGetApp().plater()->get_collapse_toolbar();
@@ -5516,28 +5568,28 @@ void GLCanvas3D::_check_and_update_toolbar_icon_scale()
     m_main_toolbar.set_scale(sc);
     m_undoredo_toolbar.set_scale(sc);
     collapse_toolbar.set_scale(sc);
-    size *= m_retina_helper->get_scale_factor();
+    size *= int(m_retina_helper->get_scale_factor());
 #else
     m_main_toolbar.set_icons_size(size);
     m_undoredo_toolbar.set_icons_size(size);
     collapse_toolbar.set_icons_size(size);
 #endif // ENABLE_RETINA_GL
 
-    float top_tb_width = m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar.get_width();
+    const float top_tb_width = m_main_toolbar.get_width() + m_undoredo_toolbar.get_width() + collapse_toolbar.get_width();
     int   items_cnt = m_main_toolbar.get_visible_items_cnt() + m_undoredo_toolbar.get_visible_items_cnt() + collapse_toolbar.get_visible_items_cnt();
-    float noitems_width = top_tb_width - size * items_cnt; // width of separators and borders in top toolbars 
+    const float noitems_width = top_tb_width - float(size) * items_cnt; // width of separators and borders in top toolbars 
 
     // calculate scale needed for items in all top toolbars
     // the std::max() is there because on some Linux dialects/virtual machines this code is called when the canvas has not been properly initialized yet,
     // leading to negative values for the scale.
     // See: https://github.com/prusa3d/PrusaSlicer/issues/8563
     //      https://github.com/supermerill/SuperSlicer/issues/854
-    float new_h_scale = std::max((cnv_size.get_width() - noitems_width), 1.0f) / (items_cnt * GLToolbar::Default_Icons_Size);
+    const float new_h_scale = std::max((cnv_size.get_width() - noitems_width), 1.0f) / (items_cnt * GLToolbar::Default_Icons_Size);
 
     items_cnt = m_gizmos.get_selectable_icons_cnt() + 3; // +3 means a place for top and view toolbars and separators in gizmos toolbar
 
     // calculate scale needed for items in the gizmos toolbar
-    float new_v_scale = cnv_size.get_height() / (items_cnt * GLGizmosManager::Default_Icons_Size);
+    const float new_v_scale = cnv_size.get_height() / (items_cnt * GLGizmosManager::Default_Icons_Size);
 
     // set minimum scale as a auto scale for the toolbars
     float new_scale = std::min(new_h_scale, new_v_scale);
@@ -5552,23 +5604,11 @@ void GLCanvas3D::_render_overlays()
 {
     glsafe(::glDisable(GL_DEPTH_TEST));
 
+    // main toolbar and undoredo toolbar need to be both updated before rendering because both their sizes are needed
+    // to correctly place them
     _check_and_update_toolbar_icon_scale();
 
     _render_gizmos_overlay();
-
-    // main toolbar and undoredo toolbar need to be both updated before rendering because both their sizes are needed
-    // to correctly place them
-#if ENABLE_RETINA_GL
-    const float scale = m_retina_helper->get_scale_factor() * wxGetApp().toolbar_icon_scale(/*true*/);
-    m_main_toolbar.set_scale(scale);
-    m_undoredo_toolbar.set_scale(scale);
-    wxGetApp().plater()->get_collapse_toolbar().set_scale(scale);
-#else
-    const float size = int(GLToolbar::Default_Icons_Size * wxGetApp().toolbar_icon_scale(/*true*/));
-    m_main_toolbar.set_icons_size(size);
-    m_undoredo_toolbar.set_icons_size(size);
-    wxGetApp().plater()->get_collapse_toolbar().set_icons_size(size);
-#endif // ENABLE_RETINA_GL
 
     _render_main_toolbar();
     _render_undoredo_toolbar();

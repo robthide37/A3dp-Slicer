@@ -87,8 +87,10 @@ private:
     // localized default text
     void set_default_text();
 
-    void check_selection();
-    ModelVolume *get_selected_volume();
+    void set_volume_by_selection();
+    // load text configuration from volume into gizmo
+    bool set_volume(ModelVolume *volume); 
+
     // create volume from text - main functionality
     bool process();
     void close();
@@ -109,6 +111,9 @@ private:
     void draw_font_preview(FaceName &face, bool is_visible);
     void draw_font_list();
     void draw_style_edit();
+    void draw_height(bool use_inch);
+    void draw_depth(bool use_inch);
+
     bool draw_italic_button();
     bool draw_bold_button();
     void draw_advanced();
@@ -119,11 +124,9 @@ private:
     void do_translate(const Vec3d& relative_move);
     void do_rotate(float relative_z_angle);
 
-    /// <summary>
-    /// Move window for edit emboss text near to embossed object
-    /// NOTE: embossed object must be selected
-    /// </summary>
-    void set_fine_position();
+    bool rev_input_mm(const std::string &name, float &value, const float *default_value,
+        const std::string &undo_tooltip, float step, float step_fast, const char *format,
+        bool use_inch, const std::optional<float>& scale);
 
     /// <summary>
     /// Reversible input float with option to restor default value
@@ -143,8 +146,9 @@ private:
     template<typename T, typename Draw>
     bool revertible(const std::string &name, T &value, const T *default_value, const std::string &undo_tooltip, float undo_offset, Draw draw);
 
+    bool   m_should_set_minimal_windows_size = false;
     void set_minimal_window_size(bool is_advance_edit_style);
-    const ImVec2 &get_minimal_window_size() const;
+    ImVec2 get_minimal_window_size() const;
 
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
@@ -153,8 +157,6 @@ private:
     bool choose_font_by_wxdialog();
     bool choose_true_type_file();
     bool choose_svg_file();
-
-    bool load_configuration(ModelVolume *volume);
 
     // When open text loaded from .3mf it could be written with unknown font
     bool m_is_unknown_font;
@@ -170,15 +172,15 @@ private:
         ImVec2 minimal_window_size              = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_collections = ImVec2(0, 0);
-        float        input_width                      = 0.f;
-        float        delete_pos_x                     = 0.f;
-        float        max_style_name_width             = 0.f;
-        unsigned int icon_width                       = 0;
+        float height_of_volume_type_selector = 0.f;
+        float input_width                    = 0.f;
+        float delete_pos_x                   = 0.f;
+        float max_style_name_width           = 0.f;
+        unsigned int icon_width              = 0;
 
         // maximal width and height of style image
         Vec2i max_style_image_size = Vec2i(0, 0);
 
-        float style_offset          = 0.f;
         float input_offset          = 0.f;
         float advanced_input_offset = 0.f;
 
@@ -195,8 +197,6 @@ private:
         // Only translations needed for calc GUI size
         struct Translations
         {
-            std::string type;
-            std::string style;
             std::string font;
             std::string size;
             std::string depth;
@@ -216,9 +216,13 @@ private:
         GuiCfg() = default;
     };
     std::optional<const GuiCfg> m_gui_cfg;
+    bool m_is_advanced_edit_style = false;
+
+    // when true window will appear near to text volume when open
+    // When false it opens on last position
+    bool m_allow_open_near_volume = false;
     // setted only when wanted to use - not all the time
     std::optional<ImVec2> m_set_window_offset;
-    bool m_is_advanced_edit_style = false;
 
     Emboss::StyleManager m_style_manager;
 
@@ -254,6 +258,7 @@ private:
                 
         // protection for open too much font files together
         // Gtk:ERROR:../../../../gtk/gtkiconhelper.c:494:ensure_surface_for_gicon: assertion failed (error == NULL): Failed to load /usr/share/icons/Yaru/48x48/status/image-missing.png: Error opening file /usr/share/icons/Yaru/48x48/status/image-missing.png: Too many open files (g-io-error-quark, 31)
+        // This variable must exist until no CreateFontImageJob is running
         unsigned int count_opened_font_files = 0; 
 
         // Configuration for texture height
@@ -307,6 +312,11 @@ private:
     // Only when drag text object it stores world position
     std::optional<Transform3d> m_temp_transformation;
 
+    // For text on scaled objects
+    std::optional<float> m_scale_height;
+    std::optional<float> m_scale_depth;
+    void calculate_scale();
+
     // drawing icons
     GLTexture m_icons_texture;
     void init_icons();
@@ -322,10 +332,6 @@ private:
         unbold,
         system_selector,
         open_file,
-        // VolumeType icons
-        part,
-        negative,
-        modifier,
         // automatic calc of icon's count
         _count
     };

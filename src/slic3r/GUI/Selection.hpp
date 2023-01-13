@@ -242,6 +242,9 @@ private:
     // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
     // Modifiers are taken in account
     std::optional<BoundingBoxf3> m_full_unscaled_instance_local_bounding_box;
+    // Bounding box aligned to the axis of the currently selected reference system (World/Object/Part)
+    // and transform to place and orient it in world coordinates
+    std::optional<std::pair<BoundingBoxf3, Transform3d>> m_bounding_box_in_current_reference_system;
 #endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_RENDER_SELECTION_CENTER
@@ -300,7 +303,7 @@ public:
     void set_deserialized(EMode mode, const std::vector<std::pair<size_t, size_t>> &volumes_and_instances);
 
     // Update the selection based on the new instance IDs.
-	void instances_changed(const std::vector<size_t> &instance_ids_selected);
+    void instances_changed(const std::vector<size_t> &instance_ids_selected);
     // Update the selection based on the map from old indices to new indices after m_volumes changed.
     // If the current selection is by instance, this call may select newly added volumes, if they belong to already selected instances.
     void volumes_changed(const std::vector<size_t> &map_volume_old_to_new);
@@ -385,10 +388,15 @@ public:
     // Bounding box of a single full instance selection, in world coordinates.
     // Modifiers are taken in account
     const BoundingBoxf3& get_full_scaled_instance_bounding_box() const;
-
     // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
     // Modifiers are taken in account
     const BoundingBoxf3& get_full_unscaled_instance_local_bounding_box() const;
+    // Returns the bounding box aligned to the axes of the currently selected reference system (World/Object/Part)
+    // and the transform to place and orient it in world coordinates
+    const std::pair<BoundingBoxf3, Transform3d>& get_bounding_box_in_current_reference_system() const;
+    // Returns the bounding box aligned to the axes of the given reference system
+    // and the transform to place and orient it in world coordinates
+    std::pair<BoundingBoxf3, Transform3d> get_bounding_box_in_reference_system(ECoordinatesType type) const;
 #endif // ENABLE_WORLD_COORDINATE
 
     void setup_cache();
@@ -402,11 +410,12 @@ public:
     void flattening_rotate(const Vec3d& normal);
     void scale(const Vec3d& scale, TransformationType transformation_type);
     void scale_to_fit_print_volume(const BuildVolume& volume);
-    void mirror(Axis axis);
 #if ENABLE_WORLD_COORDINATE
     void scale_and_translate(const Vec3d& scale, const Vec3d& translation, TransformationType transformation_type);
+    void mirror(Axis axis, TransformationType transformation_type);
     void reset_skew();
 #else
+    void mirror(Axis axis);
     void translate(unsigned int object_idx, const Vec3d& displacement);
 #endif // ENABLE_WORLD_COORDINATE
     void translate(unsigned int object_idx, unsigned int instance_idx, const Vec3d& displacement);
@@ -445,6 +454,10 @@ public:
     // returns the list of idxs of the volumes contained in the given list but not in the selection
     std::vector<unsigned int> get_unselected_volume_idxs_from(const std::vector<unsigned int>& volume_idxs) const;
 
+#if ENABLE_WORLD_COORDINATE_DEBUG
+    void render_debug_window() const;
+#endif // ENABLE_WORLD_COORDINATE_DEBUG
+
 private:
     void update_valid();
     void update_type();
@@ -459,7 +472,8 @@ private:
         m_bounding_box.reset();
         m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset();
         m_full_unscaled_instance_bounding_box.reset(); m_full_scaled_instance_bounding_box.reset();
-        m_full_unscaled_instance_local_bounding_box.reset();;
+        m_full_unscaled_instance_local_bounding_box.reset();
+        m_bounding_box_in_current_reference_system.reset();
     }
 #else
     void set_bounding_boxes_dirty() { m_bounding_box.reset(); m_unscaled_instance_bounding_box.reset(); m_scaled_instance_bounding_box.reset(); }
@@ -500,8 +514,10 @@ private:
     void paste_objects_from_clipboard();
 
 #if ENABLE_WORLD_COORDINATE
+    void transform_instance_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
+        const Transform3d& transform, const Vec3d& world_pivot);
     void transform_volume_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
-        const Transform3d& transform);
+        const Transform3d& transform, const Vec3d& world_pivot);
 #endif // ENABLE_WORLD_COORDINATE
 };
 

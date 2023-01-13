@@ -340,7 +340,7 @@ class PrintTryCancel
 {
 public:
     // calls print.throw_if_canceled().
-    void operator()();
+    void operator()() const;
 private:
     friend PrintBase;
     PrintTryCancel() = delete;
@@ -408,6 +408,10 @@ public:
     // Clean up after process() finished, either with success, error or if canceled.
     // The adjustments on the Print / PrintObject data due to set_task() are to be reverted here.
     virtual void            finalize() = 0;
+    // Clean up print step / print object step data after
+    // 1) some print step / print object step was invalidated inside PrintBase::apply() while holding the milestone mutex locked.
+    // 2) background thread finished being canceled.
+    virtual void            cleanup() = 0;
 
     struct SlicingStatus {
 		SlicingStatus(int percent, const std::string &text, unsigned int flags = 0) : percent(percent), text(text), flags(flags) {}

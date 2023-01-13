@@ -1359,10 +1359,10 @@ void GLGizmoMeasure::render_dimensioning()
                 action_exit();
 
             ImGui::SameLine();
-            if (m_imgui->button(_u8L("Scale")))
+            if (m_imgui->button(_CTX(L_CONTEXT("Scale", "Verb"), "Verb")))
                 action_scale(edit_value, curr_value);
             ImGui::SameLine();
-            if (m_imgui->button(_u8L("Cancel")))
+            if (m_imgui->button(_L("Cancel")))
                 action_exit();
             ImGui::EndPopup();
         }
@@ -1991,7 +1991,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 radius = (on_circle - center).norm();
                 if (use_inches)
                     radius = ObjectManipulation::mm_to_in * radius;
-                text += " (" + _u8L("Diameter:") + " " + format_double(2.0 * radius) + units + ")";
+                text += " (" + _u8L("Diameter") + ": " + format_double(2.0 * radius) + units + ")";
             }
             return text;
         };
@@ -2004,7 +2004,7 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
     }
 
     m_imgui->disabled_begin(!m_selected_features.first.feature.has_value());
-        if (m_imgui->button(_u8L("Restart selection"))) {
+        if (m_imgui->button(_L("Restart selection"))) {
             m_selected_features.reset();
             m_selected_sphere_raycasters.clear();
             m_imgui->set_requires_extra_frame();
@@ -2040,22 +2040,26 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                 ++measure_row_count;
                 ImGui::PopID();
             }
+
+            const bool show_strict = measure.distance_strict.has_value() &&
+                (!measure.distance_infinite.has_value() || std::abs(measure.distance_strict->dist - measure.distance_infinite->dist) > EPSILON);
+
             if (measure.distance_infinite.has_value()) {
                 double distance = measure.distance_infinite->dist;
                 if (use_inches)
                     distance = ObjectManipulation::mm_to_in * distance;
                 ImGui::PushID("ClipboardDistanceInfinite");
-                add_measure_row_to_table(_u8L("Distance"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
+                add_measure_row_to_table(show_strict ? _u8L("Perpendicular distance") : _u8L("Distance"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
                     ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 ++measure_row_count;
                 ImGui::PopID();
             }
-            if (measure.distance_strict.has_value() && !measure.distance_infinite.has_value()) {
+            if (show_strict) {
                 double distance = measure.distance_strict->dist;
                 if (use_inches)
                     distance = ObjectManipulation::mm_to_in * distance;
                 ImGui::PushID("ClipboardDistanceStrict");
-                add_measure_row_to_table(_u8L("Distance"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
+                add_measure_row_to_table(_u8L("Direct distance"), ImGuiWrapper::COL_ORANGE_LIGHT, format_double(distance) + units,
                     ImGui::GetStyleColorVec4(ImGuiCol_Text));
                 ++measure_row_count;
                 ImGui::PopID();

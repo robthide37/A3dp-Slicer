@@ -1,8 +1,11 @@
 #ifndef SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_
 #define SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_
 
-#include "libslic3r/Print.hpp"
+#include "Layer.hpp"
+#include "Line.hpp"
+#include "PrintBase.hpp"
 #include <boost/log/trivial.hpp>
+#include <vector>
 
 namespace Slic3r {
 
@@ -20,19 +23,20 @@ struct Params {
             filament_type = std::string("PLA");
         } else {
             filament_type = filament_types[0];
+             BOOST_LOG_TRIVIAL(debug)
+            << "SupportSpotsGenerator: applying filament type: " << filament_type;
         }
     }
 
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
     const float bridge_distance = 12.0f; //mm
-    const float bridge_distance_decrease_by_curvature_factor = 5.0f; // allowed bridge distance = bridge_distance / (1 + this factor * (curvature / PI) )
-    const std::pair<float,float> malformation_overlap_factor = std::pair<float, float> { 0.50, -0.1 };
-    const float max_malformation_factor = 10.0f;
+    const std::pair<float,float> malformation_distance_factors = std::pair<float, float> { 0.4, 1.2 };
+    const float max_curled_height_factor = 10.0f;
 
     const float min_distance_between_support_points = 3.0f; //mm
     const float support_points_interface_radius = 1.5f; // mm
     const float connections_min_considerable_area = 1.5f; //mm^2
-    const float min_distance_to_allow_local_supports = 2.0f; //mm
+    const float min_distance_to_allow_local_supports = 1.0f; //mm
 
     std::string filament_type;
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
@@ -40,7 +44,7 @@ struct Params {
     const double filament_density = 1.25e-3f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
     const double material_yield_strength = 33.0f * 1e6f; // (g*mm/s^2)/mm^2; 33 MPa is yield strength of ABS, which has the lowest yield strength from common materials.
     const float standard_extruder_conflict_force = 20.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
-    const float malformations_additive_conflict_extruder_force = 300.0f * gravity_constant; // for areas with possible high layered curled filaments
+    const float malformations_additive_conflict_extruder_force = 100.0f * gravity_constant; // for areas with possible high layered curled filaments
 
     // MPa * 1e^6 = (g*mm/s^2)/mm^2 = g/(mm*s^2); yield strength of the bed surface
     double get_bed_adhesion_yield_strength() const {
@@ -67,19 +71,17 @@ struct SupportPoint {
     Vec2f direction;
 };
 
-struct Issues {
-    std::vector<SupportPoint> support_points;
-};
+using SupportPoints = std::vector<SupportPoint>;
 
 struct Malformations {
     std::vector<Lines> layers; //for each layer
 };
 
 // std::vector<size_t> quick_search(const PrintObject *po, const Params &params);
-Issues full_search(const PrintObject *po, const Params &params);
+SupportPoints full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params);
 
-void estimate_supports_malformations(SupportLayerPtrs &layers, float supports_flow_width, const Params &params);
-void estimate_malformations(LayerPtrs &layers, const Params &params);
+void estimate_supports_malformations(std::vector<SupportLayer*> &layers, float supports_flow_width, const Params &params);
+void estimate_malformations(std::vector<Layer*> &layers, const Params &params);
 
 } // namespace SupportSpotsGenerator
 }

@@ -290,6 +290,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
 		break; }
 	case coString:
 	case coStrings:
+    case coFloatsOrPercents:
     case coFloatOrPercent: {
         if (m_opt.type == coFloatOrPercent && m_opt.opt_key == "first_layer_height" && !str.IsEmpty() && str.Last() == '%') {
             // Workaroud to avoid of using of the % for first layer height
@@ -301,7 +302,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
             m_value = into_u8(stVal);;
             break;
         }
-        if (m_opt.type == coFloatOrPercent && !str.IsEmpty() &&  str.Last() != '%')
+        if ((m_opt.type == coFloatOrPercent || m_opt.type == coFloatsOrPercents) && !str.IsEmpty() &&  str.Last() != '%')
         {
             double val = 0.;
             const char dec_sep = is_decimal_separator_point() ? '.' : ',';
@@ -443,6 +444,13 @@ void TextCtrl::BUILD() {
 			text_value += "%";
 		break;
 	}
+    case coFloatsOrPercents: {
+		const auto val =  m_opt.get_default_value<ConfigOptionFloatsOrPercents>()->get_at(m_opt_idx);
+        text_value = double_to_string(val.value);
+        if (val.percent)
+            text_value += "%";
+        break;
+	}
 	case coPercent:
 	{
 		text_value = wxString::Format(_T("%i"), int(m_opt.default_value->getFloat()));
@@ -574,6 +582,7 @@ bool TextCtrl::value_was_changed()
     case coString:
     case coStrings:
     case coFloatOrPercent:
+    case coFloatsOrPercents:
         return boost::any_cast<std::string>(m_value) != boost::any_cast<std::string>(val);
     default:
         return true;
@@ -1149,10 +1158,6 @@ void Choice::set_value(const boost::any& value, bool change_event)
 	}
 	case coEnum: {
 		int val = boost::any_cast<int>(value);
-		if (m_opt_id.compare("host_type") == 0 && val != 0 && 
-			m_opt.enum_values.size() > field->GetCount()) // for case, when PrusaLink isn't used as a HostType
-			val--;
-
 		if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern")
 		{
 			std::string key;
@@ -1231,10 +1236,7 @@ boost::any& Choice::get_value()
 
 	if (m_opt.type == coEnum)
 	{
-		if (m_opt_id.compare("host_type") == 0 && m_opt.enum_values.size() > field->GetCount()) {
-			// for case, when PrusaLink isn't used as a HostType
-			m_value = field->GetSelection()+1;
-		} else if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern") {
+        if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern") {
 			const std::string& key = m_opt.enum_values[field->GetSelection()];
 			m_value = int(ConfigOptionEnum<InfillPattern>::get_enum_values().at(key));
 		}
@@ -1414,6 +1416,14 @@ void ColourPicker::sys_color_changed()
 		if (wxColourPickerCtrl* picker = dynamic_cast<wxColourPickerCtrl*>(win))
 			wxGetApp().UpdateDarkUI(picker->GetPickerCtrl(), true);
 #endif
+}
+
+PointCtrl::~PointCtrl()
+{
+    if (sizer && sizer->IsEmpty()) {
+        delete sizer;
+        sizer = nullptr;
+    }
 }
 
 void PointCtrl::BUILD()

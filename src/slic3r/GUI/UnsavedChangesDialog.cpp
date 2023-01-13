@@ -1205,6 +1205,14 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
             out = double_to_string(opt->value) + (opt->percent ? "%" : "");
         return out;
     }
+    case coFloatsOrPercents: {
+        const ConfigOptionFloatsOrPercents* opt = config.opt<ConfigOptionFloatsOrPercents>(opt_key);
+        if (opt) {
+            const auto val = opt->get_at(opt_idx);
+            out = double_to_string(val.value) + (val.percent ? "%" : "");
+        }
+        return out;
+    }
     case coEnum: {
         return get_string_from_enum(opt_key, config, 
             opt_key == "top_fill_pattern" ||
@@ -1303,7 +1311,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
         m_tree->model->AddPreset(type, from_u8(presets->get_edited_preset().name), old_pt, from_u8(new_selected_preset));
 
         // Collect dirty options.
-        const bool deep_compare = (type == Preset::TYPE_PRINTER || type == Preset::TYPE_SLA_MATERIAL);
+        const bool deep_compare = type != Preset::TYPE_FILAMENT;
         auto dirty_options = presets->current_dirty_options(deep_compare);
 
         // process changes of extruders count
@@ -1563,6 +1571,11 @@ void DiffPresetDialog::create_tree()
     m_tree->GetColumn(DiffModel::colToggle)->SetHidden(true);
 }
 
+std::array<Preset::Type, 3> DiffPresetDialog::types_list() const
+{
+    return PresetBundle::types_list(m_pr_technology);
+}
+
 void DiffPresetDialog::create_buttons()
 {
     wxFont font = this->GetFont().Scaled(1.4f);
@@ -1590,8 +1603,7 @@ void DiffPresetDialog::create_buttons()
         bool enable = m_tree->has_selection();
         if (enable) {
             if (m_view_type == Preset::TYPE_INVALID) {
-                for (const Preset::Type& type : (m_pr_technology == ptFFF ? std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-                                                                            std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL }))
+                for (const Preset::Type& type : types_list())
                     if (!enable_transfer(type)) {
                         enable = false;
                         break;
@@ -1833,7 +1845,7 @@ void DiffPresetDialog::update_tree()
         }
 
         // Collect dirty options.
-        const bool deep_compare = (type == Preset::TYPE_PRINTER || type == Preset::TYPE_SLA_MATERIAL);
+        const bool deep_compare = type != Preset::TYPE_FILAMENT;
         auto dirty_options = type == Preset::TYPE_PRINTER && left_pt == ptFFF &&
                              left_config.opt<ConfigOptionStrings>("extruder_colour")->values.size() < right_congig.opt<ConfigOptionStrings>("extruder_colour")->values.size() ?
                              presets->dirty_options(right_preset, left_preset, deep_compare) :
@@ -2016,10 +2028,7 @@ bool DiffPresetDialog::is_save_confirmed()
 
     std::vector<Preset::Type> types_for_save;
 
-    const auto list = m_pr_technology == ptFFF ? std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-        std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
-
-    for (const Preset::Type& type : list) {
+    for (const Preset::Type& type : types_list()) {
         if (!m_tree->options(type, true).empty()) {
             types_for_save.emplace_back(type);
             presets_to_save.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });

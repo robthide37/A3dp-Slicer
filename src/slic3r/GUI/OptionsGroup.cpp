@@ -54,6 +54,7 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
     default:
         switch (opt.type) {
             case coFloatOrPercent:
+            case coFloatsOrPercents:
             case coFloat:
             case coFloats:
 			case coPercent:
@@ -116,6 +117,24 @@ OptionsGroup::OptionsGroup(	wxWindow* _parent, const wxString& title,
                 m_use_custom_ctrl(is_tab_opt),
                 staticbox(title!=""), extra_column(extra_clmn)
 {
+}
+
+void Line::clear()
+{
+    if (near_label_widget_win)
+        near_label_widget_win = nullptr;
+
+    if (widget_sizer) {
+        widget_sizer->Clear(true);
+        delete widget_sizer;
+        widget_sizer = nullptr;
+    }
+
+    if (extra_widget_sizer) {
+        extra_widget_sizer->Clear(true);
+        delete extra_widget_sizer;
+        extra_widget_sizer = nullptr;
+    }
 }
 
 wxWindow* OptionsGroup::ctrl_parent() const
@@ -231,7 +250,7 @@ void OptionsGroup::activate_line(Line& line)
 		}
     }
 
-	auto option_set = line.get_options();
+    const std::vector<Option>& option_set = line.get_options();
 	bool is_legend_line = option_set.front().opt.gui_type == ConfigOptionDef::GUIType::legend;
 
     if (!custom_ctrl && m_use_custom_ctrl) {
@@ -263,15 +282,13 @@ void OptionsGroup::activate_line(Line& line)
 		return;
 	}
 
-    auto grid_sizer = m_grid_sizer;
-
     if (custom_ctrl)
         m_use_custom_ctrl_as_parent = true;
 
     // if we have an extra column, build it
     if (extra_column) {
-		m_extra_column_item_ptrs.push_back(extra_column(this->ctrl_parent(), line));
-		grid_sizer->Add(m_extra_column_item_ptrs.back(), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 3);
+        m_extra_column_item_ptrs.push_back(extra_column(this->ctrl_parent(), line));
+        m_grid_sizer->Add(m_extra_column_item_ptrs.back(), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 3);
 	}
 
 	// Build a label if we have it
@@ -298,12 +315,12 @@ void OptionsGroup::activate_line(Line& line)
                 label->Wrap(label_width * wxGetApp().em_unit()); // avoid a Linux/GTK bug
             }
             if (!line.near_label_widget)
-                grid_sizer->Add(label, 0, (staticbox ? 0 : wxALIGN_RIGHT | wxRIGHT) | wxALIGN_CENTER_VERTICAL, line.label.IsEmpty() ? 0 : 5);
+                m_grid_sizer->Add(label, 0, (staticbox ? 0 : wxALIGN_RIGHT | wxRIGHT) | wxALIGN_CENTER_VERTICAL, line.label.IsEmpty() ? 0 : 5);
             else if (!line.label.IsEmpty()) {
                 // If we're here, we have some widget near the label
                 // so we need a horizontal sizer to arrange these things
                 auto sizer = new wxBoxSizer(wxHORIZONTAL);
-                grid_sizer->Add(sizer, 0, wxEXPAND | (staticbox ? wxALL : wxBOTTOM | wxTOP | wxLEFT), staticbox ? 0 : 1);
+                m_grid_sizer->Add(sizer, 0, wxEXPAND | (staticbox ? wxALL : wxBOTTOM | wxTOP | wxLEFT), staticbox ? 0 : 1);
                 sizer->Add(label, 0, (staticbox ? 0 : wxALIGN_RIGHT | wxRIGHT) | wxALIGN_CENTER_VERTICAL, 5);
             }
             if (label != nullptr && line.label_tooltip != "")
@@ -317,15 +334,19 @@ void OptionsGroup::activate_line(Line& line)
         if (custom_ctrl)
             line.widget_sizer = wgt;
         else
-            grid_sizer->Add(wgt, 0, wxEXPAND | wxBOTTOM | wxTOP, (wxOSX || line.label.IsEmpty()) ? 0 : 5);
+            m_grid_sizer->Add(wgt, 0, wxEXPAND | wxBOTTOM | wxTOP, (wxOSX || line.label.IsEmpty()) ? 0 : 5);
 		return;
 	}
 
 	// If we're here, we have more than one option or a single option with sidetext
     // so we need a horizontal sizer to arrange these things
-	auto sizer = new wxBoxSizer(wxHORIZONTAL);
-    if (!custom_ctrl)
-        grid_sizer->Add(sizer, 0, wxEXPAND | (staticbox ? wxALL : wxBOTTOM | wxTOP | wxLEFT), staticbox ? 0 : 1);
+    wxBoxSizer* h_sizer{ nullptr };
+    if (!custom_ctrl) {
+        // but this sizer is currently used just for NON-custom_ctrl cases
+        h_sizer = new wxBoxSizer(wxHORIZONTAL);
+        m_grid_sizer->Add(h_sizer, 0, wxEXPAND | (staticbox ? wxALL : wxBOTTOM | wxTOP | wxLEFT), staticbox ? 0 : 1);
+    }
+
     // If we have a single option with no sidetext just add it directly to the grid sizer
     if (option_set.size() == 1 && option_set.front().opt.sidetext.size() == 0 &&
 		option_set.front().side_widget == nullptr && line.get_extra_widgets().size() == 0) {
@@ -334,42 +355,37 @@ void OptionsGroup::activate_line(Line& line)
 
         if (!custom_ctrl) {
             if (is_window_field(field))
-                sizer->Add(field->getWindow(), option.opt.full_width ? 1 : 0,
+                h_sizer->Add(field->getWindow(), option.opt.full_width ? 1 : 0,
                     wxBOTTOM | wxTOP | (option.opt.full_width ? int(wxEXPAND) : int(wxALIGN_CENTER_VERTICAL)), (wxOSX || !staticbox) ? 0 : 2);
             if (is_sizer_field(field))
-                sizer->Add(field->getSizer(), 1, (option.opt.full_width ? int(wxEXPAND) : int(wxALIGN_CENTER_VERTICAL)), 0);
-        } else
-            delete sizer;
+                h_sizer->Add(field->getSizer(), 1, (option.opt.full_width ? int(wxEXPAND) : int(wxALIGN_CENTER_VERTICAL)), 0);
+        }
         return;
 	}
 
-    bool sizer_is_used       = false;
-    bool is_multioption_line = option_set.size() > 1;
-    for (auto opt : option_set) {
-		ConfigOptionDef option = opt.opt;
-        wxSizer* sizer_tmp = sizer;
-		// add label if any
-		if ((is_multioption_line || line.label.IsEmpty()) && !option.label.empty() && !custom_ctrl) {
-//!			To correct translation by context have to use wxGETTEXT_IN_CONTEXT macro from wxWidget 3.1.1
-			wxString str_label = (option.label == L_CONTEXT("Top", "Layers") || option.label == L_CONTEXT("Bottom", "Layers")) ?
-				_CTX(option.label, "Layers") :
-				_(option.label);
-			label = new wxStaticText(this->ctrl_parent(), wxID_ANY, str_label + ": ", wxDefaultPosition, //wxDefaultSize);
-				wxSize(sublabel_width != -1 ? sublabel_width * wxGetApp().em_unit() : -1, -1), wxALIGN_RIGHT);
-			label->SetBackgroundStyle(wxBG_STYLE_PAINT);
-            label->SetFont(wxGetApp().normal_font());
-            sizer_tmp->Add(label, 0, wxALIGN_CENTER_VERTICAL, 0);
-            sizer_is_used = true;
-        }
+    for (const Option& opt : option_set) {
+        // add field
+        auto& field = build_field(opt);
 
-		// add field
-		const Option& opt_ref = opt;
-		auto& field = build_field(opt_ref);
         if (!custom_ctrl) {
+            ConfigOptionDef option = opt.opt;
+            // add label if any
+            if ((option_set.size() > 1 || line.label.IsEmpty()) && !option.label.empty()) {
+                // To correct translation by context have to use wxGETTEXT_IN_CONTEXT macro from wxWidget 3.1.1
+                wxString str_label = (option.label == L_CONTEXT("Top", "Layers") || option.label == L_CONTEXT("Bottom", "Layers")) ?
+                    _CTX(option.label, "Layers") :
+                    _(option.label);
+                label = new wxStaticText(this->ctrl_parent(), wxID_ANY, str_label + ": ", wxDefaultPosition, //wxDefaultSize);
+                    wxSize(sublabel_width != -1 ? sublabel_width * wxGetApp().em_unit() : -1, -1), wxALIGN_RIGHT);
+                label->SetBackgroundStyle(wxBG_STYLE_PAINT);
+                label->SetFont(wxGetApp().normal_font());
+                h_sizer->Add(label, 0, wxALIGN_CENTER_VERTICAL, 0);
+            }
+
             if (option_set.size() == 1 && option_set.front().opt.full_width)
             {
                 const auto v_sizer = new wxBoxSizer(wxVERTICAL);
-                sizer_tmp->Add(v_sizer, 1, wxEXPAND);
+                h_sizer->Add(v_sizer, 1, wxEXPAND);
                 is_sizer_field(field) ?
                     v_sizer->Add(field->getSizer(), 0, wxEXPAND) :
                     v_sizer->Add(field->getWindow(), 0, wxEXPAND);
@@ -377,8 +393,8 @@ void OptionsGroup::activate_line(Line& line)
             }
 
             is_sizer_field(field) ?
-                sizer_tmp->Add(field->getSizer(), 0, wxALIGN_CENTER_VERTICAL, 0) :
-                sizer_tmp->Add(field->getWindow(), 0, wxALIGN_CENTER_VERTICAL, 0);
+                h_sizer->Add(field->getSizer(), 0, wxALIGN_CENTER_VERTICAL, 0) :
+                h_sizer->Add(field->getWindow(), 0, wxALIGN_CENTER_VERTICAL, 0);
 
             // add sidetext if any
             if (!option.sidetext.empty() || sidetext_width > 0) {
@@ -386,38 +402,35 @@ void OptionsGroup::activate_line(Line& line)
                     wxSize(sidetext_width != -1 ? sidetext_width * wxGetApp().em_unit() : -1, -1), wxALIGN_LEFT);
                 sidetext->SetBackgroundStyle(wxBG_STYLE_PAINT);
                 sidetext->SetFont(wxGetApp().normal_font());
-                sizer_tmp->Add(sidetext, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 4);
+                h_sizer->Add(sidetext, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 4);
             }
 
             // add side widget if any
             if (opt.side_widget != nullptr) {
-                sizer_tmp->Add(opt.side_widget(this->ctrl_parent())/*!.target<wxWindow>()*/, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 1);    //! requires verification
+                h_sizer->Add(opt.side_widget(this->ctrl_parent())/*!.target<wxWindow>()*/, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 1);    //! requires verification
             }
 
             if (opt.opt_id != option_set.back().opt_id) //! istead of (opt != option_set.back())
-                sizer_tmp->AddSpacer(6);
+                h_sizer->AddSpacer(6);
         }
-	}
+    }
 
-	// add extra sizers if any
-	for (auto extra_widget : line.get_extra_widgets())
+    // add extra sizers if any
+    for (auto extra_widget : line.get_extra_widgets())
     {
         if (line.get_extra_widgets().size() == 1 && !staticbox)
         {
             // extra widget for non-staticbox option group (like for the frequently used parameters on the sidebar) should be wxALIGN_RIGHT
             const auto v_sizer = new wxBoxSizer(wxVERTICAL);
-            sizer->Add(v_sizer, option_set.size() == 1 ? 0 : 1, wxEXPAND);
+            h_sizer->Add(v_sizer, option_set.size() == 1 ? 0 : 1, wxEXPAND);
             v_sizer->Add(extra_widget(this->ctrl_parent()), 0, wxALIGN_RIGHT);
             return;
         }
 
         line.extra_widget_sizer = extra_widget(this->ctrl_parent());
         if (!custom_ctrl)
-            sizer->Add(line.extra_widget_sizer, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 4);        //! requires verification
-	}
-
-    if (custom_ctrl && !sizer_is_used)
-        delete sizer;
+            h_sizer->Add(line.extra_widget_sizer, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 4);        //! requires verification
+    }
 }
 
 // create all controls for the option group from the m_lines
@@ -484,20 +497,8 @@ void OptionsGroup::clear(bool destroy_custom_ctrl)
 	m_grid_sizer = nullptr;
 	sizer = nullptr;
 
-	for (Line& line : m_lines) {
-        if (line.near_label_widget_win)
-            line.near_label_widget_win = nullptr;
-
-        if (line.widget_sizer) {
-            line.widget_sizer->Clear(true);
-            line.widget_sizer = nullptr;
-        }
-
-        if (line.extra_widget_sizer) {
-            line.extra_widget_sizer->Clear(true);
-            line.extra_widget_sizer = nullptr;
-        }
-	}
+    for (Line& line : m_lines)
+        line.clear();
 
     if (custom_ctrl) {
         for (auto const &item : m_fields) {
@@ -867,6 +868,14 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 		ret = text_value;
 		break;
 	}
+	case coFloatsOrPercents:{
+		const auto& val = config.option<ConfigOptionFloatsOrPercents>(opt_key)->get_at(idx);
+        text_value = double_to_string(val.value);
+		if (val.percent)
+			text_value += "%";
+		ret = text_value;
+		break;
+	}
 	case coPercent:{
 		double val = config.option<ConfigOptionPercent>(opt_key)->value;
 		text_value = wxString::Format(_T("%i"), int(val));
@@ -992,10 +1001,18 @@ bool OptionsGroup::launch_browser(const std::string& path_end)
     return wxGetApp().open_browser_with_warning_dialog(OptionsGroup::get_url(path_end), wxGetApp().mainframe->m_tabpanel);
 }
 
+// list of options, which doesn't have a related filed
+static const std::set<std::string> options_without_field = {
+    "compatible_printers",
+    "compatible_prints",
+    "bed_shape",
+    "filament_ramming_parameters",
+    "gcode_substitutions",
+};
+
 bool OptionsGroup::is_option_without_field(const std::string& opt_key)
 {
-    return  opt_key!= "thumbnails" // "thumbnails" has related field
-            && PresetCollection::is_independent_from_extruder_number_option(opt_key);
+    return  options_without_field.find(opt_key) != options_without_field.end();
 }
 
 

@@ -2657,47 +2657,59 @@ void ObjectList::part_selection_changed()
         disable_ununiform_scale = true;
     }
     else if ( multiple_selection() || (item && m_objects_model->GetItemType(item) == itInstanceRoot )) {
-        og_name = _L("Group manipulation");
-
         const Selection& selection = scene_selection();
-        // don't show manipulation panel for case of all Object's parts selection 
-        update_and_show_manipulations = !selection.is_single_full_instance();
 
-        if (int obj_idx = selection.get_object_idx(); obj_idx >= 0) {
-            if (selection.is_any_volume() || selection.is_any_modifier())
-                enable_manipulation = !(*m_objects)[obj_idx]->is_cut();
-            else// if (item && m_objects_model->GetItemType(item) == itInstanceRoot)
-                disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
+        if (selection.is_single_full_object()) {
+            og_name = _L("Object manipulation");
+            update_and_show_manipulations = true;
+
+            obj_idx             = selection.get_object_idx();
+            ModelObject* object = (*m_objects)[obj_idx];
+            m_config                = &object->config;
+            disable_ss_manipulation = object->is_cut();
         }
         else {
-            wxDataViewItemArray sels;
-            GetSelections(sels);
-            if (selection.is_single_full_object() || selection.is_multiple_full_instance() ) {
-                int obj_idx = m_objects_model->GetObjectIdByItem(sels.front());
-                disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
+            og_name = _L("Group manipulation");
+
+            // don't show manipulation panel for case of all Object's parts selection 
+            update_and_show_manipulations = !selection.is_single_full_instance();
+
+            if (int obj_idx = selection.get_object_idx(); obj_idx >= 0) {
+                if (selection.is_any_volume() || selection.is_any_modifier())
+                    enable_manipulation = !(*m_objects)[obj_idx]->is_cut();
+                else// if (item && m_objects_model->GetItemType(item) == itInstanceRoot)
+                    disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
             }
-            else if (selection.is_mixed() || selection.is_multiple_full_object()) {
-                std::map<CutObjectBase, std::set<int>> cut_objects;
-
-                // find cut objects
-                for (auto item : sels) {
-                    int obj_idx = m_objects_model->GetObjectIdByItem(item);
-                    const ModelObject* obj = object(obj_idx);
-                    if (obj->is_cut()) {
-                        if (cut_objects.find(obj->cut_id) == cut_objects.end())
-                            cut_objects[obj->cut_id] = std::set<int>{ obj_idx };
-                        else
-                            cut_objects.at(obj->cut_id).insert(obj_idx);
-                    }
+            else {
+                wxDataViewItemArray sels;
+                GetSelections(sels);
+                if (selection.is_single_full_object() || selection.is_multiple_full_instance() ) {
+                    int obj_idx = m_objects_model->GetObjectIdByItem(sels.front());
+                    disable_ss_manipulation = (*m_objects)[obj_idx]->is_cut();
                 }
+                else if (selection.is_mixed() || selection.is_multiple_full_object()) {
+                    std::map<CutObjectBase, std::set<int>> cut_objects;
 
-                // check if selected cut objects are "full selected"
-                for (auto cut_object : cut_objects)
-                    if (cut_object.first.check_sum() != cut_object.second.size()) {
-                        disable_ss_manipulation = true;
-                        break;
+                    // find cut objects
+                    for (auto item : sels) {
+                        int obj_idx = m_objects_model->GetObjectIdByItem(item);
+                        const ModelObject* obj = object(obj_idx);
+                        if (obj->is_cut()) {
+                            if (cut_objects.find(obj->cut_id) == cut_objects.end())
+                                cut_objects[obj->cut_id] = std::set<int>{ obj_idx };
+                            else
+                                cut_objects.at(obj->cut_id).insert(obj_idx);
+                        }
                     }
-                disable_ununiform_scale = !cut_objects.empty();
+
+                    // check if selected cut objects are "full selected"
+                    for (auto cut_object : cut_objects)
+                        if (cut_object.first.check_sum() != cut_object.second.size()) {
+                            disable_ss_manipulation = true;
+                            break;
+                        }
+                    disable_ununiform_scale = !cut_objects.empty();
+                }
             }
         }
     }
@@ -2822,8 +2834,12 @@ void ObjectList::part_selection_changed()
     panel.Freeze();
 
 #if ENABLE_WORLD_COORDINATE
-    const ManipulationEditor* const editor = wxGetApp().obj_manipul()->get_focused_editor();
-    const std::string opt_key = (editor != nullptr) ? editor->get_full_opt_name() : "";
+    std::string opt_key;
+    if (m_selected_object_id >= 0) {
+        const ManipulationEditor* const editor = wxGetApp().obj_manipul()->get_focused_editor();
+        if (editor != nullptr)
+            opt_key = editor->get_full_opt_name();
+    }
     wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event(opt_key, !opt_key.empty());
 #else
     wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event("", false);

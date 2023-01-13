@@ -1641,13 +1641,47 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
     return res;
 }
 
+/// <summary>
+/// Compare TriangleMeshes by Bounding boxes (mainly for sort)
+/// From Front(Z) Upper(Y) TopLeft(X) corner.
+/// 1. Seraparate group not overlaped i Z axis
+/// 2. Seraparate group not overlaped i Y axis
+/// 3. Start earlier in X (More on left side)
+/// </summary>
+/// <param name="triangle_mesh1">Compare from</param>
+/// <param name="triangle_mesh2">Compare to</param>
+/// <returns>True when triangle mesh 1 is closer, upper or lefter than triangle mesh 2 other wise false</returns>
+static bool is_front_up_left(const TriangleMesh &trinagle_mesh1, const TriangleMesh &triangle_mesh2)
+{
+    // stats form t1
+    const Vec3f &min1 = trinagle_mesh1.stats().min;
+    const Vec3f &max1 = trinagle_mesh1.stats().max;
+    // stats from t2
+    const Vec3f &min2 = triangle_mesh2.stats().min;
+    const Vec3f &max2 = triangle_mesh2.stats().max;
+    // priority Z, Y, X
+    for (int axe = 2; axe > 0; --axe) {
+        if (max1[axe] < min2[axe])
+            return true;
+        if (min1[axe] > max2[axe])
+            return false;
+    }
+    return min1.x() < min2.x();
+}
+
 void ModelObject::split(ModelObjectPtrs* new_objects)
 {
     for (ModelVolume* volume : this->volumes) {
         if (volume->type() != ModelVolumeType::MODEL_PART)
             continue;
 
+        // splited volume should not be text object 
+        if (volume->text_configuration.has_value())
+            volume->text_configuration.reset();
+
         std::vector<TriangleMesh> meshes = volume->mesh().split();
+        std::sort(meshes.begin(), meshes.end(), is_front_up_left);
+
         size_t counter = 1;
         for (TriangleMesh &mesh : meshes) {
             // FIXME: crashes if not satisfied
@@ -2131,9 +2165,15 @@ size_t ModelVolume::split(unsigned int max_extruders)
     if (meshes.size() <= 1)
         return 1;
 
+    std::sort(meshes.begin(), meshes.end(), is_front_up_left);
+
+    // splited volume should not be text object
+    if (text_configuration.has_value())
+        text_configuration.reset();
+
     size_t idx = 0;
     size_t ivolume = std::find(this->object->volumes.begin(), this->object->volumes.end(), this) - this->object->volumes.begin();
-    const std::string name = this->name;
+    const std::string& name = this->name;
 
     unsigned int extruder_counter = 0;
     const Vec3d offset = this->get_offset();
