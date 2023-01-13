@@ -106,6 +106,7 @@ public:
 
     /// <summary>
     /// Unproject Ray(point direction) on mesh by MeshRaycasters
+    /// NOTE: It inspect also oposit direction of ray !!
     /// </summary>
     /// <param name="point">Start point for ray</param>
     /// <param name="direction">Direction of ray</param>

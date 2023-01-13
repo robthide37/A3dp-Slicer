@@ -2980,11 +2980,6 @@ std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, Raycas
 
     // ray in direction of text projection(from volume zero to z-dir)
     std::optional<RaycastManager::Hit> hit_opt = raycast_manager.unproject(point, direction, &cond);
-    // start point lay on surface could appear slightly behind surface
-    std::optional<RaycastManager::Hit> hit_opt_opposit = raycast_manager.unproject(point, -direction, &cond);
-    if (!hit_opt.has_value() || 
-        (hit_opt_opposit.has_value() && hit_opt->squared_distance > hit_opt_opposit->squared_distance))
-        hit_opt = hit_opt_opposit;
 
     // Try to find closest point when no hit object in emboss direction
     if (!hit_opt.has_value())
