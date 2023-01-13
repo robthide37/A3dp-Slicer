@@ -706,7 +706,7 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
 }
 #endif // SHOW_OFFSET_DURING_DRAGGING
 namespace priv {
-static void draw_origin_ball(const GLCanvas3D& canvas) {
+static void draw_origin(const GLCanvas3D& canvas) {
     auto draw_list = ImGui::GetOverlayDrawList();
     const Selection &selection = canvas.get_selection();
     Transform3d to_world = priv::world_matrix(selection);
@@ -715,9 +715,22 @@ static void draw_origin_ball(const GLCanvas3D& canvas) {
     const Camera &camera = wxGetApp().plater()->get_camera();
     Point screen_coor = CameraUtils::project(camera, volume_zero);
     ImVec2 center(screen_coor.x(), screen_coor.y());
-    float radius = 10.f;
-    ImU32 color = ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT);
-    draw_list->AddCircleFilled(center, radius, color);
+    float radius = 16.f;
+    ImU32 color = ImGui::GetColorU32(ImVec4(1.f, 1.f, 1.f, .75f));
+
+    int num_segments = 0;
+    float thickness = 4.f;
+    draw_list->AddCircle(center, radius, color, num_segments, thickness);
+    auto dirs = {ImVec2{0, 1}, ImVec2{1, 0}, ImVec2{0, -1}, ImVec2{-1, 0}};
+    for (const ImVec2 &dir : dirs) {
+        ImVec2 start(
+            center.x + dir.x * 0.5 * radius,
+            center.y + dir.y * 0.5 * radius);
+        ImVec2 end(
+            center.x + dir.x * 1.5 * radius,
+            center.y + dir.y * 1.5 * radius);
+        draw_list->AddLine(start, end, color, thickness);
+    }
 }
 
 } // namespace priv
@@ -736,7 +749,9 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     const ImVec2 &min_window_size = get_minimal_window_size();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, min_window_size);
 
-    priv::draw_origin_ball(m_parent);
+    // Draw origin position of text during dragging
+    if (m_temp_transformation.has_value())
+        priv::draw_origin(m_parent);
 
 #ifdef SHOW_FINE_POSITION
     draw_fine_position(m_parent.get_selection(), m_parent.get_canvas_size(), min_window_size);
