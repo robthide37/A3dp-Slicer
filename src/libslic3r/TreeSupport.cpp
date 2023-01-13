@@ -554,7 +554,8 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
                 double next_distance = current_distance;
                 // Get points so that at least min_points are added and they each are current_distance away from each other. If that is impossible, decrease current_distance a bit.
                 // The input are lines, that means that the line from the last to the first vertex does not have to exist, so exclude all points that are on this line!
-                while ((next_point = polyline_sample_next_point_at_distance(part.points, current_point, current_index, next_distance))) {
+                while ((next_point = polyline_sample_next_point_at_distance(part.points, current_point, current_index, next_distance)) &&
+                                     next_point->second < coord_t(part.size()) - 1) {
                     // Not every point that is distance away, is valid, as it may be much closer to another point. This is especially the case when the overhang is very thin.
                     // So this ensures that the points are actually a certain distance from each other.
                     // This assurance is only made on a per polygon basis, as different but close polygon may not be able to use support below the other polygon.
@@ -3455,16 +3456,18 @@ static void draw_branches(
         const double max_nudge_smoothing = 1. * scale;
 
         static constexpr const size_t num_iter = 100; // 1000;
-        for (size_t iter = 0; iter < num_iter; ++ iter) {
+        for (size_t iter = 0; iter < num_iter; ++iter) {
             prev = pts;
             projections = pts;
             distances.assign(pts.size(), std::numeric_limits<float>::max());
             closest_surface_point->searchAndReplace(projections, distances);
             size_t num_moved = 0;
+            
             for (size_t i = 0; i < projections.size(); ++ i) {
                 const SupportElement &element = *elements_with_link_down[i].first;
                 const int            below    = elements_with_link_down[i].second;
                 const bool           locked   = below == -1 && element.state.layer_idx > 0;
+                
                 if (! locked && pts[i] != projections[i]) {
                     // Nudge the circle center away from the collision.
                     Vec3d v{ projections[i].x() - pts[i].x(), projections[i].y() - pts[i].y(), projections[i].z() - pts[i].z() };
