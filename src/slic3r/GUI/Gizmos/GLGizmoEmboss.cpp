@@ -1104,17 +1104,9 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
             m_style_manager.set_wx_font(wx_font);
         }
     }
-
-    if (!is_exact_font) {
+    
+    if (!is_exact_font)
         create_notification_not_valid_font(tc);
-
-        // update changed wxFont path
-        std::string path = WxFontUtils::store_wxFont(wx_font);
-        // current used style
-        EmbossStyle &act_style = m_style_manager.get_style();
-        act_style.path         = path;
-        act_style.type         = WxFontUtils::get_actual_type();
-    }
         
     // The change of volume could show or hide part with setter on volume type
     if (m_volume == nullptr || 
@@ -3405,31 +3397,31 @@ void GLGizmoEmboss::create_notification_not_valid_font(
     auto level =
         NotificationManager::NotificationLevel::WarningNotificationLevel;
 
-    const EmbossStyle &es     = m_style_manager.get_style();
-    const auto &origin_family = tc.style.prop.face_name;
-    const auto &actual_family = es.prop.face_name;
+    const EmbossStyle &es = m_style_manager.get_style();
+    const auto &face_name_opt = es.prop.face_name;
+    const auto &face_name_3mf_opt = tc.style.prop.face_name;
 
-    const std::string &origin_font_name = origin_family.has_value() ?
-                                              *origin_family :
+    const std::string &face_name_3mf = face_name_3mf_opt.has_value() ?
+                                              *face_name_3mf_opt :
                                               tc.style.path;
 
-    std::string actual_wx_face_name;
-    if (!actual_family.has_value()) {
-        auto& wx_font = m_style_manager.get_wx_font();
+    std::string face_name_by_wx;
+    if (!face_name_opt.has_value()) {
+        const auto& wx_font = m_style_manager.get_wx_font();
         if (wx_font.has_value()) {
-            wxString    wx_face_name = wx_font->GetFaceName();
-            actual_wx_face_name = std::string((const char *) wx_face_name.ToUTF8());
+            wxString wx_face_name = wx_font->GetFaceName();
+            face_name_by_wx = std::string((const char *) wx_face_name.ToUTF8());
         }
     }
 
-    const std::string &actual_font_name = actual_family.has_value() ? *actual_family : 
-            (!actual_wx_face_name.empty() ? actual_wx_face_name : es.path);
+    const std::string &face_name = face_name_opt.has_value() ? *face_name_opt : 
+            (!face_name_by_wx.empty() ? face_name_by_wx : es.path);
 
     std::string text =
         GUI::format(_L("Can't load exactly same font(\"%1%\"), "
                        "Aplication select similar one(\"%2%\"). "
                        "You have to specify font for enable edit text."),
-                    origin_font_name, actual_font_name);
+                    face_name_3mf, face_name);
     auto notification_manager = wxGetApp().plater()->get_notification_manager();
     notification_manager->push_notification(type, level, text);
 }
