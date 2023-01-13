@@ -257,7 +257,7 @@ std::vector<std::string> OpenGLManager::GLInfo::get_extensions_list() const
 
 OpenGLManager::GLInfo OpenGLManager::s_gl_info;
 bool OpenGLManager::s_compressed_textures_supported = false;
-bool OpenGLManager::m_use_manually_generated_mipmaps = true;
+bool OpenGLManager::s_use_manually_generated_mipmaps = true;
 OpenGLManager::EMultisampleState OpenGLManager::s_multisample = OpenGLManager::EMultisampleState::Unknown;
 OpenGLManager::EFramebufferType OpenGLManager::s_framebuffers_type = OpenGLManager::EFramebufferType::Unknown;
 
@@ -422,7 +422,7 @@ bool OpenGLManager::init_gl()
         // containing the string 'Radeon' in the string returned by glGetString(GL_RENDERER)
         const auto& gl_info = OpenGLManager::get_gl_info();
         if (boost::contains(gl_info.get_vendor(), "ATI Technologies Inc.") && boost::contains(gl_info.get_renderer(), "Radeon")) {
-            m_use_manually_generated_mipmaps = false;
+            s_use_manually_generated_mipmaps = false;
             BOOST_LOG_TRIVIAL(debug) << "Mipmapping through OpenGL was enabled.";
         }
 #endif

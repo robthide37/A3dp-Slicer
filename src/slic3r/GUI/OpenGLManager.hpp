@@ -110,10 +110,11 @@ private:
     static OSInfo s_os_info;
 #endif //__APPLE__
     static bool s_compressed_textures_supported;
+    static bool s_use_manually_generated_mipmaps;
+
     static EMultisampleState s_multisample;
     static EFramebufferType s_framebuffers_type;
 
-    static bool m_use_manually_generated_mipmaps;
 public:
     OpenGLManager() = default;
     ~OpenGLManager();
@@ -138,7 +139,7 @@ public:
     static EFramebufferType get_framebuffers_type() { return s_framebuffers_type; }
     static wxGLCanvas* create_wxglcanvas(wxWindow& parent);
     static const GLInfo& get_gl_info() { return s_gl_info; }
-    static bool use_manually_generated_mipmaps() { return m_use_manually_generated_mipmaps; }
+    static bool use_manually_generated_mipmaps() { return s_use_manually_generated_mipmaps; }
 
 private:
 #if ENABLE_GL_CORE_PROFILE || ENABLE_OPENGL_ES
