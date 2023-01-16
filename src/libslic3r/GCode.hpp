@@ -326,7 +326,7 @@ private:
     std::string     extrude_support(const ExtrusionEntityCollection &support_fills);
 
     std::string     travel_to(const Point &point, ExtrusionRole role, std::string comment);
-    bool            needs_retraction(const Polyline &travel, ExtrusionRole role = erNone);
+    bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None);
     std::string     retract(bool toolchange = false);
     std::string     unretract() { return m_writer.unlift() + m_writer.unretract(); }
     std::string     set_extruder(unsigned int extruder_id, double print_z);
@@ -363,7 +363,7 @@ private:
     // The Pressure Equalizer removes the markers from the final G-code.
     bool                                m_enable_extrusion_role_markers;
     // Keeps track of the last extrusion role passed to the processor
-    ExtrusionRole                       m_last_processor_extrusion_role;
+    GCodeExtrusionRole                  m_last_processor_extrusion_role;
     // How many times will change_layer() be called?
     // change_layer() will update the progress bar.
     unsigned int                        m_layer_count;
@@ -376,7 +376,7 @@ private:
     bool                                m_object_layer_over_raft;
     double                              m_volumetric_speed;
     // Support for the extrusion role markers. Which marker is active?
-    ExtrusionRole                       m_last_extrusion_role;
+    GCodeExtrusionRole                  m_last_extrusion_role;
     // Support for G-Code Processor
     float                               m_last_height{ 0.0f };
     float                               m_last_layer_z{ 0.0f };

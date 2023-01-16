@@ -407,13 +407,13 @@ Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerR
                     ExtrusionRole role = perimeter->role();
                     if (perimeter->is_loop()) {
                         for (const ExtrusionPath &path : static_cast<const ExtrusionLoop*>(perimeter)->paths) {
-                            if (path.role() == ExtrusionRole::erExternalPerimeter) {
-                                role = ExtrusionRole::erExternalPerimeter;
+                            if (path.role() == ExtrusionRole::ExternalPerimeter) {
+                                role = ExtrusionRole::ExternalPerimeter;
                             }
                         }
                     }
 
-                    if (role == ExtrusionRole::erExternalPerimeter) {
+                    if (role == ExtrusionRole::ExternalPerimeter) {
                         Points p;
                         perimeter->collect_points(p);
                         polygons.emplace_back(std::move(p));
@@ -1548,7 +1548,7 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
 
     Point seam_point = Point::new_scale(seam_position.x(), seam_position.y());
 
-    if (loop.role() == ExtrusionRole::erPerimeter) { //Hopefully inner perimeter
+    if (loop.role() == ExtrusionRole::Perimeter) { //Hopefully inner perimeter
         const SeamCandidate &perimeter_point = layer_perimeters.points[seam_index];
         ExtrusionLoop::ClosestPathPoint projected_point = loop.get_closest_path_and_point(seam_point, false);
         // determine depth of the seam point.

@@ -148,7 +148,7 @@ namespace Slic3r {
     int
         OozePrevention::_get_temp(GCode& gcodegen)
     {
-        return (gcodegen.layer() != NULL && gcodegen.layer()->id() == 0)
+        return (gcodegen.layer() != nullptr && gcodegen.layer()->id() == 0)
             ? gcodegen.config().first_layer_temperature.get_at(gcodegen.writer().extruder()->id())
             : gcodegen.config().temperature.get_at(gcodegen.writer().extruder()->id());
     }
@@ -244,7 +244,7 @@ namespace Slic3r {
             gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
             gcode += gcodegen.travel_to(
                 wipe_tower_point_to_object_point(gcodegen, start_pos),
-                erMixed,
+                ExtrusionRole::Mixed,
                 "Travel to a Wipe Tower");
             gcode += gcodegen.unretract();
         }
@@ -864,7 +864,7 @@ namespace DoExport {
                         auto min_mm3_per_mm_no_ironing = [](const ExtrusionEntityCollection& eec) -> double {
                             double min = std::numeric_limits<double>::max();
                             for (const ExtrusionEntity* ee : eec.entities)
-                                if (ee->role() != erIroning)
+                                if (ee->role() != ExtrusionRole::Ironing)
                                     min = std::min(min, ee->min_mm3_per_mm());
                             return min;
                         };
@@ -1271,7 +1271,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     this->_print_first_layer_extruder_temperatures(file, print, start_gcode, initial_extruder_id, false);
 
     // adds tag for processor
-    file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(erCustom).c_str());
+    file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), gcode_extrusion_role_to_string(erCustom).c_str());
 
     // Write the custom start G-code
     file.writeln(start_gcode);
@@ -1320,7 +1320,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
                 m_enable_cooling_markers = false; // we're not filtering these moves through CoolingBuffer
                 m_avoid_crossing_perimeters.use_external_mp_once();
                 file.write(this->retract());
-                file.write(this->travel_to(Point(0, 0), erNone, "move to origin position for next object"));
+                file.write(this->travel_to(Point(0, 0), ExtrusionRole::None, "move to origin position for next object"));
                 m_enable_cooling_markers = true;
                 // Disable motion planner when traveling to first object point.
                 m_avoid_crossing_perimeters.disable_once();
@@ -1407,7 +1407,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     file.write(m_writer.set_fan(0));
 
     // adds tag for processor
-    file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(erCustom).c_str());
+    file.write_format(";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), gcode_extrusion_role_to_string(erCustom).c_str());
 
     // Process filament-specific gcode in extruder order.
     {
@@ -2305,8 +2305,8 @@ void GCode::process_layer_single_object(
     if (! print_wipe_extrusions && layer_to_print.support_layer != nullptr)
         if (const SupportLayer &support_layer = *layer_to_print.support_layer; ! support_layer.support_fills.entities.empty()) {
             ExtrusionRole   role               = support_layer.support_fills.role();
-            bool            has_support        = role == erMixed || role == erSupportMaterial;
-            bool            has_interface      = role == erMixed || role == erSupportMaterialInterface;
+            bool            has_support        = role == ExtrusionRole::Mixed || role == ExtrusionRole::SupportMaterial;
+            bool            has_interface      = role == ExtrusionRole::Mixed || role == ExtrusionRole::SupportMaterialInterface;
             // Extruder ID of the support base. -1 if "don't care".
             unsigned int    support_extruder   = print_object.config().support_material_extruder.value - 1;
             // Shall the support be printed with the active extruder, preferably with non-soluble, to avoid tool changes?
@@ -2340,8 +2340,8 @@ void GCode::process_layer_single_object(
                 m_layer = layer_to_print.support_layer;
                 m_object_layer_over_raft = false;
                 gcode += this->extrude_support(
-                    // support_extrusion_role is erSupportMaterial, erSupportMaterialInterface or erMixed for all extrusion paths.
-                    support_layer.support_fills.chained_path_from(m_last_pos, has_support ? (has_interface ? erMixed : erSupportMaterial) : erSupportMaterialInterface));
+                    // support_extrusion_role is ExtrusionRole::SupportMaterial, ExtrusionRole::SupportMaterialInterface or ExtrusionRole::Mixed for all extrusion paths.
+                    support_layer.support_fills.chained_path_from(m_last_pos, has_support ? (has_interface ? ExtrusionRole::Mixed : ExtrusionRole::SupportMaterial) : ExtrusionRole::SupportMaterialInterface));
             }
         }
 
@@ -2385,7 +2385,7 @@ void GCode::process_layer_single_object(
                     for (uint32_t fill_id : *it_fill_range) {
                         assert(dynamic_cast<ExtrusionEntityCollection*>(fills.entities[fill_id]));
                         if (auto *eec = static_cast<ExtrusionEntityCollection*>(fills.entities[fill_id]);
-                            (eec->role() == erIroning) == ironing && shall_print_this_extrusion_collection(eec, region)) {
+                            (eec->role() == ExtrusionRole::Ironing) == ironing && shall_print_this_extrusion_collection(eec, region)) {
                             if (eec->can_reverse())
                                 // Flatten the infill collection for better path planning.
                                 for (auto *ee : eec->entities)
@@ -2631,7 +2631,7 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view descr
     }
 
     // make a little move inwards before leaving loop
-    if (paths.back().role() == erExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 1 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 3) {
+    if (paths.back().role() == ExtrusionRole::ExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 1 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 3) {
         // detect angle between last and first segment
         // the side depends on the original winding order of the polygon (left for contours, right for holes)
         //FIXME improve the algorithm in case the loop is tiny.
@@ -2739,9 +2739,9 @@ std::string GCode::extrude_support(const ExtrusionEntityCollection &support_fill
         const double  support_interface_speed  = m_config.support_material_interface_speed.get_abs_value(support_speed);
         for (const ExtrusionEntity *ee : support_fills.entities) {
             ExtrusionRole role = ee->role();
-            assert(role == erSupportMaterial || role == erSupportMaterialInterface);
-            const auto   label = (role == erSupportMaterial) ? support_label : support_interface_label;
-            const double speed = (role == erSupportMaterial) ? support_speed : support_interface_speed;
+            assert(role == ExtrusionRole::SupportMaterial || role == ExtrusionRole::SupportMaterialInterface);
+            const auto   label = (role == ExtrusionRole::SupportMaterial) ? support_label : support_interface_label;
+            const double speed = (role == ExtrusionRole::SupportMaterial) ? support_speed : support_interface_speed;
             const ExtrusionPath *path = dynamic_cast<const ExtrusionPath*>(ee);
             if (path)
                 gcode += this->extrude_path(*path, label, speed);
@@ -2872,21 +2872,21 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
 
     // set speed
     if (speed == -1) {
-        if (path.role() == erPerimeter) {
+        if (path.role() == ExtrusionRole::Perimeter) {
             speed = m_config.get_abs_value("perimeter_speed");
-        } else if (path.role() == erExternalPerimeter) {
+        } else if (path.role() == ExtrusionRole::ExternalPerimeter) {
             speed = m_config.get_abs_value("external_perimeter_speed");
-        } else if (path.role() == erOverhangPerimeter || path.role() == erBridgeInfill) {
+        } else if (path.role() == ExtrusionRole::OverhangPerimeter || path.role() == ExtrusionRole::BridgeInfill) {
             speed = m_config.get_abs_value("bridge_speed");
-        } else if (path.role() == erInternalInfill) {
+        } else if (path.role() == ExtrusionRole::InternalInfill) {
             speed = m_config.get_abs_value("infill_speed");
-        } else if (path.role() == erSolidInfill) {
+        } else if (path.role() == ExtrusionRole::SolidInfill) {
             speed = m_config.get_abs_value("solid_infill_speed");
-        } else if (path.role() == erTopSolidInfill) {
+        } else if (path.role() == ExtrusionRole::TopSolidInfill) {
             speed = m_config.get_abs_value("top_solid_infill_speed");
-        } else if (path.role() == erIroning) {
+        } else if (path.role() == ExtrusionRole::Ironing) {
             speed = m_config.get_abs_value("ironing_speed");
-        } else if (path.role() == erGapFill) {
+        } else if (path.role() == ExtrusionRole::GapFill) {
             speed = m_config.get_abs_value("gap_fill_speed");
         } else {
             throw Slic3r::InvalidArgument("Invalid speed");
@@ -2927,9 +2927,9 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
     // extrude arc or line
     if (m_enable_extrusion_role_markers)
     {
-        if (path.role() != m_last_extrusion_role)
+        if (GCodeExtrusionRole role = extrusion_role_to_gcode_extrusion_role(path.role()); role != m_last_extrusion_role)
         {
-            m_last_extrusion_role = path.role();
+            m_last_extrusion_role = role;
             if (m_enable_extrusion_role_markers)
             {
                 char buf[32];
@@ -2945,10 +2945,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
     bool last_was_wipe_tower = (m_last_processor_extrusion_role == erWipeTower);
     assert(is_decimal_separator_point());
 
-    if (path.role() != m_last_processor_extrusion_role) {
-        m_last_processor_extrusion_role = path.role();
+    if (GCodeExtrusionRole role = extrusion_role_to_gcode_extrusion_role(path.role()); role != m_last_processor_extrusion_role) {
+        m_last_processor_extrusion_role = role;
         char buf[64];
-        sprintf(buf, ";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), ExtrusionEntity::role_to_string(m_last_processor_extrusion_role).c_str());
+        sprintf(buf, ";%s%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role).c_str(), gcode_extrusion_role_to_string(m_last_processor_extrusion_role).c_str());
         gcode += buf;
     }
 
@@ -2979,7 +2979,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             gcode += ";_BRIDGE_FAN_START\n";
         else
             comment = ";_EXTRUDE_SET_SPEED";
-        if (path.role() == erExternalPerimeter)
+        if (path.role() == ExtrusionRole::ExternalPerimeter)
             comment += ";_EXTERNAL_PERIMETER";
     }
 
@@ -3112,7 +3112,7 @@ bool GCode::needs_retraction(const Polyline &travel, ExtrusionRole role)
         return false;
     }
 
-    if (role == erSupportMaterial)
+    if (role == ExtrusionRole::SupportMaterial)
         if (const SupportLayer *support_layer = dynamic_cast<const SupportLayer*>(m_layer);
             support_layer != nullptr && ! support_layer->support_islands_bboxes.empty()) {
             BoundingBox bbox_travel = get_extents(travel);

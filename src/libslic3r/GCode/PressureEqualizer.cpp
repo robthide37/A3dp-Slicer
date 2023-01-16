@@ -60,7 +60,7 @@ PressureEqualizer::PressureEqualizer(const Slic3r::GCodeConfig &config) : m_use_
     }
 
     // Don't regulate the pressure before and after gap-fill and ironing.
-    for (const ExtrusionRole er : {erGapFill, erIroning}) {
+    for (const GCodeExtrusionRole er : {erGapFill, erIroning}) {
         m_max_volumetric_extrusion_rate_slopes[er].negative = 0;
         m_max_volumetric_extrusion_rate_slopes[er].positive = 0;
     }
@@ -185,7 +185,7 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     if (strncmp(line, EXTRUSION_ROLE_TAG.data(), EXTRUSION_ROLE_TAG.length()) == 0) {
         line += EXTRUSION_ROLE_TAG.length();
         int role = atoi(line);
-        m_current_extrusion_role = ExtrusionRole(role);
+        m_current_extrusion_role = GCodeExtrusionRole(role);
 #ifdef PRESSURE_EQUALIZER_DEBUG
         ++line_idx;
 #endif
@@ -542,7 +542,7 @@ void PressureEqualizer::adjust_volumetric_rate()
         for (size_t iRole = 1; iRole < erCount; ++ iRole) {
             const float &rate_slope = m_max_volumetric_extrusion_rate_slopes[iRole].negative;
             if (rate_slope == 0 || feedrate_per_extrusion_role[iRole] == std::numeric_limits<float>::max())
-                continue; // The negative rate is unlimited or the rate for ExtrusionRole iRole is unlimited.
+                continue; // The negative rate is unlimited or the rate for GCodeExtrusionRole iRole is unlimited.
 
             float rate_end = feedrate_per_extrusion_role[iRole];
             if (iRole == line.extrusion_role && rate_succ < rate_end)
@@ -600,7 +600,7 @@ void PressureEqualizer::adjust_volumetric_rate()
         for (size_t iRole = 1; iRole < erCount; ++ iRole) {
             const float &rate_slope = m_max_volumetric_extrusion_rate_slopes[iRole].positive;
             if (rate_slope == 0 || feedrate_per_extrusion_role[iRole] == std::numeric_limits<float>::max())
-                continue; // The positive rate is unlimited or the rate for ExtrusionRole iRole is unlimited.
+                continue; // The positive rate is unlimited or the rate for GCodeExtrusionRole iRole is unlimited.
 
             float rate_start = feedrate_per_extrusion_role[iRole];
             if (!line.adjustable_flow || line.extrusion_role == erExternalPerimeter || line.extrusion_role == erGapFill || line.extrusion_role == erBridgeInfill || line.extrusion_role == erIroning) {

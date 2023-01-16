@@ -415,7 +415,7 @@ void GCodeProcessor::UsedFilaments::process_role_cache(const GCodeProcessor* pro
         filament.first = role_cache / s * 0.001;
         filament.second = role_cache * processor->m_result.filament_densities[processor->m_extruder_id] * 0.001;
 
-        ExtrusionRole active_role = processor->m_extrusion_role;
+        GCodeExtrusionRole active_role = processor->m_extrusion_role;
         if (filaments_per_role.find(active_role) != filaments_per_role.end()) {
             filaments_per_role[active_role].first += filament.first;
             filaments_per_role[active_role].second += filament.second;
@@ -1170,14 +1170,14 @@ std::vector<std::pair<EMoveType, float>> GCodeProcessor::get_moves_time(PrintEst
     return ret;
 }
 
-std::vector<std::pair<ExtrusionRole, float>> GCodeProcessor::get_roles_time(PrintEstimatedStatistics::ETimeMode mode) const
+std::vector<std::pair<GCodeExtrusionRole, float>> GCodeProcessor::get_roles_time(PrintEstimatedStatistics::ETimeMode mode) const
 {
-    std::vector<std::pair<ExtrusionRole, float>> ret;
+    std::vector<std::pair<GCodeExtrusionRole, float>> ret;
     if (mode < PrintEstimatedStatistics::ETimeMode::Count) {
         for (size_t i = 0; i < m_time_processor.machines[static_cast<size_t>(mode)].roles_time.size(); ++i) {
             float time = m_time_processor.machines[static_cast<size_t>(mode)].roles_time[i];
             if (time > 0.0f)
-                ret.push_back({ static_cast<ExtrusionRole>(i), time });
+                ret.push_back({ static_cast<GCodeExtrusionRole>(i), time });
         }
     }
     return ret;
@@ -1645,7 +1645,7 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
 
     // extrusion role tag
     if (boost::starts_with(comment, reserved_tag(ETags::Role))) {
-        set_extrusion_role(ExtrusionEntity::string_to_role(comment.substr(reserved_tag(ETags::Role).length())));
+        set_extrusion_role(string_to_gcode_extrusion_role(comment.substr(reserved_tag(ETags::Role).length())));
         if (m_extrusion_role == erExternalPerimeter)
             m_seams_detector.activate(true);
         return;
@@ -3771,7 +3771,7 @@ void GCodeProcessor::store_move_vertex(EMoveType type, bool internal_only)
     }
 }
 
-void GCodeProcessor::set_extrusion_role(ExtrusionRole role)
+void GCodeProcessor::set_extrusion_role(GCodeExtrusionRole role)
 {
     m_used_filaments.process_role_cache(this);
     m_extrusion_role = role;

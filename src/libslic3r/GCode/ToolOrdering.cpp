@@ -197,7 +197,7 @@ void ToolOrdering::initialize_layers(std::vector<coordf_t> &zs)
     if (object.config().wipe_into_objects)
         return true;
 
-    if (!region.config().wipe_into_infill || eec.role() != erInternalInfill)
+    if (!region.config().wipe_into_infill || eec.role() != ExtrusionRole::InternalInfill)
         return false;
 
     return true;
@@ -210,8 +210,8 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
     for (auto support_layer : object.support_layers()) {
         LayerTools   &layer_tools = this->tools_for_layer(support_layer->print_z);
         ExtrusionRole role = support_layer->support_fills.role();
-        bool         has_support        = role == erMixed || role == erSupportMaterial;
-        bool         has_interface      = role == erMixed || role == erSupportMaterialInterface;
+        bool         has_support        = role == ExtrusionRole::Mixed || role == ExtrusionRole::SupportMaterial;
+        bool         has_interface      = role == ExtrusionRole::Mixed || role == ExtrusionRole::SupportMaterialInterface;
         unsigned int extruder_support   = object.config().support_material_extruder.value;
         unsigned int extruder_interface = object.config().support_material_interface_extruder.value;
         if (has_support)
@@ -266,10 +266,10 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
             for (const ExtrusionEntity *ee : layerm->fills()) {
                 // fill represents infill extrusions of a single island.
                 const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
-                ExtrusionRole role = fill->entities.empty() ? erNone : fill->entities.front()->role();
+                ExtrusionRole role = fill->entities.empty() ? ExtrusionRole::None : fill->entities.front()->role();
                 if (is_solid_infill(role))
                     has_solid_infill = true;
-                else if (role != erNone)
+                else if (role != ExtrusionRole::None)
                     has_infill = true;
 
                 if (m_print_config_ptr) {

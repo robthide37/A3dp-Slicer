@@ -58,7 +58,7 @@ public:
     bool is_external_perimeter() const
     {
         assert(origin_entity != nullptr);
-        return origin_entity->role() == erExternalPerimeter || origin_entity->role() == erOverhangPerimeter;
+        return origin_entity->role() == ExtrusionRole::ExternalPerimeter || origin_entity->role() == ExtrusionRole::OverhangPerimeter;
     }
 
     Vec2f                  a;
@@ -170,16 +170,15 @@ struct SliceConnection
 
 float get_flow_width(const LayerRegion *region, ExtrusionRole role)
 {
-    switch (role) {
-    case ExtrusionRole::erBridgeInfill: return region->flow(FlowRole::frExternalPerimeter).width();
-    case ExtrusionRole::erExternalPerimeter: return region->flow(FlowRole::frExternalPerimeter).width();
-    case ExtrusionRole::erGapFill: return region->flow(FlowRole::frInfill).width();
-    case ExtrusionRole::erPerimeter: return region->flow(FlowRole::frPerimeter).width();
-    case ExtrusionRole::erSolidInfill: return region->flow(FlowRole::frSolidInfill).width();
-    case ExtrusionRole::erInternalInfill: return region->flow(FlowRole::frInfill).width();
-    case ExtrusionRole::erTopSolidInfill: return region->flow(FlowRole::frTopSolidInfill).width();
-    default: return region->flow(FlowRole::frPerimeter).width();
-    }
+    if (role == ExtrusionRole::BridgeInfill) return region->flow(FlowRole::frExternalPerimeter).width();
+    if (role == ExtrusionRole::ExternalPerimeter) return region->flow(FlowRole::frExternalPerimeter).width();
+    if (role == ExtrusionRole::GapFill) return region->flow(FlowRole::frInfill).width();
+    if (role == ExtrusionRole::Perimeter) return region->flow(FlowRole::frPerimeter).width();
+    if (role == ExtrusionRole::SolidInfill) return region->flow(FlowRole::frSolidInfill).width();
+    if (role == ExtrusionRole::InternalInfill) return region->flow(FlowRole::frInfill).width();
+    if (role == ExtrusionRole::TopSolidInfill) return region->flow(FlowRole::frTopSolidInfill).width();
+    // default
+    return region->flow(FlowRole::frPerimeter).width();
 }
 
 std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length_limit)
@@ -800,7 +799,7 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
                     const LayerRegion *fill_region = layer->get_region(fill_range.region());
                     for (const auto &fill_idx : fill_range) {
                         const ExtrusionEntity *entity = fill_region->fills().entities[fill_idx];
-                        if (entity->role() == erBridgeInfill) {
+                        if (entity->role() == ExtrusionRole::BridgeInfill) {
                             for (const ExtrusionLine &bridge :
                                  check_extrusion_entity_stability(entity, fill_region, prev_layer_ext_perim_lines,prev_layer_boundary, params)) {
                                 if (bridge.support_point_generated) {

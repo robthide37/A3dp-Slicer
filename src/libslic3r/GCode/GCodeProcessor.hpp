@@ -47,7 +47,7 @@ namespace Slic3r {
             float travel_time;
             std::vector<std::pair<CustomGCode::Type, std::pair<float, float>>> custom_gcode_times;
             std::vector<std::pair<EMoveType, float>> moves_times;
-            std::vector<std::pair<ExtrusionRole, float>> roles_times;
+            std::vector<std::pair<GCodeExtrusionRole, float>> roles_times;
             std::vector<float> layers_times;
 
             void reset() {
@@ -62,7 +62,7 @@ namespace Slic3r {
 
         std::vector<double>                                 volumes_per_color_change;
         std::map<size_t, double>                            volumes_per_extruder;
-        std::map<ExtrusionRole, std::pair<double, double>>  used_filaments_per_role;
+        std::map<GCodeExtrusionRole, std::pair<double, double>> used_filaments_per_role;
         std::map<size_t, double>                            cost_per_extruder;
 
         std::array<Mode, static_cast<size_t>(ETimeMode::Count)> modes;
@@ -99,7 +99,7 @@ namespace Slic3r {
         {
             unsigned int gcode_id{ 0 };
             EMoveType type{ EMoveType::Noop };
-            ExtrusionRole extrusion_role{ erNone };
+            GCodeExtrusionRole extrusion_role{ erNone };
             unsigned char extruder_id{ 0 };
             unsigned char cp_color_id{ 0 };
             Vec3f position{ Vec3f::Zero() }; // mm
@@ -238,7 +238,7 @@ namespace Slic3r {
             };
 
             EMoveType move_type{ EMoveType::Noop };
-            ExtrusionRole role{ erNone };
+            GCodeExtrusionRole role{ erNone };
             unsigned int g1_line_id{ 0 };
             unsigned int layer_id{ 0 };
             float distance{ 0.0f }; // mm
@@ -310,7 +310,7 @@ namespace Slic3r {
             std::vector<TimeBlock> blocks;
             std::vector<G1LinesCacheItem> g1_times_cache;
             std::array<float, static_cast<size_t>(EMoveType::Count)> moves_time;
-            std::array<float, static_cast<size_t>(ExtrusionRole::erCount)> roles_time;
+            std::array<float, static_cast<size_t>(GCodeExtrusionRole::erCount)> roles_time;
             std::vector<float> layers_time;
 
             void reset();
@@ -360,7 +360,7 @@ namespace Slic3r {
             std::map<size_t, double> volumes_per_extruder;
 
             double role_cache;
-            std::map<ExtrusionRole, std::pair<double, double>> filaments_per_role; // ExtrusionRole -> (m, g)
+            std::map<GCodeExtrusionRole, std::pair<double, double>> filaments_per_role; // ExtrusionRole -> (m, g)
 
             void reset();
 
@@ -441,7 +441,7 @@ namespace Slic3r {
             {
                 float value;
                 float tag_value;
-                ExtrusionRole role;
+                GCodeExtrusionRole role;
             };
 
             std::string type;
@@ -454,7 +454,7 @@ namespace Slic3r {
                 : type(type), threshold(threshold)
             {}
 
-            void update(float value, ExtrusionRole role) {
+            void update(float value, GCodeExtrusionRole role) {
                 if (role != erCustom) {
                     ++count;
                     if (last_tag_value != 0.0f) {
@@ -539,7 +539,7 @@ namespace Slic3r {
         float m_mm3_per_mm;
         float m_fan_speed; // percentage
         float m_z_offset; // mm
-        ExtrusionRole m_extrusion_role;
+        GCodeExtrusionRole m_extrusion_role;
         unsigned char m_extruder_id;
         ExtruderColors m_extruder_colors;
         ExtruderTemps m_extruder_temps;
@@ -620,7 +620,7 @@ namespace Slic3r {
         std::vector<std::pair<CustomGCode::Type, std::pair<float, float>>> get_custom_gcode_times(PrintEstimatedStatistics::ETimeMode mode, bool include_remaining) const;
 
         std::vector<std::pair<EMoveType, float>> get_moves_time(PrintEstimatedStatistics::ETimeMode mode) const;
-        std::vector<std::pair<ExtrusionRole, float>> get_roles_time(PrintEstimatedStatistics::ETimeMode mode) const;
+        std::vector<std::pair<GCodeExtrusionRole, float>> get_roles_time(PrintEstimatedStatistics::ETimeMode mode) const;
         std::vector<float> get_layers_time(PrintEstimatedStatistics::ETimeMode mode) const;
 
     private:
@@ -757,7 +757,7 @@ namespace Slic3r {
 
         void store_move_vertex(EMoveType type, bool internal_only = false);
 
-        void set_extrusion_role(ExtrusionRole role);
+        void set_extrusion_role(GCodeExtrusionRole role);
 
         float minimum_feedrate(PrintEstimatedStatistics::ETimeMode mode, float feedrate) const;
         float minimum_travel_feedrate(PrintEstimatedStatistics::ETimeMode mode, float feedrate) const;

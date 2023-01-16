@@ -52,7 +52,7 @@ struct SurfaceFillParams
     Flow 			flow;
 
 	// For the output
-    ExtrusionRole	extrusion_role = ExtrusionRole(0);
+	ExtrusionRole	extrusion_role{ ExtrusionRole::None };
 
 	// Various print settings?
 
@@ -81,8 +81,7 @@ struct SurfaceFillParams
 		RETURN_COMPARE_NON_EQUAL(flow.height());
 		RETURN_COMPARE_NON_EQUAL(flow.nozzle_diameter());
 		RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, bridge);
-		RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, extrusion_role);
-		return false;
+		return this->extrusion_role.lower(rhs.extrusion_role);
 	}
 
 	bool operator==(const SurfaceFillParams &rhs) const {
@@ -145,10 +144,10 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 
 		        params.extrusion_role =
 		            is_bridge ?
-		                erBridgeInfill :
+		                ExtrusionRole::BridgeInfill :
 		                (surface.is_solid() ?
-		                    (surface.is_top() ? erTopSolidInfill : erSolidInfill) :
-		                    erInternalInfill);
+		                    (surface.is_top() ? ExtrusionRole::TopSolidInfill : ExtrusionRole::SolidInfill) :
+							ExtrusionRole::InternalInfill);
 		        params.bridge_angle = float(surface.bridge_angle);
 		        params.angle 		= float(Geometry::deg2rad(region_config.fill_angle.value));
 		        
@@ -282,7 +281,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        params.extruder 	 = layerm.region().extruder(frSolidInfill);
 	            params.pattern 		 = layerm.region().config().top_fill_pattern == ipMonotonic ? ipMonotonic : ipRectilinear;
 	            params.density 		 = 100.f;
-		        params.extrusion_role = erInternalInfill;
+		        params.extrusion_role = ExtrusionRole::InternalInfill;
 		        params.angle 		= float(Geometry::deg2rad(layerm.region().config().fill_angle.value));
 		        // calculate the actual flow we'll be using for this infill
 				params.flow = layerm.flow(frSolidInfill);
@@ -785,7 +784,7 @@ void Layer::make_ironing()
 				eec->no_sort = true;
 		        extrusion_entities_append_paths(
 		            eec->entities, std::move(polylines),
-		            erIroning,
+					ExtrusionRole::Ironing,
 		            flow_mm3_per_mm, extrusion_width, float(extrusion_height));
 				insert_fills_into_islands(*this, ironing_params.region_id, fill_begin, uint32_t(ironing_params.layerm->fills().size()));
 		    }

@@ -208,7 +208,7 @@ class GCodeViewer
         };
 
         EMoveType type{ EMoveType::Noop };
-        ExtrusionRole role{ erNone };
+        GCodeExtrusionRole role{ erNone };
         float delta_extruder{ 0.0f };
         float height{ 0.0f };
         float width{ 0.0f };
@@ -753,7 +753,7 @@ private:
     std::vector<ColorRGBA> m_tool_colors;
     Layers m_layers;
     std::array<unsigned int, 2> m_layers_z_range;
-    std::vector<ExtrusionRole> m_roles;
+    std::vector<GCodeExtrusionRole> m_roles;
     size_t m_extruders_count;
     std::vector<unsigned char> m_extruder_ids;
     std::vector<float> m_filament_diameters;
@@ -849,7 +849,7 @@ private:
 #if ENABLE_GCODE_VIEWER_STATISTICS
     void render_statistics();
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
-    bool is_visible(ExtrusionRole role) const {
+    bool is_visible(GCodeExtrusionRole role) const {
         return role < erCount && (m_extrusions.role_visibility_flags & (1 << role)) != 0;
     }
     bool is_visible(const Path& path) const { return is_visible(path.role); }
