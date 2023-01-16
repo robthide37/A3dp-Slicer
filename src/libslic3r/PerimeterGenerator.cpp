@@ -114,7 +114,7 @@ ExtrusionMultiPath PerimeterGenerator::thick_polyline_to_multi_path(const ThickP
         }
 
         const double w        = fmax(line.a_width, line.b_width);
-        const Flow   new_flow = (role == ExtrusionRole::OverhangPerimeter && flow.bridge()) ? flow : flow.with_width(unscale<float>(w) + flow.height() * float(1. - 0.25 * PI));
+        const Flow   new_flow = (role.is_bridge() && flow.bridge()) ? flow : flow.with_width(unscale<float>(w) + flow.height() * float(1. - 0.25 * PI));
         if (path.polyline.points.empty()) {
             path.polyline.append(line.a);
             path.polyline.append(line.b);
@@ -292,9 +292,9 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
     for (const PerimeterGeneratorLoop &loop : loops) {
         bool is_external = loop.is_external();
         
-        ExtrusionRole role = ExtrusionRole::None;
         ExtrusionLoopRole loop_role;
-        role = is_external ? ExtrusionRole::ExternalPerimeter : ExtrusionRole::Perimeter;
+        ExtrusionRole role_normal   = is_external ? ExtrusionRole::ExternalPerimeter : ExtrusionRole::Perimeter;
+        ExtrusionRole role_overhang = role_normal | ExtrusionRoleModifier::Bridge;
         if (loop.is_internal_contour()) {
             // Note that we set loop role to ContourInternalPerimeter
             // also when loop is both internal and external (i.e.
@@ -321,7 +321,7 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
             extrusion_paths_append(
                 paths,
                 intersection_pl({ polygon }, lower_slices_polygons_clipped),
-                role,
+                role_normal,
                 is_external ? params.ext_mm3_per_mm           : params.mm3_per_mm,
                 is_external ? params.ext_perimeter_flow.width() : params.perimeter_flow.width(),
                 float(params.layer_height));
@@ -332,7 +332,7 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
             extrusion_paths_append(
                 paths,
                 diff_pl({ polygon }, lower_slices_polygons_clipped),
-                ExtrusionRole::OverhangPerimeter,
+                role_overhang,
                 params.mm3_per_mm_overhang,
                 params.overhang_flow.width(),
                 params.overhang_flow.height());
@@ -341,7 +341,7 @@ static ExtrusionEntityCollection traverse_loops_classic(const PerimeterGenerator
             // We allow polyline reversal because Clipper may have randomly reversed polylines during clipping.
             chain_and_reorder_extrusion_paths(paths, &paths.front().first_point());
         } else {
-            ExtrusionPath path(role);
+            ExtrusionPath path(role_normal);
             path.polyline   = polygon.split_at_first_point();
             path.mm3_per_mm = is_external ? params.ext_mm3_per_mm             : params.mm3_per_mm;
             path.width      = is_external ? params.ext_perimeter_flow.width() : params.perimeter_flow.width();
@@ -503,7 +503,8 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
             continue;
 
         const bool    is_external = extrusion->inset_idx == 0;
-        ExtrusionRole role        = is_external ? ExtrusionRole::ExternalPerimeter : ExtrusionRole::Perimeter;
+        ExtrusionRole role_normal   = is_external ? ExtrusionRole::ExternalPerimeter : ExtrusionRole::Perimeter;
+        ExtrusionRole role_overhang = role_normal | ExtrusionRoleModifier::Bridge;
 
         if (pg_extrusion.fuzzify)
             fuzzy_extrusion_line(*extrusion, scaled<float>(params.config.fuzzy_skin_thickness.value), scaled<float>(params.config.fuzzy_skin_point_dist.value));
@@ -541,13 +542,13 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
             }
 
             // get non-overhang paths by intersecting this loop with the grown lower slices
-            extrusion_paths_append(paths, clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctIntersection), role,
+            extrusion_paths_append(paths, clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctIntersection), role_normal,
                                    is_external ? params.ext_perimeter_flow : params.perimeter_flow);
 
             // get overhang paths by checking what parts of this loop fall
             // outside the grown lower slices (thus where the distance between
             // the loop centerline and original lower slices is >= half nozzle diameter
-            extrusion_paths_append(paths, clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctDifference), ExtrusionRole::OverhangPerimeter,
+            extrusion_paths_append(paths, clip_extrusion(extrusion_path, lower_slices_paths, ClipperLib_Z::ctDifference), role_overhang,
                                    params.overhang_flow);
 
             // Reapply the nearest point search for starting point.
@@ -568,7 +569,7 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
                     for (const ExtrusionPath &path : paths) {
                         ++point_occurrence[path.polyline.first_point()].occurrence;
                         ++point_occurrence[path.polyline.last_point()].occurrence;
-                        if (path.role() == ExtrusionRole::OverhangPerimeter) {
+                        if (path.role().is_bridge()) {
                             point_occurrence[path.polyline.first_point()].is_overhang = true;
                             point_occurrence[path.polyline.last_point()].is_overhang  = true;
                         }
@@ -588,7 +589,7 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
                 chain_and_reorder_extrusion_paths(paths, &start_point);
             }
         } else {
-            extrusion_paths_append(paths, *extrusion, role, is_external ? params.ext_perimeter_flow : params.perimeter_flow);
+            extrusion_paths_append(paths, *extrusion, role_normal, is_external ? params.ext_perimeter_flow : params.perimeter_flow);
         }
 
         // Append paths to collection.
