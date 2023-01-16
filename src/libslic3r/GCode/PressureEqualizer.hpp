@@ -3,7 +3,7 @@
 
 #include "../libslic3r.h"
 #include "../PrintConfig.hpp"
-#include "../ExtrusionEntity.hpp"
+#include "../ExtrusionRole.hpp"
 
 #include <queue>
 

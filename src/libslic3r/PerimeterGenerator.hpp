@@ -3,6 +3,7 @@
 
 #include "libslic3r.h"
 #include <vector>
+#include "ExtrusionEntityCollection.hpp"
 #include "Flow.hpp"
 #include "Polygon.hpp"
 #include "PrintConfig.hpp"

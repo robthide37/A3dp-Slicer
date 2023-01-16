@@ -3,7 +3,7 @@
 
 #include "libslic3r/GCodeReader.hpp"
 #include "libslic3r/Point.hpp"
-#include "libslic3r/ExtrusionEntity.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/CustomGCode.hpp"
 
