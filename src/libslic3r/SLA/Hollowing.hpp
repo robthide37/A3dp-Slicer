@@ -91,15 +91,15 @@ inline InteriorPtr generate_interior(const indexed_triangle_set &mesh,
     auto statusfn = [&ctl](int){ return ctl.stopcondition && ctl.stopcondition(); };
     auto grid = mesh_to_grid(mesh, MeshToGridParams{}
                                               .voxel_scale(voxel_scale)
-                                              .exterior_bandwidth(1.f)
-                                              .interior_bandwidth(1.f)
+                                              .exterior_bandwidth(3.f)
+                                              .interior_bandwidth(3.f)
                                               .statusfn(statusfn));
 
     if (!grid || (ctl.stopcondition && ctl.stopcondition()))
         return {};
 
-    if (its_is_splittable(mesh))
-        grid = redistance_grid(*grid, 0.0f, 6.f / voxel_scale, 6.f / voxel_scale);
+//    if (its_is_splittable(mesh))
+    grid = redistance_grid(*grid, 0.0f, 3.f, 3.f);
 
     return grid ? generate_interior(*grid, hc, ctl) : InteriorPtr{};
 }
@@ -132,11 +132,12 @@ InteriorPtr generate_interior(const Range<It>       &csgparts,
                               const JobController   &ctl = {})
 {
     double mesh_vol = csgmesh_positive_maxvolume(csgparts);
+    double voxsc    = get_voxel_scale(mesh_vol, hc);
 
     auto params = csg::VoxelizeParams{}
-                      .voxel_scale(get_voxel_scale(mesh_vol, hc))
-                      .exterior_bandwidth(1.f)
-                      .interior_bandwidth(1.f)
+                      .voxel_scale(voxsc)
+                      .exterior_bandwidth(3.f)
+                      .interior_bandwidth(3.f)
                       .statusfn([&ctl](int){ return ctl.stopcondition && ctl.stopcondition(); });
 
     auto ptr = csg::voxelize_csgmesh(csgparts, params);
@@ -144,11 +145,10 @@ InteriorPtr generate_interior(const Range<It>       &csgparts,
     if (!ptr || (ctl.stopcondition && ctl.stopcondition()))
         return {};
 
-    if (csgparts.size() > 1 || its_is_splittable(*csg::get_mesh(*csgparts.begin())))
-        ptr = redistance_grid(*ptr,
-                              0.0f,
-                              6.f / params.voxel_scale(),
-                              6.f / params.voxel_scale());
+    // TODO: figure out issues without the redistance
+//    if (csgparts.size() > 1 || its_is_splittable(*csg::get_mesh(*csgparts.begin())))
+
+    ptr = redistance_grid(*ptr, 0.0f, 3.f, 3.f);
 
     return ptr ? generate_interior(*ptr, hc, ctl) : InteriorPtr{};
 }

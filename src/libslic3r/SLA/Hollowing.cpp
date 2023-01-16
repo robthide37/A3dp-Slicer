@@ -75,11 +75,12 @@ InteriorPtr generate_interior(const VoxelGrid       &vgrid,
                               const HollowingConfig &hc,
                               const JobController   &ctl)
 {
-    double offset   = hc.min_thickness;
-    double D        = hc.closing_distance;
-    float  in_range = 1.1f * float(offset + D);
-    auto   narrowb  = 3.f / get_voxel_scale(vgrid);
-    float  out_range = narrowb;
+    double voxsc    = get_voxel_scale(vgrid);
+    double offset   = hc.min_thickness;              // world units
+    double D        = hc.closing_distance;           // world units
+    float  in_range = 1.1f * float(offset + D);      // world units
+    float  out_range = 1.f / voxsc; // world units
+    auto   narrowb  = 1.f;  // voxel units (voxel count)
 
     if (ctl.stopcondition()) return {};
     else ctl.statuscb(0, L("Hollowing"));
@@ -91,12 +92,12 @@ InteriorPtr generate_interior(const VoxelGrid       &vgrid,
 
     double iso_surface = D;
     if (D > EPSILON) {
-        in_range = narrowb;
-        gridptr = redistance_grid(*gridptr, -(offset + D), narrowb, in_range);
+        gridptr = redistance_grid(*gridptr, -(offset + D), narrowb, narrowb);
 
-        gridptr = dilate_grid(*gridptr, std::ceil(iso_surface), 0.f);
+        gridptr = dilate_grid(*gridptr, 1.1 * std::ceil(iso_surface), 0.f);
 
         out_range = iso_surface;
+        in_range  = narrowb / voxsc;
     } else {
         iso_surface = -offset;
     }

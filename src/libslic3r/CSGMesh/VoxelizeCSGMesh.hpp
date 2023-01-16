@@ -37,7 +37,11 @@ inline void perform_csg(CSGType op, VoxelGridPtr &dst, VoxelGridPtr &src)
 
     switch (op) {
     case CSGType::Union:
-        grid_union(*dst, *src);
+        if (is_grid_empty(*dst) && !is_grid_empty(*src))
+            dst = clone(*src);
+        else
+            grid_union(*dst, *src);
+
         break;
     case CSGType::Difference:
         grid_difference(*dst, *src);

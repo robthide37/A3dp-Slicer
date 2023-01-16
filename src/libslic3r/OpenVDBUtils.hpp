@@ -77,6 +77,8 @@ void grid_union(VoxelGrid &grid, VoxelGrid &arg);
 void grid_difference(VoxelGrid &grid, VoxelGrid &arg);
 void grid_intersection(VoxelGrid &grid, VoxelGrid &arg);
 
+bool is_grid_empty(const VoxelGrid &grid);
+
 } // namespace Slic3r
 
 #endif // OPENVDBUTILS_HPP

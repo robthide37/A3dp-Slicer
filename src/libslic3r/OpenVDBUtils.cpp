@@ -300,4 +300,9 @@ void rescale_grid(VoxelGrid &grid, float scale)
 //    grid.grid.setTransform(tr);
 }
 
+bool is_grid_empty(const VoxelGrid &grid)
+{
+    return grid.grid.empty();
+}
+
 } // namespace Slic3r
