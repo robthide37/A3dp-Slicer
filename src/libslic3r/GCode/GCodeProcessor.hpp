@@ -99,7 +99,7 @@ namespace Slic3r {
         {
             unsigned int gcode_id{ 0 };
             EMoveType type{ EMoveType::Noop };
-            GCodeExtrusionRole extrusion_role{ erNone };
+            GCodeExtrusionRole extrusion_role{ GCodeExtrusionRole::None };
             unsigned char extruder_id{ 0 };
             unsigned char cp_color_id{ 0 };
             Vec3f position{ Vec3f::Zero() }; // mm
@@ -238,7 +238,7 @@ namespace Slic3r {
             };
 
             EMoveType move_type{ EMoveType::Noop };
-            GCodeExtrusionRole role{ erNone };
+            GCodeExtrusionRole role{ GCodeExtrusionRole::None };
             unsigned int g1_line_id{ 0 };
             unsigned int layer_id{ 0 };
             float distance{ 0.0f }; // mm
@@ -310,7 +310,7 @@ namespace Slic3r {
             std::vector<TimeBlock> blocks;
             std::vector<G1LinesCacheItem> g1_times_cache;
             std::array<float, static_cast<size_t>(EMoveType::Count)> moves_time;
-            std::array<float, static_cast<size_t>(GCodeExtrusionRole::erCount)> roles_time;
+            std::array<float, static_cast<size_t>(GCodeExtrusionRole::Count)> roles_time;
             std::vector<float> layers_time;
 
             void reset();
@@ -455,7 +455,7 @@ namespace Slic3r {
             {}
 
             void update(float value, GCodeExtrusionRole role) {
-                if (role != erCustom) {
+                if (role != GCodeExtrusionRole::Custom) {
                     ++count;
                     if (last_tag_value != 0.0f) {
                         if (std::abs(value - last_tag_value) / last_tag_value > threshold)

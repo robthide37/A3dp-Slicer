@@ -11,42 +11,42 @@ namespace Slic3r {
 // GCodeExtrusionRole is to be serialized into G-code and deserialized by G-code viewer,
 GCodeExtrusionRole extrusion_role_to_gcode_extrusion_role(ExtrusionRole role)
 {
-    if (role == ExtrusionRole::None)                return erNone;
-    if (role == ExtrusionRole::Perimeter)           return erPerimeter;
-    if (role == ExtrusionRole::ExternalPerimeter)   return erExternalPerimeter;
-    if (role == ExtrusionRole::OverhangPerimeter)   return erOverhangPerimeter;
-    if (role == ExtrusionRole::InternalInfill)      return erInternalInfill;
-    if (role == ExtrusionRole::SolidInfill)         return erSolidInfill;
-    if (role == ExtrusionRole::TopSolidInfill)      return erTopSolidInfill;
-    if (role == ExtrusionRole::Ironing)             return erIroning;
-    if (role == ExtrusionRole::BridgeInfill)        return erBridgeInfill;
-    if (role == ExtrusionRole::GapFill)             return erGapFill;
-    if (role == ExtrusionRole::Skirt)               return erSkirt;
-    if (role == ExtrusionRole::SupportMaterial)     return erSupportMaterial;
-    if (role == ExtrusionRole::SupportMaterialInterface) return erSupportMaterialInterface;
-    if (role == ExtrusionRole::WipeTower)           return erWipeTower;
+    if (role == ExtrusionRole::None)                return GCodeExtrusionRole::None;
+    if (role == ExtrusionRole::Perimeter)           return GCodeExtrusionRole::Perimeter;
+    if (role == ExtrusionRole::ExternalPerimeter)   return GCodeExtrusionRole::ExternalPerimeter;
+    if (role == ExtrusionRole::OverhangPerimeter)   return GCodeExtrusionRole::OverhangPerimeter;
+    if (role == ExtrusionRole::InternalInfill)      return GCodeExtrusionRole::InternalInfill;
+    if (role == ExtrusionRole::SolidInfill)         return GCodeExtrusionRole::SolidInfill;
+    if (role == ExtrusionRole::TopSolidInfill)      return GCodeExtrusionRole::TopSolidInfill;
+    if (role == ExtrusionRole::Ironing)             return GCodeExtrusionRole::Ironing;
+    if (role == ExtrusionRole::BridgeInfill)        return GCodeExtrusionRole::BridgeInfill;
+    if (role == ExtrusionRole::GapFill)             return GCodeExtrusionRole::GapFill;
+    if (role == ExtrusionRole::Skirt)               return GCodeExtrusionRole::Skirt;
+    if (role == ExtrusionRole::SupportMaterial)     return GCodeExtrusionRole::SupportMaterial;
+    if (role == ExtrusionRole::SupportMaterialInterface) return GCodeExtrusionRole::SupportMaterialInterface;
+    if (role == ExtrusionRole::WipeTower)           return GCodeExtrusionRole::WipeTower;
     assert(false);
-    return erNone;
+    return GCodeExtrusionRole::None;
 }
 
 std::string gcode_extrusion_role_to_string(GCodeExtrusionRole role)
 {
     switch (role) {
-        case erNone                         : return L("Unknown");
-        case erPerimeter                    : return L("Perimeter");
-        case erExternalPerimeter            : return L("External perimeter");
-        case erOverhangPerimeter            : return L("Overhang perimeter");
-        case erInternalInfill               : return L("Internal infill");
-        case erSolidInfill                  : return L("Solid infill");
-        case erTopSolidInfill               : return L("Top solid infill");
-        case erIroning                      : return L("Ironing");
-        case erBridgeInfill                 : return L("Bridge infill");
-        case erGapFill                      : return L("Gap fill");
-        case erSkirt                        : return L("Skirt/Brim");
-        case erSupportMaterial              : return L("Support material");
-        case erSupportMaterialInterface     : return L("Support material interface");
-        case erWipeTower                    : return L("Wipe tower");
-        case erCustom                       : return L("Custom");
+        case GCodeExtrusionRole::None                         : return L("Unknown");
+        case GCodeExtrusionRole::Perimeter                    : return L("Perimeter");
+        case GCodeExtrusionRole::ExternalPerimeter            : return L("External perimeter");
+        case GCodeExtrusionRole::OverhangPerimeter            : return L("Overhang perimeter");
+        case GCodeExtrusionRole::InternalInfill               : return L("Internal infill");
+        case GCodeExtrusionRole::SolidInfill                  : return L("Solid infill");
+        case GCodeExtrusionRole::TopSolidInfill               : return L("Top solid infill");
+        case GCodeExtrusionRole::Ironing                      : return L("Ironing");
+        case GCodeExtrusionRole::BridgeInfill                 : return L("Bridge infill");
+        case GCodeExtrusionRole::GapFill                      : return L("Gap fill");
+        case GCodeExtrusionRole::Skirt                        : return L("Skirt/Brim");
+        case GCodeExtrusionRole::SupportMaterial              : return L("Support material");
+        case GCodeExtrusionRole::SupportMaterialInterface     : return L("Support material interface");
+        case GCodeExtrusionRole::WipeTower                    : return L("Wipe tower");
+        case GCodeExtrusionRole::Custom                       : return L("Custom");
         default                             : assert(false);
     }
     return {};
@@ -55,35 +55,35 @@ std::string gcode_extrusion_role_to_string(GCodeExtrusionRole role)
 GCodeExtrusionRole string_to_gcode_extrusion_role(const std::string_view role)
 {
     if (role == L("Perimeter"))
-        return erPerimeter;
+        return GCodeExtrusionRole::Perimeter;
     else if (role == L("External perimeter"))
-        return erExternalPerimeter;
+        return GCodeExtrusionRole::ExternalPerimeter;
     else if (role == L("Overhang perimeter"))
-        return erOverhangPerimeter;
+        return GCodeExtrusionRole::OverhangPerimeter;
     else if (role == L("Internal infill"))
-        return erInternalInfill;
+        return GCodeExtrusionRole::InternalInfill;
     else if (role == L("Solid infill"))
-        return erSolidInfill;
+        return GCodeExtrusionRole::SolidInfill;
     else if (role == L("Top solid infill"))
-        return erTopSolidInfill;
+        return GCodeExtrusionRole::TopSolidInfill;
     else if (role == L("Ironing"))
-        return erIroning;
+        return GCodeExtrusionRole::Ironing;
     else if (role == L("Bridge infill"))
-        return erBridgeInfill;
+        return GCodeExtrusionRole::BridgeInfill;
     else if (role == L("Gap fill"))
-        return erGapFill;
+        return GCodeExtrusionRole::GapFill;
     else if (role == L("Skirt") || role == L("Skirt/Brim")) // "Skirt" is for backward compatibility with 2.3.1 and earlier
-        return erSkirt;
+        return GCodeExtrusionRole::Skirt;
     else if (role == L("Support material"))
-        return erSupportMaterial;
+        return GCodeExtrusionRole::SupportMaterial;
     else if (role == L("Support material interface"))
-        return erSupportMaterialInterface;
+        return GCodeExtrusionRole::SupportMaterialInterface;
     else if (role == L("Wipe tower"))
-        return erWipeTower;
+        return GCodeExtrusionRole::WipeTower;
     else if (role == L("Custom"))
-        return erCustom;
+        return GCodeExtrusionRole::Custom;
     else
-        return erNone;
+        return GCodeExtrusionRole::None;
 }
 
 }

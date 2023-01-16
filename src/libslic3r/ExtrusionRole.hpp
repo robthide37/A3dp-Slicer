@@ -114,25 +114,28 @@ inline bool is_bridge(ExtrusionRole role) {
         || role == ExtrusionRole::OverhangPerimeter;
 }
 
-enum GCodeExtrusionRole : uint8_t {
-    erNone,
-    erPerimeter,
-    erExternalPerimeter,
-    erOverhangPerimeter,
-    erInternalInfill,
-    erSolidInfill,
-    erTopSolidInfill,
-    erIroning,
-    erBridgeInfill,
-    erGapFill,
-    erSkirt,
-    erSupportMaterial,
-    erSupportMaterialInterface,
-    erWipeTower,
+// Be careful when editing this list as many parts of the code depend
+// on the values of these ordinars, for example
+// GCodeViewer::Extrusion_Role_Colors
+enum class GCodeExtrusionRole : uint8_t {
+    None,
+    Perimeter,
+    ExternalPerimeter,
+    OverhangPerimeter,
+    InternalInfill,
+    SolidInfill,
+    TopSolidInfill,
+    Ironing,
+    BridgeInfill,
+    GapFill,
+    Skirt,
+    SupportMaterial,
+    SupportMaterialInterface,
+    WipeTower,
     // Custom (user defined) G-code block, for example start / end G-code.
-    erCustom,
+    Custom,
     // Stopper to count number of enums.
-    erCount
+    Count
 };
 
 // Convert a rich bitmask based ExtrusionRole to a less expressive ordinal GCodeExtrusionRole.

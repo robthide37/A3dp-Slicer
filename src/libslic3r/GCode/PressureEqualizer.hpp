@@ -65,7 +65,7 @@ private:
         float positive;
         float negative;
     };
-    ExtrusionRateSlope              m_max_volumetric_extrusion_rate_slopes[erCount];
+    ExtrusionRateSlope              m_max_volumetric_extrusion_rate_slopes[size_t(GCodeExtrusionRole::Count)];
     float                           m_max_volumetric_extrusion_rate_slope_positive;
     float                           m_max_volumetric_extrusion_rate_slope_negative;
 
