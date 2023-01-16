@@ -1,6 +1,7 @@
 #include "Downloader.hpp"
 #include "GUI_App.hpp"
 #include "NotificationManager.hpp"
+#include "format.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
