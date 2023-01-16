@@ -276,7 +276,7 @@ private:
                 _L("Developed by Prusa Research.") + "\n\n" +
                 title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + ".\n\n" +
                 _L("Contributions by Vojtech Bubnik, Enrico Turri, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.") + "\n\n" +
-                _L("Artwork model by Leslie Ing");
+                _L("Artwork model by Creative Tools");
 
             title_font = version_font = credits_font = init_font;
         }
