@@ -146,14 +146,15 @@ void Downloader::start_download(const std::string& full_url)
 #else
     std::string escaped_url = FileGet::escape_url(full_url.substr(24));
 #endif
-	// TODO: enable after testing
-	/*
-	if (!boost::starts_with(escaped_url, "https://media.printables.com/")) {
-		BOOST_LOG_TRIVIAL(error) << "Download won't start. Download URL doesn't point to https://media.printables.com : " << escaped_url;
-		// TODO: show error?
+
+	if (!boost::starts_with(escaped_url, "https://files.printables.com") && !boost::starts_with(escaped_url, "https://dev-files.printables.com")) {
+		std::string msg = format(_L("Download won't start. Download URL doesn't point to https://files.printables.com : %1%"), escaped_url);
+		BOOST_LOG_TRIVIAL(error) << msg;
+		NotificationManager* ntf_mngr = wxGetApp().notification_manager();
+		ntf_mngr->push_notification(NotificationType::CustomNotification, NotificationManager::NotificationLevel::RegularNotificationLevel, msg);
 		return;
 	}
-	*/
+	
 	std::string text(escaped_url);
     m_downloads.emplace_back(std::make_unique<Download>(id, std::move(escaped_url), this, m_dest_folder));
 	NotificationManager* ntf_mngr = wxGetApp().notification_manager();
