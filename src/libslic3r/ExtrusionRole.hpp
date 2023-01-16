@@ -58,7 +58,7 @@ struct ExtrusionRole : public ExtrusionRoleModifiers
     //FIXME why there is no bottom solid infill type?
     static constexpr const ExtrusionRoleModifiers TopSolidInfill{ ExtrusionRoleModifier::Infill | ExtrusionRoleModifier::Solid | ExtrusionRoleModifier::External };
     // Ironing infill at the top surfaces.
-    static constexpr const ExtrusionRoleModifiers Ironing{ ExtrusionRoleModifier::Infill | ExtrusionRoleModifier::Ironing | ExtrusionRoleModifier::External };
+    static constexpr const ExtrusionRoleModifiers Ironing{ ExtrusionRoleModifier::Infill | ExtrusionRoleModifier::Solid | ExtrusionRoleModifier::Ironing | ExtrusionRoleModifier::External };
     // Visible bridging infill at the bottom of an object.
     static constexpr const ExtrusionRoleModifiers BridgeInfill{ ExtrusionRoleModifier::Infill | ExtrusionRoleModifier::Solid | ExtrusionRoleModifier::Bridge | ExtrusionRoleModifier::External };
 //    static constexpr const ExtrusionRoleModifiers InternalBridgeInfill{ ExtrusionRoleModifier::Infill | ExtrusionRoleModifier::Solid | ExtrusionRoleModifier::Bridge };
@@ -76,6 +76,13 @@ struct ExtrusionRole : public ExtrusionRoleModifiers
     static constexpr const ExtrusionRoleModifiers WipeTower{ ExtrusionRoleModifier::Wipe };
     // Extrusion role for a collection with multiple extrusion roles.
     static constexpr const ExtrusionRoleModifiers Mixed{ ExtrusionRoleModifier::Mixed };
+
+    bool is_perimeter() const { return this->ExtrusionRoleModifiers::has(ExtrusionRoleModifier::Perimeter); }
+    bool is_external_perimeter() const { return this->is_perimeter() && this->is_external(); }
+    bool is_infill() const { return this->ExtrusionRoleModifiers::has(ExtrusionRoleModifier::Infill); }
+    bool is_solid_infill() const { return this->is_infill() && this->ExtrusionRoleModifiers::has(ExtrusionRoleModifier::Solid); }
+    bool is_external() const { return this->ExtrusionRoleModifiers::has(ExtrusionRoleModifier::External); }
+    bool is_bridge() const { return this->ExtrusionRoleModifiers::has(ExtrusionRoleModifier::Bridge); }
 };
 
 // Special flags describing loop
@@ -84,35 +91,6 @@ enum ExtrusionLoopRole {
     elrContourInternalPerimeter,
     elrSkirt,
 };
-
-inline bool is_perimeter(ExtrusionRole role)
-{
-    return role == ExtrusionRole::Perimeter
-        || role == ExtrusionRole::ExternalPerimeter
-        || role == ExtrusionRole::OverhangPerimeter;
-}
-
-inline bool is_infill(ExtrusionRole role)
-{
-    return role == ExtrusionRole::BridgeInfill
-        || role == ExtrusionRole::InternalInfill
-        || role == ExtrusionRole::SolidInfill
-        || role == ExtrusionRole::TopSolidInfill
-        || role == ExtrusionRole::Ironing;
-}
-
-inline bool is_solid_infill(ExtrusionRole role)
-{
-    return role == ExtrusionRole::BridgeInfill
-        || role == ExtrusionRole::SolidInfill
-        || role == ExtrusionRole::TopSolidInfill
-        || role == ExtrusionRole::Ironing;
-}
-
-inline bool is_bridge(ExtrusionRole role) {
-    return role == ExtrusionRole::BridgeInfill
-        || role == ExtrusionRole::OverhangPerimeter;
-}
 
 // Be careful when editing this list as many parts of the code depend
 // on the values of these ordinars, for example

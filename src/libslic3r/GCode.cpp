@@ -2601,7 +2601,7 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view descr
     if (paths.empty()) return "";
 
     // apply the small perimeter speed
-    if (is_perimeter(paths.front().role()) && loop.length() <= SMALL_PERIMETER_LENGTH && speed == -1)
+    if (paths.front().role().is_perimeter() && loop.length() <= SMALL_PERIMETER_LENGTH && speed == -1)
         speed = m_config.small_perimeter_speed.get_abs_value(m_config.perimeter_speed);
 
     // extrude along the path
@@ -2618,7 +2618,7 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view descr
         m_wipe.path = paths.front().polyline;
 
         for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
-            if (is_bridge(it->role()))
+            if (it->role().is_bridge())
                 break; // Don't perform a wipe on bridges.
 
             assert(it->polyline.points.size() >= 2);
@@ -2686,7 +2686,7 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::s
         m_wipe.path.reverse();
 
         for (auto it = std::next(multipath.paths.rbegin()); it != multipath.paths.rend(); ++it) {
-            if (is_bridge(it->role()))
+            if (it->role().is_bridge())
                 break; // Do not perform a wipe on bridges.
 
             assert(it->polyline.points.size() >= 2);
@@ -2831,7 +2831,7 @@ void GCode::GCodeOutputStream::write_format(const char* format, ...)
 std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view description, double speed)
 {
     std::string gcode;
-    const std::string_view description_bridge = is_bridge(path.role()) ? " (bridge)"sv : ""sv;
+    const std::string_view description_bridge = path.role().is_bridge() ? " (bridge)"sv : ""sv;
 
     // go to first point of extrusion path
     if (!m_last_pos_defined || m_last_pos != path.first_point()) {
@@ -2852,11 +2852,11 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             acceleration = m_config.first_layer_acceleration.value;
         } else if (this->object_layer_over_raft() && m_config.first_layer_acceleration_over_raft.value > 0) {
             acceleration = m_config.first_layer_acceleration_over_raft.value;
-        } else if (m_config.bridge_acceleration.value > 0 && is_bridge(path.role())) {
+        } else if (m_config.bridge_acceleration.value > 0 && path.role().is_bridge()) {
             acceleration = m_config.bridge_acceleration.value;
-        } else if (m_config.infill_acceleration.value > 0 && is_infill(path.role())) {
+        } else if (m_config.infill_acceleration.value > 0 && path.role().is_infill()) {
             acceleration = m_config.infill_acceleration.value;
-        } else if (m_config.perimeter_acceleration.value > 0 && is_perimeter(path.role())) {
+        } else if (m_config.perimeter_acceleration.value > 0 && path.role().is_perimeter()) {
             acceleration = m_config.perimeter_acceleration.value;
         } else {
             acceleration = m_config.default_acceleration.value;
@@ -2876,7 +2876,8 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             speed = m_config.get_abs_value("perimeter_speed");
         } else if (path.role() == ExtrusionRole::ExternalPerimeter) {
             speed = m_config.get_abs_value("external_perimeter_speed");
-        } else if (path.role() == ExtrusionRole::OverhangPerimeter || path.role() == ExtrusionRole::BridgeInfill) {
+        } else if (path.role().is_bridge()) {
+            assert(path.role() == ExtrusionRole::OverhangPerimeter || path.role() == ExtrusionRole::BridgeInfill);
             speed = m_config.get_abs_value("bridge_speed");
         } else if (path.role() == ExtrusionRole::InternalInfill) {
             speed = m_config.get_abs_value("infill_speed");
@@ -2915,7 +2916,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
 
     bool                        variable_speed = false;
     std::vector<ProcessedPoint> new_points{};
-    if (this->m_config.enable_dynamic_overhang_speeds && !this->on_first_layer() && is_perimeter(path.role())) {
+    if (this->m_config.enable_dynamic_overhang_speeds && !this->on_first_layer() && path.role().is_perimeter()) {
         new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path, m_config.overhang_overlap_levels,
                                                                                   m_config.dynamic_overhang_speeds,
                                                                                   m_config.get_abs_value("external_perimeter_speed"), speed);
@@ -2975,7 +2976,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
 
     std::string comment;
     if (m_enable_cooling_markers) {
-        if (is_bridge(path.role()))
+        if (path.role().is_bridge())
             gcode += ";_BRIDGE_FAN_START\n";
         else
             comment = ";_EXTRUDE_SET_SPEED";
@@ -3026,7 +3027,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
     }
 
     if (m_enable_cooling_markers)
-        gcode += is_bridge(path.role()) ? ";_BRIDGE_FAN_END\n" : ";_EXTRUDE_END\n";
+        gcode += path.role().is_bridge() ? ";_BRIDGE_FAN_END\n" : ";_EXTRUDE_END\n";
 
     this->set_last_pos(path.last_point());
     return gcode;

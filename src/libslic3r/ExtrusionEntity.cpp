@@ -50,7 +50,7 @@ void ExtrusionPath::polygons_covered_by_spacing(Polygons &out, const float scale
 {
     // Instantiating the Flow class to get the line spacing.
     // Don't know the nozzle diameter, setting to zero. It shall not matter it shall be optimized out by the compiler.
-    bool bridge = is_bridge(this->role());
+    bool bridge = this->role().is_bridge();
     assert(! bridge || this->width == this->height);
     auto flow = bridge ? Flow::bridging_flow(this->width, 0.f) : Flow(this->width, this->height, 0.f);
     polygons_append(out, offset(this->polyline, 0.5f * float(flow.scaled_spacing()) + scaled_epsilon));
@@ -208,7 +208,7 @@ ExtrusionLoop::ClosestPathPoint ExtrusionLoop::get_closest_path_and_point(const 
             out.segment_idx = foot_pt_.first;
             min2            = d2;
         }
-        if (prefer_non_overhang && !is_bridge(path.role()) && d2 < min2_non_overhang) {
+        if (prefer_non_overhang && ! path.role().is_bridge() && d2 < min2_non_overhang) {
             best_non_overhang.foot_pt     = foot_pt_.second;
             best_non_overhang.path_idx    = &path - &this->paths.front();
             best_non_overhang.segment_idx = foot_pt_.first;
@@ -294,7 +294,7 @@ bool ExtrusionLoop::has_overhang_point(const Point &point) const
         if (pos != -1) {
             // point belongs to this path
             // we consider it overhang only if it's not an endpoint
-            return (is_bridge(path.role()) && pos > 0 && pos != (int)(path.polyline.points.size())-1);
+            return (path.role().is_bridge() && pos > 0 && pos != int(path.polyline.points.size())-1);
         }
     }
     return false;

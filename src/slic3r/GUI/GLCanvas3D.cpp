@@ -6556,7 +6556,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                             const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
                             if (! fill->entities.empty())
                                 _3DScene::extrusionentity_to_verts(*fill, float(layer->print_z), copy,
-                                    select_geometry(idx_layer, is_solid_infill(fill->entities.front()->role()) ?
+                                    select_geometry(idx_layer, fill->entities.front()->role().is_solid_infill() ?
                                                     layerm->region().config().solid_infill_extruder :
                                                     layerm->region().config().infill_extruder, 1));
                         }

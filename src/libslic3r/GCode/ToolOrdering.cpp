@@ -63,11 +63,11 @@ unsigned int LayerTools::extruder(const ExtrusionEntityCollection &extrusions, c
 	assert(region.config().infill_extruder.value > 0);
 	assert(region.config().solid_infill_extruder.value > 0);
 	// 1 based extruder ID.
-	unsigned int extruder = ((this->extruder_override == 0) ?
-	    (is_infill(extrusions.role()) ?
-	    	(is_solid_infill(extrusions.entities.front()->role()) ? region.config().solid_infill_extruder : region.config().infill_extruder) :
+	unsigned int extruder = this->extruder_override == 0 ?
+	    (extrusions.role().is_infill() ?
+	    	(extrusions.entities.front()->role().is_solid_infill() ? region.config().solid_infill_extruder : region.config().infill_extruder) :
 			region.config().perimeter_extruder.value) :
-		this->extruder_override);
+		this->extruder_override;
 	return (extruder == 0) ? 0 : extruder - 1;
 }
 
@@ -267,7 +267,7 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
                 // fill represents infill extrusions of a single island.
                 const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
                 ExtrusionRole role = fill->entities.empty() ? ExtrusionRole::None : fill->entities.front()->role();
-                if (is_solid_infill(role))
+                if (role.is_solid_infill())
                     has_solid_infill = true;
                 else if (role != ExtrusionRole::None)
                     has_infill = true;

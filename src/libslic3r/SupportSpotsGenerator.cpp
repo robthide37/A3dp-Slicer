@@ -58,6 +58,8 @@ public:
     bool is_external_perimeter() const
     {
         assert(origin_entity != nullptr);
+        //FIXME origin_entity->role() == ExtrusionRole::OverhangPerimeter is not quite right.
+        // rather use origin_entity->role().is_external_perimeter()
         return origin_entity->role() == ExtrusionRole::ExternalPerimeter || origin_entity->role() == ExtrusionRole::OverhangPerimeter;
     }
 
