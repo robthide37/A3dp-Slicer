@@ -205,6 +205,8 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         if (cgalmeshptr) {
             m = MeshBoolean::cgal::cgal_to_indexed_triangle_set(*cgalmeshptr);
             handled = true;
+        } else {
+            BOOST_LOG_TRIVIAL(warning) << "CSG mesh is not egligible for proper CGAL booleans!";
         }
     } else {
         // Normal cgal processing failed. If there are no negative volumes,
@@ -290,7 +292,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         m = generate_preview_vdb(po, step);
     }
 
-    assert(po.m_preview_meshes[step].empty());
+    assert(!po.m_preview_meshes[step]);
 
     if (!m.empty())
         po.m_preview_meshes[step] =
@@ -376,7 +378,7 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
         po.m_hollowing_data.reset(new SLAPrintObject::HollowingData());
         po.m_hollowing_data->interior = std::move(interior);
 
-        indexed_triangle_set m = sla::get_mesh(*po.m_hollowing_data->interior);
+        indexed_triangle_set &m = sla::get_mesh(*po.m_hollowing_data->interior);
 
         if (!m.empty()) {
             // simplify mesh lossless
@@ -390,7 +392,8 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
         // Put the interior into the target mesh as a negative
         po.m_mesh_to_slice
             .emplace(slaposHollowing,
-                     csg::CSGPart{std::make_shared<indexed_triangle_set>(std::move(m)), csg::CSGType::Difference});
+                     csg::CSGPart{std::make_shared<indexed_triangle_set>(m),
+                                  csg::CSGType::Difference});
 
         generate_preview(po, slaposHollowing);
     }
