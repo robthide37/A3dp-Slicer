@@ -4301,7 +4301,10 @@ void ObjectList::change_part_type()
     int selection = 0;
     if (auto it = std::find(types.begin(), types.end(), type); it != types.end())
         selection = it - types.begin();
-    const auto new_type = types[wxGetApp().GetSingleChoiceIndex(_L("Type:"), _L("Select type of part"), names, selection)];
+
+    auto choice = wxGetApp().GetSingleChoiceIndex(_L("Type:"), _L("Select type of part"), names, selection);
+    const auto new_type = choice >= 0 ? types[choice] : ModelVolumeType::INVALID;
+
 	if (new_type == type || new_type == ModelVolumeType::INVALID)
         return;
 
