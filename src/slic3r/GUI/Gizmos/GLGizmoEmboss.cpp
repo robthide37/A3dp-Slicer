@@ -1969,7 +1969,9 @@ void GLGizmoEmboss::draw_font_list()
     ImGuiInputTextFlags input_flags = ImGuiInputTextFlags_CharsUppercase;
 
     // change color of hint to normal text
-    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+    bool is_popup_open = ImGui::IsPopupOpen(popup_id);
+    if (!is_popup_open)
+        ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImGui::GetStyleColorVec4(ImGuiCol_Text));
     if (ImGui::InputTextWithHint(input_id, selected, &m_face_names.search, input_flags)) {
         // update filtration result        
         m_face_names.hide = std::vector<bool>(m_face_names.faces.size(), {false});
@@ -1980,7 +1982,8 @@ void GLGizmoEmboss::draw_font_list()
             m_face_names.hide[index] = !name._Starts_with(m_face_names.search);
         }
     }
-    ImGui::PopStyleColor(); // revert changes for hint color
+    if (!is_popup_open)
+        ImGui::PopStyleColor(); // revert changes for hint color
 
     const bool is_input_text_active = ImGui::IsItemActive();
     
