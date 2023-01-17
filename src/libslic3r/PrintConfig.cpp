@@ -534,7 +534,7 @@ void PrintConfigDef::init_fff_params()
     def->category   = L("Speed");
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
     def->mode       = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(true));
+    def->set_default_value(new ConfigOptionBool(false));
 
     def             = this->add("overhang_overlap_levels", coPercents);
     def->full_label = L("Overhang overlap levels");
