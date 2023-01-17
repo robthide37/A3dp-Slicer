@@ -469,8 +469,10 @@ inline long build_ground_connection(SupportTreeBuilder &builder,
     gp.z() = ground_level(sm);
     double h = conn.path.back().pos.z() - gp.z();
 
-    if (conn.pillar_base->r_top < sm.cfg.head_back_radius_mm)
+    if (conn.pillar_base->r_top < sm.cfg.head_back_radius_mm) {
         h += sm.pad_cfg.wall_thickness_mm;
+        gp.z() -= sm.pad_cfg.wall_thickness_mm;
+    }
 
 // TODO: does not work yet
 //    if (conn.path.back().id < 0) {
@@ -478,7 +480,8 @@ inline long build_ground_connection(SupportTreeBuilder &builder,
 //        long head_id = std::abs(conn.path.back().id);
 //        ret = builder.add_pillar(head_id, h);
 //    } else
-        ret = builder.add_pillar(gp, h, conn.path.back().r, conn.pillar_base->r_top);
+
+    ret = builder.add_pillar(gp, h, conn.path.back().r, conn.pillar_base->r_top);
 
     if (conn.pillar_base->r_top >= sm.cfg.head_back_radius_mm)
         builder.add_pillar_base(ret, conn.pillar_base->height, conn.pillar_base->r_bottom);
