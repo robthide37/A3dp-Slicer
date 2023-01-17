@@ -706,7 +706,7 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
 }
 #endif // SHOW_OFFSET_DURING_DRAGGING
 namespace priv {
-static void draw_origin_ball(const GLCanvas3D& canvas) {
+static void draw_origin(const GLCanvas3D& canvas) {
     auto draw_list = ImGui::GetOverlayDrawList();
     const Selection &selection = canvas.get_selection();
     Transform3d to_world = priv::world_matrix(selection);
@@ -715,9 +715,22 @@ static void draw_origin_ball(const GLCanvas3D& canvas) {
     const Camera &camera = wxGetApp().plater()->get_camera();
     Point screen_coor = CameraUtils::project(camera, volume_zero);
     ImVec2 center(screen_coor.x(), screen_coor.y());
-    float radius = 10.f;
-    ImU32 color = ImGui::GetColorU32(ImGuiWrapper::COL_ORANGE_LIGHT);
-    draw_list->AddCircleFilled(center, radius, color);
+    float radius = 16.f;
+    ImU32 color = ImGui::GetColorU32(ImVec4(1.f, 1.f, 1.f, .75f));
+
+    int num_segments = 0;
+    float thickness = 4.f;
+    draw_list->AddCircle(center, radius, color, num_segments, thickness);
+    auto dirs = {ImVec2{0, 1}, ImVec2{1, 0}, ImVec2{0, -1}, ImVec2{-1, 0}};
+    for (const ImVec2 &dir : dirs) {
+        ImVec2 start(
+            center.x + dir.x * 0.5 * radius,
+            center.y + dir.y * 0.5 * radius);
+        ImVec2 end(
+            center.x + dir.x * 1.5 * radius,
+            center.y + dir.y * 1.5 * radius);
+        draw_list->AddLine(start, end, color, thickness);
+    }
 }
 
 } // namespace priv
@@ -736,7 +749,9 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     const ImVec2 &min_window_size = get_minimal_window_size();
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, min_window_size);
 
-    priv::draw_origin_ball(m_parent);
+    // Draw origin position of text during dragging
+    if (m_temp_transformation.has_value())
+        priv::draw_origin(m_parent);
 
 #ifdef SHOW_FINE_POSITION
     draw_fine_position(m_parent.get_selection(), m_parent.get_canvas_size(), min_window_size);
@@ -1104,17 +1119,9 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
             m_style_manager.set_wx_font(wx_font);
         }
     }
-
-    if (!is_exact_font) {
+    
+    if (!is_exact_font)
         create_notification_not_valid_font(tc);
-
-        // update changed wxFont path
-        std::string path = WxFontUtils::store_wxFont(wx_font);
-        // current used style
-        EmbossStyle &act_style = m_style_manager.get_style();
-        act_style.path         = path;
-        act_style.type         = WxFontUtils::get_actual_type();
-    }
         
     // The change of volume could show or hide part with setter on volume type
     if (m_volume == nullptr || 
@@ -2980,11 +2987,6 @@ std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, Raycas
 
     // ray in direction of text projection(from volume zero to z-dir)
     std::optional<RaycastManager::Hit> hit_opt = raycast_manager.unproject(point, direction, &cond);
-    // start point lay on surface could appear slightly behind surface
-    std::optional<RaycastManager::Hit> hit_opt_opposit = raycast_manager.unproject(point, -direction, &cond);
-    if (!hit_opt.has_value() || 
-        (hit_opt_opposit.has_value() && hit_opt->squared_distance > hit_opt_opposit->squared_distance))
-        hit_opt = hit_opt_opposit;
 
     // Try to find closest point when no hit object in emboss direction
     if (!hit_opt.has_value())
@@ -3410,31 +3412,31 @@ void GLGizmoEmboss::create_notification_not_valid_font(
     auto level =
         NotificationManager::NotificationLevel::WarningNotificationLevel;
 
-    const EmbossStyle &es     = m_style_manager.get_style();
-    const auto &origin_family = tc.style.prop.face_name;
-    const auto &actual_family = es.prop.face_name;
+    const EmbossStyle &es = m_style_manager.get_style();
+    const auto &face_name_opt = es.prop.face_name;
+    const auto &face_name_3mf_opt = tc.style.prop.face_name;
 
-    const std::string &origin_font_name = origin_family.has_value() ?
-                                              *origin_family :
+    const std::string &face_name_3mf = face_name_3mf_opt.has_value() ?
+                                              *face_name_3mf_opt :
                                               tc.style.path;
 
-    std::string actual_wx_face_name;
-    if (!actual_family.has_value()) {
-        auto& wx_font = m_style_manager.get_wx_font();
+    std::string face_name_by_wx;
+    if (!face_name_opt.has_value()) {
+        const auto& wx_font = m_style_manager.get_wx_font();
         if (wx_font.has_value()) {
-            wxString    wx_face_name = wx_font->GetFaceName();
-            actual_wx_face_name = std::string((const char *) wx_face_name.ToUTF8());
+            wxString wx_face_name = wx_font->GetFaceName();
+            face_name_by_wx = std::string((const char *) wx_face_name.ToUTF8());
         }
     }
 
-    const std::string &actual_font_name = actual_family.has_value() ? *actual_family : 
-            (!actual_wx_face_name.empty() ? actual_wx_face_name : es.path);
+    const std::string &face_name = face_name_opt.has_value() ? *face_name_opt : 
+            (!face_name_by_wx.empty() ? face_name_by_wx : es.path);
 
     std::string text =
         GUI::format(_L("Can't load exactly same font(\"%1%\"), "
                        "Aplication select similar one(\"%2%\"). "
                        "You have to specify font for enable edit text."),
-                    origin_font_name, actual_font_name);
+                    face_name_3mf, face_name);
     auto notification_manager = wxGetApp().plater()->get_notification_manager();
     notification_manager->push_notification(type, level, text);
 }

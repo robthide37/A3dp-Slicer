@@ -533,6 +533,9 @@ void UpdateJob::update_volume(ModelVolume             *volume,
     // redraw scene
     bool refresh_immediately = false;
     canvas->reload_scene(refresh_immediately);
+
+    // Change buttons "Export G-code" into "Slice now"
+    canvas->post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
 }
 
 void priv::update_volume(TriangleMesh &&mesh, const DataUpdate &data, Transform3d* tr)

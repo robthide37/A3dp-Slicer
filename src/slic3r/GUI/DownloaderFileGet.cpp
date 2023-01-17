@@ -129,7 +129,7 @@ void FileGet::priv::get_perform()
 	if (m_written == 0)
 		file = fopen(temp_path_wstring.c_str(), "wb");
 	else 
-		file = fopen(temp_path_wstring.c_str(), "a");
+		file = fopen(temp_path_wstring.c_str(), "ab");
 
 	assert(file != NULL);
 

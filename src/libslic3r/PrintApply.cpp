@@ -1470,9 +1470,11 @@ void Print::cleanup()
     for (auto it = all_objects.begin(); it != all_objects.end();) {
         PrintObjectRegions *shared_regions = (*it)->m_shared_regions;
         auto it_begin = it;
-        for (++ it; it != all_objects.end() && shared_regions == (*it)->shared_regions(); ++ it);
+        for (; it != all_objects.end() && shared_regions == (*it)->shared_regions(); ++ it)
+            // Let the PrintObject clean up its data with invalidated milestones.
+            (*it)->cleanup();
         auto this_objects = SpanOfConstPtrs<PrintObject>(const_cast<const PrintObject* const* const>(&(*it_begin)), it - it_begin);
-        if (Print::is_shared_print_object_step_valid_unguarded(this_objects, posSupportSpotsSearch))
+        if (! Print::is_shared_print_object_step_valid_unguarded(this_objects, posSupportSpotsSearch))
             shared_regions->generated_support_points.reset();
     }    
 }

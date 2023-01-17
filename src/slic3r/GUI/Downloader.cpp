@@ -1,6 +1,7 @@
 #include "Downloader.hpp"
 #include "GUI_App.hpp"
 #include "NotificationManager.hpp"
+#include "format.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
@@ -145,14 +146,15 @@ void Downloader::start_download(const std::string& full_url)
 #else
     std::string escaped_url = FileGet::escape_url(full_url.substr(24));
 #endif
-	// TODO: enable after testing
-	/*
-	if (!boost::starts_with(escaped_url, "https://media.printables.com/")) {
-		BOOST_LOG_TRIVIAL(error) << "Download won't start. Download URL doesn't point to https://media.printables.com : " << escaped_url;
-		// TODO: show error?
+
+	if (!boost::starts_with(escaped_url, "https://files.printables.com") && !boost::starts_with(escaped_url, "https://dev-files.printables.com")) {
+		std::string msg = format(_L("Download won't start. Download URL doesn't point to https://files.printables.com : %1%"), escaped_url);
+		BOOST_LOG_TRIVIAL(error) << msg;
+		NotificationManager* ntf_mngr = wxGetApp().notification_manager();
+		ntf_mngr->push_notification(NotificationType::CustomNotification, NotificationManager::NotificationLevel::RegularNotificationLevel, msg);
 		return;
 	}
-	*/
+	
 	std::string text(escaped_url);
     m_downloads.emplace_back(std::make_unique<Download>(id, std::move(escaped_url), this, m_dest_folder));
 	NotificationManager* ntf_mngr = wxGetApp().notification_manager();
@@ -177,6 +179,7 @@ void Downloader::on_error(wxCommandEvent& event)
     BOOST_LOG_TRIVIAL(error) << "Download error: " << event.GetString();
 	NotificationManager* ntf_mngr = wxGetApp().notification_manager();
 	ntf_mngr->set_download_URL_error(id, boost::nowide::narrow(event.GetString()));
+	show_error(nullptr, format_wxstr(L"%1%\n%2%", _L("The download has failed:"), event.GetString()));
 }
 void Downloader::on_complete(wxCommandEvent& event)
 {

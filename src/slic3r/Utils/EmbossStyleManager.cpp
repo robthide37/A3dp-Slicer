@@ -192,9 +192,13 @@ bool StyleManager::load_style(const EmbossStyle &style) {
 
 bool StyleManager::load_style(const EmbossStyle &style, const wxFont &font)
 {
+    m_style_cache.style = style; // copy
+
+    // wx font property has bigger priority to set
+    // it must be after copy of the style
     if (!set_wx_font(font)) return false;
-    m_style_cache.style      = style; // copy
-    m_style_cache.style_index     = std::numeric_limits<size_t>::max();
+
+    m_style_cache.style_index = std::numeric_limits<size_t>::max();
     m_style_cache.stored_wx_font = {};
     m_style_cache.truncated_name.clear();
     return true;

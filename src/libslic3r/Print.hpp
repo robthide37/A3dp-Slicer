@@ -358,11 +358,15 @@ private:
     // If ! m_slicing_params.valid, recalculate.
     void                    update_slicing_parameters();
 
+    // Called on main thread with stopped or paused background processing to let PrintObject release data for its milestones that were invalidated or canceled.
+    void                    cleanup();
+
     static PrintObjectConfig object_config_from_model_object(const PrintObjectConfig &default_object_config, const ModelObject &object, size_t num_extruders);
 
 private:
     void make_perimeters();
     void prepare_infill();
+    void clear_fills();
     void infill();
     void ironing();
     void generate_support_spots();

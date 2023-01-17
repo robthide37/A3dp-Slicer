@@ -6421,7 +6421,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                             const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
                             if (! fill->entities.empty())
                                 _3DScene::extrusionentity_to_verts(*fill, float(layer->print_z), copy,
-                                    select_geometry(idx_layer, is_solid_infill(fill->entities.front()->role()) ?
+                                    select_geometry(idx_layer, fill->entities.front()->role().is_solid_infill() ?
                                                     layerm->region().config().solid_infill_extruder :
                                                     layerm->region().config().infill_extruder, 1));
                         }
@@ -6432,7 +6432,7 @@ void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, c
                     if (support_layer) {
                         for (const ExtrusionEntity *extrusion_entity : support_layer->support_fills.entities)
                             _3DScene::extrusionentity_to_verts(extrusion_entity, float(layer->print_z), copy,
-                                select_geometry(idx_layer, (extrusion_entity->role() == erSupportMaterial) ?
+                                select_geometry(idx_layer, (extrusion_entity->role() == ExtrusionRole::SupportMaterial) ?
                                                 support_layer->object()->config().support_material_extruder :
                                                 support_layer->object()->config().support_material_interface_extruder, 2));
                     }

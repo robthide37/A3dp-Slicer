@@ -124,9 +124,14 @@ static const std::pair<unsigned int, unsigned int> THUMBNAIL_SIZE_3MF = { 256, 2
 namespace Slic3r {
 namespace GUI {
 
+// Trigger Plater::schedule_background_process().
 wxDEFINE_EVENT(EVT_SCHEDULE_BACKGROUND_PROCESS,     SimpleEvent);
+// BackgroundSlicingProcess updates UI with slicing progress: Status bar / progress bar has to be updated, possibly scene has to be refreshed,
+// see PrintBase::SlicingStatus for the content of the message.
 wxDEFINE_EVENT(EVT_SLICING_UPDATE,                  SlicingStatusEvent);
+// FDM slicing finished, but G-code was not exported yet. Initial G-code preview shall be displayed by the UI.
 wxDEFINE_EVENT(EVT_SLICING_COMPLETED,               wxCommandEvent);
+// BackgroundSlicingProcess finished either with success or error.
 wxDEFINE_EVENT(EVT_PROCESS_COMPLETED,               SlicingProcessCompletedEvent);
 wxDEFINE_EVENT(EVT_EXPORT_BEGAN,                    wxCommandEvent);
 
@@ -3341,10 +3346,8 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
     if (invalidated != Print::APPLY_STATUS_UNCHANGED && was_running && ! this->background_process.running() &&
         (return_state & UPDATE_BACKGROUND_PROCESS_RESTART) == 0) {
         // The background processing was killed and it will not be restarted.
-        wxCommandEvent evt(EVT_PROCESS_COMPLETED);
-        evt.SetInt(-1);
         // Post the "canceled" callback message, so that it will be processed after any possible pending status bar update messages.
-        wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, evt.Clone());
+        wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new SlicingProcessCompletedEvent(EVT_PROCESS_COMPLETED, 0, SlicingProcessCompletedEvent::Cancelled, std::exception_ptr{}));
     }
 
     if ((return_state & UPDATE_BACKGROUND_PROCESS_INVALID) != 0)

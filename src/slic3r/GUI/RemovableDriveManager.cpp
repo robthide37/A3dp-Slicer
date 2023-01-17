@@ -78,34 +78,13 @@ namespace {
 DEVINST get_dev_inst_by_device_number(long device_number, UINT drive_type, WCHAR* dos_device_name)
 {
 	bool is_floppy = (wcsstr(dos_device_name, L"\\Floppy") != NULL); // TODO: could be tested better?
-	GUID* guid;
-	switch (drive_type) {
-	case DRIVE_REMOVABLE:
-		if (is_floppy) {
-			// we are interested only in SD cards or USB sticks
-			BOOST_LOG_TRIVIAL(debug) << "get_dev_inst_by_device_number failed: Drive is floppy disk.";
-			return 0;
-			//guid = (GUID*)&GUID_DEVINTERFACE_FLOPPY;
-		} else {
-			guid = (GUID*)&GUID_DEVINTERFACE_DISK;
-		}
-		break;
-	case DRIVE_FIXED:
-		// we are interested only in SD cards or USB sticks
-		BOOST_LOG_TRIVIAL(debug) << "get_dev_inst_by_device_number failed: Drive is harddisk.";
-		return 0;
-		//guid = (GUID*)&GUID_DEVINTERFACE_DISK;
-		//break;
-	case DRIVE_CDROM:
-		BOOST_LOG_TRIVIAL(debug) << "get_dev_inst_by_device_number failed: Drive is cd-rom.";
-		// we are interested only in SD cards or USB sticks
-		return 0;
-		//guid = (GUID*)&GUID_DEVINTERFACE_CDROM;
-		//break;
-	default:
+	
+	if (drive_type != DRIVE_REMOVABLE || is_floppy) {
+		BOOST_LOG_TRIVIAL(debug) << "get_dev_inst_by_device_number failed: Drive is not removable.";
 		return 0;
 	}
 
+	GUID* guid = (GUID*)& GUID_DEVINTERFACE_DISK;
 	// Get device interface info set handle for all devices attached to system
 	HDEVINFO h_dev_info = SetupDiGetClassDevs(guid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
 
@@ -228,7 +207,11 @@ int eject_inner(const std::string& path)
 	// get drives's parent, e.g. the USB bridge, the SATA port, an IDE channel with two drives!
 	DEVINST dev_inst_parent = 0;
 	res = CM_Get_Parent(&dev_inst_parent, dev_inst, 0);
-	
+	if (res != CR_SUCCESS) {
+		BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Failed to get drive parent. Code: %2%", path, res);
+		return 1;
+	}
+
 #if 0
 	// loop with several tries and sleep (this is running on main UI thread)
 	for (int i = 0; i < 3; ++i) { 
@@ -247,13 +230,22 @@ int eject_inner(const std::string& path)
 	}
 #endif // 0
 
-	// perform eject 
+	// Perform eject over parent dev_inst. This works for usb drives and some SD cards.
 	res = CM_Request_Device_EjectW(dev_inst_parent, &veto_type, veto_name, MAX_PATH, 0);
+	//res = CM_Query_And_Remove_SubTreeW(dev_inst_parent, &veto_type, veto_name, MAX_PATH, CM_REMOVE_UI_OK);
+	if (res == CR_SUCCESS && veto_type == PNP_VetoTypeUnknown) {
+		return 0;
+	}
+	BOOST_LOG_TRIVIAL(warning) << GUI::format("Ejecting of %1% has failed: Request to eject device has failed. Another request will follow. Veto type: %2%", path, veto_type);
+
+	// But on some PC, SD cards ejects only with its own dev_inst. 
+	res = CM_Request_Device_EjectW(dev_inst, &veto_type, veto_name, MAX_PATH, 0);
+	//res = CM_Query_And_Remove_SubTreeW(dev_inst_parent, &veto_type, veto_name, MAX_PATH, CM_REMOVE_UI_OK);
 	if (res == CR_SUCCESS && veto_type == PNP_VetoTypeUnknown) {
 		return 0;
 	}
 
-	BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Request to eject device has failed.", path);
+	BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Request to eject device has failed. Veto type: %2%", path, veto_type);
 	return 1;
 }
 
@@ -272,6 +264,7 @@ void RemovableDriveManager::eject_drive()
 	BOOST_LOG_TRIVIAL(info) << "Ejecting started"; 
 	std::scoped_lock<std::mutex> lock(m_drives_mutex);
 	auto it_drive_data = this->find_last_save_path_drive_data();
+#if 1
 	if (it_drive_data != m_current_drives.end()) {
 		if (!eject_inner(m_last_save_path)) {
 		// success
@@ -291,6 +284,7 @@ void RemovableDriveManager::eject_drive()
 		if (m_callback_evt_handler)
 			wxPostEvent(m_callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair<DriveData, bool>({"",""}, false)));
 	}
+#endif
 #if 0
 	// Implementation used until 2.5.x version
 	// Some usb drives does not eject properly (still visible in file explorer). Some even does not write all content and eject.

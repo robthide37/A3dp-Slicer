@@ -1029,7 +1029,7 @@ void Print::_make_skirt()
         ExtrusionLoop eloop(elrSkirt);
         eloop.paths.emplace_back(ExtrusionPath(
             ExtrusionPath(
-                erSkirt,
+                ExtrusionRole::Skirt,
                 (float)mm3_per_mm,         // this will be overridden at G-code export time
                 flow.width(),
 				(float)first_layer_height  // this will be overridden at G-code export time

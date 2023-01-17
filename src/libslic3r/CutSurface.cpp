@@ -768,6 +768,15 @@ void priv::set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
 
         point_normals[i] = {p1, normal};
     }
+
+    // check that projection is not left handed
+    // Fix for reflected projection
+    if (is_out_of(point_normals[2].first, point_normals[0])) {
+        // projection is reflected so normals are reflected
+        for (auto &pn : point_normals)
+            pn.second *= -1;
+    }    
+
     // same meaning as point normal
     IsOnSides is_on_sides(its.vertices.size(), {false,false,false,false});    
     

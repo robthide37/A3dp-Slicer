@@ -507,7 +507,7 @@ bool GLGizmoFdmSupports::has_backend_supports()
     bool done = false;
     for (const PrintObject *po : m_parent.fff_print()->objects()) {
         if (po->model_object()->id() == mo->id())
-            done = po->is_step_done(posSupportSpotsSearch);
+            done = done || po->is_step_done(posSupportSpotsSearch);
     }
 
     if (!done && !wxGetApp().plater()->is_background_process_update_scheduled()) {

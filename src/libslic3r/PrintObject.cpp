@@ -352,6 +352,12 @@ void PrintObject::prepare_infill()
     this->set_done(posPrepareInfill);
 }
 
+void PrintObject::clear_fills()
+{
+    for (Layer *layer : m_layers)
+        layer->clear_fills();
+}
+
 void PrintObject::infill()
 {
     // prerequisites
@@ -816,6 +822,15 @@ bool PrintObject::invalidate_all_steps()
 	// Then reset some of the depending values.
 	m_slicing_params.valid = false;
 	return result;
+}
+
+// Called on main thread with stopped or paused background processing to let PrintObject release data for its milestones that were invalidated or canceled.
+void PrintObject::cleanup()
+{
+    if (this->query_reset_dirty_step_unguarded(posInfill))
+        this->clear_fills();
+    if (this->query_reset_dirty_step_unguarded(posSupportMaterial))
+        this->clear_support_layers();
 }
 
 // This function analyzes slices of a region (SurfaceCollection slices).

@@ -64,6 +64,8 @@ set(SLIC3R_SOURCES
     ExtrusionEntity.hpp
     ExtrusionEntityCollection.cpp
     ExtrusionEntityCollection.hpp
+    ExtrusionRole.cpp
+    ExtrusionRole.hpp
     ExtrusionSimulator.cpp
     ExtrusionSimulator.hpp
     FileParserError.hpp
