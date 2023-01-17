@@ -1051,20 +1051,16 @@ SLAPrintObject::get_parts_to_slice(SLAPrintObjectStep untilstep) const
 
 sla::SupportPoints SLAPrintObject::transformed_support_points() const
 {
-    assert(m_model_object != nullptr);
-    auto spts = m_model_object->sla_support_points;
-    const Transform3d& vol_trafo = m_model_object->volumes.front()->get_transformation().get_matrix();
-    const Transform3f& tr = (trafo() * vol_trafo).cast<float>();
-    for (sla::SupportPoint& suppt : spts) {
-        suppt.pos = tr * suppt.pos;
-    }
-    
-    return spts;
+    assert(model_object());
+
+    return sla::transformed_support_points(*model_object(), trafo());
 }
 
 sla::DrainHoles SLAPrintObject::transformed_drainhole_points() const
 {
-    return sla::transformed_drainhole_points(*this->model_object(), trafo());
+    assert(model_object());
+
+    return sla::transformed_drainhole_points(*model_object(), trafo());
 }
 
 DynamicConfig SLAPrintStatistics::config() const

@@ -123,7 +123,7 @@ void GLGizmoHollow::render_points(const Selection& selection)
         return;
 
     double shift_z = m_c->selection_info()->print_object()->get_current_elevation();
-    Transform3d trafo(inst->get_transformation().get_matrix() * inst->get_object()->volumes.front()->get_matrix());
+    Transform3d trafo(inst->get_transformation().get_matrix());
     trafo.translation()(2) += shift_z;
     const Geometry::Transformation transformation{trafo};
 

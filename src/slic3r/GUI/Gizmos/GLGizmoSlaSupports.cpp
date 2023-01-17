@@ -153,7 +153,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection)
         return;
 
     double shift_z = m_c->selection_info()->print_object()->get_current_elevation();
-    Transform3d trafo(inst->get_transformation().get_matrix() * inst->get_object()->volumes.front()->get_matrix());
+    Transform3d trafo = inst->get_transformation().get_matrix();
     trafo.translation()(2) += shift_z;
     const Geometry::Transformation transformation{trafo};
 
@@ -1084,7 +1084,7 @@ void GLGizmoSlaSupports::get_data_from_backend()
         if (po->model_object()->id() == mo->id()) {
             m_normal_cache.clear();
             const std::vector<sla::SupportPoint>& points = po->get_support_points();
-            auto mat = (po->trafo() * po->model_object()->volumes.front()->get_transformation().get_matrix()).inverse().cast<float>();
+            auto mat = po->trafo().inverse().cast<float>();
             for (unsigned int i=0; i<points.size();++i)
                 m_normal_cache.emplace_back(sla::SupportPoint(mat * points[i].pos, points[i].head_front_radius, points[i].is_new_island));
 
