@@ -841,7 +841,8 @@ void PrintConfigDef::init_fff_params()
     def = this->add("extra_perimeters_on_overhangs", coBool);
     def->label = L("Extra perimeters on overhangs (Experimental)");
     def->category = L("Layers and Perimeters");
-    def->tooltip = L("Create additional perimeter paths over steep overhangs and areas where bridges cannot be anchored.");
+    def->tooltip = L("Detect overhang areas where bridges cannot be anchored, and fill them with "
+                    "extra perimeter paths. These paths are anchored to the nearby non-overhang area when possible.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
