@@ -860,6 +860,9 @@ void GLGizmoEmboss::on_set_state()
         if (m_volume == nullptr) { 
             // reopen gizmo when new object is created
             GLGizmoBase::m_state = GLGizmoBase::Off;
+            if (wxGetApp().get_mode() == comSimple)
+                // It's impossible to add a part in simple mode
+                return;
             // start creating new object
             create_volume(ModelVolumeType::MODEL_PART);
         }

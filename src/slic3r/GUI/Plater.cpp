@@ -124,9 +124,14 @@ static const std::pair<unsigned int, unsigned int> THUMBNAIL_SIZE_3MF = { 256, 2
 namespace Slic3r {
 namespace GUI {
 
+// Trigger Plater::schedule_background_process().
 wxDEFINE_EVENT(EVT_SCHEDULE_BACKGROUND_PROCESS,     SimpleEvent);
+// BackgroundSlicingProcess updates UI with slicing progress: Status bar / progress bar has to be updated, possibly scene has to be refreshed,
+// see PrintBase::SlicingStatus for the content of the message.
 wxDEFINE_EVENT(EVT_SLICING_UPDATE,                  SlicingStatusEvent);
+// FDM slicing finished, but G-code was not exported yet. Initial G-code preview shall be displayed by the UI.
 wxDEFINE_EVENT(EVT_SLICING_COMPLETED,               wxCommandEvent);
+// BackgroundSlicingProcess finished either with success or error.
 wxDEFINE_EVENT(EVT_PROCESS_COMPLETED,               SlicingProcessCompletedEvent);
 wxDEFINE_EVENT(EVT_EXPORT_BEGAN,                    wxCommandEvent);
 
@@ -2636,7 +2641,6 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 }
 
                 if (model.looks_like_multipart_object()) {
-                    //wxMessageDialog msg_dlg(q, _L(
                     MessageDialog msg_dlg(q, _L(
                         "This file contains several objects positioned at multiple heights.\n"
                         "Instead of considering them as multiple objects, should \n"
@@ -2647,10 +2651,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     }
                 }
             }
-            else if ((wxGetApp().get_mode() == comSimple) && (type_3mf || type_any_amf) && model_has_advanced_features(model)) {
-                //wxMessageDialog msg_dlg(q, _L("This file cannot be loaded in a simple mode. Do you want to switch to an advanced mode?")+"\n",
+            if ((wxGetApp().get_mode() == comSimple) && (type_3mf || type_any_amf) && model_has_advanced_features(model)) {
                 MessageDialog msg_dlg(q, _L("This file cannot be loaded in a simple mode. Do you want to switch to an advanced mode?")+"\n",
-                    _L("Detected advanced data"), wxICON_WARNING | wxYES | wxNO);
+                    _L("Detected advanced data"), wxICON_WARNING | wxYES | wxCANCEL);
                 if (msg_dlg.ShowModal() == wxID_YES) {
                     Slic3r::GUI::wxGetApp().save_mode(comAdvanced);
                     view3D->set_as_dirty();
@@ -3350,10 +3353,8 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
     if (invalidated != Print::APPLY_STATUS_UNCHANGED && was_running && ! this->background_process.running() &&
         (return_state & UPDATE_BACKGROUND_PROCESS_RESTART) == 0) {
         // The background processing was killed and it will not be restarted.
-        wxCommandEvent evt(EVT_PROCESS_COMPLETED);
-        evt.SetInt(-1);
         // Post the "canceled" callback message, so that it will be processed after any possible pending status bar update messages.
-        wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, evt.Clone());
+        wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new SlicingProcessCompletedEvent(EVT_PROCESS_COMPLETED, 0, SlicingProcessCompletedEvent::Cancelled, std::exception_ptr{}));
     }
 
     if ((return_state & UPDATE_BACKGROUND_PROCESS_INVALID) != 0)
@@ -6153,7 +6154,7 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
                 break;
             }
             case ProjectDropDialog::LoadType::LoadGeometry: {
-                Plater::TakeSnapshot snapshot(this, _L("Import Object"));
+//                Plater::TakeSnapshot snapshot(this, _L("Import Object"));
                 load_files({ *it }, true, false);
                 break;
             }
