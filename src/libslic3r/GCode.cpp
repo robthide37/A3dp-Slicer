@@ -2631,7 +2631,7 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view descr
     }
 
     // make a little move inwards before leaving loop
-    if (paths.back().role() == ExtrusionRole::ExternalPerimeter && m_layer != NULL && m_config.perimeters.value > 1 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 3) {
+    if (paths.back().role().is_external_perimeter() && m_layer != NULL && m_config.perimeters.value > 1 && paths.front().size() >= 2 && paths.back().polyline.points.size() >= 3) {
         // detect angle between last and first segment
         // the side depends on the original winding order of the polygon (left for contours, right for holes)
         //FIXME improve the algorithm in case the loop is tiny.
@@ -2877,7 +2877,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         } else if (path.role() == ExtrusionRole::ExternalPerimeter) {
             speed = m_config.get_abs_value("external_perimeter_speed");
         } else if (path.role().is_bridge()) {
-            assert(path.role() == ExtrusionRole::OverhangPerimeter || path.role() == ExtrusionRole::BridgeInfill);
+            assert(path.role().is_perimeter() || path.role() == ExtrusionRole::BridgeInfill);
             speed = m_config.get_abs_value("bridge_speed");
         } else if (path.role() == ExtrusionRole::InternalInfill) {
             speed = m_config.get_abs_value("infill_speed");
