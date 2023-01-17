@@ -47,7 +47,6 @@
 #define ALLOW_ADD_FONT_BY_OS_SELECTOR
 #define SHOW_WX_FONT_DESCRIPTOR // OS specific descriptor | file path --> in edit style <tree header>
 #define SHOW_FONT_FILE_PROPERTY // ascent, descent, line gap, cache --> in advanced <tree header>
-#define SHOW_FONT_COUNT // count of enumerated font --> in font combo box
 #define SHOW_CONTAIN_3MF_FIX // when contain fix matrix --> show gray '3mf' next to close button
 #define SHOW_OFFSET_DURING_DRAGGING // when drag with text over surface visualize used center
 #define SHOW_IMGUI_ATLAS
@@ -1830,6 +1829,9 @@ void GLGizmoEmboss::init_font_name_texture() {
         face.cancel = nullptr;
         face.is_created = nullptr;
     }
+
+    // Prepare filtration cache
+    m_face_names.hide = std::vector<bool>(m_face_names.faces.size(), {false});
 }
 
 void GLGizmoEmboss::draw_font_preview(FaceName& face, bool is_visible)
@@ -1960,13 +1962,54 @@ void GLGizmoEmboss::draw_font_list()
         };
     }
 
+    // Code
+    const char *popup_id = "##font_list_popup";
+    const char *input_id = "##font_list_input";
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
-    if (ImGui::BeginCombo("##font_selector", selected)) {
-        if (!m_face_names.is_init) init_face_names();
-        if (m_face_names.texture_id == 0) init_font_name_texture();
+    ImGuiInputTextFlags input_flags = ImGuiInputTextFlags_CharsUppercase;
+
+    // change color of hint to normal text
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+    if (ImGui::InputTextWithHint(input_id, selected, &m_face_names.search, input_flags)) {
+        // update filtration result        
+        m_face_names.hide = std::vector<bool>(m_face_names.faces.size(), {false});
+        for (FaceName &face : m_face_names.faces) {
+            size_t      index = &face - &m_face_names.faces.front();
+            std::string name(face.wx_name.ToUTF8().data());
+            std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+            m_face_names.hide[index] = !name._Starts_with(m_face_names.search);
+        }
+    }
+    ImGui::PopStyleColor(); // revert changes for hint color
+
+    const bool is_input_text_active = ImGui::IsItemActive();
+    
+    // is_input_text_activated
+    if (ImGui::IsItemActivated())
+        ImGui::OpenPopup(popup_id);
+    
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y));
+    ImGui::SetNextWindowSize({2*m_gui_cfg->input_width, ImGui::GetTextLineHeight()*10});
+    ImGuiWindowFlags popup_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | 
+                                   ImGuiWindowFlags_NoResize | ImGuiWindowFlags_ChildWindow;
+    if (ImGui::BeginPopup(popup_id, popup_flags))
+    {
+        bool set_selection_focus = false;
+        if (!m_face_names.is_init) {
+            init_face_names();
+            set_selection_focus = true;
+        }
+        if (m_face_names.texture_id == 0) 
+            init_font_name_texture();
+
         for (FaceName &face : m_face_names.faces) {
             const wxString &wx_face_name = face.wx_name;
             size_t index = &face - &m_face_names.faces.front();
+
+            // Filter for face names
+            if (m_face_names.hide[index])
+                continue;
+
             ImGui::PushID(index);
             ScopeGuard sg([]() { ImGui::PopID(); });
             bool is_selected = (actual_face_name == wx_face_name);
@@ -1978,24 +2021,32 @@ void GLGizmoEmboss::draw_font_list()
                     wxMessageBox(GUI::format(_L("Font face \"%1%\" can't be selected."), wx_face_name));
                 }
             }
+            // tooltip as full name of font face
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", wx_face_name.ToUTF8().data());
-            if (is_selected) ImGui::SetItemDefaultFocus();
-            draw_font_preview(face, ImGui::IsItemVisible());
-        }        
-#ifdef SHOW_FONT_COUNT
-        ImGui::TextColored(ImGuiWrapper::COL_GREY_LIGHT, "Count %d",
-                           static_cast<int>(m_face_names.names.size()));
-#endif // SHOW_FONT_COUNT
-        ImGui::EndCombo();
-    } else if (m_face_names.is_init) {
-        // Just one after close combo box        
-        // free texture and set id to zero
 
+            // on first draw set focus on selected font
+            if (set_selection_focus && is_selected)
+                ImGui::SetScrollHereY();
+            draw_font_preview(face, ImGui::IsItemVisible());
+        }
+
+        if (!ImGui::IsWindowFocused() || 
+            !is_input_text_active && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Escape))) {
+            // closing of popup
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    } else if (m_face_names.is_init) {
+        // Just one after close combo box
+        // free texture and set id to zero
         m_face_names.is_init = false;
+        m_face_names.search.clear();
+        m_face_names.hide.clear();
         // cancel all process for generation of texture
         for (FaceName &face : m_face_names.faces)
-            if (face.cancel != nullptr) face.cancel->store(true);
+            if (face.cancel != nullptr)
+                face.cancel->store(true);
         glsafe(::glDeleteTextures(1, &m_face_names.texture_id));
         m_face_names.texture_id = 0;
     }
