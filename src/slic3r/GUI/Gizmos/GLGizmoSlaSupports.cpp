@@ -1184,7 +1184,16 @@ void GLGizmoSlaSupports::update_point_raycasters_for_picking_transform()
     assert(!m_point_raycasters.empty());
 
     const GLVolume* vol = m_parent.get_selection().get_first_volume();
-    const Geometry::Transformation transformation(vol->world_matrix());
+    Geometry::Transformation transformation(vol->world_matrix());
+
+    auto *inst = m_c->selection_info()->model_instance();
+    if (inst && m_c->selection_info() && m_c->selection_info()->print_object()) {
+        double shift_z = m_c->selection_info()->print_object()->get_current_elevation();
+        auto trafo = inst->get_transformation().get_matrix();
+        trafo.translation()(2) += shift_z;
+        transformation.set_matrix(trafo);
+    }
+
     const Transform3d instance_scaling_matrix_inverse = transformation.get_scaling_factor_matrix().inverse();
     for (size_t i = 0; i < m_editing_cache.size(); ++i) {
         const Transform3d support_matrix = Geometry::translation_transform(m_editing_cache[i].support_point.pos.cast<double>()) * instance_scaling_matrix_inverse;
@@ -1195,13 +1204,13 @@ void GLGizmoSlaSupports::update_point_raycasters_for_picking_transform()
         Eigen::Quaterniond q;
         q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * m_editing_cache[i].normal.cast<double>());
         const Eigen::AngleAxisd aa(q);
-        const Transform3d cone_matrix = vol->world_matrix() * support_matrix * Transform3d(aa.toRotationMatrix()) *
+        const Transform3d cone_matrix = transformation.get_matrix() * support_matrix * Transform3d(aa.toRotationMatrix()) *
             Geometry::assemble_transform((CONE_HEIGHT + m_editing_cache[i].support_point.head_front_radius * RenderPointScale) * Vec3d::UnitZ(),
                 Vec3d(PI, 0.0, 0.0), Vec3d(CONE_RADIUS, CONE_RADIUS, CONE_HEIGHT));
         m_point_raycasters[i].second->set_transform(cone_matrix);
 
         const double radius = (double)m_editing_cache[i].support_point.head_front_radius * RenderPointScale;
-        const Transform3d sphere_matrix = vol->world_matrix() * support_matrix * Geometry::scale_transform(radius);
+        const Transform3d sphere_matrix = transformation.get_matrix() * support_matrix * Geometry::scale_transform(radius);
         m_point_raycasters[i].first->set_transform(sphere_matrix);
     }
 }

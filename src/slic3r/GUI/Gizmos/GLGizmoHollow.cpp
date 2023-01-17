@@ -463,7 +463,16 @@ void GLGizmoHollow::update_hole_raycasters_for_picking_transform()
             assert(!m_hole_raycasters.empty());
 
             const GLVolume* vol = m_parent.get_selection().get_first_volume();
-            const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_scaling_factor_matrix().inverse();
+            Geometry::Transformation transformation(vol->get_instance_transformation());
+
+            auto *inst = m_c->selection_info()->model_instance();
+            if (inst && m_c->selection_info() && m_c->selection_info()->print_object()) {
+                double shift_z = m_c->selection_info()->print_object()->get_current_elevation();
+                auto trafo = inst->get_transformation().get_matrix();
+                trafo.translation()(2) += shift_z;
+                transformation.set_matrix(trafo);
+            }
+            const Transform3d instance_scaling_matrix_inverse = transformation.get_scaling_factor_matrix().inverse();
 
             for (size_t i = 0; i < drain_holes.size(); ++i) {
                 const sla::DrainHole& drain_hole = drain_holes[i];
@@ -471,7 +480,7 @@ void GLGizmoHollow::update_hole_raycasters_for_picking_transform()
                 Eigen::Quaterniond q;
                 q.setFromTwoVectors(Vec3d::UnitZ(), instance_scaling_matrix_inverse * (-drain_hole.normal).cast<double>());
                 const Eigen::AngleAxisd aa(q);
-                const Transform3d matrix = vol->world_matrix() * hole_matrix * Transform3d(aa.toRotationMatrix()) *
+                const Transform3d matrix = transformation.get_matrix() * hole_matrix * Transform3d(aa.toRotationMatrix()) *
                     Geometry::translation_transform(-drain_hole.height * Vec3d::UnitZ()) * Geometry::scale_transform(Vec3d(drain_hole.radius, drain_hole.radius, drain_hole.height + sla::HoleStickOutLength));
                 m_hole_raycasters[i]->set_transform(matrix);
             }

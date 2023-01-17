@@ -292,8 +292,6 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         m = generate_preview_vdb(po, step);
     }
 
-    assert(!po.m_preview_meshes[step]);
-
     if (!m.empty())
         po.m_preview_meshes[step] =
                 std::make_shared<const indexed_triangle_set>(std::move(m));

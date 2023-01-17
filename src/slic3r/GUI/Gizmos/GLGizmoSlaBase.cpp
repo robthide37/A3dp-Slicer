@@ -148,12 +148,23 @@ bool GLGizmoSlaBase::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, 
     if (m_volumes.volumes.empty())
         return false;
 
+    auto *inst = m_c->selection_info()->model_instance();
+    if (!inst)
+        return false;
+
+    Transform3d trafo = m_volumes.volumes.front()->world_matrix();
+    if (m_c->selection_info() && m_c->selection_info()->print_object()) {
+        double shift_z = m_c->selection_info()->print_object()->get_current_elevation();
+        trafo = inst->get_transformation().get_matrix();
+        trafo.translation()(2) += shift_z;
+    }
+
     // The raycaster query
     Vec3f hit;
     Vec3f normal;
     if (m_c->raycaster()->raycaster()->unproject_on_mesh(
         mouse_pos,
-        m_volumes.volumes.front()->world_matrix(),
+        trafo/*m_volumes.volumes.front()->world_matrix()*/,
         wxGetApp().plater()->get_camera(),
         hit,
         normal,
