@@ -235,7 +235,7 @@ void BackgroundSlicingProcess::thread_proc()
 		// Process the background slicing task.
 		m_state = STATE_RUNNING;
 		lck.unlock();
-		static std::exception_ptr exception;
+		std::exception_ptr exception;
 #ifdef _WIN32
 		this->call_process_seh_throw(exception);
 #else
