@@ -349,6 +349,7 @@ void SLAPrint::Steps::mesh_assembly(SLAPrintObject &po)
 void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
 {
     po.m_hollowing_data.reset();
+    po.m_supportdata.reset();
     clear_csg(po.m_mesh_to_slice, slaposDrillHoles);
     clear_csg(po.m_mesh_to_slice, slaposHollowing);
 
@@ -400,6 +401,7 @@ void SLAPrint::Steps::hollow_model(SLAPrintObject &po)
 // Drill holes into the hollowed/original mesh.
 void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
 {
+    po.m_supportdata.reset();
     clear_csg(po.m_mesh_to_slice, slaposDrillHoles);
 
     csg::model_to_csgmesh(*po.model_object(), po.trafo(),
