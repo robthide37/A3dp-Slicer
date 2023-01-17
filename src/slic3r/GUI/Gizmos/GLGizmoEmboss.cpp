@@ -403,7 +403,7 @@ Transform3d priv::world_matrix(const GLVolume *gl_volume, const Model *model)
     if (!fix.has_value())
         return res;
 
-    return res * (*fix);
+    return res * fix->inverse();
 }
 
 Transform3d priv::world_matrix(const Selection &selection)
