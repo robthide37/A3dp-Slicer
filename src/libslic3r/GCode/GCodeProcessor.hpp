@@ -125,6 +125,9 @@ namespace Slic3r {
         float max_print_height;
         SettingsIds settings_ids;
         size_t extruders_count;
+#if ENABLE_GCODE_POSTPROCESS_BACKTRACE
+        bool backtrace_enabled;
+#endif // ENABLE_GCODE_POSTPROCESS_BACKTRACE
         std::vector<std::string> extruder_colors;
         std::vector<float> filament_diameters;
         std::vector<float> filament_densities;
