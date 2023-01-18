@@ -534,7 +534,7 @@ void PrintConfigDef::init_fff_params()
     def->category   = L("Speed");
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
     def->mode       = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(true));
+    def->set_default_value(new ConfigOptionBool(false));
 
     def             = this->add("overhang_overlap_levels", coPercents);
     def->full_label = L("Overhang overlap levels");
@@ -841,7 +841,8 @@ void PrintConfigDef::init_fff_params()
     def = this->add("extra_perimeters_on_overhangs", coBool);
     def->label = L("Extra perimeters on overhangs (Experimental)");
     def->category = L("Layers and Perimeters");
-    def->tooltip = L("Create additional perimeter paths over steep overhangs and areas where bridges cannot be anchored.");
+    def->tooltip = L("Detect overhang areas where bridges cannot be anchored, and fill them with "
+                    "extra perimeter paths. These paths are anchored to the nearby non-overhang area when possible.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
