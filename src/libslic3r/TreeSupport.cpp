@@ -58,6 +58,7 @@ enum class LineStatus
 
 using LineInformation = std::vector<std::pair<Point, LineStatus>>;
 using LineInformations = std::vector<LineInformation>;
+using namespace std::literals;
 
 static inline void validate_range(const Point &pt)
 {
@@ -191,10 +192,9 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
 }
 #endif
 
-//todo Remove! Only relevant for public BETA!
 static bool inline g_showed_critical_error = false;
 static bool inline g_showed_performance_warning = false;
-void tree_supports_show_error(std::string message, bool critical)
+void tree_supports_show_error(std::string_view message, bool critical)
 { // todo Remove!  ONLY FOR PUBLIC BETA!!
 
 #if defined(_WIN32) && defined(TREE_SUPPORT_SHOW_ERRORS)
@@ -204,7 +204,7 @@ void tree_supports_show_error(std::string message, bool critical)
     bool show    = (critical && !g_showed_critical_error) || (!critical && !g_showed_performance_warning);
     (critical ? g_showed_critical_error : g_showed_performance_warning) = true;
     if (show)
-        MessageBoxA(nullptr, std::string("TreeSupport_2 MOD detected an error while generating the tree support.\nPlease report this back to me with profile and model.\nRevision 5.0\n" + message + "\n" + bugtype).c_str(), 
+        MessageBoxA(nullptr, std::string("TreeSupport_2 MOD detected an error while generating the tree support.\nPlease report this back to me with profile and model.\nRevision 5.0\n" + std::string(message) + "\n" + bugtype).c_str(), 
             "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
 #endif // WIN32
 }
@@ -572,7 +572,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
                             // In case a fixpoint is encountered, better aggressively overcompensate so the code does not become stuck here...
                             BOOST_LOG_TRIVIAL(warning) << "Tree Support: Encountered a fixpoint in polyline_sample_next_point_at_distance. This is expected to happen if the distance (currently " << next_distance << 
                                 ") is smaller than 100";
-                            tree_supports_show_error("Encountered issue while placing tips. Some tips may be missing.", true);
+                            tree_supports_show_error("Encountered issue while placing tips. Some tips may be missing."sv, true);
                             if (next_distance > 2 * current_distance)
                                 // This case should never happen, but better safe than sorry.
                                 break;
@@ -759,7 +759,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
         return do_final_difference ? diff(ret, collision_trimmed()) : union_(ret);
     if (safe_step_size < 0 || last_step_offset_without_check < 0) {
         BOOST_LOG_TRIVIAL(error) << "Offset increase got invalid parameter!";
-        tree_supports_show_error("Negative offset distance... How did you manage this ?", true);
+        tree_supports_show_error("Negative offset distance... How did you manage this ?"sv, true);
         return do_final_difference ? diff(ret, collision_trimmed()) : union_(ret);
     }
 
@@ -951,7 +951,7 @@ static void generate_initial_areas(
                     bool safe_radius = p.second == LineStatus::TO_BP_SAFE || p.second == LineStatus::TO_MODEL_GRACIOUS_SAFE;
                     if (!mesh_config.support_rests_on_model && !to_bp) {
                         BOOST_LOG_TRIVIAL(warning) << "Tried to add an invalid support point";
-                        tree_supports_show_error("Unable to add tip. Some overhang may not be supported correctly.", true);
+                        tree_supports_show_error("Unable to add tip. Some overhang may not be supported correctly."sv, true);
                         return;
                     }
                     Polygons circle{ base_circle };
@@ -1517,7 +1517,7 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
             if (area(check_layer_data) < tiny_area_threshold) {
                 BOOST_LOG_TRIVIAL(error) << "Lost area by doing catch up from " << ceil_radius_before << " to radius " << 
                     volumes.ceilRadius(config.getCollisionRadius(current_elem), settings.use_min_distance);
-                tree_supports_show_error("Area lost catching up radius. May not cause visible malformation.", true);
+                tree_supports_show_error("Area lost catching up radius. May not cause visible malformation."sv, true);
             }
         }
     }
@@ -1783,7 +1783,7 @@ static void increase_areas_one_layer(
                              "Parent " << &parent << ": Radius: " << config.getCollisionRadius(parent.state) << " at layer: " << layer_idx << " NextTarget: " << parent.state.layer_idx <<
                              " Distance to top: " << parent.state.distance_to_top << " Elephant foot increases " << parent.state.elephant_foot_increases << "  use_min_xy_dist " << parent.state.use_min_xy_dist <<
                              " to buildplate " << parent.state.to_buildplate << " gracious " << parent.state.to_model_gracious << " safe " << parent.state.can_use_safe_radius << " until move " << parent.state.dont_move_until;
-                    tree_supports_show_error("Potentially lost branch!", true);
+                    tree_supports_show_error("Potentially lost branch!"sv, true);
                 } else
                     result = increase_single_area(volumes, config, settings, layer_idx, parent,
                         settings.increase_speed == slow_speed ? offset_slow : offset_fast, to_bp_data, to_model_data, inc_wo_collision, 0, mergelayer);
@@ -2270,7 +2270,7 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
                     if (elem.areas.to_bp_areas.empty() && elem.areas.to_model_areas.empty()) {
                         if (area(elem.areas.influence_areas) < tiny_area_threshold) {
                             BOOST_LOG_TRIVIAL(error) << "Insert Error of Influence area bypass on layer " << layer_idx - 1;
-                            tree_supports_show_error("Insert error of area after bypassing merge.\n", true);
+                            tree_supports_show_error("Insert error of area after bypassing merge.\n"sv, true);
                         }
                         // Move the area to output.
                         this_layer.emplace_back(elem.state, std::move(elem.parents), std::move(elem.areas.influence_areas));
@@ -2303,7 +2303,7 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
                     Polygons new_area = safe_union(elem.areas.influence_areas);
                     if (area(new_area) < tiny_area_threshold) {
                         BOOST_LOG_TRIVIAL(error) << "Insert Error of Influence area on layer " << layer_idx - 1 << ". Origin of " << elem.parents.size() << " areas. Was to bp " << elem.state.to_buildplate;
-                        tree_supports_show_error("Insert error of area after merge.\n", true);
+                        tree_supports_show_error("Insert error of area after merge.\n"sv, true);
                     }
                     this_layer.emplace_back(elem.state, std::move(elem.parents), std::move(new_area));
                 }
@@ -2331,7 +2331,7 @@ static void set_points_on_areas(const SupportElement &elem, SupportElements *lay
     // Based on the branch center point of the current layer, the point on the next (further up) layer is calculated.
     if (! elem.state.result_on_layer_is_set()) {
         BOOST_LOG_TRIVIAL(error) << "Uninitialized support element";
-        tree_supports_show_error("Uninitialized support element. A branch may be missing.\n", true);
+        tree_supports_show_error("Uninitialized support element. A branch may be missing.\n"sv, true);
         return;
     }
 
@@ -2394,7 +2394,7 @@ static void set_to_model_contact_to_model_gracious(
     // Could not find valid placement, even though it should exist => error handling
     if (last_successfull_layer == nullptr) {
         BOOST_LOG_TRIVIAL(warning) << "No valid placement found for to model gracious element on layer " << first_elem.state.layer_idx;
-        tree_supports_show_error("Could not fine valid placement on model! Just placing it down anyway. Could cause floating branches.", true);
+        tree_supports_show_error("Could not fine valid placement on model! Just placing it down anyway. Could cause floating branches."sv, true);
         first_elem.state.to_model_gracious = false;
         set_to_model_contact_simple(first_elem);
     } else {
@@ -2494,7 +2494,7 @@ static void create_nodes_from_area(
                     if (elem.state.to_buildplate) {
                         BOOST_LOG_TRIVIAL(error) << "Uninitialized Influence area targeting " << elem.state.target_position.x() << "," << elem.state.target_position.y() << ") "
                             "at target_height: " << elem.state.target_height << " layer: " << layer_idx;
-                        tree_supports_show_error("Uninitialized support element! A branch could be missing or exist partially.", true);
+                        tree_supports_show_error("Uninitialized support element! A branch could be missing or exist partially."sv, true);
                     }
                     // we dont need to remove yet the parents as they will have a lower dtt and also no result_on_layer set
                     elem.state.deleted = true;
