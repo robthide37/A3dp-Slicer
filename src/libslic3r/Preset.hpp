@@ -34,6 +34,7 @@ public:
     Semver                          config_version;
     std::string                     config_update_url;
     std::string                     changelog_url;
+    bool                            templates_profile { false };
 
     struct PrinterVariant {
         PrinterVariant() {}
@@ -52,6 +53,7 @@ public:
         // Vendor & Printer Model specific print bed model & texture.
         std::string 			 	bed_model;
         std::string 				bed_texture;
+        std::string                 thumbnail;
 
         PrinterVariant*       variant(const std::string &name) {
             for (auto &v : this->variants)
@@ -619,6 +621,7 @@ namespace PresetUtils {
 	const VendorProfile::PrinterModel* system_printer_model(const Preset &preset);
     std::string system_printer_bed_model(const Preset& preset);
     std::string system_printer_bed_texture(const Preset& preset);
+    bool        vendor_profile_has_all_resources(const VendorProfile& vp);
 } // namespace PresetUtils
 
 

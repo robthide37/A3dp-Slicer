@@ -165,7 +165,8 @@ indexed_triangle_set halfcone(double       baseheight,
 {
     assert(steps > 0);
 
-    if (baseheight <= 0 || steps <= 0) return {};
+    if (baseheight <= 0 || steps <= 0 || (r_bottom <= 0. && r_top <= 0.))
+        return {};
 
     indexed_triangle_set base;
 

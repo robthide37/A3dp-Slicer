@@ -18,6 +18,8 @@
 #include <boost/log/trivial.hpp>
 #include <libslic3r/I18N.hpp>
 
+#include <libnest2d/tools/benchmark.h>
+
 //! macro used to mark string used at localization,
 //! return same string
 #define L(s) Slic3r::I18N::translate(s)
@@ -30,6 +32,9 @@ indexed_triangle_set create_support_tree(const SupportableMesh &sm,
     auto builder = make_unique<SupportTreeBuilder>(ctl);
 
     if (sm.cfg.enabled) {
+        Benchmark bench;
+        bench.start();
+
         switch (sm.cfg.tree_type) {
         case SupportTreeType::Default: {
             create_default_tree(*builder, sm);
@@ -39,8 +44,17 @@ indexed_triangle_set create_support_tree(const SupportableMesh &sm,
             create_branching_tree(*builder, sm);
             break;
         }
+        case SupportTreeType::Organic: {
+            // TODO
+        }
         default:;
         }
+
+        bench.stop();
+
+        BOOST_LOG_TRIVIAL(info) << "Support tree creation took: "
+                                << bench.getElapsedSec()
+                                << " seconds";
 
         builder->merge_and_cleanup();   // clean metadata, leave only the meshes.
     }

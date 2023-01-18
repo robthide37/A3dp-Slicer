@@ -1,5 +1,6 @@
 #include "SupportSpotsGenerator.hpp"
 
+#include "BoundingBox.hpp"
 #include "ExPolygon.hpp"
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
@@ -7,6 +8,7 @@
 #include "Line.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
+#include "PrincipalComponents2D.hpp"
 #include "Print.hpp"
 #include "PrintBase.hpp"
 #include "Tesselate.hpp"
@@ -117,13 +119,14 @@ public:
 
     size_t to_cell_index(const Vec3i &cell_coords) const
     {
+#ifdef DETAILED_DEBUG_LOGS
         assert(cell_coords.x() >= 0);
         assert(cell_coords.x() < cell_count.x());
         assert(cell_coords.y() >= 0);
         assert(cell_coords.y() < cell_count.y());
         assert(cell_coords.z() >= 0);
         assert(cell_coords.z() < cell_count.z());
-
+#endif
         return cell_coords.z() * cell_count.x() * cell_count.y() + cell_coords.y() * cell_count.x() + cell_coords.x();
     }
 
@@ -244,6 +247,7 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
         const float flow_width = get_flow_width(layer_region, entity->role());
 
+        // Compute only unsigned distance - prev_layer_lines can contain unconnected paths, thus the sign of the distance is unreliable
         std::vector<ExtendedPoint> annotated_points = estimate_points_properties<true, true, false, false>(entity->as_polyline().points,
                                                                                                            prev_layer_lines, flow_width,
                                                                                                            params.bridge_distance);
@@ -262,6 +266,7 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                                                         prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
                                                         ExtrusionLine{};
 
+            // correctify the distance sign using slice polygons
             float sign = (prev_layer_boundary.distance_from_lines<true>(curr_point.position) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
             curr_point.distance *= sign;
 
@@ -297,84 +302,39 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
     }
 }
 
-// returns triangle area, first_moment_of_area_xy, second_moment_of_area_xy, second_moment_of_area_covariance
-// none of the values is divided/normalized by area.
-// The function computes intgeral over the area of the triangle, with function f(x,y) = x for first moments of area (y is analogous)
-// f(x,y) = x^2 for second moment of area
-// and f(x,y) = x*y for second moment of area covariance
-std::tuple<float, Vec2f, Vec2f, float> compute_triangle_moments_of_area(const Vec2f &a, const Vec2f &b, const Vec2f &c)
-{
-    // based on the following guide:
-    // Denote the vertices of S by a, b, c. Then the map
-    //  g:(u,v)↦a+u(b−a)+v(c−a) ,
-    //  which in coordinates appears as
-    //  g:(u,v)↦{x(u,v)y(u,v)=a1+u(b1−a1)+v(c1−a1)=a2+u(b2−a2)+v(c2−a2) ,(1)
-    //  obviously maps S′ bijectively onto S. Therefore the transformation formula for multiple integrals steps into action, and we obtain
-    //  ∫Sf(x,y)d(x,y)=∫S′f(x(u,v),y(u,v))∣∣Jg(u,v)∣∣ d(u,v) .
-    //  In the case at hand the Jacobian determinant is a constant: From (1) we obtain
-    //  Jg(u,v)=det[xuyuxvyv]=(b1−a1)(c2−a2)−(c1−a1)(b2−a2) .
-    //  Therefore we can write
-    //  ∫Sf(x,y)d(x,y)=∣∣Jg∣∣∫10∫1−u0f~(u,v) dv du ,
-    //  where f~ denotes the pullback of f to S′:
-    //  f~(u,v):=f(x(u,v),y(u,v)) .
-    //  Don't forget taking the absolute value of Jg!
-
-    float jacobian_determinant_abs = std::abs((b.x() - a.x()) * (c.y() - a.y()) - (c.x() - a.x()) * (b.y() - a.y()));
-
-    // coordinate transform: gx(u,v) = a.x + u * (b.x - a.x) + v * (c.x - a.x)
-    // coordinate transform: gy(u,v) = a.y + u * (b.y - a.y) + v * (c.y - a.y)
-    // second moment of area for x: f(x, y) = x^2;
-    //              f(gx(u,v), gy(u,v)) = gx(u,v)^2 = ... (long expanded form)
-
-    // result is Int_T func = jacobian_determinant_abs * Int_0^1 Int_0^1-u func(gx(u,v), gy(u,v)) dv du
-    // integral_0^1 integral_0^(1 - u) (a + u (b - a) + v (c - a))^2 dv du = 1/12 (a^2 + a (b + c) + b^2 + b c + c^2)
-
-    Vec2f second_moment_of_area_xy = jacobian_determinant_abs *
-                                     (a.cwiseProduct(a) + b.cwiseProduct(b) + b.cwiseProduct(c) + c.cwiseProduct(c) +
-                                      a.cwiseProduct(b + c)) /
-                                     12.0f;
-    // second moment of area covariance : f(x, y) = x*y;
-    //              f(gx(u,v), gy(u,v)) = gx(u,v)*gy(u,v) = ... (long expanded form)
-    //(a_1 + u * (b_1 - a_1) + v * (c_1 - a_1)) * (a_2 + u * (b_2 - a_2) + v * (c_2 - a_2))
-    // ==    (a_1 + u (b_1 - a_1) + v (c_1 - a_1)) (a_2 + u (b_2 - a_2) + v (c_2 - a_2))
-
-    // intermediate result: integral_0^(1 - u) (a_1 + u (b_1 - a_1) + v (c_1 - a_1)) (a_2 + u (b_2 - a_2) + v (c_2 - a_2)) dv =
-    //  1/6 (u - 1) (-c_1 (u - 1) (a_2 (u - 1) - 3 b_2 u) - c_2 (u - 1) (a_1 (u - 1) - 3 b_1 u + 2 c_1 (u - 1)) + 3 b_1 u (a_2 (u - 1) - 2
-    //  b_2 u) + a_1 (u - 1) (3 b_2 u - 2 a_2 (u - 1))) result = integral_0^1 1/6 (u - 1) (-c_1 (u - 1) (a_2 (u - 1) - 3 b_2 u) - c_2 (u -
-    //  1) (a_1 (u - 1) - 3 b_1 u + 2 c_1 (u - 1)) + 3 b_1 u (a_2 (u - 1) - 2 b_2 u) + a_1 (u - 1) (3 b_2 u - 2 a_2 (u - 1))) du =
-    //   1/24 (a_2 (b_1 + c_1) + a_1 (2 a_2 + b_2 + c_2) + b_2 c_1 + b_1 c_2 + 2 b_1 b_2 + 2 c_1 c_2)
-    //  result is Int_T func = jacobian_determinant_abs * Int_0^1 Int_0^1-u func(gx(u,v), gy(u,v)) dv du
-    float second_moment_of_area_covariance = jacobian_determinant_abs * (1.0f / 24.0f) *
-                                             (a.y() * (b.x() + c.x()) + a.x() * (2.0f * a.y() + b.y() + c.y()) + b.y() * c.x() +
-                                              b.x() * c.y() + 2.0f * b.x() * b.y() + 2.0f * c.x() * c.y());
-
-    float area = jacobian_determinant_abs * 0.5f;
-
-    Vec2f first_moment_of_area_xy = jacobian_determinant_abs * (a + b + c) / 6.0f;
-
-    return {area, first_moment_of_area_xy, second_moment_of_area_xy, second_moment_of_area_covariance};
-};
-
 SliceConnection estimate_slice_connection(size_t slice_idx, const Layer *layer)
 {
     SliceConnection connection;
 
     const LayerSlice   &slice       = layer->lslices_ex[slice_idx];
-    ExPolygon           slice_poly  = layer->lslices[slice_idx];
+    Polygons           slice_polys  = to_polygons(layer->lslices[slice_idx]);
+    BoundingBox slice_bb = get_extents(slice_polys);
     const Layer        *lower_layer = layer->lower_layer;
 
-    ExPolygons below_polys{};
-    for (const auto &link : slice.overlaps_below) { below_polys.push_back(lower_layer->lslices[link.slice_idx]); }
-    ExPolygons overlap = intersection_ex({slice_poly}, below_polys);
+    ExPolygons below{};
+    for (const auto &link : slice.overlaps_below) { below.push_back(lower_layer->lslices[link.slice_idx]); }
+    Polygons below_polys = to_polygons(below);
 
-    std::vector<Vec2f> triangles = triangulate_expolygons_2f(overlap);
-    for (size_t idx = 0; idx < triangles.size(); idx += 3) {
-        auto [area, first_moment_of_area, second_moment_area,
-              second_moment_of_area_covariance] = compute_triangle_moments_of_area(triangles[idx], triangles[idx + 1], triangles[idx + 2]);
-        connection.area += area;
-        connection.centroid_accumulator += Vec3f(first_moment_of_area.x(), first_moment_of_area.y(), layer->print_z * area);
-        connection.second_moment_of_area_accumulator += second_moment_area;
-        connection.second_moment_of_area_covariance_accumulator += second_moment_of_area_covariance;
+    BoundingBox below_bb = get_extents(below_polys);
+
+    Polygons overlap = intersection(ClipperUtils::clip_clipper_polygons_with_subject_bbox(slice_polys, below_bb),
+                                    ClipperUtils::clip_clipper_polygons_with_subject_bbox(below_polys, slice_bb));
+
+    for (const Polygon &poly : overlap) {
+        Vec2f p0 = unscaled(poly.first_point()).cast<float>();
+        for (size_t i = 2; i < poly.points.size(); i++) {
+            Vec2f p1 = unscaled(poly.points[i - 1]).cast<float>();
+            Vec2f p2 = unscaled(poly.points[i]).cast<float>();
+
+            float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
+
+            auto [area, first_moment_of_area, second_moment_area,
+                  second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
+            connection.area += sign * area;
+            connection.centroid_accumulator += sign * Vec3f(first_moment_of_area.x(), first_moment_of_area.y(), layer->print_z * area);
+            connection.second_moment_of_area_accumulator += sign * second_moment_area;
+            connection.second_moment_of_area_covariance_accumulator += sign * second_moment_of_area_covariance;
+        }
     }
 
     return connection;
@@ -973,6 +933,9 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
         std::vector<ExtrusionLine>           current_layer_lines;
         for (const LayerRegion *layer_region : l->regions()) {
             for (const ExtrusionEntity *extrusion : layer_region->perimeters().flatten().entities) {
+                
+                if (!extrusion->role().is_external_perimeter()) continue;
+
                 Points extrusion_pts;
                 extrusion->collect_points(extrusion_pts);
                 float flow_width       = get_flow_width(layer_region, extrusion->role());

@@ -339,7 +339,7 @@ public:
 
 	void		on_roll_back_value(const bool to_sys = false);
 
-	PageShp		add_options_page(const wxString& title, const std::string& icon, bool is_extruder_pages = false);
+    PageShp		add_options_page(const wxString& title, const std::string& icon, bool is_extruder_pages = false);
 	static wxString translate_category(const wxString& title, Preset::Type preset_type);
 
 	virtual void	OnActivate();
@@ -526,6 +526,12 @@ public:
 
 class TabSLAPrint : public Tab
 {
+    // Methods are a vector of method prefix -> method label pairs
+    // method prefix is the prefix whith which all the config values are prefixed
+    // for a particular method. The label is the friendly name for the method
+    void build_sla_support_params(const std::vector<SamePair<std::string>> &methods,
+                                  const Slic3r::GUI::PageShp &page);
+
 public:
     TabSLAPrint(wxBookCtrlBase* parent) :
         Tab(parent, _(L("Print Settings")), Slic3r::Preset::TYPE_SLA_PRINT) {}

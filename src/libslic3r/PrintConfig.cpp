@@ -181,7 +181,8 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLAMaterialSpeed);
 
 static inline const t_config_enum_values s_keys_map_SLASupportTreeType = {
     {"default", int(sla::SupportTreeType::Default)},
-    {"branching",   int(sla::SupportTreeType::Branching)}
+    {"branching",   int(sla::SupportTreeType::Branching)},
+    //TODO: {"organic", int(sla::SupportTreeType::Organic)}
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(SLASupportTreeType);
 
@@ -534,7 +535,7 @@ void PrintConfigDef::init_fff_params()
     def->category   = L("Speed");
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
     def->mode       = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(true));
+    def->set_default_value(new ConfigOptionBool(false));
 
     def             = this->add("overhang_overlap_levels", coPercents);
     def->full_label = L("Overhang overlap levels");
@@ -841,7 +842,8 @@ void PrintConfigDef::init_fff_params()
     def = this->add("extra_perimeters_on_overhangs", coBool);
     def->label = L("Extra perimeters on overhangs (Experimental)");
     def->category = L("Layers and Perimeters");
-    def->tooltip = L("Create additional perimeter paths over steep overhangs and areas where bridges cannot be anchored.");
+    def->tooltip = L("Detect overhang areas where bridges cannot be anchored, and fill them with "
+                    "extra perimeter paths. These paths are anchored to the nearby non-overhang area when possible.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -3271,6 +3273,219 @@ void PrintConfigDef::init_extruder_option_keys()
     assert(std::is_sorted(m_extruder_retract_keys.begin(), m_extruder_retract_keys.end()));
 }
 
+void PrintConfigDef::init_sla_support_params(const std::string &prefix)
+{
+    ConfigOptionDef* def;
+
+    constexpr const char * pretext_unavailable = L("Unavailable for this method.\n");
+    std::string pretext;
+
+    def = this->add(prefix + "support_head_front_diameter", coFloat);
+    def->label = L("Pinhead front diameter");
+    def->category = L("Supports");
+    def->tooltip = L("Diameter of the pointing side of the head");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.4));
+
+    def = this->add(prefix + "support_head_penetration", coFloat);
+    def->label = L("Head penetration");
+    def->category = L("Supports");
+    def->tooltip = L("How much the pinhead has to penetrate the model surface");
+    def->sidetext = L("mm");
+    def->mode = comAdvanced;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloat(0.2));
+
+    def = this->add(prefix + "support_head_width", coFloat);
+    def->label = L("Pinhead width");
+    def->category = L("Supports");
+    def->tooltip = L("Width from the back sphere center to the front sphere center");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 20;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(1.0));
+
+    def = this->add(prefix + "support_pillar_diameter", coFloat);
+    def->label = L("Pillar diameter");
+    def->category = L("Supports");
+    def->tooltip = L("Diameter in mm of the support pillars");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 15;
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionFloat(1.0));
+
+    def = this->add(prefix + "support_small_pillar_diameter_percent", coPercent);
+    def->label = L("Small pillar diameter percent");
+    def->category = L("Supports");
+    def->tooltip = L("The percentage of smaller pillars compared to the normal pillar diameter "
+                      "which are used in problematic areas where a normal pilla cannot fit.");
+    def->sidetext = L("%");
+    def->min = 1;
+    def->max = 100;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionPercent(50));
+
+    pretext = "";
+    if (prefix == "branching")
+        pretext = pretext_unavailable;
+
+    def = this->add(prefix + "support_max_bridges_on_pillar", coInt);
+    def->label = L("Max bridges on a pillar");
+    def->tooltip = pretext + L(
+        "Maximum number of bridges that can be placed on a pillar. Bridges "
+        "hold support point pinheads and connect to pillars as small branches.");
+    def->min = 0;
+    def->max = 50;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(prefix == "branching" ? 2 : 3));
+
+    pretext = "";
+    if (prefix.empty())
+        pretext = pretext_unavailable;
+
+    def = this->add(prefix + "support_max_weight_on_model", coFloat);
+    def->label = L("Max weight on model");
+    def->category = L("Supports");
+    def->tooltip  = pretext + L(
+        "Maximum weight of sub-trees that terminate on the model instead of the print bed. The weight is the sum of the lenghts of all "
+        "branches emanating from the endpoint.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(10.));
+
+    pretext = "";
+    if (prefix == "branching")
+        pretext = pretext_unavailable;
+
+    def = this->add(prefix + "support_pillar_connection_mode", coEnum);
+    def->label = L("Pillar connection mode");
+    def->tooltip = pretext + L("Controls the bridge type between two neighboring pillars."
+                            " Can be zig-zag, cross (double zig-zag) or dynamic which"
+                            " will automatically switch between the first two depending"
+                            " on the distance of the two pillars.");
+    def->enum_keys_map = &ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_values();
+    def->enum_keys_map = &ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_values();
+    def->enum_values = ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_names();
+    def->enum_labels = ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_names();
+    def->enum_labels[0] = L("Zig-Zag");
+    def->enum_labels[1] = L("Cross");
+    def->enum_labels[2] = L("Dynamic");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum(SLAPillarConnectionMode::dynamic));
+
+    def = this->add(prefix + "support_buildplate_only", coBool);
+    def->label = L("Support on build plate only");
+    def->category = L("Supports");
+    def->tooltip = L("Only create support if it lies on a build plate. Don't create support on a print.");
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add(prefix + "support_pillar_widening_factor", coFloat);
+    def->label = L("Pillar widening factor");
+    def->category = L("Supports");
+
+    pretext = "";
+    if (prefix.empty())
+        pretext = pretext_unavailable;
+
+    def->tooltip  = pretext +
+        L("Merging bridges or pillars into another pillars can "
+        "increase the radius. Zero means no increase, one means "
+        "full increase. The exact amount of increase is unspecified and can "
+        "change in the future.");
+
+    def->min = 0;
+    def->max = 1;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.5));
+
+    def = this->add(prefix + "support_base_diameter", coFloat);
+    def->label = L("Support base diameter");
+    def->category = L("Supports");
+    def->tooltip = L("Diameter in mm of the pillar base");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 30;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(4.0));
+
+    def = this->add(prefix + "support_base_height", coFloat);
+    def->label = L("Support base height");
+    def->category = L("Supports");
+    def->tooltip = L("The height of the pillar base cone");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(1.0));
+
+    def = this->add(prefix + "support_base_safety_distance", coFloat);
+    def->label = L("Support base safety distance");
+    def->category = L("Supports");
+    def->tooltip  = L(
+        "The minimum distance of the pillar base from the model in mm. "
+        "Makes sense in zero elevation mode where a gap according "
+        "to this parameter is inserted between the model and the pad.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 10;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(1));
+
+    def = this->add(prefix + "support_critical_angle", coFloat);
+    def->label = L("Critical angle");
+    def->category = L("Supports");
+    def->tooltip = L("The default angle for connecting support sticks and junctions.");
+    def->sidetext = L("°");
+                    def->min = 0;
+    def->max = 90;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(45));
+
+    def = this->add(prefix + "support_max_bridge_length", coFloat);
+    def->label = L("Max bridge length");
+    def->category = L("Supports");
+    def->tooltip = L("The max length of a bridge");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+
+    double default_val = 15.0;
+    if (prefix == "branching")
+        default_val = 5.0;
+
+    def->set_default_value(new ConfigOptionFloat(default_val));
+
+    pretext = "";
+    if (prefix == "branching")
+        pretext = pretext_unavailable;
+
+    def = this->add(prefix + "support_max_pillar_link_distance", coFloat);
+    def->label = L("Max pillar linking distance");
+    def->category = L("Supports");
+    def->tooltip = pretext + L("The max distance of two pillars to get linked with each other."
+                               " A zero value will prohibit pillar cascading.");
+    def->sidetext = L("mm");
+    def->min = 0;   // 0 means no linking
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(10.0));
+
+    def = this->add(prefix + "support_object_elevation", coFloat);
+    def->label = L("Object elevation");
+    def->category = L("Supports");
+    def->tooltip = L("How much the supports should lift up the supported object. "
+                      "If \"Pad around object\" is enabled, this value is ignored.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 150; // This is the max height of print on SL1
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(5.0));
+}
+
 void PrintConfigDef::init_sla_params()
 {
     ConfigOptionDef* def;
@@ -3613,90 +3828,12 @@ void PrintConfigDef::init_sla_params()
     def->enum_labels = ConfigOptionEnum<sla::SupportTreeType>::get_enum_names();
     def->enum_labels[0] = L("Default");
     def->enum_labels[1] = L("Branching");
-    def->mode = comAdvanced;
+    // TODO: def->enum_labels[2] = L("Organic");
+    def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum(sla::SupportTreeType::Default));
 
-    def = this->add("support_head_front_diameter", coFloat);
-    def->label = L("Pinhead front diameter");
-    def->category = L("Supports");
-    def->tooltip = L("Diameter of the pointing side of the head");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(0.4));
-
-    def = this->add("support_head_penetration", coFloat);
-    def->label = L("Head penetration");
-    def->category = L("Supports");
-    def->tooltip = L("How much the pinhead has to penetrate the model surface");
-    def->sidetext = L("mm");
-    def->mode = comAdvanced;
-    def->min = 0;
-    def->set_default_value(new ConfigOptionFloat(0.2));
-
-    def = this->add("support_head_width", coFloat);
-    def->label = L("Pinhead width");
-    def->category = L("Supports");
-    def->tooltip = L("Width from the back sphere center to the front sphere center");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->max = 20;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(1.0));
-
-    def = this->add("support_pillar_diameter", coFloat);
-    def->label = L("Pillar diameter");
-    def->category = L("Supports");
-    def->tooltip = L("Diameter in mm of the support pillars");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->max = 15;
-    def->mode = comSimple;
-    def->set_default_value(new ConfigOptionFloat(1.0));
-
-    def = this->add("support_small_pillar_diameter_percent", coPercent);
-    def->label = L("Small pillar diameter percent");
-    def->category = L("Supports");
-    def->tooltip = L("The percentage of smaller pillars compared to the normal pillar diameter "
-                     "which are used in problematic areas where a normal pilla cannot fit.");
-    def->sidetext = L("%");
-    def->min = 1;
-    def->max = 100;
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionPercent(50));
-    
-    def = this->add("support_max_bridges_on_pillar", coInt);
-    def->label = L("Max bridges on a pillar");
-    def->tooltip = L(
-        "Maximum number of bridges that can be placed on a pillar. Bridges "
-        "hold support point pinheads and connect to pillars as small branches.");
-    def->min = 0;
-    def->max = 50;
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionInt(3));
-
-    def = this->add("support_pillar_connection_mode", coEnum);
-    def->label = L("Pillar connection mode");
-    def->tooltip = L("Controls the bridge type between two neighboring pillars."
-                     " Can be zig-zag, cross (double zig-zag) or dynamic which"
-                     " will automatically switch between the first two depending"
-                     " on the distance of the two pillars.");
-    def->enum_keys_map = &ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_values();
-    def->enum_keys_map = &ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_values();
-    def->enum_values = ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_names();
-    def->enum_labels = ConfigOptionEnum<SLAPillarConnectionMode>::get_enum_names();
-    def->enum_labels[0] = L("Zig-Zag");
-    def->enum_labels[1] = L("Cross");
-    def->enum_labels[2] = L("Dynamic");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum(SLAPillarConnectionMode::dynamic));
-
-    def = this->add("support_buildplate_only", coBool);
-    def->label = L("Support on build plate only");
-    def->category = L("Supports");
-    def->tooltip = L("Only create support if it lies on a build plate. Don't create support on a print.");
-    def->mode = comSimple;
-    def->set_default_value(new ConfigOptionBool(false));
+    init_sla_support_params("");
+    init_sla_support_params("branching");
 
     def = this->add("support_enforcers_only", coBool);
     def->label = L("Support only in enforced regions");
@@ -3704,93 +3841,6 @@ void PrintConfigDef::init_sla_params()
     def->tooltip = L("Only create support if it lies in a support enforcer.");
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionBool(false));
-
-    def = this->add("support_pillar_widening_factor", coFloat);
-    def->label = L("Pillar widening factor");
-    def->category = L("Supports");
-    def->tooltip  = L(
-         "Merging bridges or pillars into another pillars can "
-          "increase the radius. Zero means no increase, one means "
-          "full increase. The exact amount of increase is unspecified and can "
-          "change in the future. What is garanteed is that thickness will not "
-          "exceed \"support_base_diameter\"");
-
-    def->min = 0;
-    def->max = 1;
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(0.15));
-
-    def = this->add("support_base_diameter", coFloat);
-    def->label = L("Support base diameter");
-    def->category = L("Supports");
-    def->tooltip = L("Diameter in mm of the pillar base");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->max = 30;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(4.0));
-
-    def = this->add("support_base_height", coFloat);
-    def->label = L("Support base height");
-    def->category = L("Supports");
-    def->tooltip = L("The height of the pillar base cone");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(1.0));
-
-    def = this->add("support_base_safety_distance", coFloat);
-    def->label = L("Support base safety distance");
-    def->category = L("Supports");
-    def->tooltip  = L(
-        "The minimum distance of the pillar base from the model in mm. "
-        "Makes sense in zero elevation mode where a gap according "
-        "to this parameter is inserted between the model and the pad.");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->max = 10;
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(1));
-
-    def = this->add("support_critical_angle", coFloat);
-    def->label = L("Critical angle");
-    def->category = L("Supports");
-    def->tooltip = L("The default angle for connecting support sticks and junctions.");
-    def->sidetext = L("°");
-    def->min = 0;
-    def->max = 90;
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloat(45));
-
-    def = this->add("support_max_bridge_length", coFloat);
-    def->label = L("Max bridge length");
-    def->category = L("Supports");
-    def->tooltip = L("The max length of a bridge");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(15.0));
-
-    def = this->add("support_max_pillar_link_distance", coFloat);
-    def->label = L("Max pillar linking distance");
-    def->category = L("Supports");
-    def->tooltip = L("The max distance of two pillars to get linked with each other."
-                     " A zero value will prohibit pillar cascading.");
-    def->sidetext = L("mm");
-    def->min = 0;   // 0 means no linking
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(10.0));
-
-    def = this->add("support_object_elevation", coFloat);
-    def->label = L("Object elevation");
-    def->category = L("Supports");
-    def->tooltip = L("How much the supports should lift up the supported object. "
-                     "If \"Pad around object\" is enabled, this value is ignored.");
-    def->sidetext = L("mm");
-    def->min = 0;
-    def->max = 150; // This is the max height of print on SL1
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionFloat(5.0));
 
     def = this->add("support_points_density_relative", coInt);
     def->label = L("Support points density");
@@ -4758,6 +4808,23 @@ Points get_bed_shape(const PrintConfig &cfg)
 }
 
 Points get_bed_shape(const SLAPrinterConfig &cfg) { return to_points(cfg.bed_shape.values); }
+
+std::string get_sla_suptree_prefix(const DynamicPrintConfig &config)
+{
+    const auto *suptreetype = config.option<ConfigOptionEnum<sla::SupportTreeType>>("support_tree_type");
+    std::string slatree = "";
+    if (suptreetype) {
+        auto ttype = static_cast<sla::SupportTreeType>(suptreetype->getInt());
+        switch (ttype) {
+        case sla::SupportTreeType::Branching: slatree = "branching"; break;
+        case sla::SupportTreeType::Organic: slatree = "organic"; break;
+        default:
+            ;
+        }
+    }
+
+    return slatree;
+}
 
 } // namespace Slic3r
 

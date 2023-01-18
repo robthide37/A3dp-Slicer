@@ -553,12 +553,12 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
             const bool supports_enable = selection == _("None") ? false : true;
             new_conf.set_key_value("supports_enable", new ConfigOptionBool(supports_enable));
 
-            new_conf.set_key_value("support_enforcers_only", new ConfigOptionBool(false));
+            std::string treetype = get_sla_suptree_prefix(new_conf);
 
             if (selection == _("Everywhere"))
-                new_conf.set_key_value("support_buildplate_only", new ConfigOptionBool(false));
+                new_conf.set_key_value(treetype + "support_buildplate_only", new ConfigOptionBool(false));
             else if (selection == _("Support on build plate only"))
-                new_conf.set_key_value("support_buildplate_only", new ConfigOptionBool(true));
+                new_conf.set_key_value(treetype + "support_buildplate_only", new ConfigOptionBool(true));
             else if (selection == _("For support enforcers only")) {
                 new_conf.set_key_value("support_enforcers_only", new ConfigOptionBool(true));
             }
@@ -2643,7 +2643,6 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 }
 
                 if (model.looks_like_multipart_object()) {
-                    //wxMessageDialog msg_dlg(q, _L(
                     MessageDialog msg_dlg(q, _L(
                         "This file contains several objects positioned at multiple heights.\n"
                         "Instead of considering them as multiple objects, should \n"
@@ -2654,10 +2653,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     }
                 }
             }
-            else if ((wxGetApp().get_mode() == comSimple) && (type_3mf || type_any_amf) && model_has_advanced_features(model)) {
-                //wxMessageDialog msg_dlg(q, _L("This file cannot be loaded in a simple mode. Do you want to switch to an advanced mode?")+"\n",
+            if ((wxGetApp().get_mode() == comSimple) && (type_3mf || type_any_amf) && model_has_advanced_features(model)) {
                 MessageDialog msg_dlg(q, _L("This file cannot be loaded in a simple mode. Do you want to switch to an advanced mode?")+"\n",
-                    _L("Detected advanced data"), wxICON_WARNING | wxYES | wxNO);
+                    _L("Detected advanced data"), wxICON_WARNING | wxYES | wxCANCEL);
                 if (msg_dlg.ShowModal() == wxID_YES) {
                     Slic3r::GUI::wxGetApp().save_mode(comAdvanced);
                     view3D->set_as_dirty();
@@ -6147,7 +6145,7 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
                 break;
             }
             case ProjectDropDialog::LoadType::LoadGeometry: {
-                Plater::TakeSnapshot snapshot(this, _L("Import Object"));
+//                Plater::TakeSnapshot snapshot(this, _L("Import Object"));
                 load_files({ *it }, true, false);
                 break;
             }

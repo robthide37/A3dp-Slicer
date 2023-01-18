@@ -445,8 +445,11 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->angle 	= surface_fill.params.angle;
         f->adapt_fill_octree = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
 
-        if (surface_fill.params.pattern == ipLightning)
-            dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator;
+		if (surface_fill.params.pattern == ipLightning) {
+			auto *lf = dynamic_cast<FillLightning::Filler*>(f.get());
+			lf->generator = lightning_generator;
+			lf->num_raft_layers = this->object()->slicing_parameters().raft_layers();
+		}
 
         if (perimeter_generator.value == PerimeterGeneratorType::Arachne && surface_fill.params.pattern == ipConcentric) {
             FillConcentric *fill_concentric = dynamic_cast<FillConcentric *>(f.get());

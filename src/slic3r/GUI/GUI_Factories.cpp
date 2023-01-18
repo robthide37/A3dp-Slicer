@@ -558,8 +558,8 @@ void MenuFactory::append_menu_items_add_volume(MenuType menu_type)
         menu->Destroy(range_id);
 
     if (wxGetApp().get_mode() == comSimple) {
-        append_menu_item_add_text(menu, ModelVolumeType::MODEL_PART, false);
-        append_menu_item_add_text(menu, ModelVolumeType::NEGATIVE_VOLUME, false);
+        //append_menu_item_add_text(menu, ModelVolumeType::MODEL_PART, false);
+        //append_menu_item_add_text(menu, ModelVolumeType::NEGATIVE_VOLUME, false);
 
         append_menu_item(menu, wxID_ANY, _(ADD_VOLUME_MENU_ITEMS[int(ModelVolumeType::SUPPORT_ENFORCER)].first), "",
             [](wxCommandEvent&) { obj_list()->load_generic_subobject(L("Box"), ModelVolumeType::SUPPORT_ENFORCER); },

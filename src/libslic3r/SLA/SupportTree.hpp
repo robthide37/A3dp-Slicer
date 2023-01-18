@@ -50,7 +50,7 @@ struct SupportTreeConfig
     // when bridges and pillars are merged. The resulting pillar should be a bit
     // thicker than the ones merging into it. How much thicker? I don't know
     // but it will be derived from this value.
-    double pillar_widening_factor = .05;
+    double pillar_widening_factor = .5;
 
     // Radius in mm of the pillar base.
     double base_radius_mm = 2.0;
@@ -76,10 +76,18 @@ struct SupportTreeConfig
     double pillar_base_safety_distance_mm = 0.5;
     
     unsigned max_bridges_on_pillar = 3;
-    
+
+    double max_weight_on_model_support = 10.f;
+
     double head_fullwidth() const {
         return 2 * head_front_radius_mm + head_width_mm +
                2 * head_back_radius_mm - head_penetration_mm;
+    }
+
+    double safety_distance() const { return safety_distance_mm; }
+    double safety_distance(double r) const
+    {
+        return std::min(safety_distance_mm, r * safety_distance_mm / head_back_radius_mm);
     }
 
     // /////////////////////////////////////////////////////////////////////////
@@ -89,13 +97,15 @@ struct SupportTreeConfig
     // The max Z angle for a normal at which it will get completely ignored.
     static const double constexpr normal_cutoff_angle = 150.0 * M_PI / 180.0;
 
-    // The shortest distance of any support structure from the model surface
+    // The safety gap between a support structure and model body. For support
+    // struts smaller than head_back_radius, the safety distance is scaled
+    // down accordingly. see method safety_distance()
     static const double constexpr safety_distance_mm = 0.5;
 
     static const double constexpr max_solo_pillar_height_mm = 15.0;
     static const double constexpr max_dual_pillar_height_mm = 35.0;
-    static const double constexpr optimizer_rel_score_diff = 1e-6;
-    static const unsigned constexpr optimizer_max_iterations = 1000;
+    static const double constexpr optimizer_rel_score_diff = 1e-10;
+    static const unsigned constexpr optimizer_max_iterations = 2000;
     static const unsigned constexpr pillar_cascade_neighbors = 3;
     
 };
@@ -116,11 +126,11 @@ struct SupportableMesh
         : emesh{trmsh}, pts{sp}, cfg{c}
     {}
 
-    explicit SupportableMesh(const AABBMesh          &em,
-                             const SupportPoints     &sp,
-                             const SupportTreeConfig &c)
-        : emesh{em}, pts{sp}, cfg{c}
-    {}
+//    explicit SupportableMesh(const AABBMesh          &em,
+//                             const SupportPoints     &sp,
+//                             const SupportTreeConfig &c)
+//        : emesh{em}, pts{sp}, cfg{c}
+//    {}
 };
 
 inline double ground_level(const SupportableMesh &sm)

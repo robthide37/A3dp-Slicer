@@ -2246,6 +2246,29 @@ void  NotificationManager::push_simplify_suggestion_notification(const std::stri
 	notification->object_id = object_id;
 	push_notification_data(std::move(notification), 0);
 }
+void NotificationManager::push_version_notification(NotificationType type, NotificationLevel level, const std::string& text, const std::string& hypertext, std::function<bool(wxEvtHandler*)> callback)
+{
+	assert (type == NotificationType::NewAlphaAvailable
+		 || type == NotificationType::NewBetaAvailable 
+		 || type == NotificationType::NoNewReleaseAvailable);
+
+	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
+		// NoNewReleaseAvailable must not show if alfa / beta is on.
+		NotificationType nttype = notification->get_type();
+		if (type == NotificationType::NoNewReleaseAvailable
+			&& (notification->get_type() == NotificationType::NewAlphaAvailable 
+				|| notification->get_type() == NotificationType::NewBetaAvailable)) {
+			return;
+		}
+		// NoNewReleaseAvailable must close if alfa / beta is being push.
+		if (notification->get_type() == NotificationType::NoNewReleaseAvailable
+			&& (type == NotificationType::NewAlphaAvailable
+				|| type == NotificationType::NewBetaAvailable)) {
+			notification->close();
+		}
+	}
+	push_notification(type, level, text, hypertext, callback);
+}
 void NotificationManager::close_notification_of_type(const NotificationType type)
 {
 	for (std::unique_ptr<PopNotification> &notification : m_pop_notifications) {

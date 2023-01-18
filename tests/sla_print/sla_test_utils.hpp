@@ -14,14 +14,12 @@
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/SLA/Pad.hpp"
 #include "libslic3r/SLA/SupportTreeBuilder.hpp"
-#include "libslic3r/SLA/SupportTreeUtils.hpp"
 #include "libslic3r/SLA/SupportPointGenerator.hpp"
 #include "libslic3r/SLA/AGGRaster.hpp"
 #include "libslic3r/SLA/ConcaveHull.hpp"
 #include "libslic3r/MTUtils.hpp"
 
 #include "libslic3r/SVG.hpp"
-#include "libslic3r/Format/OBJ.hpp"
 
 using namespace Slic3r;
 
@@ -109,58 +107,6 @@ inline void test_support_model_collision(
     sla::HollowingConfig hcfg;
     hcfg.enabled = false;
     test_support_model_collision(obj_filename, input_supportcfg, hcfg, {});
-}
-
-// Test pair hash for 'nums' random number pairs.
-template <class I, class II> void test_pairhash()
-{
-    const constexpr size_t nums = 1000;
-    I A[nums] = {0}, B[nums] = {0};
-    std::unordered_set<I> CH;
-    std::unordered_map<II, std::pair<I, I>> ints;
-    
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    
-    const I Ibits = int(sizeof(I) * CHAR_BIT);
-    const II IIbits = int(sizeof(II) * CHAR_BIT);
-    
-    int bits = IIbits / 2 < Ibits ? Ibits / 2 : Ibits;
-    if (std::is_signed<I>::value) bits -= 1;
-    const I Imin = 0;
-    const I Imax = I(std::pow(2., bits) - 1);
-    
-    std::uniform_int_distribution<I> dis(Imin, Imax);
-    
-    for (size_t i = 0; i < nums;) {
-        I a = dis(gen);
-        if (CH.find(a) == CH.end()) { CH.insert(a); A[i] = a; ++i; }
-    }
-    
-    for (size_t i = 0; i < nums;) {
-        I b = dis(gen);
-        if (CH.find(b) == CH.end()) { CH.insert(b); B[i] = b; ++i; }
-    }
-    
-    for (size_t i = 0; i < nums; ++i) {
-        I a = A[i], b = B[i];
-        
-        REQUIRE(a != b);
-        
-        II hash_ab = sla::pairhash<I, II>(a, b);
-        II hash_ba = sla::pairhash<I, II>(b, a);
-        REQUIRE(hash_ab == hash_ba);
-        
-        auto it = ints.find(hash_ab);
-        
-        if (it != ints.end()) {
-            REQUIRE((
-                (it->second.first == a && it->second.second == b) ||
-                (it->second.first == b && it->second.second == a)
-                ));
-        } else
-            ints[hash_ab] = std::make_pair(a, b);
-    }
 }
 
 // SLA Raster test utils:

@@ -67,9 +67,9 @@ public:
         double m_t = infty();
         int m_face_id = -1;
         const AABBMesh *m_mesh = nullptr;
-        Vec3d m_dir;
-        Vec3d m_source;
-        Vec3d m_normal;
+        Vec3d m_dir    = Vec3d::Zero();
+        Vec3d m_source = Vec3d::Zero();
+        Vec3d m_normal = Vec3d::Zero();
         friend class AABBMesh;
         
         // A valid object of this class can only be obtained from

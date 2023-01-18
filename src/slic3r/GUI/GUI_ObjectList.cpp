@@ -2480,6 +2480,9 @@ bool ObjectList::is_splittable(bool to_objects)
         return false;
     }
 
+    if (wxGetApp().get_mode() == comSimple)
+        return false; // suppress to split to parts for simple mode
+
     ModelVolume* volume;
     if (!get_volume_by_item(item, volume) || !volume)
         return false;

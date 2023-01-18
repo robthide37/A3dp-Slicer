@@ -270,6 +270,10 @@ private:
         // hash created from enumerated font from OS
         // check when new font was installed
         size_t hash = 0;
+
+        // filtration pattern
+        std::string search = "";
+        std::vector<bool> hide; // result of filtration
     } m_face_names;
     static bool store(const Facenames &facenames);
     static bool load(Facenames &facenames);
