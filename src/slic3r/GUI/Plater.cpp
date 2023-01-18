@@ -553,10 +553,13 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
             const bool supports_enable = selection == _("None") ? false : true;
             new_conf.set_key_value("supports_enable", new ConfigOptionBool(supports_enable));
 
+            std::string treetype = get_sla_suptree_prefix(new_conf);
+
             if (selection == _("Everywhere"))
-                new_conf.set_key_value("support_buildplate_only", new ConfigOptionBool(false));
+                new_conf.set_key_value(treetype + "support_buildplate_only", new ConfigOptionBool(false));
             else if (selection == _("Support on build plate only"))
-                new_conf.set_key_value("support_buildplate_only", new ConfigOptionBool(true));
+                new_conf.set_key_value(treetype + "support_buildplate_only", new ConfigOptionBool(true));
+
         }
 
         tab->load_config(new_conf);

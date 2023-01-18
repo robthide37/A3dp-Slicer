@@ -1038,8 +1038,11 @@ void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bo
 
 static wxString support_combo_value_for_config(const DynamicPrintConfig &config, bool is_fff)
 {
+    std::string slatree = is_fff ? "" : get_sla_suptree_prefix(config);
+
     const std::string support         = is_fff ? "support_material"                 : "supports_enable";
-    const std::string buildplate_only = is_fff ? "support_material_buildplate_only" : "support_buildplate_only";
+    const std::string buildplate_only = is_fff ? "support_material_buildplate_only" : slatree + "support_buildplate_only";
+
     return
         ! config.opt_bool(support) ?
             _("None") :
@@ -1082,7 +1085,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
 
     if (is_fff ?
             (opt_key == "support_material" || opt_key == "support_material_auto" || opt_key == "support_material_buildplate_only") :
-            (opt_key == "supports_enable"  || opt_key == "support_buildplate_only"))
+            (opt_key == "supports_enable"  || opt_key == "support_tree_type" || opt_key == get_sla_suptree_prefix(*m_config) + "support_buildplate_only"))
         og_freq_chng_params->set_value("support", support_combo_value_for_config(*m_config, is_fff));
 
     if (! is_fff && (opt_key == "pad_enable" || opt_key == "pad_around_object"))
@@ -4821,6 +4824,60 @@ void TabSLAMaterial::update()
         wxGetApp().mainframe->on_config_changed(m_config);
 }
 
+static void add_options_into_line(ConfigOptionsGroupShp &optgroup,
+                                  const std::vector<SamePair<std::string>> &prefixes,
+                                  const std::string &optkey)
+{
+    auto opt = optgroup->get_option(prefixes.front().first + optkey);
+    Line line{ opt.opt.label, "" };
+    line.full_width = 1;
+    for (auto &prefix : prefixes) {
+        opt = optgroup->get_option(prefix.first + optkey);
+        opt.opt.label = prefix.second;
+        opt.opt.width = 12; // TODO
+        line.append_option(opt);
+    }
+    optgroup->append_line(line);
+}
+
+void TabSLAPrint::build_sla_support_params(const std::vector<SamePair<std::string>> &prefixes,
+                                           const Slic3r::GUI::PageShp &page)
+{
+
+    auto optgroup = page->new_optgroup(L("Support head"));
+    add_options_into_line(optgroup, prefixes, "support_head_front_diameter");
+    add_options_into_line(optgroup, prefixes, "support_head_penetration");
+    add_options_into_line(optgroup, prefixes, "support_head_width");
+
+    optgroup = page->new_optgroup(L("Support pillar"));
+    add_options_into_line(optgroup, prefixes, "support_pillar_diameter");
+    add_options_into_line(optgroup, prefixes, "support_small_pillar_diameter_percent");
+    add_options_into_line(optgroup, prefixes, "support_max_bridges_on_pillar");
+
+    add_options_into_line(optgroup, prefixes, "support_pillar_connection_mode");
+    add_options_into_line(optgroup, prefixes, "support_buildplate_only");
+    add_options_into_line(optgroup, prefixes, "support_pillar_widening_factor");
+    add_options_into_line(optgroup, prefixes, "support_max_weight_on_model");
+    add_options_into_line(optgroup, prefixes, "support_base_diameter");
+    add_options_into_line(optgroup, prefixes, "support_base_height");
+    add_options_into_line(optgroup, prefixes, "support_base_safety_distance");
+
+    // Mirrored parameter from Pad page for toggling elevation on the same page
+    add_options_into_line(optgroup, prefixes, "support_object_elevation");
+
+    Line line{ "", "" };
+    line.full_width = 1;
+    line.widget = [this](wxWindow* parent) {
+        return description_line_widget(parent, &m_support_object_elevation_description_line);
+    };
+    optgroup->append_line(line);
+
+    optgroup = page->new_optgroup(L("Connection of the support sticks and junctions"));
+    add_options_into_line(optgroup, prefixes, "support_critical_angle");
+    add_options_into_line(optgroup, prefixes, "support_max_bridge_length");
+    add_options_into_line(optgroup, prefixes, "support_max_pillar_link_distance");
+}
+
 void TabSLAPrint::build()
 {
     m_presets = &m_preset_bundle->sla_prints;
@@ -4833,41 +4890,12 @@ void TabSLAPrint::build()
     optgroup->append_single_option_line("faded_layers");
 
     page = add_options_page(L("Supports"), "support"/*"sla_supports"*/);
+
     optgroup = page->new_optgroup(L("Supports"));
     optgroup->append_single_option_line("supports_enable");
     optgroup->append_single_option_line("support_tree_type");
 
-    optgroup = page->new_optgroup(L("Support head"));
-    optgroup->append_single_option_line("support_head_front_diameter");
-    optgroup->append_single_option_line("support_head_penetration");
-    optgroup->append_single_option_line("support_head_width");
-
-    optgroup = page->new_optgroup(L("Support pillar"));
-    optgroup->append_single_option_line("support_pillar_diameter");
-    optgroup->append_single_option_line("support_small_pillar_diameter_percent");
-    optgroup->append_single_option_line("support_max_bridges_on_pillar");
-    
-    optgroup->append_single_option_line("support_pillar_connection_mode");
-    optgroup->append_single_option_line("support_buildplate_only");
-    optgroup->append_single_option_line("support_pillar_widening_factor");
-    optgroup->append_single_option_line("support_base_diameter");
-    optgroup->append_single_option_line("support_base_height");
-    optgroup->append_single_option_line("support_base_safety_distance");
-    
-    // Mirrored parameter from Pad page for toggling elevation on the same page
-    optgroup->append_single_option_line("support_object_elevation");
-
-    Line line{ "", "" };
-    line.full_width = 1;
-    line.widget = [this](wxWindow* parent) {
-        return description_line_widget(parent, &m_support_object_elevation_description_line);
-    };
-    optgroup->append_line(line);
-
-    optgroup = page->new_optgroup(L("Connection of the support sticks and junctions"));
-    optgroup->append_single_option_line("support_critical_angle");
-    optgroup->append_single_option_line("support_max_bridge_length");
-    optgroup->append_single_option_line("support_max_pillar_link_distance");
+    build_sla_support_params({{"", "Default"}, {"branching", "Branching"}}, page);
 
     optgroup = page->new_optgroup(L("Automatic generation"));
     optgroup->append_single_option_line("support_points_density_relative");

@@ -340,14 +340,17 @@ bool DefaultSupportTree::connect_to_nearpillar(const Head &head,
     return true;
 }
 
-bool DefaultSupportTree::create_ground_pillar(const Vec3d &hjp,
+bool DefaultSupportTree::create_ground_pillar(const Junction &hjp,
                                              const Vec3d &sourcedir,
-                                             double       radius,
                                              long         head_id)
 {
     auto [ret, pillar_id] = sla::create_ground_pillar(suptree_ex_policy,
-                                                      m_builder, m_sm, hjp,
-                                                      sourcedir, radius, radius,
+                                                      m_builder,
+                                                      m_sm,
+                                                      hjp.pos,
+                                                      sourcedir,
+                                                      hjp.r,
+                                                      hjp.r,
                                                       head_id);
 
     if (pillar_id >= 0) // Save the pillar endpoint in the spatial index
@@ -362,20 +365,19 @@ void DefaultSupportTree::add_pinheads()
     // The minimum distance for two support points to remain valid.
     const double /*constexpr*/ D_SP = 0.1;
 
-       // Get the points that are too close to each other and keep only the
-       // first one
+    // Get the points that are too close to each other and keep only the
+    // first one
     auto aliases = cluster(m_points, D_SP, 2);
 
     PtIndices filtered_indices;
     filtered_indices.reserve(aliases.size());
     m_iheads.reserve(aliases.size());
-    m_iheadless.reserve(aliases.size());
     for(auto& a : aliases) {
         // Here we keep only the front point of the cluster.
         filtered_indices.emplace_back(a.front());
     }
 
-       // calculate the normals to the triangles for filtered points
+    // calculate the normals to the triangles for filtered points
     auto nmls = normals(suptree_ex_policy, m_points, m_sm.emesh,
                         m_sm.cfg.head_front_radius_mm, m_thr,
                         filtered_indices);
@@ -404,22 +406,22 @@ void DefaultSupportTree::add_pinheads()
 
         Vec3d n = nmls.row(Eigen::Index(i));
 
-           // for all normals we generate the spherical coordinates and
-           // saturate the polar angle to 45 degrees from the bottom then
-           // convert back to standard coordinates to get the new normal.
-           // Then we just create a quaternion from the two normals
-           // (Quaternion::FromTwoVectors) and apply the rotation to the
-           // arrow head.
+        // for all normals we generate the spherical coordinates and
+        // saturate the polar angle to 45 degrees from the bottom then
+        // convert back to standard coordinates to get the new normal.
+        // Then we just create a quaternion from the two normals
+        // (Quaternion::FromTwoVectors) and apply the rotation to the
+        // arrow head.
 
         auto [polar, azimuth] = dir_to_spheric(n);
 
-           // skip if the tilt is not sane
+        // skip if the tilt is not sane
         if (polar < PI - m_sm.cfg.normal_cutoff_angle) return;
 
-           // We saturate the polar angle to 3pi/4
+        // We saturate the polar angle to 3pi/4
         polar = std::max(polar, PI - m_sm.cfg.bridge_slope);
 
-           // save the head (pinpoint) position
+        // save the head (pinpoint) position
         Vec3d hp = m_points.row(fidx);
 
         double lmin = m_sm.cfg.head_width_mm, lmax = lmin;
@@ -428,18 +430,17 @@ void DefaultSupportTree::add_pinheads()
             lmin = 0., lmax = m_sm.cfg.head_penetration_mm;
         }
 
-           // The distance needed for a pinhead to not collide with model.
+        // The distance needed for a pinhead to not collide with model.
         double w = lmin + 2 * back_r + 2 * m_sm.cfg.head_front_radius_mm -
                    m_sm.cfg.head_penetration_mm;
 
         double pin_r = double(m_sm.pts[fidx].head_front_radius);
 
-           // Reassemble the now corrected normal
+        // Reassemble the now corrected normal
         auto nn = spheric_to_dir(polar, azimuth).normalized();
 
-           // check available distance
-        AABBMesh::hit_result t = pinhead_mesh_intersect(hp, nn, pin_r,
-                                                           back_r, w);
+        // check available distance
+        AABBMesh::hit_result t = pinhead_mesh_intersect(hp, nn, pin_r, back_r, w);
 
         if (t.distance() < w) {
             // Let's try to optimize this angle, there might be a
@@ -509,10 +510,10 @@ void DefaultSupportTree::classify()
     ground_head_indices.reserve(m_iheads.size());
     m_iheads_onmodel.reserve(m_iheads.size());
 
-       // First we decide which heads reach the ground and can be full
-       // pillars and which shall be connected to the model surface (or
-       // search a suitable path around the surface that leads to the
-       // ground -- TODO)
+    // First we decide which heads reach the ground and can be full
+    // pillars and which shall be connected to the model surface (or
+    // search a suitable path around the surface that leads to the
+    // ground -- TODO)
     for(unsigned i : m_iheads) {
         m_thr();
 
@@ -530,10 +531,10 @@ void DefaultSupportTree::classify()
         m_head_to_ground_scans[i] = hit;
     }
 
-       // We want to search for clusters of points that are far enough
-       // from each other in the XY plane to not cross their pillar bases
-       // These clusters of support points will join in one pillar,
-       // possibly in their centroid support point.
+    // We want to search for clusters of points that are far enough
+    // from each other in the XY plane to not cross their pillar bases
+    // These clusters of support points will join in one pillar,
+    // possibly in their centroid support point.
 
     auto pointfn = [this](unsigned i) {
         return m_builder.head(i).junction_point();
@@ -559,13 +560,13 @@ void DefaultSupportTree::routing_to_ground()
     for (auto &cl : m_pillar_clusters) {
         m_thr();
 
-           // place all the centroid head positions into the index. We
-           // will query for alternative pillar positions. If a sidehead
-           // cannot connect to the cluster centroid, we have to search
-           // for another head with a full pillar. Also when there are two
-           // elements in the cluster, the centroid is arbitrary and the
-           // sidehead is allowed to connect to a nearby pillar to
-           // increase structural stability.
+        // place all the centroid head positions into the index. We
+        // will query for alternative pillar positions. If a sidehead
+        // cannot connect to the cluster centroid, we have to search
+        // for another head with a full pillar. Also when there are two
+        // elements in the cluster, the centroid is arbitrary and the
+        // sidehead is allowed to connect to a nearby pillar to
+        // increase structural stability.
 
         if (cl.empty()) continue;
 
@@ -587,7 +588,7 @@ void DefaultSupportTree::routing_to_ground()
 
         Head &h = m_builder.head(hid);
 
-        if (!create_ground_pillar(h.junction_point(), h.dir, h.r_back_mm, h.id)) {
+        if (!create_ground_pillar(h.junction(), h.dir, h.id)) {
             BOOST_LOG_TRIVIAL(warning)
                 << "Pillar cannot be created for support point id: " << hid;
             m_iheads_onmodel.emplace_back(h.id);
@@ -595,11 +596,11 @@ void DefaultSupportTree::routing_to_ground()
         }
     }
 
-       // now we will go through the clusters ones again and connect the
-       // sidepoints with the cluster centroid (which is a ground pillar)
-       // or a nearby pillar if the centroid is unreachable.
+    // now we will go through the clusters ones again and connect the
+    // sidepoints with the cluster centroid (which is a ground pillar)
+    // or a nearby pillar if the centroid is unreachable.
     size_t ci = 0;
-    for (auto cl : m_pillar_clusters) {
+    for (const std::vector<unsigned> &cl : m_pillar_clusters) {
         m_thr();
 
         auto cidx = cl_centroids[ci++];
@@ -615,10 +616,9 @@ void DefaultSupportTree::routing_to_ground()
 
                 if (!connect_to_nearpillar(sidehead, centerpillarID) &&
                     !search_pillar_and_connect(sidehead)) {
-                    Vec3d pstart = sidehead.junction_point();
                     // Vec3d pend = Vec3d{pstart.x(), pstart.y(), gndlvl};
                     // Could not find a pillar, create one
-                    create_ground_pillar(pstart, sidehead.dir, sidehead.r_back_mm, sidehead.id);
+                    create_ground_pillar(sidehead.junction(), sidehead.dir, sidehead.id);
                 }
             }
         }
@@ -664,10 +664,10 @@ bool DefaultSupportTree::connect_to_model_body(Head &head)
     zangle = std::max(zangle, PI/4);
     double h = std::sin(zangle) * head.fullwidth();
 
-       // The width of the tail head that we would like to have...
+    // The width of the tail head that we would like to have...
     h = std::min(hit.distance() - head.r_back_mm, h);
 
-       // If this is a mini pillar dont bother with the tail width, can be 0.
+    // If this is a mini pillar dont bother with the tail width, can be 0.
     if (head.r_back_mm < m_sm.cfg.head_back_radius_mm) h = std::max(h, 0.);
     else if (h <= 0.) return false;
 
@@ -773,23 +773,23 @@ void DefaultSupportTree::interconnect_pillars()
     // Ideally every pillar should be connected with at least one of its
     // neighbors if that neighbor is within max_pillar_link_distance
 
-       // Pillars with height exceeding H1 will require at least one neighbor
-       // to connect with. Height exceeding H2 require two neighbors.
+    // Pillars with height exceeding H1 will require at least one neighbor
+    // to connect with. Height exceeding H2 require two neighbors.
     double H1 = m_sm.cfg.max_solo_pillar_height_mm;
     double H2 = m_sm.cfg.max_dual_pillar_height_mm;
     double d = m_sm.cfg.max_pillar_link_distance_mm;
 
-       //A connection between two pillars only counts if the height ratio is
-       // bigger than 50%
+    // A connection between two pillars only counts if the height ratio is
+    // bigger than 50%
     double min_height_ratio = 0.5;
 
     std::set<unsigned long> pairs;
 
-       // A function to connect one pillar with its neighbors. THe number of
-       // neighbors is given in the configuration. This function if called
-       // for every pillar in the pillar index. A pair of pillar will not
-       // be connected multiple times this is ensured by the 'pairs' set which
-       // remembers the processed pillar pairs
+    // A function to connect one pillar with its neighbors. THe number of
+    // neighbors is given in the configuration. This function if called
+    // for every pillar in the pillar index. A pair of pillar will not
+    // be connected multiple times this is ensured by the 'pairs' set which
+    // remembers the processed pillar pairs
     auto cascadefn =
         [this, d, &pairs, min_height_ratio, H1] (const PointIndexEl& el)
     {
@@ -797,10 +797,10 @@ void DefaultSupportTree::interconnect_pillars()
 
         const Pillar& pillar = m_builder.pillar(el.second); // actual pillar
 
-           // Get the max number of neighbors a pillar should connect to
+        // Get the max number of neighbors a pillar should connect to
         unsigned neighbors = m_sm.cfg.pillar_cascade_neighbors;
 
-           // connections are already enough for the pillar
+        // connections are already enough for the pillar
         if(pillar.links >= neighbors) return;
 
         double max_d = d * pillar.r_start / m_sm.cfg.head_back_radius_mm;
@@ -809,7 +809,7 @@ void DefaultSupportTree::interconnect_pillars()
             return distance(e.first, qp) < max_d;
         });
 
-           // sort the result by distance (have to check if this is needed)
+        // sort the result by distance (have to check if this is needed)
         std::sort(qres.begin(), qres.end(),
                   [qp](const PointIndexEl& e1, const PointIndexEl& e2){
                       return distance(e1.first, qp) < distance(e2.first, qp);
@@ -821,23 +821,23 @@ void DefaultSupportTree::interconnect_pillars()
 
             auto a = el.second, b = re.second;
 
-               // Get unique hash for the given pair (order doesn't matter)
+            // Get unique hash for the given pair (order doesn't matter)
             auto hashval = pairhash(a, b);
 
-               // Search for the pair amongst the remembered pairs
+            // Search for the pair amongst the remembered pairs
             if(pairs.find(hashval) != pairs.end()) continue;
 
             const Pillar& neighborpillar = m_builder.pillar(re.second);
 
-               // this neighbor is occupied, skip
+            // this neighbor is occupied, skip
             if (neighborpillar.links >= neighbors) continue;
             if (neighborpillar.r_start < pillar.r_start) continue;
 
             if(interconnect(pillar, neighborpillar)) {
                 pairs.insert(hashval);
 
-                   // If the interconnection length between the two pillars is
-                   // less than 50% of the longer pillar's height, don't count
+                // If the interconnection length between the two pillars is
+                // less than 50% of the longer pillar's height, don't count
                 if(pillar.height < H1 ||
                     neighborpillar.height / pillar.height > min_height_ratio)
                     m_builder.increment_links(pillar);
@@ -848,30 +848,30 @@ void DefaultSupportTree::interconnect_pillars()
 
             }
 
-               // connections are enough for one pillar
+            // connections are enough for one pillar
             if(pillar.links >= neighbors) break;
         }
     };
 
-       // Run the cascade for the pillars in the index
+    // Run the cascade for the pillars in the index
     m_pillar_index.foreach(cascadefn);
 
-       // We would be done here if we could allow some pillars to not be
-       // connected with any neighbors. But this might leave the support tree
-       // unprintable.
-       //
-       // The current solution is to insert additional pillars next to these
-       // lonely pillars. One or even two additional pillar might get inserted
-       // depending on the length of the lonely pillar.
+    // We would be done here if we could allow some pillars to not be
+    // connected with any neighbors. But this might leave the support tree
+    // unprintable.
+    //
+    // The current solution is to insert additional pillars next to these
+    // lonely pillars. One or even two additional pillar might get inserted
+    // depending on the length of the lonely pillar.
 
     size_t pillarcount = m_builder.pillarcount();
 
-       // Again, go through all pillars, this time in the whole support tree
-       // not just the index.
+    // Again, go through all pillars, this time in the whole support tree
+    // not just the index.
     for(size_t pid = 0; pid < pillarcount; pid++) {
         auto pillar = [this, pid]() { return m_builder.pillar(pid); };
 
-           // Decide how many additional pillars will be needed:
+        // Decide how many additional pillars will be needed:
 
         unsigned needpillars = 0;
         if (pillar().bridges > m_sm.cfg.max_bridges_on_pillar)
@@ -887,17 +887,17 @@ void DefaultSupportTree::interconnect_pillars()
         needpillars = std::max(pillar().links, needpillars) - pillar().links;
         if (needpillars == 0) continue;
 
-           // Search for new pillar locations:
+        // Search for new pillar locations:
 
         bool   found    = false;
         double alpha    = 0; // goes to 2Pi
         double r        = 2 * m_sm.cfg.base_radius_mm;
         Vec3d  pillarsp = pillar().startpoint();
 
-           // temp value for starting point detection
+        // temp value for starting point detection
         Vec3d sp(pillarsp.x(), pillarsp.y(), pillarsp.z() - r);
 
-           // A vector of bool for placement feasbility
+        // A vector of bool for placement feasbility
         std::vector<bool>  canplace(needpillars, false);
         std::vector<Vec3d> spts(needpillars); // vector of starting points
 
@@ -916,12 +916,12 @@ void DefaultSupportTree::interconnect_pillars()
                 s.y() += std::sin(a) * r;
                 spts[n] = s;
 
-                   // Check the path vertically down
+                // Check the path vertically down
                 Vec3d check_from = s + Vec3d{0., 0., pillar().r_start};
                 auto hr = bridge_mesh_intersect(check_from, DOWN, pillar().r_start);
                 Vec3d gndsp{s.x(), s.y(), gnd};
 
-                   // If the path is clear, check for pillar base collisions
+                // If the path is clear, check for pillar base collisions
                 canplace[n] = std::isinf(hr.distance()) &&
                               std::sqrt(m_sm.emesh.squared_distance(gndsp)) >
                                   min_dist;
@@ -930,7 +930,7 @@ void DefaultSupportTree::interconnect_pillars()
             found = std::all_of(canplace.begin(), canplace.end(),
                                 [](bool v) { return v; });
 
-               // 20 angles will be tried...
+            // 20 angles will be tried...
             alpha += 0.1 * PI;
         }
 

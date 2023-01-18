@@ -13,20 +13,28 @@
 
 namespace Slic3r { namespace sla {
 
+inline constexpr const auto &beam_ex_policy = ex_tbb;
+
 class BranchingTreeBuilder: public branchingtree::Builder {
     SupportTreeBuilder &m_builder;
     const SupportableMesh  &m_sm;
     const branchingtree::PointCloud &m_cloud;
 
+    std::vector<branchingtree::Node> m_pillars; // to put an index over them
+
+    // cache succesfull ground connections
+    mutable std::map<int, GroundConnection> m_gnd_connections;
+    mutable execution::SpinningMutex<ExecutionTBB>  m_gnd_connections_mtx;
+
     // Scaling of the input value 'widening_factor:<0, 1>' to produce resonable
     // widening behaviour
-    static constexpr double WIDENING_SCALE = 0.02;
+    static constexpr double WIDENING_SCALE = 0.05;
 
-    double get_radius(const branchingtree::Node &j)
+    double get_radius(const branchingtree::Node &j) const
     {
         double w = WIDENING_SCALE * m_sm.cfg.pillar_widening_factor * j.weight;
 
-        return std::min(m_sm.cfg.base_radius_mm, double(j.Rmin) + w);
+        return double(j.Rmin) + w;
     }
 
     std::vector<size_t>  m_unroutable_pinheads;
@@ -78,6 +86,44 @@ class BranchingTreeBuilder: public branchingtree::Builder {
         });
     }
 
+    void discard_subtree_rescure(size_t root)
+    {
+        // Discard all the support points connecting to this branch.
+        // As a last resort, try to route child nodes to ground and stop
+        // traversing if any child branch succeeds.
+        traverse(m_cloud, root, [this](const branchingtree::Node &node) {
+            branchingtree::TraverseReturnT ret{true, true};
+
+            int suppid_parent = m_cloud.get_leaf_id(node.id);
+            int suppid_left   = branchingtree::Node::ID_NONE;
+            int suppid_right  = branchingtree::Node::ID_NONE;
+
+            double glvl = ground_level(m_sm);
+            branchingtree::Node dst = node;
+            dst.pos.z() = glvl;
+            dst.weight += node.pos.z() - glvl;
+
+            if (node.left >= 0 && add_ground_bridge(m_cloud.get(node.left), dst))
+                ret.to_left = false;
+            else
+                suppid_left = m_cloud.get_leaf_id(node.left);
+
+            if (node.right >= 0 && add_ground_bridge(m_cloud.get(node.right), dst))
+                ret.to_right = false;
+            else
+                suppid_right = m_cloud.get_leaf_id(node.right);
+
+            if (suppid_parent >= 0)
+                m_unroutable_pinheads.emplace_back(suppid_parent);
+            if (suppid_left >= 0)
+                m_unroutable_pinheads.emplace_back(suppid_left);
+            if (suppid_right >= 0)
+                m_unroutable_pinheads.emplace_back(suppid_right);
+
+            return ret;
+        });
+    }
+
 public:
     BranchingTreeBuilder(SupportTreeBuilder          &builder,
                      const SupportableMesh       &sm,
@@ -98,13 +144,24 @@ public:
     bool add_mesh_bridge(const branchingtree::Node &from,
                          const branchingtree::Node &to) override;
 
+    std::optional<Vec3f> suggest_avoidance(const branchingtree::Node &from,
+                                           float max_bridge_len) const override;
+
     void report_unroutable(const branchingtree::Node &j) override
     {
-        BOOST_LOG_TRIVIAL(error) << "Cannot route junction at " << j.pos.x()
-                                 << " " << j.pos.y() << " " << j.pos.z();
+        double glvl = ground_level(m_sm);
+        branchingtree::Node dst = j;
+        dst.pos.z() = glvl;
+        dst.weight += j.pos.z() - glvl;
+        if (add_ground_bridge(j, dst))
+            return;
+
+        BOOST_LOG_TRIVIAL(warning) << "Cannot route junction at " << j.pos.x()
+                                   << " " << j.pos.y() << " " << j.pos.z();
 
         // Discard all the support points connecting to this branch.
-        discard_subtree(j.id);
+        discard_subtree_rescure(j.id);
+//        discard_subtree(j.id);
     }
 
     const std::vector<size_t>& unroutable_pinheads() const
@@ -113,15 +170,28 @@ public:
     }
 
     bool is_valid() const override { return !m_builder.ctl().stopcondition(); }
+
+    const std::vector<branchingtree::Node> & pillars() const { return m_pillars; }
+
+    const GroundConnection *ground_conn(size_t pillar) const
+    {
+        const GroundConnection *ret = nullptr;
+
+        auto it = m_gnd_connections.find(m_pillars[pillar].id);
+        if (it != m_gnd_connections.end())
+            ret = &it->second;
+
+        return ret;
+    }
 };
 
 bool BranchingTreeBuilder::add_bridge(const branchingtree::Node &from,
-                                  const branchingtree::Node &to)
+                                      const branchingtree::Node &to)
 {
     Vec3d fromd = from.pos.cast<double>(), tod = to.pos.cast<double>();
     double fromR = get_radius(from), toR = get_radius(to);
     Beam beam{Ball{fromd, fromR}, Ball{tod, toR}};
-    auto   hit = beam_mesh_hit(ex_tbb, m_sm.emesh, beam,
+    auto   hit = beam_mesh_hit(beam_ex_policy , m_sm.emesh, beam,
                                m_sm.cfg.safety_distance_mm);
 
     bool ret = hit.distance() > (tod - fromd).norm();
@@ -144,8 +214,8 @@ bool BranchingTreeBuilder::add_merger(const branchingtree::Node &node,
     Beam beam2{Ball{from2d, closestR}, Ball{tod, mergeR}};
 
     auto sd = m_sm.cfg.safety_distance_mm ;
-    auto hit1 = beam_mesh_hit(ex_tbb, m_sm.emesh, beam1, sd);
-    auto hit2 = beam_mesh_hit(ex_tbb, m_sm.emesh, beam2, sd);
+    auto hit1 = beam_mesh_hit(beam_ex_policy , m_sm.emesh, beam1, sd);
+    auto hit2 = beam_mesh_hit(beam_ex_policy , m_sm.emesh, beam2, sd);
 
     bool ret = hit1.distance() > (tod - from1d).norm() &&
                hit2.distance() > (tod - from2d).norm();
@@ -156,12 +226,31 @@ bool BranchingTreeBuilder::add_merger(const branchingtree::Node &node,
 bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
                                              const branchingtree::Node &to)
 {
-    bool ret = search_ground_route(ex_tbb, m_builder, m_sm,
-                                   sla::Junction{from.pos.cast<double>(),
-                                                 get_radius(from)},
-                                   get_radius(to)).first;
+    bool ret = false;
 
-    if (ret) {
+    namespace bgi = boost::geometry::index;
+
+    auto it = m_gnd_connections.find(from.id);
+    const GroundConnection *connptr = nullptr;
+
+    if (it == m_gnd_connections.end()) {
+        sla::Junction j{from.pos.cast<double>(), get_radius(from)};
+        Vec3d init_dir = (to.pos - from.pos).cast<double>().normalized();
+
+        auto conn = deepsearch_ground_connection(beam_ex_policy , m_sm, j,
+                                                 get_radius(to), init_dir);
+
+        // Remember that this node was tested if can go to ground, don't
+        // test it with any other destination ground point because
+        // it is unlikely that search_ground_route would find a better solution
+        connptr = &(m_gnd_connections[from.id] = conn);
+    } else {
+        connptr = &(it->second);
+    }
+
+    if (connptr && *connptr) {
+        m_pillars.emplace_back(from);
+        ret = true;
         build_subtree(from.id);
     }
 
@@ -171,17 +260,20 @@ bool BranchingTreeBuilder::add_ground_bridge(const branchingtree::Node &from,
 bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
                                            const branchingtree::Node &to)
 {
+    if (from.weight > m_sm.cfg.max_weight_on_model_support)
+        return false;
+
     sla::Junction fromj = {from.pos.cast<double>(), get_radius(from)};
 
     auto anchor = m_sm.cfg.ground_facing_only ?
                       std::optional<Anchor>{} : // If no mesh connections are allowed
-                      calculate_anchor_placement(ex_tbb, m_sm, fromj,
+                      calculate_anchor_placement(beam_ex_policy , m_sm, fromj,
                                                  to.pos.cast<double>());
 
     if (anchor) {
         sla::Junction toj = {anchor->junction_point(), anchor->r_back_mm};
 
-        auto hit = beam_mesh_hit(ex_tbb, m_sm.emesh,
+        auto hit = beam_mesh_hit(beam_ex_policy , m_sm.emesh,
                                  Beam{{fromj.pos, fromj.r}, {toj.pos, toj.r}}, 0.);
 
         if (hit.distance() > distance(fromj.pos, toj.pos)) {
@@ -195,6 +287,70 @@ bool BranchingTreeBuilder::add_mesh_bridge(const branchingtree::Node &from,
     }
 
     return bool(anchor);
+}
+
+static std::optional<Vec3f> get_avoidance(const GroundConnection &conn,
+                                          float maxdist)
+{
+    std::optional<Vec3f> ret;
+
+    if (conn) {
+        if (conn.path.size() > 1) {
+            ret = conn.path[1].pos.cast<float>();
+        } else {
+            Vec3f pbeg = conn.path[0].pos.cast<float>();
+            Vec3f pend = conn.pillar_base->pos.cast<float>();
+            pbeg.z()   = std::max(pbeg.z() - maxdist, pend.z());
+            ret = pbeg;
+        }
+    }
+
+    return ret;
+}
+
+std::optional<Vec3f> BranchingTreeBuilder::suggest_avoidance(
+    const branchingtree::Node &from, float max_bridge_len) const
+{
+    std::optional<Vec3f> ret;
+
+    double glvl = ground_level(m_sm);
+    branchingtree::Node dst = from;
+    dst.pos.z() = glvl;
+    dst.weight += from.pos.z() - glvl;
+    sla::Junction j{from.pos.cast<double>(), get_radius(from)};
+
+    auto found_it = m_gnd_connections.end();
+    {
+        std::lock_guard lk{m_gnd_connections_mtx};
+        found_it = m_gnd_connections.find(from.id);
+    }
+
+    if (found_it != m_gnd_connections.end()) {
+        ret = get_avoidance(found_it->second, max_bridge_len);
+    } else {
+        auto conn = deepsearch_ground_connection(
+            beam_ex_policy , m_sm, j, get_radius(dst), sla::DOWN);
+
+        {
+            std::lock_guard lk{m_gnd_connections_mtx};
+            m_gnd_connections[from.id] = conn;
+        }
+
+        ret = get_avoidance(conn, max_bridge_len);
+    }
+
+    return ret;
+}
+
+inline void build_pillars(SupportTreeBuilder &builder,
+                          BranchingTreeBuilder &vbuilder,
+                          const SupportableMesh &sm)
+{
+    for (size_t pill_id = 0; pill_id < vbuilder.pillars().size(); ++pill_id) {
+        auto * conn = vbuilder.ground_conn(pill_id);
+        if (conn)
+            build_ground_connection(builder, sm, *conn);
+    }
 }
 
 void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &sm)
@@ -221,7 +377,7 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
     for (auto &h : heads)
         if (h && h->is_valid()) {
             leafs.emplace_back(h->junction_point().cast<float>(), h->r_back_mm);
-            h->id = leafs.size() - 1;
+            h->id = long(leafs.size() - 1);
             builder.add_head(h->id, *h);
         }
 
@@ -240,14 +396,28 @@ void create_branching_tree(SupportTreeBuilder &builder, const SupportableMesh &s
                                                   props.sampling_radius());
 
     auto bedpts  = branchingtree::sample_bed(props.bed_shape(),
-                                             props.ground_level(),
+                                             float(props.ground_level()),
                                              props.sampling_radius());
+
+    for (auto &bp : bedpts)
+        bp.Rmin = sm.cfg.head_back_radius_mm;
 
     branchingtree::PointCloud nodes{std::move(meshpts), std::move(bedpts),
                                     std::move(leafs), props};
 
     BranchingTreeBuilder vbuilder{builder, sm, nodes};
+
+    execution::for_each(ex_tbb,
+                        size_t(0),
+                        nodes.get_leafs().size(),
+                        [&nodes, &vbuilder](size_t leaf_idx) {
+                            vbuilder.suggest_avoidance(nodes.get_leafs()[leaf_idx],
+                                                       nodes.properties().max_branch_length());
+                        });
+
     branchingtree::build_tree(nodes, vbuilder);
+
+    build_pillars(builder, vbuilder, sm);
 
     for (size_t id : vbuilder.unroutable_pinheads())
         builder.head(id).invalidate();

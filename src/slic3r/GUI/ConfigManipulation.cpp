@@ -374,22 +374,42 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
     bool is_default_tree = treetype == sla::SupportTreeType::Default;
     bool is_branching_tree = treetype == sla::SupportTreeType::Branching;
 
-    toggle_field("support_head_front_diameter", supports_en);
-    toggle_field("support_head_penetration", supports_en);
-    toggle_field("support_head_width", supports_en);
-    toggle_field("support_pillar_diameter", supports_en);
-    toggle_field("support_small_pillar_diameter_percent", supports_en);
+    toggle_field("support_tree_type", supports_en);
+
+    toggle_field("support_head_front_diameter", supports_en && is_default_tree);
+    toggle_field("support_head_penetration", supports_en && is_default_tree);
+    toggle_field("support_head_width", supports_en && is_default_tree);
+    toggle_field("support_pillar_diameter", supports_en && is_default_tree);
+    toggle_field("support_small_pillar_diameter_percent", supports_en && is_default_tree);
     toggle_field("support_max_bridges_on_pillar", supports_en && is_default_tree);
     toggle_field("support_pillar_connection_mode", supports_en && is_default_tree);
-    toggle_field("support_tree_type", supports_en);
-    toggle_field("support_buildplate_only", supports_en);
-    toggle_field("support_base_diameter", supports_en);
-    toggle_field("support_base_height", supports_en);
-    toggle_field("support_base_safety_distance", supports_en);
-    toggle_field("support_critical_angle", supports_en);
-    toggle_field("support_max_bridge_length", supports_en);
+    toggle_field("support_buildplate_only", supports_en && is_default_tree);
+    toggle_field("support_base_diameter", supports_en && is_default_tree);
+    toggle_field("support_base_height", supports_en && is_default_tree);
+    toggle_field("support_base_safety_distance", supports_en && is_default_tree);
+    toggle_field("support_critical_angle", supports_en && is_default_tree);
+    toggle_field("support_max_bridge_length", supports_en && is_default_tree);
     toggle_field("support_max_pillar_link_distance", supports_en && is_default_tree);
-    toggle_field("support_pillar_widening_factor", supports_en && is_branching_tree);
+    toggle_field("support_pillar_widening_factor", false);
+    toggle_field("support_max_weight_on_model", false);
+
+    toggle_field("branchingsupport_head_front_diameter", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_head_penetration", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_head_width", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_pillar_diameter", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_small_pillar_diameter_percent", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_bridges_on_pillar", false);
+    toggle_field("branchingsupport_pillar_connection_mode", false);
+    toggle_field("branchingsupport_buildplate_only", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_base_diameter", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_base_height", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_base_safety_distance", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_critical_angle", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_bridge_length", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_pillar_link_distance", false);
+    toggle_field("branchingsupport_pillar_widening_factor", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_weight_on_model", supports_en && is_branching_tree);
+
     toggle_field("support_points_density_relative", supports_en);
     toggle_field("support_points_minimal_distance", supports_en);
 
@@ -406,7 +426,8 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
 
     bool zero_elev = config->opt_bool("pad_around_object") && pad_en;
 
-    toggle_field("support_object_elevation", supports_en && !zero_elev);
+    toggle_field("support_object_elevation", supports_en && is_default_tree && !zero_elev);
+    toggle_field("branchingsupport_object_elevation", supports_en && is_branching_tree && !zero_elev);
     toggle_field("pad_object_gap", zero_elev);
     toggle_field("pad_around_object_everywhere", zero_elev);
     toggle_field("pad_object_connector_stride", zero_elev);
