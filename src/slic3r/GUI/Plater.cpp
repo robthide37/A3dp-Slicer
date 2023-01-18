@@ -4407,6 +4407,7 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
             } else {
                 show_error(q, message.first, message.second);
                 notification_manager->set_slicing_progress_hidden();
+                notification_manager->stop_delayed_notifications_of_type(NotificationType::ExportOngoing);
             }
         } else
             notification_manager->push_slicing_error_notification(message.first);
