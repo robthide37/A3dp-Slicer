@@ -141,6 +141,8 @@ BundleMap BundleMap::load()
     typedef std::pair<const fs::path&, BundleLocation> DirData;
     std::vector<DirData> dir_list { {vendor_dir, BundleLocation::IN_VENDOR},  {archive_dir, BundleLocation::IN_ARCHIVE},  {rsrc_vendor_dir, BundleLocation::IN_RESOURCES} };
     for ( auto dir : dir_list) {
+        if (!fs::exists(dir.first))
+            continue;
         for (const auto &dir_entry : boost::filesystem::directory_iterator(dir.first)) {
             if (Slic3r::is_ini_file(dir_entry)) {
                 std::string id = dir_entry.path().stem().string();  // stem() = filename() without the trailing ".ini" part
@@ -226,26 +228,30 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
 
     bool is_variants = false;
 
+    const fs::path vendor_dir_path = (fs::path(Slic3r::data_dir()) / "vendor").make_preferred();
+    const fs::path cache_dir_path = (fs::path(Slic3r::data_dir()) / "cache").make_preferred();
+    const fs::path rsrc_dir_path = (fs::path(resources_dir()) / "profiles").make_preferred();
+
     for (const auto &model : models) {
         if (! filter(model)) { continue; }
 
         wxBitmap bitmap;
         int bitmap_width = 0;
-        auto load_bitmap = [](const wxString& bitmap_file, wxBitmap& bitmap, int& bitmap_width)->bool {
-            if (wxFileExists(bitmap_file)) {
-                bitmap.LoadFile(bitmap_file, wxBITMAP_TYPE_PNG);
-                bitmap_width = bitmap.GetWidth();
-                return true;
-            }
-            return false;
+        auto load_bitmap = [](const wxString& bitmap_file, wxBitmap& bitmap, int& bitmap_width) {
+            bitmap.LoadFile(bitmap_file, wxBITMAP_TYPE_PNG);
+            bitmap_width = bitmap.GetWidth();
         };
         
         bool found = false;
-        for (const std::string& res : { Slic3r::data_dir() + "/vendor/" + vendor.id + "/", Slic3r::resources_dir() + "/profiles/" + vendor.id + "/", Slic3r::data_dir() + "/cache/" + vendor.id + "/" } ) {
-            if (load_bitmap(GUI::from_u8(res + "/" + model.thumbnail), bitmap, bitmap_width)) {
-                found = true;
-                break;
-            }
+        for (const fs::path& res : { rsrc_dir_path   / vendor.id / model.thumbnail
+                                   , vendor_dir_path / vendor.id / model.thumbnail
+                                   , cache_dir_path  / vendor.id / model.thumbnail })
+        {
+            if (!fs::exists(res))
+                continue;
+            load_bitmap(GUI::from_u8(res.string()), bitmap, bitmap_width);
+            found = true;
+            break;
         }
         
         if (!found) {
@@ -256,7 +262,7 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
             load_bitmap(Slic3r::var(PRINTER_PLACEHOLDER), bitmap, bitmap_width);
         }
         
-        auto *title = new wxStaticText(this, wxID_ANY, from_u8(model.name), wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+        wxStaticText* title = new wxStaticText(this, wxID_ANY, from_u8(model.name), wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
         title->SetFont(font_name);
         const int wrap_width = std::max((int)MODEL_MIN_WRAP, bitmap_width);
         title->Wrap(wrap_width);
@@ -269,7 +275,7 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
 
         titles.push_back(title);
 
-        auto *bitmap_widget = new wxStaticBitmap(this, wxID_ANY, bitmap);
+        wxStaticBitmap* bitmap_widget = new wxStaticBitmap(this, wxID_ANY, bitmap);
         bitmaps.push_back(bitmap_widget);
 
         auto *variants_panel = new wxPanel(this);
@@ -292,7 +298,7 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
                 is_variants = true;
             }
 
-            auto *cbox = new Checkbox(variants_panel, label, model_id, variant.name);
+            Checkbox* cbox = new Checkbox(variants_panel, label, model_id, variant.name);
             i == 0 ? cboxes.push_back(cbox) : cboxes_alt.push_back(cbox);
 
             const bool enabled = appconfig.get_variant(vendor.id, model_id, variant.name);
@@ -1616,7 +1622,7 @@ PageVendors::PageVendors(ConfigWizard *parent)
     for (const auto &pair : wizard_p()->bundles) {
         const VendorProfile *vendor = pair.second.vendor_profile;
         if (vendor->id == PresetBundle::PRUSA_BUNDLE) { continue; }
-        if (vendor->templates_profile)
+        if (vendor && vendor->templates_profile)
             continue;
 
         auto *cbox = new wxCheckBox(this, wxID_ANY, vendor->name);
@@ -2498,7 +2504,7 @@ void ConfigWizard::priv::update_materials(Technology technology)
                     }
 				}
                 // template filament bundle has no printers - filament would be never added
-                if(pair.second.vendor_profile->templates_profile && pair.second.preset_bundle->printers.begin() == pair.second.preset_bundle->printers.end())
+                if(pair.second.vendor_profile&& pair.second.vendor_profile->templates_profile && pair.second.preset_bundle->printers.begin() == pair.second.preset_bundle->printers.end())
                 {
                     if (!filaments.containts(&filament)) {
                         filaments.push(&filament);

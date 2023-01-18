@@ -2146,7 +2146,7 @@ namespace PresetUtils {
                 if (! res.empty()
                  && !fs::exists(fs::path(vendor_folder + res))
                  && !fs::exists(fs::path(rsrc_folder   + res))
-                 && (fs::exists(fs::path(cache_folder + res))))
+                 && !fs::exists(fs::path(cache_folder  + res)))
                     return false;
             }
         }

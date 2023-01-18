@@ -53,6 +53,8 @@ public:
 	// Providing old slic3r version upgrade profiles on upgrade of an application even in case
 	// that the config index installed from the Internet is equal to the index contained in the installation package.
 	UpdateResult config_update(const Semver &old_slic3r_version, UpdateParams params) const;
+	
+	void update_index_db();
 
 	// "Update" a list of bundles from resources or cache/vendor (behaves like an online update).
 	bool install_bundles_rsrc_or_cache_vendor(std::vector<std::string> bundles, bool snapshot = true) const;

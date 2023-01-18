@@ -369,11 +369,11 @@ struct Materials
             if (((printer == nullptr && printer_name == PageMaterials::EMPTY) || (printer != nullptr && is_compatible_with_printer(PresetWithVendorProfile(prst, prst.vendor), PresetWithVendorProfile(prntr, prntr.vendor)))) &&
                 (type.empty() || get_type(preset) == type) &&
                 (vendor.empty() || get_vendor(preset) == vendor) &&
-                !prst.vendor->templates_profile) {
+                prst.vendor && !prst.vendor->templates_profile) {
 
                 cb(preset);
             }
-            else if ((printer == nullptr && printer_name == PageMaterials::TEMPLATES) && prst.vendor->templates_profile &&
+            else if ((printer == nullptr && printer_name == PageMaterials::TEMPLATES) && prst.vendor && prst.vendor->templates_profile &&
                 (type.empty() || get_type(preset) == type) &&
                 (vendor.empty() || get_vendor(preset) == vendor)) {
                 cb(preset);

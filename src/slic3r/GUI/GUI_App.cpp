@@ -1282,7 +1282,8 @@ bool GUI_App::on_init_inner()
             associate_gcode_files();
 #endif // __WXMSW__
     }
-
+    
+    std::string delayed_error_load_presets;
     // Suppress the '- default -' presets.
     preset_bundle->set_default_suppressed(app_config->get("no_defaults") == "1");
     try {
@@ -1291,7 +1292,7 @@ bool GUI_App::on_init_inner()
         // installation of a compatible system preset, thus nullifying the system preset substitutions.
         init_params->preset_substitutions = preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
     } catch (const std::exception &ex) {
-        show_error(nullptr, ex.what());
+        delayed_error_load_presets = ex.what(); 
     }
 
 #ifdef WIN32
@@ -1307,6 +1308,9 @@ bool GUI_App::on_init_inner()
     // application frame
     if (scrn && is_editor())
         scrn->SetText(_L("Preparing settings tabs") + dots);
+
+    if (!delayed_error_load_presets.empty())
+        show_error(nullptr, delayed_error_load_presets);
 
     mainframe = new MainFrame();
     // hide settings tabs after first Layout
@@ -3001,6 +3005,7 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
     if (reason == ConfigWizard::RR_USER) {
         // Cancel sync before starting wizard to prevent two downloads at same time
         preset_updater->cancel_sync();
+        preset_updater->update_index_db();
         if (preset_updater->config_update(app_config->orig_version(), PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD) == PresetUpdater::R_ALL_CANCELED)
             return false;
     }
@@ -3183,6 +3188,7 @@ bool GUI_App::check_updates(const bool verbose)
 {	
 	PresetUpdater::UpdateResult updater_result;
 	try {
+        preset_updater->update_index_db();
 		updater_result = preset_updater->config_update(app_config->orig_version(), verbose ? PresetUpdater::UpdateParams::SHOW_TEXT_BOX : PresetUpdater::UpdateParams::SHOW_NOTIFICATION);
 		if (updater_result == PresetUpdater::R_INCOMPAT_EXIT) {
 			mainframe->Close();

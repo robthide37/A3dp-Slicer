@@ -1308,13 +1308,22 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
         try {
             pt::read_ini(ifs, tree);
         } catch (const boost::property_tree::ini_parser::ini_parser_error &err) {
-            throw Slic3r::RuntimeError(format("Failed loading config bundle \"%1%\"\nError: \"%2%\" at line %3%", path, err.message(), err.line()).c_str());
+            // This throw was uncatched. While other similar problems later are just returning empty pair.
+            //throw Slic3r::RuntimeError(format("Failed loading config bundle \"%1%\"\nError: \"%2%\" at line %3%", path, err.message(), err.line()).c_str());
+            BOOST_LOG_TRIVIAL(error) << format("Failed loading config bundle \"%1%\"\nError: \"%2%\" at line %3%", path, err.message(), err.line()).c_str();
+            return std::make_pair(PresetsConfigSubstitutions{}, 0);
         }
     }
 
     const VendorProfile *vendor_profile = nullptr;
     if (flags.has(LoadConfigBundleAttribute::LoadSystem) || flags.has(LoadConfigBundleAttribute::LoadVendorOnly)) {
-        auto vp = VendorProfile::from_ini(tree, path);
+        VendorProfile vp;
+        try {
+            vp = VendorProfile::from_ini(tree, path);
+        } catch (const std::exception& e) {
+            BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: Failed to open profile file.") % path;
+            return std::make_pair(PresetsConfigSubstitutions{}, 0);
+        }
         if (vp.models.size() == 0 && !vp.templates_profile) {
             BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: No printer model defined.") % path;
             return std::make_pair(PresetsConfigSubstitutions{}, 0);
@@ -1360,7 +1369,7 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
         } else if (boost::starts_with(section.first, "filament:")) {
             presets = &this->filaments;
             preset_name = section.first.substr(9);
-            if (vendor_profile->templates_profile) {
+            if (vendor_profile && vendor_profile->templates_profile) {
                 preset_name += " @Template";
             }
         } else if (boost::starts_with(section.first, "sla_print:")) {
