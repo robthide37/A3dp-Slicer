@@ -163,6 +163,8 @@ void FileGet::priv::get_perform()
 				m_stopped = true;
 				fclose(file);
 				cancel = true;
+				if (m_written == 0)
+					std::remove(m_tmp_path.string().c_str());
 				wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_PAUSED);
 				evt->SetInt(m_id);
 				m_evt_handler->QueueEvent(evt);
