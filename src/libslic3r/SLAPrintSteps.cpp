@@ -150,7 +150,7 @@ static indexed_triangle_set csgmesh_merge_positive_parts(const Cont &csgmesh)
         const indexed_triangle_set * pmesh = csg::get_mesh(csgpart);
         if (pmesh && op == csg::CSGType::Union) {
             indexed_triangle_set mcpy = *pmesh;
-            its_transform(mcpy, csg::get_transform(csgpart));
+            its_transform(mcpy, csg::get_transform(csgpart), true);
             its_merge(m, mcpy);
         }
     }
@@ -292,9 +292,8 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         m = generate_preview_vdb(po, step);
     }
 
-    if (!m.empty())
-        po.m_preview_meshes[step] =
-                std::make_shared<const indexed_triangle_set>(std::move(m));
+    po.m_preview_meshes[step] =
+            std::make_shared<const indexed_triangle_set>(std::move(m));
 
     for (size_t i = size_t(step) + 1; i < slaposCount; ++i)
     {
@@ -408,13 +407,7 @@ void SLAPrint::Steps::drill_holes(SLAPrintObject &po)
                           csg_inserter{po.m_mesh_to_slice, slaposDrillHoles},
                           csg::mpartsDrillHoles);
 
-    auto r = po.m_mesh_to_slice.equal_range(slaposDrillHoles);
-
-    // update preview mesh
-    if (r.first != r.second)
-        generate_preview(po, slaposDrillHoles);
-    else
-        po.m_preview_meshes[slaposDrillHoles] = po.get_mesh_to_print();
+    generate_preview(po, slaposDrillHoles);
 
     // Release the data, won't be needed anymore, takes huge amount of ram
     if (po.m_hollowing_data && po.m_hollowing_data->interior)
