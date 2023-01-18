@@ -3664,7 +3664,7 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager& st
             text_fixed = text; // copy
             std::replace(text_fixed.begin(), text_fixed.end(), '\n', ' ');
         }
-        return _u8L("Text") + " - " + ((contain_enter) ? text_fixed : text);
+        return ((contain_enter) ? text_fixed : text);
     };
 
     auto create_configuration = [&]() -> TextConfiguration {

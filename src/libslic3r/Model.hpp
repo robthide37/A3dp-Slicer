@@ -383,7 +383,9 @@ public:
     bool                    is_seam_painted() const;
     // Checks if any of object volume is painted using the multi-material painting gizmo.
     bool                    is_mm_painted() const;
-
+    // Checks if object contains just one volume and it's a text
+    bool                    is_text() const;
+     
     ModelInstance*          add_instance();
     ModelInstance*          add_instance(const ModelInstance &instance);
     ModelInstance*          add_instance(const Vec3d &offset, const Vec3d &scaling_factor, const Vec3d &rotation, const Vec3d &mirror);
@@ -797,6 +799,7 @@ public:
 	bool                is_support_enforcer()   const { return m_type == ModelVolumeType::SUPPORT_ENFORCER; }
 	bool                is_support_blocker()    const { return m_type == ModelVolumeType::SUPPORT_BLOCKER; }
 	bool                is_support_modifier()   const { return m_type == ModelVolumeType::SUPPORT_BLOCKER || m_type == ModelVolumeType::SUPPORT_ENFORCER; }
+    bool                is_text()               const { return text_configuration.has_value(); }
     t_model_material_id material_id() const { return m_material_id; }
     void                reset_extra_facets();
     void                apply_tolerance();

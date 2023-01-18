@@ -226,6 +226,21 @@ ObjectList::ObjectList(wxWindow* parent) :
         wxDataViewItem item;
         wxDataViewColumn* col;
         this->HitTest(this->get_mouse_position_in_control(), item, col);
+
+        // if there is text item to editing, than edit just a name without Text marker
+        if (auto type = m_objects_model->GetItemType(item);
+            type & (itObject | itVolume) && col->GetModelColumn() == colName) {
+            if (ModelObject* obj = object(m_objects_model->GetObjectIdByItem(item))) {
+                if (type == itObject && obj->is_text())
+                    m_objects_model->SetName(from_u8(obj->name), item);
+                else if (type == itVolume && obj->volumes[m_objects_model->GetVolumeIdByItem(item)]->is_text()) {
+                    // we cant rename text parts
+                    event.StopPropagation();
+                    return;
+                }
+            }
+        }
+
         this->EditItem(item, col);
         event.StopPropagation();
         });
@@ -640,6 +655,11 @@ void ObjectList::update_extruder_in_config(const wxDataViewItem& item)
     wxGetApp().plater()->update();
 }
 
+static wxString get_item_name(const std::string& name, const bool is_text_volume)
+{
+    return (is_text_volume ? _L("Text") + " - " : "") + from_u8(name);
+}
+
 void ObjectList::update_name_in_model(const wxDataViewItem& item) const 
 {
     const int obj_idx = m_objects_model->GetObjectIdByItem(item);
@@ -652,8 +672,11 @@ void ObjectList::update_name_in_model(const wxDataViewItem& item) const
     if (m_objects_model->GetItemType(item) & itObject) {
         obj->name = into_u8(m_objects_model->GetName(item));
         // if object has just one volume, rename this volume too
-        if (obj->volumes.size() == 1 && !obj->volumes[0]->text_configuration.has_value())
+        if (obj->is_text()) {
             obj->volumes[0]->name = obj->name;
+            //update object name with text marker in ObjectList
+            m_objects_model->SetName(get_item_name(obj->name, true), item);
+        }
         return;
     }
 
@@ -662,28 +685,32 @@ void ObjectList::update_name_in_model(const wxDataViewItem& item) const
 
     // Renaming of the text volume is suppressed
     // So, revert the name in object list
-    if (obj->volumes[volume_id]->text_configuration.has_value()) {
-        m_objects_model->SetName(from_u8(obj->volumes[volume_id]->name), item);
+    if (obj->volumes[volume_id]->is_text()) {
+        m_objects_model->SetName(get_item_name(obj->volumes[volume_id]->name, true), item);
         return;
     }
-    obj->volumes[volume_id]->name = m_objects_model->GetName(item).ToUTF8().data();
+    obj->volumes[volume_id]->name = into_u8(m_objects_model->GetName(item));
 }
 
 void ObjectList::update_name_in_list(int obj_idx, int vol_idx) const 
 {
     if (obj_idx < 0) return;
     wxDataViewItem item = GetSelection();
-    if (!item || !(m_objects_model->GetItemType(item) & (itVolume | itObject)))
+    auto type = m_objects_model->GetItemType(item);
+    if (!item || !(type & (itVolume | itObject)))
         return;
 
-    wxString new_name = from_u8(object(obj_idx)->volumes[vol_idx]->name);
+    ModelObject* obj = object(obj_idx); 
+    const bool is_text_volume = type == itVolume ? obj->volumes[vol_idx]->is_text() : obj->is_text();
+    const wxString new_name = get_item_name(object(obj_idx)->volumes[vol_idx]->name, is_text_volume);
+
     if (new_name.IsEmpty() || m_objects_model->GetName(item) == new_name)
         return;
 
     m_objects_model->SetName(new_name, item);
 
     // if object has just one volume, rename object too
-    if (ModelObject* obj = object(obj_idx); obj->volumes.size() == 1)
+    if (obj->volumes.size() == 1)
         obj->name = obj->volumes.front()->name;
 }
 
@@ -2089,13 +2116,13 @@ bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, con
         object->delete_volume(idx);
 
         if (object->volumes.size() == 1) {
+            wxDataViewItem obj_item = m_objects_model->GetItemById(obj_idx);
             const auto last_volume = object->volumes[0];
             if (!last_volume->config.empty()) {
                 object->config.apply(last_volume->config);
                 last_volume->config.reset();
 
                 // update extruder color in ObjectList
-                wxDataViewItem obj_item = m_objects_model->GetItemById(obj_idx);
                 if (obj_item) {
                     wxString extruder = object->config.has("extruder") ? wxString::Format("%d", object->config.extruder()) : _L("default");
                     m_objects_model->SetExtruder(extruder, obj_item);
@@ -2103,6 +2130,9 @@ bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, con
                 // add settings to the object, if it has them
                 add_settings_item(obj_item, &object->config.get());
             }
+
+            if (last_volume->is_text())
+                m_objects_model->SetName(get_item_name(/*last_volume*/object->name, true), obj_item);
         }
     }
     else if (type == itInstance) {
@@ -3005,6 +3035,12 @@ wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, st
     const ModelObject* object = (*m_objects)[obj_idx];
     // add volumes to the object
     if (can_add_volumes_to_object(object)) {
+        if (object->volumes.size() > 1) {
+            wxString obj_item_name = from_u8(object->name);
+            if (m_objects_model->GetName(object_item) != obj_item_name)
+                m_objects_model->SetName(obj_item_name, object_item);
+        }
+
         int volume_idx{ -1 };
         for (const ModelVolume* volume : object->volumes) {
             ++volume_idx;
@@ -3012,10 +3048,10 @@ wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, st
                 (printer_technology() == ptSLA && volume->type() == ModelVolumeType::PARAMETER_MODIFIER))
                 continue;
             const wxDataViewItem& vol_item = m_objects_model->AddVolumeChild(object_item,
-                from_u8(volume->name),
+                get_item_name(volume->name, volume->is_text()),
                 volume_idx,
                 volume->type(),
-                volume->text_configuration.has_value(),
+                volume->is_text(),
                 get_warning_icon_name(volume->mesh().stats()),
                 extruder2str(volume->config.has("extruder") ? volume->config.extruder() : 0));
             add_settings_item(vol_item, &volume->config.get());
@@ -3033,7 +3069,7 @@ wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, st
 void ObjectList::add_object_to_list(size_t obj_idx, bool call_selection_changed)
 {
     auto model_object = (*m_objects)[obj_idx];
-    const wxString& item_name = from_u8(model_object->name);
+    const wxString& item_name = get_item_name(model_object->name, model_object->is_text());
     const auto item = m_objects_model->AddObject(item_name,
                       extruder2str(model_object->config.has("extruder") ? model_object->config.extruder() : 0),
                       get_warning_icon_name(model_object->mesh().stats()),
@@ -4560,11 +4596,18 @@ void ObjectList::split_instances()
 void ObjectList::rename_item()
 {
     const wxDataViewItem item = GetSelection();
-    if (!item || !(m_objects_model->GetItemType(item) & (itVolume | itObject)))
+    auto type = m_objects_model->GetItemType(item);
+    if (!item || !(type & (itVolume | itObject)))
         return ;
 
-    const wxString new_name = wxGetTextFromUser(_(L("Enter new name"))+":", _(L("Renaming")), 
-                                                m_objects_model->GetName(item), this);
+    wxString input_name = m_objects_model->GetName(item);
+    if (ModelObject* obj = object(m_objects_model->GetObjectIdByItem(item))) {
+        // if there is text item to editing, than edit just a name without Text marker
+        if (type == itObject && obj->is_text())
+            input_name = from_u8(obj->name);
+    }
+
+    const wxString new_name = wxGetTextFromUser(_L("Enter new name")+":", _L("Renaming"), input_name, this);
 
     if (new_name.IsEmpty())
         return;
