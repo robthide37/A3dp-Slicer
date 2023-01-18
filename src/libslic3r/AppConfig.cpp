@@ -36,6 +36,10 @@ static const std::string MODEL_PREFIX = "model:";
 // are phased out, then we will revert to the original name.
 //static const std::string VERSION_CHECK_URL = "https://files.prusa3d.com/wp-content/uploads/repository/PrusaSlicer-settings-master/live/PrusaSlicer.version";
 static const std::string VERSION_CHECK_URL = "https://files.prusa3d.com/wp-content/uploads/repository/PrusaSlicer-settings-master/live/PrusaSlicer.version2";
+// Url to index archive zip that contains latest indicies
+static const std::string INDEX_ARCHIVE_URL= "https://files.prusa3d.com/wp-content/uploads/repository/vendor_indices.zip";
+// Url to folder with vendor profile files. Used when downloading new profiles that are not in resources folder.
+static const std::string PROFILE_FOLDER_URL = "https://files.prusa3d.com/wp-content/uploads/repository/PrusaSlicer-settings-master/live/";
 
 const std::string AppConfig::SECTION_FILAMENTS = "filaments";
 const std::string AppConfig::SECTION_MATERIALS = "sla_materials";
@@ -68,6 +72,8 @@ void AppConfig::set_defaults()
         // If set, the "- default -" selections of print/filament/printer are suppressed, if there is a valid preset available.
         if (get("no_defaults").empty())
             set("no_defaults", "1");
+        if (get("no_templates").empty())
+            set("no_templates", "0");
         if (get("show_incompatible_presets").empty())
             set("show_incompatible_presets", "0");
 
@@ -663,6 +669,26 @@ std::string AppConfig::version_check_url() const
 {
     auto from_settings = get("version_check_url");
     return from_settings.empty() ? VERSION_CHECK_URL : from_settings;
+}
+
+std::string AppConfig::index_archive_url() const
+{
+#if 0  
+    // this code is for debug & testing purposes only - changed url wont get trough inner checks anyway. 
+    auto from_settings = get("index_archive_url");
+    return from_settings.empty() ? INDEX_ARCHIVE_URL : from_settings;
+#endif
+    return INDEX_ARCHIVE_URL;
+}
+
+std::string AppConfig::profile_folder_url() const
+{
+#if 0   
+    // this code is for debug & testing purposes only - changed url wont get trough inner checks anyway. 
+    auto from_settings = get("profile_folder_url");
+    return from_settings.empty() ? PROFILE_FOLDER_URL : from_settings;
+#endif
+    return PROFILE_FOLDER_URL;
 }
 
 bool AppConfig::exists()

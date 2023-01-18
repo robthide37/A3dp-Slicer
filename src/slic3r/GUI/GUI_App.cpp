@@ -808,6 +808,7 @@ void GUI_App::post_init()
             // Configuration is not compatible and reconfigure was refused by the user. Application is closing.
             return;
         CallAfter([this] {
+            // preset_updater->sync downloads profile updates on background so it must begin after config wizard finished.
             bool cw_showed = this->config_wizard_startup();
             this->preset_updater->sync(preset_bundle);
             this->app_version_check(false);
@@ -1281,7 +1282,8 @@ bool GUI_App::on_init_inner()
             associate_gcode_files();
 #endif // __WXMSW__
     }
-
+    
+    std::string delayed_error_load_presets;
     // Suppress the '- default -' presets.
     preset_bundle->set_default_suppressed(app_config->get("no_defaults") == "1");
     try {
@@ -1290,7 +1292,7 @@ bool GUI_App::on_init_inner()
         // installation of a compatible system preset, thus nullifying the system preset substitutions.
         init_params->preset_substitutions = preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
     } catch (const std::exception &ex) {
-        show_error(nullptr, ex.what());
+        delayed_error_load_presets = ex.what(); 
     }
 
 #ifdef WIN32
@@ -1306,6 +1308,9 @@ bool GUI_App::on_init_inner()
     // application frame
     if (scrn && is_editor())
         scrn->SetText(_L("Preparing settings tabs") + dots);
+
+    if (!delayed_error_load_presets.empty())
+        show_error(nullptr, delayed_error_load_presets);
 
     mainframe = new MainFrame();
     // hide settings tabs after first Layout
@@ -2998,6 +3003,9 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
     wxCHECK_MSG(mainframe != nullptr, false, "Internal error: Main frame not created / null");
 
     if (reason == ConfigWizard::RR_USER) {
+        // Cancel sync before starting wizard to prevent two downloads at same time
+        preset_updater->cancel_sync();
+        preset_updater->update_index_db();
         if (preset_updater->config_update(app_config->orig_version(), PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD) == PresetUpdater::R_ALL_CANCELED)
             return false;
     }
@@ -3180,6 +3188,7 @@ bool GUI_App::check_updates(const bool verbose)
 {	
 	PresetUpdater::UpdateResult updater_result;
 	try {
+        preset_updater->update_index_db();
 		updater_result = preset_updater->config_update(app_config->orig_version(), verbose ? PresetUpdater::UpdateParams::SHOW_TEXT_BOX : PresetUpdater::UpdateParams::SHOW_NOTIFICATION);
 		if (updater_result == PresetUpdater::R_INCOMPAT_EXIT) {
 			mainframe->Close();
