@@ -271,8 +271,6 @@ public:
     void export_toolpaths_to_obj() const;
     void reslice();
     void reslice_FFF_until_step(PrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
-    void reslice_SLA_supports(const ModelObject &object, bool postpone_error_messages = false);
-    void reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
 
     void clear_before_change_mesh(int obj_idx);

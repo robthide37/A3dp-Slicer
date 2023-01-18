@@ -26,10 +26,9 @@ class TriangleMesh;
 // casting and other higher level operations.
 class AABBMesh {
     class AABBImpl;
-    
+
     const indexed_triangle_set* m_tm;
-    double m_ground_level = 0/*, m_gnd_offset = 0*/;
-    
+
     std::unique_ptr<AABBImpl> m_aabb;
     VertexFaceIndex m_vfidx;    // vertex-face index
     std::vector<Vec3i> m_fnidx; // face-neighbor index
@@ -43,7 +42,7 @@ class AABBMesh {
     template<class M> void init(const M &mesh, bool calculate_epsilon);
 
 public:
-    
+
     // calculate_epsilon ... calculate epsilon for triangle-ray intersection from an average triangle edge length.
     // If set to false, a default epsilon is used, which works for "reasonable" meshes.
     explicit AABBMesh(const indexed_triangle_set &tmesh, bool calculate_epsilon = false);
@@ -51,21 +50,17 @@ public:
     
     AABBMesh(const AABBMesh& other);
     AABBMesh& operator=(const AABBMesh&);
-    
+
     AABBMesh(AABBMesh &&other);
     AABBMesh& operator=(AABBMesh &&other);
-    
+
     ~AABBMesh();
-    
-    inline double ground_level() const { return m_ground_level /*+ m_gnd_offset*/; }
-//    inline void ground_level_offset(double o) { m_gnd_offset = o; }
-//    inline double ground_level_offset() const { return m_gnd_offset; }
-    
+
     const std::vector<Vec3f>& vertices() const;
     const std::vector<Vec3i>& indices()  const;
     const Vec3f& vertices(size_t idx) const;
     const Vec3i& indices(size_t idx) const;
-    
+
     // Result of a raycast
     class hit_result {
         // m_t holds a distance from m_source to the intersection.

@@ -2134,10 +2134,10 @@ void GLGizmoEmboss::draw_model_type()
         else if (type != negative)
             ImGui::SetTooltip("%s", _u8L("Click to change part type into negative volume.").c_str());
     }
-    ImGui::SameLine();
 
     // In simple mode are not modifiers
-    if (wxGetApp().get_mode() != ConfigOptionMode::comSimple) {
+    if (wxGetApp().plater()->printer_technology() != ptSLA && wxGetApp().get_mode() != ConfigOptionMode::comSimple) {
+        ImGui::SameLine();
         if (ImGui::RadioButton(_u8L("Modifier").c_str(), type == modifier))
             new_type = modifier;
         else if (ImGui::IsItemHovered()) {

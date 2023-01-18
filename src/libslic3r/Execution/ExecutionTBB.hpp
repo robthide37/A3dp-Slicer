@@ -53,7 +53,7 @@ public:
                     I          to,
                     const T   &init,
                     MergeFn  &&mergefn,
-                    AccessFn &&access,
+                    AccessFn &&accessfn,
                     size_t     granularity = 1
                     )
     {
@@ -61,7 +61,7 @@ public:
             tbb::blocked_range{from, to, granularity}, init,
             [&](const auto &range, T subinit) {
                 T acc = subinit;
-                loop_(range, [&](auto &i) { acc = mergefn(acc, access(i)); });
+                loop_(range, [&](auto &i) { acc = mergefn(acc, accessfn(i)); });
                 return acc;
             },
             std::forward<MergeFn>(mergefn));

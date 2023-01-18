@@ -2626,6 +2626,15 @@ bool model_mmu_segmentation_data_changed(const ModelObject& mo, const ModelObjec
         [](const ModelVolume &mv_old, const ModelVolume &mv_new){ return mv_old.mmu_segmentation_facets.timestamp_matches(mv_new.mmu_segmentation_facets); });
 }
 
+bool model_has_parameter_modifiers_in_objects(const Model &model)
+{
+    for (const auto& model_object : model.objects)
+        for (const auto& volume : model_object->volumes)
+            if (volume->is_modifier())
+                return true;
+    return false;
+}
+
 bool model_has_multi_part_objects(const Model &model)
 {
     for (const ModelObject *model_object : model.objects)

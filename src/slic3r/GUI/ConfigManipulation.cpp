@@ -389,6 +389,7 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
     toggle_field("support_base_safety_distance", supports_en && is_default_tree);
     toggle_field("support_critical_angle", supports_en && is_default_tree);
     toggle_field("support_max_bridge_length", supports_en && is_default_tree);
+    toggle_field("support_enforcers_only", supports_en);
     toggle_field("support_max_pillar_link_distance", supports_en && is_default_tree);
     toggle_field("support_pillar_widening_factor", false);
     toggle_field("support_max_weight_on_model", false);

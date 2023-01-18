@@ -1046,7 +1046,7 @@ static wxString support_combo_value_for_config(const DynamicPrintConfig &config,
     return
         ! config.opt_bool(support) ?
             _("None") :
-            (is_fff && !config.opt_bool("support_material_auto")) ?
+               ((is_fff && !config.opt_bool("support_material_auto")) || (!is_fff && config.opt_bool("support_enforcers_only"))) ?
                 _("For support enforcers only") :
                 (config.opt_bool(buildplate_only) ? _("Support on build plate only") :
                                                     _("Everywhere"));
@@ -1085,7 +1085,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
 
     if (is_fff ?
             (opt_key == "support_material" || opt_key == "support_material_auto" || opt_key == "support_material_buildplate_only") :
-            (opt_key == "supports_enable"  || opt_key == "support_tree_type" || opt_key == get_sla_suptree_prefix(*m_config) + "support_buildplate_only"))
+            (opt_key == "supports_enable"  || opt_key == "support_tree_type" || opt_key == get_sla_suptree_prefix(*m_config) + "support_buildplate_only" || opt_key == "support_enforcers_only"))
         og_freq_chng_params->set_value("support", support_combo_value_for_config(*m_config, is_fff));
 
     if (! is_fff && (opt_key == "pad_enable" || opt_key == "pad_around_object"))
@@ -4921,8 +4921,10 @@ void TabSLAPrint::build()
     optgroup = page->new_optgroup(L("Supports"));
     optgroup->append_single_option_line("supports_enable");
     optgroup->append_single_option_line("support_tree_type");
-
+    optgroup->append_single_option_line("support_enforcers_only");
+    
     build_sla_support_params({{"", "Default"}, {"branching", "Branching"}}, page);
+
 
     optgroup = page->new_optgroup(L("Automatic generation"));
     optgroup->append_single_option_line("support_points_density_relative");

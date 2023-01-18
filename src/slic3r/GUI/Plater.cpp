@@ -555,11 +555,17 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
 
             std::string treetype = get_sla_suptree_prefix(new_conf);
 
-            if (selection == _("Everywhere"))
+            if (selection == _("Everywhere")) {
                 new_conf.set_key_value(treetype + "support_buildplate_only", new ConfigOptionBool(false));
-            else if (selection == _("Support on build plate only"))
+                new_conf.set_key_value("support_enforcers_only", new ConfigOptionBool(false));
+            }
+            else if (selection == _("Support on build plate only")) {
                 new_conf.set_key_value(treetype + "support_buildplate_only", new ConfigOptionBool(true));
-
+                new_conf.set_key_value("support_enforcers_only", new ConfigOptionBool(false));
+            }
+            else if (selection == _("For support enforcers only")) {
+                new_conf.set_key_value("support_enforcers_only", new ConfigOptionBool(true));
+            }
         }
 
         tab->load_config(new_conf);
@@ -570,8 +576,6 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
 
     ConfigOptionDef support_def_sla = support_def;
     support_def_sla.set_default_value(new ConfigOptionStrings{ "None" });
-    assert(support_def_sla.enum_labels[2] == L("For support enforcers only"));
-    support_def_sla.enum_labels.erase(support_def_sla.enum_labels.begin() + 2);
     option = Option(support_def_sla, "support");
     option.opt.full_width = true;
     line.append_option(option);
@@ -1540,7 +1544,6 @@ void Sidebar::update_mode()
 
     p->object_list->unselect_objects();
     p->object_list->update_selections();
-//    p->object_list->update_object_menu();
 
     Layout();
 }
@@ -2674,17 +2677,6 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     }
                 }
                 model_object->ensure_on_bed(is_project_file);
-            }
-
-            // check multi-part object adding for the SLA-printing
-            if (printer_technology == ptSLA) {
-                for (auto obj : model.objects)
-                    if ( obj->volumes.size()>1 ) {
-                        Slic3r::GUI::show_error(nullptr,
-                            format_wxstr(_L("You can't to add the object(s) from %s because of one or some of them is(are) multi-part"),
-                                        from_path(filename)));
-                        return obj_idxs;
-                    }
             }
 
             if (one_by_one) {
@@ -4529,9 +4521,9 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
         // so this selection should be updated before menu creation
         wxGetApp().obj_list()->update_selections();
 
-        if (printer_technology == ptSLA)
-            menu = menus.sla_object_menu();
-        else {
+//        if (printer_technology == ptSLA)
+//            menu = menus.sla_object_menu();
+//        else {
             const Selection& selection = get_selection();
             // show "Object menu" for each one or several FullInstance instead of FullObject
             const bool is_some_full_instances = selection.is_single_full_instance() || 
@@ -4543,12 +4535,12 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
             const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
 #endif // ENABLE_WORLD_COORDINATE
             if (is_some_full_instances)
-                menu = menus.object_menu();
+                menu = printer_technology == ptSLA ? menus.sla_object_menu() : menus.object_menu();
             else if (is_part)
                 menu = selection.is_single_text() ? menus.text_part_menu() : menus.part_menu();
             else
                 menu = menus.multi_selection_menu();
-        }
+//        }
     }
 
     if (q != nullptr && menu) {
@@ -5017,7 +5009,7 @@ bool Plater::priv::can_split_to_objects() const
 
 bool Plater::priv::can_split_to_volumes() const
 {
-    return (printer_technology != ptSLA) && q->can_split(false);
+    return q->can_split(false);
 }
 
 bool Plater::priv::can_arrange() const
@@ -6559,7 +6551,7 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
         return;
 
     // Following lambda generates a combined mesh for export with normals pointing outwards.
-    auto mesh_to_export = [](const ModelObject& mo, int instance_id) {
+    auto mesh_to_export_fff = [](const ModelObject& mo, int instance_id) {
         TriangleMesh mesh;
         for (const ModelVolume* v : mo.volumes)
             if (v->is_model_part()) {
@@ -6581,99 +6573,101 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
         return mesh;
     };
 
-    TriangleMesh mesh;
-    if (p->printer_technology == ptFFF) {
-        if (selection_only) {
-            const ModelObject* model_object = p->model.objects[obj_idx];
-            if (selection.get_mode() == Selection::Instance)
-                mesh = mesh_to_export(*model_object, (selection.is_single_full_object() && model_object->instances.size() > 1) ? -1 : selection.get_instance_idx());
-            else {
-                const GLVolume* volume = selection.get_first_volume();
-                mesh = model_object->volumes[volume->volume_idx()]->mesh();
-                mesh.transform(volume->get_volume_transformation().get_matrix(), true);
-            }
+    auto mesh_to_export_sla = [&, this](const ModelObject& mo, int instance_id) {
+        TriangleMesh mesh;
 
-            if (!selection.is_single_full_object() || model_object->instances.size() == 1)
-                mesh.translate(-model_object->origin_translation.cast<float>());
-        }
+        const SLAPrintObject *object = this->p->sla_print.get_print_object_by_model_object_id(mo.id());
+
+        if (auto m = object->get_mesh_to_print(); !m || m->empty())
+            mesh = mesh_to_export_fff(mo, instance_id);
         else {
-            for (const ModelObject* o : p->model.objects) {
-                mesh.merge(mesh_to_export(*o, -1));
-            }
-        }
-    }
-    else {
-        // This is SLA mode, all objects have only one volume.
-        // However, we must have a look at the backend to load
-        // hollowed mesh and/or supports
-
-        const PrintObjects& objects = p->sla_print.objects();
-        for (const SLAPrintObject* object : objects) {
-            const ModelObject* model_object = object->model_object();
-            if (selection_only) {
-                if (model_object->id() != p->model.objects[obj_idx]->id())
-                    continue;
-            }
             const Transform3d mesh_trafo_inv = object->trafo().inverse();
             const bool is_left_handed = object->is_left_handed();
 
-            TriangleMesh pad_mesh;
-            const bool has_pad_mesh = extended && object->has_mesh(slaposPad);
-            if (has_pad_mesh) {
-                pad_mesh = object->get_mesh(slaposPad);
-                pad_mesh.transform(mesh_trafo_inv);
-            }
+            auto pad_mesh = extended? object->pad_mesh() : TriangleMesh{};
+            pad_mesh.transform(mesh_trafo_inv);
 
-            TriangleMesh supports_mesh;
-            const bool has_supports_mesh = extended && object->has_mesh(slaposSupportTree);
-            if (has_supports_mesh) {
-                supports_mesh = object->get_mesh(slaposSupportTree);
-                supports_mesh.transform(mesh_trafo_inv);
-            }
+            auto supports_mesh = extended ? object->support_mesh() : TriangleMesh{};
+            supports_mesh.transform(mesh_trafo_inv);
+
             const std::vector<SLAPrintObject::Instance>& obj_instances = object->instances();
             for (const SLAPrintObject::Instance& obj_instance : obj_instances) {
-                auto it = std::find_if(model_object->instances.begin(), model_object->instances.end(),
-                    [&obj_instance](const ModelInstance *mi) { return mi->id() == obj_instance.instance_id; });
-                assert(it != model_object->instances.end());
+                auto it = std::find_if(object->model_object()->instances.begin(), object->model_object()->instances.end(),
+                                       [&obj_instance](const ModelInstance *mi) { return mi->id() == obj_instance.instance_id; });
+                assert(it != object->model_object()->instances.end());
 
-                if (it != model_object->instances.end()) {
+                if (it != object->model_object()->instances.end()) {
                     const bool one_inst_only = selection_only && ! selection.is_single_full_object();
 
-                    const int instance_idx = it - model_object->instances.begin();
+                    const int instance_idx = it - object->model_object()->instances.begin();
                     const Transform3d& inst_transform = one_inst_only
-                            ? Transform3d::Identity()
-                            : object->model_object()->instances[instance_idx]->get_transformation().get_matrix();
+                                                            ? Transform3d::Identity()
+                                                            : object->model_object()->instances[instance_idx]->get_transformation().get_matrix();
 
                     TriangleMesh inst_mesh;
 
-                    if (has_pad_mesh) {
+                    if (!pad_mesh.empty()) {
                         TriangleMesh inst_pad_mesh = pad_mesh;
                         inst_pad_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_pad_mesh);
                     }
 
-                    if (has_supports_mesh) {
+                    if (!supports_mesh.empty()) {
                         TriangleMesh inst_supports_mesh = supports_mesh;
                         inst_supports_mesh.transform(inst_transform, is_left_handed);
                         inst_mesh.merge(inst_supports_mesh);
                     }
 
-                    TriangleMesh inst_object_mesh = object->get_mesh_to_slice();
+                    std::shared_ptr<const indexed_triangle_set> m = object->get_mesh_to_print();
+                    TriangleMesh inst_object_mesh;
+                    if (m)
+                        inst_object_mesh = TriangleMesh{*m};
+
                     inst_object_mesh.transform(mesh_trafo_inv);
                     inst_object_mesh.transform(inst_transform, is_left_handed);
 
                     inst_mesh.merge(inst_object_mesh);
 
-                    // ensure that the instance lays on the bed
+                           // ensure that the instance lays on the bed
                     inst_mesh.translate(0.0f, 0.0f, -inst_mesh.bounding_box().min.z());
 
-                    // merge instance with global mesh
+                           // merge instance with global mesh
                     mesh.merge(inst_mesh);
 
                     if (one_inst_only)
                         break;
                 }
             }
+        }
+
+        return mesh;
+    };
+
+    std::function<TriangleMesh(const ModelObject& mo, int instance_id)>
+        mesh_to_export;
+
+    if (p->printer_technology == ptFFF )
+        mesh_to_export = mesh_to_export_fff;
+    else
+        mesh_to_export = mesh_to_export_sla;
+
+    TriangleMesh mesh;
+    if (selection_only) {
+        const ModelObject* model_object = p->model.objects[obj_idx];
+        if (selection.get_mode() == Selection::Instance)
+            mesh = mesh_to_export(*model_object, (selection.is_single_full_object() && model_object->instances.size() > 1) ? -1 : selection.get_instance_idx());
+        else {
+            const GLVolume* volume = selection.get_first_volume();
+            mesh = model_object->volumes[volume->volume_idx()]->mesh();
+            mesh.transform(volume->get_volume_transformation().get_matrix(), true);
+        }
+
+        if (!selection.is_single_full_object() || model_object->instances.size() == 1)
+            mesh.translate(-model_object->origin_translation.cast<float>());
+    }
+    else {
+        for (const ModelObject* o : p->model.objects) {
+            mesh.merge(mesh_to_export(*o, -1));
         }
     }
 
@@ -6847,16 +6841,6 @@ void Plater::reslice()
         reset_gcode_toolpaths();
 
     p->preview->reload_print(!clean_gcode_toolpaths);
-}
-
-void Plater::reslice_SLA_supports(const ModelObject &object, bool postpone_error_messages)
-{
-    reslice_SLA_until_step(slaposPad, object, postpone_error_messages);
-}
-
-void Plater::reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages)
-{
-    reslice_SLA_until_step(slaposDrillHoles, object, postpone_error_messages);
 }
 
 void Plater::reslice_until_step_inner(int step, const ModelObject &object, bool postpone_error_messages)

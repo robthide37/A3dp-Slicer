@@ -1046,6 +1046,8 @@ private:
     float get_overlay_window_width() { return LayersEditing::get_overlay_window_width(); }
 };
 
+const ModelVolume * get_model_volume(const GLVolume &v, const Model &model);
+
 } // namespace GUI
 } // namespace Slic3r
 

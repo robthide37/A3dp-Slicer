@@ -3,7 +3,11 @@
 
 #include <libslic3r/Point.hpp>
 
-namespace Slic3r { namespace sla {
+namespace Slic3r {
+
+class ModelObject;
+
+namespace sla {
 
 // An enum to keep track of where the current points on the ModelObject came from.
 enum class PointsStatus {
@@ -61,6 +65,9 @@ struct SupportPoint
 };
 
 using SupportPoints = std::vector<SupportPoint>;
+
+SupportPoints transformed_support_points(const ModelObject &mo,
+                                         const Transform3d &trafo);
 
 }} // namespace Slic3r::sla
 

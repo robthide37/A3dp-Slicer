@@ -3835,6 +3835,13 @@ void PrintConfigDef::init_sla_params()
     init_sla_support_params("");
     init_sla_support_params("branching");
 
+    def = this->add("support_enforcers_only", coBool);
+    def->label = L("Support only in enforced regions");
+    def->category = L("Supports");
+    def->tooltip = L("Only create support if it lies in a support enforcer.");
+    def->mode = comSimple;
+    def->set_default_value(new ConfigOptionBool(false));
+
     def = this->add("support_points_density_relative", coInt);
     def->label = L("Support points density");
     def->category = L("Supports");

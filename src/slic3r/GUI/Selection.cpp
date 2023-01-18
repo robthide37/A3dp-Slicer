@@ -62,18 +62,18 @@ Selection::VolumeCache::VolumeCache(const Geometry::Transformation& volume_trans
 
 bool Selection::Clipboard::is_sla_compliant() const
 {
-    if (m_mode == Selection::Volume)
-        return false;
+//    if (m_mode == Selection::Volume)
+//        return false;
 
-    for (const ModelObject* o : m_model->objects) {
-        if (o->is_multiparts())
-            return false;
+//    for (const ModelObject* o : m_model->objects) {
+//        if (o->is_multiparts())
+//            return false;
 
-        for (const ModelVolume* v : o->volumes) {
-            if (v->is_modifier())
-                return false;
-        }
-    }
+//        for (const ModelVolume* v : o->volumes) {
+//            if (v->is_modifier())
+//                return false;
+//        }
+//    }
 
     return true;
 }
@@ -157,6 +157,11 @@ void Selection::add(unsigned int volume_idx, bool as_single_selection, bool chec
         return;
 
     const GLVolume* volume = (*m_volumes)[volume_idx];
+
+    if (wxGetApp().plater()->printer_technology() == ptSLA && volume->is_modifier &&
+        m_model->objects[volume->object_idx()]->volumes[volume->volume_idx()]->is_modifier())
+        return;
+
     // wipe tower is already selected
     if (is_wipe_tower() && volume->is_wipe_tower)
         return;
@@ -482,8 +487,14 @@ void Selection::instances_changed(const std::vector<size_t> &instance_ids_select
     assert(m_valid);
     assert(m_mode == Instance);
     m_list.clear();
+
+    const PrinterTechnology pt = wxGetApp().plater()->printer_technology();
+
     for (unsigned int volume_idx = 0; volume_idx < (unsigned int)m_volumes->size(); ++ volume_idx) {
         const GLVolume *volume = (*m_volumes)[volume_idx];
+        if (pt == ptSLA && volume->is_modifier &&
+            m_model->objects[volume->object_idx()]->volumes[volume->volume_idx()]->is_modifier())
+            continue;
         auto it = std::lower_bound(instance_ids_selected.begin(), instance_ids_selected.end(), volume->geometry_id.second);
 		if (it != instance_ids_selected.end() && *it == volume->geometry_id.second)
             this->do_add_volume(volume_idx);
@@ -571,13 +582,13 @@ bool Selection::is_from_single_object() const
 
 bool Selection::is_sla_compliant() const
 {
-    if (m_mode == Volume)
-        return false;
+//    if (m_mode == Volume)
+//        return false;
 
-    for (unsigned int i : m_list) {
-        if ((*m_volumes)[i]->is_modifier)
-            return false;
-    }
+//    for (unsigned int i : m_list) {
+//        if ((*m_volumes)[i]->is_modifier)
+//            return false;
+//    }
 
     return true;
 }
@@ -2072,9 +2083,16 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_object(unsigned int ob
 {
     std::vector<unsigned int> idxs;
 
+    const PrinterTechnology pt = wxGetApp().plater()->printer_technology();
+
     for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
-        if ((*m_volumes)[i]->object_idx() == (int)object_idx)
+        const GLVolume* v = (*m_volumes)[i];
+        if (v->object_idx() == (int)object_idx) {
+            if (pt == ptSLA && v->is_modifier &&
+                m_model->objects[object_idx]->volumes[v->volume_idx()]->is_modifier())
+                continue;
             idxs.push_back(i);
+        }
     }
 
     return idxs;
@@ -2084,8 +2102,13 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_instance(unsigned int 
 {
     std::vector<unsigned int> idxs;
 
+    const PrinterTechnology pt = wxGetApp().plater()->printer_technology();
+
     for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
         const GLVolume* v = (*m_volumes)[i];
+        const ModelVolume *mv = get_model_volume(*v, *m_model);
+        if (pt == ptSLA && v->is_modifier && mv && mv->is_modifier())
+            continue;
         if (v->object_idx() == (int)object_idx && v->instance_idx() == (int)instance_idx)
             idxs.push_back(i);
     }
@@ -3130,7 +3153,12 @@ bool Selection::is_from_fully_selected_instance(unsigned int volume_idx) const
         return false;
 
     unsigned int count = (unsigned int)std::count_if(m_list.begin(), m_list.end(), SameInstance(object_idx, volume->instance_idx(), *m_volumes));
-    return count == (unsigned int)m_model->objects[object_idx]->volumes.size();
+
+    PrinterTechnology pt = wxGetApp().plater()->printer_technology();
+    const ModelVolumePtrs& volumes = m_model->objects[object_idx]->volumes;
+    const unsigned int vol_cnt = (unsigned int)std::count_if(volumes.begin(), volumes.end(), [pt](const ModelVolume* volume) { return pt == ptFFF || !volume->is_modifier(); });
+
+    return count == vol_cnt;
 }
 
 void Selection::paste_volumes_from_clipboard()

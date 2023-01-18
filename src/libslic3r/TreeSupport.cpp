@@ -20,7 +20,7 @@
 #include "MutablePolygon.hpp"
 #include "SupportMaterial.hpp"
 #include "TriangleMeshSlicer.hpp"
-#include "OpenVDBUtils.hpp"
+#include "OpenVDBUtilsLegacy.hpp"
 #include <openvdb/tools/VolumeToSpheres.h>
 
 #include <cassert>
@@ -3441,7 +3441,7 @@ static void draw_branches(
         TriangleMesh mesh = print_object.model_object()->raw_mesh();
         mesh.transform(print_object.trafo_centered());
         double scale = 10.;
-        openvdb::FloatGrid::Ptr grid = mesh_to_grid(mesh.its, {}, scale, 0., 0.);
+        openvdb::FloatGrid::Ptr grid = mesh_to_grid(mesh.its, openvdb::math::Transform{}, scale, 0., 0.);
         closest_surface_point = openvdb::tools::ClosestSurfacePoint<openvdb::FloatGrid>::create(*grid);
         std::vector<openvdb::Vec3R> pts, prev, projections;
         std::vector<float> distances;

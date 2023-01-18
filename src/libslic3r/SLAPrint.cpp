@@ -1,13 +1,9 @@
 #include "SLAPrint.hpp"
 #include "SLAPrintSteps.hpp"
+#include "CSGMesh/CSGMeshCopy.hpp"
+#include "CSGMesh/PerformCSGMeshBooleans.hpp"
 
-#include "Format/SL1.hpp"
-#include "Format/SL1_SVG.hpp"
-#include "Format/pwmx.hpp"
-
-#include "ClipperUtils.hpp"
 #include "Geometry.hpp"
-#include "MTUtils.hpp"
 #include "Thread.hpp"
 
 #include <unordered_set>
@@ -17,7 +13,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/log/trivial.hpp>
 
-// #define SLAPRINT_DO_BENCHMARK
+ #define SLAPRINT_DO_BENCHMARK
 
 #ifdef SLAPRINT_DO_BENCHMARK
 #include <libnest2d/tools/benchmark.h>
@@ -41,7 +37,7 @@ bool is_zero_elevation(const SLAPrintObjectConfig &c)
 sla::SupportTreeConfig make_support_cfg(const SLAPrintObjectConfig& c)
 {
     sla::SupportTreeConfig scfg;
-    
+
     scfg.enabled = c.supports_enable.getBool();
     scfg.tree_type = c.support_tree_type.value;
 
@@ -423,7 +419,12 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
             if (it_print_object_status != print_object_status.end() && it_print_object_status->id != model_object.id())
                 it_print_object_status = print_object_status.end();
             // Check whether a model part volume was added or removed, their transformations or order changed.
-            bool model_parts_differ = model_volume_list_changed(model_object, model_object_new, ModelVolumeType::MODEL_PART);
+            bool model_parts_differ =
+                model_volume_list_changed(model_object, model_object_new,
+                                          {ModelVolumeType::MODEL_PART,
+                                           ModelVolumeType::NEGATIVE_VOLUME,
+                                           ModelVolumeType::SUPPORT_ENFORCER,
+                                           ModelVolumeType::SUPPORT_BLOCKER});
             bool sla_trafo_differs  =
                 model_object.instances.empty() != model_object_new.instances.empty() ||
                 (! model_object.instances.empty() &&
@@ -632,7 +633,7 @@ void SLAPrint::process()
 
     // We want to first process all objects...
     std::vector<SLAPrintObjectStep> level1_obj_steps = {
-        slaposHollowing, slaposDrillHoles, slaposObjectSlice, slaposSupportPoints, slaposSupportTree, slaposPad
+        slaposAssembly, slaposHollowing, slaposDrillHoles, slaposObjectSlice, slaposSupportPoints, slaposSupportTree, slaposPad
     };
 
     // and then slice all supports to allow preview to be displayed ASAP
@@ -828,12 +829,6 @@ bool SLAPrint::is_step_done(SLAPrintObjectStep step) const
 
 SLAPrintObject::SLAPrintObject(SLAPrint *print, ModelObject *model_object)
     : Inherited(print, model_object)
-    , m_transformed_rmesh([this](TriangleMesh &obj) {
-        obj = m_model_object->raw_mesh();
-        if (!obj.empty()) {
-            obj.transform(m_trafo);
-        }
-    })
 {}
 
 SLAPrintObject::~SLAPrintObject() {}
@@ -870,6 +865,7 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             steps.emplace_back(slaposObjectSlice);
         } else if (
                opt_key == "support_points_density_relative"
+            || opt_key == "support_enforcers_only"
             || opt_key == "support_points_minimal_distance") {
             steps.emplace_back(slaposSupportPoints);
         } else if (
@@ -937,8 +933,10 @@ bool SLAPrintObject::invalidate_step(SLAPrintObjectStep step)
 {
     bool invalidated = Inherited::invalidate_step(step);
     // propagate to dependent steps
-    if (step == slaposHollowing) {
+    if (step == slaposAssembly) {
         invalidated |= this->invalidate_all_steps();
+    } else if (step == slaposHollowing) {
+        invalidated |= invalidated |= this->invalidate_steps({ slaposDrillHoles, slaposObjectSlice, slaposSupportPoints, slaposSupportTree, slaposPad, slaposSliceSupports });
     } else if (step == slaposDrillHoles) {
         invalidated |= this->invalidate_steps({ slaposObjectSlice, slaposSupportPoints, slaposSupportTree, slaposPad, slaposSliceSupports });
         invalidated |= m_print->invalidate_step(slapsMergeSlicesAndEval);
@@ -962,7 +960,7 @@ bool SLAPrintObject::invalidate_step(SLAPrintObjectStep step)
 
 bool SLAPrintObject::invalidate_all_steps()
 {
-    return Inherited::invalidate_all_steps() | m_print->invalidate_all_steps();
+    return Inherited::invalidate_all_steps() || m_print->invalidate_all_steps();
 }
 
 double SLAPrintObject::get_elevation() const {
@@ -1053,113 +1051,71 @@ const ExPolygons &SliceRecord::get_slice(SliceOrigin o) const
     return idx >= v.size() ? EMPTY_SLICE : v[idx];
 }
 
-bool SLAPrintObject::has_mesh(SLAPrintObjectStep step) const
-{
-    switch (step) {
-    case slaposDrillHoles:
-        return m_hollowing_data && !m_hollowing_data->hollow_mesh_with_holes.empty();
-    case slaposSupportTree:
-        return ! this->support_mesh().empty();
-    case slaposPad:
-        return ! this->pad_mesh().empty();
-    default:
-        return false;
-    }
-}
-
-TriangleMesh SLAPrintObject::get_mesh(SLAPrintObjectStep step) const
-{
-    switch (step) {
-    case slaposSupportTree:
-        return this->support_mesh();
-    case slaposPad:
-        return this->pad_mesh();
-    case slaposDrillHoles:
-        if (m_hollowing_data)
-            return get_mesh_to_print();
-        [[fallthrough]];
-    default:
-        return TriangleMesh();
-    }
-}
-
 const TriangleMesh& SLAPrintObject::support_mesh() const
 {
-    if(m_config.supports_enable.getBool() && m_supportdata)
+    if (m_config.supports_enable.getBool() &&
+        is_step_done(slaposSupportTree) &&
+        m_supportdata)
         return m_supportdata->tree_mesh;
-    
+
     return EMPTY_MESH;
 }
 
 const TriangleMesh& SLAPrintObject::pad_mesh() const
 {
-    if(m_config.pad_enable.getBool() && m_supportdata)
+    if(m_config.pad_enable.getBool() && is_step_done(slaposPad) && m_supportdata)
         return m_supportdata->pad_mesh;
 
     return EMPTY_MESH;
 }
 
-const indexed_triangle_set &SLAPrintObject::hollowed_interior_mesh() const
+const std::shared_ptr<const indexed_triangle_set> &
+SLAPrintObject::get_mesh_to_print() const
 {
-    if (m_hollowing_data && m_hollowing_data->interior &&
-        m_config.hollowing_enable.getBool())
-        return sla::get_mesh(*m_hollowing_data->interior);
-    
-    return EMPTY_TRIANGLE_SET;
+    int s = last_completed_step();
+
+    while (s > 0 && ! m_preview_meshes[s])
+        --s;
+
+    return m_preview_meshes[s];
 }
 
-const TriangleMesh &SLAPrintObject::transformed_mesh() const {
-    // we need to transform the raw mesh...
-    // currently all the instances share the same x and y rotation and scaling
-    // so we have to extract those from e.g. the first instance and apply to the
-    // raw mesh. This is also true for the support points.
-    // BUT: when the support structure is spawned for each instance than it has
-    // to omit the X, Y rotation and scaling as those have been already applied
-    // or apply an inverse transformation on the support structure after it
-    // has been created.
+std::vector<csg::CSGPart> SLAPrintObject::get_parts_to_slice() const
+{
+    return get_parts_to_slice(slaposCount);
+}
 
-    return m_transformed_rmesh.get();
+std::vector<csg::CSGPart>
+SLAPrintObject::get_parts_to_slice(SLAPrintObjectStep untilstep) const
+{
+    auto laststep = last_completed_step();
+    SLAPrintObjectStep s = std::min(untilstep, laststep);
+
+    if (s == slaposCount)
+        return {};
+
+    std::vector<csg::CSGPart> ret;
+
+    for (int step = 0; step < s; ++step) {
+        auto r = m_mesh_to_slice.equal_range(SLAPrintObjectStep(step));
+        csg::copy_csgrange_shallow(Range{r.first, r.second}, std::back_inserter(ret));
+    }
+
+    return ret;
 }
 
 sla::SupportPoints SLAPrintObject::transformed_support_points() const
 {
-    assert(m_model_object != nullptr);
-    auto spts = m_model_object->sla_support_points;
-    const Transform3d& vol_trafo = m_model_object->volumes.front()->get_transformation().get_matrix();
-    const Transform3f& tr = (trafo() * vol_trafo).cast<float>();
-    for (sla::SupportPoint& suppt : spts) {
-        suppt.pos = tr * suppt.pos;
-    }
-    
-    return spts;
+    assert(model_object());
+
+    return sla::transformed_support_points(*model_object(), trafo());
 }
 
 sla::DrainHoles SLAPrintObject::transformed_drainhole_points() const
 {
-    assert(m_model_object != nullptr);
-    auto pts = m_model_object->sla_drain_holes;
-    const Transform3d& vol_trafo = m_model_object->volumes.front()->get_transformation().get_matrix();
-    const Geometry::Transformation trans(trafo() * vol_trafo);
-    const Transform3f& tr = trans.get_matrix().cast<float>();
-    const Vec3f sc = trans.get_scaling_factor().cast<float>();
-    for (sla::DrainHole &hl : pts) {
-        hl.pos = tr * hl.pos;
-        hl.normal = tr * hl.normal - tr.translation();
+    assert(model_object());
 
-        // The normal scales as a covector (and we must also
-        // undo the damage already done).
-        hl.normal = Vec3f(hl.normal(0)/(sc(0)*sc(0)),
-                          hl.normal(1)/(sc(1)*sc(1)),
-                          hl.normal(2)/(sc(2)*sc(2)));
-
-        // Now shift the hole a bit above the object and make it deeper to
-        // compensate for it. This is to avoid problems when the hole is placed
-        // on (nearly) flat surface.
-        hl.pos -= hl.normal.normalized() * sla::HoleStickOutLength;
-        hl.height += sla::HoleStickOutLength;
-    }
-
-    return pts;
+    return sla::transformed_drainhole_points(*model_object(), trafo());
 }
 
 DynamicConfig SLAPrintStatistics::config() const
@@ -1215,5 +1171,18 @@ void SLAPrint::StatusReporter::operator()(SLAPrint &         p,
 
     p.set_status(int(std::round(st)), msg, flags);
 }
+
+namespace csg {
+
+MeshBoolean::cgal::CGALMeshPtr get_cgalmesh(const CSGPartForStep &part)
+{
+    if (!part.cgalcache && csg::get_mesh(part)) {
+        part.cgalcache = csg::get_cgalmesh(static_cast<const csg::CSGPart&>(part));
+    }
+
+    return part.cgalcache? clone(*part.cgalcache) : nullptr;
+}
+
+} // namespace csg
 
 } // namespace Slic3r
