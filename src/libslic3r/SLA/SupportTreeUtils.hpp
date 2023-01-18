@@ -31,7 +31,7 @@ using Slic3r::Geometry::spheric_to_dir;
 // https://math.stackexchange.com/questions/73237/parametric-equation-of-a-circle-in-3d-space
 template<size_t N>
 class PointRing {
-    std::array<double, N> m_phis;
+    std::array<double, N - 1> m_phis;
 
     // Two vectors that will be perpendicular to each other and to the
     // axis. Values for a(X) and a(Y) are now arbitrary, a(Z) is just a
@@ -51,7 +51,7 @@ class PointRing {
 
 public:
 
-    PointRing(const Vec3d &n) : m_phis{linspace_array<N>(0., 2 * PI)}
+    PointRing(const Vec3d &n) : m_phis{linspace_array<N - 1>(0., 2 * PI)}
     {
         // We have to address the case when the direction vector v (same as
         // dir) is coincident with one of the world axes. In this case two of
@@ -70,7 +70,10 @@ public:
 
     Vec3d get(size_t idx, const Vec3d &src, double r) const
     {
-        double phi = m_phis[idx];
+        if (idx == 0)
+            return src;
+
+        double phi = m_phis[idx - 1];
         double sinphi = std::sin(phi);
         double cosphi = std::cos(phi);
 
@@ -137,9 +140,9 @@ struct Beam_ { // Defines a set of rays displaced along a cone's surface
     {}
 };
 
-using Beam = Beam_<8>;
+using Beam = Beam_<>;
 
-template<class Ex, size_t RayCount = 8>
+template<class Ex, size_t RayCount = Beam::SAMPLES>
 Hit beam_mesh_hit(Ex policy,
                   const AABBMesh &mesh,
                   const Beam_<RayCount> &beam,
@@ -196,7 +199,10 @@ Hit pinhead_mesh_hit(Ex              ex,
                      double          width,
                      double          sd)
 {
-    static const size_t SAMPLES = 8;
+    // Support tree generation speed depends heavily on this value. 8 is almost
+    // ok, but to prevent rare cases of collision, 16 is necessary, which makes
+    // the algorithm run about 60% longer.
+    static const size_t SAMPLES = 16;
 
     // Move away slightly from the touching point to avoid raycasting on the
     // inner surface of the mesh.
