@@ -1982,7 +1982,10 @@ void GLGizmoEmboss::draw_font_list()
             size_t      index = &face - &m_face_names.faces.front();
             std::string name(face.wx_name.ToUTF8().data());
             std::transform(name.begin(), name.end(), name.begin(), ::toupper);
-            m_face_names.hide[index] = !name._Starts_with(m_face_names.search);
+
+            // It should use C++ 20 feature https://en.cppreference.com/w/cpp/string/basic_string/starts_with
+            bool start_with = boost::starts_with(name, m_face_names.search);
+            m_face_names.hide[index] = !start_with; 
         }
     }
     if (!is_popup_open)
