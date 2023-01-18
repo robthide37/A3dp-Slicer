@@ -323,6 +323,11 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 		return;
 #endif // 0
 		BOOST_LOG_TRIVIAL(error) << "Could not find property tree in version file. Checking for application update has failed.";
+		// Lets send event with current version, this way if user triggered this check, it will notify him about no new version online.
+		std::string version = Semver().to_string();
+		wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
+		evt->SetString(GUI::from_u8(version));
+		GUI::wxGetApp().QueueEvent(evt);
 		return;
 	}
 	std::string tree_string = body.substr(start);
