@@ -40,6 +40,10 @@
 #include <tbb/parallel_for.h>
 #include <tbb/spin_mutex.h>
 
+#if defined(TREE_SUPPORT_SHOW_ERRORS) && defined(_WIN32)
+    #define TREE_SUPPORT_SHOW_ERRORS_WIN32
+#endif
+
 namespace Slic3r
 {
 
@@ -104,16 +108,16 @@ static inline void validate_range(const LineInformations &lines)
 
 static inline void check_self_intersections(const Polygons &polygons, const std::string_view message)
 {
-#ifdef _WIN32
+#ifdef TREE_SUPPORT_SHOW_ERRORS_WIN32
     if (!intersecting_edges(polygons).empty())
         ::MessageBoxA(nullptr, (std::string("TreeSupport infill self intersections: ") + std::string(message)).c_str(), "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
-#endif // _WIN32
+#endif // TREE_SUPPORT_SHOW_ERRORS_WIN32
 }
 static inline void check_self_intersections(const ExPolygon &expoly, const std::string_view message)
 {
-#ifdef _WIN32
+#ifdef TREE_SUPPORT_SHOW_ERRORS_WIN32
     check_self_intersections(to_polygons(expoly), message);
-#endif // _WIN32
+#endif // TREE_SUPPORT_SHOW_ERRORS_WIN32
 }
 
 static constexpr const auto tiny_area_threshold = sqr(scaled<double>(0.001));
@@ -197,7 +201,7 @@ static bool inline g_showed_performance_warning = false;
 void tree_supports_show_error(std::string_view message, bool critical)
 { // todo Remove!  ONLY FOR PUBLIC BETA!!
 
-#if defined(_WIN32) && defined(TREE_SUPPORT_SHOW_ERRORS)
+#ifdef TREE_SUPPORT_SHOW_ERRORS_WIN32
     static bool showed_critical = false;
     static bool showed_performance = false;
     auto bugtype = std::string(critical ? " This is a critical bug. It may cause missing or malformed branches.\n" : "This bug should only decrease performance.\n");
@@ -206,7 +210,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
     if (show)
         MessageBoxA(nullptr, std::string("TreeSupport_2 MOD detected an error while generating the tree support.\nPlease report this back to me with profile and model.\nRevision 5.0\n" + std::string(message) + "\n" + bugtype).c_str(), 
             "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
-#endif // WIN32
+#endif // TREE_SUPPORT_SHOW_ERRORS_WIN32
 }
 
 [[nodiscard]] static const std::vector<Polygons> generate_overhangs(const PrintObject &print_object)
@@ -644,14 +648,6 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
     append(lines, to_polylines(polygons));
     return lines;
 #else
-#ifdef _WIN32
-    // Max dimensions for MK3
-//    if (! BoundingBox(Point::new_scale(-170., -170.), Point::new_scale(170., 170.)).contains(get_extents(polygon)))
-    // Max dimensions for XL
-    if (! BoundingBox(Point::new_scale(-250., -250.), Point::new_scale(250., 250.)).contains(get_extents(polygon)))
-        ::MessageBoxA(nullptr, "TreeSupport infill kravsky", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
-#endif // _WIN32
-
     const Flow            &flow   = roof ? support_params.support_material_interface_flow : support_params.support_material_flow;
     std::unique_ptr<Fill>  filler = std::unique_ptr<Fill>(Fill::new_from_type(roof ? support_params.interface_fill_pattern : support_params.base_fill_pattern));
     FillParams             fill_params;
@@ -670,20 +666,20 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
     for (ExPolygon &expoly : union_ex(polygon)) {
         // The surface type does not matter.
         assert(area(expoly) > 0.);
-#ifdef _WIN32
+#ifdef TREE_SUPPORT_SHOW_ERRORS_WIN32
         if (area(expoly) <= 0.)
             ::MessageBoxA(nullptr, "TreeSupport infill negative area", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
-#endif // _WIN32
+#endif // TREE_SUPPORT_SHOW_ERRORS_WIN32
         assert(intersecting_edges(to_polygons(expoly)).empty());
         check_self_intersections(expoly, "generate_support_infill_lines");
         Surface surface(stInternal, std::move(expoly));
         try {
             Polylines pl = filler->fill_surface(&surface, fill_params);
             assert(pl.empty() || get_extents(surface.expolygon).inflated(SCALED_EPSILON).contains(get_extents(pl)));
-#ifdef _WIN32
+#ifdef TREE_SUPPORT_SHOW_ERRORS_WIN32
             if (! pl.empty() && ! get_extents(surface.expolygon).inflated(SCALED_EPSILON).contains(get_extents(pl)))
                 ::MessageBoxA(nullptr, "TreeSupport infill failure", "Bug detected!", MB_OK | MB_SYSTEMMODAL | MB_SETFOREGROUND | MB_ICONWARNING);
-#endif // _WIN32
+#endif // TREE_SUPPORT_SHOW_ERRORS_WIN32
             append(out, std::move(pl));
         } catch (InfillFailedException &) {
         }
@@ -3520,7 +3516,7 @@ static void draw_branches(
                     pts[i].y() += nudge_v.y();
                 }
             }
-            printf("iteration: %d, moved: %d\n", int(iter), int(num_moved));
+//            printf("iteration: %d, moved: %d\n", int(iter), int(num_moved));
             if (num_moved == 0)
                 break;
         }
