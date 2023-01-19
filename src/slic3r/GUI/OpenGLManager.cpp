@@ -200,7 +200,6 @@ std::string OpenGLManager::GLInfo::to_string(bool for_github) const
     out << b_start << "Renderer:     " << b_end << m_renderer << line_end;
     out << b_start << "GLSL version: " << b_end << m_glsl_version << line_end;
     out << b_start << "Textures compression:       " << b_end << (are_compressed_textures_supported() ? "Enabled" : "Disabled") << line_end;
-    out << b_start << "Textures mipmap generation: " << b_end << (use_manually_generated_mipmaps() ? "Manual" : "Automatic") << line_end;
 
     {
 #if ENABLE_GL_CORE_PROFILE
@@ -257,7 +256,7 @@ std::vector<std::string> OpenGLManager::GLInfo::get_extensions_list() const
 
 OpenGLManager::GLInfo OpenGLManager::s_gl_info;
 bool OpenGLManager::s_compressed_textures_supported = false;
-bool OpenGLManager::s_use_manually_generated_mipmaps = true;
+bool OpenGLManager::s_force_power_of_two_textures = false;
 OpenGLManager::EMultisampleState OpenGLManager::s_multisample = OpenGLManager::EMultisampleState::Unknown;
 OpenGLManager::EFramebufferType OpenGLManager::s_framebuffers_type = OpenGLManager::EFramebufferType::Unknown;
 
@@ -415,17 +414,16 @@ bool OpenGLManager::init_gl()
         // texture of the bed (see: https://github.com/prusa3d/PrusaSlicer/issues/8417).
         // It seems that this issue only triggers when mipmaps are generated manually
         // (combined with a texture compression) with texture size not being power of two.
-        // When mipmaps are generated through OpenGL function glGenerateMipmap() the driver works fine.
+        // When mipmaps are generated through OpenGL function glGenerateMipmap() the driver works fine,
+        // but the mipmap generation is quite slow on some machines.
         // There is no an easy way to detect the driver version without using Win32 API because the strings returned by OpenGL
         // have no standardized format, only some of them contain the driver version.
-        // Until we do not know that driver will be fixed (if ever) we force the use of glGenerateMipmap() on all cards
+        // Until we do not know that driver will be fixed (if ever) we force the use of power of two textures on all cards
         // containing the string 'Radeon' in the string returned by glGetString(GL_RENDERER)
         const auto& gl_info = OpenGLManager::get_gl_info();
-        if (boost::contains(gl_info.get_vendor(), "ATI Technologies Inc.") && boost::contains(gl_info.get_renderer(), "Radeon")) {
-            s_use_manually_generated_mipmaps = false;
-            BOOST_LOG_TRIVIAL(debug) << "Mipmapping through OpenGL was enabled.";
-        }
-#endif
+        if (boost::contains(gl_info.get_vendor(), "ATI Technologies Inc.") && boost::contains(gl_info.get_renderer(), "Radeon"))
+            s_force_power_of_two_textures = true;
+#endif // _WIN32
     }
 
     return true;
