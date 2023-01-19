@@ -463,7 +463,7 @@ public:
 #ifdef DETAILED_DEBUG_LOGS
             BOOST_LOG_TRIVIAL(debug) << "bed_centroid: " << bed_centroid.x() << "  " << bed_centroid.y() << "  " << bed_centroid.z();
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_yield_torque: " << bed_yield_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_arm: " << bed_weight_arm;
+            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_arm: " << bed_weight_arm_len;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_torque: " << bed_weight_torque;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_arm: " << bed_movement_arm;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_torque: " << bed_movement_torque;
@@ -492,7 +492,7 @@ public:
                                       params.material_yield_strength;
 
             float conn_weight_arm    = (conn_centroid.head<2>() - mass_centroid.head<2>()).norm();
-            float conn_weight_torque = conn_weight_arm * weight * (conn_centroid.z() / layer_z);
+            float conn_weight_torque = conn_weight_arm * weight * (1.0f - conn_centroid.z() / layer_z);
 
             float conn_movement_arm    = std::max(0.0f, mass_centroid.z() - conn_centroid.z());
             float conn_movement_torque = movement_force * conn_movement_arm;
@@ -732,17 +732,24 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
             // and the support presence grid and add the point to the issues.
             auto reckon_new_support_point = [&part, &weakest_conn, &supp_points, &supports_presence_grid, &params,
                                              &layer_idx](const Vec3f &support_point, float force, const Vec2f &dir) {
+                // if position is taken and point is for global stability (force > 0) or we are too close to the bed, do not add
+                // This allows local support points (e.g. bridging) to be generated densely 
                 if ((supports_presence_grid.position_taken(support_point) && force > 0) || layer_idx <= 1) {
                     return;
                 }
+
                 float area = params.support_points_interface_radius * params.support_points_interface_radius * float(PI);
-                part.add_support_point(support_point, area);
+                // add the stability effect of the point only if the spot is not taken, so that the densely created local support points do not add 
+                // unrealistic amount of stability to the object (due to overlaping of local support points)
+                if (!(supports_presence_grid.position_taken(support_point))) {
+                    part.add_support_point(support_point, area);
+                }
 
                 float radius = params.support_points_interface_radius;
                 supp_points.emplace_back(support_point, force, radius, dir);
-                if (force > 0) {
-                    supports_presence_grid.take_position(support_point);
-                }
+                supports_presence_grid.take_position(support_point);
+                
+                // The support point also increases the stability of the weakest connection of the object, which should be reflected
                 if (weakest_conn.area > EPSILON) { // Do not add it to the weakest connection if it is not valid - does not exist
                     weakest_conn.area += area;
                     weakest_conn.centroid_accumulator += support_point * area;
