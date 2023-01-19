@@ -89,6 +89,13 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	m_custom_toolbar_size		= atoi(get_app_config()->get("custom_toolbar_size").c_str());
 	m_use_custom_toolbar_size	= get_app_config()->get("use_custom_toolbar_size") == "1";
 
+	// set Field for notify_release to its value
+	if (m_optgroup_gui && m_optgroup_gui->get_field("notify_release") != nullptr) {
+		boost::any val = s_keys_map_NotifyReleaseMode.at(wxGetApp().app_config->get("notify_release"));
+		m_optgroup_gui->get_field("notify_release")->set_value(val, false);
+	}
+	
+
 	if (wxGetApp().is_editor()) {
 		auto app_config = get_app_config();
 

@@ -93,7 +93,7 @@ bool MsgUpdateSlic3r::disable_version_check() const
 
  wxSize AppUpdateAvailableDialog::AUAD_size;
 // AppUpdater
-AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online)
+AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user)
 	: MsgDialog(nullptr, _(L("App Update available")), wxString::Format(_(L("New version of %s is available.\nDo you wish to download it?")), SLIC3R_APP_NAME))
 {
 	auto* versions = new wxFlexGridSizer(1, 0, VERT_SPACING);
@@ -104,8 +104,10 @@ AppUpdateAvailableDialog::AppUpdateAvailableDialog(const Semver& ver_current, co
 	content_sizer->Add(versions);
 	content_sizer->AddSpacer(VERT_SPACING);
 
-	cbox = new wxCheckBox(this, wxID_ANY, _(L("Don't notify about new releases any more")));
-	content_sizer->Add(cbox);
+	if(!from_user) {
+		cbox = new wxCheckBox(this, wxID_ANY, _(L("Don't notify about new releases any more")));
+		content_sizer->Add(cbox);
+	}
 	content_sizer->AddSpacer(VERT_SPACING);
 	
 	AUAD_size = content_sizer->GetSize();
@@ -125,6 +127,8 @@ AppUpdateAvailableDialog::~AppUpdateAvailableDialog() {}
 
 bool AppUpdateAvailableDialog::disable_version_check() const
 {
+	if (!cbox)
+		return false;
 	return cbox->GetValue();
 }
 

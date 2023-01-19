@@ -221,7 +221,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 			} 
 			// progress event
 			size_t gui_progress = progress.dltotal > 0 ? 100 * progress.dlnow / progress.dltotal : 0;
-			BOOST_LOG_TRIVIAL(error) << "App download " << gui_progress << "% " << progress.dlnow << " of " << progress.dltotal;
+			BOOST_LOG_TRIVIAL(debug) << "App download " << gui_progress << "% " << progress.dlnow << " of " << progress.dltotal;
 			if (last_gui_progress < gui_progress && (last_gui_progress != 0 || gui_progress != 100)) {
 				last_gui_progress = gui_progress;
 				wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS);
@@ -243,14 +243,15 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 			tmp_path += format(".%1%%2%", get_current_pid(), ".download");
 			try
 			{
-				boost::nowide::fstream file(tmp_path.string(), std::ios::out | std::ios::binary | std::ios::trunc);
-				file.write(body.c_str(), body.size());
-				file.close();
+				FILE* file;
+				file = fopen(tmp_path.string().c_str(), "wb");
+				fwrite(body.c_str(), 1, body.size(), file);
+				fclose(file);
 				boost::filesystem::rename(tmp_path, dest_path);
 			}
-			catch (const std::exception&)
+			catch (const std::exception& e)
 			{
-				error_message = GUI::format("Failed to write and move %1% to %2%", tmp_path, dest_path);
+				error_message = GUI::format("Failed to write and move %1% to %2%:/n%3%", tmp_path, dest_path, e.what());
 				return false;
 			}
 			return true;
@@ -363,10 +364,10 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 				if (data.first == "url") {
 					new_data.url = data.second.data();
 					new_data.target_path = m_default_dest_folder / AppUpdater::get_filename_from_url(new_data.url);
-					BOOST_LOG_TRIVIAL(error) << format("parsing version string: url: %1%", new_data.url);
+					BOOST_LOG_TRIVIAL(info) << format("parsing version string: url: %1%", new_data.url);
 				} else if (data.first == "size"){
 					new_data.size = std::stoi(data.second.data());
-					BOOST_LOG_TRIVIAL(error) << format("parsing version string: expected size: %1%", new_data.size);
+					BOOST_LOG_TRIVIAL(info) << format("parsing version string: expected size: %1%", new_data.size);
 				}
 			}
 		}
