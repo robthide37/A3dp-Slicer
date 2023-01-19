@@ -547,6 +547,14 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionInt,                 support_material_threshold))
     ((ConfigOptionBool,                support_material_with_sheath))
     ((ConfigOptionFloatOrPercent,      support_material_xy_spacing))
+    // Tree supports
+    ((ConfigOptionFloat,               support_tree_angle))
+    ((ConfigOptionFloat,               support_tree_angle_slow))
+    ((ConfigOptionFloat,               support_tree_branch_diameter))
+    ((ConfigOptionFloat,               support_tree_branch_diameter_angle))
+    ((ConfigOptionPercent,             support_tree_top_rate))
+    ((ConfigOptionFloat,               support_tree_tip_diameter))
+    // The rest
     ((ConfigOptionBool,                thick_bridges))
     ((ConfigOptionFloat,               xy_size_compensation))
     ((ConfigOptionBool,                wipe_into_objects))

@@ -1526,6 +1526,14 @@ void TabPrint::build()
         optgroup->append_single_option_line("dont_support_bridges", category_path + "dont-support-bridges");
         optgroup->append_single_option_line("support_material_synchronize_layers", category_path + "synchronize-with-object-layers");
 
+        optgroup = page->new_optgroup(L("Tree supports"));
+        optgroup->append_single_option_line("support_tree_angle", category_path + "tree_angle");
+        optgroup->append_single_option_line("support_tree_angle_slow", category_path + "tree_angle_slow");
+        optgroup->append_single_option_line("support_tree_branch_diameter", category_path + "tree_branch_diameter");
+        optgroup->append_single_option_line("support_tree_branch_diameter_angle", category_path + "tree_branch_diameter_angle");
+        optgroup->append_single_option_line("support_tree_tip_diameter", category_path + "tree_tip_diameter");
+        optgroup->append_single_option_line("support_tree_top_rate", category_path + "tree_top_rate");
+
     page = add_options_page(L("Speed"), "time");
         optgroup = page->new_optgroup(L("Speed for print moves"));
         optgroup->append_single_option_line("perimeter_speed");

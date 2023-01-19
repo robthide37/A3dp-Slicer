@@ -11,7 +11,6 @@
 
 #include <mutex>
 #include <unordered_map>
-#include <unordered_set>
 
 #include <boost/functional/hash.hpp>
 
@@ -43,7 +42,7 @@ struct TreeSupportMeshGroupSettings {
     // the print will be less accurate, but the g-code will be smaller. Maximum Deviation is a limit for Maximum Resolution, 
     // so if the two conflict the Maximum Deviation will always be held true.
     coord_t                         resolution                              { scaled<coord_t>(0.025) };
-    // Minimum Feature Size (aka minimum line width)
+    // Minimum Feature Size (aka minimum line width) - Arachne specific
     // Minimum thickness of thin features. Model features that are thinner than this value will not be printed, while features thicker 
     // than the Minimum Feature Size will be widened to the Minimum Wall Line Width.
     coord_t                         min_feature_size                        { scaled<coord_t>(0.1) };
@@ -183,7 +182,7 @@ struct TreeSupportMeshGroupSettings {
     // 5%-35%
     double                          support_tree_top_rate                   { 15. };
     // Tree Support Tip Diameter
-    // The diameter of the top of the tip of the branches of tree support."
+    // The diameter of the top of the tip of the branches of tree support.
     // minimum: min_wall_line_width, minimum warning: min_wall_line_width+0.05, maximum_value: support_tree_branch_diameter, value: support_line_width
     coord_t                         support_tree_tip_diameter               { scaled<coord_t>(0.4) };
 

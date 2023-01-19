@@ -2876,6 +2876,71 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(true));
 
+    def = this->add("support_tree_angle", coFloat);
+    def->label = L("Tree Support Maximum Branch Angle");
+    def->category = L("Support material");
+    def->tooltip = L("The maximum angle of the branches, when the branches have to avoid the model. "
+                     "Use a lower angle to make them more vertical and more stable. Use a higher angle to be able to have more reach.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 85;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(40));
+
+    def = this->add("support_tree_angle_slow", coFloat);
+    def->label = L("Tree Support Preferred Branch Angle");
+    def->category = L("Support material");
+    def->tooltip = L("The preferred angle of the branches, when they do not have to avoid the model. "
+                     "Use a lower angle to make them more vertical and more stable. Use a higher angle for branches to merge faster.");
+    def->sidetext = L("°");
+    def->min = 10;
+    def->max = 85;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(25));
+
+    def = this->add("support_tree_tip_diameter", coFloat);
+    def->label = L("Tree Support Tip Diameter");
+    def->category = L("Support material");
+    def->tooltip = L("The diameter of the top of the tip of the branches of tree support.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(0.8));
+
+    def = this->add("support_tree_branch_diameter", coFloat);
+    def->label = L("Tree Support Branch Diameter");
+    def->category = L("Support material");
+    def->tooltip = L("The diameter of the thinnest branches of tree support. Thicker branches are more sturdy. "
+                     "Branches towards the base will be thicker than this.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(2));
+
+    def = this->add("support_tree_branch_diameter_angle", coFloat);
+    def->label = L("Tree Support Branch Diameter Angle");
+    def->category = L("Support material");
+    def->tooltip = L("The angle of the branches' diameter as they gradually become thicker towards the bottom. "
+                     "An angle of 0 will cause the branches to have uniform thickness over their length. "
+                     "A bit of an angle can increase stability of the tree support.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 15;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(5));
+
+    def = this->add("support_tree_top_rate", coPercent);
+    def->label = L("Tree Support Branch Density");
+    def->category = L("Support material");
+    def->tooltip = L("Adjusts the density of the support structure used to generate the tips of the branches. "
+                     "A higher value results in better overhangs, but the supports are harder to remove. "
+                     "Use Support Roof for very high values or ensure support density is similarly high at the top.");
+    def->sidetext = L("%");
+    def->min = 5;
+    def->max_literal = 35;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionPercent(30));
+
     def = this->add("temperature", coInts);
     def->label = L("Other layers");
     def->tooltip = L("Nozzle temperature for layers after the first one. Set this to zero to disable "
