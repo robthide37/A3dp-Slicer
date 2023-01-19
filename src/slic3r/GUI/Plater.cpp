@@ -5015,8 +5015,7 @@ bool Plater::priv::can_split_to_volumes() const
 bool Plater::priv::can_arrange() const
 {
     if (model.objects.empty() || !m_worker.is_idle()) return false;
-    if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
-    return true;
+    return q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Undefined;
 }
 
 bool Plater::priv::can_layers_editing() const

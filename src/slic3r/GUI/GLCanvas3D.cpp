@@ -4745,7 +4745,7 @@ bool GLCanvas3D::_init_main_toolbar()
     };
     item.left.action_callback   = GLToolbarItem::Default_Action_Callback;
     item.visibility_callback    = GLToolbarItem::Default_Visibility_Callback;
-    item.enabling_callback      = GLToolbarItem::Default_Enabling_Callback;
+    item.enabling_callback      = [this]()->bool { return m_gizmos.get_current_type() == GLGizmosManager::Undefined; };
     if (!m_main_toolbar.add_item(item))
         return false;
 
