@@ -188,20 +188,30 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boos
 	if (auto* btn_ok = get_button(wxID_OK); btn_ok != NULL) {
 		btn_ok->SetLabel(_L("Download"));
 		btn_ok->Bind(wxEVT_BUTTON, ([this, path](wxCommandEvent& e){
-			boost::filesystem::path path =boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()) / GUI::format(filename);
+			boost::filesystem::path path = boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()) / GUI::format(filename);
 			boost::system::error_code ec;
 			if (path.parent_path().string().empty()) {
-				MessageDialog msgdlg(nullptr, _L("Directory path is empty."), _L("Notice"), wxYES_NO);
+				MessageDialog msgdlg(nullptr, _L("Directory path is empty."), _L("Notice"), wxOK);
+				msgdlg.ShowModal();
 				return;
 			}
 			ec.clear();
 			if (!boost::filesystem::exists(path.parent_path(), ec) || !boost::filesystem::is_directory(path.parent_path(),ec) || ec) {
+				ec.clear();
+				if (!boost::filesystem::exists(path.parent_path().parent_path(), ec) || !boost::filesystem::is_directory(path.parent_path().parent_path(), ec) || ec) {
+					MessageDialog msgdlg(nullptr, _L("Directory path is incorrect."), _L("Notice"), wxOK);
+					msgdlg.ShowModal();
+					return;
+				}
+
 				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("Directory %1% doesn't exists. Do you wish to create it?"), GUI::format_wxstr(path.parent_path().string())), _L("Notice"), wxYES_NO);
 				if (msgdlg.ShowModal() != wxID_YES)
 					return;
-				if(!boost::filesystem::create_directory(path.parent_path()))
+				ec.clear();
+				if(!boost::filesystem::create_directory(path.parent_path(), ec) || ec)
 				{
-					MessageDialog msgdlg(nullptr, _L("Failed to creeate directory."), _L("Notice"), wxYES_NO);
+					MessageDialog msgdlg(nullptr, _L("Failed to create directory."), _L("Notice"), wxOK);
+					msgdlg.ShowModal();
 					return;
 				}
 			}
