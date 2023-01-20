@@ -3813,7 +3813,9 @@ void GCode::split_at_seam_pos(ExtrusionLoop& loop, bool was_clockwise)
         assert(m_layer != nullptr);
         //FIXME update external_perimeters_first
         m_seam_placer.place_seam(m_layer, loop,
-            m_config.external_perimeters_first, this->last_pos()
+            /*m_config.external_perimeters_first,*/
+            m_print_object_instance_id,
+            this->last_pos()
             //EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0.4),
             //m_print_object_instance_id,
             //lower_layer_edge_grid ? lower_layer_edge_grid->get() : nullptr

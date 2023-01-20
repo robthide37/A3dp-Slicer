@@ -4,9 +4,10 @@
 #include "tbb/blocked_range.h"
 #include "tbb/parallel_reduce.h"
 #include <boost/log/trivial.hpp>
-#include <random>
 #include <algorithm>
 #include <queue>
+#include <random>
+#include <tuple>
 
 #include "libslic3r/AABBTreeLines.hpp"
 #include "libslic3r/KDTreeIndirect.hpp"
@@ -315,6 +316,8 @@ struct GlobalModelInfo {
     indexed_triangle_set blockers;
     AABBTreeIndirect::Tree<3, float> enforcers_tree;
     AABBTreeIndirect::Tree<3, float> blockers_tree;
+
+    bool has_custom_seam_modifier{ false };
 
     bool is_enforced(const Vec3f &position, float radius) const {
         if (enforcers.empty()) {
@@ -1675,7 +1678,74 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
     this->external_perimeters_first = print.default_region_config().external_perimeters_first;
 }
 
-void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first,
+static constexpr float MINIMAL_POLYGON_SIDE = scaled<float>(0.2f);
+std::tuple<bool,std::optional<Vec3f>> get_seam_from_modifier(const Layer& layer, ExtrusionLoop& loop, const uint16_t print_object_instance_idx, const Point& last_po, const PrintObject* po) {
+
+    bool has_custom_seam_modifier = false;
+    if (print_object_instance_idx < po->instances().size()) {
+        for (ModelVolume* v : po->model_object()->volumes) {
+            if (v->is_seam_position()) {
+                has_custom_seam_modifier = true;
+                break;
+            }
+        }
+    }
+    if (has_custom_seam_modifier) {
+        Polygon polygon = loop.polygon();
+        polygon.densify(MINIMAL_POLYGON_SIDE);
+        bool was_clockwise = polygon.make_counter_clockwise();
+        // Look for all lambda-seam-modifiers below current z, choose the highest one
+        ModelVolume* v_lambda_seam = nullptr;
+        Vec3d lambda_pos;
+        double lambda_z = 0;
+        double lambda_dist = 0;
+        double lambda_radius = 0;
+        double max_lambda_radius = 0;
+        //get model_instance (like from po->model_object()->instances, but we don't have the index for that array)
+        const ModelInstance* model_instance = po->instances()[print_object_instance_idx].model_instance;
+        for (ModelVolume* v : po->model_object()->volumes) {
+            if (v->is_seam_position()) {
+                //xy in object coordinates, z in plater coordinates
+                // created/moved shpere have offset in their transformation, and loaded ones have their loaded transformation in the source transformation.
+                Vec3d test_lambda_pos = model_instance->transform_vector((v->get_transformation() * v->source.transform).get_offset(), false);
+                // remove shift, as we used the transform_vector(.., FALSE). that way, we have a correct z vs the layer height, and same for the x and y vs polygon.
+                test_lambda_pos.x() -= unscaled(po->instances()[print_object_instance_idx].shift.x());
+                test_lambda_pos.y() -= unscaled(po->instances()[print_object_instance_idx].shift.y());
+
+                double test_lambda_z = std::abs(layer.print_z - test_lambda_pos.z());
+                Point xy_lambda(scale_(test_lambda_pos.x()), scale_(test_lambda_pos.y()));
+                Point nearest = polygon.point_projection(xy_lambda);
+                Vec3d polygon_3dpoint{ unscaled(nearest.x()), unscaled(nearest.y()), (double)layer.print_z };
+                double test_lambda_dist = (polygon_3dpoint - test_lambda_pos).norm();
+                double sphere_radius = po->model_object()->instance_bounding_box(0, true).size().x() / 2;
+                max_lambda_radius = std::max(max_lambda_radius, sphere_radius);
+
+                //use this one if the first or nearer (in z, or in xy if same z)
+                if (v_lambda_seam == nullptr
+                    || (lambda_z > test_lambda_z)
+                    || (lambda_z == test_lambda_z && lambda_dist > test_lambda_dist)) {
+                    v_lambda_seam = v;
+                    lambda_pos = test_lambda_pos;
+                    lambda_radius = sphere_radius;
+                    lambda_dist = test_lambda_dist;
+                    lambda_z = test_lambda_z;
+                }
+            }
+        }
+
+        if (v_lambda_seam != nullptr) {
+            // Found, get the center point and apply rotation and scaling of Model instance. Continues to spAligned if not found or Weight set to Zero.
+            // Weight is set by user and stored in the radius of the sphere
+            float seam_mod_weight = 1.f + 100 * (lambda_radius / max_lambda_radius);
+            if (seam_mod_weight > 0.0) {
+                return std::tuple<bool, std::optional<Vec3f>>{ true, std::optional{ Vec3f{(float)lambda_pos.x(), (float)lambda_pos.y(), (float)layer.slice_z} } };
+            }
+        }
+    }
+    return std::tuple<bool, std::optional<Vec3f>>{ false, std::nullopt };
+}
+
+void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, const uint16_t print_object_instance_idx,
         const Point &last_pos) const {
     using namespace SeamPlacerImpl;
     const PrintObject *po = layer->object();
@@ -1737,38 +1807,44 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
         seam_position = layer_perimeters.points[seam_index].position;
     }
 
+
     Point seam_point = Point::new_scale(seam_position.x(), seam_position.y());
 
-    if (const SeamCandidate &perimeter_point = layer_perimeters.points[seam_index];
-    (po->config().seam_position.value == spNearest || po->config().seam_position.value == spAligned || po->config().seam_position.value == spExtremlyAligned || po->config().seam_position.value == spCost || po->config().seam_position.value == spCustom) &&
+    auto [has_seam_mod, seam_mod_pos] = get_seam_from_modifier(*layer, loop, print_object_instance_idx, last_pos, po);
+    if (has_seam_mod && seam_mod_pos.has_value()) {
+        seam_point = Point::new_scale(seam_mod_pos->x(), seam_mod_pos->y());
+    } else {
+
+        if (const SeamCandidate& perimeter_point = layer_perimeters.points[seam_index];
+            (po->config().seam_position.value == spNearest || po->config().seam_position.value == spAligned || po->config().seam_position.value == spExtremlyAligned || po->config().seam_position.value == spCost || po->config().seam_position.value == spCustom) &&
             loop.role() == ExtrusionRole::erPerimeter && //Hopefully internal perimeter
             (seam_position - perimeter_point.position).squaredNorm() < 4.0f && // seam is on perimeter point
             perimeter_point.local_ccw_angle < -EPSILON // In concave angles
-                    ) { // In this case, we are at internal perimeter, where the external perimeter has seam in concave angle. We want to align
-            // the internal seam into the concave corner, and not on the perpendicular projection on the closest edge (which is what the split_at function does)
-        size_t index_of_prev =
+            ) { // In this case, we are at internal perimeter, where the external perimeter has seam in concave angle. We want to align
+    // the internal seam into the concave corner, and not on the perpendicular projection on the closest edge (which is what the split_at function does)
+            size_t index_of_prev =
                 seam_index == perimeter_point.perimeter.start_index ?
-                                                                      perimeter_point.perimeter.end_index - 1 :
-                                                                      seam_index - 1;
-        size_t index_of_next =
+                perimeter_point.perimeter.end_index - 1 :
+                seam_index - 1;
+            size_t index_of_next =
                 seam_index == perimeter_point.perimeter.end_index - 1 ?
-                                                                        perimeter_point.perimeter.start_index :
-                                                                        seam_index + 1;
+                perimeter_point.perimeter.start_index :
+                seam_index + 1;
 
-        Vec2f dir_to_middle =
+            Vec2f dir_to_middle =
                 ((perimeter_point.position - layer_perimeters.points[index_of_prev].position).head<2>().normalized()
-                        + (perimeter_point.position - layer_perimeters.points[index_of_next].position).head<2>().normalized())
-                        * 0.5;
+                    + (perimeter_point.position - layer_perimeters.points[index_of_next].position).head<2>().normalized())
+                * 0.5;
 
-        ExtrusionLoop::ClosestPathPoint projected_point = loop.get_closest_path_and_point(seam_point, true);
-        //get closest projected point, determine depth of the seam point.
-        float depth = (float) unscale(Point(seam_point - projected_point.foot_pt)).norm();
-        float angle_factor = cos(-perimeter_point.local_ccw_angle / 2.0f); // There are some nice geometric identities in determination of the correct depth of new seam point.
-        //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
-        Vec2f final_pos = perimeter_point.position.head<2>() + (1.4142 * depth / angle_factor) * dir_to_middle;
-        seam_point = Point::new_scale(final_pos.x(), final_pos.y());
+            ExtrusionLoop::ClosestPathPoint projected_point = loop.get_closest_path_and_point(seam_point, true);
+            //get closest projected point, determine depth of the seam point.
+            float depth = (float)unscale(Point(seam_point - projected_point.foot_pt)).norm();
+            float angle_factor = cos(-perimeter_point.local_ccw_angle / 2.0f); // There are some nice geometric identities in determination of the correct depth of new seam point.
+            //overshoot the target depth, in concave angles it will correctly snap to the corner; TODO: find out why such big overshoot is needed.
+            Vec2f final_pos = perimeter_point.position.head<2>() + (1.4142 * depth / angle_factor) * dir_to_middle;
+            seam_point = Point::new_scale(final_pos.x(), final_pos.y());
+        }
     }
-
     // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,
     // thus empty path segments will not be produced by G-code export.
     if (!loop.split_at_vertex(seam_point, scaled<double>(0.0015))) {
