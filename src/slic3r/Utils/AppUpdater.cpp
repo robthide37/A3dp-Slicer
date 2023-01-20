@@ -203,6 +203,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 		BOOST_LOG_TRIVIAL(error) << "Download from " << data.url << " could not start. Destination path is empty.";
 		return boost::filesystem::path();
 	}
+
 	std::string error_message;
 	bool res = http_get_file(data.url, 130 * 1024 * 1024 //2.4.0 windows installer is 65MB //lm:I don't know, but larger. The binaries will grow. // dk: changed to 130, to have 100% more space. We should put this information into version file. 
 		// on_progress

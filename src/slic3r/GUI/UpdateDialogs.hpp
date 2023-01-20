@@ -73,6 +73,7 @@ public:
 private:
 	wxCheckBox* cbox_run;
 	wxTextCtrl* txtctrl_path;
+	wxString filename;
 };
 
 // Confirmation dialog informing about configuration update. Lists updated bundles & their versions.

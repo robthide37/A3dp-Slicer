@@ -147,13 +147,14 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boos
 #endif
 	content_sizer->AddSpacer(VERT_SPACING);
 	content_sizer->AddSpacer(VERT_SPACING);
-	content_sizer->Add(new wxStaticText(this, wxID_ANY, _(L("Target path:"))));
+	content_sizer->Add(new wxStaticText(this, wxID_ANY, _(L("Target directory:"))));
 	content_sizer->AddSpacer(VERT_SPACING);
-	txtctrl_path = new wxTextCtrl(this, wxID_ANY, path.wstring());
+	txtctrl_path = new wxTextCtrl(this, wxID_ANY, GUI::format_wxstr(path.parent_path().string()));
+	filename = GUI::format_wxstr(path.filename().string());
 	content_sizer->Add(txtctrl_path, 1, wxEXPAND);
 	content_sizer->AddSpacer(VERT_SPACING);
 	
-	wxButton* btn = new wxButton(this, wxID_ANY, _L("Select path"));
+	wxButton* btn = new wxButton(this, wxID_ANY, _L("Select directory"));
 	content_sizer->Add(btn/*, 1, wxEXPAND*/);
 
 	// button to open file dialog
@@ -165,13 +166,14 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boos
 			wxString wxext = boost::nowide::widen(extension);
 			wildcard = GUI::format_wxstr("%1% Files (*.%2%)|*.%2%", wxext.Upper(), wxext);
 		}
-		wxFileDialog save_dlg(
+		wxDirDialog save_dlg(
 			this
-			, _L("Save as:")
+			, _L("Select directory:")
 			, txtctrl_path->GetValue()
-			, boost::nowide::widen(AppUpdater::get_filename_from_url(txtctrl_path->GetValue().ToUTF8().data()))
+			/*
+			, filename //boost::nowide::widen(AppUpdater::get_filename_from_url(txtctrl_path->GetValue().ToUTF8().data()))
 			, wildcard
-			, wxFD_SAVE | wxFD_OVERWRITE_PROMPT
+			, wxFD_SAVE | wxFD_OVERWRITE_PROMPT*/
 		);
 		if (save_dlg.ShowModal() == wxID_OK) {
 			txtctrl_path->SetValue(save_dlg.GetPath());
@@ -185,8 +187,25 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boos
 	if (auto* btn_ok = get_button(wxID_OK); btn_ok != NULL) {
 		btn_ok->SetLabel(_L("Download"));
 		btn_ok->Bind(wxEVT_BUTTON, ([this, path](wxCommandEvent& e){
-			if (boost::filesystem::exists(boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()))) {
-				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), txtctrl_path->GetValue()),_L("Notice"), wxYES_NO);
+			boost::filesystem::path path =boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()) / GUI::format(filename);
+			boost::system::error_code ec;
+			if (path.parent_path().string().empty()) {
+				MessageDialog msgdlg(nullptr, _L("Directory path is empty."), _L("Notice"), wxYES_NO);
+				return;
+			}
+			ec.clear();
+			if (!boost::filesystem::exists(path.parent_path(), ec) || !boost::filesystem::is_directory(path.parent_path(),ec) || ec) {
+				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("Directory %1% doesn't exists. Do you wish to create it?"), GUI::format_wxstr(path.parent_path().string())), _L("Notice"), wxYES_NO);
+				if (msgdlg.ShowModal() != wxID_YES)
+					return;
+				if(!boost::filesystem::create_directory(path.parent_path()))
+				{
+					MessageDialog msgdlg(nullptr, _L("Failed to creeate directory."), _L("Notice"), wxYES_NO);
+					return;
+				}
+			}
+			if (boost::filesystem::exists(path)) {
+				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), GUI::format_wxstr(path.string())),_L("Notice"), wxYES_NO);
 				if (msgdlg.ShowModal() != wxID_YES)
 					return;
 			}
@@ -211,7 +230,7 @@ bool AppUpdateDownloadDialog::run_after_download() const
 
 boost::filesystem::path AppUpdateDownloadDialog::get_download_path() const
 {
-	return boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data());
+	return boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()) / GUI::format(filename);
 }
 
 // MsgUpdateConfig
