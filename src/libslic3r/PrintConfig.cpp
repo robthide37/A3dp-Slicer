@@ -4429,28 +4429,19 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Aligned"));
     def->enum_labels.push_back(L("Contiguous"));
     def->enum_labels.push_back(L("Rear"));
-    def->mode = comSimpleAE | comPrusa;
+    def->mode = comSimpleAE | comPrusa | comSuSi;
     def->set_default_value(new ConfigOptionEnum<SeamPosition>(spCost));
 
     def = this->add("seam_angle_cost", coPercent);
     def->label = L("Angle cost");
     def->full_label = L("Seam angle cost");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Cost of placing the seam at a bad angle. The worst angle (max penalty) is when it's flat.");
+    def->tooltip = L("Cost of placing the seam at a bad angle. The worst angle (max penalty) is when it's flat."
+                    "\n100% is the default penalty");
     def->sidetext = L("%");
     def->min = 0;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionPercent(80));
-
-    def = this->add("seam_travel_cost", coPercent);
-    def->label = L("Travel cost");
-    def->full_label = L("Seam travel cost");
-    def->category = OptionCategory::perimeter;
-    def->tooltip = L("Cost of moving the extruder. The highest penalty is when the point is the furthest from the position of the extruder before extruding the external perimeter");
-    def->sidetext = L("%");
-    def->min = 0;
-    def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionPercent(20));
+    def->set_default_value(new ConfigOptionPercent(60));
 
     def = this->add("seam_gap", coFloatsOrPercents);
     def->label = L("Seam gap");
@@ -4463,6 +4454,72 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{15,true} });
+
+    def = this->add("seam_notch_all", coFloatOrPercent);
+    def->label = L("for everything");
+    def->full_label = L("Seam notch");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("It's sometimes very problematic to have a little buldge from the seam."
+        " This setting move the seam inside the part, in a little cavity (for every seams in external perimeters, unless it's in an overhang)."
+        "\nThe size of the cavity is in mm or a % of the external perimeter width. It's overriden by the two other 'seam notch' setting when applicable."
+        "\nSet zero to disable.");
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->max_literal = { 5, false };
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
+
+    def = this->add("seam_notch_angle", coFloat);
+    def->label = L("max angle");
+    def->full_label = L("Seam notch maximum angle");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("If the (external) angle at the seam is higher than this value, then no notch will be set. If the angle is too high, there isn't enough room for the notch.");
+    def->sidetext = L("°");
+    def->min = 0;
+    def->max = 360;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(250));
+
+    def = this->add("seam_notch_inner", coFloatOrPercent);
+    def->label = L("for round holes");
+    def->full_label = L("Seam notch for round holes");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("In convex holes (circular/oval), it's sometimes very problematic to have a little buldge from the seam."
+        " This setting move the seam inside the part, in a little cavity (for all external perimeters in convex holes, unless it's in an overhang)."
+        "\nThe size of the cavity is in mm or a % of the external perimeter width"
+        "\nSet zero to disable.");
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->max = 50;
+    def->max_literal = { 5, false };
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
+
+    def = this->add("seam_notch_outer", coFloatOrPercent);
+    def->label = L("for round perimeters");
+    def->full_label = L("Seam notch for round perimeters");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("In convex perimeters (circular/oval), it's sometimes very problematic to have a little buldge from the seam."
+        " This setting move the seam inside the part, in a little cavity (for all external perimeters if the path is convex, unless it's in an overhang)."
+        "\nThe size of the cavity is in mm or a % of the external perimeter width"
+        "\nSet zero to disable.");
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->max = 50;
+    def->max_literal = { 5, false };
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
+
+    def = this->add("seam_travel_cost", coPercent);
+    def->label = L("Travel cost");
+    def->full_label = L("Seam travel cost");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Cost of moving the extruder. The highest penalty is when the point is the furthest from the position of the extruder before extruding the external perimeter");
+    def->sidetext = L("%");
+    def->min = 0;
+    def->max = 50;
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionPercent(100));
 
 #if 0
     def = this->add("seam_preferred_direction", coFloat);
@@ -7559,6 +7616,10 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "retract_lift_top",
 "seam_angle_cost",
 "seam_gap",
+"seam_notch_all",
+"seam_notch_angle",
+"seam_notch_inner",
+"seam_notch_outer",
 "seam_travel_cost",
 "skirt_brim",
 "skirt_distance_from_brim",
