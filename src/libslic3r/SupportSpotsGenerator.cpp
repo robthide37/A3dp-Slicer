@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <functional>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <stack>
@@ -68,7 +69,7 @@ public:
     float                  len;
     const ExtrusionEntity *origin_entity;
 
-    bool  support_point_generated = false;
+    std::optional<SupportSpotsGenerator::SupportPointCause> support_point_generated = {};
     float form_quality            = 1.0f;
     float curled_up_height        = 0.0f;
 
@@ -80,10 +81,6 @@ auto get_a(ExtrusionLine &&l) { return l.a; }
 auto get_b(ExtrusionLine &&l) { return l.b; }
 
 namespace SupportSpotsGenerator {
-
-SupportPoint::SupportPoint(const Vec3f &position, float force, float spot_radius, const Vec2f &direction)
-    : position(position), force(force), spot_radius(spot_radius), direction(direction)
-{}
 
 using LD = AABBTreeLines::LinesDistancer<ExtrusionLine>;
 
@@ -270,21 +267,27 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
             float sign = (prev_layer_boundary.distance_from_lines<true>(curr_point.position) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
             curr_point.distance *= sign;
 
+            SupportPointCause potential_cause = SupportPointCause::FloatingExtrusion;
+            if (entity->role().is_bridge() && !entity->role().is_perimeter()) {
+                potential_cause = std::abs(curr_point.curvature) > 0.1 ? SupportPointCause::FloatingBridgeAnchor : SupportPointCause::LongBridge;
+            }
+
             float max_bridge_len = params.bridge_distance /
-                                   ((1.0f + std::abs(curr_point.curvature)) * (1.0f + std::abs(curr_point.curvature)));
+                                   ((1.0f + std::abs(curr_point.curvature)) * (1.0f + std::abs(curr_point.curvature)) *
+                                    (1.0f + std::abs(curr_point.curvature)));
 
             if (curr_point.distance > 2.0f * flow_width) {
                 line_out.form_quality = 0.8f;
                 bridged_distance += line_len;
                 if (bridged_distance > max_bridge_len) {
-                    line_out.support_point_generated = true;
+                    line_out.support_point_generated = potential_cause;
                     bridged_distance                 = 0.0f;
                 }
             } else if (curr_point.distance > flow_width * (1.0 + std::clamp(curr_point.curvature, -0.30f, 0.20f))) {
                 bridged_distance += line_len;
                 line_out.form_quality = nearest_prev_layer_line.form_quality - 0.3f;
                 if (line_out.form_quality < 0 && bridged_distance > max_bridge_len) {
-                    line_out.support_point_generated = true;
+                    line_out.support_point_generated = potential_cause;
                     line_out.form_quality            = 0.5f;
                     bridged_distance                 = 0.0f;
                 }
@@ -349,11 +352,13 @@ public:
     Vec3f sticking_centroid_accumulator              = Vec3f::Zero();
     Vec2f sticking_second_moment_of_area_accumulator = Vec2f::Zero();
     float sticking_second_moment_of_area_covariance_accumulator{};
+    bool  connected_to_bed = false;
 
     ObjectPart() = default;
 
     void add(const ObjectPart &other)
     {
+        this->connected_to_bed = this->connected_to_bed || other.connected_to_bed;
         this->volume_centroid_accumulator += other.volume_centroid_accumulator;
         this->volume += other.volume;
         this->sticking_area += other.sticking_area;
@@ -416,7 +421,7 @@ public:
         return elastic_section_modulus;
     }
 
-    float is_stable_while_extruding(const SliceConnection &connection,
+    std::tuple<float, SupportPointCause> is_stable_while_extruding(const SliceConnection &connection,
                                     const ExtrusionLine   &extruded_line,
                                     const Vec3f           &extreme_point,
                                     float                  layer_z,
@@ -434,7 +439,7 @@ public:
 
         // section for bed calculations
         {
-            if (this->sticking_area < EPSILON) return 1.0f;
+            if (this->sticking_area < EPSILON) return {1.0f, SupportPointCause::UnstableFloatingPart};
 
             Vec3f bed_centroid     = this->sticking_centroid_accumulator / this->sticking_area;
             float bed_yield_torque = -compute_elastic_section_modulus(line_dir, extreme_point, this->sticking_centroid_accumulator,
@@ -475,16 +480,19 @@ public:
             BOOST_LOG_TRIVIAL(debug) << "SSG: total_torque: " << bed_total_torque << "   layer_z: " << layer_z;
 #endif
 
-            if (bed_total_torque > 0) return bed_total_torque / bed_conflict_torque_arm;
+            if (bed_total_torque > 0) {
+                return {bed_total_torque / bed_conflict_torque_arm,
+                        (this->connected_to_bed ? SupportPointCause::SeparationFromBed : SupportPointCause::UnstableFloatingPart)};
+            }
         }
 
         // section for weak connection calculations
         {
-            if (connection.area < EPSILON) return 1.0f;
+            if (connection.area < EPSILON) return {1.0f, SupportPointCause::UnstableFloatingPart};
 
             Vec3f conn_centroid = connection.centroid_accumulator / connection.area;
 
-            if (layer_z - conn_centroid.z() < 3.0f) { return -1.0f; }
+            if (layer_z - conn_centroid.z() < 3.0f) { return {-1.0f, SupportPointCause::WeakObjectPart}; }
             float conn_yield_torque = compute_elastic_section_modulus(line_dir, extreme_point, connection.centroid_accumulator,
                                                                       connection.second_moment_of_area_accumulator,
                                                                       connection.second_moment_of_area_covariance_accumulator,
@@ -514,7 +522,7 @@ public:
             BOOST_LOG_TRIVIAL(debug) << "SSG: total_torque: " << conn_total_torque << "   layer_z: " << layer_z;
 #endif
 
-            return conn_total_torque / conn_conflict_torque_arm;
+            return {conn_total_torque / conn_conflict_torque_arm, SupportPointCause::WeakObjectPart};
         }
     }
 };
@@ -538,6 +546,7 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &sli
             new_object_part.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), slice_z) * volume;
 
             if (l->bottom_z() < EPSILON) { // layer attached on bed
+                new_object_part.connected_to_bed = true;
                 float sticking_area = line.len * flow_width;
                 new_object_part.sticking_area += sticking_area;
                 Vec2f middle = Vec2f((line.a + line.b) / 2.0f);
@@ -731,24 +740,25 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
             // Function that is used when new support point is generated. It will update the ObjectPart stability, weakest conneciton info,
             // and the support presence grid and add the point to the issues.
             auto reckon_new_support_point = [&part, &weakest_conn, &supp_points, &supports_presence_grid, &params,
-                                             &layer_idx](const Vec3f &support_point, float force, const Vec2f &dir) {
+                                             &layer_idx](SupportPointCause cause, const Vec3f &support_point, float force,
+                                                         const Vec2f &dir) {
                 // if position is taken and point is for global stability (force > 0) or we are too close to the bed, do not add
-                // This allows local support points (e.g. bridging) to be generated densely 
+                // This allows local support points (e.g. bridging) to be generated densely
                 if ((supports_presence_grid.position_taken(support_point) && force > 0) || layer_idx <= 1) {
                     return;
                 }
 
                 float area = params.support_points_interface_radius * params.support_points_interface_radius * float(PI);
-                // add the stability effect of the point only if the spot is not taken, so that the densely created local support points do not add 
-                // unrealistic amount of stability to the object (due to overlaping of local support points)
+                // add the stability effect of the point only if the spot is not taken, so that the densely created local support points do
+                // not add unrealistic amount of stability to the object (due to overlaping of local support points)
                 if (!(supports_presence_grid.position_taken(support_point))) {
                     part.add_support_point(support_point, area);
                 }
 
                 float radius = params.support_points_interface_radius;
-                supp_points.emplace_back(support_point, force, radius, dir);
+                supp_points.emplace_back(cause, support_point, force, radius, dir);
                 supports_presence_grid.take_position(support_point);
-                
+
                 // The support point also increases the stability of the weakest connection of the object, which should be reflected
                 if (weakest_conn.area > EPSILON) { // Do not add it to the weakest connection if it is not valid - does not exist
                     weakest_conn.area += area;
@@ -768,9 +778,11 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
                         const ExtrusionEntity *entity = fill_region->fills().entities[fill_idx];
                         if (entity->role() == ExtrusionRole::BridgeInfill) {
                             for (const ExtrusionLine &bridge :
-                                 check_extrusion_entity_stability(entity, fill_region, prev_layer_ext_perim_lines,prev_layer_boundary, params)) {
-                                if (bridge.support_point_generated) {
-                                    reckon_new_support_point(create_support_point_position(bridge.b), -EPSILON, Vec2f::Zero());
+                                 check_extrusion_entity_stability(entity, fill_region, prev_layer_ext_perim_lines, prev_layer_boundary,
+                                                                  params)) {
+                                if (bridge.support_point_generated.has_value()) {
+                                    reckon_new_support_point(*bridge.support_point_generated, create_support_point_position(bridge.b),
+                                                             -EPSILON, Vec2f::Zero());
                                 }
                             }
                         }
@@ -783,10 +795,13 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
                     std::vector<ExtrusionLine> perims = check_extrusion_entity_stability(entity, perimeter_region,
                                                                                          prev_layer_ext_perim_lines,prev_layer_boundary, params);
                     for (const ExtrusionLine &perim : perims) {
-                        if (perim.support_point_generated) {
-                            reckon_new_support_point(create_support_point_position(perim.b), -EPSILON, Vec2f::Zero());
+                        if (perim.support_point_generated.has_value()) {
+                            reckon_new_support_point(*perim.support_point_generated, create_support_point_position(perim.b), -EPSILON,
+                                                     Vec2f::Zero());
                         }
-                        if (perim.is_external_perimeter()) { current_slice_ext_perims_lines.push_back(perim); }
+                        if (perim.is_external_perimeter()) {
+                            current_slice_ext_perims_lines.push_back(perim);
+                        }
                     }
                 }
             }
@@ -795,7 +810,8 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
             float unchecked_dist = params.min_distance_between_support_points + 1.0f;
 
             for (const ExtrusionLine &line : current_slice_ext_perims_lines) {
-                if ((unchecked_dist + line.len < params.min_distance_between_support_points && line.curled_up_height < 0.3f) || line.len < EPSILON) {
+                if ((unchecked_dist + line.len < params.min_distance_between_support_points && line.curled_up_height < 0.3f) ||
+                    line.len < EPSILON) {
                     unchecked_dist += line.len;
                 } else {
                     unchecked_dist                = line.len;
@@ -803,8 +819,10 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
                     auto [dist, nidx,
                           nearest_point]          = current_slice_lines_distancer.distance_from_lines_extra<false>(pivot_site_search_point);
                     Vec3f support_point           = create_support_point_position(nearest_point);
-                    auto  force                   = part.is_stable_while_extruding(weakest_conn, line, support_point, bottom_z, params);
-                    if (force > 0) { reckon_new_support_point(support_point, force, (line.b - line.a).normalized()); }
+                    auto [force, cause]           = part.is_stable_while_extruding(weakest_conn, line, support_point, bottom_z, params);
+                    if (force > 0) {
+                        reckon_new_support_point(cause, support_point, force, (line.b - line.a).normalized());
+                    }
                 }
             }
             current_layer_ext_perims_lines.insert(current_layer_ext_perims_lines.end(), current_slice_ext_perims_lines.begin(),
@@ -827,13 +845,18 @@ void debug_export(SupportPoints support_points, std::string file_name)
         }
 
         for (size_t i = 0; i < support_points.size(); ++i) {
-            if (support_points[i].force <= 0) {
-                fprintf(fp, "v %f %f %f  %f %f %f\n", support_points[i].position(0), support_points[i].position(1),
-                        support_points[i].position(2), 0.0, 1.0, 0.0);
-            } else {
-                fprintf(fp, "v %f %f %f  %f %f %f\n", support_points[i].position(0), support_points[i].position(1),
-                        support_points[i].position(2), 1.0, 0.0, 0.0);
+            Vec3f color{1.0f, 1.0f, 1.0f};
+            switch (support_points[i].cause) {
+            case SupportPointCause::FloatingBridgeAnchor: color = {0.863281f, 0.109375f, 0.113281f}; break; //RED
+            case SupportPointCause::LongBridge: color = {0.960938f, 0.90625f, 0.0625f}; break;  // YELLOW
+            case SupportPointCause::FloatingExtrusion: color = {0.921875f, 0.515625f, 0.101563f}; break; // ORANGE
+            case SupportPointCause::SeparationFromBed: color = {0.0f, 1.0f, 0.0}; break; // GREEN
+            case SupportPointCause::UnstableFloatingPart: color = {0.105469f, 0.699219f, 0.84375f}; break; // BLUE
+            case SupportPointCause::WeakObjectPart: color = {0.609375f, 0.210938f, 0.621094f}; break; // PURPLE
             }
+
+            fprintf(fp, "v %f %f %f  %f %f %f\n", support_points[i].position(0), support_points[i].position(1),
+                    support_points[i].position(2), color[0], color[1], color[2]);
         }
 
         fclose(fp);
@@ -841,9 +864,6 @@ void debug_export(SupportPoints support_points, std::string file_name)
 }
 #endif
 
-// std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
-//     return {};
-// }
 SupportPoints full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params)
 {
     SupportPoints supp_points = check_stability(po, cancel_func, params);
