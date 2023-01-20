@@ -574,7 +574,8 @@ void TreeModelVolumes::calculateCollisionHolefree(const std::vector<RadiusLayerP
 
     tbb::parallel_for(tbb::blocked_range<LayerIndex>(0, max_layer + 1, keys.size()),
         [&](const tbb::blocked_range<LayerIndex> &range) {
-        RadiusLayerPolygonCacheData data;
+        std::vector<std::pair<RadiusLayerPair, Polygons>> data;
+        data.reserve(range.size() * keys.size());
         for (LayerIndex layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
             for (RadiusLayerPair key : keys)
                 if (layer_idx <= key.second) {
@@ -585,10 +586,10 @@ void TreeModelVolumes::calculateCollisionHolefree(const std::vector<RadiusLayerP
                     coord_t increase_radius_ceil = ceilRadius(m_increase_until_radius, false) - radius;
                     assert(increase_radius_ceil > 0);
                     // this union is important as otherwise holes(in form of lines that will increase to holes in a later step) can get unioned onto the area.
-                    data[RadiusLayerPair(radius, layer_idx)] = polygons_simplify(
-                        offset(union_ex(getCollision(m_increase_until_radius, layer_idx, false)),
+                    data.emplace_back(RadiusLayerPair(radius, layer_idx), polygons_simplify(
+                        offset(union_ex(this->getCollision(m_increase_until_radius, layer_idx, false)),
                             5 - increase_radius_ceil, ClipperLib::jtRound, m_min_resolution),
-                        m_min_resolution);
+                        m_min_resolution));
                 }
         }
         m_collision_cache_holefree.insert(std::move(data));
@@ -832,13 +833,25 @@ coord_t TreeModelVolumes::ceilRadius(const coord_t radius) const
     return out;
 }
 
+void TreeModelVolumes::RadiusLayerPolygonCache::allocate_layers(size_t num_layers)
+{
+    if (num_layers > m_data.size()) {
+        if (num_layers > m_data.capacity())
+            reserve_power_of_2(m_data, num_layers);
+        m_data.resize(num_layers, {});
+    }
+}
+
 // For debugging purposes, sorted by layer index, then by radius.
 std::vector<std::pair<TreeModelVolumes::RadiusLayerPair, std::reference_wrapper<const Polygons>>> TreeModelVolumes::RadiusLayerPolygonCache::sorted() const
 {
     std::vector<std::pair<RadiusLayerPair, std::reference_wrapper<const Polygons>>> out;
-    for (auto it = this->data.begin(); it != this->data.end(); ++ it)
-        out.emplace_back(it->first, it->second);
-    std::sort(out.begin(), out.end(), [](auto &l, auto &r){ return l.first.second < r.first.second || (l.first.second == r.first.second) && l.first.first < r.first.first; });
+    for (auto &layer : m_data) {
+        auto layer_idx = LayerIndex(&layer - m_data.data());
+        for (auto &radius_polygons : layer)
+            out.emplace_back(std::make_pair(radius_polygons.first, layer_idx), radius_polygons.second);
+    }
+    assert(std::is_sorted(out.begin(), out.end(), [](auto &l, auto &r){ return l.first.second < r.first.second || (l.first.second == r.first.second) && l.first.first < r.first.first; }));
     return out;
 }
 

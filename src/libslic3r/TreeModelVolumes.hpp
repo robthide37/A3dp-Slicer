@@ -305,36 +305,36 @@ private:
      * \brief Convenience typedef for the keys to the caches
      */
     using RadiusLayerPair             = std::pair<coord_t, LayerIndex>;
-    using RadiusLayerPolygonCacheData = std::unordered_map<RadiusLayerPair, Polygons, boost::hash<RadiusLayerPair>>;
     class RadiusLayerPolygonCache {
+        // Map from radius to Polygons. Cache of one layer collision regions.
+        using LayerData = std::map<coord_t, Polygons>;
+        // Vector of layers, at each layer map of radius to Polygons.
+        // Reference to Polygons returned shall be stable to insertion.
+        using Layers = std::vector<LayerData>;
     public:
         RadiusLayerPolygonCache() = default;
-        RadiusLayerPolygonCache(RadiusLayerPolygonCache &&rhs) : data(std::move(rhs.data)) {}
-        RadiusLayerPolygonCache& operator=(RadiusLayerPolygonCache &&rhs) { data = std::move(rhs.data); return *this; }
+        RadiusLayerPolygonCache(RadiusLayerPolygonCache &&rhs) : m_data(std::move(rhs.m_data)) {}
+        RadiusLayerPolygonCache& operator=(RadiusLayerPolygonCache &&rhs) { m_data = std::move(rhs.m_data); return *this; }
 
         RadiusLayerPolygonCache(const RadiusLayerPolygonCache&) = delete;
         RadiusLayerPolygonCache& operator=(const RadiusLayerPolygonCache&) = delete;
 
-        void insert(RadiusLayerPolygonCacheData &&in) {
-            std::lock_guard<std::mutex> guard(this->mutex);
-            for (auto& d : in)
-                this->data.emplace(d.first, std::move(d.second));
-        }
         void insert(std::vector<std::pair<RadiusLayerPair, Polygons>> &&in) {
-            std::lock_guard<std::mutex> guard(this->mutex);
-            for (auto& d : in)
-                this->data.emplace(d.first, std::move(d.second));
+            std::lock_guard<std::mutex> guard(m_mutex);
+            for (auto &d : in)
+                this->get_allocate_layer_data(d.first.second).emplace(d.first.first, std::move(d.second));
         }
         // by layer
         void insert(std::vector<std::pair<coord_t, Polygons>> &&in, coord_t radius) {
-            std::lock_guard<std::mutex> guard(this->mutex);
+            std::lock_guard<std::mutex> guard(m_mutex);
             for (auto &d : in)
-                this->data.emplace(RadiusLayerPair{ radius, d.first }, std::move(d.second));
+                this->get_allocate_layer_data(d.first).emplace(radius, std::move(d.second));
         }
         void insert(std::vector<Polygons> &&in, coord_t first_layer_idx, coord_t radius) {
-            std::lock_guard<std::mutex> guard(this->mutex);
+            std::lock_guard<std::mutex> guard(m_mutex);
+            allocate_layers(first_layer_idx + in.size());
             for (auto &d : in)
-                this->data.emplace(RadiusLayerPair{ radius, first_layer_idx ++ }, std::move(d));
+                m_data[first_layer_idx ++].emplace(radius, std::move(d));
         }
         /*!
          * \brief Checks a cache for a given RadiusLayerPair and returns it if it is found
@@ -342,10 +342,29 @@ private:
          * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
          */
         std::optional<std::reference_wrapper<const Polygons>> getArea(const TreeModelVolumes::RadiusLayerPair &key) const {
-            std::lock_guard<std::mutex> guard(this->mutex);
-            const auto it = this->data.find(key);
-            return it == this->data.end() ?
+            std::lock_guard<std::mutex> guard(m_mutex);
+            if (key.second >= m_data.size())
+                return std::optional<std::reference_wrapper<const Polygons>>{};
+            const auto &layer = m_data[key.second];
+            auto it = layer.find(key.first);
+            return it == layer.end() ? 
                 std::optional<std::reference_wrapper<const Polygons>>{} : std::optional<std::reference_wrapper<const Polygons>>{ it->second };
+        }
+        // Get a collision area at a given layer for a radius that is a lower or equial to the key radius.
+        std::optional<std::pair<coord_t, std::reference_wrapper<const Polygons>>> get_lower_bound_area(const TreeModelVolumes::RadiusLayerPair &key) const {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            if (key.second >= m_data.size())
+                return {};
+            const auto &layer = m_data[key.second];
+            if (layer.empty())
+                return {};
+            auto it = layer.lower_bound(key.first);
+            if (it == layer.end() || it->first != key.first) {
+                if (it == layer.begin())
+                    return {};
+                -- it;
+            }
+            return std::make_pair(it->first, std::reference_wrapper<const Polygons>(it->second));
         }
         /*!
          * \brief Get the highest already calculated layer in the cache.
@@ -355,22 +374,27 @@ private:
          * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
          */
         LayerIndex getMaxCalculatedLayer(coord_t radius) const {
-            std::lock_guard<std::mutex> guard(this->mutex);
-            int max_layer = -1;
-            // the placeable on model areas do not exist on layer 0, as there can not be model below it. As such it may be possible that layer 1 is available, but layer 0 does not exist.
-            if (this->data.find({ radius, 1 }) != this->data.end())
-                max_layer = 1;
-            while (this->data.count(TreeModelVolumes::RadiusLayerPair(radius, max_layer + 1)) > 0)
-                ++ max_layer;
-            return max_layer;
+            std::lock_guard<std::mutex> guard(m_mutex);
+            auto layer_idx = LayerIndex(m_data.size()) - 1;
+            for (; layer_idx > 0; -- layer_idx)
+                if (const auto &layer = m_data[layer_idx]; layer.find(radius) != layer.end())
+                    break;
+            // The placeable on model areas do not exist on layer 0, as there can not be model below it. As such it may be possible that layer 1 is available, but layer 0 does not exist.
+            return layer_idx == 0 ? -1 : layer_idx;
         }
 
         // For debugging purposes, sorted by layer index, then by radius.
         [[nodiscard]] std::vector<std::pair<RadiusLayerPair, std::reference_wrapper<const Polygons>>> sorted() const;
 
     private:
-        RadiusLayerPolygonCacheData data;
-        mutable std::mutex          mutex;
+        LayerData&          get_allocate_layer_data(LayerIndex layer_idx) {
+            allocate_layers(layer_idx + 1);
+            return m_data[layer_idx];
+        }
+        void                allocate_layers(size_t num_layers);
+
+        Layers              m_data;
+        mutable std::mutex  m_mutex;
     };
 
 
