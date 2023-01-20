@@ -128,10 +128,9 @@ namespace Emboss
     // data = raw file data
     std::unique_ptr<FontFile> create_font_file(std::unique_ptr<std::vector<unsigned char>> data);
 #ifdef _WIN32
-    // fix for unknown pointer HFONT
-    using HFONT = void*;
-    void * can_load(HFONT hfont);
-    std::unique_ptr<FontFile> create_font_file(HFONT hfont);
+    // fix for unknown pointer HFONT is replaced with "void *"
+    void * can_load(void* hfont);
+    std::unique_ptr<FontFile> create_font_file(void * hfont);
 #endif // _WIN32
 
     /// <summary>

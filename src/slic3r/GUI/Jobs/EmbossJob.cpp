@@ -40,6 +40,8 @@ bool check(const DataUpdate &input, bool is_main_thread = false, bool use_surfac
 bool check(const CreateSurfaceVolumeData &input, bool is_main_thread = false);
 bool check(const UpdateSurfaceVolumeData &input, bool is_main_thread = false);
 
+template<typename Fnc> static ExPolygons create_shape(DataBase &input, Fnc was_canceled);
+
 // <summary>
 /// Try to create mesh from text
 /// </summary>
@@ -49,7 +51,7 @@ bool check(const UpdateSurfaceVolumeData &input, bool is_main_thread = false);
 /// NOTE: Cache glyphs is changed</param>
 /// <param name="was_canceled">To check if process was canceled</param>
 /// <returns>Triangle mesh model</returns>
-template<typename Fnc> static TriangleMesh try_create_mesh(const DataBase &input, FontFileWithCache &font, Fnc was_canceled);
+template<typename Fnc> static TriangleMesh try_create_mesh(DataBase &input, Fnc was_canceled);
 template<typename Fnc> static TriangleMesh create_mesh(DataBase &input, Fnc was_canceled, Job::Ctl &ctl);
 
 /// <summary>
@@ -246,7 +248,7 @@ void UpdateJob::process(Ctl &ctl)
         if (cancel->load()) return true;
         return ctl.was_canceled();
     };
-    m_result = priv::try_create_mesh(m_input, m_input.font_file, was_canceled);
+    m_result = priv::try_create_mesh(m_input, was_canceled);
     if (was_canceled()) return;
     if (m_result.its.empty())
         throw priv::JobException(_u8L("Created text volume is empty. Change text or font.").c_str());
@@ -426,22 +428,31 @@ bool priv::check(const UpdateSurfaceVolumeData &input, bool is_main_thread){
     return res;
 }
 
-template<typename Fnc>
-TriangleMesh priv::try_create_mesh(const DataBase &input, FontFileWithCache &font, Fnc was_canceled)
-{
-    const TextConfiguration &tc = input.text_configuration;
-    const char *text = tc.text.c_str();
-    const FontProp &prop = tc.style.prop;
+template<typename Fnc> 
+ExPolygons priv::create_shape(DataBase &input, Fnc was_canceled) {
+    FontFileWithCache       &font = input.font_file;
+    const TextConfiguration &tc   = input.text_configuration;
+    const char              *text = tc.text.c_str();
+    const FontProp          &prop = tc.style.prop;
 
     assert(font.has_value());
-    if (!font.has_value()) return {};
+    if (!font.has_value())
+        return {};
 
-    ExPolygons shapes = text2shapes(font, text, prop, was_canceled);
+    return text2shapes(font, text, prop, was_canceled);
+}
+
+template<typename Fnc>
+TriangleMesh priv::try_create_mesh(DataBase &input, Fnc was_canceled)
+{
+    ExPolygons shapes = priv::create_shape(input, was_canceled);
     if (shapes.empty()) return {};
     if (was_canceled()) return {};
-
-    const auto  &cn = prop.collection_number;
+    
+    const FontProp &prop = input.text_configuration.style.prop;
+    const std::optional<unsigned int> &cn = prop.collection_number;
     unsigned int font_index = (cn.has_value()) ? *cn : 0;
+    const FontFileWithCache &font = input.font_file;
     assert(font_index < font.font_file->infos.size());
     int unit_per_em = font.font_file->infos[font_index].unit_per_em;
     float scale    = prop.size_in_mm / unit_per_em;
@@ -459,7 +470,7 @@ TriangleMesh priv::create_mesh(DataBase &input, Fnc was_canceled, Job::Ctl& ctl)
     // Emboss text window is opened by creation new emboss text object
     TriangleMesh result;
     if (input.font_file.has_value()) {
-        result = try_create_mesh(input, input.font_file, was_canceled);
+        result = try_create_mesh(input, was_canceled);
         if (was_canceled()) return {};
     }
 
@@ -699,12 +710,8 @@ OrthoProject3d priv::create_emboss_projection(
 // input can't be const - cache of font
 TriangleMesh priv::cut_surface(DataBase& input1, const SurfaceVolumeData& input2, std::function<bool()> was_canceled)
 {
-    const TextConfiguration &tc   = input1.text_configuration;
-    const char              *text = tc.text.c_str();
-    const FontProp          &fp   = tc.style.prop;
-
-    ExPolygons shapes = text2shapes(input1.font_file, text, fp, was_canceled);
-    if (shapes.empty() || shapes.front().contour.empty())
+    ExPolygons shapes = create_shape(input1, was_canceled);
+    if (shapes.empty())
         throw JobException(_u8L("Font doesn't have any shape for given text.").c_str());
 
     if (was_canceled()) return {};
@@ -716,6 +723,7 @@ TriangleMesh priv::cut_surface(DataBase& input1, const SurfaceVolumeData& input2
     bb.translate(-projection_center);
 
     const FontFile &ff = *input1.font_file.font_file;
+    const FontProp &fp = input1.text_configuration.style.prop;
     double shape_scale = get_shape_scale(fp, ff);
 
     const SurfaceVolumeData::ModelSources &sources = input2.sources;
