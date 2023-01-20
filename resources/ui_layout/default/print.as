@@ -100,8 +100,8 @@ int s_seam_position_get(string &out get_val)
 	} else {
 		float angle = get_float("seam_angle_cost");
 		float travel = get_float("seam_travel_cost");
-		if(angle > travel * 3.9 && angle < travel * 4.1) return 0;
-		if(travel > angle * 1.9 && travel < angle * 2.1) return 1;
+		if(angle > travel * 3.9 && angle < travel * 4.1) return 0; //corner
+		if(travel > angle * 1.9 && travel < angle * 2.1) return 1; //nearest
 		user_angle = angle;
 		user_travel = travel;
 	}
@@ -122,15 +122,15 @@ void s_seam_position_set(string &in set_val, int idx)
 		set_int("seam_position", 5); // Rear
 	} else if (idx <= 1) {
 		set_int("seam_position", 7);
-		if (idx == 0) {
-			set_percent("seam_angle_cost", 80);
-			set_percent("seam_travel_cost", 20);
-		} else {
-			set_percent("seam_angle_cost", 30);
+		if (idx == 0) { //corner
+			set_percent("seam_angle_cost", 120);
 			set_percent("seam_travel_cost", 60);
+		} else { // == 1 // nearest
+			set_percent("seam_angle_cost", 80);
+			set_percent("seam_travel_cost", 120);
 		}
 	} else {
-		set_int("seam_position", 7);
+		set_int("seam_position", 7); // custom
 		if(user_angle > 0 || user_travel > 0){
 			set_percent("seam_angle_cost", user_angle);
 			set_percent("seam_travel_cost", user_travel);

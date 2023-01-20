@@ -4429,18 +4429,19 @@ void PrintConfigDef::init_fff_params()
     def->enum_labels.push_back(L("Aligned"));
     def->enum_labels.push_back(L("Contiguous"));
     def->enum_labels.push_back(L("Rear"));
-    def->mode = comSimpleAE | comPrusa;
+    def->mode = comSimpleAE | comPrusa | comSuSi;
     def->set_default_value(new ConfigOptionEnum<SeamPosition>(spCost));
 
     def = this->add("seam_angle_cost", coPercent);
     def->label = L("Angle cost");
     def->full_label = L("Seam angle cost");
     def->category = OptionCategory::perimeter;
-    def->tooltip = L("Cost of placing the seam at a bad angle. The worst angle (max penalty) is when it's flat.");
+    def->tooltip = L("Cost of placing the seam at a bad angle. The worst angle (max penalty) is when it's flat."
+                    "\n100% is the default penalty");
     def->sidetext = L("%");
     def->min = 0;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionPercent(80));
+    def->set_default_value(new ConfigOptionPercent(60));
 
     def = this->add("seam_gap", coFloatsOrPercents);
     def->label = L("Seam gap");
@@ -4518,7 +4519,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->max = 50;
     def->mode = comExpert | comSuSi;
-    def->set_default_value(new ConfigOptionPercent(20));
+    def->set_default_value(new ConfigOptionPercent(100));
 
 #if 0
     def = this->add("seam_preferred_direction", coFloat);

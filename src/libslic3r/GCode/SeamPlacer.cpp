@@ -23,7 +23,7 @@
 #include "libslic3r/Utils.hpp"
 
 //#define DEBUG_FILES
-
+#pragma optimize("", off)
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
 #include <SVG.hpp>
@@ -788,25 +788,29 @@ void gather_enforcers_blockers(GlobalModelInfo &result, const PrintObject *po) {
 
 struct SeamComparator {
     SeamPosition setup;
-    float angle_importance;
+    float angle_importance = 1.f;
+    float travel_importance = 1.f;
     Point seam_mod_pos;
     explicit SeamComparator(SeamPosition setup, const PrintObject& po) :
             setup(setup) {
-        //angle_importance =
-        //        setup == spNearest ? SeamPlacer::angle_importance_nearest : SeamPlacer::angle_importance_aligned;
         if (setup == spCustom)
             setup = spCost;
-        if (setup == spNearest)
-            setup = spCost;
-        float travel_cost = (float)po.config().seam_travel_cost.get_abs_value(1.f);
-        angle_importance = (float)po.config().seam_angle_cost.get_abs_value(1.f) / travel_cost;
+        if (setup == spNearest) {
+            //setup = spCost;
+            angle_importance = SeamPlacer::angle_importance_nearest;
+        } else if (setup == spAligned || setup == spExtremlyAligned) {
+            angle_importance = SeamPlacer::angle_importance_aligned;
+        } else {
+            travel_importance = (float)po.config().seam_travel_cost.get_abs_value(1.f);
+            angle_importance = (float)po.config().seam_angle_cost.get_abs_value(1.f);
+        }
     }
 
     // Standard comparator, must respect the requirements of comparators (e.g. give same result on same inputs) for sorting usage
     // should return if a is better seamCandidate than b
     bool is_first_better(const SeamCandidate &a, const SeamCandidate &b, const Vec2f &preffered_location = Vec2f { 0.0f,
             0.0f }) const {
-        if (setup == SeamPosition::spAligned && a.central_enforcer != b.central_enforcer) {
+        if ((setup == SeamPosition::spAligned || setup == SeamPosition::spExtremlyAligned) && a.central_enforcer != b.central_enforcer) {
             return a.central_enforcer;
         }
 
@@ -842,10 +846,10 @@ struct SeamComparator {
         // the penalites are kept close to range [0-1.x] however, it should not be relied upon
         float penalty_a = a.overhang + a.visibility +
                 angle_importance * compute_angle_penalty(a.local_ccw_angle)
-                + distance_penalty_a;
+                + travel_importance * distance_penalty_a;
         float penalty_b = b.overhang + b.visibility +
                 angle_importance * compute_angle_penalty(b.local_ccw_angle)
-                + distance_penalty_b;
+                + travel_importance * distance_penalty_b;
 
         return penalty_a < penalty_b;
     }
@@ -855,7 +859,7 @@ struct SeamComparator {
     // Also used by the random seam generator.
     bool is_first_not_much_worse(const SeamCandidate &a, const SeamCandidate &b) const {
         // Blockers/Enforcers discrimination, top priority
-        if (setup == SeamPosition::spAligned && a.central_enforcer != b.central_enforcer) {
+        if ( (setup == SeamPosition::spAligned || setup == SeamPosition::spExtremlyAligned) && a.central_enforcer != b.central_enforcer) {
             // Prefer centers of enforcers.
             return a.central_enforcer;
         }
@@ -984,7 +988,7 @@ void pick_seam_point(std::vector<SeamCandidate> &perimeter_points, size_t start_
 size_t pick_nearest_seam_point_index(const std::vector<SeamCandidate> &perimeter_points, size_t start_index,
         const Vec2f &preffered_location, const PrintObject& po) {
     size_t end_index = perimeter_points[start_index].perimeter.end_index;
-    SeamComparator comparator { spNearest, po };
+    SeamComparator comparator { po.config().seam_position.value/*spNearest*/, po };
 
     size_t seam_index = start_index;
     for (size_t index = start_index; index < end_index; ++index) {
@@ -1268,6 +1272,7 @@ std::optional<std::pair<size_t, size_t>> SeamPlacer::find_next_seam_in_layer(
     return {};
 }
 
+// get the nearests points from layers above & below. stop when the seam_align_tolerable_dist_factor don't allow to jump to a point, 
 std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintObject *po,
         std::pair<size_t, size_t> start_seam, const SeamPlacerImpl::SeamComparator &comparator) const {
     const std::vector<PrintObjectSeamData::LayerSeams> &layers = m_seam_per_object.find(po)->second.layers;
@@ -1292,7 +1297,11 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
                 break;
             }
         }
-        float max_distance = SeamPlacer::seam_align_tolerable_dist_factor *
+        float max_nozzle_diam = 0;
+        for (size_t region_id = 0; region_id < po->num_printing_regions(); ++region_id) {
+            max_nozzle_diam = std::max(max_nozzle_diam, (float)po->print()->config().nozzle_diameter.get_at(po->printing_region(region_id).config().perimeter_extruder.value - 1));
+        }
+        float max_distance = SeamPlacer::seam_align_tolerable_dist_factor * max_nozzle_diam *
                 layers[start_seam.first].points[start_seam.second].perimeter.flow_width;
         Vec3f prev_position = layers[prev_point_index.first].points[prev_point_index.second].position;
         Vec3f projected_position = prev_position;
@@ -1362,13 +1371,93 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
     }
 
     //sort them before alignment. Alignment is sensitive to initializaion, this gives it better chance to choose something nice
-    std::stable_sort(seams.begin(), seams.end(),
-            [&comparator, &layers](const std::pair<size_t, size_t> &left,
-                    const std::pair<size_t, size_t> &right) {
-                return comparator.is_first_better(layers[left.first].points[left.second],
+    if (comparator.setup != spExtremlyAligned) {
+        std::stable_sort(seams.begin(), seams.end(),
+            [&comparator, &layers](const std::pair<size_t, size_t>& left,
+                const std::pair<size_t, size_t>& right) {
+                    return comparator.is_first_better(layers[left.first].points[left.second],
                         layers[right.first].points[right.second]);
             }
-    );
+        );
+    }
+
+    // spExtremlyAligned: don't move unless it's an enforcer / Sphere
+    if (comparator.setup == spExtremlyAligned && seams.size() > 1) {
+        std::vector<std::vector<Perimeter*>> layer2seams;
+        size_t seam_idx = 0;
+        size_t current_layer_idx = 0;
+        // fisrt layer: keep that.
+        layer2seams.emplace_back();
+        while (seams[seam_idx].first == 0 && seam_idx < seams.size()) {
+            layer2seams.back().push_back(&layers[0].points[seams[seam_idx].second].perimeter);
+            layer2seams.back().back()->finalized = true;
+            //iterate
+            seam_idx++;
+        }
+        //next layer: get the nearest point form previous layer, and project it onto the current perimeter.
+        for (; seam_idx < seams.size(); seam_idx++) {
+            while (current_layer_idx < seams[seam_idx].first) {
+                layer2seams.emplace_back();
+                current_layer_idx++;
+            }
+            const std::vector<SeamPlacerImpl::SeamCandidate>& points = layers[seams[seam_idx].first].points;
+            const SeamCandidate& current = points[seams[seam_idx].second];
+            Perimeter& perimeter = points[seams[seam_idx].second].perimeter;
+            layer2seams.back().push_back(&perimeter);
+            if (current.type == EnforcedBlockedSeamPoint::Enforced) {
+                //// TODO: align as much as possible inside the enforcement
+                perimeter.seam_index = seams[seam_idx].second;
+                perimeter.final_seam_position = current.position;
+                perimeter.finalized = true;
+            } else if (current.type == EnforcedBlockedSeamPoint::Sphere) {
+                //keep as-is
+            } else if (current_layer_idx > 0 && !layer2seams[current_layer_idx - 1].empty()) {
+                //TODO: remove seam blocker
+                Point nearest_point;
+                Vec3f nearest_old_point;
+                size_t nearest_pt_idx;
+                size_t next_pt_idx;
+                double nearest_sqr_dist = std::numeric_limits<double>::max();
+                for (const Perimeter* lower_peri : layer2seams[current_layer_idx - 1]) {
+                    //old point
+                    Point lower_pt{ scale_t(lower_peri->final_seam_position.x()), scale_t(lower_peri->final_seam_position.y()) };
+                    //for each segment
+                    for (int i = perimeter.start_index; i < perimeter.end_index-1; i++) {
+                        Line l = Line{ Point{scale_t(points[i].position.x()), scale_t(points[i].position.y())}, Point{scale_t(points[i + 1].position.x()), scale_t(points[i + 1].position.y())} };
+                        Point pt = lower_pt.projection_onto(l);
+                        double dist_sqr = pt.distance_to_square(lower_pt);
+                        if (dist_sqr < nearest_sqr_dist) {
+                            nearest_sqr_dist = dist_sqr;
+                            nearest_point = pt;
+                            nearest_pt_idx = i;
+                            next_pt_idx = i + 1;
+                            nearest_old_point = lower_peri->final_seam_position;
+                        }
+                    }
+                    //test last segment
+                    {
+                        Point pt = lower_pt.projection_onto(Line{ Point{scale_t(points[perimeter.end_index - 1].position.x()), scale_t(points[perimeter.end_index - 1].position.y())}, Point{scale_t(points[perimeter.start_index].position.x()), scale_t(points[perimeter.start_index].position.y())} });
+                        double dist_sqr = pt.distance_to_square(lower_pt);
+                        if (dist_sqr < nearest_sqr_dist) {
+                            nearest_sqr_dist = dist_sqr;
+                            nearest_point = pt;
+                            nearest_pt_idx = perimeter.end_index - 1;
+                            next_pt_idx = perimeter.start_index;
+                            nearest_old_point = lower_peri->final_seam_position;
+                        }
+                    }
+                }
+
+                if (nearest_sqr_dist < std::numeric_limits<double>::max()) {
+                    perimeter.seam_index = nearest_pt_idx;
+                    perimeter.final_seam_position.x() = unscaled(nearest_point.x());
+                    perimeter.final_seam_position.y() = unscaled(nearest_point.y());
+                    perimeter.finalized = true;
+                } 
+            }
+        }
+        return;
+    }
 
     //align the seam points - start with the best, and check if they are aligned, if yes, skip, else start alignment
     // Keeping the vectors outside, so with a bit of luck they will not get reallocated after couple of for loop iterations.
@@ -1393,9 +1482,9 @@ void SeamPlacer::align_seam_points(const PrintObject *po, const SeamPlacerImpl::
             for (size_t alternative_start = 0; alternative_start < seam_string.size(); alternative_start += step_size) {
                 size_t start_layer_idx = seam_string[alternative_start].first;
                 size_t seam_idx =
-                        layers[start_layer_idx].points[seam_string[alternative_start].second].perimeter.seam_index;
+                    layers[start_layer_idx].points[seam_string[alternative_start].second].perimeter.seam_index;
                 alternative_seam_string = this->find_seam_string(po,
-                        std::pair<size_t, size_t>(start_layer_idx, seam_idx), comparator);
+                    std::pair<size_t, size_t>(start_layer_idx, seam_idx), comparator);
                 if (alternative_seam_string.size() > seam_string.size()) {
                     seam_string = std::move(alternative_seam_string);
                 }
@@ -1687,6 +1776,16 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
         // The point is not in the original loop.
         // Insert it.
         loop.split_at(seam_point, true);
+        /*{
+                static int isaqsdsdfsdfqzfn = 0;
+                std::stringstream stri;
+                stri << layer->id() << "_split_seam_" << isaqsdsdfsdfqzfn++ << ".svg";
+                SVG svg(stri.str());
+                for(auto& path : loop.paths)
+                    svg.draw(path.polyline, "blue");
+                svg.draw(seam_point, "red");
+                svg.Close();
+            }*/
     }
 
 }
