@@ -440,7 +440,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
             }
 
             if (role == ExtrusionRole::erExternalPerimeter
-                || (is_perimeter(role) && (configured_seam_preference == spRandom || configured_seam_preference == spAllRandom))) { //for random seam alignment, extract all perimeters
+                || (is_perimeter(role) && configured_seam_preference == spAllRandom)) { //for random seam alignment, extract all perimeters
                 Points p;
                 loop.collect_points(p);
                 polygons->emplace_back(std::move(p));
@@ -469,8 +469,7 @@ Polygons extract_perimeter_polygons(const Layer *layer, const SeamPosition confi
                     }
 
                     if (role == ExtrusionRole::erExternalPerimeter
-                            || (is_perimeter(role)
-                                    && (configured_seam_preference == spRandom || configured_seam_preference == spAllRandom ) )) { //for random seam alignment, extract all perimeters
+                            || (is_perimeter(role) && (configured_seam_preference == spAllRandom) )) { //for random seam alignment, extract all perimeters
                         Points p;
                         perimeter->collect_points(p);
                         polygons.emplace_back(std::move(p));
@@ -890,7 +889,7 @@ struct SeamComparator {
             return false;
         }
 
-        if (setup == SeamPosition::spRandom) {
+        if (setup == SeamPosition::spRandom || setup == SeamPosition::spAllRandom) {
             return true;
         }
 
@@ -1651,7 +1650,7 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
                             std::vector<SeamCandidate> &layer_perimeter_points = layers[layer_idx].points;
                             for (size_t current = 0; current < layer_perimeter_points.size();
                                     current = layer_perimeter_points[current].perimeter.end_index)
-                                if (configured_seam_preference == spRandom)
+                                if (configured_seam_preference == spRandom || configured_seam_preference == SeamPosition::spAllRandom)
                                     pick_random_seam_point(layer_perimeter_points, current, *po);
                                 else
                                     pick_seam_point(layer_perimeter_points, current, comparator);
