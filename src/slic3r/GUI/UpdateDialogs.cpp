@@ -12,6 +12,7 @@
 #include <wx/button.h>
 #include <wx/statbmp.h>
 #include <wx/checkbox.h>
+#include <wx/dirdlg.h>
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
