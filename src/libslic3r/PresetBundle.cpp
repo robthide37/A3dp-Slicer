@@ -1308,22 +1308,13 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
         try {
             pt::read_ini(ifs, tree);
         } catch (const boost::property_tree::ini_parser::ini_parser_error &err) {
-            // This throw was uncatched. While other similar problems later are just returning empty pair.
-            //throw Slic3r::RuntimeError(format("Failed loading config bundle \"%1%\"\nError: \"%2%\" at line %3%", path, err.message(), err.line()).c_str());
-            BOOST_LOG_TRIVIAL(error) << format("Failed loading config bundle \"%1%\"\nError: \"%2%\" at line %3%", path, err.message(), err.line()).c_str();
-            return std::make_pair(PresetsConfigSubstitutions{}, 0);
+            throw Slic3r::RuntimeError(format("Failed loading config bundle \"%1%\"\nError: \"%2%\" at line %3%", path, err.message(), err.line()).c_str());
         }
     }
 
     const VendorProfile *vendor_profile = nullptr;
     if (flags.has(LoadConfigBundleAttribute::LoadSystem) || flags.has(LoadConfigBundleAttribute::LoadVendorOnly)) {
-        VendorProfile vp;
-        try {
-            vp = VendorProfile::from_ini(tree, path);
-        } catch (const std::exception& e) {
-            BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: Failed to open profile file.") % path;
-            return std::make_pair(PresetsConfigSubstitutions{}, 0);
-        }
+        VendorProfile vp = VendorProfile::from_ini(tree, path);
         if (vp.models.size() == 0 && !vp.templates_profile) {
             BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: No printer model defined.") % path;
             return std::make_pair(PresetsConfigSubstitutions{}, 0);
