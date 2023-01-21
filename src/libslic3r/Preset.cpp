@@ -477,11 +477,12 @@ static std::vector<std::string> s_Preset_print_options {
         "overhangs_reverse_threshold",
         "seam_position",
         "seam_angle_cost",
-        "seam_travel_cost",
         "seam_notch_all",
         "seam_notch_angle",
         "seam_notch_inner",
         "seam_notch_outer",
+        "seam_travel_cost",
+        "seam_visibility",
         // external_perimeters
         "external_perimeters_first",
         "external_perimeters_vase",

@@ -2124,6 +2124,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     option.opt.tooltip = (params[i].substr(8, params[i].size() - 8));
                     boost::replace_all(option.opt.tooltip, "\\n", "\n");
                     boost::replace_all(option.opt.tooltip, "\\t", "\t");
+                    boost::replace_all(option.opt.tooltip, "\\.", ":");
+                    boost::replace_all(option.opt.tooltip, "\\£", "$");
                     need_to_notified_search = true;
                 }
                 else if (boost::starts_with(params[i], "max_literal$"))

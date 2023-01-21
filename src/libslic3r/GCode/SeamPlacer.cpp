@@ -142,10 +142,12 @@ Vec3f sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
     return Vec3f(cos(term1) * term3, sin(term1) * term3, term2);
 }
 
+// raycast evrything and store the weight, or set everything to 1 if 'deactivate'
 std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &raycasting_tree,
         const indexed_triangle_set &triangles,
         const TriangleSetSamples &samples,
-        size_t negative_volumes_start_index) {
+        size_t negative_volumes_start_index,
+        bool deactivate) {
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: raycast visibility of " << samples.positions.size() << " samples over " << triangles.indices.size()
             << " triangles: end";
@@ -168,13 +170,14 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
     std::vector<float> result(samples.positions.size());
     tbb::parallel_for(tbb::blocked_range<size_t>(0, result.size()),
             [&triangles, &precomputed_sample_directions, model_contains_negative_parts, negative_volumes_start_index,
-                    &raycasting_tree, &result, &samples](tbb::blocked_range<size_t> r) {
+                    &raycasting_tree, &result, &samples, deactivate](tbb::blocked_range<size_t> r) {
                 // Maintaining hits memory outside of the loop, so it does not have to be reallocated for each query.
                 std::vector<igl::Hit> hits;
                 for (size_t s_idx = r.begin(); s_idx < r.end(); ++s_idx) {
                     result[s_idx] = 1.0f;
-#if _DEBUG
-#else
+                    if (deactivate) {
+                        continue;
+                    }
                     constexpr float decrease_step = 1.0f
                             / (SeamPlacer::sqr_rays_per_sample_point * SeamPlacer::sqr_rays_per_sample_point);
 
@@ -229,7 +232,6 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
                             }
                         }
                     }
-#endif
                 }
             });
 
@@ -752,7 +754,7 @@ void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po,
     BOOST_LOG_TRIVIAL(debug)
     << "SeamPlacer: build AABB tree: end";
     result.mesh_samples_visibility = raycast_visibility(raycasting_tree, triangle_set, result.mesh_samples,
-            negative_volumes_start_index);
+            negative_volumes_start_index, !po->config().seam_visibility.value);
     throw_if_canceled();
 #ifdef DEBUG_FILES
     result.debug_export(triangle_set);
@@ -792,6 +794,7 @@ struct SeamComparator {
     SeamPosition setup;
     float angle_importance = 1.f;
     float travel_importance = 1.f;
+    float visibility_importance = 1.f;
     Point seam_mod_pos;
     explicit SeamComparator(SeamPosition setup, const PrintObject& po) :
             setup(setup) {
@@ -806,6 +809,7 @@ struct SeamComparator {
             travel_importance = (float)po.config().seam_travel_cost.get_abs_value(1.f);
             angle_importance = (float)po.config().seam_angle_cost.get_abs_value(1.f);
         }
+        visibility_importance = po.config().seam_visibility.value ? 1.f : 0.f;
     }
 
     // Standard comparator, must respect the requirements of comparators (e.g. give same result on same inputs) for sorting usage
@@ -846,11 +850,13 @@ struct SeamComparator {
         }
 
         // the penalites are kept close to range [0-1.x] however, it should not be relied upon
-        float penalty_a = a.overhang + a.visibility +
-                angle_importance * compute_angle_penalty(a.local_ccw_angle)
+        float penalty_a = a.overhang
+                + visibility_importance * a.visibility
+                + angle_importance * compute_angle_penalty(a.local_ccw_angle)
                 + travel_importance * distance_penalty_a;
-        float penalty_b = b.overhang + b.visibility +
-                angle_importance * compute_angle_penalty(b.local_ccw_angle)
+        float penalty_b = b.overhang 
+                + visibility_importance * b.visibility
+                + angle_importance * compute_angle_penalty(b.local_ccw_angle)
                 + travel_importance * distance_penalty_b;
 
         return penalty_a < penalty_b;
