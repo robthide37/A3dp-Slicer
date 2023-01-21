@@ -4415,7 +4415,13 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Position of perimeters' starting points."
                     "\nCost-based option let you choose the angle and travel cost. A high angle cost will place the seam where it can be hidden by a corner"
-                    ", the travel cost place the seam near the last position (often at the end of the previous infill).");
+                    ", the travel cost place the seam near the last position (often at the end of the previous infill). Default is 60 % and 100 %."
+                    " There is also the visibility and the overhang cost, but they are static."
+                    "\n Scattered: seam is placed at a random position on external perimeters"
+                    "\n Random: seam is placed at a random position for all perimeters"
+                    "\n Aligned: seams are grouped in the best place possible (minimum 6 layers per group)"
+                    "\n Contiguous: seam is placed over a seam from the previous layer (useful with enforcers)"
+                    "\n Rear: seam is placed at the far side (highest Y coordinates)");
     def->enum_keys_map = &ConfigOptionEnum<SeamPosition>::get_enum_values();
     def->enum_values.push_back("cost");
     def->enum_values.push_back("random");
@@ -4437,9 +4443,10 @@ void PrintConfigDef::init_fff_params()
     def->full_label = L("Seam angle cost");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Cost of placing the seam at a bad angle. The worst angle (max penalty) is when it's flat."
-                    "\n100% is the default penalty");
+        "\n100% is the default penalty");
     def->sidetext = L("%");
     def->min = 0;
+    def->max = 1000;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionPercent(60));
 
@@ -4517,9 +4524,18 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Cost of moving the extruder. The highest penalty is when the point is the furthest from the position of the extruder before extruding the external perimeter");
     def->sidetext = L("%");
     def->min = 0;
-    def->max = 50;
+    def->max = 1000;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionPercent(100));
+
+    def = this->add("seam_visibility", coBool);
+    def->label = L("use visibility check");
+    def->full_label = L("Seam visibility check");
+    def->category = OptionCategory::perimeter;
+    def->tooltip = L("Check and penalize seams that are the most visible. launch rays to check from how many direction a point is visible."
+        "\nThis is a compute-intensive option.");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionBool(true));
 
 #if 0
     def = this->add("seam_preferred_direction", coFloat);
@@ -7621,6 +7637,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "seam_notch_inner",
 "seam_notch_outer",
 "seam_travel_cost",
+"seam_visibility",
 "skirt_brim",
 "skirt_distance_from_brim",
 "skirt_extrusion_width",
