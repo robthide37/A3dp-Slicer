@@ -822,9 +822,8 @@ void WipeTower::toolchange_Unload(
         writer.travel(ramming_start_pos); // move to starting position
     else
         writer.set_position(ramming_start_pos);
-
     // if the ending point of the ram would end up in mid air, align it with the end of the wipe tower:
-    if (m_layer_info > m_plan.begin() && m_layer_info < m_plan.end() && (m_layer_info-1!=m_plan.begin() || !m_adhesion )) {
+    if (m_semm && (m_layer_info > m_plan.begin() && m_layer_info < m_plan.end() && (m_layer_info-1!=m_plan.begin() || !m_adhesion ))) {
 
         // this is y of the center of previous sparse infill border
         float sparse_beginning_y = 0.f;

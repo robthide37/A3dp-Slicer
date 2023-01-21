@@ -230,9 +230,16 @@ namespace Slic3r {
 
         std::string tcr_rotated_gcode = post_process_wipe_tower_moves(tcr, wipe_tower_offset, wipe_tower_rotation);
 
-        if (gcodegen.config().single_extruder_multi_material && ! tcr.priming) {
+        double current_z = gcodegen.writer().get_position().z();
+        if (z == -1.) // in case no specific z was provided, print at current_z pos
+            z = current_z;
+
+        const bool needs_toolchange = gcodegen.writer().need_toolchange(new_extruder_id);
+        const bool will_go_down = ! is_approx(z, current_z);
+
+        if (! needs_toolchange || (gcodegen.config().single_extruder_multi_material && ! tcr.priming)) {
             // Move over the wipe tower. If this is not single-extruder MM, the first wipe tower move following the
-            // toolchange will travel there anyway.
+            // toolchange will travel there anyway (if there is a toolchange).
             gcode += gcodegen.retract();
             gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
             gcode += gcodegen.travel_to(
@@ -241,47 +248,16 @@ namespace Slic3r {
                 "Travel to a Wipe Tower");
             gcode += gcodegen.unretract();
         }
-
-        double current_z = gcodegen.writer().get_position().z();
-        if (z == -1.) // in case no specific z was provided, print at current_z pos
-            z = current_z;
-        if (! is_approx(z, current_z)) {
+        
+        if (will_go_down) {
             gcode += gcodegen.writer().retract();
             gcode += gcodegen.writer().travel_to_z(z, "Travel down to the last wipe tower layer.");
             gcode += gcodegen.writer().unretract();
         }
 
-
-
-        // Process the custom toolchange_gcode. If it is empty, provide a simple Tn command to change the filament.
-        // Otherwise, leave control to the user completely.
-        /*std::string toolchange_gcode_str;
-        const std::string& toolchange_gcode = gcodegen.config().toolchange_gcode.value;
-        if (! toolchange_gcode.empty()) {
-            DynamicConfig config;
-            int previous_extruder_id = gcodegen.writer().extruder() ? (int)gcodegen.writer().extruder()->id() : -1;
-            config.set_key_value("previous_extruder", new ConfigOptionInt(previous_extruder_id));
-            config.set_key_value("next_extruder", new ConfigOptionInt((int)new_extruder_id));
-            config.set_key_value("layer_num", new ConfigOptionInt(gcodegen.m_layer_index));
-            config.set_key_value("layer_z", new ConfigOptionFloat(tcr.print_z));
-            config.set_key_value("toolchange_z", new ConfigOptionFloat(z));
-            config.set_key_value("max_layer_z", new ConfigOptionFloat(gcodegen.m_max_layer_z));
-            toolchange_gcode_str = gcodegen.placeholder_parser_process("toolchange_gcode", toolchange_gcode, new_extruder_id, &config);
-            check_add_eol(toolchange_gcode_str);
-        }
-
-        std::string toolchange_command;
-        if (tcr.priming || (new_extruder_id >= 0 && gcodegen.writer().need_toolchange(new_extruder_id)))
-            toolchange_command = gcodegen.writer().toolchange(new_extruder_id);
-        if (!custom_gcode_changes_tool(toolchange_gcode_str, gcodegen.writer().toolchange_prefix(), new_extruder_id))
-            toolchange_gcode_str += toolchange_command;
-        else {
-            // We have informed the m_writer about the current extruder_id, we can ignore the generated G-code.
-        }*/
-
         std::string toolchange_gcode_str;
         std::string deretraction_str;
-        if (tcr.priming || (new_extruder_id >= 0 && gcodegen.writer().need_toolchange(new_extruder_id))) {
+        if (tcr.priming || (new_extruder_id >= 0 && needs_toolchange)) {
             if (gcodegen.config().single_extruder_multi_material)
                 gcodegen.m_wipe.reset_path(); // We don't want wiping on the ramming lines.
             toolchange_gcode_str = gcodegen.set_extruder(new_extruder_id, tcr.print_z); // TODO: toolchange_z vs print_z
@@ -301,7 +277,6 @@ namespace Slic3r {
         unescape_string_cstyle(tcr_escaped_gcode, tcr_gcode);
         gcode += tcr_gcode;
         check_add_eol(toolchange_gcode_str);
-
 
         // A phony move to the end position at the wipe tower.
         gcodegen.writer().travel_to_xy(end_pos.cast<double>());
