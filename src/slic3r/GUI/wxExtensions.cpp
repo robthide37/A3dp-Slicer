@@ -747,9 +747,11 @@ ModeSizer::ModeSizer(wxWindow *parent, int hgap/* = 0*/) :
 {
     SetFlexibleDirection(wxHORIZONTAL);
 
-    auto modebtnfn = [](wxCommandEvent &event, int mode_id) {
-        Slic3r::GUI::wxGetApp().save_mode(mode_id);
-        event.Skip();
+    auto modebtnfn = [this](wxCommandEvent &event, int mode_id) {
+        if (Slic3r::GUI::wxGetApp().save_mode(mode_id))
+            event.Skip();
+        else
+            SetMode(Slic3r::GUI::wxGetApp().get_mode());
     };
     
     m_mode_btns.reserve(3);

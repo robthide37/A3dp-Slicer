@@ -2659,10 +2659,10 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             }
             if ((wxGetApp().get_mode() == comSimple) && (type_3mf || type_any_amf) && model_has_advanced_features(model)) {
                 MessageDialog msg_dlg(q, _L("This file cannot be loaded in a simple mode. Do you want to switch to an advanced mode?")+"\n",
-                    _L("Detected advanced data"), wxICON_WARNING | wxYES | wxCANCEL);
-                if (msg_dlg.ShowModal() == wxID_YES) {
-                    Slic3r::GUI::wxGetApp().save_mode(comAdvanced);
-                    view3D->set_as_dirty();
+                    _L("Detected advanced data"), wxICON_WARNING | wxOK | wxCANCEL);
+                if (msg_dlg.ShowModal() == wxID_OK) {
+                    if (wxGetApp().save_mode(comAdvanced))
+                        view3D->set_as_dirty();
                 }
                 else
                     return obj_idxs;
@@ -5299,8 +5299,8 @@ void Plater::priv::update_after_undo_redo(const UndoRedo::Snapshot& snapshot, bo
     if (wxGetApp().get_mode() == comSimple && model_has_advanced_features(this->model)) {
         // If the user jumped to a snapshot that require user interface with advanced features, switch to the advanced mode without asking.
         // There is a little risk of surprising the user, as he already must have had the advanced or expert mode active for such a snapshot to be taken.
-        Slic3r::GUI::wxGetApp().save_mode(comAdvanced);
-        view3D->set_as_dirty();
+        if (wxGetApp().save_mode(comAdvanced))
+            view3D->set_as_dirty();
     }
 
 	// this->update() above was called with POSTPONE_VALIDATION_ERROR_MESSAGE, so that if an error message was generated when updating the back end, it would not open immediately, 

@@ -2324,13 +2324,33 @@ ConfigOptionMode GUI_App::get_mode()
            mode == "simple" ? comSimple : comAdvanced;
 }
 
-void GUI_App::save_mode(const /*ConfigOptionMode*/int mode) 
+bool GUI_App::save_mode(const /*ConfigOptionMode*/int mode) 
 {
     const std::string mode_str = mode == comExpert ? "expert" :
                                  mode == comSimple ? "simple" : "advanced";
+
+    auto can_switch_to_simple = [](Model& model) {
+        for (const ModelObject* model_object : model.objects)
+            if (model_object->volumes.size() > 1) {
+                for (size_t i = 1; i < model_object->volumes.size(); ++i)
+                    if (!model_object->volumes[i]->is_support_modifier())
+                        return false;
+            }
+        return true;
+    };
+
+    if (mode == comSimple && !can_switch_to_simple(model())) {
+        show_info(nullptr,
+            _L("Simple mode supports manipulation with single-part object(s)\n"
+            "or object(s) with support modifiers only.") + "\n\n" +
+            _L("Please check your object list before mode changing."),
+            _L("Change application mode"));
+        return false;
+    }
     app_config->set("view_mode", mode_str);
     app_config->save(); 
     update_mode();
+    return true;
 }
 
 // Update view mode according to selected menu

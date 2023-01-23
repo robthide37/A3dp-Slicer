@@ -465,19 +465,19 @@ void MenuFactory::append_menu_item_delete(wxMenu* menu)
 
 }
 
-wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType type) {
+wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType type)
+{
     auto sub_menu = new wxMenu;
 
     const ConfigOptionMode mode = wxGetApp().get_mode();
 
-    if (mode == comExpert   && type != ModelVolumeType::INVALID ||
-        mode == comAdvanced && type == ModelVolumeType::MODEL_PART) {
+    if (mode > comSimple) {
         append_menu_item(sub_menu, wxID_ANY, _L("Load") + " " + dots, "",
             [type](wxCommandEvent&) { obj_list()->load_subobject(type); }, "", menu);
         sub_menu->AppendSeparator();
     }
 
-    if (!(type == ModelVolumeType::MODEL_PART && mode == comAdvanced))
+    //if (!(type == ModelVolumeType::MODEL_PART && mode == comAdvanced))
         for (auto& item : { L("Box"), L("Cylinder"), L("Sphere"), L("Slab") })
         {
             if (type == ModelVolumeType::INVALID && strncmp(item, "Slab", 4) == 0)
@@ -527,6 +527,7 @@ void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, 
         ) {
         wxString item_name = is_submenu_item ? "" : _(ADD_VOLUME_MENU_ITEMS[int(type)].first) + ": ";
         item_name += _L("Text");
+        menu->AppendSeparator();
         const std::string icon_name = is_submenu_item ? "" : ADD_VOLUME_MENU_ITEMS[int(type)].second;
         append_menu_item(menu, wxID_ANY, item_name, "", add_text, icon_name, menu);
     }
