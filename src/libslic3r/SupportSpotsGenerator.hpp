@@ -68,7 +68,7 @@ enum class SupportPointCause {
     LongBridge, // point generated on bridge extrusion longer than the allowed length 
     FloatingBridgeAnchor, // point generated on unsupported bridge endpoint
     FloatingExtrusion, // point generated on extrusion that does not hold on its own - huge overhangs
-    SeparationFromBed, // point generated for object parts that are connected to the bed, but the area is too low and there is risk of separation (brim may help)
+    SeparationFromBed, // point generated for object parts that are connected to the bed, but the area is too small and there is a risk of separation (brim may help)
     UnstableFloatingPart, // point generated for object parts not connected to the bed, holded only by the other support points (brim will not help here)
     WeakObjectPart // point generated when some part of the object is too weak to hold the upper part and may break (imagine hourglass)
     };

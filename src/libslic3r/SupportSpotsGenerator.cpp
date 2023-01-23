@@ -237,13 +237,66 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
             checked_lines_out.insert(checked_lines_out.end(), tmp.begin(), tmp.end());
         }
         return checked_lines_out;
+    } else if (entity->role().is_bridge() && !entity->role().is_perimeter()) {
+        // pure bridges are handled separately, beacuse we need to align the forward and backward direction support points
+        if (entity->length() < scale_(params.min_distance_to_allow_local_supports)) {
+            return {};
+        }
+        const float                flow_width       = get_flow_width(layer_region, entity->role());
+        std::vector<ExtendedPoint> annotated_points = estimate_points_properties<true, true, true, true>(entity->as_polyline().points,
+                                                                                                         prev_layer_boundary, flow_width,
+                                                                                                         params.bridge_distance);
+
+        std::vector<ExtrusionLine> lines_out;
+        lines_out.reserve(annotated_points.size());
+        float bridged_distance = 0.0f;
+
+        std::optional<Vec2d> bridging_dir{};
+
+        for (size_t i = 0; i < annotated_points.size(); ++i) {
+            ExtendedPoint &curr_point = annotated_points[i];
+            ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i - 1];
+
+            SupportPointCause potential_cause = std::abs(curr_point.curvature) > 0.1 ? SupportPointCause::FloatingBridgeAnchor :
+                                                                                       SupportPointCause::LongBridge;
+            float         line_len = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
+            Vec2d line_dir = (curr_point.position - prev_point.position).normalized();
+
+            ExtrusionLine line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
+                                   curr_point.position.cast<float>(), line_len, entity};
+
+            float max_bridge_len = std::max(params.support_points_interface_radius * 2.0f,
+                                            params.bridge_distance /
+                                                ((1.0f + std::abs(curr_point.curvature)) * (1.0f + std::abs(curr_point.curvature)) *
+                                                 (1.0f + std::abs(curr_point.curvature))));
+
+            if (!bridging_dir.has_value() && curr_point.distance > flow_width && line_len > params.bridge_distance * 0.6) {
+                bridging_dir = (prev_point.position - curr_point.position).normalized();
+            }
+
+            if (curr_point.distance > flow_width && potential_cause == SupportPointCause::LongBridge && bridging_dir.has_value() &&
+                bridging_dir->dot(line_dir) < 0.8) { // skip backward direction of bridge - supported by forward points enough
+                bridged_distance += line_len;
+            } else if (curr_point.distance > flow_width) {
+                bridged_distance += line_len;
+                if (bridged_distance > max_bridge_len) {
+                    bridged_distance                 = 0.0f;
+                    line_out.support_point_generated = potential_cause;
+                }
+            } else {
+                bridged_distance = 0.0f;
+            }
+
+            lines_out.push_back(line_out);
+        }
+        return lines_out;
+
     } else { // single extrusion path, with possible varying parameters
         if (entity->length() < scale_(params.min_distance_to_allow_local_supports)) {
             return {};
         }
 
         const float flow_width = get_flow_width(layer_region, entity->role());
-
         // Compute only unsigned distance - prev_layer_lines can contain unconnected paths, thus the sign of the distance is unreliable
         std::vector<ExtendedPoint> annotated_points = estimate_points_properties<true, true, false, false>(entity->as_polyline().points,
                                                                                                            prev_layer_lines, flow_width,
@@ -268,13 +321,11 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
             curr_point.distance *= sign;
 
             SupportPointCause potential_cause = SupportPointCause::FloatingExtrusion;
-            if (entity->role().is_bridge() && !entity->role().is_perimeter()) {
-                potential_cause = std::abs(curr_point.curvature) > 0.1 ? SupportPointCause::FloatingBridgeAnchor : SupportPointCause::LongBridge;
-            }
 
-            float max_bridge_len = params.bridge_distance /
-                                   ((1.0f + std::abs(curr_point.curvature)) * (1.0f + std::abs(curr_point.curvature)) *
-                                    (1.0f + std::abs(curr_point.curvature)));
+            float max_bridge_len = std::max(params.support_points_interface_radius * 2.0f,
+                                            params.bridge_distance /
+                                                ((1.0f + std::abs(curr_point.curvature)) * (1.0f + std::abs(curr_point.curvature)) *
+                                                 (1.0f + std::abs(curr_point.curvature))));
 
             if (curr_point.distance > 2.0f * flow_width) {
                 line_out.form_quality = 0.8f;
