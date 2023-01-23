@@ -429,7 +429,8 @@ void PrintObject::generate_support_spots()
         if (!this->shared_regions()->generated_support_points.has_value()) {
             PrintTryCancel                cancel_func = m_print->make_try_cancel();
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
-                                                 float(this->print()->m_config.perimeter_acceleration.getFloat())};
+                                                 float(this->print()->m_config.perimeter_acceleration.getFloat()),
+                                                 this->config().raft_layers.getInt()};
             auto [supp_points, partial_objects]              = SupportSpotsGenerator::full_search(this, cancel_func, params);
             this->m_shared_regions->generated_support_points = {this->trafo_centered(), supp_points};
             m_print->throw_if_canceled();
@@ -470,7 +471,9 @@ void PrintObject::estimate_curled_extrusions()
             // Estimate curling of support material and add it to the malformaition lines of each layer
             float                         support_flow_width = support_material_flow(this, this->config().layer_height).width();
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
-                                                 float(this->print()->config().perimeter_acceleration.getFloat())};
+                                                 float(this->print()->config().perimeter_acceleration.getFloat()),
+                                                 this->config().raft_layers.getInt()
+                                                 };
             SupportSpotsGenerator::estimate_supports_malformations(this->support_layers(), support_flow_width, params);
             SupportSpotsGenerator::estimate_malformations(this->layers(), params);
             m_print->throw_if_canceled();

@@ -14,7 +14,7 @@ namespace SupportSpotsGenerator {
 
 struct Params
 {
-    Params(const std::vector<std::string> &filament_types, float max_acceleration, size_t raft_layers_count)
+    Params(const std::vector<std::string> &filament_types, float max_acceleration, int raft_layers_count)
         : max_acceleration(max_acceleration), raft_layers_count(raft_layers_count)
     {
         if (filament_types.size() > 1) {
@@ -34,7 +34,7 @@ struct Params
     const float bridge_distance = 12.0f; // mm
     const float max_acceleration; // mm/s^2 ; max acceleration of object (bed) in XY (NOTE: The max hit is received by the object in the
                                   // jerk phase, so the usual machine limits are too low)
-    const size_t raft_layers_count;
+    const int raft_layers_count;
     std::string filament_type;
 
     const std::pair<float,float> malformation_distance_factors = std::pair<float, float> { 0.4, 1.2 };
