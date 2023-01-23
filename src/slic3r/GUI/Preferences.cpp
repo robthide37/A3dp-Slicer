@@ -322,8 +322,14 @@ void PreferencesDialog::build()
 		m_optgroup_general->append_separator();
 
 		append_bool_option(m_optgroup_general, "show_drop_project_dialog",
+#if 1 // #ysFIXME_delete_after_test_of_6377
+			L("Show load project dialog"),
+			L("When checked, whenever dragging and dropping a project file on the application or open it from a browser, "
+			  "shows a dialog asking to select the action to take on the file to load."),
+#else
 			L("Show drop project dialog"),
 			L("When checked, whenever dragging and dropping a project file on the application, shows a dialog asking to select the action to take on the file to load."),
+#endif
 			app_config->get("show_drop_project_dialog") == "1");
 
 		append_bool_option(m_optgroup_general, "single_instance",

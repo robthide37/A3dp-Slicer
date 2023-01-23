@@ -6010,7 +6010,9 @@ protected:
 
 ProjectDropDialog::ProjectDropDialog(const std::string& filename)
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY,
-        from_u8((boost::format(_utf8(L("%s - Drop project file"))) % SLIC3R_APP_NAME).str()), wxDefaultPosition,
+// #ysFIXME_delete_after_test_of_6377
+//        from_u8((boost::format(_utf8(L("%s - Drop project file"))) % SLIC3R_APP_NAME).str()), wxDefaultPosition,
+        from_u8((boost::format(_utf8(L("%s - Load project file"))) % SLIC3R_APP_NAME).str()), wxDefaultPosition,
         wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
 {
     SetFont(wxGetApp().normal_font());
@@ -6118,7 +6120,7 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
         std::string filename = (*it).filename().string();
         if (boost::algorithm::iends_with(filename, ".3mf") || boost::algorithm::iends_with(filename, ".amf")) {
             ProjectDropDialog::LoadType load_type = ProjectDropDialog::LoadType::Unknown;
-            if (!model().objects.empty()) {
+//            if (!model().objects.empty()) { // #ysFIXME_delete_after_test_of_6377
                 if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(it->string())) ||
                     (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf")))
                     load_type = ProjectDropDialog::LoadType::LoadGeometry;
@@ -6135,9 +6137,11 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
                         load_type = static_cast<ProjectDropDialog::LoadType>(std::clamp(std::stoi(wxGetApp().app_config->get("drop_project_action")),
                             static_cast<int>(ProjectDropDialog::LoadType::OpenProject), static_cast<int>(ProjectDropDialog::LoadType::LoadConfig)));
                 }
+/* // #ysFIXME_delete_after_test_of_6377
             }
             else
                 load_type = ProjectDropDialog::LoadType::OpenProject;
+*/
 
             if (load_type == ProjectDropDialog::LoadType::Unknown)
                 return false;
