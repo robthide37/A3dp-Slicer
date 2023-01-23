@@ -471,7 +471,7 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
 
     const ConfigOptionMode mode = wxGetApp().get_mode();
 
-    if (mode > comSimple) {
+    if (type != ModelVolumeType::INVALID && mode > comSimple) {
         append_menu_item(sub_menu, wxID_ANY, _L("Load") + " " + dots, "",
             [type](wxCommandEvent&) { obj_list()->load_subobject(type); }, "", menu);
         sub_menu->AppendSeparator();
