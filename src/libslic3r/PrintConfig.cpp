@@ -3890,7 +3890,7 @@ void PrintConfigDef::init_sla_params()
     def->enum_values = ConfigOptionEnum<sla::SupportTreeType>::get_enum_names();
     def->enum_labels = ConfigOptionEnum<sla::SupportTreeType>::get_enum_names();
     def->enum_labels[0] = L("Default");
-    def->enum_labels[1] = L("Branching");
+    def->enum_labels[1] = L("Branching (experimental)");
     // TODO: def->enum_labels[2] = L("Organic");
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum(sla::SupportTreeType::Default));
