@@ -2004,7 +2004,12 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     else
         m_selection.volumes_changed(map_glvolume_old_to_new);
 
-    m_gizmos.update_data();
+    // The current gizmo may be not supported by the current printer technology
+    // after the user changes printer.
+    // Check if it is still activable before to call update_data() method.
+    const GLGizmoBase* gizmo = m_gizmos.get_current();
+    if (gizmo != nullptr && gizmo->is_activable())
+        m_gizmos.update_data();
     m_gizmos.refresh_on_off_state();
 
     // Update the toolbar
