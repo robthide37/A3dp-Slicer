@@ -5,31 +5,38 @@
 #include "Line.hpp"
 #include "PrintBase.hpp"
 #include <boost/log/trivial.hpp>
+#include <cstddef>
 #include <vector>
 
 namespace Slic3r {
 
 namespace SupportSpotsGenerator {
 
-struct Params {
-    Params(const std::vector<std::string> &filament_types) {
+struct Params
+{
+    Params(const std::vector<std::string> &filament_types, float max_acceleration, size_t raft_layers_count)
+        : max_acceleration(max_acceleration), raft_layers_count(raft_layers_count)
+    {
         if (filament_types.size() > 1) {
             BOOST_LOG_TRIVIAL(warning)
-            << "SupportSpotsGenerator does not currently handle different materials properly, only first will be used";
+                << "SupportSpotsGenerator does not currently handle different materials properly, only first will be used";
         }
         if (filament_types.empty() || filament_types[0].empty()) {
-            BOOST_LOG_TRIVIAL(error)
-            << "SupportSpotsGenerator error: empty filament_type";
+            BOOST_LOG_TRIVIAL(error) << "SupportSpotsGenerator error: empty filament_type";
             filament_type = std::string("PLA");
         } else {
             filament_type = filament_types[0];
-             BOOST_LOG_TRIVIAL(debug)
-            << "SupportSpotsGenerator: applying filament type: " << filament_type;
+            BOOST_LOG_TRIVIAL(debug) << "SupportSpotsGenerator: applying filament type: " << filament_type;
         }
     }
 
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
-    const float bridge_distance = 12.0f; //mm
+    const float bridge_distance = 12.0f; // mm
+    const float max_acceleration; // mm/s^2 ; max acceleration of object (bed) in XY (NOTE: The max hit is received by the object in the
+                                  // jerk phase, so the usual machine limits are too low)
+    const size_t raft_layers_count;
+    std::string filament_type;
+
     const std::pair<float,float> malformation_distance_factors = std::pair<float, float> { 0.4, 1.2 };
     const float max_curled_height_factor = 10.0f;
 
@@ -37,9 +44,7 @@ struct Params {
     const float support_points_interface_radius = 1.5f; // mm
     const float min_distance_to_allow_local_supports = 1.0f; //mm
 
-    std::string filament_type;
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
-    const float max_acceleration = 9 * 1000.0f; // mm/s^2 ; max acceleration of object (bed) in XY (NOTE: The max hit is received by the object in the jerk phase, so the usual machine limits are too low)
     const double filament_density = 1.25e-3f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
     const double material_yield_strength = 33.0f * 1e6f; // (g*mm/s^2)/mm^2; 33 MPa is yield strength of ABS, which has the lowest yield strength from common materials.
     const float standard_extruder_conflict_force = 20.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
@@ -47,6 +52,10 @@ struct Params {
 
     // MPa * 1e^6 = (g*mm/s^2)/mm^2 = g/(mm*s^2); yield strength of the bed surface
     double get_bed_adhesion_yield_strength() const {
+        if (raft_layers_count > 0) {
+            return get_support_spots_adhesion_strength();
+        }
+
         if (filament_type == "PLA") {
             return 0.018 * 1e6;
         } else if (filament_type == "PET" || filament_type == "PETG") {
@@ -67,7 +76,7 @@ struct Params {
 enum class SupportPointCause { 
     LongBridge, // point generated on bridge extrusion longer than the allowed length 
     FloatingBridgeAnchor, // point generated on unsupported bridge endpoint
-    FloatingExtrusion, // point generated on extrusion that does not hold on its own - huge overhangs
+    FloatingExtrusion, // point generated on extrusion that does not hold on its own
     SeparationFromBed, // point generated for object parts that are connected to the bed, but the area is too small and there is a risk of separation (brim may help)
     UnstableFloatingPart, // point generated for object parts not connected to the bed, holded only by the other support points (brim will not help here)
     WeakObjectPart // point generated when some part of the object is too weak to hold the upper part and may break (imagine hourglass)
@@ -118,8 +127,20 @@ struct Malformations {
     std::vector<Lines> layers; //for each layer
 };
 
-// std::vector<size_t> quick_search(const PrintObject *po, const Params &params);
-SupportPoints full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params);
+struct PartialObject
+{
+    PartialObject(Vec3f centroid, float volume, bool connected_to_bed)
+        : centroid(centroid), volume(volume), connected_to_bed(connected_to_bed)
+    {}
+
+    Vec3f centroid;
+    float volume;
+    bool  connected_to_bed;
+};
+
+using PartialObjects = std::vector<PartialObject>;
+
+std::tuple<SupportPoints, PartialObjects> full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params);
 
 void estimate_supports_malformations(std::vector<SupportLayer*> &layers, float supports_flow_width, const Params &params);
 void estimate_malformations(std::vector<Layer*> &layers, const Params &params);

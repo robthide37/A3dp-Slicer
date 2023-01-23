@@ -579,12 +579,13 @@ public:
 };
 
 // return new object part and actual area covered by extrusions
-std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &slice, const Layer *layer)
+std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &slice, const Layer *layer, const Params& params)
 {
     ObjectPart new_object_part;
     float      area_covered_by_extrusions = 0;
 
-    auto add_extrusions_to_object = [&new_object_part, &area_covered_by_extrusions](const ExtrusionEntity *e, const LayerRegion *region) {
+    auto add_extrusions_to_object = [&new_object_part, &area_covered_by_extrusions, &params](const ExtrusionEntity *e,
+                                                                                             const LayerRegion     *region) {
         float                      flow_width = get_flow_width(region, e->role());
         const Layer               *l          = region->layer();
         float                      slice_z    = l->slice_z;
@@ -596,9 +597,9 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &sli
             new_object_part.volume += volume;
             new_object_part.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), slice_z) * volume;
 
-            if (l->bottom_z() < EPSILON) { // layer attached on bed
+            if (l->id() == params.raft_layers_count) { // layer attached on bed/raft
                 new_object_part.connected_to_bed = true;
-                float sticking_area = line.len * flow_width;
+                float sticking_area              = line.len * flow_width;
                 new_object_part.sticking_area += sticking_area;
                 Vec2f middle = Vec2f((line.a + line.b) / 2.0f);
                 new_object_part.sticking_centroid_accumulator += sticking_area * to_3d(middle, slice_z);
@@ -681,17 +682,26 @@ public:
     }
 };
 
-SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params)
+std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po, const PrintTryCancel &cancel_func, const Params &params)
 {
-    SupportPoints            supp_points{};
+    SupportPoints     supp_points{};
     SupportGridFilter supports_presence_grid(po, params.min_distance_between_support_points);
     ActiveObjectParts active_object_parts{};
+    PartialObjects    partial_objects{};
     LD                prev_layer_ext_perim_lines;
 
     std::unordered_map<size_t, size_t>          prev_slice_idx_to_object_part_mapping;
     std::unordered_map<size_t, size_t>          next_slice_idx_to_object_part_mapping;
     std::unordered_map<size_t, SliceConnection> prev_slice_idx_to_weakest_connection;
     std::unordered_map<size_t, SliceConnection> next_slice_idx_to_weakest_connection;
+
+    auto remember_partial_object = [&active_object_parts, &partial_objects](size_t object_part_id) {
+        auto object_part = active_object_parts.access(object_part_id);
+        if (object_part.volume > EPSILON) {
+            partial_objects.emplace_back(object_part.volume_centroid_accumulator / object_part.volume, object_part.volume,
+                                         object_part.connected_to_bed);
+        }
+    };
 
     for (size_t layer_idx = 0; layer_idx < po->layer_count(); ++layer_idx) {
         cancel_func();
@@ -701,7 +711,7 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
 
         for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
             const LayerSlice &slice             = layer->lslices_ex.at(slice_idx);
-            auto [new_part, covered_area]       = build_object_part_from_slice(slice, layer);
+            auto [new_part, covered_area]       = build_object_part_from_slice(slice, layer, params);
             SliceConnection connection_to_below = estimate_slice_connection(slice_idx, layer);
 
 #ifdef DETAILED_DEBUG_LOGS
@@ -730,7 +740,10 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
 
                     final_part_id = *parts_ids.begin();
                     for (size_t part_id : parts_ids) {
-                        if (final_part_id != part_id) { active_object_parts.merge(part_id, final_part_id); }
+                        if (final_part_id != part_id) {
+                            remember_partial_object(part_id);
+                            active_object_parts.merge(part_id, final_part_id);
+                        }
                     }
                 }
                 auto estimate_conn_strength = [bottom_z](const SliceConnection &conn) {
@@ -881,11 +894,16 @@ SupportPoints check_stability(const PrintObject *po, const PrintTryCancel& cance
         } // slice iterations
         prev_layer_ext_perim_lines = LD(current_layer_ext_perims_lines);
     } // layer iterations
-    return supp_points;
+
+    for (const auto& active_obj_pair : prev_slice_idx_to_object_part_mapping) {
+        remember_partial_object(active_obj_pair.second);
+    }
+
+    return {supp_points, partial_objects};
 }
 
 #ifdef DEBUG_FILES
-void debug_export(SupportPoints support_points, std::string file_name)
+void debug_export(const SupportPoints& support_points,const PartialObjects& objects, std::string file_name)
 {
     Slic3r::CNumericLocalesSetter locales_setter;
     {
@@ -910,19 +928,29 @@ void debug_export(SupportPoints support_points, std::string file_name)
                     support_points[i].position(2), color[0], color[1], color[2]);
         }
 
+        for (size_t i = 0; i < objects.size(); ++i) {
+            Vec3f color{1.0f, 0.0f, 1.0f};
+            if (objects[i].connected_to_bed) {
+                color = {1.0f, 0.0f, 0.0f};
+            }
+            fprintf(fp, "v %f %f %f  %f %f %f\n", objects[i].centroid(0), objects[i].centroid(1), objects[i].centroid(2), color[0],
+                    color[1], color[2]);
+        }
+
         fclose(fp);
     }
 }
 #endif
 
-SupportPoints full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params)
+std::tuple<SupportPoints, PartialObjects> full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params)
 {
-    SupportPoints supp_points = check_stability(po, cancel_func, params);
+    auto results = check_stability(po, cancel_func, params);
 #ifdef DEBUG_FILES
-    debug_export(supp_points, "issues");
+    auto [supp_points, objects] = results;
+    debug_export(supp_points, objects, "issues");
 #endif
 
-    return supp_points;
+    return results;
 }
 
 void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width, const Params &params)
