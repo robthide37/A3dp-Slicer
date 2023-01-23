@@ -3182,14 +3182,10 @@ void GCodeViewer::render_shells()
     if (shader == nullptr)
         return;
 
-//    glsafe(::glDepthMask(GL_FALSE));
-
     shader->start_using();
     const Camera& camera = wxGetApp().plater()->get_camera();
     m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, camera.get_view_matrix(), camera.get_projection_matrix());
     shader->stop_using();
-
-//    glsafe(::glDepthMask(GL_TRUE));
 }
 
 void GCodeViewer::render_legend(float& legend_height)

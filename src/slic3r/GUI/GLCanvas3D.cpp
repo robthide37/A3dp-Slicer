@@ -1515,12 +1515,12 @@ void GLCanvas3D::render()
     _render_background();
 
     _render_objects(GLVolumeCollection::ERenderType::Opaque);
-    if (!m_main_toolbar.is_enabled())
-        _render_gcode();
     _render_sla_slices();
     _render_selection();
     if (is_looking_downward)
         _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false, true);
+    if (!m_main_toolbar.is_enabled())
+        _render_gcode();
     _render_objects(GLVolumeCollection::ERenderType::Transparent);
 
     _render_sequential_clearance();
