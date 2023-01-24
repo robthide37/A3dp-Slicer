@@ -1464,45 +1464,12 @@ void Selection::mirror(Axis axis)
 void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation, TransformationType transformation_type)
 {
     if (!m_valid)
-        return;
-
-    Vec3d relative_scale = scale;
+      return;
 
     for (unsigned int i : m_list) {
         GLVolume& v = *(*m_volumes)[i];
         const VolumeCache& volume_data = m_cache.volumes_data[i];
         const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
-
-        if (transformation_type.absolute()) {
-            // convert from absolute scaling to relative scaling
-            BoundingBoxf3 original_box;
-            BoundingBoxf3 reference_box = m_box.get_bounding_box();
-            if (m_mode == Instance) {
-              if (is_single_full_instance()) {
-                if (transformation_type.world())
-                    original_box = get_full_unscaled_instance_bounding_box();
-                else
-                    original_box = get_full_unscaled_instance_local_bounding_box();
-              }
-              else
-                  original_box = get_bounding_box();
-            }
-            else {
-                if (!is_single_volume_or_modifier())
-                    original_box = get_bounding_box();
-                else if (transformation_type.world())
-                    original_box = get_bounding_box();
-                else if (transformation_type.instance())
-                    original_box = v.transformed_convex_hull_bounding_box(volume_data.get_volume_transform().get_matrix());
-                else {
-                    original_box = v.bounding_box();
-                    reference_box = v.bounding_box().transformed(volume_data.get_volume_transform().get_scaling_factor_matrix());
-                }
-                transformation_type.set_relative();
-            }
-
-            relative_scale = original_box.size().cwiseProduct(scale).cwiseQuotient(reference_box.size());
-        }
 
         if (m_mode == Instance) {
             if (transformation_type.instance()) {
@@ -1511,39 +1478,40 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                 Matrix3d inst_rotation, inst_scale;
                 inst_trafo.get_matrix().computeRotationScaling(&inst_rotation, &inst_scale);
                 const Transform3d offset_trafo = Geometry::translation_transform(inst_trafo.get_offset() + inst_rotation * translation);
-                const Transform3d scale_trafo = Transform3d(inst_scale) * Geometry::scale_transform(relative_scale);
+                const Transform3d scale_trafo = Transform3d(inst_scale) * Geometry::scale_transform(scale);
                 v.set_instance_transformation(Geometry::translation_transform(world_inst_pivot) * offset_trafo * Transform3d(inst_rotation) * scale_trafo * Geometry::translation_transform(-local_inst_pivot));
             }
             else
-                transform_instance_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
+                transform_instance_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(scale), m_cache.dragging_center);
         }
         else {
             if (!is_single_volume_or_modifier()) {
                 assert(transformation_type.world());
-                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
+                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(scale), m_cache.dragging_center);
             }
             else {
-              if (transformation_type.local()) {
-                  const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
-                  Matrix3d vol_rotation, vol_scale;
-                  vol_trafo.get_matrix().computeRotationScaling(&vol_rotation, &vol_scale);
-                  const Transform3d offset_trafo = Geometry::translation_transform(vol_trafo.get_offset() + vol_rotation * translation);
-                  const Transform3d scale_trafo = Transform3d(vol_scale) * Geometry::scale_transform(relative_scale);
-                  v.set_volume_transformation(offset_trafo * Transform3d(vol_rotation) * scale_trafo);
-              }
-              else {
-                  transformation_type.set_independent();
-                  transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
-              }
+                if (transformation_type.local()) {
+                    const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
+                    Matrix3d vol_rotation, vol_scale;
+                    vol_trafo.get_matrix().computeRotationScaling(&vol_rotation, &vol_scale);
+                    const Transform3d offset_trafo = Geometry::translation_transform(vol_trafo.get_offset() + vol_rotation * translation);
+                    const Transform3d scale_trafo = Transform3d(vol_scale) * Geometry::scale_transform(scale);
+                    v.set_volume_transformation(offset_trafo * Transform3d(vol_rotation) * scale_trafo);
+                }
+                else {
+                    transformation_type.set_independent();
+                    transformation_type.set_relative();
+                    transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(scale), m_cache.dragging_center);
+                }
             }
         }
     }
 
 #if !DISABLE_INSTANCES_SYNCH
     if (m_mode == Instance)
-        synchronize_unselected_instances(SyncRotationType::NONE);
+      synchronize_unselected_instances(SyncRotationType::NONE);
     else if (m_mode == Volume)
-        synchronize_unselected_volumes();
+      synchronize_unselected_volumes();
 #endif // !DISABLE_INSTANCES_SYNCH
 
     ensure_on_bed();
