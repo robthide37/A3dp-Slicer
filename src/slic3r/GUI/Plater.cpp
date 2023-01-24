@@ -702,10 +702,8 @@ void Sidebar::priv::show_preset_comboboxes()
     for (size_t i = 0; i < 4; ++i)
         sizer_presets->Show(i, !showSLA);
 
-    for (size_t i = 4; i < 8; ++i) {
-        if (sizer_presets->IsShown(i) != showSLA)
-            sizer_presets->Show(i, showSLA);
-    }
+    for (size_t i = 4; i < 8; ++i)
+        sizer_presets->Show(i, showSLA);
 
     frequently_changed_parameters->Show(!showSLA);
 
@@ -819,8 +817,11 @@ Sidebar::Sidebar(Plater *parent)
 
         auto *sizer_presets = this->p->sizer_presets;
         auto *sizer_filaments = this->p->sizer_filaments;
+        // Hide controls, which will be shown/hidden in respect to the printer technology
+        text->Show(preset_type == Preset::TYPE_PRINTER);
         sizer_presets->Add(text, 0, wxALIGN_LEFT | wxEXPAND | wxRIGHT, 4);
         if (! filament) {
+            combo_and_btn_sizer->ShowItems(preset_type == Preset::TYPE_PRINTER);
             sizer_presets->Add(combo_and_btn_sizer, 0, wxEXPAND | 
 #ifdef __WXGTK3__
                 wxRIGHT, margin_5);
@@ -835,6 +836,7 @@ Sidebar::Sidebar(Plater *parent)
                 wxBOTTOM, 1);
 #endif // __WXGTK3__
             (*combo)->set_extruder_idx(0);
+            sizer_filaments->ShowItems(false);
             sizer_presets->Add(sizer_filaments, 1, wxEXPAND);
         }
     };
@@ -1087,7 +1089,10 @@ void Sidebar::update_presets(Preset::Type preset_type)
     case Preset::TYPE_PRINTER:
     {
         update_all_preset_comboboxes();
-        p->show_preset_comboboxes();
+        // CallAfter is really needed here to correct layout of the preset comboboxes,
+        // when printer technology is changed during a project loading AND/OR switching the application mode.
+        // Otherwise, some of comboboxes are invisible 
+        CallAfter([this]() { p->show_preset_comboboxes(); });
         break;
     }
 
