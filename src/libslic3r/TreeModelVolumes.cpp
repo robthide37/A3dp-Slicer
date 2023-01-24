@@ -355,6 +355,14 @@ const Polygons& TreeModelVolumes::getCollision(const coord_t orig_radius, LayerI
     return getCollision(orig_radius, layer_idx, min_xy_dist);
 }
 
+// Get a collision area at a given layer for a radius that is a lower or equial to the key radius.
+// It is expected that the collision area is precalculated for a given layer at least for the radius zero.
+// Used for pushing tree supports away from object during the final Organic optimization step.
+std::optional<std::pair<coord_t, std::reference_wrapper<const Polygons>>> TreeModelVolumes::get_collision_lower_bound_area(LayerIndex layer_id, coord_t max_radius) const
+{
+    return m_collision_cache.get_lower_bound_area({ max_radius, layer_id });
+}
+
 // Private. Only called internally by calculateAvoidance() and calculateAvoidanceToModel(), radius is already snapped to grid.
 const Polygons& TreeModelVolumes::getCollisionHolefree(coord_t radius, LayerIndex layer_idx) const
 {
