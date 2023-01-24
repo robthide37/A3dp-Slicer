@@ -321,6 +321,12 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
             curr_point.distance *= sign;
 
             SupportPointCause potential_cause = SupportPointCause::FloatingExtrusion;
+            if (curr_point.distance > flow_width * 5.0) {
+                if (std::abs(curr_point.curvature) > 0.1)
+                    potential_cause = SupportPointCause::LongUnsupportedExtrusion;
+                else
+                    potential_cause = SupportPointCause::LongBridge;
+            }
 
             float max_bridge_len = std::max(params.support_points_interface_radius * 2.0f,
                                             params.bridge_distance /
@@ -919,6 +925,7 @@ void debug_export(const SupportPoints& support_points,const PartialObjects& obje
             case SupportPointCause::FloatingBridgeAnchor: color = {0.863281f, 0.109375f, 0.113281f}; break; //RED
             case SupportPointCause::LongBridge: color = {0.960938f, 0.90625f, 0.0625f}; break;  // YELLOW
             case SupportPointCause::FloatingExtrusion: color = {0.921875f, 0.515625f, 0.101563f}; break; // ORANGE
+            case SupportPointCause::LongUnsupportedExtrusion: color = {0.863281f, 0.109375f, 0.113281f}; break; // RED
             case SupportPointCause::SeparationFromBed: color = {0.0f, 1.0f, 0.0}; break; // GREEN
             case SupportPointCause::UnstableFloatingPart: color = {0.105469f, 0.699219f, 0.84375f}; break; // BLUE
             case SupportPointCause::WeakObjectPart: color = {0.609375f, 0.210938f, 0.621094f}; break; // PURPLE

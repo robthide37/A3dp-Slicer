@@ -1,4 +1,5 @@
 #include "Exception.hpp"
+#include "Point.hpp"
 #include "Print.hpp"
 #include "BoundingBox.hpp"
 #include "ClipperUtils.hpp"
@@ -21,9 +22,13 @@
 #include "SupportSpotsGenerator.hpp"
 #include "TriangleSelectorWrapper.hpp"
 #include "format.hpp"
+#include "libslic3r.h"
 
+#include <algorithm>
+#include <cmath>
 #include <float.h>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 #include <boost/log/trivial.hpp>
@@ -406,21 +411,6 @@ void PrintObject::ironing()
     }
 }
 
-
-/*
-std::vector<size_t> problematic_layers = SupportSpotsGenerator::quick_search(this);
-    if (!problematic_layers.empty()) {
-        std::cout << "Object needs supports" << std::endl;
-        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                L("Supportable issues found. Consider enabling supports for this object"));
-        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                L("Supportable issues found. Consider enabling supports for this object"));
-        for (size_t index = 0; index < std::min(problematic_layers.size(), size_t(4)); ++index) {
-            this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                    format(L("Layer with issues: %1%"), problematic_layers[index] + 1));
-        }
-    }
- */
 void PrintObject::generate_support_spots()
 {
     if (this->set_started(posSupportSpotsSearch)) {
@@ -434,6 +424,124 @@ void PrintObject::generate_support_spots()
             auto [supp_points, partial_objects]              = SupportSpotsGenerator::full_search(this, cancel_func, params);
             this->m_shared_regions->generated_support_points = {this->trafo_centered(), supp_points};
             m_print->throw_if_canceled();
+
+            auto check_problems = [&]() {
+                std::unordered_map<SupportSpotsGenerator::SupportPointCause, SupportSpotsGenerator::SupportPoints> sp_by_cause{};
+                for (const SupportSpotsGenerator::SupportPoint &sp : supp_points) {
+                    sp_by_cause[sp.cause].push_back(sp);
+                }
+
+                if (!sp_by_cause[SupportSpotsGenerator::SupportPointCause::SeparationFromBed].empty()) {
+                    this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
+                                                  L("Object part may break from the bed. Consider adding brim and/or supports."));
+                }
+
+                std::reverse(partial_objects.begin(), partial_objects.end());
+                std::sort(partial_objects.begin(), partial_objects.end(),
+                          [](const SupportSpotsGenerator::PartialObject &left, const SupportSpotsGenerator::PartialObject &right) {
+                              return left.volume > right.volume;
+                          });
+
+                float max_volume_part = partial_objects.front().volume;
+                for (const SupportSpotsGenerator::PartialObject &p : partial_objects) {
+                    if (p.volume > max_volume_part / 1000.0f && !p.connected_to_bed) {
+                        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                                                      L("Floating object parts detected. Please add supports."));
+                        return;
+                    }
+                }
+
+                if (!sp_by_cause[SupportSpotsGenerator::SupportPointCause::WeakObjectPart].empty()) {
+                    this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                                                  L("Thin parts of the object may break. Please add supports."));
+                    return;
+                }
+
+                if (!sp_by_cause[SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor].empty()) {
+                    Vec3f  last_pos = Vec3f::Zero();
+                    size_t count    = 0;
+                    for (const SupportSpotsGenerator::SupportPoint &sp :
+                         sp_by_cause[SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor]) {
+                        if ((sp.position - last_pos).squaredNorm() < 9.0f) {
+                            count++;
+                            last_pos = sp.position;
+                        } else {
+                            last_pos = sp.position;
+                            count    = 1;
+                        }
+                        if (count > 1) {
+                            this->active_step_add_warning(
+                                PrintStateBase::WarningLevel::CRITICAL,
+                                L("Bridges without supported endpoints will collapse. Please add supports. "));
+                            break;
+                        }
+                    }
+                }
+
+                if (!sp_by_cause[SupportSpotsGenerator::SupportPointCause::LongUnsupportedExtrusion].empty()) {
+                    Vec3f  last_pos = Vec3f::Zero();
+                    size_t count    = 0;
+                    for (const SupportSpotsGenerator::SupportPoint &sp :
+                         sp_by_cause[SupportSpotsGenerator::SupportPointCause::LongUnsupportedExtrusion]) {
+                        if ((sp.position - last_pos).squaredNorm() < 9.0f) {
+                            count++;
+                            last_pos = sp.position;
+                        } else {
+                            last_pos = sp.position;
+                            count    = 1;
+                        }
+                        if (count > 1) {
+                            this->active_step_add_warning(
+                                PrintStateBase::WarningLevel::CRITICAL,
+                                L("Long unsupported extrusions will collapse. Please add supports. "));
+                            break;
+                        }
+                    }
+                }
+
+                if (!sp_by_cause[SupportSpotsGenerator::SupportPointCause::LongBridge].empty()) {
+                    this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
+                                                  L("There are bridges longer than allowed distance. Consider adding supports. "));
+                }
+
+                if (!sp_by_cause[SupportSpotsGenerator::SupportPointCause::FloatingExtrusion].empty()) {
+                    Vec3f  last_pos      = Vec3f::Zero();
+                    size_t count         = 0;
+                    bool   small_warning = false;
+                    for (const SupportSpotsGenerator::SupportPoint &sp :
+                         sp_by_cause[SupportSpotsGenerator::SupportPointCause::FloatingExtrusion]) {
+                        if ((sp.position - last_pos).squaredNorm() <
+                            params.bridge_distance + EPSILON) {
+                            count++;
+                            last_pos = sp.position;
+                        } else {
+                            if (count > 6) {
+                                this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                                                              L("Object has large part with loose extrusions. Please enable supports. "));
+                                small_warning = false;
+                                break;
+                            }
+                            if (count > 3) {
+                                small_warning = true;
+                            }
+
+                            last_pos = sp.position;
+                            count    = 1;
+                        }
+                    }
+                    if (small_warning) {
+                        this->active_step_add_warning(
+                            PrintStateBase::WarningLevel::NON_CRITICAL,
+                            L("Object has parts with loose extrusions and may look bad. Consider enabling supports. "));
+                    } else if (sp_by_cause[SupportSpotsGenerator::SupportPointCause::FloatingExtrusion].size() > max_volume_part / 100) {
+                        this->active_step_add_warning(
+                            PrintStateBase::WarningLevel::NON_CRITICAL,
+                            L("There are many loose surface extrusions on this object. Consider enabling supports. "));
+                    }
+                }
+            };
+
+            check_problems();
         }
         BOOST_LOG_TRIVIAL(debug) << "Searching support spots - end";
         this->set_done(posSupportSpotsSearch);

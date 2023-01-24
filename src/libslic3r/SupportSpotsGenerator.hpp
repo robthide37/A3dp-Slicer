@@ -32,8 +32,8 @@ struct Params
 
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
     const float bridge_distance = 12.0f; // mm
-    const float max_acceleration; // mm/s^2 ; max acceleration of object (bed) in XY (NOTE: The max hit is received by the object in the
-                                  // jerk phase, so the usual machine limits are too low)
+    const float max_acceleration; // mm/s^2 ; max acceleration of object in XY -- should be applicable only to printers with bed slinger, 
+                                  // however we do not have such info yet. The force is usually small anyway, so not such a big deal to include it everytime
     const int raft_layers_count;
     std::string filament_type;
 
@@ -74,9 +74,10 @@ struct Params
 };
 
 enum class SupportPointCause { 
-    LongBridge, // point generated on bridge extrusion longer than the allowed length 
+    LongBridge, // point generated on bridge and straight perimeter extrusion longer than the allowed length 
     FloatingBridgeAnchor, // point generated on unsupported bridge endpoint
     FloatingExtrusion, // point generated on extrusion that does not hold on its own
+    LongUnsupportedExtrusion, // similar to above, but with large distance to object. This really needs supports.
     SeparationFromBed, // point generated for object parts that are connected to the bed, but the area is too small and there is a risk of separation (brim may help)
     UnstableFloatingPart, // point generated for object parts not connected to the bed, holded only by the other support points (brim will not help here)
     WeakObjectPart // point generated when some part of the object is too weak to hold the upper part and may break (imagine hourglass)
