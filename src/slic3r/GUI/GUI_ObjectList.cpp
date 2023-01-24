@@ -2628,6 +2628,9 @@ void ObjectList::delete_all_connectors_for_object(int obj_idx)
 
 bool ObjectList::can_merge_to_multipart_object() const
 {
+    if (has_selected_cut_object())
+        return false;
+
     wxDataViewItemArray sels;
     GetSelections(sels);
     if (sels.IsEmpty())
