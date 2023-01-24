@@ -972,7 +972,7 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
                 transform_instance_relative(v, volume_data, transformation_type, Geometry::translation_transform(displacement), m_cache.dragging_center);
         }
         else {
-            if (transformation_type.local()) {
+            if (transformation_type.local() && transformation_type.absolute()) {
                 const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
                 const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
                 v.set_volume_offset(vol_trafo.get_offset() + inst_trafo.get_scaling_factor_matrix().inverse() * vol_trafo.get_rotation_matrix() * displacement);
@@ -1074,7 +1074,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
             }
             else {
-                if (transformation_type.local()) {
+                if (transformation_type.local() && transformation_type.absolute()) {
                     const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
                     Matrix3d vol_rotation, vol_scale;
                     vol_trafo.get_matrix().computeRotationScaling(&vol_rotation, &vol_scale);
@@ -1490,7 +1490,7 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                 transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(scale), m_cache.dragging_center);
             }
             else {
-                if (transformation_type.local()) {
+                if (transformation_type.local() && transformation_type.absolute()) {
                     const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
                     Matrix3d vol_rotation, vol_scale;
                     vol_trafo.get_matrix().computeRotationScaling(&vol_rotation, &vol_scale);
@@ -3266,6 +3266,8 @@ void Selection::transform_volume_relative(GLVolume& volume, const VolumeCache& v
         const Transform3d trafo = Geometry::translation_transform(inst_pivot) * transform * Geometry::translation_transform(-inst_pivot);
         volume.set_volume_transformation(trafo * vol_trafo.get_matrix());
     }
+    else if (transformation_type.local())
+        volume.set_volume_transformation(vol_trafo.get_matrix() * transform);
     else
         assert(false);
 }
