@@ -4145,6 +4145,7 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     std::string dist_key = "min_object_distance";
     std::string dist_bed_key = "min_bed_distance";
     std::string rot_key = "enable_rotation";
+    std::string align_key = "alignment";
     std::string postfix;
 
     if (ptech == ptSLA) {
@@ -4163,6 +4164,7 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     dist_key += postfix;
     dist_bed_key += postfix;
     rot_key += postfix;
+    align_key += postfix;
 
     imgui->text(GUI::format_wxstr(_L("Press %1%left mouse button to enter the exact value"), shortkey_ctrl_prefix()));
 
@@ -4183,6 +4185,12 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     if (imgui->checkbox(_L("Enable rotations (slow)"), settings.enable_rotation)) {
         settings_out.enable_rotation = settings.enable_rotation;
         appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation? "1" : "0");
+        settings_changed = true;
+    }
+
+    if (imgui->combo(_("Alignment"), {"Center", "Top left", "Bottom left", "Bottom right", "Top right", "Random"}, settings.alignment)) {
+        settings_out.alignment = settings.alignment;
+        appcfg->set("arrange", align_key.c_str(), std::to_string(settings_out.alignment));
         settings_changed = true;
     }
 

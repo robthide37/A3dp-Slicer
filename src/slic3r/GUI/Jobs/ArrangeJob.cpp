@@ -298,6 +298,21 @@ arrangement::ArrangeParams get_arrange_params(Plater *p)
     params.min_obj_distance = scaled(settings.distance);
     params.min_bed_distance = scaled(settings.distance_from_bed);
 
+    arrangement::Pivots pivot = arrangement::Pivots::Center;
+
+    int pivot_max = static_cast<int>(arrangement::Pivots::TopRight);
+    if (settings.alignment > pivot_max) {
+        // means it should be random
+        std::random_device rd{};
+        std::mt19937 rng(rd());
+        std::uniform_int_distribution<std::mt19937::result_type> dist(0, pivot_max);
+        pivot = static_cast<arrangement::Pivots>(dist(rng));
+    } else {
+        pivot = static_cast<arrangement::Pivots>(settings.alignment);
+    }
+
+    params.alignment = pivot;
+
     return params;
 }
 

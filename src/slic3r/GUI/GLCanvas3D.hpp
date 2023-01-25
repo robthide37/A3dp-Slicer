@@ -463,6 +463,7 @@ public:
 //        float distance_sla       = 6.;
         float accuracy           = 0.65f; // Unused currently
         bool  enable_rotation    = false;
+        int   alignment          = 0;
     };
 
 private:

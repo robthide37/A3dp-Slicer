@@ -75,6 +75,10 @@ struct ArrangePolygon {
 
 using ArrangePolygons = std::vector<ArrangePolygon>;
 
+enum class Pivots {
+    Center, TopLeft, BottomLeft, BottomRight, TopRight
+};
+
 struct ArrangeParams {
 
     /// The minimum distance which is allowed for any 
@@ -92,6 +96,12 @@ struct ArrangeParams {
     bool parallel = true;
 
     bool allow_rotations = false;
+
+    /// Final alignment of the merged pile after arrangement
+    Pivots alignment = Pivots::Center;
+
+    /// Starting position hint for the arrangement
+    Pivots starting_point = Pivots::Center;
 
     /// Progress indicator callback called when an object gets packed. 
     /// The unsigned argument is the number of items remaining to pack.
