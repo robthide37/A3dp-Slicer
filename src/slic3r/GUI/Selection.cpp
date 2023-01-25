@@ -2889,6 +2889,225 @@ static void verify_instances_rotation_synchronized(const Model &model, const GLV
 }
 #endif /* NDEBUG */
 
+#if ENABLE_WORLD_COORDINATE
+#define NO_TEST 0
+#define TEST_1 1
+#define TEST_2 2
+#define TEST_3 3
+#define USE_ALGORITHM TEST_3
+
+#if USE_ALGORITHM == TEST_1
+void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_type)
+{
+    std::set<unsigned int> done;  // prevent processing volumes twice
+    done.insert(m_list.begin(), m_list.end());
+
+    for (unsigned int i : m_list) {
+        if (done.size() == m_volumes->size())
+            break;
+
+        const GLVolume& volume_i = *(*m_volumes)[i];
+        if (volume_i.is_wipe_tower)
+            continue;
+
+        const Geometry::Transformation& trafo_inst_i = volume_i.get_instance_transformation();
+        const Vec3d offset_i = trafo_inst_i.get_offset();
+        const double rotation_z_i = trafo_inst_i.get_rotation().z();
+
+        // Process unselected instances.
+        for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
+            if (done.size() == m_volumes->size())
+                break;
+
+            if (done.find(j) != done.end())
+                continue;
+
+            GLVolume& volume_j = *(*m_volumes)[j];
+            if (volume_j.object_idx() != volume_i.object_idx() || volume_j.instance_idx() == volume_i.instance_idx())
+                continue;
+
+            const Geometry::Transformation& trafo_inst_j = m_cache.volumes_data[j].get_instance_transform();
+            const Vec3d offset_j = trafo_inst_j.get_offset();
+            const double rotation_z_j = trafo_inst_j.get_rotation().z();
+            const double diff_rotation_z = rotation_z_j - rotation_z_i;
+
+            const Transform3d new_matrix_inst_j = Geometry::translation_transform(offset_j) * Geometry::rotation_transform(diff_rotation_z * Vec3d::UnitZ()) *
+                Geometry::translation_transform(-offset_i) * trafo_inst_i.get_matrix();
+
+            volume_j.set_instance_transformation(Geometry::Transformation(new_matrix_inst_j));
+            done.insert(j);
+        }
+    }
+
+//#ifndef NDEBUG
+//    verify_instances_rotation_synchronized(*m_model, *m_volumes);
+//#endif /* NDEBUG */
+}
+#elif USE_ALGORITHM == TEST_2
+void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_type)
+{
+    auto fix_rotation = [](const Vec3d& rotation) {
+        const bool x = std::abs(std::abs(rotation.x()) - (double)PI) < EPSILON;
+        const bool y = std::abs(std::abs(rotation.y()) - (double)PI) < EPSILON;
+        const bool z = std::abs(std::abs(rotation.z()) - (double)PI) < EPSILON;
+
+        Vec3d ret = rotation;
+        if ((x && y) || (x && z) || (y && z)) {
+            ret += (double)PI * Vec3d::Ones();
+            if (ret.x() >= 2.0f * (double)PI) ret.x() -= 2.0f * (double)PI;
+            if (ret.y() >= 2.0f * (double)PI) ret.y() -= 2.0f * (double)PI;
+            if (ret.z() >= 2.0f * (double)PI) ret.z() -= 2.0f * (double)PI;
+        }
+
+        return ret;
+    };
+
+    std::set<unsigned int> done;  // prevent processing volumes twice
+    done.insert(m_list.begin(), m_list.end());
+
+    for (unsigned int i : m_list) {
+        if (done.size() == m_volumes->size())
+            break;
+
+        const GLVolume& volume_i = *(*m_volumes)[i];
+        if (volume_i.is_wipe_tower)
+            continue;
+
+        const Geometry::Transformation& trafo_inst_i = volume_i.get_instance_transformation();
+        const Vec3d offset_i = trafo_inst_i.get_offset();
+        const double rotation_z_i = fix_rotation(trafo_inst_i.get_rotation()).z();
+
+        // Process unselected instances.
+        for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
+            if (done.size() == m_volumes->size())
+                break;
+
+            if (done.find(j) != done.end())
+                continue;
+
+            GLVolume& volume_j = *(*m_volumes)[j];
+            if (volume_j.object_idx() != volume_i.object_idx() || volume_j.instance_idx() == volume_i.instance_idx())
+                continue;
+
+            const Geometry::Transformation& trafo_inst_j = m_cache.volumes_data[j].get_instance_transform();
+            const Vec3d offset_j = trafo_inst_j.get_offset();
+            const double rotation_z_j = fix_rotation(trafo_inst_j.get_rotation()).z();
+            const double diff_rotation_z = rotation_z_j - rotation_z_i;
+
+            const Transform3d new_matrix_inst_j = Geometry::translation_transform(offset_j) * Geometry::rotation_transform(diff_rotation_z * Vec3d::UnitZ()) *
+                Geometry::translation_transform(-offset_i) * trafo_inst_i.get_matrix();
+
+            volume_j.set_instance_transformation(Geometry::Transformation(new_matrix_inst_j));
+            done.insert(j);
+        }
+    }
+
+//#ifndef NDEBUG
+//    verify_instances_rotation_synchronized(*m_model, *m_volumes);
+//#endif /* NDEBUG */
+}
+#elif USE_ALGORITHM == TEST_3
+#define APPLY_FIX_ROTATION 1
+#define APPLY_FIX_ROTATION_2 2 && APPLY_FIX_ROTATION
+void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_type)
+{
+#if APPLY_FIX_ROTATION
+    auto fix_rotation = [](const Vec3d& rotation) {
+        const bool x = std::abs(std::abs(rotation.x()) - (double)PI) < EPSILON;
+        const bool y = std::abs(std::abs(rotation.y()) - (double)PI) < EPSILON;
+        const bool z = std::abs(std::abs(rotation.z()) - (double)PI) < EPSILON;
+
+        Vec3d ret = rotation;
+        if ((x && y) || (x && z) || (y && z)) {
+            ret += (double)PI * Vec3d::Ones();
+            if (ret.x() >= 2.0f * (double)PI) ret.x() -= 2.0f * (double)PI;
+            if (ret.y() >= 2.0f * (double)PI) ret.y() -= 2.0f * (double)PI;
+            if (ret.z() >= 2.0f * (double)PI) ret.z() -= 2.0f * (double)PI;
+        }
+
+        return ret;
+    };
+
+#if APPLY_FIX_ROTATION_2
+    auto fix_rotation_2 = [](const Vec3d& rotation) {
+        Vec3d ret = rotation;
+        if (0.5 * (double)PI <= rotation.y() && rotation.y() <= 1.5 * (double)PI)
+            ret.y() = 2.0 * (double)PI - ret.y();
+        return ret;
+    };
+#endif // APPLY_FIX_ROTATION_2
+#endif // APPLY_FIX_ROTATION
+
+    std::set<unsigned int> done;  // prevent processing volumes twice
+    done.insert(m_list.begin(), m_list.end());
+
+    for (unsigned int i : m_list) {
+        if (done.size() == m_volumes->size())
+            break;
+
+        const GLVolume& volume_i = *(*m_volumes)[i];
+        if (volume_i.is_wipe_tower)
+            continue;
+
+        const Geometry::Transformation& cached_trafo_inst_i = m_cache.volumes_data[i].get_instance_transform();
+        const Geometry::Transformation& trafo_inst_i = volume_i.get_instance_transformation();
+        Geometry::Transformation trafo_i = Geometry::Transformation(trafo_inst_i.get_matrix() * cached_trafo_inst_i.get_matrix().inverse());
+
+        Matrix3d rotation_comp_i;
+        Matrix3d scale_comp_i;
+        trafo_i.get_matrix().computeRotationScaling(&rotation_comp_i, &scale_comp_i);
+#if APPLY_FIX_ROTATION
+#if APPLY_FIX_ROTATION_2
+        const Vec3d rotation_i = fix_rotation_2(fix_rotation(Geometry::extract_rotation(Transform3d(rotation_comp_i))));
+#else
+        const Vec3d rotation_i = fix_rotation(Geometry::extract_rotation(Transform3d(rotation_comp_i)));
+#endif // APPLY_FIX_ROTATION_2
+#else
+        const Vec3d rotation_i = Geometry::extract_rotation(Transform3d(rotation_comp_i));
+#endif // APPLY_FIX_ROTATION
+
+        std::cout << "rotation_i: " << to_string(rotation_i);
+
+        const Vec3d rotation_no_z_i(rotation_i.x(), rotation_i.y(), 0.0);
+
+        trafo_i = Geometry::Transformation(Geometry::rotation_transform(rotation_no_z_i) * Transform3d(scale_comp_i));
+
+        // Process unselected instances.
+        for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
+            if (done.size() == m_volumes->size())
+                break;
+
+            if (done.find(j) != done.end())
+                continue;
+
+            GLVolume& volume_j = *(*m_volumes)[j];
+            if (volume_j.object_idx() != volume_i.object_idx() || volume_j.instance_idx() == volume_i.instance_idx())
+                continue;
+
+            const Geometry::Transformation& cached_trafo_inst_j = m_cache.volumes_data[j].get_instance_transform();
+#if APPLY_FIX_ROTATION
+            const Vec3d rotation_cached_trafo_inst_j = fix_rotation(cached_trafo_inst_j.get_rotation());
+#else
+            const Vec3d rotation_cached_trafo_inst_j = cached_trafo_inst_j.get_rotation();
+#endif // APPLY_FIX_ROTATION
+
+            std::cout << " - rotation_cached_trafo_inst_j: " << to_string(rotation_cached_trafo_inst_j) << "\n";
+
+            const Transform3d rotation_z_cached_trafo_inst_j = Geometry::rotation_transform({ 0.0, 0.0, rotation_cached_trafo_inst_j.z() });
+
+            const Transform3d new_matrix_inst_j = cached_trafo_inst_j.get_offset_matrix() * rotation_z_cached_trafo_inst_j * trafo_i.get_matrix() *
+                rotation_z_cached_trafo_inst_j.inverse() * cached_trafo_inst_j.get_matrix_no_offset();
+
+            volume_j.set_instance_transformation(Geometry::Transformation(new_matrix_inst_j));
+            done.insert(j);
+        }
+    }
+
+//#ifndef NDEBUG
+//    verify_instances_rotation_synchronized(*m_model, *m_volumes);
+//#endif /* NDEBUG */
+}
+#else
 void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_type)
 {
     std::set<unsigned int> done;  // prevent processing volumes twice
@@ -2904,17 +3123,11 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
 
         const int object_idx = volume_i->object_idx();
         const int instance_idx = volume_i->instance_idx();
-#if ENABLE_WORLD_COORDINATE
         const Geometry::Transformation& curr_inst_trafo_i = volume_i->get_instance_transformation();
         const Vec3d curr_inst_rotation_i = curr_inst_trafo_i.get_rotation();
         const Vec3d& curr_inst_scaling_factor_i = curr_inst_trafo_i.get_scaling_factor();
         const Vec3d& curr_inst_mirror_i = curr_inst_trafo_i.get_mirror();
         const Vec3d old_inst_rotation_i = m_cache.volumes_data[i].get_instance_transform().get_rotation();
-#else
-        const Vec3d& rotation = volume_i->get_instance_rotation();
-        const Vec3d& scaling_factor = volume_i->get_instance_scaling_factor();
-        const Vec3d& mirror = volume_i->get_instance_mirror();
-#endif // ENABLE_WORLD_COORDINATE
 
         // Process unselected instances.
         for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
@@ -2928,44 +3141,28 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
             if (volume_j->object_idx() != object_idx || volume_j->instance_idx() == instance_idx)
                 continue;
 
-#if ENABLE_WORLD_COORDINATE
             const Vec3d old_inst_rotation_j = m_cache.volumes_data[j].get_instance_transform().get_rotation();
             assert(is_rotation_xy_synchronized(old_inst_rotation_i, old_inst_rotation_j));
             const Geometry::Transformation& curr_inst_trafo_j = volume_j->get_instance_transformation();
             const Vec3d curr_inst_rotation_j = curr_inst_trafo_j.get_rotation();
             Vec3d new_inst_offset_j = curr_inst_trafo_j.get_offset();
             Vec3d new_inst_rotation_j = curr_inst_rotation_j;
-#else
-            assert(is_rotation_xy_synchronized(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation()));
-#endif // ENABLE_WORLD_COORDINATE
 
             switch (sync_rotation_type) {
             case SyncRotationType::NONE: {
                 // z only rotation -> synch instance z
                 // The X,Y rotations should be synchronized from start to end of the rotation.
-#if ENABLE_WORLD_COORDINATE
                 assert(is_rotation_xy_synchronized(curr_inst_rotation_i, curr_inst_rotation_j));
                 if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
                     new_inst_offset_j.z() = curr_inst_trafo_i.get_offset().z();
-#else
-                assert(is_rotation_xy_synchronized(rotation, volume_j->get_instance_rotation()));
-                if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
-                    volume_j->set_instance_offset(Z, volume_i->get_instance_offset().z());
-#endif // ENABLE_WORLD_COORDINATE
                 break;
             }
             case SyncRotationType::GENERAL: {
                 // generic rotation -> update instance z with the delta of the rotation.
-#if ENABLE_WORLD_COORDINATE
                 const double z_diff = Geometry::rotation_diff_z(old_inst_rotation_i, old_inst_rotation_j);
                 new_inst_rotation_j = curr_inst_rotation_i + z_diff * Vec3d::UnitZ();
-#else
-                const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation());
-                volume_j->set_instance_rotation({ rotation.x(), rotation.y(), rotation.z() + z_diff });
-#endif // ENABLE_WORLD_COORDINATE
                 break;
             }
-#if ENABLE_WORLD_COORDINATE
             case SyncRotationType::FULL: {
                 // generic rotation -> update instance z with the delta of the rotation.
                 const Eigen::AngleAxisd angle_axis(Geometry::rotation_xyz_diff(curr_inst_rotation_i, old_inst_rotation_j));
@@ -2976,16 +3173,10 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
                 new_inst_rotation_j = curr_inst_rotation_i + z_diff * Vec3d::UnitZ();
                 break;
             }
-#endif // ENABLE_WORLD_COORDINATE
             }
 
-#if ENABLE_WORLD_COORDINATE
             volume_j->set_instance_transformation(Geometry::assemble_transform(new_inst_offset_j, new_inst_rotation_j,
                 curr_inst_scaling_factor_i, curr_inst_mirror_i));
-#else
-            volume_j->set_instance_scaling_factor(scaling_factor);
-            volume_j->set_instance_mirror(mirror);
-#endif // ENABLE_WORLD_COORDINATE
 
             done.insert(j);
         }
@@ -2995,6 +3186,70 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
     verify_instances_rotation_synchronized(*m_model, *m_volumes);
 #endif /* NDEBUG */
 }
+#endif // USE_ALGORITHM
+#else
+void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_type)
+{
+    std::set<unsigned int> done;  // prevent processing volumes twice
+    done.insert(m_list.begin(), m_list.end());
+
+    for (unsigned int i : m_list) {
+        if (done.size() == m_volumes->size())
+            break;
+
+        const GLVolume* volume_i = (*m_volumes)[i];
+        if (volume_i->is_wipe_tower)
+            continue;
+
+        const int object_idx = volume_i->object_idx();
+        const int instance_idx = volume_i->instance_idx();
+        const Vec3d& rotation = volume_i->get_instance_rotation();
+        const Vec3d& scaling_factor = volume_i->get_instance_scaling_factor();
+        const Vec3d& mirror = volume_i->get_instance_mirror();
+
+        // Process unselected instances.
+        for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
+            if (done.size() == m_volumes->size())
+                break;
+
+            if (done.find(j) != done.end())
+                continue;
+
+            GLVolume* volume_j = (*m_volumes)[j];
+            if (volume_j->object_idx() != object_idx || volume_j->instance_idx() == instance_idx)
+                continue;
+
+            assert(is_rotation_xy_synchronized(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation()));
+
+            switch (sync_rotation_type) {
+            case SyncRotationType::NONE: {
+                // z only rotation -> synch instance z
+                // The X,Y rotations should be synchronized from start to end of the rotation.
+                assert(is_rotation_xy_synchronized(rotation, volume_j->get_instance_rotation()));
+                if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
+                    volume_j->set_instance_offset(Z, volume_i->get_instance_offset().z());
+                break;
+            }
+            case SyncRotationType::GENERAL: {
+                // generic rotation -> update instance z with the delta of the rotation.
+                const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation());
+                volume_j->set_instance_rotation({ rotation.x(), rotation.y(), rotation.z() + z_diff });
+                break;
+            }
+            }
+
+            volume_j->set_instance_scaling_factor(scaling_factor);
+            volume_j->set_instance_mirror(mirror);
+
+            done.insert(j);
+        }
+    }
+
+#ifndef NDEBUG
+    verify_instances_rotation_synchronized(*m_model, *m_volumes);
+#endif /* NDEBUG */
+}
+#endif // ENABLE_WORLD_COORDINATE
 
 void Selection::synchronize_unselected_volumes()
 {
