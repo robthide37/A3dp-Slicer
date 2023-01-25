@@ -201,7 +201,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
                     new_points.push_back(ExtendedPoint{pos, float(p_dist + boundary_offset), p_near_l});
                 }
             }
-            new_points.push_back(new_points.back());
+            new_points.push_back(points.back());
         }
         points = new_points;
     }

@@ -77,7 +77,6 @@ enum class SupportPointCause {
     LongBridge, // point generated on bridge and straight perimeter extrusion longer than the allowed length 
     FloatingBridgeAnchor, // point generated on unsupported bridge endpoint
     FloatingExtrusion, // point generated on extrusion that does not hold on its own
-    LongUnsupportedExtrusion, // similar to above, but with large distance to object. This really needs supports.
     SeparationFromBed, // point generated for object parts that are connected to the bed, but the area is too small and there is a risk of separation (brim may help)
     UnstableFloatingPart, // point generated for object parts not connected to the bed, holded only by the other support points (brim will not help here)
     WeakObjectPart // point generated when some part of the object is too weak to hold the upper part and may break (imagine hourglass)
@@ -143,10 +142,13 @@ using PartialObjects = std::vector<PartialObject>;
 
 std::tuple<SupportPoints, PartialObjects> full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params);
 
-void estimate_supports_malformations(std::vector<SupportLayer*> &layers, float supports_flow_width, const Params &params);
-void estimate_malformations(std::vector<Layer*> &layers, const Params &params);
+void estimate_supports_malformations(std::vector<SupportLayer *> &layers, float supports_flow_width, const Params &params);
+void estimate_malformations(std::vector<Layer *> &layers, const Params &params);
 
-} // namespace SupportSpotsGenerator
-}
+void raise_alerts_for_issues(const SupportPoints                                                 &support_points,
+                             PartialObjects                                                      &partial_objects,
+                             std::function<void(PrintStateBase::WarningLevel, SupportPointCause)> alert_fn);
+
+}} // namespace Slic3r::SupportSpotsGenerator
 
 #endif /* SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_ */

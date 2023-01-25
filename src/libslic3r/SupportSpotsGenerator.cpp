@@ -37,7 +37,7 @@
 #include "Geometry/ConvexHull.hpp"
 
 // #define DETAILED_DEBUG_LOGS
-// #define DEBUG_FILES
+#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -313,19 +313,16 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                                    curr_point.position.cast<float>(), line_len, entity};
 
             const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
-                                                        prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
-                                                        ExtrusionLine{};
+                                                              prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
+                                                              ExtrusionLine{};
 
             // correctify the distance sign using slice polygons
             float sign = (prev_layer_boundary.distance_from_lines<true>(curr_point.position) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
             curr_point.distance *= sign;
 
             SupportPointCause potential_cause = SupportPointCause::FloatingExtrusion;
-            if (curr_point.distance > flow_width * 5.0) {
-                if (std::abs(curr_point.curvature) > 0.1)
-                    potential_cause = SupportPointCause::LongUnsupportedExtrusion;
-                else
-                    potential_cause = SupportPointCause::LongBridge;
+            if (bridged_distance + line_len > params.bridge_distance * 0.8 && std::abs(curr_point.curvature) < 0.1) {
+                potential_cause = SupportPointCause::FloatingExtrusion;
             }
 
             float max_bridge_len = std::max(params.support_points_interface_radius * 2.0f,
@@ -337,6 +334,14 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                 line_out.form_quality = 0.8f;
                 bridged_distance += line_len;
                 if (bridged_distance > max_bridge_len) {
+                    std::cout << "Problem found A: " << std::endl;
+                    std::cout << "bridged_distance: " << bridged_distance << std::endl;
+                    std::cout << "max_bridge_len: " << max_bridge_len << std::endl;
+                    std::cout << "line_out.form_quality: " << line_out.form_quality << std::endl;
+                    std::cout << "curr_point.distance: " << curr_point.distance << std::endl;
+                    std::cout << "curr_point.curvature: " << curr_point.curvature << std::endl;
+                    std::cout << "flow_width: " << flow_width << std::endl;
+
                     line_out.support_point_generated = potential_cause;
                     bridged_distance                 = 0.0f;
                 }
@@ -344,6 +349,14 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                 bridged_distance += line_len;
                 line_out.form_quality = nearest_prev_layer_line.form_quality - 0.3f;
                 if (line_out.form_quality < 0 && bridged_distance > max_bridge_len) {
+                    std::cout << "Problem found B: " << std::endl;
+                    std::cout << "bridged_distance: " << bridged_distance << std::endl;
+                    std::cout << "max_bridge_len: " << max_bridge_len << std::endl;
+                    std::cout << "line_out.form_quality: " << line_out.form_quality << std::endl;
+                    std::cout << "curr_point.distance: " << curr_point.distance << std::endl;
+                    std::cout << "curr_point.curvature: " << curr_point.curvature << std::endl;
+                    std::cout << "flow_width: " << flow_width << std::endl;
+
                     line_out.support_point_generated = potential_cause;
                     line_out.form_quality            = 0.5f;
                     bridged_distance                 = 0.0f;
@@ -557,7 +570,7 @@ public:
                                       params.material_yield_strength;
 
             float conn_weight_arm    = (conn_centroid.head<2>() - mass_centroid.head<2>()).norm();
-            float conn_weight_torque = conn_weight_arm * weight * (1.0f - conn_centroid.z() / layer_z);
+            float conn_weight_torque = conn_weight_arm * weight * (1.0f - conn_centroid.z() / layer_z) * (1.0f - conn_centroid.z() / layer_z);
 
             float conn_movement_arm    = std::max(0.0f, mass_centroid.z() - conn_centroid.z());
             float conn_movement_torque = movement_force * conn_movement_arm;
@@ -925,7 +938,6 @@ void debug_export(const SupportPoints& support_points,const PartialObjects& obje
             case SupportPointCause::FloatingBridgeAnchor: color = {0.863281f, 0.109375f, 0.113281f}; break; //RED
             case SupportPointCause::LongBridge: color = {0.960938f, 0.90625f, 0.0625f}; break;  // YELLOW
             case SupportPointCause::FloatingExtrusion: color = {0.921875f, 0.515625f, 0.101563f}; break; // ORANGE
-            case SupportPointCause::LongUnsupportedExtrusion: color = {0.863281f, 0.109375f, 0.113281f}; break; // RED
             case SupportPointCause::SeparationFromBed: color = {0.0f, 1.0f, 0.0}; break; // GREEN
             case SupportPointCause::UnstableFloatingPart: color = {0.105469f, 0.699219f, 0.84375f}; break; // BLUE
             case SupportPointCause::WeakObjectPart: color = {0.609375f, 0.210938f, 0.621094f}; break; // PURPLE
@@ -1102,6 +1114,85 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
     fclose(debug_file);
     fclose(full_file);
 #endif
+}
+
+void raise_alerts_for_issues(const SupportPoints                                                 &support_points,
+                             PartialObjects                                                      &partial_objects,
+                             std::function<void(PrintStateBase::WarningLevel, SupportPointCause)> alert_fn)
+{
+    for (const SupportPoint &sp : support_points) {
+        if (sp.cause == SupportPointCause::SeparationFromBed) {
+                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::SeparationFromBed);
+                break;
+        }
+    }
+
+    std::reverse(partial_objects.begin(), partial_objects.end());
+    std::sort(partial_objects.begin(), partial_objects.end(),
+              [](const PartialObject &left, const PartialObject &right) { return left.volume > right.volume; });
+
+    float max_volume_part = partial_objects.front().volume;
+    for (const PartialObject &p : partial_objects) {
+        if (p.volume > max_volume_part / 500.0f && !p.connected_to_bed) {
+                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::UnstableFloatingPart);
+                return;
+        }
+    }
+
+    for (const SupportPoint &sp : support_points) {
+        if (sp.cause == SupportPointCause::UnstableFloatingPart) {
+                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::UnstableFloatingPart);
+                return;
+        }
+    }
+
+    for (const SupportPoint &sp : support_points) {
+        if (sp.cause == SupportPointCause::WeakObjectPart) {
+                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::WeakObjectPart);
+                return;
+        }
+    }
+
+    std::vector<SupportPoint> ext_supp_points{};
+    ext_supp_points.reserve(support_points.size());
+    for (const SupportPoint &sp : support_points) {
+        switch (sp.cause) {
+        case SupportPointCause::FloatingBridgeAnchor:
+        case SupportPointCause::FloatingExtrusion: ext_supp_points.push_back(sp); break;
+        default: break;
+        }
+    }
+
+    auto coord_fn = [&ext_supp_points](size_t idx, size_t dim) { return ext_supp_points[idx].position[dim]; };
+    KDTreeIndirect<3, float, decltype(coord_fn)> ext_points_tree{coord_fn, ext_supp_points.size()};
+    for (const SupportPoint &sp : ext_supp_points) {
+        auto cluster         = find_nearby_points(ext_points_tree, sp.position, 3.0);
+        int  score           = 0;
+        bool floating_bridge = false;
+        for (size_t idx : cluster) {
+                score += ext_supp_points[idx].cause == SupportPointCause::FloatingBridgeAnchor ? 3 : 1;
+                floating_bridge = floating_bridge || ext_supp_points[idx].cause == SupportPointCause::FloatingBridgeAnchor;
+        }
+        if (score > 5) {
+                if (floating_bridge) {
+                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::FloatingBridgeAnchor);
+                } else {
+                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::FloatingExtrusion);
+                }
+                return;
+        }
+    }
+
+    if (ext_supp_points.size() > 5) {
+        alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::FloatingExtrusion);
+    }
+
+    for (const SupportPoint &sp : support_points) {
+        if (sp.cause == SupportPointCause::LongBridge) {
+                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::LongBridge);
+                return;
+        }
+    }
 }
 
 } // namespace SupportSpotsGenerator
