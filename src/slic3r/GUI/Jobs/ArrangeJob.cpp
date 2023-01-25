@@ -14,6 +14,7 @@
 #include "libnest2d/common.hpp"
 
 #include <numeric>
+#include <random>
 
 namespace Slic3r { namespace GUI {
 
