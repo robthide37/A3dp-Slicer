@@ -470,8 +470,7 @@ public:
     Transform3d get_mirror_matrix() const;
 
     bool is_left_handed() const {
-        const Vec3d mirror = get_mirror();
-        return mirror.x() * mirror.y() * mirror.z() < 0.0;
+        return m_matrix.affine().determinant() < 0;
     }
 #else
     bool is_scaling_uniform() const { return std::abs(m_scaling_factor.x() - m_scaling_factor.y()) < 1e-8 && std::abs(m_scaling_factor.x() - m_scaling_factor.z()) < 1e-8; }

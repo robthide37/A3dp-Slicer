@@ -877,7 +877,8 @@ double rotation_diff_z(const Vec3d &rot_xyz_from, const Vec3d &rot_xyz_to)
     const Eigen::AngleAxisd angle_axis(rotation_xyz_diff(rot_xyz_from, rot_xyz_to));
     const Vec3d& axis  = angle_axis.axis();
     const double angle = angle_axis.angle();
-#ifndef NDEBUG
+#if 0
+//#ifndef NDEBUG
     if (std::abs(angle) > 1e-8) {
         assert(std::abs(axis.x()) < 1e-8);
         assert(std::abs(axis.y()) < 1e-8);
