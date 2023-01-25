@@ -1751,7 +1751,7 @@ PageBuildVolume::PageBuildVolume(ConfigWizard* parent)
     : ConfigWizardPage(parent, _L("Build Volume"), _L("Build Volume"), 1)
     , build_volume(new DiamTextCtrl(this))
 {
-    append_text(_L("Set verctical size of your printer."));
+    append_text(_L("Set vertical size of your printer."));
 
     wxString value = "200";
     build_volume->SetValue(value);
