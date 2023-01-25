@@ -11,6 +11,7 @@
 #include "PrincipalComponents2D.hpp"
 #include "Print.hpp"
 #include "PrintBase.hpp"
+#include "PrintConfig.hpp"
 #include "Tesselate.hpp"
 #include "libslic3r.h"
 #include "tbb/parallel_for.h"
@@ -598,10 +599,11 @@ public:
 };
 
 // return new object part and actual area covered by extrusions
-std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &slice, const Layer *layer, const Params& params)
+std::tuple<ObjectPart, float> build_object_part_from_slice(const size_t &slice_idx, const Layer *layer, const Params& params)
 {
     ObjectPart new_object_part;
     float      area_covered_by_extrusions = 0;
+    const LayerSlice& slice = layer->lslices_ex.at(slice_idx);
 
     auto add_extrusions_to_object = [&new_object_part, &area_covered_by_extrusions, &params](const ExtrusionEntity *e,
                                                                                              const LayerRegion     *region) {
@@ -656,6 +658,49 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &sli
         }
         for (const auto &thin_fill_idx : island.thin_fills) {
             add_extrusions_to_object(perimeter_region->thin_fills().entities[thin_fill_idx], perimeter_region);
+        }
+    }
+
+    //  BRIM HANDLING
+    if (layer->id() == params.raft_layers_count && params.raft_layers_count == 0 && params.brim_type != BrimType::btNoBrim) {
+        // TODO: The algorithm here should take into account that multiple slices may have coliding Brim areas and the final brim area is
+        // smaller,
+        //  thus has lower adhesion. For now this effect will be neglected.
+        ExPolygon  slice_poly = layer->lslices[slice_idx];
+        ExPolygons brim;
+        if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btOuterOnly) {
+            Polygon brim_hole = slice_poly.contour;
+            brim_hole.reverse();
+            brim.push_back(ExPolygon{expand(slice_poly.contour, scale_(params.brim_width)).front(), brim_hole});
+        }
+        if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btInnerOnly) {
+            Polygons brim_contours = slice_poly.holes;
+            polygons_reverse(brim_contours);
+            for (const Polygon &brim_contour : brim_contours) {
+                Polygons brim_holes = shrink({brim_contour}, scale_(params.brim_width));
+                polygons_reverse(brim_holes);
+                ExPolygon inner_brim{brim_contour};
+                inner_brim.holes = brim_holes;
+                brim.push_back(inner_brim);
+            }
+        }
+
+        for (const Polygon &poly : to_polygons(brim)) {
+            Vec2f p0 = unscaled(poly.first_point()).cast<float>();
+            for (size_t i = 2; i < poly.points.size(); i++) {
+                Vec2f p1 = unscaled(poly.points[i - 1]).cast<float>();
+                Vec2f p2 = unscaled(poly.points[i]).cast<float>();
+
+                float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
+
+                auto [area, first_moment_of_area, second_moment_area,
+                      second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
+                new_object_part.sticking_area += sign * area;
+                new_object_part.sticking_centroid_accumulator += sign * Vec3f(first_moment_of_area.x(), first_moment_of_area.y(),
+                                                                              layer->print_z * area);
+                new_object_part.sticking_second_moment_of_area_accumulator += sign * second_moment_area;
+                new_object_part.sticking_second_moment_of_area_covariance_accumulator += sign * second_moment_of_area_covariance;
+            }
         }
     }
 
@@ -730,7 +775,7 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po,
 
         for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
             const LayerSlice &slice             = layer->lslices_ex.at(slice_idx);
-            auto [new_part, covered_area]       = build_object_part_from_slice(slice, layer, params);
+            auto [new_part, covered_area]       = build_object_part_from_slice(slice_idx, layer, params);
             SliceConnection connection_to_below = estimate_slice_connection(slice_idx, layer);
 
 #ifdef DETAILED_DEBUG_LOGS
@@ -1146,13 +1191,6 @@ void raise_alerts_for_issues(const SupportPoints                                
         }
     }
 
-    for (const SupportPoint &sp : support_points) {
-        if (sp.cause == SupportPointCause::WeakObjectPart) {
-                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::WeakObjectPart);
-                return;
-        }
-    }
-
     std::vector<SupportPoint> ext_supp_points{};
     ext_supp_points.reserve(support_points.size());
     for (const SupportPoint &sp : support_points) {
@@ -1189,8 +1227,15 @@ void raise_alerts_for_issues(const SupportPoints                                
 
     for (const SupportPoint &sp : support_points) {
         if (sp.cause == SupportPointCause::LongBridge) {
-                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::LongBridge);
-                return;
+                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::LongBridge);
+                break;
+        }
+    }
+
+    for (const SupportPoint &sp : support_points) {
+        if (sp.cause == SupportPointCause::WeakObjectPart) {
+                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::WeakObjectPart);
+                break;
         }
     }
 }

@@ -4,6 +4,7 @@
 #include "Layer.hpp"
 #include "Line.hpp"
 #include "PrintBase.hpp"
+#include "PrintConfig.hpp"
 #include <boost/log/trivial.hpp>
 #include <cstddef>
 #include <vector>
@@ -14,8 +15,9 @@ namespace SupportSpotsGenerator {
 
 struct Params
 {
-    Params(const std::vector<std::string> &filament_types, float max_acceleration, int raft_layers_count)
-        : max_acceleration(max_acceleration), raft_layers_count(raft_layers_count)
+    Params(
+        const std::vector<std::string> &filament_types, float max_acceleration, int raft_layers_count, BrimType brim_type, float brim_width)
+        : max_acceleration(max_acceleration), raft_layers_count(raft_layers_count), brim_type(brim_type), brim_width(brim_width)
     {
         if (filament_types.size() > 1) {
             BOOST_LOG_TRIVIAL(warning)
@@ -37,6 +39,9 @@ struct Params
     const int raft_layers_count;
     std::string filament_type;
 
+    BrimType brim_type;
+    const float brim_width;
+
     const std::pair<float,float> malformation_distance_factors = std::pair<float, float> { 0.4, 1.2 };
     const float max_curled_height_factor = 10.0f;
 
@@ -53,7 +58,7 @@ struct Params
     // MPa * 1e^6 = (g*mm/s^2)/mm^2 = g/(mm*s^2); yield strength of the bed surface
     double get_bed_adhesion_yield_strength() const {
         if (raft_layers_count > 0) {
-            return get_support_spots_adhesion_strength();
+            return get_support_spots_adhesion_strength() * 2.0;
         }
 
         if (filament_type == "PLA") {

@@ -422,7 +422,8 @@ void PrintObject::generate_support_spots()
             PrintTryCancel                cancel_func = m_print->make_try_cancel();
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
                                                  float(this->print()->m_config.perimeter_acceleration.getFloat()),
-                                                 this->config().raft_layers.getInt()};
+                                                 this->config().raft_layers.getInt(), this->config().brim_type.value,
+                                                 float(this->config().brim_width.getFloat())};
             auto [supp_points, partial_objects]              = SupportSpotsGenerator::full_search(this, cancel_func, params);
             this->m_shared_regions->generated_support_points = {this->trafo_centered(), supp_points};
             m_print->throw_if_canceled();
@@ -430,27 +431,33 @@ void PrintObject::generate_support_spots()
             auto alert_fn = [&](PrintStateBase::WarningLevel level, SupportSpotsGenerator::SupportPointCause cause) {
                 switch (cause) {
                 case SupportSpotsGenerator::SupportPointCause::LongBridge:
-                    this->active_step_add_warning(level, L("There are bridges longer than allowed distance. Consider adding supports. "));
+                    this->active_step_add_warning(level, L("There are bridges longer than recommended length. Consider adding supports.") +
+                                                             (L("Object name")) + ": " + this->model_object()->name);
                     break;
                 case SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor:
-                    this->active_step_add_warning(level, L("Unsupported bridges will collapse. Supports are needed."));
+                    this->active_step_add_warning(level, L("Unsupported bridges will collapse. Supports are needed.") + (L("Object name")) +
+                                                             ": " + this->model_object()->name);
                     break;
                 case SupportSpotsGenerator::SupportPointCause::FloatingExtrusion:
                     if (level == PrintStateBase::WarningLevel::CRITICAL) {
-                        this->active_step_add_warning(level, L("Clusters of unsupported extrusions found. Supports are needed."));
+                        this->active_step_add_warning(level, L("Clusters of unsupported extrusions found. Supports are needed.") +
+                                                                 (L("Object name")) + ": " + this->model_object()->name);
                     } else {
-                        this->active_step_add_warning(level, L("Some unspported extrusions found. Consider adding supports. "));
+                        this->active_step_add_warning(level, L("Some unspported extrusions found. Consider adding supports. ") +
+                                                                 (L("Object name")) + ": " + this->model_object()->name);
                     }
                     break;
                 case SupportSpotsGenerator::SupportPointCause::SeparationFromBed:
-                    this->active_step_add_warning(level, L("Object part may break from the bed. Consider adding brim and/or supports."));
+                    this->active_step_add_warning(level, L("Object part may break from the bed. Consider adding brim and/or supports.") +
+                                                             (L("Object name")) + ": " + this->model_object()->name);
                     break;
                 case SupportSpotsGenerator::SupportPointCause::UnstableFloatingPart:
-                    this->active_step_add_warning(level, L("Floating object parts detected. Supports are needed."));
+                    this->active_step_add_warning(level, L("Floating object parts detected. Supports are needed.") + (L("Object name")) +
+                                                             ": " + this->model_object()->name);
                     break;
                 case SupportSpotsGenerator::SupportPointCause::WeakObjectPart:
-                    this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                                                  L("Thin parts of the object may break. Supports are needed."));
+                    this->active_step_add_warning(level, L("Thin parts of the object may break. Consider adding supports.") +
+                                                             (L("Object name")) + ": " + this->model_object()->name);
                     break;
                 }
             };
@@ -495,9 +502,9 @@ void PrintObject::estimate_curled_extrusions()
             // Estimate curling of support material and add it to the malformaition lines of each layer
             float                         support_flow_width = support_material_flow(this, this->config().layer_height).width();
             SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
-                                                 float(this->print()->config().perimeter_acceleration.getFloat()),
-                                                 this->config().raft_layers.getInt()
-                                                 };
+                                                 float(this->print()->m_config.perimeter_acceleration.getFloat()),
+                                                 this->config().raft_layers.getInt(), this->config().brim_type.value,
+                                                 float(this->config().brim_width.getFloat())};
             SupportSpotsGenerator::estimate_supports_malformations(this->support_layers(), support_flow_width, params);
             SupportSpotsGenerator::estimate_malformations(this->layers(), params);
             m_print->throw_if_canceled();
@@ -609,6 +616,7 @@ bool PrintObject::invalidate_state_by_config_options(
         if (   opt_key == "brim_width"
             || opt_key == "brim_separation"
             || opt_key == "brim_type") {
+            steps.emplace_back(posSupportSpotsSearch);
             // Brim is printed below supports, support invalidates brim and skirt.
             steps.emplace_back(posSupportMaterial);
         } else if (
