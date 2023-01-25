@@ -404,7 +404,7 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print& print, Poly
       }
 	    // Make a copy, so it may be rotated for instances.
 	    Polygon convex_hull0 = it_convex_hull->second;
-		const double z_diff = Geometry::rotation_diff_z(model_instance0->get_rotation(), print_object->instances().front().model_instance->get_rotation());
+		const double z_diff = Geometry::rotation_diff_z(model_instance0->get_matrix(), print_object->instances().front().model_instance->get_matrix());
 		if (std::abs(z_diff) > EPSILON)
 			convex_hull0.rotate(z_diff);
 	    // Now we check that no instance of convex_hull intersects any of the previously checked object instances.

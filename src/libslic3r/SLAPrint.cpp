@@ -190,14 +190,13 @@ static std::vector<SLAPrintObject::Instance> sla_instances(const ModelObject &mo
     std::vector<SLAPrintObject::Instance> instances;
     assert(! model_object.instances.empty());
     if (! model_object.instances.empty()) {
-        Vec3d rotation0 = model_object.instances.front()->get_rotation();
-        rotation0(2) = 0.;
+        const Transform3d& trafo0 = model_object.instances.front()->get_matrix();
         for (ModelInstance *model_instance : model_object.instances)
             if (model_instance->is_printable()) {
                 instances.emplace_back(
                     model_instance->id(),
                     Point::new_scale(model_instance->get_offset(X), model_instance->get_offset(Y)),
-                    float(Geometry::rotation_diff_z(rotation0, model_instance->get_rotation())));
+                    float(Geometry::rotation_diff_z(trafo0, model_instance->get_matrix())));
             }
     }
     return instances;
