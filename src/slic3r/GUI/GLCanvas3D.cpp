@@ -4188,7 +4188,9 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
         settings_changed = true;
     }
 
-    if (imgui->combo(_("Alignment"), {"Center", "Top left", "Bottom left", "Bottom right", "Top right", "Random"}, settings.alignment)) {
+    Points bed       = m_config ? get_bed_shape(*m_config) : Points{};
+
+    if (arrangement::is_box(bed) && imgui->combo(_("Alignment"), {"Center", "Top left", "Bottom left", "Bottom right", "Top right", "Random"}, settings.alignment)) {
         settings_out.alignment = settings.alignment;
         appcfg->set("arrange", align_key.c_str(), std::to_string(settings_out.alignment));
         settings_changed = true;

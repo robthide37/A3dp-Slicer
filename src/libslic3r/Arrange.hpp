@@ -143,6 +143,8 @@ inline void arrange(ArrangePolygons &items, const CircleBed &bed, const ArrangeP
 inline void arrange(ArrangePolygons &items, const Polygon &bed, const ArrangeParams &params = {}) { arrange(items, {}, bed, params); }
 inline void arrange(ArrangePolygons &items, const InfiniteBed &bed, const ArrangeParams &params = {}) { arrange(items, {}, bed, params); }
 
+bool is_box(const Points &bed);
+
 }} // namespace Slic3r::arrangement
 
 #endif // MODELARRANGE_HPP

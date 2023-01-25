@@ -607,6 +607,12 @@ template<class Fn> auto call_with_bed(const Points &bed, Fn &&fn)
     }
 }
 
+bool is_box(const Points &bed)
+{
+    return !bed.empty() &&
+           ((1.0 - poly_area(bed) / area(BoundingBox(bed))) < 1e-3);
+}
+
 template<>
 void arrange(ArrangePolygons &      items,
              const ArrangePolygons &excludes,
