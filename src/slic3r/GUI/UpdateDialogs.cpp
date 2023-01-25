@@ -167,10 +167,14 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boos
 			wxString wxext = boost::nowide::widen(extension);
 			wildcard = GUI::format_wxstr("%1% Files (*.%2%)|*.%2%", wxext.Upper(), wxext);
 		}
+		boost::system::error_code ec;
+		boost::filesystem::path dir = boost::filesystem::absolute(boost::filesystem::path(GUI::format(txtctrl_path->GetValue())), ec);
+		if (ec)
+			dir = GUI::format(txtctrl_path->GetValue());
 		wxDirDialog save_dlg(
 			this
 			, _L("Select directory:")
-			, txtctrl_path->GetValue()
+			, GUI::format_wxstr(dir.string())
 			/*
 			, filename //boost::nowide::widen(AppUpdater::get_filename_from_url(txtctrl_path->GetValue().ToUTF8().data()))
 			, wildcard
@@ -188,35 +192,46 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boos
 	if (auto* btn_ok = get_button(wxID_OK); btn_ok != NULL) {
 		btn_ok->SetLabel(_L("Download"));
 		btn_ok->Bind(wxEVT_BUTTON, ([this, path](wxCommandEvent& e){
-			boost::filesystem::path path = boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()) / GUI::format(filename);
 			boost::system::error_code ec;
-			if (path.parent_path().string().empty()) {
+			std::string input = GUI::format(txtctrl_path->GetValue());
+			boost::filesystem::path dir = boost::filesystem::absolute(boost::filesystem::path(input), ec);
+			if (ec)
+				dir = boost::filesystem::path(input);
+			bool show_change = (dir.string() != input);
+			boost::filesystem::path path = dir / GUI::format(filename);
+			ec.clear();
+			if (dir.string().empty()) {
 				MessageDialog msgdlg(nullptr, _L("Directory path is empty."), _L("Notice"), wxOK);
 				msgdlg.ShowModal();
 				return;
 			}
 			ec.clear();
-			if (!boost::filesystem::exists(path.parent_path(), ec) || !boost::filesystem::is_directory(path.parent_path(),ec) || ec) {
+			if (!boost::filesystem::exists(dir, ec) || !boost::filesystem::is_directory(dir,ec) || ec) {
 				ec.clear();
-				if (!boost::filesystem::exists(path.parent_path().parent_path(), ec) || !boost::filesystem::is_directory(path.parent_path().parent_path(), ec) || ec) {
+				if (!boost::filesystem::exists(dir.parent_path(), ec) || !boost::filesystem::is_directory(dir.parent_path(), ec) || ec) {
 					MessageDialog msgdlg(nullptr, _L("Directory path is incorrect."), _L("Notice"), wxOK);
 					msgdlg.ShowModal();
 					return;
 				}
-
-				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("Directory %1% doesn't exists. Do you wish to create it?"), GUI::format_wxstr(path.parent_path().string())), _L("Notice"), wxYES_NO);
+				show_change = false;
+				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("Directory %1% doesn't exists. Do you wish to create it?"), dir.string()), _L("Notice"), wxYES_NO);
 				if (msgdlg.ShowModal() != wxID_YES)
 					return;
 				ec.clear();
-				if(!boost::filesystem::create_directory(path.parent_path(), ec) || ec)
-				{
+				if(!boost::filesystem::create_directory(dir, ec) || ec) {
 					MessageDialog msgdlg(nullptr, _L("Failed to create directory."), _L("Notice"), wxOK);
 					msgdlg.ShowModal();
 					return;
 				}
 			}
 			if (boost::filesystem::exists(path)) {
-				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), GUI::format_wxstr(path.string())),_L("Notice"), wxYES_NO);
+				show_change = false;
+				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), path.string()),_L("Notice"), wxYES_NO);
+				if (msgdlg.ShowModal() != wxID_YES)
+					return;
+			}
+			if (show_change) {
+				MessageDialog msgdlg(nullptr, GUI::format_wxstr(_L("Download path is %1%. Do you wish to continue?"), path.string()), _L("Notice"), wxYES_NO);
 				if (msgdlg.ShowModal() != wxID_YES)
 					return;
 			}
@@ -241,7 +256,12 @@ bool AppUpdateDownloadDialog::run_after_download() const
 
 boost::filesystem::path AppUpdateDownloadDialog::get_download_path() const
 {
-	return boost::filesystem::path(txtctrl_path->GetValue().ToUTF8().data()) / GUI::format(filename);
+	boost::system::error_code ec;
+	std::string input = GUI::format(txtctrl_path->GetValue());
+	boost::filesystem::path dir = boost::filesystem::absolute(boost::filesystem::path(input), ec);
+	if (ec)
+		dir = boost::filesystem::path(input);
+	return dir / GUI::format(filename);
 }
 
 // MsgUpdateConfig
