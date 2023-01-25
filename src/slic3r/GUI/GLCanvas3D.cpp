@@ -999,6 +999,15 @@ void GLCanvas3D::load_arrange_settings()
     std::string en_rot_sla_str =
         wxGetApp().app_config->get("arrange", "enable_rotation_sla");
 
+    std::string alignment_fff_str =
+        wxGetApp().app_config->get("arrange", "alignment_fff");
+
+    std::string alignment_fff_seqp_str =
+        wxGetApp().app_config->get("arrange", "alignment_fff_seq_pring");
+
+    std::string alignment_sla_str =
+        wxGetApp().app_config->get("arrange", "alignment_sla");
+
     if (!dist_fff_str.empty())
         m_arrange_settings_fff.distance = string_to_float_decimal_point(dist_fff_str);
 
@@ -1025,6 +1034,15 @@ void GLCanvas3D::load_arrange_settings()
 
     if (!en_rot_sla_str.empty())
         m_arrange_settings_sla.enable_rotation = (en_rot_sla_str == "1" || en_rot_sla_str == "yes");
+
+    if (!alignment_sla_str.empty())
+        m_arrange_settings_sla.alignment = std::stoi(alignment_sla_str);
+
+    if (!alignment_fff_str.empty())
+        m_arrange_settings_fff.alignment = std::stoi(alignment_fff_str);
+
+    if (!alignment_fff_seqp_str.empty())
+        m_arrange_settings_fff_seq_print.alignment = std::stoi(alignment_fff_seqp_str);
 }
 
 PrinterTechnology GLCanvas3D::current_printer_technology() const
