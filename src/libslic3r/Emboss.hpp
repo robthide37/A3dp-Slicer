@@ -157,10 +157,9 @@ namespace Emboss
     /// Fix duplicit points and self intersections in polygons.
     /// Also try to reduce amount of points and remove useless polygon parts
     /// </summary>
-    /// <param name="shape">Input shape to heal</param>
     /// <param name="precision">Define wanted precision of shape after heal</param>
     /// <returns>Healed shapes</returns>
-    ExPolygons heal_shape(const Polygons &shape, double precision);
+    ExPolygons heal_shape(const Polygons &shape);
 
     /// <summary>
     /// NOTE: call Slic3r::union_ex before this call

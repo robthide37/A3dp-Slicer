@@ -23,6 +23,12 @@ using namespace Slic3r;
 using namespace Emboss;
 using fontinfo_opt = std::optional<stbtt_fontinfo>;
 
+// for try approach to heal shape by Clipper::Closing
+//#define HEAL_WITH_CLOSING
+
+// functionality to remove all spikes from shape
+//#define REMOVE_SPIKES
+
 // do not expose out of this file stbtt_ data types
 namespace priv{
 using Polygon = Slic3r::Polygon;
@@ -60,8 +66,8 @@ Points collect_close_points(const ExPolygons &expolygons, double distance = .6);
 
 // Heal duplicates points and self intersections
 bool heal_dupl_inter(ExPolygons &shape, unsigned max_iteration);
-bool heal_dupl_inter2(ExPolygons &shape, unsigned max_iteration); // by close_ex
 
+// for debug purpose
 void visualize_heal(const std::string& svg_filepath, const ExPolygons &expolygons);
 
 const Points pts_2x2({Point(0, 0), Point(1, 0), Point(1, 1), Point(0, 1)});
@@ -93,155 +99,20 @@ struct SpikeDesc
     }
 };
 
+// return TRUE when remove point. It could create polygon with 2 points.
+bool remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc);
+void remove_spikes_in_duplicates(ExPolygons &expolygons, const Points &duplicates);
+
+#ifdef REMOVE_SPIKES
 // Remove long sharp corners aka spikes 
 // by adding points to bevel tip of spikes - Not printable parts
 // Try to not modify long sides of spike and add points on it's side
 void remove_spikes(Polygon &polygon, const SpikeDesc &spike_desc);
 void remove_spikes(Polygons &polygons, const SpikeDesc &spike_desc);
 void remove_spikes(ExPolygons &expolygons, const SpikeDesc &spike_desc);
-// return TRUE when remove point. It could create polygon with 2 points.
-bool remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc);
+#endif
 
-void remove_spikes_in_duplicates(ExPolygons &expolygons, const Points &duplicates);
 };
-
-#include <Geometry.hpp>
-void priv::remove_spikes(Polygon &polygon, const SpikeDesc &spike_desc)
-{
-    enum class Type {
-        add, // Move with point B on A-side and add new point on C-side
-        move, // Only move with point B
-        erase // left only points A and C without move 
-    };
-    struct SpikeHeal
-    {
-        Type   type;
-        size_t index;
-        Point  b;
-        Point  add;
-    };
-    using SpikeHeals = std::vector<SpikeHeal>;
-    SpikeHeals heals;
-
-    size_t count = polygon.size();
-    if (count < 3)
-        return;
-
-    const Point *ptr_a = &polygon[count - 2];
-    const Point *ptr_b = &polygon[count - 1];
-    for (const Point &c : polygon) {
-        const Point &a = *ptr_a;
-        const Point &b = *ptr_b;
-        ScopeGuard sg([&ptr_a, &ptr_b, &c]() {
-            // prepare for next loop
-            ptr_a = ptr_b;
-            ptr_b = &c;
-        });
-
-        // calc sides
-        Point ba = a - b;
-        Point bc = c - b;
-
-        Vec2d ba_f = ba.cast<double>();
-        Vec2d bc_f = bc.cast<double>();
-        double dot_product = ba_f.dot(bc_f);
-
-        // sqrt together after multiplication save one sqrt
-        double ba_size_sq = ba_f.squaredNorm();
-        double bc_size_sq = bc_f.squaredNorm();
-        double norm = sqrt(ba_size_sq * bc_size_sq);
-        double cos_angle = dot_product / norm;
-
-        // small angle are around 1 --> cos(0) = 1
-        if (cos_angle < spike_desc.cos_angle)
-            continue;
-
-        SpikeHeal heal;
-        heal.index = &b - &polygon.points.front();
-
-        // has to be in range <-1, 1>
-        // Due to preccission of floating point number could be sligtly out of range
-        if (cos_angle > 1.)
-            cos_angle = 1.;
-        if (cos_angle < -1.)
-            cos_angle = -1.;
-
-        // Current Spike angle
-        double angle = acos(cos_angle);
-        double wanted_size = spike_desc.half_bevel / cos(angle / 2.);
-        double wanted_size_sq = wanted_size * wanted_size;
-
-        bool is_ba_short = ba_size_sq < wanted_size_sq;
-        bool is_bc_short = bc_size_sq < wanted_size_sq;
-        auto a_side = [&b, &ba_f, &ba_size_sq, &wanted_size]() {
-            Vec2d ba_norm = ba_f / sqrt(ba_size_sq);
-            return b + (wanted_size * ba_norm).cast<coord_t>();
-        };
-        auto c_side = [&b, &bc_f, &bc_size_sq, &wanted_size]() {
-            Vec2d bc_norm = bc_f / sqrt(bc_size_sq);
-            return b + (wanted_size * bc_norm).cast<coord_t>();
-        };
-        if (is_ba_short && is_bc_short) {
-            // remove short spike
-            heal.type = Type::erase;
-        } else if (is_ba_short){
-            // move point B on C-side
-            heal.type = Type::move;
-            heal.b    = c_side();
-        } else if (is_bc_short) {
-            // move point B on A-side
-            heal.type = Type::move;
-            heal.b    = a_side();
-        } else {
-            // move point B on A-side and add point on C-side
-            heal.type = Type::add;
-            heal.b    = a_side();
-            heal.add  = c_side();           
-        }
-        heals.push_back(heal);
-    }
-
-    if (heals.empty())
-        return;
-
-    // sort index from high to low
-    if (heals.front().index == (count - 1))
-        std::rotate(heals.begin(), heals.begin()+1, heals.end());
-    std::reverse(heals.begin(), heals.end());
-
-    int extend = 0;
-    int curr_extend = 0;
-    for (const SpikeHeal &h : heals)
-        switch (h.type) {
-        case Type::add:
-            ++curr_extend;
-            if (extend < curr_extend)
-                extend = curr_extend;
-            break;
-        case Type::erase:
-            --curr_extend;
-        }
-
-    Points &pts = polygon.points;
-    if (extend > 0)
-        pts.reserve(pts.size() + extend);
-
-    for (const SpikeHeal &h : heals) {
-        switch (h.type) {
-        case Type::add:
-            pts[h.index] = h.b;
-            pts.insert(pts.begin() + h.index+1, h.add);
-            break;
-        case Type::erase:
-            pts.erase(pts.begin() + h.index);
-            break;
-        case Type::move:
-            pts[h.index] = h.b; 
-            break;
-        default: break;
-        }
-    }
-}
 
 bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc) {    
     Points &pts = polygon.points;
@@ -344,43 +215,6 @@ void priv::remove_spikes_in_duplicates(ExPolygons &expolygons, const Points &dup
 
     if (exist_remove)
         remove_bad(expolygons);
-    
-    // erase invalid ExPolygon after removing
-    //expolygons.erase(std::remove_if(expolygons.begin(), expolygons.end(), 
-    //    [&duplicates, &check](ExPolygon &expolygon) {
-    //    BoundingBox bb(to_points(expolygon.contour));
-    //    for (const Point &d : duplicates) {
-    //        if (!bb.contains(d))
-    //            continue;
-    //        if(check(expolygon.contour, d))
-    //            return true;
-
-    //        // erase invalid hole after removing
-    //        Polygons &holes = expolygon.holes;            
-    //        holes.erase(std::remove_if(holes.begin(), holes.end(),
-    //            [&check, &d](Polygon &hole) { 
-    //                return check(hole, d); 
-    //            })
-    //        );
-    //    }
-    //    return false;
-    //}));
-}
-
-void priv::remove_spikes(Polygons &polygons, const SpikeDesc &spike_desc)
-{
-    for (Polygon &polygon : polygons)
-        remove_spikes(polygon, spike_desc);
-    remove_bad(polygons);
-}
-
-void priv::remove_spikes(ExPolygons &expolygons, const SpikeDesc &spike_desc)
-{
-    for (ExPolygon &expolygon : expolygons) {
-        remove_spikes(expolygon.contour, spike_desc);
-        remove_spikes(expolygon.holes, spike_desc);    
-    }
-    remove_bad(expolygons);
 }
 
 bool priv::is_valid(const FontFile &font, unsigned int index) {
@@ -678,7 +512,7 @@ bool priv::remove_self_intersections(ExPolygons &shape, unsigned max_iteration) 
     return false;
 }
 
-ExPolygons Emboss::heal_shape(const Polygons &shape, double precision)
+ExPolygons Emboss::heal_shape(const Polygons &shape)
 {
     // When edit this code check that font 'ALIENATE.TTF' and glyph 'i' still work
     // fix of self intersections
@@ -704,8 +538,7 @@ ExPolygons Emboss::heal_shape(const Polygons &shape, double precision)
     // TrueTypeFonts use non zero winding number
     // https://docs.microsoft.com/en-us/typography/opentype/spec/ttch01
     // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM01/Chap1.html
-    ExPolygons res = Slic3r::union_ex(polygons, ClipperLib::pftNonZero);
-        
+    ExPolygons res = Slic3r::union_ex(polygons, ClipperLib::pftNonZero);        
     heal_shape(res);
     return res;
 }
@@ -731,15 +564,13 @@ void priv::visualize_heal(const std::string &svg_filepath, const ExPolygons &exp
 
 bool Emboss::heal_shape(ExPolygons &shape, unsigned max_iteration)
 {
-    return priv::heal_dupl_inter(shape, max_iteration);
-    //return priv::heal_dupl_inter2(shape, max_iteration);    
+    return priv::heal_dupl_inter(shape, max_iteration);  
 }
 
+#ifndef HEAL_WITH_CLOSING
 bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
 {    
     if (shape.empty()) return true;
-
-    //priv::visualize_heal("C:/data/temp/heal_prev.svg", shape);
 
     // create loop permanent memory
     Polygons holes;
@@ -798,8 +629,9 @@ bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
     shape = {priv::create_bounding_rect(shape)};
     return false;
 }
-
-bool priv::heal_dupl_inter2(ExPolygons &shape, unsigned max_iteration) {
+#else
+bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
+{
     priv::remove_same_neighbor(shape);
 
     const float                delta    = 2.f;
@@ -828,6 +660,7 @@ bool priv::heal_dupl_inter2(ExPolygons &shape, unsigned max_iteration) {
     shape = {priv::create_bounding_rect(shape)};
     return false;
 }
+#endif // !HEAL_WITH_CLOSING
 
 ExPolygon priv::create_bounding_rect(const ExPolygons &shape) {
     BoundingBox bb   = get_extents(shape);
@@ -930,7 +763,7 @@ std::optional<Glyph> priv::get_glyph(const stbtt_fontinfo &font_info, int unicod
         glyph_polygons.emplace_back(pts);
     }
     if (!glyph_polygons.empty())
-        glyph.shape = Emboss::heal_shape(glyph_polygons, flatness / SHAPE_SCALE);
+        glyph.shape = Emboss::heal_shape(glyph_polygons);
     return glyph;
 }
 
@@ -1772,3 +1605,160 @@ std::optional<Vec2d> Emboss::OrthoProject::unproject(const Vec3d &p, double *dep
     if (depth != nullptr) *depth = pp.z();
     return Vec2d(pp.x(), pp.y());
 }
+
+#ifdef REMOVE_SPIKES
+#include <Geometry.hpp>
+void priv::remove_spikes(Polygon &polygon, const SpikeDesc &spike_desc)
+{
+    enum class Type {
+        add, // Move with point B on A-side and add new point on C-side
+        move, // Only move with point B
+        erase // left only points A and C without move 
+    };
+    struct SpikeHeal
+    {
+        Type   type;
+        size_t index;
+        Point  b;
+        Point  add;
+    };
+    using SpikeHeals = std::vector<SpikeHeal>;
+    SpikeHeals heals;
+
+    size_t count = polygon.size();
+    if (count < 3)
+        return;
+
+    const Point *ptr_a = &polygon[count - 2];
+    const Point *ptr_b = &polygon[count - 1];
+    for (const Point &c : polygon) {
+        const Point &a = *ptr_a;
+        const Point &b = *ptr_b;
+        ScopeGuard sg([&ptr_a, &ptr_b, &c]() {
+            // prepare for next loop
+            ptr_a = ptr_b;
+            ptr_b = &c;
+        });
+
+        // calc sides
+        Point ba = a - b;
+        Point bc = c - b;
+
+        Vec2d ba_f = ba.cast<double>();
+        Vec2d bc_f = bc.cast<double>();
+        double dot_product = ba_f.dot(bc_f);
+
+        // sqrt together after multiplication save one sqrt
+        double ba_size_sq = ba_f.squaredNorm();
+        double bc_size_sq = bc_f.squaredNorm();
+        double norm = sqrt(ba_size_sq * bc_size_sq);
+        double cos_angle = dot_product / norm;
+
+        // small angle are around 1 --> cos(0) = 1
+        if (cos_angle < spike_desc.cos_angle)
+            continue;
+
+        SpikeHeal heal;
+        heal.index = &b - &polygon.points.front();
+
+        // has to be in range <-1, 1>
+        // Due to preccission of floating point number could be sligtly out of range
+        if (cos_angle > 1.)
+            cos_angle = 1.;
+        if (cos_angle < -1.)
+            cos_angle = -1.;
+
+        // Current Spike angle
+        double angle = acos(cos_angle);
+        double wanted_size = spike_desc.half_bevel / cos(angle / 2.);
+        double wanted_size_sq = wanted_size * wanted_size;
+
+        bool is_ba_short = ba_size_sq < wanted_size_sq;
+        bool is_bc_short = bc_size_sq < wanted_size_sq;
+        auto a_side = [&b, &ba_f, &ba_size_sq, &wanted_size]() {
+            Vec2d ba_norm = ba_f / sqrt(ba_size_sq);
+            return b + (wanted_size * ba_norm).cast<coord_t>();
+        };
+        auto c_side = [&b, &bc_f, &bc_size_sq, &wanted_size]() {
+            Vec2d bc_norm = bc_f / sqrt(bc_size_sq);
+            return b + (wanted_size * bc_norm).cast<coord_t>();
+        };
+        if (is_ba_short && is_bc_short) {
+            // remove short spike
+            heal.type = Type::erase;
+        } else if (is_ba_short){
+            // move point B on C-side
+            heal.type = Type::move;
+            heal.b    = c_side();
+        } else if (is_bc_short) {
+            // move point B on A-side
+            heal.type = Type::move;
+            heal.b    = a_side();
+        } else {
+            // move point B on A-side and add point on C-side
+            heal.type = Type::add;
+            heal.b    = a_side();
+            heal.add  = c_side();           
+        }
+        heals.push_back(heal);
+    }
+
+    if (heals.empty())
+        return;
+
+    // sort index from high to low
+    if (heals.front().index == (count - 1))
+        std::rotate(heals.begin(), heals.begin()+1, heals.end());
+    std::reverse(heals.begin(), heals.end());
+
+    int extend = 0;
+    int curr_extend = 0;
+    for (const SpikeHeal &h : heals)
+        switch (h.type) {
+        case Type::add:
+            ++curr_extend;
+            if (extend < curr_extend)
+                extend = curr_extend;
+            break;
+        case Type::erase:
+            --curr_extend;
+        }
+
+    Points &pts = polygon.points;
+    if (extend > 0)
+        pts.reserve(pts.size() + extend);
+
+    for (const SpikeHeal &h : heals) {
+        switch (h.type) {
+        case Type::add:
+            pts[h.index] = h.b;
+            pts.insert(pts.begin() + h.index+1, h.add);
+            break;
+        case Type::erase:
+            pts.erase(pts.begin() + h.index);
+            break;
+        case Type::move:
+            pts[h.index] = h.b; 
+            break;
+        default: break;
+        }
+    }
+}
+
+void priv::remove_spikes(Polygons &polygons, const SpikeDesc &spike_desc)
+{
+    for (Polygon &polygon : polygons)
+        remove_spikes(polygon, spike_desc);
+    remove_bad(polygons);
+}
+
+void priv::remove_spikes(ExPolygons &expolygons, const SpikeDesc &spike_desc)
+{
+    for (ExPolygon &expolygon : expolygons) {
+        remove_spikes(expolygon.contour, spike_desc);
+        remove_spikes(expolygon.holes, spike_desc);    
+    }
+    remove_bad(expolygons);
+}
+
+#endif // REMOVE_SPIKES
