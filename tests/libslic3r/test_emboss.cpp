@@ -216,20 +216,20 @@ ExPolygons heal_and_check(const Polygons &polygons)
     Pointfs intersections = intersection_points(shape);
     Points  shape_points  = to_points(shape);
     Points  duplicits     = collect_duplicates(shape_points);
-    {
-        BoundingBox bb(polygons_points);
-        // bb.scale(svg_scale);
-        SVG svg("C:/data/temp/test_visualization.svg", bb);
-        svg.draw(polygons, "gray"); // input
-        svg.draw(shape, "green"); // output
+    //{
+    //    BoundingBox bb(polygons_points);
+    //    // bb.scale(svg_scale);
+    //    SVG svg("C:/data/temp/test_visualization.svg", bb);
+    //    svg.draw(polygons, "gray"); // input
+    //    svg.draw(shape, "green"); // output
 
-        Points pts;
-        pts.reserve(intersections.size());
-        for (const Vec2d &intersection : intersections)
-            pts.push_back(intersection.cast<int>());
-        svg.draw(pts, "red", 10);
-        svg.draw(duplicits, "orenge", 10);
-    }
+    //    Points pts;
+    //    pts.reserve(intersections.size());
+    //    for (const Vec2d &intersection : intersections)
+    //        pts.push_back(intersection.cast<int>());
+    //    svg.draw(pts, "red", 10);
+    //    svg.draw(duplicits, "orenge", 10);
+    //}
 
     CHECK(intersections.empty());
     CHECK(duplicits.empty());
