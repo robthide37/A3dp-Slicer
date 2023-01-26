@@ -198,6 +198,15 @@ static void find_closest_volume(const Selection       &selection,
 /// <param name="emboss_data">Define params of text</param>
 /// <param name="coor">Screen coordinat, where to create new object laying on bed</param>
 static void start_create_object_job(DataBase &emboss_data, const Vec2d &coor);
+
+/// <summary>
+/// Search if exist model volume for given id in object lists
+/// </summary>
+/// <param name="objects">List to search volume</param>
+/// <param name="volume_id">Unique Identifier of volume</param>
+/// <returns>Volume when found otherwise nullptr</returns>
+static const ModelVolume *get_volume(const ModelObjectPtrs &objects, const ObjectID &volume_id);
+
 } // namespace priv
 
 bool priv::is_valid(ModelVolumeType volume_type){
@@ -561,8 +570,11 @@ bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
 
     // not selected volume
     assert(m_volume != nullptr);
+    assert(priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) != nullptr);
     assert(m_volume->text_configuration.has_value());
-    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) return false;
+    if (m_volume == nullptr ||
+        priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ||
+        !m_volume->text_configuration.has_value()) return false;
 
     if (on_mouse_for_rotation(mouse_event)) return true;
     if (on_mouse_for_translate(mouse_event)) return true;
@@ -583,7 +595,9 @@ std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 
 void GLGizmoEmboss::on_render() {
     // no volume selected
-    if (m_volume == nullptr) return;
+    if (m_volume == nullptr ||
+        priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr)
+        return;
     Selection &selection = m_parent.get_selection();
     if (selection.is_empty()) return;
 
@@ -740,7 +754,9 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     set_volume_by_selection();
 
     // Do not render window for not selected text volume
-    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
+    if (m_volume == nullptr ||
+        priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ||
+        !m_volume->text_configuration.has_value()) {
         close();
         return;
     }
@@ -855,7 +871,8 @@ void GLGizmoEmboss::on_set_state()
         set_volume(priv::get_selected_volume(m_parent.get_selection()));
 
         // when open window by "T" and no valid volume is selected, so Create new one
-        if (m_volume == nullptr) { 
+        if (m_volume == nullptr ||
+            priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ) { 
             // reopen gizmo when new object is created
             GLGizmoBase::m_state = GLGizmoBase::Off;
             if (wxGetApp().get_mode() == comSimple)
@@ -1129,6 +1146,7 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
         
     // The change of volume could show or hide part with setter on volume type
     if (m_volume == nullptr || 
+        priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ||
         (m_volume->get_object()->volumes.size() == 1) != 
         (volume->get_object()->volumes.size() == 1)){
         m_should_set_minimal_windows_size = true;
@@ -1136,6 +1154,7 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
 
     m_text   = tc.text;
     m_volume = volume;
+    m_volume_id = volume->id();
 
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();
@@ -3717,6 +3736,15 @@ void priv::start_create_volume_job(const ModelObject *object,
     Worker &worker = plater->get_ui_job_worker();
     queue_job(worker, std::move(job));
 }
+
+const ModelVolume *priv::get_volume(const ModelObjectPtrs &objects, const ObjectID &volume_id)
+{
+    for (const ModelObject *obj : objects)
+        for (const ModelVolume *vol : obj->volumes)
+            if (vol->id() == volume_id)
+                return vol;
+    return nullptr;
+};
 
 GLVolume * priv::get_hovered_gl_volume(const GLCanvas3D &canvas) {
     int hovered_id_signed = canvas.get_first_hover_volume_idx();

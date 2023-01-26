@@ -284,6 +284,10 @@ private:
     // actual volume
     ModelVolume *m_volume;
 
+    // When work with undo redo stack there could be situation that 
+    // m_volume point to unexisting volume so One need also objectID
+    ObjectID m_volume_id;
+
     // True when m_text contain character unknown by selected font
     bool m_text_contain_unknown_glyph = false;
 
