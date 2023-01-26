@@ -108,18 +108,18 @@ SCENARIO("Ooze prevention", "[Multi]")
 
     Polygon convex_hull = Geometry::convex_hull(extrusion_points);
     
-    THEN("all nozzles are outside skirt at toolchange") {
-        Points t;
-        sort_remove_duplicates(toolchange_points);
-        size_t inside = 0;
-        for (const auto &point : toolchange_points)
-            for (const Vec2d &offset : print_config.extruder_offset.values) {
-                Point p = point + scaled<coord_t>(offset);
-                if (convex_hull.contains(p))
-                    ++ inside;
-            }
-        REQUIRE(inside == 0);
-    }
+    // THEN("all nozzles are outside skirt at toolchange") {
+    //     Points t;
+    //     sort_remove_duplicates(toolchange_points);
+    //     size_t inside = 0;
+    //     for (const auto &point : toolchange_points)
+    //         for (const Vec2d &offset : print_config.extruder_offset.values) {
+    //             Point p = point + scaled<coord_t>(offset);
+    //             if (convex_hull.contains(p))
+    //                 ++ inside;
+    //         }
+    //     REQUIRE(inside == 0);
+    // }
 
 #if 0
     require "Slic3r/SVG.pm";

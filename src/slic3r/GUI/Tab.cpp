@@ -1826,44 +1826,58 @@ static void validate_custom_gcode_cb(Tab* tab, const wxString& title, const t_co
     tab->on_value_change(opt_key, value);
 }
 
+void TabFilament::create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, int opt_index/* = 0*/)
+{
+    Line line {"",""};
+    if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
+        Option opt = optgroup->get_option(opt_key);
+        opt.opt.label = opt.opt.full_label;
+        line = optgroup->create_single_option_line(opt);
+    }
+    else
+        line = optgroup->create_single_option_line(optgroup->get_option(opt_key));
+
+    line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
+        wxCheckBox* check_box = new wxCheckBox(parent, wxID_ANY, "");
+
+        check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
+            const bool is_checked = evt.IsChecked();
+            if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
+                if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
+                    field->toggle(is_checked);
+                    if (is_checked)
+                        field->set_last_meaningful_value();
+                    else
+                        field->set_na_value();
+                }
+            }
+        }, check_box->GetId());
+
+        m_overrides_options[opt_key] = check_box;
+        return check_box;
+    };
+
+    optgroup->append_line(line);
+}
+
+void TabFilament::update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, int opt_index/* = 0*/, bool is_checked/* = true*/)
+{
+    if (!m_overrides_options[opt_key])
+        return;
+    m_overrides_options[opt_key]->Enable(is_checked);
+
+    is_checked &= !m_config->option(opt_key)->is_nil();
+    m_overrides_options[opt_key]->SetValue(is_checked);
+
+    Field* field = optgroup->get_fieldc(opt_key, opt_index);
+    if (field != nullptr)
+        field->toggle(is_checked);
+}
+
 void TabFilament::add_filament_overrides_page()
 {
     PageShp page = add_options_page(L("Filament Overrides"), "wrench");
     ConfigOptionsGroupShp optgroup = page->new_optgroup(L("Retraction"));
-
-    auto append_single_option_line = [optgroup, this](const std::string& opt_key, int opt_index)
-    {
-        Line line {"",""};
-        if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
-            Option opt = optgroup->get_option(opt_key);
-            opt.opt.label = opt.opt.full_label;
-            line = optgroup->create_single_option_line(opt);
-        }
-        else
-            line = optgroup->create_single_option_line(optgroup->get_option(opt_key));
-
-        line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
-            wxCheckBox* check_box = new wxCheckBox(parent, wxID_ANY, "");
-
-            check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
-                const bool is_checked = evt.IsChecked();
-                if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
-                    if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
-                        field->toggle(is_checked);
-                        if (is_checked)
-                            field->set_last_meaningful_value();
-                        else
-                            field->set_na_value();
-                    }
-                }
-            }, check_box->GetId());
-
-            m_overrides_options[opt_key] = check_box;
-            return check_box;
-        };
-
-        optgroup->append_line(line);
-    };
 
     const int extruder_idx = 0; // #ys_FIXME
 
@@ -1879,7 +1893,7 @@ void TabFilament::add_filament_overrides_page()
                                         "filament_wipe",
                                         "filament_retract_before_wipe"
                                      })
-        append_single_option_line(opt_key, extruder_idx);
+        create_line_with_near_label_widget(optgroup, opt_key, extruder_idx);
 }
 
 void TabFilament::update_filament_overrides_page()
@@ -1914,14 +1928,7 @@ void TabFilament::update_filament_overrides_page()
     for (const std::string& opt_key : opt_keys)
     {
         bool is_checked = opt_key=="filament_retract_length" ? true : have_retract_length;
-        m_overrides_options[opt_key]->Enable(is_checked);
-
-        is_checked &= !m_config->option(opt_key)->is_nil();
-        m_overrides_options[opt_key]->SetValue(is_checked);
-
-        Field* field = optgroup->get_fieldc(opt_key, extruder_idx);
-        if (field != nullptr)
-            field->toggle(is_checked);
+        update_line_with_near_label_widget(optgroup, opt_key, extruder_idx, is_checked);
     }
 }
 
@@ -1952,6 +1959,9 @@ void TabFilament::build()
         };
 
         optgroup = page->new_optgroup(L("Temperature"));
+
+        create_line_with_near_label_widget(optgroup, "idle_temperature");
+
         Line line = { L("Nozzle"), "" };
         line.append_option(optgroup->get_option("first_layer_temperature"));
         line.append_option(optgroup->get_option("temperature"));
@@ -2142,6 +2152,14 @@ void TabFilament::toggle_options()
 
     if (m_active_page->title() == "Filament Overrides")
         update_filament_overrides_page();
+
+    if (m_active_page->title() == "Filament") {
+        Page* page = m_active_page;
+
+        const auto og_it = std::find_if(page->m_optgroups.begin(), page->m_optgroups.end(), [](const ConfigOptionsGroupShp og) { return og->title == "Temperature"; });
+        if (og_it != page->m_optgroups.end())
+            update_line_with_near_label_widget(*og_it, "idle_temperature");
+    }
 }
 
 void TabFilament::update()
