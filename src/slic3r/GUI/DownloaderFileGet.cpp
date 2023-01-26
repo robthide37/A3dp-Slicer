@@ -9,6 +9,8 @@
 #include <iostream>
 
 #include "format.hpp"
+#include "GUI.hpp"
+#include "I18N.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -168,7 +170,14 @@ void FileGet::priv::get_perform()
 	else 
 		file = fopen(temp_path_wstring.c_str(), "ab");
 
-	assert(file != NULL);
+	//assert(file != NULL);
+	if (file == NULL) {
+		wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_ERROR);
+		evt->SetString(GUI::format_wxstr(_L("Can't create file at %1%."), temp_path_wstring));
+		evt->SetInt(m_id);
+		m_evt_handler->QueueEvent(evt);
+		return;
+	}
 
 	std:: string range_string = std::to_string(m_written) + "-";
 
@@ -244,7 +253,7 @@ void FileGet::priv::get_perform()
 			if (file != NULL)
 				fclose(file);
 			wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_ERROR);
-			evt->SetString(error);
+			evt->SetString(GUI::from_u8(error));
 			evt->SetInt(m_id);
 			m_evt_handler->QueueEvent(evt);
 		})
