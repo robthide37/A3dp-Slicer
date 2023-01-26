@@ -1484,9 +1484,6 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                         original_box = get_full_unscaled_instance_local_bounding_box();
 
                     relative_scale = original_box.size().cwiseProduct(scale).cwiseQuotient(current_box.size());
-
-                    std::cout << to_string(scale) << to_string(original_box.size()) << to_string(current_box.size()) << to_string(relative_scale) << "\n";
-
                     transformation_type.set_relative();
                 }
             }
