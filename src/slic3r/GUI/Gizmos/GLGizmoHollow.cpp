@@ -85,6 +85,12 @@ void GLGizmoHollow::on_render()
         return;
     }
 
+    if (m_state == On) {
+        // This gizmo is showing the object elevated. Tell the common
+        // SelectionInfo object to lie about the actual shift.
+        m_c->selection_info()->set_use_shift(true);
+    }
+
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glEnable(GL_DEPTH_TEST));
 
@@ -828,6 +834,7 @@ void GLGizmoHollow::on_set_state()
         // the gizmo was just turned Off
         m_parent.post_event(SimpleEvent(EVT_GLCANVAS_FORCE_UPDATE));
         m_c->instances_hider()->set_hide_full_scene(false);
+        m_c->selection_info()->set_use_shift(false); // see top of on_render for details
     }
 
     m_old_state = m_state;

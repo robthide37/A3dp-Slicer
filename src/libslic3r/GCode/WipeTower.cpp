@@ -932,7 +932,7 @@ void WipeTower::toolchange_Unload(
 	// this is to align ramming and future wiping extrusions, so the future y-steps can be uniform from the start:
     // the perimeter_width will later be subtracted, it is there to not load while moving over just extruded material
     Vec2f pos = Vec2f(end_of_ramming.x(), end_of_ramming.y() + (y_step/m_extra_spacing-m_perimeter_width) / 2.f + m_perimeter_width);
-	if (m_semm)
+    if (m_semm)
         writer.travel(pos, 2400.f);
     else
         writer.set_position(pos);

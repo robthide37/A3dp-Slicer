@@ -87,6 +87,12 @@ void GLGizmoSlaSupports::data_changed()
 
 void GLGizmoSlaSupports::on_render()
 {
+    if (m_state == On) {
+        // This gizmo is showing the object elevated. Tell the common
+        // SelectionInfo object to lie about the actual shift.
+        m_c->selection_info()->set_use_shift(true);
+    }
+
     if (!m_sphere.model.is_initialized()) {
         indexed_triangle_set its = its_make_sphere(1.0, double(PI) / 12.0);
         m_sphere.model.init_from(its);
@@ -836,8 +842,10 @@ void GLGizmoSlaSupports::on_set_state()
             m_old_mo_id = -1;
         }
 
-        if (m_state == Off)
+        if (m_state == Off) {
             m_c->instances_hider()->set_hide_full_scene(false);
+            m_c->selection_info()->set_use_shift(true); // see top of on_render for details
+        }
     }
     m_old_state = m_state;
 }

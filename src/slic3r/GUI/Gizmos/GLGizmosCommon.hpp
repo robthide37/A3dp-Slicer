@@ -163,7 +163,8 @@ public:
     ModelVolume* model_volume() const { return m_model_volume; }
     ModelInstance *model_instance() const;
     int get_active_instance() const;
-    float get_sla_shift() const { return m_z_shift; }
+    float get_sla_shift() const { return m_use_shift ? m_z_shift : 0.f; }
+    void set_use_shift(bool use) { m_use_shift = use; }
 
 protected:
     void on_update() override;
@@ -175,6 +176,7 @@ private:
     ModelVolume* m_model_volume = nullptr;
     // int m_active_inst = -1;
     float m_z_shift = 0.f;
+    bool m_use_shift = false;
 };
 
 
