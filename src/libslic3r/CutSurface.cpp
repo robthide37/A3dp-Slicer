@@ -1623,9 +1623,9 @@ void priv::create_reduce_map(ReductionMap &reduction_map, const CutMesh &mesh)
             Vec3d n1 = v_ab.cross(v_ae);
             Vec3d n2 = v_ab.cross(v_al);
             // check that normal has same direction
-            if ((n1.x() > 0 != n2.x() > 0) ||
-                (n1.y() > 0 != n2.y() > 0) ||
-                (n1.z() > 0 != n2.z() > 0))
+            if (((n1.x() > 0) != (n2.x() > 0)) ||
+                ((n1.y() > 0) != (n2.y() > 0)) ||
+                ((n1.z() > 0) != (n2.z() > 0)))
                 return; // this reduction will create CCW triangle
         }
 

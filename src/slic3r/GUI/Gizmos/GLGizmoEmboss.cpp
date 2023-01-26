@@ -762,8 +762,6 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     draw_mouse_offset(m_dragging_mouse_offset);
 #endif // SHOW_OFFSET_DURING_DRAGGING
 
-    std::string window_title_string = on_get_name();
-    const char* window_title = window_title_string.c_str();
     if (m_allow_open_near_volume){
         // check if is set window offset
         if (m_set_window_offset.has_value()) {
@@ -2041,7 +2039,7 @@ void GLGizmoEmboss::draw_font_list()
         }
 
         if (!ImGui::IsWindowFocused() || 
-            !is_input_text_active && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Escape))) {
+            (!is_input_text_active && ImGui::IsKeyPressed(ImGui::GetKeyIndex(ImGuiKey_Escape)))) {
             // closing of popup
             ImGui::CloseCurrentPopup();
         }
