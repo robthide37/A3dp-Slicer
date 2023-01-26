@@ -1447,9 +1447,12 @@ bool PageDownloader::on_finish_downloader() const
 
 bool DownloaderUtils::Worker::perform_register()
 {
-    //boost::filesystem::path chosen_dest/*(path_text_ctrl->GetValue());*/(boost::nowide::narrow(path_text_ctrl->GetValue()));
-    boost::filesystem::path chosen_dest (GUI::format(path_name()));
+    boost::filesystem::path aux_dest (GUI::into_u8(path_name()));
     boost::system::error_code ec;
+    boost::filesystem::path chosen_dest = boost::filesystem::absolute(aux_dest, ec);
+    if(ec)
+        chosen_dest = aux_dest;
+    ec.clear();
     if (chosen_dest.empty() || !boost::filesystem::is_directory(chosen_dest, ec) || ec) {
         std::string err_msg = GUI::format("%1%\n\n%2%",_L("Chosen directory for downloads does not Exists.") ,chosen_dest.string());
         BOOST_LOG_TRIVIAL(error) << err_msg;
