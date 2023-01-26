@@ -98,8 +98,11 @@ SCENARIO("Ooze prevention", "[Multi]")
             int s;
             if (! line.has_value('S', s))
                 throw std::runtime_error("M104 or M109 without S");
-            if (tool_temp[t] == 0 && s != print_config.first_layer_temperature.get_at(t) + print_config.standby_temperature_delta)
-                throw std::runtime_error("initial temperature is not equal to first layer temperature + standby delta");
+
+            // Following is obsolete. The first printing extruder is newly set to its first layer temperature immediately, not to the standby.
+            //if (tool_temp[t] == 0 && s != print_config.first_layer_temperature.get_at(t) + print_config.standby_temperature_delta)
+            //    throw std::runtime_error("initial temperature is not equal to first layer temperature + standby delta");
+
             tool_temp[t] = s;
         } else if (line.cmd_is("G1") && line.extruding(self) && line.dist_XY(self) > 0) {
             extrusion_points.emplace_back(line.new_XY_scaled(self) + scaled<coord_t>(print_config.extruder_offset.get_at(tool)));
