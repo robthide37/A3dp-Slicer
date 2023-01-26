@@ -260,8 +260,8 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
             SupportPointCause potential_cause = std::abs(curr_point.curvature) > 0.1 ? SupportPointCause::FloatingBridgeAnchor :
                                                                                        SupportPointCause::LongBridge;
-            float         line_len = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
-            Vec2d line_dir = (curr_point.position - prev_point.position).normalized();
+            float line_len = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
+            Vec2d line_dir = line_len > EPSILON ? Vec2d((curr_point.position - prev_point.position) / double(line_len)) : Vec2d::Zero();
 
             ExtrusionLine line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
                                    curr_point.position.cast<float>(), line_len, entity};
@@ -335,14 +335,6 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                 line_out.form_quality = 0.8f;
                 bridged_distance += line_len;
                 if (bridged_distance > max_bridge_len) {
-                    std::cout << "Problem found A: " << std::endl;
-                    std::cout << "bridged_distance: " << bridged_distance << std::endl;
-                    std::cout << "max_bridge_len: " << max_bridge_len << std::endl;
-                    std::cout << "line_out.form_quality: " << line_out.form_quality << std::endl;
-                    std::cout << "curr_point.distance: " << curr_point.distance << std::endl;
-                    std::cout << "curr_point.curvature: " << curr_point.curvature << std::endl;
-                    std::cout << "flow_width: " << flow_width << std::endl;
-
                     line_out.support_point_generated = potential_cause;
                     bridged_distance                 = 0.0f;
                 }
@@ -350,14 +342,6 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                 bridged_distance += line_len;
                 line_out.form_quality = nearest_prev_layer_line.form_quality - 0.3f;
                 if (line_out.form_quality < 0 && bridged_distance > max_bridge_len) {
-                    std::cout << "Problem found B: " << std::endl;
-                    std::cout << "bridged_distance: " << bridged_distance << std::endl;
-                    std::cout << "max_bridge_len: " << max_bridge_len << std::endl;
-                    std::cout << "line_out.form_quality: " << line_out.form_quality << std::endl;
-                    std::cout << "curr_point.distance: " << curr_point.distance << std::endl;
-                    std::cout << "curr_point.curvature: " << curr_point.curvature << std::endl;
-                    std::cout << "flow_width: " << flow_width << std::endl;
-
                     line_out.support_point_generated = potential_cause;
                     line_out.form_quality            = 0.5f;
                     bridged_distance                 = 0.0f;
@@ -662,7 +646,8 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const size_t &slice_i
     }
 
     //  BRIM HANDLING
-    if (layer->id() == params.raft_layers_count && params.raft_layers_count == 0 && params.brim_type != BrimType::btNoBrim) {
+    if (layer->id() == params.raft_layers_count && params.raft_layers_count == 0 && params.brim_type != BrimType::btNoBrim &&
+        params.brim_width > 0.0) {
         // TODO: The algorithm here should take into account that multiple slices may have coliding Brim areas and the final brim area is
         // smaller,
         //  thus has lower adhesion. For now this effect will be neglected.
@@ -921,7 +906,8 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po,
                 for (const auto &perimeter_idx : island.perimeters) {
                     const ExtrusionEntity     *entity = perimeter_region->perimeters().entities[perimeter_idx];
                     std::vector<ExtrusionLine> perims = check_extrusion_entity_stability(entity, perimeter_region,
-                                                                                         prev_layer_ext_perim_lines,prev_layer_boundary, params);
+                                                                                         prev_layer_ext_perim_lines, prev_layer_boundary,
+                                                                                         params);
                     for (const ExtrusionLine &perim : perims) {
                         if (perim.support_point_generated.has_value()) {
                             reckon_new_support_point(*perim.support_point_generated, create_support_point_position(perim.b), -EPSILON,
@@ -932,6 +918,30 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po,
                         }
                     }
                 }
+                // DEBUG EXPORT, NOT USED NOW
+                // if (BR_bridge) {
+                //     Lines scaledl;
+                //     for (const auto &l : prev_layer_boundary.get_lines()) {
+                //         scaledl.emplace_back(Point::new_scale(l.a), Point::new_scale(l.b));
+                //     }
+
+                //     Lines perimsl;
+                //     for (const auto &l : current_slice_ext_perims_lines) {
+                //         perimsl.emplace_back(Point::new_scale(l.a), Point::new_scale(l.b));
+                //     }
+
+                //     BoundingBox bb = get_extents(scaledl);
+                //     bb.merge(get_extents(perimsl));
+
+                //     ::Slic3r::SVG svg(debug_out_path(
+                //                           ("slice" + std::to_string(slice_idx) + "_" + std::to_string(layer_idx).c_str()).c_str()),
+                //                       get_extents(scaledl));
+                //     svg.draw(scaledl, "red", scale_(0.4));
+                //     svg.draw(perimsl, "blue", scale_(0.25));
+                    
+                    
+                //     svg.Close();
+                // }
             }
 
             LD    current_slice_lines_distancer(current_slice_ext_perims_lines);

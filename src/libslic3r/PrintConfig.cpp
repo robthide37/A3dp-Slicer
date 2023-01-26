@@ -537,7 +537,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(60));
 
     def             = this->add("enable_dynamic_overhang_speeds", coBool);
-    def->label      = L("Enable dynamic overhang speeds (Experimental)");
+    def->label      = L("Enable dynamic overhang speeds");
     def->category   = L("Speed");
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
     def->mode       = comAdvanced;
