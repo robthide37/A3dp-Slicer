@@ -2190,10 +2190,9 @@ void TabFilament::clear_pages()
 
 void TabFilament::msw_rescale()
 {
-    for (const auto& over_opt : m_overrides_options) {
-        wxWindow* win = over_opt.second;
-        win->SetInitialSize(win->GetBestSize());
-    }
+    for (const auto& over_opt : m_overrides_options)
+        if (wxWindow* win = over_opt.second)
+            win->SetInitialSize(win->GetBestSize());
 
     Tab::msw_rescale();
 }
