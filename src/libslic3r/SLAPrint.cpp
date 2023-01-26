@@ -157,30 +157,12 @@ void SLAPrint::clear()
 // Transformation without rotation around Z and without a shift by X and Y.
 Transform3d SLAPrint::sla_trafo(const ModelObject &model_object) const
 {
-
-    Vec3d corr = this->relative_correction();
-
     ModelInstance &model_instance = *model_object.instances.front();
-    Vec3d          offset         = model_instance.get_offset();
-    Vec3d          rotation       = model_instance.get_rotation();
-    offset(0) = 0.;
-    offset(1) = 0.;
-    rotation(2) = 0.;
-
-    offset.z() *= corr.z();
-
     auto trafo = Transform3d::Identity();
-    trafo.translate(offset);
-    trafo.scale(corr);
-    trafo.rotate(Eigen::AngleAxisd(rotation.z(), Vec3d::UnitZ()));
-    trafo.rotate(Eigen::AngleAxisd(rotation.y(), Vec3d::UnitY()));
-    trafo.rotate(Eigen::AngleAxisd(rotation.x(), Vec3d::UnitX()));
-    trafo.scale(model_instance.get_scaling_factor());
-    trafo.scale(model_instance.get_mirror());
-
+    trafo.translate(Vec3d{ 0., 0., model_instance.get_offset().z() * this->relative_correction().z() });
+    trafo.linear() = Eigen::DiagonalMatrix<double, 3, 3>(this->relative_correction()) * model_instance.get_matrix().linear();
     if (model_instance.is_left_handed())
         trafo = Eigen::Scaling(Vec3d(-1., 1., 1.)) * trafo;
-
     return trafo;
 }
 
