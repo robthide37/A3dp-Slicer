@@ -122,39 +122,18 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
     CurvatureEstimator cestim;
     auto maybe_unscale = [](const P &p) { return SCALED_INPUT ? unscaled(p) : p.template cast<double>(); };
 
-    std::vector<P> extrusion_points;
-    {
-        if (max_line_length <= 0) {
-            extrusion_points = input_points;
-        } else {
-            extrusion_points.reserve(input_points.size() * 2);
-            for (size_t i = 0; i + 1 < input_points.size(); i++) {
-                const P &curr            = input_points[i];
-                const P &next            = input_points[i + 1];
-                extrusion_points.push_back(curr);
-                auto     len             = maybe_unscale(next - curr).squaredNorm();
-                double   t               = sqrt((max_line_length * max_line_length) / len);
-                size_t   new_point_count = 1.0 / (t + EPSILON);
-                for (size_t j = 1; j < new_point_count + 1; j++) {
-                    extrusion_points.push_back(curr * (1.0 - j * t) + next * (j * t));
-                }
-            }
-            extrusion_points.push_back(input_points.back());
-        }
-    }
-
     std::vector<ExtendedPoint> points;
-    points.reserve(extrusion_points.size() * (ADD_INTERSECTIONS ? 1.5 : 1));
+    points.reserve(input_points.size() * (ADD_INTERSECTIONS ? 1.5 : 1));
 
     {
-        ExtendedPoint start_point{maybe_unscale(extrusion_points.front())};
+        ExtendedPoint start_point{maybe_unscale(input_points.front())};
         auto [distance, nearest_line, x]    = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(start_point.position.cast<AABBScalar>());
         start_point.distance                = distance + boundary_offset;
         start_point.nearest_prev_layer_line = nearest_line;
         points.push_back(start_point);
     }
-    for (size_t i = 1; i < extrusion_points.size(); i++) {
-        ExtendedPoint next_point{maybe_unscale(extrusion_points[i])};
+    for (size_t i = 1; i < input_points.size(); i++) {
+        ExtendedPoint next_point{maybe_unscale(input_points[i])};
         auto [distance, nearest_line, x]   = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(next_point.position.cast<AABBScalar>());
         next_point.distance                = distance + boundary_offset;
         next_point.nearest_prev_layer_line = nearest_line;
@@ -172,7 +151,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
 
     if (PREV_LAYER_BOUNDARY_OFFSET && ADD_INTERSECTIONS) {
         std::vector<ExtendedPoint> new_points;
-        new_points.reserve(points.size() * 2);
+        new_points.reserve(points.size()*2);
         new_points.push_back(points.front());
         for (int point_idx = 0; point_idx < int(points.size()) - 1; ++point_idx) {
             const ExtendedPoint &curr = points[point_idx];
@@ -201,7 +180,30 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
             }
             new_points.push_back(next);
         }
-        points = std::move(new_points);
+        points = new_points;
+    }
+
+    if (max_line_length > 0) {
+        std::vector<ExtendedPoint> new_points;
+        new_points.reserve(points.size()*2);
+        {
+            for (size_t i = 0; i + 1 < points.size(); i++) {
+                const ExtendedPoint &curr = points[i];
+                const ExtendedPoint &next = points[i + 1];
+                new_points.push_back(curr);
+                double len             = (next.position - curr.position).squaredNorm();
+                double t               = sqrt((max_line_length * max_line_length) / len);
+                size_t new_point_count = 1.0 / t;
+                for (size_t j = 1; j < new_point_count + 1; j++) {
+                    Vec2d pos  = curr.position * (1.0 - j * t) + next.position * (j * t);
+                    auto [p_dist, p_near_l,
+                          p_x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(pos.cast<AABBScalar>());
+                    new_points.push_back(ExtendedPoint{pos, float(p_dist + boundary_offset), p_near_l});
+                }
+            }
+            new_points.push_back(points.back());
+        }
+        points = new_points;
     }
 
     for (int point_idx = 0; point_idx < int(points.size()); ++point_idx) {

@@ -290,7 +290,6 @@ private:
 	// Extruder specific parameters.
     std::vector<FilamentParameters> m_filpar;
 
-
 	// State of the wipe tower generator.
 	unsigned int m_num_layer_changes = 0; // Layer change counter for the output statistics.
 	unsigned int m_num_tool_changes  = 0; // Tool change change counter for the output statistics.

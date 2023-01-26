@@ -1,4 +1,6 @@
 #include "Exception.hpp"
+#include "KDTreeIndirect.hpp"
+#include "Point.hpp"
 #include "Print.hpp"
 #include "BoundingBox.hpp"
 #include "ClipperUtils.hpp"
@@ -21,14 +23,19 @@
 #include "SupportSpotsGenerator.hpp"
 #include "TriangleSelectorWrapper.hpp"
 #include "format.hpp"
+#include "libslic3r.h"
 
+#include <algorithm>
+#include <cmath>
 #include <float.h>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 #include <boost/log/trivial.hpp>
 
 #include <tbb/parallel_for.h>
+#include <vector>
 
 using namespace std::literals;
 
@@ -406,32 +413,58 @@ void PrintObject::ironing()
     }
 }
 
-
-/*
-std::vector<size_t> problematic_layers = SupportSpotsGenerator::quick_search(this);
-    if (!problematic_layers.empty()) {
-        std::cout << "Object needs supports" << std::endl;
-        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                L("Supportable issues found. Consider enabling supports for this object"));
-        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                L("Supportable issues found. Consider enabling supports for this object"));
-        for (size_t index = 0; index < std::min(problematic_layers.size(), size_t(4)); ++index) {
-            this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                    format(L("Layer with issues: %1%"), problematic_layers[index] + 1));
-        }
-    }
- */
 void PrintObject::generate_support_spots()
 {
     if (this->set_started(posSupportSpotsSearch)) {
         BOOST_LOG_TRIVIAL(debug) << "Searching support spots - start";
         m_print->set_status(75, L("Searching support spots"));
         if (!this->shared_regions()->generated_support_points.has_value()) {
-            PrintTryCancel cancel_func = m_print->make_try_cancel();
-            SupportSpotsGenerator::Params        params{this->print()->m_config.filament_type.values};
-            SupportSpotsGenerator::SupportPoints supp_points = SupportSpotsGenerator::full_search(this, cancel_func, params);
+            PrintTryCancel                cancel_func = m_print->make_try_cancel();
+            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
+                                                 float(this->print()->m_config.perimeter_acceleration.getFloat()),
+                                                 this->config().raft_layers.getInt(), this->config().brim_type.value,
+                                                 float(this->config().brim_width.getFloat())};
+            auto [supp_points, partial_objects]              = SupportSpotsGenerator::full_search(this, cancel_func, params);
             this->m_shared_regions->generated_support_points = {this->trafo_centered(), supp_points};
             m_print->throw_if_canceled();
+
+            auto alert_fn = [&](PrintStateBase::WarningLevel level, SupportSpotsGenerator::SupportPointCause cause) {
+                switch (cause) {
+                case SupportSpotsGenerator::SupportPointCause::LongBridge:
+                    this->active_step_add_warning(level, L("There are bridges longer than recommended length. Consider adding supports. ") +
+                                                             (L("Object name")) + ": " + this->model_object()->name);
+                    break;
+                case SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor:
+                    this->active_step_add_warning(level, L("Unsupported bridges will collapse. Supports are needed. ") + (L("Object name")) +
+                                                             ": " + this->model_object()->name);
+                    break;
+                case SupportSpotsGenerator::SupportPointCause::FloatingExtrusion:
+                    if (level == PrintStateBase::WarningLevel::CRITICAL) {
+                        this->active_step_add_warning(level, L("Clusters of unsupported extrusions found. Supports are needed. ") +
+                                                                 (L("Object name")) + ": " + this->model_object()->name);
+                    } else {
+                        this->active_step_add_warning(level, L("Some unspported extrusions found. Consider adding supports. ") +
+                                                                 (L("Object name")) + ": " + this->model_object()->name);
+                    }
+                    break;
+                case SupportSpotsGenerator::SupportPointCause::SeparationFromBed:
+                    this->active_step_add_warning(level, L("Object part may break from the bed. Consider adding brim and/or supports. ") +
+                                                             (L("Object name")) + ": " + this->model_object()->name);
+                    break;
+                case SupportSpotsGenerator::SupportPointCause::UnstableFloatingPart:
+                    this->active_step_add_warning(level, L("Floating object parts detected. Supports are needed. ") + (L("Object name")) +
+                                                             ": " + this->model_object()->name);
+                    break;
+                case SupportSpotsGenerator::SupportPointCause::WeakObjectPart:
+                    this->active_step_add_warning(level, L("Thin parts of the object may break. Consider adding supports. ") +
+                                                             (L("Object name")) + ": " + this->model_object()->name);
+                    break;
+                }
+            };
+
+            if (!this->has_support()) {
+                SupportSpotsGenerator::raise_alerts_for_issues(supp_points, partial_objects, alert_fn);
+            }
         }
         BOOST_LOG_TRIVIAL(debug) << "Searching support spots - end";
         this->set_done(posSupportSpotsSearch);
@@ -468,7 +501,10 @@ void PrintObject::estimate_curled_extrusions()
 
             // Estimate curling of support material and add it to the malformaition lines of each layer
             float                         support_flow_width = support_material_flow(this, this->config().layer_height).width();
-            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values};
+            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
+                                                 float(this->print()->m_config.perimeter_acceleration.getFloat()),
+                                                 this->config().raft_layers.getInt(), this->config().brim_type.value,
+                                                 float(this->config().brim_width.getFloat())};
             SupportSpotsGenerator::estimate_supports_malformations(this->support_layers(), support_flow_width, params);
             SupportSpotsGenerator::estimate_malformations(this->layers(), params);
             m_print->throw_if_canceled();
@@ -580,6 +616,7 @@ bool PrintObject::invalidate_state_by_config_options(
         if (   opt_key == "brim_width"
             || opt_key == "brim_separation"
             || opt_key == "brim_type") {
+            steps.emplace_back(posSupportSpotsSearch);
             // Brim is printed below supports, support invalidates brim and skirt.
             steps.emplace_back(posSupportMaterial);
         } else if (
