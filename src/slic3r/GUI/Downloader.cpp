@@ -146,8 +146,7 @@ void Downloader::start_download(const std::string& full_url)
 #else
     std::string escaped_url = FileGet::escape_url(full_url.substr(24));
 #endif
-
-	if (!boost::starts_with(escaped_url, "https://files.printables.com") && !boost::starts_with(escaped_url, "https://dev-files.printables.com")) {
+	if (!boost::starts_with(escaped_url, "https://") || !FileGet::is_subdomain(escaped_url, "printables.com")) {
 		std::string msg = format(_L("Download won't start. Download URL doesn't point to https://files.printables.com : %1%"), escaped_url);
 		BOOST_LOG_TRIVIAL(error) << msg;
 		NotificationManager* ntf_mngr = wxGetApp().notification_manager();
