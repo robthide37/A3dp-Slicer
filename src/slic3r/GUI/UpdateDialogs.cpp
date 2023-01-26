@@ -193,7 +193,7 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boos
 		btn_ok->SetLabel(_L("Download"));
 		btn_ok->Bind(wxEVT_BUTTON, ([this, path](wxCommandEvent& e){
 			boost::system::error_code ec;
-			std::string input = GUI::format(txtctrl_path->GetValue());
+			std::string input = GUI::into_u8(txtctrl_path->GetValue());
 			boost::filesystem::path dir = boost::filesystem::absolute(boost::filesystem::path(input), ec);
 			if (ec)
 				dir = boost::filesystem::path(input);
