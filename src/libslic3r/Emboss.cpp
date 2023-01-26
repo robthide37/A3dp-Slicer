@@ -543,6 +543,7 @@ ExPolygons Emboss::heal_shape(const Polygons &shape)
     return res;
 }
 
+#include "libslic3r/SVG.hpp"
 void priv::visualize_heal(const std::string &svg_filepath, const ExPolygons &expolygons) {
     double svg_scale = SHAPE_SCALE / unscale<double>(1.);
     Points pts = to_points(expolygons);
