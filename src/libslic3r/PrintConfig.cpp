@@ -2589,6 +2589,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<SlicingMode>(SlicingMode::Regular));
 
+    def           = this->add("check_for_issues_mode", coBool);
+    def->label    = L("Check for issues: ");
+    def->category = L("Support material");
+    def->tooltip  = L("Check for supportable issues that may appear during printing. "
+                       "If enabled, slicer will make alerts when it detects "
+                       "issues that may be resolved with supports and/or brim.");
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("support_material", coBool);
     def->label = L("Generate support material");
     def->category = L("Support material");
