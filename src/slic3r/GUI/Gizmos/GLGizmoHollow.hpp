@@ -1,7 +1,7 @@
 #ifndef slic3r_GLGizmoHollow_hpp_
 #define slic3r_GLGizmoHollow_hpp_
 
-#include "GLGizmoBase.hpp"
+#include "GLGizmoSlaBase.hpp"
 #include "slic3r/GUI/GLSelectionRectangle.hpp"
 
 #include <libslic3r/SLA/Hollowing.hpp>
@@ -20,12 +20,8 @@ namespace GUI {
 
 enum class SLAGizmoEventType : unsigned char;
 class Selection;
-class GLGizmoHollow : public GLGizmoBase
+class GLGizmoHollow : public GLGizmoSlaBase
 {
-private:
-    bool unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal);
-
-
 public:
     GLGizmoHollow(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
     void data_changed() override;
@@ -51,14 +47,14 @@ protected:
 
 private:
     void render_points(const Selection& selection);
-    void hollow_mesh(bool postpone_error_messages = false);
-    void set_sla_auxiliary_volumes_picking_state(bool state);
-    void update_raycasters_for_picking_transform();
+    void register_hole_raycasters_for_picking();
+    void unregister_hole_raycasters_for_picking();
+    void update_hole_raycasters_for_picking_transform();
 
     ObjectID m_old_mo_id = -1;
 
     PickingModel m_cylinder;
-    std::vector<std::shared_ptr<SceneRaycasterItem>> m_raycasters;
+    std::vector<std::shared_ptr<SceneRaycasterItem>> m_hole_raycasters;
 
     float m_new_hole_radius = 2.f;        // Size of a new hole.
     float m_new_hole_height = 6.f;
@@ -106,7 +102,6 @@ protected:
     void on_stop_dragging() override;
     void on_dragging(const UpdateData &data) override;
     void on_render_input_window(float x, float y, float bottom_limit) override;
-    virtual CommonGizmosDataID on_get_requirements() const override;
 
     std::string on_get_name() const override;
     bool on_is_activable() const override;

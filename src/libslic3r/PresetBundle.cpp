@@ -159,6 +159,7 @@ void PresetBundle::setup_directories()
         data_dir,
 		data_dir / "vendor",
         data_dir / "cache",
+        data_dir / "cache" / "vendor",
         data_dir / "shapes",
 #ifdef SLIC3R_PROFILE_USE_PRESETS_SUBDIR
         // Store the print/filament/printer presets into a "presets" directory.
@@ -1313,11 +1314,11 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
 
     const VendorProfile *vendor_profile = nullptr;
     if (flags.has(LoadConfigBundleAttribute::LoadSystem) || flags.has(LoadConfigBundleAttribute::LoadVendorOnly)) {
-        auto vp = VendorProfile::from_ini(tree, path);
-        if (vp.models.size() == 0) {
+        VendorProfile vp = VendorProfile::from_ini(tree, path);
+        if (vp.models.size() == 0 && !vp.templates_profile) {
             BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: No printer model defined.") % path;
             return std::make_pair(PresetsConfigSubstitutions{}, 0);
-        } else if (vp.num_variants() == 0) {
+        } else if (vp.num_variants() == 0 && !vp.templates_profile) {
             BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: No printer variant defined") % path;
             return std::make_pair(PresetsConfigSubstitutions{}, 0);
         }
@@ -1359,6 +1360,9 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
         } else if (boost::starts_with(section.first, "filament:")) {
             presets = &this->filaments;
             preset_name = section.first.substr(9);
+            if (vendor_profile && vendor_profile->templates_profile) {
+                preset_name += " @Template";
+            }
         } else if (boost::starts_with(section.first, "sla_print:")) {
             presets = &this->sla_prints;
             preset_name = section.first.substr(10);

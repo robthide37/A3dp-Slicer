@@ -772,8 +772,15 @@ void GUI_App::post_init()
             this->mainframe->load_config_file(this->init_params->load_configs.back());
         // If loading a 3MF file, the config is loaded from the last one.
         if (!this->init_params->input_files.empty()) {
+#if 1 // #ysFIXME_delete_after_test_of
+            wxArrayString fns;
+            for (const std::string& name : this->init_params->input_files)
+                fns.Add(from_u8(name));
+            if (plater()->load_files(fns) && this->init_params->input_files.size() == 1) {
+#else
             const std::vector<size_t> res = this->plater()->load_files(this->init_params->input_files, true, true);
             if (!res.empty() && this->init_params->input_files.size() == 1) {
+#endif
                 // Update application titlebar when opening a project file
                 const std::string& filename = this->init_params->input_files.front();
                 if (boost::algorithm::iends_with(filename, ".amf") ||
@@ -808,15 +815,17 @@ void GUI_App::post_init()
             // Configuration is not compatible and reconfigure was refused by the user. Application is closing.
             return;
         CallAfter([this] {
+            // preset_updater->sync downloads profile updates on background so it must begin after config wizard finished.
             bool cw_showed = this->config_wizard_startup();
             this->preset_updater->sync(preset_bundle);
-            this->app_version_check(false);
             if (! cw_showed) {
                 // The CallAfter is needed as well, without it, GL extensions did not show.
                 // Also, we only want to show this when the wizard does not, so the new user
                 // sees something else than "we want something" on the first start.
-                show_send_system_info_dialog_if_needed();
-            }
+                show_send_system_info_dialog_if_needed();   
+            }  
+            // app version check is asynchronous and triggers blocking dialog window, better call it last
+            this->app_version_check(false);
         });
     }
 
@@ -1244,11 +1253,11 @@ bool GUI_App::on_init_inner()
         preset_updater = new PresetUpdater();
         Bind(EVT_SLIC3R_VERSION_ONLINE, &GUI_App::on_version_read, this);
         Bind(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, [this](const wxCommandEvent& evt) {
-            if (this->plater_ != nullptr && app_config->get("notify_release") == "all") {
+            if (this->plater_ != nullptr && (m_app_updater->get_triggered_by_user() || app_config->get("notify_release") == "all")) {
                 std::string evt_string = into_u8(evt.GetString());
                 if (*Semver::parse(SLIC3R_VERSION) < *Semver::parse(evt_string)) {
                     auto notif_type = (evt_string.find("beta") != std::string::npos ? NotificationType::NewBetaAvailable : NotificationType::NewAlphaAvailable);
-                    this->plater_->get_notification_manager()->push_notification( notif_type
+                    this->plater_->get_notification_manager()->push_version_notification( notif_type
                         , NotificationManager::NotificationLevel::ImportantNotificationLevel
                         , Slic3r::format(_u8L("New prerelease version %1% is available."), evt_string)
                         , _u8L("See Releases page.")
@@ -1281,7 +1290,8 @@ bool GUI_App::on_init_inner()
             associate_gcode_files();
 #endif // __WXMSW__
     }
-
+    
+    std::string delayed_error_load_presets;
     // Suppress the '- default -' presets.
     preset_bundle->set_default_suppressed(app_config->get("no_defaults") == "1");
     try {
@@ -1290,7 +1300,7 @@ bool GUI_App::on_init_inner()
         // installation of a compatible system preset, thus nullifying the system preset substitutions.
         init_params->preset_substitutions = preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSystemSilent);
     } catch (const std::exception &ex) {
-        show_error(nullptr, ex.what());
+        delayed_error_load_presets = ex.what(); 
     }
 
 #ifdef WIN32
@@ -1306,6 +1316,9 @@ bool GUI_App::on_init_inner()
     // application frame
     if (scrn && is_editor())
         scrn->SetText(_L("Preparing settings tabs") + dots);
+
+    if (!delayed_error_load_presets.empty())
+        show_error(nullptr, delayed_error_load_presets);
 
     mainframe = new MainFrame();
     // hide settings tabs after first Layout
@@ -2318,13 +2331,33 @@ ConfigOptionMode GUI_App::get_mode()
            mode == "simple" ? comSimple : comAdvanced;
 }
 
-void GUI_App::save_mode(const /*ConfigOptionMode*/int mode) 
+bool GUI_App::save_mode(const /*ConfigOptionMode*/int mode) 
 {
     const std::string mode_str = mode == comExpert ? "expert" :
                                  mode == comSimple ? "simple" : "advanced";
+
+    auto can_switch_to_simple = [](Model& model) {
+        for (const ModelObject* model_object : model.objects)
+            if (model_object->volumes.size() > 1) {
+                for (size_t i = 1; i < model_object->volumes.size(); ++i)
+                    if (!model_object->volumes[i]->is_support_modifier())
+                        return false;
+            }
+        return true;
+    };
+
+    if (mode == comSimple && !can_switch_to_simple(model())) {
+        show_info(nullptr,
+            _L("Simple mode supports manipulation with single-part object(s)\n"
+            "or object(s) with support modifiers only.") + "\n\n" +
+            _L("Please check your object list before mode changing."),
+            _L("Change application mode"));
+        return false;
+    }
     app_config->set("view_mode", mode_str);
     app_config->save(); 
     update_mode();
+    return true;
 }
 
 // Update view mode according to selected menu
@@ -2976,6 +3009,14 @@ void GUI_App::open_web_page_localized(const std::string &http_address)
 // Because of we can't to print the multi-part objects with SLA technology.
 bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
 {
+    if (model_has_parameter_modifiers_in_objects(model())) {
+        show_info(nullptr,
+            _L("It's impossible to print object(s) which contains parameter modifiers with SLA technology.") + "\n\n" +
+            _L("Please check your object list before preset changing."),
+            caption);
+        return false;
+    }
+/*
     if (model_has_multi_part_objects(model())) {
         show_info(nullptr,
             _L("It's impossible to print multi-part object(s) with SLA technology.") + "\n\n" +
@@ -2990,6 +3031,7 @@ bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
             caption);
         return false;
     }
+*/
     return true;
 }
 
@@ -2998,6 +3040,9 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
     wxCHECK_MSG(mainframe != nullptr, false, "Internal error: Main frame not created / null");
 
     if (reason == ConfigWizard::RR_USER) {
+        // Cancel sync before starting wizard to prevent two downloads at same time
+        preset_updater->cancel_sync();
+        preset_updater->update_index_db();
         if (preset_updater->config_update(app_config->orig_version(), PresetUpdater::UpdateParams::FORCED_BEFORE_WIZARD) == PresetUpdater::R_ALL_CANCELED)
             return false;
     }
@@ -3180,6 +3225,7 @@ bool GUI_App::check_updates(const bool verbose)
 {	
 	PresetUpdater::UpdateResult updater_result;
 	try {
+        preset_updater->update_index_db();
 		updater_result = preset_updater->config_update(app_config->orig_version(), verbose ? PresetUpdater::UpdateParams::SHOW_TEXT_BOX : PresetUpdater::UpdateParams::SHOW_NOTIFICATION);
 		if (updater_result == PresetUpdater::R_INCOMPAT_EXIT) {
 			mainframe->Close();
@@ -3287,10 +3333,24 @@ void GUI_App::on_version_read(wxCommandEvent& evt)
     app_config->set("version_online", into_u8(evt.GetString()));
     app_config->save();
     std::string opt = app_config->get("notify_release");
-    if (this->plater_ == nullptr || (opt != "all" && opt != "release")) {
+    if (this->plater_ == nullptr || (!m_app_updater->get_triggered_by_user() && opt != "all" && opt != "release")) {
+        BOOST_LOG_TRIVIAL(info) << "Version online: " << evt.GetString() << ". User does not wish to be notified.";
         return;
     }
     if (*Semver::parse(SLIC3R_VERSION) >= *Semver::parse(into_u8(evt.GetString()))) {
+        if (m_app_updater->get_triggered_by_user())
+        {
+            std::string text = (*Semver::parse(into_u8(evt.GetString())) == Semver()) 
+                ? Slic3r::format(_u8L("Check for application update has failed."))
+                : Slic3r::format(_u8L("No new version is available. Latest release version is %1%."), evt.GetString());
+
+            this->plater_->get_notification_manager()->push_version_notification(NotificationType::NoNewReleaseAvailable
+                , NotificationManager::NotificationLevel::RegularNotificationLevel
+                , text
+                , std::string()
+                , std::function<bool(wxEvtHandler*)>()
+            );
+        }
         return;
     }
     // notification
@@ -3324,7 +3384,7 @@ void GUI_App::app_updater(bool from_user)
     assert(!app_data.target_path.empty());
 
     // dialog with new version info
-    AppUpdateAvailableDialog dialog(*Semver::parse(SLIC3R_VERSION), *app_data.version);
+    AppUpdateAvailableDialog dialog(*Semver::parse(SLIC3R_VERSION), *app_data.version, from_user);
     auto dialog_result = dialog.ShowModal();
     // checkbox "do not show again"
     if (dialog.disable_version_check()) {
@@ -3339,6 +3399,10 @@ void GUI_App::app_updater(bool from_user)
     dialog_result = dwnld_dlg.ShowModal();
     //  Doesn't wish to download
     if (dialog_result != wxID_OK) {
+        return;
+    }
+    if (dwnld_dlg.get_download_path().parent_path().empty() || !boost::filesystem::exists(dwnld_dlg.get_download_path().parent_path())) {
+        show_error(nullptr,GUI::format_wxstr(_L("Download can't proceed. Target directory doesn't exists: %1%"), dwnld_dlg.get_download_path().parent_path().string()));
         return;
     }
     app_data.target_path =dwnld_dlg.get_download_path();

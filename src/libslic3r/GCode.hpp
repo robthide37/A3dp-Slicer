@@ -39,14 +39,13 @@ struct PrintInstance;
 class OozePrevention {
 public:
     bool enable;
-    Points standby_points;
     
     OozePrevention() : enable(false) {}
     std::string pre_toolchange(GCode &gcodegen);
     std::string post_toolchange(GCode &gcodegen);
     
 private:
-    int _get_temp(GCode &gcodegen);
+    int _get_temp(const GCode &gcodegen) const;
 };
 
 class Wipe {

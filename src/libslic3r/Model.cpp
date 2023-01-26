@@ -794,6 +794,11 @@ bool ModelObject::is_mm_painted() const
     return std::any_of(this->volumes.cbegin(), this->volumes.cend(), [](const ModelVolume *mv) { return mv->is_mm_painted(); });
 }
 
+bool ModelObject::is_text() const
+{
+    return this->volumes.size() == 1 && this->volumes[0]->is_text();
+}
+
 void ModelObject::sort_volumes(bool full_sort)
 {
     // sort volumes inside the object to order "Model Part, Negative Volume, Modifier, Support Blocker and Support Enforcer. "
@@ -1775,7 +1780,7 @@ void ModelObject::bake_xy_rotation_into_meshes(size_t instance_idx)
     // Adjust the instances.
     for (size_t i = 0; i < this->instances.size(); ++ i) {
         ModelInstance &model_instance = *this->instances[i];
-        model_instance.set_rotation(Vec3d(0., 0., Geometry::rotation_diff_z(reference_trafo.get_rotation(), model_instance.get_rotation())));
+        model_instance.set_rotation(Vec3d(0., 0., Geometry::rotation_diff_z(reference_trafo.get_matrix(), model_instance.get_matrix())));
         model_instance.set_scaling_factor(Vec3d(new_scaling_factor, new_scaling_factor, new_scaling_factor));
         model_instance.set_mirror(Vec3d(1., 1., 1.));
     }
@@ -2624,6 +2629,15 @@ bool model_mmu_segmentation_data_changed(const ModelObject& mo, const ModelObjec
     return model_property_changed(mo, mo_new, 
         [](const ModelVolumeType t) { return t == ModelVolumeType::MODEL_PART; }, 
         [](const ModelVolume &mv_old, const ModelVolume &mv_new){ return mv_old.mmu_segmentation_facets.timestamp_matches(mv_new.mmu_segmentation_facets); });
+}
+
+bool model_has_parameter_modifiers_in_objects(const Model &model)
+{
+    for (const auto& model_object : model.objects)
+        for (const auto& volume : model_object->volumes)
+            if (volume->is_modifier())
+                return true;
+    return false;
 }
 
 bool model_has_multi_part_objects(const Model &model)

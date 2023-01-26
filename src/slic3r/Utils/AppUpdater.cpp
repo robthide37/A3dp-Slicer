@@ -13,6 +13,7 @@
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
+#include "slic3r/GUI/I18N.hpp"
 #include "slic3r/Utils/Http.hpp"
 
 #include "libslic3r/Utils.hpp"
@@ -36,7 +37,7 @@ namespace {
 		std::string msg;
 		bool res = GUI::create_process(path, std::wstring(), msg);
 		if (!res) {
-			std::string full_message = GUI::format("Running downloaded instaler of %1% has failed:\n%2%", SLIC3R_APP_NAME, msg);
+			std::string full_message = GUI::format(_utf8("Running downloaded instaler of %1% has failed:\n%2%"), SLIC3R_APP_NAME, msg);
 			BOOST_LOG_TRIVIAL(error) << full_message; // lm: maybe UI error msg?  // dk: bellow. (maybe some general show error evt would be better?)
 			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
 			evt->SetString(full_message);
@@ -170,8 +171,10 @@ bool  AppUpdater::priv::http_get_file(const std::string& url, size_t size_limit,
 			// progress function returns true as success (to continue) 
 			cancel = (m_cancel ? true : !progress_fn(std::move(progress)));
 			if (cancel) {
-				error_message = GUI::format("Error getting: `%1%`: Download was canceled.", //lm:typo //dk: am i blind? :)
-					url);
+				// Lets keep error_message empty here - if there is need to show error dialog, the message will be probably shown by whatever caused the cancel.
+				/*
+				error_message = GUI::format(_utf8("Error getting: `%1%`: Download was canceled."), url);
+				*/
 				BOOST_LOG_TRIVIAL(debug) << "AppUpdater::priv::http_get_file message: "<< error_message;
 			}
 		})
@@ -200,9 +203,33 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 	assert(!dest_path.empty());
 	if (dest_path.empty())
 	{
-		BOOST_LOG_TRIVIAL(error) << "Download from " << data.url << " could not start. Destination path is empty.";
+		std::string line1 = GUI::format(_utf8("Internal download error for url %1%:"), data.url);
+		std::string line2 = _utf8("Destination path is empty.");
+		std::string message = GUI::format("%1%\n%2%", line1, line2);
+		BOOST_LOG_TRIVIAL(error) << message;
+		wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+		evt->SetString(message);
+		GUI::wxGetApp().QueueEvent(evt);
 		return boost::filesystem::path();
 	}
+
+	boost::filesystem::path tmp_path = dest_path;
+	tmp_path += format(".%1%%2%", get_current_pid(), ".download");
+	FILE* file;
+	wxString temp_path_wstring(tmp_path.wstring());
+	file = fopen(temp_path_wstring.c_str(), "wb");
+	assert(file != NULL);
+	if (file == NULL) {
+	    std::string line1 = GUI::format(_utf8("Download from %1% couldn't start:"), data.url);
+		std::string line2 = GUI::format(_utf8("Can't create file at %1%."), tmp_path.string());
+		std::string message = GUI::format("%1%\n%2%", line1, line2);
+		BOOST_LOG_TRIVIAL(error) << message;
+		wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
+		evt->SetString(message);
+		GUI::wxGetApp().QueueEvent(evt);
+		return boost::filesystem::path();
+	}
+
 	std::string error_message;
 	bool res = http_get_file(data.url, 130 * 1024 * 1024 //2.4.0 windows installer is 65MB //lm:I don't know, but larger. The binaries will grow. // dk: changed to 130, to have 100% more space. We should put this information into version file. 
 		// on_progress
@@ -216,12 +243,12 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 				GUI::wxGetApp().QueueEvent(evt);
 				return false;
 			} else if (progress.dltotal > 0 && progress.dltotal < expected_size) { 
-				//lm:When will this happen? Is that not an error? // dk: It is possible error, but we cannot know until the download is finished. Somehow the total size can grow during the download.
+				// This is possible error, but we cannot know until the download is finished. Somehow the total size can grow during the download.
 				BOOST_LOG_TRIVIAL(info) << GUI::format("Downloading new %1% has incorrect size. The download will continue. \nExpected size: %2%\nDownload size: %3%", SLIC3R_APP_NAME, expected_size, progress.dltotal);
 			} 
 			// progress event
 			size_t gui_progress = progress.dltotal > 0 ? 100 * progress.dlnow / progress.dltotal : 0;
-			BOOST_LOG_TRIVIAL(error) << "App download " << gui_progress << "% " << progress.dlnow << " of " << progress.dltotal;
+			BOOST_LOG_TRIVIAL(debug) << "App download " << gui_progress << "% " << progress.dlnow << " of " << progress.dltotal;
 			if (last_gui_progress < gui_progress && (last_gui_progress != 0 || gui_progress != 100)) {
 				last_gui_progress = gui_progress;
 				wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_PROGRESS);
@@ -231,26 +258,26 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 			return true;
 		}
 		// on_complete
-		, [dest_path, expected_size](std::string body, std::string& error_message){
+		, [&file, dest_path, tmp_path, expected_size](std::string body, std::string& error_message){
 			// Size check. Does always 1 char == 1 byte?
 			size_t body_size = body.size(); 
 			if (body_size != expected_size) {
-				//lm:UI message? // dk: changed. Now it propagates to UI.
-				error_message = GUI::format("Downloaded file has wrong size. Expected size: %1% Downloaded size: %2%", expected_size, body_size);
+				error_message = GUI::format(_utf8("Downloaded file has wrong size. Expected size: %1% Downloaded size: %2%"), expected_size, body_size);
 				return false;
 			}
-			boost::filesystem::path tmp_path = dest_path;
-			tmp_path += format(".%1%%2%", get_current_pid(), ".download");
+			if (file == NULL) {
+				error_message = GUI::format(_utf8("Can't create file at %1%."), tmp_path.string());
+				return false;
+			}
 			try
 			{
-				boost::nowide::fstream file(tmp_path.string(), std::ios::out | std::ios::binary | std::ios::trunc);
-				file.write(body.c_str(), body.size());
-				file.close();
+				fwrite(body.c_str(), 1, body.size(), file);
+				fclose(file);
 				boost::filesystem::rename(tmp_path, dest_path);
 			}
-			catch (const std::exception&)
+			catch (const std::exception& e)
 			{
-				error_message = GUI::format("Failed to write and move %1% to %2%", tmp_path, dest_path);
+				error_message = GUI::format(_utf8("Failed to write to file or to move %1% to %2%:\n%3%"), tmp_path, dest_path, e.what());
 				return false;
 			}
 			return true;
@@ -259,16 +286,19 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 	);
 	if (!res)
 	{
-		if (m_cancel)
-		{
-			BOOST_LOG_TRIVIAL(info) << error_message; //lm:Is this an error? // dk: changed to info
+		if (m_cancel) {
+			BOOST_LOG_TRIVIAL(info) << error_message; 
 			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED); // FAILED with empty msg only closes progress notification
 			GUI::wxGetApp().QueueEvent(evt);
 		} else {
-			std::string message = GUI::format("Downloading new %1% has failed:\n%2%", SLIC3R_APP_NAME, error_message);
-			BOOST_LOG_TRIVIAL(error) << message;
+			std::string message = (error_message.empty() 
+				? std::string()
+				: GUI::format(_utf8("Downloading new %1% has failed:\n%2%"), SLIC3R_APP_NAME, error_message));
 			wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
-			evt->SetString(message);
+			if (!message.empty()) {
+				BOOST_LOG_TRIVIAL(error) << message;
+				evt->SetString(message);
+			}
 			GUI::wxGetApp().QueueEvent(evt);
 		}
 		return boost::filesystem::path();
@@ -323,6 +353,11 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 		return;
 #endif // 0
 		BOOST_LOG_TRIVIAL(error) << "Could not find property tree in version file. Checking for application update has failed.";
+		// Lets send event with current version, this way if user triggered this check, it will notify him about no new version online.
+		std::string version = Semver().to_string();
+		wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_VERSION_ONLINE);
+		evt->SetString(GUI::from_u8(version));
+		GUI::wxGetApp().QueueEvent(evt);
 		return;
 	}
 	std::string tree_string = body.substr(start);
@@ -358,10 +393,10 @@ void AppUpdater::priv::parse_version_string(const std::string& body)
 				if (data.first == "url") {
 					new_data.url = data.second.data();
 					new_data.target_path = m_default_dest_folder / AppUpdater::get_filename_from_url(new_data.url);
-					BOOST_LOG_TRIVIAL(error) << format("parsing version string: url: %1%", new_data.url);
+					BOOST_LOG_TRIVIAL(info) << format("parsing version string: url: %1%", new_data.url);
 				} else if (data.first == "size"){
 					new_data.size = std::stoi(data.second.data());
-					BOOST_LOG_TRIVIAL(error) << format("parsing version string: expected size: %1%", new_data.size);
+					BOOST_LOG_TRIVIAL(info) << format("parsing version string: expected size: %1%", new_data.size);
 				}
 			}
 		}

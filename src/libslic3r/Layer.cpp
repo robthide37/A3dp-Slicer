@@ -577,12 +577,22 @@ void Layer::sort_perimeters_into_islands(
             }
         if (! sample_set) {
             // If there is no infill, take a sample of some inner perimeter.
-            for (uint32_t iperimeter : extrusions.first)
-                if (const ExtrusionEntity &ee = *this_layer_region.perimeters().entities[iperimeter]; ! ee.role().is_external()) {
-                    sample     = ee.first_point();
+            for (uint32_t iperimeter : extrusions.first) {
+                const ExtrusionEntity &ee = *this_layer_region.perimeters().entities[iperimeter];
+                if (ee.is_collection()) {
+                    for (const ExtrusionEntity *ee2 : dynamic_cast<const ExtrusionEntityCollection&>(ee).entities)
+                        if (! ee2->role().is_external()) {
+                            sample     = ee2->first_point();
+                            sample_set = true;
+                            goto loop_end;
+                        }
+                } else if (! ee.role().is_external()) {
+                    sample = ee.first_point();
                     sample_set = true;
                     break;
                 }
+            }
+        loop_end:
             if (! sample_set) {
                 if (! extrusions.second.empty()) {
                     // If there is no inner perimeter, take a sample of some gap fill extrusion.
@@ -752,7 +762,9 @@ void Layer::sort_perimeters_into_islands(
         const PrintRegionConfig &region_config = this_layer_region.region().config();
         const auto               bbox_eps      = scaled<coord_t>(
             EPSILON + print_config.gcode_resolution.value +
-            (region_config.fuzzy_skin.value == FuzzySkinType::None ? 0. : region_config.fuzzy_skin_thickness.value));
+            (region_config.fuzzy_skin.value == FuzzySkinType::None ? 0. : region_config.fuzzy_skin_thickness.value 
+                //FIXME it looks as if Arachne could extend open lines by fuzzy_skin_point_dist, which does not seem right.
+                + region_config.fuzzy_skin_point_dist.value));
         auto point_inside_surface_dist2 =
             [&lslices = this->lslices, &lslices_ex = this->lslices_ex, bbox_eps]
             (const size_t lslice_idx, const Point &point) {

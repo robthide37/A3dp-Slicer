@@ -18,6 +18,8 @@
 #include "PrintConfig.hpp"
 #include "Utils.hpp"
 
+#include <string_view>
+
 #include <boost/log/trivial.hpp>
 
 #include <tbb/parallel_for.h>
@@ -25,6 +27,8 @@
 
 namespace Slic3r::FFFTreeSupport
 {
+
+using namespace std::literals;
 
 // or warning
 // had to use a define beacuse the macro processing inside macro BOOST_LOG_TRIVIAL()
@@ -50,6 +54,7 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
 
     this->layer_height              = scaled<coord_t>(config.layer_height.value);
     this->resolution                = scaled<coord_t>(print_config.gcode_resolution.value);
+    // Arache feature
     this->min_feature_size          = scaled<coord_t>(config.min_feature_size.value);
     // +1 makes the threshold inclusive
     this->support_angle             = 0.5 * M_PI - std::clamp<double>((config.support_material_threshold + 1) * M_PI / 180., 0., 0.5 * M_PI);
@@ -84,6 +89,14 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
 //    this->minimum_support_area      = 
 //    this->minimum_bottom_area       = 
 //    this->support_offset            = 
+//    this->support_tree_branch_distance = 2.5 * line_width ??
+    this->support_tree_angle          = std::clamp<double>(config.support_tree_angle * M_PI / 180., 0., 0.5 * M_PI - EPSILON);
+    this->support_tree_angle_slow     = std::clamp<double>(config.support_tree_angle_slow * M_PI / 180., 0., this->support_tree_angle - EPSILON);
+    this->support_tree_branch_diameter = scaled<coord_t>(config.support_tree_branch_diameter.value);
+    this->support_tree_branch_diameter_angle = std::clamp<double>(config.support_tree_branch_diameter_angle * M_PI / 180., 0., 0.5 * M_PI - EPSILON);
+    this->support_tree_top_rate       = config.support_tree_top_rate.value; // percent
+//    this->support_tree_tip_diameter = this->support_line_width;
+    this->support_tree_tip_diameter = std::clamp(scaled<coord_t>(config.support_tree_tip_diameter.value), 0, this->support_tree_branch_diameter);
 }
 
 //FIXME Machine border is currently ignored.
@@ -336,10 +349,18 @@ const Polygons& TreeModelVolumes::getCollision(const coord_t orig_radius, LayerI
         return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate collision at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-        tree_supports_show_error("Not precalculated Collision requested.", false);
+        tree_supports_show_error("Not precalculated Collision requested."sv, false);
     }
     const_cast<TreeModelVolumes*>(this)->calculateCollision(radius, layer_idx);
     return getCollision(orig_radius, layer_idx, min_xy_dist);
+}
+
+// Get a collision area at a given layer for a radius that is a lower or equial to the key radius.
+// It is expected that the collision area is precalculated for a given layer at least for the radius zero.
+// Used for pushing tree supports away from object during the final Organic optimization step.
+std::optional<std::pair<coord_t, std::reference_wrapper<const Polygons>>> TreeModelVolumes::get_collision_lower_bound_area(LayerIndex layer_id, coord_t max_radius) const
+{
+    return m_collision_cache.get_lower_bound_area({ max_radius, layer_id });
 }
 
 // Private. Only called internally by calculateAvoidance() and calculateAvoidanceToModel(), radius is already snapped to grid.
@@ -351,7 +372,7 @@ const Polygons& TreeModelVolumes::getCollisionHolefree(coord_t radius, LayerInde
         return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate collision holefree at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-        tree_supports_show_error("Not precalculated Holefree Collision requested.", false);
+        tree_supports_show_error("Not precalculated Holefree Collision requested."sv, false);
     }
     const_cast<TreeModelVolumes*>(this)->calculateCollisionHolefree({ radius, layer_idx });
     return getCollisionHolefree(radius, layer_idx);
@@ -375,10 +396,10 @@ const Polygons& TreeModelVolumes::getAvoidance(const coord_t orig_radius, LayerI
     if (m_precalculated) {
         if (to_model) {
             BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Avoidance to model at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-            tree_supports_show_error("Not precalculated Avoidance(to model) requested.", false);
+            tree_supports_show_error("Not precalculated Avoidance(to model) requested."sv, false);
         } else {
             BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Avoidance at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-            tree_supports_show_error("Not precalculated Avoidance(to buildplate) requested.", false);
+            tree_supports_show_error("Not precalculated Avoidance(to buildplate) requested."sv, false);
         }
     }
     const_cast<TreeModelVolumes*>(this)->calculateAvoidance({ radius, layer_idx }, ! to_model, to_model);
@@ -396,7 +417,7 @@ const Polygons& TreeModelVolumes::getPlaceableAreas(const coord_t orig_radius, L
         return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Placeable Areas at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-        tree_supports_show_error("Not precalculated Placeable areas requested.", false);
+        tree_supports_show_error("Not precalculated Placeable areas requested."sv, false);
     }
     const_cast<TreeModelVolumes*>(this)->calculatePlaceables(radius, layer_idx);
     return getPlaceableAreas(orig_radius, layer_idx);
@@ -422,7 +443,7 @@ const Polygons& TreeModelVolumes::getWallRestriction(const coord_t orig_radius, 
         tree_supports_show_error(
             min_xy_dist ? 
                 "Not precalculated Wall restriction of minimum xy distance requested )." :
-                "Not precalculated Wall restriction requested )."
+                "Not precalculated Wall restriction requested )."sv
             , false);
     }
     const_cast<TreeModelVolumes*>(this)->calculateWallRestrictions({ radius, layer_idx });
@@ -561,7 +582,8 @@ void TreeModelVolumes::calculateCollisionHolefree(const std::vector<RadiusLayerP
 
     tbb::parallel_for(tbb::blocked_range<LayerIndex>(0, max_layer + 1, keys.size()),
         [&](const tbb::blocked_range<LayerIndex> &range) {
-        RadiusLayerPolygonCacheData data;
+        std::vector<std::pair<RadiusLayerPair, Polygons>> data;
+        data.reserve(range.size() * keys.size());
         for (LayerIndex layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
             for (RadiusLayerPair key : keys)
                 if (layer_idx <= key.second) {
@@ -572,10 +594,10 @@ void TreeModelVolumes::calculateCollisionHolefree(const std::vector<RadiusLayerP
                     coord_t increase_radius_ceil = ceilRadius(m_increase_until_radius, false) - radius;
                     assert(increase_radius_ceil > 0);
                     // this union is important as otherwise holes(in form of lines that will increase to holes in a later step) can get unioned onto the area.
-                    data[RadiusLayerPair(radius, layer_idx)] = polygons_simplify(
-                        offset(union_ex(getCollision(m_increase_until_radius, layer_idx, false)),
+                    data.emplace_back(RadiusLayerPair(radius, layer_idx), polygons_simplify(
+                        offset(union_ex(this->getCollision(m_increase_until_radius, layer_idx, false)),
                             5 - increase_radius_ceil, ClipperLib::jtRound, m_min_resolution),
-                        m_min_resolution);
+                        m_min_resolution));
                 }
         }
         m_collision_cache_holefree.insert(std::move(data));
@@ -819,13 +841,25 @@ coord_t TreeModelVolumes::ceilRadius(const coord_t radius) const
     return out;
 }
 
+void TreeModelVolumes::RadiusLayerPolygonCache::allocate_layers(size_t num_layers)
+{
+    if (num_layers > m_data.size()) {
+        if (num_layers > m_data.capacity())
+            reserve_power_of_2(m_data, num_layers);
+        m_data.resize(num_layers, {});
+    }
+}
+
 // For debugging purposes, sorted by layer index, then by radius.
 std::vector<std::pair<TreeModelVolumes::RadiusLayerPair, std::reference_wrapper<const Polygons>>> TreeModelVolumes::RadiusLayerPolygonCache::sorted() const
 {
     std::vector<std::pair<RadiusLayerPair, std::reference_wrapper<const Polygons>>> out;
-    for (auto it = this->data.begin(); it != this->data.end(); ++ it)
-        out.emplace_back(it->first, it->second);
-    std::sort(out.begin(), out.end(), [](auto &l, auto &r){ return l.first.second < r.first.second || (l.first.second == r.first.second) && l.first.first < r.first.first; });
+    for (auto &layer : m_data) {
+        auto layer_idx = LayerIndex(&layer - m_data.data());
+        for (auto &radius_polygons : layer)
+            out.emplace_back(std::make_pair(radius_polygons.first, layer_idx), radius_polygons.second);
+    }
+    assert(std::is_sorted(out.begin(), out.end(), [](auto &l, auto &r){ return l.first.second < r.first.second || (l.first.second == r.first.second) && l.first.first < r.first.first; }));
     return out;
 }
 

@@ -944,6 +944,9 @@ void ObjectManipulation::update_reset_buttons_visibility()
 
         if (selection.is_single_full_instance()) {
 #if ENABLE_WORLD_COORDINATE
+            const Geometry::Transformation& trafo = volume->get_instance_transformation();
+            rotation = trafo.get_rotation_matrix();
+            scale = trafo.get_scaling_factor_matrix();
             const Selection::IndicesList& idxs = selection.get_volume_idxs();
             for (unsigned int id : idxs) {
                 const Geometry::Transformation world_trafo(selection.get_volume(id)->world_matrix());
@@ -1215,8 +1218,8 @@ void ObjectManipulation::change_scale_value(int axis, double value)
     const Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
     Vec3d ref_scale = m_cache.scale;
     if (selection.is_single_volume_or_modifier()) {
-        if (is_local_coordinates())
-        ref_scale = 100.0 * Vec3d::Ones();
+        scale = scale.cwiseQuotient(ref_scale);
+        ref_scale = Vec3d::Ones();
     }
     else if (selection.is_single_full_instance()) {
         scale = scale.cwiseQuotient(ref_scale);
@@ -1257,8 +1260,6 @@ void ObjectManipulation::change_size_value(int axis, double value)
     Vec3d ref_size = m_cache.size;
 #if ENABLE_WORLD_COORDINATE
     if (selection.is_single_volume_or_modifier()) {
-        if (is_local_coordinates())
-            ref_size = selection.get_first_volume()->bounding_box().size();
         size = size.cwiseQuotient(ref_size);
         ref_size = Vec3d::Ones();
 #else

@@ -82,12 +82,11 @@ inline std::tuple<Vec2d, double> detect_bridging_direction(const Polygons &to_co
 
     if (floating_polylines.empty()) {
         // consider this area anchored from all sides, pick bridging direction that will likely yield shortest bridges
-        //use 3mm resolution (should be quite fast, and rough estimation should not cause any problems here)
-        auto [pc1, pc2] = compute_principal_components(overhang_area, 3.0);
-        if (pc2 == Vec2d::Zero()) { // overhang may be smaller than resolution. In this case, any direction is ok
+        auto [pc1, pc2] = compute_principal_components(overhang_area);
+        if (pc2 == Vec2f::Zero()) { // overhang may be smaller than resolution. In this case, any direction is ok
             return {Vec2d{1.0,0.0}, 0.0};
         } else {
-            return {pc2.normalized(), 0.0};
+            return {pc2.normalized().cast<double>(), 0.0};
         }
     }
 

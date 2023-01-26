@@ -68,9 +68,6 @@ public:
 
 template<class M> void AABBMesh::init(const M &mesh, bool calculate_epsilon)
 {
-    BoundingBoxf3 bb = bounding_box(mesh);
-    m_ground_level += bb.min(Z);
-
     // Build the AABB accelaration tree
     m_aabb->init(*m_tm, calculate_epsilon);
 }
@@ -97,7 +94,6 @@ AABBMesh::~AABBMesh() {}
 
 AABBMesh::AABBMesh(const AABBMesh &other)
     : m_tm(other.m_tm)
-    , m_ground_level(other.m_ground_level)
     , m_aabb(new AABBImpl(*other.m_aabb))
     , m_vfidx{other.m_vfidx}
     , m_fnidx{other.m_fnidx}
@@ -106,7 +102,6 @@ AABBMesh::AABBMesh(const AABBMesh &other)
 AABBMesh &AABBMesh::operator=(const AABBMesh &other)
 {
     m_tm = other.m_tm;
-    m_ground_level = other.m_ground_level;
     m_aabb.reset(new AABBImpl(*other.m_aabb));
     m_vfidx = other.m_vfidx;
     m_fnidx = other.m_fnidx;

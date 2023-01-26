@@ -119,8 +119,8 @@ void FileGet::priv::get_perform()
 
 	wxString temp_path_wstring(m_tmp_path.wstring());
 	
-	std::cout << "dest_path: " << dest_path.string() << std::endl;
-	std::cout << "m_tmp_path: " << m_tmp_path.string() << std::endl;
+	//std::cout << "dest_path: " << dest_path.string() << std::endl;
+	//std::cout << "m_tmp_path: " << m_tmp_path.string() << std::endl;
 	
 	BOOST_LOG_TRIVIAL(info) << GUI::format("Starting download from %1% to %2%. Temp path is %3%",m_url, dest_path, m_tmp_path);
 
@@ -163,6 +163,8 @@ void FileGet::priv::get_perform()
 				m_stopped = true;
 				fclose(file);
 				cancel = true;
+				if (m_written == 0)
+					std::remove(m_tmp_path.string().c_str());
 				wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_PAUSED);
 				evt->SetInt(m_id);
 				m_evt_handler->QueueEvent(evt);
