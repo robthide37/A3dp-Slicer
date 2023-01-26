@@ -875,6 +875,10 @@ void GLGizmoEmboss::on_set_state()
     }
 }
 
+void GLGizmoEmboss::data_changed() { 
+    set_volume(priv::get_selected_volume(m_parent.get_selection()));
+}
+
 void GLGizmoEmboss::on_start_dragging() { m_rotate_gizmo.start_dragging(); }
 void GLGizmoEmboss::on_stop_dragging()
 {
@@ -1133,10 +1137,6 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
     m_text   = tc.text;
     m_volume = volume;
 
-    // store volume state before edit
-    m_unmodified_volume = {*volume->get_mesh_shared_ptr(), // copy
-                           tc, volume->get_matrix(), volume->name};
-
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();
     return true;
@@ -1313,32 +1313,10 @@ void GLGizmoEmboss::close()
         }
     }
 
-    // prepare for new opening
-    m_unmodified_volume.reset();
-
     // close gizmo == open it again
     auto& mng = m_parent.get_gizmos_manager();
     if (mng.get_current_type() == GLGizmosManager::Emboss)
         mng.open_gizmo(GLGizmosManager::Emboss);
-}
-
-void GLGizmoEmboss::discard_and_close() { 
-    if (!m_unmodified_volume.has_value()) return;    
-    m_volume->set_transformation(m_unmodified_volume->tr);
-    UpdateJob::update_volume(m_volume, std::move(m_unmodified_volume->tm), m_unmodified_volume->tc, m_unmodified_volume->name);
-    close();    
-
-    //auto plater = wxGetApp().plater();
-    // 2 .. on set state off, history is squashed into 'emboss_begin' and 'emboss_end'
-    //plater->undo_to(2); // undo before open emboss gizmo
-    // TODO: need fix after move to find correct undo timestamp or different approach
-    // It is weird ford user that after discard changes it is moving with history
-
-    // NOTE: Option to remember state before edit:
-    //  * Need triangle mesh(memory consuming), volume name, transformation + TextConfiguration
-    //  * Can't revert volume id.
-    //  * Need to refresh a lot of stored data. More info in implementation EmbossJob.cpp -> update_volume()
-    //  * Volume containing 3mf fix transformation - needs work around
 }
 
 namespace priv {
