@@ -75,11 +75,16 @@ struct SpikeDesc
     // Half of Wanted bevel size
     double half_bevel; 
 
-    SpikeDesc(double bevel_size) {
+    /// <summary>
+    /// Calculate spike description
+    /// </summary>
+    /// <param name="bevel_size">Size of spike width after cut of the tip, has to be grater than 2.5</param>
+    /// <param name="pixel_spike_length">When spike has same or more pixels with width less than 1 pixel</param>
+    SpikeDesc(double bevel_size, double pixel_spike_length = 6)
+    {
         // create min angle given by spike_length
         // Use it as minimal height of 1 pixel base spike
-        double length = 6; // has to be smaller than count of heal iteration
-        double angle = 2. * atan2(length, .5); // [rad]
+        double angle  = 2. * atan2(pixel_spike_length, .5); // [rad]
         cos_angle = std::fabs(cos(angle));
 
         // When remove spike this angle is set.
@@ -94,6 +99,10 @@ struct SpikeDesc
 void remove_spikes(Polygon &polygon, const SpikeDesc &spike_desc);
 void remove_spikes(Polygons &polygons, const SpikeDesc &spike_desc);
 void remove_spikes(ExPolygons &expolygons, const SpikeDesc &spike_desc);
+// return TRUE when remove point. It could create polygon with 2 points.
+bool remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc);
+
+void remove_spikes_in_duplicates(ExPolygons &expolygons, const Points &duplicates);
 };
 
 #include <Geometry.hpp>
@@ -165,8 +174,8 @@ void priv::remove_spikes(Polygon &polygon, const SpikeDesc &spike_desc)
         bool is_ba_short = ba_size_sq < wanted_size_sq;
         bool is_bc_short = bc_size_sq < wanted_size_sq;
         auto a_side = [&b, &ba_f, &ba_size_sq, &wanted_size]() {
-            Vec2d ab_norm = ba_f / sqrt(ba_size_sq);
-            return b + (wanted_size * ab_norm).cast<coord_t>();
+            Vec2d ba_norm = ba_f / sqrt(ba_size_sq);
+            return b + (wanted_size * ba_norm).cast<coord_t>();
         };
         auto c_side = [&b, &bc_f, &bc_size_sq, &wanted_size]() {
             Vec2d bc_norm = bc_f / sqrt(bc_size_sq);
@@ -232,6 +241,130 @@ void priv::remove_spikes(Polygon &polygon, const SpikeDesc &spike_desc)
         default: break;
         }
     }
+}
+
+bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc) {    
+    Points &pts = polygon.points;
+    const Point &a = (index == 0) ? pts.back() : pts[index-1];
+    const Point &b = pts[index];
+    const Point &c = (&b == &pts.back())? pts.front() : pts[index+1];
+
+    // calc sides
+    Vec2d ba = (a - b).cast<double>();
+    Vec2d bc = (c - b).cast<double>();
+
+    double dot_product = ba.dot(bc);
+
+    // sqrt together after multiplication save one sqrt
+    double ba_size_sq = ba.squaredNorm();
+    double bc_size_sq = bc.squaredNorm();
+    double norm       = sqrt(ba_size_sq * bc_size_sq);
+    double cos_angle  = dot_product / norm;
+
+    // small angle are around 1 --> cos(0) = 1
+    if (cos_angle < spike_desc.cos_angle)
+        return false; // not a spike    
+
+    // has to be in range <-1, 1>
+    // Due to preccission of floating point number could be sligtly out of range
+    if (cos_angle > 1.)
+        cos_angle = 1.;
+    //if (cos_angle < -1.)
+    //    cos_angle = -1.;
+
+    // Current Spike angle
+    double angle = acos(cos_angle);
+    double wanted_size    = spike_desc.half_bevel / cos(angle / 2.);
+    double wanted_size_sq = wanted_size * wanted_size;
+
+    bool is_ba_short = ba_size_sq < wanted_size_sq;
+    bool is_bc_short = bc_size_sq < wanted_size_sq;
+
+    auto a_side = [&b, &ba, &ba_size_sq, &wanted_size]() {
+        Vec2d ba_norm = ba / sqrt(ba_size_sq);
+        return b + (wanted_size * ba_norm).cast<coord_t>();
+    };
+    auto c_side = [&b, &bc, &bc_size_sq, &wanted_size]() {
+        Vec2d bc_norm = bc / sqrt(bc_size_sq);
+        return b + (wanted_size * bc_norm).cast<coord_t>();
+    };
+
+    if (is_ba_short && is_bc_short) {
+        // remove short spike
+        pts.erase(pts.begin() + index);
+        return true;
+    } else if (is_ba_short) {
+        // move point B on C-side
+        pts[index] = c_side();
+    } else if (is_bc_short) {
+        // move point B on A-side
+        pts[index] = a_side();
+    } else {
+        // move point B on C-side and add point on A-side(left - before)
+        pts[index] = c_side();
+        Point add = a_side();
+        if (add == pts[index]) {
+            // should be very rare, when SpikeDesc has small base 
+            // will be fixed by remove B point
+            pts.erase(pts.begin() + index);
+            return true;
+        }
+        pts.insert(pts.begin() + index, add);
+    }
+    return false;
+}
+
+void priv::remove_spikes_in_duplicates(ExPolygons &expolygons, const Points &duplicates) { 
+
+    auto check = [](Polygon &polygon, const Point &d) -> bool {
+        double spike_bevel = 1 / SHAPE_SCALE;
+        double spike_length = 5.;
+        const static SpikeDesc sd(spike_bevel, spike_length);
+        Points& pts = polygon.points;
+        bool exist_remove = false;
+        for (size_t i = 0; i < pts.size(); i++) {
+            if (pts[i] != d)
+                continue;
+            exist_remove |= remove_when_spike(polygon, i, sd);
+        }
+        return exist_remove && pts.size() < 3;
+    };
+
+    bool exist_remove = false;
+    for (ExPolygon &expolygon : expolygons) {
+        BoundingBox bb(to_points(expolygon.contour));
+        for (const Point &d : duplicates) {
+            if (!bb.contains(d))
+                continue;
+            exist_remove |= check(expolygon.contour, d);
+            for (Polygon &hole : expolygon.holes)
+                exist_remove |= check(hole, d);
+        }
+    }
+
+    if (exist_remove)
+        remove_bad(expolygons);
+    
+    // erase invalid ExPolygon after removing
+    //expolygons.erase(std::remove_if(expolygons.begin(), expolygons.end(), 
+    //    [&duplicates, &check](ExPolygon &expolygon) {
+    //    BoundingBox bb(to_points(expolygon.contour));
+    //    for (const Point &d : duplicates) {
+    //        if (!bb.contains(d))
+    //            continue;
+    //        if(check(expolygon.contour, d))
+    //            return true;
+
+    //        // erase invalid hole after removing
+    //        Polygons &holes = expolygon.holes;            
+    //        holes.erase(std::remove_if(holes.begin(), holes.end(),
+    //            [&check, &d](Polygon &hole) { 
+    //                return check(hole, d); 
+    //            })
+    //        );
+    //    }
+    //    return false;
+    //}));
 }
 
 void priv::remove_spikes(Polygons &polygons, const SpikeDesc &spike_desc)
@@ -555,15 +688,8 @@ ExPolygons Emboss::heal_shape(const Polygons &shape, double precision)
     ClipperLib::CleanPolygons(paths, clean_distance);
     Polygons polygons = to_polygons(paths);
     polygons.erase(std::remove_if(polygons.begin(), polygons.end(), [](const Polygon &p) { return p.size() < 3; }), polygons.end());
-
-    // use douglas peucker to reduce amount of used points
-    for (Polygon &polygon : polygons)
-        polygon.douglas_peucker(precision);
-
-    priv::SpikeDesc spike(precision);
-    priv::remove_spikes(polygons, spike);
-            
-    // Do not remove all duplicits but do it better way
+                
+    // Do not remove all duplicates but do it better way
     // Overlap all duplicit points by rectangle 3x3
     Points duplicits = collect_duplicates(to_points(polygons));
     if (!duplicits.empty()) {
@@ -580,11 +706,6 @@ ExPolygons Emboss::heal_shape(const Polygons &shape, double precision)
     // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM01/Chap1.html
     ExPolygons res = Slic3r::union_ex(polygons, ClipperLib::pftNonZero);
         
-    priv::remove_spikes(polygons, spike);
-
-    double min_area = precision * precision;
-    priv::remove_small_islands(res, min_area);
-
     heal_shape(res);
     return res;
 }
@@ -638,15 +759,17 @@ bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
         auto it = std::unique(intersections.begin(), intersections.end());
         intersections.erase(it, intersections.end());
 
-        Points duplicits = collect_duplicates(to_points(shape));
-        // duplicits are already uniqua and sorted
+        Points duplicates = collect_duplicates(to_points(shape));
+        // duplicates are already uniqua and sorted
 
         // Check whether shape is already healed
-        if (intersections.empty() && duplicits.empty())
+        if (intersections.empty() && duplicates.empty())
             return true;
 
         assert(holes.empty());
-        holes.reserve(intersections.size() + duplicits.size());
+        holes.reserve(intersections.size() + duplicates.size());
+
+        remove_spikes_in_duplicates(shape, duplicates);
 
         // Fix self intersection in result by subtracting hole 2x2
         for (const Point &p : intersections) {
@@ -656,7 +779,7 @@ bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
         }
 
         // Fix duplicit points by hole 3x3 around duplicit point
-        for (const Point &p : duplicits) {
+        for (const Point &p : duplicates) {
             Polygon hole(priv::pts_3x3);
             hole.translate(p);
             holes.push_back(hole);
@@ -693,7 +816,7 @@ bool priv::heal_dupl_inter2(ExPolygons &shape, unsigned max_iteration) {
         // double minimal_area = 1000;
         // priv::remove_small_islands(shape, minimal_area);
 
-        // check that duplicits and intersections do NOT exists
+        // check that duplicates and intersections do NOT exists
         Points  duplicits       = collect_duplicates(to_points(shape));
         Pointfs intersections_f = intersection_points(shape);
         if (duplicits.empty() && intersections_f.empty())
