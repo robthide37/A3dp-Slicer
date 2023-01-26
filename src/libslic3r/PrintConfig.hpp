@@ -516,6 +516,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionInt,                 wall_distribution_count))
     ((ConfigOptionFloatOrPercent,      min_feature_size))
     ((ConfigOptionFloatOrPercent,      min_bead_width))
+    ((ConfigOptionBool,                check_for_issues_mode))
     ((ConfigOptionBool,                support_material))
     // Automatic supports (generated based fdm support point generator).
     ((ConfigOptionBool,                support_material_auto))

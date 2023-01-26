@@ -2308,7 +2308,8 @@ void GCode::process_layer_single_object(
 
     ExtrusionEntitiesPtr temp_fill_extrusions;
     if (const Layer *layer = layer_to_print.object_layer; layer)
-        for (const LayerSlice &lslice : layer->lslices_ex) {
+        for (size_t idx : layer->lslice_indices_sorted_by_print_order) {
+            const LayerSlice &lslice = layer->lslices_ex[idx];
             auto extrude_infill_range = [&](
                 const LayerRegion &layerm, const ExtrusionEntityCollection &fills,
                 LayerExtrusionRanges::const_iterator it_fill_ranges_begin, LayerExtrusionRanges::const_iterator it_fill_ranges_end, bool ironing) {
