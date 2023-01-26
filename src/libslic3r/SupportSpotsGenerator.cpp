@@ -1175,13 +1175,6 @@ void raise_alerts_for_issues(const SupportPoints                                
                              PartialObjects                                                      &partial_objects,
                              std::function<void(PrintStateBase::WarningLevel, SupportPointCause)> alert_fn)
 {
-    for (const SupportPoint &sp : support_points) {
-        if (sp.cause == SupportPointCause::SeparationFromBed) {
-                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::SeparationFromBed);
-                break;
-        }
-    }
-
     std::reverse(partial_objects.begin(), partial_objects.end());
     std::sort(partial_objects.begin(), partial_objects.end(),
               [](const PartialObject &left, const PartialObject &right) { return left.volume > right.volume; });
@@ -1231,21 +1224,29 @@ void raise_alerts_for_issues(const SupportPoints                                
         }
     }
 
-    if (ext_supp_points.size() > 5) {
-        alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::FloatingExtrusion);
-    }
-
     for (const SupportPoint &sp : support_points) {
-        if (sp.cause == SupportPointCause::LongBridge) {
-                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::LongBridge);
-                break;
+        if (sp.cause == SupportPointCause::SeparationFromBed) {
+                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::SeparationFromBed);
+                return;
         }
     }
 
     for (const SupportPoint &sp : support_points) {
         if (sp.cause == SupportPointCause::WeakObjectPart) {
                 alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::WeakObjectPart);
-                break;
+                return;
+        }
+    }
+
+    if (ext_supp_points.size() > 5) {
+        alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::FloatingExtrusion);
+        return;
+    }
+
+    for (const SupportPoint &sp : support_points) {
+        if (sp.cause == SupportPointCause::LongBridge) {
+                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::LongBridge);
+                return;
         }
     }
 }

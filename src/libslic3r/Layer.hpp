@@ -336,6 +336,7 @@ public:
     // These lslices are also used to detect overhangs and overlaps between successive layers, therefore it is important
     // that the 1st lslice is not compensated by the Elephant foot compensation algorithm.
     ExPolygons 				lslices;
+    std::vector<size_t>     lslice_indices_sorted_by_print_order;
     LayerSlices             lslices_ex;
 
     size_t                  region_count() const { return m_regions.size(); }
