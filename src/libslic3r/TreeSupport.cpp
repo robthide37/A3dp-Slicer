@@ -21,8 +21,6 @@
 #include "MutablePolygon.hpp"
 #include "SupportMaterial.hpp"
 #include "TriangleMeshSlicer.hpp"
-#include "OpenVDBUtilsLegacy.hpp"
-#include <openvdb/tools/VolumeToSpheres.h>
 
 #include <cassert>
 #include <chrono>
@@ -44,6 +42,14 @@
 #if defined(TREE_SUPPORT_SHOW_ERRORS) && defined(_WIN32)
     #define TREE_SUPPORT_SHOW_ERRORS_WIN32
 #endif
+
+// #define TREE_SUPPORT_ORGANIC_NUDGE_NEW 1
+
+#ifndef TREE_SUPPORT_ORGANIC_NUDGE_NEW
+    // Old version using OpenVDB, works but it is extremely slow for complex meshes.
+    #include "OpenVDBUtilsLegacy.hpp"
+    #include <openvdb/tools/VolumeToSpheres.h>
+#endif // TREE_SUPPORT_ORGANIC_NUDGE_NEW
 
 namespace Slic3r
 {
@@ -3388,8 +3394,6 @@ static void extrude_branch(
     }
 }
 #endif
-
-// #define TREE_SUPPORT_ORGANIC_NUDGE_NEW 1
 
 #ifdef TREE_SUPPORT_ORGANIC_NUDGE_NEW
 // New version using per layer AABB trees of lines for nudging spheres away from an object.
