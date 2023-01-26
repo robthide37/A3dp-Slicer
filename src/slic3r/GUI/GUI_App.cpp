@@ -3401,12 +3401,7 @@ void GUI_App::app_updater(bool from_user)
     if (dialog_result != wxID_OK) {
         return;
     }
-    if (dwnld_dlg.get_download_path().parent_path().empty() || !boost::filesystem::exists(dwnld_dlg.get_download_path().parent_path())) {
-        show_error(nullptr,GUI::format_wxstr(_L("Download can't proceed. Target directory doesn't exists: %1%"), dwnld_dlg.get_download_path().parent_path().string()));
-        return;
-    }
     app_data.target_path =dwnld_dlg.get_download_path();
-
     // start download
     this->plater_->get_notification_manager()->push_download_progress_notification(_utf8("Download"), std::bind(&AppUpdater::cancel_callback, this->m_app_updater.get()));
     app_data.start_after = dwnld_dlg.run_after_download();

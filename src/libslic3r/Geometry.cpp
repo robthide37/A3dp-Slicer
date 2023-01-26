@@ -728,7 +728,7 @@ void Transformation::reset_skew()
 
     const double average_scale = std::cbrt(scale(0, 0) * scale(1, 1) * scale(2, 2));
 
-    scale(0, 0) = average_scale;
+    scale(0, 0) = is_left_handed() ? -average_scale : average_scale;
     scale(1, 1) = average_scale;
     scale(2, 2) = average_scale;
 

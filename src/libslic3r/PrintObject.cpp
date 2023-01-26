@@ -462,7 +462,7 @@ void PrintObject::generate_support_spots()
                 }
             };
 
-            if (!this->has_support()) {
+            if (!this->has_support() && this->config().check_for_issues_mode.getBool())  {
                 SupportSpotsGenerator::raise_alerts_for_issues(supp_points, partial_objects, alert_fn);
             }
         }
@@ -619,6 +619,8 @@ bool PrintObject::invalidate_state_by_config_options(
             steps.emplace_back(posSupportSpotsSearch);
             // Brim is printed below supports, support invalidates brim and skirt.
             steps.emplace_back(posSupportMaterial);
+        }else if (opt_key == "check_for_issues_mode") {
+            steps.emplace_back(posSupportSpotsSearch);
         } else if (
                opt_key == "perimeters"
             || opt_key == "extra_perimeters"

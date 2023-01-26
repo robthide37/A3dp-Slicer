@@ -38,32 +38,37 @@ LayerRegion* Layer::add_region(const PrintRegion *print_region)
 // merge all regions' slices to get islands
 void Layer::make_slices()
 {
-    ExPolygons slices;
-    if (m_regions.size() == 1) {
-        // optimization: if we only have one region, take its slices
-        slices = to_expolygons(m_regions.front()->slices().surfaces);
-    } else {
-        Polygons slices_p;
-        for (LayerRegion *layerm : m_regions)
-            polygons_append(slices_p, to_polygons(layerm->slices().surfaces));
-        slices = union_safety_offset_ex(slices_p);
+    {
+        ExPolygons slices;
+        if (m_regions.size() == 1) {
+            // optimization: if we only have one region, take its slices
+            slices = to_expolygons(m_regions.front()->slices().surfaces);
+        } else {
+            Polygons slices_p;
+            for (LayerRegion *layerm : m_regions)
+                polygons_append(slices_p, to_polygons(layerm->slices().surfaces));
+            slices = union_safety_offset_ex(slices_p);
+        }
+        // lslices are sorted by topological order from outside to inside from the clipper union used above
+        this->lslices = slices;
     }
-    
-    this->lslices.clear();
-    this->lslices.reserve(slices.size());
-    
+
+    // prepare lslices ordered by print order
+    this->lslice_indices_sorted_by_print_order.clear();
+    this->lslice_indices_sorted_by_print_order.reserve(lslices.size());
     // prepare ordering points
     Points ordering_points;
-    ordering_points.reserve(slices.size());
-    for (const ExPolygon &ex : slices)
+    ordering_points.reserve( this->lslices.size());
+    for (const ExPolygon &ex :  this->lslices)
         ordering_points.push_back(ex.contour.first_point());
     
     // sort slices
     std::vector<Points::size_type> order = chain_points(ordering_points);
-    
+
     // populate slices vector
-    for (size_t i : order)
-        this->lslices.emplace_back(std::move(slices[i]));
+    for (size_t i : order) {
+        this->lslice_indices_sorted_by_print_order.emplace_back(i);
+    }
 }
 
 // used by Layer::build_up_down_graph()

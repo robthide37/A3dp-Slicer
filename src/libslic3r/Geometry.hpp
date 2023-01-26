@@ -470,7 +470,7 @@ public:
     Transform3d get_mirror_matrix() const;
 
     bool is_left_handed() const {
-        return m_matrix.affine().determinant() < 0;
+        return m_matrix.linear().determinant() < 0;
     }
 #else
     bool is_scaling_uniform() const { return std::abs(m_scaling_factor.x() - m_scaling_factor.y()) < 1e-8 && std::abs(m_scaling_factor.x() - m_scaling_factor.z()) < 1e-8; }
