@@ -82,6 +82,8 @@ public:
 			}
 			return e_length;
 		}
+
+		bool force_travel = false;
 	};
 
     struct box_coordinates

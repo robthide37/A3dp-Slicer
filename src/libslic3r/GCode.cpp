@@ -236,10 +236,11 @@ namespace Slic3r {
 
         const bool needs_toolchange = gcodegen.writer().need_toolchange(new_extruder_id);
         const bool will_go_down = ! is_approx(z, current_z);
-
-        if (! needs_toolchange || (gcodegen.config().single_extruder_multi_material && ! tcr.priming)) {
+        if (tcr.force_travel || ! needs_toolchange || (gcodegen.config().single_extruder_multi_material && ! tcr.priming)) {
             // Move over the wipe tower. If this is not single-extruder MM, the first wipe tower move following the
             // toolchange will travel there anyway (if there is a toolchange).
+            // FIXME: It would be better if the wipe tower set the force_travel flag for all toolchanges,
+            // then we could simplify the condition and make it more readable.
             gcode += gcodegen.retract();
             gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
             gcode += gcodegen.travel_to(
@@ -264,7 +265,6 @@ namespace Slic3r {
             if (gcodegen.config().wipe_tower)
                 deretraction_str = gcodegen.unretract();
         }
-
 
         
 
