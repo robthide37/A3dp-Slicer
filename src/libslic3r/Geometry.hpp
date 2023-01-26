@@ -546,7 +546,6 @@ extern Transform3d transform3d_from_string(const std::string& transform_str);
 extern Eigen::Quaterniond rotation_xyz_diff(const Vec3d &rot_xyz_from, const Vec3d &rot_xyz_to);
 // Rotation by Z to align rot_xyz_from to rot_xyz_to.
 // This should only be called if it is known, that the two rotations only differ in rotation around the Z axis.
-extern double rotation_diff_z(const Vec3d &rot_xyz_from, const Vec3d &rot_xyz_to);
 extern double rotation_diff_z(const Transform3d &trafo_from, const Transform3d &trafo_to);
 
 // Is the angle close to a multiple of 90 degrees?

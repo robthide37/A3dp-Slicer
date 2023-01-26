@@ -1780,7 +1780,7 @@ void ModelObject::bake_xy_rotation_into_meshes(size_t instance_idx)
     // Adjust the instances.
     for (size_t i = 0; i < this->instances.size(); ++ i) {
         ModelInstance &model_instance = *this->instances[i];
-        model_instance.set_rotation(Vec3d(0., 0., Geometry::rotation_diff_z(reference_trafo.get_rotation(), model_instance.get_rotation())));
+        model_instance.set_rotation(Vec3d(0., 0., Geometry::rotation_diff_z(reference_trafo.get_matrix(), model_instance.get_matrix())));
         model_instance.set_scaling_factor(Vec3d(new_scaling_factor, new_scaling_factor, new_scaling_factor));
         model_instance.set_mirror(Vec3d(1., 1., 1.));
     }

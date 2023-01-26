@@ -69,8 +69,8 @@ PrintObject::PrintObject(Print* print, ModelObject* model_object, const Transfor
     BoundingBoxf3  bbox        = model_object->raw_bounding_box();
     Vec3d 		   bbox_center = bbox.center();
 	// We may need to rotate the bbox / bbox_center from the original instance to the current instance.
-	double z_diff = Geometry::rotation_diff_z(model_object->instances.front()->get_rotation(), instances.front().model_instance->get_rotation());
-	if (std::abs(z_diff) > EPSILON) {
+    double z_diff = Geometry::rotation_diff_z(model_object->instances.front()->get_matrix(), instances.front().model_instance->get_matrix());
+  if (std::abs(z_diff) > EPSILON) {
 		auto z_rot  = Eigen::AngleAxisd(z_diff, Vec3d::UnitZ());
 		bbox 		= bbox.transformed(Transform3d(z_rot));
 		bbox_center = (z_rot * bbox_center).eval();

@@ -872,24 +872,10 @@ Eigen::Quaterniond rotation_xyz_diff(const Vec3d &rot_xyz_from, const Vec3d &rot
 }
 
 // This should only be called if it is known, that the two rotations only differ in rotation around the Z axis.
-double rotation_diff_z(const Vec3d &rot_xyz_from, const Vec3d &rot_xyz_to)
-{
-    const Eigen::AngleAxisd angle_axis(rotation_xyz_diff(rot_xyz_from, rot_xyz_to));
-    const Vec3d& axis  = angle_axis.axis();
-    const double angle = angle_axis.angle();
-#ifndef NDEBUG
-    if (std::abs(angle) > 1e-8) {
-        assert(std::abs(axis.x()) < 1e-8);
-        assert(std::abs(axis.y()) < 1e-8);
-    }
-#endif /* NDEBUG */
-    return (axis.z() < 0) ? -angle : angle;
-}
-
 double rotation_diff_z(const Transform3d &trafo_from, const Transform3d &trafo_to)
 {
     auto  m  = trafo_to.linear() * trafo_from.linear().inverse();
-    assert(std::abs(m.determinant() - 1));
+    assert(std::abs(m.determinant() - 1) < EPSILON);
     Vec3d vx = m * Vec3d(1., 0., 0);
     // Verify that the linear part of rotation from trafo_from to trafo_to rotates around Z and is unity.
     assert(std::abs(std::hypot(vx.x(), vx.y()) - 1.) < 1e-5);
