@@ -2852,6 +2852,16 @@ void Selection::render_debug_window() const
 }
 #endif // ENABLE_WORLD_COORDINATE_DEBUG
 
+static bool is_left_handed(const Transform3d::ConstLinearPart& m)
+{
+    return m.determinant() < 0;
+}
+
+static bool is_left_handed(const Transform3d& m)
+{
+    return is_left_handed(m.linear());
+}
+
 #ifndef NDEBUG
 static bool is_rotation_xy_synchronized(const Vec3d &rot_xyz_from, const Vec3d &rot_xyz_to)
 {
@@ -2866,6 +2876,7 @@ static bool is_rotation_xy_synchronized(const Vec3d &rot_xyz_from, const Vec3d &
     return std::abs(axis.x()) < 1e-8 && std::abs(axis.y()) < 1e-8 && std::abs(std::abs(axis.z()) - 1.) < 1e-8;
 }
 
+#if 0
 static void verify_instances_rotation_synchronized(const Model &model, const GLVolumePtrs &volumes)
 {
     for (int idx_object = 0; idx_object < int(model.objects.size()); ++idx_object) {
@@ -2887,8 +2898,103 @@ static void verify_instances_rotation_synchronized(const Model &model, const GLV
             }
     }
 }
+#endif
+
+static bool is_rotation_xy_synchronized(const Transform3d::ConstLinearPart &trafo_from, const Transform3d::ConstLinearPart &trafo_to)
+{
+    auto rot = trafo_to * trafo_from.inverse();
+    static constexpr const double eps = EPSILON;
+    return 
+           // Looks like a rotation around Z: block(0..1, 0..1) + no change of Z component.
+           is_approx(rot(0, 0),   rot(1, 1), eps) &&
+           is_approx(rot(0, 1), - rot(1, 0), eps) &&
+           is_approx(rot(2, 2),          1., eps) &&
+           // Rest should be zeros.
+           is_approx(rot(0, 2),          0., eps) &&
+           is_approx(rot(1, 2),          0., eps) &&
+           is_approx(rot(2, 0),          0., eps) &&
+           is_approx(rot(2, 1),          0., eps) &&
+           // Determinant equals 1
+           is_approx(rot.determinant(),  1., eps) &&
+           // and finally the rotated X and Y axes shall be perpendicular.
+           is_approx(rot(0, 0) * rot(0, 1) + rot(1, 0) * rot(1, 1), 0., eps);
+}
+
+static bool is_rotation_xy_synchronized(const Transform3d& trafo_from, const Transform3d& trafo_to)
+{
+    return is_rotation_xy_synchronized(trafo_from.linear(), trafo_to.linear());
+}
+
+static void verify_instances_rotation_synchronized(const Model &model, const GLVolumePtrs &volumes)
+{
+    for (int idx_object = 0; idx_object < int(model.objects.size()); ++idx_object) {
+        int idx_volume_first = -1;
+        for (int i = 0; i < (int)volumes.size(); ++i) {
+            if (volumes[i]->object_idx() == idx_object) {
+                idx_volume_first = i;
+                break;
+            }
+        }
+        assert(idx_volume_first != -1); // object without instances?
+        if (idx_volume_first == -1)
+            continue;
+        const Transform3d::ConstLinearPart &rotation0 = volumes[idx_volume_first]->get_instance_transformation().get_matrix().linear();
+        for (int i = idx_volume_first + 1; i < (int)volumes.size(); ++i)
+            if (volumes[i]->object_idx() == idx_object) {
+                const Transform3d::ConstLinearPart &rotation = volumes[i]->get_instance_transformation().get_matrix().linear();
+                assert(is_rotation_xy_synchronized(rotation, rotation0));
+            }
+    }
+}
+
 #endif /* NDEBUG */
 
+#if ENABLE_WORLD_COORDINATE
+void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_type)
+{
+    std::set<unsigned int> done;  // prevent processing volumes twice
+    done.insert(m_list.begin(), m_list.end());
+    for (unsigned int i : m_list) {
+        if (done.size() == m_volumes->size())
+            break;
+        const GLVolume* volume_i = (*m_volumes)[i];
+        if (volume_i->is_wipe_tower)
+            continue;
+
+        const int object_idx = volume_i->object_idx();
+        const int instance_idx = volume_i->instance_idx();
+        const Transform3d& curr_inst_trafo_i = volume_i->get_instance_transformation().get_matrix();
+        const bool         curr_inst_left_handed = is_left_handed(curr_inst_trafo_i);
+        const Transform3d& old_inst_trafo_i = m_cache.volumes_data[i].get_instance_transform().get_matrix();
+        bool               mirrored = is_left_handed(curr_inst_trafo_i) != is_left_handed(old_inst_trafo_i);
+//        bool               mirrored = curr_inst_trafo_i.linear().determinant() * old_inst_trafo_i.linear().determinant() < 0;
+
+        // Process unselected instances.
+        for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
+            if (done.size() == m_volumes->size())
+                break;
+            if (done.find(j) != done.end())
+                continue;
+            GLVolume* volume_j = (*m_volumes)[j];
+            if (volume_j->object_idx() != object_idx || volume_j->instance_idx() == instance_idx)
+                continue;
+            const Transform3d& old_inst_trafo_j = m_cache.volumes_data[j].get_instance_transform().get_matrix();
+            assert(is_rotation_xy_synchronized(old_inst_trafo_i, old_inst_trafo_j));
+            Transform3d        new_inst_trafo_j = volume_j->get_instance_transformation().get_matrix();
+            if (sync_rotation_type != SyncRotationType::NONE || mirrored)
+                new_inst_trafo_j.linear() = (old_inst_trafo_j.linear() * old_inst_trafo_i.linear().inverse()) * curr_inst_trafo_i.linear();
+            if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
+                new_inst_trafo_j.translation().z() = curr_inst_trafo_i.translation().z();
+            assert(is_rotation_xy_synchronized(curr_inst_trafo_i, new_inst_trafo_j));
+            volume_j->set_instance_transformation(new_inst_trafo_j);
+            done.insert(j);
+        }
+    }
+#ifndef NDEBUG
+    verify_instances_rotation_synchronized(*m_model, *m_volumes);
+#endif /* NDEBUG */
+}
+#else
 void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_type)
 {
     std::set<unsigned int> done;  // prevent processing volumes twice
@@ -2904,17 +3010,9 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
 
         const int object_idx = volume_i->object_idx();
         const int instance_idx = volume_i->instance_idx();
-#if ENABLE_WORLD_COORDINATE
-        const Geometry::Transformation& curr_inst_trafo_i = volume_i->get_instance_transformation();
-        const Vec3d curr_inst_rotation_i = curr_inst_trafo_i.get_rotation();
-        const Vec3d& curr_inst_scaling_factor_i = curr_inst_trafo_i.get_scaling_factor();
-        const Vec3d& curr_inst_mirror_i = curr_inst_trafo_i.get_mirror();
-        const Vec3d old_inst_rotation_i = m_cache.volumes_data[i].get_instance_transform().get_rotation();
-#else
         const Vec3d& rotation = volume_i->get_instance_rotation();
         const Vec3d& scaling_factor = volume_i->get_instance_scaling_factor();
         const Vec3d& mirror = volume_i->get_instance_mirror();
-#endif // ENABLE_WORLD_COORDINATE
 
         // Process unselected instances.
         for (unsigned int j = 0; j < (unsigned int)m_volumes->size(); ++j) {
@@ -2928,64 +3026,27 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
             if (volume_j->object_idx() != object_idx || volume_j->instance_idx() == instance_idx)
                 continue;
 
-#if ENABLE_WORLD_COORDINATE
-            const Vec3d old_inst_rotation_j = m_cache.volumes_data[j].get_instance_transform().get_rotation();
-            assert(is_rotation_xy_synchronized(old_inst_rotation_i, old_inst_rotation_j));
-            const Geometry::Transformation& curr_inst_trafo_j = volume_j->get_instance_transformation();
-            const Vec3d curr_inst_rotation_j = curr_inst_trafo_j.get_rotation();
-            Vec3d new_inst_offset_j = curr_inst_trafo_j.get_offset();
-            Vec3d new_inst_rotation_j = curr_inst_rotation_j;
-#else
             assert(is_rotation_xy_synchronized(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation()));
-#endif // ENABLE_WORLD_COORDINATE
 
             switch (sync_rotation_type) {
             case SyncRotationType::NONE: {
                 // z only rotation -> synch instance z
                 // The X,Y rotations should be synchronized from start to end of the rotation.
-#if ENABLE_WORLD_COORDINATE
-                assert(is_rotation_xy_synchronized(curr_inst_rotation_i, curr_inst_rotation_j));
-                if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
-                    new_inst_offset_j.z() = curr_inst_trafo_i.get_offset().z();
-#else
                 assert(is_rotation_xy_synchronized(rotation, volume_j->get_instance_rotation()));
                 if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
                     volume_j->set_instance_offset(Z, volume_i->get_instance_offset().z());
-#endif // ENABLE_WORLD_COORDINATE
                 break;
             }
             case SyncRotationType::GENERAL: {
                 // generic rotation -> update instance z with the delta of the rotation.
-#if ENABLE_WORLD_COORDINATE
-                const double z_diff = Geometry::rotation_diff_z(old_inst_rotation_i, old_inst_rotation_j);
-                new_inst_rotation_j = curr_inst_rotation_i + z_diff * Vec3d::UnitZ();
-#else
                 const double z_diff = Geometry::rotation_diff_z(m_cache.volumes_data[i].get_instance_rotation(), m_cache.volumes_data[j].get_instance_rotation());
                 volume_j->set_instance_rotation({ rotation.x(), rotation.y(), rotation.z() + z_diff });
-#endif // ENABLE_WORLD_COORDINATE
                 break;
             }
-#if ENABLE_WORLD_COORDINATE
-            case SyncRotationType::FULL: {
-                // generic rotation -> update instance z with the delta of the rotation.
-                const Eigen::AngleAxisd angle_axis(Geometry::rotation_xyz_diff(curr_inst_rotation_i, old_inst_rotation_j));
-                const Vec3d& axis = angle_axis.axis();
-                const double z_diff = (std::abs(axis.x()) > EPSILON || std::abs(axis.y()) > EPSILON) ?
-                    angle_axis.angle() * axis.z() : Geometry::rotation_diff_z(curr_inst_rotation_i, old_inst_rotation_j);
-
-                new_inst_rotation_j = curr_inst_rotation_i + z_diff * Vec3d::UnitZ();
-                break;
-            }
-#endif // ENABLE_WORLD_COORDINATE
             }
 
-#if ENABLE_WORLD_COORDINATE
-            volume_j->set_instance_transformation(Geometry::assemble_transform(new_inst_offset_j, new_inst_rotation_j,
-                curr_inst_scaling_factor_i, curr_inst_mirror_i));
-#else
             volume_j->set_instance_scaling_factor(scaling_factor);
             volume_j->set_instance_mirror(mirror);
-#endif // ENABLE_WORLD_COORDINATE
 
             done.insert(j);
         }
@@ -2995,6 +3056,7 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
     verify_instances_rotation_synchronized(*m_model, *m_volumes);
 #endif /* NDEBUG */
 }
+#endif // ENABLE_WORLD_COORDINATE
 
 void Selection::synchronize_unselected_volumes()
 {
