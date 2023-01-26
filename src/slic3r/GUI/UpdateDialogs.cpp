@@ -257,7 +257,7 @@ bool AppUpdateDownloadDialog::run_after_download() const
 boost::filesystem::path AppUpdateDownloadDialog::get_download_path() const
 {
 	boost::system::error_code ec;
-	std::string input = GUI::format(txtctrl_path->GetValue());
+	std::string input = GUI::into_u8(txtctrl_path->GetValue());
 	boost::filesystem::path dir = boost::filesystem::absolute(boost::filesystem::path(input), ec);
 	if (ec)
 		dir = boost::filesystem::path(input);
