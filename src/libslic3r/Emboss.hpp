@@ -154,11 +154,13 @@ namespace Emboss
     ExPolygons text2shapes(FontFileWithCache &font, const char *text, const FontProp &font_prop, std::function<bool()> was_canceled = nullptr);
 
     /// <summary>
-    /// Fix intersections and self intersections in polygons glyph shape 
+    /// Fix duplicit points and self intersections in polygons.
+    /// Also try to reduce amount of points and remove useless polygon parts
     /// </summary>
     /// <param name="shape">Input shape to heal</param>
+    /// <param name="precision">Define wanted precision of shape after heal</param>
     /// <returns>Healed shapes</returns>
-    ExPolygons heal_shape(const Polygons &shape);
+    ExPolygons heal_shape(const Polygons &shape, double precision);
 
     /// <summary>
     /// NOTE: call Slic3r::union_ex before this call

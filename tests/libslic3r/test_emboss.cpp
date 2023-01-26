@@ -203,7 +203,7 @@ ExPolygons heal_and_check(const Polygons &polygons)
     Points  polygons_points    = to_points(polygons);
     Points  duplicits_prev     = collect_duplicates(polygons_points);
 
-    ExPolygons shape = Emboss::heal_shape(polygons);
+    ExPolygons shape = Emboss::heal_shape(polygons, 10);
 
     // Is default shape for unhealabled shape?
     bool is_default_shape = 
