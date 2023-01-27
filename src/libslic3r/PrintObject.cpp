@@ -480,7 +480,7 @@ void PrintObject::alert_when_supports_needed()
         }
 
         BOOST_LOG_TRIVIAL(debug) << "posAlertWhenSupportsNeeded - end";
-        this->set_done(posSupportSpotsSearch);
+        this->set_done(posAlertWhenSupportsNeeded);
     }
 }
 
