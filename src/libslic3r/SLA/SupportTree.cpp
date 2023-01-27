@@ -68,13 +68,14 @@ indexed_triangle_set create_pad(const SupportableMesh      &sm,
                                 const indexed_triangle_set &support_mesh,
                                 const JobController        &ctl)
 {
+    constexpr float PadSamplingLH = 0.1f;
 
     ExPolygons model_contours; // This will store the base plate of the pad.
-    double   pad_h             = sm.pad_cfg.full_height();
-
-    float zstart = ground_level(sm);
-    float zend   = zstart + float(pad_h + EPSILON);
-    auto heights = grid(zstart, zend, 0.1f);
+    double pad_h  = sm.pad_cfg.full_height();
+    auto   gndlvl = float(ground_level(sm));
+    float  zstart = gndlvl - bool(sm.pad_cfg.embed_object) * sm.pad_cfg.wall_thickness_mm;
+    float  zend   = zstart + float(pad_h + PadSamplingLH + EPSILON);
+    auto  heights = grid(zstart, zend, PadSamplingLH);
 
     if (!sm.cfg.enabled || sm.pad_cfg.embed_object) {
         // No support (thus no elevation) or zero elevation mode
@@ -91,7 +92,7 @@ indexed_triangle_set create_pad(const SupportableMesh      &sm,
     indexed_triangle_set out;
     create_pad(sup_contours, model_contours, out, sm.pad_cfg);
 
-    Vec3f offs{.0f, .0f, zstart};
+    Vec3f offs{.0f, .0f, gndlvl};
     for (auto &p : out.vertices) p += offs;
 
     its_merge_vertices(out);
