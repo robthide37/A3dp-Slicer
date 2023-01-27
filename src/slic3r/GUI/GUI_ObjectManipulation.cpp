@@ -947,8 +947,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
 
         show_drop_to_bed = std::abs(min_z) > EPSILON;
         const GLVolume* volume = selection.get_first_volume();
-        Transform3d rotation = Transform3d::Identity();
-        Transform3d scale = Transform3d::Identity();
+        Geometry::Transformation trafo;
 #else
     if (selection.is_single_full_instance() || selection.is_single_modifier() || selection.is_single_volume()) {
         const GLVolume* volume = selection.get_first_volume();
@@ -959,9 +958,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
 
         if (selection.is_single_full_instance()) {
 #if ENABLE_WORLD_COORDINATE
-            const Geometry::Transformation& trafo = volume->get_instance_transformation();
-            rotation = trafo.get_rotation_matrix();
-            scale = trafo.get_scaling_factor_matrix();
+            trafo = volume->get_instance_transformation();
             const Selection::IndicesList& idxs = selection.get_volume_idxs();
             for (unsigned int id : idxs) {
                 const Geometry::Transformation world_trafo(selection.get_volume(id)->world_matrix());
@@ -976,9 +973,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
         }
         else {
 #if ENABLE_WORLD_COORDINATE
-            const Geometry::Transformation& trafo = volume->get_volume_transformation();
-            rotation = trafo.get_rotation_matrix();
-            scale = trafo.get_scaling_factor_matrix();
+            Geometry::Transformation trafo = volume->get_volume_transformation();
             const Geometry::Transformation world_trafo(volume->world_matrix());
             show_skew |= world_trafo.has_skew();
             show_mirror_warning |= world_trafo.get_matrix().matrix().determinant() < 0.0;
@@ -989,7 +984,9 @@ void ObjectManipulation::update_reset_buttons_visibility()
 #endif // ENABLE_WORLD_COORDINATE
         }
 #if ENABLE_WORLD_COORDINATE
-        show_rotation = !rotation.isApprox(Transform3d::Identity());
+        const Transform3d rotation = trafo.get_rotation_matrix();
+        const Transform3d scale = trafo.get_scaling_factor_matrix();
+        show_rotation = show_mirror_warning ? !trafo.get_matrix().matrix().block<3, 3>(0, 0).isDiagonal() : !rotation.isApprox(Transform3d::Identity());
         show_scale = !scale.isApprox(Transform3d::Identity());
 #else
         show_rotation = !rotation.isApprox(Vec3d::Zero());
