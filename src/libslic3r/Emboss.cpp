@@ -116,9 +116,13 @@ void remove_spikes(ExPolygons &expolygons, const SpikeDesc &spike_desc);
 
 bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc) {    
     Points &pts = polygon.points;
+    size_t  pts_size = pts.size();
+    if (pts_size < 3)
+        return false;
+
     const Point &a = (index == 0) ? pts.back() : pts[index-1];
     const Point &b = pts[index];
-    const Point &c = (&b == &pts.back())? pts.front() : pts[index+1];
+    const Point &c = (index == (pts_size - 1)) ? pts.front() : pts[index + 1];
 
     // calc sides
     Vec2d ba = (a - b).cast<double>();
