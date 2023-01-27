@@ -114,78 +114,83 @@ void remove_spikes(ExPolygons &expolygons, const SpikeDesc &spike_desc);
 
 };
 
-bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc) {    
-    Points &pts = polygon.points;
-    size_t  pts_size = pts.size();
-    if (pts_size < 3)
-        return false;
+bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc) {
 
-    const Point &a = (index == 0) ? pts.back() : pts[index-1];
-    const Point &b = pts[index];
-    const Point &c = (index == (pts_size - 1)) ? pts.front() : pts[index + 1];
+    std::optional<Point> add;
+    Points &pts      = polygon.points;
+    {
+        size_t  pts_size = pts.size();
+        if (pts_size < 3)
+            return false;
 
-    // calc sides
-    Vec2d ba = (a - b).cast<double>();
-    Vec2d bc = (c - b).cast<double>();
+        const Point &a = (index == 0) ? pts.back() : pts[index - 1];
+        const Point &b = pts[index];
+        const Point &c = (index == (pts_size - 1)) ? pts.front() : pts[index + 1];
 
-    double dot_product = ba.dot(bc);
+        // calc sides
+        Vec2d ba = (a - b).cast<double>();
+        Vec2d bc = (c - b).cast<double>();
 
-    // sqrt together after multiplication save one sqrt
-    double ba_size_sq = ba.squaredNorm();
-    double bc_size_sq = bc.squaredNorm();
-    double norm       = sqrt(ba_size_sq * bc_size_sq);
-    double cos_angle  = dot_product / norm;
+        double dot_product = ba.dot(bc);
 
-    // small angle are around 1 --> cos(0) = 1
-    if (cos_angle < spike_desc.cos_angle)
-        return false; // not a spike    
+        // sqrt together after multiplication save one sqrt
+        double ba_size_sq = ba.squaredNorm();
+        double bc_size_sq = bc.squaredNorm();
+        double norm       = sqrt(ba_size_sq * bc_size_sq);
+        double cos_angle  = dot_product / norm;
 
-    // has to be in range <-1, 1>
-    // Due to preccission of floating point number could be sligtly out of range
-    if (cos_angle > 1.)
-        cos_angle = 1.;
-    //if (cos_angle < -1.)
-    //    cos_angle = -1.;
+        // small angle are around 1 --> cos(0) = 1
+        if (cos_angle < spike_desc.cos_angle)
+            return false; // not a spike
 
-    // Current Spike angle
-    double angle = acos(cos_angle);
-    double wanted_size    = spike_desc.half_bevel / cos(angle / 2.);
-    double wanted_size_sq = wanted_size * wanted_size;
+        // has to be in range <-1, 1>
+        // Due to preccission of floating point number could be sligtly out of range
+        if (cos_angle > 1.)
+            cos_angle = 1.;
+        // if (cos_angle < -1.)
+        //     cos_angle = -1.;
 
-    bool is_ba_short = ba_size_sq < wanted_size_sq;
-    bool is_bc_short = bc_size_sq < wanted_size_sq;
+        // Current Spike angle
+        double angle          = acos(cos_angle);
+        double wanted_size    = spike_desc.half_bevel / cos(angle / 2.);
+        double wanted_size_sq = wanted_size * wanted_size;
 
-    auto a_side = [&b, &ba, &ba_size_sq, &wanted_size]() {
-        Vec2d ba_norm = ba / sqrt(ba_size_sq);
-        return b + (wanted_size * ba_norm).cast<coord_t>();
-    };
-    auto c_side = [&b, &bc, &bc_size_sq, &wanted_size]() {
-        Vec2d bc_norm = bc / sqrt(bc_size_sq);
-        return b + (wanted_size * bc_norm).cast<coord_t>();
-    };
+        bool is_ba_short = ba_size_sq < wanted_size_sq;
+        bool is_bc_short = bc_size_sq < wanted_size_sq;
 
-    if (is_ba_short && is_bc_short) {
-        // remove short spike
-        pts.erase(pts.begin() + index);
-        return true;
-    } else if (is_ba_short) {
-        // move point B on C-side
-        pts[index] = c_side();
-    } else if (is_bc_short) {
-        // move point B on A-side
-        pts[index] = a_side();
-    } else {
-        // move point B on C-side and add point on A-side(left - before)
-        pts[index] = c_side();
-        Point add = a_side();
-        if (add == pts[index]) {
-            // should be very rare, when SpikeDesc has small base 
-            // will be fixed by remove B point
+        auto a_side = [&b, &ba, &ba_size_sq, &wanted_size]() {
+            Vec2d ba_norm = ba / sqrt(ba_size_sq);
+            return b + (wanted_size * ba_norm).cast<coord_t>();
+        };
+        auto c_side = [&b, &bc, &bc_size_sq, &wanted_size]() {
+            Vec2d bc_norm = bc / sqrt(bc_size_sq);
+            return b + (wanted_size * bc_norm).cast<coord_t>();
+        };
+
+        if (is_ba_short && is_bc_short) {
+            // remove short spike
             pts.erase(pts.begin() + index);
             return true;
+        } else if (is_ba_short) {
+            // move point B on C-side
+            pts[index] = c_side();
+        } else if (is_bc_short) {
+            // move point B on A-side
+            pts[index] = a_side();
+        } else {
+            // move point B on C-side and add point on A-side(left - before)
+            pts[index] = c_side();
+            add = a_side();
+            if (add == pts[index]) {
+                // should be very rare, when SpikeDesc has small base
+                // will be fixed by remove B point
+                pts.erase(pts.begin() + index);
+                return true;
+            }
         }
-        pts.insert(pts.begin() + index, add);
     }
+    if (add.has_value())
+        pts.insert(pts.begin() + index, *add);
     return false;
 }
 
