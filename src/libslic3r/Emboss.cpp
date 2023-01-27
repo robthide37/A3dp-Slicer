@@ -117,7 +117,8 @@ void remove_spikes(ExPolygons &expolygons, const SpikeDesc &spike_desc);
 bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc) {
 
     std::optional<Point> add;
-    Points &pts      = polygon.points;
+    bool do_erase = false;
+    Points &pts = polygon.points;
     {
         size_t  pts_size = pts.size();
         if (pts_size < 3)
@@ -169,8 +170,7 @@ bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &sp
 
         if (is_ba_short && is_bc_short) {
             // remove short spike
-            pts.erase(pts.begin() + index);
-            return true;
+            do_erase = true;
         } else if (is_ba_short) {
             // move point B on C-side
             pts[index] = c_side();
@@ -181,13 +181,17 @@ bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &sp
             // move point B on C-side and add point on A-side(left - before)
             pts[index] = c_side();
             add = a_side();
-            if (add == pts[index]) {
+            if (*add == pts[index]) {
                 // should be very rare, when SpikeDesc has small base
                 // will be fixed by remove B point
-                pts.erase(pts.begin() + index);
-                return true;
+                add.reset();
+                do_erase = true;
             }
         }
+    }
+    if (do_erase) {
+        pts.erase(pts.begin() + index);
+        return true;
     }
     if (add.has_value())
         pts.insert(pts.begin() + index, *add);
@@ -554,9 +558,9 @@ ExPolygons Emboss::heal_shape(const Polygons &shape)
 
 #include "libslic3r/SVG.hpp"
 void priv::visualize_heal(const std::string &svg_filepath, const ExPolygons &expolygons) {
-    double svg_scale = SHAPE_SCALE / unscale<double>(1.);
     Points pts = to_points(expolygons);
     BoundingBox bb(pts);
+    //double svg_scale = SHAPE_SCALE / unscale<double>(1.);
     // bb.scale(svg_scale);
     SVG svg(svg_filepath, bb);
     svg.draw(expolygons);
