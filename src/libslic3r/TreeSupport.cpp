@@ -43,7 +43,7 @@
     #define TREE_SUPPORT_SHOW_ERRORS_WIN32
 #endif
 
-// #define TREE_SUPPORT_ORGANIC_NUDGE_NEW 1
+#define TREE_SUPPORT_ORGANIC_NUDGE_NEW 1
 
 #ifndef TREE_SUPPORT_ORGANIC_NUDGE_NEW
     // Old version using OpenVDB, works but it is extremely slow for complex meshes.
