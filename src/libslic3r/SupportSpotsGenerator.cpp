@@ -256,7 +256,7 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
         for (size_t i = 0; i < annotated_points.size(); ++i) {
             ExtendedPoint &curr_point = annotated_points[i];
-            ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i - 1];
+            ExtendedPoint &prev_point = i > 0 ? annotated_points[i] : annotated_points[i - 1];
 
             SupportPointCause potential_cause = std::abs(curr_point.curvature) > 0.1 ? SupportPointCause::FloatingBridgeAnchor :
                                                                                        SupportPointCause::LongBridge;
@@ -272,7 +272,7 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                                                  (1.0f + std::abs(curr_point.curvature))));
 
             if (!bridging_dir.has_value() && curr_point.distance > flow_width && line_len > params.bridge_distance * 0.6) {
-                bridging_dir = (prev_point.position - curr_point.position).normalized();
+                bridging_dir = line_dir;
             }
 
             if (curr_point.distance > flow_width && potential_cause == SupportPointCause::LongBridge && bridging_dir.has_value() &&
