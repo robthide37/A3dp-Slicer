@@ -1019,7 +1019,7 @@ bool PrusaLink::put_inner(PrintHostUpload upload_data, std::string url, const st
     set_auth(http);
     // This is ugly, but works. There was an error at PrusaLink side that accepts any string at Print-After-Upload as true, thus False was also triggering print after upload.
     if (upload_data.post_action == PrintHostPostUploadAction::StartPrint)
-        http.header("Print-After-Upload", "True");
+        http.header("Print-After-Upload", "?1");
 
     http.set_put_body(upload_data.source_path)
         .header("Content-Type", "text/x.gcode")
