@@ -2849,7 +2849,6 @@ void PrintConfigDef::init_fff_params()
     def->set_enum_values({
         { "grid", L("Grid") }, 
         { "snug", L("Snug") },
-        { "tree", L("Tree") },
         { "organic", L("Organic") }
     });
     def->mode = comAdvanced;
