@@ -51,6 +51,8 @@
     #include <openvdb/tools/VolumeToSpheres.h>
 #endif // TREE_SUPPORT_ORGANIC_NUDGE_NEW
 
+// #define TREESUPPORT_DEBUG_SVG
+
 namespace Slic3r
 {
 
@@ -235,9 +237,11 @@ void tree_supports_show_error(std::string_view message, bool critical)
     const bool               support_threshold_auto = support_threshold == 0;
     // +1 makes the threshold inclusive
     double                   tan_threshold          = support_threshold_auto ? 0. : tan(M_PI * double(support_threshold + 1) / 180.);
+    //FIXME this is a fudge constant!
+    auto                     enforcer_overhang_offset = scaled<double>(config.support_tree_tip_diameter.value);
 
     tbb::parallel_for(tbb::blocked_range<LayerIndex>(1, out.size()),
-        [&print_object, &enforcers_layers, &blockers_layers, support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, &out]
+        [&print_object, &enforcers_layers, &blockers_layers, support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, enforcer_overhang_offset, &out]
         (const tbb::blocked_range<LayerIndex> &range) {
         for (LayerIndex layer_id = range.begin(); layer_id < range.end(); ++ layer_id) {
             const Layer   &current_layer  = *print_object.get_layer(layer_id);
@@ -284,18 +288,16 @@ void tree_supports_show_error(std::string_view message, bool critical)
                     //Polygons enforced_overhangs_prev = enforced_overhangs;
                     //check_self_intersections(to_polygons(union_ex(enforced_overhangs)), "generate_overhangs - enforced overhangs11");
                     //check_self_intersections(offset(union_ex(enforced_overhangs),
-                        //FIXME this is a fudge constant!
-                    //    scaled<float>(0.4)), "generate_overhangs - enforced overhangs12");
-                    enforced_overhangs = diff(offset(union_ex(enforced_overhangs),
-                        //FIXME this is a fudge constant!
-                        scaled<float>(0.4)), 
+                    //FIXME enforcer_overhang_offset is a fudge constant!
+                    enforced_overhangs = diff(offset(union_ex(enforced_overhangs), enforcer_overhang_offset),
                         lower_layer.lslices);
 #ifdef TREESUPPORT_DEBUG_SVG
-                    if (! intersecting_edges(enforced_overhangs).empty()) {
+//                    if (! intersecting_edges(enforced_overhangs).empty()) 
+                    {
                         static int irun = 0;
                         SVG::export_expolygons(debug_out_path("treesupport-self-intersections-%d.svg", ++irun),
-                            { { { union_ex(enforced_overhangs_prev) },   { "prev", "yellow", 0.5f } },
-                              { { lower_layer.lslices },   { "lower_layer.lslices", "gray", 0.5f } },
+                            { { { current_layer.lslices },        { "current_layer.lslices", "yellow", 0.5f } },
+                              { { lower_layer.lslices },          { "lower_layer.lslices", "gray", 0.5f } },
                               { { union_ex(enforced_overhangs) }, { "enforced_overhangs", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
                     }
 #endif // TREESUPPORT_DEBUG_SVG
@@ -1571,8 +1573,6 @@ struct SupportElementMerging {
     // Not needed, thus zero is returned.
     static size_t                           idx() { return 0; }
 };
-
-// #define TREESUPPORT_DEBUG_SVG
 
 /*!
  * \brief Increases influence areas as far as required.
