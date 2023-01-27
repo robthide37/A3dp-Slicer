@@ -1062,18 +1062,6 @@ void NotificationManager::ProgressBarWithCancelNotification::render_bar(ImGuiWra
 	imgui.text(text.c_str());
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
 //------URLDownloadNotification----------------
 
 void NotificationManager::URLDownloadNotification::render_close_button(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
@@ -1259,6 +1247,20 @@ void NotificationManager::URLDownloadNotification::trigger_user_action_callback(
 
 void NotificationManager::URLDownloadNotification::render_bar(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
+	auto shorten_to_line = [this](const std::string& text, bool dots) -> std::string {
+		std::string line = text;
+		bool did_shorten = false;
+		while (ImGui::CalcTextSize(line.c_str()).x > m_window_width - m_window_width_offset) {
+			line = line.substr(0, line.length() - 1);
+			did_shorten = true;
+		}
+		if (did_shorten && dots) {
+			line = line.substr(0, line.length() - 2);
+			line += "...";
+		}
+		return line;
+	};
+
 	ProgressBarNotification::render_bar(imgui, win_size_x, win_size_y, win_pos_x, win_pos_y);
 	std::string text;
 	if (m_percentage < 0.f) {
@@ -1272,7 +1274,7 @@ void NotificationManager::URLDownloadNotification::render_bar(ImGuiWrapper& imgu
 	}
 	ImGui::SetCursorPosX(m_left_indentation);
 	ImGui::SetCursorPosY(win_size_y / 2 + win_size_y / 6 - (m_multiline ? 0 : m_line_height / 4));
-	imgui.text(text.c_str());
+	imgui.text(shorten_to_line(text, true).c_str());
 }
 
 void NotificationManager::URLDownloadNotification::count_spaces()
@@ -1280,44 +1282,6 @@ void NotificationManager::URLDownloadNotification::count_spaces()
 	ProgressBarNotification::count_spaces();
 	m_window_width_offset = m_line_height * 6; 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //------PrintHostUploadNotification----------------
 void NotificationManager::PrintHostUploadNotification::init()
