@@ -117,6 +117,7 @@ static TriangleMesh cut_surface(/*const*/ DataBase &input1, const SurfaceVolumeD
 
 static void create_message(const std::string &message); // only in finalize
 static bool process(std::exception_ptr &eptr);
+static bool finalize(bool canceled, std::exception_ptr &eptr, const DataBase &input);
 
 class JobException : public std::runtime_error { 
 public: JobException(const char* message):runtime_error(message){}}; 
@@ -141,12 +142,8 @@ void CreateVolumeJob::process(Ctl &ctl) {
 }
 
 void CreateVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
-    // doesn't care about exception when process was canceled by user
-    if (canceled) {
-        eptr = nullptr;
+    if (!priv::finalize(canceled, eptr, m_input))
         return;
-    }
-    if (priv::process(eptr)) return;
     if (m_result.its.empty()) 
         return priv::create_message(_u8L("Can't create empty volume."));
 
@@ -196,12 +193,8 @@ void CreateObjectJob::process(Ctl &ctl)
 
 void CreateObjectJob::finalize(bool canceled, std::exception_ptr &eptr)
 {
-    // doesn't care about exception when process was canceled by user
-    if (canceled) {
-        eptr = nullptr;
+    if (!priv::finalize(canceled, eptr, m_input))
         return;
-    }
-    if (priv::process(eptr)) return;
 
     // only for sure
     if (m_result.empty()) 
@@ -260,12 +253,8 @@ void UpdateJob::process(Ctl &ctl)
 
 void UpdateJob::finalize(bool canceled, std::exception_ptr &eptr)
 {
-    // doesn't care about exception when process was canceled by user
-    if (canceled || m_input.cancel->load()) {
-        eptr = nullptr;
+    if (!priv::finalize(canceled, eptr, m_input))
         return;
-    }
-    if (priv::process(eptr)) return;
     priv::update_volume(std::move(m_result), m_input);    
 }
 
@@ -316,9 +305,8 @@ void CreateSurfaceVolumeJob::process(Ctl &ctl) {
 }
 
 void CreateSurfaceVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
-    // doesn't care about exception when process was canceled by user
-    if (canceled) return;
-    if (priv::process(eptr)) return;
+    if (!priv::finalize(canceled, eptr, m_input))
+        return; 
     priv::create_volume(std::move(m_result), m_input.object_id,
         m_input.volume_type, m_input.text_tr, m_input);
 }
@@ -346,13 +334,8 @@ void UpdateSurfaceVolumeJob::process(Ctl &ctl)
 
 void UpdateSurfaceVolumeJob::finalize(bool canceled, std::exception_ptr &eptr)
 {
-    // doesn't care about exception when process was canceled by user
-    if (m_input.cancel->load()) { 
-        eptr = nullptr;
+    if (!priv::finalize(canceled, eptr, m_input))
         return;
-    }
-    if (canceled) return;
-    if (priv::process(eptr)) return;
 
     // when start using surface it is wanted to move text origin on surface of model
     // also when repeteadly move above surface result position should match
@@ -822,6 +805,17 @@ bool priv::process(std::exception_ptr &eptr) {
     }
     return true;
 }
+
+bool priv::finalize(bool canceled, std::exception_ptr &eptr, const DataBase &input)
+{
+    // doesn't care about exception when process was canceled by user
+    if (canceled || input.cancel->load()) {
+        eptr = nullptr;
+        return false;
+    }
+    return !process(eptr);
+}
+
 
 #include <wx/msgdlg.h>
 

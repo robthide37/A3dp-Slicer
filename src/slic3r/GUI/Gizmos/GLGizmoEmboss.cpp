@@ -125,7 +125,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_is_unknown_font(false)
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
     , m_style_manager(m_imgui->get_glyph_ranges())
-    , m_update_job_cancel(nullptr)
+    , m_job_cancel(nullptr)
 {
     m_rotate_gizmo.set_group_id(0);
     m_rotate_gizmo.set_force_local_coordinate(true);
@@ -142,8 +142,9 @@ namespace priv {
 /// </summary>
 /// <param name="text">Text to emboss</param>
 /// <param name="style_manager">Keep actual selected style</param>
+/// <param name="cancel">Cancel for previous job</param>
 /// <returns>Base data for emboss text</returns>
-static DataBase create_emboss_data_base(const std::string &text, StyleManager &style_manager);
+static DataBase create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>> &cancel);
 
 static bool is_valid(ModelVolumeType volume_type);
 
@@ -227,7 +228,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     m_style_manager.discard_style_changes();
     
     GLVolume *gl_volume = priv::get_hovered_gl_volume(m_parent);
-    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager);
+    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
     // Try to cast ray into scene and find object for add volume 
     if (priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager))
         // object found
@@ -251,7 +252,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 
     Size s = m_parent.get_canvas_size();
     Vec2d screen_center(s.get_width() / 2., s.get_height() / 2.);
-    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager);
+    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
     const ModelObjectPtrs &objects = selection.get_model()->objects;
     // No selected object so create new object
     if (selection.is_empty() || object_idx < 0 || static_cast<size_t>(object_idx) >= objects.size()) {
@@ -500,8 +501,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         m_raycast_manager.actualize(act_model_object, &condition);
         m_dragging_mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
         // Cancel job to prevent interuption of dragging (duplicit result)
-        if (m_update_job_cancel != nullptr) 
-            m_update_job_cancel->store(true);
+        if (m_job_cancel != nullptr) 
+            m_job_cancel->store(true);
         return false;
     }
 
@@ -1152,6 +1153,12 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
         m_should_set_minimal_windows_size = true;
     }
 
+    // cancel previous job
+    if (m_job_cancel != nullptr) {
+        m_job_cancel->store(true);
+        m_job_cancel = nullptr;
+    }
+
     m_text   = tc.text;
     m_volume = volume;
     m_volume_id = volume->id();
@@ -1259,15 +1266,7 @@ bool GLGizmoEmboss::process()
     // exist loaded font file?
     if (!m_style_manager.is_active_font()) return false;
     
-    // Cancel previous Job, when it is in process
-    // Can't use cancel, because I want cancel only previous EmbossUpdateJob no other jobs
-    // worker.cancel();
-    // Cancel only EmbossUpdateJob no others
-    if (m_update_job_cancel != nullptr)
-        m_update_job_cancel->store(true);
-    // create new shared ptr to cancel new job
-    m_update_job_cancel = std::make_shared<std::atomic<bool> >(false);
-    DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager), m_volume->id(), m_update_job_cancel};
+    DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel), m_volume->id()};
 
     std::unique_ptr<Job> job = nullptr;
 
@@ -3649,7 +3648,7 @@ std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
 // priv namespace implementation
 ///////////////
 
-DataBase priv::create_emboss_data_base(const std::string &text, StyleManager& style_manager)
+DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>>& cancel)
 {
     auto create_volume_name = [&]() {
         bool        contain_enter = text.find('\n') != std::string::npos;
@@ -3680,7 +3679,14 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager& st
         return TextConfiguration{es, text};
     };
 
-    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), create_configuration(), create_volume_name()};
+    // Cancel previous Job, when it is in process
+    // worker.cancel(); --> Use less in this case I want cancel only previous EmbossJob no other jobs
+    // Cancel only EmbossUpdateJob no others
+    if (cancel != nullptr)
+        cancel->store(true);
+    // create new shared ptr to cancel new job
+    cancel = std::make_shared<std::atomic<bool>>(false);
+    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), create_configuration(), create_volume_name(), cancel};
 }
 
 void priv::start_create_object_job(DataBase &emboss_data, const Vec2d &coor)

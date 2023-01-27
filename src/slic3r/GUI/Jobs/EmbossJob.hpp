@@ -27,6 +27,10 @@ struct DataBase
     TextConfiguration text_configuration;
     // new volume name created from text
     std::string volume_name;
+
+    // flag that job is canceled
+    // for time after process.
+    std::shared_ptr<std::atomic<bool>> cancel;
 };
 
 /// <summary>
@@ -101,10 +105,6 @@ struct DataUpdate : public DataBase
 {
     // unique identifier of volume to change
     ObjectID volume_id;
-
-    // flag that job is canceled
-    // for time after process.
-    std::shared_ptr<std::atomic<bool>> cancel;
 };
 
 /// <summary>

@@ -292,7 +292,7 @@ private:
     bool m_text_contain_unknown_glyph = false;
 
     // cancel for previous update of volume to cancel finalize part
-    std::shared_ptr<std::atomic<bool>> m_update_job_cancel;
+    std::shared_ptr<std::atomic<bool>> m_job_cancel;
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
