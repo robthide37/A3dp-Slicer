@@ -842,6 +842,8 @@ void Print::process()
     for (PrintObject *obj : m_objects)
         obj->generate_support_spots();
     for (PrintObject *obj : m_objects)
+        obj->alert_when_supports_needed();
+    for (PrintObject *obj : m_objects)
         obj->generate_support_material();
     for (PrintObject *obj : m_objects)
         obj->estimate_curled_extrusions();

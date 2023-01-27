@@ -273,6 +273,14 @@ void PreferencesDialog::build()
 				"as they\'re loaded in order to save time when exporting G-code."),
 			app_config->get("background_processing") == "1");
 
+		append_bool_option(m_optgroup_general, "alert_when_supports_needed", 
+			L("Alert when supports needed"),
+			L("If this is enabled, Slic3r will raise alerts when it detects "
+				"issues in the sliced object, that can be resolved with supports (and brim). "
+				"Examples of such issues are floating object parts, unsupported extrusions and low bed adhesion."),
+			app_config->get("alert_when_supports_needed") == "1");
+
+
 		m_optgroup_general->append_separator();
 
 		// Please keep in sync with ConfigWizard

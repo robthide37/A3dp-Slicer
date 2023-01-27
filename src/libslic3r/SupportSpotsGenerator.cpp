@@ -256,15 +256,14 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
         for (size_t i = 0; i < annotated_points.size(); ++i) {
             ExtendedPoint &curr_point = annotated_points[i];
-            ExtendedPoint &prev_point = i > 0 ? annotated_points[i] : annotated_points[i - 1];
+            const ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i];
 
             SupportPointCause potential_cause = std::abs(curr_point.curvature) > 0.1 ? SupportPointCause::FloatingBridgeAnchor :
                                                                                        SupportPointCause::LongBridge;
-            float line_len = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
+            float             line_len        = (prev_point.position - curr_point.position).norm();
             Vec2d line_dir = line_len > EPSILON ? Vec2d((curr_point.position - prev_point.position) / double(line_len)) : Vec2d::Zero();
 
-            ExtrusionLine line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
-                                   curr_point.position.cast<float>(), line_len, entity};
+            ExtrusionLine line_out{prev_point.position.cast<float>(), curr_point.position.cast<float>(), line_len, entity};
 
             float max_bridge_len = std::max(params.support_points_interface_radius * 2.0f,
                                             params.bridge_distance /
@@ -308,10 +307,10 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
         float bridged_distance = annotated_points.front().position != annotated_points.back().position ? (params.bridge_distance + 1.0f) :
                                                                                                          0.0f;
         for (size_t i = 0; i < annotated_points.size(); ++i) {
-            ExtendedPoint &curr_point = annotated_points[i];
-            float          line_len   = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
-            ExtrusionLine  line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
-                                   curr_point.position.cast<float>(), line_len, entity};
+            ExtendedPoint       &curr_point = annotated_points[i];
+            const ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+            float                line_len   = (prev_point.position - curr_point.position).norm();
+            ExtrusionLine        line_out{prev_point.position.cast<float>(), curr_point.position.cast<float>(), line_len, entity};
 
             const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
                                                               prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :

@@ -64,7 +64,7 @@ enum PrintStep : unsigned int {
 
 enum PrintObjectStep : unsigned int {
     posSlice, posPerimeters, posPrepareInfill,
-    posInfill, posIroning, posSupportSpotsSearch, posSupportMaterial, posEstimateCurledExtrusions, posCount,
+    posInfill, posIroning, posSupportSpotsSearch, posAlertWhenSupportsNeeded, posSupportMaterial, posEstimateCurledExtrusions, posCount,
 };
 
 // A PrintRegion object represents a group of volumes to print
@@ -205,6 +205,7 @@ public:
     struct GeneratedSupportPoints{
         Transform3d object_transform; // for frontend object mapping
         SupportSpotsGenerator::SupportPoints support_points;
+        SupportSpotsGenerator::PartialObjects partial_objects;
     };
 
     std::vector<std::unique_ptr<PrintRegion>>   all_regions;
@@ -370,6 +371,7 @@ private:
     void infill();
     void ironing();
     void generate_support_spots();
+    void alert_when_supports_needed();
     void generate_support_material();
     void estimate_curled_extrusions();
 
