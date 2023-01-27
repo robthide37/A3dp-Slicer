@@ -140,7 +140,7 @@ namespace Slic3r {
 
     int OozePrevention::_get_temp(const GCode& gcodegen) const
     {
-        return (gcodegen.layer() != nullptr && gcodegen.layer()->id() == 0)
+        return (gcodegen.layer() == nullptr || gcodegen.layer()->id() == 0)
             ? gcodegen.config().first_layer_temperature.get_at(gcodegen.writer().extruder()->id())
             : gcodegen.config().temperature.get_at(gcodegen.writer().extruder()->id());
     }
@@ -236,10 +236,11 @@ namespace Slic3r {
 
         const bool needs_toolchange = gcodegen.writer().need_toolchange(new_extruder_id);
         const bool will_go_down = ! is_approx(z, current_z);
-
-        if (! needs_toolchange || (gcodegen.config().single_extruder_multi_material && ! tcr.priming)) {
+        if (tcr.force_travel || ! needs_toolchange || (gcodegen.config().single_extruder_multi_material && ! tcr.priming)) {
             // Move over the wipe tower. If this is not single-extruder MM, the first wipe tower move following the
             // toolchange will travel there anyway (if there is a toolchange).
+            // FIXME: It would be better if the wipe tower set the force_travel flag for all toolchanges,
+            // then we could simplify the condition and make it more readable.
             gcode += gcodegen.retract();
             gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
             gcode += gcodegen.travel_to(
@@ -264,7 +265,6 @@ namespace Slic3r {
             if (gcodegen.config().wipe_tower)
                 deretraction_str = gcodegen.unretract();
         }
-
 
         
 
@@ -1196,6 +1196,10 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
             is_extruder_used[extruder_id] = true;
         m_placeholder_parser.set("is_extruder_used", new ConfigOptionBools(is_extruder_used));
     }
+
+    // Enable ooze prevention if configured so.
+    DoExport::init_ooze_prevention(print, m_ooze_prevention);
+
     std::string start_gcode = this->placeholder_parser_process("start_gcode", print.config().start_gcode.value, initial_extruder_id);
     // Set bed temperature if the start G-code does not contain any bed temp control G-codes.
     this->_print_first_layer_bed_temperature(file, print, start_gcode, initial_extruder_id, true);
@@ -1213,9 +1217,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
     // Set other general things.
     file.write(this->preamble());
-
-    // Enable ooze prevention if configured so.
-    DoExport::init_ooze_prevention(print, m_ooze_prevention);
 
     print.throw_if_canceled();
 
@@ -1747,7 +1748,7 @@ void GCode::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, Pr
         m_writer.set_temperature(temp, wait, first_printing_extruder_id);
     } else {
         // Custom G-code does not set the extruder temperature. Do it now.
-        if (print.config().single_extruder_multi_material.value || m_ooze_prevention.enable) {
+        if (print.config().single_extruder_multi_material.value) {
             // Set temperature of the first printing extruder only.
             int temp = print.config().first_layer_temperature.get_at(first_printing_extruder_id);
             if (temp > 0)
@@ -1756,8 +1757,14 @@ void GCode::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, Pr
             // Set temperatures of all the printing extruders.
             for (unsigned int tool_id : print.extruders()) {
                 int temp = print.config().first_layer_temperature.get_at(tool_id);
-                if (print.config().ooze_prevention.value)
-                    temp += print.config().standby_temperature_delta.value;
+
+                if (print.config().ooze_prevention.value && tool_id != first_printing_extruder_id) {
+                    if (print.config().idle_temperature.is_nil(tool_id))
+                        temp += print.config().standby_temperature_delta.value;
+                    else
+                        temp = print.config().idle_temperature.get_at(tool_id);
+                }
+
                 if (temp > 0)
                     file.write(m_writer.set_temperature(temp, wait, tool_id));
             }

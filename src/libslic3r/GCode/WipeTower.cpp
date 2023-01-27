@@ -1387,8 +1387,10 @@ void WipeTower::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &
             layer_result.emplace_back(std::move(finish_layer_tcr));
         }
         else {
-            if (idx == -1)
+            if (idx == -1) {
                 layer_result[0] = merge_tcr(finish_layer_tcr, layer_result[0]);
+                layer_result[0].force_travel = true;
+            }
             else
                 layer_result[idx] = merge_tcr(layer_result[idx], finish_layer_tcr);
         }
