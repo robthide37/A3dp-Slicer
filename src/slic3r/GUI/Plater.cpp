@@ -4271,10 +4271,10 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
         this->preview->reload_print();
     }
 
-    if ((evt.status.flags & PrintBase::SlicingStatus::UPDATE_PRINT_OBJECT_STEP_WARNINGS) &&
-        static_cast<PrintObjectStep>(evt.status.warning_step) == posAlertWhenSupportsNeeded &&
+    if ((evt.status.flags & PrintBase::SlicingStatus::UPDATE_PRINT_STEP_WARNINGS) &&
+        static_cast<PrintStep>(evt.status.warning_step) == psAlertWhenSupportsNeeded &&
         get_app_config()->get("alert_when_supports_needed") != "1") {
-        // This alerts are from posAlertWhenSupportsNeeded and the respective app settings is not Enabled, so discard the alerts.
+        // This alerts are from psAlertWhenSupportsNeeded and the respective app settings is not Enabled, so discard the alerts.
     } else if (evt.status.flags &
                (PrintBase::SlicingStatus::UPDATE_PRINT_STEP_WARNINGS | PrintBase::SlicingStatus::UPDATE_PRINT_OBJECT_STEP_WARNINGS)) {
         // Update notification center with warnings of object_id and its warning_step.

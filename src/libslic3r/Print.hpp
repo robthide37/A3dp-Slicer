@@ -54,6 +54,7 @@ enum PrintStep : unsigned int {
     // psToolOrdering is a synonym to psWipeTower, as the Wipe Tower calculates and modifies the ToolOrdering,
     // while if printing without the Wipe Tower, the ToolOrdering is calculated as well.
     psToolOrdering = psWipeTower,
+    psAlertWhenSupportsNeeded,
     psSkirtBrim,
     // Last step before G-code export, after this step is finished, the initial extrusion path preview
     // should be refreshed.
@@ -64,7 +65,7 @@ enum PrintStep : unsigned int {
 
 enum PrintObjectStep : unsigned int {
     posSlice, posPerimeters, posPrepareInfill,
-    posInfill, posIroning, posSupportSpotsSearch, posAlertWhenSupportsNeeded, posSupportMaterial, posEstimateCurledExtrusions, posCount,
+    posInfill, posIroning, posSupportSpotsSearch, posSupportMaterial, posEstimateCurledExtrusions, posCount,
 };
 
 // A PrintRegion object represents a group of volumes to print
@@ -371,7 +372,6 @@ private:
     void infill();
     void ironing();
     void generate_support_spots();
-    void alert_when_supports_needed();
     void generate_support_material();
     void estimate_curled_extrusions();
 
@@ -609,6 +609,7 @@ private:
     void                _make_skirt();
     void                _make_wipe_tower();
     void                finalize_first_layer_convex_hull();
+    void                alert_when_supports_needed();
 
     // Islands of objects and their supports extruded at the 1st layer.
     Polygons            first_layer_islands() const;

@@ -433,57 +433,6 @@ void PrintObject::generate_support_spots()
     }
 }
 
-void PrintObject::alert_when_supports_needed()
-{
-    if (this->set_started(posAlertWhenSupportsNeeded)) {
-        BOOST_LOG_TRIVIAL(debug) << "posAlertWhenSupportsNeeded - start";
-        m_print->set_status(69, L("Alert if supports needed"));
-
-        auto alert_fn = [&](PrintStateBase::WarningLevel level, SupportSpotsGenerator::SupportPointCause cause) {
-            switch (cause) {
-            case SupportSpotsGenerator::SupportPointCause::LongBridge:
-                this->active_step_add_warning(level, L("There are bridges longer than recommended length. Consider adding supports. ") +
-                                                         (L("Object name")) + ": " + this->model_object()->name);
-                break;
-            case SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor:
-                this->active_step_add_warning(level, L("Unsupported bridges will collapse. Supports are needed. ") + (L("Object name")) +
-                                                         ": " + this->model_object()->name);
-                break;
-            case SupportSpotsGenerator::SupportPointCause::FloatingExtrusion:
-                if (level == PrintStateBase::WarningLevel::CRITICAL) {
-                    this->active_step_add_warning(level, L("Clusters of unsupported extrusions found. Supports are needed. ") +
-                                                             (L("Object name")) + ": " + this->model_object()->name);
-                } else {
-                    this->active_step_add_warning(level, L("Some unspported extrusions found. Consider adding supports. ") +
-                                                             (L("Object name")) + ": " + this->model_object()->name);
-                }
-                break;
-            case SupportSpotsGenerator::SupportPointCause::SeparationFromBed:
-                this->active_step_add_warning(level, L("Object part may break from the bed. Consider adding brim and/or supports. ") +
-                                                         (L("Object name")) + ": " + this->model_object()->name);
-                break;
-            case SupportSpotsGenerator::SupportPointCause::UnstableFloatingPart:
-                this->active_step_add_warning(level, L("Floating object parts detected. Supports are needed. ") + (L("Object name")) +
-                                                         ": " + this->model_object()->name);
-                break;
-            case SupportSpotsGenerator::SupportPointCause::WeakObjectPart:
-                this->active_step_add_warning(level, L("Thin parts of the object may break. Consider adding supports. ") +
-                                                         (L("Object name")) + ": " + this->model_object()->name);
-                break;
-            }
-        };
-
-        if (!this->has_support() && this->m_shared_regions->generated_support_points.has_value()) {
-            SupportSpotsGenerator::SupportPoints  supp_points     = this->m_shared_regions->generated_support_points->support_points;
-            SupportSpotsGenerator::PartialObjects partial_objects = this->m_shared_regions->generated_support_points->partial_objects;
-            SupportSpotsGenerator::raise_alerts_for_issues(supp_points, partial_objects, alert_fn);
-        }
-
-        BOOST_LOG_TRIVIAL(debug) << "posAlertWhenSupportsNeeded - end";
-        this->set_done(posAlertWhenSupportsNeeded);
-    }
-}
-
 void PrintObject::generate_support_material()
 {
     if (this->set_started(posSupportMaterial)) {
@@ -845,26 +794,26 @@ bool PrintObject::invalidate_step(PrintObjectStep step)
     
     // propagate to dependent steps
     if (step == posPerimeters) {
-		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning,  posSupportSpotsSearch, posAlertWhenSupportsNeeded, posEstimateCurledExtrusions });
+		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning,  posSupportSpotsSearch, posEstimateCurledExtrusions });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posPrepareInfill) {
-        invalidated |= this->invalidate_steps({ posInfill, posIroning, posSupportSpotsSearch, posAlertWhenSupportsNeeded });
+        invalidated |= this->invalidate_steps({ posInfill, posIroning, posSupportSpotsSearch});
     } else if (step == posInfill) {
-        invalidated |= this->invalidate_steps({ posIroning, posSupportSpotsSearch, posAlertWhenSupportsNeeded });
+        invalidated |= this->invalidate_steps({ posIroning, posSupportSpotsSearch });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posSlice) {
         invalidated |= this->invalidate_steps({posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportSpotsSearch,
-                                               posAlertWhenSupportsNeeded, posSupportMaterial, posEstimateCurledExtrusions});
+                                               posSupportMaterial, posEstimateCurledExtrusions});
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
         m_slicing_params.valid = false;
-    } else if (step == posSupportSpotsSearch) {
-        invalidated |= posAlertWhenSupportsNeeded;
     } else if (step == posSupportMaterial) {
         invalidated |= m_print->invalidate_steps({ psSkirtBrim,  });
         invalidated |= this->invalidate_steps({ posEstimateCurledExtrusions });
         m_slicing_params.valid = false;
     }
 
+    // invalidate alerts step always, since it depends on everything (except supports, but with supports enabled it is skipped anyway.)
+    invalidated |= m_print->invalidate_step(psAlertWhenSupportsNeeded);
     // Wipe tower depends on the ordering of extruders, which in turn depends on everything.
     // It also decides about what the wipe_into_infill / wipe_into_object features will do,
     // and that too depends on many of the settings.

@@ -841,8 +841,8 @@ void Print::process()
         obj->ironing();
     for (PrintObject *obj : m_objects)
         obj->generate_support_spots();
-    for (PrintObject *obj : m_objects)
-        obj->alert_when_supports_needed();
+    // check data from previous step, format the error message(s) and send alert to ui
+    alert_when_supports_needed();
     for (PrintObject *obj : m_objects)
         obj->generate_support_material();
     for (PrintObject *obj : m_objects)
@@ -1065,6 +1065,8 @@ void Print::_make_skirt()
         append(m_skirt_convex_hull, std::move(poly.points));
 }
 
+
+
 Polygons Print::first_layer_islands() const
 {
     Polygons islands;
@@ -1115,6 +1117,98 @@ void Print::finalize_first_layer_convex_hull()
     }
     append(m_first_layer_convex_hull.points, this->first_layer_wipe_tower_corners());
     m_first_layer_convex_hull = Geometry::convex_hull(m_first_layer_convex_hull.points);
+}
+
+void Print::alert_when_supports_needed()
+{
+    if (this->set_started(psAlertWhenSupportsNeeded)) {
+        BOOST_LOG_TRIVIAL(debug) << "psAlertWhenSupportsNeeded - start";
+        set_status(69, L("Alert if supports needed"));
+
+        auto issue_to_alert_message = [](SupportSpotsGenerator::SupportPointCause cause, bool critical) {
+            std::string message;
+            switch (cause) {
+            case SupportSpotsGenerator::SupportPointCause::LongBridge: message = L("long bridging extrusions"); break;
+            case SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor: message = L("floating bridge anchors"); break;
+            case SupportSpotsGenerator::SupportPointCause::FloatingExtrusion:
+                if (critical) {
+                    message = L("collapsing overhang");
+                } else {
+                    message = L("loose extrusions");
+                }
+                break;
+            case SupportSpotsGenerator::SupportPointCause::SeparationFromBed: message = L("low bed adhesion"); break;
+            case SupportSpotsGenerator::SupportPointCause::UnstableFloatingPart: message = L("floating object part"); break;
+            case SupportSpotsGenerator::SupportPointCause::WeakObjectPart: message = L("thin fragile section"); break;
+            }
+
+            return  (critical ? "!" : "") + message;
+        };
+
+        // vector of pairs of object and its issues, where each issue is a pair of type and critical flag
+        std::vector<std::pair<const PrintObject *, std::vector<std::pair<SupportSpotsGenerator::SupportPointCause, bool>>>> objects_isssues;
+
+        for (const PrintObject *object : m_objects) {
+            std::unordered_set<const ModelObject *> checked_model_objects;
+            if (!object->has_support() && checked_model_objects.find(object->model_object()) == checked_model_objects.end()) {
+                if (object->m_shared_regions->generated_support_points.has_value()) {
+                    SupportSpotsGenerator::SupportPoints  supp_points = object->m_shared_regions->generated_support_points->support_points;
+                    SupportSpotsGenerator::PartialObjects partial_objects = object->m_shared_regions->generated_support_points
+                                                                                ->partial_objects;
+                    auto issues = SupportSpotsGenerator::gather_issues(supp_points, partial_objects);
+                    if (issues.size() > 0) {
+                        objects_isssues.emplace_back(object, issues);
+                    }
+                }
+                checked_model_objects.emplace(object->model_object());
+            }
+        }
+
+        bool recommend_brim = false;
+        std::map<std::pair<SupportSpotsGenerator::SupportPointCause, bool>, std::vector<const PrintObject *>> po_by_support_issues;
+        for (const auto &obj : objects_isssues) {
+            for (const auto &issue : obj.second) {
+                po_by_support_issues[issue].push_back(obj.first);
+                if (issue.first == SupportSpotsGenerator::SupportPointCause::SeparationFromBed){
+                    recommend_brim = true;
+                }
+            }
+        }
+
+        auto message = L("Detected print stability issues") + ": \n";
+        if (objects_isssues.size() > po_by_support_issues.size()) {
+            // there are more objects than causes, group by issues
+            for (const auto &issue : po_by_support_issues) {
+                message += "\n" + issue_to_alert_message(issue.first.first, issue.first.second) + "  >>  ";
+                for (const auto &obj : issue.second) {
+                    message += obj->m_model_object->name + ", ";
+                }
+                message.pop_back();
+                message.pop_back(); // remove ,
+                message += ".\n";
+            }
+        } else {
+            // more causes than objects, group by objects
+            for (const auto &obj : objects_isssues) {
+                message += "\n" + L("Object") + " " + obj.first->model_object()->name + "  <<  ";
+                for (const auto &issue : obj.second) {
+                    message += issue_to_alert_message(issue.first, issue.second) + ", ";
+                }
+                message.pop_back();
+                message.pop_back(); // remove ,
+                message += ".\n";
+            }
+        }
+
+        message += "\n" + L("Consider enabling supports") + (recommend_brim ? (" " + L("and brim")) : "") + ".";
+
+        if (objects_isssues.size() > 0) {
+            this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL, message);
+        }
+
+        BOOST_LOG_TRIVIAL(debug) << "psAlertWhenSupportsNeeded - end";
+        this->set_done(psAlertWhenSupportsNeeded);
+    }
 }
 
 // Wipe tower support.

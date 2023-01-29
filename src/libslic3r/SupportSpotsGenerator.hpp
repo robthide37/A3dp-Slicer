@@ -52,7 +52,7 @@ struct Params
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
     const double filament_density = 1.25e-3f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
     const double material_yield_strength = 33.0f * 1e6f; // (g*mm/s^2)/mm^2; 33 MPa is yield strength of ABS, which has the lowest yield strength from common materials.
-    const float standard_extruder_conflict_force = 20.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
+    const float standard_extruder_conflict_force = 5.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
     const float malformations_additive_conflict_extruder_force = 100.0f * gravity_constant; // for areas with possible high layered curled filaments
 
     // MPa * 1e^6 = (g*mm/s^2)/mm^2 = g/(mm*s^2); yield strength of the bed surface
@@ -62,19 +62,19 @@ struct Params
         }
 
         if (filament_type == "PLA") {
-            return 0.018 * 1e6;
+            return 0.02 * 1e6;
         } else if (filament_type == "PET" || filament_type == "PETG") {
             return 0.3 * 1e6;
         } else if (filament_type == "ABS" || filament_type == "ASA") {
             return 0.1 * 1e6; //TODO do measurements
         } else { //PLA default value - defensive approach, PLA has quite low adhesion
-            return 0.018 * 1e6;
+            return 0.02 * 1e6;
         }
     }
 
     //just return PLA adhesion value as value for supports
     double get_support_spots_adhesion_strength() const {
-         return 0.018f * 1e6; 
+         return 0.02f * 1e6; 
     }
 };
 
@@ -150,9 +150,10 @@ std::tuple<SupportPoints, PartialObjects> full_search(const PrintObject *po, con
 void estimate_supports_malformations(std::vector<SupportLayer *> &layers, float supports_flow_width, const Params &params);
 void estimate_malformations(std::vector<Layer *> &layers, const Params &params);
 
-void raise_alerts_for_issues(const SupportPoints                                                 &support_points,
-                             PartialObjects                                                      &partial_objects,
-                             std::function<void(PrintStateBase::WarningLevel, SupportPointCause)> alert_fn);
+
+// NOTE: the boolean marks if the issue is critical or not for now.
+std::vector<std::pair<SupportPointCause, bool>> gather_issues(const SupportPoints &support_points,
+                                                             PartialObjects      &partial_objects);
 
 }} // namespace Slic3r::SupportSpotsGenerator
 

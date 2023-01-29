@@ -330,14 +330,14 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                                                 ((1.0f + std::abs(curr_point.curvature)) * (1.0f + std::abs(curr_point.curvature)) *
                                                  (1.0f + std::abs(curr_point.curvature))));
 
-            if (curr_point.distance > 2.0f * flow_width) {
+            if (curr_point.distance > 1.2f * flow_width) {
                 line_out.form_quality = 0.8f;
                 bridged_distance += line_len;
                 if (bridged_distance > max_bridge_len) {
                     line_out.support_point_generated = potential_cause;
                     bridged_distance                 = 0.0f;
                 }
-            } else if (curr_point.distance > flow_width * (1.0 + std::clamp(curr_point.curvature, -0.30f, 0.20f))) {
+            } else if (curr_point.distance > flow_width * 0.8f) {
                 bridged_distance += line_len;
                 line_out.form_quality = nearest_prev_layer_line.form_quality - 0.3f;
                 if (line_out.form_quality < 0 && bridged_distance > max_bridge_len) {
@@ -554,6 +554,10 @@ public:
                                       params.material_yield_strength;
 
             float conn_weight_arm    = (conn_centroid.head<2>() - mass_centroid.head<2>()).norm();
+            if (layer_z - conn_centroid.z() < 30.0) {
+                conn_weight_arm = 0.0f; // Given that we do not have very good info about the weight distribution between the connection and current layer,
+                // do not consider the weight until quite far away from the weak connection segment
+            }
             float conn_weight_torque = conn_weight_arm * weight * (1.0f - conn_centroid.z() / layer_z) * (1.0f - conn_centroid.z() / layer_z);
 
             float conn_movement_arm    = std::max(0.0f, mass_centroid.z() - conn_centroid.z());
@@ -1170,26 +1174,30 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
 #endif
 }
 
-void raise_alerts_for_issues(const SupportPoints                                                 &support_points,
-                             PartialObjects                                                      &partial_objects,
-                             std::function<void(PrintStateBase::WarningLevel, SupportPointCause)> alert_fn)
+std::vector<std::pair<SupportPointCause, bool>> gather_issues(const SupportPoints &support_points, PartialObjects &partial_objects)
 {
+    std::vector<std::pair<SupportPointCause, bool>> result;
+    // The partial object are most likely sorted from smaller to larger as the print continues, so this should save some sorting time
     std::reverse(partial_objects.begin(), partial_objects.end());
     std::sort(partial_objects.begin(), partial_objects.end(),
               [](const PartialObject &left, const PartialObject &right) { return left.volume > right.volume; });
 
-    float max_volume_part = partial_objects.front().volume;
+    float max_volume_part              = partial_objects.front().volume;
+    bool  unstable_floating_part_added = false;
     for (const PartialObject &p : partial_objects) {
         if (p.volume > max_volume_part / 500.0f && !p.connected_to_bed) {
-                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::UnstableFloatingPart);
-                return;
+                result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
+                unstable_floating_part_added = true;
+                break;
         }
     }
 
-    for (const SupportPoint &sp : support_points) {
-        if (sp.cause == SupportPointCause::UnstableFloatingPart) {
-                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::UnstableFloatingPart);
-                return;
+    if (!unstable_floating_part_added) {
+        for (const SupportPoint &sp : support_points) {
+                if (sp.cause == SupportPointCause::UnstableFloatingPart) {
+                result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
+                break;
+                }
         }
     }
 
@@ -1215,39 +1223,40 @@ void raise_alerts_for_issues(const SupportPoints                                
         }
         if (score > 5) {
                 if (floating_bridge) {
-                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::FloatingBridgeAnchor);
+                result.emplace_back(SupportPointCause::FloatingBridgeAnchor, true);
                 } else {
-                alert_fn(PrintStateBase::WarningLevel::CRITICAL, SupportPointCause::FloatingExtrusion);
+                result.emplace_back(SupportPointCause::FloatingExtrusion, true);
                 }
-                return;
+                break;
         }
     }
 
     for (const SupportPoint &sp : support_points) {
         if (sp.cause == SupportPointCause::SeparationFromBed) {
-                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::SeparationFromBed);
-                return;
+                result.emplace_back(SupportPointCause::SeparationFromBed, true);
+                break;
         }
     }
 
     for (const SupportPoint &sp : support_points) {
         if (sp.cause == SupportPointCause::WeakObjectPart) {
-                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::WeakObjectPart);
-                return;
+                result.emplace_back(SupportPointCause::WeakObjectPart, true);
+                break;
         }
     }
 
     if (ext_supp_points.size() > 5) {
-        alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::FloatingExtrusion);
-        return;
+        result.emplace_back(SupportPointCause::FloatingExtrusion, false);
     }
 
     for (const SupportPoint &sp : support_points) {
         if (sp.cause == SupportPointCause::LongBridge) {
-                alert_fn(PrintStateBase::WarningLevel::NON_CRITICAL, SupportPointCause::LongBridge);
-                return;
+                result.emplace_back(SupportPointCause::LongBridge, false);
+                break;
         }
     }
+
+    return result;
 }
 
 } // namespace SupportSpotsGenerator
