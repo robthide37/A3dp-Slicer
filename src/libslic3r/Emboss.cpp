@@ -159,11 +159,11 @@ bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &sp
         bool is_ba_short = ba_size_sq < wanted_size_sq;
         bool is_bc_short = bc_size_sq < wanted_size_sq;
 
-        auto a_side = [&b, &ba, &ba_size_sq, &wanted_size]() {
+        auto a_side = [&b, &ba, &ba_size_sq, &wanted_size]() -> Point {
             Vec2d ba_norm = ba / sqrt(ba_size_sq);
             return b + (wanted_size * ba_norm).cast<coord_t>();
         };
-        auto c_side = [&b, &bc, &bc_size_sq, &wanted_size]() {
+        auto c_side = [&b, &bc, &bc_size_sq, &wanted_size]() -> Point {
             Vec2d bc_norm = bc / sqrt(bc_size_sq);
             return b + (wanted_size * bc_norm).cast<coord_t>();
         };
