@@ -82,13 +82,16 @@ template<class P> class DPIAware : public P
 {
 public:
     DPIAware(wxWindow *parent, wxWindowID id, const wxString &title, const wxPoint &pos=wxDefaultPosition,
-        const wxSize &size=wxDefaultSize, long style=wxDEFAULT_FRAME_STYLE, const wxString &name=wxFrameNameStr)
+        const wxSize &size=wxDefaultSize, long style=wxDEFAULT_FRAME_STYLE, const wxString &name= wxFrameNameStr, const int font_point_size = -1)
         : P(parent, id, title, pos, size, style, name)
     {
         int dpi = get_dpi_for_window(this);
         m_scale_factor = (float)dpi / (float)DPI_DEFAULT;
         m_prev_scale_factor = m_scale_factor;
 		m_normal_font = get_default_font_for_dpi(this, dpi);
+
+        if (font_point_size > 0)
+            m_normal_font.SetPointSize(font_point_size);
 
         /* Because of default window font is a primary display font, 
          * We should set correct font for window before getting em_unit value.

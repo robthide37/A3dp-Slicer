@@ -139,7 +139,7 @@ protected:
     virtual void on_sys_color_changed() override;
 
 public:
-    MainFrame();
+    MainFrame(const int font_point_size);
     ~MainFrame() = default;
 
     void update_layout();

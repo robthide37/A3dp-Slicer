@@ -837,7 +837,8 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
     // ys_FIXME! temporary workaround for correct font scaling
     // Because of from wxWidgets 3.1.3 auto rescaling is implemented for the Fonts,
     // From the very beginning set dialog font to the wxSYS_DEFAULT_GUI_FONT
-    this->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT));
+//    this->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT));
+    this->SetFont(wxGetApp().normal_font());
 #endif // __WXMSW__
 
     int border = 10;
@@ -850,7 +851,8 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
         add_new_value_column = false;
 
     m_action_line = new wxStaticText(this, wxID_ANY, "");
-    m_action_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
+//    m_action_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
+    m_action_line->SetFont(wxGetApp().bold_font());
 
     m_tree = new DiffViewCtrl(this, wxSize(em * (add_new_value_column ? 80 : 60), em * 30));
     m_tree->AppendToggleColumn_(L"\u2714"      , DiffModel::colToggle, wxLinux ? 9 : 6);
@@ -910,7 +912,8 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
     cancel_btn->Bind(wxEVT_BUTTON, [this](wxEvent&) { this->EndModal(wxID_CANCEL); });
 
     m_info_line = new wxStaticText(this, wxID_ANY, "");
-    m_info_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
+//    m_info_line->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold());
+    m_info_line->SetFont(wxGetApp().bold_font());
     m_info_line->Hide();
 
     if (!m_app_config_key.empty()) {
@@ -1362,6 +1365,7 @@ FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString
     : wxDialog(nullptr, wxID_ANY, option_name, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
     wxGetApp().UpdateDarkUI(this);
+    this->SetFont(wxGetApp().normal_font());
 
     int border = 10;
     bool has_new_value_column = !new_value_header.IsEmpty();
@@ -1528,7 +1532,8 @@ void DiffPresetDialog::create_show_all_presets_chb()
 
 void DiffPresetDialog::create_info_lines()
 {
-    const wxFont font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold();
+//    const wxFont font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).Bold();
+    const wxFont font = GetFont().Bold();
 
     m_top_info_line = new wxStaticText(this, wxID_ANY, _L("Select presets to compare"));
     m_top_info_line->SetFont(font);
@@ -1668,7 +1673,8 @@ DiffPresetDialog::DiffPresetDialog(MainFrame* mainframe)
     // ys_FIXME! temporary workaround for correct font scaling
     // Because of from wxWidgets 3.1.3 auto rescaling is implemented for the Fonts,
     // From the very beginning set dialog font to the wxSYS_DEFAULT_GUI_FONT
-    this->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT));
+//    this->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT));
+    this->SetFont(mainframe->normal_font());
 #endif // __WXMSW__
 
     // Init bundles
