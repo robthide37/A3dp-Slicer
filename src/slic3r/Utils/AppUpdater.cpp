@@ -2,18 +2,20 @@
 
 #include <atomic>
 #include <thread>
+#include <string>
 
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/nowide/convert.hpp>
-#include <boost/property_tree/ini_parser.hpp> 
+#include <boost/property_tree/ini_parser.hpp>
 #include <curl/curl.h>
 
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/I18N.hpp"
+#include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/Utils/Http.hpp"
 
 #include "libslic3r/Utils.hpp"
@@ -214,7 +216,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 	}
 
 	boost::filesystem::path tmp_path = dest_path;
-	tmp_path += format(".%1%%2%", get_current_pid(), ".download");
+	tmp_path += format(".%1%%2%", std::to_string(GUI::GLCanvas3D::timestamp_now()), ".download");
 	FILE* file;
 	wxString temp_path_wstring(tmp_path.wstring());
 	file = fopen(temp_path_wstring.c_str(), "wb");
