@@ -253,7 +253,10 @@ void FileGet::priv::get_perform()
 			if (file != NULL)
 				fclose(file);
 			wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_ERROR);
-			evt->SetString(GUI::from_u8(error));
+			if (!error.empty())
+				evt->SetString(GUI::from_u8(error));
+			else
+				evt->SetString(GUI::from_u8(body));
 			evt->SetInt(m_id);
 			m_evt_handler->QueueEvent(evt);
 		})
