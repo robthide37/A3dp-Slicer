@@ -254,7 +254,7 @@ protected:
 	std::map<std::string, int>	m_options_list;
 	int							m_opt_status_value = 0;
 
-	std::vector<ButtonsDescription::Entry>	m_icon_descriptions = {};
+	std::vector<GUI_Descriptions::ButtonEntry>	m_icon_descriptions = {};
 
 	bool				m_is_modified_values{ false };
 	bool				m_is_nonsys_values{ true };

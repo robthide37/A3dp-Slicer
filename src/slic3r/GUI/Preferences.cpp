@@ -1041,7 +1041,7 @@ void PreferencesDialog::create_settings_text_color_widget()
 	m_blinkers[opt_key] = new BlinkingBitmap(parent);
 
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
-	ButtonsDescription::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_sys_colour, &m_mod_colour);
+	GUI_Descriptions::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_sys_colour, &m_mod_colour);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
@@ -1068,7 +1068,7 @@ void PreferencesDialog::create_settings_mode_color_widget()
 
     // Mode color markers description
 	m_mode_palette = wxGetApp().get_mode_palette();
-    ButtonsDescription::FillSizerWithModeColorDescriptions(stb_sizer, parent, { &m_mode_simple, &m_mode_advanced, &m_mode_expert }, m_mode_palette);
+	GUI_Descriptions::FillSizerWithModeColorDescriptions(stb_sizer, parent, { &m_mode_simple, &m_mode_advanced, &m_mode_expert }, m_mode_palette);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);

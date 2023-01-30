@@ -194,7 +194,7 @@ void Tab::create_preset_tab()
     m_undo_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent) { on_roll_back_value(); }));
     m_undo_to_sys_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent) { on_roll_back_value(true); }));
     m_question_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent) {
-        ButtonsDescription dlg(this, m_icon_descriptions);
+        GUI_Descriptions::Dialog dlg(this, m_icon_descriptions);
         if (dlg.ShowModal() == wxID_OK)
             wxGetApp().update_label_colours();
     });
