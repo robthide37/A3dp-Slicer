@@ -170,7 +170,12 @@ void GLGizmosManager::reset_all_states()
     if (! m_enabled || m_serializing)
         return;
 
-    activate_gizmo(Undefined);
+    EType current = get_current_type();
+    if (current != Undefined)
+        // close any open gizmo
+        open_gizmo(current);
+    else
+        activate_gizmo(Undefined);
     m_hover = Undefined;
 }
 
