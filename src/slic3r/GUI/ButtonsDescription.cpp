@@ -83,8 +83,9 @@ wxBitmapBundle * ModePaletteComboBox::get_bmp(const std::vector<std::string> &pa
 	return bmp_bndl;
 }
 
+namespace GUI_Descriptions {
 
-void ButtonsDescription::FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent, wxColourPickerCtrl** sys_colour, wxColourPickerCtrl** mod_colour)
+void FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent, wxColourPickerCtrl** sys_colour, wxColourPickerCtrl** mod_colour)
 {
 	wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(3, 5, 5);
 	sizer->Add(grid_sizer, 0, wxEXPAND);
@@ -127,7 +128,7 @@ void ButtonsDescription::FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWi
 	add_color(mod_colour, wxGetApp().get_label_clr_modified(),wxGetApp().get_label_default_clr_modified(),	_L("Value was changed and is not equal to the system value or the last saved preset"));
 }
 
-void ButtonsDescription::FillSizerWithModeColorDescriptions(
+void FillSizerWithModeColorDescriptions(
 	wxSizer* sizer, wxWindow* parent, 
 	std::vector<wxColourPickerCtrl**> clr_pickers, 
 	std::vector<wxColour>& mode_palette)
@@ -195,7 +196,7 @@ void ButtonsDescription::FillSizerWithModeColorDescriptions(
 	}
 }
 
-ButtonsDescription::ButtonsDescription(wxWindow* parent, const std::vector<Entry> &entries) :
+Dialog::Dialog(wxWindow* parent, const std::vector<ButtonEntry> &entries) :
 	wxDialog(parent, wxID_ANY, _(L("Buttons And Text Colors Description")), wxDefaultPosition, wxDefaultSize),
 	m_entries(entries)
 {
@@ -207,7 +208,7 @@ ButtonsDescription::ButtonsDescription(wxWindow* parent, const std::vector<Entry
 	main_sizer->Add(grid_sizer, 0, wxEXPAND | wxALL, 20);
 
 	// Icon description
-	for (const Entry &entry : m_entries)
+	for (const ButtonEntry &entry : m_entries)
 	{
 		auto icon = new wxStaticBitmap(this, wxID_ANY, entry.bitmap->bmp());
 		grid_sizer->Add(icon, -1, wxALIGN_CENTRE_VERTICAL);
@@ -219,14 +220,14 @@ ButtonsDescription::ButtonsDescription(wxWindow* parent, const std::vector<Entry
 
 	// Text color description
 	wxSizer* sizer = new wxBoxSizer(wxVERTICAL);
-	FillSizerWithTextColorDescriptions(sizer, this, &sys_colour, &mod_colour);
+	GUI_Descriptions::FillSizerWithTextColorDescriptions(sizer, this, &sys_colour, &mod_colour);
 	main_sizer->Add(sizer, 0, wxEXPAND | wxALL, 20);
 
 	// Mode color markers description
 	mode_palette = wxGetApp().get_mode_palette();
 
 	wxSizer* mode_sizer = new wxBoxSizer(wxVERTICAL);
-	FillSizerWithModeColorDescriptions(mode_sizer, this, { &simple, &advanced, &expert }, mode_palette);
+	GUI_Descriptions::FillSizerWithModeColorDescriptions(mode_sizer, this, { &simple, &advanced, &expert }, mode_palette);
 	main_sizer->Add(mode_sizer, 0, wxEXPAND | wxALL, 20);
 
 	auto buttons = CreateStdDialogButtonSizer(wxOK|wxCANCEL);
@@ -248,6 +249,7 @@ ButtonsDescription::ButtonsDescription(wxWindow* parent, const std::vector<Entry
 	main_sizer->SetSizeHints(this);
 }
 
+} // GUI_Descriptions
 } // GUI
 } // Slic3r
 
