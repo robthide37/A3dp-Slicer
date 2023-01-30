@@ -124,7 +124,7 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     , m_volume(nullptr)
     , m_is_unknown_font(false)
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
-    , m_style_manager(m_imgui->get_glyph_ranges())
+    , m_style_manager(m_imgui->get_glyph_ranges(), create_default_styles)
     , m_job_cancel(nullptr)
 {
     m_rotate_gizmo.set_group_id(0);
@@ -1014,7 +1014,7 @@ void GLGizmoEmboss::initialize()
     init_icons();
     
     // initialize text styles
-    m_style_manager.init(wxGetApp().app_config, create_default_styles());
+    m_style_manager.init(wxGetApp().app_config);
     set_default_text();
 
     // Set rotation gizmo upwardrotate 
@@ -1025,20 +1025,48 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
 {
     // https://docs.wxwidgets.org/3.0/classwx_font.html
     // Predefined objects/pointers: wxNullFont, wxNORMAL_FONT, wxSMALL_FONT, wxITALIC_FONT, wxSWISS_FONT
-    return {
+    EmbossStyles styles = {
         WxFontUtils::create_emboss_style(*wxNORMAL_FONT, _u8L("NORMAL")), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
         WxFontUtils::create_emboss_style(*wxSMALL_FONT, _u8L("SMALL")),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
         WxFontUtils::create_emboss_style(*wxITALIC_FONT, _u8L("ITALIC")), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
         WxFontUtils::create_emboss_style(*wxSWISS_FONT, _u8L("SWISS")),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
-        WxFontUtils::create_emboss_style(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN"))
+        WxFontUtils::create_emboss_style(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN")),
+        
     };
-}
 
-// Could exist systems without installed font so last chance is used own file
-//EmbossStyle GLGizmoEmboss::create_default_style() {
-//    std::string font_path = Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf";
-//    return EmbossStyle{"Default font", font_path, EmbossStyle::Type::file_path};
-//}
+    // Not all predefined font for wx must be valid TTF, but at least one style must be loadable
+    styles.erase(std::remove_if(styles.begin(), styles.end(), [](const EmbossStyle& style) {
+        wxFont wx_font = WxFontUtils::create_wxFont(style);
+        return WxFontUtils::create_font_file(wx_font) == nullptr;
+        }),styles.end()
+    );
+
+    // exist some valid style?
+    if (!styles.empty())
+        return styles;
+
+    // No valid style in defult list
+    // at least one style must contain loadable font
+    wxArrayString facenames = wxFontEnumerator::GetFacenames(wxFontEncoding::wxFONTENCODING_SYSTEM);
+    wxFont wx_font;
+    for (const wxString &face : facenames) {
+        wx_font = wxFont(face);
+        if (WxFontUtils::create_font_file(wx_font) != nullptr)
+            break;
+        wx_font = wxFont(); // NotOk
+    }
+
+    if (wx_font.IsOk()) {
+        // use first alphabetic sorted installed font
+        styles.push_back(WxFontUtils::create_emboss_style(wx_font, _u8L("First font")));
+    } else {
+        // On current OS is not installed any correct TTF font
+        // use font packed with Slic3r
+        std::string font_path = Slic3r::resources_dir() + "/fonts/NotoSans-Regular.ttf";
+        styles.push_back(EmbossStyle{_u8L("Default font"), font_path, EmbossStyle::Type::file_path});
+    }
+    return styles;
+}
 
 void GLGizmoEmboss::set_default_text(){ m_text = _u8L("Embossed text"); }
 
@@ -3650,34 +3678,25 @@ std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
 
 DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>>& cancel)
 {
-    auto create_volume_name = [&]() {
-        bool        contain_enter = text.find('\n') != std::string::npos;
-        std::string text_fixed;
-        if (contain_enter) {
-            // change enters to space
-            text_fixed = text; // copy
-            std::replace(text_fixed.begin(), text_fixed.end(), '\n', ' ');
-        }
-        return ((contain_enter) ? text_fixed : text);
-    };
+    // create volume_name
+    std::string volume_name = text; // copy
+    // contain_enter?
+    if (volume_name.find('\n') != std::string::npos)
+        // change enters to space
+        std::replace(volume_name.begin(), volume_name.end(), '\n', ' ');
 
-    auto create_configuration = [&]() -> TextConfiguration {
-        if (!style_manager.is_active_font()) {
-            std::string       default_text_for_emboss = _u8L("Embossed text");
-            EmbossStyle       es                      = style_manager.get_style();
-            TextConfiguration tc{es, default_text_for_emboss};
-            // TODO: investigate how to initialize
-            return tc;
-        }
+    if (!style_manager.is_active_font())
+        style_manager.load_valid_style();
+    assert(style_manager.is_active_font());
 
-        EmbossStyle &es = style_manager.get_style();
-        // actualize font path - during changes in gui it could be corrupted
-        // volume must store valid path
-        assert(style_manager.get_wx_font().has_value());
-        assert(es.path.compare(WxFontUtils::store_wxFont(*style_manager.get_wx_font())) == 0);
-        // style.path = WxFontUtils::store_wxFont(*m_style_manager.get_wx_font());
-        return TextConfiguration{es, text};
-    };
+    const EmbossStyle &es = style_manager.get_style();
+    // actualize font path - during changes in gui it could be corrupted
+    // volume must store valid path
+    assert(style_manager.get_wx_font().has_value());
+    assert(style_manager.get_wx_font()->IsOk());
+    assert(es.path.compare(WxFontUtils::store_wxFont(*style_manager.get_wx_font())) == 0);
+    // style.path = WxFontUtils::store_wxFont(*m_style_manager.get_wx_font());
+    TextConfiguration tc{es, text};
 
     // Cancel previous Job, when it is in process
     // worker.cancel(); --> Use less in this case I want cancel only previous EmbossJob no other jobs
@@ -3686,7 +3705,7 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &st
         cancel->store(true);
     // create new shared ptr to cancel new job
     cancel = std::make_shared<std::atomic<bool>>(false);
-    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), create_configuration(), create_volume_name(), cancel};
+    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), tc, volume_name, cancel};
 }
 
 void priv::start_create_object_job(DataBase &emboss_data, const Vec2d &coor)

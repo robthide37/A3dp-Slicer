@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <functional>
 #include <imgui/imgui.h>
 #include <wx/font.h>
 #include <GL/glew.h>
@@ -23,7 +24,9 @@ class StyleManager
     friend class CreateFontStyleImagesJob; // access to StyleImagesData
 
 public:
-    StyleManager(const ImWchar *language_glyph_range);
+    /// <param name="language_glyph_range">Character to load for imgui when initialize imgui font</param>
+    /// <param name="create_default_styles">Function to create default styles</param>
+    StyleManager(const ImWchar *language_glyph_range, std::function<EmbossStyles()> create_default_styles);
         
     /// <summary>
     /// Release imgui font and style images from GPU
@@ -36,8 +39,7 @@ public:
     /// </summary>
     /// <param name="app_config">Application configuration loaded from file "PrusaSlicer.ini"
     /// + cfg is stored to privat variable</param>
-    /// <param name="default_styles">Used when list is not loadable from config</param>
-    void init(AppConfig *app_config, const EmbossStyles &default_styles);
+    void init(AppConfig *app_config);
     
     /// <summary>
     /// Write font list into AppConfig
@@ -81,6 +83,11 @@ public:
     /// <param name="name">New name</param>
     void rename(const std::string &name);
         
+    /// <summary>
+    /// load some valid style
+    /// </summary>
+    void load_valid_style();
+
     /// <summary>
     /// Change active font
     /// When font not loaded roll back activ font
@@ -194,9 +201,7 @@ public:
     static float get_imgui_font_size(const FontProp &prop, const Slic3r::Emboss::FontFile &file, double scale);
 
 private:
-    // erase font when not possible to load
-    // used at initialize phaze - fonts could be modified in appConfig file by user
-    bool load_first_valid_font();
+    std::function<EmbossStyles()> m_create_default_styles;
 
     /// <summary>
     /// Cache data from style to reduce amount of:
