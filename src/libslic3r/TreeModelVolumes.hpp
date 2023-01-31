@@ -222,7 +222,7 @@ public:
      * Knowledge about branch angle is used to only calculate avoidances and collisions that may actually be needed.
      * Not calling precalculate() will cause the class to lazily calculate avoidances and collisions as needed, which will be a lot slower on systems with more then one or two cores!
      */
-    void precalculate(const coord_t max_layer);
+    void precalculate(const coord_t max_layer, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
@@ -266,7 +266,7 @@ public:
      * \param layer_idx The layer of interest
      * \return Polygons object
      */
-    const Polygons& getPlaceableAreas(coord_t radius, LayerIndex layer_idx) const;
+    const Polygons& getPlaceableAreas(coord_t radius, LayerIndex layer_idx, std::function<void()> throw_on_cancel) const;
     /*!
      * \brief Provides the area that represents the walls, as in the printed area, of the model. This is an abstract representation not equal with the outline. See calculateWallRestrictions for better description.
      * \param radius The radius of the node of interest.
@@ -431,8 +431,8 @@ private:
      * collide with the model. Result is saved in the cache.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateCollision(const std::vector<RadiusLayerPair> &keys);
-    void calculateCollision(const coord_t radius, const LayerIndex max_layer_idx);
+    void calculateCollision(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel);
+    void calculateCollision(const coord_t radius, const LayerIndex max_layer_idx, std::function<void()> throw_on_cancel);
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer. Holes are removed.
      *
@@ -441,7 +441,7 @@ private:
      * A Hole is defined as an area, in which a branch with m_increase_until_radius radius would collide with the wall.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateCollisionHolefree(const std::vector<RadiusLayerPair> &keys);
+    void calculateCollisionHolefree(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer. Holes are removed.
@@ -453,7 +453,7 @@ private:
      */
     void calculateCollisionHolefree(RadiusLayerPair key)
     {
-        calculateCollisionHolefree(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) });
+        calculateCollisionHolefree(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, {});
     }
 
     /*!
@@ -463,7 +463,7 @@ private:
      * collide with the model. Result is saved in the cache.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateAvoidance(const std::vector<RadiusLayerPair> &keys, bool to_build_plate, bool to_model);
+    void calculateAvoidance(const std::vector<RadiusLayerPair> &keys, bool to_build_plate, bool to_model, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model.
@@ -474,7 +474,7 @@ private:
      */
     void calculateAvoidance(RadiusLayerPair key, bool to_build_plate, bool to_model)
     {
-        calculateAvoidance(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, to_build_plate, to_model);
+        calculateAvoidance(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, to_build_plate, to_model, {});
     }
 
     /*!
@@ -482,7 +482,7 @@ private:
      * Result is saved in the cache.
      * \param key RadiusLayerPair of the requested areas. It will be calculated up to the provided layer.
      */
-    void calculatePlaceables(const coord_t radius, const LayerIndex max_required_layer);
+    void calculatePlaceables(const coord_t radius, const LayerIndex max_required_layer, std::function<void()> throw_on_cancel);
 
 
     /*!
@@ -490,7 +490,7 @@ private:
      * Result is saved in the cache.
      * \param keys RadiusLayerPair of the requested areas. The radius will be calculated up to the provided layer.
      */
-    void calculatePlaceables(const std::vector<RadiusLayerPair> &keys);
+    void calculatePlaceables(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Creates the areas that can not be passed when expanding an area downwards. As such these areas are an somewhat abstract representation of a wall (as in a printed object).
@@ -499,7 +499,7 @@ private:
      *
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateWallRestrictions(const std::vector<RadiusLayerPair> &keys);
+    void calculateWallRestrictions(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Creates the areas that can not be passed when expanding an area downwards. As such these areas are an somewhat abstract representation of a wall (as in a printed object).
@@ -508,7 +508,7 @@ private:
      */
     void calculateWallRestrictions(RadiusLayerPair key)
     {
-        calculateWallRestrictions(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) });
+        calculateWallRestrictions(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, {});
     }
 
     /*!
