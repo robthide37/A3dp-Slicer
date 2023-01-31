@@ -1083,7 +1083,9 @@ void GLGizmoEmboss::set_volume_by_selection()
     remove_notification_not_valid_font();
 
     // Do not use focused input value when switch volume(it must swith value)
-    if (m_volume != nullptr) ImGui::ClearActiveID();
+    if (m_volume != nullptr && 
+        m_volume != vol) // when update volume it changed id BUT not pointer
+        ImGui::ClearActiveID();
 
     // is select embossed volume?
     if (!set_volume(vol)) {
