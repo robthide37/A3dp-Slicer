@@ -4343,7 +4343,7 @@ void generate_support_toolpaths(
         {
             SupportLayer &support_layer = *support_layers[support_layer_id];
             LayerCache   &layer_cache   = layer_caches[support_layer_id];
-            float         interface_angle_delta = config.support_material_style.value == smsSnug || config.support_material_style.value == smsTree ? 
+            float         interface_angle_delta = config.support_material_style.value == smsSnug || config.support_material_style.value == smsTree || config.support_material_style.value == smsOrganic ? 
                 (support_layer.interface_id() & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.) :
                 0;
 
