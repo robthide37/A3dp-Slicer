@@ -1109,7 +1109,6 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
     if (face_name_opt.has_value()) {
         face_name = wxString(face_name_opt->c_str());
 
-        //* SWITCH for search in OS fonts
         // search in enumerated fonts
         // refresh list of installed font in the OS.
         init_face_names();
@@ -1118,12 +1117,19 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
         const std::vector<FaceName> &faces = m_face_names.faces;
         auto it = std::lower_bound(faces.begin(), faces.end(), face_name, cmp);
         is_font_installed = it != faces.end() && it->wx_name == face_name;
-        /*/ 
-        // test it by Wx
-        wxFontEnumerator::InvalidateCache();
-        wxFont wx_font_; // temporary structure
-        is_font_installed = wx_font_.SetFaceName(face_name);
-        //  */
+
+        if (!is_font_installed) {
+            // check if wx allowed to set it up - another encoding of name
+            wxFontEnumerator::InvalidateCache();
+            wxFont wx_font_; // temporary structure
+            if (wx_font_.SetFaceName(face_name) && 
+                WxFontUtils::create_font_file(wx_font_) != nullptr // can load TTF file?
+                ) {
+                is_font_installed = true;
+                // QUESTION: add this name to allowed faces?
+                // Could create twin of font face
+            }
+        }
     }
 
     wxFont wx_font;
