@@ -2764,7 +2764,7 @@ void TabPrinter::build_extruder_pages(size_t n_before_extruders)
         line.append_widget(reset_to_filament_color);
         optgroup->append_line(line);
 
-        optgroup = page->new_optgroup(L(""));
+        optgroup = page->new_optgroup("");
 
         auto copy_settings_btn = 
         line            = { "", ""};

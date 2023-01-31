@@ -249,7 +249,13 @@ class GLCanvas3D
             GLModel baseline;
             GLModel profile;
             GLModel background;
-            float old_canvas_width{ 0.0f };
+            struct OldCanvasWidth
+            {
+                float background{ 0.0f };
+                float baseline{ 0.0f };
+                float profile{ 0.0f };
+            };
+            OldCanvasWidth old_canvas_width;
             std::vector<double> old_layer_height_profile;
         };
         Profile m_profile;

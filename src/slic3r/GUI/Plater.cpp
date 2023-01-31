@@ -4367,13 +4367,20 @@ void Plater::priv::clear_warnings()
 }
 bool Plater::priv::warnings_dialog()
 {
-	if (current_warnings.empty())
+    std::vector<std::pair<Slic3r::PrintStateBase::Warning, size_t>> current_critical_warnings{};
+    for (const auto& w : current_warnings) {
+        if (w.first.level == PrintStateBase::WarningLevel::CRITICAL) {
+            current_critical_warnings.push_back(w);
+        }
+    }
+
+	if (current_critical_warnings.empty())
 		return true;
 	std::string text = _u8L("There are active warnings concerning sliced models:") + "\n";
-	for (auto const& it : current_warnings) {
+	for (auto const& it : current_critical_warnings) {
         size_t next_n = it.first.message.find_first_of('\n', 0);
 		text += "\n";
-		if (next_n != std::string::npos)
+		if (next_n != std::string::npos) 
 			text += it.first.message.substr(0, next_n);
 		else
 			text += it.first.message;
