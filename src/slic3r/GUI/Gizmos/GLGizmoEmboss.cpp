@@ -973,7 +973,7 @@ void GLGizmoEmboss::initialize()
 
     // calculate window size
     const ImGuiStyle &style = ImGui::GetStyle();
-    float window_title = line_height + 2*style.FramePadding.y;
+    float window_title = line_height + 2*style.FramePadding.y + 2 * style.WindowTitleAlign.y;
     float input_height = line_height_with_spacing + 2*style.FramePadding.y;
     float tree_header  = line_height_with_spacing;
     float separator_height = 1 + style.FramePadding.y;
