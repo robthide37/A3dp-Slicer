@@ -576,9 +576,6 @@ bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
     if (mouse_event.Moving()) return false;
 
     // not selected volume
-    assert(m_volume != nullptr);
-    assert(priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) != nullptr);
-    assert(m_volume->text_configuration.has_value());
     if (m_volume == nullptr ||
         priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ||
         !m_volume->text_configuration.has_value()) return false;
