@@ -352,8 +352,8 @@ void GLCanvas3D::LayersEditing::render_active_object_annotations(const GLCanvas3
     glsafe(::glBindTexture(GL_TEXTURE_2D, m_z_texture_id));
 
     // Render the color bar
-    if (!m_profile.background.is_initialized() || m_profile.old_canvas_width != cnv_width) {
-        m_profile.old_canvas_width = cnv_width;
+    if (!m_profile.background.is_initialized() || m_profile.old_canvas_width.background != cnv_width) {
+        m_profile.old_canvas_width.background = cnv_width;
         m_profile.background.reset();
 
         GLModel::Geometry init_data;
@@ -404,9 +404,11 @@ void GLCanvas3D::LayersEditing::render_profile(const GLCanvas3D& canvas)
 
     const float cnv_inv_width  = 1.0f / cnv_width;
     const float cnv_inv_height = 1.0f / cnv_height;
+    const float left = 1.0f - 2.0f * THICKNESS_BAR_WIDTH * cnv_inv_width;
 
     // Baseline
-    if (!m_profile.baseline.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile) {
+    if (!m_profile.baseline.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile || m_profile.old_canvas_width.baseline != cnv_width) {
+        m_profile.old_canvas_width.baseline = cnv_width;
         m_profile.baseline.reset();
 
         GLModel::Geometry init_data;
@@ -416,7 +418,7 @@ void GLCanvas3D::LayersEditing::render_profile(const GLCanvas3D& canvas)
         init_data.reserve_indices(2);
 
         // vertices
-        const float axis_x = 2.0f * ((cnv_width - THICKNESS_BAR_WIDTH + float(m_slicing_parameters->layer_height) * scale_x) * cnv_inv_width - 0.5f);
+        const float axis_x = left + 2.0f * float(m_slicing_parameters->layer_height) * scale_x * cnv_inv_width;
         init_data.add_vertex(Vec2f(axis_x, -1.0f));
         init_data.add_vertex(Vec2f(axis_x, 1.0f));
 
@@ -426,7 +428,8 @@ void GLCanvas3D::LayersEditing::render_profile(const GLCanvas3D& canvas)
         m_profile.baseline.init_from(std::move(init_data));
     }
 
-    if (!m_profile.profile.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile) {
+    if (!m_profile.profile.is_initialized() || m_profile.old_layer_height_profile != m_layer_height_profile || m_profile.old_canvas_width.profile != cnv_width) {
+        m_profile.old_canvas_width.profile = cnv_width;
         m_profile.old_layer_height_profile = m_layer_height_profile;
         m_profile.profile.reset();
 
@@ -438,7 +441,7 @@ void GLCanvas3D::LayersEditing::render_profile(const GLCanvas3D& canvas)
 
         // vertices + indices
         for (unsigned int i = 0; i < (unsigned int)m_layer_height_profile.size(); i += 2) {
-            init_data.add_vertex(Vec2f(2.0f * ((cnv_width - THICKNESS_BAR_WIDTH + float(m_layer_height_profile[i + 1]) * scale_x) * cnv_inv_width - 0.5f),
+            init_data.add_vertex(Vec2f(left + 2.0f * float(m_layer_height_profile[i + 1]) * scale_x * cnv_inv_width,
                 2.0f * (float(m_layer_height_profile[i]) * scale_y * cnv_inv_height - 0.5)));
             init_data.add_index(i / 2);
         }
