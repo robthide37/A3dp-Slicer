@@ -3557,7 +3557,7 @@ static void organic_smooth_branches_avoid_collisions(
     throw_on_cancel();
 
     static constexpr const double collision_extra_gap = 0.1;
-    static constexpr const double max_nudge_collision_avoidance = 0.2;
+    static constexpr const double max_nudge_collision_avoidance = 0.5;
     static constexpr const double max_nudge_smoothing = 0.2;
     static constexpr const size_t num_iter = 100; // 1000;
     for (size_t iter = 0; iter < num_iter; ++ iter) {
@@ -3574,16 +3574,17 @@ static void organic_smooth_branches_avoid_collisions(
                     for (uint32_t layer_id = collision_sphere.layer_begin; layer_id != collision_sphere.layer_end; ++ layer_id) {
                         double dz = (layer_id - collision_sphere.element.state.layer_idx) * slicing_params.layer_height;
                         if (double r2 = sqr(collision_sphere.radius) - sqr(dz); r2 > 0) {
-                            if (const LayerCollisionCache &layer_collision_cache_item = layer_collision_cache[layer_id]; ! layer_collision_cache.empty()) {
+                            if (const LayerCollisionCache &layer_collision_cache_item = layer_collision_cache[layer_id]; ! layer_collision_cache_item.empty()) {
                                 size_t hit_idx_out;
                                 Vec2d  hit_point_out;
-                                double dist = sqrt(AABBTreeLines::squared_distance_to_indexed_lines(
+                                if (double dist = sqrt(AABBTreeLines::squared_distance_to_indexed_lines(
                                     layer_collision_cache_item.lines, layer_collision_cache_item.aabbtree_lines, Vec2d(to_2d(collision_sphere.position).cast<double>()),
-                                    hit_idx_out, hit_point_out, r2));
-                                double collision_depth = sqrt(r2) - dist;
-                                if (collision_depth > collision_sphere.last_collision_depth) {
-                                    collision_sphere.last_collision_depth = collision_depth;
-                                    collision_sphere.last_collision = to_3d(hit_point_out.cast<float>(), float(layer_z(slicing_params, layer_id)));
+                                    hit_idx_out, hit_point_out, r2)); dist >= 0.) {
+                                    double collision_depth = sqrt(r2) - dist;
+                                    if (collision_depth > collision_sphere.last_collision_depth) {
+                                        collision_sphere.last_collision_depth = collision_depth;
+                                        collision_sphere.last_collision = to_3d(hit_point_out.cast<float>(), float(layer_z(slicing_params, layer_id)));
+                                    }
                                 }
                             }
                         }
@@ -3628,7 +3629,14 @@ static void organic_smooth_branches_avoid_collisions(
                     throw_on_cancel();
                 }
         });
-        //            printf("iteration: %d, moved: %d\n", int(iter), int(num_moved));
+#if 0
+        std::vector<double> stat;
+        for (CollisionSphere& collision_sphere : collision_spheres)
+            if (!collision_sphere.locked)
+                stat.emplace_back(collision_sphere.last_collision_depth);
+        std::sort(stat.begin(), stat.end());
+        printf("iteration: %d, moved: %d, collision depth: min %lf, max %lf, median %lf\n", int(iter), int(num_moved), stat.front(), stat.back(), stat[stat.size() / 2]);
+#endif
         if (num_moved == 0)
             break;
     }
@@ -3644,7 +3652,8 @@ static void organic_smooth_branches_avoid_collisions(
     const TreeSupportSettings                           &config,
     std::vector<SupportElements>                        &move_bounds,
     const std::vector<std::pair<SupportElement*, int>>  &elements_with_link_down,
-    const std::vector<size_t>                           &linear_data_layers)
+    const std::vector<size_t>                           &linear_data_layers,
+    std::function<void()>                                throw_on_cancel)
 {
     TriangleMesh mesh = print_object.model_object()->raw_mesh();
     mesh.transform(print_object.trafo_centered());
