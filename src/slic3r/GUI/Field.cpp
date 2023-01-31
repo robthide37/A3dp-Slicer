@@ -1200,7 +1200,7 @@ void Choice::set_value(const boost::any& value, bool change_event)
 	}
 	case coEnum: {
 		int val = boost::any_cast<int>(value);
-		if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern")
+		if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern" || m_opt_id == "support_material_style")
 		{
 			std::string key;
 			const t_config_enum_values& map_names = ConfigOptionEnum<InfillPattern>::get_enum_values();
@@ -1281,7 +1281,9 @@ boost::any& Choice::get_value()
         if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern") {
 			const std::string& key = m_opt.enum_values[field->GetSelection()];
 			m_value = int(ConfigOptionEnum<InfillPattern>::get_enum_values().at(key));
-		}
+		} else if (m_opt_id == "support_material_style") {
+            m_value = int(ConfigOptionEnum<SupportMaterialStyle>::get_enum_values().at(m_opt.enum_values[field->GetSelection()]));
+        }
 		else
 			m_value = field->GetSelection();
 	}

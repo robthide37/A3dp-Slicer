@@ -1217,7 +1217,8 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         return get_string_from_enum(opt_key, config, 
             opt_key == "top_fill_pattern" ||
             opt_key == "bottom_fill_pattern" ||
-            opt_key == "fill_pattern");
+            opt_key == "fill_pattern" ||
+            opt_key == "support_material_style");
     }
     case coPoints: {
         if (opt_key == "bed_shape") {
