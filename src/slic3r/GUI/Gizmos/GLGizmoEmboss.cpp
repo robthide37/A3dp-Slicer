@@ -547,11 +547,25 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // with Mesa driver OR on Linux
         if (!m_temp_transformation.has_value()) return false;
 
+        int instance_idx = m_parent.get_selection().get_instance_idx();
+        const auto &instances = m_volume->get_object()->instances;
+        if (instance_idx < 0 || instance_idx >= instances.size())
+            return false;
+
         // Override of common transformation after draggig by set transformation into gl_volume
-        Transform3d volume_trmat =
-            gl_volume->get_instance_transformation().get_matrix().inverse() *
+        Transform3d volume_trmat = 
+            instances[instance_idx]->get_matrix().inverse() *
             *m_temp_transformation;
-        gl_volume->set_volume_transformation(Geometry::Transformation(volume_trmat));
+
+        // ReWrite transformation inside of all instances
+        Geometry::Transformation transformation(volume_trmat);
+        for (GLVolume *vol : m_parent.get_volumes().volumes) {
+            if (vol->object_idx() != gl_volume->object_idx() ||
+                vol->volume_idx() != gl_volume->volume_idx())
+                continue;
+            vol->set_volume_transformation(transformation);
+        }
+
         m_parent.toggle_model_objects_visibility(true);
         // Apply temporary position
         m_temp_transformation = {};
