@@ -1076,7 +1076,8 @@ void GLGizmoEmboss::set_volume_by_selection()
 {
     ModelVolume *vol = priv::get_selected_volume(m_parent.get_selection());
     // is same volume selected?
-    if (vol != nullptr && m_volume == vol) return;
+    if (vol != nullptr && vol->id() == m_volume_id) 
+        return;
 
     // for changed volume notification is NOT valid
     remove_notification_not_valid_font();
