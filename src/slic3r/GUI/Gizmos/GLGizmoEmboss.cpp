@@ -858,7 +858,7 @@ void GLGizmoEmboss::on_set_state()
                 _u8L("ERROR: Wait until ends or Cancel process."));
             return;
         }
-        m_volume = nullptr;
+        set_volume(nullptr);
         // Store order and last activ index into app.ini
         // TODO: what to do when can't store into file?
         m_style_manager.store_styles_to_app_config(false);
@@ -1024,15 +1024,22 @@ void GLGizmoEmboss::initialize()
 
 EmbossStyles GLGizmoEmboss::create_default_styles()
 {
+    wxFont wx_font_normal = *wxNORMAL_FONT;
+    wxFont wx_font_small = *wxSMALL_FONT;
+
+#ifdef __APPLE__
+    wx_font_normal.SetFaceName("Helvetica");
+    wx_font_small.SetFaceName("Helvetica");
+#endif // __APPLE__
+
     // https://docs.wxwidgets.org/3.0/classwx_font.html
     // Predefined objects/pointers: wxNullFont, wxNORMAL_FONT, wxSMALL_FONT, wxITALIC_FONT, wxSWISS_FONT
     EmbossStyles styles = {
-        WxFontUtils::create_emboss_style(*wxNORMAL_FONT, _u8L("NORMAL")), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
-        WxFontUtils::create_emboss_style(*wxSMALL_FONT, _u8L("SMALL")),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
+        WxFontUtils::create_emboss_style(wx_font_normal, _u8L("NORMAL")), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
+        WxFontUtils::create_emboss_style(wx_font_normal, _u8L("SMALL")),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
         WxFontUtils::create_emboss_style(*wxITALIC_FONT, _u8L("ITALIC")), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
         WxFontUtils::create_emboss_style(*wxSWISS_FONT, _u8L("SWISS")),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
-        WxFontUtils::create_emboss_style(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN")),
-        
+        WxFontUtils::create_emboss_style(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN")),        
     };
 
     // Not all predefined font for wx must be valid TTF, but at least one style must be loadable
@@ -1040,9 +1047,12 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
         wxFont wx_font = WxFontUtils::create_wxFont(style);
 
         // check that face name is setabled
-        wxFont wx_font_temp;
-        if (!wx_font_temp.SetFaceName(wx_font.GetFaceName()))
-            return true;
+        if (style.prop.face_name.has_value()) {
+            wxString face_name(style.prop.face_name->c_str());
+            wxFont wx_font_temp;
+            if (!wx_font_temp.SetFaceName(face_name))
+                return true;        
+        }
 
         // Check that exsit valid TrueType Font for wx font
         return WxFontUtils::create_font_file(wx_font) == nullptr;
@@ -1095,16 +1105,20 @@ void GLGizmoEmboss::set_volume_by_selection()
         ImGui::ClearActiveID();
 
     // is select embossed volume?
-    if (!set_volume(vol)) {
-        // Can't load so behave like adding new text
-        m_volume = nullptr;
-        set_default_text();    
-    }
+    set_volume(vol);
 }
 
 bool GLGizmoEmboss::set_volume(ModelVolume *volume)
 {
-    if (volume == nullptr) return false;
+    if (volume == nullptr) {
+        if (m_volume == nullptr)
+            return false;
+        m_volume = nullptr;
+        // TODO: check if it is neccessary to set default text
+        // Idea is to set default text when create object
+        set_default_text();
+        return false;
+    }
     const std::optional<TextConfiguration> tc_opt = volume->text_configuration;
     if (!tc_opt.has_value()) return false;
     const TextConfiguration &tc    = *tc_opt;
@@ -1129,15 +1143,20 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
         is_font_installed = it != faces.end() && it->wx_name == face_name;
 
         if (!is_font_installed) {
-            // check if wx allowed to set it up - another encoding of name
-            wxFontEnumerator::InvalidateCache();
-            wxFont wx_font_; // temporary structure
-            if (wx_font_.SetFaceName(face_name) && 
-                WxFontUtils::create_font_file(wx_font_) != nullptr // can load TTF file?
-                ) {
-                is_font_installed = true;
-                // QUESTION: add this name to allowed faces?
-                // Could create twin of font face
+            const std::vector<wxString> &bad = m_face_names.bad;
+            auto it_bad = std::lower_bound(bad.begin(), bad.end(), face_name);
+            if (it_bad == bad.end() || *it_bad != face_name){
+                // check if wx allowed to set it up - another encoding of name
+                wxFontEnumerator::InvalidateCache();
+                wxFont wx_font_; // temporary structure
+                if (wx_font_.SetFaceName(face_name) && 
+                    WxFontUtils::create_font_file(wx_font_) != nullptr // can load TTF file?
+                    ) {
+                    is_font_installed = true;
+                    // QUESTION: add this name to allowed faces?
+                    // Could create twin of font face name
+                    // When not add it will be hard to select it again when change font
+                }
             }
         }
     }
