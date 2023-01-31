@@ -33,7 +33,7 @@ struct Params
     }
 
     // the algorithm should use the following units for all computations: distance [mm], mass [g], time [s], force [g*mm/s^2]
-    const float bridge_distance = 12.0f; // mm
+    const float bridge_distance = 16.0f; // mm
     const float max_acceleration; // mm/s^2 ; max acceleration of object in XY -- should be applicable only to printers with bed slinger, 
                                   // however we do not have such info yet. The force is usually small anyway, so not such a big deal to include it everytime
     const int raft_layers_count;
@@ -42,7 +42,7 @@ struct Params
     BrimType brim_type;
     const float brim_width;
 
-    const std::pair<float,float> malformation_distance_factors = std::pair<float, float> { 0.4, 1.2 };
+    const std::pair<float,float> malformation_distance_factors = std::pair<float, float> { 0.5, 1.1 };
     const float max_curled_height_factor = 10.0f;
 
     const float min_distance_between_support_points = 3.0f; //mm
@@ -52,8 +52,8 @@ struct Params
     const float gravity_constant = 9806.65f; // mm/s^2; gravity acceleration on Earth's surface, algorithm assumes that printer is in upwards position.
     const double filament_density = 1.25e-3f; // g/mm^3  ; Common filaments are very lightweight, so precise number is not that important
     const double material_yield_strength = 33.0f * 1e6f; // (g*mm/s^2)/mm^2; 33 MPa is yield strength of ABS, which has the lowest yield strength from common materials.
-    const float standard_extruder_conflict_force = 5.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
-    const float malformations_additive_conflict_extruder_force = 100.0f * gravity_constant; // for areas with possible high layered curled filaments
+    const float standard_extruder_conflict_force = 10.0f * gravity_constant; // force that can occasionally push the model due to various factors (filament leaks, small curling, ... );
+    const float malformations_additive_conflict_extruder_force = 65.0f * gravity_constant; // for areas with possible high layered curled filaments
 
     // MPa * 1e^6 = (g*mm/s^2)/mm^2 = g/(mm*s^2); yield strength of the bed surface
     double get_bed_adhesion_yield_strength() const {
@@ -72,9 +72,8 @@ struct Params
         }
     }
 
-    //just return PLA adhesion value as value for supports
     double get_support_spots_adhesion_strength() const {
-         return 0.02f * 1e6; 
+         return 0.016f * 1e6; 
     }
 };
 

@@ -217,7 +217,7 @@ float estimate_curled_up_height(
         float dist_factor = std::max(point.distance - params.malformation_distance_factors.first * flow_width, 0.01f) /
                             ((params.malformation_distance_factors.second - params.malformation_distance_factors.first) * flow_width);
 
-        curled_up_height = layer_height * 2.0f * sqrt(sqrt(dist_factor)) * std::clamp(6.0f * point.curvature, 1.0f, 6.0f);
+        curled_up_height = layer_height * sqrt(sqrt(dist_factor)) * std::clamp(3.0f * point.curvature, 1.0f, 3.0f);
         curled_up_height = std::min(curled_up_height, params.max_curled_height_factor * layer_height);
     }
 
@@ -1183,23 +1183,22 @@ std::vector<std::pair<SupportPointCause, bool>> gather_issues(const SupportPoint
               [](const PartialObject &left, const PartialObject &right) { return left.volume > right.volume; });
 
     float max_volume_part              = partial_objects.front().volume;
-    bool  unstable_floating_part_added = false;
     for (const PartialObject &p : partial_objects) {
-        if (p.volume > max_volume_part / 500.0f && !p.connected_to_bed) {
+        if (p.volume > max_volume_part / 200.0f && !p.connected_to_bed) {
                 result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
-                unstable_floating_part_added = true;
                 break;
         }
     }
 
-    if (!unstable_floating_part_added) {
-        for (const SupportPoint &sp : support_points) {
-                if (sp.cause == SupportPointCause::UnstableFloatingPart) {
-                result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
-                break;
-                }
-        }
-    }
+    // should be detected in previous step
+    // if (!unstable_floating_part_added) {
+    //     for (const SupportPoint &sp : support_points) {
+    //             if (sp.cause == SupportPointCause::UnstableFloatingPart) {
+    //             result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
+    //             break;
+    //             }
+    //     }
+    // }
 
     std::vector<SupportPoint> ext_supp_points{};
     ext_supp_points.reserve(support_points.size());
@@ -1245,7 +1244,7 @@ std::vector<std::pair<SupportPointCause, bool>> gather_issues(const SupportPoint
         }
     }
 
-    if (ext_supp_points.size() > 5) {
+    if (ext_supp_points.size() > max_volume_part / 200.0f) {
         result.emplace_back(SupportPointCause::FloatingExtrusion, false);
     }
 

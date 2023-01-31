@@ -1200,7 +1200,7 @@ void Print::alert_when_supports_needed()
             }
         }
 
-        message += "\n" + L("Consider enabling supports") + (recommend_brim ? (" " + L("and brim")) : "") + ".";
+        message += "\n" + L("Consider enabling supports") + (recommend_brim ? (" " + L("and/or brim")) : "") + ".";
 
         if (objects_isssues.size() > 0) {
             this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL, message);
