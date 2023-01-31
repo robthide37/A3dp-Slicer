@@ -649,10 +649,11 @@ void GLGizmoEmboss::on_render() {
     if (!selection.is_single_volume_or_modifier() && 
         !selection.is_single_volume_instance()) return;
     bool is_surface_dragging = m_temp_transformation.has_value();
+    bool is_parent_dragging = m_parent.is_mouse_dragging();
     // Do NOT render rotation grabbers when dragging object
     bool is_rotate_by_grabbers = m_dragging;
-    if (!is_surface_dragging && 
-        (!m_parent.is_dragging() || is_rotate_by_grabbers)) {
+    if (is_rotate_by_grabbers || 
+        (!is_surface_dragging && !is_parent_dragging)) {
         glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
         m_rotate_gizmo.render();
     }
