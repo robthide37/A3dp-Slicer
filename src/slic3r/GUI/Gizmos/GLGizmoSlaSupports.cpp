@@ -848,7 +848,7 @@ void GLGizmoSlaSupports::on_set_state()
 
         if (m_state == Off) {
             m_c->instances_hider()->set_hide_full_scene(false);
-            m_c->selection_info()->set_use_shift(true); // see top of on_render for details
+            m_c->selection_info()->set_use_shift(false); // see top of on_render for details
         }
     }
     m_old_state = m_state;
