@@ -208,6 +208,24 @@ public:
     TreeModelVolumes(const TreeModelVolumes&) = delete;
     TreeModelVolumes& operator=(const TreeModelVolumes&) = delete;
 
+    void clear() { 
+        this->clear_all_but_object_collision();
+        m_collision_cache.clear();
+    }
+    void clear_all_but_object_collision() { 
+        //m_collision_cache.clear_all_but_radius0();
+        m_collision_cache_holefree.clear();
+        m_avoidance_cache.clear();
+        m_avoidance_cache_slow.clear();
+        m_avoidance_cache_to_model.clear();
+        m_avoidance_cache_to_model_slow.clear();
+        m_placeable_areas_cache.clear();
+        m_avoidance_cache_holefree.clear();
+        m_avoidance_cache_holefree_to_model.clear();
+        m_wall_restrictions_cache.clear();
+        m_wall_restrictions_cache_min.clear();
+    }
+
     enum class AvoidanceType : int8_t
     {
         Slow,
@@ -390,6 +408,16 @@ private:
 
         // For debugging purposes, sorted by layer index, then by radius.
         [[nodiscard]] std::vector<std::pair<RadiusLayerPair, std::reference_wrapper<const Polygons>>> sorted() const;
+
+        void clear() { m_data.clear(); }
+        void clear_all_but_radius0() { 
+            for (LayerData &l : m_data) {
+                auto begin = l.begin();
+                auto end = l.end();
+                if (begin != end && ++ begin != end)
+                    l.erase(begin, end);
+            }
+        }
 
     private:
         LayerData&          get_allocate_layer_data(LayerIndex layer_idx) {

@@ -3749,18 +3749,12 @@ static void organic_smooth_branches_avoid_collisions(
 }
 #endif // TREE_SUPPORT_ORGANIC_NUDGE_NEW
 
-static void draw_branches(
+// Organic specific: Smooth branches and produce one cummulative mesh to be sliced.
+static indexed_triangle_set draw_branches(
     PrintObject                     &print_object,
     const TreeModelVolumes          &volumes, 
     const TreeSupportSettings       &config,
-    const std::vector<Polygons>     &overhangs,
     std::vector<SupportElements>    &move_bounds,
-
-    SupportGeneratorLayersPtr       &bottom_contacts,
-    SupportGeneratorLayersPtr       &top_contacts,
-    SupportGeneratorLayersPtr       &intermediate_layers,
-    SupportGeneratorLayerStorage    &layer_storage,
-    
     std::function<void()>            throw_on_cancel)
 {
     static int irun = 0;
@@ -3806,9 +3800,6 @@ static void draw_branches(
     throw_on_cancel();
 
     organic_smooth_branches_avoid_collisions(print_object, volumes, config, move_bounds, elements_with_link_down, linear_data_layers, throw_on_cancel);
-
-    std::vector<Polygons> support_layer_storage(move_bounds.size());
-    std::vector<Polygons> support_roof_storage(move_bounds.size());
 
     // Unmark all nodes.
     for (SupportElements &elements : move_bounds)
@@ -3875,7 +3866,26 @@ static void draw_branches(
                 throw_on_cancel();
             }
     }
+    return cummulative_mesh;
+}
 
+// Organic specific: Slice the cummulative mesh produced by draw_branches().
+static void slice_branches(
+    PrintObject                     &print_object,
+    const TreeModelVolumes          &volumes, 
+    const TreeSupportSettings       &config,
+    const std::vector<Polygons>     &overhangs,
+    std::vector<SupportElements>    &move_bounds,
+    const indexed_triangle_set      &cummulative_mesh,
+
+    SupportGeneratorLayersPtr       &bottom_contacts,
+    SupportGeneratorLayersPtr       &top_contacts,
+    SupportGeneratorLayersPtr       &intermediate_layers,
+    SupportGeneratorLayerStorage    &layer_storage,
+    
+    std::function<void()>            throw_on_cancel)
+{
+    const SlicingParameters &slicing_params = print_object.slicing_parameters();
     std::vector<float> slice_z;
     for (size_t layer_idx = 0; layer_idx < move_bounds.size(); ++ layer_idx) {
         double print_z      = slicing_params.object_print_z_min + slicing_params.first_object_layer_height + layer_idx * slicing_params.layer_height;
@@ -3896,7 +3906,7 @@ static void draw_branches(
     MeshSlicingParamsEx params;
     params.closing_radius = float(print_object.config().slice_closing_radius.value);
     params.mode = MeshSlicingParams::SlicingMode::Positive;
-    std::vector<ExPolygons> slices = slice_mesh_ex(cummulative_mesh, slice_z, params);
+    std::vector<ExPolygons> slices = slice_mesh_ex(cummulative_mesh, slice_z, params, throw_on_cancel);
     for (size_t layer_idx = 0; layer_idx < slice_z.size(); ++ layer_idx)
         if (! slices[layer_idx].empty()) {
             SupportGeneratorLayer *&l = intermediate_layers[layer_idx];
@@ -3915,6 +3925,8 @@ static void draw_branches(
                 }
         });
 
+    std::vector<Polygons> support_layer_storage(move_bounds.size());
+    std::vector<Polygons> support_roof_storage(move_bounds.size());
     finalize_interface_and_support_areas(print_object, volumes, config, overhangs, support_layer_storage, support_roof_storage,
         bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
 }
@@ -4028,7 +4040,10 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
                 bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
         else {
             assert(print_object.config().support_material_style == smsOrganic);
-            draw_branches(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
+            indexed_triangle_set branches = draw_branches(*print.get_object(processing.second.front()), volumes, config, move_bounds, throw_on_cancel);
+            // Reduce memory footprint. After this point only slice_branches() will use volumes and from that only collisions with zero radius will be used.
+            volumes.clear_all_but_object_collision();
+            slice_branches(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, branches,
                 bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
         }
 
