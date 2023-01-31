@@ -38,8 +38,6 @@ protected:
     bool is_input_enabled() const { return m_input_enabled; }
     int get_min_sla_print_object_step() const { return m_min_sla_print_object_step; }
 
-    static int last_completed_step(const SLAPrint& sla);
-
     bool unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal);
 
     const GLVolumeCollection &volumes() const { return m_volumes; }
