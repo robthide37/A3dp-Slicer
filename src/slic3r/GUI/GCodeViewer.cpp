@@ -3589,9 +3589,9 @@ void GCodeViewer::render_legend(float& legend_height)
 
     // extrusion paths section -> title
     if (m_view_type == EViewType::FeatureType)
-        append_headers({ _u8L(""), _u8L("Time"), _u8L("Percentage"), _u8L("Used filament") }, offsets);
+        append_headers({ "", _u8L("Time"), _u8L("Percentage"), _u8L("Used filament") }, offsets);
     else if (m_view_type == EViewType::Tool)
-        append_headers({ _u8L(""), _u8L("Used filament"), _u8L(""), _u8L("") }, offsets);
+        append_headers({ "", _u8L("Used filament"), "", ""}, offsets);
     else
         ImGui::Separator();
 
