@@ -382,6 +382,12 @@ static const GLVolume *get_gl_volume(const Selection &selection);
 static Transform3d world_matrix(const GLVolume *gl_volume, const Model *model);
 static Transform3d world_matrix(const Selection &selection);
 
+/// <summary>
+/// Change position of emboss window
+/// </summary>
+/// <param name="output_window_offset"></param>
+/// <param name="try_to_fix">When True Only move to be full visible otherwise reset position</param>
+static void change_window_position(std::optional<ImVec2> &output_window_offset, bool try_to_fix);
 } // namespace priv
 
 const GLVolume *priv::get_gl_volume(const Selection &selection) {
@@ -780,13 +786,15 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     draw_mouse_offset(m_dragging_mouse_offset);
 #endif // SHOW_OFFSET_DURING_DRAGGING
 
-    if (m_allow_open_near_volume){
-        // check if is set window offset
-        if (m_set_window_offset.has_value()) {
-            ImGui::SetNextWindowPos(*m_set_window_offset, ImGuiCond_Always);
-            m_set_window_offset.reset();
-        }
-    } else {
+    // check if is set window offset
+    if (m_set_window_offset.has_value()) {
+        if (m_set_window_offset->y < 0)
+            // position near toolbar
+            m_set_window_offset = ImVec2(x, std::min(y, bottom_limit - min_window_size.y));
+        
+        ImGui::SetNextWindowPos(*m_set_window_offset, ImGuiCond_Always);
+        m_set_window_offset.reset();
+    } else if (!m_allow_open_near_volume) {
         y = std::min(y, bottom_limit - min_window_size.y);
         // position near toolbar
         ImVec2 pos(x, y);
@@ -885,9 +893,10 @@ void GLGizmoEmboss::on_set_state()
         }
 
         // change position of just opened emboss window
-        if (m_allow_open_near_volume) 
+        if (m_allow_open_near_volume)
             m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
-
+        else
+            priv::change_window_position(m_set_window_offset, false);
         // when open by hyperlink it needs to show up
         // or after key 'T' windows doesn't appear
         m_parent.set_as_dirty();
@@ -1106,6 +1115,41 @@ void GLGizmoEmboss::set_volume_by_selection()
 
     // is select embossed volume?
     set_volume(vol);
+}
+
+// Need internals to get window
+void priv::change_window_position(std::optional<ImVec2>& output_window_offset, bool try_to_fix) {
+    const char* name = "Emboss";
+    ImGuiWindow *window = ImGui::FindWindowByName(name);
+    // is window just created 
+    if (window == NULL)
+        return;
+
+    // position of window on screen
+    ImVec2 position = window->Pos;
+    ImVec2 size     = window->SizeFull;
+
+    // screen size
+    ImVec2 screen = ImGui::GetMainViewport()->Size;
+
+    if (position.x < 0) {
+        if (position.y < 0)
+            output_window_offset = ImVec2(0, 0);
+        else
+            output_window_offset = ImVec2(0, position.y);
+    } else if (position.y < 0) {
+        output_window_offset = ImVec2(position.x, 0);
+    } else if (screen.x < (position.x + size.x)) {
+        if (screen.y < (position.y + size.y))
+            output_window_offset = ImVec2(screen.x - size.x, screen.y - size.y);
+        else
+            output_window_offset = ImVec2(screen.x - size.x, position.y);
+    } else if (screen.y < (position.y + size.y)) {
+        output_window_offset = ImVec2(position.x, screen.y - size.y);
+    }
+
+    if (!try_to_fix && output_window_offset.has_value())
+        output_window_offset = ImVec2(-1, -1); // Cannot 
 }
 
 bool GLGizmoEmboss::set_volume(ModelVolume *volume)
@@ -3387,6 +3431,7 @@ void GLGizmoEmboss::set_minimal_window_size(bool is_advance_edit_style)
     const ImVec2 &min_win_size = get_minimal_window_size();
     ImGui::SetWindowSize(ImVec2(0.f, min_win_size.y + diff_y),
                          ImGuiCond_Always);
+    priv::change_window_position(m_set_window_offset, true);
 }
 
 ImVec2 GLGizmoEmboss::get_minimal_window_size() const
