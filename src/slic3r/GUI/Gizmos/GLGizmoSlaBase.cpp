@@ -62,7 +62,11 @@ void GLGizmoSlaBase::update_volumes()
         new_volume->set_instance_transformation(po->model_object()->instances[m_parent.get_selection().get_instance_idx()]->get_transformation());
         new_volume->set_sla_shift_z(po->get_current_elevation());
         new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(backend_mesh);
-        m_input_enabled = po->last_completed_step() >= m_min_sla_print_object_step;
+        auto last_comp_step = static_cast<int>(po->last_completed_step());
+        if (last_comp_step == slaposCount)
+            last_comp_step = -1;
+
+        m_input_enabled = last_comp_step >= m_min_sla_print_object_step;
         if (m_input_enabled)
             new_volume->selected = true; // to set the proper color
         else

@@ -272,10 +272,6 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 #else
     const Transform3d complete_scaling_matrix_inverse = Geometry::Transformation(trafo).get_matrix(true, true, false, true).inverse();
 #endif // ENABLE_WORLD_COORDINATE
-    const bool is_left_handed = Geometry::Transformation(trafo).is_left_handed();
-
-    if (is_left_handed)
-        glsafe(::glFrontFace(GL_CW));
 
     ColorRGBA render_color = { 0.0f, 0.0f, 0.0f, 0.25f };
     if (m_button_down == Button::Left)
@@ -293,14 +289,18 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
+    const bool is_left_handed = Geometry::Transformation(view_model_matrix).is_left_handed();
+    if (is_left_handed)
+        glsafe(::glFrontFace(GL_CW));
+
     assert(s_sphere != nullptr);
     s_sphere->set_color(render_color);
     s_sphere->render();
 
-    shader->stop_using();
-
     if (is_left_handed)
         glsafe(::glFrontFace(GL_CCW));
+
+    shader->stop_using();
 }
 
 
