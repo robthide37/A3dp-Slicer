@@ -222,7 +222,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
 #endif // TREE_SUPPORT_SHOW_ERRORS_WIN32
 }
 
-[[nodiscard]] static const std::vector<Polygons> generate_overhangs(const PrintObject &print_object)
+[[nodiscard]] static const std::vector<Polygons> generate_overhangs(const PrintObject &print_object, std::function<void()> throw_on_cancel)
 {
     std::vector<Polygons> out(print_object.layer_count(), Polygons{});
 
@@ -241,7 +241,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
     auto                     enforcer_overhang_offset = scaled<double>(config.support_tree_tip_diameter.value);
 
     tbb::parallel_for(tbb::blocked_range<LayerIndex>(1, out.size()),
-        [&print_object, &enforcers_layers, &blockers_layers, support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, enforcer_overhang_offset, &out]
+        [&print_object, &enforcers_layers, &blockers_layers, support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, enforcer_overhang_offset, &throw_on_cancel, &out]
         (const tbb::blocked_range<LayerIndex> &range) {
         for (LayerIndex layer_id = range.begin(); layer_id < range.end(); ++ layer_id) {
             const Layer   &current_layer  = *print_object.get_layer(layer_id);
@@ -307,6 +307,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
                 }
             }   
             out[layer_id] = std::move(overhangs);
+            throw_on_cancel();
         }
     });
 
@@ -319,7 +320,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
  * \param storage[in] Background storage to access meshes.
  * \param currently_processing_meshes[in] Indexes of all meshes that are processed in this iteration
  */
-[[nodiscard]] static LayerIndex precalculate(const Print &print, const std::vector<Polygons> &overhangs, const TreeSupportSettings &config, const std::vector<size_t> &object_ids, TreeModelVolumes &volumes)
+[[nodiscard]] static LayerIndex precalculate(const Print &print, const std::vector<Polygons> &overhangs, const TreeSupportSettings &config, const std::vector<size_t> &object_ids, TreeModelVolumes &volumes, std::function<void()> throw_on_cancel)
 {
     // calculate top most layer that is relevant for support
     LayerIndex max_layer = 0;
@@ -333,7 +334,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
     }
     if (max_layer > 0)
         // The actual precalculation happens in TreeModelVolumes.
-        volumes.precalculate(max_layer);
+        volumes.precalculate(max_layer, throw_on_cancel);
     return max_layer;
 }
 
@@ -874,7 +875,8 @@ static void generate_initial_areas(
     std::vector<SupportElements>    &move_bounds,
     SupportGeneratorLayersPtr       &top_contacts,
     SupportGeneratorLayersPtr       &top_interface_layers,
-    SupportGeneratorLayerStorage    &layer_storage)
+    SupportGeneratorLayerStorage    &layer_storage,
+    std::function<void()>            throw_on_cancel)
 {
     using                           AvoidanceType = TreeModelVolumes::AvoidanceType;
     static constexpr const auto     base_radius = scaled<int>(0.01);
@@ -932,7 +934,7 @@ static void generate_initial_areas(
         [&print_object, &volumes, &config, &overhangs, &mesh_config, &mesh_group_settings, &support_params, 
          z_distance_delta, min_xy_dist, force_tip_to_roof, roof_enabled, support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
          &base_circle, &mutex_layer_storage, &mutex_movebounds, &top_contacts, &layer_storage, &already_inserted,
-         &move_bounds](const tbb::blocked_range<size_t> &range) {
+         &move_bounds, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
             if (overhangs[layer_idx + z_distance_delta].empty())
                 continue;
@@ -1142,6 +1144,8 @@ static void generate_initial_areas(
                 }
             }
 
+            throw_on_cancel();
+
             Polygons overhang_roofs;
             std::vector<std::pair<ExPolygon, bool>> overhang_processing; 
             if (roof_enabled) {
@@ -1271,6 +1275,7 @@ static void generate_initial_areas(
                     append(l->polygons, std::move(overhang_outset));
                 } else // normal trees have to be generated
                     addLinesAsInfluenceAreas(overhang_lines, force_tip_to_roof ? support_roof_layers - dtt_roof : 0, layer_idx - dtt_roof, dtt_roof > 0, roof_enabled ? support_roof_layers - dtt_roof : 0);
+                throw_on_cancel();
             }
         }
     });
@@ -1602,7 +1607,8 @@ static void increase_areas_one_layer(
     // Layer elements above merging_areas.
     SupportElements                     &layer_elements,
     // If false, the merging_areas will not be merged for performance reasons.
-    const bool                           mergelayer)
+    const bool                           mergelayer,
+    std::function<void()>                throw_on_cancel)
 {
     using AvoidanceType = TreeModelVolumes::AvoidanceType;
 
@@ -1731,7 +1737,7 @@ static void increase_areas_one_layer(
                 }
                 order = new_order;
             }
-            if (elem.to_buildplate || (elem.to_model_gracious && intersection(parent.influence_area, volumes.getPlaceableAreas(radius, layer_idx)).empty())) {
+            if (elem.to_buildplate || (elem.to_model_gracious && intersection(parent.influence_area, volumes.getPlaceableAreas(radius, layer_idx, throw_on_cancel)).empty())) {
                 // error case
                 // it is normal that we wont be able to find a new area at some point in time if we wont be able to reach layer 0 aka have to connect with the model
                 insertSetting({ AvoidanceType::Fast, fast_speed, !increase_radius, !no_error, elem.use_min_xy_dist, move }, true);
@@ -1849,6 +1855,7 @@ static void increase_areas_one_layer(
                 // A point can be set on the top most tip layer (maybe more if it should not move for a few layers).
                 parent.state.result_on_layer_reset();
             }
+            throw_on_cancel();
         }
     });
 }
@@ -2144,8 +2151,11 @@ static SupportElementMerging* merge_influence_areas_two_sets(
  * \param layer_idx[in] The current layer.
  */
 static void merge_influence_areas(
-    const TreeModelVolumes &volumes, const TreeSupportSettings &config, const LayerIndex layer_idx,
-    std::vector<SupportElementMerging> &influence_areas)
+    const TreeModelVolumes             &volumes, 
+    const TreeSupportSettings          &config, 
+    const LayerIndex                    layer_idx,
+    std::vector<SupportElementMerging> &influence_areas,
+    std::function<void()>               throw_on_cancel)
 {
     const size_t input_size = influence_areas.size();
     if (input_size == 0)
@@ -2163,6 +2173,8 @@ static void merge_influence_areas(
     AABBTreeIndirect::Tree<2, coord_t> tree;
     // Sort influence_areas in place.
     tree.build_modify_input(influence_areas);
+
+    throw_on_cancel();
 
     // Prepare the initial buckets as ranges of influence areas. The initial buckets contain power of 2 influence areas to follow
     // the branching of the AABB tree.
@@ -2203,6 +2215,7 @@ static void merge_influence_areas(
             const size_t bucket_pair_idx = idx * 2;
             // Merge bucket_count adjacent to each other, merging uneven bucket numbers into even buckets
             buckets[idx].second = merge_influence_areas_leaves(volumes, config, layer_idx, buckets[idx].first, buckets[idx].second);
+            throw_on_cancel();
         }
     });
 
@@ -2217,6 +2230,7 @@ static void merge_influence_areas(
                 buckets[bucket_pair_idx].second = merge_influence_areas_two_sets(volumes, config, layer_idx,
                     buckets[bucket_pair_idx].first, buckets[bucket_pair_idx].second,
                     buckets[bucket_pair_idx + 1].first, buckets[bucket_pair_idx + 1].second);
+                throw_on_cancel();
             }
         });
         // Remove odd buckets, which were merged into even buckets.
@@ -2232,7 +2246,7 @@ static void merge_influence_areas(
  *
  * \param move_bounds[in,out] All currently existing influence areas
  */
-static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupportSettings &config, std::vector<SupportElements> &move_bounds)
+static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupportSettings &config, std::vector<SupportElements> &move_bounds, std::function<void()> throw_on_cancel)
 {
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     const double data_size_inverse = 1 / double(move_bounds.size());
@@ -2269,7 +2283,7 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
                 parents.emplace_back(element_idx);
                 influence_areas.push_back({ el.state, parents });
             }
-            increase_areas_one_layer(volumes, config, influence_areas, layer_idx, prev_layer, merge_this_layer);
+            increase_areas_one_layer(volumes, config, influence_areas, layer_idx, prev_layer, merge_this_layer, throw_on_cancel);
 
             // Place already fully constructed elements to the output, remove them from influence_areas.
             SupportElements &this_layer = move_bounds[layer_idx - 1];
@@ -2298,7 +2312,7 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
                 bool reduced_by_merging = false;
                 if (size_t count_before_merge = influence_areas.size(); count_before_merge > 1) {
                     // ### Calculate which influence areas overlap, and merge them into a new influence area (simplified: an intersection of influence areas that have such an intersection)
-                    merge_influence_areas(volumes, config, layer_idx, influence_areas);
+                    merge_influence_areas(volumes, config, layer_idx, influence_areas, throw_on_cancel);
                     reduced_by_merging = count_before_merge > influence_areas.size();
                 }
                 last_merge_layer_idx = layer_idx;
@@ -2323,6 +2337,7 @@ static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupp
             progress_total += data_size_inverse * TREE_PROGRESS_AREA_CALC;
             Progress::messageProgress(Progress::Stage::SUPPORT, progress_total * m_progress_multiplier + m_progress_offset, TREE_PROGRESS_TOTAL);
     #endif
+            throw_on_cancel();
         }
 
     BOOST_LOG_TRIVIAL(info) << "Time spent with creating influence areas' subtasks: Increasing areas " << dur_inc.count() / 1000000 << 
@@ -2382,7 +2397,8 @@ static void set_to_model_contact_to_model_gracious(
     const TreeModelVolumes          &volumes, 
     const TreeSupportSettings       &config, 
     std::vector<SupportElements>    &move_bounds, 
-    SupportElement                  &first_elem)
+    SupportElement                  &first_elem,
+    std::function<void()>            throw_on_cancel)
 {
     SupportElement *last_successfull_layer = nullptr;
 
@@ -2390,7 +2406,7 @@ static void set_to_model_contact_to_model_gracious(
     {
         SupportElement *elem = &first_elem;
         for (LayerIndex layer_check = elem->state.layer_idx;
-            ! intersection(elem->influence_area, volumes.getPlaceableAreas(config.getCollisionRadius(elem->state), layer_check)).empty();
+            ! intersection(elem->influence_area, volumes.getPlaceableAreas(config.getCollisionRadius(elem->state), layer_check, throw_on_cancel)).empty();
             elem = &move_bounds[++ layer_check][elem->parents.front()]) {
             assert(elem->state.layer_idx == layer_check);
             assert(! elem->state.deleted);
@@ -2475,7 +2491,8 @@ static void remove_deleted_elements(std::vector<SupportElements> &move_bounds)
 static void create_nodes_from_area(
     const TreeModelVolumes       &volumes,
     const TreeSupportSettings    &config,
-    std::vector<SupportElements> &move_bounds)
+    std::vector<SupportElements> &move_bounds,
+    std::function<void()>         throw_on_cancel)
 {
     // Initialize points on layer 0, with a "random" point in the influence area. 
     // Point is chosen based on an inaccurate estimate where the branches will split into two, but every point inside the influence area would produce a valid result.
@@ -2489,6 +2506,8 @@ static void create_nodes_from_area(
             set_points_on_areas(init, layer_above);
         }
     }
+
+    throw_on_cancel();
 
     for (LayerIndex layer_idx = 1; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
         auto &layer       = move_bounds[layer_idx];
@@ -2512,7 +2531,7 @@ static void create_nodes_from_area(
                 } else {
                     // set the point where the branch will be placed on the model
                     if (elem.state.to_model_gracious)
-                        set_to_model_contact_to_model_gracious(volumes, config, move_bounds, elem);
+                        set_to_model_contact_to_model_gracious(volumes, config, move_bounds, elem, throw_on_cancel);
                     else
                         set_to_model_contact_simple(elem);
                 }
@@ -2531,6 +2550,7 @@ static void create_nodes_from_area(
                 set_points_on_areas(elem, layer_above);
             }
         }
+        throw_on_cancel();
     }
 
 #ifndef NDEBUG
@@ -2601,7 +2621,12 @@ struct DrawArea
  * \param layer_tree_polygons[out] Resulting branch areas with the layerindex they appear on. layer_tree_polygons.size() has to be at least linear_data.size() as each Influence area in linear_data will save have at least one (that's why it's a vector<vector>) corresponding branch area in layer_tree_polygons.
  * \param inverse_tree_order[in] A mapping that returns the child of every influence area.
  */
-static void generate_branch_areas(const TreeModelVolumes &volumes, const TreeSupportSettings &config, const std::vector<SupportElements> &move_bounds, std::vector<DrawArea> &linear_data)
+static void generate_branch_areas(
+    const TreeModelVolumes              &volumes, 
+    const TreeSupportSettings           &config, 
+    const std::vector<SupportElements>  &move_bounds, 
+    std::vector<DrawArea>               &linear_data,
+    std::function<void()>                throw_on_cancel)
 {
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     double progress_total = TREE_PROGRESS_PRECALC_AVO + TREE_PROGRESS_PRECALC_COLL + TREE_PROGRESS_GENERATE_NODES + TREE_PROGRESS_AREA_CALC;
@@ -2614,7 +2639,7 @@ static void generate_branch_areas(const TreeModelVolumes &volumes, const TreeSup
     const Polygon branch_circle = make_circle(config.branch_radius, SUPPORT_TREE_CIRCLE_RESOLUTION);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, linear_data.size()),
-        [&volumes, &config, &move_bounds, &linear_data, &branch_circle](const tbb::blocked_range<size_t> &range) {
+        [&volumes, &config, &move_bounds, &linear_data, &branch_circle, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
         for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
             DrawArea             &draw_area  = linear_data[idx];
             const LayerIndex      layer_idx  = draw_area.element->state.layer_idx;
@@ -2717,6 +2742,7 @@ static void generate_branch_areas(const TreeModelVolumes &volumes, const TreeSup
                 Progress::messageProgress(Progress::Stage::SUPPORT, progress_total * m_progress_multiplier + m_progress_offset, TREE_PROGRESS_TOTAL);
             }
 #endif
+            throw_on_cancel();
         }
     });
 }
@@ -2730,7 +2756,8 @@ static void smooth_branch_areas(
     const TreeSupportSettings      &config,
     std::vector<SupportElements>   &move_bounds,
     std::vector<DrawArea>          &linear_data,
-    const std::vector<size_t>      &linear_data_layers)
+    const std::vector<size_t>      &linear_data_layers,
+    std::function<void()>           throw_on_cancel)
 {
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     double progress_total = TREE_PROGRESS_PRECALC_AVO + TREE_PROGRESS_PRECALC_COLL + TREE_PROGRESS_GENERATE_NODES + TREE_PROGRESS_AREA_CALC + TREE_PROGRESS_GENERATE_BRANCH_AREAS;
@@ -2792,6 +2819,7 @@ static void smooth_branch_areas(
                         }
                     }
                 }
+                throw_on_cancel();
             }
         });
     }
@@ -2835,6 +2863,7 @@ static void smooth_branch_areas(
                         draw_area.polygons = std::move(result);
                     }
                 }
+                throw_on_cancel();
             }
         });
     }
@@ -2856,12 +2885,13 @@ static void smooth_branch_areas(
 static void drop_non_gracious_areas(
     const TreeModelVolumes                                      &volumes,
     const std::vector<DrawArea>                                 &linear_data,
-    std::vector<Polygons>                                       &support_layer_storage)
+    std::vector<Polygons>                                       &support_layer_storage,
+    std::function<void()>                                        throw_on_cancel)
 {
     std::vector<std::vector<std::pair<LayerIndex, Polygons>>> dropped_down_areas(linear_data.size());
     tbb::parallel_for(tbb::blocked_range<size_t>(0, linear_data.size()),
         [&](const tbb::blocked_range<size_t> &range) {
-        for (size_t idx = range.begin(); idx < range.end(); ++ idx)
+        for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
             // If a element has no child, it connects to whatever is below as no support further down for it will exist.
             if (const DrawArea &draw_element = linear_data[idx]; ! draw_element.element->state.to_model_gracious && draw_element.child_element == nullptr) {
                 Polygons rest_support;
@@ -2871,6 +2901,8 @@ static void drop_non_gracious_areas(
                     dropped_down_areas[idx].emplace_back(layer_idx, rest_support);
                 }
             }
+            throw_on_cancel();
+        }
     });
 
     for (coord_t i = 0; i < static_cast<coord_t>(dropped_down_areas.size()); i++)
@@ -2896,7 +2928,9 @@ static void finalize_interface_and_support_areas(
     SupportGeneratorLayersPtr   	&bottom_contacts,
     SupportGeneratorLayersPtr   	&top_contacts,
     SupportGeneratorLayersPtr       &intermediate_layers,
-    SupportGeneratorLayerStorage    &layer_storage)
+    SupportGeneratorLayerStorage    &layer_storage,
+    
+    std::function<void()>            throw_on_cancel)
 {
     InterfacePreference interface_pref = config.interface_preference; // InterfacePreference::SupportLinesOverwriteInterface;
 
@@ -3013,6 +3047,7 @@ static void finalize_interface_and_support_areas(
                     storage.support.layer_nr_max_filled_layer = std::max(storage.support.layer_nr_max_filled_layer, static_cast<int>(layer_idx));
             }
 #endif
+            throw_on_cancel();
         }
     });
 }
@@ -3033,7 +3068,8 @@ static void draw_areas(
     SupportGeneratorLayersPtr       &bottom_contacts,
     SupportGeneratorLayersPtr   	&top_contacts,
     SupportGeneratorLayersPtr       &intermediate_layers,
-    SupportGeneratorLayerStorage    &layer_storage)
+    SupportGeneratorLayerStorage    &layer_storage,
+    std::function<void()>            throw_on_cancel)
 {
     std::vector<Polygons> support_layer_storage(move_bounds.size());
     std::vector<Polygons> support_roof_storage(move_bounds.size());
@@ -3071,6 +3107,8 @@ static void draw_areas(
         linear_data_layers.emplace_back(linear_data.size());
     }
 
+    throw_on_cancel();
+
 #ifndef NDEBUG
     for (size_t i = 0; i < move_bounds.size(); ++ i) {
         size_t begin = linear_data_layers[i];
@@ -3082,7 +3120,7 @@ static void draw_areas(
 
     auto t_start = std::chrono::high_resolution_clock::now();
     // Generate the circles that will be the branches.
-    generate_branch_areas(volumes, config, move_bounds, linear_data);
+    generate_branch_areas(volumes, config, move_bounds, linear_data, throw_on_cancel);
 
 #if 0
     assert(linear_data_layers.size() == move_bounds.size() + 1);
@@ -3115,7 +3153,7 @@ static void draw_areas(
 
     auto t_generate = std::chrono::high_resolution_clock::now();
     // In some edgecases a branch may go though a hole, where the regular radius does not fit. This can result in an apparent jump in branch radius. As such this cases need to be caught and smoothed out.
-    smooth_branch_areas(config, move_bounds, linear_data, linear_data_layers);
+    smooth_branch_areas(config, move_bounds, linear_data, linear_data_layers, throw_on_cancel);
 
 #if 0
     for (size_t area_layer_idx = 0; area_layer_idx + 1 < linear_data_layers.size(); ++area_layer_idx) {
@@ -3133,7 +3171,7 @@ static void draw_areas(
 
     auto t_smooth = std::chrono::high_resolution_clock::now();
     // drop down all trees that connect non gracefully with the model
-    drop_non_gracious_areas(volumes, linear_data, support_layer_storage);
+    drop_non_gracious_areas(volumes, linear_data, support_layer_storage, throw_on_cancel);
     auto t_drop = std::chrono::high_resolution_clock::now();
 
     // Single threaded combining all support areas to the right layers.
@@ -3156,7 +3194,7 @@ static void draw_areas(
     }
 
     finalize_interface_and_support_areas(print_object, volumes, config, overhangs, support_layer_storage, support_roof_storage,
-        bottom_contacts, top_contacts, intermediate_layers, layer_storage);
+        bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
     auto t_end = std::chrono::high_resolution_clock::now();
 
     auto dur_gen_tips = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_generate - t_start).count();
@@ -3403,7 +3441,8 @@ static void organic_smooth_branches_avoid_collisions(
     const TreeSupportSettings                           &config,
     std::vector<SupportElements>                        &move_bounds,
     const std::vector<std::pair<SupportElement*, int>>  &elements_with_link_down,
-    const std::vector<size_t>                           &linear_data_layers)
+    const std::vector<size_t>                           &linear_data_layers,
+    std::function<void()>                                throw_on_cancel)
 {
     struct LayerCollisionCache {
         coord_t          min_element_radius{ std::numeric_limits<coord_t>::max() };
@@ -3426,6 +3465,9 @@ static void organic_smooth_branches_avoid_collisions(
         auto& l = layer_collision_cache[layer_idx];
         l.min_element_radius = std::min(l.min_element_radius, config.getRadius(element.first->state));
     }
+
+    throw_on_cancel();
+
     for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(layer_collision_cache.size()); ++layer_idx)
         if (LayerCollisionCache& l = layer_collision_cache[layer_idx]; !l.min_element_radius_known())
             l.min_element_radius = 0;
@@ -3440,6 +3482,7 @@ static void organic_smooth_branches_avoid_collisions(
             for (const Line &line : alines)
                 l.lines.push_back({ unscaled<double>(line.a), unscaled<double>(line.b) });
             l.aabbtree_lines = AABBTreeLines::build_aabb_tree_over_indexed_lines(l.lines);
+            throw_on_cancel();
         }
 
     struct CollisionSphere {
@@ -3511,6 +3554,8 @@ static void organic_smooth_branches_avoid_collisions(
         collision_sphere.layer_end   = std::max(collision_sphere.element.state.layer_idx, layer_idx_floor(slicing_params, collision_sphere.max_z)) + 1;
     }
 
+    throw_on_cancel();
+
     static constexpr const double collision_extra_gap = 0.1;
     static constexpr const double max_nudge_collision_avoidance = 0.2;
     static constexpr const double max_nudge_smoothing = 0.2;
@@ -3521,7 +3566,7 @@ static void organic_smooth_branches_avoid_collisions(
             collision_sphere.prev_position = collision_sphere.position;
         std::atomic<size_t> num_moved{ 0 };
         tbb::parallel_for(tbb::blocked_range<size_t>(0, collision_spheres.size()),
-            [&collision_spheres, &layer_collision_cache, &slicing_params, &move_bounds, &linear_data_layers, &num_moved](const tbb::blocked_range<size_t> range) {
+            [&collision_spheres, &layer_collision_cache, &slicing_params, &move_bounds, &linear_data_layers, &num_moved, &throw_on_cancel](const tbb::blocked_range<size_t> range) {
             for (size_t collision_sphere_id = range.begin(); collision_sphere_id < range.end(); ++ collision_sphere_id)
                 if (CollisionSphere &collision_sphere = collision_spheres[collision_sphere_id]; ! collision_sphere.locked) {
                     // Calculate collision of multiple 2D layers against a collision sphere.
@@ -3579,6 +3624,8 @@ static void organic_smooth_branches_avoid_collisions(
                     // Shift by maximum 1mm, less than the collision avoidance factor.
                     double nudge_dist = std::min(std::max(0., nudge_dist_max), max_nudge_smoothing);
                     collision_sphere.position.head<2>() += (shift.normalized() * nudge_dist).cast<float>();
+
+                    throw_on_cancel();
                 }
         });
         //            printf("iteration: %d, moved: %d\n", int(iter), int(num_moved));
@@ -3703,7 +3750,9 @@ static void draw_branches(
     SupportGeneratorLayersPtr       &bottom_contacts,
     SupportGeneratorLayersPtr       &top_contacts,
     SupportGeneratorLayersPtr       &intermediate_layers,
-    SupportGeneratorLayerStorage    &layer_storage)
+    SupportGeneratorLayerStorage    &layer_storage,
+    
+    std::function<void()>            throw_on_cancel)
 {
     static int irun = 0;
 
@@ -3745,7 +3794,9 @@ static void draw_branches(
         }
     }
 
-    organic_smooth_branches_avoid_collisions(print_object, volumes, config, move_bounds, elements_with_link_down, linear_data_layers);
+    throw_on_cancel();
+
+    organic_smooth_branches_avoid_collisions(print_object, volumes, config, move_bounds, elements_with_link_down, linear_data_layers, throw_on_cancel);
 
     std::vector<Polygons> support_layer_storage(move_bounds.size());
     std::vector<Polygons> support_roof_storage(move_bounds.size());
@@ -3812,6 +3863,7 @@ static void draw_branches(
 #endif
                     its_merge(cummulative_mesh, partial_mesh);
                 }
+                throw_on_cancel();
             }
     }
 
@@ -3855,7 +3907,7 @@ static void draw_branches(
         });
 
     finalize_interface_and_support_areas(print_object, volumes, config, overhangs, support_layer_storage, support_roof_storage,
-        bottom_contacts, top_contacts, intermediate_layers, layer_storage);
+        bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
 }
 
 /*!
@@ -3916,10 +3968,10 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
 
         //FIXME generating overhangs just for the furst mesh of the group.
         assert(processing.second.size() == 1);
-        std::vector<Polygons>        overhangs = generate_overhangs(*print.get_object(processing.second.front()));
+        std::vector<Polygons>        overhangs = generate_overhangs(*print.get_object(processing.second.front()), throw_on_cancel);
 
         // ### Precalculate avoidances, collision etc.
-        size_t num_support_layers = precalculate(print, overhangs, processing.first, processing.second, volumes);
+        size_t num_support_layers = precalculate(print, overhangs, processing.first, processing.second, volumes, throw_on_cancel);
         if (num_support_layers == 0)
             continue;
 
@@ -3936,7 +3988,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         SupportGeneratorLayerStorage layer_storage;
 
         for (size_t mesh_idx : processing.second)
-            generate_initial_areas(*print.get_object(mesh_idx), volumes, config, overhangs, move_bounds, top_contacts, top_interface_layers, layer_storage);
+            generate_initial_areas(*print.get_object(mesh_idx), volumes, config, overhangs, move_bounds, top_contacts, top_interface_layers, layer_storage, throw_on_cancel);
         auto t_gen = std::chrono::high_resolution_clock::now();
 
 #ifdef TREESUPPORT_DEBUG_SVG
@@ -3953,22 +4005,22 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
 #endif // TREESUPPORT_DEBUG_SVG
 
         // ### Propagate the influence areas downwards. This is an inherently serial operation.
-        create_layer_pathing(volumes, config, move_bounds);
+        create_layer_pathing(volumes, config, move_bounds, throw_on_cancel);
         auto t_path = std::chrono::high_resolution_clock::now();
 
         // ### Set a point in each influence area
-        create_nodes_from_area(volumes, config, move_bounds);
+        create_nodes_from_area(volumes, config, move_bounds, throw_on_cancel);
         auto t_place = std::chrono::high_resolution_clock::now();
 
         // ### draw these points as circles
         
         if (print_object.config().support_material_style == smsTree)
             draw_areas(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
-                bottom_contacts, top_contacts, intermediate_layers, layer_storage);
+                bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
         else {
             assert(print_object.config().support_material_style == smsOrganic);
             draw_branches(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
-                bottom_contacts, top_contacts, intermediate_layers, layer_storage);
+                bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
         }
 
         auto t_draw = std::chrono::high_resolution_clock::now();
