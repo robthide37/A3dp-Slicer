@@ -1038,6 +1038,13 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
     // Not all predefined font for wx must be valid TTF, but at least one style must be loadable
     styles.erase(std::remove_if(styles.begin(), styles.end(), [](const EmbossStyle& style) {
         wxFont wx_font = WxFontUtils::create_wxFont(style);
+
+        // check that face name is setabled
+        wxFont wx_font_temp;
+        if (!wx_font_temp.SetFaceName(wx_font.GetFaceName()))
+            return true;
+
+        // Check that exsit valid TrueType Font for wx font
         return WxFontUtils::create_font_file(wx_font) == nullptr;
         }),styles.end()
     );
