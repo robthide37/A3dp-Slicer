@@ -895,7 +895,7 @@ void GLGizmoEmboss::on_set_state()
 }
 
 void GLGizmoEmboss::data_changed() { 
-    set_volume(priv::get_selected_volume(m_parent.get_selection()));
+    set_volume_by_selection();
 }
 
 void GLGizmoEmboss::on_start_dragging() { m_rotate_gizmo.start_dragging(); }
