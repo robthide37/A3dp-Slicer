@@ -2297,7 +2297,7 @@ void GLGizmoEmboss::draw_style_rename_button()
         ImGui::OpenPopup(popup_id);
     }
     else if (ImGui::IsItemHovered()) {
-        if (can_rename) ImGui::SetTooltip("%s", _u8L("Rename actual style.").c_str());
+        if (can_rename) ImGui::SetTooltip("%s", _u8L("Rename current style.").c_str());
         else            ImGui::SetTooltip("%s", _u8L("Can't rename temporary style.").c_str());
     }
     if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
