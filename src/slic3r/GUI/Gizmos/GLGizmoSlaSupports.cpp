@@ -66,7 +66,7 @@ void GLGizmoSlaSupports::data_changed()
         m_c->instances_hider()->set_hide_full_scene(true);
         const SLAPrintObject* po = m_c->selection_info()->print_object();
         const int required_step = get_min_sla_print_object_step();
-        if (po != nullptr && last_completed_step(*po->print()) < required_step)
+        if (po != nullptr && po->last_completed_step() < required_step)
             reslice_until_step((SLAPrintObjectStep)required_step, false);
 
         update_volumes();

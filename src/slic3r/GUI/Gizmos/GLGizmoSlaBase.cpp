@@ -62,7 +62,7 @@ void GLGizmoSlaBase::update_volumes()
         new_volume->set_instance_transformation(po->model_object()->instances[m_parent.get_selection().get_instance_idx()]->get_transformation());
         new_volume->set_sla_shift_z(po->get_current_elevation());
         new_volume->mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(backend_mesh);
-        m_input_enabled = last_completed_step(*m_c->selection_info()->print_object()->print()) >= m_min_sla_print_object_step;
+        m_input_enabled = po->last_completed_step() >= m_min_sla_print_object_step;
         if (m_input_enabled)
             new_volume->selected = true; // to set the proper color
         else
@@ -125,16 +125,6 @@ void GLGizmoSlaBase::unregister_volume_raycasters_for_picking()
         m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo, VOLUME_RAYCASTERS_BASE_ID + (int)i);
     }
     m_volume_raycasters.clear();
-}
-
-int GLGizmoSlaBase::last_completed_step(const SLAPrint& sla)
-{
-    int step = -1;
-    for (int i = 0; i < (int)SLAPrintObjectStep::slaposCount; ++i) {
-        if (sla.is_step_done((SLAPrintObjectStep)i))
-            ++step;
-    }
-    return step;
 }
 
 // Unprojects the mouse position on the mesh and saves hit point and normal of the facet into pos_and_normal
