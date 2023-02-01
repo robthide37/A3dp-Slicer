@@ -111,7 +111,7 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
 
     for (std::string opt_key : config->keys())
     {
-        const ConfigOptionDef& opt = config->def()->options.at(opt_key);
+        const ConfigOptionDef& opt = *config->option_def(opt_key);
         if (opt.mode > mode)
             continue;
 

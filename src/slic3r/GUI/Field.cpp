@@ -1021,16 +1021,10 @@ void Choice::BUILD() {
 	// recast as a wxWindow to fit the calling convention
 	window = dynamic_cast<wxWindow*>(temp);
 
-	if (! m_opt.enum_labels.empty() || ! m_opt.enum_values.empty()) {
-		if (m_opt.enum_labels.empty()) {
-			// Append non-localized enum_values
-			for (auto el : m_opt.enum_values)
-				temp->Append(el);
-		} else {
-			// Append localized enum_labels
-			for (auto el : m_opt.enum_labels)
-				temp->Append(_(el));
-		}
+    if (auto &labels = m_opt.enum_def->labels(); ! labels.empty()) {
+        bool localized = m_opt.enum_def->has_labels();
+        for (const std::string &el : labels)
+            temp->Append(localized ? _(wxString::FromUTF8(el)) : wxString::FromUTF8(el));
 		set_selection();
 	}
 
@@ -1141,33 +1135,23 @@ void Choice::set_selection()
 	}
 
 	if (!text_value.IsEmpty()) {
-        size_t idx = 0;
-		for (auto el : m_opt.enum_values) {
-			if (el == text_value)
-				break;
-			++idx;
-		}
-		idx == m_opt.enum_values.size() ? field->SetValue(text_value) : field->SetSelection(idx);
+		if (auto opt = m_opt.enum_def->value_to_index(into_u8(text_value)); opt.has_value())
+            // This enum has a value field of the same content as text_value. Select it.
+            field->SetSelection(opt.value());
+        else
+            field->SetValue(text_value);
 	}
 }
 
 void Choice::set_value(const std::string& value, bool change_event)  //! Redundant?
 {
 	m_disable_change_event = !change_event;
-
-	size_t idx=0;
-	for (auto el : m_opt.enum_values)
-	{
-		if (el == value)
-			break;
-		++idx;
-	}
-
     choice_ctrl* field = dynamic_cast<choice_ctrl*>(window);
-	idx == m_opt.enum_values.size() ?
-		field->SetValue(value) :
-		field->SetSelection(idx);
-
+    if (auto opt = m_opt.enum_def->value_to_index(value); opt.has_value())
+        // This enum has a value field of the same content as text_value. Select it.
+        field->SetSelection(opt.value());
+    else
+        field->SetValue(value);
 	m_disable_change_event = false;
 }
 
@@ -1184,27 +1168,17 @@ void Choice::set_value(const boost::any& value, bool change_event)
 	case coFloatOrPercent:
 	case coString:
 	case coStrings: {
-		wxString text_value;
-		if (m_opt.type == coInt)
-			text_value = wxString::Format(_T("%i"), int(boost::any_cast<int>(value)));
-		else
-			text_value = boost::any_cast<wxString>(value);
-        size_t idx = 0;
-        const std::vector<std::string>& enums = m_opt.enum_values.empty() ? m_opt.enum_labels : m_opt.enum_values;
-		for (auto el : enums)
-		{
-			if (el == text_value)
-				break;
-			++idx;
-		}
-        if (idx == enums.size()) {
+		wxString text_value = m_opt.type == coInt ? 
+            wxString::Format(_T("%i"), int(boost::any_cast<int>(value))) :
+            boost::any_cast<wxString>(value);
+        if (auto idx = m_opt.enum_def->label_to_index(into_u8(text_value)); idx.has_value()) {
+            field->SetSelection(idx.value());
+        } else {
             // For editable Combobox under OSX is needed to set selection to -1 explicitly,
             // otherwise selection doesn't be changed
             field->SetSelection(-1);
             field->SetValue(text_value);
         }
-        else
-			field->SetSelection(idx);
 
         if (!m_value.empty() && m_opt.opt_key == "fill_density") {
             // If m_value was changed before, then update m_value here too to avoid case 
@@ -1217,36 +1191,9 @@ void Choice::set_value(const boost::any& value, bool change_event)
 		break;
 	}
 	case coEnum: {
-		int val = boost::any_cast<int>(value);
-		if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern")
-		{
-			std::string key;
-			const t_config_enum_values& map_names = ConfigOptionEnum<InfillPattern>::get_enum_values();
-			for (auto it : map_names)
-				if (val == it.second) {
-					key = it.first;
-					break;
-				}
-
-			const std::vector<std::string>& values = m_opt.enum_values;
-			auto it = std::find(values.begin(), values.end(), key);
-			val = it == values.end() ? 0 : it - values.begin();
-		}
-		else if (m_opt_id == "support_material_style")
-		{
-			std::string key;
-			const t_config_enum_values& map_names = ConfigOptionEnum<SupportMaterialStyle>::get_enum_values();
-			for (auto it : map_names)
-				if (val == it.second) {
-					key = it.first;
-					break;
-				}
-
-			const std::vector<std::string>& values = m_opt.enum_values;
-			auto it = std::find(values.begin(), values.end(), key);
-			val = it == values.end() ? 0 : it - values.begin();
-		}
-		field->SetSelection(val);
+		auto val = m_opt.enum_def->enum_to_index(boost::any_cast<int>(value));
+        assert(val.has_value());
+		field->SetSelection(val.has_value() ? val.value() : 0);
 		break;
 	}
 	default:
@@ -1309,28 +1256,21 @@ boost::any& Choice::get_value()
 			return m_value = boost::any(ret_str);
 
 	if (m_opt.type == coEnum)
-	{
-        if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern") {
-			const std::string& key = m_opt.enum_values[field->GetSelection()];
-			m_value = int(ConfigOptionEnum<InfillPattern>::get_enum_values().at(key));
-		} else if (m_opt_id == "support_material_style") {
-            m_value = int(ConfigOptionEnum<SupportMaterialStyle>::get_enum_values().at(m_opt.enum_values[field->GetSelection()]));
-        }
-		else
-			m_value = field->GetSelection();
-	}
+        // Closed enum: The combo box item index returned by the field must be convertible to an enum value.
+        m_value = m_opt.enum_def->index_to_enum(field->GetSelection());
     else if (m_opt.gui_type == ConfigOptionDef::GUIType::f_enum_open || m_opt.gui_type == ConfigOptionDef::GUIType::i_enum_open) {
+        // Open enum: The combo box item index returned by the field 
         const int ret_enum = field->GetSelection();
-        if (ret_enum < 0 || m_opt.enum_values.empty() || m_opt.type == coStrings ||
-            (ret_str != m_opt.enum_values[ret_enum] && ret_str != _(m_opt.enum_labels[ret_enum])))
+        if (ret_enum < 0 || ! m_opt.enum_def->has_values() || m_opt.type == coStrings ||
+            (into_u8(ret_str) != m_opt.enum_def->value(ret_enum) && ret_str != _(m_opt.enum_def->label(ret_enum))))
 			// modifies ret_string!
             get_value_by_opt_type(ret_str);
         else if (m_opt.type == coFloatOrPercent)
-            m_value = m_opt.enum_values[ret_enum];
+            m_value = m_opt.enum_def->value(ret_enum);
         else if (m_opt.type == coInt)
-            m_value = atoi(m_opt.enum_values[ret_enum].c_str());
+            m_value = atoi(m_opt.enum_def->value(ret_enum).c_str());
         else
-            m_value = string_to_double_decimal_point(m_opt.enum_values[ret_enum]);
+            m_value = string_to_double_decimal_point(m_opt.enum_def->value(ret_enum));
     }
 	else
 		// modifies ret_string!
