@@ -466,70 +466,77 @@ Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolu
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
-    // filter events
-    if (!(mouse_event.Dragging() && mouse_event.LeftIsDown()) && 
-        !mouse_event.LeftUp() &&
-        !mouse_event.LeftDown())
-        return false;
-
-    // must exist hover object
-    int hovered_id = m_parent.get_first_hover_volume_idx();
-    if (hovered_id < 0) return false;
-
-    GLVolume *gl_volume = m_parent.get_volumes().volumes[hovered_id];
-    const ModelObjectPtrs &objects = wxGetApp().plater()->model().objects;
-    ModelVolume *act_model_volume = priv::get_model_volume(gl_volume, objects);
-
-    // hovered object must be actual text volume
-    if (m_volume != act_model_volume) return false;
-
-    const ModelVolumePtrs &volumes = m_volume->get_object()->volumes;
-    std::vector<size_t> allowed_volumes_id;
-    if (volumes.size() > 1) {
-        allowed_volumes_id.reserve(volumes.size() - 1);
-        for (auto &v : volumes) { 
-            if (v->id() == m_volume->id()) continue;
-            if (!v->is_model_part()) continue;
-            allowed_volumes_id.emplace_back(v->id().id);
-        }
-    }
-
-    // wxCoord == int --> wx/types.h
-    Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
-    Vec2d mouse_pos = mouse_coord.cast<double>();        
-    RaycastManager::AllowVolumes condition(std::move(allowed_volumes_id));
-
     // detect start text dragging
     if (mouse_event.LeftDown()) {
+        // must exist hover object
+        int hovered_id = m_parent.get_first_hover_volume_idx();
+        if (hovered_id < 0)
+            return false;
+
+        GLVolume *gl_volume = m_parent.get_volumes().volumes[hovered_id];
+        const ModelObjectPtrs &objects = m_parent.get_model()->objects;
+
+        // hovered object must be actual text volume
+        if (m_volume != priv::get_model_volume(gl_volume, objects))
+            return false;
+
+        const ModelVolumePtrs &volumes = m_volume->get_object()->volumes;
+        std::vector<size_t> allowed_volumes_id;
+        if (volumes.size() > 1) {
+            allowed_volumes_id.reserve(volumes.size() - 1);
+            for (auto &v : volumes) {
+                if (v->id() == m_volume->id())
+                    continue;
+                if (!v->is_model_part())
+                    continue;
+                allowed_volumes_id.emplace_back(v->id().id);
+            }
+        }        
+        RaycastManager::AllowVolumes condition(std::move(allowed_volumes_id));
+
         // initialize raycasters
-        // IMPROVE: move to job, for big scene it slows down 
-        ModelObject *act_model_object = act_model_volume->get_object();
-        m_raycast_manager.actualize(act_model_object, &condition);
-        m_dragging_mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
+        // INFO: It could slows down for big objects
+        // (may be move to thread and do not show drag until it finish)
+        m_raycast_manager.actualize(m_volume->get_object(), &condition);
+                
+        // wxCoord == int --> wx/types.h
+        Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+        Vec2d mouse_pos = mouse_coord.cast<double>();
+        Vec2d mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
+        Transform3d instance_inv = gl_volume->get_instance_transformation().get_matrix().inverse();
+        m_surface_drag = SurfaceDrag{mouse_offset, instance_inv, gl_volume, condition};
+
         // Cancel job to prevent interuption of dragging (duplicit result)
         if (m_job_cancel != nullptr) 
             m_job_cancel->store(true);
-        return false;
+
+        m_parent.enable_moving(false);
+        m_parent.enable_picking(false);
+        return true;
     }
 
     // Dragging starts out of window
-    if (!m_dragging_mouse_offset.has_value()) 
+    if (!m_surface_drag.has_value())
         return false;
 
     if (mouse_event.Dragging()) {
+        // wxCoord == int --> wx/types.h
+        Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
+        Vec2d mouse_pos = mouse_coord.cast<double>();
+        Vec2d offseted_mouse = mouse_pos + m_surface_drag->mouse_offset;
         const Camera &camera = wxGetApp().plater()->get_camera();
-        Vec2d offseted_mouse = mouse_pos + *m_dragging_mouse_offset;
-        auto hit = m_raycast_manager.unproject(offseted_mouse, camera, &condition);        
-        if (!hit.has_value())
-            return false;
-        TextConfiguration &tc = *m_volume->text_configuration;
-        // INFO: GLVolume is transformed by common movement but we need move over surface
-        // so hide common dragging of object
-        m_parent.toggle_model_objects_visibility(false, m_volume->get_object(), gl_volume->instance_idx(), m_volume);
+        auto hit = m_raycast_manager.unproject(offseted_mouse, camera, &m_surface_drag->condition);
+        if (!hit.has_value()) {
+            // cross hair need redraw
+            m_parent.set_as_dirty();
+            return true;
+        }
 
         // Calculate temporary position
         Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
         Transform3d trmat = create_transformation_onto_surface(hit->position, hit->normal);
+
+        TextConfiguration &tc = *m_volume->text_configuration;
         const FontProp& font_prop = tc.style.prop;
         apply_transformation(font_prop, trmat);
 
@@ -537,49 +544,43 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         if (tc.fix_3mf_tr.has_value())
             trmat = trmat * (*tc.fix_3mf_tr);
 
-        // temp is in world coors
-        m_temp_transformation = object_trmat * trmat;
+        // volume transfomration in world coor
+        Transform3d world = object_trmat * trmat;
+        Transform3d volume_tr = m_surface_drag->instance_inv * world;
+
+        // Update transformation inside of  instances
+        for (GLVolume *vol : m_parent.get_volumes().volumes) {
+            if (vol->object_idx() != m_surface_drag->gl_volume->object_idx() || 
+                vol->volume_idx() != m_surface_drag->gl_volume->volume_idx())
+                continue;
+            vol->set_volume_transformation(volume_tr);
+        }
 
         // calculate scale
         calculate_scale();
+
+        m_parent.set_as_dirty();
+        return true;
     } else if (mouse_event.LeftUp()) {
-        // Added because of weird case after double click into scene 
-        // with Mesa driver OR on Linux
-        if (!m_temp_transformation.has_value()) return false;
-
-        int instance_idx = m_parent.get_selection().get_instance_idx();
-        const auto &instances = m_volume->get_object()->instances;
-        if (instance_idx < 0 || instance_idx >= instances.size())
-            return false;
-
-        // Override of common transformation after draggig by set transformation into gl_volume
-        Transform3d volume_trmat = 
-            instances[instance_idx]->get_matrix().inverse() *
-            *m_temp_transformation;
-
-        // ReWrite transformation inside of all instances
-        Geometry::Transformation transformation(volume_trmat);
-        for (GLVolume *vol : m_parent.get_volumes().volumes) {
-            if (vol->object_idx() != gl_volume->object_idx() ||
-                vol->volume_idx() != gl_volume->volume_idx())
-                continue;
-            vol->set_volume_transformation(transformation);
-        }
-
-        m_parent.toggle_model_objects_visibility(true);
-        // Apply temporary position
-        m_temp_transformation = {};
-        m_dragging_mouse_offset = {};
+        // write transformation from UI into model
+        Selection &s = m_parent.get_selection();
+        Selection::EMode mode = s.get_mode();
+        s.set_mode(Selection::EMode::Volume); // Want to move with all volumes inside of instances
+        m_parent.do_move(L("Surface move"));
+        s.set_mode(mode); // revert setting of mode
 
         // Update surface by new position
-        if (m_volume->text_configuration->style.prop.use_surface) {
-            // need actual position
-            m_volume->set_transformation(volume_trmat);
+        if (m_volume->text_configuration->style.prop.use_surface)
             process();
-        }
 
         // calculate scale
         calculate_scale();
+        
+        // allow moving and picking again
+        m_parent.enable_moving(true);
+        m_parent.enable_picking(true);
+        m_surface_drag.reset();
+        return true;
     }
     return false;
 }
@@ -619,53 +620,10 @@ void GLGizmoEmboss::on_render() {
     Selection &selection = m_parent.get_selection();
     if (selection.is_empty()) return;
 
-    if (m_temp_transformation.has_value()) {
-        // draw text volume on temporary position
-        GLVolume& gl_volume = *selection.get_volume(*selection.get_volume_idxs().begin());
-        GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
-        shader->start_using();
-
-        const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d matrix = camera.get_view_matrix() * (*m_temp_transformation);
-        shader->set_uniform("view_model_matrix", matrix);
-        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        shader->set_uniform("view_normal_matrix", (Matrix3d) (matrix).matrix().block(0, 0, 3, 3).inverse().transpose());
-        shader->set_uniform("emission_factor", 0.0f);
-
-        // dragging object must be selected so draw it with correct color
-        //auto color = gl_volume.color;
-        //auto color = gl_volume.render_color;
-        auto color = GLVolume::SELECTED_COLOR;
-        // Set transparent color for NEGATIVE_VOLUME & PARAMETER_MODIFIER
-        bool is_transparent = m_volume->type() != ModelVolumeType::MODEL_PART;        
-        if (is_transparent) {
-            color.a(0.5f);
-            glsafe(::glEnable(GL_BLEND));
-            glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-        }
-
-        bool is_left_handed = has_reflection(*m_temp_transformation);
-        if (is_left_handed)
-            glsafe(::glFrontFace(GL_CW));        
-
-        glsafe(::glEnable(GL_DEPTH_TEST));
-        gl_volume.model.set_color(color);
-        gl_volume.model.render();
-        glsafe(::glDisable(GL_DEPTH_TEST));
-
-        // set it back to pevious state
-        if (is_left_handed)
-            glsafe(::glFrontFace(GL_CCW));
-        if (is_transparent)
-            glsafe(::glDisable(GL_BLEND));
-
-        shader->stop_using();
-    }
-
     // prevent get local coordinate system on multi volumes
     if (!selection.is_single_volume_or_modifier() && 
         !selection.is_single_volume_instance()) return;
-    bool is_surface_dragging = m_temp_transformation.has_value();
+    bool is_surface_dragging = m_surface_drag.has_value();
     bool is_parent_dragging = m_parent.is_mouse_dragging();
     // Do NOT render rotation grabbers when dragging object
     bool is_rotate_by_grabbers = m_dragging;
@@ -737,35 +695,26 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
     draw_list->AddLine(p1, p2, color, thickness);
 }
 #endif // SHOW_OFFSET_DURING_DRAGGING
-namespace priv {
-static void draw_origin(const GLCanvas3D& canvas) {
-    auto draw_list = ImGui::GetOverlayDrawList();
-    const Selection &selection = canvas.get_selection();
-    Transform3d to_world = priv::world_matrix(selection);
-    Vec3d volume_zero = to_world * Vec3d::Zero();
-    
-    const Camera &camera = wxGetApp().plater()->get_camera();
-    Point screen_coor = CameraUtils::project(camera, volume_zero);
-    ImVec2 center(screen_coor.x(), screen_coor.y());
-    float radius = 16.f;
-    ImU32 color = ImGui::GetColorU32(ImVec4(1.f, 1.f, 1.f, .75f));
 
-    int num_segments = 0;
-    float thickness = 4.f;
-    draw_list->AddCircle(center, radius, color, num_segments, thickness);
+namespace priv {
+static void draw_cross_hair(const ImVec2 &position,
+                            float         radius       = 16.f,
+                            ImU32         color        = ImGui::GetColorU32(ImVec4(1.f, 1.f, 1.f, .75f)),
+                            int           num_segments = 0,
+                            float         thickness    = 4.f);
+} // namespace priv
+
+void priv::draw_cross_hair(const ImVec2 &position, float radius, ImU32 color, int num_segments, float thickness)
+{
+    auto draw_list = ImGui::GetOverlayDrawList();
+    draw_list->AddCircle(position, radius, color, num_segments, thickness);
     auto dirs = {ImVec2{0, 1}, ImVec2{1, 0}, ImVec2{0, -1}, ImVec2{-1, 0}};
     for (const ImVec2 &dir : dirs) {
-        ImVec2 start(
-            center.x + dir.x * 0.5 * radius,
-            center.y + dir.y * 0.5 * radius);
-        ImVec2 end(
-            center.x + dir.x * 1.5 * radius,
-            center.y + dir.y * 1.5 * radius);
+        ImVec2 start(position.x + dir.x * 0.5 * radius, position.y + dir.y * 0.5 * radius);
+        ImVec2 end(position.x + dir.x * 1.5 * radius, position.y + dir.y * 1.5 * radius);
         draw_list->AddLine(start, end, color, thickness);
     }
 }
-
-} // namespace priv
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
@@ -784,8 +733,13 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, min_window_size);
 
     // Draw origin position of text during dragging
-    if (m_temp_transformation.has_value())
-        priv::draw_origin(m_parent);
+    if (m_surface_drag.has_value()) {
+        ImVec2 mouse_pos = ImGui::GetMousePos();
+        ImVec2 center(
+            mouse_pos.x + m_surface_drag->mouse_offset.x(),
+            mouse_pos.y + m_surface_drag->mouse_offset.y());
+        priv::draw_cross_hair(center);
+    }
 
 #ifdef SHOW_FINE_POSITION
     draw_fine_position(m_parent.get_selection(), m_parent.get_canvas_size(), min_window_size);
@@ -1288,9 +1242,7 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
 }
 
 void GLGizmoEmboss::calculate_scale() {
-    Transform3d to_world = m_temp_transformation.has_value()?
-        *m_temp_transformation :        
-        priv::world_matrix(m_parent.get_selection());
+    Transform3d to_world = m_parent.get_selection().get_first_volume()->world_matrix();
     auto to_world_linear = to_world.linear();
     auto calc = [&to_world_linear](const Vec3d &axe, std::optional<float>& scale)->bool {
         Vec3d  axe_world = to_world_linear * axe;

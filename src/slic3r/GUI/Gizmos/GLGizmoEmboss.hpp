@@ -299,15 +299,28 @@ private:
     // Value is set only when dragging rotation to calculate actual angle
     std::optional<float> m_rotate_start_angle;
 
-    // when draging with text object hold screen offset of cursor from object center
-    std::optional<Vec2d> m_dragging_mouse_offset;
+    // Data for drag&drop over surface with mouse
+    struct SurfaceDrag
+    {
+        // hold screen coor offset of cursor from object center
+        Vec2d mouse_offset;
+
+        // Invers transformation of text volume instance
+        // Help convert world transformation to instance space
+        Transform3d instance_inv;
+
+        // Dragged gl volume
+        GLVolume *gl_volume;
+
+        // condition for raycaster
+        RaycastManager::AllowVolumes condition;
+    };
+    // Keep data about dragging only during drag&drop
+    std::optional<SurfaceDrag> m_surface_drag;
 
     // TODO: it should be accessible by other gizmo too.
     // May be move to plater?
     RaycastManager m_raycast_manager;
-
-    // Only when drag text object it stores world position
-    std::optional<Transform3d> m_temp_transformation;
 
     // For text on scaled objects
     std::optional<float> m_scale_height;
