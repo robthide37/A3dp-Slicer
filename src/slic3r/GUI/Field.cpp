@@ -1306,11 +1306,11 @@ void Choice::msw_rescale()
     field->SetSize(size);
 
     size_t idx = 0;
-    if (! m_opt.enum_labels.empty() || ! m_opt.enum_values.empty()) {
+    if (m_opt.enum_def && ! m_opt.enum_def->labels().empty()) {
     	size_t counter = 0;
-    	bool   labels = ! m_opt.enum_labels.empty();
-        for (const std::string &el : labels ? m_opt.enum_labels : m_opt.enum_values) {
-        	wxString text = labels ? _(el) : from_u8(el);
+    	bool   localized = m_opt.enum_def->has_labels();
+        for (const std::string &el : m_opt.enum_def->labels()) {
+        	wxString text = localized ? _(el) : from_u8(el);
             field->Append(text);
             if (text == selection)
                 idx = counter;
