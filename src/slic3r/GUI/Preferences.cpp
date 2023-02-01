@@ -708,15 +708,16 @@ void PreferencesDialog::update_ctrls_alignment()
 
 void PreferencesDialog::accept(wxEvent&)
 {
-	if (const auto it = m_values.find("downloader_url_registered"); it != m_values.end())
-		downloader->allow(it->second == "1");
-	if (!downloader->on_finish())
-		return;
-
+	if(wxGetApp().is_editor()) {
+		if (const auto it = m_values.find("downloader_url_registered"); it != m_values.end())
+			downloader->allow(it->second == "1");
+		if (!downloader->on_finish())
+			return;
 #ifdef __linux__
-	if( downloader->get_perform_registration_linux()) 
-		DesktopIntegrationDialog::perform_desktop_integration(true);
+		if( downloader->get_perform_registration_linux()) 
+			DesktopIntegrationDialog::perform_desktop_integration(true);
 #endif // __linux__
+	}
 
 	bool update_filament_sidebar = (m_values.find("no_templates") != m_values.end());
 
