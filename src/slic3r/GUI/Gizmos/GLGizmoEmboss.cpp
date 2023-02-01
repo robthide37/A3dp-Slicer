@@ -608,6 +608,12 @@ bool GLGizmoEmboss::on_init()
     ColorRGBA gray_color(.6f, .6f, .6f, .3f);
     m_rotate_gizmo.set_highlight_color(gray_color);
     m_shortcut_key = WXK_CONTROL_T;
+
+    // initialize text styles
+    m_style_manager.init(wxGetApp().app_config);
+
+    // Set rotation gizmo upwardrotate
+    m_rotate_gizmo.set_angle(PI / 2);
     return true;
 }
 
@@ -720,13 +726,20 @@ void priv::draw_cross_hair(const ImVec2 &position, float radius, ImU32 color, in
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     // Check that DPI is same
-    double screen_scale = wxDisplay(wxGetApp().plater()).GetScaleFactor();
-    if (m_gui_cfg.has_value() && m_gui_cfg->screen_scale != screen_scale)
-        m_gui_cfg.reset();
+    GUI_App& app = wxGetApp();
+    double screen_scale = wxDisplay(app.plater()).GetScaleFactor();
+    if (!m_gui_cfg.has_value() || 
+        m_gui_cfg->screen_scale != screen_scale) {
+        // Create cache for gui offsets
+        GuiCfg cfg = create_gui_configuration();
+        cfg.screen_scale = screen_scale;
+        m_gui_cfg.emplace(std::move(cfg));
+        // set position near toolbar
+        m_set_window_offset = ImVec2(-1.f, -1.f);
 
-    // Cache for gui offsets
-    if (!m_gui_cfg.has_value())
-        initialize(screen_scale);
+        // change resolution regenerate icons
+        init_icons();
+    }
     set_volume_by_selection();
 
     // Do not render window for not selected text volume
@@ -904,12 +917,9 @@ void GLGizmoEmboss::on_stop_dragging()
 }
 void GLGizmoEmboss::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
 
-void GLGizmoEmboss::initialize(double screen_scale)
+GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
 {
-    if (m_gui_cfg.has_value()) return;
-
-    GuiCfg cfg; // initialize by default values;   
-    cfg.screen_scale = screen_scale;
+    GuiCfg cfg; // initialize by default values;
 
     float line_height = ImGui::GetTextLineHeight();
     float line_height_with_spacing = ImGui::GetTextLineHeightWithSpacing();
@@ -996,17 +1006,7 @@ void GLGizmoEmboss::initialize(double screen_scale)
     int max_style_image_height = 1.5 * input_height;
     cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
     cfg.face_name_size.y() = line_height_with_spacing;
-
-    m_gui_cfg.emplace(std::move(cfg));
-
-    init_icons();
-    
-    // initialize text styles
-    m_style_manager.init(wxGetApp().app_config);
-    set_default_text();
-
-    // Set rotation gizmo upwardrotate 
-    m_rotate_gizmo.set_angle(PI/2);
+    return cfg;
 }
 
 EmbossStyles GLGizmoEmboss::create_default_styles()
@@ -1014,7 +1014,7 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
     wxFont wx_font_normal = *wxNORMAL_FONT;
     wxFont wx_font_small = *wxSMALL_FONT;
 
-#ifdef __APPLE__
+#ifdef __APPLE__=
     wx_font_normal.SetFaceName("Helvetica");
     wx_font_small.SetFaceName("Helvetica");
 #endif // __APPLE__

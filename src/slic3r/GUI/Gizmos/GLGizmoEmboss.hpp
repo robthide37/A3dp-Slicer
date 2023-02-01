@@ -82,7 +82,6 @@ protected:
     std::string get_gizmo_leaving_text() const override { return _u8L("Leave emboss gizmo"); }
     std::string get_action_snapshot_name() override { return _u8L("Embossing actions"); }
 private:
-    void initialize(double screen_scale);
     static EmbossStyles create_default_styles();
     // localized default text
     void set_default_text();
@@ -213,10 +212,10 @@ private:
             std::string collection;
         };
         Translations translations;
-                
-        GuiCfg() = default;
     };
     std::optional<const GuiCfg> m_gui_cfg;
+    static GuiCfg create_gui_configuration();
+
     bool m_is_advanced_edit_style = false;
 
     // when true window will appear near to text volume when open
