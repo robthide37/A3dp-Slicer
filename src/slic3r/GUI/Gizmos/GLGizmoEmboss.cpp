@@ -466,6 +466,29 @@ Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolu
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
+    auto do_move = [&]() {
+        // write transformation from UI into model
+        m_parent.do_move(L("Surface move"));
+
+        // Update surface by new position
+        if (m_volume->text_configuration->style.prop.use_surface)
+            process();
+
+        // calculate scale
+        calculate_scale();
+
+        // allow moving with object again
+        m_parent.enable_moving(true);
+        m_surface_drag.reset();
+    };
+
+    if (mouse_event.Moving()) {
+        // Fix when leave window during dragging and move cursor back
+        if (m_surface_drag.has_value())
+            do_move();
+        return false;
+    }
+
     // detect start text dragging
     if (mouse_event.LeftDown()) {
         // must exist hover object
@@ -562,19 +585,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         m_parent.set_as_dirty();
         return true;
     } else if (mouse_event.LeftUp()) {
-        // write transformation from UI into model
-        m_parent.do_move(L("Surface move"));
-
-        // Update surface by new position
-        if (m_volume->text_configuration->style.prop.use_surface)
-            process();
-
-        // calculate scale
-        calculate_scale();
-        
-        // allow moving with object again
-        m_parent.enable_moving(true);
-        m_surface_drag.reset();
+        do_move();
         return true;
     }
     return false;
@@ -582,9 +593,6 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
 bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
 {
-    // do not process moving event
-    if (mouse_event.Moving()) return false;
-
     // not selected volume
     if (m_volume == nullptr ||
         priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ||
