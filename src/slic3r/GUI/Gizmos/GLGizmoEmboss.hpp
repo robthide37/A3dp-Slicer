@@ -82,7 +82,7 @@ protected:
     std::string get_gizmo_leaving_text() const override { return _u8L("Leave emboss gizmo"); }
     std::string get_action_snapshot_name() override { return _u8L("Embossing actions"); }
 private:
-    void initialize();
+    void initialize(double screen_scale);
     static EmbossStyles create_default_styles();
     // localized default text
     void set_default_text();
@@ -118,7 +118,6 @@ private:
     void draw_advanced();
 
     bool select_facename(const wxString& facename);
-    void init_face_names();
 
     void do_translate(const Vec3d& relative_move);
     void do_rotate(float relative_z_angle);
@@ -167,6 +166,9 @@ private:
     // so the change takes effect. (info by GLGizmoFdmSupports.hpp)
     struct GuiCfg
     {
+        // Detect invalid config values when change monitor DPI
+        double screen_scale;
+
         // Zero means it is calculated in init function
         ImVec2 minimal_window_size              = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
@@ -244,6 +246,8 @@ private:
         // true  .. already enumerated(During opened combo box)
         bool is_init = false;
 
+        bool has_truncated_names = false;
+
         // data of can_load() faces
         std::vector<FaceName> faces = {};
         // Sorter set of Non valid face names in OS
@@ -277,6 +281,8 @@ private:
     static bool store(const Facenames &facenames);
     static bool load(Facenames &facenames);
 
+    static void init_face_names(Facenames &facenames);
+    static void init_truncated_names(Facenames &face_names, float max_width);
 
     // Text to emboss
     std::string m_text;

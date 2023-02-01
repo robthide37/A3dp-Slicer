@@ -223,9 +223,8 @@ bool priv::is_valid(ModelVolumeType volume_type){
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
     if (!priv::is_valid(volume_type)) return;
-    if (!m_gui_cfg.has_value()) initialize();
-    set_default_text();
     m_style_manager.discard_style_changes();
+    set_default_text();
     
     GLVolume *gl_volume = priv::get_hovered_gl_volume(m_parent);
     DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
@@ -242,9 +241,8 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 {
     if (!priv::is_valid(volume_type)) return;
-    if (!m_gui_cfg.has_value()) initialize();
-    set_default_text();
     m_style_manager.discard_style_changes();
+    set_default_text();
 
     // select position by camera position and view direction
     const Selection &selection = m_parent.get_selection();
@@ -721,7 +719,14 @@ void priv::draw_cross_hair(const ImVec2 &position, float radius, ImU32 color, in
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
-    if (!m_gui_cfg.has_value()) initialize();
+    // Check that DPI is same
+    double screen_scale = wxDisplay(wxGetApp().plater()).GetScaleFactor();
+    if (m_gui_cfg.has_value() && m_gui_cfg->screen_scale != screen_scale)
+        m_gui_cfg.reset();
+
+    // Cache for gui offsets
+    if (!m_gui_cfg.has_value())
+        initialize(screen_scale);
     set_volume_by_selection();
 
     // Do not render window for not selected text volume
@@ -840,8 +845,6 @@ void GLGizmoEmboss::on_set_state()
         m_style_manager.store_styles_to_app_config(false);
         remove_notification_not_valid_font();
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
-        if (!m_gui_cfg.has_value()) initialize();
-
         // to reload fonts from system, when install new one
         wxFontEnumerator::InvalidateCache();
 
@@ -861,10 +864,15 @@ void GLGizmoEmboss::on_set_state()
         }
 
         // change position of just opened emboss window
-        if (m_allow_open_near_volume)
+        if (m_allow_open_near_volume) {
             m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
-        else
-            priv::change_window_position(m_set_window_offset, false);
+        } else {
+            if (m_gui_cfg.has_value())
+                priv::change_window_position(m_set_window_offset, false);
+            else
+                m_set_window_offset = ImVec2(-1, -1);
+        }
+
         // when open by hyperlink it needs to show up
         // or after key 'T' windows doesn't appear
         m_parent.set_as_dirty();
@@ -896,11 +904,13 @@ void GLGizmoEmboss::on_stop_dragging()
 }
 void GLGizmoEmboss::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
 
-void GLGizmoEmboss::initialize()
+void GLGizmoEmboss::initialize(double screen_scale)
 {
     if (m_gui_cfg.has_value()) return;
 
-    GuiCfg cfg; // initialize by default values;    
+    GuiCfg cfg; // initialize by default values;   
+    cfg.screen_scale = screen_scale;
+
     float line_height = ImGui::GetTextLineHeight();
     float line_height_with_spacing = ImGui::GetTextLineHeightWithSpacing();
     float space = line_height_with_spacing - line_height;
@@ -1147,8 +1157,9 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
 
         // search in enumerated fonts
         // refresh list of installed font in the OS.
-        init_face_names();
+        init_face_names(m_face_names);
         m_face_names.is_init = false;
+
         auto cmp = [](const FaceName &fn, const wxString& face_name)->bool { return fn.wx_name < face_name; };
         const std::vector<FaceName> &faces = m_face_names.faces;
         auto it = std::lower_bound(faces.begin(), faces.end(), face_name, cmp);
@@ -1779,31 +1790,34 @@ bool GLGizmoEmboss::load(Facenames &facenames) {
     return true;
 }
 
-void GLGizmoEmboss::init_face_names() {
+void GLGizmoEmboss::init_truncated_names(Facenames &face_names, float max_width)
+{
+    for (FaceName &face : face_names.faces) {
+        std::string name_str(face.wx_name.ToUTF8().data());
+        face.name_truncated = ImGuiWrapper::trunc(name_str, max_width);
+    }
+    face_names.has_truncated_names = true;
+}
+
+void GLGizmoEmboss::init_face_names(Facenames &face_names)
+{
     Timer t("enumerate_fonts");
-    if (m_face_names.is_init) return;
-    m_face_names.is_init = true;
+    if (face_names.is_init) return;
+    face_names.is_init = true;
 
     // to reload fonts from system, when install new one
     wxFontEnumerator::InvalidateCache();
 
-    auto create_truncated_names = [&facenames = m_face_names, &width = m_gui_cfg->face_name_max_width]() {
-        for (FaceName &face : facenames.faces) {
-            std::string name_str(face.wx_name.ToUTF8().data());
-            face.name_truncated = ImGuiWrapper::trunc(name_str, width);
-        }
-    };
-
     // try load cache
     // Only not OS enumerated face has hash value 0
-    if (m_face_names.hash == 0) {
-        load(m_face_names);
-        create_truncated_names();
+    if (face_names.hash == 0) {
+        load(face_names);
+        face_names.has_truncated_names = false;
     }
 
     using namespace std::chrono;
     steady_clock::time_point enumerate_start = steady_clock::now();
-    ScopeGuard sg([&enumerate_start, &face_names = m_face_names]() {
+    ScopeGuard sg([&enumerate_start, &face_names = face_names]() {
         steady_clock::time_point enumerate_end = steady_clock::now();
         long long enumerate_duration = duration_cast<milliseconds>(enumerate_end - enumerate_start).count();
         BOOST_LOG_TRIVIAL(info) << "OS enumerate " << face_names.faces.size() << " fonts "
@@ -1811,25 +1825,25 @@ void GLGizmoEmboss::init_face_names() {
                                 << "= " << face_names.faces.size() + face_names.bad.size() << " fonts) "
                                 << "in " << enumerate_duration << " ms\n" << concat(face_names.bad);
     });
-    wxArrayString facenames = wxFontEnumerator::GetFacenames(m_face_names.encoding);
+    wxArrayString facenames = wxFontEnumerator::GetFacenames(face_names.encoding);
     size_t hash = boost::hash_range(facenames.begin(), facenames.end());
     // Zero value is used as uninitialized hash
     if (hash == 0) hash = 1;
     // check if it is same as last time
-    if (m_face_names.hash == hash) { 
+    if (face_names.hash == hash) { 
         // no new installed font
         BOOST_LOG_TRIVIAL(info) << "Same FontNames hash, cache is used. " 
             << "For clear cache delete file: " << get_fontlist_cache_path().string();
         return;
     }
 
-    BOOST_LOG_TRIVIAL(info) << ((m_face_names.hash == 0) ?
+    BOOST_LOG_TRIVIAL(info) << ((face_names.hash == 0) ?
         "FontName list is generate from scratch." :
         "Hash are different. Only previous bad fonts are used and set again as bad");
-    m_face_names.hash = hash;
+    face_names.hash = hash;
     
     // validation lambda
-    auto is_valid_font = [encoding = m_face_names.encoding, bad = m_face_names.bad /*copy*/](const wxString &name) {
+    auto is_valid_font = [encoding = face_names.encoding, bad = face_names.bad /*copy*/](const wxString &name) {
         if (name.empty()) return false;
 
         // vertical font start with @, we will filter it out
@@ -1856,20 +1870,20 @@ void GLGizmoEmboss::init_face_names() {
         return true;
     };
 
-    m_face_names.faces.clear();
-    m_face_names.bad.clear();
-    m_face_names.faces.reserve(facenames.size());
+    face_names.faces.clear();
+    face_names.bad.clear();
+    face_names.faces.reserve(facenames.size());
     std::sort(facenames.begin(), facenames.end());
     for (const wxString &name : facenames) {
         if (is_valid_font(name)) {
-            m_face_names.faces.push_back({name});
+            face_names.faces.push_back({name});
         }else{
-            m_face_names.bad.push_back(name);
+            face_names.bad.push_back(name);
         }
     }
-    assert(std::is_sorted(m_face_names.bad.begin(), m_face_names.bad.end()));
-    create_truncated_names();
-    store(m_face_names);
+    assert(std::is_sorted(face_names.bad.begin(), face_names.bad.end()));
+    face_names.has_truncated_names = false;
+    store(face_names);
 }
 
 // create texture for visualization font face
@@ -2073,9 +2087,13 @@ void GLGizmoEmboss::draw_font_list()
     {
         bool set_selection_focus = false;
         if (!m_face_names.is_init) {
-            init_face_names();
+            init_face_names(m_face_names);
             set_selection_focus = true;
         }
+
+        if (!m_face_names.has_truncated_names)
+            init_truncated_names(m_face_names, m_gui_cfg->face_name_max_width);
+        
         if (m_face_names.texture_id == 0) 
             init_font_name_texture();
 
