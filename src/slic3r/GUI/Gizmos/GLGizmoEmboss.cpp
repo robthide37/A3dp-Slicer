@@ -510,8 +510,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         if (m_job_cancel != nullptr) 
             m_job_cancel->store(true);
 
+        // disable moving with object by mouse
         m_parent.enable_moving(false);
-        m_parent.enable_picking(false);
         return true;
     }
 
@@ -563,11 +563,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         return true;
     } else if (mouse_event.LeftUp()) {
         // write transformation from UI into model
-        Selection &s = m_parent.get_selection();
-        Selection::EMode mode = s.get_mode();
-        s.set_mode(Selection::EMode::Volume); // Want to move with all volumes inside of instances
         m_parent.do_move(L("Surface move"));
-        s.set_mode(mode); // revert setting of mode
 
         // Update surface by new position
         if (m_volume->text_configuration->style.prop.use_surface)
@@ -576,9 +572,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // calculate scale
         calculate_scale();
         
-        // allow moving and picking again
+        // allow moving with object again
         m_parent.enable_moving(true);
-        m_parent.enable_picking(true);
         m_surface_drag.reset();
         return true;
     }
