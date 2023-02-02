@@ -448,14 +448,21 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         Selection& selection = canvas->get_selection();
 
 #if ENABLE_WORLD_COORDINATE
-        if (selection.is_single_volume_or_modifier())
+        if (selection.is_single_volume_or_modifier()) {
+            GLVolume* vol = const_cast<GLVolume*>(selection.get_first_volume());
+            Geometry::Transformation trafo = vol->get_volume_transformation();
+            trafo.reset_rotation();
+            vol->set_volume_transformation(trafo);
+        }
 #else
         if (selection.is_single_volume() || selection.is_single_modifier())
-#endif // ENABLE_WORLD_COORDINATE
             const_cast<GLVolume*>(selection.get_first_volume())->set_volume_rotation(Vec3d::Zero());
+#endif // ENABLE_WORLD_COORDINATE
         else if (selection.is_single_full_instance()) {
+            Geometry::Transformation trafo = selection.get_first_volume()->get_instance_transformation();
+            trafo.reset_rotation();
             for (unsigned int idx : selection.get_volume_idxs()) {
-                const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_rotation(Vec3d::Zero());
+                const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_transformation(trafo);
             }
         }
         else
@@ -484,14 +491,17 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
         Selection& selection = canvas->get_selection();
         if (selection.is_single_volume_or_modifier()) {
-            Geometry::Transformation trafo = selection.get_first_volume()->get_volume_transformation();
+            GLVolume* vol = const_cast<GLVolume*>(selection.get_first_volume());
+            Geometry::Transformation trafo = vol->get_volume_transformation();
             trafo.reset_scaling_factor();
-            const_cast<GLVolume*>(selection.get_first_volume())->set_volume_transformation(trafo);
+            vol->set_volume_transformation(trafo);
         }
         else if (selection.is_single_full_instance()) {
             Geometry::Transformation trafo = selection.get_first_volume()->get_instance_transformation();
             trafo.reset_scaling_factor();
-            const_cast<GLVolume*>(selection.get_first_volume())->set_instance_transformation(trafo);
+            for (unsigned int idx : selection.get_volume_idxs()) {
+                const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_transformation(trafo);
+            }
         }
         else
             return;

@@ -720,6 +720,13 @@ void Transformation::reset()
 }
 
 #if ENABLE_WORLD_COORDINATE
+void Transformation::reset_rotation()
+{
+    const Geometry::TransformationSVD svd(*this);
+    const Transform3d mirror = is_left_handed() ? Geometry::scale_transform({ -1.0, 1.0, 1.0 }) : Transform3d::Identity();
+    m_matrix = get_offset_matrix() * mirror * Transform3d(svd.v * svd.s * svd.v.transpose());
+}
+
 void Transformation::reset_scaling_factor()
 {
     const Geometry::TransformationSVD svd(*this);
