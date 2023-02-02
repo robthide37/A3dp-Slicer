@@ -1019,7 +1019,7 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
     wxFont wx_font_normal = *wxNORMAL_FONT;
     wxFont wx_font_small = *wxSMALL_FONT;
 
-#ifdef __APPLE__=
+#ifdef __APPLE__
     wx_font_normal.SetFaceName("Helvetica");
     wx_font_small.SetFaceName("Helvetica");
 #endif // __APPLE__
