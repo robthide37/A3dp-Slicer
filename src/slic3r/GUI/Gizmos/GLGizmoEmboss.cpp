@@ -34,6 +34,7 @@
 #include <wx/fontutil.h>
 #include <wx/fontdlg.h>
 #include <wx/fontenum.h>
+#include <wx/display.h> // detection of change DPI
 
 #include <boost/log/trivial.hpp>
 
