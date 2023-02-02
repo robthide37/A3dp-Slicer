@@ -722,26 +722,15 @@ void Transformation::reset()
 #if ENABLE_WORLD_COORDINATE
 void Transformation::reset_skew()
 {
-    Matrix3d rotation;
-    Matrix3d scale;
-    m_matrix.computeRotationScaling(&rotation, &scale);
+    auto new_scale_factor = [](const Matrix3d& s) {
+//        return s.determinant(); // scale determinant
+        return (s(0, 0) + s(1, 1) + s(2, 2)) / 3.0; // scale average
+//        return std::max(s(0, 0), std::max(s(1, 1), s(2, 2))); // max scale
+//        return std::min(s(0, 0), std::min(s(1, 1), s(2, 2))); // min scale
+    };
 
-    const double average_scale = std::cbrt(scale(0, 0) * scale(1, 1) * scale(2, 2));
-
-    scale(0, 0) = is_left_handed() ? -average_scale : average_scale;
-    scale(1, 1) = average_scale;
-    scale(2, 2) = average_scale;
-
-    scale(0, 1) = 0.0;
-    scale(0, 2) = 0.0;
-    scale(1, 0) = 0.0;
-    scale(1, 2) = 0.0;
-    scale(2, 0) = 0.0;
-    scale(2, 1) = 0.0;
-
-    const Vec3d offset = get_offset();
-    m_matrix = rotation * scale;
-    m_matrix.translation() = offset;
+    const Geometry::TransformationSVD svd(*this);
+    m_matrix = get_offset_matrix() * Transform3d(svd.u) * scale_transform(new_scale_factor(svd.s)) * Transform3d(svd.v.transpose());
 }
 
 Transform3d Transformation::get_matrix_no_offset() const
