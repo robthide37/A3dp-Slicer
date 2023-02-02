@@ -493,7 +493,7 @@ public:
 #if ENABLE_WORLD_COORDINATE
     void reset_offset() { set_offset(Vec3d::Zero()); }
     void reset_rotation() { set_rotation(Vec3d::Zero()); }
-    void reset_scaling_factor() { set_scaling_factor(Vec3d::Ones()); }
+    void reset_scaling_factor();
     void reset_mirror() { set_mirror(Vec3d::Ones()); }
     void reset_skew();
 

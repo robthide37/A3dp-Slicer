@@ -484,24 +484,19 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
         Selection& selection = canvas->get_selection();
         if (selection.is_single_volume_or_modifier()) {
-            const bool is_left_handed = selection.get_first_volume()->get_volume_transformation().is_left_handed();
-            const_cast<GLVolume*>(selection.get_first_volume())->set_volume_scaling_factor(Vec3d::Ones());
-            if (is_left_handed)
-                const_cast<GLVolume*>(selection.get_first_volume())->set_volume_mirror({ -1.0 , 1.0, 1.0 });
+            Geometry::Transformation trafo = selection.get_first_volume()->get_volume_transformation();
+            trafo.reset_scaling_factor();
+            const_cast<GLVolume*>(selection.get_first_volume())->set_volume_transformation(trafo);
         }
         else if (selection.is_single_full_instance()) {
-            const bool is_left_handed = selection.get_first_volume()->get_instance_transformation().is_left_handed();
-            for (unsigned int idx : selection.get_volume_idxs()) {
-                const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_scaling_factor(Vec3d::Ones());
-                if (is_left_handed)
-                    const_cast<GLVolume*>(selection.get_volume(idx))->set_instance_mirror({ -1.0 , 1.0, 1.0 });
-            }
+            Geometry::Transformation trafo = selection.get_first_volume()->get_instance_transformation();
+            trafo.reset_scaling_factor();
+            const_cast<GLVolume*>(selection.get_first_volume())->set_instance_transformation(trafo);
         }
         else
             return;
 
         canvas->do_scale(L("Reset scale"));
-
         UpdateAndShow(true);
 #else
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Reset scale"));

@@ -720,6 +720,12 @@ void Transformation::reset()
 }
 
 #if ENABLE_WORLD_COORDINATE
+void Transformation::reset_scaling_factor()
+{
+    const Geometry::TransformationSVD svd(*this);
+    m_matrix = get_offset_matrix() * Transform3d(svd.u) * Transform3d(svd.v.transpose());
+}
+
 void Transformation::reset_skew()
 {
     auto new_scale_factor = [](const Matrix3d& s) {
