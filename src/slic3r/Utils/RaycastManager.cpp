@@ -6,34 +6,53 @@
 #include "slic3r/GUI/Plater.hpp"  
 #include "slic3r/GUI/Camera.hpp"
 
-using namespace Slic3r::GUI;   
+using namespace Slic3r::GUI;
 
-void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
+namespace priv {
+
+using namespace Slic3r;
+// copied from private part of RaycastManager.hpp
+using Raycaster = std::pair<size_t, std::unique_ptr<MeshRaycaster> >;
+//                      ModelVolume.id
+
+using Raycasters = std::vector<Raycaster>;
+
+static void actualize(Raycasters &casters, const ModelVolumePtrs &volumes, const RaycastManager::ISkip *skip)
 {
     // check if volume was removed
-    std::vector<bool> removed_casters(m_raycasters.size(), {true});
-    // check if inscance was removed
-    std::vector<bool> removed_transf(m_transformations.size(), {true});
-    
+    std::vector<bool> removed_casters(casters.size(), {true});
     // actualize MeshRaycaster
-    for (const ModelVolume *volume : object->volumes) {
+    for (const ModelVolume *volume : volumes) {
         size_t oid = volume->id().id;
-        if (skip != nullptr && skip->skip(oid)) 
+        if (skip != nullptr && skip->skip(oid))
             continue;
-        auto item = std::find_if(m_raycasters.begin(), m_raycasters.end(),
-                              [oid](const RaycastManager::Raycaster &it)->bool {
-                                  return oid == it.first;
-                              });
-        if (item == m_raycasters.end()) {
+        auto item = std::find_if(casters.begin(), casters.end(),
+                                 [oid](const Raycaster &it) -> bool { return oid == it.first; });
+        if (item == casters.end()) {
             // add new raycaster
             auto raycaster = std::make_unique<MeshRaycaster>(volume->get_mesh_shared_ptr());
-            m_raycasters.emplace_back(std::make_pair(oid, std::move(raycaster)));
+            casters.emplace_back(std::make_pair(oid, std::move(raycaster)));
         } else {
-            size_t index = item - m_raycasters.begin();
+            size_t index           = item - casters.begin();
             removed_casters[index] = false;
         }
     }
+    
+    // clean other raycasters
+    for (int i = removed_casters.size() - 1; i >= 0; --i)
+        if (removed_casters[i])
+            casters.erase(casters.begin() + i);
+}
+}
 
+void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
+{
+    // actualize MeshRaycaster
+    priv::actualize(m_raycasters, object->volumes, skip);
+
+    // check if inscance was removed
+    std::vector<bool> removed_transf(m_transformations.size(), {true});
+    
     // actualize transformation matrices
     for (const ModelVolume *volume : object->volumes) {
         if (skip != nullptr && skip->skip(volume->id().id)) continue;
@@ -41,8 +60,6 @@ void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
         for (const ModelInstance *instance : object->instances) {
             const Transform3d &instrance_tr   = instance->get_matrix();
             Transform3d        transformation = instrance_tr * volume_tr;
-            // TODO: add SLA shift Z
-            // transformation.translation()(2) += m_sla_shift_z;
             TrKey tr_key = std::make_pair(instance->id().id, volume->id().id);
             auto  item   = std::find_if(m_transformations.begin(),
                                         m_transformations.end(),
@@ -62,16 +79,48 @@ void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
         }
     }
 
-    // clean other raycasters
-    for (int i = removed_casters.size() - 1; i >= 0; --i) 
-        if (removed_casters[i]) 
-            m_raycasters.erase(m_raycasters.begin() + i);
-    
     // clean other transformation
     for (int i = removed_transf.size() - 1; i >= 0; --i)
         if (removed_transf[i])
             m_transformations.erase(m_transformations.begin() + i);
 }
+
+void RaycastManager::actualize(const ModelInstance *instance, const ISkip *skip) {
+    const ModelVolumePtrs &volumes = instance->get_object()->volumes;
+
+    // actualize MeshRaycaster
+    priv::actualize(m_raycasters, volumes, skip);
+
+    // check if inscance was removed
+    std::vector<bool> removed_transf(m_transformations.size(), {true});
+
+    // actualize transformation matrices
+    for (const ModelVolume *volume : volumes) {
+        if (skip != nullptr && skip->skip(volume->id().id))
+            continue;
+        const Transform3d &volume_tr = volume->get_matrix();
+        const Transform3d &instrance_tr   = instance->get_matrix();
+        Transform3d        transformation = instrance_tr * volume_tr;
+        TrKey tr_key = std::make_pair(instance->id().id, volume->id().id);
+        auto  item   = std::find_if(m_transformations.begin(), m_transformations.end(),
+                                    [&tr_key](const TrItem &it) -> bool { return it.first == tr_key; });
+        if (item != m_transformations.end()) {
+            // actualize transformation all the time
+            item->second          = transformation;
+            size_t index          = item - m_transformations.begin();
+            removed_transf[index] = false;
+        } else {
+            // add new transformation
+            m_transformations.emplace_back(std::make_pair(tr_key, transformation));
+        }        
+    }
+
+    // clean other transformation
+    for (int i = removed_transf.size() - 1; i >= 0; --i)
+        if (removed_transf[i])
+            m_transformations.erase(m_transformations.begin() + i);
+}
+
 
 std::optional<RaycastManager::Hit> RaycastManager::unproject(
     const Vec2d &mouse_pos, const Camera &camera, const ISkip *skip) const

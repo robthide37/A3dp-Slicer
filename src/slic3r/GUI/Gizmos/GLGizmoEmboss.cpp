@@ -490,6 +490,10 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
     // detect start text dragging
     if (mouse_event.LeftDown()) {
+        // exist selected volume?
+        if (m_volume == nullptr)
+            return false;
+
         // must exist hover object
         int hovered_id = m_parent.get_first_hover_volume_idx();
         if (hovered_id < 0)
@@ -501,6 +505,12 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // hovered object must be actual text volume
         if (m_volume != priv::get_model_volume(gl_volume, objects))
             return false;
+
+        const ModelInstancePtrs instances = m_volume->get_object()->instances;
+        int instance_id = gl_volume->instance_idx();
+        if (instance_id < 0 || static_cast<size_t>(instance_id) >= instances.size())
+            return false; // should not happen
+        const ModelInstance *instance = instances[instance_id];
 
         const ModelVolumePtrs &volumes = m_volume->get_object()->volumes;
         std::vector<size_t> allowed_volumes_id;
@@ -519,7 +529,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // initialize raycasters
         // INFO: It could slows down for big objects
         // (may be move to thread and do not show drag until it finish)
-        m_raycast_manager.actualize(m_volume->get_object(), &condition);
+        m_raycast_manager.actualize(instance, &condition);
                 
         // wxCoord == int --> wx/types.h
         Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());

@@ -51,6 +51,7 @@ public:
     /// <param name="object">Model representation</param>
     /// <param name="skip">Condifiton for skip actualization</param>
     void actualize(const ModelObject *object, const ISkip *skip = nullptr);
+    void actualize(const ModelInstance *instance, const ISkip *skip = nullptr);
 
     // TODO: it is more general object move outside of this class
     struct SurfacePoint
