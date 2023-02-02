@@ -1484,11 +1484,11 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                         original_box = get_full_unscaled_instance_local_bounding_box();
 
                     relative_scale = original_box.size().cwiseProduct(scale).cwiseQuotient(current_box.size());
-                    transformation_type.set_relative();
                 }
             }
             else {
             }
+            transformation_type.set_relative();
         }
 
         if (m_mode == Instance) {
