@@ -167,6 +167,7 @@ private:
     {
         // Detect invalid config values when change monitor DPI
         double screen_scale;
+        float  main_toolbar_height;
 
         // Zero means it is calculated in init function
         ImVec2 minimal_window_size              = ImVec2(0, 0);
@@ -181,6 +182,7 @@ private:
         // maximal width and height of style image
         Vec2i max_style_image_size = Vec2i(0, 0);
 
+        float indent = 0.f;
         float input_offset          = 0.f;
         float advanced_input_offset = 0.f;
 

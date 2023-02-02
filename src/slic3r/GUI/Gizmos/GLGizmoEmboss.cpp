@@ -726,29 +726,33 @@ void priv::draw_cross_hair(const ImVec2 &position, float radius, ImU32 color, in
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
-    // Check that DPI is same
-    GUI_App& app = wxGetApp();
-    double screen_scale = wxDisplay(app.plater()).GetScaleFactor();
-    if (!m_gui_cfg.has_value() || 
-        m_gui_cfg->screen_scale != screen_scale) {
-        // Create cache for gui offsets
-        GuiCfg cfg = create_gui_configuration();
-        cfg.screen_scale = screen_scale;
-        m_gui_cfg.emplace(std::move(cfg));
-        // set position near toolbar
-        m_set_window_offset = ImVec2(-1.f, -1.f);
-
-        // change resolution regenerate icons
-        init_icons();
-    }
     set_volume_by_selection();
-
     // Do not render window for not selected text volume
     if (m_volume == nullptr ||
         priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ||
         !m_volume->text_configuration.has_value()) {
         close();
         return;
+    }
+
+    // Configuration creation
+    double screen_scale = wxDisplay(wxGetApp().plater()).GetScaleFactor();
+    float  main_toolbar_height = m_parent.get_main_toolbar_height();
+    if (!m_gui_cfg.has_value() || // Exist configuration - first run
+        m_gui_cfg->screen_scale != screen_scale || // change of DPI
+        m_gui_cfg->main_toolbar_height != main_toolbar_height // change size of view port
+        ) {
+        // Create cache for gui offsets
+        GuiCfg cfg       = create_gui_configuration();
+        cfg.screen_scale = screen_scale;
+        cfg.main_toolbar_height = main_toolbar_height;
+        m_gui_cfg.emplace(std::move(cfg));
+        // set position near toolbar
+        m_set_window_offset = ImVec2(-1.f, -1.f);
+
+        // change resolution regenerate icons
+        init_icons();
+        m_style_manager.clear_imgui_font();
     }
 
     const ImVec2 &min_window_size = get_minimal_window_size();
@@ -925,10 +929,11 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
     float line_height = ImGui::GetTextLineHeight();
     float line_height_with_spacing = ImGui::GetTextLineHeightWithSpacing();
     float space = line_height_with_spacing - line_height;
+    const ImGuiStyle &style  = ImGui::GetStyle();
 
     cfg.max_style_name_width = ImGui::CalcTextSize("Maximal font name, extended").x;
 
-    cfg.icon_width = std::ceil(line_height);
+    cfg.icon_width = static_cast<unsigned int>(std::ceil(line_height));
     // make size pair number
     if (cfg.icon_width % 2 != 0) ++cfg.icon_width;
 
@@ -946,8 +951,8 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
         ImGui::CalcTextSize(tr.font.c_str()).x,
         ImGui::CalcTextSize(tr.size.c_str()).x,
         ImGui::CalcTextSize(tr.depth.c_str()).x});
-    cfg.input_offset = max_text_width 
-        + 3 * space + ImGui::GetTreeNodeToLabelSpacing();
+    cfg.indent       = static_cast<float>(cfg.icon_width);
+    cfg.input_offset = style.WindowPadding.x + cfg.indent + max_text_width + space;
 
     tr.use_surface = _u8L("Use surface");
     tr.char_gap = _u8L("Char gap");
@@ -967,10 +972,9 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
         ImGui::CalcTextSize(tr.angle.c_str()).x,
         ImGui::CalcTextSize(tr.collection.c_str()).x });
     cfg.advanced_input_offset = max_advanced_text_width
-        + 3 * space + ImGui::GetTreeNodeToLabelSpacing();
+        + 3 * space + cfg.indent;
 
     // calculate window size
-    const ImGuiStyle &style = ImGui::GetStyle();
     float window_title = line_height + 2*style.FramePadding.y + 2 * style.WindowTitleAlign.y;
     float input_height = line_height_with_spacing + 2*style.FramePadding.y;
     float tree_header  = line_height_with_spacing;
@@ -1495,12 +1499,13 @@ void GLGizmoEmboss::draw_window()
     ScopeGuard unknown_font_sc([&]() { 
         m_imgui->disabled_end(); 
     });
-
     draw_text_input();
     m_imgui->disabled_begin(!is_active_font);
-    ImGui::TreePush();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, m_gui_cfg->indent);
+    ImGui::Indent();
     draw_style_edit();
-    ImGui::TreePop();
+    ImGui::Unindent();
 
     // close advanced style property when unknown font is selected
     if (m_is_unknown_font && m_is_advanced_edit_style) 
@@ -1515,6 +1520,8 @@ void GLGizmoEmboss::draw_window()
         ImGui::TreePop();
     } else if (m_is_advanced_edit_style) 
         set_minimal_window_size(false);
+
+    ImGui::PopStyleVar(); // ImGuiStyleVar_IndentSpacing
 
     ImGui::Separator();
 
@@ -1590,7 +1597,9 @@ void GLGizmoEmboss::draw_text_input()
     ImFont *imgui_font = m_style_manager.get_imgui_font();
     if (imgui_font == nullptr) {
         // try create new imgui font
-        m_style_manager.create_imgui_font(create_range_text_prep(), scale);
+        double screen_scale = wxDisplay(wxGetApp().plater()).GetScaleFactor();
+        double imgui_scale = scale * screen_scale;
+        m_style_manager.create_imgui_font(create_range_text_prep(), imgui_scale);
         imgui_font = m_style_manager.get_imgui_font();
     }
     bool exist_font = 
@@ -1680,10 +1689,8 @@ void GLGizmoEmboss::draw_text_input()
     // IMPROVE: only extend not clear
     // Extend font ranges
     if (!range_text.empty() &&
-        !m_imgui->contain_all_glyphs(imgui_font, range_text) ) { 
-        m_style_manager.clear_imgui_font(); 
-        m_style_manager.create_imgui_font(range_text, scale);
-    }
+        !m_imgui->contain_all_glyphs(imgui_font, range_text) )
+        m_style_manager.clear_imgui_font();    
 }
 
 #include <boost/functional/hash.hpp>
