@@ -54,6 +54,7 @@ enum PrintStep : unsigned int {
     // psToolOrdering is a synonym to psWipeTower, as the Wipe Tower calculates and modifies the ToolOrdering,
     // while if printing without the Wipe Tower, the ToolOrdering is calculated as well.
     psToolOrdering = psWipeTower,
+    psAlertWhenSupportsNeeded,
     psSkirtBrim,
     // Last step before G-code export, after this step is finished, the initial extrusion path preview
     // should be refreshed.
@@ -205,6 +206,7 @@ public:
     struct GeneratedSupportPoints{
         Transform3d object_transform; // for frontend object mapping
         SupportSpotsGenerator::SupportPoints support_points;
+        SupportSpotsGenerator::PartialObjects partial_objects;
     };
 
     std::vector<std::unique_ptr<PrintRegion>>   all_regions;
@@ -222,7 +224,6 @@ public:
         all_regions.clear();
         layer_ranges.clear();
         cached_volume_ids.clear();
-        generated_support_points.reset();
     }
 
 private:
@@ -359,11 +360,15 @@ private:
     // If ! m_slicing_params.valid, recalculate.
     void                    update_slicing_parameters();
 
+    // Called on main thread with stopped or paused background processing to let PrintObject release data for its milestones that were invalidated or canceled.
+    void                    cleanup();
+
     static PrintObjectConfig object_config_from_model_object(const PrintObjectConfig &default_object_config, const ModelObject &object, size_t num_extruders);
 
 private:
     void make_perimeters();
     void prepare_infill();
+    void clear_fills();
     void infill();
     void ironing();
     void generate_support_spots();
@@ -517,6 +522,7 @@ public:
     void                set_task(const TaskParams &params) override { PrintBaseWithState<PrintStep, psCount>::set_task_impl(params, m_objects); }
     void                process() override;
     void                finalize() override { PrintBaseWithState<PrintStep, psCount>::finalize_impl(m_objects); }
+    void                cleanup() override;
 
     // Exports G-code into a file name based on the path_template, returns the file path of the generated G-code file.
     // If preview_data is not null, the preview_data is filled in for the G-code visualization (not used by the command line Slic3r).
@@ -603,11 +609,18 @@ private:
     void                _make_skirt();
     void                _make_wipe_tower();
     void                finalize_first_layer_convex_hull();
+    void                alert_when_supports_needed();
 
     // Islands of objects and their supports extruded at the 1st layer.
     Polygons            first_layer_islands() const;
     // Return 4 wipe tower corners in the world coordinates (shifted and rotated), including the wipe tower brim.
     std::vector<Point>  first_layer_wipe_tower_corners() const;
+
+    // Returns true if any of the print_objects has print_object_step valid.
+    // That means data shared by all print objects of the print_objects span may still use the shared data.
+    // Otherwise the shared data shall be released.
+    // Unguarded variant, thus it shall only be called from main thread with background processing stopped.
+    static bool         is_shared_print_object_step_valid_unguarded(SpanOfConstPtrs<PrintObject> print_objects, PrintObjectStep print_object_step);
 
     PrintConfig                             m_config;
     PrintObjectConfig                       m_default_object_config;

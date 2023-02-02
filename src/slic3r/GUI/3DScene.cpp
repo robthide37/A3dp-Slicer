@@ -476,51 +476,6 @@ int GLVolumeCollection::load_object_volume(
     return int(this->volumes.size() - 1);
 }
 
-// Load SLA auxiliary GLVolumes (for support trees or pad).
-// This function produces volumes for multiple instances in a single shot,
-// as some object specific mesh conversions may be expensive.
-void GLVolumeCollection::load_object_auxiliary(
-    const SLAPrintObject* print_object,
-    int                             obj_idx,
-    // pairs of <instance_idx, print_instance_idx>
-    const std::vector<std::pair<size_t, size_t>>& instances,
-    SLAPrintObjectStep              milestone,
-    // Timestamp of the last change of the milestone
-    size_t                          timestamp)
-{
-    assert(print_object->is_step_done(milestone));
-    Transform3d  mesh_trafo_inv = print_object->trafo().inverse();
-    // Get the support mesh.
-    TriangleMesh mesh = print_object->get_mesh(milestone);
-    mesh.transform(mesh_trafo_inv);
-    // Convex hull is required for out of print bed detection.
-    TriangleMesh convex_hull = mesh.convex_hull_3d();
-    for (const std::pair<size_t, size_t>& instance_idx : instances) {
-        const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
-        this->volumes.emplace_back(new GLVolume((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR));
-        GLVolume& v = *this->volumes.back();
-#if ENABLE_SMOOTH_NORMALS
-        v.model.init_from(mesh, true);
-#else
-        v.model.init_from(mesh);
-        v.model.set_color((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR);
-        v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
-#endif // ENABLE_SMOOTH_NORMALS
-        v.composite_id = GLVolume::CompositeID(obj_idx, -int(milestone), (int)instance_idx.first);
-        v.geometry_id = std::pair<size_t, size_t>(timestamp, model_instance.id().id);
-        // Create a copy of the convex hull mesh for each instance. Use a move operator on the last instance.
-        if (&instance_idx == &instances.back())
-            v.set_convex_hull(std::move(convex_hull));
-        else
-            v.set_convex_hull(convex_hull);
-        v.is_modifier = false;
-        v.shader_outside_printer_detection_enabled = (milestone == slaposSupportTree);
-        v.set_instance_transformation(model_instance.get_transformation());
-        // Leave the volume transformation at identity.
-        // v.set_volume_transformation(model_volume->get_transformation());
-    }
-}
-
 #if ENABLE_OPENGL_ES
 int GLVolumeCollection::load_wipe_tower_preview(
     float pos_x, float pos_y, float width, float depth, float height,

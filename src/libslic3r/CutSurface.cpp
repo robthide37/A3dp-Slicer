@@ -768,6 +768,15 @@ void priv::set_skip_for_out_of_aoi(std::vector<bool>          &skip_indicies,
 
         point_normals[i] = {p1, normal};
     }
+
+    // check that projection is not left handed
+    // Fix for reflected projection
+    if (is_out_of(point_normals[2].first, point_normals[0])) {
+        // projection is reflected so normals are reflected
+        for (auto &pn : point_normals)
+            pn.second *= -1;
+    }    
+
     // same meaning as point normal
     IsOnSides is_on_sides(its.vertices.size(), {false,false,false,false});    
     
@@ -1614,9 +1623,9 @@ void priv::create_reduce_map(ReductionMap &reduction_map, const CutMesh &mesh)
             Vec3d n1 = v_ab.cross(v_ae);
             Vec3d n2 = v_ab.cross(v_al);
             // check that normal has same direction
-            if ((n1.x() > 0 != n2.x() > 0) ||
-                (n1.y() > 0 != n2.y() > 0) ||
-                (n1.z() > 0 != n2.z() > 0))
+            if (((n1.x() > 0) != (n2.x() > 0)) ||
+                ((n1.y() > 0) != (n2.y() > 0)) ||
+                ((n1.z() > 0) != (n2.z() > 0)))
                 return; // this reduction will create CCW triangle
         }
 

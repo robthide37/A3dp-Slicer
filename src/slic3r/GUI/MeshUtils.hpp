@@ -5,6 +5,8 @@
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/AABBMesh.hpp"
+#include "libslic3r/CSGMesh/TriangleMeshAdapter.hpp"
+#include "libslic3r/CSGMesh/CSGMeshCopy.hpp"
 #include "admesh/stl.h"
 
 #include "slic3r/GUI/GLModel.hpp"
@@ -14,7 +16,6 @@
 #include <memory>
 
 namespace Slic3r {
-
 namespace GUI {
 
 struct Camera;
@@ -88,9 +89,25 @@ public:
 
     // Which mesh to cut. MeshClipper remembers const * to it, caller
     // must make sure that it stays valid.
-    void set_mesh(const TriangleMesh& mesh);
+    void set_mesh(const indexed_triangle_set& mesh);
+    void set_mesh(AnyPtr<const indexed_triangle_set> &&ptr);
 
-    void set_negative_mesh(const TriangleMesh &mesh);
+    void set_negative_mesh(const indexed_triangle_set &mesh);
+    void set_negative_mesh(AnyPtr<const indexed_triangle_set> &&ptr);
+
+    template<class It>
+    void set_mesh(const Range<It> &csgrange, bool copy_meshes = false)
+    {
+        if (! csg::is_same(range(m_csgmesh), csgrange)) {
+            m_csgmesh.clear();
+            if (copy_meshes)
+                csg::copy_csgrange_deep(csgrange, std::back_inserter(m_csgmesh));
+            else
+                csg::copy_csgrange_shallow(csgrange, std::back_inserter(m_csgmesh));
+
+            m_result.reset();
+        }
+    }
 
     // Inform the MeshClipper about the transformation that transforms the mesh
     // into world coordinates.
@@ -110,8 +127,10 @@ private:
     void recalculate_triangles();
 
     Geometry::Transformation m_trafo;
-    const TriangleMesh* m_mesh = nullptr;
-    const TriangleMesh* m_negative_mesh = nullptr;
+    AnyPtr<const indexed_triangle_set> m_mesh;
+    AnyPtr<const indexed_triangle_set> m_negative_mesh;
+    std::vector<csg::CSGPart> m_csgmesh;
+
     ClippingPlane m_plane;
     ClippingPlane m_limiting_plane = ClippingPlane::ClipsNothing();
 
@@ -138,12 +157,16 @@ private:
 class MeshRaycaster {
 public:
     explicit MeshRaycaster(std::shared_ptr<const TriangleMesh> mesh)
-        : m_mesh(mesh)
-        , m_emesh(*mesh, true) // calculate epsilon for triangle-ray intersection from an average edge length
-        , m_normals(its_face_normals(mesh->its))
+        : m_mesh(std::move(mesh))
+        , m_emesh(*m_mesh, true) // calculate epsilon for triangle-ray intersection from an average edge length
+        , m_normals(its_face_normals(m_mesh->its))
     {
-        assert(m_mesh != nullptr);
+        assert(m_mesh);
     }
+
+    explicit MeshRaycaster(const TriangleMesh &mesh)
+        : MeshRaycaster(std::make_unique<TriangleMesh>(mesh))
+    {}
 
     // DEPRICATED - use CameraUtils::ray_from_screen_pos
     static void line_from_mouse_pos(const Vec2d& mouse_pos, const Transform3d& trafo, const Camera& camera,

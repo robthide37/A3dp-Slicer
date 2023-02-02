@@ -54,10 +54,10 @@ public:
 
     bool is_collection() const override { return true; }
     ExtrusionRole role() const override {
-        ExtrusionRole out = erNone;
+        ExtrusionRole out{ ExtrusionRole::None };
         for (const ExtrusionEntity *ee : entities) {
             ExtrusionRole er = ee->role();
-            out = (out == erNone || out == er) ? er : erMixed;
+            out = (out == ExtrusionRole::None || out == er) ? er : ExtrusionRole::Mixed;
         }
         return out;
     }
@@ -96,8 +96,8 @@ public:
     }
     void replace(size_t i, const ExtrusionEntity &entity);
     void remove(size_t i);
-    static ExtrusionEntityCollection chained_path_from(const ExtrusionEntitiesPtr &extrusion_entities, const Point &start_near, ExtrusionRole role = erMixed);
-    ExtrusionEntityCollection chained_path_from(const Point &start_near, ExtrusionRole role = erMixed) const 
+    static ExtrusionEntityCollection chained_path_from(const ExtrusionEntitiesPtr &extrusion_entities, const Point &start_near, ExtrusionRole role = ExtrusionRole::Mixed);
+    ExtrusionEntityCollection chained_path_from(const Point &start_near, ExtrusionRole role = ExtrusionRole::Mixed) const
     	{ return this->no_sort ? *this : chained_path_from(this->entities, start_near, role); }
     void reverse() override;
     const Point& first_point() const override { return this->entities.front()->first_point(); }

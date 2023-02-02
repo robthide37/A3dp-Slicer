@@ -11,7 +11,6 @@
 
 #include <mutex>
 #include <unordered_map>
-#include <unordered_set>
 
 #include <boost/functional/hash.hpp>
 
@@ -43,7 +42,7 @@ struct TreeSupportMeshGroupSettings {
     // the print will be less accurate, but the g-code will be smaller. Maximum Deviation is a limit for Maximum Resolution, 
     // so if the two conflict the Maximum Deviation will always be held true.
     coord_t                         resolution                              { scaled<coord_t>(0.025) };
-    // Minimum Feature Size (aka minimum line width)
+    // Minimum Feature Size (aka minimum line width) - Arachne specific
     // Minimum thickness of thin features. Model features that are thinner than this value will not be printed, while features thicker 
     // than the Minimum Feature Size will be widened to the Minimum Wall Line Width.
     coord_t                         min_feature_size                        { scaled<coord_t>(0.1) };
@@ -183,7 +182,7 @@ struct TreeSupportMeshGroupSettings {
     // 5%-35%
     double                          support_tree_top_rate                   { 15. };
     // Tree Support Tip Diameter
-    // The diameter of the top of the tip of the branches of tree support."
+    // The diameter of the top of the tip of the branches of tree support.
     // minimum: min_wall_line_width, minimum warning: min_wall_line_width+0.05, maximum_value: support_tree_branch_diameter, value: support_line_width
     coord_t                         support_tree_tip_diameter               { scaled<coord_t>(0.4) };
 
@@ -209,6 +208,24 @@ public:
     TreeModelVolumes(const TreeModelVolumes&) = delete;
     TreeModelVolumes& operator=(const TreeModelVolumes&) = delete;
 
+    void clear() { 
+        this->clear_all_but_object_collision();
+        m_collision_cache.clear();
+    }
+    void clear_all_but_object_collision() { 
+        //m_collision_cache.clear_all_but_radius0();
+        m_collision_cache_holefree.clear();
+        m_avoidance_cache.clear();
+        m_avoidance_cache_slow.clear();
+        m_avoidance_cache_to_model.clear();
+        m_avoidance_cache_to_model_slow.clear();
+        m_placeable_areas_cache.clear();
+        m_avoidance_cache_holefree.clear();
+        m_avoidance_cache_holefree_to_model.clear();
+        m_wall_restrictions_cache.clear();
+        m_wall_restrictions_cache_min.clear();
+    }
+
     enum class AvoidanceType : int8_t
     {
         Slow,
@@ -223,7 +240,7 @@ public:
      * Knowledge about branch angle is used to only calculate avoidances and collisions that may actually be needed.
      * Not calling precalculate() will cause the class to lazily calculate avoidances and collisions as needed, which will be a lot slower on systems with more then one or two cores!
      */
-    void precalculate(const coord_t max_layer);
+    void precalculate(const coord_t max_layer, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
@@ -237,6 +254,11 @@ public:
      * \return Polygons object
      */
     const Polygons& getCollision(const coord_t radius, LayerIndex layer_idx, bool min_xy_dist) const;
+
+    // Get a collision area at a given layer for a radius that is a lower or equial to the key radius.
+    // It is expected that the collision area is precalculated for a given layer at least for the radius zero.
+    // Used for pushing tree supports away from object during the final Organic optimization step.
+    std::optional<std::pair<coord_t, std::reference_wrapper<const Polygons>>> get_collision_lower_bound_area(LayerIndex layer_id, coord_t max_radius) const;
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches
@@ -262,7 +284,7 @@ public:
      * \param layer_idx The layer of interest
      * \return Polygons object
      */
-    const Polygons& getPlaceableAreas(coord_t radius, LayerIndex layer_idx) const;
+    const Polygons& getPlaceableAreas(coord_t radius, LayerIndex layer_idx, std::function<void()> throw_on_cancel) const;
     /*!
      * \brief Provides the area that represents the walls, as in the printed area, of the model. This is an abstract representation not equal with the outline. See calculateWallRestrictions for better description.
      * \param radius The radius of the node of interest.
@@ -306,36 +328,36 @@ private:
      * \brief Convenience typedef for the keys to the caches
      */
     using RadiusLayerPair             = std::pair<coord_t, LayerIndex>;
-    using RadiusLayerPolygonCacheData = std::unordered_map<RadiusLayerPair, Polygons, boost::hash<RadiusLayerPair>>;
     class RadiusLayerPolygonCache {
+        // Map from radius to Polygons. Cache of one layer collision regions.
+        using LayerData = std::map<coord_t, Polygons>;
+        // Vector of layers, at each layer map of radius to Polygons.
+        // Reference to Polygons returned shall be stable to insertion.
+        using Layers = std::vector<LayerData>;
     public:
         RadiusLayerPolygonCache() = default;
-        RadiusLayerPolygonCache(RadiusLayerPolygonCache &&rhs) : data(std::move(rhs.data)) {}
-        RadiusLayerPolygonCache& operator=(RadiusLayerPolygonCache &&rhs) { data = std::move(rhs.data); return *this; }
+        RadiusLayerPolygonCache(RadiusLayerPolygonCache &&rhs) : m_data(std::move(rhs.m_data)) {}
+        RadiusLayerPolygonCache& operator=(RadiusLayerPolygonCache &&rhs) { m_data = std::move(rhs.m_data); return *this; }
 
         RadiusLayerPolygonCache(const RadiusLayerPolygonCache&) = delete;
         RadiusLayerPolygonCache& operator=(const RadiusLayerPolygonCache&) = delete;
 
-        void insert(RadiusLayerPolygonCacheData &&in) {
-            std::lock_guard<std::mutex> guard(this->mutex);
-            for (auto& d : in)
-                this->data.emplace(d.first, std::move(d.second));
-        }
         void insert(std::vector<std::pair<RadiusLayerPair, Polygons>> &&in) {
-            std::lock_guard<std::mutex> guard(this->mutex);
-            for (auto& d : in)
-                this->data.emplace(d.first, std::move(d.second));
+            std::lock_guard<std::mutex> guard(m_mutex);
+            for (auto &d : in)
+                this->get_allocate_layer_data(d.first.second).emplace(d.first.first, std::move(d.second));
         }
         // by layer
         void insert(std::vector<std::pair<coord_t, Polygons>> &&in, coord_t radius) {
-            std::lock_guard<std::mutex> guard(this->mutex);
+            std::lock_guard<std::mutex> guard(m_mutex);
             for (auto &d : in)
-                this->data.emplace(RadiusLayerPair{ radius, d.first }, std::move(d.second));
+                this->get_allocate_layer_data(d.first).emplace(radius, std::move(d.second));
         }
         void insert(std::vector<Polygons> &&in, coord_t first_layer_idx, coord_t radius) {
-            std::lock_guard<std::mutex> guard(this->mutex);
+            std::lock_guard<std::mutex> guard(m_mutex);
+            allocate_layers(first_layer_idx + in.size());
             for (auto &d : in)
-                this->data.emplace(RadiusLayerPair{ radius, first_layer_idx ++ }, std::move(d));
+                m_data[first_layer_idx ++].emplace(radius, std::move(d));
         }
         /*!
          * \brief Checks a cache for a given RadiusLayerPair and returns it if it is found
@@ -343,10 +365,29 @@ private:
          * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
          */
         std::optional<std::reference_wrapper<const Polygons>> getArea(const TreeModelVolumes::RadiusLayerPair &key) const {
-            std::lock_guard<std::mutex> guard(this->mutex);
-            const auto it = this->data.find(key);
-            return it == this->data.end() ?
+            std::lock_guard<std::mutex> guard(m_mutex);
+            if (key.second >= m_data.size())
+                return std::optional<std::reference_wrapper<const Polygons>>{};
+            const auto &layer = m_data[key.second];
+            auto it = layer.find(key.first);
+            return it == layer.end() ? 
                 std::optional<std::reference_wrapper<const Polygons>>{} : std::optional<std::reference_wrapper<const Polygons>>{ it->second };
+        }
+        // Get a collision area at a given layer for a radius that is a lower or equial to the key radius.
+        std::optional<std::pair<coord_t, std::reference_wrapper<const Polygons>>> get_lower_bound_area(const TreeModelVolumes::RadiusLayerPair &key) const {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            if (key.second >= m_data.size())
+                return {};
+            const auto &layer = m_data[key.second];
+            if (layer.empty())
+                return {};
+            auto it = layer.lower_bound(key.first);
+            if (it == layer.end() || it->first != key.first) {
+                if (it == layer.begin())
+                    return {};
+                -- it;
+            }
+            return std::make_pair(it->first, std::reference_wrapper<const Polygons>(it->second));
         }
         /*!
          * \brief Get the highest already calculated layer in the cache.
@@ -356,22 +397,37 @@ private:
          * \return A wrapped optional reference of the requested area (if it was found, an empty optional if nothing was found)
          */
         LayerIndex getMaxCalculatedLayer(coord_t radius) const {
-            std::lock_guard<std::mutex> guard(this->mutex);
-            int max_layer = -1;
-            // the placeable on model areas do not exist on layer 0, as there can not be model below it. As such it may be possible that layer 1 is available, but layer 0 does not exist.
-            if (this->data.find({ radius, 1 }) != this->data.end())
-                max_layer = 1;
-            while (this->data.count(TreeModelVolumes::RadiusLayerPair(radius, max_layer + 1)) > 0)
-                ++ max_layer;
-            return max_layer;
+            std::lock_guard<std::mutex> guard(m_mutex);
+            auto layer_idx = LayerIndex(m_data.size()) - 1;
+            for (; layer_idx > 0; -- layer_idx)
+                if (const auto &layer = m_data[layer_idx]; layer.find(radius) != layer.end())
+                    break;
+            // The placeable on model areas do not exist on layer 0, as there can not be model below it. As such it may be possible that layer 1 is available, but layer 0 does not exist.
+            return layer_idx == 0 ? -1 : layer_idx;
         }
 
         // For debugging purposes, sorted by layer index, then by radius.
         [[nodiscard]] std::vector<std::pair<RadiusLayerPair, std::reference_wrapper<const Polygons>>> sorted() const;
 
+        void clear() { m_data.clear(); }
+        void clear_all_but_radius0() { 
+            for (LayerData &l : m_data) {
+                auto begin = l.begin();
+                auto end = l.end();
+                if (begin != end && ++ begin != end)
+                    l.erase(begin, end);
+            }
+        }
+
     private:
-        RadiusLayerPolygonCacheData data;
-        mutable std::mutex          mutex;
+        LayerData&          get_allocate_layer_data(LayerIndex layer_idx) {
+            allocate_layers(layer_idx + 1);
+            return m_data[layer_idx];
+        }
+        void                allocate_layers(size_t num_layers);
+
+        Layers              m_data;
+        mutable std::mutex  m_mutex;
     };
 
 
@@ -403,8 +459,8 @@ private:
      * collide with the model. Result is saved in the cache.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateCollision(const std::vector<RadiusLayerPair> &keys);
-    void calculateCollision(const coord_t radius, const LayerIndex max_layer_idx);
+    void calculateCollision(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel);
+    void calculateCollision(const coord_t radius, const LayerIndex max_layer_idx, std::function<void()> throw_on_cancel);
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer. Holes are removed.
      *
@@ -413,7 +469,7 @@ private:
      * A Hole is defined as an area, in which a branch with m_increase_until_radius radius would collide with the wall.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateCollisionHolefree(const std::vector<RadiusLayerPair> &keys);
+    void calculateCollisionHolefree(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer. Holes are removed.
@@ -425,7 +481,7 @@ private:
      */
     void calculateCollisionHolefree(RadiusLayerPair key)
     {
-        calculateCollisionHolefree(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) });
+        calculateCollisionHolefree(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, {});
     }
 
     /*!
@@ -435,7 +491,7 @@ private:
      * collide with the model. Result is saved in the cache.
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateAvoidance(const std::vector<RadiusLayerPair> &keys, bool to_build_plate, bool to_model);
+    void calculateAvoidance(const std::vector<RadiusLayerPair> &keys, bool to_build_plate, bool to_model, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Creates the areas that have to be avoided by the tree's branches to prevent collision with the model.
@@ -446,7 +502,7 @@ private:
      */
     void calculateAvoidance(RadiusLayerPair key, bool to_build_plate, bool to_model)
     {
-        calculateAvoidance(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, to_build_plate, to_model);
+        calculateAvoidance(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, to_build_plate, to_model, {});
     }
 
     /*!
@@ -454,7 +510,7 @@ private:
      * Result is saved in the cache.
      * \param key RadiusLayerPair of the requested areas. It will be calculated up to the provided layer.
      */
-    void calculatePlaceables(const coord_t radius, const LayerIndex max_required_layer);
+    void calculatePlaceables(const coord_t radius, const LayerIndex max_required_layer, std::function<void()> throw_on_cancel);
 
 
     /*!
@@ -462,7 +518,7 @@ private:
      * Result is saved in the cache.
      * \param keys RadiusLayerPair of the requested areas. The radius will be calculated up to the provided layer.
      */
-    void calculatePlaceables(const std::vector<RadiusLayerPair> &keys);
+    void calculatePlaceables(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Creates the areas that can not be passed when expanding an area downwards. As such these areas are an somewhat abstract representation of a wall (as in a printed object).
@@ -471,7 +527,7 @@ private:
      *
      * \param keys RadiusLayerPairs of all requested areas. Every radius will be calculated up to the provided layer.
      */
-    void calculateWallRestrictions(const std::vector<RadiusLayerPair> &keys);
+    void calculateWallRestrictions(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Creates the areas that can not be passed when expanding an area downwards. As such these areas are an somewhat abstract representation of a wall (as in a printed object).
@@ -480,7 +536,7 @@ private:
      */
     void calculateWallRestrictions(RadiusLayerPair key)
     {
-        calculateWallRestrictions(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) });
+        calculateWallRestrictions(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, {});
     }
 
     /*!

@@ -1,4 +1,6 @@
 #include "Exception.hpp"
+#include "KDTreeIndirect.hpp"
+#include "Point.hpp"
 #include "Print.hpp"
 #include "BoundingBox.hpp"
 #include "ClipperUtils.hpp"
@@ -7,6 +9,7 @@
 #include "I18N.hpp"
 #include "Layer.hpp"
 #include "MutablePolygon.hpp"
+#include "PrintBase.hpp"
 #include "SupportMaterial.hpp"
 #include "TreeSupport.hpp"
 #include "Surface.hpp"
@@ -20,14 +23,19 @@
 #include "SupportSpotsGenerator.hpp"
 #include "TriangleSelectorWrapper.hpp"
 #include "format.hpp"
+#include "libslic3r.h"
 
+#include <algorithm>
+#include <cmath>
 #include <float.h>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 #include <boost/log/trivial.hpp>
 
 #include <tbb/parallel_for.h>
+#include <vector>
 
 using namespace std::literals;
 
@@ -68,8 +76,8 @@ PrintObject::PrintObject(Print* print, ModelObject* model_object, const Transfor
     BoundingBoxf3  bbox        = model_object->raw_bounding_box();
     Vec3d 		   bbox_center = bbox.center();
 	// We may need to rotate the bbox / bbox_center from the original instance to the current instance.
-	double z_diff = Geometry::rotation_diff_z(model_object->instances.front()->get_rotation(), instances.front().model_instance->get_rotation());
-	if (std::abs(z_diff) > EPSILON) {
+    double z_diff = Geometry::rotation_diff_z(model_object->instances.front()->get_matrix(), instances.front().model_instance->get_matrix());
+  if (std::abs(z_diff) > EPSILON) {
 		auto z_rot  = Eigen::AngleAxisd(z_diff, Vec3d::UnitZ());
 		bbox 		= bbox.transformed(Transform3d(z_rot));
 		bbox_center = (z_rot * bbox_center).eval();
@@ -363,6 +371,12 @@ void PrintObject::prepare_infill()
     this->set_done(posPrepareInfill);
 }
 
+void PrintObject::clear_fills()
+{
+    for (Layer *layer : m_layers)
+        layer->clear_fills();
+}
+
 void PrintObject::infill()
 {
     // prerequisites
@@ -411,30 +425,19 @@ void PrintObject::ironing()
     }
 }
 
-
-/*
-std::vector<size_t> problematic_layers = SupportSpotsGenerator::quick_search(this);
-    if (!problematic_layers.empty()) {
-        std::cout << "Object needs supports" << std::endl;
-        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                L("Supportable issues found. Consider enabling supports for this object"));
-        this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                L("Supportable issues found. Consider enabling supports for this object"));
-        for (size_t index = 0; index < std::min(problematic_layers.size(), size_t(4)); ++index) {
-            this->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                    format(L("Layer with issues: %1%"), problematic_layers[index] + 1));
-        }
-    }
- */
 void PrintObject::generate_support_spots()
 {
     if (this->set_started(posSupportSpotsSearch)) {
         BOOST_LOG_TRIVIAL(debug) << "Searching support spots - start";
-        m_print->set_status(75, L("Searching support spots"));
+        m_print->set_status(65, L("Searching support spots"));
         if (!this->shared_regions()->generated_support_points.has_value()) {
-            SupportSpotsGenerator::Params        params{this->print()->m_config.filament_type.values};
-            SupportSpotsGenerator::SupportPoints supp_points = SupportSpotsGenerator::full_search(this, params);
-            this->m_shared_regions->generated_support_points = {this->trafo_centered(), supp_points};
+            PrintTryCancel                cancel_func = m_print->make_try_cancel();
+            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
+                                                 float(this->print()->m_config.perimeter_acceleration.getFloat()),
+                                                 this->config().raft_layers.getInt(), this->config().brim_type.value,
+                                                 float(this->config().brim_width.getFloat())};
+            auto [supp_points, partial_objects]              = SupportSpotsGenerator::full_search(this, cancel_func, params);
+            this->m_shared_regions->generated_support_points = {this->trafo_centered(), supp_points, partial_objects};
             m_print->throw_if_canceled();
         }
         BOOST_LOG_TRIVIAL(debug) << "Searching support spots - end";
@@ -447,7 +450,7 @@ void PrintObject::generate_support_material()
     if (this->set_started(posSupportMaterial)) {
         this->clear_support_layers();
         if ((this->has_support() && m_layers.size() > 1) || (this->has_raft() && ! m_layers.empty())) {
-            m_print->set_status(85, L("Generating support material"));    
+            m_print->set_status(70, L("Generating support material"));    
             this->_generate_support_material();
             m_print->throw_if_canceled();
         } else {
@@ -466,16 +469,18 @@ void PrintObject::generate_support_material()
 void PrintObject::estimate_curled_extrusions()
 {
     if (this->set_started(posEstimateCurledExtrusions)) {
-        if (this->print()->config().avoid_curled_filament_during_travels) {
+        if (this->print()->config().avoid_crossing_curled_overhangs) {
             BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - start";
             m_print->set_status(88, L("Estimating curled extrusions"));
 
             // Estimate curling of support material and add it to the malformaition lines of each layer
             float                         support_flow_width = support_material_flow(this, this->config().layer_height).width();
-            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values};
+            SupportSpotsGenerator::Params params{this->print()->m_config.filament_type.values,
+                                                 float(this->print()->m_config.perimeter_acceleration.getFloat()),
+                                                 this->config().raft_layers.getInt(), this->config().brim_type.value,
+                                                 float(this->config().brim_width.getFloat())};
             SupportSpotsGenerator::estimate_supports_malformations(this->support_layers(), support_flow_width, params);
             SupportSpotsGenerator::estimate_malformations(this->layers(), params);
-
             m_print->throw_if_canceled();
             BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - end";
         }
@@ -585,6 +590,7 @@ bool PrintObject::invalidate_state_by_config_options(
         if (   opt_key == "brim_width"
             || opt_key == "brim_separation"
             || opt_key == "brim_type") {
+            steps.emplace_back(posSupportSpotsSearch);
             // Brim is printed below supports, support invalidates brim and skirt.
             steps.emplace_back(posSupportMaterial);
         } else if (
@@ -662,6 +668,12 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_material_synchronize_layers"
             || opt_key == "support_material_threshold"
             || opt_key == "support_material_with_sheath"
+            || opt_key == "support_tree_angle"
+            || opt_key == "support_tree_angle_slow"
+            || opt_key == "support_tree_branch_diameter"
+            || opt_key == "support_tree_branch_diameter_angle"
+            || opt_key == "support_tree_top_rate"
+            || opt_key == "support_tree_tip_diameter"
             || opt_key == "raft_expansion"
             || opt_key == "raft_first_layer_density"
             || opt_key == "raft_first_layer_expansion"
@@ -762,7 +774,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_material_interface_speed"
             || opt_key == "bridge_speed"
             || opt_key == "enable_dynamic_overhang_speeds"
-            || opt_key == "overhang_steepness_levels"
+            || opt_key == "overhang_overlap_levels"
             || opt_key == "dynamic_overhang_speeds"
             || opt_key == "external_perimeter_speed"
             || opt_key == "infill_speed"
@@ -795,15 +807,16 @@ bool PrintObject::invalidate_step(PrintObjectStep step)
     
     // propagate to dependent steps
     if (step == posPerimeters) {
-		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning, posEstimateCurledExtrusions });
+		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning,  posSupportSpotsSearch, posEstimateCurledExtrusions });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posPrepareInfill) {
-        invalidated |= this->invalidate_steps({ posInfill, posIroning });
+        invalidated |= this->invalidate_steps({ posInfill, posIroning, posSupportSpotsSearch});
     } else if (step == posInfill) {
-        invalidated |= this->invalidate_steps({ posIroning });
+        invalidated |= this->invalidate_steps({ posIroning, posSupportSpotsSearch });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posSlice) {
-		invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportMaterial, posEstimateCurledExtrusions });
+        invalidated |= this->invalidate_steps({posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportSpotsSearch,
+                                               posSupportMaterial, posEstimateCurledExtrusions});
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
         m_slicing_params.valid = false;
     } else if (step == posSupportMaterial) {
@@ -812,6 +825,8 @@ bool PrintObject::invalidate_step(PrintObjectStep step)
         m_slicing_params.valid = false;
     }
 
+    // invalidate alerts step always, since it depends on everything (except supports, but with supports enabled it is skipped anyway.)
+    invalidated |= m_print->invalidate_step(psAlertWhenSupportsNeeded);
     // Wipe tower depends on the ordering of extruders, which in turn depends on everything.
     // It also decides about what the wipe_into_infill / wipe_into_object features will do,
     // and that too depends on many of the settings.
@@ -828,6 +843,15 @@ bool PrintObject::invalidate_all_steps()
 	// Then reset some of the depending values.
 	m_slicing_params.valid = false;
 	return result;
+}
+
+// Called on main thread with stopped or paused background processing to let PrintObject release data for its milestones that were invalidated or canceled.
+void PrintObject::cleanup()
+{
+    if (this->query_reset_dirty_step_unguarded(posInfill))
+        this->clear_fills();
+    if (this->query_reset_dirty_step_unguarded(posSupportMaterial))
+        this->clear_support_layers();
 }
 
 // This function analyzes slices of a region (SurfaceCollection slices).

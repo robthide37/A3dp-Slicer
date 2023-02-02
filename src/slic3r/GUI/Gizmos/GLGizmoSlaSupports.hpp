@@ -1,7 +1,7 @@
 #ifndef slic3r_GLGizmoSlaSupports_hpp_
 #define slic3r_GLGizmoSlaSupports_hpp_
 
-#include "GLGizmoBase.hpp"
+#include "GLGizmoSlaBase.hpp"
 #include "slic3r/GUI/GLSelectionRectangle.hpp"
 
 #include "libslic3r/SLA/SupportPoint.hpp"
@@ -19,13 +19,10 @@ namespace GUI {
 class Selection;
 enum class SLAGizmoEventType : unsigned char;
 
-class GLGizmoSlaSupports : public GLGizmoBase
+class GLGizmoSlaSupports : public GLGizmoSlaBase
 {
 private:
-
-    bool unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal);
-
-    const float RenderPointScale = 1.f;
+    static constexpr float RenderPointScale = 1.f;
 
     class CacheEntry {
     public:
@@ -65,7 +62,6 @@ public:
     bool is_in_editing_mode() const override { return m_editing_mode; }
     bool is_selection_rectangle_dragging() const  override { return m_selection_rectangle.is_dragging(); }
     bool has_backend_supports() const;
-    void reslice_SLA_supports(bool postpone_error_messages = false) const;
 
     bool wants_enter_leave_snapshots() const override { return true; }
     std::string get_gizmo_entering_text() const override { return _u8L("Entering SLA support points"); }
@@ -86,8 +82,9 @@ private:
 
     void render_points(const Selection& selection);
     bool unsaved_changes() const;
-    void set_sla_auxiliary_volumes_picking_state(bool state);
-    void update_raycasters_for_picking_transform();
+    void register_point_raycasters_for_picking();
+    void unregister_point_raycasters_for_picking();
+    void update_point_raycasters_for_picking_transform();
 
     bool m_lock_unique_islands = false;
     bool m_editing_mode = false;            // Is editing mode active?
@@ -102,8 +99,7 @@ private:
 
     PickingModel m_sphere;
     PickingModel m_cone;
-    std::vector<std::pair<std::shared_ptr<SceneRaycasterItem>, std::shared_ptr<SceneRaycasterItem>>> m_raycasters;
-    GLModel m_cylinder;
+    std::vector<std::pair<std::shared_ptr<SceneRaycasterItem>, std::shared_ptr<SceneRaycasterItem>>> m_point_raycasters;
 
     // This map holds all translated description texts, so they can be easily referenced during layout calculations
     // etc. When language changes, GUI is recreated and this class constructed again, so the change takes effect.
@@ -138,8 +134,7 @@ private:
 
 protected:
     void on_set_state() override;
-    void on_set_hover_id() override
-    {
+    void on_set_hover_id() override {
         if (! m_editing_mode || (int)m_editing_cache.size() <= m_hover_id)
             m_hover_id = -1;
     }
@@ -151,7 +146,6 @@ protected:
     std::string on_get_name() const override;
     bool on_is_activable() const override;
     bool on_is_selectable() const override;
-    virtual CommonGizmosDataID on_get_requirements() const override;
     void on_load(cereal::BinaryInputArchive& ar) override;
     void on_save(cereal::BinaryOutputArchive& ar) const override;
 };

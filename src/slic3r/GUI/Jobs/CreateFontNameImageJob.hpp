@@ -68,6 +68,12 @@ public:
     /// <param name="canceled"></param>
     /// <param name=""></param>
     void finalize(bool canceled, std::exception_ptr &) override;
+
+    /// <summary>
+    /// Text used for generate preview for empty text
+    /// and when no glyph for given m_input.text
+    /// </summary>
+    static const std::string default_text;
 };
 
 } // namespace Slic3r::GUI

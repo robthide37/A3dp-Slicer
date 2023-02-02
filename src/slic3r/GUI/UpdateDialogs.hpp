@@ -42,7 +42,7 @@ private:
 class AppUpdateAvailableDialog : public MsgDialog
 {
 public:
-	AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online);
+	AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user);
 	AppUpdateAvailableDialog(AppUpdateAvailableDialog&&) = delete;
 	AppUpdateAvailableDialog(const AppUpdateAvailableDialog&) = delete;
 	AppUpdateAvailableDialog& operator=(AppUpdateAvailableDialog&&) = delete;
@@ -53,7 +53,7 @@ public:
 	bool disable_version_check() const;
 	static wxSize AUAD_size;
 private:
-	wxCheckBox* cbox;
+	wxCheckBox* cbox {nullptr};
 };
 
 class AppUpdateDownloadDialog : public MsgDialog
@@ -73,6 +73,7 @@ public:
 private:
 	wxCheckBox* cbox_run;
 	wxTextCtrl* txtctrl_path;
+	wxString filename;
 };
 
 // Confirmation dialog informing about configuration update. Lists updated bundles & their versions.

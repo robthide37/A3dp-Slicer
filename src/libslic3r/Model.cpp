@@ -794,6 +794,11 @@ bool ModelObject::is_mm_painted() const
     return std::any_of(this->volumes.cbegin(), this->volumes.cend(), [](const ModelVolume *mv) { return mv->is_mm_painted(); });
 }
 
+bool ModelObject::is_text() const
+{
+    return this->volumes.size() == 1 && this->volumes[0]->is_text();
+}
+
 void ModelObject::sort_volumes(bool full_sort)
 {
     // sort volumes inside the object to order "Model Part, Negative Volume, Modifier, Support Blocker and Support Enforcer. "
@@ -1641,13 +1646,47 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
     return res;
 }
 
+/// <summary>
+/// Compare TriangleMeshes by Bounding boxes (mainly for sort)
+/// From Front(Z) Upper(Y) TopLeft(X) corner.
+/// 1. Seraparate group not overlaped i Z axis
+/// 2. Seraparate group not overlaped i Y axis
+/// 3. Start earlier in X (More on left side)
+/// </summary>
+/// <param name="triangle_mesh1">Compare from</param>
+/// <param name="triangle_mesh2">Compare to</param>
+/// <returns>True when triangle mesh 1 is closer, upper or lefter than triangle mesh 2 other wise false</returns>
+static bool is_front_up_left(const TriangleMesh &trinagle_mesh1, const TriangleMesh &triangle_mesh2)
+{
+    // stats form t1
+    const Vec3f &min1 = trinagle_mesh1.stats().min;
+    const Vec3f &max1 = trinagle_mesh1.stats().max;
+    // stats from t2
+    const Vec3f &min2 = triangle_mesh2.stats().min;
+    const Vec3f &max2 = triangle_mesh2.stats().max;
+    // priority Z, Y, X
+    for (int axe = 2; axe > 0; --axe) {
+        if (max1[axe] < min2[axe])
+            return true;
+        if (min1[axe] > max2[axe])
+            return false;
+    }
+    return min1.x() < min2.x();
+}
+
 void ModelObject::split(ModelObjectPtrs* new_objects)
 {
     for (ModelVolume* volume : this->volumes) {
         if (volume->type() != ModelVolumeType::MODEL_PART)
             continue;
 
+        // splited volume should not be text object 
+        if (volume->text_configuration.has_value())
+            volume->text_configuration.reset();
+
         std::vector<TriangleMesh> meshes = volume->mesh().split();
+        std::sort(meshes.begin(), meshes.end(), is_front_up_left);
+
         size_t counter = 1;
         for (TriangleMesh &mesh : meshes) {
             // FIXME: crashes if not satisfied
@@ -1741,7 +1780,7 @@ void ModelObject::bake_xy_rotation_into_meshes(size_t instance_idx)
     // Adjust the instances.
     for (size_t i = 0; i < this->instances.size(); ++ i) {
         ModelInstance &model_instance = *this->instances[i];
-        model_instance.set_rotation(Vec3d(0., 0., Geometry::rotation_diff_z(reference_trafo.get_rotation(), model_instance.get_rotation())));
+        model_instance.set_rotation(Vec3d(0., 0., Geometry::rotation_diff_z(reference_trafo.get_matrix(), model_instance.get_matrix())));
         model_instance.set_scaling_factor(Vec3d(new_scaling_factor, new_scaling_factor, new_scaling_factor));
         model_instance.set_mirror(Vec3d(1., 1., 1.));
     }
@@ -2131,9 +2170,15 @@ size_t ModelVolume::split(unsigned int max_extruders)
     if (meshes.size() <= 1)
         return 1;
 
+    std::sort(meshes.begin(), meshes.end(), is_front_up_left);
+
+    // splited volume should not be text object
+    if (text_configuration.has_value())
+        text_configuration.reset();
+
     size_t idx = 0;
     size_t ivolume = std::find(this->object->volumes.begin(), this->object->volumes.end(), this) - this->object->volumes.begin();
-    const std::string name = this->name;
+    const std::string& name = this->name;
 
     unsigned int extruder_counter = 0;
     const Vec3d offset = this->get_offset();
@@ -2584,6 +2629,15 @@ bool model_mmu_segmentation_data_changed(const ModelObject& mo, const ModelObjec
     return model_property_changed(mo, mo_new, 
         [](const ModelVolumeType t) { return t == ModelVolumeType::MODEL_PART; }, 
         [](const ModelVolume &mv_old, const ModelVolume &mv_new){ return mv_old.mmu_segmentation_facets.timestamp_matches(mv_new.mmu_segmentation_facets); });
+}
+
+bool model_has_parameter_modifiers_in_objects(const Model &model)
+{
+    for (const auto& model_object : model.objects)
+        for (const auto& volume : model_object->volumes)
+            if (volume->is_modifier())
+                return true;
+    return false;
 }
 
 bool model_has_multi_part_objects(const Model &model)

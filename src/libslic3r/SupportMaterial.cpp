@@ -1178,7 +1178,7 @@ namespace SupportMaterialInternal {
     static inline bool has_bridging_perimeters(const ExtrusionLoop &loop)
     {
         for (const ExtrusionPath &ep : loop.paths)
-            if (ep.role() == erOverhangPerimeter && ! ep.polyline.empty())
+            if (ep.role() == ExtrusionRole::OverhangPerimeter && ! ep.polyline.empty())
                 return int(ep.size()) >= (ep.is_closed() ? 3 : 2);
         return false;
     }
@@ -1204,7 +1204,7 @@ namespace SupportMaterialInternal {
             for (const ExtrusionEntity *ee2 : static_cast<const ExtrusionEntityCollection*>(ee)->entities) {
                 assert(! ee2->is_collection());
                 assert(! ee2->is_loop());
-                if (ee2->role() == erBridgeInfill)
+                if (ee2->role() == ExtrusionRole::BridgeInfill)
                     return true;
             }
         }
@@ -1225,7 +1225,7 @@ namespace SupportMaterialInternal {
     {
         assert(expansion_scaled >= 0.f);
         for (const ExtrusionPath &ep : loop.paths)
-            if (ep.role() == erOverhangPerimeter && ! ep.polyline.empty()) {
+            if (ep.role() == ExtrusionRole::OverhangPerimeter && ! ep.polyline.empty()) {
                 float exp = 0.5f * (float)scale_(ep.width) + expansion_scaled;
                 if (ep.is_closed()) {
                     if (ep.size() >= 3) {
@@ -3357,7 +3357,7 @@ static inline void tree_supports_generate_paths(
             ExPolygons level2 = offset2_ex({ expoly }, -1.5 * flow.scaled_width(), 0.5 * flow.scaled_width());
             if (level2.size() == 1) {
                 Polylines polylines;
-                extrusion_entities_append_paths(dst, draw_perimeters(expoly, clip_length), erSupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(),
+                extrusion_entities_append_paths(dst, draw_perimeters(expoly, clip_length), ExtrusionRole::SupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(),
                     // Disable reversal of the path, always start with the anchor, always print CCW.
                     false);
                 expoly = level2.front();
@@ -3460,7 +3460,7 @@ static inline void tree_supports_generate_paths(
             pl.reverse();
             polylines.emplace_back(std::move(pl));
         }
-        extrusion_entities_append_paths(dst, polylines, erSupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(), 
+        extrusion_entities_append_paths(dst, polylines, ExtrusionRole::SupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(), 
             // Disable reversal of the path, always start with the anchor, always print CCW.
             false);
     }
@@ -3505,7 +3505,7 @@ static inline void fill_expolygons_with_sheath_generate_paths(
             eec->no_sort = true;
         }
         ExtrusionEntitiesPtr &out = no_sort ? eec->entities : dst;
-        extrusion_entities_append_paths(out, draw_perimeters(expoly, clip_length), erSupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height());
+        extrusion_entities_append_paths(out, draw_perimeters(expoly, clip_length), ExtrusionRole::SupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height());
         // Fill in the rest.
         fill_expolygons_generate_paths(out, offset_ex(expoly, float(-0.4 * spacing)), filler, fill_params, density, role, flow);
         if (no_sort && ! eec->empty())
@@ -3817,7 +3817,7 @@ void LoopInterfaceProcessor::generate(SupportGeneratorLayerExtruded &top_contact
     extrusion_entities_append_paths(
         top_contact_layer.extrusions,
         std::move(loop_lines),
-        erSupportMaterialInterface, flow.mm3_per_mm(), flow.width(), flow.height());
+        ExtrusionRole::SupportMaterialInterface, flow.mm3_per_mm(), flow.width(), flow.height());
 }
 
 #ifdef SLIC3R_DEBUG
@@ -4252,7 +4252,7 @@ void generate_support_toolpaths(
                         // Filler and its parameters
                         filler, float(support_params.support_density),
                         // Extrusion parameters
-                        erSupportMaterial, flow,
+                        ExtrusionRole::SupportMaterial, flow,
                         support_params.with_sheath, false);
                 }
             }
@@ -4284,7 +4284,7 @@ void generate_support_toolpaths(
                 // Filler and its parameters
                 filler, density,
                 // Extrusion parameters
-                (support_layer_id < slicing_params.base_raft_layers) ? erSupportMaterial : erSupportMaterialInterface, flow, 
+                (support_layer_id < slicing_params.base_raft_layers) ? ExtrusionRole::SupportMaterial : ExtrusionRole::SupportMaterialInterface, flow, 
                 // sheath at first layer
                 support_layer_id == 0, support_layer_id == 0);
         }
@@ -4343,7 +4343,7 @@ void generate_support_toolpaths(
         {
             SupportLayer &support_layer = *support_layers[support_layer_id];
             LayerCache   &layer_cache   = layer_caches[support_layer_id];
-            float         interface_angle_delta = config.support_material_style.value == smsSnug || config.support_material_style.value == smsTree ? 
+            float         interface_angle_delta = config.support_material_style.value == smsSnug || config.support_material_style.value == smsTree || config.support_material_style.value == smsOrganic ? 
                 (support_layer.interface_id() & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.) :
                 0;
 
@@ -4440,7 +4440,7 @@ void generate_support_toolpaths(
                     // Filler and its parameters
                     filler_interface.get(), float(density),
                     // Extrusion parameters
-                    erSupportMaterialInterface, interface_flow);
+                    ExtrusionRole::SupportMaterialInterface, interface_flow);
             }
 
             // Base interface layers under soluble interfaces
@@ -4462,7 +4462,7 @@ void generate_support_toolpaths(
                     // Filler and its parameters
                     filler, float(support_params.interface_density),
                     // Extrusion parameters
-                    erSupportMaterial, interface_flow);
+                    ExtrusionRole::SupportMaterial, interface_flow);
             }
 
             // Base support or flange.
@@ -4500,7 +4500,7 @@ void generate_support_toolpaths(
                     // Filler and its parameters
                     filler, density,
                     // Extrusion parameters
-                    erSupportMaterial, flow,
+                    ExtrusionRole::SupportMaterial, flow,
                     sheath, no_sort);
 
             }

@@ -391,9 +391,12 @@ public:
     // Bounding box of a single full instance selection, in local coordinates, with no instance scaling applied.
     // Modifiers are taken in account
     const BoundingBoxf3& get_full_unscaled_instance_local_bounding_box() const;
-    // Returns the bounding box aligned to the axis of the currently selected reference system (World/Object/Part)
+    // Returns the bounding box aligned to the axes of the currently selected reference system (World/Object/Part)
     // and the transform to place and orient it in world coordinates
     const std::pair<BoundingBoxf3, Transform3d>& get_bounding_box_in_current_reference_system() const;
+    // Returns the bounding box aligned to the axes of the given reference system
+    // and the transform to place and orient it in world coordinates
+    std::pair<BoundingBoxf3, Transform3d> get_bounding_box_in_reference_system(ECoordinatesType type) const;
 #endif // ENABLE_WORLD_COORDINATE
 
     void setup_cache();
@@ -511,7 +514,7 @@ private:
     void paste_objects_from_clipboard();
 
 #if ENABLE_WORLD_COORDINATE
-    void transform_instance_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
+    void transform_instance_relative_world(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
         const Transform3d& transform, const Vec3d& world_pivot);
     void transform_volume_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
         const Transform3d& transform, const Vec3d& world_pivot);

@@ -407,13 +407,13 @@ Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerR
                     ExtrusionRole role = perimeter->role();
                     if (perimeter->is_loop()) {
                         for (const ExtrusionPath &path : static_cast<const ExtrusionLoop*>(perimeter)->paths) {
-                            if (path.role() == ExtrusionRole::erExternalPerimeter) {
-                                role = ExtrusionRole::erExternalPerimeter;
+                            if (path.role() == ExtrusionRole::ExternalPerimeter) {
+                                role = ExtrusionRole::ExternalPerimeter;
                             }
                         }
                     }
 
-                    if (role == ExtrusionRole::erExternalPerimeter) {
+                    if (role == ExtrusionRole::ExternalPerimeter) {
                         Points p;
                         perimeter->collect_points(p);
                         polygons.emplace_back(std::move(p));
@@ -1071,7 +1071,7 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                     for (SeamCandidate &perimeter_point : layers[layer_idx].points) {
                         Vec2f point = Vec2f { perimeter_point.position.head<2>() };
                         if (prev_layer_distancer.get() != nullptr) {
-                            perimeter_point.overhang = prev_layer_distancer->signed_distance_from_lines(point.cast<double>())
+                            perimeter_point.overhang = prev_layer_distancer->distance_from_lines<true>(point.cast<double>())
                                     + 0.6f * perimeter_point.perimeter.flow_width
                                     - tan(SeamPlacer::overhang_angle_threshold)
                                             * po->layers()[layer_idx]->height;
@@ -1080,7 +1080,7 @@ void SeamPlacer::calculate_overhangs_and_layer_embedding(const PrintObject *po) 
                         }
 
                         if (should_compute_layer_embedding) { // search for embedded perimeter points (points hidden inside the print ,e.g. multimaterial join, best position for seam)
-                            perimeter_point.embedded_distance = current_layer_distancer->signed_distance_from_lines(point.cast<double>())
+                            perimeter_point.embedded_distance = current_layer_distancer->distance_from_lines<true>(point.cast<double>())
                                     + 0.6f * perimeter_point.perimeter.flow_width;
                         }
                     }
@@ -1548,7 +1548,7 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, bool extern
 
     Point seam_point = Point::new_scale(seam_position.x(), seam_position.y());
 
-    if (loop.role() == ExtrusionRole::erPerimeter) { //Hopefully inner perimeter
+    if (loop.role() == ExtrusionRole::Perimeter) { //Hopefully inner perimeter
         const SeamCandidate &perimeter_point = layer_perimeters.points[seam_index];
         ExtrusionLoop::ClosestPathPoint projected_point = loop.get_closest_path_and_point(seam_point, false);
         // determine depth of the seam point.

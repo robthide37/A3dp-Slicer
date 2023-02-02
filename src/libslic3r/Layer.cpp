@@ -38,32 +38,37 @@ LayerRegion* Layer::add_region(const PrintRegion *print_region)
 // merge all regions' slices to get islands
 void Layer::make_slices()
 {
-    ExPolygons slices;
-    if (m_regions.size() == 1) {
-        // optimization: if we only have one region, take its slices
-        slices = to_expolygons(m_regions.front()->slices().surfaces);
-    } else {
-        Polygons slices_p;
-        for (LayerRegion *layerm : m_regions)
-            polygons_append(slices_p, to_polygons(layerm->slices().surfaces));
-        slices = union_safety_offset_ex(slices_p);
+    {
+        ExPolygons slices;
+        if (m_regions.size() == 1) {
+            // optimization: if we only have one region, take its slices
+            slices = to_expolygons(m_regions.front()->slices().surfaces);
+        } else {
+            Polygons slices_p;
+            for (LayerRegion *layerm : m_regions)
+                polygons_append(slices_p, to_polygons(layerm->slices().surfaces));
+            slices = union_safety_offset_ex(slices_p);
+        }
+        // lslices are sorted by topological order from outside to inside from the clipper union used above
+        this->lslices = slices;
     }
-    
-    this->lslices.clear();
-    this->lslices.reserve(slices.size());
-    
+
+    // prepare lslices ordered by print order
+    this->lslice_indices_sorted_by_print_order.clear();
+    this->lslice_indices_sorted_by_print_order.reserve(lslices.size());
     // prepare ordering points
     Points ordering_points;
-    ordering_points.reserve(slices.size());
-    for (const ExPolygon &ex : slices)
+    ordering_points.reserve( this->lslices.size());
+    for (const ExPolygon &ex :  this->lslices)
         ordering_points.push_back(ex.contour.first_point());
     
     // sort slices
     std::vector<Points::size_type> order = chain_points(ordering_points);
-    
+
     // populate slices vector
-    for (size_t i : order)
-        this->lslices.emplace_back(std::move(slices[i]));
+    for (size_t i : order) {
+        this->lslice_indices_sorted_by_print_order.emplace_back(i);
+    }
 }
 
 // used by Layer::build_up_down_graph()
@@ -465,15 +470,18 @@ void Layer::make_perimeters()
     	        } else {
     	            SurfaceCollection new_slices;
     	            // Use the region with highest infill rate, as the make_perimeters() function below decides on the gap fill based on the infill existence.
-    	            LayerRegion *layerm_config = m_regions[layer_region_ids.front()];
-    	            {
+                    uint32_t     region_id_config = layer_region_ids.front();
+                    LayerRegion* layerm_config = m_regions[region_id_config];
+                    {
     	                // Merge slices (surfaces) according to number of extra perimeters.
     	                for (uint32_t region_id : layer_region_ids) {
                             LayerRegion &layerm = *m_regions[region_id];
     	                    for (const Surface &surface : layerm.slices())
                                 surfaces_to_merge.emplace_back(&surface);
-    	                    if (layerm.region().config().fill_density > layerm_config->region().config().fill_density)
-    	                    	layerm_config = &layerm;
+                            if (layerm.region().config().fill_density > layerm_config->region().config().fill_density) {
+                                region_id_config = region_id;
+                                layerm_config    = &layerm;
+                            }
     	                }
                         std::sort(surfaces_to_merge.begin(), surfaces_to_merge.end(), [](const Surface *l, const Surface *r){ return l->extra_perimeters < r->extra_perimeters; });
                         for (size_t i = 0; i < surfaces_to_merge.size();) {
@@ -493,7 +501,7 @@ void Layer::make_perimeters()
     	            }
     	            // make perimeters
     	            layerm_config->make_perimeters(new_slices, perimeter_and_gapfill_ranges, fill_expolygons, fill_expolygons_ranges);
-                    this->sort_perimeters_into_islands(new_slices, region_id, perimeter_and_gapfill_ranges, std::move(fill_expolygons), fill_expolygons_ranges, layer_region_ids);
+                    this->sort_perimeters_into_islands(new_slices, region_id_config, perimeter_and_gapfill_ranges, std::move(fill_expolygons), fill_expolygons_ranges, layer_region_ids);
     	        }
     	    }
         }
@@ -533,19 +541,43 @@ void Layer::sort_perimeters_into_islands(
         const std::pair<ExtrusionRange, ExtrusionRange> &extrusions = perimeter_and_gapfill_ranges[islice];
         Point sample;
         bool  sample_set = false;
-        if (! extrusions.first.empty()) {
-            sample     = this_layer_region.perimeters().entities[*extrusions.first.begin()]->first_point();
-            sample_set = true;
-        } else if (! extrusions.second.empty()) {
-            sample     = this_layer_region.thin_fills().entities[*extrusions.second.begin()]->first_point();
-            sample_set = true;
-        } else {
-            for (uint32_t iexpoly : fill_expolygons_ranges[islice])
-                if (const ExPolygon &expoly = fill_expolygons[iexpoly]; ! expoly.empty()) {
-                    sample     = expoly.contour.points.front();
+        // Take a sample deep inside its island if available. Infills are usually quite far from the island boundary.
+        for (uint32_t iexpoly : fill_expolygons_ranges[islice])
+            if (const ExPolygon &expoly = fill_expolygons[iexpoly]; ! expoly.empty()) {
+                sample     = expoly.contour.points.front();
+                sample_set = true;
+                break;
+            }
+        if (! sample_set) {
+            // If there is no infill, take a sample of some inner perimeter.
+            for (uint32_t iperimeter : extrusions.first) {
+                const ExtrusionEntity &ee = *this_layer_region.perimeters().entities[iperimeter];
+                if (ee.is_collection()) {
+                    for (const ExtrusionEntity *ee2 : dynamic_cast<const ExtrusionEntityCollection&>(ee).entities)
+                        if (! ee2->role().is_external()) {
+                            sample     = ee2->first_point();
+                            sample_set = true;
+                            goto loop_end;
+                        }
+                } else if (! ee.role().is_external()) {
+                    sample = ee.first_point();
                     sample_set = true;
                     break;
                 }
+            }
+        loop_end:
+            if (! sample_set) {
+                if (! extrusions.second.empty()) {
+                    // If there is no inner perimeter, take a sample of some gap fill extrusion.
+                    sample     = this_layer_region.thin_fills().entities[*extrusions.second.begin()]->first_point();
+                    sample_set = true;
+                }
+                if (! sample_set && ! extrusions.first.empty()) {
+                    // As a last resort, take a sample of some external perimeter.
+                    sample     = this_layer_region.perimeters().entities[*extrusions.first.begin()]->first_point();
+                    sample_set = true;
+                }
+            }
         }
         // There may be a valid empty island.
         // assert(sample_set);
@@ -694,27 +726,39 @@ void Layer::sort_perimeters_into_islands(
                 perimeter_slices_queue.pop_back();
                 break;
             }
-    // If anything fails to be sorted in using exact fit, try to find a closest island.
-    auto point_inside_surface_dist2 =
-        [&lslices = this->lslices, &lslices_ex = this->lslices_ex, bbox_eps = scaled<coord_t>(this->object()->print()->config().gcode_resolution.value) + SCALED_EPSILON]
-        (const size_t lslice_idx, const Point &point) {
-        const BoundingBox &bbox = lslices_ex[lslice_idx].bbox;
-        return 
-            point.x() < bbox.min.x() - bbox_eps || point.x() > bbox.max.x() + bbox_eps ||
-            point.y() < bbox.min.y() - bbox_eps || point.y() > bbox.max.y() + bbox_eps ?
-            std::numeric_limits<double>::max() :
-            (lslices[lslice_idx].point_projection(point) - point).cast<double>().squaredNorm();
-    };
-    for (auto it_source_slice  = perimeter_slices_queue.begin(); it_source_slice != perimeter_slices_queue.end(); ++ it_source_slice) {
-        double d2min = std::numeric_limits<double>::max();
-        int    lslice_idx_min = -1;
-        for (int lslice_idx = int(lslices_ex.size()) - 1; lslice_idx >= 0; -- lslice_idx)
-            if (double d2 = point_inside_surface_dist2(lslice_idx, it_source_slice->second); d2 < d2min) {
-                d2min = d2;
-                lslice_idx_min = lslice_idx;
-            }
-        assert(lslice_idx_min != -1);
-        insert_into_island(lslice_idx_min, it_source_slice->first);
+    if (! perimeter_slices_queue.empty()) {
+        // If the slice sample was not fitted into any slice using exact fit, try to find a closest island as a last resort.
+        // This should be a rare event especially if the sample point was taken from infill or inner perimeter,
+        // however we may land here for external perimeter only islands with fuzzy skin applied.
+        // Check whether fuzzy skin was enabled and adjust the bounding box accordingly.
+        const PrintConfig       &print_config  = this->object()->print()->config();
+        const PrintRegionConfig &region_config = this_layer_region.region().config();
+        const auto               bbox_eps      = scaled<coord_t>(
+            EPSILON + print_config.gcode_resolution.value +
+            (region_config.fuzzy_skin.value == FuzzySkinType::None ? 0. : region_config.fuzzy_skin_thickness.value 
+                //FIXME it looks as if Arachne could extend open lines by fuzzy_skin_point_dist, which does not seem right.
+                + region_config.fuzzy_skin_point_dist.value));
+        auto point_inside_surface_dist2 =
+            [&lslices = this->lslices, &lslices_ex = this->lslices_ex, bbox_eps]
+            (const size_t lslice_idx, const Point &point) {
+            const BoundingBox &bbox = lslices_ex[lslice_idx].bbox;
+            return 
+                point.x() < bbox.min.x() - bbox_eps || point.x() > bbox.max.x() + bbox_eps ||
+                point.y() < bbox.min.y() - bbox_eps || point.y() > bbox.max.y() + bbox_eps ?
+                std::numeric_limits<double>::max() :
+                (lslices[lslice_idx].point_projection(point) - point).cast<double>().squaredNorm();
+        };
+        for (auto it_source_slice  = perimeter_slices_queue.begin(); it_source_slice != perimeter_slices_queue.end(); ++ it_source_slice) {
+            double d2min = std::numeric_limits<double>::max();
+            int    lslice_idx_min = -1;
+            for (int lslice_idx = int(lslices_ex.size()) - 1; lslice_idx >= 0; -- lslice_idx)
+                if (double d2 = point_inside_surface_dist2(lslice_idx, it_source_slice->second); d2 < d2min) {
+                    d2min = d2;
+                    lslice_idx_min = lslice_idx;
+                }
+            assert(lslice_idx_min != -1);
+            insert_into_island(lslice_idx_min, it_source_slice->first);
+        }
     }
 }
 

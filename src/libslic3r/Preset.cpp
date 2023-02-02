@@ -146,6 +146,11 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
         res.changelog_url = changelog_url->second.data();
     }
 
+    const auto templates_profile = vendor_section.find("templates_profile");
+    if (templates_profile != vendor_section.not_found()) {
+        res.templates_profile = templates_profile->second.data() == "1";
+    }
+
     if (! load_all) {
         return res;
     }
@@ -200,6 +205,10 @@ VendorProfile VendorProfile::from_ini(const ptree &tree, const boost::filesystem
             }
             model.bed_model   = section.second.get<std::string>("bed_model", "");
             model.bed_texture = section.second.get<std::string>("bed_texture", "");
+            model.thumbnail   = section.second.get<std::string>("thumbnail", "");
+            if (model.thumbnail.empty())
+                model.thumbnail = model.id + "_thumbnail.png";
+
             if (! model.id.empty() && ! model.variants.empty())
                 res.models.push_back(std::move(model));
         }
@@ -336,7 +345,8 @@ std::string Preset::label() const
 
 bool is_compatible_with_print(const PresetWithVendorProfile &preset, const PresetWithVendorProfile &active_print, const PresetWithVendorProfile &active_printer)
 {
-	if (preset.vendor != nullptr && preset.vendor != active_printer.vendor)
+    // templates_profile vendor profiles should be decided as same vendor profiles
+	if (preset.vendor != nullptr && preset.vendor != active_printer.vendor && !preset.vendor->templates_profile)
 		// The current profile has a vendor assigned and it is different from the active print's vendor.
 		return false;
     auto &condition             = preset.preset.compatible_prints_condition();
@@ -358,7 +368,8 @@ bool is_compatible_with_print(const PresetWithVendorProfile &preset, const Prese
 
 bool is_compatible_with_printer(const PresetWithVendorProfile &preset, const PresetWithVendorProfile &active_printer, const DynamicPrintConfig *extra_config)
 {
-	if (preset.vendor != nullptr && preset.vendor != active_printer.vendor)
+    // templates_profile vendor profiles should be decided as same vendor profiles
+	if (preset.vendor != nullptr && preset.vendor != active_printer.vendor && !preset.vendor->templates_profile)
 		// The current profile has a vendor assigned and it is different from the active print's vendor.
 		return false;
     auto &condition               = preset.preset.compatible_printers_condition();
@@ -420,7 +431,7 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
 static std::vector<std::string> s_Preset_print_options {
     "layer_height", "first_layer_height", "perimeters", "spiral_vase", "slice_closing_radius", "slicing_mode",
     "top_solid_layers", "top_solid_min_thickness", "bottom_solid_layers", "bottom_solid_min_thickness",
-    "extra_perimeters", "extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "avoid_curled_filament_during_travels", "avoid_crossing_perimeters", "thin_walls", "overhangs",
+    "extra_perimeters", "extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "avoid_crossing_curled_overhangs", "avoid_crossing_perimeters", "thin_walls", "overhangs",
     "seam_position","staggered_inner_seams", "external_perimeters_first", "fill_density", "fill_pattern", "top_fill_pattern", "bottom_fill_pattern",
     "infill_every_layers", "infill_only_where_needed", "solid_infill_every_layers", "fill_angle", "bridge_angle",
     "solid_infill_below_area", "only_retract_when_crossing_perimeters", "infill_first",
@@ -429,7 +440,7 @@ static std::vector<std::string> s_Preset_print_options {
     "fuzzy_skin", "fuzzy_skin_thickness", "fuzzy_skin_point_dist",
     "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative",
     "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "infill_speed", "solid_infill_speed",
-    "enable_dynamic_overhang_speeds", "dynamic_overhang_speeds", "overhang_steepness_levels",
+    "enable_dynamic_overhang_speeds", "dynamic_overhang_speeds", "overhang_overlap_levels",
     "top_solid_infill_speed", "support_material_speed", "support_material_xy_spacing", "support_material_interface_speed",
     "bridge_speed", "gap_fill_speed", "gap_fill_enabled", "travel_speed", "travel_speed_z", "first_layer_speed", "first_layer_speed_over_raft", "perimeter_acceleration", "infill_acceleration",
     "bridge_acceleration", "first_layer_acceleration", "first_layer_acceleration_over_raft", "default_acceleration", "skirts", "skirt_distance", "skirt_height", "draft_shield",
@@ -439,7 +450,9 @@ static std::vector<std::string> s_Preset_print_options {
     "support_material_synchronize_layers", "support_material_angle", "support_material_interface_layers", "support_material_bottom_interface_layers",
     "support_material_interface_pattern", "support_material_interface_spacing", "support_material_interface_contact_loops", 
     "support_material_contact_distance", "support_material_bottom_contact_distance",
-    "support_material_buildplate_only", "dont_support_bridges", "thick_bridges", "notes", "complete_objects", "extruder_clearance_radius",
+    "support_material_buildplate_only", 
+    "support_tree_angle", "support_tree_angle_slow", "support_tree_branch_diameter", "support_tree_branch_diameter_angle", "support_tree_top_rate", "support_tree_tip_diameter",
+    "dont_support_bridges", "thick_bridges", "notes", "complete_objects", "extruder_clearance_radius",
     "extruder_clearance_height", "gcode_comments", "gcode_label_objects", "output_filename_format", "post_process", "gcode_substitutions", "perimeter_extruder",
     "infill_extruder", "solid_infill_extruder", "support_material_extruder", "support_material_interface_extruder",
     "ooze_prevention", "standby_temperature_delta", "interface_shells", "extrusion_width", "first_layer_extrusion_width",
@@ -457,7 +470,7 @@ static std::vector<std::string> s_Preset_filament_options {
     "extrusion_multiplier", "filament_density", "filament_cost", "filament_spool_weight", "filament_loading_speed", "filament_loading_speed_start", "filament_load_time",
     "filament_unloading_speed", "filament_unloading_speed_start", "filament_unload_time", "filament_toolchange_delay", "filament_cooling_moves",
     "filament_cooling_initial_speed", "filament_cooling_final_speed", "filament_ramming_parameters", "filament_minimal_purge_on_wipe_tower",
-    "temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", "fan_always_on", "cooling", "min_fan_speed",
+    "temperature", "idle_temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", "fan_always_on", "cooling", "min_fan_speed",
     "max_fan_speed", "bridge_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed",
     "start_filament_gcode", "end_filament_gcode",
     // Retract overrides
@@ -495,14 +508,17 @@ static std::vector<std::string> s_Preset_sla_print_options {
     "faded_layers",
     "supports_enable",
     "support_tree_type",
+
     "support_head_front_diameter",
     "support_head_penetration",
     "support_head_width",
     "support_pillar_diameter",
     "support_small_pillar_diameter_percent",
     "support_max_bridges_on_pillar",
+    "support_max_weight_on_model",
     "support_pillar_connection_mode",
     "support_buildplate_only",
+    "support_enforcers_only",
     "support_pillar_widening_factor",
     "support_base_diameter",
     "support_base_height",
@@ -511,6 +527,25 @@ static std::vector<std::string> s_Preset_sla_print_options {
     "support_max_bridge_length",
     "support_max_pillar_link_distance",
     "support_object_elevation",
+
+    "branchingsupport_head_front_diameter",
+    "branchingsupport_head_penetration",
+    "branchingsupport_head_width",
+    "branchingsupport_pillar_diameter",
+    "branchingsupport_small_pillar_diameter_percent",
+    "branchingsupport_max_bridges_on_pillar",
+    "branchingsupport_max_weight_on_model",
+    "branchingsupport_pillar_connection_mode",
+    "branchingsupport_buildplate_only",
+    "branchingsupport_pillar_widening_factor",
+    "branchingsupport_base_diameter",
+    "branchingsupport_base_height",
+    "branchingsupport_base_safety_distance",
+    "branchingsupport_critical_angle",
+    "branchingsupport_max_bridge_length",
+    "branchingsupport_max_pillar_link_distance",
+    "branchingsupport_object_elevation",
+
     "support_points_density_relative",
     "support_points_minimal_distance",
     "slice_closing_radius",
@@ -1164,6 +1199,7 @@ size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfil
     if (opt)
         config.set_key_value("num_extruders", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
     bool some_compatible = false;
+    std::vector<size_t> indices_of_template_presets;
     for (size_t idx_preset = m_num_default_presets; idx_preset < m_presets.size(); ++ idx_preset) {
         bool    selected        = idx_preset == m_idx_selected;
         Preset &preset_selected = m_presets[idx_preset];
@@ -1180,7 +1216,29 @@ size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfil
             m_idx_selected = size_t(-1);
         if (selected)
             preset_selected.is_compatible = preset_edited.is_compatible;
+        if (preset_edited.vendor && preset_edited.vendor->templates_profile) {
+            indices_of_template_presets.push_back(idx_preset);
+        }
     }
+    // filter out template profiles where profile with same alias and compability exists
+    if (!indices_of_template_presets.empty()) {
+        for (size_t idx_preset = m_num_default_presets; idx_preset < m_presets.size(); ++idx_preset) {
+            if (m_presets[idx_preset].vendor && !m_presets[idx_preset].vendor->templates_profile && m_presets[idx_preset].is_compatible) {
+                std::string preset_alias = m_presets[idx_preset].alias;
+                for (size_t idx_of_template_in_presets : indices_of_template_presets) {
+                    if (m_presets[idx_of_template_in_presets].alias == preset_alias) {
+                        // unselect selected template filament if there is non-template alias compatible
+                        if (idx_of_template_in_presets == m_idx_selected && (unselect_if_incompatible == PresetSelectCompatibleType::Always || unselect_if_incompatible == PresetSelectCompatibleType::OnlyIfWasCompatible)) {
+                            m_idx_selected = size_t(-1);
+                        }
+                        m_presets[idx_of_template_in_presets].is_compatible = false;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
     // Update visibility of the default profiles here if the defaults are suppressed, the current profile is not compatible and we don't want to select another compatible profile.
     if (m_idx_selected >= m_num_default_presets && m_default_suppressed)
 	    for (size_t i = 0; i < m_num_default_presets; ++ i)
@@ -2077,6 +2135,25 @@ namespace PresetUtils {
                 out = Slic3r::resources_dir() + "/profiles/" + preset.vendor->id + "/" + pm->bed_texture;
         }
         return out;
+    }
+
+    bool vendor_profile_has_all_resources(const VendorProfile& vp)
+    {
+        namespace fs = boost::filesystem;
+
+        std::string vendor_folder = Slic3r::data_dir()      + "/vendor/"   + vp.id + "/";
+        std::string rsrc_folder   = Slic3r::resources_dir() + "/profiles/" + vp.id + "/";
+        std::string cache_folder  = Slic3r::data_dir()      + "/cache/"    + vp.id + "/";
+        for (const VendorProfile::PrinterModel& model : vp.models) {
+            for (const std::string& res : { model.bed_texture, model.bed_model, model.thumbnail } ) {
+                if (! res.empty()
+                 && !fs::exists(fs::path(vendor_folder + res))
+                 && !fs::exists(fs::path(rsrc_folder   + res))
+                 && !fs::exists(fs::path(cache_folder  + res)))
+                    return false;
+            }
+        }
+        return true;
     }
 } // namespace PresetUtils
 

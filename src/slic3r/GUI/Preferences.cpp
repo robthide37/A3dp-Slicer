@@ -89,6 +89,13 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 	m_custom_toolbar_size		= atoi(get_app_config()->get("custom_toolbar_size").c_str());
 	m_use_custom_toolbar_size	= get_app_config()->get("use_custom_toolbar_size") == "1";
 
+	// set Field for notify_release to its value
+	if (m_optgroup_gui && m_optgroup_gui->get_field("notify_release") != nullptr) {
+		boost::any val = s_keys_map_NotifyReleaseMode.at(wxGetApp().app_config->get("notify_release"));
+		m_optgroup_gui->get_field("notify_release")->set_value(val, false);
+	}
+	
+
 	if (wxGetApp().is_editor()) {
 		auto app_config = get_app_config();
 
@@ -266,6 +273,14 @@ void PreferencesDialog::build()
 				"as they\'re loaded in order to save time when exporting G-code."),
 			app_config->get("background_processing") == "1");
 
+		append_bool_option(m_optgroup_general, "alert_when_supports_needed", 
+			L("Alert when supports needed"),
+			L("If this is enabled, Slic3r will raise alerts when it detects "
+				"issues in the sliced object, that can be resolved with supports (and brim). "
+				"Examples of such issues are floating object parts, unsupported extrusions and low bed adhesion."),
+			app_config->get("alert_when_supports_needed") == "1");
+
+
 		m_optgroup_general->append_separator();
 
 		// Please keep in sync with ConfigWizard
@@ -301,6 +316,11 @@ void PreferencesDialog::build()
 			L("Suppress \" - default - \" presets in the Print / Filament / Printer selections once there are any other valid presets available."),
 			app_config->get("no_defaults") == "1");
 
+		append_bool_option(m_optgroup_general, "no_templates",
+			L("Suppress \" Template \" filament presets"),
+			L("Suppress \" Template \" filament presets in configuration wizard and sidebar visibility."),
+			app_config->get("no_templates") == "1");
+
 		append_bool_option(m_optgroup_general, "show_incompatible_presets",
 			L("Show incompatible print and filament presets"),
 			L("When checked, the print and filament presets are shown in the preset editor "
@@ -310,8 +330,14 @@ void PreferencesDialog::build()
 		m_optgroup_general->append_separator();
 
 		append_bool_option(m_optgroup_general, "show_drop_project_dialog",
+#if 1 // #ysFIXME_delete_after_test_of_6377
+			L("Show load project dialog"),
+			L("When checked, whenever dragging and dropping a project file on the application or open it from a browser, "
+			  "shows a dialog asking to select the action to take on the file to load."),
+#else
 			L("Show drop project dialog"),
 			L("When checked, whenever dragging and dropping a project file on the application, shows a dialog asking to select the action to take on the file to load."),
+#endif
 			app_config->get("show_drop_project_dialog") == "1");
 
 		append_bool_option(m_optgroup_general, "single_instance",
@@ -562,7 +588,7 @@ void PreferencesDialog::build()
 			if (opt_key == "suppress_hyperlinks")
 				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
 			else
-				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0"; m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
+				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 		};
 
 
@@ -682,15 +708,18 @@ void PreferencesDialog::update_ctrls_alignment()
 
 void PreferencesDialog::accept(wxEvent&)
 {
-	if (const auto it = m_values.find("downloader_url_registered"); it != m_values.end())
-		downloader->allow(it->second == "1");
-	if (!downloader->on_finish())
-		return;
-
+	if(wxGetApp().is_editor()) {
+		if (const auto it = m_values.find("downloader_url_registered"); it != m_values.end())
+			downloader->allow(it->second == "1");
+		if (!downloader->on_finish())
+			return;
 #ifdef __linux__
-	if( downloader->get_perform_registration_linux()) 
-		DesktopIntegrationDialog::perform_desktop_integration(true);
+		if( downloader->get_perform_registration_linux()) 
+			DesktopIntegrationDialog::perform_desktop_integration(true);
 #endif // __linux__
+	}
+
+	bool update_filament_sidebar = (m_values.find("no_templates") != m_values.end());
 
 	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled" };
 
@@ -761,6 +790,9 @@ void PreferencesDialog::accept(wxEvent&)
 	
 	wxGetApp().update_ui_from_settings();
 	clear_cache();
+
+	if (update_filament_sidebar)
+		wxGetApp().plater()->sidebar().update_presets(Preset::Type::TYPE_FILAMENT);
 }
 
 void PreferencesDialog::revert(wxEvent&)
@@ -1010,7 +1042,7 @@ void PreferencesDialog::create_settings_text_color_widget()
 	m_blinkers[opt_key] = new BlinkingBitmap(parent);
 
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
-	ButtonsDescription::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_sys_colour, &m_mod_colour);
+	GUI_Descriptions::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_sys_colour, &m_mod_colour);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
@@ -1037,7 +1069,7 @@ void PreferencesDialog::create_settings_mode_color_widget()
 
     // Mode color markers description
 	m_mode_palette = wxGetApp().get_mode_palette();
-    ButtonsDescription::FillSizerWithModeColorDescriptions(stb_sizer, parent, { &m_mode_simple, &m_mode_advanced, &m_mode_expert }, m_mode_palette);
+	GUI_Descriptions::FillSizerWithModeColorDescriptions(stb_sizer, parent, { &m_mode_simple, &m_mode_advanced, &m_mode_expert }, m_mode_palette);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
 	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);

@@ -124,8 +124,16 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(const Vec3d &point,
         Transform3d tr_inv = transformation.inverse();
         Vec3d mesh_point = tr_inv * point;
         Vec3d mesh_direction = tr_inv.linear() * direction;
-        std::vector<AABBMesh::hit_result> hits = mesh.query_ray_hits(mesh_point, mesh_direction);
-        for (const AABBMesh::hit_result &hit : hits) {
+
+        // Need for detect that actual point position is on correct place
+        Vec3d point_positive = mesh_point - mesh_direction;
+        Vec3d point_negative = mesh_point + mesh_direction;
+
+        // Throw ray to both directions of ray
+        std::vector<AABBMesh::hit_result> hits = mesh.query_ray_hits(point_positive, mesh_direction);
+        std::vector<AABBMesh::hit_result> hits_neg = mesh.query_ray_hits(point_negative, -mesh_direction);
+        hits.insert(hits.end(), std::make_move_iterator(hits_neg.begin()), std::make_move_iterator(hits_neg.end()));
+        for (const AABBMesh::hit_result &hit : hits) { 
             double squared_distance = (mesh_point - hit.position()).squaredNorm();
             if (closest.has_value() &&
                 closest->squared_distance < squared_distance)

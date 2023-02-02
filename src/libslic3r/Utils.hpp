@@ -282,8 +282,6 @@ class ScopeGuard
 {
 public:
     typedef std::function<void()> Closure;
-private:
-//    bool committed;
     Closure closure;
 
 public:

@@ -2,6 +2,7 @@
 #define slic3r_GCodeViewer_hpp_
 
 #include "3DScene.hpp"
+#include "libslic3r/ExtrusionRole.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GLModel.hpp"
 
@@ -30,7 +31,7 @@ class GCodeViewer
     using InstanceIdBuffer = std::vector<size_t>;
     using InstancesOffsets = std::vector<Vec3f>;
 
-    static const std::vector<ColorRGBA> Extrusion_Role_Colors;
+    static const std::array<ColorRGBA, static_cast<size_t>(GCodeExtrusionRole::Count)> Extrusion_Role_Colors;
     static const std::vector<ColorRGBA> Options_Colors;
     static const std::vector<ColorRGBA> Travel_Colors;
     static const std::vector<ColorRGBA> Range_Colors;
@@ -208,7 +209,7 @@ class GCodeViewer
         };
 
         EMoveType type{ EMoveType::Noop };
-        ExtrusionRole role{ erNone };
+        GCodeExtrusionRole role{ GCodeExtrusionRole::None };
         float delta_extruder{ 0.0f };
         float height{ 0.0f };
         float width{ 0.0f };
@@ -482,7 +483,7 @@ class GCodeViewer
 
         void reset_role_visibility_flags() {
             role_visibility_flags = 0;
-            for (unsigned int i = 0; i < erCount; ++i) {
+            for (uint32_t i = 0; i < uint32_t(GCodeExtrusionRole::Count); ++i) {
                 role_visibility_flags |= 1 << i;
             }
         }
@@ -753,7 +754,7 @@ private:
     std::vector<ColorRGBA> m_tool_colors;
     Layers m_layers;
     std::array<unsigned int, 2> m_layers_z_range;
-    std::vector<ExtrusionRole> m_roles;
+    std::vector<GCodeExtrusionRole> m_roles;
     size_t m_extruders_count;
     std::vector<unsigned char> m_extruder_ids;
     std::vector<float> m_filament_diameters;
@@ -849,8 +850,8 @@ private:
 #if ENABLE_GCODE_VIEWER_STATISTICS
     void render_statistics();
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
-    bool is_visible(ExtrusionRole role) const {
-        return role < erCount && (m_extrusions.role_visibility_flags & (1 << role)) != 0;
+    bool is_visible(GCodeExtrusionRole role) const {
+        return role < GCodeExtrusionRole::Count && (m_extrusions.role_visibility_flags & (1 << int(role))) != 0;
     }
     bool is_visible(const Path& path) const { return is_visible(path.role); }
     void log_memory_used(const std::string& label, int64_t additional = 0) const;

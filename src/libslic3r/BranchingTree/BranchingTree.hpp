@@ -5,7 +5,6 @@
 #include <admesh/stl.h>
 
 #include "libslic3r/ExPolygon.hpp"
-#include "libslic3r/BoundingBox.hpp"
 
 namespace Slic3r { namespace branchingtree {
 
@@ -21,6 +20,7 @@ class Properties
     ExPolygons m_bed_shape;
 
 public:
+
     // Maximum slope for bridges of the tree
     Properties &max_slope(double val) noexcept
     {
@@ -77,6 +77,11 @@ struct Node
     {}
 };
 
+inline bool is_occupied(const Node &n)
+{
+    return n.left != Node::ID_NONE && n.right != Node::ID_NONE;
+}
+
 // An output interface for the branching tree generator function. Consider each
 // method as a callback and implement the actions that need to be done.
 class Builder
@@ -99,6 +104,12 @@ public:
 
     // Add an anchor bridge to the model body
     virtual bool add_mesh_bridge(const Node &from, const Node &to) = 0;
+
+    virtual std::optional<Vec3f> suggest_avoidance(const Node &from,
+                                                   float max_bridge_len) const
+    {
+        return {};
+    }
 
     // Report nodes that can not be routed to an endpoint (model or ground)
     virtual void report_unroutable(const Node &j) = 0;

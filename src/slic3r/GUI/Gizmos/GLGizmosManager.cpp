@@ -170,6 +170,11 @@ void GLGizmosManager::reset_all_states()
     if (! m_enabled || m_serializing)
         return;
 
+    const EType current = get_current_type();
+    if (current != Undefined)
+        // close any open gizmo
+        open_gizmo(current);
+
     activate_gizmo(Undefined);
     m_hover = Undefined;
 }
@@ -657,7 +662,7 @@ void GLGizmosManager::update_after_undo_redo(const UndoRedo::Snapshot& snapshot)
     m_serializing = false;
     if (m_current == SlaSupports
      && snapshot.snapshot_data.flags & UndoRedo::SnapshotData::RECALCULATE_SLA_SUPPORTS)
-        dynamic_cast<GLGizmoSlaSupports*>(m_gizmos[SlaSupports].get())->reslice_SLA_supports(true);
+        dynamic_cast<GLGizmoSlaSupports*>(m_gizmos[SlaSupports].get())->reslice_until_step(slaposPad, true);
 }
 
 void GLGizmosManager::render_background(float left, float top, float right, float bottom, float border_w, float border_h) const

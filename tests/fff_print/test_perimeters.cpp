@@ -80,13 +80,13 @@ SCENARIO("Perimeter nesting", "[Perimeters]")
         }
         THEN("expected number of external loops") {
             size_t num_external = std::count_if(loops.entities.begin(), loops.entities.end(), 
-                [](const ExtrusionEntity *ee){ return ee->role() == erExternalPerimeter; });
+                [](const ExtrusionEntity *ee){ return ee->role() == ExtrusionRole::ExternalPerimeter; });
             REQUIRE(num_external == data.external);
         }
         THEN("expected external order") {
             std::vector<bool> ext_order;
             for (auto *ee : loops.entities)
-                ext_order.emplace_back(ee->role() == erExternalPerimeter);
+                ext_order.emplace_back(ee->role() == ExtrusionRole::ExternalPerimeter);
             REQUIRE(ext_order == data.ext_order);
         }
         THEN("expected number of internal contour loops") {

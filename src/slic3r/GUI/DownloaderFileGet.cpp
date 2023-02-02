@@ -5,9 +5,12 @@
 #include <boost/nowide/fstream.hpp>
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/algorithm/string.hpp>
 #include <iostream>
 
 #include "format.hpp"
+#include "GUI.hpp"
+#include "I18N.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -30,6 +33,42 @@ std::string FileGet::escape_url(const std::string& unescaped)
 	}
 	return ret_val;
 }
+bool FileGet::is_subdomain(const std::string& url, const std::string& domain)
+{
+	// domain should be f.e. printables.com (.com including)
+	char* host;
+	std::string host_string;
+	CURLUcode rc;
+	CURLU* curl = curl_url();
+	if (!curl) {
+		BOOST_LOG_TRIVIAL(error) << "Failed to init Curl library in function is_domain.";
+		return false;
+	}
+	rc = curl_url_set(curl, CURLUPART_URL, url.c_str(), 0);
+	if (rc != CURLUE_OK) {
+		curl_url_cleanup(curl);
+		return false;
+	}
+	rc = curl_url_get(curl, CURLUPART_HOST, &host, 0);
+	if (rc != CURLUE_OK || !host) {
+		curl_url_cleanup(curl);
+		return false;
+	}
+	host_string = std::string(host);
+	curl_free(host);
+	// now host should be subdomain.domain or just domain
+	if (domain == host_string) {
+		curl_url_cleanup(curl);
+		return true;
+	}
+	if(boost::ends_with(host_string, "." + domain)) {
+		curl_url_cleanup(curl);
+		return true;
+	}
+	curl_url_cleanup(curl);
+	return false;
+}
+
 namespace {
 unsigned get_current_pid()
 {
@@ -119,8 +158,8 @@ void FileGet::priv::get_perform()
 
 	wxString temp_path_wstring(m_tmp_path.wstring());
 	
-	std::cout << "dest_path: " << dest_path.string() << std::endl;
-	std::cout << "m_tmp_path: " << m_tmp_path.string() << std::endl;
+	//std::cout << "dest_path: " << dest_path.string() << std::endl;
+	//std::cout << "m_tmp_path: " << m_tmp_path.string() << std::endl;
 	
 	BOOST_LOG_TRIVIAL(info) << GUI::format("Starting download from %1% to %2%. Temp path is %3%",m_url, dest_path, m_tmp_path);
 
@@ -129,9 +168,16 @@ void FileGet::priv::get_perform()
 	if (m_written == 0)
 		file = fopen(temp_path_wstring.c_str(), "wb");
 	else 
-		file = fopen(temp_path_wstring.c_str(), "a");
+		file = fopen(temp_path_wstring.c_str(), "ab");
 
-	assert(file != NULL);
+	//assert(file != NULL);
+	if (file == NULL) {
+		wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_ERROR);
+		evt->SetString(GUI::format_wxstr(_L("Can't create file at %1%."), temp_path_wstring));
+		evt->SetInt(m_id);
+		m_evt_handler->QueueEvent(evt);
+		return;
+	}
 
 	std:: string range_string = std::to_string(m_written) + "-";
 
@@ -163,6 +209,8 @@ void FileGet::priv::get_perform()
 				m_stopped = true;
 				fclose(file);
 				cancel = true;
+				if (m_written == 0)
+					std::remove(m_tmp_path.string().c_str());
 				wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_PAUSED);
 				evt->SetInt(m_id);
 				m_evt_handler->QueueEvent(evt);
@@ -205,7 +253,10 @@ void FileGet::priv::get_perform()
 			if (file != NULL)
 				fclose(file);
 			wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_ERROR);
-			evt->SetString(error);
+			if (!error.empty())
+				evt->SetString(GUI::from_u8(error));
+			else
+				evt->SetString(GUI::from_u8(body));
 			evt->SetInt(m_id);
 			m_evt_handler->QueueEvent(evt);
 		})

@@ -120,7 +120,6 @@ void GLGizmoFlatten::on_render()
         if (this->is_plane_update_necessary())
             update_planes();
         for (int i = 0; i < (int)m_planes.size(); ++i) {
-            m_planes_casters[i]->set_transform(model_matrix);
             m_planes[i].vbo.model.set_color(i == m_hover_id ? DEFAULT_HOVER_PLANE_COLOR : DEFAULT_PLANE_COLOR);
             m_planes[i].vbo.model.render();
         }
@@ -242,9 +241,7 @@ void GLGizmoFlatten::update_planes()
     }
 
     // Let's prepare transformation of the normal vector from mesh to instance coordinates.
-    Geometry::Transformation t(inst_matrix);
-    Vec3d scaling = t.get_scaling_factor();
-    t.set_scaling_factor(Vec3d(1./scaling(0), 1./scaling(1), 1./scaling(2)));
+    const Matrix3d normal_matrix = inst_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
 
     // Now we'll go through all the polygons, transform the points into xy plane to process them:
     for (unsigned int polygon_id=0; polygon_id < m_planes.size(); ++polygon_id) {
@@ -252,7 +249,7 @@ void GLGizmoFlatten::update_planes()
         const Vec3d& normal = m_planes[polygon_id].normal;
 
         // transform the normal according to the instance matrix:
-        Vec3d normal_transformed = t.get_matrix() * normal;
+        const Vec3d normal_transformed = normal_matrix * normal;
 
         // We are going to rotate about z and y to flatten the plane
         Eigen::Quaterniond q;
@@ -383,12 +380,19 @@ void GLGizmoFlatten::update_planes()
         for (size_t i = 1; i < plane.vertices.size() - 1; ++i) {
             its.indices.emplace_back(0, i, i + 1); // triangle fan
         }
+
         plane.vbo.model.init_from(its);
+        if (Geometry::Transformation(inst_matrix).is_left_handed()) {
+            // we need to swap face normals in case the object is mirrored
+            // for the raycaster to work properly
+            for (stl_triangle_vertex_indices& face : its.indices) {
+                if (its_face_normal(its, face).cast<double>().dot(plane.normal) < 0.0)
+                    std::swap(face[1], face[2]);
+            }
+        }
         plane.vbo.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
-        // FIXME: vertices should really be local, they need not
-        // persist now when we use VBOs
-        plane.vertices.clear();
-        plane.vertices.shrink_to_fit();
+        // vertices are no more needed, clear memory
+        plane.vertices = std::vector<Vec3d>();
     }
 
     on_register_raycasters_for_picking();

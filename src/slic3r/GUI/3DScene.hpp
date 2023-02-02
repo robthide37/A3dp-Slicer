@@ -181,7 +181,7 @@ public:
         bool                force_neutral_color : 1;
         // Whether or not to force rendering of sinking contours
         bool                force_sinking_contours : 1;
-    };
+    }; // this gets instantiated automatically in the parent struct
 
     // Is mouse or rectangle selection over this object to select/deselect it ?
     EHoverState         	hover;
@@ -415,16 +415,6 @@ public:
         int                obj_idx,
         int                volume_idx,
         int                instance_idx);
-
-    // Load SLA auxiliary GLVolumes (for support trees or pad).
-    void load_object_auxiliary(
-        const SLAPrintObject* print_object,
-        int                             obj_idx,
-        // pairs of <instance_idx, print_instance_idx>
-        const std::vector<std::pair<size_t, size_t>>& instances,
-        SLAPrintObjectStep              milestone,
-        // Timestamp of the last change of the milestone
-        size_t                          timestamp);
 
 #if ENABLE_OPENGL_ES
     int load_wipe_tower_preview(

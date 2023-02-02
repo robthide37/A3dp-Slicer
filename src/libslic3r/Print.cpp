@@ -191,6 +191,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "infill_first"
             || opt_key == "single_extruder_multi_material"
             || opt_key == "temperature"
+            || opt_key == "idle_temperature"
             || opt_key == "wipe_tower"
             || opt_key == "wipe_tower_width"
             || opt_key == "wipe_tower_brim_width"
@@ -222,7 +223,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             osteps.emplace_back(posInfill);
             osteps.emplace_back(posSupportMaterial);
             steps.emplace_back(psSkirtBrim);
-        } else if (opt_key == "avoid_curled_filament_during_travels") {
+        } else if (opt_key == "avoid_crossing_curled_overhangs") {
             osteps.emplace_back(posEstimateCurledExtrusions);
         } else {
             // for legacy, if we can't handle this option let's invalidate all steps
@@ -347,7 +348,7 @@ std::vector<ObjectID> Print::print_object_ids() const
 
 bool Print::has_infinite_skirt() const
 {
-    return (m_config.draft_shield == dsEnabled && m_config.skirts > 0) || (m_config.ooze_prevention && this->extruders().size() > 1);
+    return (m_config.draft_shield == dsEnabled && m_config.skirts > 0)/* || (m_config.ooze_prevention && this->extruders().size() > 1)*/;
 }
 
 bool Print::has_skirt() const
@@ -404,7 +405,7 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print& print, Poly
       }
 	    // Make a copy, so it may be rotated for instances.
 	    Polygon convex_hull0 = it_convex_hull->second;
-		const double z_diff = Geometry::rotation_diff_z(model_instance0->get_rotation(), print_object->instances().front().model_instance->get_rotation());
+		const double z_diff = Geometry::rotation_diff_z(model_instance0->get_matrix(), print_object->instances().front().model_instance->get_matrix());
 		if (std::abs(z_diff) > EPSILON)
 			convex_hull0.rotate(z_diff);
 	    // Now we check that no instance of convex_hull intersects any of the previously checked object instances.
@@ -505,8 +506,8 @@ std::string Print::validate(std::string* warning) const
             return L("The Wipe Tower is currently only supported for the Marlin, RepRap/Sprinter, RepRapFirmware and Repetier G-code flavors.");
         if (! m_config.use_relative_e_distances)
             return L("The Wipe Tower is currently only supported with the relative extruder addressing (use_relative_e_distances=1).");
-        if (m_config.ooze_prevention)
-            return L("Ooze prevention is currently not supported with the wipe tower enabled.");
+        if (m_config.ooze_prevention && m_config.single_extruder_multi_material)
+            return L("Ooze prevention is only supported with the wipe tower when 'single_extruder_multi_material' is off.");
         if (m_config.use_volumetric_e)
             return L("The Wipe Tower currently does not support volumetric E (use_volumetric_e=0).");
         if (m_config.complete_objects && extruders.size() > 1)
@@ -840,6 +841,8 @@ void Print::process()
         obj->ironing();
     for (PrintObject *obj : m_objects)
         obj->generate_support_spots();
+    // check data from previous step, format the error message(s) and send alert to ui
+    alert_when_supports_needed();
     for (PrintObject *obj : m_objects)
         obj->generate_support_material();
     for (PrintObject *obj : m_objects)
@@ -1029,7 +1032,7 @@ void Print::_make_skirt()
         ExtrusionLoop eloop(elrSkirt);
         eloop.paths.emplace_back(ExtrusionPath(
             ExtrusionPath(
-                erSkirt,
+                ExtrusionRole::Skirt,
                 (float)mm3_per_mm,         // this will be overridden at G-code export time
                 flow.width(),
 				(float)first_layer_height  // this will be overridden at G-code export time
@@ -1061,6 +1064,8 @@ void Print::_make_skirt()
     for (Polygon &poly : offset(convex_hull, distance + 0.5f * float(scale_(spacing)), ClipperLib::jtRound, float(scale_(0.1))))
         append(m_skirt_convex_hull, std::move(poly.points));
 }
+
+
 
 Polygons Print::first_layer_islands() const
 {
@@ -1112,6 +1117,98 @@ void Print::finalize_first_layer_convex_hull()
     }
     append(m_first_layer_convex_hull.points, this->first_layer_wipe_tower_corners());
     m_first_layer_convex_hull = Geometry::convex_hull(m_first_layer_convex_hull.points);
+}
+
+void Print::alert_when_supports_needed()
+{
+    if (this->set_started(psAlertWhenSupportsNeeded)) {
+        BOOST_LOG_TRIVIAL(debug) << "psAlertWhenSupportsNeeded - start";
+        set_status(69, L("Alert if supports needed"));
+
+        auto issue_to_alert_message = [](SupportSpotsGenerator::SupportPointCause cause, bool critical) {
+            std::string message;
+            switch (cause) {
+            case SupportSpotsGenerator::SupportPointCause::LongBridge: message = L("long bridging extrusions"); break;
+            case SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor: message = L("floating bridge anchors"); break;
+            case SupportSpotsGenerator::SupportPointCause::FloatingExtrusion:
+                if (critical) {
+                    message = L("collapsing overhang");
+                } else {
+                    message = L("loose extrusions");
+                }
+                break;
+            case SupportSpotsGenerator::SupportPointCause::SeparationFromBed: message = L("low bed adhesion"); break;
+            case SupportSpotsGenerator::SupportPointCause::UnstableFloatingPart: message = L("floating object part"); break;
+            case SupportSpotsGenerator::SupportPointCause::WeakObjectPart: message = L("thin fragile section"); break;
+            }
+
+            return  (critical ? "!" : "") + message;
+        };
+
+        // vector of pairs of object and its issues, where each issue is a pair of type and critical flag
+        std::vector<std::pair<const PrintObject *, std::vector<std::pair<SupportSpotsGenerator::SupportPointCause, bool>>>> objects_isssues;
+
+        for (const PrintObject *object : m_objects) {
+            std::unordered_set<const ModelObject *> checked_model_objects;
+            if (!object->has_support() && checked_model_objects.find(object->model_object()) == checked_model_objects.end()) {
+                if (object->m_shared_regions->generated_support_points.has_value()) {
+                    SupportSpotsGenerator::SupportPoints  supp_points = object->m_shared_regions->generated_support_points->support_points;
+                    SupportSpotsGenerator::PartialObjects partial_objects = object->m_shared_regions->generated_support_points
+                                                                                ->partial_objects;
+                    auto issues = SupportSpotsGenerator::gather_issues(supp_points, partial_objects);
+                    if (issues.size() > 0) {
+                        objects_isssues.emplace_back(object, issues);
+                    }
+                }
+                checked_model_objects.emplace(object->model_object());
+            }
+        }
+
+        bool recommend_brim = false;
+        std::map<std::pair<SupportSpotsGenerator::SupportPointCause, bool>, std::vector<const PrintObject *>> po_by_support_issues;
+        for (const auto &obj : objects_isssues) {
+            for (const auto &issue : obj.second) {
+                po_by_support_issues[issue].push_back(obj.first);
+                if (issue.first == SupportSpotsGenerator::SupportPointCause::SeparationFromBed){
+                    recommend_brim = true;
+                }
+            }
+        }
+
+        auto message = L("Detected print stability issues") + ": \n";
+        if (objects_isssues.size() > po_by_support_issues.size()) {
+            // there are more objects than causes, group by issues
+            for (const auto &issue : po_by_support_issues) {
+                message += "\n" + issue_to_alert_message(issue.first.first, issue.first.second) + "  >>  ";
+                for (const auto &obj : issue.second) {
+                    message += obj->m_model_object->name + ", ";
+                }
+                message.pop_back();
+                message.pop_back(); // remove ,
+                message += ".\n";
+            }
+        } else {
+            // more causes than objects, group by objects
+            for (const auto &obj : objects_isssues) {
+                message += "\n" + L("Object") + " " + obj.first->model_object()->name + "  <<  ";
+                for (const auto &issue : obj.second) {
+                    message += issue_to_alert_message(issue.first, issue.second) + ", ";
+                }
+                message.pop_back();
+                message.pop_back(); // remove ,
+                message += ".\n";
+            }
+        }
+
+        message += "\n" + L("Consider enabling supports") + (recommend_brim ? (" " + L("and/or brim")) : "") + ".";
+
+        if (objects_isssues.size() > 0) {
+            this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL, message);
+        }
+
+        BOOST_LOG_TRIVIAL(debug) << "psAlertWhenSupportsNeeded - end";
+        this->set_done(psAlertWhenSupportsNeeded);
+    }
 }
 
 // Wipe tower support.

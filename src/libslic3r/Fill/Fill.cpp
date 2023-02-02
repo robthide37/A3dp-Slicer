@@ -54,7 +54,7 @@ struct SurfaceFillParams
     Flow 			flow;
 
 	// For the output
-    ExtrusionRole	extrusion_role = ExtrusionRole(0);
+	ExtrusionRole	extrusion_role{ ExtrusionRole::None };
 
 	// Various print settings?
 
@@ -83,8 +83,7 @@ struct SurfaceFillParams
 		RETURN_COMPARE_NON_EQUAL(flow.height());
 		RETURN_COMPARE_NON_EQUAL(flow.nozzle_diameter());
 		RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, bridge);
-		RETURN_COMPARE_NON_EQUAL_TYPED(unsigned, extrusion_role);
-		return false;
+		return this->extrusion_role.lower(rhs.extrusion_role);
 	}
 
 	bool operator==(const SurfaceFillParams &rhs) const {
@@ -152,11 +151,10 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 
 		        params.extrusion_role =
 		            is_bridge ?
-		                erBridgeInfill :
+		                ExtrusionRole::BridgeInfill :
 		                (surface.is_solid() ?
-		                    (surface.is_top() ? erTopSolidInfill : erSolidInfill) :
-		                  	//(surface.is_top() ? erTopSolidInfill : (surface.is_bottom()? erBottomSurface : erSolidInfill)) :
-		                    erInternalInfill);
+		                    (surface.is_top() ? ExtrusionRole::TopSolidInfill : ExtrusionRole::SolidInfill) :
+							ExtrusionRole::InternalInfill);
 		        params.bridge_angle = float(surface.bridge_angle);
 		        params.angle 		= float(Geometry::deg2rad(region_config.fill_angle.value));
 		        
@@ -291,7 +289,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		        params.extruder 	 = layerm.region().extruder(frSolidInfill);
 	            params.pattern 		 = fill_type_monotonic(layerm.region().config().top_fill_pattern) ? ipMonotonic : ipRectilinear;
 	            params.density 		 = 100.f;
-		        params.extrusion_role = erInternalInfill;
+		        params.extrusion_role = ExtrusionRole::InternalInfill;
 		        params.angle 		= float(Geometry::deg2rad(layerm.region().config().fill_angle.value));
 		        // calculate the actual flow we'll be using for this infill
 				params.flow = layerm.flow(frSolidInfill);
@@ -497,8 +495,11 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
         f->print_config        = &this->object()->print()->config();
         f->print_object_config = &this->object()->config();
 
-        if (surface_fill.params.pattern == ipLightning)
-            dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator;
+		if (surface_fill.params.pattern == ipLightning) {
+			auto *lf = dynamic_cast<FillLightning::Filler*>(f.get());
+			lf->generator = lightning_generator;
+			lf->num_raft_layers = this->object()->slicing_parameters().raft_layers();
+		}
 
         if (surface_fill.params.pattern == ipEnsuring) {
             auto *fill_bounded_rectilinear = dynamic_cast<FillEnsuring *>(f.get());
@@ -835,7 +836,7 @@ void Layer::make_ironing()
 				eec->no_sort = true;
 		        extrusion_entities_append_paths(
 		            eec->entities, std::move(polylines),
-		            erIroning,
+					ExtrusionRole::Ironing,
 		            flow_mm3_per_mm, extrusion_width, float(extrusion_height));
 				insert_fills_into_islands(*this, ironing_params.region_id, fill_begin, uint32_t(ironing_params.layerm->fills().size()));
 		    }

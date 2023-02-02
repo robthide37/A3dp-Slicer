@@ -8,7 +8,7 @@ namespace Slic3r {
 
 void filter_by_extrusion_role_in_place(ExtrusionEntitiesPtr &extrusion_entities, ExtrusionRole role)
 {
-	if (role != erMixed) {
+	if (role != ExtrusionRole::Mixed) {
 		auto first  = extrusion_entities.begin();
 		auto last   = extrusion_entities.end();
         extrusion_entities.erase(

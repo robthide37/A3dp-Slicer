@@ -762,27 +762,25 @@ void SpinCtrl::BUILD() {
     if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
 
 	wxString	text_value = wxString("");
-	int			default_value = 0;
+	int			default_value = UNDEF_VALUE;
 
 	switch (m_opt.type) {
 	case coInt:
 		default_value = m_opt.default_value->getInt();
-		text_value = wxString::Format(_T("%i"), default_value);
 		break;
 	case coInts:
 	{
-		const ConfigOptionInts *vec = m_opt.get_default_value<ConfigOptionInts>();
-		if (vec == nullptr || vec->empty()) break;
-		for (size_t id = 0; id < vec->size(); ++id)
-		{
-			default_value = vec->get_at(id);
-			text_value += wxString::Format(_T("%i"), default_value);
-		}
+		default_value = m_opt.get_default_value<ConfigOptionInts>()->get_at(m_opt_idx);
+        if (m_opt.nullable)
+            m_last_meaningful_value = default_value == ConfigOptionIntsNullable::nil_value() ? static_cast<int>(m_opt.max) : default_value;
 		break;
 	}
 	default:
 		break;
 	}
+
+    if (default_value != UNDEF_VALUE)
+        text_value = wxString::Format(_T("%i"), default_value);
 
     const int min_val = m_opt.min == -FLT_MAX
 #ifdef __WXOSX__
@@ -880,6 +878,50 @@ void SpinCtrl::BUILD() {
 
 	// recast as a wxWindow to fit the calling convention
 	window = dynamic_cast<wxWindow*>(temp);
+}
+
+void SpinCtrl::set_value(const boost::any& value, bool change_event/* = false*/)
+{
+    m_disable_change_event = !change_event;
+    tmp_value = boost::any_cast<int>(value);
+    m_value = value;
+    if (m_opt.nullable) {
+        const bool m_is_na_val = tmp_value == ConfigOptionIntsNullable::nil_value();
+        if (m_is_na_val)
+            dynamic_cast<wxSpinCtrl*>(window)->SetValue(na_value());
+        else {
+            m_last_meaningful_value = value;
+            dynamic_cast<wxSpinCtrl*>(window)->SetValue(tmp_value);
+        }
+    }
+    else
+        dynamic_cast<wxSpinCtrl*>(window)->SetValue(tmp_value);
+    m_disable_change_event = false;
+}
+
+void SpinCtrl::set_last_meaningful_value()
+{
+    const int val = boost::any_cast<int>(m_last_meaningful_value);
+    dynamic_cast<wxSpinCtrl*>(window)->SetValue(val);
+    tmp_value = val;
+    propagate_value();
+}
+
+void SpinCtrl::set_na_value()
+{
+    dynamic_cast<wxSpinCtrl*>(window)->SetValue(na_value());
+    m_value = ConfigOptionIntsNullable::nil_value();
+    propagate_value();
+}
+
+boost::any& SpinCtrl::get_value()
+{
+    wxSpinCtrl* spin = static_cast<wxSpinCtrl*>(window);
+    if (spin->GetTextValue() == na_value())
+        return m_value;
+
+	int value = spin->GetValue();
+	return m_value = value;
 }
 
 void SpinCtrl::propagate_value()
@@ -1172,6 +1214,20 @@ void Choice::set_value(const boost::any& value, bool change_event)
 			auto it = std::find(values.begin(), values.end(), key);
 			val = it == values.end() ? 0 : it - values.begin();
 		}
+		else if (m_opt_id == "support_material_style")
+		{
+			std::string key;
+			const t_config_enum_values& map_names = ConfigOptionEnum<SupportMaterialStyle>::get_enum_values();
+			for (auto it : map_names)
+				if (val == it.second) {
+					key = it.first;
+					break;
+				}
+
+			const std::vector<std::string>& values = m_opt.enum_values;
+			auto it = std::find(values.begin(), values.end(), key);
+			val = it == values.end() ? 0 : it - values.begin();
+		}
 		field->SetSelection(val);
 		break;
 	}
@@ -1239,7 +1295,9 @@ boost::any& Choice::get_value()
         if (m_opt_id == "top_fill_pattern" || m_opt_id == "bottom_fill_pattern" || m_opt_id == "fill_pattern") {
 			const std::string& key = m_opt.enum_values[field->GetSelection()];
 			m_value = int(ConfigOptionEnum<InfillPattern>::get_enum_values().at(key));
-		}
+		} else if (m_opt_id == "support_material_style") {
+            m_value = int(ConfigOptionEnum<SupportMaterialStyle>::get_enum_values().at(m_opt.enum_values[field->GetSelection()]));
+        }
 		else
 			m_value = field->GetSelection();
 	}

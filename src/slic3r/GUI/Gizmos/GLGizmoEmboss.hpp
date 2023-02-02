@@ -62,7 +62,7 @@ protected:
     bool on_is_activable() const override { return true; }
     bool on_is_selectable() const override { return false; }
     void on_set_state() override;    
-    
+    void data_changed() override; // selection changed
     void on_set_hover_id() override{ m_rotate_gizmo.set_hover_id(m_hover_id); }
     void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(); }
     void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(); }
@@ -94,7 +94,6 @@ private:
     // create volume from text - main functionality
     bool process();
     void close();
-    void discard_and_close();
     void draw_window();
     void draw_text_input();
     void draw_model_type();
@@ -111,8 +110,8 @@ private:
     void draw_font_preview(FaceName &face, bool is_visible);
     void draw_font_list();
     void draw_style_edit();
-    void draw_height(std::optional<float> scale, bool use_inch);
-    void draw_depth(std::optional<float> scale, bool use_inch);
+    void draw_height(bool use_inch);
+    void draw_depth(bool use_inch);
 
     bool draw_italic_button();
     bool draw_bold_button();
@@ -126,7 +125,7 @@ private:
 
     bool rev_input_mm(const std::string &name, float &value, const float *default_value,
         const std::string &undo_tooltip, float step, float step_fast, const char *format,
-        bool use_inch = false, std::optional<float> scale = {});
+        bool use_inch, const std::optional<float>& scale);
 
     /// <summary>
     /// Reversible input float with option to restor default value
@@ -146,8 +145,9 @@ private:
     template<typename T, typename Draw>
     bool revertible(const std::string &name, T &value, const T *default_value, const std::string &undo_tooltip, float undo_offset, Draw draw);
 
+    bool   m_should_set_minimal_windows_size = false;
     void set_minimal_window_size(bool is_advance_edit_style);
-    const ImVec2 &get_minimal_window_size() const;
+    ImVec2 get_minimal_window_size() const;
 
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
@@ -171,15 +171,15 @@ private:
         ImVec2 minimal_window_size              = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
         ImVec2 minimal_window_size_with_collections = ImVec2(0, 0);
-        float        input_width                      = 0.f;
-        float        delete_pos_x                     = 0.f;
-        float        max_style_name_width             = 0.f;
-        unsigned int icon_width                       = 0;
+        float height_of_volume_type_selector = 0.f;
+        float input_width                    = 0.f;
+        float delete_pos_x                   = 0.f;
+        float max_style_name_width           = 0.f;
+        unsigned int icon_width              = 0;
 
         // maximal width and height of style image
         Vec2i max_style_image_size = Vec2i(0, 0);
 
-        float style_offset          = 0.f;
         float input_offset          = 0.f;
         float advanced_input_offset = 0.f;
 
@@ -196,8 +196,6 @@ private:
         // Only translations needed for calc GUI size
         struct Translations
         {
-            std::string type;
-            std::string style;
             std::string font;
             std::string size;
             std::string depth;
@@ -219,8 +217,9 @@ private:
     std::optional<const GuiCfg> m_gui_cfg;
     bool m_is_advanced_edit_style = false;
 
-    // when true window will appear near to text
-    bool m_allow_float_window = false;
+    // when true window will appear near to text volume when open
+    // When false it opens on last position
+    bool m_allow_open_near_volume = false;
     // setted only when wanted to use - not all the time
     std::optional<ImVec2> m_set_window_offset;
 
@@ -258,6 +257,7 @@ private:
                 
         // protection for open too much font files together
         // Gtk:ERROR:../../../../gtk/gtkiconhelper.c:494:ensure_surface_for_gicon: assertion failed (error == NULL): Failed to load /usr/share/icons/Yaru/48x48/status/image-missing.png: Error opening file /usr/share/icons/Yaru/48x48/status/image-missing.png: Too many open files (g-io-error-quark, 31)
+        // This variable must exist until no CreateFontImageJob is running
         unsigned int count_opened_font_files = 0; 
 
         // Configuration for texture height
@@ -269,6 +269,10 @@ private:
         // hash created from enumerated font from OS
         // check when new font was installed
         size_t hash = 0;
+
+        // filtration pattern
+        std::string search = "";
+        std::vector<bool> hide; // result of filtration
     } m_face_names;
     static bool store(const Facenames &facenames);
     static bool load(Facenames &facenames);
@@ -280,21 +284,15 @@ private:
     // actual volume
     ModelVolume *m_volume;
 
-    // state of volume when open EmbossGizmo
-    struct EmbossVolume
-    {
-        TriangleMesh tm;
-        TextConfiguration tc;
-        Transform3d tr;
-        std::string name;
-    };
-    std::optional<EmbossVolume> m_unmodified_volume;
+    // When work with undo redo stack there could be situation that 
+    // m_volume point to unexisting volume so One need also objectID
+    ObjectID m_volume_id;
 
     // True when m_text contain character unknown by selected font
     bool m_text_contain_unknown_glyph = false;
 
     // cancel for previous update of volume to cancel finalize part
-    std::shared_ptr<std::atomic<bool>> m_update_job_cancel;
+    std::shared_ptr<std::atomic<bool>> m_job_cancel;
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
@@ -311,6 +309,11 @@ private:
     // Only when drag text object it stores world position
     std::optional<Transform3d> m_temp_transformation;
 
+    // For text on scaled objects
+    std::optional<float> m_scale_height;
+    std::optional<float> m_scale_depth;
+    void calculate_scale();
+
     // drawing icons
     GLTexture m_icons_texture;
     void init_icons();
@@ -326,10 +329,6 @@ private:
         unbold,
         system_selector,
         open_file,
-        // VolumeType icons
-        part,
-        negative,
-        modifier,
         // automatic calc of icon's count
         _count
     };

@@ -1201,7 +1201,6 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                 }
                 // Invalidate just the supports step.
                 for (const PrintObjectStatus &print_object_status : print_objects_range) {
-                    update_apply_status(print_object_status.print_object->invalidate_step(posSupportSpotsSearch));
                     update_apply_status(print_object_status.print_object->invalidate_step(posSupportMaterial));
                 }
                 if (supports_differ) {
@@ -1336,7 +1335,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 					deleted_objects = true;
                 }
 			if (new_objects || deleted_objects)
-                update_apply_status(this->invalidate_steps({ psSkirtBrim, psWipeTower, psGCodeExport }));
+                update_apply_status(this->invalidate_steps({ psAlertWhenSupportsNeeded, psSkirtBrim, psWipeTower, psGCodeExport }));
 			if (new_objects)
 	            update_apply_status(false);
             print_regions_reshuffled = true;
@@ -1451,11 +1450,37 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     for (PrintObject *object : m_objects)
         object->update_slicing_parameters();
 
+    if (apply_status == APPLY_STATUS_CHANGED || apply_status == APPLY_STATUS_INVALIDATED)
+        this->cleanup();
+
 #ifdef _DEBUG
     check_model_ids_equal(m_model, model);
 #endif /* _DEBUG */
 
 	return static_cast<ApplyStatus>(apply_status);
+}
+
+void Print::cleanup()
+{
+    // Invalidate data of a single ModelObject shared by multiple PrintObjects.
+    // Find spans of PrintObjects sharing the same PrintObjectRegions.
+    std::vector<PrintObject*> all_objects(m_objects);
+    std::sort(all_objects.begin(), all_objects.end(), [](const PrintObject *l, const PrintObject *r){ return l->shared_regions() < r->shared_regions(); } );
+    for (auto it = all_objects.begin(); it != all_objects.end();) {
+        PrintObjectRegions *shared_regions = (*it)->m_shared_regions;
+        auto it_begin = it;
+        for (; it != all_objects.end() && shared_regions == (*it)->shared_regions(); ++ it)
+            // Let the PrintObject clean up its data with invalidated milestones.
+            (*it)->cleanup();
+        auto this_objects = SpanOfConstPtrs<PrintObject>(const_cast<const PrintObject* const* const>(&(*it_begin)), it - it_begin);
+        if (! Print::is_shared_print_object_step_valid_unguarded(this_objects, posSupportSpotsSearch))
+            shared_regions->generated_support_points.reset();
+    }    
+}
+
+bool Print::is_shared_print_object_step_valid_unguarded(SpanOfConstPtrs<PrintObject> print_objects, PrintObjectStep print_object_step)
+{
+    return std::any_of(print_objects.begin(), print_objects.end(), [print_object_step](auto po){ return po->is_step_done_unguarded(print_object_step); });
 }
 
 } // namespace Slic3r

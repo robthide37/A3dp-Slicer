@@ -56,7 +56,7 @@ private:
     float m_old_angle{ 0.0f };
 
     // emboss need to draw rotation gizmo in local coordinate systems
-    bool m_using_local_coordinate{false};
+    bool m_force_local_coordinate{ false };
 
     ColorRGBA m_drag_color;
     ColorRGBA m_highlight_color;
@@ -71,7 +71,7 @@ public:
     std::string get_tooltip() const override;
 
     void set_group_id(int group_id) { m_group_id = group_id; }
-    void set_using_local_coordinate(bool use) { m_using_local_coordinate =use;}
+    void set_force_local_coordinate(bool use) { m_force_local_coordinate = use; }
 
     void start_dragging();
     void stop_dragging();

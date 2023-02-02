@@ -615,7 +615,7 @@ public:
     static double 			nil_value() { return std::numeric_limits<double>::quiet_NaN(); }
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (! std::isnan(v)) return false; return true; }
-    bool 					is_nil(size_t idx) const override { return std::isnan(this->values[idx]); }
+    bool 					is_nil(size_t idx) const override { return std::isnan(this->values[idx < values.size() ? idx : 0]); }
 
     std::string serialize() const override
     {
@@ -776,7 +776,7 @@ public:
     static int	 			nil_value() { return std::numeric_limits<int>::max(); }
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
-    bool 					is_nil(size_t idx) const override { return this->values[idx] == nil_value(); }
+    bool 					is_nil(size_t idx) const override { return values[idx < this->values.size() ? idx : 0] == nil_value(); }
 
     std::string serialize() const override
     {
@@ -1092,7 +1092,7 @@ public:
     static FloatOrPercent   nil_value() { return { std::numeric_limits<double>::quiet_NaN(), false }; }
     // A scalar is nil, or all values of a vector are nil.
     bool                    is_nil() const override { for (auto v : this->values) if (! std::isnan(v.value)) return false; return true; }
-    bool                    is_nil(size_t idx) const override { return std::isnan(this->values[idx].value); }
+    bool                    is_nil(size_t idx) const override { return std::isnan(this->values[idx < values.size() ? idx : 0].value); }
 
     std::string serialize() const override
     {
@@ -1404,7 +1404,7 @@ public:
     static unsigned char	nil_value() { return std::numeric_limits<unsigned char>::max(); }
     // A scalar is nil, or all values of a vector are nil.
     bool 					is_nil() const override { for (auto v : this->values) if (v != nil_value()) return false; return true; }
-    bool 					is_nil(size_t idx) const override { return this->values[idx] == nil_value(); }
+    bool 					is_nil(size_t idx) const override { return this->values[idx < values.size() ? idx : 0] == nil_value(); }
 
     bool& get_at(size_t i) {
         assert(! this->values.empty());

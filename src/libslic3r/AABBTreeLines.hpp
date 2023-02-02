@@ -117,18 +117,18 @@ inline std::tuple<int, int> coordinate_aligned_ray_hit_count(size_t             
 }
 
 template<typename LineType, typename TreeType, typename VectorType>
-inline std::vector<VectorType> get_intersections_with_line(size_t                                node_idx,
-                                                           const TreeType                       &tree,
-                                                           const std::vector<LineType>          &lines,
-                                                           const LineType                       &line,
-                                                           const typename TreeType::BoundingBox &line_bb)
+inline std::vector<std::pair<VectorType, size_t>> get_intersections_with_line(size_t                                node_idx,
+                                                                              const TreeType                       &tree,
+                                                                              const std::vector<LineType>          &lines,
+                                                                              const LineType                       &line,
+                                                                              const typename TreeType::BoundingBox &line_bb)
 {
     const auto &node = tree.node(node_idx);
     assert(node.is_valid());
     if (node.is_leaf()) {
         VectorType intersection_pt;
         if (line_alg::intersection(line, lines[node.idx], &intersection_pt)) {
-            return {intersection_pt};
+            return {std::pair<VectorType, size_t>(intersection_pt, node.idx)};
         } else {
             return {};
         }
@@ -140,17 +140,17 @@ inline std::vector<VectorType> get_intersections_with_line(size_t               
         assert(node_left.is_valid());
         assert(node_right.is_valid());
 
-        std::vector<VectorType> result;
+        std::vector<std::pair<VectorType, size_t>> result;
 
         if (node_left.bbox.intersects(line_bb)) {
-            std::vector<VectorType> intersections = get_intersections_with_line<LineType, TreeType, VectorType>(left_node_idx, tree, lines,
-                                                                                                                line, line_bb);
+            std::vector<std::pair<VectorType, size_t>> intersections =
+                get_intersections_with_line<LineType, TreeType, VectorType>(left_node_idx, tree, lines, line, line_bb);
             result.insert(result.end(), intersections.begin(), intersections.end());
         }
 
         if (node_right.bbox.intersects(line_bb)) {
-            std::vector<VectorType> intersections = get_intersections_with_line<LineType, TreeType, VectorType>(right_node_idx, tree, lines,
-                                                                                                                line, line_bb);
+            std::vector<std::pair<VectorType, size_t>> intersections =
+                get_intersections_with_line<LineType, TreeType, VectorType>(right_node_idx, tree, lines, line, line_bb);
             result.insert(result.end(), intersections.begin(), intersections.end());
         }
 
@@ -263,9 +263,13 @@ inline int point_outside_closed_contours(const std::vector<LineType> &lines, con
 }
 
 template<bool sorted, typename VectorType, typename LineType, typename TreeType>
-inline std::vector<VectorType> get_intersections_with_line(const std::vector<LineType> &lines, const TreeType &tree, const LineType &line)
+inline std::vector<std::pair<VectorType, size_t>> get_intersections_with_line(const std::vector<LineType> &lines,
+                                                                              const TreeType              &tree,
+                                                                              const LineType              &line)
 {
-    if (tree.empty()) { return {}; }
+    if (tree.empty()) {
+        return {};
+    }
     auto line_bb = typename TreeType::BoundingBox(line.a, line.a);
     line_bb.extend(line.b);
 
@@ -274,15 +278,16 @@ inline std::vector<VectorType> get_intersections_with_line(const std::vector<Lin
         using Floating =
             typename std::conditional<std::is_floating_point<typename LineType::Scalar>::value, typename LineType::Scalar, double>::type;
 
-        std::vector<std::pair<Floating, VectorType>> points_with_sq_distance{};
-        for (const VectorType &p : intersections) {
-            points_with_sq_distance.emplace_back((p - line.a).template cast<Floating>().squaredNorm(), p);
+        std::vector<std::pair<Floating, std::pair<VectorType, size_t>>> points_with_sq_distance{};
+        for (const auto &p : intersections) {
+            points_with_sq_distance.emplace_back((p.first - line.a).template cast<Floating>().squaredNorm(), p);
         }
         std::sort(points_with_sq_distance.begin(), points_with_sq_distance.end(),
-                  [](const std::pair<Floating, VectorType> &left, std::pair<Floating, VectorType> &right) {
-                      return left.first < right.first;
-                  });
-        for (size_t i = 0; i < points_with_sq_distance.size(); i++) { intersections[i] = points_with_sq_distance[i].second; }
+                  [](const std::pair<Floating, std::pair<VectorType, size_t>> &left,
+                     std::pair<Floating, std::pair<VectorType, size_t>>       &right) { return left.first < right.first; });
+        for (size_t i = 0; i < points_with_sq_distance.size(); i++) {
+            intersections[i] = points_with_sq_distance[i].second;
+        }
     }
 
     return intersections;
@@ -290,10 +295,11 @@ inline std::vector<VectorType> get_intersections_with_line(const std::vector<Lin
 
 template<typename LineType> class LinesDistancer
 {
-private:
-    std::vector<LineType> lines;
+public:
     using Scalar   = typename LineType::Scalar;
     using Floating = typename std::conditional<std::is_floating_point<Scalar>::value, Scalar, double>::type;
+private:
+    std::vector<LineType> lines;
     AABBTreeIndirect::Tree<2, Scalar> tree;
 
 public:
@@ -313,23 +319,29 @@ public:
     int outside(const Vec<2, Scalar> &point) const { return point_outside_closed_contours(lines, tree, point); }
 
     // negative sign means inside
-    std::tuple<Floating, size_t, Vec<2, Floating>> signed_distance_from_lines_extra(const Vec<2, Scalar> &point) const
+    template<bool SIGNED_DISTANCE>
+    std::tuple<Floating, size_t, Vec<2, Floating>> distance_from_lines_extra(const Vec<2, Scalar> &point) const
     {
         size_t           nearest_line_index_out = size_t(-1);
         Vec<2, Floating> nearest_point_out      = Vec<2, Floating>::Zero();
         Vec<2, Floating> p                      = point.template cast<Floating>();
         auto distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, p, nearest_line_index_out, nearest_point_out);
 
-        if (distance < 0) { return {std::numeric_limits<Floating>::infinity(), nearest_line_index_out, nearest_point_out}; }
+        if (distance < 0) {
+            return {std::numeric_limits<Floating>::infinity(), nearest_line_index_out, nearest_point_out};
+        }
         distance = sqrt(distance);
-        distance *= outside(point);
+
+        if (SIGNED_DISTANCE) {
+            distance *= outside(point);
+        }
 
         return {distance, nearest_line_index_out, nearest_point_out};
     }
 
-    Floating signed_distance_from_lines(const Vec<2, typename LineType::Scalar> &point) const
+    template<bool SIGNED_DISTANCE> Floating distance_from_lines(const Vec<2, typename LineType::Scalar> &point) const
     {
-        auto [dist, idx, np] = signed_distance_from_lines_extra(point);
+        auto [dist, idx, np] = distance_from_lines_extra<SIGNED_DISTANCE>(point);
         return dist;
     }
 
@@ -338,7 +350,7 @@ public:
         return all_lines_in_radius(this->lines, this->tree, point, radius * radius);
     }
 
-    template<bool sorted> std::vector<Vec<2, Scalar>> intersections_with_line(const LineType &line) const
+    template<bool sorted> std::vector<std::pair<Vec<2, Scalar>, size_t>> intersections_with_line(const LineType &line) const
     {
         return get_intersections_with_line<sorted, Vec<2, Scalar>>(lines, tree, line);
     }

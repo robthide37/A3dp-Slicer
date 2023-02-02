@@ -13,6 +13,8 @@
 
 #include "libnest2d/common.hpp"
 
+#include <numeric>
+
 namespace Slic3r { namespace GUI {
 
 // Cache the wti info

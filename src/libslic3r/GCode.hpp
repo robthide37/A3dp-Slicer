@@ -39,14 +39,13 @@ struct PrintInstance;
 class OozePrevention {
 public:
     bool enable;
-    Points standby_points;
     
     OozePrevention() : enable(false) {}
     std::string pre_toolchange(GCode &gcodegen);
     std::string post_toolchange(GCode &gcodegen);
     
 private:
-    int _get_temp(GCode &gcodegen);
+    int _get_temp(const GCode &gcodegen) const;
 };
 
 class Wipe {
@@ -137,14 +136,14 @@ public:
         m_enable_loop_clipping(true), 
         m_enable_cooling_markers(false), 
         m_enable_extrusion_role_markers(false),
-        m_last_processor_extrusion_role(erNone),
+        m_last_processor_extrusion_role(GCodeExtrusionRole::None),
         m_layer_count(0),
         m_layer_index(-1), 
         m_layer(nullptr),
         m_object_layer_over_raft(false),
         m_volumetric_speed(0),
         m_last_pos_defined(false),
-        m_last_extrusion_role(erNone),
+        m_last_extrusion_role(GCodeExtrusionRole::None),
         m_last_width(0.0f),
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
         m_last_mm3_per_mm(0.0),
@@ -326,7 +325,7 @@ private:
     std::string     extrude_support(const ExtrusionEntityCollection &support_fills);
 
     std::string     travel_to(const Point &point, ExtrusionRole role, std::string comment);
-    bool            needs_retraction(const Polyline &travel, ExtrusionRole role = erNone);
+    bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None);
     std::string     retract(bool toolchange = false);
     std::string     unretract() { return m_writer.unlift() + m_writer.unretract(); }
     std::string     set_extruder(unsigned int extruder_id, double print_z);
@@ -352,7 +351,7 @@ private:
     OozePrevention                      m_ooze_prevention;
     Wipe                                m_wipe;
     AvoidCrossingPerimeters             m_avoid_crossing_perimeters;
-    JPSPathFinder                       m_avoid_curled_filaments;
+    JPSPathFinder                       m_avoid_crossing_curled_overhangs;
     RetractWhenCrossingPerimeters       m_retract_when_crossing_perimeters;
     bool                                m_enable_loop_clipping;
     // If enabled, the G-code generator will put following comments at the ends
@@ -363,7 +362,7 @@ private:
     // The Pressure Equalizer removes the markers from the final G-code.
     bool                                m_enable_extrusion_role_markers;
     // Keeps track of the last extrusion role passed to the processor
-    ExtrusionRole                       m_last_processor_extrusion_role;
+    GCodeExtrusionRole                  m_last_processor_extrusion_role;
     // How many times will change_layer() be called?
     // change_layer() will update the progress bar.
     unsigned int                        m_layer_count;
@@ -376,7 +375,7 @@ private:
     bool                                m_object_layer_over_raft;
     double                              m_volumetric_speed;
     // Support for the extrusion role markers. Which marker is active?
-    ExtrusionRole                       m_last_extrusion_role;
+    GCodeExtrusionRole                  m_last_extrusion_role;
     // Support for G-Code Processor
     float                               m_last_height{ 0.0f };
     float                               m_last_layer_z{ 0.0f };

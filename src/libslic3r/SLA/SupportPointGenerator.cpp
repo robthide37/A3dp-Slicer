@@ -661,5 +661,17 @@ void SupportPointGenerator::output_expolygons(const ExPolygons& expolys, const s
 }
 #endif
 
+SupportPoints transformed_support_points(const ModelObject &mo,
+                                         const Transform3d &trafo)
+{
+    auto spts = mo.sla_support_points;
+    Transform3f tr = trafo.cast<float>();
+    for (sla::SupportPoint& suppt : spts) {
+        suppt.pos = tr * suppt.pos;
+    }
+
+    return spts;
+}
+
 } // namespace sla
 } // namespace Slic3r

@@ -2,6 +2,7 @@
 #define slic3r_ExtrusionEntity_hpp_
 
 #include "libslic3r.h"
+#include "ExtrusionRole.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 
@@ -15,65 +16,6 @@ class ExPolygon;
 using ExPolygons = std::vector<ExPolygon>;
 class ExtrusionEntityCollection;
 class Extruder;
-
-// Each ExtrusionRole value identifies a distinct set of { extruder, speed }
-enum ExtrusionRole : uint8_t {
-    erNone,
-    erPerimeter,
-    erExternalPerimeter,
-    erOverhangPerimeter,
-    erInternalInfill,
-    erSolidInfill,
-    erTopSolidInfill,
-    erIroning,
-    erBridgeInfill,
-    erGapFill,
-    erSkirt,
-    erSupportMaterial,
-    erSupportMaterialInterface,
-    erWipeTower,
-    erCustom,
-    // Extrusion role for a collection with multiple extrusion roles.
-    erMixed,
-    erCount
-};
-
-// Special flags describing loop
-enum ExtrusionLoopRole {
-    elrDefault,
-    elrContourInternalPerimeter,
-    elrSkirt,
-};
-
-
-inline bool is_perimeter(ExtrusionRole role)
-{
-    return role == erPerimeter
-        || role == erExternalPerimeter
-        || role == erOverhangPerimeter;
-}
-
-inline bool is_infill(ExtrusionRole role)
-{
-    return role == erBridgeInfill
-        || role == erInternalInfill
-        || role == erSolidInfill
-        || role == erTopSolidInfill
-        || role == erIroning;
-}
-
-inline bool is_solid_infill(ExtrusionRole role)
-{
-    return role == erBridgeInfill
-        || role == erSolidInfill
-        || role == erTopSolidInfill
-        || role == erIroning;
-}
-
-inline bool is_bridge(ExtrusionRole role) {
-    return role == erBridgeInfill
-        || role == erOverhangPerimeter;
-}
 
 class ExtrusionEntity
 {
@@ -108,9 +50,6 @@ public:
     virtual Polylines as_polylines() const { Polylines dst; this->collect_polylines(dst); return dst; }
     virtual double length() const = 0;
     virtual double total_volume() const = 0;
-
-    static std::string role_to_string(ExtrusionRole role);
-    static ExtrusionRole string_to_role(const std::string_view role);
 };
 
 typedef std::vector<ExtrusionEntity*> ExtrusionEntitiesPtr;
@@ -217,7 +156,7 @@ public:
     size_t size() const { return this->paths.size(); }
     bool empty() const { return this->paths.empty(); }
     double length() const override;
-    ExtrusionRole role() const override { return this->paths.empty() ? erNone : this->paths.front().role(); }
+    ExtrusionRole role() const override { return this->paths.empty() ? ExtrusionRole::None : this->paths.front().role(); }
     // Produce a list of 2D polygons covered by the extruded paths, offsetted by the extrusion width.
     // Increase the offset by scaled_epsilon to achieve an overlap, so a union will produce no gaps.
     void polygons_covered_by_width(Polygons &out, const float scaled_epsilon) const override;
@@ -279,7 +218,7 @@ public:
     // Test, whether the point is extruded by a bridging flow.
     // This used to be used to avoid placing seams on overhangs, but now the EdgeGrid is used instead.
     bool has_overhang_point(const Point &point) const;
-    ExtrusionRole role() const override { return this->paths.empty() ? erNone : this->paths.front().role(); }
+    ExtrusionRole role() const override { return this->paths.empty() ? ExtrusionRole::None : this->paths.front().role(); }
     ExtrusionLoopRole loop_role() const { return m_loop_role; }
     // Produce a list of 2D polygons covered by the extruded paths, offsetted by the extrusion width.
     // Increase the offset by scaled_epsilon to achieve an overlap, so a union will produce no gaps.
@@ -303,8 +242,6 @@ public:
             append(dst, p.polyline.points);
     }
     double total_volume() const override { double volume =0.; for (const auto& path : paths) volume += path.total_volume(); return volume; }
-
-    //static inline std::string role_to_string(ExtrusionLoopRole role);
 
 #ifndef NDEBUG
 	bool validate() const {
