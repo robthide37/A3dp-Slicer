@@ -676,25 +676,61 @@ bool paths_touch(const ExtrusionPath &path_one, const ExtrusionPath &path_two, d
 
 ExtrusionPaths reconnect_extrusion_paths(const ExtrusionPaths& paths, double limit_distance) {
     if (paths.empty()) return paths;
-    ExtrusionPaths result;
-    result.push_back(paths.front());
-    for (size_t pidx = 1; pidx < paths.size(); pidx++) {
-        if ((result.back().last_point() - paths[pidx].first_point()).cast<double>().squaredNorm() < limit_distance * limit_distance) {
-            result.back().polyline.points.insert(result.back().polyline.points.end(), paths[pidx].polyline.points.begin(),
-                                                 paths[pidx].polyline.points.end());
-        } else {
-            result.push_back(paths[pidx]);
+
+    std::unordered_map<size_t, ExtrusionPath> connected;
+    connected.reserve(paths.size());
+    for (size_t i = 0; i < paths.size(); i++) {
+        if (!paths[i].empty()) {
+            connected.emplace(i, paths[i]);
         }
     }
+
+    for (size_t a = 0; a < paths.size(); a++) {
+        if (connected.find(a) == connected.end()) {
+            continue;
+        }
+        ExtrusionPath &base = connected.at(a);
+        for (size_t b = a + 1; b < paths.size(); b++) {
+            if (connected.find(b) == connected.end()) {
+                continue;
+            }
+            ExtrusionPath &next = connected.at(b);
+            if ((base.last_point() - next.first_point()).cast<double>().squaredNorm() < limit_distance * limit_distance) {
+                base.polyline.append(std::move(next.polyline));
+                connected.erase(b);
+            } else if ((base.last_point() - next.last_point()).cast<double>().squaredNorm() < limit_distance * limit_distance) {
+                base.polyline.points.insert(base.polyline.points.end(), next.polyline.points.rbegin(), next.polyline.points.rend());
+                connected.erase(b);
+            } else if ((base.first_point() - next.last_point()).cast<double>().squaredNorm() < limit_distance * limit_distance) {
+                next.polyline.append(std::move(base.polyline));
+                base = std::move(next);
+                base.reverse();
+                connected.erase(b);
+            } else if ((base.first_point() - next.first_point()).cast<double>().squaredNorm() < limit_distance * limit_distance) {
+                base.reverse();
+                base.polyline.append(std::move(next.polyline));
+                base.reverse();
+                connected.erase(b);
+            }
+        }
+    }
+
+    ExtrusionPaths result;
+    for (auto& ext : connected) {
+        result.push_back(std::move(ext.second));
+    }
+
     return result;
 }
 
-ExtrusionPaths sort_and_connect_extra_perimeters(const std::vector<ExtrusionPaths> &extra_perims, double touch_distance)
+ExtrusionPaths sort_and_connect_extra_perimeters(const std::vector<ExtrusionPaths> &extra_perims, double extrusion_spacing)
 {
     std::vector<ExtrusionPaths> connected_shells;
-    for (const ExtrusionPaths& ps : extra_perims) {
-        connected_shells.push_back(reconnect_extrusion_paths(ps, touch_distance));
+    connected_shells.reserve(extra_perims.size());
+    for (const ExtrusionPaths &ps : extra_perims) {
+        connected_shells.push_back(reconnect_extrusion_paths(ps, 1.0 * extrusion_spacing));
     }
+    
     struct Pidx
     {
         size_t shell;
@@ -708,8 +744,6 @@ ExtrusionPaths sort_and_connect_extra_perimeters(const std::vector<ExtrusionPath
 
     auto get_path = [&](Pidx i) { return connected_shells[i.shell][i.path]; };
 
-    Point current_point{};
-    bool any_point_found = false;
     std::vector<std::unordered_map<Pidx, std::unordered_set<Pidx, PidxHash>, PidxHash>> dependencies;
     for (size_t shell = 0; shell < connected_shells.size(); shell++) {
         dependencies.push_back({});
@@ -719,29 +753,37 @@ ExtrusionPaths sort_and_connect_extra_perimeters(const std::vector<ExtrusionPath
             std::unordered_set<Pidx, PidxHash> current_dependencies{};
             if (shell > 0) {
                 for (const auto &prev_path : dependencies[shell - 1]) {
-                    if (paths_touch(get_path(current_path), get_path(prev_path.first), touch_distance)) {
+                    if (paths_touch(get_path(current_path), get_path(prev_path.first), extrusion_spacing * 2.0)) {
                         current_dependencies.insert(prev_path.first);
                     };
                 }
-                current_shell[current_path] = current_dependencies;
-                if (!any_point_found) {
-                    current_point = get_path(current_path).first_point();
-                    any_point_found = true;
-                }
             }
+            current_shell[current_path] = current_dependencies;
         }
     }
 
+    Point current_point{};
+    for (const ExtrusionPaths &ps : connected_shells) {
+        for (const ExtrusionPath &p : ps) {
+            if (!p.empty()) {
+                current_point = p.first_point();
+                goto first_point_found;
+            }
+        }
+    }
+first_point_found:
+
     ExtrusionPaths sorted_paths{};
-    Pidx           npidx         = Pidx{size_t(-1), 0};
-    Pidx           next_pidx     = npidx;
-    bool           reverse       = false;
+    Pidx           npidx     = Pidx{size_t(-1), 0};
+    Pidx           next_pidx = npidx;
+    bool           reverse   = false;
     while (true) {
         if (next_pidx == npidx) { // find next pidx to print
             double dist = std::numeric_limits<double>::max();
             for (size_t shell = 0; shell < dependencies.size(); shell++) {
                 for (const auto &p : dependencies[shell]) {
-                    if (!p.second.empty()) continue;
+                    if (!p.second.empty())
+                        continue;
                     const auto &path   = get_path(p.first);
                     double      dist_a = (path.first_point() - current_point).cast<double>().squaredNorm();
                     if (dist_a < dist) {
@@ -757,14 +799,21 @@ ExtrusionPaths sort_and_connect_extra_perimeters(const std::vector<ExtrusionPath
                     }
                 }
             }
-            if (next_pidx == npidx) { break; }
-        } else { // we have valid next_pidx, add it to the sorted paths, update dependencies, update current point and potentialy set new next_pidx
+            if (next_pidx == npidx) {
+                break;
+            }
+        } else {
+            // we have valid next_pidx, add it to the sorted paths, update dependencies, update current point and potentialy set new next_pidx
             ExtrusionPath path = get_path(next_pidx);
-            if (reverse) { path.reverse(); }
+            if (reverse) {
+                path.reverse();
+            }
             sorted_paths.push_back(path);
             current_point = sorted_paths.back().last_point();
             if (next_pidx.shell < dependencies.size() - 1) {
-                for (auto &p : dependencies[next_pidx.shell + 1]) { p.second.erase(next_pidx); }
+                for (auto &p : dependencies[next_pidx.shell + 1]) {
+                    p.second.erase(next_pidx);
+                }
             }
             dependencies[next_pidx.shell].erase(next_pidx);
             // check current and next shell for next pidx
@@ -773,9 +822,10 @@ ExtrusionPaths sort_and_connect_extra_perimeters(const std::vector<ExtrusionPath
             next_pidx            = npidx;
             for (size_t shell = current_shell; shell < std::min(current_shell + 2, dependencies.size()); shell++) {
                 for (const auto &p : dependencies[shell]) {
-                    if (!p.second.empty()) continue;
-                    const ExtrusionPath &next_path   = get_path(p.first);
-                    double      dist_a = (next_path.first_point() - current_point).cast<double>().squaredNorm();
+                    if (!p.second.empty())
+                        continue;
+                    const ExtrusionPath &next_path = get_path(p.first);
+                    double               dist_a    = (next_path.first_point() - current_point).cast<double>().squaredNorm();
                     if (dist_a < dist) {
                         dist      = dist_a;
                         next_pidx = p.first;
@@ -789,17 +839,19 @@ ExtrusionPaths sort_and_connect_extra_perimeters(const std::vector<ExtrusionPath
                     }
                 }
             }
-            if (dist > scaled(5.0)){
+            if (dist > scaled(5.0)) {
                 next_pidx = npidx;
             }
         }
     }
 
-    ExtrusionPaths reconnected = reconnect_extrusion_paths(sorted_paths, touch_distance);
+    ExtrusionPaths reconnected = reconnect_extrusion_paths(sorted_paths, extrusion_spacing * 2.0);
     ExtrusionPaths filtered;
     filtered.reserve(reconnected.size());
     for (ExtrusionPath &p : reconnected) {
-        if (p.length() > touch_distance) { filtered.push_back(p); }
+        if (p.length() > 3 * extrusion_spacing) {
+            filtered.push_back(p);
+        }
     }
 
     return filtered;
@@ -936,7 +988,7 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
                 perimeter_polygon = intersection(offset(perimeter_polygon, -overhang_flow.scaled_spacing()), expanded_overhang_to_cover);
 
                 if (perimeter_polygon.empty()) { // fill possible gaps of single extrusion width
-                    Polygons shrinked = offset(prev, -0.4 * overhang_flow.scaled_spacing());
+                    Polygons shrinked = intersection(offset(prev, -0.3 * overhang_flow.scaled_spacing()), expanded_overhang_to_cover);
                     if (!shrinked.empty()) {
                         overhang_region.emplace_back();
                         extrusion_paths_append(overhang_region.back(), perimeter, ExtrusionRole::OverhangPerimeter, overhang_flow.mm3_per_mm(),
@@ -944,15 +996,13 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
                     }
 
                     Polylines  fills;
-                    ExPolygons gap = shrinked.empty() ? offset_ex(prev, overhang_flow.scaled_spacing() * 0.5) :
-                                                        offset_ex(prev, -overhang_flow.scaled_spacing() * 0.5);
+                    ExPolygons gap = shrinked.empty() ? offset_ex(prev, overhang_flow.scaled_spacing() * 0.5) : to_expolygons(shrinked);
 
-                    //gap = expolygons_simplify(gap, overhang_flow.scaled_spacing());
                     for (const ExPolygon &ep : gap) {
-                        ep.medial_axis(0.3 * overhang_flow.scaled_width(), overhang_flow.scaled_spacing() * 2.0, &fills);
+                        ep.medial_axis(0.75 * overhang_flow.scaled_width(), 3.0 * overhang_flow.scaled_spacing(), &fills);
                     }
                     if (!fills.empty()) {
-                        fills = intersection_pl(fills, inset_overhang_area);
+                        fills = intersection_pl(fills, shrinked_overhang_to_cover);
                         overhang_region.emplace_back();
                         extrusion_paths_append(overhang_region.back(), fills, ExtrusionRole::OverhangPerimeter, overhang_flow.mm3_per_mm(),
                                                overhang_flow.width(), overhang_flow.height());
@@ -981,9 +1031,11 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
                 }
             }
             Polylines perimeter = intersection_pl(to_polylines(perimeter_polygon), shrinked_overhang_to_cover);
-            overhang_region.emplace_back();
-            extrusion_paths_append(overhang_region.back(), perimeter, ExtrusionRole::OverhangPerimeter, overhang_flow.mm3_per_mm(),
-                                   overhang_flow.width(), overhang_flow.height());
+            if (!perimeter.empty()) {
+                overhang_region.emplace_back();
+                extrusion_paths_append(overhang_region.back(), perimeter, ExtrusionRole::OverhangPerimeter, overhang_flow.mm3_per_mm(),
+                                       overhang_flow.width(), overhang_flow.height());
+            }
 
             perimeter_polygon = expand(perimeter_polygon, 0.5 * overhang_flow.scaled_spacing());
             perimeter_polygon = union_(perimeter_polygon, anchoring);
@@ -1006,7 +1058,7 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
 
     std::vector<ExtrusionPaths> result{};
     for (const std::vector<ExtrusionPaths> &paths : extra_perims) {
-        result.push_back(sort_and_connect_extra_perimeters(paths, 2.0 * overhang_flow.scaled_spacing()));
+        result.push_back(sort_and_connect_extra_perimeters(paths, overhang_flow.scaled_spacing()));
     }
 
 #ifdef EXTRA_PERIM_DEBUG_FILES
