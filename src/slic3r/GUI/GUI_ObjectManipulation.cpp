@@ -1035,18 +1035,19 @@ void ObjectManipulation::update_reset_buttons_visibility()
 
 void ObjectManipulation::update_mirror_buttons_visibility()
 {
+#if ENABLE_WORLD_COORDINATE
+    const bool can_mirror = wxGetApp().plater()->can_mirror();
+    for (ScalableButton* button : m_mirror_buttons) {
+        button->Enable(can_mirror);
+    }
+#else
     GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
     Selection& selection = canvas->get_selection();
 
-#if ENABLE_WORLD_COORDINATE
-    if (is_local_coordinates()) {
-        if (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) {
-#else
     std::array<MirrorButtonState, 3> new_states = { mbHidden, mbHidden, mbHidden };
 
     if (!m_world_coordinates) {
         if (selection.is_single_full_instance() || selection.is_single_modifier() || selection.is_single_volume()) {
-#endif // ENABLE_WORLD_COORDINATE
             const GLVolume* volume = selection.get_first_volume();
             Vec3d mirror;
 
@@ -1055,19 +1056,10 @@ void ObjectManipulation::update_mirror_buttons_visibility()
             else
                 mirror = volume->get_volume_mirror();
 
-#if !ENABLE_WORLD_COORDINATE
             for (unsigned char i=0; i<3; ++i)
                 new_states[i] = (mirror[i] < 0. ? mbActive : mbShown);
-#endif // !ENABLE_WORLD_COORDINATE
         }
     }
-
-#if ENABLE_WORLD_COORDINATE
-    const bool can_mirror = wxGetApp().plater()->can_mirror();
-    for (ScalableButton* button : m_mirror_buttons) {
-        button->Enable(can_mirror);
-    }
-#else
     else {
         // the mirroring buttons should be hidden in world coordinates,
         // unless we make it actually mirror in world coords.
