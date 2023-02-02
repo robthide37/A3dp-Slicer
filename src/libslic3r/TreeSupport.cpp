@@ -1055,9 +1055,8 @@ static void generate_initial_areas(
             Polygons overhang_regular;
             {
                 const Polygons &overhang_raw = overhangs[layer_idx + z_distance_delta];
-                overhang_regular = mesh_group_settings.support_offset == 0 ? 
-                    overhang_raw :
-                    safe_offset_inc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
+                // When support_offset = 0 safe_offset_inc will only be the difference between overhang_raw and relevant_forbidden, that has to be calculated anyway. 
+                overhang_regular = safe_offset_inc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
                 //check_self_intersections(overhang_regular, "overhang_regular1");
 
                 // offset ensures that areas that could be supported by a part of a support line, are not considered unsupported overhang
