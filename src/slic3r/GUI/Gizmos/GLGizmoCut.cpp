@@ -2038,7 +2038,7 @@ void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, bool &create_dowel
                 create_dowels_as_separate_object = true;
             }
             else {
-                // culculate shift of the connector center regarding to the position on the cut plane
+                // calculate shift of the connector center regarding to the position on the cut plane
                 Vec3d shifted_center = m_plane_center + Vec3d::UnitZ();
                 rotate_vec3d_around_plane_center(shifted_center);
                 Vec3d norm = (shifted_center - m_plane_center).normalized();
