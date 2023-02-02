@@ -2824,7 +2824,7 @@ void Selection::render_debug_window() const
     }
 
     static int current_method_idx = 0;
-    ImGui::Combo("Decomposition method", &current_method_idx, "computeRotationScaling\0computeScalingRotation\0");
+    ImGui::Combo("Decomposition method", &current_method_idx, "computeRotationScaling\0computeScalingRotation\0SVD\0");
 
     const GLVolume& v = *get_volume(current_vol_idx);
 
@@ -2844,23 +2844,56 @@ void Selection::render_debug_window() const
         ImGui::EndGroup();
     };
 
-    auto add_matrices_set = [add_matrix](const std::string& name, const Transform3d& m, size_t method) {
+    auto add_matrices_set = [&imgui, add_matrix](const std::string& name, const Transform3d& m, size_t method) {
         static unsigned int counter = 0;
         ++counter;
         if (ImGui::CollapsingHeader(name.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
             add_matrix("Full", m, 4);
 
-            Matrix3d rotation;
-            Matrix3d scale;
-            if (method == 0)
-                m.computeRotationScaling(&rotation, &scale);
-            else
-                m.computeScalingRotation(&scale, &rotation);
+            if (method == 0 || method == 1) {
+                Matrix3d rotation;
+                Matrix3d scale;
+                if (method == 0)
+                    m.computeRotationScaling(&rotation, &scale);
+                else
+                    m.computeScalingRotation(&scale, &rotation);
 
-            ImGui::SameLine();
-            add_matrix("Rotation component", Transform3d(rotation), 3);
-            ImGui::SameLine();
-            add_matrix("Scale component", Transform3d(scale), 3);
+                ImGui::SameLine();
+                add_matrix("Rotation component", Transform3d(rotation), 3);
+                ImGui::SameLine();
+                add_matrix("Scale component", Transform3d(scale), 3);
+            }
+            else {
+                const Geometry::TransformationSVD svd(m);
+
+                ImGui::SameLine();
+                add_matrix("U", Transform3d(svd.u), 3);
+                ImGui::SameLine();
+                add_matrix("S", Transform3d(svd.s), 3);
+                ImGui::SameLine();
+                add_matrix("V", Transform3d(svd.v), 3);
+                ImGui::Dummy(ImVec2(0.0f, 0.0f));
+                float spacing = 0.0f;
+                if (svd.rotation) {
+                    ImGui::SameLine(0.0f, spacing);
+                    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, svd.rotation_90_degrees ? "Rotation 90 degs" : "Rotation");
+                    spacing = 10.0f;
+                }
+                if (svd.scale) {
+                    ImGui::SameLine(0.0f, spacing);
+                    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, svd.anisotropic_scale ? "Anisotropic scale" : "Isotropic scale");
+                    spacing = 10.0f;
+                }
+                if (svd.mirror) {
+                    ImGui::SameLine(0.0f, spacing);
+                    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Mirror");
+                    spacing = 10.0f;
+                }
+                if (svd.skew) {
+                    ImGui::SameLine(0.0f, spacing);
+                    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Skew");
+                }
+            }
         }
     };
 
