@@ -841,6 +841,8 @@ Transformation Transformation::volume_to_bed_transformation(const Transformation
 #if ENABLE_WORLD_COORDINATE
 TransformationSVD::TransformationSVD(const Transform3d& trafo)
 {
+    static const Matrix3d mirror_x = Geometry::scale_transform({ -1.0, 1.0, 1.0 }).linear();
+
     const Matrix3d m = trafo.matrix().block<3, 3>(0, 0);
     const Eigen::JacobiSVD<Matrix3d> svd(m, Eigen::ComputeFullU | Eigen::ComputeFullV);
     u = svd.matrixU();
@@ -850,7 +852,7 @@ TransformationSVD::TransformationSVD(const Transform3d& trafo)
     mirror = m.determinant() < 0.0;
     scale = !s.isApprox(Matrix3d::Identity());
     anisotropic_scale = std::abs(s(0, 0) - s(1, 1)) > EPSILON || std::abs(s(1, 1) - s(2, 2)) > EPSILON;
-    rotation = v.isApprox(u.transpose());
+    rotation = mirror ? !u.isApprox(mirror_x) : !v.isApprox(u.transpose());
 
     rotation_90_degrees = true;
     if (rotation) {
