@@ -838,6 +838,50 @@ Transformation Transformation::volume_to_bed_transformation(const Transformation
 }
 #endif // !ENABLE_WORLD_COORDINATE
 
+#if ENABLE_WORLD_COORDINATE
+TransformationSVD::TransformationSVD(const Transform3d& trafo)
+{
+    const Matrix3d m = trafo.matrix().block<3, 3>(0, 0);
+    const Eigen::JacobiSVD<Matrix3d> svd(m, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    u = svd.matrixU();
+    v = svd.matrixV();
+    s = svd.singularValues().asDiagonal();
+
+    mirror = m.determinant() < 0.0;
+    scale = !s.isApprox(Matrix3d::Identity());
+    anisotropic_scale = std::abs(s(0, 0) - s(1, 1)) > EPSILON || std::abs(s(1, 1) - s(2, 2)) > EPSILON;
+    rotation = v.isApprox(u.transpose());
+
+    rotation_90_degrees = true;
+    if (rotation) {
+        for (int i = 0; i < 3; ++i) {
+            const Vec3d row = u.row(i).cwiseAbs();
+            if ((std::abs(row[0] - 1.0) > EPSILON && row[1] > EPSILON && row[2] > EPSILON) ||
+                (row[0] > EPSILON && std::abs(row[1] - 1.0) > EPSILON && row[2] > EPSILON) ||
+                (row[0] > EPSILON && row[1] > EPSILON && std::abs(row[2] - 1.0) > EPSILON)) {
+                rotation_90_degrees = false;
+                break;
+            }
+        }
+    }
+    else
+        rotation_90_degrees = true;
+
+    skew = false;
+    if (anisotropic_scale) {
+        for (int i = 0; i < 3; ++i) {
+            const Vec3d row = v.row(i).cwiseAbs();
+            if ((std::abs(row[0] - 1.0) > EPSILON && row[1] > EPSILON && row[2] > EPSILON) ||
+                (row[0] > EPSILON && std::abs(row[1] - 1.0) > EPSILON && row[2] > EPSILON) ||
+                (row[0] > EPSILON && row[1] > EPSILON && std::abs(row[2] - 1.0) > EPSILON)) {
+                skew = true;
+                break;
+            }
+        }
+    }
+}
+#endif // ENABLE_WORLD_COORDINATE
+
 // For parsing a transformation matrix from 3MF / AMF.
 Transform3d transform3d_from_string(const std::string& transform_str)
 {

@@ -538,6 +538,25 @@ private:
 #endif // ENABLE_WORLD_COORDINATE
 };
 
+#if ENABLE_WORLD_COORDINATE
+struct TransformationSVD
+{
+    Matrix3d u = Matrix3d::Identity();
+    Matrix3d s = Matrix3d::Identity();
+    Matrix3d v = Matrix3d::Identity();
+
+    bool mirror{ false };
+    bool scale{ false };
+    bool anisotropic_scale{ false };
+    bool rotation{ false };
+    bool rotation_90_degrees{ false };
+    bool skew{ false };
+
+    explicit TransformationSVD(const Transformation& trafo) : TransformationSVD(trafo.get_matrix()) {}
+    explicit TransformationSVD(const Transform3d& trafo);
+};
+#endif // ENABLE_WORLD_COORDINATE
+
 // For parsing a transformation matrix from 3MF / AMF.
 extern Transform3d transform3d_from_string(const std::string& transform_str);
 
