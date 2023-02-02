@@ -1080,7 +1080,6 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
 
 void GLGizmoEmboss::set_default_text(){ m_text = _u8L("Embossed text"); }
 
-#include "imgui/imgui_internal.h" // to unfocus input --> ClearActiveID
 void GLGizmoEmboss::set_volume_by_selection()
 {
     ModelVolume *vol = priv::get_selected_volume(m_parent.get_selection());
@@ -1094,45 +1093,10 @@ void GLGizmoEmboss::set_volume_by_selection()
     // Do not use focused input value when switch volume(it must swith value)
     if (m_volume != nullptr && 
         m_volume != vol) // when update volume it changed id BUT not pointer
-        ImGui::ClearActiveID();
+        ImGuiWrapper::left_inputs();
 
     // is select embossed volume?
     set_volume(vol);
-}
-
-// Need internals to get window
-void priv::change_window_position(std::optional<ImVec2>& output_window_offset, bool try_to_fix) {
-    const char* name = "Emboss";
-    ImGuiWindow *window = ImGui::FindWindowByName(name);
-    // is window just created 
-    if (window == NULL)
-        return;
-
-    // position of window on screen
-    ImVec2 position = window->Pos;
-    ImVec2 size     = window->SizeFull;
-
-    // screen size
-    ImVec2 screen = ImGui::GetMainViewport()->Size;
-
-    if (position.x < 0) {
-        if (position.y < 0)
-            output_window_offset = ImVec2(0, 0);
-        else
-            output_window_offset = ImVec2(0, position.y);
-    } else if (position.y < 0) {
-        output_window_offset = ImVec2(position.x, 0);
-    } else if (screen.x < (position.x + size.x)) {
-        if (screen.y < (position.y + size.y))
-            output_window_offset = ImVec2(screen.x - size.x, screen.y - size.y);
-        else
-            output_window_offset = ImVec2(screen.x - size.x, position.y);
-    } else if (screen.y < (position.y + size.y)) {
-        output_window_offset = ImVec2(position.x, screen.y - size.y);
-    }
-
-    if (!try_to_fix && output_window_offset.has_value())
-        output_window_offset = ImVec2(-1, -1); // Cannot 
 }
 
 bool GLGizmoEmboss::set_volume(ModelVolume *volume)
@@ -2152,6 +2116,9 @@ void GLGizmoEmboss::draw_font_list()
                 face.cancel->store(true);
         glsafe(::glDeleteTextures(1, &m_face_names.texture_id));
         m_face_names.texture_id = 0;
+
+        // Remove value from search input
+        ImGuiWrapper::left_inputs();
     }
 
     // delete unloadable face name when try to use
@@ -3921,6 +3888,42 @@ void priv::find_closest_volume(const Selection       &selection,
         *closest_center = c;
         *closest_volume = gl_volume;
     }
+}
+
+// Need internals to get window
+#include "imgui/imgui_internal.h"
+void priv::change_window_position(std::optional<ImVec2>& output_window_offset, bool try_to_fix) {
+    const char* name = "Emboss";
+    ImGuiWindow *window = ImGui::FindWindowByName(name);
+    // is window just created 
+    if (window == NULL)
+        return;
+
+    // position of window on screen
+    ImVec2 position = window->Pos;
+    ImVec2 size     = window->SizeFull;
+
+    // screen size
+    ImVec2 screen = ImGui::GetMainViewport()->Size;
+
+    if (position.x < 0) {
+        if (position.y < 0)
+            output_window_offset = ImVec2(0, 0);
+        else
+            output_window_offset = ImVec2(0, position.y);
+    } else if (position.y < 0) {
+        output_window_offset = ImVec2(position.x, 0);
+    } else if (screen.x < (position.x + size.x)) {
+        if (screen.y < (position.y + size.y))
+            output_window_offset = ImVec2(screen.x - size.x, screen.y - size.y);
+        else
+            output_window_offset = ImVec2(screen.x - size.x, position.y);
+    } else if (screen.y < (position.y + size.y)) {
+        output_window_offset = ImVec2(position.x, screen.y - size.y);
+    }
+
+    if (!try_to_fix && output_window_offset.has_value())
+        output_window_offset = ImVec2(-1, -1); // Cannot 
 }
 
 // any existing icon filename to not influence GUI

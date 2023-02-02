@@ -147,6 +147,12 @@ public:
     bool slider_optional_int(const char* label, std::optional<int> &v, int v_min, int v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true, int def_val = 0);
 
     /// <summary>
+    /// Use ImGui internals to unactivate (lose focus) in input.
+    /// When input is activ it can't change value by application.
+    /// </summary>
+    static void left_inputs();
+
+    /// <summary>
     /// Truncate text by ImGui draw function to specific width
     /// NOTE 1: ImGui must be initialized
     /// NOTE 2: Calculation for actual acive imgui font

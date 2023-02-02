@@ -1360,6 +1360,10 @@ bool ImGuiWrapper::slider_optional_int(const char         *label,
     } else return false;
 }
 
+void ImGuiWrapper::left_inputs() { 
+    ImGui::ClearActiveID(); 
+}
+
 std::string ImGuiWrapper::trunc(const std::string &text,
                                 float              width,
                                 const char *       tail)
