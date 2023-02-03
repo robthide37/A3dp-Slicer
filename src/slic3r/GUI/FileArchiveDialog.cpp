@@ -267,6 +267,8 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
     topSizer->Add(btn_sizer, 0, wxEXPAND | wxALL, 10);
     this->SetMinSize(wxSize(80 * em, 30 * em));
     this->SetSizer(topSizer);
+
+    wxGetApp().UpdateDlgDarkUI(this, true);
 }  
 
 void FileArchiveDialog::on_dpi_changed(const wxRect& suggested_rect)
