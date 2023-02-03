@@ -1784,9 +1784,7 @@ std::vector<GCode::InstanceToPrint> GCode::sort_print_object_instances(
     if (ordering == nullptr) {
         // Sequential print, single object is being printed.
         assert(object_layers.size() == 1);
-        const Layer *layer = object_layers.front().object_layer;
-        assert(layer != nullptr);
-        out.emplace_back(0, *layer->object(), single_object_instance_idx);
+        out.emplace_back(0, *object_layers.front().object(), single_object_instance_idx);
     } else {
         // Create mapping from PrintObject* to ObjectLayerToPrint ID.
         std::vector<std::pair<const PrintObject*, size_t>> sorted;
