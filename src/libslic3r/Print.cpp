@@ -474,6 +474,10 @@ std::string Print::validate(std::string* warning) const
 	        return L("Some objects are too tall and cannot be printed without extruder collisions.");
     }
 
+    if (m_config.avoid_crossing_perimeters && m_config.avoid_crossing_curled_overhangs) {
+        return L("Avoid crossing perimeters option and avoid crossing curled overhangs option cannot be both enabled together.");
+    }    
+
     if (m_config.spiral_vase) {
         size_t total_copies_count = 0;
         for (const PrintObject *object : m_objects)

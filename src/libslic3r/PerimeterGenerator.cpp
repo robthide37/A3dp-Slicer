@@ -728,6 +728,7 @@ ExtrusionPaths sort_and_connect_extra_perimeters(const std::vector<ExtrusionPath
     std::vector<ExtrusionPaths> connected_shells;
     connected_shells.reserve(extra_perims.size());
     for (const ExtrusionPaths &ps : extra_perims) {
+        // this will also filter away empty paths
         connected_shells.push_back(reconnect_extrusion_paths(ps, 1.0 * extrusion_spacing));
     }
     
@@ -845,7 +846,18 @@ first_point_found:
         }
     }
 
-    ExtrusionPaths reconnected = reconnect_extrusion_paths(sorted_paths, extrusion_spacing * 2.0);
+    ExtrusionPaths reconnected;
+    reconnected.reserve(sorted_paths.size());
+    for (const ExtrusionPath &path : sorted_paths) {
+        if (!reconnected.empty() && (reconnected.back().last_point() - path.first_point()).cast<double>().squaredNorm() <
+                                        extrusion_spacing * extrusion_spacing * 4.0) {
+            reconnected.back().polyline.points.insert(reconnected.back().polyline.points.end(), path.polyline.points.begin(),
+                                                      path.polyline.points.end());
+        } else {
+            reconnected.push_back(path);
+        }
+    }
+
     ExtrusionPaths filtered;
     filtered.reserve(reconnected.size());
     for (ExtrusionPath &p : reconnected) {
