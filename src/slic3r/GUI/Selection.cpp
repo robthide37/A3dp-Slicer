@@ -1074,12 +1074,11 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
             }
             else {
-                if (transformation_type.local() && transformation_type.absolute()) {
+                if (transformation_type.instance()) {
+                    // ensure that the volume rotates as a rigid body
                     const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
-                    Matrix3d vol_rotation, vol_scale;
-                    vol_trafo.get_matrix().computeRotationScaling(&vol_rotation, &vol_scale);
-                    const Transform3d trafo = vol_trafo.get_rotation_matrix() * rotation_matrix;
-                    v.set_volume_transformation(vol_trafo.get_offset_matrix() * trafo * Transform3d(vol_scale));
+                    const Transform3d cached_vol_rotation_matrix = vol_trafo.get_rotation_matrix();
+                    v.set_volume_transformation(vol_trafo.get_matrix() * cached_vol_rotation_matrix.inverse() * rotation_matrix * cached_vol_rotation_matrix);
                 }
                 else
                     transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
