@@ -430,7 +430,6 @@ class Worker : public wxBoxSizer
     bool        perform_registration_linux { false };
 #endif // __linux__
 
-    bool perform_register();
     void deregister();
 
 public:
@@ -445,7 +444,7 @@ public:
     void set_path_name(const std::string& name);
 
     bool on_finish();
-
+    bool perform_register(const std::string& path_override = {});
 #ifdef __linux__
     bool get_perform_registration_linux() { return perform_registration_linux; }
 #endif // __linux__
