@@ -515,7 +515,7 @@ bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& v
 
     const BoundingBoxf3 bbox = bounding_box();
     float mean_size = float((bbox.size().x() + bbox.size().y() + bbox.size().z()) / 9.0);
-    float min_size  = value_in < 0.f ? UndefMinVal : 2.f;
+    float min_size  = value_in < 0.f ? UndefMinVal : 1.f;
     if (m_imperial_units) {
         mean_size *= float(ObjectManipulation::mm_to_in);
         min_size  *= float(ObjectManipulation::mm_to_in);
