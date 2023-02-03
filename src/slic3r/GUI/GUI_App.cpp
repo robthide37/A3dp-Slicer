@@ -79,6 +79,7 @@
 #include "DesktopIntegrationDialog.hpp"
 #include "SendSystemInfoDialog.hpp"
 #include "Downloader.hpp"
+#include "ConfigWizard_private.hpp"
 
 #include "BitmapCache.hpp"
 #include "Notebook.hpp"
@@ -1010,7 +1011,6 @@ std::string GUI_App::check_older_app_config(Semver current_version, bool backup)
         return {};
     BOOST_LOG_TRIVIAL(info) << "last app config file used: " << older_data_dir_path;
     // ask about using older data folder
-
     InfoDialog msg(nullptr
         , format_wxstr(_L("You are opening %1% version %2%."), SLIC3R_APP_NAME, SLIC3R_VERSION)
         , backup ? 
@@ -1155,12 +1155,16 @@ bool GUI_App::on_init_inner()
 
     std::string older_data_dir_path;
     if (m_app_conf_exists) {
-        if (app_config->orig_version().valid() && app_config->orig_version() < *Semver::parse(SLIC3R_VERSION))
+        if (app_config->orig_version().valid() && app_config->orig_version() < *Semver::parse(SLIC3R_VERSION)) {
             // Only copying configuration if it was saved with a newer slicer than the one currently running.
             older_data_dir_path = check_older_app_config(app_config->orig_version(), true);
+            m_last_app_conf_lower_version = true;
+        }
     } else {
         // No AppConfig exists, fresh install. Always try to copy from an alternate location, don't make backup of the current configuration.
         older_data_dir_path = check_older_app_config(Semver(), false);
+        if (!older_data_dir_path.empty())
+            m_last_app_conf_lower_version = true;
     }
 
 #ifdef _MSW_DARK_MODE
@@ -3078,6 +3082,29 @@ void GUI_App::show_desktop_integration_dialog()
 #endif //__linux__
 }
 
+void GUI_App::show_downloader_registration_dialog()
+{
+    InfoDialog msg(nullptr
+        , format_wxstr(_L("Welcome to %1% version %2%."), SLIC3R_APP_NAME, SLIC3R_VERSION)
+        , format_wxstr(_L(
+            "Do you wish to register downloads from <b>Printables.com</b>"
+            "\nfor this <b>%1% %2%</b> executable?"
+            "\n\nDownloads can be registered for only 1 executable at time."
+            ), SLIC3R_APP_NAME, SLIC3R_VERSION)
+        , true, wxYES_NO);
+    if (msg.ShowModal() == wxID_YES) {
+        auto downloader = new DownloaderUtils::Worker(nullptr);
+        downloader->perform_register(app_config->get("url_downloader_dest"));
+#ifdef __linux__
+        if (downloader->get_perform_registration_linux())
+            DesktopIntegrationDialog::perform_desktop_integration(true);
+#endif // __linux__
+    } else {
+        app_config->set("downloader_url_registered", "0");
+    }
+}
+
+
 #if ENABLE_THUMBNAIL_GENERATOR_DEBUG
 void GUI_App::gcode_thumbnails_debug()
 {
@@ -3225,7 +3252,13 @@ bool GUI_App::config_wizard_startup()
 
         run_wizard(ConfigWizard::RR_DATA_LEGACY);
         return true;
+    } 
+#ifndef __APPLE__    
+    else if (is_editor() && m_last_app_conf_lower_version && app_config->get("downloader_url_registered") == "1") {
+        show_downloader_registration_dialog();
+        return true;
     }
+#endif
     return false;
 }
 
