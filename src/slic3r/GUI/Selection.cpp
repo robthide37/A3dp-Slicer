@@ -884,8 +884,6 @@ std::pair<BoundingBoxf3, Transform3d> Selection::get_bounding_box_in_reference_s
     };
 
     auto calc_box_size = [point_to_Vec4d, Vec4d_to_Vec3d, apply_transform](const BoundingBoxf3& box, const Transform3d& trafo) {
-        Geometry::Transformation transformation(trafo);
-
         // box aligned to current reference system
         std::vector<Vec4d> homo_vertices = {
             point_to_Vec4d({ box.min.x(), box.min.y(), box.min.z() }),
