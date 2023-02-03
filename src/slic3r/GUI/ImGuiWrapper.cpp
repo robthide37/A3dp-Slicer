@@ -65,6 +65,8 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::RevertButton          , "undo"                          },
     {ImGui::WarningMarkerSmall    , "notification_warning"          },
     {ImGui::InfoMarkerSmall       , "notification_info"             },
+    {ImGui::PlugMarker            , "plug"                          },
+    {ImGui::DowelMarker           , "dowel"                         },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {
