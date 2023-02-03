@@ -2037,8 +2037,14 @@ void GLGizmoEmboss::draw_font_list()
 
     // change color of hint to normal text
     bool is_popup_open = ImGui::IsPopupOpen(popup_id);
-    if (!is_popup_open)
+    if (!is_popup_open) {
         ImGui::PushStyleColor(ImGuiCol_TextDisabled, ImGui::GetStyleColorVec4(ImGuiCol_Text));
+
+        // Fix clearance of search input,
+        // Sometime happens that search text not disapear after font select
+        m_face_names.search.clear();
+    }
+
     if (ImGui::InputTextWithHint(input_id, selected, &m_face_names.search, input_flags)) {
         // update filtration result        
         m_face_names.hide = std::vector<bool>(m_face_names.faces.size(), {false});
@@ -2052,7 +2058,7 @@ void GLGizmoEmboss::draw_font_list()
             m_face_names.hide[index] = !start_with; 
         }
     }
-    if (!is_popup_open)
+    if (!is_popup_open) 
         ImGui::PopStyleColor(); // revert changes for hint color
 
     const bool is_input_text_active = ImGui::IsItemActive();
@@ -2118,7 +2124,6 @@ void GLGizmoEmboss::draw_font_list()
         // Just one after close combo box
         // free texture and set id to zero
         m_face_names.is_init = false;
-        m_face_names.search.clear();
         m_face_names.hide.clear();
         // cancel all process for generation of texture
         for (FaceName &face : m_face_names.faces)
@@ -2129,6 +2134,7 @@ void GLGizmoEmboss::draw_font_list()
 
         // Remove value from search input
         ImGuiWrapper::left_inputs();
+        m_face_names.search.clear();
     }
 
     // delete unloadable face name when try to use
