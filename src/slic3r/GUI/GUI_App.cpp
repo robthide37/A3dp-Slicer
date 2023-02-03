@@ -2270,7 +2270,14 @@ bool GUI_App::load_language(wxString language, bool initial)
     }
 #endif
 
+#ifdef __APPLE__
+    // ysFIXME after fix for wxWidgets issue (https://github.com/wxWidgets/wxWidgets/issues/23209)
+    // Workaround for wxLANGUAGE_CHINESE(...) languages => Allow to continue even if wxLocale is not available.
+    // Because of translation will works fine, just locales will set to EN 
+    if (! wxLocale::IsAvailable(language_info->Language) && language_info->CanonicalName.BeforeFirst('_') != "zh" ) {
+#else
     if (! wxLocale::IsAvailable(language_info->Language)) {
+#endif
     	// Loading the language dictionary failed.
     	wxString message = "Switching PrusaSlicer to language " + language_info->CanonicalName + " failed.";
 #if !defined(_WIN32) && !defined(__APPLE__)
@@ -2295,10 +2302,11 @@ bool GUI_App::load_language(wxString language, bool initial)
     // to load possibly different dictionary, for example, load Czech dictionary for Slovak language.
     wxTranslations::Get()->SetLanguage(language_dict);
     {
+        // ysFIXME after fix for wxWidgets issue (https://github.com/wxWidgets/wxWidgets/issues/23210)
         // UKR Localization specific workaround till the wxWidgets doesn't fixed:
         // From wxWidgets 3.1.6 calls setlocation(0, wxInfoLanguage->LocaleTag), see (https://github.com/prusa3d/wxWidgets/commit/deef116a09748796711d1e3509965ee208dcdf0b#diff-7de25e9a71c4dce61bbf76492c589623d5b93fd1bb105ceaf0662075d15f4472),
         // where LocaleTag is a Tag of locale in BCP 47 - like notation.
-        // For Ukrainian Language LocaleTag == "uk".
+        // For Ukrainian Language LocaleTag is "uk".
         // But setlocale(0, "uk") returns "English_United Kingdom.1252" instead of "uk",
         // and, as a result, locales are set to English_United Kingdom        
          

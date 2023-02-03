@@ -556,6 +556,9 @@ void Layer::sort_perimeters_into_islands(
     // If the current layer consists of multiple regions, then the fill_expolygons above are split by the source LayerRegion surfaces.
     const std::vector<uint32_t>                                     &layer_region_ids)
 {
+    assert(perimeter_and_gapfill_ranges.size() == fill_expolygons_ranges.size());
+    assert(! layer_region_ids.empty());
+
     LayerRegion &this_layer_region = *m_regions[region_id];
 
     // Bounding boxes of fill_expolygons.
@@ -563,7 +566,6 @@ void Layer::sort_perimeters_into_islands(
     fill_expolygons_bboxes.reserve(fill_expolygons.size());
     for (const ExPolygon &expolygon : fill_expolygons)
         fill_expolygons_bboxes.emplace_back(get_extents(expolygon));
-
 
     // Take one sample point for each source slice, to be used to sort source slices into layer slices.
     // source slice index + its sample.
@@ -619,7 +621,11 @@ void Layer::sort_perimeters_into_islands(
 
     // Map of source fill_expolygon into region and fill_expolygon of that region.
     // -1: not set
-    std::vector<std::pair<int, int>> map_expolygon_to_region_and_fill;
+    struct RegionWithFillIndex {
+        int region_id{ -1 };
+        int fill_in_region_id{ -1 };
+    };
+    std::vector<RegionWithFillIndex> map_expolygon_to_region_and_fill;
     const bool                       has_multiple_regions = layer_region_ids.size() > 1;
     assert(has_multiple_regions || layer_region_ids.size() == 1);
     // assign fill_surfaces to each layer
@@ -633,7 +639,7 @@ void Layer::sort_perimeters_into_islands(
                 const BoundingBox &bbr = fill_expolygons_bboxes[rhs];
                 return bbl.min < bbr.min || (bbl.min == bbr.min && bbl.max < bbr.max);
             });
-            map_expolygon_to_region_and_fill.assign(fill_expolygons.size(), std::make_pair(-1, -1));
+            map_expolygon_to_region_and_fill.assign(fill_expolygons.size(), {});
             for (uint32_t region_idx : layer_region_ids) {
                 LayerRegion &l = *m_regions[region_idx];
                 l.m_fill_expolygons = intersection_ex(l.slices().surfaces, fill_expolygons);
@@ -649,23 +655,80 @@ void Layer::sort_perimeters_into_islands(
                         if (uint32_t fill_id = *it_bbox; fill_expolygons_bboxes[fill_id] == bbox) {
                             // With a very high probability the two expolygons match exactly. Confirm that.
                             if (expolygons_match(expolygon, fill_expolygons[fill_id])) {
-                                std::pair<int, int> &ref = map_expolygon_to_region_and_fill[fill_id];
+                                RegionWithFillIndex &ref = map_expolygon_to_region_and_fill[fill_id];
                                 // Only one expolygon produced by intersection with LayerRegion surface may match an expolygon of fill_expolygons.
-                                assert(ref.first == -1);
-                                ref.first  = region_idx;
-                                ref.second = int(&expolygon - l.fill_expolygons().data());
+                                assert(ref.region_id == -1 && ref.fill_in_region_id == -1);
+                                ref.region_id         = region_idx;
+                                ref.fill_in_region_id = int(&expolygon - l.fill_expolygons().data());
                             }
                         }
                 }
             }
+            // Check whether any island contains multiple fills that fall into the same region, but not they are not contiguous.
+            // If so, sort fills in that particular region so that fills of an island become contiguous.
+            // Index of a region to sort.
+            int              sort_region_id = -1;
+            // Temporary vector of fills for reordering.
+            ExPolygons       fills_temp;
+            // Vector of new positions of the above.
+            std::vector<int> new_positions;
+            do {
+                sort_region_id = -1;
+                for (size_t source_slice_idx = 0; source_slice_idx < fill_expolygons_ranges.size(); ++ source_slice_idx)
+                    if (ExPolygonRange fill_range = fill_expolygons_ranges[source_slice_idx]; fill_range.size() > 1) {
+                        // More than one expolygon exists for a single island. Check whether they are contiguous inside a single LayerRegion::fill_expolygons() vector.
+                        uint32_t fill_idx = *fill_range.begin();
+                        if (const int fill_regon_id = map_expolygon_to_region_and_fill[fill_idx].region_id; fill_regon_id != -1) {
+                            int fill_in_region_id = map_expolygon_to_region_and_fill[fill_idx].fill_in_region_id;
+                            bool needs_sorting = false;
+                            for (++ fill_idx; fill_idx != *fill_range.end(); ++ fill_idx) {
+                                if (const RegionWithFillIndex &ref = map_expolygon_to_region_and_fill[fill_idx]; ref.region_id != fill_regon_id) {
+                                    // This island has expolygons split among multiple regions.
+                                    needs_sorting = false;
+                                    break;
+                                } else if (ref.fill_in_region_id != ++ fill_in_region_id) {
+                                    // This island has all expolygons stored inside the same region, but not sorted.
+                                    needs_sorting = true;
+                                }
+                            }
+                            if (needs_sorting) {
+                                sort_region_id = fill_regon_id;
+                                break;
+                            }
+                        }
+                    }
+                if (sort_region_id != -1) {
+                    // Reorder fills in region with sort_region index.
+                    LayerRegion &layerm = *m_regions[sort_region_id];
+                    new_positions.assign(layerm.fill_expolygons().size(), -1);
+                    int last = 0;
+                    for (RegionWithFillIndex &ref : map_expolygon_to_region_and_fill)
+                        if (ref.region_id == sort_region_id) {
+                            new_positions[ref.fill_in_region_id] = last;
+                            ref.fill_in_region_id = last ++;
+                        }
+                    for (auto &new_pos : new_positions)
+                        if (new_pos == -1)
+                            // Not referenced by any map_expolygon_to_region_and_fill.
+                            new_pos = last ++;
+                    // Move just the content of m_fill_expolygons to fills_temp, but don't move the container vector.
+                    auto &fills = layerm.m_fill_expolygons;
+                    assert(last == int(fills.size()));
+                    fills_temp.reserve(fills.size());
+                    fills_temp.insert(fills_temp.end(), std::make_move_iterator(fills.begin()), std::make_move_iterator(fills.end()));
+                    for (ExPolygon &ex : fills)
+                        ex.clear();
+                    // Move / reoder the expolygons back into m_fill_expolygons.
+                    for (size_t old_pos = 0; old_pos < new_positions.size(); ++ old_pos)
+                        fills[new_positions[old_pos]] = std::move(fills_temp[old_pos]);
+                }
+            } while (sort_region_id != -1);
         } else {
             this_layer_region.m_fill_expolygons        = std::move(fill_expolygons);
             this_layer_region.m_fill_expolygons_bboxes = std::move(fill_expolygons_bboxes);
         }
     }
 
-    // Sort perimeter extrusions, thin fill extrusions and fill expolygons into islands.
-    std::vector<uint32_t> region_fill_sorted_last;
     auto insert_into_island = [
         // Region where the perimeters, gap fills and fill expolygons are stored.
         region_id, 
@@ -678,10 +741,7 @@ void Layer::sort_perimeters_into_islands(
         // Mapping of fill_expolygon to region and its infill.
         &map_expolygon_to_region_and_fill,
         // Output
-        &regions = m_regions, &lslices_ex = this->lslices_ex,
-        // fill_expolygons and fill_expolygons_bboxes need to be sorted into contiguous sequence by island,
-        // thus region_fill_sorted_last contains last fill_expolygon processed (meaning sorted).
-        &region_fill_sorted_last]
+        &regions = m_regions, &lslices_ex = this->lslices_ex]
         (int lslice_idx, int source_slice_idx) {
         lslices_ex[lslice_idx].islands.push_back({});
         LayerIsland &island = lslices_ex[lslice_idx].islands.back();
@@ -692,12 +752,12 @@ void Layer::sort_perimeters_into_islands(
                 // Check whether the fill expolygons of this island were split into multiple regions.
                 island.fill_region_id = LayerIsland::fill_region_composite_id;
                 for (uint32_t fill_idx : fill_range) {
-                    const std::pair<int, int> &kvp = map_expolygon_to_region_and_fill[fill_idx];
-                    if (kvp.first == -1 || (island.fill_region_id != -1 && island.fill_region_id != kvp.second)) {
+                    if (const int fill_regon_id = map_expolygon_to_region_and_fill[fill_idx].region_id; 
+                        fill_regon_id == -1 || (island.fill_region_id != LayerIsland::fill_region_composite_id && island.fill_region_id != fill_regon_id)) {
                         island.fill_region_id = LayerIsland::fill_region_composite_id;
                         break;
                     } else
-                        island.fill_region_id = kvp.second;
+                        island.fill_region_id = fill_regon_id;
                 }
                 if (island.fill_expolygons_composite()) {
                     // They were split, thus store the unsplit "composite" expolygons into the region of perimeters.
@@ -709,23 +769,10 @@ void Layer::sort_perimeters_into_islands(
                         fill_expolygons_bboxes.begin() + *fill_range.begin(), fill_expolygons_bboxes.begin() + *fill_range.end());
                     island.fill_expolygons = ExPolygonRange(begin, uint32_t(this_layer_region.fill_expolygons_composite().size()));
                 } else {
-                    if (region_fill_sorted_last.empty())
-                        region_fill_sorted_last.assign(regions.size(), 0);
-                    uint32_t &last = region_fill_sorted_last[island.fill_region_id];
-                    // They were not split and they belong to the same region.
-                    // Sort the region m_fill_expolygons to a continuous span.
-                    uint32_t begin = last;
-                    LayerRegion &layerm = *regions[island.fill_region_id];
-                    for (uint32_t fill_id : fill_range) {
-                        uint32_t region_fill_id = map_expolygon_to_region_and_fill[fill_id].second;
-                        assert(region_fill_id >= last);
-                        if (region_fill_id > last) {
-                            std::swap(layerm.m_fill_expolygons[region_fill_id], layerm.m_fill_expolygons[last]);
-                            std::swap(layerm.m_fill_expolygons_bboxes[region_fill_id], layerm.m_fill_expolygons_bboxes[last]);
-                        }
-                        ++ last;
-                    }
-                    island.fill_expolygons = ExPolygonRange(begin, last);
+                    // All expolygons are stored inside a single LayerRegion in a contiguous range.
+                    island.fill_expolygons = ExPolygonRange(
+                        map_expolygon_to_region_and_fill[*fill_range.begin()].fill_in_region_id,
+                        map_expolygon_to_region_and_fill[*fill_range.end() - 1].fill_in_region_id + 1);
                 }
             } else {
                 // Layer island is made of one fill region only.
