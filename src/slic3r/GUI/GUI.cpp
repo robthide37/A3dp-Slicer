@@ -282,8 +282,8 @@ static void add_config_substitutions(const ConfigSubstitutions& conf_substitutio
 		{
 			auto opt = def->enum_def->enum_to_index(conf_substitution.new_value->getInt());
 			new_val = opt.has_value() ?
-				wxString("\"") + def->enum_def->value(opt.value()) + "\"" + " (" +
-					_(wxString::FromUTF8(def->enum_def->label(opt.value()))) + ")" :
+				wxString("\"") + def->enum_def->value(*opt) + "\"" + " (" +
+					_(from_u8(def->enum_def->label(*opt))) + ")" :
 				_L("Undefined");
 			break;
 		}

@@ -1194,7 +1194,7 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     }
     case coEnum: {
         auto opt = config.option_def(opt_key)->enum_def->enum_to_label(config.option(opt_key)->getInt());
-        return opt.has_value() ? _(wxString::FromUTF8(opt.value())) : _L("Undef");
+        return opt.has_value() ? _(from_u8(*opt)) : _L("Undef");
     }
     case coPoints: {
         if (opt_key == "bed_shape") {

@@ -1689,7 +1689,7 @@ public:
         assert(this->is_valid_closed_enum());
         auto opt = this->enum_to_index(enum_val);
         return opt.has_value() ?
-            std::optional<std::reference_wrapper<const std::string>>{ this->value(opt.value()) } :
+            std::optional<std::reference_wrapper<const std::string>>{ this->value(*opt) } :
             std::optional<std::reference_wrapper<const std::string>>{};
     }
 
@@ -1697,7 +1697,7 @@ public:
         assert(this->is_valid_closed_enum());
         auto opt = this->enum_to_index(enum_val);
         return opt.has_value() ?
-            std::optional<std::reference_wrapper<const std::string>>{ this->label(opt.value()) } : 
+            std::optional<std::reference_wrapper<const std::string>>{ this->label(*opt) } : 
             std::optional<std::reference_wrapper<const std::string>>{};
     }
 

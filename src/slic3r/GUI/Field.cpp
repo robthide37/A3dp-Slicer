@@ -1141,7 +1141,7 @@ void Choice::set_selection()
 	if (!text_value.IsEmpty()) {
 		if (auto opt = m_opt.enum_def->value_to_index(into_u8(text_value)); opt.has_value())
             // This enum has a value field of the same content as text_value. Select it.
-            field->SetSelection(opt.value());
+            field->SetSelection(*opt);
         else
             field->SetValue(text_value);
 	}
@@ -1153,7 +1153,7 @@ void Choice::set_value(const std::string& value, bool change_event)  //! Redunda
     choice_ctrl* field = dynamic_cast<choice_ctrl*>(window);
     if (auto opt = m_opt.enum_def->value_to_index(value); opt.has_value())
         // This enum has a value field of the same content as text_value. Select it.
-        field->SetSelection(opt.value());
+        field->SetSelection(*opt);
     else
         field->SetValue(value);
 	m_disable_change_event = false;
@@ -1178,9 +1178,9 @@ void Choice::set_value(const boost::any& value, bool change_event)
         int sel_idx = -1;
         if (m_opt.enum_def) {
             if (auto idx = m_opt.enum_def->label_to_index(into_u8(text_value)); idx.has_value())
-                sel_idx = idx.value();
+                sel_idx = *idx;
             else if (idx = m_opt.enum_def->value_to_index(into_u8(text_value)); idx.has_value())
-                sel_idx = idx.value();
+                sel_idx = *idx;
         }
 
         if (sel_idx >= 0 )
@@ -1205,7 +1205,7 @@ void Choice::set_value(const boost::any& value, bool change_event)
 	case coEnum: {
 		auto val = m_opt.enum_def->enum_to_index(boost::any_cast<int>(value));
         assert(val.has_value());
-		field->SetSelection(val.has_value() ? val.value() : 0);
+		field->SetSelection(val.has_value() ? *val : 0);
 		break;
 	}
 	default:
@@ -1325,7 +1325,7 @@ void Choice::msw_rescale()
 
             if (auto opt = m_opt.enum_def->label_to_index(into_u8(selection)); opt.has_value())
                 // This enum has a value field of the same content as text_value. Select it.
-                field->SetSelection(opt.value());
+                field->SetSelection(*opt);
             else
                 field->SetValue(selection);
         }
