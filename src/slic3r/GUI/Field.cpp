@@ -991,7 +991,9 @@ void Choice::BUILD() {
     if (m_opt.width >= 0) size.SetWidth(m_opt.width*m_em_unit);
 
 	choice_ctrl* temp;
-    if (m_opt.gui_type != ConfigOptionDef::GUIType::undefined && m_opt.gui_type != ConfigOptionDef::GUIType::select_open) {
+    if (m_opt.gui_type != ConfigOptionDef::GUIType::undefined 
+        && m_opt.gui_type != ConfigOptionDef::GUIType::select_open 
+        && m_opt.gui_type != ConfigOptionDef::GUIType::select_close) {
         m_is_editable = true;
         temp = new choice_ctrl(m_parent, wxID_ANY, wxString(""), wxDefaultPosition, size, 0, nullptr, wxTE_PROCESS_ENTER);
     }
@@ -1021,11 +1023,13 @@ void Choice::BUILD() {
 	// recast as a wxWindow to fit the calling convention
 	window = dynamic_cast<wxWindow*>(temp);
 
-    if (auto &labels = m_opt.enum_def->labels(); ! labels.empty()) {
-        bool localized = m_opt.enum_def->has_labels();
-        for (const std::string &el : labels)
-            temp->Append(localized ? _(wxString::FromUTF8(el)) : wxString::FromUTF8(el));
-		set_selection();
+    if (m_opt.enum_def) {
+        if (auto& labels = m_opt.enum_def->labels(); !labels.empty()) {
+            bool localized = m_opt.enum_def->has_labels();
+            for (const std::string& el : labels)
+                temp->Append(localized ? _(from_u8(el)) : from_u8(el));
+            set_selection();
+        }
 	}
 
     temp->Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent& e) {
@@ -1171,9 +1175,17 @@ void Choice::set_value(const boost::any& value, bool change_event)
 		wxString text_value = m_opt.type == coInt ? 
             wxString::Format(_T("%i"), int(boost::any_cast<int>(value))) :
             boost::any_cast<wxString>(value);
-        if (auto idx = m_opt.enum_def->label_to_index(into_u8(text_value)); idx.has_value()) {
-            field->SetSelection(idx.value());
-        } else {
+        int sel_idx = -1;
+        if (m_opt.enum_def) {
+            if (auto idx = m_opt.enum_def->label_to_index(into_u8(text_value)); idx.has_value())
+                sel_idx = idx.value();
+            else if (idx = m_opt.enum_def->value_to_index(into_u8(text_value)); idx.has_value())
+                sel_idx = idx.value();
+        }
+
+        if (sel_idx >= 0 )
+            field->SetSelection(sel_idx);
+        else {
             // For editable Combobox under OSX is needed to set selection to -1 explicitly,
             // otherwise selection doesn't be changed
             field->SetSelection(-1);
@@ -1305,22 +1317,19 @@ void Choice::msw_rescale()
     // Set rescaled size
     field->SetSize(size);
 
-    size_t idx = 0;
-    if (m_opt.enum_def && ! m_opt.enum_def->labels().empty()) {
-    	size_t counter = 0;
-    	bool   localized = m_opt.enum_def->has_labels();
-        for (const std::string &el : m_opt.enum_def->labels()) {
-        	wxString text = localized ? _(el) : from_u8(el);
-            field->Append(text);
-            if (text == selection)
-                idx = counter;
-            ++ counter;
+    if (m_opt.enum_def) {
+        if (auto& labels = m_opt.enum_def->labels(); !labels.empty()) {
+            const bool localized = m_opt.enum_def->has_labels();
+            for (const std::string& el : labels)
+                field->Append(localized ? _(from_u8(el)) : from_u8(el));
+
+            if (auto opt = m_opt.enum_def->label_to_index(into_u8(selection)); opt.has_value())
+                // This enum has a value field of the same content as text_value. Select it.
+                field->SetSelection(opt.value());
+            else
+                field->SetValue(selection);
         }
     }
-
-    idx == m_opt.enum_values.size() ?
-        field->SetValue(selection) :
-        field->SetSelection(idx);
 #else
 #ifdef _WIN32
     field->Rescale();

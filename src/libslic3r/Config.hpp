@@ -1812,6 +1812,8 @@ public:
         legend,
         // Vector value, but edited as a single string.
         one_string,
+        // Close parameter, string value could be one of the list values.
+        select_close,
     };
 
 	// Identifier of this option. It is stored here so that it is accessible through the by_serialization_key_ordinal map.

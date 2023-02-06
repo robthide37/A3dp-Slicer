@@ -32,15 +32,14 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
     // Check the gui_type field first, fall through
     // is the normal type.
     switch (opt.gui_type) {
+    case ConfigOptionDef::GUIType::select_close:
     case ConfigOptionDef::GUIType::select_open:
+    case ConfigOptionDef::GUIType::f_enum_open:
+    case ConfigOptionDef::GUIType::i_enum_open:
         m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id));
         break;
     case ConfigOptionDef::GUIType::color:
         m_fields.emplace(id, ColourPicker::Create<ColourPicker>(this->ctrl_parent(), opt, id));
-        break;
-    case ConfigOptionDef::GUIType::f_enum_open:
-    case ConfigOptionDef::GUIType::i_enum_open:
-        m_fields.emplace(id, Choice::Create<Choice>(this->ctrl_parent(), opt, id));
         break;
     case ConfigOptionDef::GUIType::slider:
         m_fields.emplace(id, SliderCtrl::Create<SliderCtrl>(this->ctrl_parent(), opt, id));
