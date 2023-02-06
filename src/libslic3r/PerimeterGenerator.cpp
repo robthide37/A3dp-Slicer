@@ -1042,12 +1042,6 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
                     break;
                 }
             }
-            Polylines perimeter = intersection_pl(to_polylines(perimeter_polygon), shrinked_overhang_to_cover);
-            if (!perimeter.empty()) {
-                overhang_region.emplace_back();
-                extrusion_paths_append(overhang_region.back(), perimeter, ExtrusionRole::OverhangPerimeter, overhang_flow.mm3_per_mm(),
-                                       overhang_flow.width(), overhang_flow.height());
-            }
 
             perimeter_polygon = expand(perimeter_polygon, 0.5 * overhang_flow.scaled_spacing());
             perimeter_polygon = union_(perimeter_polygon, anchoring);
