@@ -1445,9 +1445,11 @@ bool PageDownloader::on_finish_downloader() const
     return downloader->on_finish();
 }
 
-bool DownloaderUtils::Worker::perform_register()
+bool DownloaderUtils::Worker::perform_register(const std::string& path_override/* = {}*/)
 {
     boost::filesystem::path aux_dest (GUI::into_u8(path_name()));
+    if (!path_override.empty())
+        aux_dest = boost::filesystem::path(path_override);
     boost::system::error_code ec;
     boost::filesystem::path chosen_dest = boost::filesystem::absolute(aux_dest, ec);
     if(ec)
