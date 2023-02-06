@@ -1204,7 +1204,7 @@ void Print::alert_when_supports_needed()
         for (const auto &obj : objects_isssues) {
             for (const auto &issue : obj.second) {
                 po_by_support_issues[issue].push_back(obj.first);
-                if (issue.first == SupportSpotsGenerator::SupportPointCause::SeparationFromBed){
+                if (issue.first == SupportSpotsGenerator::SupportPointCause::SeparationFromBed && !obj.first->has_brim()){
                     recommend_brim = true;
                 }
             }
@@ -1235,7 +1235,9 @@ void Print::alert_when_supports_needed()
             }
         }
 
-        message += "\n" + L("Consider enabling supports") + (recommend_brim ? (" " + L("and/or brim")) : "") + ".";
+        bool brim_or_supp = recommend_brim && po_by_support_issues.size() < 2;
+        auto brim_part = " " + (brim_or_supp ? L("or") : L("and")) + " " + L("brim");
+        message += "\n" + L("Consider enabling supports") + (recommend_brim ? brim_part : "") + ".";
 
         if (objects_isssues.size() > 0) {
             this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL, message);
