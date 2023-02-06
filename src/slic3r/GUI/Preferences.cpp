@@ -10,7 +10,7 @@
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
 #include "GLCanvas3D.hpp"
-#include "ConfigWizard_private.hpp"
+#include "ConfigWizard.hpp"
 
 #include <boost/dll/runtime_symbol_info.hpp>
 

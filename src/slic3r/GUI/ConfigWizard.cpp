@@ -1315,10 +1315,12 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     box_presets->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &event) { this->preset_update = event.IsChecked(); });
 }
 
+
+
 namespace DownloaderUtils
 {
+namespace {
 #ifdef _WIN32
-
     wxString get_downloads_path()
     {
         wxString ret;
@@ -1330,7 +1332,6 @@ namespace DownloaderUtils
         CoTaskMemFree(path);
         return ret;
     }
-
 #elif  __APPLE__
     wxString get_downloads_path()
     {
@@ -1348,9 +1349,8 @@ namespace DownloaderUtils
         }
         return wxString();
     }
-
 #endif
-
+ }
 Worker::Worker(wxWindow* parent)
 : wxBoxSizer(wxHORIZONTAL)
 , m_parent(parent)
@@ -1432,16 +1432,16 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
     )));
 #endif
 
-    box_allow_downloads->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) { this->downloader->allow(event.IsChecked()); });
+    box_allow_downloads->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) { this->m_downloader->allow(event.IsChecked()); });
 
-    downloader = new DownloaderUtils::Worker(this);
-    append(downloader);
-    downloader->allow(box_allow_value);
+    m_downloader = new DownloaderUtils::Worker(this);
+    append(m_downloader);
+    m_downloader->allow(box_allow_value);
 }
 
 bool PageDownloader::on_finish_downloader() const
 {
-    return downloader->on_finish();
+    return m_downloader->on_finish();
 }
 
 bool DownloaderUtils::Worker::perform_register(const std::string& path_override/* = {}*/)
