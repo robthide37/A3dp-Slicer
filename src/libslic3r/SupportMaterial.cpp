@@ -3246,6 +3246,10 @@ static Polylines draw_perimeters(const ExPolygon &expoly, double clip_length)
     for (size_t i = 0; i <= expoly.holes.size();  ++ i) {
         Polyline pl(i == 0 ? expoly.contour.points : expoly.holes[i - 1].points);
         pl.points.emplace_back(pl.points.front());
+        if (i > 0)
+            // It is a hole, reverse it.
+            pl.reverse();
+        // so that all contours are CCW oriented.
         pl.clip_end(clip_length);
         polylines.emplace_back(std::move(pl));
     }
@@ -3351,13 +3355,17 @@ static inline void tree_supports_generate_paths(
     const double anchor_length = spacing * 6.;
     ClipperLib_Z::Paths anchor_candidates;
     for (ExPolygon& expoly : closing_ex(polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5 * flow.scaled_width()))) {
+        std::unique_ptr<ExtrusionEntityCollection> eec;
         double area = expoly.area();
         if (area > sqr(scaled<double>(5.))) {
+            eec = std::make_unique<ExtrusionEntityCollection>();
+            // Don't reoder internal / external loops of the same island, always start with the internal loop.
+            eec->no_sort = true;
             // Make the tree branch stable by adding another perimeter.
             ExPolygons level2 = offset2_ex({ expoly }, -1.5 * flow.scaled_width(), 0.5 * flow.scaled_width());
             if (level2.size() == 1) {
                 Polylines polylines;
-                extrusion_entities_append_paths(dst, draw_perimeters(expoly, clip_length), ExtrusionRole::SupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(),
+                extrusion_entities_append_paths(eec->entities, draw_perimeters(expoly, clip_length), ExtrusionRole::SupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(),
                     // Disable reversal of the path, always start with the anchor, always print CCW.
                     false);
                 expoly = level2.front();
@@ -3369,20 +3377,21 @@ static inline void tree_supports_generate_paths(
         // The anchor candidate points are annotated with an index of the source contour or with -1 if on intersection.
         anchor_candidates.clear();
         shrink_expolygon_with_contour_idx(expoly, flow.scaled_width(), DefaultJoinType, 1.2, anchor_candidates);
-        // Orient all contours CCW.
+        // Orient all contours CW.
         for (auto &path : anchor_candidates)
-            if (ClipperLib_Z::Area(path) < 0)
+            if (ClipperLib_Z::Area(path) > 0)
                 std::reverse(path.begin(), path.end());
 
         // Draw the perimeters.
         Polylines polylines;
         polylines.reserve(expoly.holes.size() + 1);
-        for (size_t idx_loop = 0; idx_loop <= expoly.holes.size(); ++ idx_loop) {
+        for (size_t idx_loop = 0; idx_loop < expoly.num_contours(); ++ idx_loop) {
             // Open the loop with a seam.
-            const Polygon &loop = idx_loop == 0 ? expoly.contour : expoly.holes[idx_loop - 1];
+            const Polygon &loop = expoly.contour_or_hole(idx_loop);
             Polyline pl(loop.points);
-            // Orient all contours CCW.
-            if (loop.area() < 0)
+            // Orient all contours CW, because the anchor will be added to the end of polyline while we want to start a loop with the anchor.
+            if (idx_loop == 0)
+                // It is an outer contour.
                 pl.reverse();
             pl.points.emplace_back(pl.points.front());
             pl.clip_end(clip_length);
@@ -3421,7 +3430,7 @@ static inline void tree_supports_generate_paths(
                 }
             if (d2min < sqr(flow.scaled_width() * 3.)) {
                 // Try to cut an anchor from the closest_contour.
-                // Both closest_contour and pl are CCW oriented.
+                // Both closest_contour and pl are CW oriented.
                 pl.points.emplace_back(closest_point.cast<coord_t>());
                 const ClipperLib_Z::Path &path = *closest_contour;
                 double remaining_length = anchor_length - (seam_pt - closest_point).norm();
@@ -3460,9 +3469,15 @@ static inline void tree_supports_generate_paths(
             pl.reverse();
             polylines.emplace_back(std::move(pl));
         }
-        extrusion_entities_append_paths(dst, polylines, ExtrusionRole::SupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(), 
+
+        ExtrusionEntitiesPtr &out = eec ? eec->entities : dst;
+        extrusion_entities_append_paths(out, std::move(polylines), ExtrusionRole::SupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(), 
             // Disable reversal of the path, always start with the anchor, always print CCW.
             false);
+        if (eec) {
+            std::reverse(eec->entities.begin(), eec->entities.end());
+            dst.emplace_back(eec.release());
+        }
     }
 }
 
