@@ -465,7 +465,9 @@ Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolu
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
-    auto do_move = [&]() {
+    // Fix when leave window during dragging
+    // Fix when click right button
+    if (m_surface_drag.has_value() && !mouse_event.Dragging()) {
         // write transformation from UI into model
         m_parent.do_move(L("Surface move"));
 
@@ -479,14 +481,14 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // allow moving with object again
         m_parent.enable_moving(true);
         m_surface_drag.reset();
-    };
 
-    if (mouse_event.Moving()) {
-        // Fix when leave window during dragging and move cursor back
-        if (m_surface_drag.has_value())
-            do_move();
-        return false;
+        // only left up is correct 
+        // otherwise it is fix state and return false
+        return mouse_event.LeftUp();
     }
+
+    if (mouse_event.Moving())
+        return false;
 
     // detect start text dragging
     if (mouse_event.LeftDown()) {
@@ -536,7 +538,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Vec2d mouse_pos = mouse_coord.cast<double>();
         Vec2d mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
         Transform3d instance_inv = gl_volume->get_instance_transformation().get_matrix().inverse();
-        m_surface_drag = SurfaceDrag{mouse_offset, instance_inv, gl_volume, condition};
+        Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
+        m_surface_drag = SurfaceDrag{mouse_offset, instance_inv, volume_tr, gl_volume, condition};
 
         // Cancel job to prevent interuption of dragging (duplicit result)
         if (m_job_cancel != nullptr) 
@@ -568,19 +571,85 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
         Transform3d trmat = create_transformation_onto_surface(hit->position, hit->normal);
 
-        TextConfiguration &tc = *m_volume->text_configuration;
-        const FontProp& font_prop = tc.style.prop;
-        apply_transformation(font_prop, trmat);
+        // !!!!!!!!!!!!!!!! USE DIRECT hit position and normal
 
-        // fix baked transformation from .3mf store process
-        if (tc.fix_3mf_tr.has_value())
-            trmat = trmat * (*tc.fix_3mf_tr);
+        //TextConfiguration &tc = *m_volume->text_configuration;
+        //const FontProp& font_prop = tc.style.prop;
+        //apply_transformation(font_prop, trmat);
+
+        //// fix baked transformation from .3mf store process
+        //if (tc.fix_3mf_tr.has_value())
+        //    trmat = trmat * (*tc.fix_3mf_tr);
 
         // volume transfomration in world coor
-        Transform3d world = object_trmat * trmat;
-        Transform3d volume_tr = m_surface_drag->instance_inv * world;
+        Transform3d wanted_world = object_trmat * trmat;
+        Transform3d wanted_volume = m_surface_drag->instance_inv * wanted_world;
 
-        // Update transformation inside of  instances
+        // Calculate offset inside instance: 
+        // transformation from curret to wanted position
+        Vec3d from_position = m_surface_drag->volume_tr * Vec3d::Zero();
+        Vec3d to_position = wanted_volume * Vec3d::Zero();
+
+        Transform3d hit_to_instance = object_trmat * m_surface_drag->instance_inv;
+        Vec3d to_position2 = hit_to_instance * hit->position.cast<double>();
+        Vec3d z_t2 = hit_to_instance.linear() * hit->normal.cast<double>();
+
+        Vec3d offset_instance = to_position - from_position;
+        Transform3d trnsl{Eigen::Translation<double, 3>(offset_instance)};
+
+        // current transformation from volume to world
+        Transform3d current_world = m_surface_drag->instance_inv.inverse() * m_surface_drag->volume_tr;
+
+        auto current_world_linear = current_world.linear();
+        auto wanted_world_linear  = wanted_world.linear();
+
+        // Calculate rotation of Z-vectors from current to wanted position
+        Transform3d rot = Transform3d::Identity();
+        // Transformed unit vector Z direction (f)rom, (t)o
+        Vec3d z_f = m_surface_drag->volume_tr.linear() * Vec3d::UnitZ();
+        Vec3d z_t = wanted_volume.linear() * Vec3d::UnitZ();
+        z_f.normalize();
+        z_t.normalize();
+        double cos_angle = z_t.dot(z_f);
+
+        // Calculate only when angle is not zero
+        if (cos_angle < 1. && cos_angle > -1.) {
+            m_surface_drag->from = from_position;
+            m_surface_drag->to = to_position;
+            m_surface_drag->from_dir = z_f;
+            m_surface_drag->to_dir   = z_t;
+
+            m_surface_drag->f_tr = current_world;
+            m_surface_drag->t_tr = wanted_world;
+
+            // TODO: solve opposit direction of z_t and z_f (a.k.a. angle 180 DEG)
+            // if (cos_angle == 0.) {}
+
+            // Calculate rotation axe from current to wanted inside instance
+            Vec3d axe = z_t.cross(z_f);
+            axe.normalize();                        
+            double angle = acos(cos_angle);
+            rot = Eigen::AngleAxis(-angle, axe);
+        }
+
+        // Calculate scale in world
+        auto calc_scale = [&current_world_linear, wanted_world_linear](const Vec3d &dir) -> double {
+            Vec3d  current    = current_world_linear * dir;
+            Vec3d  wanted     = wanted_world_linear * dir;
+            double current_sq = current.squaredNorm();
+            double wanted_sq  = wanted.squaredNorm();
+            return sqrt(wanted_sq / current_sq);
+        };
+        double y_scale = calc_scale(Vec3d::UnitY());
+        double z_scale = calc_scale(Vec3d::UnitZ());
+        Transform3d scale(Eigen::Scaling(1., y_scale, z_scale));
+
+        Transform3d volume_tr = trnsl * m_surface_drag->volume_tr * rot;
+
+        assert(volume_tr.matrix()(0,0) == volume_tr.matrix()(0,0)); // Check valid transformation not a NAN
+        Transform3d volume_tr2 = m_surface_drag->instance_inv * wanted_world;
+
+        // Update transformation inside of instances
         for (GLVolume *vol : m_parent.get_volumes().volumes) {
             if (vol->object_idx() != m_surface_drag->gl_volume->object_idx() || 
                 vol->volume_idx() != m_surface_drag->gl_volume->volume_idx())
@@ -592,9 +661,6 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         calculate_scale();
 
         m_parent.set_as_dirty();
-        return true;
-    } else if (mouse_event.LeftUp()) {
-        do_move();
         return true;
     }
     return false;
@@ -631,6 +697,23 @@ bool GLGizmoEmboss::on_init()
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 
 void GLGizmoEmboss::on_render() {
+    // Render debug view to surface move
+    if (m_surface_drag.has_value()) {
+        auto glvol = priv::get_gl_volume(m_parent.get_selection());
+        auto      tr    = glvol->get_instance_transformation().get_matrix();
+        CoordAxes from;
+        from.set_origin(m_surface_drag->from);
+        //from.render(tr, 2.);
+
+        CoordAxes to;
+        to.set_origin(m_surface_drag->to);
+        //to.render(tr, 2.);
+
+        CoordAxes axe;
+        axe.render(m_surface_drag->f_tr);
+        axe.render(m_surface_drag->t_tr);
+    }
+
     // no volume selected
     if (m_volume == nullptr ||
         priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr)

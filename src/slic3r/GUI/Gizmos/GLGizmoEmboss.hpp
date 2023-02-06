@@ -316,11 +316,24 @@ private:
         // Help convert world transformation to instance space
         Transform3d instance_inv;
 
+        // Start dragging volume transformation
+        Transform3d volume_tr;
+
         // Dragged gl volume
         GLVolume *gl_volume;
 
         // condition for raycaster
         RaycastManager::AllowVolumes condition;
+
+        // Visuzalization
+        Vec3d from = Vec3d::Zero();
+        Vec3d to = Vec3d::Zero();
+
+        Vec3d from_dir = Vec3d::UnitZ();
+        Vec3d to_dir = Vec3d::UnitZ();
+
+        Transform3d f_tr = Transform3d::Identity();
+        Transform3d t_tr = Transform3d::Identity();
     };
     // Keep data about dragging only during drag&drop
     std::optional<SurfaceDrag> m_surface_drag;
