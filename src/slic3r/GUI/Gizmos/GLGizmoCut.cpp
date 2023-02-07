@@ -206,7 +206,16 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     };
 
     m_connector_modes = { _u8L("Auto"), _u8L("Manual") };
-    m_connector_types = { _u8L("Plug"), _u8L("Dowel") };
+
+    std::map<const wchar_t, std::string> connetor_types = {
+        {ImGui::PlugMarker , _u8L("Plug")  }, 
+        {ImGui::DowelMarker, _u8L("Dowel") },
+    };
+    for (auto connector : connetor_types) {
+        std::string type_label = " " + connector.second + " ";
+        type_label += connector.first;
+        m_connector_types.push_back(type_label);
+    }
 
     m_connector_styles = { _u8L("Prizm"), _u8L("Frustum")
 //              , _u8L("Claw")
@@ -506,7 +515,7 @@ bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& v
 
     const BoundingBoxf3 bbox = bounding_box();
     float mean_size = float((bbox.size().x() + bbox.size().y() + bbox.size().z()) / 9.0);
-    float min_size  = value_in < 0.f ? UndefMinVal : 2.f;
+    float min_size  = value_in < 0.f ? UndefMinVal : 1.f;
     if (m_imperial_units) {
         mean_size *= float(ObjectManipulation::mm_to_in);
         min_size  *= float(ObjectManipulation::mm_to_in);

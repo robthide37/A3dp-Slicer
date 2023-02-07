@@ -201,7 +201,14 @@ bool Field::is_matched(const std::string& string, const std::string& pattern)
 	return std::regex_match(string, regex_pattern);
 }
 
-static wxString na_value() { return _(L("N/A")); }
+static wxString na_value(bool for_spin_ctrl = false)
+{
+#ifdef __linux__
+    if (for_spin_ctrl)
+        return "";
+#endif
+    return _(L("N/A"));
+}
 
 void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true*/)
 {
@@ -888,7 +895,7 @@ void SpinCtrl::set_value(const boost::any& value, bool change_event/* = false*/)
     if (m_opt.nullable) {
         const bool m_is_na_val = tmp_value == ConfigOptionIntsNullable::nil_value();
         if (m_is_na_val)
-            dynamic_cast<wxSpinCtrl*>(window)->SetValue(na_value());
+            dynamic_cast<wxSpinCtrl*>(window)->SetValue(na_value(true));
         else {
             m_last_meaningful_value = value;
             dynamic_cast<wxSpinCtrl*>(window)->SetValue(tmp_value);
@@ -909,7 +916,7 @@ void SpinCtrl::set_last_meaningful_value()
 
 void SpinCtrl::set_na_value()
 {
-    dynamic_cast<wxSpinCtrl*>(window)->SetValue(na_value());
+    dynamic_cast<wxSpinCtrl*>(window)->SetValue(na_value(true));
     m_value = ConfigOptionIntsNullable::nil_value();
     propagate_value();
 }
@@ -917,7 +924,7 @@ void SpinCtrl::set_na_value()
 boost::any& SpinCtrl::get_value()
 {
     wxSpinCtrl* spin = static_cast<wxSpinCtrl*>(window);
-    if (spin->GetTextValue() == na_value())
+    if (spin->GetTextValue() == na_value(true))
         return m_value;
 
 	int value = spin->GetValue();

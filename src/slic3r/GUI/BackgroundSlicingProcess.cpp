@@ -23,7 +23,6 @@
 #include "libslic3r/Format/SL1.hpp"
 #include "libslic3r/Thread.hpp"
 #include "libslic3r/libslic3r.h"
-#include "libslic3r/BuildVolume.hpp"
 
 #include <cassert>
 #include <stdexcept>
@@ -145,20 +144,6 @@ std::string BackgroundSlicingProcess::output_filepath_for_project(const boost::f
 void BackgroundSlicingProcess::process_fff()
 {
 	assert(m_print == m_fff_print);
-
-	// Checks that the print does not exceed the max print height
-	const BuildVolume& build_volume = GUI::wxGetApp().mainframe->m_plater->build_volume();
-	auto objects = m_fff_print->objects();
-	for (auto obj : objects) {
-		std::vector<coordf_t> layer_height_profile;
-		PrintObject::update_layer_height_profile(*obj->model_object(), obj->slicing_parameters(), layer_height_profile);
-		auto layers = generate_object_layers(obj->slicing_parameters(), layer_height_profile);
-		if (!layers.empty() && layers.back() > build_volume.max_print_height()) {
-			throw Slic3r::SlicingError("The print is taller than the maximum allowed height. You might want to reduce the size of your model"
-				" or change current print settings and retry.");
-		}
-	}
-
 	m_print->process();
 	wxCommandEvent evt(m_event_slicing_completed_id);
 	// Post the Slicing Finished message for the G-code viewer to update.

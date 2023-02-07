@@ -338,42 +338,47 @@ void DesktopIntegrationDialog::perform_desktop_integration(bool perform_download
         "StartupNotify=false\n"
         "StartupWMClass=prusa-slicer\n", name_suffix, version_suffix, excutable_path);
 
+    bool candidate_found = false;
     for (size_t i = 0; i < target_candidates.size(); ++i) {
         if (contains_path_dir(target_candidates[i], "applications")) {
             target_dir_desktop = target_candidates[i];
             // Write slicer desktop file
             std::string path = GUI::format("%1%/applications/PrusaSlicer%2%.desktop", target_dir_desktop, version_suffix);
-            if (create_desktop_file(path, desktop_file)){
+            if (create_desktop_file(path, desktop_file)) {
+                candidate_found = true;
                 BOOST_LOG_TRIVIAL(debug) << "PrusaSlicer.desktop file installation success.";
                 break;
-            } else {
-            	// write failed - try another path
-                BOOST_LOG_TRIVIAL(debug) << "Attempt to PrusaSlicer.desktop file installation failed. failed path: " << target_candidates[i];
-                target_dir_desktop.clear(); 
             }
-        }
-        // if all failed - try creating default home folder
-        if (i == target_candidates.size() - 1) {
-            // create $HOME/.local/share
-            create_path(boost::nowide::narrow(wxFileName::GetHomeDir()), ".local/share/applications");
-            // create desktop file
-            target_dir_desktop = GUI::format("%1%/.local/share",wxFileName::GetHomeDir());
-            std::string path = GUI::format("%1%/applications/PrusaSlicer%2%.desktop", target_dir_desktop, version_suffix);
-            if (contains_path_dir(target_dir_desktop, "applications")) {
-                if (!create_desktop_file(path, desktop_file)) {    
-                    // Desktop file not written - end desktop integration
-                    BOOST_LOG_TRIVIAL(error) << "Performing desktop integration failed - could not create desktop file";
-                    return;
-                }
-             } else {
-             	// Desktop file not written - end desktop integration
-                BOOST_LOG_TRIVIAL(error) << "Performing desktop integration failed because the application directory was not found.";
-                return;
+            else {
+                // write failed - try another path
+                BOOST_LOG_TRIVIAL(debug) << "Attempt to PrusaSlicer.desktop file installation failed. failed path: " << target_candidates[i];
+                target_dir_desktop.clear();
             }
         }
     }
-    if(target_dir_desktop.empty()) {
-    	// Desktop file not written - end desktop integration
+    // if all failed - try creating default home folder
+    if (!candidate_found) {
+        // create $HOME/.local/share
+        create_path(boost::nowide::narrow(wxFileName::GetHomeDir()), ".local/share/applications");
+        // create desktop file
+        target_dir_desktop = GUI::format("%1%/.local/share", wxFileName::GetHomeDir());
+        std::string path = GUI::format("%1%/applications/PrusaSlicer%2%.desktop", target_dir_desktop, version_suffix);
+        if (contains_path_dir(target_dir_desktop, "applications")) {
+            if (!create_desktop_file(path, desktop_file)) {
+                // Desktop file not written - end desktop integration
+                BOOST_LOG_TRIVIAL(error) << "Performing desktop integration failed - could not create desktop file";
+                return;
+            }
+        }
+        else {
+            // Desktop file not written - end desktop integration
+            BOOST_LOG_TRIVIAL(error) << "Performing desktop integration failed because the application directory was not found.";
+            return;
+        }
+    }
+    assert(!target_dir_desktop.empty());
+    if (target_dir_desktop.empty()) {
+        // Desktop file not written - end desktop integration
         BOOST_LOG_TRIVIAL(error) << "Performing desktop integration failed because the application directory was not found.";
         show_error(nullptr, _L("Performing desktop integration failed because the application directory was not found."));
         return;

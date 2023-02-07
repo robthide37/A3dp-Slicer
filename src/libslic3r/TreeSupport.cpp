@@ -923,7 +923,9 @@ static void generate_initial_areas(
     // does not turn valid in double the amount of layers a slope of support angle would take to travel xy_distance, nothing reasonable will come from it. 
     // The 2*z_distance_delta is only a catch for when the support angle is very high.
     // Used only if not min_xy_dist.
-    const coord_t max_overhang_insert_lag = std::max<coord_t>(round_up_divide(mesh_config.xy_distance, max_overhang_speed / 2), 2 * mesh_config.z_distance_top_layers);
+    const coord_t max_overhang_insert_lag = mesh_config.z_distance_top_layers > 0 ?
+        std::max<coord_t>(round_up_divide(mesh_config.xy_distance, max_overhang_speed / 2), 2 * mesh_config.z_distance_top_layers) :
+        0;
 
     //FIXME 
     size_t num_support_layers = print_object.layer_count();
@@ -2498,8 +2500,10 @@ static void create_nodes_from_area(
     // Point is chosen based on an inaccurate estimate where the branches will split into two, but every point inside the influence area would produce a valid result.
     {
         SupportElements *layer_above = move_bounds.size() > 1 ? &move_bounds[1] : nullptr;
-        for (SupportElement &elem : *layer_above)
-            elem.state.marked = false;
+        if (layer_above) {
+            for (SupportElement &elem : *layer_above)
+                elem.state.marked = false;
+        }
         for (SupportElement &init : move_bounds.front()) {
             init.state.result_on_layer = move_inside_if_outside(init.influence_area, init.state.next_position);
             // Also set the parent nodes, as these will be required for the first iteration of the loop below and mark the parent nodes.
