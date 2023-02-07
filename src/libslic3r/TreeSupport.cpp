@@ -2500,8 +2500,10 @@ static void create_nodes_from_area(
     // Point is chosen based on an inaccurate estimate where the branches will split into two, but every point inside the influence area would produce a valid result.
     {
         SupportElements *layer_above = move_bounds.size() > 1 ? &move_bounds[1] : nullptr;
-        for (SupportElement &elem : *layer_above)
-            elem.state.marked = false;
+        if (layer_above) {
+            for (SupportElement &elem : *layer_above)
+                elem.state.marked = false;
+        }
         for (SupportElement &init : move_bounds.front()) {
             init.state.result_on_layer = move_inside_if_outside(init.influence_area, init.state.next_position);
             // Also set the parent nodes, as these will be required for the first iteration of the loop below and mark the parent nodes.
