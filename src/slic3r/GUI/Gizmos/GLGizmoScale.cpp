@@ -264,9 +264,8 @@ void GLGizmoScale3D::on_render()
 #endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
-    const Transform3d base_matrix = local_transform(selection);
     for (int i = 0; i < 10; ++i) {
-        m_grabbers[i].matrix = base_matrix;
+        m_grabbers[i].matrix = box_trafo;
     }
 
     const float grabber_mean_size = (float)((m_bounding_box.size().x() + m_bounding_box.size().y() + m_bounding_box.size().z()) / 3.0);
@@ -281,7 +280,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -315,7 +314,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -347,7 +346,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -379,7 +378,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -411,7 +410,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -919,21 +918,6 @@ double GLGizmoScale3D::calc_ratio(const UpdateData& data) const
 
     return ratio;
 }
-
-#if ENABLE_WORLD_COORDINATE
-Transform3d GLGizmoScale3D::local_transform(const Selection& selection) const
-{
-    Transform3d ret = Geometry::translation_transform(m_center);
-    if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
-        const GLVolume& v = *selection.get_first_volume();
-        Transform3d orient_matrix = v.get_instance_transformation().get_rotation_matrix();
-        if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
-            orient_matrix = orient_matrix * v.get_volume_transformation().get_rotation_matrix();
-        ret = ret * orient_matrix;
-    }
-    return ret;
-}
-#endif // ENABLE_WORLD_COORDINATE
 
 } // namespace GUI
 } // namespace Slic3r
