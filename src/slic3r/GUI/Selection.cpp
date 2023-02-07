@@ -1419,7 +1419,7 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
         if (transformation_type.absolute()) {
             if (m_mode == Instance) {
                 if (is_single_full_instance()) {
-                    BoundingBoxf3 current_box = m_box.get_bounding_box();
+                    BoundingBoxf3 current_box = get_bounding_box_in_current_reference_system().first;
                     BoundingBoxf3 original_box;
                     if (transformation_type.world())
                         original_box = get_full_unscaled_instance_bounding_box();
