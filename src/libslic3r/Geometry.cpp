@@ -854,9 +854,9 @@ TransformationSVD::TransformationSVD(const Transform3d& trafo)
 
     scale = !s.isApprox(Matrix3d::Identity());
     anisotropic_scale = ! is_approx(s(0, 0), s(1, 1)) || ! is_approx(s(1, 1), s(2, 2));
-    rotation = !v.isApprox(u.transpose());
+    rotation = !v.isApprox(u);
 
-    if (anisotropic_scale && rotation) {
+    if (anisotropic_scale) {
         rotation_90_degrees = true;
         for (int i = 0; i < 3; ++i) {
             const Vec3d row = v.row(i).cwiseAbs();
