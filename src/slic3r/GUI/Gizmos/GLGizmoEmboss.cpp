@@ -229,13 +229,17 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     
     GLVolume *gl_volume = priv::get_hovered_gl_volume(m_parent);
     DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
-    // Try to cast ray into scene and find object for add volume 
-    if (priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager))
-        // object found
-        return;
-
-    // object is not under mouse position soo create object on plater
-    priv::start_create_object_job(emboss_data, mouse_pos);
+    if (gl_volume != nullptr) {
+        // Try to cast ray into scene and find object for add volume
+        if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager)) {
+            // When model is broken. It could appear that hit miss the object.
+            // So add part near by in simmilar manner as right panel do
+            create_volume(volume_type);
+        }
+    } else {
+        // object is not under mouse position soo create object on plater
+        priv::start_create_object_job(emboss_data, mouse_pos);    
+    }
 }
 
 // Designed for create volume without information of mouse in scene
@@ -266,8 +270,9 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
     const GLVolume *vol = nullptr;
     const Camera &camera = wxGetApp().plater()->get_camera();
     priv::find_closest_volume(selection, screen_center, camera, objects, &coor, &vol);
-    if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager)) {
-        assert(vol != nullptr);
+    if (vol == nullptr) {
+        priv::start_create_object_job(emboss_data, screen_center);
+    } else if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager)) {
         // in centroid of convex hull is not hit with object
         // soo create transfomation on border of object
         
@@ -3924,7 +3929,9 @@ GLVolume * priv::get_hovered_gl_volume(const GLCanvas3D &canvas) {
 bool priv::start_create_volume_on_surface_job(
     DataBase &emboss_data, ModelVolumeType volume_type, const Vec2d &screen_coor, const GLVolume *gl_volume, RaycastManager &raycaster)
 {
+    assert(gl_volume != nullptr);
     if (gl_volume == nullptr) return false;
+
     Plater *plater = wxGetApp().plater();
     const ModelObjectPtrs &objects = plater->model().objects;
 
@@ -3941,7 +3948,8 @@ bool priv::start_create_volume_on_surface_job(
     // context menu for add text could be open only by right click on an
     // object. After right click, object is selected and object_idx is set
     // also hit must exist. But there is options to add text by object list
-    if (!hit.has_value()) return false;
+    if (!hit.has_value())
+        return false;
 
     Transform3d hit_object_trmat = raycaster.get_transformation(hit->tr_key);
     Transform3d hit_instance_trmat = gl_volume->get_instance_transformation().get_matrix();

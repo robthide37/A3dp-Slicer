@@ -124,7 +124,7 @@ public:
     std::optional<Hit> closest(const Vec3d &point, const ISkip *skip = nullptr) const;
 
     /// <summary>
-    /// Getter on transformation
+    /// Getter on transformation from hitted volume to world
     /// </summary>
     /// <param name="tr_key">Define transformation</param>
     /// <returns>Transformation for key</returns>
