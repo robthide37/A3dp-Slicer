@@ -2946,10 +2946,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             prev = p;
         }
     } else {
-        std::string comment;
+        std::string marked_comment;
         if (m_config.gcode_comments) {
-            comment = description;
-            comment += description_bridge;
+            marked_comment = description;
+            marked_comment += description_bridge;
         }
         double last_set_speed = new_points[0].speed * 60.0;
         gcode += m_writer.set_speed(last_set_speed, "", comment);
@@ -2958,7 +2958,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             const ProcessedPoint& processed_point = new_points[i];
             Vec2d p = this->point_to_gcode_quantized(processed_point.p);
             const double line_length = (p - prev).norm();
-            gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
+            gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, marked_comment);
             prev = p;
             double new_speed = processed_point.speed * 60.0;
             if (last_set_speed != new_speed) {
