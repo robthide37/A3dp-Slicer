@@ -121,6 +121,33 @@ void RaycastManager::actualize(const ModelInstance *instance, const ISkip *skip)
             m_transformations.erase(m_transformations.begin() + i);
 }
 
+#include "slic3r/GUI/CameraUtils.hpp"
+namespace priv {
+
+// Copy functionality from MeshRaycaster::unproject_on_mesh without filtering
+static std::optional<RaycastManager::SurfacePoint> unproject_on_mesh(const MeshRaycaster &raycaster,
+    const Vec2d &mouse_pos, const Transform3d &transformation, const Camera &camera) {
+
+    Vec3d point;
+    Vec3d direction;
+    CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
+    Transform3d inv = transformation.inverse();
+    point     = inv*point;
+    direction = inv.linear()*direction;
+
+    const AABBMesh &aabb_mesh = raycaster.get_aabb_mesh();
+    std::vector<AABBMesh::hit_result> hits = aabb_mesh.query_ray_hits(point, direction);
+
+    if (hits.empty())
+        return {}; // no intersection found
+
+    const AABBMesh::hit_result &hit = hits.front();
+    return RaycastManager::SurfacePoint(
+        hit.position().cast<float>(), 
+        hit.normal().cast<float>()
+    );
+}
+} // namespace priv
 
 std::optional<RaycastManager::Hit> RaycastManager::unproject(
     const Vec2d &mouse_pos, const Camera &camera, const ISkip *skip) const
@@ -137,12 +164,11 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(
                              -> bool { return volume_id == it.first; });
         if (raycaster_it == m_raycasters.end()) continue;
         const MeshRaycaster &raycaster = *(raycaster_it->second);
-        SurfacePoint surface_point;
-        bool success = raycaster.unproject_on_mesh(
-            mouse_pos, transformation, camera,
-            surface_point.position, surface_point.normal);
-        if (!success) continue;
-
+        std::optional<SurfacePoint> surface_point_opt = priv::unproject_on_mesh(
+            raycaster, mouse_pos, transformation, camera);
+        if (!surface_point_opt.has_value())
+            continue;
+        const SurfacePoint &surface_point = *surface_point_opt;
         Vec3d act_hit_tr = transformation * surface_point.position.cast<double>();
         double squared_distance = (camera.get_position() - act_hit_tr).squaredNorm();
         if (closest.has_value() &&
