@@ -756,7 +756,7 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
     double ratio = calc_ratio(data);
     if (ratio > 0.0) {
         Vec3d curr_scale = m_scale;
-        Vec3d starting_scale = m_starting.scale;
+        const Vec3d starting_scale = m_starting.scale;
         const Selection& selection = m_parent.get_selection();
         const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
 
@@ -768,13 +768,6 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
 
             if (m_hover_id == 2 * axis)
                 local_offset *= -1.0;
-
-            Vec3d center_offset = m_starting.instance_center - m_starting.center; // world coordinates (== Vec3d::Zero() for single volume selection)
-            if (selection.is_single_full_instance() && coordinates_type == ECoordinatesType::Local)
-                // from world coordinates to instance coordinates
-                center_offset = selection.get_first_volume()->get_instance_transformation().get_rotation_matrix().inverse() * center_offset;
-
-            local_offset += (ratio - 1.0) * center_offset(axis);
 
             switch (axis)
             {
@@ -847,14 +840,6 @@ void GLGizmoScale3D::do_scale_uniform(const UpdateData & data)
                 m_offset.x() *= -1.0;
             if (m_hover_id == 6 || m_hover_id == 7)
                 m_offset.y() *= -1.0;
-
-            Vec3d center_offset = m_starting.instance_center - m_starting.center; // world coordinates (== Vec3d::Zero() for single volume selection)
-
-            if (selection.is_single_full_instance() && coordinates_type == ECoordinatesType::Local)
-                // from world coordinates to instance coordinates
-                center_offset = selection.get_first_volume()->get_instance_transformation().get_rotation_matrix().inverse() * center_offset;
-
-            m_offset += (ratio - 1.0) * center_offset;
 
             if (selection.is_single_full_instance() && coordinates_type == ECoordinatesType::Local)
                 // from instance coordinates to world coordinates
