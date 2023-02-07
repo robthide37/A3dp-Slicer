@@ -554,6 +554,8 @@ struct TransformationSVD
 
     explicit TransformationSVD(const Transformation& trafo) : TransformationSVD(trafo.get_matrix()) {}
     explicit TransformationSVD(const Transform3d& trafo);
+
+    Eigen::DiagonalMatrix<double, 3, 3> mirror_matrix() const { return Eigen::DiagonalMatrix<double, 3, 3>(this->mirror ? -1. : 1., 1., 1.); }
 };
 #endif // ENABLE_WORLD_COORDINATE
 

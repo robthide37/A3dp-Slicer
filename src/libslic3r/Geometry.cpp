@@ -723,27 +723,23 @@ void Transformation::reset()
 void Transformation::reset_rotation()
 {
     const Geometry::TransformationSVD svd(*this);
-    const Transform3d mirror = is_left_handed() ? Geometry::scale_transform({ -1.0, 1.0, 1.0 }) : Transform3d::Identity();
-    m_matrix = get_offset_matrix() * mirror * Transform3d(svd.v * svd.s * svd.v.transpose());
+    m_matrix = get_offset_matrix() * Transform3d(svd.v * svd.s * svd.v.transpose()) * svd.mirror_matrix();
 }
 
 void Transformation::reset_scaling_factor()
 {
     const Geometry::TransformationSVD svd(*this);
-    m_matrix = get_offset_matrix() * Transform3d(svd.u) * Transform3d(svd.v.transpose());
+    m_matrix = get_offset_matrix() * Transform3d(svd.u) * Transform3d(svd.v.transpose()) * svd.mirror_matrix();
 }
 
 void Transformation::reset_skew()
 {
     auto new_scale_factor = [](const Matrix3d& s) {
-//        return s.determinant(); // scale determinant
-        return (s(0, 0) + s(1, 1) + s(2, 2)) / 3.0; // scale average
-//        return std::max(s(0, 0), std::max(s(1, 1), s(2, 2))); // max scale
-//        return std::min(s(0, 0), std::min(s(1, 1), s(2, 2))); // min scale
+        return pow(s(0, 0) * s(1, 1) * s(2, 2), 1. / 3.); // scale average
     };
 
     const Geometry::TransformationSVD svd(*this);
-    m_matrix = get_offset_matrix() * Transform3d(svd.u) * scale_transform(new_scale_factor(svd.s)) * Transform3d(svd.v.transpose());
+    m_matrix = get_offset_matrix() * Transform3d(svd.u) * scale_transform(new_scale_factor(svd.s)) * Transform3d(svd.v.transpose()) * svd.mirror_matrix();
 }
 
 Transform3d Transformation::get_matrix_no_offset() const
@@ -843,46 +839,37 @@ Transformation Transformation::volume_to_bed_transformation(const Transformation
 #if ENABLE_WORLD_COORDINATE
 TransformationSVD::TransformationSVD(const Transform3d& trafo)
 {
-    static const Matrix3d mirror_x = Geometry::scale_transform({ -1.0, 1.0, 1.0 }).linear();
+    const auto &m0 = trafo.matrix().block<3, 3>(0, 0);
+    mirror = m0.determinant() < 0.0;
 
-    const Matrix3d m = trafo.matrix().block<3, 3>(0, 0);
+    Matrix3d m;
+    if (mirror)
+        m = m0 * Eigen::DiagonalMatrix<double, 3, 3>(-1.0, 1.0, 1.0);
+    else
+        m = m0;
     const Eigen::JacobiSVD<Matrix3d> svd(m, Eigen::ComputeFullU | Eigen::ComputeFullV);
     u = svd.matrixU();
     v = svd.matrixV();
     s = svd.singularValues().asDiagonal();
 
-    mirror = m.determinant() < 0.0;
     scale = !s.isApprox(Matrix3d::Identity());
-    anisotropic_scale = std::abs(s(0, 0) - s(1, 1)) > EPSILON || std::abs(s(1, 1) - s(2, 2)) > EPSILON;
-    rotation = mirror ? !u.isApprox(mirror_x) : !v.isApprox(u.transpose());
+    anisotropic_scale = ! is_approx(s(0, 0), s(1, 1)) || ! is_approx(s(1, 1), s(2, 2));
+    rotation = !v.isApprox(u.transpose());
 
-    rotation_90_degrees = true;
-    if (rotation) {
+    if (anisotropic_scale && rotation) {
+        rotation_90_degrees = true;
         for (int i = 0; i < 3; ++i) {
-            const Vec3d row = u.row(i).cwiseAbs();
-            if ((std::abs(row[0] - 1.0) > EPSILON && row[1] > EPSILON && row[2] > EPSILON) ||
-                (row[0] > EPSILON && std::abs(row[1] - 1.0) > EPSILON && row[2] > EPSILON) ||
-                (row[0] > EPSILON && row[1] > EPSILON && std::abs(row[2] - 1.0) > EPSILON)) {
+            const Vec3d row = v.row(i).cwiseAbs();
+            size_t num_zeros = is_approx(row[0], 0.) + is_approx(row[1], 0.) + is_approx(row[2], 0.);
+            size_t num_ones  = is_approx(row[0], 1.) + is_approx(row[1], 1.) + is_approx(row[2], 1.);
+            if (num_zeros != 2 || num_ones != 1) {
                 rotation_90_degrees = false;
                 break;
             }
         }
-    }
-    else
-        rotation_90_degrees = true;
-
-    skew = false;
-    if (anisotropic_scale) {
-        for (int i = 0; i < 3; ++i) {
-            const Vec3d row = v.row(i).cwiseAbs();
-            if ((std::abs(row[0] - 1.0) > EPSILON && row[1] > EPSILON && row[2] > EPSILON) ||
-                (row[0] > EPSILON && std::abs(row[1] - 1.0) > EPSILON && row[2] > EPSILON) ||
-                (row[0] > EPSILON && row[1] > EPSILON && std::abs(row[2] - 1.0) > EPSILON)) {
-                skew = true;
-                break;
-            }
-        }
-    }
+        skew = ! rotation_90_degrees;
+    } else
+        skew = false;
 }
 #endif // ENABLE_WORLD_COORDINATE
 
