@@ -578,7 +578,7 @@ void Layer::sort_perimeters_into_islands(
         // Take a sample deep inside its island if available. Infills are usually quite far from the island boundary.
         for (uint32_t iexpoly : fill_expolygons_ranges[islice])
             if (const ExPolygon &expoly = fill_expolygons[iexpoly]; ! expoly.empty()) {
-                sample     = expoly.contour.points.front();
+                sample     = expoly.contour.points[expoly.contour.points.size() / 2];
                 sample_set = true;
                 break;
             }
@@ -589,12 +589,12 @@ void Layer::sort_perimeters_into_islands(
                 if (ee.is_collection()) {
                     for (const ExtrusionEntity *ee2 : dynamic_cast<const ExtrusionEntityCollection&>(ee).entities)
                         if (! ee2->role().is_external()) {
-                            sample     = ee2->first_point();
+                            sample     = ee2->middle_point();
                             sample_set = true;
                             goto loop_end;
                         }
                 } else if (! ee.role().is_external()) {
-                    sample = ee.first_point();
+                    sample = ee.middle_point();
                     sample_set = true;
                     break;
                 }
@@ -603,12 +603,12 @@ void Layer::sort_perimeters_into_islands(
             if (! sample_set) {
                 if (! extrusions.second.empty()) {
                     // If there is no inner perimeter, take a sample of some gap fill extrusion.
-                    sample     = this_layer_region.thin_fills().entities[*extrusions.second.begin()]->first_point();
+                    sample     = this_layer_region.thin_fills().entities[*extrusions.second.begin()]->middle_point();
                     sample_set = true;
                 }
                 if (! sample_set && ! extrusions.first.empty()) {
                     // As a last resort, take a sample of some external perimeter.
-                    sample     = this_layer_region.perimeters().entities[*extrusions.first.begin()]->first_point();
+                    sample     = this_layer_region.perimeters().entities[*extrusions.first.begin()]->middle_point();
                     sample_set = true;
                 }
             }
@@ -835,6 +835,15 @@ void Layer::sort_perimeters_into_islands(
                     d2min = d2;
                     lslice_idx_min = lslice_idx;
                 }
+            if (lslice_idx_min == -1) {
+                // This should not happen, but Arachne seems to produce a perimeter point far outside its source contour.
+                // As a last resort, find the closest source contours to the sample point.
+                for (int lslice_idx = int(lslices_ex.size()) - 1; lslice_idx >= 0; -- lslice_idx)
+                    if (double d2 = (lslices[lslice_idx].point_projection(it_source_slice->second) - it_source_slice->second).cast<double>().squaredNorm(); d2 < d2min) {
+                        d2min = d2;
+                        lslice_idx_min = lslice_idx;
+                    }
+            }
             assert(lslice_idx_min != -1);
             insert_into_island(lslice_idx_min, it_source_slice->first);
         }
