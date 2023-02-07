@@ -1703,9 +1703,9 @@ void GLGizmoEmboss::draw_text_input()
         auto &ff         = m_style_manager.get_font_file_with_cache();
         float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file, scale);
         if (imgui_size > StyleManager::max_imgui_font_size)
-            append_warning(_u8L("To tall"), _u8L("Diminished font height inside text input."));
+            append_warning(_u8L("Too tall"), _u8L("Diminished font height inside text input."));
         if (imgui_size < StyleManager::min_imgui_font_size)
-            append_warning(_u8L("To small"), _u8L("Enlarged font height inside text input."));
+            append_warning(_u8L("Too small"), _u8L("Enlarged font height inside text input."));
         if (!who.empty()) warning = GUI::format(_L("%1% is NOT shown."), who);
     }
 
