@@ -2129,7 +2129,6 @@ void Selection::update_type()
                 unsigned int volumes_count = (unsigned int)model_object->volumes.size();
                 unsigned int instances_count = (unsigned int)model_object->instances.size();
                 if (volumes_count * instances_count == 1) {
-                    const ModelVolume* model_volume = model_object->volumes[first->volume_idx()];
                     m_type = SingleFullObject;
                     // ensures the correct mode is selected
                     m_mode = Instance;
@@ -2960,7 +2959,6 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
         const int object_idx = volume_i->object_idx();
         const int instance_idx = volume_i->instance_idx();
         const Transform3d& curr_inst_trafo_i = volume_i->get_instance_transformation().get_matrix();
-        const bool         curr_inst_left_handed = is_left_handed(curr_inst_trafo_i);
         const Transform3d& old_inst_trafo_i = m_cache.volumes_data[i].get_instance_transform().get_matrix();
         bool               mirrored = is_left_handed(curr_inst_trafo_i) != is_left_handed(old_inst_trafo_i);
 //        bool               mirrored = curr_inst_trafo_i.linear().determinant() * old_inst_trafo_i.linear().determinant() < 0;
