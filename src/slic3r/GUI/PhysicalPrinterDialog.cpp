@@ -241,9 +241,7 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
         m_printer_name->SelectAll();
     }
 
-    const wxSize& bestsize = this->GetBestSize();
-    const wxSize& size = wxSize(bestsize.x, 1.1f * bestsize.y);
-    this->SetSize(size);
+    this->Fit();
     this->Layout();
 
     this->CenterOnScreen();
@@ -532,10 +530,11 @@ void PhysicalPrinterDialog::update(bool printer_change)
 
     update_printhost_buttons();
 
-    const wxSize& bestsize= this->GetBestSize();
-    const wxSize& size = wxSize( bestsize.x, 1.1f * bestsize.y);
-    this->SetSize(size);
+    this->Fit();
     this->Layout();
+#ifdef __WXMSW__
+    this->Refresh();
+#endif
 }
 
 void PhysicalPrinterDialog::update_host_type(bool printer_change)
