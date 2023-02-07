@@ -836,106 +836,52 @@ const std::pair<BoundingBoxf3, Transform3d>& Selection::get_bounding_box_in_curr
 
 std::pair<BoundingBoxf3, Transform3d> Selection::get_bounding_box_in_reference_system(ECoordinatesType type) const
 {
-    BoundingBoxf3 original_box;
+    //
+    // trafo to current reference system
+    //
     Transform3d trafo;
-
-    //
-    // calculate box aligned to current reference system
-    //
     switch (type)
     {
-    case ECoordinatesType::World:
-    {
-        original_box = get_bounding_box();
-        trafo = Transform3d::Identity();
-        break;
-    }
-    case ECoordinatesType::Instance: {
-        for (unsigned int id : m_list) {
-            const GLVolume& v = *get_volume(id);
-            original_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
-        }
-        trafo = get_first_volume()->get_instance_transformation().get_matrix();
-        break;
-    }
-    case ECoordinatesType::Local: {
-        assert(is_single_volume_or_modifier() || is_single_volume_instance());
-        const GLVolume& v = *get_first_volume();
-        original_box = v.bounding_box();
-        trafo = v.world_matrix();
-        break;
-    }
+    case ECoordinatesType::World:    { trafo = Transform3d::Identity(); break; }
+    case ECoordinatesType::Instance: { trafo = get_first_volume()->get_instance_transformation().get_matrix(); break; }
+    case ECoordinatesType::Local:    { trafo = get_first_volume()->world_matrix(); break; }
     }
 
     //
-    // calculate box size in world coordinates
+    // trafo basis in world coordinates
     //
-    auto point_to_Vec4d = [](const Vec3d& p) { return Vec4d(p.x(), p.y(), p.z(), 1.0); };
-    auto Vec4d_to_Vec3d = [](const Vec4d& v) { return Vec3d(v.x(), v.y(), v.z()); };
+    const Transform3d basis_trafo = Geometry::Transformation(trafo).get_rotation_matrix();
+    std::vector<Vec3d> axes = { Vec3d::UnitX(), Vec3d::UnitY(), Vec3d::UnitZ() };
+    for (size_t i = 0; i < axes.size(); ++i) {
+        axes[i] = basis_trafo * axes[i];
+    }
 
-    auto apply_transform = [](const std::vector<Vec4d>& original, const Transform3d& trafo, bool normalize) {
-        std::vector<Vec4d> transformed(original.size());
-        for (size_t i = 0; i < original.size(); ++i) {
-            transformed[i] = trafo * original[i];
-            if (normalize)
-                transformed[i].normalize();
-        }
-        return transformed;
-    };
-
-    auto calc_box_size = [point_to_Vec4d, Vec4d_to_Vec3d, apply_transform](const BoundingBoxf3& box, const Transform3d& trafo) {
-        // box aligned to current reference system
-        std::vector<Vec4d> homo_vertices = {
-            point_to_Vec4d({ box.min.x(), box.min.y(), box.min.z() }),
-            point_to_Vec4d({ box.max.x(), box.min.y(), box.min.z() }),
-            point_to_Vec4d({ box.max.x(), box.max.y(), box.min.z() }),
-            point_to_Vec4d({ box.min.x(), box.max.y(), box.min.z() }),
-            point_to_Vec4d({ box.min.x(), box.min.y(), box.max.z() }),
-            point_to_Vec4d({ box.max.x(), box.min.y(), box.max.z() }),
-            point_to_Vec4d({ box.max.x(), box.max.y(), box.max.z() }),
-            point_to_Vec4d({ box.min.x(), box.max.y(), box.max.z() })
-        };
-
-        // box vertices in world coordinates
-        std::vector<Vec4d> transformed_homo_vertices = apply_transform(homo_vertices, trafo, false);
-
-        // project back to current reference system
-        const std::vector<Vec4d> homo_axes = { Vec4d::UnitX(), Vec4d::UnitY(), Vec4d::UnitZ() };
-        std::vector<Vec4d> transformed_homo_axes = apply_transform(homo_axes, Geometry::Transformation(trafo).get_matrix_no_scaling_factor(), true);
-        std::vector<Vec3d> transformed_axes(transformed_homo_axes.size());
-        for (size_t i = 0; i < transformed_homo_axes.size(); ++i) {
-            transformed_axes[i] = Vec4d_to_Vec3d(transformed_homo_axes[i]);
-        }
-
-        Vec3d min = { DBL_MAX, DBL_MAX, DBL_MAX };
-        Vec3d max = { -DBL_MAX, -DBL_MAX, -DBL_MAX };
-
-        for (const Vec4d& v_homo : transformed_homo_vertices) {
-            const Vec3d v = Vec4d_to_Vec3d(v_homo);
+    //
+    // calculate bounding box aligned to trafo basis
+    //
+    Vec3d min = { DBL_MAX, DBL_MAX, DBL_MAX };
+    Vec3d max = { -DBL_MAX, -DBL_MAX, -DBL_MAX };
+    for (unsigned int id : m_list) {
+        const GLVolume& vol = *get_volume(id);
+        const Transform3d vol_world_rafo = vol.world_matrix();
+        const TriangleMesh* ch = vol.convex_hull();
+        for (const stl_vertex& v : ch->its.vertices) {
+            const Vec3d world_v = vol_world_rafo * v.cast<double>();
             for (int i = 0; i < 3; ++i) {
-                const double dot_i = v.dot(transformed_axes[i]);
-                min(i) = std::min(min(i), dot_i);
-                max(i) = std::max(max(i), dot_i);
+                const double i_comp = world_v.dot(axes[i]);
+                min(i) = std::min(min(i), i_comp);
+                max(i) = std::max(max(i), i_comp);
             }
         }
-
-        // return size
-        const Vec3d size = max - min;
-        return size;
-    };
-
-    const Vec3d box_size = calc_box_size(original_box, trafo);
-    const std::vector<Vec4d> box_center = { point_to_Vec4d(original_box.center()) };
-    std::vector<Vec4d> transformed_box_center = apply_transform(box_center, trafo, false);
-
-    //
-    // return box centered at 0, 0, 0
-    //
+    }
+    const Vec3d box_size = max - min;
     const Vec3d half_box_size = 0.5 * box_size;
     BoundingBoxf3 out_box(-half_box_size, half_box_size);
     Geometry::Transformation out_trafo(trafo);
-    out_trafo.set_offset(Vec4d_to_Vec3d(transformed_box_center[0]));
+    const Vec3d center = 0.5 * (min + max);
+    out_trafo.set_offset(basis_trafo * center);
     return { out_box, out_trafo.get_matrix_no_scaling_factor() };
+
 }
 #endif // ENABLE_WORLD_COORDINATE
 
