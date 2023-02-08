@@ -2936,7 +2936,11 @@ static void finalize_interface_and_support_areas(
     
     std::function<void()>            throw_on_cancel)
 {
-    InterfacePreference interface_pref = config.interface_preference; // InterfacePreference::SupportLinesOverwriteInterface;
+    assert(std::all_of(bottom_contacts.begin(), bottom_contacts.end(), [](auto *p) { return p == nullptr; }));
+//    assert(std::all_of(top_contacts.begin(), top_contacts.end(), [](auto* p) { return p == nullptr; }));
+    assert(std::all_of(intermediate_layers.begin(), intermediate_layers.end(), [](auto* p) { return p == nullptr; }));
+
+    InterfacePreference interface_pref = config.interface_preference; // InterfacePreference::InterfaceAreaOverwritesSupport;
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     double progress_total = TREE_PROGRESS_PRECALC_AVO + TREE_PROGRESS_PRECALC_COLL + TREE_PROGRESS_GENERATE_NODES + TREE_PROGRESS_AREA_CALC + TREE_PROGRESS_GENERATE_BRANCH_AREAS + TREE_PROGRESS_SMOOTH_BRANCH_AREAS;
@@ -2947,29 +2951,41 @@ static void finalize_interface_and_support_areas(
     tbb::parallel_for(tbb::blocked_range<size_t>(0, support_layer_storage.size()),
         [&](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
-            // Most of the time in this function is this union call. Can take 300+ ms when a lot of areas are to be unioned.
-            support_layer_storage[layer_idx] = smooth_outward(union_(support_layer_storage[layer_idx]), config.support_line_width); //FIXME was .smooth(50);
-            //smooth_outward(closing(std::move(bottom), closing_distance + minimum_island_radius, closing_distance, SUPPORT_SURFACES_OFFSET_PARAMETERS), smoothing_distance) :
-
-            // simplify a bit, to ensure the output does not contain outrageous amounts of vertices. Should not be necessary, just a precaution.
-            support_layer_storage[layer_idx] = polygons_simplify(support_layer_storage[layer_idx], std::min(scaled<double>(0.03), double(config.resolution)));
             // Subtract support lines of the branches from the roof
-            SupportGeneratorLayer*& support_roof = top_contacts[layer_idx];
-            if (! support_roof_storage[layer_idx].empty() || support_roof != nullptr) {
-                if (support_roof == nullptr) {
-                    support_roof = &layer_allocate(layer_storage, layer_storage_mutex, SupporLayerType::TopContact, print_object.slicing_parameters(), layer_idx);
-                    support_roof->polygons = union_(support_roof_storage[layer_idx]);
-                } else
-                    support_roof->polygons = union_(support_roof->polygons, support_roof_storage[layer_idx]);
+            SupportGeneratorLayer *support_roof = top_contacts[layer_idx];
+            Polygons               support_roof_polygons;
 
-                if (! support_roof->polygons.empty() &&
-                    area(intersection(support_layer_storage[layer_idx], support_roof->polygons)) > tiny_area_threshold) {
+            if (Polygons &src = support_roof_storage[layer_idx]; ! src.empty()) {
+                if (support_roof != nullptr && ! support_roof->polygons.empty()) {
+                    support_roof_polygons = union_(src, support_roof->polygons);
+                    support_roof->polygons.clear();
+                } else
+                    support_roof_polygons = std::move(src);
+            } else if (support_roof != nullptr) {
+                support_roof_polygons = std::move(support_roof->polygons);
+                support_roof->polygons.clear();
+            }
+
+            assert(intermediate_layers[layer_idx] == nullptr);
+            Polygons                base_layer_polygons = std::move(support_layer_storage[layer_idx]);
+
+            if (! base_layer_polygons.empty()) {
+                // Most of the time in this function is this union call. Can take 300+ ms when a lot of areas are to be unioned.
+                base_layer_polygons = smooth_outward(union_(base_layer_polygons), config.support_line_width); //FIXME was .smooth(50);
+                //smooth_outward(closing(std::move(bottom), closing_distance + minimum_island_radius, closing_distance, SUPPORT_SURFACES_OFFSET_PARAMETERS), smoothing_distance) :
+                // simplify a bit, to ensure the output does not contain outrageous amounts of vertices. Should not be necessary, just a precaution.
+                base_layer_polygons = polygons_simplify(base_layer_polygons, std::min(scaled<double>(0.03), double(config.resolution)));
+            }
+
+            if (! support_roof_polygons.empty() && ! base_layer_polygons.empty()) {
+//              if (area(intersection(base_layer_polygons, support_roof_polygons)) > tiny_area_threshold)
+                {
                     switch (interface_pref) {
                         case InterfacePreference::InterfaceAreaOverwritesSupport:
-                            support_layer_storage[layer_idx] = diff(support_layer_storage[layer_idx], support_roof->polygons);
+                            base_layer_polygons = diff(base_layer_polygons, support_roof_polygons);
                             break;
                         case InterfacePreference::SupportAreaOverwritesInterface:
-                            support_roof->polygons = diff(support_roof->polygons, support_layer_storage[layer_idx]);
+                            support_roof_polygons = diff(support_roof_polygons, base_layer_polygons);
                             break;
     //FIXME
     #if 1
@@ -2984,14 +3000,14 @@ static void finalize_interface_and_support_areas(
                             Polygons interface_lines = offset(to_polylines(
                                 generate_support_infill_lines(support_roof->polygons, true, layer_idx, config.support_roof_line_distance)),
                                 config.support_roof_line_width / 2);
-                            support_layer_storage[layer_idx] = diff(support_layer_storage[layer_idx], interface_lines);
+                            base_layer_polygons = diff(base_layer_polygons, interface_lines);
                             break;
                         }
                         case InterfacePreference::SupportLinesOverwriteInterface:
                         {
                             // Hatch the support roof interfaces, offset them by their line width and subtract them from support base.
                             Polygons tree_lines = union_(offset(to_polylines(
-                                generate_support_infill_lines(support_layer_storage[layer_idx], false, layer_idx, config.support_line_distance, true)),
+                                generate_support_infill_lines(base_layer_polygons, false, layer_idx, config.support_line_distance, true)),
                                 config.support_line_width / 2));
                             // do not draw roof where the tree is. I prefer it this way as otherwise the roof may cut of a branch from its support below.
                             support_roof->polygons = diff(support_roof->polygons, tree_lines);
@@ -3005,10 +3021,10 @@ static void finalize_interface_and_support_areas(
             }
 
             // Subtract support floors from the support area and add them to the support floor instead.
-            if (config.support_bottom_layers > 0 && !support_layer_storage[layer_idx].empty()) {
+            if (config.support_bottom_layers > 0 && ! base_layer_polygons.empty()) {
                 SupportGeneratorLayer*& support_bottom = bottom_contacts[layer_idx];
                 Polygons layer_outset = diff_clipped(
-                    config.support_bottom_offset > 0 ? offset(support_layer_storage[layer_idx], config.support_bottom_offset, jtMiter, 1.2) : support_layer_storage[layer_idx],
+                    config.support_bottom_offset > 0 ? offset(base_layer_polygons, config.support_bottom_offset, jtMiter, 1.2) : base_layer_polygons,
                     volumes.getCollision(0, layer_idx, false));
                 Polygons floor_layer;
                 size_t layers_below = 0;
@@ -3026,15 +3042,18 @@ static void finalize_interface_and_support_areas(
                     if (support_bottom == nullptr)
                         support_bottom = &layer_allocate(layer_storage, layer_storage_mutex, SupporLayerType::BottomContact, print_object.slicing_parameters(), layer_idx);
                     support_bottom->polygons = union_(floor_layer, support_bottom->polygons);
-                    support_layer_storage[layer_idx] = diff_clipped(support_layer_storage[layer_idx], offset(support_bottom->polygons, scaled<float>(0.01), jtMiter, 1.2)); // Subtract the support floor from the normal support.
+                    base_layer_polygons = diff_clipped(base_layer_polygons, offset(support_bottom->polygons, scaled<float>(0.01), jtMiter, 1.2)); // Subtract the support floor from the normal support.
                 }
             }
 
-            if (! support_layer_storage[layer_idx].empty()) {
-                SupportGeneratorLayer *&l = intermediate_layers[layer_idx];
-                if (l == nullptr)
-                    l = &layer_allocate(layer_storage, layer_storage_mutex, SupporLayerType::Base, print_object.slicing_parameters(), layer_idx);
-                append(l->polygons, union_(support_layer_storage[layer_idx]));
+            if (! support_roof_polygons.empty()) {
+                if (support_roof == nullptr)
+                    support_roof = top_contacts[layer_idx] = &layer_allocate(layer_storage, layer_storage_mutex, SupporLayerType::TopContact, print_object.slicing_parameters(), layer_idx);
+                support_roof->polygons = union_(support_roof_polygons);
+            }
+            if (! base_layer_polygons.empty()) {
+                SupportGeneratorLayer *base_layer = intermediate_layers[layer_idx] = &layer_allocate(layer_storage, layer_storage_mutex, SupporLayerType::Base, print_object.slicing_parameters(), layer_idx);
+                base_layer->polygons = union_(base_layer_polygons);
             }
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
@@ -3911,25 +3930,15 @@ static void slice_branches(
     params.closing_radius = float(print_object.config().slice_closing_radius.value);
     params.mode = MeshSlicingParams::SlicingMode::Positive;
     std::vector<ExPolygons> slices = slice_mesh_ex(cummulative_mesh, slice_z, params, throw_on_cancel);
-    for (size_t layer_idx = 0; layer_idx < slice_z.size(); ++ layer_idx)
-        if (! slices[layer_idx].empty()) {
-            SupportGeneratorLayer *&l = intermediate_layers[layer_idx];
-            if (l == nullptr)
-                l = &layer_allocate(layer_storage, SupporLayerType::Base, slicing_params, layer_idx);
-            append(l->polygons, to_polygons(std::move(slices[layer_idx])));
-        }
-
     // Trim the slices.
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, intermediate_layers.size()),
+    std::vector<Polygons> support_layer_storage(move_bounds.size());
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, slices.size()),
         [&](const tbb::blocked_range<size_t> &range) {
-            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
-                if (SupportGeneratorLayer *layer = intermediate_layers[layer_idx]; layer) {
-                    Polygons &poly = intermediate_layers[layer_idx]->polygons;
-                    poly = diff_clipped(poly, volumes.getCollision(0, layer_idx, true));
-                }
+            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx)
+                if (ExPolygons &src = slices[layer_idx]; ! src.empty())
+                    support_layer_storage[layer_idx] = diff_clipped(to_polygons(std::move(src)), volumes.getCollision(0, layer_idx, true));
         });
 
-    std::vector<Polygons> support_layer_storage(move_bounds.size());
     std::vector<Polygons> support_roof_storage(move_bounds.size());
     finalize_interface_and_support_areas(print_object, volumes, config, overhangs, support_layer_storage, support_roof_storage,
         bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
