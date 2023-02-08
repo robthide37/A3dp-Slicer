@@ -4,6 +4,8 @@
 #include <memory>
 
 #include <wx/dialog.h>
+#include <wx/sizer.h>
+#include <wx/textctrl.h>
 
 #include "GUI_Utils.hpp"
 
@@ -17,7 +19,7 @@ namespace GUI {
 namespace DownloaderUtils {
     class Worker : public wxBoxSizer
     {
-        wxWindow* m_parent{ nullptr };
+        wxWindow*   m_parent{ nullptr };
         wxTextCtrl* m_input_path{ nullptr };
         bool        downloader_checked{ false };
 #ifdef __linux__
