@@ -818,8 +818,11 @@ static float get_cursor_height()
 void GLCanvas3D::Tooltip::set_text(const std::string& text)
 {
     // If the mouse is inside an ImGUI dialog, then the tooltip is suppressed.
-    m_text = m_in_imgui ? std::string() : text;
-    m_cursor_height = get_cursor_height();
+    const std::string& new_text = m_in_imgui ? std::string() : text;
+    if (m_text != new_text) { // To avoid calling the expensive call to get_cursor_height.
+        m_text = new_text;
+        m_cursor_height = get_cursor_height();
+    }
 }
 
 void GLCanvas3D::Tooltip::render(const Vec2d& mouse_position, GLCanvas3D& canvas)
