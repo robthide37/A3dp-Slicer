@@ -598,6 +598,10 @@ bool TextCtrl::value_was_changed()
 
 void TextCtrl::propagate_value()
 {
+    wxString val = dynamic_cast<wxTextCtrl*>(window)->GetValue();
+    if (m_opt.nullable && val != na_value())
+        m_last_meaningful_value = val;
+
 	if (!is_defined_input_value<wxTextCtrl>(window, m_opt.type) )
 		// on_kill_focus() cause a call of OptionsGroup::reload_config(),
 		// Thus, do it only when it's really needed (when undefined value was input)
@@ -778,8 +782,12 @@ void SpinCtrl::BUILD() {
 	case coInts:
 	{
 		default_value = m_opt.get_default_value<ConfigOptionInts>()->get_at(m_opt_idx);
-        if (m_opt.nullable)
-            m_last_meaningful_value = default_value == ConfigOptionIntsNullable::nil_value() ? static_cast<int>(m_opt.max) : default_value;
+        if (m_opt.nullable) {
+            if (default_value == ConfigOptionIntsNullable::nil_value())
+                m_last_meaningful_value = m_opt.opt_key == "idle_temperature" ? 30 : static_cast<int>(m_opt.max);
+            else
+                m_last_meaningful_value = default_value;
+        }
 		break;
 	}
 	default:
@@ -936,6 +944,9 @@ void SpinCtrl::propagate_value()
     // check if value was really changed
     if (boost::any_cast<int>(m_value) == tmp_value)
         return;
+
+    if (m_opt.nullable && tmp_value != ConfigOptionIntsNullable::nil_value())
+        m_last_meaningful_value = tmp_value;
 
     if (tmp_value == UNDEF_VALUE) {
         on_kill_focus();
