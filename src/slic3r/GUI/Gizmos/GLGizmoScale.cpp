@@ -777,10 +777,6 @@ void GLGizmoScale3D::do_scale_along_axis(Axis axis, const UpdateData& data)
             default: { m_offset = Vec3d::Zero(); break; }
             }
 
-            if (selection.is_single_full_instance() && coordinates_type == ECoordinatesType::Local)
-                // from instance coordinates to world coordinates
-                m_offset = selection.get_first_volume()->get_instance_transformation().get_rotation_matrix() * m_offset;
-
             if (selection.is_single_volume_or_modifier()) {
                 if (coordinates_type == ECoordinatesType::Instance)
                     m_offset = selection.get_first_volume()->get_instance_transformation().get_scaling_factor_matrix().inverse() * m_offset;
@@ -840,10 +836,6 @@ void GLGizmoScale3D::do_scale_uniform(const UpdateData & data)
                 m_offset.x() *= -1.0;
             if (m_hover_id == 6 || m_hover_id == 7)
                 m_offset.y() *= -1.0;
-
-            if (selection.is_single_full_instance() && coordinates_type == ECoordinatesType::Local)
-                // from instance coordinates to world coordinates
-                m_offset = selection.get_first_volume()->get_instance_transformation().get_rotation_matrix() * m_offset;
 
             if (selection.is_single_volume_or_modifier()) {
                 if (coordinates_type == ECoordinatesType::Instance)
