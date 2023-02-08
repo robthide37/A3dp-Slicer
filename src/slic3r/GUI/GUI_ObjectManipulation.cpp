@@ -745,7 +745,6 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
             m_new_rotate_label_string = L("Rotate (relative)");
             m_new_position = Vec3d::Zero();
             m_new_rotation = Vec3d::Zero();
-            m_new_scale = Vec3d(100.0, 100.0, 100.0);
             m_new_size = selection.get_bounding_box_in_current_reference_system().first.size();
 #else
             m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
