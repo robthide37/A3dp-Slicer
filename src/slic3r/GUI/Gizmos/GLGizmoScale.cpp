@@ -218,15 +218,7 @@ void GLGizmoScale3D::on_render()
     m_bounding_box = box;
     m_center = box_trafo.translation();
     m_grabbers_transform = box_trafo;
-    m_instance_center = Vec3d::Zero();
-    if (selection.is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates())
-        m_instance_center = selection.get_first_volume()->get_instance_offset();
-    else if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_instance_coordinates())
-        m_instance_center = m_center;
-    else if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
-        m_instance_center = m_center;
-    else
-        m_instance_center = selection.is_single_full_instance() ? selection.get_first_volume()->get_instance_offset() : m_center;
+    m_instance_center = (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) ? selection.get_first_volume()->get_instance_offset() : m_center;
 
     // x axis
     const Vec3d box_half_size = 0.5 * m_bounding_box.size();
