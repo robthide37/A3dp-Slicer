@@ -2889,6 +2889,7 @@ void GUI_App::MacOpenURL(const wxString& url)
 {
     if (app_config && !app_config->get_bool("downloader_url_registered"))
     {
+        notification_manager()->push_notification(NotificationType::URLNotRegistered);
         BOOST_LOG_TRIVIAL(error) << "Recieved command to open URL, but it is not allowed in app configuration. URL: " << url;
         return;
     }
