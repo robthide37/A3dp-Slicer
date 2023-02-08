@@ -126,6 +126,12 @@ inline std::tuple<Vec2d, double> detect_bridging_direction(const Polygons &to_co
 };
 
 
+inline Vec2d detect_internal_bridge_direction() {
+    //TODO AABB tree, get nearest point on the infill polylines (or perimeters) and do not take duplicates
+    // this could yield some density map where the more scattered points are more interesting
+}
+
+
 }
 
 #endif

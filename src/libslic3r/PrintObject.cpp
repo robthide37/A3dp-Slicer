@@ -27,9 +27,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <float.h>
+#include <limits>
+#include <oneapi/tbb/parallel_for.h>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include <boost/log/trivial.hpp>
@@ -1522,7 +1526,86 @@ void PrintObject::discover_vertical_shells()
 // This method applies bridge flow to the first internal solid layer above sparse infill.
 void PrintObject::bridge_over_infill()
 {
-    BOOST_LOG_TRIVIAL(info) << "Bridge over infill..." << log_memory_info();
+    BOOST_LOG_TRIVIAL(info) << "Bridge over infill - Start" << log_memory_info();
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this](tbb::blocked_range<size_t> r) {
+        for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
+
+            const Layer *layer = po->get_layer(lidx);
+
+            // gather also sparse infill surfaces on this layer, to which we can expand the bridges for anchoring
+            // gather potential internal bridging surfaces for the current layer
+            // pair of LayerSlice idx and surfaces. The LayerSlice idx simplifies the processing, since we cannot expand beyond it
+            std::unordered_map<const LayerSlice *, SurfacesPtr> bridging_surface_candidates;
+            std::unordered_map<const LayerSlice *, SurfacesPtr> expansion_space;
+            std::unordered_map<const LayerSlice *, float>       max_bridge_flow_height;
+            for (const LayerSlice &slice : layer->lslices_ex) {
+                std::unordered_set<size_t> regions_to_check;
+                for (const LayerIsland &island : slice.islands) {
+                    regions_to_check.insert(island.perimeters.region());
+                    if (!island.fill_expolygons_composite()) {
+                        regions_to_check.insert(island.fill_region_id);
+                    }
+                }
+
+                for (size_t region_idx : regions_to_check) {
+                    const LayerRegion *region                 = layer->get_region(region_idx);
+                    auto               region_internal_solids = region->fill_surfaces().filter_by_type(stInternalSolid);
+                    if (!region_internal_solids.empty()) {
+                        max_bridge_flow_height[&slice] = std::max(max_bridge_flow_height[&slice],
+                                                                  region->bridging_flow(frSolidInfill).height());
+                    }
+                    bridging_surface_candidates[&slice].insert(bridging_surface_candidates[&slice].end(), region_internal_solids.begin(),
+                                                               region_internal_solids.end());
+                    auto region_sparse_infill = region->fill_surfaces().filter_by_type(stInternal);
+                    expansion_space[&slice].insert(expansion_space[&slice].end(), region_sparse_infill.begin(), region_sparse_infill.end());
+                }
+            }
+
+            for (const std::pair<const LayerSlice *, SurfacesPtr> &candidates : bridging_surface_candidates) {
+                if (candidates.second.empty()) {
+                    continue;
+                };
+
+                // Gather lower layers sparse infill areas, to depth defined by used bridge flow
+                Polygons lower_layers_sparse_infill;
+                double   bottom_z = layer->print_z - max_bridge_flow_height[candidates.first] - EPSILON;
+                LayerSlice::Links current_links = candidates.first->overlaps_below;
+                for (auto i = int(lidx) - 1; i >= 0; --i) {
+                    // Stop iterating if layer is lower than bottom_z.
+                    if (po->get_layer(i)->print_z < bottom_z)
+                        break;
+                    for (const auto &link : current_links) {
+                        const LayerSlice& slice_below = po->get_layer(i)->lslices_ex[link.slice_idx];
+                        for (const LayerRegion *region : po->get_layer(i)->regions()) {
+                            for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
+                                Polygons p = to_polygons(surface->expolygon);
+                                lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), p.begin(), p.end());
+                            }
+                        }
+                    }
+                }
+                lower_layers_sparse_infill = union_(lower_layers_sparse_infill);
+            }
+
+            // Now, temporarily fill the previous layer and extract the extrusions.
+            po->get_layer(lidx)->lower_layer->make_fills(nullptr, nullptr, nullptr);
+            Polylines lower_layer_polylines;
+            for (const LayerRegion *region : layer->lower_layer->m_regions) {
+                for (const ExtrusionEntity *ee : region->fills().entities) {
+                    assert(ee->is_collection());
+                    auto region_polylines = dynamic_cast<const ExtrusionEntityCollection *>(ee)->as_polylines();
+                    lower_layer_polylines.insert(lower_layer_polylines.end(), region_polylines.begin(), region_polylines.end());
+                }
+            }
+        }
+    });
+
+    BOOST_LOG_TRIVIAL(info) << "Bridge over infill - End" << log_memory_info();
+
+
+
+
 
     std::vector<int> sparse_infill_regions;
     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id)
