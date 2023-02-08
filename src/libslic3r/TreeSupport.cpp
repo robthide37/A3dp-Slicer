@@ -154,7 +154,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
         const PrintObjectConfig &object_config = print_object.config();
 #endif // NDEBUG
         // Support must be enabled and set to Tree style.
-        assert(object_config.support_material);
+        assert(object_config.support_material || object_config.support_material_enforce_layers > 0);
         assert(object_config.support_material_style == smsTree || object_config.support_material_style == smsOrganic);
 
         bool found_existing_group = false;
@@ -227,7 +227,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
     std::vector<Polygons> out(print_object.layer_count(), Polygons{});
 
     const PrintObjectConfig &config                 = print_object.config();
-    const bool               support_auto           = config.support_material_auto.value;
+    const bool               support_auto           = config.support_material.value && config.support_material_auto.value;
     const int                support_enforce_layers = config.support_material_enforce_layers.value;
     std::vector<Polygons>    enforcers_layers{ print_object.slice_support_enforcers() };
     std::vector<Polygons>    blockers_layers{ print_object.slice_support_blockers() };
@@ -240,7 +240,8 @@ void tree_supports_show_error(std::string_view message, bool critical)
     //FIXME this is a fudge constant!
     auto                     enforcer_overhang_offset = scaled<double>(config.support_tree_tip_diameter.value);
 
-    tbb::parallel_for(tbb::blocked_range<LayerIndex>(1, out.size()),
+    size_t num_overhang_layers = support_auto ? out.size() : std::max(size_t(support_enforce_layers), enforcers_layers.size());
+    tbb::parallel_for(tbb::blocked_range<LayerIndex>(1, num_overhang_layers),
         [&print_object, &enforcers_layers, &blockers_layers, support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, enforcer_overhang_offset, &throw_on_cancel, &out]
         (const tbb::blocked_range<LayerIndex> &range) {
         for (LayerIndex layer_id = range.begin(); layer_id < range.end(); ++ layer_id) {
