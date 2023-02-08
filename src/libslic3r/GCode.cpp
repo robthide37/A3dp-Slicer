@@ -2859,9 +2859,12 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
     bool                        variable_speed = false;
     std::vector<ProcessedPoint> new_points{};
     if (this->m_config.enable_dynamic_overhang_speeds && !this->on_first_layer() && path.role().is_perimeter()) {
+        double external_perim_reference_speed = std::min(m_config.get_abs_value("external_perimeter_speed"),
+                                                         std::min(EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm,
+                                                                  m_config.max_volumetric_speed.value / path.mm3_per_mm));
         new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path, m_config.overhang_overlap_levels,
                                                                                   m_config.dynamic_overhang_speeds,
-                                                                                  m_config.get_abs_value("external_perimeter_speed"), speed);
+                                                                                  external_perim_reference_speed, speed);
         variable_speed = std::any_of(new_points.begin(), new_points.end(), [speed](const ProcessedPoint &p) { return p.speed != speed; });
     }
 
