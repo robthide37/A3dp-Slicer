@@ -850,7 +850,9 @@ std::pair<BoundingBoxf3, Transform3d> Selection::get_bounding_box_in_reference_s
     //
     // trafo basis in world coordinates
     //
-    const Transform3d basis_trafo = Geometry::Transformation(trafo).get_rotation_matrix();
+    Geometry::Transformation t(trafo);
+    t.reset_scaling_factor();
+    const Transform3d basis_trafo = t.get_matrix_no_offset();
     std::vector<Vec3d> axes = { Vec3d::UnitX(), Vec3d::UnitY(), Vec3d::UnitZ() };
     for (size_t i = 0; i < axes.size(); ++i) {
         axes[i] = basis_trafo * axes[i];
