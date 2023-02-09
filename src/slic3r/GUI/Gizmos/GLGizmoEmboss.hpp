@@ -255,7 +255,7 @@ private:
         std::vector<wxString> bad   = {};
 
         // Configuration of font encoding
-        const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
+        static const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
 
         // Identify if preview texture exists
         GLuint texture_id = 0;
@@ -324,6 +324,8 @@ private:
 
         // condition for raycaster
         RaycastManager::AllowVolumes condition;
+
+        bool exist_hit = true;
 
         // Visuzalization
         Vec3d from = Vec3d::Zero();

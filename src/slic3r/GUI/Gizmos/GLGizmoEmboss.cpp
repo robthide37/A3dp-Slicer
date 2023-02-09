@@ -467,6 +467,41 @@ Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolu
     }
     return nearest_offset;
 }
+namespace priv {
+
+static bool allign_z(const Vec3d &z_t, Transform3d &rotate)
+{
+    // Transformed unit vector Z direction (f)rom, (t)o
+    const Vec3d& z_f = Vec3d::UnitZ();
+    Vec3d z_t_norm = z_t.normalized();
+    double cos_angle = z_t_norm.dot(z_f);
+
+    // Calculate rotation of Z-vectors from current to wanted position
+    rotate = Transform3d::Identity();
+
+    if (cos_angle == 0.) {
+        // check that direction is not same
+        if (z_t_norm.z() > 0.) 
+            return false;
+
+        // opposit direction of z_t and z_f (a.k.a. angle 180 DEG)
+        rotate = Eigen::AngleAxis(M_PI, Vec3d::UnitX());
+        return true;
+    } else if (cos_angle >= 1. || cos_angle <= -1.) {
+        // bad cas angle value almost zero angle so no rotation
+        return false;
+    }
+
+    // Calculate only when angle is not zero
+    // Calculate rotation axe from current to wanted inside instance
+    Vec3d axe = z_t_norm.cross(z_f);
+    axe.normalize();
+    double angle = acos(cos_angle);
+    rotate = Eigen::AngleAxis(-angle, axe);
+    return true;
+}
+
+}
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
@@ -544,6 +579,11 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Vec2d mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
         Transform3d instance_inv = gl_volume->get_instance_transformation().get_matrix().inverse();
         Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
+        TextConfiguration &tc = *m_volume->text_configuration;
+        // fix baked transformation from .3mf store process
+        if (tc.fix_3mf_tr.has_value())
+            volume_tr = volume_tr * tc.fix_3mf_tr->inverse();
+
         m_surface_drag = SurfaceDrag{mouse_offset, instance_inv, volume_tr, gl_volume, condition};
 
         // Cancel job to prevent interuption of dragging (duplicit result)
@@ -566,76 +606,38 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Vec2d offseted_mouse = mouse_pos + m_surface_drag->mouse_offset;
         const Camera &camera = wxGetApp().plater()->get_camera();
         auto hit = m_raycast_manager.unproject(offseted_mouse, camera, &m_surface_drag->condition);
+        m_surface_drag->exist_hit = hit.has_value();
         if (!hit.has_value()) {
             // cross hair need redraw
             m_parent.set_as_dirty();
             return true;
         }
 
-        // Calculate temporary position
+        // Calculate offset: transformation to wanted position
         Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
-        Transform3d trmat = create_transformation_onto_surface(hit->position, hit->normal);
-
-        // !!!!!!!!!!!!!!!! USE DIRECT hit position and normal
-
-        //TextConfiguration &tc = *m_volume->text_configuration;
-        //const FontProp& font_prop = tc.style.prop;
-        //apply_transformation(font_prop, trmat);
-
-        //// fix baked transformation from .3mf store process
-        //if (tc.fix_3mf_tr.has_value())
-        //    trmat = trmat * (*tc.fix_3mf_tr);
-
-        // volume transfomration in world coor
-        Transform3d wanted_world = object_trmat * trmat;
-        Transform3d wanted_volume = m_surface_drag->instance_inv * wanted_world;
-
-        // Calculate offset inside instance: 
-        // transformation from curret to wanted position
-        Vec3d from_position = m_surface_drag->volume_tr * Vec3d::Zero();
-        Vec3d to_position = wanted_volume * Vec3d::Zero();
-
         Transform3d hit_to_instance = object_trmat * m_surface_drag->instance_inv;
-        Vec3d to_position2 = hit_to_instance * hit->position.cast<double>();
-        Vec3d z_t2 = hit_to_instance.linear() * hit->normal.cast<double>();
+        Transform3d hit_to_volume = hit_to_instance * m_surface_drag->volume_tr.inverse();
+        Vec3d offset_volume = hit_to_volume * hit->position.cast<double>();
+        Transform3d translate{Eigen::Translation<double, 3>(offset_volume)};
 
-        Vec3d offset_instance = to_position - from_position;
-        Transform3d trnsl{Eigen::Translation<double, 3>(offset_instance)};
+        Transform3d rotate;
+        // normal transformed to volume
+        Vec3d z_t = hit_to_volume.linear() * hit->normal.cast<double>();
+        bool exist_rotate = priv::allign_z(z_t, rotate);
 
+        Transform3d volume_tr = m_surface_drag->volume_tr * translate * rotate;
+        assert(volume_tr.matrix()(0, 0) == volume_tr.matrix()(0, 0)); // Check valid transformation not a NAN
+        if (volume_tr.matrix()(0, 0) != volume_tr.matrix()(0, 0))
+            return true;
+
+        // Check scale in world
+        
         // current transformation from volume to world
         Transform3d current_world = m_surface_drag->instance_inv.inverse() * m_surface_drag->volume_tr;
-
         auto current_world_linear = current_world.linear();
-        auto wanted_world_linear  = wanted_world.linear();
 
-        // Calculate rotation of Z-vectors from current to wanted position
-        Transform3d rot = Transform3d::Identity();
-        // Transformed unit vector Z direction (f)rom, (t)o
-        Vec3d z_f = m_surface_drag->volume_tr.linear() * Vec3d::UnitZ();
-        Vec3d z_t = wanted_volume.linear() * Vec3d::UnitZ();
-        z_f.normalize();
-        z_t.normalize();
-        double cos_angle = z_t.dot(z_f);
-
-        // Calculate only when angle is not zero
-        if (cos_angle < 1. && cos_angle > -1.) {
-            m_surface_drag->from = from_position;
-            m_surface_drag->to = to_position;
-            m_surface_drag->from_dir = z_f;
-            m_surface_drag->to_dir   = z_t;
-
-            m_surface_drag->f_tr = current_world;
-            m_surface_drag->t_tr = wanted_world;
-
-            // TODO: solve opposit direction of z_t and z_f (a.k.a. angle 180 DEG)
-            // if (cos_angle == 0.) {}
-
-            // Calculate rotation axe from current to wanted inside instance
-            Vec3d axe = z_t.cross(z_f);
-            axe.normalize();                        
-            double angle = acos(cos_angle);
-            rot = Eigen::AngleAxis(-angle, axe);
-        }
+        Transform3d wanted_world = m_surface_drag->instance_inv.inverse() * volume_tr;
+        auto wanted_world_linear = wanted_world.linear();
 
         // Calculate scale in world
         auto calc_scale = [&current_world_linear, wanted_world_linear](const Vec3d &dir) -> double {
@@ -643,18 +645,32 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             Vec3d  wanted     = wanted_world_linear * dir;
             double current_sq = current.squaredNorm();
             double wanted_sq  = wanted.squaredNorm();
-            return sqrt(wanted_sq / current_sq);
+            return sqrt(current_sq / wanted_sq);
         };
         double y_scale = calc_scale(Vec3d::UnitY());
         double z_scale = calc_scale(Vec3d::UnitZ());
         Transform3d scale(Eigen::Scaling(1., y_scale, z_scale));
+        volume_tr = volume_tr * scale;
 
-        Transform3d volume_tr = trnsl * m_surface_drag->volume_tr * rot;
+        // recalculate rotation for scaled volume
+        //Transform3d hit_to_volume2 = hit_to_instance * (m_surface_drag->volume_tr*scale).inverse();
+        //z_t = hit_to_volume2.linear() * hit->normal.cast<double>();
+        //bool exist_rotate2 = priv::allign_z(z_t, rotate);
+        //volume_tr = m_surface_drag->volume_tr * translate * rotate * scale;
 
-        assert(volume_tr.matrix()(0,0) == volume_tr.matrix()(0,0)); // Check valid transformation not a NAN
-        Transform3d volume_tr2 = m_surface_drag->instance_inv * wanted_world;
+        const TextConfiguration &tc = *m_volume->text_configuration;
+        // fix baked transformation from .3mf store process
+        if (tc.fix_3mf_tr.has_value())
+            volume_tr = volume_tr * (*tc.fix_3mf_tr);
 
-        // Update transformation inside of instances
+        // apply move in Z direction for move with flat surface above texture
+        const FontProp &prop = tc.style.prop;
+        if (!prop.use_surface && prop.distance.has_value()) {
+            Vec3d translate = Vec3d::UnitZ() * (*prop.distance);
+            volume_tr.translate(translate);
+        }
+
+        // Update transformation forf all instances
         for (GLVolume *vol : m_parent.get_volumes().volumes) {
             if (vol->object_idx() != m_surface_drag->gl_volume->object_idx() || 
                 vol->volume_idx() != m_surface_drag->gl_volume->volume_idx())
@@ -662,7 +678,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             vol->set_volume_transformation(volume_tr);
         }
 
-        // calculate scale
+        // update scale of selected volume --> should be approx the same
         calculate_scale();
 
         m_parent.set_as_dirty();
@@ -862,7 +878,13 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         ImVec2 center(
             mouse_pos.x + m_surface_drag->mouse_offset.x(),
             mouse_pos.y + m_surface_drag->mouse_offset.y());
-        priv::draw_cross_hair(center);
+        ImU32 color = ImGui::GetColorU32(
+            m_surface_drag->exist_hit ? 
+                ImVec4(1.f, 1.f, 1.f, .75f) : // transparent white
+                ImVec4(1.f, .3f, .3f, .75f)
+        ); // Warning color
+        const float radius = 16.f;
+        priv::draw_cross_hair(center, radius, color);
     }
 
 #ifdef SHOW_FINE_POSITION
@@ -1115,18 +1137,22 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
 EmbossStyles GLGizmoEmboss::create_default_styles()
 {
     wxFont wx_font_normal = *wxNORMAL_FONT;
-    wxFont wx_font_small = *wxSMALL_FONT;
-
 #ifdef __APPLE__
-    wx_font_normal.SetFaceName("Helvetica");
-    wx_font_small.SetFaceName("Helvetica");
+    // Set normal font to helvetica when possible
+    wxArrayString facenames = wxFontEnumerator::GetFacenames(Facenames::encoding);
+    for (const wxString &facename : facenames) {
+        if (facename.IsSameAs("Helvetica")) {
+            wx_font_normal = wxFont(wxFontInfo().FaceName(facename).Encoding(Facenames::encoding));
+            break;
+        }
+    }
 #endif // __APPLE__
 
     // https://docs.wxwidgets.org/3.0/classwx_font.html
     // Predefined objects/pointers: wxNullFont, wxNORMAL_FONT, wxSMALL_FONT, wxITALIC_FONT, wxSWISS_FONT
     EmbossStyles styles = {
         WxFontUtils::create_emboss_style(wx_font_normal, _u8L("NORMAL")), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
-        WxFontUtils::create_emboss_style(wx_font_normal, _u8L("SMALL")),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
+        WxFontUtils::create_emboss_style(*wxSMALL_FONT, _u8L("SMALL")),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
         WxFontUtils::create_emboss_style(*wxITALIC_FONT, _u8L("ITALIC")), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
         WxFontUtils::create_emboss_style(*wxSWISS_FONT, _u8L("SWISS")),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
         WxFontUtils::create_emboss_style(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN")),        
