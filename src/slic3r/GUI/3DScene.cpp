@@ -814,6 +814,10 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
 
         shader->set_uniform("z_range", m_z_range);
         shader->set_uniform("clipping_plane", m_clipping_plane);
+        shader->set_uniform("use_color_clip_plane", m_use_color_clip_plane);
+        shader->set_uniform("color_clip_plane", m_color_clip_plane);
+        shader->set_uniform("uniform_color_clip_plane_1", m_color_clip_plane_colors[0]);
+        shader->set_uniform("uniform_color_clip_plane_2", m_color_clip_plane_colors[1]);
         shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
         shader->set_uniform("print_volume.xy_data", m_print_volume.data);
         shader->set_uniform("print_volume.z_data", m_print_volume.zs);

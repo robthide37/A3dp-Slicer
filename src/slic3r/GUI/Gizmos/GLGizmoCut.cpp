@@ -413,7 +413,7 @@ void GLGizmoCut3D::update_clipper()
     Vec3d normal = m_cut_normal = end - beg;
     m_cut_normal.normalize();
 
-    if (!is_looking_forward()) {
+    if (!is_looking_forward() && m_connectors_editing) {
         end = beg = m_plane_center;
         beg[Z] = box.center().z() + m_radius;
         end[Z] = box.center().z() - m_radius;
@@ -437,6 +437,13 @@ void GLGizmoCut3D::update_clipper()
     m_c->object_clipper()->set_range_and_pos(normal, offset, dist);
 
     put_connectors_on_cut_plane(normal, offset);
+
+    std::array<double, 4> data = m_c->object_clipper()->get_clipping_plane(true)->get_data();
+    // we need to invert the normal for the shader to work properly
+    for (int i = 0; i < 3; ++i) {
+        data[i] = -data[i];
+    }
+    m_parent.set_color_clip_plane(data);
 
     if (m_raycasters.empty())
         on_register_raycasters_for_picking();
@@ -901,6 +908,9 @@ std::string GLGizmoCut3D::on_get_name() const
 void GLGizmoCut3D::on_set_state()
 {
     if (m_state == On) {
+        m_parent.set_use_color_clip_plane(true);
+        m_parent.set_color_clip_plane_colors({ ABOVE_GRABBER_COLOR , BELOW_GRABBER_COLOR });
+
         update_bb();
         m_connectors_editing = !m_selected.empty();
 
@@ -916,6 +926,7 @@ void GLGizmoCut3D::on_set_state()
             oc->release();
         }
         m_selected.clear();
+        m_parent.set_use_color_clip_plane(false);
     }
 	force_update_clipper_on_render = m_state == On;
 }
