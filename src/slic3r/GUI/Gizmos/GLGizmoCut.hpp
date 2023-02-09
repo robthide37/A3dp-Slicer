@@ -250,6 +250,7 @@ private:
     void render_connectors();
 
     bool can_perform_cut() const;
+    bool has_valid_contour() const;
     void apply_connectors_in_model(ModelObject* mo, bool &create_dowels_as_separate_object);
     bool cut_line_processing() const;
     void discard_cut_line_processing();
