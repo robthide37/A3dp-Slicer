@@ -1129,16 +1129,15 @@ void PageMaterials::sort_list_data(StringList* list, bool add_All_item, bool mat
         else 
             other_profiles.push_back(data);
     }
-    if(material_type_ordering) {
+    if (material_type_ordering) {
         
         const ConfigOptionDef* def = print_config_def.get("filament_type");
-        std::vector<std::string>enum_values = def->enum_values;
         size_t end_of_sorted = 0;
-        for (size_t vals = 0; vals < enum_values.size(); vals++) {
+        for (const std::string &value : def->enum_def->values()) {
             for (size_t profs = end_of_sorted; profs < other_profiles.size(); profs++)
             {
                 // find instead compare because PET vs PETG
-                if (other_profiles[profs].get().find(enum_values[vals]) != std::string::npos) {
+                if (other_profiles[profs].get().find(value) != std::string::npos) {
                     //swap
                     if(profs != end_of_sorted) {
                         std::reference_wrapper<const std::string> aux = other_profiles[end_of_sorted];
@@ -1660,14 +1659,14 @@ PageFirmware::PageFirmware(ConfigWizard *parent)
     append_text(_(gcode_opt.tooltip));
 
     wxArrayString choices;
-    choices.Alloc(gcode_opt.enum_labels.size());
-    for (const auto &label : gcode_opt.enum_labels) {
+    choices.Alloc(gcode_opt.enum_def->labels().size());
+    for (const auto &label : gcode_opt.enum_def->labels()) {
         choices.Add(label);
     }
 
     gcode_picker = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, choices);
     wxGetApp().UpdateDarkUI(gcode_picker);
-    const auto &enum_values = gcode_opt.enum_values;
+    const auto &enum_values = gcode_opt.enum_def->values();
     auto needle = enum_values.cend();
     if (gcode_opt.default_value) {
         needle = std::find(enum_values.cbegin(), enum_values.cend(), gcode_opt.default_value->serialize());
@@ -1684,7 +1683,7 @@ PageFirmware::PageFirmware(ConfigWizard *parent)
 void PageFirmware::apply_custom_config(DynamicPrintConfig &config)
 {
     auto sel = gcode_picker->GetSelection();
-    if (sel >= 0 && (size_t)sel < gcode_opt.enum_labels.size()) {
+    if (sel >= 0 && (size_t)sel < gcode_opt.enum_def->labels().size()) {
         auto *opt = new ConfigOptionEnum<GCodeFlavor>(static_cast<GCodeFlavor>(sel));
         config.set_key_value("gcode_flavor", opt);
     }

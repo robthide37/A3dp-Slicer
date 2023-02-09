@@ -165,23 +165,20 @@ static void append_bool_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
 	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
 }
 
+template<typename EnumType>
 static void append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
 								const std::string& opt_key,
 								const std::string& label,
 								const std::string& tooltip,
 								const ConfigOption* def_val,
-								const t_config_enum_values *enum_keys_map,
-								std::initializer_list<std::string> enum_values,
-								std::initializer_list<std::string> enum_labels,
+								std::initializer_list<std::pair<std::string_view, std::string_view>> enum_values,
 								ConfigOptionMode mode = comSimple)
 {
 	ConfigOptionDef def = {opt_key, coEnum };
 	def.label = label;
 	def.tooltip = tooltip;
 	def.mode = mode;
-	def.enum_keys_map = enum_keys_map;
-	def.enum_values = std::vector<std::string>(enum_values);
-	def.enum_labels = std::vector<std::string>(enum_labels);
+	def.set_enum<EnumType>(enum_values);
 
 	def.set_default_value(def_val);
 	Option option(def, opt_key);
@@ -210,7 +207,7 @@ static void append_string_option(std::shared_ptr<ConfigOptionsGroup> optgroup,
 	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
 }
 
-static void append_preferences_option_to_searcer(std::shared_ptr<ConfigOptionsGroup> optgroup,
+static void append_preferences_option_to_searcher(std::shared_ptr<ConfigOptionsGroup> optgroup,
 												const std::string& opt_key,
 												const wxString& label)
 {
@@ -547,13 +544,14 @@ void PreferencesDialog::build()
 			L("If enabled, useful hints are displayed at startup."),
 			app_config->get("show_hints") == "1");
 
-		append_enum_option(m_optgroup_gui, "notify_release",
+		append_enum_option<NotifyReleaseMode>(m_optgroup_gui, "notify_release",
 			L("Notify about new releases"),
 			L("You will be notified about new release after startup acordingly: All = Regular release and alpha / beta releases. Release only = regular release."),
 			new ConfigOptionEnum<NotifyReleaseMode>(static_cast<NotifyReleaseMode>(s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release")))),
-			&ConfigOptionEnum<NotifyReleaseMode>::get_enum_values(),
-			{"all", "release", "none"},
-			{L("All"), L("Release only"), L("None")});
+			{ { "all", L("All") },
+			  { "release", L("Release only") },
+			  { "none", L("None") }
+			});
 
 		m_optgroup_gui->append_separator();
 
@@ -1026,7 +1024,7 @@ void PreferencesDialog::create_settings_mode_widget()
 	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
 	m_optgroup_gui->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
-	append_preferences_option_to_searcer(m_optgroup_gui, opt_key, title);
+	append_preferences_option_to_searcher(m_optgroup_gui, opt_key, title);
 }
 
 void PreferencesDialog::create_settings_text_color_widget()
@@ -1050,7 +1048,7 @@ void PreferencesDialog::create_settings_text_color_widget()
 
 	m_optgroup_gui->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
-	append_preferences_option_to_searcer(m_optgroup_gui, opt_key, title);
+	append_preferences_option_to_searcher(m_optgroup_gui, opt_key, title);
 }
 
 void PreferencesDialog::create_settings_mode_color_widget()
@@ -1077,7 +1075,7 @@ void PreferencesDialog::create_settings_mode_color_widget()
 
 	m_optgroup_gui->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
-	append_preferences_option_to_searcer(m_optgroup_gui, opt_key, title);
+	append_preferences_option_to_searcher(m_optgroup_gui, opt_key, title);
 }
 
 void PreferencesDialog::create_downloader_path_sizer()
@@ -1096,7 +1094,7 @@ void PreferencesDialog::create_downloader_path_sizer()
 
 	m_optgroup_other->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
-	append_preferences_option_to_searcer(m_optgroup_other, opt_key, title);
+	append_preferences_option_to_searcher(m_optgroup_other, opt_key, title);
 }
 
 void PreferencesDialog::init_highlighter(const t_config_option_key& opt_key)

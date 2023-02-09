@@ -433,12 +433,13 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
     ConfigOptionDef support_def;
     support_def.label = L("Supports");
     support_def.type = coStrings;
-    support_def.gui_type = ConfigOptionDef::GUIType::select_open;
     support_def.tooltip = L("Select what kind of support do you need");
-    support_def.enum_labels.push_back(L("None"));
-    support_def.enum_labels.push_back(L("Support on build plate only"));
-    support_def.enum_labels.push_back(L("For support enforcers only"));
-    support_def.enum_labels.push_back(L("Everywhere"));
+    support_def.set_enum_labels(ConfigOptionDef::GUIType::select_open, {
+        L("None"),
+        L("Support on build plate only"),
+        L("For support enforcers only"),
+        L("Everywhere")
+    });
     support_def.set_default_value(new ConfigOptionStrings{ "None" });
     Option option = Option(support_def, "support");
     option.opt.full_width = true;
@@ -587,11 +588,12 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
     ConfigOptionDef pad_def;
     pad_def.label = L("Pad");
     pad_def.type = coStrings;
-    pad_def.gui_type = ConfigOptionDef::GUIType::select_open;
     pad_def.tooltip = L("Select what kind of pad do you need");
-    pad_def.enum_labels.push_back(L("None"));
-    pad_def.enum_labels.push_back(L("Below object"));
-    pad_def.enum_labels.push_back(L("Around object"));
+    pad_def.set_enum_labels(ConfigOptionDef::GUIType::select_open, {
+        L("None"),
+        L("Below object"),
+        L("Around object")
+    });
     pad_def.set_default_value(new ConfigOptionStrings{ "Below object" });
     option = Option(pad_def, "pad");
     option.opt.full_width = true;
