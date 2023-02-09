@@ -1681,7 +1681,7 @@ void PrintObject::bridge_over_infill()
                                     Point a(start + v * (i * step_size));
                                     auto [distance, index, p] = anchors_and_walls.distance_from_lines_extra<false>(a);
                                     const Line& l = anchors_and_walls.get_line(index);
-                                    directions_with_distances.emplace_back(l.direction(), unscaled(distance));
+                                    directions_with_distances.emplace_back(PI - l.direction(), unscaled(distance));
                                 }
                             }
                         }
@@ -1697,7 +1697,10 @@ void PrintObject::bridge_over_infill()
                         bridging_dir /= acc;
                     }
 
-                    
+                    //TODO use get_extens_rotated on the bridged_area polygons, generate vertical lines of the box, 
+                    //  OR maybe get extens of rotated max_area, then fill with vertical lines, make AABB tree rotated for anchors and walls and also 
+                        // for bridged area
+                    // then cut off the vertical lines, compose the final polygon, and rotate back
 
                 } // surface iteration end
             }     // island iteration end
