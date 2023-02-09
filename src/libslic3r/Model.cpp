@@ -1477,6 +1477,12 @@ void ModelObject::process_solid_part_cut(ModelVolume* volume, const Transform3d&
 
     // Add required cut parts to the objects
 
+    if (attributes.has(ModelObjectCutAttribute::KeepAsParts)) {
+        add_cut_volume(lower_mesh, lower, volume, cut_matrix);
+        add_cut_volume(upper_mesh, lower, volume, cut_matrix);
+        return;
+    }
+
     if (attributes.has(ModelObjectCutAttribute::KeepUpper))
         add_cut_volume(upper_mesh, upper, volume, cut_matrix);
 
@@ -1608,34 +1614,39 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
 
     ModelObjectPtrs res;
 
-    if (attributes.has(ModelObjectCutAttribute::KeepUpper) && !upper->volumes.empty()) {
-        invalidate_translations(upper, instances[instance]);
-
-        reset_instance_transformation(upper, instance, cut_matrix,
-                                      attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper),
-                                      attributes.has(ModelObjectCutAttribute::FlipUpper), 
-                                      local_displace);
-        res.push_back(upper);
-    }
-
-    if (attributes.has(ModelObjectCutAttribute::KeepLower) && !lower->volumes.empty()) {
-        invalidate_translations(lower, instances[instance]);
-
-        reset_instance_transformation(lower, instance, cut_matrix,
-                                      attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),
-                                      attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) ? true : attributes.has(ModelObjectCutAttribute::FlipLower));
+    if (attributes.has(ModelObjectCutAttribute::KeepAsParts) && !lower->volumes.empty()) {
         res.push_back(lower);
     }
+    else {
+        if (attributes.has(ModelObjectCutAttribute::KeepUpper) && !upper->volumes.empty()) {
+            invalidate_translations(upper, instances[instance]);
 
-    if (attributes.has(ModelObjectCutAttribute::CreateDowels) && !dowels.empty()) {
-        for (auto dowel : dowels) {
-            invalidate_translations(dowel, instances[instance]);
+            reset_instance_transformation(upper, instance, cut_matrix,
+                attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper),
+                attributes.has(ModelObjectCutAttribute::FlipUpper),
+                local_displace);
+            res.push_back(upper);
+        }
 
-            reset_instance_transformation(dowel, instance, Transform3d::Identity(), false, false, local_dowels_displace);
+        if (attributes.has(ModelObjectCutAttribute::KeepLower) && !lower->volumes.empty()) {
+            invalidate_translations(lower, instances[instance]);
 
-            local_dowels_displace += dowel->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(-1.5, -1.5, 0.0));
-            dowel->name += "-Dowel-" + dowel->volumes[0]->name;
-            res.push_back(dowel);
+            reset_instance_transformation(lower, instance, cut_matrix,
+                attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),
+                attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) ? true : attributes.has(ModelObjectCutAttribute::FlipLower));
+            res.push_back(lower);
+        }
+
+        if (attributes.has(ModelObjectCutAttribute::CreateDowels) && !dowels.empty()) {
+            for (auto dowel : dowels) {
+                invalidate_translations(dowel, instances[instance]);
+
+                reset_instance_transformation(dowel, instance, Transform3d::Identity(), false, false, local_dowels_displace);
+
+                local_dowels_displace += dowel->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(-1.5, -1.5, 0.0));
+                dowel->name += "-Dowel-" + dowel->volumes[0]->name;
+                res.push_back(dowel);
+            }
         }
     }
 
