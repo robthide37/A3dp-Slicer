@@ -217,7 +217,13 @@ void GLGizmoScale3D::on_render()
     const auto& [box, box_trafo] = selection.get_bounding_box_in_current_reference_system();
     m_bounding_box = box;
     m_center = box_trafo.translation();
-    m_grabbers_transform = box_trafo;
+    m_grabbers_transform = Geometry::translation_transform(m_center);
+    if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
+        const GLVolume& v = *selection.get_first_volume();
+        m_grabbers_transform = m_grabbers_transform * v.get_instance_transformation().get_rotation_matrix();
+        if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
+            m_grabbers_transform = m_grabbers_transform * v.get_volume_transformation().get_rotation_matrix();
+    }
     m_instance_center = (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) ? selection.get_first_volume()->get_instance_offset() : m_center;
 
     // x axis
@@ -257,7 +263,7 @@ void GLGizmoScale3D::on_render()
         glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
     for (int i = 0; i < 10; ++i) {
-        m_grabbers[i].matrix = box_trafo;
+        m_grabbers[i].matrix = m_grabbers_transform;
     }
 
     const float grabber_mean_size = (float)((m_bounding_box.size().x() + m_bounding_box.size().y() + m_bounding_box.size().z()) / 3.0);
@@ -272,7 +278,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_grabbers_transform);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -306,7 +312,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_grabbers_transform);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -338,7 +344,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_grabbers_transform);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -370,7 +376,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_grabbers_transform);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -402,7 +408,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * box_trafo);
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix() * m_grabbers_transform);
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
