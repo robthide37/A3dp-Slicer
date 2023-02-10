@@ -254,7 +254,7 @@ protected:
 	std::map<std::string, int>	m_options_list;
 	int							m_opt_status_value = 0;
 
-	std::vector<ButtonsDescription::Entry>	m_icon_descriptions = {};
+	std::vector<GUI_Descriptions::ButtonEntry>	m_icon_descriptions = {};
 
 	bool				m_is_modified_values{ false };
 	bool				m_is_nonsys_values{ true };
@@ -339,7 +339,7 @@ public:
 
 	void		on_roll_back_value(const bool to_sys = false);
 
-	PageShp		add_options_page(const wxString& title, const std::string& icon, bool is_extruder_pages = false);
+    PageShp		add_options_page(const wxString& title, const std::string& icon, bool is_extruder_pages = false);
 	static wxString translate_category(const wxString& title, Preset::Type preset_type);
 
 	virtual void	OnActivate();
@@ -436,6 +436,8 @@ private:
 	ogStaticText*	m_volumetric_speed_description_line {nullptr};
 	ogStaticText*	m_cooling_description_line {nullptr};
 
+    void            create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string &opt_key, int opt_index = 0);
+    void            update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string &opt_key, int opt_index = 0, bool is_checked = true);
     void            add_filament_overrides_page();
     void            update_filament_overrides_page();
 	void 			update_volumetric_flow_preset_hints();
@@ -526,6 +528,12 @@ public:
 
 class TabSLAPrint : public Tab
 {
+    // Methods are a vector of method prefix -> method label pairs
+    // method prefix is the prefix whith which all the config values are prefixed
+    // for a particular method. The label is the friendly name for the method
+    void build_sla_support_params(const std::vector<SamePair<std::string>> &methods,
+                                  const Slic3r::GUI::PageShp &page);
+
 public:
     TabSLAPrint(wxBookCtrlBase* parent) :
         Tab(parent, _(L("Print Settings")), Slic3r::Preset::TYPE_SLA_PRINT) {}

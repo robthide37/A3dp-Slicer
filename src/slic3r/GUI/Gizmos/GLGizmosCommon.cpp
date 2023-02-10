@@ -23,7 +23,7 @@ CommonGizmosDataPool::CommonGizmosDataPool(GLCanvas3D* canvas)
     using c = CommonGizmosDataID;
     m_data[c::SelectionInfo].reset(   new SelectionInfo(this));
     m_data[c::InstancesHider].reset(  new InstancesHider(this));
-    m_data[c::HollowedMesh].reset(    new HollowedMesh(this));
+//    m_data[c::HollowedMesh].reset(    new HollowedMesh(this));
     m_data[c::Raycaster].reset(       new Raycaster(this));
     m_data[c::ObjectClipper].reset(   new ObjectClipper(this));
     m_data[c::SupportsClipper].reset( new SupportsClipper(this));
@@ -57,13 +57,6 @@ InstancesHider* CommonGizmosDataPool::instances_hider() const
     InstancesHider* inst_hider = dynamic_cast<InstancesHider*>(m_data.at(CommonGizmosDataID::InstancesHider).get());
     assert(inst_hider);
     return inst_hider->is_valid() ? inst_hider : nullptr;
-}
-
-HollowedMesh* CommonGizmosDataPool::hollowed_mesh() const
-{
-    HollowedMesh* hol_mesh = dynamic_cast<HollowedMesh*>(m_data.at(CommonGizmosDataID::HollowedMesh).get());
-    assert(hol_mesh);
-    return hol_mesh->is_valid() ? hol_mesh : nullptr;
 }
 
 Raycaster* CommonGizmosDataPool::raycaster() const
@@ -117,15 +110,16 @@ bool CommonGizmosDataPool::check_dependencies(CommonGizmosDataID required) const
 void SelectionInfo::on_update()
 {
     const Selection& selection = get_pool()->get_canvas()->get_selection();
+
+    m_model_object = nullptr;
+    m_print_object = nullptr;
+
     if (selection.is_single_full_instance()) {
         m_model_object = selection.get_model()->objects[selection.get_object_idx()];
-        m_model_volume = nullptr;
-        m_z_shift = selection.get_first_volume()->get_sla_shift_z();
-    }
-    else {
-        m_model_object = nullptr;
-        if (selection.is_single_volume())
-            m_model_volume = selection.get_model()->objects[selection.get_object_idx()]->volumes[selection.get_first_volume()->volume_idx()];
+        if (m_model_object)
+            m_print_object = get_pool()->get_canvas()->sla_print()->get_print_object_by_model_object_id(m_model_object->id());
+
+        m_z_shift = m_print_object ? m_print_object->get_current_elevation() : selection.get_first_volume()->get_sla_shift_z();
     }
 }
 
@@ -133,6 +127,13 @@ void SelectionInfo::on_release()
 {
     m_model_object = nullptr;
     m_model_volume = nullptr;
+}
+
+ModelInstance *SelectionInfo::model_instance() const
+{
+    int inst_idx = get_active_instance();
+    return inst_idx < int(m_model_object->instances.size()) ?
+               m_model_object->instances[get_active_instance()] : nullptr;
 }
 
 int SelectionInfo::get_active_instance() const
@@ -152,8 +153,10 @@ void InstancesHider::on_update()
 
     if (mo && active_inst != -1) {
         canvas->toggle_model_objects_visibility(false);
-        canvas->toggle_model_objects_visibility(true, mo, active_inst);
-        canvas->toggle_sla_auxiliaries_visibility(m_show_supports, mo, active_inst);
+        if (!m_hide_full_scene) {
+            canvas->toggle_model_objects_visibility(true, mo, active_inst);
+            canvas->toggle_sla_auxiliaries_visibility(false, mo, active_inst);
+        }
         canvas->set_use_clipping_planes(true);
         // Some objects may be sinking, do not show whatever is below the bed.
         canvas->set_clipping_plane(0, ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
@@ -169,7 +172,7 @@ void InstancesHider::on_update()
             for (const TriangleMesh* mesh : meshes) {
                 m_clippers.emplace_back(new MeshClipper);
                 m_clippers.back()->set_plane(ClippingPlane(-Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
-                m_clippers.back()->set_mesh(*mesh);
+                m_clippers.back()->set_mesh(mesh->its);
             }
             m_old_meshes = meshes;
         }
@@ -186,9 +189,10 @@ void InstancesHider::on_release()
     m_clippers.clear();
 }
 
-void InstancesHider::show_supports(bool show) {
-    if (m_show_supports != show) {
-        m_show_supports = show;
+void InstancesHider::set_hide_full_scene(bool hide)
+{
+    if (m_hide_full_scene != hide) {
+        m_hide_full_scene = hide;
         on_update();
     }
 }
@@ -236,81 +240,6 @@ void InstancesHider::render_cut() const
 }
 
 
-
-void HollowedMesh::on_update()
-{
-    const ModelObject* mo = get_pool()->selection_info()->model_object();
-    bool is_sla = wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA;
-    if (! mo || ! is_sla)
-        return;
-
-    const GLCanvas3D* canvas = get_pool()->get_canvas();
-    const PrintObjects& print_objects = canvas->sla_print()->objects();
-    const SLAPrintObject* print_object = (m_print_object_idx >= 0 && m_print_object_idx < int(print_objects.size()))
-            ? print_objects[m_print_object_idx]
-            : nullptr;
-
-    // Find the respective SLAPrintObject.
-    if (m_print_object_idx < 0 || m_print_objects_count != int(print_objects.size())) {
-        m_print_objects_count = print_objects.size();
-        m_print_object_idx = -1;
-        for (const SLAPrintObject* po : print_objects) {
-            ++m_print_object_idx;
-            if (po->model_object()->id() == mo->id()) {
-                print_object = po;
-                break;
-            }
-        }
-    }
-
-    // If there is a valid SLAPrintObject, check state of Hollowing step.
-    if (print_object) {
-        if (print_object->is_step_done(slaposDrillHoles) && print_object->has_mesh(slaposDrillHoles)) {
-            size_t timestamp = print_object->step_state_with_timestamp(slaposDrillHoles).timestamp;
-            if (timestamp > m_old_hollowing_timestamp) {
-                const TriangleMesh& backend_mesh = print_object->get_mesh_to_slice();
-                if (! backend_mesh.empty()) {
-                    m_hollowed_mesh_transformed.reset(new TriangleMesh(backend_mesh));
-                    Transform3d trafo_inv = (canvas->sla_print()->sla_trafo(*mo) * print_object->model_object()->volumes.front()->get_transformation().get_matrix()).inverse();
-                    m_hollowed_mesh_transformed->transform(trafo_inv);
-                    m_drainholes = print_object->model_object()->sla_drain_holes;
-                    m_old_hollowing_timestamp = timestamp;
-
-                    indexed_triangle_set interior = print_object->hollowed_interior_mesh();
-                    its_flip_triangles(interior);
-                    m_hollowed_interior_transformed = std::make_unique<TriangleMesh>(std::move(interior));
-                    m_hollowed_interior_transformed->transform(trafo_inv);
-                }
-                else {
-                    m_hollowed_mesh_transformed.reset(nullptr);
-                }
-            }
-        }
-        else
-            m_hollowed_mesh_transformed.reset(nullptr);
-    }
-}
-
-
-void HollowedMesh::on_release()
-{
-    m_hollowed_mesh_transformed.reset();
-    m_old_hollowing_timestamp = 0;
-    m_print_object_idx = -1;
-}
-
-
-const TriangleMesh* HollowedMesh::get_hollowed_mesh() const
-{
-    return m_hollowed_mesh_transformed.get();
-}
-
-const TriangleMesh* HollowedMesh::get_hollowed_interior() const
-{
-    return m_hollowed_interior_transformed.get();
-}
-
-
 void Raycaster::on_update()
 {
     wxBusyCursor wait;
@@ -327,20 +256,33 @@ void Raycaster::on_update()
         mvs = mo->volumes;
 
     std::vector<const TriangleMesh*> meshes;
-    if (mvs.size() == 1) {
-        assert(mvs.front()->is_model_part());
-        const HollowedMesh* hollowed_mesh_tracker = get_pool()->hollowed_mesh();
-        if (hollowed_mesh_tracker && hollowed_mesh_tracker->get_hollowed_mesh())
-            meshes.push_back(hollowed_mesh_tracker->get_hollowed_mesh());
-    }
-    if (meshes.empty()) {
-        for (const ModelVolume* v : mvs) {
-            if (v->is_model_part())
-                meshes.push_back(&v->mesh());
+    bool force_raycaster_regeneration = false;
+    if (wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA) {
+        // For sla printers we use the mesh generated by the backend
+        std::shared_ptr<const indexed_triangle_set> preview_mesh_ptr;
+        const SLAPrintObject* po = get_pool()->selection_info()->print_object();
+        if (po)
+            preview_mesh_ptr = po->get_mesh_to_print();
+
+        if (preview_mesh_ptr)
+            m_sla_mesh_cache = TriangleMesh{*preview_mesh_ptr};
+
+        if (!m_sla_mesh_cache.empty()) {
+            m_sla_mesh_cache.transform(po->trafo().inverse());
+            meshes.emplace_back(&m_sla_mesh_cache);
+            force_raycaster_regeneration = true;
         }
     }
 
-    if (meshes != m_old_meshes) {
+    if (meshes.empty()) {
+        const std::vector<ModelVolume*>& mvs = mo->volumes;
+        for (const ModelVolume* mv : mvs) {
+            if (mv->is_model_part())
+                meshes.push_back(&mv->mesh());
+        }
+    }
+
+    if (force_raycaster_regeneration || meshes != m_old_meshes) {
         m_raycasters.clear();
         for (const TriangleMesh* mesh : meshes)
             m_raycasters.emplace_back(new MeshRaycaster(std::make_shared<const TriangleMesh>(*mesh)));
@@ -362,8 +304,9 @@ std::vector<const MeshRaycaster*> Raycaster::raycasters() const
     return mrcs;
 }
 
+} // namespace GUI
 
-
+namespace GUI {
 
 
 void ObjectClipper::on_update()
@@ -374,24 +317,42 @@ void ObjectClipper::on_update()
 
     // which mesh should be cut?
     std::vector<const TriangleMesh*> meshes;
-    bool has_hollowed = get_pool()->hollowed_mesh() && get_pool()->hollowed_mesh()->get_hollowed_mesh();
-    if (has_hollowed)
-        meshes.push_back(get_pool()->hollowed_mesh()->get_hollowed_mesh());
+    std::vector<Geometry::Transformation> trafos;
+    bool force_clipper_regeneration = false;
 
-    if (meshes.empty())
-        for (const ModelVolume* mv : mo->volumes)
-            meshes.push_back(&mv->mesh());
-
-    if (meshes != m_old_meshes) {
-        m_clippers.clear();
-        for (const TriangleMesh* mesh : meshes) {
-            m_clippers.emplace_back(new MeshClipper);
-            m_clippers.back()->set_mesh(*mesh);
+    std::unique_ptr<MeshClipper> mc;
+    Geometry::Transformation     mc_tr;
+    if (wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology() == ptSLA) {
+        // For sla printers we use the mesh generated by the backend
+        const SLAPrintObject* po = get_pool()->selection_info()->print_object();
+        if (po) {
+            auto partstoslice = po->get_parts_to_slice();
+            if (! partstoslice.empty()) {
+                mc = std::make_unique<MeshClipper>();
+                mc->set_mesh(range(partstoslice));
+                mc_tr = Geometry::Transformation{po->trafo().inverse().cast<double>()};
+            }
         }
-        m_old_meshes = meshes;
+    }
 
-        if (has_hollowed)
-            m_clippers.front()->set_negative_mesh(*get_pool()->hollowed_mesh()->get_hollowed_interior());
+    if (!mc && meshes.empty()) {
+        for (const ModelVolume* mv : mo->volumes) {
+            meshes.emplace_back(&mv->mesh());
+            trafos.emplace_back(mv->get_transformation());
+        }
+    }
+
+    if (mc || force_clipper_regeneration || meshes != m_old_meshes) {
+        m_clippers.clear();
+        for (size_t i = 0; i < meshes.size(); ++i) {
+            m_clippers.emplace_back(new MeshClipper, trafos[i]);
+            m_clippers.back().first->set_mesh(meshes[i]->its);
+        }
+        m_old_meshes = std::move(meshes);
+
+        if (mc) {
+            m_clippers.emplace_back(std::move(mc), mc_tr);
+        }
 
         m_active_inst_bb_radius =
             mo->instance_bounding_box(get_pool()->selection_info()->get_active_instance()).radius();
@@ -413,37 +374,27 @@ void ObjectClipper::render_cut() const
     if (m_clp_ratio == 0.)
         return;
     const SelectionInfo* sel_info = get_pool()->selection_info();
-    int sel_instance_idx = sel_info->get_active_instance();
-    if (sel_instance_idx < 0)
-        return;
-    const ModelObject* mo = sel_info->model_object();
-    const Geometry::Transformation inst_trafo = mo->instances[sel_instance_idx]->get_transformation();
+    const Geometry::Transformation inst_trafo = sel_info->model_object()->instances[sel_info->get_active_instance()]->get_transformation();
 
-    size_t clipper_id = 0;
-    for (const ModelVolume* mv : mo->volumes) {
-        const Geometry::Transformation vol_trafo  = mv->get_transformation();
-        Geometry::Transformation trafo = inst_trafo * vol_trafo;
-        trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
-
-        auto& clipper = m_clippers[clipper_id];
-        clipper->set_plane(*m_clp);
-        clipper->set_transformation(trafo);
-        clipper->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
-        clipper->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
-        clipper->render_contour({ 1.f, 1.f, 1.f, 1.f});
-
-        ++clipper_id;
+    for (auto& clipper : m_clippers) {
+      Geometry::Transformation trafo = inst_trafo * clipper.second;
+      trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
+      clipper.first->set_plane(*m_clp);
+      clipper.first->set_transformation(trafo);
+      clipper.first->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
+      clipper.first->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
+      clipper.first->render_contour({ 1.f, 1.f, 1.f, 1.f });
     }
 }
 
 bool ObjectClipper::is_projection_inside_cut(const Vec3d& point) const
 {
-    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [point](const std::unique_ptr<MeshClipper>& cl) { return cl->is_projection_inside_cut(point); });
+    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [point](const auto& cl) { return cl.first->is_projection_inside_cut(point); });
 }
 
 bool ObjectClipper::has_valid_contour() const
 {
-    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [](const std::unique_ptr<MeshClipper>& cl) { return cl->has_valid_contour(); });
+    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [](const auto& cl) { return cl.first->has_valid_contour(); });
 }
 
 void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal)
@@ -481,13 +432,13 @@ void ObjectClipper::set_behavior(bool hide_clipped, bool fill_cut, double contou
 {
     m_hide_clipped = hide_clipped;
     for (auto& clipper : m_clippers)
-        clipper->set_behaviour(fill_cut, contour_width);
+        clipper.first->set_behaviour(fill_cut, contour_width);
 }
 
 void ObjectClipper::pass_mouse_click(const Vec3d& pt)
 {
     for (auto& clipper : m_clippers)
-        clipper->pass_mouse_click(pt);
+        clipper.first->pass_mouse_click(pt);
 }
 
 std::vector<Vec3d> ObjectClipper::get_disabled_contours() const
@@ -532,7 +483,7 @@ void SupportsClipper::on_update()
             // The timestamp has changed.
             m_clipper.reset(new MeshClipper);
             // The mesh should already have the shared vertices calculated.
-            m_clipper->set_mesh(print_object->support_mesh());
+            m_clipper->set_mesh(print_object->support_mesh().its);
             m_old_timestamp = timestamp;
         }
     }
@@ -553,7 +504,6 @@ void SupportsClipper::render_cut() const
 {
     const CommonGizmosDataObjects::ObjectClipper* ocl = get_pool()->object_clipper();
     if (ocl->get_position() == 0.
-     || ! get_pool()->instances_hider()->are_supports_shown()
      || ! m_clipper)
         return;
 

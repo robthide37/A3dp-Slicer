@@ -241,39 +241,49 @@ void scale(Polygons &polygons, double multiplicator) {
         for (Point &p : polygon) p *= multiplicator;
 }
 
-TEST_CASE("Heal of damaged polygons", "[Emboss]")
-{
-    // Shape loaded from svg is letter 'i' from font 'ALIENATE.TTF'
-    std::string file_name = "contour_ALIENATO.TTF_glyph_i.svg";
-    std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + file_name;
+Polygons load_polygons(const std::string &svg_file) {
+    std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + svg_file;
     NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
     Polygons polygons = NSVGUtils::to_polygons(image);
     nsvgDelete(image);
+    return polygons;
+}
 
-    heal_and_check(polygons);
+TEST_CASE("Heal of 'i' in ALIENATO.TTF", "[Emboss]")
+{
+    // Shape loaded from svg is letter 'i' from font 'ALIENATE.TTF'
+    std::string file_name = "contour_ALIENATO.TTF_glyph_i.svg";
+    Polygons polygons = load_polygons(file_name);
+
+    auto a = heal_and_check(polygons);
 
     Polygons scaled_shape = polygons; // copy
     scale(scaled_shape, 1 / Emboss::SHAPE_SCALE);
-    heal_and_check(scaled_shape);
+    auto b = heal_and_check(scaled_shape);
 
     // different scale
     scale(scaled_shape, 10.);
-    heal_and_check(scaled_shape);
+    auto c = heal_and_check(scaled_shape);
 
     // check reverse order of points
     Polygons reverse_shape = polygons;
     for (Polygon &p : reverse_shape)
         std::reverse(p.points.begin(), p.points.end());
-    heal_and_check(scaled_shape);
+    auto d = heal_and_check(scaled_shape);
 
 #ifdef VISUALIZE
     CHECK(false);
 #endif // VISUALIZE
 }
 
+TEST_CASE("Heal of 'm' in Allura_Script.ttf", "[Emboss]")
+{
+    Polygons polygons = load_polygons("contour_Allura_Script.ttf_glyph_m.svg");
+    auto a = heal_and_check(polygons);
+}
+
 TEST_CASE("Heal of points close to line", "[Emboss]")
 {
-    // Shape loaded from svg is letter 'i' from font 'ALIENATE.TTF'
     std::string file_name = "points_close_to_line.svg";
     std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + file_name;
     NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
@@ -381,9 +391,9 @@ TEST_CASE("triangle intersection", "[]")
 
 #if defined _WIN32
 #define FONT_DIR_PATH "C:/Windows/Fonts";
-#elif defined __linux__
-#define FONT_DIR_PATH "/usr/share/fonts";
 #endif
+//#elif defined __linux__
+//#define FONT_DIR_PATH "/usr/share/fonts";
 //#elif defined __APPLE__
 //#define FONT_DIR_PATH "//System/Library/Fonts";
 //#endif
@@ -391,8 +401,10 @@ TEST_CASE("triangle intersection", "[]")
 #ifdef FONT_DIR_PATH
 #include <string>
 #include <iostream>
-#include <filesystem>
-namespace fs = std::filesystem;
+#include <boost/filesystem.hpp>
+namespace fs = boost::filesystem;
+//#include <filesystem>
+//namespace fs = std::filesystem;
 // Check function Emboss::is_italic that exist some italic and some non-italic font.
 TEST_CASE("Italic check", "[Emboss]") 
 {  
@@ -406,15 +418,15 @@ TEST_CASE("Italic check", "[Emboss]")
         dir_paths.pop();
         for (const auto &entry : fs::directory_iterator(dir_path)) {
             const fs::path &act_path = entry.path();
-            if (entry.is_directory()) {
-                dir_paths.push(act_path.u8string());
+            if (fs::is_directory(entry)) {
+                dir_paths.push(act_path.string());
                 continue;
             }
-            std::string ext = act_path.extension().u8string();
+            std::string ext = act_path.extension().string();
             std::transform(ext.begin(), ext.end(), ext.begin(),
                            [](unsigned char c) { return std::tolower(c); });
             if (ext != ".ttf") continue;
-            std::string path_str = act_path.u8string();
+            std::string path_str = act_path.string();
             auto        font_opt = Emboss::create_font_file(path_str.c_str());
             if (font_opt == nullptr) continue;
 

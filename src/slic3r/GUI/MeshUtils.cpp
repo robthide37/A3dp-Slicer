@@ -5,11 +5,13 @@
 #include "libslic3r/TriangleMeshSlicer.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/CSGMesh/SliceCSGMesh.hpp"
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
+
 
 #include <GL/glew.h>
 
@@ -50,18 +52,34 @@ void MeshClipper::set_limiting_plane(const ClippingPlane& plane)
 
 
 
-void MeshClipper::set_mesh(const TriangleMesh& mesh)
+void MeshClipper::set_mesh(const indexed_triangle_set& mesh)
 {
-    if (m_mesh != &mesh) {
+    if (m_mesh.get() != &mesh) {
         m_mesh = &mesh;
         m_result.reset();
     }
 }
 
-void MeshClipper::set_negative_mesh(const TriangleMesh& mesh)
+void MeshClipper::set_mesh(AnyPtr<const indexed_triangle_set> &&ptr)
 {
-    if (m_negative_mesh != &mesh) {
+    if (m_mesh.get() != ptr.get()) {
+        m_mesh = std::move(ptr);
+        m_result.reset();
+    }
+}
+
+void MeshClipper::set_negative_mesh(const indexed_triangle_set& mesh)
+{
+    if (m_negative_mesh.get() != &mesh) {
         m_negative_mesh = &mesh;
+        m_result.reset();
+    }
+}
+
+void MeshClipper::set_negative_mesh(AnyPtr<const indexed_triangle_set> &&ptr)
+{
+    if (m_negative_mesh.get() != ptr.get()) {
+        m_negative_mesh = std::move(ptr);
         m_result.reset();
     }
 }
@@ -173,12 +191,20 @@ void MeshClipper::recalculate_triangles()
     MeshSlicingParams slicing_params;
     slicing_params.trafo.rotate(Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(up, Vec3d::UnitZ()));
 
-    ExPolygons expolys = union_ex(slice_mesh(m_mesh->its, height_mesh, slicing_params));
+    ExPolygons expolys;
 
-    if (m_negative_mesh && !m_negative_mesh->empty()) {
-        const ExPolygons neg_expolys = union_ex(slice_mesh(m_negative_mesh->its, height_mesh, slicing_params));
-        expolys = diff_ex(expolys, neg_expolys);
+    if (m_csgmesh.empty()) {
+        if (m_mesh)
+            expolys = union_ex(slice_mesh(*m_mesh, height_mesh, slicing_params));
+
+        if (m_negative_mesh && !m_negative_mesh->empty()) {
+            const ExPolygons neg_expolys = union_ex(slice_mesh(*m_negative_mesh, height_mesh, slicing_params));
+            expolys = diff_ex(expolys, neg_expolys);
+        }
+    } else {
+        expolys = std::move(csg::slice_csgmesh_ex(range(m_csgmesh), {height_mesh}, MeshSlicingParamsEx{slicing_params}).front());
     }
+
 
     // Triangulate and rotate the cut into world coords:
     Eigen::Quaterniond q;
@@ -289,12 +315,12 @@ void MeshClipper::recalculate_triangles()
 
             // To prevent overflow after scaling, downscale the input if needed:
             double extra_scale = 1.;
-            int32_t limit = int32_t(std::min(std::numeric_limits<coord_t>::max() / (2. * scale_x), std::numeric_limits<coord_t>::max() / (2. * scale_y)));
+            int32_t limit = int32_t(std::min(std::numeric_limits<coord_t>::max() / (2. * std::max(1., scale_x)), std::numeric_limits<coord_t>::max() / (2. * std::max(1., scale_y))));
             int32_t max_coord = 0;
             for (const Point& pt : exp.contour)
                 max_coord = std::max(max_coord, std::max(std::abs(pt.x()), std::abs(pt.y())));
             if (max_coord + m_contour_width >= limit)
-                extra_scale = 0.9 * double(limit) / max_coord;            
+                extra_scale = 0.9 * double(limit) / max_coord;
 
             ExPolygon exp_copy = exp;
             if (extra_scale != 1.)

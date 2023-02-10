@@ -18,6 +18,8 @@
 #include <boost/log/trivial.hpp>
 #include <libslic3r/I18N.hpp>
 
+#include <libnest2d/tools/benchmark.h>
+
 //! macro used to mark string used at localization,
 //! return same string
 #define L(s) Slic3r::I18N::translate(s)
@@ -30,6 +32,9 @@ indexed_triangle_set create_support_tree(const SupportableMesh &sm,
     auto builder = make_unique<SupportTreeBuilder>(ctl);
 
     if (sm.cfg.enabled) {
+        Benchmark bench;
+        bench.start();
+
         switch (sm.cfg.tree_type) {
         case SupportTreeType::Default: {
             create_default_tree(*builder, sm);
@@ -39,8 +44,17 @@ indexed_triangle_set create_support_tree(const SupportableMesh &sm,
             create_branching_tree(*builder, sm);
             break;
         }
+        case SupportTreeType::Organic: {
+            // TODO
+        }
         default:;
         }
+
+        bench.stop();
+
+        BOOST_LOG_TRIVIAL(info) << "Support tree creation took: "
+                                << bench.getElapsedSec()
+                                << " seconds";
 
         builder->merge_and_cleanup();   // clean metadata, leave only the meshes.
     }
@@ -54,13 +68,14 @@ indexed_triangle_set create_pad(const SupportableMesh      &sm,
                                 const indexed_triangle_set &support_mesh,
                                 const JobController        &ctl)
 {
+    constexpr float PadSamplingLH = 0.1f;
 
     ExPolygons model_contours; // This will store the base plate of the pad.
-    double   pad_h             = sm.pad_cfg.full_height();
-
-    float zstart = ground_level(sm);
-    float zend   = zstart + float(pad_h + EPSILON);
-    auto heights = grid(zstart, zend, 0.1f);
+    double pad_h  = sm.pad_cfg.full_height();
+    auto   gndlvl = float(ground_level(sm));
+    float  zstart = gndlvl - bool(sm.pad_cfg.embed_object) * sm.pad_cfg.wall_thickness_mm;
+    float  zend   = zstart + float(pad_h + PadSamplingLH + EPSILON);
+    auto  heights = grid(zstart, zend, PadSamplingLH);
 
     if (!sm.cfg.enabled || sm.pad_cfg.embed_object) {
         // No support (thus no elevation) or zero elevation mode
@@ -77,7 +92,7 @@ indexed_triangle_set create_pad(const SupportableMesh      &sm,
     indexed_triangle_set out;
     create_pad(sup_contours, model_contours, out, sm.pad_cfg);
 
-    Vec3f offs{.0f, .0f, zstart};
+    Vec3f offs{.0f, .0f, gndlvl};
     for (auto &p : out.vertices) p += offs;
 
     its_merge_vertices(out);

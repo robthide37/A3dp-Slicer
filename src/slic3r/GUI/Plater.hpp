@@ -152,6 +152,8 @@ public:
     void render_project_state_debug_window() const;
 #endif // ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW
 
+    bool is_project_temp() const;
+
     Sidebar& sidebar();
     const Model& model() const;
     Model& model();
@@ -175,8 +177,10 @@ public:
     // To be called when providing a list of files to the GUI slic3r on command line.
     std::vector<size_t> load_files(const std::vector<std::string>& input_files, bool load_model = true, bool load_config = true, bool imperial_units = false);
     // to be called on drag and drop
-    bool load_files(const wxArrayString& filenames);
+    bool load_files(const wxArrayString& filenames, bool delete_after_load = false);
     void check_selected_presets_visibility(PrinterTechnology loaded_printer_technology);
+
+    bool preview_zip_archive(const boost::filesystem::path& input_file);
 
     const wxString& get_last_loaded_gcode() const { return m_last_loaded_gcode; }
 
@@ -267,8 +271,6 @@ public:
     void export_toolpaths_to_obj() const;
     void reslice();
     void reslice_FFF_until_step(PrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
-    void reslice_SLA_supports(const ModelObject &object, bool postpone_error_messages = false);
-    void reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages = false);
     void reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
 
     void clear_before_change_mesh(int obj_idx);
@@ -313,6 +315,7 @@ public:
 
     void update_menus();
     void show_action_buttons(const bool is_ready_to_slice) const;
+    void show_action_buttons() const;
 
     wxString get_project_filename(const wxString& extension = wxEmptyString) const;
     void set_project_filename(const wxString& filename);

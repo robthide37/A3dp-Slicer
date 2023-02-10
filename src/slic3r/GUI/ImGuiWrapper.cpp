@@ -65,6 +65,8 @@ static const std::map<const wchar_t, std::string> font_icons = {
     {ImGui::RevertButton          , "undo"                          },
     {ImGui::WarningMarkerSmall    , "notification_warning"          },
     {ImGui::InfoMarkerSmall       , "notification_info"             },
+    {ImGui::PlugMarker            , "plug"                          },
+    {ImGui::DowelMarker           , "dowel"                         },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_large = {
@@ -96,7 +98,12 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::DocumentationButton     , "notification_documentation"      },
     {ImGui::DocumentationHoverButton, "notification_documentation_hover"},
     {ImGui::InfoMarker              , "notification_info"               },
-    
+    {ImGui::PlayButton              , "notification_play"               },
+    {ImGui::PlayHoverButton         , "notification_play_hover"         },
+    {ImGui::PauseButton             , "notification_pause"              },
+    {ImGui::PauseHoverButton        , "notification_pause_hover"        },
+    {ImGui::OpenButton              , "notification_open"               },
+    {ImGui::OpenHoverButton         , "notification_open_hover"         },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_extra_large = {

@@ -32,8 +32,8 @@ public:
     ExPolygon& operator=(const ExPolygon &other) = default;
     ExPolygon& operator=(ExPolygon &&other) = default;
 
-    Polygon  contour;
-    Polygons holes;
+    Polygon  contour; //CCW
+    Polygons holes; //CW
 
     void clear() { contour.points.clear(); holes.clear(); }
     void scale(double factor);

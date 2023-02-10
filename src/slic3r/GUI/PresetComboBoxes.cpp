@@ -555,7 +555,8 @@ bool PresetComboBox::selection_is_changed_according_to_physical_printers()
     // if new preset wasn't selected, there is no need to call update preset selection
     if (old_printer_preset == preset_name) {
         tab->update_preset_choice();
-        wxGetApp().plater()->show_action_buttons(false);
+        // update action buttons to show/hide "Send to" button
+        wxGetApp().plater()->show_action_buttons();
 
         // we need just to update according Plater<->Tab PresetComboBox 
         if (dynamic_cast<PlaterPresetComboBox*>(this)!=nullptr) {
@@ -663,6 +664,18 @@ void PlaterPresetComboBox::OnSelect(wxCommandEvent &evt)
         m_last_selected = selected_item;
         
     evt.Skip();
+}
+
+std::string PlaterPresetComboBox::get_selected_ph_printer_name() const
+{
+    if (m_type != Preset::TYPE_PRINTER)
+        return {};
+
+    const PhysicalPrinterCollection& physical_printers = m_preset_bundle->physical_printers;
+    if (physical_printers.has_selection())
+        return physical_printers.get_selected_full_printer_name();
+
+    return {};
 }
 
 void PlaterPresetComboBox::switch_to_tab()
@@ -785,7 +798,7 @@ void PlaterPresetComboBox::show_edit_menu()
 
 wxString PlaterPresetComboBox::get_preset_name(const Preset& preset)
 {
-    std::string name = preset.alias.empty() ? preset.name : preset.alias;
+    std::string name = preset.alias.empty() ? preset.name : (preset.vendor && preset.vendor->templates_profile ? preset.name : preset.alias);
     return from_u8(name + suffix(preset));
 }
 
@@ -823,6 +836,7 @@ void PlaterPresetComboBox::update()
     null_icon_width = (wide_icons ? 3 : 2) * norm_icon_width + thin_space_icon_width + wide_space_icon_width;
 
     std::map<wxString, wxBitmapBundle*> nonsys_presets;
+    std::map<wxString, wxBitmapBundle*> template_presets;
 
     wxString selected_user_preset;
     wxString tooltip;
@@ -870,10 +884,18 @@ void PlaterPresetComboBox::update()
 
         const std::string name = preset.alias.empty() ? preset.name : preset.alias;
         if (preset.is_default || preset.is_system) {
-            Append(get_preset_name(preset), *bmp);
-            validate_selection(is_selected);
-            if (is_selected)
-                tooltip = from_u8(preset.name);
+            if (preset.vendor && preset.vendor->templates_profile) {
+                template_presets.emplace(get_preset_name(preset), bmp);
+                if (is_selected) {
+                    selected_user_preset = get_preset_name(preset);
+                    tooltip = from_u8(preset.name);
+                }
+            } else {
+                Append(get_preset_name(preset), *bmp);
+                validate_selection(is_selected);
+                if (is_selected)
+                    tooltip = from_u8(preset.name);
+            }
         }
         else
         {
@@ -886,10 +908,21 @@ void PlaterPresetComboBox::update()
         if (i + 1 == m_collection->num_default_presets())
             set_label_marker(Append(separator(L("System presets")), NullBitmapBndl()));
     }
+
+    
     if (!nonsys_presets.empty())
     {
         set_label_marker(Append(separator(L("User presets")), NullBitmapBndl()));
         for (std::map<wxString, wxBitmapBundle*>::iterator it = nonsys_presets.begin(); it != nonsys_presets.end(); ++it) {
+            Append(it->first, *it->second);
+            validate_selection(it->first == selected_user_preset);
+        }
+    }
+
+    const AppConfig* app_config = wxGetApp().app_config;
+    if (!template_presets.empty() && app_config->get("no_templates") == "0") {
+        set_label_marker(Append(separator(L("Template presets")), wxNullBitmap));
+        for (std::map<wxString, wxBitmapBundle*>::iterator it = template_presets.begin(); it != template_presets.end(); ++it) {
             Append(it->first, *it->second);
             validate_selection(it->first == selected_user_preset);
         }
@@ -1033,6 +1066,8 @@ void TabPresetComboBox::update()
     const std::deque<Preset>& presets = m_collection->get_presets();
 
     std::map<wxString, std::pair<wxBitmapBundle*, bool>> nonsys_presets;
+    std::map<wxString, std::pair<wxBitmapBundle*, bool>> template_presets;
+
     wxString selected = "";
     if (!presets.front().is_visible)
         set_label_marker(Append(separator(L("System presets")), NullBitmapBndl()));
@@ -1065,11 +1100,19 @@ void TabPresetComboBox::update()
         auto bmp = get_bmp(bitmap_key, main_icon_name, "lock_closed", is_enabled, preset.is_compatible, preset.is_system || preset.is_default);
         assert(bmp);
 
-        if (preset.is_default || preset.is_system) {
-            int item_id = Append(get_preset_name(preset), *bmp);
-            if (!is_enabled)
-                set_label_marker(item_id, LABEL_ITEM_DISABLED);
-            validate_selection(i == idx_selected);
+         if (preset.is_default || preset.is_system) {
+            if (preset.vendor && preset.vendor->templates_profile) {
+                template_presets.emplace(get_preset_name(preset), std::pair<wxBitmapBundle*, bool>(bmp, is_enabled));
+                if (i == idx_selected)
+                    selected = get_preset_name(preset);
+            } else {
+                int item_id = Append(get_preset_name(preset), *bmp);
+                if (!is_enabled)
+                    set_label_marker(item_id, LABEL_ITEM_DISABLED);
+                validate_selection(i == idx_selected);
+            }
+
+            
         }
         else
         {
@@ -1081,6 +1124,7 @@ void TabPresetComboBox::update()
         if (i + 1 == m_collection->num_default_presets())
             set_label_marker(Append(separator(L("System presets")), NullBitmapBndl()));
     }
+   
     if (!nonsys_presets.empty())
     {
         set_label_marker(Append(separator(L("User presets")), NullBitmapBndl()));
@@ -1092,7 +1136,19 @@ void TabPresetComboBox::update()
             validate_selection(it->first == selected);
         }
     }
-
+    
+    const AppConfig* app_config = wxGetApp().app_config;
+    if (!template_presets.empty() && app_config->get("no_templates") == "0") {
+        set_label_marker(Append(separator(L("Template presets")), wxNullBitmap));
+        for (std::map<wxString, std::pair<wxBitmapBundle*, bool>>::iterator it = template_presets.begin(); it != template_presets.end(); ++it) {
+            int item_id = Append(it->first, *it->second.first);
+            bool is_enabled = it->second.second;
+            if (!is_enabled)
+                set_label_marker(item_id, LABEL_ITEM_DISABLED);
+            validate_selection(it->first == selected);
+        }
+    }
+    
     if (m_type == Preset::TYPE_PRINTER)
     {
         // add Physical printers, if any exists

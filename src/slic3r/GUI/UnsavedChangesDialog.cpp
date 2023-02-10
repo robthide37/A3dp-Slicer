@@ -1056,27 +1056,6 @@ bool UnsavedChangesDialog::save(PresetCollection* dependent_presets, bool show_s
     return true;
 }
 
-wxString get_string_from_enum(const std::string& opt_key, const DynamicPrintConfig& config, bool is_infill = false)
-{
-    const ConfigOptionDef& def = config.def()->options.at(opt_key);
-    const std::vector<std::string>& names = def.enum_labels.empty() ? def.enum_values : def.enum_labels;
-    int val = config.option(opt_key)->getInt();
-
-    // Each infill doesn't use all list of infill declared in PrintConfig.hpp.
-    // So we should "convert" val to the correct one
-    if (is_infill) {
-        for (auto key_val : *def.enum_keys_map)
-            if (int(key_val.second) == val) {
-                auto it = std::find(def.enum_values.begin(), def.enum_values.end(), key_val.first);
-                if (it == def.enum_values.end())
-                    return "";
-                return from_u8(_utf8(names[it - def.enum_values.begin()]));
-            }
-        return _L("Undef");
-    }
-    return from_u8(_utf8(names[val]));
-}
-
 static size_t get_id_from_opt_key(std::string opt_key)
 {
     int pos = opt_key.find("#");
@@ -1214,10 +1193,8 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         return out;
     }
     case coEnum: {
-        return get_string_from_enum(opt_key, config, 
-            opt_key == "top_fill_pattern" ||
-            opt_key == "bottom_fill_pattern" ||
-            opt_key == "fill_pattern");
+        auto opt = config.option_def(opt_key)->enum_def->enum_to_label(config.option(opt_key)->getInt());
+        return opt.has_value() ? _(from_u8(*opt)) : _L("Undef");
     }
     case coPoints: {
         if (opt_key == "bed_shape") {
@@ -1571,6 +1548,11 @@ void DiffPresetDialog::create_tree()
     m_tree->GetColumn(DiffModel::colToggle)->SetHidden(true);
 }
 
+std::array<Preset::Type, 3> DiffPresetDialog::types_list() const
+{
+    return PresetBundle::types_list(m_pr_technology);
+}
+
 void DiffPresetDialog::create_buttons()
 {
     wxFont font = this->GetFont().Scaled(1.4f);
@@ -1598,8 +1580,7 @@ void DiffPresetDialog::create_buttons()
         bool enable = m_tree->has_selection();
         if (enable) {
             if (m_view_type == Preset::TYPE_INVALID) {
-                for (const Preset::Type& type : (m_pr_technology == ptFFF ? std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-                                                                            std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL }))
+                for (const Preset::Type& type : types_list())
                     if (!enable_transfer(type)) {
                         enable = false;
                         break;
@@ -2024,10 +2005,7 @@ bool DiffPresetDialog::is_save_confirmed()
 
     std::vector<Preset::Type> types_for_save;
 
-    const auto list = m_pr_technology == ptFFF ? std::initializer_list<Preset::Type>{Preset::TYPE_PRINTER, Preset::TYPE_PRINT, Preset::TYPE_FILAMENT} :
-        std::initializer_list<Preset::Type>{ Preset::TYPE_PRINTER, Preset::TYPE_SLA_PRINT, Preset::TYPE_SLA_MATERIAL };
-
-    for (const Preset::Type& type : list) {
+    for (const Preset::Type& type : types_list()) {
         if (!m_tree->options(type, true).empty()) {
             types_for_save.emplace_back(type);
             presets_to_save.emplace_back(PresetToSave{ type, get_left_preset_name(type), get_right_preset_name(type), get_right_preset_name(type) });

@@ -1,25 +1,34 @@
 #include "SupportSpotsGenerator.hpp"
 
+#include "BoundingBox.hpp"
 #include "ExPolygon.hpp"
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
+#include "GCode/ExtrusionProcessor.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
+#include "PrincipalComponents2D.hpp"
 #include "Print.hpp"
+#include "PrintBase.hpp"
+#include "PrintConfig.hpp"
 #include "Tesselate.hpp"
 #include "libslic3r.h"
 #include "tbb/parallel_for.h"
 #include "tbb/blocked_range.h"
 #include "tbb/blocked_range2d.h"
 #include "tbb/parallel_reduce.h"
+#include <algorithm>
 #include <boost/log/trivial.hpp>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <functional>
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <stack>
+#include <utility>
 #include <vector>
 
 #include "AABBTreeLines.hpp"
@@ -41,17 +50,19 @@ namespace Slic3r {
 class ExtrusionLine
 {
 public:
-    ExtrusionLine() : a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0f), origin_entity(nullptr) {}
-    ExtrusionLine(const Vec2f &a, const Vec2f &b, const ExtrusionEntity *origin_entity)
-        : a(a), b(b), len((a - b).norm()), origin_entity(origin_entity)
+    ExtrusionLine() : a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0), origin_entity(nullptr) {}
+    ExtrusionLine(const Vec2f &a, const Vec2f &b, float len, const ExtrusionEntity *origin_entity)
+        : a(a), b(b), len(len), origin_entity(origin_entity)
     {}
 
-    float length() { return (a - b).norm(); }
+    ExtrusionLine(const Vec2f &a, const Vec2f &b)
+        : a(a), b(b), len((a-b).norm()), origin_entity(nullptr)
+    {}
 
     bool is_external_perimeter() const
     {
         assert(origin_entity != nullptr);
-        return origin_entity->role() == erExternalPerimeter || origin_entity->role() == erOverhangPerimeter;
+        return origin_entity->role().is_external_perimeter();
     }
 
     Vec2f                  a;
@@ -59,8 +70,9 @@ public:
     float                  len;
     const ExtrusionEntity *origin_entity;
 
-    bool  support_point_generated = false;
-    float malformation            = 0.0f;
+    std::optional<SupportSpotsGenerator::SupportPointCause> support_point_generated = {};
+    float form_quality            = 1.0f;
+    float curled_up_height        = 0.0f;
 
     static const constexpr int Dim = 2;
     using Scalar                   = Vec2f::Scalar;
@@ -70,10 +82,6 @@ auto get_a(ExtrusionLine &&l) { return l.a; }
 auto get_b(ExtrusionLine &&l) { return l.b; }
 
 namespace SupportSpotsGenerator {
-
-SupportPoint::SupportPoint(const Vec3f &position, float force, float spot_radius, const Vec2f &direction)
-    : position(position), force(force), spot_radius(spot_radius), direction(direction)
-{}
 
 using LD = AABBTreeLines::LinesDistancer<ExtrusionLine>;
 
@@ -109,13 +117,14 @@ public:
 
     size_t to_cell_index(const Vec3i &cell_coords) const
     {
+#ifdef DETAILED_DEBUG_LOGS
         assert(cell_coords.x() >= 0);
         assert(cell_coords.x() < cell_count.x());
         assert(cell_coords.y() >= 0);
         assert(cell_coords.y() < cell_count.y());
         assert(cell_coords.z() >= 0);
         assert(cell_coords.z() < cell_count.z());
-
+#endif
         return cell_coords.z() * cell_count.x() * cell_count.y() + cell_coords.y() * cell_count.x() + cell_coords.x();
     }
 
@@ -162,42 +171,16 @@ struct SliceConnection
 
 float get_flow_width(const LayerRegion *region, ExtrusionRole role)
 {
-    switch (role) {
-    case ExtrusionRole::erBridgeInfill: return region->flow(FlowRole::frExternalPerimeter).width();
-    case ExtrusionRole::erExternalPerimeter: return region->flow(FlowRole::frExternalPerimeter).width();
-    case ExtrusionRole::erGapFill: return region->flow(FlowRole::frInfill).width();
-    case ExtrusionRole::erPerimeter: return region->flow(FlowRole::frPerimeter).width();
-    case ExtrusionRole::erSolidInfill: return region->flow(FlowRole::frSolidInfill).width();
-    case ExtrusionRole::erInternalInfill: return region->flow(FlowRole::frInfill).width();
-    case ExtrusionRole::erTopSolidInfill: return region->flow(FlowRole::frTopSolidInfill).width();
-    default: return region->flow(FlowRole::frPerimeter).width();
-    }
+    if (role == ExtrusionRole::BridgeInfill) return region->flow(FlowRole::frExternalPerimeter).width();
+    if (role == ExtrusionRole::ExternalPerimeter) return region->flow(FlowRole::frExternalPerimeter).width();
+    if (role == ExtrusionRole::GapFill) return region->flow(FlowRole::frInfill).width();
+    if (role == ExtrusionRole::Perimeter) return region->flow(FlowRole::frPerimeter).width();
+    if (role == ExtrusionRole::SolidInfill) return region->flow(FlowRole::frSolidInfill).width();
+    if (role == ExtrusionRole::InternalInfill) return region->flow(FlowRole::frInfill).width();
+    if (role == ExtrusionRole::TopSolidInfill) return region->flow(FlowRole::frTopSolidInfill).width();
+    // default
+    return region->flow(FlowRole::frPerimeter).width();
 }
-
-// Accumulator of current extrusion path properties
-// It remembers unsuported distance and maximum accumulated curvature over that distance.
-// Used to determine local stability issues (too long bridges, extrusion curves into air)
-struct ExtrusionPropertiesAccumulator
-{
-    float distance      = 0; // accumulated distance
-    float curvature     = 0; // accumulated signed ccw angles
-    float max_curvature = 0; // max absolute accumulated value
-
-    void add_distance(float dist) { distance += dist; }
-
-    void add_angle(float ccw_angle)
-    {
-        curvature += ccw_angle;
-        max_curvature = std::max(max_curvature, std::abs(curvature));
-    }
-
-    void reset()
-    {
-        distance      = 0;
-        curvature     = 0;
-        max_curvature = 0;
-    }
-};
 
 std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length_limit)
 {
@@ -205,7 +188,6 @@ std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length
     Polyline                   pl = e->as_polyline();
     std::vector<ExtrusionLine> lines;
     lines.reserve(pl.points.size() * 1.5f);
-    lines.emplace_back(unscaled(pl.points[0]).cast<float>(), unscaled(pl.points[0]).cast<float>(), e);
     for (int point_idx = 0; point_idx < int(pl.points.size()) - 1; ++point_idx) {
         Vec2f start        = unscaled(pl.points[point_idx]).cast<float>();
         Vec2f next         = unscaled(pl.points[point_idx + 1]).cast<float>();
@@ -217,168 +199,199 @@ std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length
         for (int i = 0; i < lines_count; ++i) {
             Vec2f a(start + v * (i * step_size));
             Vec2f b(start + v * ((i + 1) * step_size));
-            lines.emplace_back(a, b, e);
+            lines.emplace_back(a, b, (a-b).norm(), e);
         }
     }
     return lines;
 }
 
-std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntity *entity,
-                                                            const LayerRegion     *layer_region,
-                                                            const LD              &prev_layer_lines,
-                                                            const Params          &params)
+float estimate_curled_up_height(
+    const ExtendedPoint &point, float layer_height, float flow_width, float prev_line_curled_height, Params params)
+{
+    float curled_up_height = 0.0f;
+    if (fabs(point.distance) < 1.5 * flow_width) {
+        curled_up_height = 0.85 * prev_line_curled_height;
+    }
+    if (point.distance > params.malformation_distance_factors.first * flow_width &&
+        point.distance < params.malformation_distance_factors.second * flow_width && point.curvature > -0.1f) {
+        float dist_factor = std::max(point.distance - params.malformation_distance_factors.first * flow_width, 0.01f) /
+                            ((params.malformation_distance_factors.second - params.malformation_distance_factors.first) * flow_width);
+
+        curled_up_height = layer_height * sqrt(sqrt(dist_factor)) * std::clamp(3.0f * point.curvature, 1.0f, 3.0f);
+        curled_up_height = std::min(curled_up_height, params.max_curled_height_factor * layer_height);
+    }
+
+    return curled_up_height;
+}
+
+std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntity                      *entity,
+                                                            const LayerRegion                          *layer_region,
+                                                            const LD                                   &prev_layer_lines,
+                                                            const AABBTreeLines::LinesDistancer<Linef> &prev_layer_boundary,
+                                                            const Params                               &params)
 {
     if (entity->is_collection()) {
         std::vector<ExtrusionLine> checked_lines_out;
         checked_lines_out.reserve(prev_layer_lines.get_lines().size() / 3);
         for (const auto *e : static_cast<const ExtrusionEntityCollection *>(entity)->entities) {
-            auto tmp = check_extrusion_entity_stability(e, layer_region, prev_layer_lines, params);
+            auto tmp = check_extrusion_entity_stability(e, layer_region, prev_layer_lines, prev_layer_boundary, params);
             checked_lines_out.insert(checked_lines_out.end(), tmp.begin(), tmp.end());
         }
         return checked_lines_out;
-    } else { // single extrusion path, with possible varying parameters
-        if (entity->length() < scale_(params.min_distance_to_allow_local_supports)) { return {}; }
-
-        std::vector<ExtrusionLine> lines = to_short_lines(entity, params.bridge_distance);
-
-        ExtrusionPropertiesAccumulator bridging_acc{};
-        ExtrusionPropertiesAccumulator malformation_acc{};
-        bridging_acc.add_distance(params.bridge_distance + 1.0f);
-        const float flow_width            = get_flow_width(layer_region, entity->role());
-        float       min_malformation_dist = flow_width - params.malformation_overlap_factor.first * flow_width;
-        float       max_malformation_dist = flow_width - params.malformation_overlap_factor.second * flow_width;
-
-        for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
-            ExtrusionLine &current_line = lines[line_idx];
-            if (line_idx + 1 == lines.size() && current_line.b != lines.begin()->a) {
-                bridging_acc.add_distance(params.bridge_distance + 1.0f);
-            }
-            float curr_angle = 0;
-            if (line_idx + 1 < lines.size()) {
-                const Vec2f v1 = current_line.b - current_line.a;
-                const Vec2f v2 = lines[line_idx + 1].b - lines[line_idx + 1].a;
-                curr_angle     = angle(v1, v2);
-            }
-            bridging_acc.add_angle(curr_angle);
-            // malformation in concave angles does not happen
-            malformation_acc.add_angle(std::max(0.0f, curr_angle));
-            if (curr_angle < -20.0 * PI / 180.0) { malformation_acc.reset(); }
-
-            auto [dist_from_prev_layer, nearest_line_idx, nearest_point] = prev_layer_lines.signed_distance_from_lines_extra(current_line.b);
-            if (dist_from_prev_layer < flow_width) {
-                bridging_acc.reset();
-            } else {
-                bridging_acc.add_distance(current_line.len);
-                // if unsupported distance is larger than bridge distance linearly decreased by curvature, enforce supports.
-                bool in_layer_dist_condition = bridging_acc.distance >
-                                               params.bridge_distance / (1.0f + (bridging_acc.max_curvature *
-                                                                                 params.bridge_distance_decrease_by_curvature_factor / PI));
-                bool between_layers_condition = dist_from_prev_layer > max_malformation_dist;
-                if (in_layer_dist_condition && between_layers_condition) {
-                    current_line.support_point_generated = true;
-                    bridging_acc.reset();
-                }
-            }
-
-            // malformation propagation from below
-            if (fabs(dist_from_prev_layer) < 2.0f * flow_width) {
-                const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
-                current_line.malformation += 0.85 * nearest_line.malformation;
-            }
-            // current line maformation
-            if (dist_from_prev_layer > min_malformation_dist && dist_from_prev_layer < max_malformation_dist) {
-                float factor = std::abs(dist_from_prev_layer - (max_malformation_dist + min_malformation_dist) * 0.5) /
-                               (max_malformation_dist - min_malformation_dist);
-                malformation_acc.add_distance(current_line.len);
-                current_line.malformation += layer_region->layer()->height * factor * (2.0f + 3.0f * (malformation_acc.max_curvature / PI));
-                current_line.malformation = std::min(current_line.malformation,
-                                                     float(layer_region->layer()->height * params.max_malformation_factor));
-            } else {
-                malformation_acc.reset();
-            }
+    } else if (entity->role().is_bridge() && !entity->role().is_perimeter()) {
+        // pure bridges are handled separately, beacuse we need to align the forward and backward direction support points
+        if (entity->length() < scale_(params.min_distance_to_allow_local_supports)) {
+            return {};
         }
-        return lines;
+        const float                flow_width       = get_flow_width(layer_region, entity->role());
+        std::vector<ExtendedPoint> annotated_points = estimate_points_properties<true, true, true, true>(entity->as_polyline().points,
+                                                                                                         prev_layer_boundary, flow_width,
+                                                                                                         params.bridge_distance);
+
+        std::vector<ExtrusionLine> lines_out;
+        lines_out.reserve(annotated_points.size());
+        float bridged_distance = 0.0f;
+
+        std::optional<Vec2d> bridging_dir{};
+
+        for (size_t i = 0; i < annotated_points.size(); ++i) {
+            ExtendedPoint &curr_point = annotated_points[i];
+            const ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+
+            SupportPointCause potential_cause = std::abs(curr_point.curvature) > 0.1 ? SupportPointCause::FloatingBridgeAnchor :
+                                                                                       SupportPointCause::LongBridge;
+            float             line_len        = (prev_point.position - curr_point.position).norm();
+            Vec2d line_dir = line_len > EPSILON ? Vec2d((curr_point.position - prev_point.position) / double(line_len)) : Vec2d::Zero();
+
+            ExtrusionLine line_out{prev_point.position.cast<float>(), curr_point.position.cast<float>(), line_len, entity};
+
+            float max_bridge_len = std::max(params.support_points_interface_radius * 2.0f,
+                                            params.bridge_distance /
+                                                ((1.0f + std::abs(curr_point.curvature)) * (1.0f + std::abs(curr_point.curvature)) *
+                                                 (1.0f + std::abs(curr_point.curvature))));
+
+            if (!bridging_dir.has_value() && curr_point.distance > flow_width && line_len > params.bridge_distance * 0.6) {
+                bridging_dir = line_dir;
+            }
+
+            if (curr_point.distance > flow_width && potential_cause == SupportPointCause::LongBridge && bridging_dir.has_value() &&
+                bridging_dir->dot(line_dir) < 0.8) { // skip backward direction of bridge - supported by forward points enough
+                bridged_distance += line_len;
+            } else if (curr_point.distance > flow_width) {
+                bridged_distance += line_len;
+                if (bridged_distance > max_bridge_len) {
+                    bridged_distance                 = 0.0f;
+                    line_out.support_point_generated = potential_cause;
+                }
+            } else {
+                bridged_distance = 0.0f;
+            }
+
+            lines_out.push_back(line_out);
+        }
+        return lines_out;
+
+    } else { // single extrusion path, with possible varying parameters
+        if (entity->length() < scale_(params.min_distance_to_allow_local_supports)) {
+            return {};
+        }
+
+        const float flow_width = get_flow_width(layer_region, entity->role());
+        // Compute only unsigned distance - prev_layer_lines can contain unconnected paths, thus the sign of the distance is unreliable
+        std::vector<ExtendedPoint> annotated_points = estimate_points_properties<true, true, false, false>(entity->as_polyline().points,
+                                                                                                           prev_layer_lines, flow_width,
+                                                                                                           params.bridge_distance);
+
+        std::vector<ExtrusionLine> lines_out;
+        lines_out.reserve(annotated_points.size());
+        float bridged_distance = annotated_points.front().position != annotated_points.back().position ? (params.bridge_distance + 1.0f) :
+                                                                                                         0.0f;
+        for (size_t i = 0; i < annotated_points.size(); ++i) {
+            ExtendedPoint       &curr_point = annotated_points[i];
+            const ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+            float                line_len   = (prev_point.position - curr_point.position).norm();
+            ExtrusionLine        line_out{prev_point.position.cast<float>(), curr_point.position.cast<float>(), line_len, entity};
+
+            const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
+                                                              prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
+                                                              ExtrusionLine{};
+
+            // correctify the distance sign using slice polygons
+            float sign = (prev_layer_boundary.distance_from_lines<true>(curr_point.position) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
+            curr_point.distance *= sign;
+
+            SupportPointCause potential_cause = SupportPointCause::FloatingExtrusion;
+            if (bridged_distance + line_len > params.bridge_distance * 0.8 && std::abs(curr_point.curvature) < 0.1) {
+                potential_cause = SupportPointCause::FloatingExtrusion;
+            }
+
+            float max_bridge_len = std::max(params.support_points_interface_radius * 2.0f,
+                                            params.bridge_distance /
+                                                ((1.0f + std::abs(curr_point.curvature)) * (1.0f + std::abs(curr_point.curvature)) *
+                                                 (1.0f + std::abs(curr_point.curvature))));
+
+            if (curr_point.distance > 1.2f * flow_width) {
+                line_out.form_quality = 0.8f;
+                bridged_distance += line_len;
+                if (bridged_distance > max_bridge_len) {
+                    line_out.support_point_generated = potential_cause;
+                    bridged_distance                 = 0.0f;
+                }
+            } else if (curr_point.distance > flow_width * 0.8f) {
+                bridged_distance += line_len;
+                line_out.form_quality = nearest_prev_layer_line.form_quality - 0.3f;
+                if (line_out.form_quality < 0 && bridged_distance > max_bridge_len) {
+                    line_out.support_point_generated = potential_cause;
+                    line_out.form_quality            = 0.5f;
+                    bridged_distance                 = 0.0f;
+                }
+            } else {
+                bridged_distance = 0.0f;
+            }
+
+            line_out.curled_up_height = estimate_curled_up_height(curr_point, layer_region->layer()->height, flow_width,
+                                                                  nearest_prev_layer_line.curled_up_height, params);
+
+            lines_out.push_back(line_out);
+        }
+
+        return lines_out;
     }
 }
-
-// returns triangle area, first_moment_of_area_xy, second_moment_of_area_xy, second_moment_of_area_covariance
-// none of the values is divided/normalized by area.
-// The function computes intgeral over the area of the triangle, with function f(x,y) = x for first moments of area (y is analogous)
-// f(x,y) = x^2 for second moment of area
-// and f(x,y) = x*y for second moment of area covariance
-std::tuple<float, Vec2f, Vec2f, float> compute_triangle_moments_of_area(const Vec2f &a, const Vec2f &b, const Vec2f &c)
-{
-    // based on the following guide:
-    // Denote the vertices of S by a, b, c. Then the map
-    //  g:(u,v)↦a+u(b−a)+v(c−a) ,
-    //  which in coordinates appears as
-    //  g:(u,v)↦{x(u,v)y(u,v)=a1+u(b1−a1)+v(c1−a1)=a2+u(b2−a2)+v(c2−a2) ,(1)
-    //  obviously maps S′ bijectively onto S. Therefore the transformation formula for multiple integrals steps into action, and we obtain
-    //  ∫Sf(x,y)d(x,y)=∫S′f(x(u,v),y(u,v))∣∣Jg(u,v)∣∣ d(u,v) .
-    //  In the case at hand the Jacobian determinant is a constant: From (1) we obtain
-    //  Jg(u,v)=det[xuyuxvyv]=(b1−a1)(c2−a2)−(c1−a1)(b2−a2) .
-    //  Therefore we can write
-    //  ∫Sf(x,y)d(x,y)=∣∣Jg∣∣∫10∫1−u0f~(u,v) dv du ,
-    //  where f~ denotes the pullback of f to S′:
-    //  f~(u,v):=f(x(u,v),y(u,v)) .
-    //  Don't forget taking the absolute value of Jg!
-
-    float jacobian_determinant_abs = std::abs((b.x() - a.x()) * (c.y() - a.y()) - (c.x() - a.x()) * (b.y() - a.y()));
-
-    // coordinate transform: gx(u,v) = a.x + u * (b.x - a.x) + v * (c.x - a.x)
-    // coordinate transform: gy(u,v) = a.y + u * (b.y - a.y) + v * (c.y - a.y)
-    // second moment of area for x: f(x, y) = x^2;
-    //              f(gx(u,v), gy(u,v)) = gx(u,v)^2 = ... (long expanded form)
-
-    // result is Int_T func = jacobian_determinant_abs * Int_0^1 Int_0^1-u func(gx(u,v), gy(u,v)) dv du
-    // integral_0^1 integral_0^(1 - u) (a + u (b - a) + v (c - a))^2 dv du = 1/12 (a^2 + a (b + c) + b^2 + b c + c^2)
-
-    Vec2f second_moment_of_area_xy = jacobian_determinant_abs *
-                                     (a.cwiseProduct(a) + b.cwiseProduct(b) + b.cwiseProduct(c) + c.cwiseProduct(c) +
-                                      a.cwiseProduct(b + c)) /
-                                     12.0f;
-    // second moment of area covariance : f(x, y) = x*y;
-    //              f(gx(u,v), gy(u,v)) = gx(u,v)*gy(u,v) = ... (long expanded form)
-    //(a_1 + u * (b_1 - a_1) + v * (c_1 - a_1)) * (a_2 + u * (b_2 - a_2) + v * (c_2 - a_2))
-    // ==    (a_1 + u (b_1 - a_1) + v (c_1 - a_1)) (a_2 + u (b_2 - a_2) + v (c_2 - a_2))
-
-    // intermediate result: integral_0^(1 - u) (a_1 + u (b_1 - a_1) + v (c_1 - a_1)) (a_2 + u (b_2 - a_2) + v (c_2 - a_2)) dv =
-    //  1/6 (u - 1) (-c_1 (u - 1) (a_2 (u - 1) - 3 b_2 u) - c_2 (u - 1) (a_1 (u - 1) - 3 b_1 u + 2 c_1 (u - 1)) + 3 b_1 u (a_2 (u - 1) - 2
-    //  b_2 u) + a_1 (u - 1) (3 b_2 u - 2 a_2 (u - 1))) result = integral_0^1 1/6 (u - 1) (-c_1 (u - 1) (a_2 (u - 1) - 3 b_2 u) - c_2 (u -
-    //  1) (a_1 (u - 1) - 3 b_1 u + 2 c_1 (u - 1)) + 3 b_1 u (a_2 (u - 1) - 2 b_2 u) + a_1 (u - 1) (3 b_2 u - 2 a_2 (u - 1))) du =
-    //   1/24 (a_2 (b_1 + c_1) + a_1 (2 a_2 + b_2 + c_2) + b_2 c_1 + b_1 c_2 + 2 b_1 b_2 + 2 c_1 c_2)
-    //  result is Int_T func = jacobian_determinant_abs * Int_0^1 Int_0^1-u func(gx(u,v), gy(u,v)) dv du
-    float second_moment_of_area_covariance = jacobian_determinant_abs * (1.0f / 24.0f) *
-                                             (a.y() * (b.x() + c.x()) + a.x() * (2.0f * a.y() + b.y() + c.y()) + b.y() * c.x() +
-                                              b.x() * c.y() + 2.0f * b.x() * b.y() + 2.0f * c.x() * c.y());
-
-    float area = jacobian_determinant_abs * 0.5f;
-
-    Vec2f first_moment_of_area_xy = jacobian_determinant_abs * (a + b + c) / 6.0f;
-
-    return {area, first_moment_of_area_xy, second_moment_of_area_xy, second_moment_of_area_covariance};
-};
 
 SliceConnection estimate_slice_connection(size_t slice_idx, const Layer *layer)
 {
     SliceConnection connection;
 
     const LayerSlice   &slice       = layer->lslices_ex[slice_idx];
-    ExPolygon           slice_poly  = layer->lslices[slice_idx];
+    Polygons           slice_polys  = to_polygons(layer->lslices[slice_idx]);
+    BoundingBox slice_bb = get_extents(slice_polys);
     const Layer        *lower_layer = layer->lower_layer;
 
-    ExPolygons below_polys{};
-    for (const auto &link : slice.overlaps_below) { below_polys.push_back(lower_layer->lslices[link.slice_idx]); }
-    ExPolygons overlap = intersection_ex({slice_poly}, below_polys);
+    ExPolygons below{};
+    for (const auto &link : slice.overlaps_below) { below.push_back(lower_layer->lslices[link.slice_idx]); }
+    Polygons below_polys = to_polygons(below);
 
-    std::vector<Vec2f> triangles = triangulate_expolygons_2f(overlap);
-    for (size_t idx = 0; idx < triangles.size(); idx += 3) {
-        auto [area, first_moment_of_area, second_moment_area,
-              second_moment_of_area_covariance] = compute_triangle_moments_of_area(triangles[idx], triangles[idx + 1], triangles[idx + 2]);
-        connection.area += area;
-        connection.centroid_accumulator += Vec3f(first_moment_of_area.x(), first_moment_of_area.y(), layer->print_z * area);
-        connection.second_moment_of_area_accumulator += second_moment_area;
-        connection.second_moment_of_area_covariance_accumulator += second_moment_of_area_covariance;
+    BoundingBox below_bb = get_extents(below_polys);
+
+    Polygons overlap = intersection(ClipperUtils::clip_clipper_polygons_with_subject_bbox(slice_polys, below_bb),
+                                    ClipperUtils::clip_clipper_polygons_with_subject_bbox(below_polys, slice_bb));
+
+    for (const Polygon &poly : overlap) {
+        Vec2f p0 = unscaled(poly.first_point()).cast<float>();
+        for (size_t i = 2; i < poly.points.size(); i++) {
+            Vec2f p1 = unscaled(poly.points[i - 1]).cast<float>();
+            Vec2f p2 = unscaled(poly.points[i]).cast<float>();
+
+            float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
+
+            auto [area, first_moment_of_area, second_moment_area,
+                  second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
+            connection.area += sign * area;
+            connection.centroid_accumulator += sign * Vec3f(first_moment_of_area.x(), first_moment_of_area.y(), layer->print_z * area);
+            connection.second_moment_of_area_accumulator += sign * second_moment_area;
+            connection.second_moment_of_area_covariance_accumulator += sign * second_moment_of_area_covariance;
+        }
     }
 
     return connection;
@@ -393,11 +406,13 @@ public:
     Vec3f sticking_centroid_accumulator              = Vec3f::Zero();
     Vec2f sticking_second_moment_of_area_accumulator = Vec2f::Zero();
     float sticking_second_moment_of_area_covariance_accumulator{};
+    bool  connected_to_bed = false;
 
     ObjectPart() = default;
 
     void add(const ObjectPart &other)
     {
+        this->connected_to_bed = this->connected_to_bed || other.connected_to_bed;
         this->volume_centroid_accumulator += other.volume_centroid_accumulator;
         this->volume += other.volume;
         this->sticking_area += other.sticking_area;
@@ -460,7 +475,7 @@ public:
         return elastic_section_modulus;
     }
 
-    float is_stable_while_extruding(const SliceConnection &connection,
+    std::tuple<float, SupportPointCause> is_stable_while_extruding(const SliceConnection &connection,
                                     const ExtrusionLine   &extruded_line,
                                     const Vec3f           &extreme_point,
                                     float                  layer_z,
@@ -474,11 +489,11 @@ public:
         float movement_force = params.max_acceleration * mass;
 
         float extruder_conflict_force = params.standard_extruder_conflict_force +
-                                        std::min(extruded_line.malformation, 1.0f) * params.malformations_additive_conflict_extruder_force;
+                                        std::min(extruded_line.curled_up_height, 1.0f) * params.malformations_additive_conflict_extruder_force;
 
         // section for bed calculations
         {
-            if (this->sticking_area < EPSILON) return 1.0f;
+            if (this->sticking_area < EPSILON) return {1.0f, SupportPointCause::UnstableFloatingPart};
 
             Vec3f bed_centroid     = this->sticking_centroid_accumulator / this->sticking_area;
             float bed_yield_torque = -compute_elastic_section_modulus(line_dir, extreme_point, this->sticking_centroid_accumulator,
@@ -507,27 +522,31 @@ public:
 #ifdef DETAILED_DEBUG_LOGS
             BOOST_LOG_TRIVIAL(debug) << "bed_centroid: " << bed_centroid.x() << "  " << bed_centroid.y() << "  " << bed_centroid.z();
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_yield_torque: " << bed_yield_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_arm: " << bed_weight_arm;
+            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_arm: " << bed_weight_arm_len;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_torque: " << bed_weight_torque;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_arm: " << bed_movement_arm;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_torque: " << bed_movement_torque;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_conflict_torque_arm: " << bed_conflict_torque_arm;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.malformation: " << extruded_line.malformation;
+            BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.curled_up_height: " << extruded_line.curled_up_height;
+            BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.form_quality: " << extruded_line.form_quality;
             BOOST_LOG_TRIVIAL(debug) << "SSG: extruder_conflict_force: " << extruder_conflict_force;
             BOOST_LOG_TRIVIAL(debug) << "SSG: bed_extruder_conflict_torque: " << bed_extruder_conflict_torque;
             BOOST_LOG_TRIVIAL(debug) << "SSG: total_torque: " << bed_total_torque << "   layer_z: " << layer_z;
 #endif
 
-            if (bed_total_torque > 0) return bed_total_torque / bed_conflict_torque_arm;
+            if (bed_total_torque > 0) {
+                return {bed_total_torque / bed_conflict_torque_arm,
+                        (this->connected_to_bed ? SupportPointCause::SeparationFromBed : SupportPointCause::UnstableFloatingPart)};
+            }
         }
 
         // section for weak connection calculations
         {
-            if (connection.area < EPSILON) return 1.0f;
+            if (connection.area < EPSILON) return {1.0f, SupportPointCause::UnstableFloatingPart};
 
             Vec3f conn_centroid = connection.centroid_accumulator / connection.area;
 
-            if (layer_z - conn_centroid.z() < 3.0f) { return -1.0f; }
+            if (layer_z - conn_centroid.z() < 3.0f) { return {-1.0f, SupportPointCause::WeakObjectPart}; }
             float conn_yield_torque = compute_elastic_section_modulus(line_dir, extreme_point, connection.centroid_accumulator,
                                                                       connection.second_moment_of_area_accumulator,
                                                                       connection.second_moment_of_area_covariance_accumulator,
@@ -535,7 +554,11 @@ public:
                                       params.material_yield_strength;
 
             float conn_weight_arm    = (conn_centroid.head<2>() - mass_centroid.head<2>()).norm();
-            float conn_weight_torque = conn_weight_arm * weight * (conn_centroid.z() / layer_z);
+            if (layer_z - conn_centroid.z() < 30.0) {
+                conn_weight_arm = 0.0f; // Given that we do not have very good info about the weight distribution between the connection and current layer,
+                // do not consider the weight until quite far away from the weak connection segment
+            }
+            float conn_weight_torque = conn_weight_arm * weight * (1.0f - conn_centroid.z() / layer_z) * (1.0f - conn_centroid.z() / layer_z);
 
             float conn_movement_arm    = std::max(0.0f, mass_centroid.z() - conn_centroid.z());
             float conn_movement_torque = movement_force * conn_movement_arm;
@@ -546,7 +569,7 @@ public:
             float conn_total_torque = conn_movement_torque + conn_extruder_conflict_torque + conn_weight_torque - conn_yield_torque;
 
 #ifdef DETAILED_DEBUG_LOGS
-            BOOST_LOG_TRIVIAL(debug) << "bed_centroid: " << conn_centroid.x() << "  " << conn_centroid.y() << "  " << conn_centroid.z();
+            BOOST_LOG_TRIVIAL(debug) << "conn_centroid: " << conn_centroid.x() << "  " << conn_centroid.y() << "  " << conn_centroid.z();
             BOOST_LOG_TRIVIAL(debug) << "SSG: conn_yield_torque: " << conn_yield_torque;
             BOOST_LOG_TRIVIAL(debug) << "SSG: conn_weight_arm: " << conn_weight_arm;
             BOOST_LOG_TRIVIAL(debug) << "SSG: conn_weight_torque: " << conn_weight_torque;
@@ -557,18 +580,20 @@ public:
             BOOST_LOG_TRIVIAL(debug) << "SSG: total_torque: " << conn_total_torque << "   layer_z: " << layer_z;
 #endif
 
-            return conn_total_torque / conn_conflict_torque_arm;
+            return {conn_total_torque / conn_conflict_torque_arm, SupportPointCause::WeakObjectPart};
         }
     }
 };
 
 // return new object part and actual area covered by extrusions
-std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &slice, const Layer *layer)
+std::tuple<ObjectPart, float> build_object_part_from_slice(const size_t &slice_idx, const Layer *layer, const Params& params)
 {
     ObjectPart new_object_part;
     float      area_covered_by_extrusions = 0;
+    const LayerSlice& slice = layer->lslices_ex.at(slice_idx);
 
-    auto add_extrusions_to_object = [&new_object_part, &area_covered_by_extrusions](const ExtrusionEntity *e, const LayerRegion *region) {
+    auto add_extrusions_to_object = [&new_object_part, &area_covered_by_extrusions, &params](const ExtrusionEntity *e,
+                                                                                             const LayerRegion     *region) {
         float                      flow_width = get_flow_width(region, e->role());
         const Layer               *l          = region->layer();
         float                      slice_z    = l->slice_z;
@@ -580,8 +605,9 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &sli
             new_object_part.volume += volume;
             new_object_part.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), slice_z) * volume;
 
-            if (l->id() == 0) { // first layer
-                float sticking_area = line.len * flow_width;
+            if (l->id() == params.raft_layers_count) { // layer attached on bed/raft
+                new_object_part.connected_to_bed = true;
+                float sticking_area              = line.len * flow_width;
                 new_object_part.sticking_area += sticking_area;
                 Vec2f middle = Vec2f((line.a + line.b) / 2.0f);
                 new_object_part.sticking_centroid_accumulator += sticking_area * to_3d(middle, slice_z);
@@ -617,9 +643,55 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const LayerSlice &sli
                 }
             }
         }
-        const LayerRegion *thin_fill_region = layer->get_region(island.fill_region_id);
         for (const auto &thin_fill_idx : island.thin_fills) {
-            add_extrusions_to_object(thin_fill_region->thin_fills().entities[thin_fill_idx], perimeter_region);
+            add_extrusions_to_object(perimeter_region->thin_fills().entities[thin_fill_idx], perimeter_region);
+        }
+    }
+
+    //  BRIM HANDLING
+    if (layer->id() == params.raft_layers_count && params.raft_layers_count == 0 && params.brim_type != BrimType::btNoBrim &&
+        params.brim_width > 0.0) {
+        // TODO: The algorithm here should take into account that multiple slices may have coliding Brim areas and the final brim area is
+        // smaller,
+        //  thus has lower adhesion. For now this effect will be neglected.
+        ExPolygon  slice_poly = layer->lslices[slice_idx];
+        ExPolygons brim;
+        if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btOuterOnly) {
+            Polygon brim_hole = slice_poly.contour;
+            brim_hole.reverse();
+            Polygons c = expand(slice_poly.contour, scale_(params.brim_width)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
+            if (!c.empty()) {
+                brim.push_back(ExPolygon{c.front(), brim_hole});
+            }
+        }
+        if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btInnerOnly) {
+            Polygons brim_contours = slice_poly.holes;
+            polygons_reverse(brim_contours);
+            for (const Polygon &brim_contour : brim_contours) {
+                Polygons brim_holes = shrink({brim_contour}, scale_(params.brim_width));
+                polygons_reverse(brim_holes);
+                ExPolygon inner_brim{brim_contour};
+                inner_brim.holes = brim_holes;
+                brim.push_back(inner_brim);
+            }
+        }
+
+        for (const Polygon &poly : to_polygons(brim)) {
+            Vec2f p0 = unscaled(poly.first_point()).cast<float>();
+            for (size_t i = 2; i < poly.points.size(); i++) {
+                Vec2f p1 = unscaled(poly.points[i - 1]).cast<float>();
+                Vec2f p2 = unscaled(poly.points[i]).cast<float>();
+
+                float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
+
+                auto [area, first_moment_of_area, second_moment_area,
+                      second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
+                new_object_part.sticking_area += sign * area;
+                new_object_part.sticking_centroid_accumulator += sign * Vec3f(first_moment_of_area.x(), first_moment_of_area.y(),
+                                                                              layer->print_z * area);
+                new_object_part.sticking_second_moment_of_area_accumulator += sign * second_moment_area;
+                new_object_part.sticking_second_moment_of_area_covariance_accumulator += sign * second_moment_of_area_covariance;
+            }
         }
     }
 
@@ -665,11 +737,12 @@ public:
     }
 };
 
-SupportPoints check_stability(const PrintObject *po, const Params &params)
+std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po, const PrintTryCancel &cancel_func, const Params &params)
 {
-    SupportPoints            supp_points{};
+    SupportPoints     supp_points{};
     SupportGridFilter supports_presence_grid(po, params.min_distance_between_support_points);
     ActiveObjectParts active_object_parts{};
+    PartialObjects    partial_objects{};
     LD                prev_layer_ext_perim_lines;
 
     std::unordered_map<size_t, size_t>          prev_slice_idx_to_object_part_mapping;
@@ -677,14 +750,23 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
     std::unordered_map<size_t, SliceConnection> prev_slice_idx_to_weakest_connection;
     std::unordered_map<size_t, SliceConnection> next_slice_idx_to_weakest_connection;
 
+    auto remember_partial_object = [&active_object_parts, &partial_objects](size_t object_part_id) {
+        auto object_part = active_object_parts.access(object_part_id);
+        if (object_part.volume > EPSILON) {
+            partial_objects.emplace_back(object_part.volume_centroid_accumulator / object_part.volume, object_part.volume,
+                                         object_part.connected_to_bed);
+        }
+    };
+
     for (size_t layer_idx = 0; layer_idx < po->layer_count(); ++layer_idx) {
+        cancel_func();
         const Layer *layer                 = po->get_layer(layer_idx);
         float        bottom_z              = layer->bottom_z();
         auto create_support_point_position = [bottom_z](const Vec2f &layer_pos) { return Vec3f{layer_pos.x(), layer_pos.y(), bottom_z}; };
 
         for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
             const LayerSlice &slice             = layer->lslices_ex.at(slice_idx);
-            auto [new_part, covered_area]       = build_object_part_from_slice(slice, layer);
+            auto [new_part, covered_area]       = build_object_part_from_slice(slice_idx, layer, params);
             SliceConnection connection_to_below = estimate_slice_connection(slice_idx, layer);
 
 #ifdef DETAILED_DEBUG_LOGS
@@ -713,7 +795,10 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
 
                     final_part_id = *parts_ids.begin();
                     for (size_t part_id : parts_ids) {
-                        if (final_part_id != part_id) { active_object_parts.merge(part_id, final_part_id); }
+                        if (final_part_id != part_id) {
+                            remember_partial_object(part_id);
+                            active_object_parts.merge(part_id, final_part_id);
+                        }
                     }
                 }
                 auto estimate_conn_strength = [bottom_z](const SliceConnection &conn) {
@@ -757,6 +842,15 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
             const LayerSlice          &slice        = layer->lslices_ex.at(slice_idx);
             ObjectPart                &part         = active_object_parts.access(prev_slice_idx_to_object_part_mapping[slice_idx]);
             SliceConnection           &weakest_conn = prev_slice_idx_to_weakest_connection[slice_idx];
+
+            std::vector<Linef> boundary_lines;
+            for (const auto &link : slice.overlaps_below) { 
+                auto ls = to_unscaled_linesf({layer->lower_layer->lslices[link.slice_idx]});
+                boundary_lines.insert(boundary_lines.end(), ls.begin(), ls.end());
+            }
+            AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary{std::move(boundary_lines)};
+
+
             std::vector<ExtrusionLine> current_slice_ext_perims_lines{};
             current_slice_ext_perims_lines.reserve(prev_layer_ext_perim_lines.get_lines().size() / layer->lslices_ex.size());
 #ifdef DETAILED_DEBUG_LOGS
@@ -765,15 +859,26 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
             // Function that is used when new support point is generated. It will update the ObjectPart stability, weakest conneciton info,
             // and the support presence grid and add the point to the issues.
             auto reckon_new_support_point = [&part, &weakest_conn, &supp_points, &supports_presence_grid, &params,
-                                             &layer_idx](const Vec3f &support_point, float force, const Vec2f &dir) {
-                if (supports_presence_grid.position_taken(support_point) || layer_idx <= 1) { return; }
+                                             &layer_idx](SupportPointCause cause, const Vec3f &support_point, float force,
+                                                         const Vec2f &dir) {
+                // if position is taken and point is for global stability (force > 0) or we are too close to the bed, do not add
+                // This allows local support points (e.g. bridging) to be generated densely
+                if ((supports_presence_grid.position_taken(support_point) && force > 0) || layer_idx <= 1) {
+                    return;
+                }
+
                 float area = params.support_points_interface_radius * params.support_points_interface_radius * float(PI);
-                part.add_support_point(support_point, area);
+                // add the stability effect of the point only if the spot is not taken, so that the densely created local support points do
+                // not add unrealistic amount of stability to the object (due to overlaping of local support points)
+                if (!(supports_presence_grid.position_taken(support_point))) {
+                    part.add_support_point(support_point, area);
+                }
 
                 float radius = params.support_points_interface_radius;
-                supp_points.emplace_back(support_point, force, radius, dir);
+                supp_points.emplace_back(cause, support_point, force, radius, dir);
                 supports_presence_grid.take_position(support_point);
 
+                // The support point also increases the stability of the weakest connection of the object, which should be reflected
                 if (weakest_conn.area > EPSILON) { // Do not add it to the weakest connection if it is not valid - does not exist
                     weakest_conn.area += area;
                     weakest_conn.centroid_accumulator += support_point * area;
@@ -790,11 +895,13 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
                     const LayerRegion *fill_region = layer->get_region(fill_range.region());
                     for (const auto &fill_idx : fill_range) {
                         const ExtrusionEntity *entity = fill_region->fills().entities[fill_idx];
-                        if (entity->role() == erBridgeInfill) {
+                        if (entity->role() == ExtrusionRole::BridgeInfill) {
                             for (const ExtrusionLine &bridge :
-                                 check_extrusion_entity_stability(entity, fill_region, prev_layer_ext_perim_lines, params)) {
-                                if (bridge.support_point_generated) {
-                                    reckon_new_support_point(create_support_point_position(bridge.b), -EPSILON, Vec2f::Zero());
+                                 check_extrusion_entity_stability(entity, fill_region, prev_layer_ext_perim_lines, prev_layer_boundary,
+                                                                  params)) {
+                                if (bridge.support_point_generated.has_value()) {
+                                    reckon_new_support_point(*bridge.support_point_generated, create_support_point_position(bridge.b),
+                                                             -EPSILON, Vec2f::Zero());
                                 }
                             }
                         }
@@ -805,30 +912,61 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
                 for (const auto &perimeter_idx : island.perimeters) {
                     const ExtrusionEntity     *entity = perimeter_region->perimeters().entities[perimeter_idx];
                     std::vector<ExtrusionLine> perims = check_extrusion_entity_stability(entity, perimeter_region,
-                                                                                         prev_layer_ext_perim_lines, params);
+                                                                                         prev_layer_ext_perim_lines, prev_layer_boundary,
+                                                                                         params);
                     for (const ExtrusionLine &perim : perims) {
-                        if (perim.support_point_generated) {
-                            reckon_new_support_point(create_support_point_position(perim.b), -EPSILON, Vec2f::Zero());
+                        if (perim.support_point_generated.has_value()) {
+                            reckon_new_support_point(*perim.support_point_generated, create_support_point_position(perim.b), -EPSILON,
+                                                     Vec2f::Zero());
                         }
-                        if (perim.is_external_perimeter()) { current_slice_ext_perims_lines.push_back(perim); }
+                        if (perim.is_external_perimeter()) {
+                            current_slice_ext_perims_lines.push_back(perim);
+                        }
                     }
                 }
+                // DEBUG EXPORT, NOT USED NOW
+                // if (BR_bridge) {
+                //     Lines scaledl;
+                //     for (const auto &l : prev_layer_boundary.get_lines()) {
+                //         scaledl.emplace_back(Point::new_scale(l.a), Point::new_scale(l.b));
+                //     }
+
+                //     Lines perimsl;
+                //     for (const auto &l : current_slice_ext_perims_lines) {
+                //         perimsl.emplace_back(Point::new_scale(l.a), Point::new_scale(l.b));
+                //     }
+
+                //     BoundingBox bb = get_extents(scaledl);
+                //     bb.merge(get_extents(perimsl));
+
+                //     ::Slic3r::SVG svg(debug_out_path(
+                //                           ("slice" + std::to_string(slice_idx) + "_" + std::to_string(layer_idx).c_str()).c_str()),
+                //                       get_extents(scaledl));
+                //     svg.draw(scaledl, "red", scale_(0.4));
+                //     svg.draw(perimsl, "blue", scale_(0.25));
+                    
+                    
+                //     svg.Close();
+                // }
             }
 
             LD    current_slice_lines_distancer(current_slice_ext_perims_lines);
             float unchecked_dist = params.min_distance_between_support_points + 1.0f;
 
             for (const ExtrusionLine &line : current_slice_ext_perims_lines) {
-                if ((unchecked_dist + line.len < params.min_distance_between_support_points && line.malformation < 0.3f) || line.len == 0) {
+                if ((unchecked_dist + line.len < params.min_distance_between_support_points && line.curled_up_height < params.curling_tolerance_limit) ||
+                    line.len < EPSILON) {
                     unchecked_dist += line.len;
                 } else {
                     unchecked_dist                = line.len;
                     Vec2f pivot_site_search_point = Vec2f(line.b + (line.b - line.a).normalized() * 300.0f);
                     auto [dist, nidx,
-                          nearest_point]          = current_slice_lines_distancer.signed_distance_from_lines_extra(pivot_site_search_point);
+                          nearest_point]          = current_slice_lines_distancer.distance_from_lines_extra<false>(pivot_site_search_point);
                     Vec3f support_point           = create_support_point_position(nearest_point);
-                    auto  force                   = part.is_stable_while_extruding(weakest_conn, line, support_point, bottom_z, params);
-                    if (force > 0) { reckon_new_support_point(support_point, force, (line.b - line.a).normalized()); }
+                    auto [force, cause]           = part.is_stable_while_extruding(weakest_conn, line, support_point, bottom_z, params);
+                    if (force > 0) {
+                        reckon_new_support_point(cause, support_point, force, (line.b - line.a).normalized());
+                    }
                 }
             }
             current_layer_ext_perims_lines.insert(current_layer_ext_perims_lines.end(), current_slice_ext_perims_lines.begin(),
@@ -836,11 +974,16 @@ SupportPoints check_stability(const PrintObject *po, const Params &params)
         } // slice iterations
         prev_layer_ext_perim_lines = LD(current_layer_ext_perims_lines);
     } // layer iterations
-    return supp_points;
+
+    for (const auto& active_obj_pair : prev_slice_idx_to_object_part_mapping) {
+        remember_partial_object(active_obj_pair.second);
+    }
+
+    return {supp_points, partial_objects};
 }
 
 #ifdef DEBUG_FILES
-void debug_export(Issues issues, std::string file_name)
+void debug_export(const SupportPoints& support_points,const PartialObjects& objects, std::string file_name)
 {
     Slic3r::CNumericLocalesSetter locales_setter;
     {
@@ -850,14 +993,28 @@ void debug_export(Issues issues, std::string file_name)
             return;
         }
 
-        for (size_t i = 0; i < issues.support_points.size(); ++i) {
-            if (issues.support_points[i].force <= 0) {
-                fprintf(fp, "v %f %f %f  %f %f %f\n", issues.support_points[i].position(0), issues.support_points[i].position(1),
-                        issues.support_points[i].position(2), 0.0, 1.0, 0.0);
-            } else {
-                fprintf(fp, "v %f %f %f  %f %f %f\n", issues.support_points[i].position(0), issues.support_points[i].position(1),
-                        issues.support_points[i].position(2), 1.0, 0.0, 0.0);
+        for (size_t i = 0; i < support_points.size(); ++i) {
+            Vec3f color{1.0f, 1.0f, 1.0f};
+            switch (support_points[i].cause) {
+            case SupportPointCause::FloatingBridgeAnchor: color = {0.863281f, 0.109375f, 0.113281f}; break; //RED
+            case SupportPointCause::LongBridge: color = {0.960938f, 0.90625f, 0.0625f}; break;  // YELLOW
+            case SupportPointCause::FloatingExtrusion: color = {0.921875f, 0.515625f, 0.101563f}; break; // ORANGE
+            case SupportPointCause::SeparationFromBed: color = {0.0f, 1.0f, 0.0}; break; // GREEN
+            case SupportPointCause::UnstableFloatingPart: color = {0.105469f, 0.699219f, 0.84375f}; break; // BLUE
+            case SupportPointCause::WeakObjectPart: color = {0.609375f, 0.210938f, 0.621094f}; break; // PURPLE
             }
+
+            fprintf(fp, "v %f %f %f  %f %f %f\n", support_points[i].position(0), support_points[i].position(1),
+                    support_points[i].position(2), color[0], color[1], color[2]);
+        }
+
+        for (size_t i = 0; i < objects.size(); ++i) {
+            Vec3f color{1.0f, 0.0f, 1.0f};
+            if (objects[i].connected_to_bed) {
+                color = {1.0f, 0.0f, 0.0f};
+            }
+            fprintf(fp, "v %f %f %f  %f %f %f\n", objects[i].centroid(0), objects[i].centroid(1), objects[i].centroid(2), color[0],
+                    color[1], color[2]);
         }
 
         fclose(fp);
@@ -865,116 +1022,85 @@ void debug_export(Issues issues, std::string file_name)
 }
 #endif
 
-// std::vector<size_t> quick_search(const PrintObject *po, const Params &params) {
-//     return {};
-// }
-SupportPoints full_search(const PrintObject *po, const Params &params)
+std::tuple<SupportPoints, PartialObjects> full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params)
 {
-    SupportPoints supp_points = check_stability(po, params);
+    auto results = check_stability(po, cancel_func, params);
 #ifdef DEBUG_FILES
-    debug_export(issues, "issues");
+    auto [supp_points, objects] = results;
+    debug_export(supp_points, objects, "issues");
 #endif
 
-    return supp_points;
+    return results;
 }
 
-
-struct LayerCurlingEstimator
-{
-    LD                                          prev_layer_lines;
-    Params                                      params;
-    std::function<float(const ExtrusionLine &)> flow_width_getter;
-
-    LayerCurlingEstimator(std::function<float(const ExtrusionLine &)> flow_width_getter, const Params &params)
-        : flow_width_getter(flow_width_getter), params(params)
-    {}
-
-    void estimate_curling(std::vector<ExtrusionLine> &extrusion_lines, Layer *l)
-    {
-        ExtrusionPropertiesAccumulator malformation_acc{};
-        for (size_t line_idx = 0; line_idx < extrusion_lines.size(); ++line_idx) {
-            ExtrusionLine &current_line = extrusion_lines[line_idx];
-
-            float flow_width = flow_width_getter(current_line);
-
-            float min_malformation_dist = flow_width - params.malformation_overlap_factor.first * flow_width;
-            float max_malformation_dist = flow_width - params.malformation_overlap_factor.second * flow_width;
-
-            float curr_angle = 0;
-            if (line_idx + 1 < extrusion_lines.size()) {
-                const Vec2f v1 = current_line.b - current_line.a;
-                const Vec2f v2 = extrusion_lines[line_idx + 1].b - extrusion_lines[line_idx + 1].a;
-                curr_angle     = angle(v1, v2);
-            }
-            // malformation in concave angles does not happen
-            malformation_acc.add_angle(std::max(0.0f, curr_angle));
-            if (curr_angle < -20.0 * PI / 180.0) { malformation_acc.reset(); }
-
-            auto [dist_from_prev_layer, nearest_line_idx, nearest_point] = prev_layer_lines.signed_distance_from_lines_extra(current_line.b);
-
-            if (fabs(dist_from_prev_layer) < 2.0f * flow_width) {
-                const ExtrusionLine &nearest_line = prev_layer_lines.get_line(nearest_line_idx);
-                current_line.malformation += 0.9 * nearest_line.malformation;
-            }
-            if (dist_from_prev_layer > min_malformation_dist && dist_from_prev_layer < max_malformation_dist) {
-                float factor = 0.5f + 0.5f * std::abs(dist_from_prev_layer - (max_malformation_dist + min_malformation_dist) * 0.5) /
-                                          (max_malformation_dist - min_malformation_dist);
-                malformation_acc.add_distance(current_line.len);
-                current_line.malformation += l->height * factor * (1.5f + 3.0f * (malformation_acc.max_curvature / PI));
-                current_line.malformation = std::min(current_line.malformation, float(l->height * params.max_malformation_factor));
-            } else {
-                malformation_acc.reset();
-            }
-        }
-
-        for (const ExtrusionLine &line : extrusion_lines) {
-            if (line.malformation > 0.3f) { l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)}); }
-        }
-        prev_layer_lines = LD(extrusion_lines);
-    }
-};
-
-
-void estimate_supports_malformations(SupportLayerPtrs &layers, float supports_flow_width, const Params &params)
+void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width, const Params &params)
 {
 #ifdef DEBUG_FILES
     FILE *debug_file = boost::nowide::fopen(debug_out_path("supports_malformations.obj").c_str(), "w");
+    FILE *full_file = boost::nowide::fopen(debug_out_path("supports_full.obj").c_str(), "w");
 #endif
-    auto flow_width_getter = [=](const ExtrusionLine& l) {
-        return supports_flow_width;
-    };
 
-    LayerCurlingEstimator lce{flow_width_getter, params};
+    AABBTreeLines::LinesDistancer<ExtrusionLine> prev_layer_lines{};
 
     for (SupportLayer *l : layers) {
-        std::vector<ExtrusionLine> extrusion_lines;
+        std::vector<ExtrusionLine> current_layer_lines;
+
         for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities) {
             Polyline pl = extrusion->as_polyline();
-            Polygon pol(pl.points);
+            Polygon  pol(pl.points);
             pol.make_counter_clockwise();
-            pl = pol.split_at_first_point();
-            for (int point_idx = 0; point_idx < int(pl.points.size() - 1); ++point_idx) {
-                Vec2f         start = unscaled(pl.points[point_idx]).cast<float>();
-                Vec2f         next  = unscaled(pl.points[point_idx + 1]).cast<float>();
-                ExtrusionLine line{start, next, extrusion};
-                extrusion_lines.push_back(line);
+
+            auto annotated_points = estimate_points_properties<true, true, false, false>(pol.points, prev_layer_lines, flow_width);
+
+            for (size_t i = 0; i < annotated_points.size(); ++i) {
+                ExtendedPoint &curr_point = annotated_points[i];
+                float          line_len   = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
+                ExtrusionLine  line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
+                                       curr_point.position.cast<float>(), line_len, extrusion};
+
+                const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
+                                                                  prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
+                                                                  ExtrusionLine{};
+
+                Vec2f v1 = (nearest_prev_layer_line.b - nearest_prev_layer_line.a);
+                Vec2f v2 = (curr_point.position.cast<float>() - nearest_prev_layer_line.a);
+                auto  d  = (v1.x() * v2.y()) - (v1.y() * v2.x());
+                if (d > 0) {
+                    curr_point.distance *= -1.0f;
+                }
+
+                line_out.curled_up_height = estimate_curled_up_height(curr_point, l->height, flow_width,
+                                                                      nearest_prev_layer_line.curled_up_height, params);
+
+                current_layer_lines.push_back(line_out);
             }
         }
 
-        lce.estimate_curling(extrusion_lines, l);
+        for (const ExtrusionLine &line : current_layer_lines) {
+            if (line.curled_up_height > params.curling_tolerance_limit) {
+                l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)});
+            }
+        }
 
 #ifdef DEBUG_FILES
-        for (const ExtrusionLine &line : extrusion_lines) {
-            if (line.malformation > 0.3f) {
-                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_malformation_factor, line.malformation);
+        for (const ExtrusionLine &line : current_layer_lines) {
+            if (line.curled_up_height > params.curling_tolerance_limit) {
+                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
                 fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
             }
         }
+        for (const ExtrusionLine &line : current_layer_lines) {
+            Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
+            fprintf(full_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
+        }
 #endif
+
+        prev_layer_lines = LD{current_layer_lines};
     }
 
 #ifdef DEBUG_FILES
     fclose(debug_file);
+    fclose(full_file);
 #endif
 }
 
@@ -982,52 +1108,159 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
 {
 #ifdef DEBUG_FILES
     FILE *debug_file = boost::nowide::fopen(debug_out_path("object_malformations.obj").c_str(), "w");
+    FILE *full_file = boost::nowide::fopen(debug_out_path("object_full.obj").c_str(), "w");
 #endif
-    auto flow_width_getter = [](const ExtrusionLine &l) { return 0.0; };
-    LayerCurlingEstimator lce{flow_width_getter, params};
+
+    LD prev_layer_lines{};
 
     for (Layer *l : layers) {
-        if (l->regions().empty()) {
-            continue;
-        }
-        struct Visitor {
-            Visitor(const Params &params) : params(params) {}
-            void recursive_do(const ExtrusionEntityCollection &collection, const LayerRegion *region) {
-                for (const ExtrusionEntity* entity : collection.entities)
-                    if (entity->is_collection())
-                        this->recursive_do(*static_cast<const ExtrusionEntityCollection*>(entity), region);
-                    else {
-                        append(extrusion_lines, to_short_lines(entity, params.bridge_distance));
-                        extrusions_widths.emplace(entity, get_flow_width(region, entity->role()));
-                    }
+        std::vector<Linef> boundary_lines = l->lower_layer != nullptr ? to_unscaled_linesf(l->lower_layer->lslices) : std::vector<Linef>();
+        AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary{std::move(boundary_lines)};
+        std::vector<ExtrusionLine>           current_layer_lines;
+        for (const LayerRegion *layer_region : l->regions()) {
+            for (const ExtrusionEntity *extrusion : layer_region->perimeters().flatten().entities) {
+                
+                if (!extrusion->role().is_external_perimeter()) continue;
+
+                Points extrusion_pts;
+                extrusion->collect_points(extrusion_pts);
+                float flow_width       = get_flow_width(layer_region, extrusion->role());
+                auto  annotated_points = estimate_points_properties<true, false, false, false>(extrusion_pts, prev_layer_lines, flow_width,
+                                                                                              params.bridge_distance);
+                for (size_t i = 0; i < annotated_points.size(); ++i) {
+                    ExtendedPoint &curr_point = annotated_points[i];
+                    float          line_len   = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
+                    ExtrusionLine  line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
+                                           curr_point.position.cast<float>(), line_len, extrusion};
+
+                    const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
+                                                                      prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
+                                                                      ExtrusionLine{};
+
+                    float sign = (prev_layer_boundary.distance_from_lines<true>(curr_point.position) + 0.5f * flow_width) < 0.0f ? -1.0f :
+                                                                                                                                   1.0f;
+                    curr_point.distance *= sign;
+
+                    line_out.curled_up_height = estimate_curled_up_height(curr_point, layer_region->layer()->height, flow_width,
+                                                                          nearest_prev_layer_line.curled_up_height, params);
+
+                    current_layer_lines.push_back(line_out);
+                }
             }
-            const Params                                       &params;
-            std::unordered_map<const ExtrusionEntity*, float>   extrusions_widths;
-            std::vector<ExtrusionLine>                          extrusion_lines;
-        } visitor(params);
+        }
 
-        for (const LayerRegion *region : l->regions())
-            visitor.recursive_do(region->perimeters(), region);
-
-        lce.flow_width_getter = [&](const ExtrusionLine &l) { return visitor.extrusions_widths[l.origin_entity]; };
-
-        lce.estimate_curling(visitor.extrusion_lines, l);
+        for (const ExtrusionLine &line : current_layer_lines) {
+            if (line.curled_up_height > params.curling_tolerance_limit) {
+                l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)});
+            }
+        }
 
 #ifdef DEBUG_FILES
-        for (const ExtrusionLine &line : extrusion_lines) {
-            if (line.malformation > 0.3f) {
-                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_malformation_factor, line.malformation);
+        for (const ExtrusionLine &line : current_layer_lines) {
+            if (line.curled_up_height > params.curling_tolerance_limit) {
+                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
                 fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
             }
         }
+         for (const ExtrusionLine &line : current_layer_lines) {
+                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
+                fprintf(full_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
+        }
 #endif
+
+        prev_layer_lines = LD{current_layer_lines};
     }
 
 #ifdef DEBUG_FILES
     fclose(debug_file);
+    fclose(full_file);
 #endif
 }
 
-} //SupportableIssues End
+std::vector<std::pair<SupportPointCause, bool>> gather_issues(const SupportPoints &support_points, PartialObjects &partial_objects)
+{
+    std::vector<std::pair<SupportPointCause, bool>> result;
+    // The partial object are most likely sorted from smaller to larger as the print continues, so this should save some sorting time
+    std::reverse(partial_objects.begin(), partial_objects.end());
+    std::sort(partial_objects.begin(), partial_objects.end(),
+              [](const PartialObject &left, const PartialObject &right) { return left.volume > right.volume; });
+
+    // Object may have zero extrusions and thus no partial objects. (e.g. very tiny object)
+    float max_volume_part = partial_objects.empty() ? 0.0f : partial_objects.front().volume;
+    for (const PartialObject &p : partial_objects) {
+        if (p.volume > max_volume_part / 200.0f && !p.connected_to_bed) {
+                result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
+                break;
+        }
+    }
+
+    // should be detected in previous step
+    // if (!unstable_floating_part_added) {
+    //     for (const SupportPoint &sp : support_points) {
+    //             if (sp.cause == SupportPointCause::UnstableFloatingPart) {
+    //             result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
+    //             break;
+    //             }
+    //     }
+    // }
+
+    std::vector<SupportPoint> ext_supp_points{};
+    ext_supp_points.reserve(support_points.size());
+    for (const SupportPoint &sp : support_points) {
+        switch (sp.cause) {
+        case SupportPointCause::FloatingBridgeAnchor:
+        case SupportPointCause::FloatingExtrusion: ext_supp_points.push_back(sp); break;
+        default: break;
+        }
+    }
+
+    auto coord_fn = [&ext_supp_points](size_t idx, size_t dim) { return ext_supp_points[idx].position[dim]; };
+    KDTreeIndirect<3, float, decltype(coord_fn)> ext_points_tree{coord_fn, ext_supp_points.size()};
+    for (const SupportPoint &sp : ext_supp_points) {
+        auto cluster         = find_nearby_points(ext_points_tree, sp.position, 3.0);
+        int  score           = 0;
+        bool floating_bridge = false;
+        for (size_t idx : cluster) {
+                score += ext_supp_points[idx].cause == SupportPointCause::FloatingBridgeAnchor ? 3 : 1;
+                floating_bridge = floating_bridge || ext_supp_points[idx].cause == SupportPointCause::FloatingBridgeAnchor;
+        }
+        if (score > 5) {
+                if (floating_bridge) {
+                result.emplace_back(SupportPointCause::FloatingBridgeAnchor, true);
+                } else {
+                result.emplace_back(SupportPointCause::FloatingExtrusion, true);
+                }
+                break;
+        }
+    }
+
+    for (const SupportPoint &sp : support_points) {
+        if (sp.cause == SupportPointCause::SeparationFromBed) {
+                result.emplace_back(SupportPointCause::SeparationFromBed, true);
+                break;
+        }
+    }
+
+    for (const SupportPoint &sp : support_points) {
+        if (sp.cause == SupportPointCause::WeakObjectPart) {
+                result.emplace_back(SupportPointCause::WeakObjectPart, true);
+                break;
+        }
+    }
+
+    if (ext_supp_points.size() > max_volume_part / 200.0f) {
+        result.emplace_back(SupportPointCause::FloatingExtrusion, false);
+    }
+
+    for (const SupportPoint &sp : support_points) {
+        if (sp.cause == SupportPointCause::LongBridge) {
+                result.emplace_back(SupportPointCause::LongBridge, false);
+                break;
+        }
+    }
+
+    return result;
 }
 
+} // namespace SupportSpotsGenerator
+} // namespace Slic3r

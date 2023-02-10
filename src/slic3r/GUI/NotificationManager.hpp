@@ -7,6 +7,7 @@
 #include "Event.hpp"
 #include "I18N.hpp"
 #include "Jobs/ProgressIndicator.hpp"
+#include "Downloader.hpp"
 
 #include <libslic3r/ObjectID.hpp>
 #include <libslic3r/Technologies.hpp>
@@ -55,6 +56,7 @@ enum class NotificationType
 	// Like NewAppAvailable but with text and link for alpha / bet release
 	NewAlphaAvailable,
 	NewBetaAvailable,
+	NoNewReleaseAvailable,
 	// Notification on the start of PrusaSlicer, when updates of system profiles are detected.
 	// Contains a hyperlink to execute installation of the new system profiles.
 	PresetUpdateAvailable,
@@ -117,6 +119,8 @@ enum class NotificationType
 	NetfabbFinished,
 	// Short meesage to fill space between start and finish of export
 	ExportOngoing,
+	// Progressbar of download from prusaslicer:// url
+	URLDownload
 };
 
 class NotificationManager
@@ -188,6 +192,9 @@ public:
 	// Object warning with ObjectID, closes when object is deleted. ID used is of object not print like in slicing warning.
 	void push_simplify_suggestion_notification(const std::string& text, ObjectID object_id, const std::string& hypertext = "",
 		std::function<bool(wxEvtHandler*)> callback = std::function<bool(wxEvtHandler*)>());
+	// Could be either NewAlphaAvailable, NewBetaAvailable or NoNewReleaseAvailable - this function only makes sure only 1 is visible. 
+	void push_version_notification(NotificationType type, NotificationLevel level, const std::string& text, const std::string& hypertext,
+		std::function<bool(wxEvtHandler*)> callback);
 	// Close object warnings, whose ObjectID is not in the list.
 	// living_oids is expected to be sorted.
 	void remove_simplify_suggestion_of_released_objects(const std::vector<ObjectID>& living_oids);
@@ -215,6 +222,12 @@ public:
 	// Download App progress
 	void push_download_progress_notification(const std::string& text, std::function<bool()>	cancel_callback);
 	void set_download_progress_percentage(float percentage);
+	// Download URL progress notif
+	void push_download_URL_progress_notification(size_t id, const std::string& text, std::function<bool(DownloaderUserAction, int)> user_action_callback);
+	void set_download_URL_progress(size_t id, float percentage);
+	void set_download_URL_paused(size_t id);
+	void set_download_URL_canceled(size_t id);
+	void set_download_URL_error(size_t id, const std::string& text);
 	// slicing progress
 	void init_slicing_progress_notification(std::function<bool()> cancel_callback);
 	void set_slicing_progress_began();
@@ -503,6 +516,62 @@ private:
 
 		std::function<bool()>	m_cancel_callback;
 		long					m_hover_time{ 0 };
+	};
+
+	class URLDownloadNotification : public ProgressBarNotification
+	{
+	public:
+		URLDownloadNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler, size_t download_id, std::function<bool(DownloaderUserAction, int)> user_action_callback)
+			//: ProgressBarWithCancelNotification(n, id_provider, evt_handler, cancel_callback)
+			: ProgressBarNotification(n, id_provider, evt_handler)
+			, m_download_id(download_id)
+			, m_user_action_callback(user_action_callback)
+		{
+		}
+		void	set_percentage(float percent) override 
+		{ 
+			m_percentage = percent; 
+			if (m_percentage >= 1.f) {
+				m_notification_start = GLCanvas3D::timestamp_now();
+				m_state = EState::Shown; 
+			} else
+				m_state = EState::NotFading; 
+		}
+		size_t	get_download_id() { return m_download_id; }
+		void	set_user_action_callback(std::function<bool(DownloaderUserAction, int)> user_action_callback) { m_user_action_callback = user_action_callback; }
+		void	set_paused(bool paused) { m_download_paused = paused; }
+		void    set_error_message(const std::string& message) { m_error_message = message; }
+		bool    compare_text(const std::string& text) const override { return false; };
+	protected: 
+		void	render_close_button(ImGuiWrapper& imgui,
+									const float win_size_x, const float win_size_y,
+									const float win_pos_x, const float win_pos_y) override;
+		void    render_close_button_inner(ImGuiWrapper& imgui,
+											const float win_size_x, const float win_size_y,
+											const float win_pos_x, const float win_pos_y);
+		void    render_pause_cancel_buttons_inner(ImGuiWrapper& imgui,
+											const float win_size_x, const float win_size_y,
+											const float win_pos_x, const float win_pos_y);
+		void    render_open_button_inner(ImGuiWrapper& imgui,
+											const float win_size_x, const float win_size_y,
+											const float win_pos_x, const float win_pos_y);
+		void    render_cancel_button_inner(ImGuiWrapper& imgui,
+											const float win_size_x, const float win_size_y,
+											const float win_pos_x, const float win_pos_y);
+		void    render_pause_button_inner(ImGuiWrapper& imgui,
+											const float win_size_x, const float win_size_y,
+											const float win_pos_x, const float win_pos_y);
+		void	render_bar(ImGuiWrapper& imgui,
+							const float win_size_x, const float win_size_y,
+							const float win_pos_x, const float win_pos_y) override;
+		void    trigger_user_action_callback(DownloaderUserAction action);
+
+		void    count_spaces() override;
+
+		size_t							m_download_id;
+		std::function<bool(DownloaderUserAction, int)>	m_user_action_callback;
+		bool							m_download_paused {false};
+		std::string						m_error_message;
 	};
 
 	class PrintHostUploadNotification : public ProgressBarNotification
@@ -819,7 +888,8 @@ private:
 		NotificationType::PlaterWarning, 
 		NotificationType::ProgressBar, 
 		NotificationType::PrintHostUpload, 
-        NotificationType::SimplifySuggestion
+        NotificationType::SimplifySuggestion,
+		NotificationType::URLDownload
 	};
 	//prepared (basic) notifications
 	// non-static so its not loaded too early. If static, the translations wont load correctly.

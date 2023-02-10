@@ -53,6 +53,15 @@ KBShortcutsDialog::KBShortcutsDialog()
     SetSizer(main_sizer);
     main_sizer->SetSizeHints(this);
     this->CenterOnParent();
+
+#ifdef __linux__
+    // workaround to correct pages layout
+    book->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [book](wxBookCtrlEvent& e) {
+        book->GetPage(e.GetSelection())->Fit();
+    });
+    const wxSize sz = this->GetBestSize();
+    this->SetSize(sz.x + 1, sz.y);
+#endif
 }
 
 void KBShortcutsDialog::on_dpi_changed(const wxRect& suggested_rect)

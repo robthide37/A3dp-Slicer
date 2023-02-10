@@ -35,9 +35,20 @@ protected:
     wxBitmapBundle*			get_bmp( const std::vector<std::string>& palette);
 };
 
+namespace GUI_Descriptions {
 
-class ButtonsDescription : public wxDialog
+struct ButtonEntry {
+	ButtonEntry(ScalableBitmap *bitmap, const std::string &symbol, const std::string &explanation) : bitmap(bitmap), symbol(symbol), explanation(explanation) {}
+
+	ScalableBitmap *bitmap;
+	std::string     symbol;
+	std::string   	explanation;
+};
+
+class Dialog : public wxDialog
 {
+	std::vector<ButtonEntry> m_entries;
+
 	wxColourPickerCtrl* sys_colour{ nullptr };
 	wxColourPickerCtrl* mod_colour{ nullptr };
 
@@ -47,25 +58,16 @@ class ButtonsDescription : public wxDialog
 
 	std::vector<wxColour> mode_palette;
 public:
-	struct Entry {
-		Entry(ScalableBitmap *bitmap, const std::string &symbol, const std::string &explanation) : bitmap(bitmap), symbol(symbol), explanation(explanation) {}
 
-		ScalableBitmap *bitmap;
-		std::string     symbol;
-		std::string   	explanation;
-	};
-
-	ButtonsDescription(wxWindow* parent, const std::vector<Entry> &entries);
-	~ButtonsDescription() {}
-
-	static void FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent, wxColourPickerCtrl** sys_colour, wxColourPickerCtrl** mod_colour);
-	static void FillSizerWithModeColorDescriptions(wxSizer* sizer, wxWindow* parent, 
-		                                            std::vector<wxColourPickerCtrl**> clr_pickers, 
-		                                            std::vector<wxColour>& mode_palette);
-
-private:
-	std::vector<Entry> m_entries;
+	Dialog(wxWindow* parent, const std::vector<ButtonEntry> &entries);
+	~Dialog() {}
 };
+
+extern void FillSizerWithTextColorDescriptions(wxSizer* sizer, wxWindow* parent, wxColourPickerCtrl** sys_colour, wxColourPickerCtrl** mod_colour);
+extern void FillSizerWithModeColorDescriptions(wxSizer* sizer, wxWindow* parent,
+		                                       std::vector<wxColourPickerCtrl**> clr_pickers,
+		                                       std::vector<wxColour>& mode_palette);
+} // GUI_Descriptions
 
 } // GUI
 } // Slic3r

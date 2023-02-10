@@ -128,10 +128,9 @@ namespace Emboss
     // data = raw file data
     std::unique_ptr<FontFile> create_font_file(std::unique_ptr<std::vector<unsigned char>> data);
 #ifdef _WIN32
-    // fix for unknown pointer HFONT
-    using HFONT = void*;
-    void * can_load(HFONT hfont);
-    std::unique_ptr<FontFile> create_font_file(HFONT hfont);
+    // fix for unknown pointer HFONT is replaced with "void *"
+    void * can_load(void* hfont);
+    std::unique_ptr<FontFile> create_font_file(void * hfont);
 #endif // _WIN32
 
     /// <summary>
@@ -155,9 +154,10 @@ namespace Emboss
     ExPolygons text2shapes(FontFileWithCache &font, const char *text, const FontProp &font_prop, std::function<bool()> was_canceled = nullptr);
 
     /// <summary>
-    /// Fix intersections and self intersections in polygons glyph shape 
+    /// Fix duplicit points and self intersections in polygons.
+    /// Also try to reduce amount of points and remove useless polygon parts
     /// </summary>
-    /// <param name="shape">Input shape to heal</param>
+    /// <param name="precision">Define wanted precision of shape after heal</param>
     /// <returns>Healed shapes</returns>
     ExPolygons heal_shape(const Polygons &shape);
 

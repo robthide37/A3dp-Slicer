@@ -164,6 +164,8 @@ public:
     void sys_color_changed() override;
     void OnSelect(wxCommandEvent& evt) override;
 
+    std::string get_selected_ph_printer_name() const;
+
 private:
     int     m_extruder_idx = -1;
 };

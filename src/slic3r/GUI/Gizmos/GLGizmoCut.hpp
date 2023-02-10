@@ -233,6 +233,8 @@ protected:
     std::string get_gizmo_leaving_text() const override     { return _u8L("Leaving Cut gizmo"); }
     std::string get_action_snapshot_name() override         { return _u8L("Cut gizmo editing"); }
 
+    void data_changed() override;
+
 private:
     void set_center(const Vec3d& center);
     bool render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx);
@@ -248,6 +250,7 @@ private:
     void render_connectors();
 
     bool can_perform_cut() const;
+    bool has_valid_contour() const;
     void apply_connectors_in_model(ModelObject* mo, bool &create_dowels_as_separate_object);
     bool cut_line_processing() const;
     void discard_cut_line_processing();

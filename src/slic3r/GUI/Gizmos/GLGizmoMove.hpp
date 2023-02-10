@@ -67,7 +67,6 @@ private:
     double calc_projection(const UpdateData& data) const;
 #if ENABLE_WORLD_COORDINATE
     Transform3d local_transform(const Selection& selection) const;
-    void calc_selection_box_and_center();
 #endif // ENABLE_WORLD_COORDINATE
 };
 

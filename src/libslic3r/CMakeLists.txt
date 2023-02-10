@@ -11,7 +11,7 @@ endif ()
 
 set(OpenVDBUtils_SOURCES "")
 if (TARGET OpenVDB::openvdb)
-    set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp)
+    set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp OpenVDBUtilsLegacy.hpp)
 endif()
 
 set(SLIC3R_SOURCES
@@ -22,6 +22,7 @@ set(SLIC3R_SOURCES
     AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
+    AnyPtr.hpp
     BoundingBox.cpp
     BoundingBox.hpp
     BridgeDetector.cpp
@@ -39,6 +40,13 @@ set(SLIC3R_SOURCES
     Color.hpp
     Config.cpp
     Config.hpp
+    CSGMesh/CSGMesh.hpp
+    CSGMesh/SliceCSGMesh.hpp
+    CSGMesh/ModelToCSGMesh.hpp
+    CSGMesh/PerformCSGMeshBooleans.hpp
+    CSGMesh/VoxelizeCSGMesh.hpp
+    CSGMesh/TriangleMeshAdapter.hpp
+    CSGMesh/CSGMeshCopy.hpp
     EdgeGrid.cpp
     EdgeGrid.hpp
     ElephantFootCompensation.cpp
@@ -56,6 +64,8 @@ set(SLIC3R_SOURCES
     ExtrusionEntity.hpp
     ExtrusionEntityCollection.cpp
     ExtrusionEntityCollection.hpp
+    ExtrusionRole.cpp
+    ExtrusionRole.hpp
     ExtrusionSimulator.cpp
     ExtrusionSimulator.hpp
     FileParserError.hpp
@@ -321,6 +331,7 @@ set(SLIC3R_SOURCES
     SLA/SupportTreeMesher.hpp
     SLA/SupportTreeMesher.cpp
     SLA/SupportTreeUtils.hpp
+    SLA/SupportTreeUtilsLegacy.hpp
     SLA/SupportTreeBuilder.cpp
     SLA/SupportTree.hpp
     SLA/SupportTree.cpp

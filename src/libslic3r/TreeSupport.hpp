@@ -17,7 +17,7 @@
 #include "BoundingBox.hpp"
 #include "Utils.hpp"
 
- #define TREE_SUPPORT_SHOW_ERRORS
+// #define TREE_SUPPORT_SHOW_ERRORS
 
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
     // The various stages of the process can be weighted differently in the progress bar.
@@ -310,7 +310,8 @@ struct TreeSupportSettings
 //            interface_preference = interface_map.at(mesh_group_settings.get<std::string>("support_interface_priority"));
 //FIXME this was the default
 //            interface_preference = InterfacePreference::SupportLinesOverwriteInterface;
-        interface_preference = InterfacePreference::SupportAreaOverwritesInterface;
+        //interface_preference = InterfacePreference::SupportAreaOverwritesInterface;
+        interface_preference = InterfacePreference::InterfaceAreaOverwritesSupport;
     }
 
 private:
@@ -576,8 +577,7 @@ public:
     }
 };
 
-// todo Remove!  ONLY FOR PUBLIC BETA!!
-void tree_supports_show_error(std::string message, bool critical);
+void tree_supports_show_error(std::string_view message, bool critical);
 
 } // namespace FFFTreeSupport
 

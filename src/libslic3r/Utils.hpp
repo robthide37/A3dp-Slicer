@@ -176,6 +176,21 @@ template<class T> size_t next_highest_power_of_2(T v,
     return next_highest_power_of_2(uint32_t(v));
 }
 
+template<class VectorType> void reserve_power_of_2(VectorType &vector, size_t n)
+{
+    vector.reserve(next_highest_power_of_2(n));
+}
+
+template<class VectorType> void reserve_more(VectorType &vector, size_t n)
+{
+    vector.reserve(vector.size() + n);
+}
+
+template<class VectorType> void reserve_more_power_of_2(VectorType &vector, size_t n)
+{
+    vector.reserve(next_highest_power_of_2(vector.size() + n));
+}
+
 template<typename INDEX_TYPE>
 inline INDEX_TYPE prev_idx_modulo(INDEX_TYPE idx, const INDEX_TYPE count)
 {
@@ -267,8 +282,6 @@ class ScopeGuard
 {
 public:
     typedef std::function<void()> Closure;
-private:
-//    bool committed;
     Closure closure;
 
 public:

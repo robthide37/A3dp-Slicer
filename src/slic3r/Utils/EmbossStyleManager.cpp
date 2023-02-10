@@ -14,8 +14,9 @@ using namespace Slic3r;
 using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI::Emboss;
 
-StyleManager::StyleManager(const ImWchar *language_glyph_range)
+StyleManager::StyleManager(const ImWchar *language_glyph_range, std::function<EmbossStyles()> create_default_styles)
     : m_imgui_init_glyph_range(language_glyph_range)
+    , m_create_default_styles(create_default_styles)
     , m_exist_style_images(false)
     , m_temp_style_images(nullptr)
     , m_app_config(nullptr)
@@ -27,13 +28,14 @@ StyleManager::~StyleManager() {
     free_style_images();
 }
 
-void StyleManager::init(AppConfig *app_config, const EmbossStyles &default_styles)
+void StyleManager::init(AppConfig *app_config)
 {
     m_app_config = app_config;
-    EmbossStyles styles = (app_config != nullptr) ?
-        EmbossStylesSerializable::load_styles(*app_config) :
-        default_styles;
-    if (styles.empty()) styles = default_styles;
+    EmbossStyles styles = (app_config != nullptr) ? 
+        EmbossStylesSerializable::load_styles(*app_config) : 
+        EmbossStyles{};
+    if (styles.empty()) 
+        styles = m_create_default_styles();
     for (EmbossStyle &style : styles) {
         make_unique_name(style.name);
         m_style_items.push_back({style});
@@ -48,23 +50,13 @@ void StyleManager::init(AppConfig *app_config, const EmbossStyles &default_style
     if (active_index >= m_style_items.size()) active_index = 0;
     
     // find valid font item
-    if (!load_style(active_index)) {
-        m_style_items.erase(m_style_items.begin() + active_index);
-        active_index = 0;
-        while (m_style_items.empty() || !load_style(active_index))
-            m_style_items.erase(m_style_items.begin());
-        // no one style from config is loadable
-        if (m_style_items.empty()) {
-            // set up default font list
-            for (EmbossStyle style : default_styles) {
-                make_unique_name(style.name);
-                m_style_items.push_back({std::move(style)});
-            }
-            // try to load first default font
-            [[maybe_unused]] bool loaded = load_style(active_index);
-            assert(loaded);
-        }
-    }
+    if (load_style(active_index))
+        return; // style is loaded
+
+    // Try to fix that style can't be loaded
+    m_style_items.erase(m_style_items.begin() + active_index);
+
+    load_valid_style();
 }
 
 bool StyleManager::store_styles_to_app_config(bool use_modification,
@@ -135,7 +127,7 @@ void StyleManager::discard_style_changes() {
     }
 
     // try to save situation by load some font
-    load_first_valid_font();
+    load_valid_style();
 }
 
 void StyleManager::erase(size_t index) {
@@ -159,6 +151,38 @@ void StyleManager::rename(const std::string& name) {
         it.style.name = name;
         it.truncated_name.clear();
     }
+}
+
+void StyleManager::load_valid_style()
+{
+    // iterate over all known styles
+    while (!m_style_items.empty()) {
+        if (load_style(0))
+            return;
+        // can't load so erase it from list
+        m_style_items.erase(m_style_items.begin());
+    }
+
+    // no one style is loadable
+    // set up default font list
+    EmbossStyles def_style = m_create_default_styles();
+    for (EmbossStyle &style : def_style) {
+        make_unique_name(style.name);
+        m_style_items.push_back({std::move(style)});
+    }
+
+    // iterate over default styles
+    // There have to be option to use build in font
+    while (!m_style_items.empty()) {
+        if (load_style(0))
+            return;
+        // can't load so erase it from list
+        m_style_items.erase(m_style_items.begin());
+    }
+
+    // This OS doesn't have TTF as default font,
+    // find some loadable font out of default list
+    assert(false);
 }
 
 bool StyleManager::load_style(size_t style_index)
@@ -192,24 +216,19 @@ bool StyleManager::load_style(const EmbossStyle &style) {
 
 bool StyleManager::load_style(const EmbossStyle &style, const wxFont &font)
 {
+    m_style_cache.style = style; // copy
+
+    // wx font property has bigger priority to set
+    // it must be after copy of the style
     if (!set_wx_font(font)) return false;
-    m_style_cache.style      = style; // copy
-    m_style_cache.style_index     = std::numeric_limits<size_t>::max();
+
+    m_style_cache.style_index = std::numeric_limits<size_t>::max();
     m_style_cache.stored_wx_font = {};
     m_style_cache.truncated_name.clear();
     return true;
 }
 
 bool StyleManager::is_active_font() { return m_style_cache.font_file.has_value(); }
-
-bool StyleManager::load_first_valid_font() {
-    while (!m_style_items.empty()) {
-        if (load_style(0)) return true;
-        // can't load so erase it from list
-        m_style_items.erase(m_style_items.begin());
-    }
-    return false;
-}
 
 const EmbossStyle* StyleManager::get_stored_style() const
 {
@@ -243,13 +262,6 @@ ImFont *StyleManager::get_imgui_font()
 }
 
 const std::vector<StyleManager::Item> &StyleManager::get_styles() const{ return m_style_items; }
-
-ImFont* StyleManager::extend_imgui_font_range(size_t index, const std::string& text)
-{
-    // TODO: start using merge mode
-    // ImFontConfig::MergeMode = true;
-    return create_imgui_font(text);
-}
 
 void StyleManager::make_unique_name(std::string &name)
 {
@@ -369,8 +381,7 @@ void StyleManager::free_style_images() {
 
 float StyleManager::min_imgui_font_size = 18.f;
 float StyleManager::max_imgui_font_size = 60.f;
-float StyleManager::get_imgui_font_size(const FontProp         &prop,
-                                              const FontFile &file)
+float StyleManager::get_imgui_font_size(const FontProp &prop, const FontFile &file, double scale)
 {
     const auto  &cn = prop.collection_number;
     unsigned int font_index = (cn.has_value()) ? *cn : 0;
@@ -381,10 +392,10 @@ float StyleManager::get_imgui_font_size(const FontProp         &prop,
 
     // The point size is defined as 1/72 of the Anglo-Saxon inch (25.4 mm):
     // It is approximately 0.0139 inch or 352.8 um.
-    return c1 * std::abs(prop.size_in_mm) / 0.3528f;
+    return c1 * std::abs(prop.size_in_mm) / 0.3528f * scale;
 }
 
-ImFont *StyleManager::create_imgui_font(const std::string &text)
+ImFont *StyleManager::create_imgui_font(const std::string &text, double scale)
 {
     // inspiration inside of ImGuiWrapper::init_font
     auto& ff = m_style_cache.font_file;
@@ -404,7 +415,7 @@ ImFont *StyleManager::create_imgui_font(const std::string &text)
                                 ImFontAtlasFlags_NoPowerOfTwoHeight;
 
     const FontProp &font_prop = m_style_cache.style.prop;
-    float font_size = get_imgui_font_size(font_prop, font_file);
+    float font_size = get_imgui_font_size(font_prop, font_file, scale);
     if (font_size < min_imgui_font_size)
         font_size = min_imgui_font_size;
     if (font_size > max_imgui_font_size)

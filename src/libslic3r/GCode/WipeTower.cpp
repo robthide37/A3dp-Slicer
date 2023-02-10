@@ -37,7 +37,7 @@ public:
             // adds tag for analyzer:
             std::ostringstream str;
             str << ";" << GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height) << m_layer_height << "\n"; // don't rely on GCodeAnalyzer knowing the layer height - it knows nothing at priming
-            str << ";" << GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role) << ExtrusionEntity::role_to_string(erWipeTower) << "\n";
+            str << ";" << GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role) << gcode_extrusion_role_to_string(GCodeExtrusionRole::WipeTower) << "\n";
             m_gcode += str.str();
             change_analyzer_line_width(line_width);
     }
@@ -70,6 +70,8 @@ public:
 		m_current_pos = pos;
 		return *this;
 	}
+
+    WipeTowerWriter& 			 set_position(const Vec2f &pos) { m_current_pos = pos; return *this; }
 
     WipeTowerWriter&				 set_initial_tool(size_t tool) { m_current_tool = tool; return *this; }
 
@@ -802,9 +804,11 @@ void WipeTower::toolchange_Unload(
 {
 	float xl = cleaning_box.ld.x() + 1.f * m_perimeter_width;
 	float xr = cleaning_box.rd.x() - 1.f * m_perimeter_width;
-	
-	const float line_width = m_perimeter_width * m_filpar[m_current_tool].ramming_line_width_multiplicator;       // desired ramming line thickness
+
+    const float line_width = m_perimeter_width * m_filpar[m_current_tool].ramming_line_width_multiplicator;       // desired ramming line thickness
 	const float y_step = line_width * m_filpar[m_current_tool].ramming_step_multiplicator * m_extra_spacing; // spacing between lines in mm
+
+    const Vec2f ramming_start_pos = Vec2f(xl, cleaning_box.ld.y() + m_depth_traversed + y_step/2.f);
 
     writer.append("; CP TOOLCHANGE UNLOAD\n")
         .change_analyzer_line_width(line_width);
@@ -812,12 +816,14 @@ void WipeTower::toolchange_Unload(
 	unsigned i = 0;										// iterates through ramming_speed
 	m_left_to_right = true;								// current direction of ramming
 	float remaining = xr - xl ;							// keeps track of distance to the next turnaround
-	float e_done = 0;									// measures E move done from each segment
+	float e_done = 0;									// measures E move done from each segment   
 
-	writer.travel(xl, cleaning_box.ld.y() + m_depth_traversed + y_step/2.f ); // move to starting position
-
+    if (m_semm)
+        writer.travel(ramming_start_pos); // move to starting position
+    else
+        writer.set_position(ramming_start_pos);
     // if the ending point of the ram would end up in mid air, align it with the end of the wipe tower:
-    if (m_layer_info > m_plan.begin() && m_layer_info < m_plan.end() && (m_layer_info-1!=m_plan.begin() || !m_adhesion )) {
+    if (m_semm && (m_layer_info > m_plan.begin() && m_layer_info < m_plan.end() && (m_layer_info-1!=m_plan.begin() || !m_adhesion ))) {
 
         // this is y of the center of previous sparse infill border
         float sparse_beginning_y = 0.f;
@@ -849,7 +855,7 @@ void WipeTower::toolchange_Unload(
     writer.disable_linear_advance();
 
     // now the ramming itself:
-    while (i < m_filpar[m_current_tool].ramming_speed.size())
+    while (m_semm && i < m_filpar[m_current_tool].ramming_speed.size())
     {
         const float x = volume_to_length(m_filpar[m_current_tool].ramming_speed[i] * 0.25f, line_width, m_layer_height);
         const float e = m_filpar[m_current_tool].ramming_speed[i] * 0.25f / filament_area(); // transform volume per sec to E move;
@@ -898,7 +904,7 @@ void WipeTower::toolchange_Unload(
 
     // Cooling:
     const int& number_of_moves = m_filpar[m_current_tool].cooling_moves;
-    if (number_of_moves > 0) {
+    if (m_semm && number_of_moves > 0) {
         const float& initial_speed = m_filpar[m_current_tool].cooling_initial_speed;
         const float& final_speed   = m_filpar[m_current_tool].cooling_final_speed;
 
@@ -916,14 +922,20 @@ void WipeTower::toolchange_Unload(
         }
     }
 
-    // let's wait is necessary:
-    writer.wait(m_filpar[m_current_tool].delay);
-    // we should be at the beginning of the cooling tube again - let's move to parking position:
-    writer.retract(-m_cooling_tube_length/2.f+m_parking_pos_retraction-m_cooling_tube_retraction, 2000);
+    if (m_semm) {
+        // let's wait is necessary:
+        writer.wait(m_filpar[m_current_tool].delay);
+        // we should be at the beginning of the cooling tube again - let's move to parking position:
+        writer.retract(-m_cooling_tube_length/2.f+m_parking_pos_retraction-m_cooling_tube_retraction, 2000);
+    }
 
 	// this is to align ramming and future wiping extrusions, so the future y-steps can be uniform from the start:
     // the perimeter_width will later be subtracted, it is there to not load while moving over just extruded material
-	writer.travel(end_of_ramming.x(), end_of_ramming.y() + (y_step/m_extra_spacing-m_perimeter_width) / 2.f + m_perimeter_width, 2400.f);
+    Vec2f pos = Vec2f(end_of_ramming.x(), end_of_ramming.y() + (y_step/m_extra_spacing-m_perimeter_width) / 2.f + m_perimeter_width);
+    if (m_semm)
+        writer.travel(pos, 2400.f);
+    else
+        writer.set_position(pos);
 
 	writer.resume_preview()
 		  .flush_planner_queue();
@@ -941,7 +953,7 @@ void WipeTower::toolchange_Change(
 
     // This is where we want to place the custom gcodes. We will use placeholders for this.
     // These will be substituted by the actual gcodes when the gcode is generated.
-    writer.append("[end_filament_gcode]\n");
+    //writer.append("[end_filament_gcode]\n");
     writer.append("[toolchange_gcode]\n");
 
     // Travel to where we assume we are. Custom toolchange or some special T code handling (parking extruder etc)
@@ -952,11 +964,12 @@ void WipeTower::toolchange_Change(
           .append(std::string("G1 X") + Slic3r::float_to_string_decimal_point(current_pos.x())
                              +  " Y"  + Slic3r::float_to_string_decimal_point(current_pos.y())
                              + never_skip_tag() + "\n");
+    writer.append("[deretraction_from_wipe_tower_generator]");
 
     // The toolchange Tn command will be inserted later, only in case that the user does
     // not provide a custom toolchange gcode.
 	writer.set_tool(new_tool); // This outputs nothing, the writer just needs to know the tool has changed.
-    writer.append("[start_filament_gcode]\n");
+    //writer.append("[start_filament_gcode]\n");
 
 	writer.flush_planner_queue();
 	m_current_tool = new_tool;
@@ -1374,8 +1387,10 @@ void WipeTower::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &
             layer_result.emplace_back(std::move(finish_layer_tcr));
         }
         else {
-            if (idx == -1)
+            if (idx == -1) {
                 layer_result[0] = merge_tcr(finish_layer_tcr, layer_result[0]);
+                layer_result[0].force_travel = true;
+            }
             else
                 layer_result[idx] = merge_tcr(layer_result[idx], finish_layer_tcr);
         }

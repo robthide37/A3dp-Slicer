@@ -13,7 +13,7 @@
 namespace Slic3r
 {
 
-void PrintTryCancel::operator()()
+void PrintTryCancel::operator()() const
 {
     m_print->throw_if_canceled();
 }

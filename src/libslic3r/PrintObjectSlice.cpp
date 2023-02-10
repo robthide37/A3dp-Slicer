@@ -799,7 +799,7 @@ void PrintObject::slice_volumes()
 	                            layer->m_regions[region_id]->trim_surfaces(trimming);
 	                    }
 	                }
-	                // Merge all regions' slices to get islands, chain them by a shortest path.
+	                // Merge all regions' slices to get islands sorted topologically, chain them by a shortest path in separate index list
 	                layer->make_slices();
 	            }
 	        });

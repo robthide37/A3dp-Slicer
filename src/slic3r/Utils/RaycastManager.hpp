@@ -67,8 +67,9 @@ public:
     {
         using Key = TrKey;
         Key tr_key;
-        Hit(Key tr_key, Vec3f position, Vec3f normal)
-            : SurfacePoint(position, normal), tr_key(tr_key)
+        double squared_distance;
+        Hit(const Key& tr_key, const SurfacePoint& surface_point, double squared_distance)
+            : SurfacePoint(surface_point), tr_key(tr_key), squared_distance(squared_distance)
         {} 
     };    
 
@@ -105,6 +106,7 @@ public:
 
     /// <summary>
     /// Unproject Ray(point direction) on mesh by MeshRaycasters
+    /// NOTE: It inspect also oposit direction of ray !!
     /// </summary>
     /// <param name="point">Start point for ray</param>
     /// <param name="direction">Direction of ray</param>

@@ -5,7 +5,7 @@
 
 #include "BranchingTree.hpp"
 
-#include "libslic3r/Execution/Execution.hpp"
+//#include "libslic3r/Execution/Execution.hpp"
 #include "libslic3r/MutablePriorityQueue.hpp"
 
 #include "libslic3r/BoostAdapter.hpp"
@@ -78,14 +78,6 @@ private:
         rtree<PointIndexEl, boost::geometry::index::rstar<16, 4> /* ? */>
             m_ktree;
 
-    bool is_outside_support_cone(const Vec3f &supp, const Vec3f &pt) const
-    {
-        Vec3d D = (pt - supp).cast<double>();
-        double dot_sq = -D.z() * std::abs(-D.z());
-
-        return dot_sq < D.squaredNorm() * cos2bridge_slope;
-    }
-
     template<class PC>
     static auto *get_node(PC &&pc, size_t id)
     {
@@ -103,6 +95,14 @@ private:
     }
 
 public:
+
+    bool is_outside_support_cone(const Vec3f &supp, const Vec3f &pt) const
+    {
+        Vec3d D = (pt - supp).cast<double>();
+        double dot_sq = -D.z() * std::abs(-D.z());
+
+        return dot_sq < D.squaredNorm() * cos2bridge_slope;
+    }
 
     static constexpr auto Unqueued = size_t(-1);
 
@@ -255,17 +255,41 @@ public:
     }
 };
 
+template<class Fn> constexpr bool IsTraverseFn = std::is_invocable_v<Fn, Node&>;
+
+struct TraverseReturnT
+{
+    bool to_left : 1; // if true, continue traversing to the left
+    bool to_right : 1; // if true, continue traversing to the right
+};
+
 template<class PC, class Fn> void traverse(PC &&pc, size_t root, Fn &&fn)
 {
     if (auto nodeptr = pc.find(root); nodeptr != nullptr) {
         auto &nroot = *nodeptr;
-        fn(nroot);
-        if (nroot.left  >= 0) traverse(pc, nroot.left, fn);
-        if (nroot.right >= 0) traverse(pc, nroot.right, fn);
+        TraverseReturnT ret{true, true};
+
+        if constexpr (std::is_same_v<std::invoke_result_t<Fn, decltype(nroot)>, void>) {
+            // Our fn has no return value
+            fn(nroot);
+        } else {
+            // Fn returns instructions about how to continue traversing
+            ret = fn(nroot);
+        }
+
+        if (ret.to_left && nroot.left >= 0)
+            traverse(pc, nroot.left, fn);
+        if (ret.to_right && nroot.right >= 0)
+            traverse(pc, nroot.right, fn);
     }
 }
 
 void build_tree(PointCloud &pcloud, Builder &builder);
+
+inline void build_tree(PointCloud &&pc, Builder &builder)
+{
+    build_tree(pc, builder);
+}
 
 }} // namespace Slic3r::branchingtree
 

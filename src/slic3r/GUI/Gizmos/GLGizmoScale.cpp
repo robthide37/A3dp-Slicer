@@ -206,6 +206,7 @@ void GLGizmoScale3D::on_dragging(const UpdateData& data)
         do_scale_uniform(data);
 }
 
+#if ENABLE_WORLD_COORDINATE
 void GLGizmoScale3D::on_render()
 {
     const Selection& selection = m_parent.get_selection();
@@ -213,98 +214,20 @@ void GLGizmoScale3D::on_render()
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     glsafe(::glEnable(GL_DEPTH_TEST));
 
-    m_bounding_box.reset();
-#if ENABLE_WORLD_COORDINATE
-    m_grabbers_transform = Transform3d::Identity();
-    m_center = Vec3d::Zero();
+    const auto& [box, box_trafo] = selection.get_bounding_box_in_current_reference_system();
+    m_bounding_box = box;
+    m_center = box_trafo.translation();
+    m_grabbers_transform = box_trafo;
     m_instance_center = Vec3d::Zero();
-    if (selection.is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
-#else
-    m_transform = Transform3d::Identity();
-    // Transforms grabbers' offsets to world refefence system 
-    Transform3d offsets_transform = Transform3d::Identity();
-    m_offsets_transform = Transform3d::Identity();
-    Vec3d angles = Vec3d::Zero();
-
-    if (selection.is_single_full_instance()) {
-#endif // ENABLE_WORLD_COORDINATE    
-        // calculate bounding box in instance local reference system
-        const Selection::IndicesList& idxs = selection.get_volume_idxs();
-        for (unsigned int idx : idxs) {
-            const GLVolume& v = *selection.get_volume(idx);
-            m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
-        }
-
-#if ENABLE_WORLD_COORDINATE
-        m_bounding_box = m_bounding_box.transformed(selection.get_first_volume()->get_instance_transformation().get_scaling_factor_matrix());
-#endif // ENABLE_WORLD_COORDINATE
-
-        // gets transform from first selected volume
-        const GLVolume& v = *selection.get_first_volume();
-#if ENABLE_WORLD_COORDINATE
-        const Transform3d inst_trafo = v.get_instance_transformation().get_matrix_no_scaling_factor();
-        m_grabbers_transform = inst_trafo * Geometry::translation_transform(m_bounding_box.center());
-        m_center = inst_trafo * m_bounding_box.center();
-        m_instance_center = v.get_instance_offset();
-    }
-    else if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_instance_coordinates()) {
-#else
-        m_transform = v.get_instance_transformation().get_matrix();
-
-        // gets angles from first selected volume
-        angles = v.get_instance_rotation();
-        // consider rotation+mirror only components of the transform for offsets
-        offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v.get_instance_mirror());
-        m_offsets_transform = offsets_transform;
-    }
-    else if (selection.is_single_modifier() || selection.is_single_volume()) {
-#endif // ENABLE_WORLD_COORDINATE
-        const GLVolume& v = *selection.get_first_volume();
-#if ENABLE_WORLD_COORDINATE
-        m_bounding_box.merge(v.transformed_convex_hull_bounding_box(
-            v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_matrix_no_offset()));
-        Geometry::Transformation trafo(v.get_instance_transformation().get_rotation_matrix());
-        trafo.set_offset(v.world_matrix().translation());
-        m_grabbers_transform = trafo.get_matrix();
-        m_center = v.world_matrix() * m_bounding_box.center();
+    if (selection.is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates())
+        m_instance_center = selection.get_first_volume()->get_instance_offset();
+    else if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_instance_coordinates())
         m_instance_center = m_center;
-    }
-    else if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates()) {
-        const GLVolume& v = *selection.get_first_volume();
-        m_bounding_box.merge(v.transformed_convex_hull_bounding_box(
-            v.get_instance_transformation().get_scaling_factor_matrix() * v.get_volume_transformation().get_scaling_factor_matrix()));
-        Geometry::Transformation trafo(v.get_instance_transformation().get_rotation_matrix() * v.get_volume_transformation().get_rotation_matrix());
-        trafo.set_offset(v.world_matrix().translation());
-        m_grabbers_transform = trafo.get_matrix();
-        m_center = v.world_matrix() * m_bounding_box.center();
+    else if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
         m_instance_center = m_center;
-    }
-    else {
-        m_bounding_box = selection.get_bounding_box();
-        m_grabbers_transform = Geometry::translation_transform(m_bounding_box.center());
-        m_center = m_bounding_box.center();
-        m_instance_center = selection.is_single_full_instance() ? selection.get_first_volume()->get_instance_offset() : m_center;
-    }
-#else
-        m_bounding_box = v.bounding_box();
-        m_transform = v.world_matrix();
-        angles = Geometry::extract_rotation(m_transform);
-        // consider rotation+mirror only components of the transform for offsets
-        offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v.get_instance_mirror());
-        m_offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), v.get_volume_rotation(), Vec3d::Ones(), v.get_volume_mirror());
-    }
     else
-        m_bounding_box = selection.get_bounding_box();
+        m_instance_center = selection.is_single_full_instance() ? selection.get_first_volume()->get_instance_offset() : m_center;
 
-    const Vec3d& center = m_bounding_box.center();
-    const Vec3d offset_x = offsets_transform * Vec3d((double)Offset, 0.0, 0.0);
-    const Vec3d offset_y = offsets_transform * Vec3d(0.0, (double)Offset, 0.0);
-    const Vec3d offset_z = offsets_transform * Vec3d(0.0, 0.0, (double)Offset);
-
-    const bool ctrl_down = (m_dragging && m_starting.ctrl_down) || (!m_dragging && wxGetKeyState(WXK_CONTROL));
-#endif // ENABLE_WORLD_COORDINATE
-
-#if ENABLE_WORLD_COORDINATE
     // x axis
     const Vec3d box_half_size = 0.5 * m_bounding_box.size();
     bool use_constrain = wxGetKeyState(WXK_CONTROL) && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier());
@@ -335,57 +258,18 @@ void GLGizmoScale3D::on_render()
     m_grabbers[8].color = (use_constrain && m_hover_id == 6) ? CONSTRAINED_COLOR : m_highlight_color;
     m_grabbers[9].center = { -(box_half_size.x() + Offset), box_half_size.y() + Offset, 0.0 };
     m_grabbers[9].color = (use_constrain && m_hover_id == 7) ? CONSTRAINED_COLOR : m_highlight_color;
-#else
-    // x axis
-    m_grabbers[0].center = m_transform * Vec3d(m_bounding_box.min.x(), center.y(), center.z()) - offset_x;
-    m_grabbers[0].color = (ctrl_down && m_hover_id == 1) ? CONSTRAINED_COLOR : AXES_COLOR[0];
-    m_grabbers[1].center = m_transform * Vec3d(m_bounding_box.max.x(), center.y(), center.z()) + offset_x;
-    m_grabbers[1].color = (ctrl_down && m_hover_id == 0) ? CONSTRAINED_COLOR : AXES_COLOR[0];
-
-    // y axis
-    m_grabbers[2].center = m_transform * Vec3d(center.x(), m_bounding_box.min.y(), center.z()) - offset_y;
-    m_grabbers[2].color = (ctrl_down && m_hover_id == 3) ? CONSTRAINED_COLOR : AXES_COLOR[1];
-    m_grabbers[3].center = m_transform * Vec3d(center.x(), m_bounding_box.max.y(), center.z()) + offset_y;
-    m_grabbers[3].color = (ctrl_down && m_hover_id == 2) ? CONSTRAINED_COLOR : AXES_COLOR[1];
-
-    // z axis
-    m_grabbers[4].center = m_transform * Vec3d(center.x(), center.y(), m_bounding_box.min.z()) - offset_z;
-    m_grabbers[4].color = (ctrl_down && m_hover_id == 5) ? CONSTRAINED_COLOR : AXES_COLOR[2];
-    m_grabbers[5].center = m_transform * Vec3d(center.x(), center.y(), m_bounding_box.max.z()) + offset_z;
-    m_grabbers[5].color = (ctrl_down && m_hover_id == 4) ? CONSTRAINED_COLOR : AXES_COLOR[2];
-
-    // uniform
-    m_grabbers[6].center = m_transform * Vec3d(m_bounding_box.min.x(), m_bounding_box.min.y(), center.z()) - offset_x - offset_y;
-    m_grabbers[7].center = m_transform * Vec3d(m_bounding_box.max.x(), m_bounding_box.min.y(), center.z()) + offset_x - offset_y;
-    m_grabbers[8].center = m_transform * Vec3d(m_bounding_box.max.x(), m_bounding_box.max.y(), center.z()) + offset_x + offset_y;
-    m_grabbers[9].center = m_transform * Vec3d(m_bounding_box.min.x(), m_bounding_box.max.y(), center.z()) - offset_x + offset_y;
-
-    for (int i = 6; i < 10; ++i) {
-        m_grabbers[i].color = m_highlight_color;
-    }
-
-    // sets grabbers orientation
-    for (int i = 0; i < 10; ++i) {
-        m_grabbers[i].angles = angles;
-    }
-#endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_GL_CORE_PROFILE
     if (!OpenGLManager::get_gl_info().is_core_profile())
 #endif // ENABLE_GL_CORE_PROFILE
         glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
 
-#if ENABLE_WORLD_COORDINATE
     const Transform3d base_matrix = local_transform(selection);
     for (int i = 0; i < 10; ++i) {
         m_grabbers[i].matrix = base_matrix;
     }
 
     const float grabber_mean_size = (float)((m_bounding_box.size().x() + m_bounding_box.size().y() + m_bounding_box.size().z()) / 3.0);
-#else
-    const BoundingBoxf3& selection_box = selection.get_bounding_box();
-    const float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
-#endif // ENABLE_WORLD_COORDINATE
 
     if (m_hover_id == -1) {
         // draw connections
@@ -397,11 +281,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
-#else
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -435,11 +315,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
-#else
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -471,11 +347,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
-#else
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -507,11 +379,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
-#else
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -543,11 +411,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             const Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_WORLD_COORDINATE
             shader->set_uniform("view_model_matrix", camera.get_view_matrix() * base_matrix);
-#else
-            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
-#endif // ENABLE_WORLD_COORDINATE
             shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 #if ENABLE_GL_CORE_PROFILE
             const std::array<int, 4>& viewport = camera.get_viewport();
@@ -574,6 +438,267 @@ void GLGizmoScale3D::on_render()
         }
     }
 }
+#else
+void GLGizmoScale3D::on_render()
+{
+    const Selection& selection = m_parent.get_selection();
+
+    glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
+    glsafe(::glEnable(GL_DEPTH_TEST));
+
+    m_bounding_box.reset();
+    m_transform = Transform3d::Identity();
+    // Transforms grabbers' offsets to world refefence system 
+    Transform3d offsets_transform = Transform3d::Identity();
+    m_offsets_transform = Transform3d::Identity();
+    Vec3d angles = Vec3d::Zero();
+
+    if (selection.is_single_full_instance()) {
+        // calculate bounding box in instance local reference system
+        const Selection::IndicesList& idxs = selection.get_volume_idxs();
+        for (unsigned int idx : idxs) {
+            const GLVolume& v = *selection.get_volume(idx);
+            m_bounding_box.merge(v.transformed_convex_hull_bounding_box(v.get_volume_transformation().get_matrix()));
+        }
+
+        // gets transform from first selected volume
+        const GLVolume& v = *selection.get_first_volume();
+        m_transform = v.get_instance_transformation().get_matrix();
+
+        // gets angles from first selected volume
+        angles = v.get_instance_rotation();
+        // consider rotation+mirror only components of the transform for offsets
+        offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v.get_instance_mirror());
+        m_offsets_transform = offsets_transform;
+    }
+    else if (selection.is_single_modifier() || selection.is_single_volume()) {
+        const GLVolume& v = *selection.get_first_volume();
+        m_bounding_box = v.bounding_box();
+        m_transform = v.world_matrix();
+        angles = Geometry::extract_rotation(m_transform);
+        // consider rotation+mirror only components of the transform for offsets
+        offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), angles, Vec3d::Ones(), v.get_instance_mirror());
+        m_offsets_transform = Geometry::assemble_transform(Vec3d::Zero(), v.get_volume_rotation(), Vec3d::Ones(), v.get_volume_mirror());
+    }
+    else
+        m_bounding_box = selection.get_bounding_box();
+
+    const Vec3d& center = m_bounding_box.center();
+    const Vec3d offset_x = offsets_transform * Vec3d((double)Offset, 0.0, 0.0);
+    const Vec3d offset_y = offsets_transform * Vec3d(0.0, (double)Offset, 0.0);
+    const Vec3d offset_z = offsets_transform * Vec3d(0.0, 0.0, (double)Offset);
+
+    const bool ctrl_down = (m_dragging && m_starting.ctrl_down) || (!m_dragging && wxGetKeyState(WXK_CONTROL));
+
+    // x axis
+    m_grabbers[0].center = m_transform * Vec3d(m_bounding_box.min.x(), center.y(), center.z()) - offset_x;
+    m_grabbers[0].color = (ctrl_down && m_hover_id == 1) ? CONSTRAINED_COLOR : AXES_COLOR[0];
+    m_grabbers[1].center = m_transform * Vec3d(m_bounding_box.max.x(), center.y(), center.z()) + offset_x;
+    m_grabbers[1].color = (ctrl_down && m_hover_id == 0) ? CONSTRAINED_COLOR : AXES_COLOR[0];
+
+    // y axis
+    m_grabbers[2].center = m_transform * Vec3d(center.x(), m_bounding_box.min.y(), center.z()) - offset_y;
+    m_grabbers[2].color = (ctrl_down && m_hover_id == 3) ? CONSTRAINED_COLOR : AXES_COLOR[1];
+    m_grabbers[3].center = m_transform * Vec3d(center.x(), m_bounding_box.max.y(), center.z()) + offset_y;
+    m_grabbers[3].color = (ctrl_down && m_hover_id == 2) ? CONSTRAINED_COLOR : AXES_COLOR[1];
+
+    // z axis
+    m_grabbers[4].center = m_transform * Vec3d(center.x(), center.y(), m_bounding_box.min.z()) - offset_z;
+    m_grabbers[4].color = (ctrl_down && m_hover_id == 5) ? CONSTRAINED_COLOR : AXES_COLOR[2];
+    m_grabbers[5].center = m_transform * Vec3d(center.x(), center.y(), m_bounding_box.max.z()) + offset_z;
+    m_grabbers[5].color = (ctrl_down && m_hover_id == 4) ? CONSTRAINED_COLOR : AXES_COLOR[2];
+
+    // uniform
+    m_grabbers[6].center = m_transform * Vec3d(m_bounding_box.min.x(), m_bounding_box.min.y(), center.z()) - offset_x - offset_y;
+    m_grabbers[7].center = m_transform * Vec3d(m_bounding_box.max.x(), m_bounding_box.min.y(), center.z()) + offset_x - offset_y;
+    m_grabbers[8].center = m_transform * Vec3d(m_bounding_box.max.x(), m_bounding_box.max.y(), center.z()) + offset_x + offset_y;
+    m_grabbers[9].center = m_transform * Vec3d(m_bounding_box.min.x(), m_bounding_box.max.y(), center.z()) - offset_x + offset_y;
+
+    for (int i = 6; i < 10; ++i) {
+        m_grabbers[i].color = m_highlight_color;
+    }
+
+    // sets grabbers orientation
+    for (int i = 0; i < 10; ++i) {
+        m_grabbers[i].angles = angles;
+    }
+
+#if ENABLE_GL_CORE_PROFILE
+    if (!OpenGLManager::get_gl_info().is_core_profile())
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth((m_hover_id != -1) ? 2.0f : 1.5f));
+
+    const BoundingBoxf3& selection_box = selection.get_bounding_box();
+    const float grabber_mean_size = (float)((selection_box.size().x() + selection_box.size().y() + selection_box.size().z()) / 3.0);
+
+    if (m_hover_id == -1) {
+        // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
+        if (shader != nullptr) {
+            shader->start_using();
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
+            if (m_grabbers[0].enabled && m_grabbers[1].enabled)
+                render_grabbers_connection(0, 1, m_grabbers[0].color);
+            if (m_grabbers[2].enabled && m_grabbers[3].enabled)
+                render_grabbers_connection(2, 3, m_grabbers[2].color);
+            if (m_grabbers[4].enabled && m_grabbers[5].enabled)
+                render_grabbers_connection(4, 5, m_grabbers[4].color);
+            render_grabbers_connection(6, 7, m_base_color);
+            render_grabbers_connection(7, 8, m_base_color);
+            render_grabbers_connection(8, 9, m_base_color);
+            render_grabbers_connection(9, 6, m_base_color);
+            shader->stop_using();
+        }
+
+        // draw grabbers
+        render_grabbers(grabber_mean_size);
+    }
+    else if ((m_hover_id == 0 || m_hover_id == 1) && m_grabbers[0].enabled && m_grabbers[1].enabled) {
+        // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
+        if (shader != nullptr) {
+            shader->start_using();
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
+            render_grabbers_connection(0, 1, m_grabbers[0].color);
+            shader->stop_using();
+        }
+
+        // draw grabbers
+        shader = wxGetApp().get_shader("gouraud_light");
+        if (shader != nullptr) {
+            shader->start_using();
+            shader->set_uniform("emission_factor", 0.1f);
+            m_grabbers[0].render(true, grabber_mean_size);
+            m_grabbers[1].render(true, grabber_mean_size);
+            shader->stop_using();
+        }
+    }
+    else if ((m_hover_id == 2 || m_hover_id == 3) && m_grabbers[2].enabled && m_grabbers[3].enabled) {
+        // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
+        if (shader != nullptr) {
+            shader->start_using();
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
+            render_grabbers_connection(2, 3, m_grabbers[2].color);
+            shader->stop_using();
+        }
+
+        // draw grabbers
+        shader = wxGetApp().get_shader("gouraud_light");
+        if (shader != nullptr) {
+            shader->start_using();
+            shader->set_uniform("emission_factor", 0.1f);
+            m_grabbers[2].render(true, grabber_mean_size);
+            m_grabbers[3].render(true, grabber_mean_size);
+            shader->stop_using();
+        }
+    }
+    else if ((m_hover_id == 4 || m_hover_id == 5) && m_grabbers[4].enabled && m_grabbers[5].enabled) {
+        // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
+        if (shader != nullptr) {
+            shader->start_using();
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
+            render_grabbers_connection(4, 5, m_grabbers[4].color);
+            shader->stop_using();
+        }
+
+        // draw grabbers
+        shader = wxGetApp().get_shader("gouraud_light");
+        if (shader != nullptr) {
+            shader->start_using();
+            shader->set_uniform("emission_factor", 0.1f);
+            m_grabbers[4].render(true, grabber_mean_size);
+            m_grabbers[5].render(true, grabber_mean_size);
+            shader->stop_using();
+        }
+    }
+    else if (m_hover_id >= 6) {
+        // draw connections
+#if ENABLE_GL_CORE_PROFILE
+        GLShaderProgram* shader = OpenGLManager::get_gl_info().is_core_profile() ? wxGetApp().get_shader("dashed_thick_lines") : wxGetApp().get_shader("flat");
+#else
+        GLShaderProgram* shader = wxGetApp().get_shader("flat");
+#endif // ENABLE_GL_CORE_PROFILE
+        if (shader != nullptr) {
+            shader->start_using();
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            shader->set_uniform("view_model_matrix", camera.get_view_matrix());
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+#if ENABLE_GL_CORE_PROFILE
+            const std::array<int, 4>& viewport = camera.get_viewport();
+            shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+            shader->set_uniform("width", 0.25f);
+            shader->set_uniform("gap_size", 0.0f);
+#endif // ENABLE_GL_CORE_PROFILE
+            render_grabbers_connection(6, 7, m_drag_color);
+            render_grabbers_connection(7, 8, m_drag_color);
+            render_grabbers_connection(8, 9, m_drag_color);
+            render_grabbers_connection(9, 6, m_drag_color);
+            shader->stop_using();
+        }
+
+        // draw grabbers
+        shader = wxGetApp().get_shader("gouraud_light");
+        if (shader != nullptr) {
+            shader->start_using();
+            shader->set_uniform("emission_factor", 0.1f);
+            for (int i = 6; i < 10; ++i) {
+                m_grabbers[i].render(true, grabber_mean_size);
+            }
+            shader->stop_using();
+        }
+    }
+}
+#endif // ENABLE_WORLD_COORDINATE
 
 void GLGizmoScale3D::on_register_raycasters_for_picking()
 {

@@ -270,11 +270,17 @@ inline int its_triangle_edge_index(const stl_triangle_vertex_indices &triangle_i
 using its_triangle = std::array<stl_vertex, 3>;
 
 inline its_triangle its_triangle_vertices(const indexed_triangle_set &its,
+                                          const Vec3i &face)
+{
+    return {its.vertices[face(0)],
+            its.vertices[face(1)],
+            its.vertices[face(2)]};
+}
+
+inline its_triangle its_triangle_vertices(const indexed_triangle_set &its,
                                           size_t                      face_id)
 {
-    return {its.vertices[its.indices[face_id](0)],
-            its.vertices[its.indices[face_id](1)],
-            its.vertices[its.indices[face_id](2)]};
+    return its_triangle_vertices(its, its.indices[face_id]);
 }
 
 inline stl_normal its_unnormalized_normal(const indexed_triangle_set &its,
@@ -341,6 +347,22 @@ inline BoundingBoxf3 bounding_box(const indexed_triangle_set& its)
     for (const Vec3f &p : its.vertices) {
         bmin = p.cwiseMin(bmin);
         bmax = p.cwiseMax(bmax);
+    }
+
+    return {bmin.cast<double>(), bmax.cast<double>()};
+}
+
+inline BoundingBoxf3 bounding_box(const indexed_triangle_set& its, const Transform3f &tr)
+{
+    if (its.vertices.empty())
+        return {};
+
+    Vec3f bmin = tr * its.vertices.front(), bmax = tr * its.vertices.front();
+
+    for (const Vec3f &p : its.vertices) {
+        Vec3f pp = tr * p;
+        bmin = pp.cwiseMin(bmin);
+        bmax = pp.cwiseMax(bmax);
     }
 
     return {bmin.cast<double>(), bmax.cast<double>()};

@@ -72,6 +72,8 @@ int CLI::run(int argc, char **argv)
 {
     // Mark the main thread for the debugger and for runtime checks.
     set_current_thread_name("slic3r_main");
+    // Save the thread ID of the main thread.
+    save_main_thread_id();
 
 #ifdef __WXGTK__
     // On Linux, wxGTK has no support for Wayland, and the app crashes on
@@ -113,6 +115,9 @@ int CLI::run(int argc, char **argv)
         std::find(m_transforms.begin(), m_transforms.end(), "cut") == m_transforms.end() &&
         std::find(m_transforms.begin(), m_transforms.end(), "cut_x") == m_transforms.end() &&
         std::find(m_transforms.begin(), m_transforms.end(), "cut_y") == m_transforms.end();
+    bool                            start_downloader = false;
+    bool                            delete_after_load = false;
+    std::string                     download_url;
     bool 							start_as_gcodeviewer =
 #ifdef _WIN32
             false;
@@ -221,6 +226,11 @@ int CLI::run(int argc, char **argv)
         }
     if (!start_as_gcodeviewer) {
         for (const std::string& file : m_input_files) {
+            if (boost::starts_with(file, "prusaslicer://")) {
+                start_downloader = true;
+                download_url = file;
+                continue;
+            }
             if (!boost::filesystem::exists(file)) {
                 boost::nowide::cerr << "No such file: " << file << std::endl;
                 exit(1);
@@ -478,6 +488,9 @@ int CLI::run(int argc, char **argv)
             // Models are repaired by default.
             //for (auto &model : m_models)
             //    model.repair();
+
+        } else if (opt_key == "delete-after-load") {
+            delete_after_load = true;
         } else {
             boost::nowide::cerr << "error: option not implemented yet: " << opt_key << std::endl;
             return 1;
@@ -663,9 +676,12 @@ int CLI::run(int argc, char **argv)
         params.extra_config = std::move(m_extra_config);
         params.input_files  = std::move(m_input_files);
         params.start_as_gcodeviewer = start_as_gcodeviewer;
+        params.start_downloader = start_downloader;
+        params.download_url = download_url;
+        params.delete_after_load = delete_after_load;
 #if ENABLE_GL_CORE_PROFILE
-        params.opengl_version = opengl_version;
 #if ENABLE_OPENGL_DEBUG_OPTION
+        params.opengl_version = opengl_version;
         params.opengl_debug = opengl_debug;
 #endif // ENABLE_OPENGL_DEBUG_OPTION
 #endif // ENABLE_GL_CORE_PROFILE

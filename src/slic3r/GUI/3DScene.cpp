@@ -385,8 +385,10 @@ void GLVolume::render()
     GLShaderProgram* shader = GUI::wxGetApp().get_current_shader();
     if (shader == nullptr)
         return;
+    
+    const bool is_left_handed = this->is_left_handed();
 
-    if (this->is_left_handed())
+    if (is_left_handed)
         glsafe(::glFrontFace(GL_CW));
     glsafe(::glCullFace(GL_BACK));
 
@@ -395,7 +397,7 @@ void GLVolume::render()
     else
         model.render(this->tverts_range);
 
-    if (this->is_left_handed())
+    if (is_left_handed)
         glsafe(::glFrontFace(GL_CCW));
 }
 
@@ -474,51 +476,6 @@ int GLVolumeCollection::load_object_volume(
     v.set_volume_transformation(model_volume->get_transformation());
 
     return int(this->volumes.size() - 1);
-}
-
-// Load SLA auxiliary GLVolumes (for support trees or pad).
-// This function produces volumes for multiple instances in a single shot,
-// as some object specific mesh conversions may be expensive.
-void GLVolumeCollection::load_object_auxiliary(
-    const SLAPrintObject* print_object,
-    int                             obj_idx,
-    // pairs of <instance_idx, print_instance_idx>
-    const std::vector<std::pair<size_t, size_t>>& instances,
-    SLAPrintObjectStep              milestone,
-    // Timestamp of the last change of the milestone
-    size_t                          timestamp)
-{
-    assert(print_object->is_step_done(milestone));
-    Transform3d  mesh_trafo_inv = print_object->trafo().inverse();
-    // Get the support mesh.
-    TriangleMesh mesh = print_object->get_mesh(milestone);
-    mesh.transform(mesh_trafo_inv);
-    // Convex hull is required for out of print bed detection.
-    TriangleMesh convex_hull = mesh.convex_hull_3d();
-    for (const std::pair<size_t, size_t>& instance_idx : instances) {
-        const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
-        this->volumes.emplace_back(new GLVolume((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR));
-        GLVolume& v = *this->volumes.back();
-#if ENABLE_SMOOTH_NORMALS
-        v.model.init_from(mesh, true);
-#else
-        v.model.init_from(mesh);
-        v.model.set_color((milestone == slaposPad) ? GLVolume::SLA_PAD_COLOR : GLVolume::SLA_SUPPORT_COLOR);
-        v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
-#endif // ENABLE_SMOOTH_NORMALS
-        v.composite_id = GLVolume::CompositeID(obj_idx, -int(milestone), (int)instance_idx.first);
-        v.geometry_id = std::pair<size_t, size_t>(timestamp, model_instance.id().id);
-        // Create a copy of the convex hull mesh for each instance. Use a move operator on the last instance.
-        if (&instance_idx == &instances.back())
-            v.set_convex_hull(std::move(convex_hull));
-        else
-            v.set_convex_hull(convex_hull);
-        v.is_modifier = false;
-        v.shader_outside_printer_detection_enabled = (milestone == slaposSupportTree);
-        v.set_instance_transformation(model_instance.get_transformation());
-        // Leave the volume transformation at identity.
-        // v.set_volume_transformation(model_volume->get_transformation());
-    }
 }
 
 #if ENABLE_OPENGL_ES
@@ -838,6 +795,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glsafe(::glDisable(GL_CULL_FACE));
 
     for (GLVolumeWithIdAndZ& volume : to_render) {
+        const Transform3d& world_matrix = volume.first->world_matrix();
         volume.first->set_render_color(true);
 
         // render sinking contours of non-hovered volumes
@@ -859,9 +817,9 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         shader->set_uniform("print_volume.type", static_cast<int>(m_print_volume.type));
         shader->set_uniform("print_volume.xy_data", m_print_volume.data);
         shader->set_uniform("print_volume.z_data", m_print_volume.zs);
-        shader->set_uniform("volume_world_matrix", volume.first->world_matrix());
+        shader->set_uniform("volume_world_matrix", world_matrix);
         shader->set_uniform("slope.actived", m_slope.active && !volume.first->is_modifier && !volume.first->is_wipe_tower);
-        shader->set_uniform("slope.volume_world_normal_matrix", static_cast<Matrix3f>(volume.first->world_matrix().matrix().block(0, 0, 3, 3).inverse().transpose().cast<float>()));
+        shader->set_uniform("slope.volume_world_normal_matrix", static_cast<Matrix3f>(world_matrix.matrix().block(0, 0, 3, 3).inverse().transpose().cast<float>()));
         shader->set_uniform("slope.normal_z", m_slope.normal_z);
 
 #if ENABLE_ENVIRONMENT_MAP
@@ -874,7 +832,7 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
         glcheck();
 
         volume.first->model.set_color(volume.first->render_color);
-        const Transform3d model_matrix = volume.first->world_matrix();
+        const Transform3d model_matrix = world_matrix;
         shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();

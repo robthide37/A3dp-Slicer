@@ -383,6 +383,12 @@ public:
     bool                    is_seam_painted() const;
     // Checks if any of object volume is painted using the multi-material painting gizmo.
     bool                    is_mm_painted() const;
+    // Checks if object contains just one volume and it's a text
+    bool                    is_text() const;
+    // This object may have a varying layer height by painting or by a table.
+    // Even if true is returned, the layer height profile may be "flat" with no difference to default layering.
+    bool                    has_custom_layering() const 
+        { return ! this->layer_config_ranges.empty() || ! this->layer_height_profile.empty(); }
 
     ModelInstance*          add_instance();
     ModelInstance*          add_instance(const ModelInstance &instance);
@@ -797,6 +803,7 @@ public:
 	bool                is_support_enforcer()   const { return m_type == ModelVolumeType::SUPPORT_ENFORCER; }
 	bool                is_support_blocker()    const { return m_type == ModelVolumeType::SUPPORT_BLOCKER; }
 	bool                is_support_modifier()   const { return m_type == ModelVolumeType::SUPPORT_BLOCKER || m_type == ModelVolumeType::SUPPORT_ENFORCER; }
+    bool                is_text()               const { return text_configuration.has_value(); }
     t_model_material_id material_id() const { return m_material_id; }
     void                reset_extra_facets();
     void                apply_tolerance();
@@ -1387,6 +1394,9 @@ bool model_custom_seam_data_changed(const ModelObject& mo, const ModelObject& mo
 // The function assumes that volumes list is synchronized.
 extern bool model_mmu_segmentation_data_changed(const ModelObject& mo, const ModelObject& mo_new);
 
+// If the model has object(s) which contains a modofoer, then it is currently not supported by the SLA mode.
+// Either the model cannot be loaded, or a SLA printer has to be activated.
+bool model_has_parameter_modifiers_in_objects(const Model& model);
 // If the model has multi-part objects, then it is currently not supported by the SLA mode.
 // Either the model cannot be loaded, or a SLA printer has to be activated.
 bool model_has_multi_part_objects(const Model &model);

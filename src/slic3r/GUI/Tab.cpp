@@ -194,7 +194,7 @@ void Tab::create_preset_tab()
     m_undo_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent) { on_roll_back_value(); }));
     m_undo_to_sys_btn->Bind(wxEVT_BUTTON, ([this](wxCommandEvent) { on_roll_back_value(true); }));
     m_question_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent) {
-        ButtonsDescription dlg(this, m_icon_descriptions);
+        GUI_Descriptions::Dialog dlg(this, m_icon_descriptions);
         if (dlg.ShowModal() == wxID_OK)
             wxGetApp().update_label_colours();
     });
@@ -1038,12 +1038,15 @@ void Tab::load_key_value(const std::string& opt_key, const boost::any& value, bo
 
 static wxString support_combo_value_for_config(const DynamicPrintConfig &config, bool is_fff)
 {
+    std::string slatree = is_fff ? "" : get_sla_suptree_prefix(config);
+
     const std::string support         = is_fff ? "support_material"                 : "supports_enable";
-    const std::string buildplate_only = is_fff ? "support_material_buildplate_only" : "support_buildplate_only";
+    const std::string buildplate_only = is_fff ? "support_material_buildplate_only" : slatree + "support_buildplate_only";
+
     return
         ! config.opt_bool(support) ?
             _("None") :
-            (is_fff && !config.opt_bool("support_material_auto")) ?
+               ((is_fff && !config.opt_bool("support_material_auto")) || (!is_fff && config.opt_bool("support_enforcers_only"))) ?
                 _("For support enforcers only") :
                 (config.opt_bool(buildplate_only) ? _("Support on build plate only") :
                                                     _("Everywhere"));
@@ -1082,7 +1085,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
 
     if (is_fff ?
             (opt_key == "support_material" || opt_key == "support_material_auto" || opt_key == "support_material_buildplate_only") :
-            (opt_key == "supports_enable"  || opt_key == "support_buildplate_only"))
+            (opt_key == "supports_enable"  || opt_key == "support_tree_type" || opt_key == get_sla_suptree_prefix(*m_config) + "support_buildplate_only" || opt_key == "support_enforcers_only"))
         og_freq_chng_params->set_value("support", support_combo_value_for_config(*m_config, is_fff));
 
     if (! is_fff && (opt_key == "pad_enable" || opt_key == "pad_around_object"))
@@ -1425,7 +1428,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("extra_perimeters", category_path + "extra-perimeters-if-needed");
         optgroup->append_single_option_line("extra_perimeters_on_overhangs", category_path + "extra-perimeters-on-overhangs");
         optgroup->append_single_option_line("ensure_vertical_shell_thickness", category_path + "ensure-vertical-shell-thickness");
-        optgroup->append_single_option_line("avoid_curled_filament_during_travels", category_path + "avoid-curled-filament-during-travels");
+        optgroup->append_single_option_line("avoid_crossing_curled_overhangs", category_path + "avoid-crossing-curled-overhangs");
         optgroup->append_single_option_line("avoid_crossing_perimeters", category_path + "avoid-crossing-perimeters");
         optgroup->append_single_option_line("avoid_crossing_perimeters_max_detour", category_path + "avoid_crossing_perimeters_max_detour");
         optgroup->append_single_option_line("thin_walls", category_path + "detect-thin-walls");
@@ -1523,6 +1526,14 @@ void TabPrint::build()
         optgroup->append_single_option_line("dont_support_bridges", category_path + "dont-support-bridges");
         optgroup->append_single_option_line("support_material_synchronize_layers", category_path + "synchronize-with-object-layers");
 
+        optgroup = page->new_optgroup(L("Tree supports"));
+        optgroup->append_single_option_line("support_tree_angle", category_path + "tree_angle");
+        optgroup->append_single_option_line("support_tree_angle_slow", category_path + "tree_angle_slow");
+        optgroup->append_single_option_line("support_tree_branch_diameter", category_path + "tree_branch_diameter");
+        optgroup->append_single_option_line("support_tree_branch_diameter_angle", category_path + "tree_branch_diameter_angle");
+        optgroup->append_single_option_line("support_tree_tip_diameter", category_path + "tree_tip_diameter");
+        optgroup->append_single_option_line("support_tree_top_rate", category_path + "tree_top_rate");
+
     page = add_options_page(L("Speed"), "time");
         optgroup = page->new_optgroup(L("Speed for print moves"));
         optgroup->append_single_option_line("perimeter_speed");
@@ -1548,7 +1559,7 @@ void TabPrint::build()
             optgroup->append_line(line);
         };
         optgroup->append_single_option_line("enable_dynamic_overhang_speeds");
-	    append_option_line(optgroup,"overhang_steepness_levels");
+	    append_option_line(optgroup,"overhang_overlap_levels");
         append_option_line(optgroup,"dynamic_overhang_speeds");
 
         optgroup = page->new_optgroup(L("Speed for non-print moves"));
@@ -1815,44 +1826,58 @@ static void validate_custom_gcode_cb(Tab* tab, const wxString& title, const t_co
     tab->on_value_change(opt_key, value);
 }
 
+void TabFilament::create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, int opt_index/* = 0*/)
+{
+    Line line {"",""};
+    if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
+        Option opt = optgroup->get_option(opt_key);
+        opt.opt.label = opt.opt.full_label;
+        line = optgroup->create_single_option_line(opt);
+    }
+    else
+        line = optgroup->create_single_option_line(optgroup->get_option(opt_key));
+
+    line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
+        wxCheckBox* check_box = new wxCheckBox(parent, wxID_ANY, "");
+
+        check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
+            const bool is_checked = evt.IsChecked();
+            if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
+                if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
+                    field->toggle(is_checked);
+                    if (is_checked)
+                        field->set_last_meaningful_value();
+                    else
+                        field->set_na_value();
+                }
+            }
+        }, check_box->GetId());
+
+        m_overrides_options[opt_key] = check_box;
+        return check_box;
+    };
+
+    optgroup->append_line(line);
+}
+
+void TabFilament::update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& opt_key, int opt_index/* = 0*/, bool is_checked/* = true*/)
+{
+    if (!m_overrides_options[opt_key])
+        return;
+    m_overrides_options[opt_key]->Enable(is_checked);
+
+    is_checked &= !m_config->option(opt_key)->is_nil();
+    m_overrides_options[opt_key]->SetValue(is_checked);
+
+    Field* field = optgroup->get_fieldc(opt_key, opt_index);
+    if (field != nullptr)
+        field->toggle(is_checked);
+}
+
 void TabFilament::add_filament_overrides_page()
 {
     PageShp page = add_options_page(L("Filament Overrides"), "wrench");
     ConfigOptionsGroupShp optgroup = page->new_optgroup(L("Retraction"));
-
-    auto append_single_option_line = [optgroup, this](const std::string& opt_key, int opt_index)
-    {
-        Line line {"",""};
-        if (opt_key == "filament_retract_lift_above" || opt_key == "filament_retract_lift_below") {
-            Option opt = optgroup->get_option(opt_key);
-            opt.opt.label = opt.opt.full_label;
-            line = optgroup->create_single_option_line(opt);
-        }
-        else
-            line = optgroup->create_single_option_line(optgroup->get_option(opt_key));
-
-        line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
-            wxCheckBox* check_box = new wxCheckBox(parent, wxID_ANY, "");
-
-            check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
-                const bool is_checked = evt.IsChecked();
-                if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
-                    if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
-                        field->toggle(is_checked);
-                        if (is_checked)
-                            field->set_last_meaningful_value();
-                        else
-                            field->set_na_value();
-                    }
-                }
-            }, check_box->GetId());
-
-            m_overrides_options[opt_key] = check_box;
-            return check_box;
-        };
-
-        optgroup->append_line(line);
-    };
 
     const int extruder_idx = 0; // #ys_FIXME
 
@@ -1868,7 +1893,7 @@ void TabFilament::add_filament_overrides_page()
                                         "filament_wipe",
                                         "filament_retract_before_wipe"
                                      })
-        append_single_option_line(opt_key, extruder_idx);
+        create_line_with_near_label_widget(optgroup, opt_key, extruder_idx);
 }
 
 void TabFilament::update_filament_overrides_page()
@@ -1903,14 +1928,7 @@ void TabFilament::update_filament_overrides_page()
     for (const std::string& opt_key : opt_keys)
     {
         bool is_checked = opt_key=="filament_retract_length" ? true : have_retract_length;
-        m_overrides_options[opt_key]->Enable(is_checked);
-
-        is_checked &= !m_config->option(opt_key)->is_nil();
-        m_overrides_options[opt_key]->SetValue(is_checked);
-
-        Field* field = optgroup->get_fieldc(opt_key, extruder_idx);
-        if (field != nullptr)
-            field->toggle(is_checked);
+        update_line_with_near_label_widget(optgroup, opt_key, extruder_idx, is_checked);
     }
 }
 
@@ -1941,6 +1959,9 @@ void TabFilament::build()
         };
 
         optgroup = page->new_optgroup(L("Temperature"));
+
+        create_line_with_near_label_widget(optgroup, "idle_temperature");
+
         Line line = { L("Nozzle"), "" };
         line.append_option(optgroup->get_option("first_layer_temperature"));
         line.append_option(optgroup->get_option("temperature"));
@@ -2131,6 +2152,14 @@ void TabFilament::toggle_options()
 
     if (m_active_page->title() == "Filament Overrides")
         update_filament_overrides_page();
+
+    if (m_active_page->title() == "Filament") {
+        Page* page = m_active_page;
+
+        const auto og_it = std::find_if(page->m_optgroups.begin(), page->m_optgroups.end(), [](const ConfigOptionsGroupShp og) { return og->title == "Temperature"; });
+        if (og_it != page->m_optgroups.end())
+            update_line_with_near_label_widget(*og_it, "idle_temperature");
+    }
 }
 
 void TabFilament::update()
@@ -2161,10 +2190,9 @@ void TabFilament::clear_pages()
 
 void TabFilament::msw_rescale()
 {
-    for (const auto& over_opt : m_overrides_options) {
-        wxWindow* win = over_opt.second;
-        win->SetInitialSize(win->GetBestSize());
-    }
+    for (const auto& over_opt : m_overrides_options)
+        if (wxWindow* win = over_opt.second)
+            win->SetInitialSize(win->GetBestSize());
 
     Tab::msw_rescale();
 }
@@ -2373,7 +2401,7 @@ void TabPrinter::build_fff()
         option = optgroup->get_option("start_gcode");
         option.opt.full_width = true;
         option.opt.is_code = true;
-        option.opt.height = gcode_field_height;//150;
+        option.opt.height = 3 * gcode_field_height;//150;
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("End G-code"), 0);
@@ -2383,7 +2411,7 @@ void TabPrinter::build_fff()
         option = optgroup->get_option("end_gcode");
         option.opt.full_width = true;
         option.opt.is_code = true;
-        option.opt.height = gcode_field_height;//150;
+        option.opt.height = 1.75 * gcode_field_height;//150;
         optgroup->append_single_option_line(option);
 
         optgroup = page->new_optgroup(L("Before layer change G-code"), 0);
@@ -2736,7 +2764,7 @@ void TabPrinter::build_extruder_pages(size_t n_before_extruders)
         line.append_widget(reset_to_filament_color);
         optgroup->append_line(line);
 
-        optgroup = page->new_optgroup(L(""));
+        optgroup = page->new_optgroup("");
 
         auto copy_settings_btn = 
         line            = { "", ""};
@@ -2978,6 +3006,10 @@ void TabPrinter::activate_selected_page(std::function<void()> throw_if_canceled)
 void TabPrinter::clear_pages()
 {
     Tab::clear_pages();
+
+    m_machine_limits_description_line           = nullptr;
+    m_fff_print_host_upload_description_line    = nullptr;
+    m_sla_print_host_upload_description_line    = nullptr;
 }
 
 void TabPrinter::toggle_options()
@@ -3402,7 +3434,7 @@ void Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
                 // If preset selection was canceled and previously was selected physical printer, we should select it back
                 m_preset_bundle->physical_printers.select_printer(last_selected_ph_printer_name);
             }
-            if (m_preset_bundle->physical_printers.has_selection()) {
+            else if (m_preset_bundle->physical_printers.has_selection()) {
                 // If preset selection was canceled and physical printer was selected
                 // we must disable selection marker for the physical printers
                 m_preset_bundle->physical_printers.unselect_printer();
@@ -3708,11 +3740,25 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     // focus currently.is there anything better than this ?
 //!	m_treectrl->OnSetFocus();
 
+    auto& old_preset = m_presets->get_edited_preset();
+    bool from_template = false;
+    std::string edited_printer;
+    if (m_type == Preset::TYPE_FILAMENT && old_preset.vendor && old_preset.vendor->templates_profile)
+    {
+        //TODO: is this really the best way to get "printer_model" option of currently edited printer?
+        edited_printer = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt<ConfigOptionString>("printer_model")->serialize();
+        if (!edited_printer.empty())
+            from_template = true;
+        
+    }
+
     if (name.empty()) {
-        SavePresetDialog dlg(m_parent, m_type, detach ? _u8L("Detached") : "");
+        SavePresetDialog dlg(m_parent, m_type, detach ? _u8L("Detached") : "", from_template);
         if (dlg.ShowModal() != wxID_OK)
             return;
         name = dlg.get_name();
+        if (from_template)
+            from_template = dlg.get_template_filament_checkbox();
     }
 
     if (detach && m_type == Preset::TYPE_PRINTER)
@@ -3723,6 +3769,19 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
 
     if (detach && m_type == Preset::TYPE_PRINTER)
         wxGetApp().mainframe->on_config_changed(m_config);
+
+    // Update compatible printers
+    if (from_template && !edited_printer.empty()) {
+        auto& new_preset = m_presets->get_edited_preset();
+        std::string cond = new_preset.compatible_printers_condition();
+        if (!cond.empty())
+            cond += " and ";
+        cond += "printer_model == \""+edited_printer+"\"";
+        new_preset.config.set("compatible_printers_condition", cond);
+        new_preset.save();
+        m_presets->save_current_preset(name, detach);
+        load_current_preset();
+    }
 
     // Mark the print & filament enabled if they are compatible with the currently selected preset.
     // If saving the preset changes compatibility with other presets, keep the now incompatible dependent presets selected, however with a "red flag" icon showing that they are no more compatible.
@@ -4817,6 +4876,60 @@ void TabSLAMaterial::update()
         wxGetApp().mainframe->on_config_changed(m_config);
 }
 
+static void add_options_into_line(ConfigOptionsGroupShp &optgroup,
+                                  const std::vector<SamePair<std::string>> &prefixes,
+                                  const std::string &optkey)
+{
+    auto opt = optgroup->get_option(prefixes.front().first + optkey);
+    Line line{ opt.opt.label, "" };
+    line.full_width = 1;
+    for (auto &prefix : prefixes) {
+        opt = optgroup->get_option(prefix.first + optkey);
+        opt.opt.label = prefix.second;
+        opt.opt.width = 12; // TODO
+        line.append_option(opt);
+    }
+    optgroup->append_line(line);
+}
+
+void TabSLAPrint::build_sla_support_params(const std::vector<SamePair<std::string>> &prefixes,
+                                           const Slic3r::GUI::PageShp &page)
+{
+
+    auto optgroup = page->new_optgroup(L("Support head"));
+    add_options_into_line(optgroup, prefixes, "support_head_front_diameter");
+    add_options_into_line(optgroup, prefixes, "support_head_penetration");
+    add_options_into_line(optgroup, prefixes, "support_head_width");
+
+    optgroup = page->new_optgroup(L("Support pillar"));
+    add_options_into_line(optgroup, prefixes, "support_pillar_diameter");
+    add_options_into_line(optgroup, prefixes, "support_small_pillar_diameter_percent");
+    add_options_into_line(optgroup, prefixes, "support_max_bridges_on_pillar");
+
+    add_options_into_line(optgroup, prefixes, "support_pillar_connection_mode");
+    add_options_into_line(optgroup, prefixes, "support_buildplate_only");
+    add_options_into_line(optgroup, prefixes, "support_pillar_widening_factor");
+    add_options_into_line(optgroup, prefixes, "support_max_weight_on_model");
+    add_options_into_line(optgroup, prefixes, "support_base_diameter");
+    add_options_into_line(optgroup, prefixes, "support_base_height");
+    add_options_into_line(optgroup, prefixes, "support_base_safety_distance");
+
+    // Mirrored parameter from Pad page for toggling elevation on the same page
+    add_options_into_line(optgroup, prefixes, "support_object_elevation");
+
+    Line line{ "", "" };
+    line.full_width = 1;
+    line.widget = [this](wxWindow* parent) {
+        return description_line_widget(parent, &m_support_object_elevation_description_line);
+    };
+    optgroup->append_line(line);
+
+    optgroup = page->new_optgroup(L("Connection of the support sticks and junctions"));
+    add_options_into_line(optgroup, prefixes, "support_critical_angle");
+    add_options_into_line(optgroup, prefixes, "support_max_bridge_length");
+    add_options_into_line(optgroup, prefixes, "support_max_pillar_link_distance");
+}
+
 void TabSLAPrint::build()
 {
     m_presets = &m_preset_bundle->sla_prints;
@@ -4829,41 +4942,14 @@ void TabSLAPrint::build()
     optgroup->append_single_option_line("faded_layers");
 
     page = add_options_page(L("Supports"), "support"/*"sla_supports"*/);
+
     optgroup = page->new_optgroup(L("Supports"));
     optgroup->append_single_option_line("supports_enable");
     optgroup->append_single_option_line("support_tree_type");
-
-    optgroup = page->new_optgroup(L("Support head"));
-    optgroup->append_single_option_line("support_head_front_diameter");
-    optgroup->append_single_option_line("support_head_penetration");
-    optgroup->append_single_option_line("support_head_width");
-
-    optgroup = page->new_optgroup(L("Support pillar"));
-    optgroup->append_single_option_line("support_pillar_diameter");
-    optgroup->append_single_option_line("support_small_pillar_diameter_percent");
-    optgroup->append_single_option_line("support_max_bridges_on_pillar");
+    optgroup->append_single_option_line("support_enforcers_only");
     
-    optgroup->append_single_option_line("support_pillar_connection_mode");
-    optgroup->append_single_option_line("support_buildplate_only");
-    optgroup->append_single_option_line("support_pillar_widening_factor");
-    optgroup->append_single_option_line("support_base_diameter");
-    optgroup->append_single_option_line("support_base_height");
-    optgroup->append_single_option_line("support_base_safety_distance");
-    
-    // Mirrored parameter from Pad page for toggling elevation on the same page
-    optgroup->append_single_option_line("support_object_elevation");
+    build_sla_support_params({{"", "Default"}, {"branching", "Branching"}}, page);
 
-    Line line{ "", "" };
-    line.full_width = 1;
-    line.widget = [this](wxWindow* parent) {
-        return description_line_widget(parent, &m_support_object_elevation_description_line);
-    };
-    optgroup->append_line(line);
-
-    optgroup = page->new_optgroup(L("Connection of the support sticks and junctions"));
-    optgroup->append_single_option_line("support_critical_angle");
-    optgroup->append_single_option_line("support_max_bridge_length");
-    optgroup->append_single_option_line("support_max_pillar_link_distance");
 
     optgroup = page->new_optgroup(L("Automatic generation"));
     optgroup->append_single_option_line("support_points_density_relative");

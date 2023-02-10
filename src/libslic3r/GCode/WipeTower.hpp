@@ -82,6 +82,8 @@ public:
 			}
 			return e_length;
 		}
+
+		bool force_travel = false;
 	};
 
     struct box_coordinates
@@ -289,7 +291,6 @@ private:
 
 	// Extruder specific parameters.
     std::vector<FilamentParameters> m_filpar;
-
 
 	// State of the wipe tower generator.
 	unsigned int m_num_layer_changes = 0; // Layer change counter for the output statistics.

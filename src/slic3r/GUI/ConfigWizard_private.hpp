@@ -26,6 +26,7 @@
 #include "slic3r/Utils/PresetUpdater.hpp"
 #include "BedShapeDialog.hpp"
 #include "GUI.hpp"
+#include "SavePresetDialog.hpp"
 #include "wxExtensions.hpp"
 
 
@@ -59,18 +60,25 @@ enum Technology {
     T_ANY = ~0,
 };
 
+enum BundleLocation{
+    IN_VENDOR,
+    IN_ARCHIVE,
+    IN_RESOURCES
+};
+
 struct Bundle
 {
 	std::unique_ptr<PresetBundle> preset_bundle;
 	VendorProfile* vendor_profile{ nullptr };
-	bool is_in_resources{ false };
+	//bool is_in_resources{ false };
+    BundleLocation location;
 	bool is_prusa_bundle{ false };
 
 	Bundle() = default;
 	Bundle(Bundle&& other);
 
 	// Returns false if not loaded. Reason for that is logged as boost::log error.
-	bool load(fs::path source_path, bool is_in_resources, bool is_prusa_bundle = false);
+	bool load(fs::path source_path, BundleLocation location, bool is_prusa_bundle = false);
 
 	const std::string& vendor_id() const { return vendor_profile->id; }
 };
@@ -83,74 +91,8 @@ struct BundleMap : std::map<std::string /* = vendor ID */, Bundle>
 	const Bundle& prusa_bundle() const;
 };
 
-struct Materials
-{
-    Technology technology;
-    // use vector for the presets to purpose of save of presets sorting in the bundle
-    std::vector<const Preset*> presets;
-    // String is alias of material, size_t number of compatible counters 
-    std::vector<std::pair<std::string, size_t>> compatibility_counter;
-    std::set<std::string> types;
-	std::set<const Preset*> printers;
+struct Materials;
 
-    Materials(Technology technology) : technology(technology) {}
-
-    void push(const Preset *preset);
-	void add_printer(const Preset* preset);
-    void clear();
-    bool containts(const Preset *preset) const {
-        //return std::find(presets.begin(), presets.end(), preset) != presets.end(); 
-		return std::find_if(presets.begin(), presets.end(),
-			[preset](const Preset* element) { return element == preset; }) != presets.end();
-
-    }
-	
-	bool get_omnipresent(const Preset* preset) {
-		return get_printer_counter(preset) == printers.size();
-	}
-
-    const std::vector<const Preset*> get_presets_by_alias(const std::string name) {
-        std::vector<const Preset*> ret_vec;
-        for (auto it = presets.begin(); it != presets.end(); ++it) {
-            if ((*it)->alias == name)
-                ret_vec.push_back((*it));
-        }
-        return ret_vec;
-    }
-
-	
-
-	size_t get_printer_counter(const Preset* preset) {
-		for (auto it : compatibility_counter) {
-			if (it.first == preset->alias)
-                return it.second;
-        }
-		return 0;
-	}
-
-    const std::string& appconfig_section() const;
-    const std::string& get_type(const Preset *preset) const;
-    const std::string& get_vendor(const Preset *preset) const;
-	
-	template<class F> void filter_presets(const Preset* printer, const std::string& type, const std::string& vendor, F cb) {
-		for (auto preset : presets) {
-			const Preset& prst = *(preset);
-			const Preset& prntr = *printer;
-		      if ((printer == nullptr || is_compatible_with_printer(PresetWithVendorProfile(prst, prst.vendor), PresetWithVendorProfile(prntr, prntr.vendor))) &&
-			    (type.empty() || get_type(preset) == type) &&
-				(vendor.empty() || get_vendor(preset) == vendor)) {
-
-				cb(preset);
-			}
-		}
-	}
-
-    static const std::string UNKNOWN;
-    static const std::string& get_filament_type(const Preset *preset);
-    static const std::string& get_filament_vendor(const Preset *preset);
-    static const std::string& get_material_type(const Preset *preset);
-    static const std::string& get_material_vendor(const Preset *preset);
-};
 
 
 struct PrinterPickerEvent;
@@ -343,6 +285,10 @@ struct PageMaterials: ConfigWizardPage
     std::string empty_printers_label;
     bool first_paint = { false };
     static const std::string EMPTY;
+    static const std::string TEMPLATES;
+    // notify user first time they choose template profile
+    bool template_shown = { false }; 
+    bool notification_shown = { false };
     int last_hovered_item = { -1 } ;
 
     PageMaterials(ConfigWizard *parent, Materials *materials, wxString title, wxString shortname, wxString list1name);
@@ -367,19 +313,99 @@ struct PageMaterials: ConfigWizardPage
     virtual void on_activate() override;
 };
 
+struct Materials
+{
+    Technology technology;
+    // use vector for the presets to purpose of save of presets sorting in the bundle
+    std::vector<const Preset*> presets;
+    // String is alias of material, size_t number of compatible counters 
+    std::vector<std::pair<std::string, size_t>> compatibility_counter;
+    std::set<std::string> types;
+    std::set<const Preset*> printers;
+
+    Materials(Technology technology) : technology(technology) {}
+
+    void push(const Preset* preset);
+    void add_printer(const Preset* preset);
+    void clear();
+    bool containts(const Preset* preset) const {
+        //return std::find(presets.begin(), presets.end(), preset) != presets.end(); 
+        return std::find_if(presets.begin(), presets.end(),
+            [preset](const Preset* element) { return element == preset; }) != presets.end();
+
+    }
+
+    bool get_omnipresent(const Preset* preset) {
+        return get_printer_counter(preset) == printers.size();
+    }
+
+    const std::vector<const Preset*> get_presets_by_alias(const std::string name) {
+        std::vector<const Preset*> ret_vec;
+        for (auto it = presets.begin(); it != presets.end(); ++it) {
+            if ((*it)->alias == name)
+                ret_vec.push_back((*it));
+        }
+        return ret_vec;
+    }
+
+
+
+    size_t get_printer_counter(const Preset* preset) {
+        for (auto it : compatibility_counter) {
+            if (it.first == preset->alias)
+                return it.second;
+        }
+        return 0;
+    }
+
+    const std::string& appconfig_section() const;
+    const std::string& get_type(const Preset* preset) const;
+    const std::string& get_vendor(const Preset* preset) const;
+
+    template<class F> void filter_presets(const Preset* printer, const std::string& printer_name, const std::string& type, const std::string& vendor, F cb) {
+        for (auto preset : presets) {
+            const Preset& prst = *(preset);
+            const Preset& prntr = *printer;
+            if (((printer == nullptr && printer_name == PageMaterials::EMPTY) || (printer != nullptr && is_compatible_with_printer(PresetWithVendorProfile(prst, prst.vendor), PresetWithVendorProfile(prntr, prntr.vendor)))) &&
+                (type.empty() || get_type(preset) == type) &&
+                (vendor.empty() || get_vendor(preset) == vendor) &&
+                prst.vendor && !prst.vendor->templates_profile) {
+
+                cb(preset);
+            }
+            else if ((printer == nullptr && printer_name == PageMaterials::TEMPLATES) && prst.vendor && prst.vendor->templates_profile &&
+                (type.empty() || get_type(preset) == type) &&
+                (vendor.empty() || get_vendor(preset) == vendor)) {
+                cb(preset);
+            }
+        }
+    }
+
+    static const std::string UNKNOWN;
+    static const std::string& get_filament_type(const Preset* preset);
+    static const std::string& get_filament_vendor(const Preset* preset);
+    static const std::string& get_material_type(const Preset* preset);
+    static const std::string& get_material_vendor(const Preset* preset);
+};
+
+
 struct PageCustom: ConfigWizardPage
 {
     PageCustom(ConfigWizard *parent);
+    ~PageCustom() {
+        if (profile_name_editor) 
+            delete profile_name_editor;
+    }
 
-    bool custom_wanted() const { return cb_custom->GetValue(); }
-    std::string profile_name() const { return into_u8(tc_profile_name->GetValue()); }
+    bool        custom_wanted()         const { return cb_custom->GetValue(); }
+    bool        is_valid_profile_name() const { return profile_name_editor->is_valid();}
+    std::string profile_name()          const { return profile_name_editor->preset_name(); }
 
 private:
     static const char* default_profile_name;
 
-    wxCheckBox *cb_custom;
-    wxTextCtrl *tc_profile_name;
-    wxString profile_name_prev;
+    wxCheckBox              *cb_custom {nullptr};
+    SavePresetDialog::Item  *profile_name_editor {nullptr};
 
 };
 
@@ -387,8 +413,53 @@ struct PageUpdate: ConfigWizardPage
 {
     bool version_check;
     bool preset_update;
+    wxTextCtrl* path_text_ctrl;
 
     PageUpdate(ConfigWizard *parent);
+};
+
+namespace DownloaderUtils {
+    wxString get_downloads_path();
+
+class Worker : public wxBoxSizer
+{
+    wxWindow*   m_parent {nullptr};
+    wxTextCtrl* m_input_path {nullptr};
+    bool        downloader_checked {false};
+#ifdef __linux__
+    bool        perform_registration_linux { false };
+#endif // __linux__
+
+    void deregister();
+
+public:
+    Worker(wxWindow* parent);
+    ~Worker(){}
+
+    void allow(bool allow_)     { downloader_checked = allow_; }
+    bool is_checked() const     { return downloader_checked; }
+    wxString path_name() const  { return m_input_path ? m_input_path->GetValue() : wxString(); }
+
+    void set_path_name(wxString name);
+    void set_path_name(const std::string& name);
+
+    bool on_finish();
+    bool perform_register(const std::string& path_override = {});
+#ifdef __linux__
+    bool get_perform_registration_linux() { return perform_registration_linux; }
+#endif // __linux__
+};
+
+}
+
+
+struct PageDownloader : ConfigWizardPage
+{
+    DownloaderUtils::Worker* downloader{ nullptr };
+
+    PageDownloader(ConfigWizard* parent);
+
+    bool on_finish_downloader() const ;
 };
 
 struct PageReloadFromDisk : ConfigWizardPage
@@ -557,9 +628,11 @@ struct ConfigWizard::priv
     std::unique_ptr<DynamicPrintConfig> custom_config;           // Backing for custom printer definition
     bool any_fff_selected;        // Used to decide whether to display Filaments page
     bool any_sla_selected;        // Used to decide whether to display SLA Materials page
-    bool custom_printer_selected { false }; 
+    bool custom_printer_selected { false }; // New custom printer is requested
+    bool custom_printer_in_bundle { false }; // Older custom printer already exists when wizard starts
     // Set to true if there are none FFF printers on the main FFF page. If true, only SLA printers are shown (not even custum printers)
     bool only_sla_mode { false };
+    bool template_profile_selected { false }; // This bool has one purpose - to tell that template profile should be installed if its not (because it cannot be added to appconfig)
 
     wxScrolledWindow *hscroll = nullptr;
     wxBoxSizer *hscroll_sizer = nullptr;
@@ -578,7 +651,8 @@ struct ConfigWizard::priv
     PageMaterials    *page_filaments = nullptr;
     PageMaterials    *page_sla_materials = nullptr;
     PageCustom       *page_custom = nullptr;
-    PageUpdate       *page_update = nullptr;
+    PageUpdate* page_update = nullptr;
+    PageDownloader* page_downloader = nullptr;
     PageReloadFromDisk *page_reload_from_disk = nullptr;
 #ifdef _WIN32
     PageFilesAssociation* page_files_association = nullptr;
@@ -626,9 +700,9 @@ struct ConfigWizard::priv
     bool apply_config(AppConfig *app_config, PresetBundle *preset_bundle, const PresetUpdater *updater, bool& apply_keeped_changes);
     // #ys_FIXME_alise
     void update_presets_in_config(const std::string& section, const std::string& alias_key, bool add);
-#ifdef __linux__
-    void perform_desktop_integration() const;
-#endif
+//#ifdef __linux__
+//    void perform_desktop_integration() const;
+//#endif
     bool check_fff_selected();        // Used to decide whether to display Filaments page
     bool check_sla_selected();        // Used to decide whether to display SLA Materials page
 

@@ -101,7 +101,7 @@ void test_supports(const std::string          &obj_filename,
     REQUIRE_FALSE(mesh.empty());
 
     if (hollowingcfg.enabled) {
-        sla::InteriorPtr interior = sla::generate_interior(mesh, hollowingcfg);
+        sla::InteriorPtr interior = sla::generate_interior(mesh.its, hollowingcfg);
         REQUIRE(interior);
         mesh.merge(TriangleMesh{sla::get_mesh(*interior)});
     }
@@ -118,7 +118,7 @@ void test_supports(const std::string          &obj_filename,
 
     // Create the special index-triangle mesh with spatial indexing which
     // is the input of the support point and support mesh generators
-    AABBMesh emesh{mesh};
+    sla::SupportableMesh  sm{mesh.its, {}, supportcfg};
 
     #ifdef SLIC3R_HOLE_RAYCASTER
     if (hollowingcfg.enabled)
@@ -130,23 +130,23 @@ void test_supports(const std::string          &obj_filename,
     // Create the support point generator
     sla::SupportPointGenerator::Config autogencfg;
     autogencfg.head_diameter = float(2 * supportcfg.head_front_radius_mm);
-    sla::SupportPointGenerator point_gen{emesh, autogencfg, [] {}, [](int) {}};
+    sla::SupportPointGenerator point_gen{sm.emesh, autogencfg, [] {}, [](int) {}};
 
     point_gen.seed(0); // Make the test repeatable
     point_gen.execute(out.model_slices, out.slicegrid);
 
     // Get the calculated support points.
-    std::vector<sla::SupportPoint> support_points = point_gen.output();
+    sm.pts = point_gen.output();
 
     int validityflags = ASSUME_NO_REPAIR;
 
     // If there is no elevation, support points shall be removed from the
     // bottom of the object.
     if (std::abs(supportcfg.object_elevation_mm) < EPSILON) {
-        sla::remove_bottom_points(support_points, zmin + supportcfg.base_height_mm);
+        sla::remove_bottom_points(sm.pts, zmin + supportcfg.base_height_mm);
     } else {
         // Should be support points at least on the bottom of the model
-        REQUIRE_FALSE(support_points.empty());
+        REQUIRE_FALSE(sm.pts.empty());
 
         // Also the support mesh should not be empty.
         validityflags |= ASSUME_NO_EMPTY;
@@ -154,7 +154,6 @@ void test_supports(const std::string          &obj_filename,
 
     // Generate the actual support tree
     sla::SupportTreeBuilder treebuilder;
-    sla::SupportableMesh    sm{emesh, support_points, supportcfg};
 
     switch (sm.cfg.tree_type) {
     case sla::SupportTreeType::Default: {
@@ -181,6 +180,18 @@ void test_supports(const std::string          &obj_filename,
 
     if (std::abs(supportcfg.object_elevation_mm) < EPSILON)
         allowed_zmin = zmin - 2 * supportcfg.head_back_radius_mm;
+
+#ifndef NDEBUG
+    if (!(obb.min.z() >= Approx(allowed_zmin)) || !(obb.max.z() <= Approx(zmax)))
+    {
+        indexed_triangle_set its;
+        treebuilder.retrieve_full_mesh(its);
+        TriangleMesh m{its};
+        m.merge(mesh);
+        m.WriteOBJFile((Catch::getResultCapture().getCurrentTestName() + "_" +
+                        obj_filename).c_str());
+    }
+#endif
 
     REQUIRE(obb.min.z() >= Approx(allowed_zmin));
     REQUIRE(obb.max.z() <= Approx(zmax));

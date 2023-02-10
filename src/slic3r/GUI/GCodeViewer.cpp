@@ -560,23 +560,22 @@ void GCodeViewer::SequentialView::render(float legend_height)
     gcode_window.render(legend_height, bottom, static_cast<uint64_t>(gcode_ids[current.last]));
 }
 
-const std::vector<ColorRGBA> GCodeViewer::Extrusion_Role_Colors{ {
-    { 0.90f, 0.70f, 0.70f, 1.0f },   // erNone
-    { 1.00f, 0.90f, 0.30f, 1.0f },   // erPerimeter
-    { 1.00f, 0.49f, 0.22f, 1.0f },   // erExternalPerimeter
-    { 0.12f, 0.12f, 1.00f, 1.0f },   // erOverhangPerimeter
-    { 0.69f, 0.19f, 0.16f, 1.0f },   // erInternalInfill
-    { 0.59f, 0.33f, 0.80f, 1.0f },   // erSolidInfill
-    { 0.94f, 0.25f, 0.25f, 1.0f },   // erTopSolidInfill
-    { 1.00f, 0.55f, 0.41f, 1.0f },   // erIroning
-    { 0.30f, 0.50f, 0.73f, 1.0f },   // erBridgeInfill
-    { 1.00f, 1.00f, 1.00f, 1.0f },   // erGapFill
-    { 0.00f, 0.53f, 0.43f, 1.0f },   // erSkirt
-    { 0.00f, 1.00f, 0.00f, 1.0f },   // erSupportMaterial
-    { 0.00f, 0.50f, 0.00f, 1.0f },   // erSupportMaterialInterface
-    { 0.70f, 0.89f, 0.67f, 1.0f },   // erWipeTower
-    { 0.37f, 0.82f, 0.58f, 1.0f },   // erCustom
-    { 0.00f, 0.00f, 0.00f, 1.0f }    // erMixed
+const std::array<ColorRGBA, static_cast<size_t>(GCodeExtrusionRole::Count)> GCodeViewer::Extrusion_Role_Colors{ {
+    { 0.90f, 0.70f, 0.70f, 1.0f },   // GCodeExtrusionRole::None
+    { 1.00f, 0.90f, 0.30f, 1.0f },   // GCodeExtrusionRole::Perimeter
+    { 1.00f, 0.49f, 0.22f, 1.0f },   // GCodeExtrusionRole::ExternalPerimeter
+    { 0.12f, 0.12f, 1.00f, 1.0f },   // GCodeExtrusionRole::OverhangPerimeter
+    { 0.69f, 0.19f, 0.16f, 1.0f },   // GCodeExtrusionRole::InternalInfill
+    { 0.59f, 0.33f, 0.80f, 1.0f },   // GCodeExtrusionRole::SolidInfill
+    { 0.94f, 0.25f, 0.25f, 1.0f },   // GCodeExtrusionRole::TopSolidInfill
+    { 1.00f, 0.55f, 0.41f, 1.0f },   // GCodeExtrusionRole::Ironing
+    { 0.30f, 0.50f, 0.73f, 1.0f },   // GCodeExtrusionRole::BridgeInfill
+    { 1.00f, 1.00f, 1.00f, 1.0f },   // GCodeExtrusionRole::GapFill
+    { 0.00f, 0.53f, 0.43f, 1.0f },   // GCodeExtrusionRole::Skirt
+    { 0.00f, 1.00f, 0.00f, 1.0f },   // GCodeExtrusionRole::SupportMaterial
+    { 0.00f, 0.50f, 0.00f, 1.0f },   // GCodeExtrusionRole::SupportMaterialInterface
+    { 0.70f, 0.89f, 0.67f, 1.0f },   // GCodeExtrusionRole::WipeTower
+    { 0.37f, 0.82f, 0.58f, 1.0f },   // GCodeExtrusionRole::Custom
 }};
 
 const std::vector<ColorRGBA> GCodeViewer::Options_Colors{ {
@@ -840,7 +839,7 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
             m_extrusions.ranges.width.update_from(round_to_bin(curr.width));
             m_extrusions.ranges.fan_speed.update_from(curr.fan_speed);
             m_extrusions.ranges.temperature.update_from(curr.temperature);
-            if (curr.extrusion_role != erCustom || is_visible(erCustom))
+            if (curr.extrusion_role != GCodeExtrusionRole::Custom || is_visible(GCodeExtrusionRole::Custom))
                 m_extrusions.ranges.volumetric_rate.update_from(round_to_bin(curr.volumetric_rate()));
             [[fallthrough]];
         }
@@ -899,7 +898,7 @@ void GCodeViewer::reset()
     m_shells.volumes.clear();
     m_layers.reset();
     m_layers_z_range = { 0, 0 };
-    m_roles = std::vector<ExtrusionRole>();
+    m_roles = std::vector<GCodeExtrusionRole>();
     m_print_statistics.reset();
     for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
         m_layers_times[i] = std::vector<float>();
@@ -1556,7 +1555,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
             // for the gcode viewer we need to take in account all moves to correctly size the printbed
             m_paths_bounding_box.merge(move.position.cast<double>());
         else {
-            if (move.type == EMoveType::Extrude && move.extrusion_role != erCustom && move.width != 0.0f && move.height != 0.0f)
+            if (move.type == EMoveType::Extrude && move.extrusion_role != GCodeExtrusionRole::Custom && move.width != 0.0f && move.height != 0.0f)
                 m_paths_bounding_box.merge(move.position.cast<double>());
         }
     }
@@ -1603,12 +1602,11 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         const GCodeProcessorResult::MoveVertex& prev = gcode_result.moves[i - 1];
 
         if (curr.type == EMoveType::Extrude &&
-            curr.extrusion_role != erSkirt &&
-            curr.extrusion_role != erSupportMaterial &&
-            curr.extrusion_role != erSupportMaterialInterface &&
-            curr.extrusion_role != erWipeTower &&
-            curr.extrusion_role != erCustom &&
-            curr.extrusion_role != erMixed) {
+            curr.extrusion_role != GCodeExtrusionRole::Skirt &&
+            curr.extrusion_role != GCodeExtrusionRole::SupportMaterial &&
+            curr.extrusion_role != GCodeExtrusionRole::SupportMaterialInterface &&
+            curr.extrusion_role != GCodeExtrusionRole::WipeTower &&
+            curr.extrusion_role != GCodeExtrusionRole::Custom) {
             const Vec3d curr_pos = curr.position.cast<double>();
             const Vec3d prev_pos = prev.position.cast<double>();
             m_cog.add_segment(curr_pos, prev_pos, curr.mm3_per_mm * (curr_pos - prev_pos).norm());
@@ -3184,14 +3182,10 @@ void GCodeViewer::render_shells()
     if (shader == nullptr)
         return;
 
-//    glsafe(::glDepthMask(GL_FALSE));
-
     shader->start_using();
     const Camera& camera = wxGetApp().plater()->get_camera();
     m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, camera.get_view_matrix(), camera.get_projection_matrix());
     shader->stop_using();
-
-//    glsafe(::glDepthMask(GL_TRUE));
 }
 
 void GCodeViewer::render_legend(float& legend_height)
@@ -3469,12 +3463,12 @@ void GCodeViewer::render_legend(float& legend_height)
         return _u8L("from") + " " + std::string(buf1) + " " + _u8L("to") + " " + std::string(buf2) + " " + _u8L("mm");
     };
 
-    auto role_time_and_percent = [time_mode](ExtrusionRole role) {
-        auto it = std::find_if(time_mode.roles_times.begin(), time_mode.roles_times.end(), [role](const std::pair<ExtrusionRole, float>& item) { return role == item.first; });
+    auto role_time_and_percent = [time_mode](GCodeExtrusionRole role) {
+        auto it = std::find_if(time_mode.roles_times.begin(), time_mode.roles_times.end(), [role](const std::pair<GCodeExtrusionRole, float>& item) { return role == item.first; });
         return (it != time_mode.roles_times.end()) ? std::make_pair(it->second, it->second / time_mode.time) : std::make_pair(0.0f, 0.0f);
     };
 
-    auto used_filament_per_role = [this, imperial_units](ExtrusionRole role) {
+    auto used_filament_per_role = [this, imperial_units](GCodeExtrusionRole role) {
         auto it = m_print_statistics.used_filaments_per_role.find(role);
         if (it == m_print_statistics.used_filaments_per_role.end())
             return std::make_pair(0.0, 0.0);
@@ -3494,10 +3488,10 @@ void GCodeViewer::render_legend(float& legend_height)
 
     if (m_view_type == EViewType::FeatureType) {
         // calculate offsets to align time/percentage data
-        for (size_t i = 0; i < m_roles.size(); ++i) {
-            ExtrusionRole role = m_roles[i];
-            if (role < erCount) {
-                labels.push_back(_u8L(ExtrusionEntity::role_to_string(role)));
+        for (GCodeExtrusionRole role : m_roles) {
+            assert(role < GCodeExtrusionRole::Count);
+            if (role < GCodeExtrusionRole::Count) {
+                labels.push_back(_u8L(gcode_extrusion_role_to_string(role)));
                 auto [time, percent] = role_time_and_percent(role);
                 times.push_back((time > 0.0f) ? short_time(get_time_dhms(time)) : "");
                 percents.push_back(percent);
@@ -3595,9 +3589,9 @@ void GCodeViewer::render_legend(float& legend_height)
 
     // extrusion paths section -> title
     if (m_view_type == EViewType::FeatureType)
-        append_headers({ _u8L(""), _u8L("Time"), _u8L("Percentage"), _u8L("Used filament") }, offsets);
+        append_headers({ "", _u8L("Time"), _u8L("Percentage"), _u8L("Used filament") }, offsets);
     else if (m_view_type == EViewType::Tool)
-        append_headers({ _u8L(""), _u8L("Used filament"), _u8L(""), _u8L("") }, offsets);
+        append_headers({ "", _u8L("Used filament"), "", ""}, offsets);
     else
         ImGui::Separator();
 
@@ -3610,13 +3604,13 @@ void GCodeViewer::render_legend(float& legend_height)
             max_time_percent = std::max(max_time_percent, time_mode.travel_time / time_mode.time);
 
             for (size_t i = 0; i < m_roles.size(); ++i) {
-                ExtrusionRole role = m_roles[i];
-                if (role >= erCount)
+                GCodeExtrusionRole role = m_roles[i];
+                if (role >= GCodeExtrusionRole::Count)
                     continue;
                 const bool visible = is_visible(role);
                 append_item(EItemType::Rect, Extrusion_Role_Colors[static_cast<unsigned int>(role)], labels[i],
                     visible, times[i], percents[i], max_time_percent, offsets, used_filaments_m[i], used_filaments_g[i], [this, role, visible]() {
-                        m_extrusions.role_visibility_flags = visible ? m_extrusions.role_visibility_flags & ~(1 << role) : m_extrusions.role_visibility_flags | (1 << role);
+                        m_extrusions.role_visibility_flags = visible ? m_extrusions.role_visibility_flags & ~(1 << int(role)) : m_extrusions.role_visibility_flags | (1 << int(role));
                         // update buffers' render paths
                         refresh_render_paths(false, false);
                         wxGetApp().plater()->update_preview_moves_slider();
