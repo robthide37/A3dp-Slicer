@@ -656,7 +656,7 @@ void GLGizmoCut3D::render_cut_plane()
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
-    if (can_perform_cut())
+    if (can_perform_cut() && has_valid_contour())
 //        m_plane.set_color({ 0.8f, 0.8f, 0.8f, 0.5f });
         m_plane.set_color({ 0.9f, 0.9f, 0.9f, 0.5f });
     else
@@ -669,9 +669,19 @@ void GLGizmoCut3D::render_cut_plane()
     shader->stop_using();
 }
 
-static float get_grabber_mean_size(const BoundingBoxf3& bb)
+static double get_grabber_mean_size(const BoundingBoxf3& bb)
 {
-    return float((bb.size().x() + bb.size().y() + bb.size().z()) / 3.0);
+    return (bb.size().x() + bb.size().y() + bb.size().z()) / 30.;
+}
+
+static double get_half_size(double size)
+{
+    return std::max(size * 0.35, 0.05);
+}
+
+static double get_dragging_half_size(double size)
+{
+    return get_half_size(size) * 1.25;
 }
 
 void GLGizmoCut3D::render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix)
@@ -754,10 +764,9 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
 
     const Transform3d view_matrix = wxGetApp().plater()->get_camera().get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
 
-    const Grabber& grabber = m_grabbers.front();
-    const float mean_size = get_grabber_mean_size(bounding_box());
+    const double mean_size = get_grabber_mean_size(bounding_box());
 
-    double size = m_dragging && m_hover_id == Z ? double(grabber.get_dragging_half_size(mean_size)) : double(grabber.get_half_size(mean_size));
+    double size = m_dragging && m_hover_id == Z ? get_dragging_half_size(mean_size) : get_half_size(mean_size);
 
     Vec3d cone_scale = Vec3d(0.75 * size, 0.75 * size, 1.8 * size);
     Vec3d offset = 1.25 * size * Vec3d::UnitZ();
@@ -782,7 +791,7 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
 
     if ((!m_dragging && m_hover_id < 0) || m_hover_id == X || m_hover_id == Y)
     {
-        size = m_dragging ? double(grabber.get_dragging_half_size(mean_size)) : double(grabber.get_half_size(mean_size));
+        size = m_dragging ? get_dragging_half_size(mean_size) : get_half_size(mean_size);
         color = m_hover_id == Y ? complementary(ColorRGBA::GREEN()) :
                 m_hover_id == X ? complementary(ColorRGBA::RED())   : ColorRGBA::GRAY();
         render_model(m_sphere.model, color, view_matrix * translation_transform(m_grabber_connection_len * Vec3d::UnitZ()) * scale_transform(size));
@@ -792,7 +801,7 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
 
     if ((!m_dragging && m_hover_id < 0) || m_hover_id == X)
     {
-        size = m_dragging && m_hover_id == X ? double(grabber.get_dragging_half_size(mean_size)) : double(grabber.get_half_size(mean_size));
+        size = m_dragging && m_hover_id == X ? get_dragging_half_size(mean_size) : get_half_size(mean_size);
         cone_scale = Vec3d(0.75 * size, 0.75 * size, 1.8 * size);
         color = m_hover_id == X ? complementary(ColorRGBA::RED()) : ColorRGBA::RED();
 
@@ -811,7 +820,7 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
 
     if ((!m_dragging && m_hover_id < 0) || m_hover_id == Y)
     {
-        size = m_dragging && m_hover_id == Y ? double(grabber.get_dragging_half_size(mean_size)) : double(grabber.get_half_size(mean_size));
+        size = m_dragging && m_hover_id == Y ? get_dragging_half_size(mean_size) : get_half_size(mean_size);
         cone_scale = Vec3d(0.75 * size, 0.75 * size, 1.8 * size);
         color = m_hover_id == Y ? complementary(ColorRGBA::GREEN()) : ColorRGBA::GREEN();
 
@@ -1005,9 +1014,8 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
         const Transform3d trafo = translation_transform(m_plane_center) * m_rotation_m;
 
         const BoundingBoxf3 box = bounding_box();
-        const float mean_size = get_grabber_mean_size(box);
 
-        double size = double(m_grabbers.front().get_half_size(mean_size));
+        const double size = get_half_size(get_grabber_mean_size(box));
         Vec3d scale = Vec3d(0.75 * size, 0.75 * size, 1.8 * size);
 
         Vec3d offset = Vec3d(0.0, 1.25 * size, m_grabber_connection_len);
@@ -1387,7 +1395,8 @@ void GLGizmoCut3D::init_rendering_items()
 
     if (!m_plane.is_initialized() && !m_hide_cut_plane && !m_connectors_editing) {
 #if 1
-        m_plane.init_from(its_make_frustum_dowel((double)m_cut_plane_radius_koef * m_radius, 0.3, m_cut_plane_as_circle ? 180 : 4));
+        const double cp_width = 0.02 * get_grabber_mean_size(bounding_box());
+        m_plane.init_from(its_make_frustum_dowel((double)m_cut_plane_radius_koef * m_radius, cp_width, m_cut_plane_as_circle ? 180 : 4));
 #else
         if (m_cut_plane_as_circle)
             m_plane.init_from(its_make_frustum_dowel(2. * m_radius, 0.3, 180));
@@ -1825,6 +1834,8 @@ void GLGizmoCut3D::render_input_window_warning() const
     }
     if (!m_keep_upper && !m_keep_lower)
         m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Invalid state. \nNo one part is selected for keep after cut"));
+    if (!has_valid_contour())
+        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Warning state. \nCut plane is placed out of object"));
 }
 
 void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
@@ -2029,6 +2040,11 @@ bool GLGizmoCut3D::can_perform_cut() const
     if (m_has_invalid_connector || (!m_keep_upper && !m_keep_lower) || m_connectors_editing)
         return false;
 
+    return true;// has_valid_contour();
+}
+
+bool GLGizmoCut3D::has_valid_contour() const
+{
     const auto clipper = m_c->object_clipper();
     return clipper && clipper->has_valid_contour();
 }
