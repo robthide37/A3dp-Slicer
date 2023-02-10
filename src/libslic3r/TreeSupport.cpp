@@ -576,7 +576,8 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
                 double next_distance = current_distance;
                 // Get points so that at least min_points are added and they each are current_distance away from each other. If that is impossible, decrease current_distance a bit.
                 // The input are lines, that means that the line from the last to the first vertex does not have to exist, so exclude all points that are on this line!
-                while ((next_point = polyline_sample_next_point_at_distance(part.points, current_point, current_index, next_distance))) {
+                while ((next_point = polyline_sample_next_point_at_distance(part.points, current_point, current_index, next_distance)) &&
+                                     next_point->second < coord_t(part.size()) - 1) {
                     // Not every point that is distance away, is valid, as it may be much closer to another point. This is especially the case when the overhang is very thin.
                     // So this ensures that the points are actually a certain distance from each other.
                     // This assurance is only made on a per polygon basis, as different but close polygon may not be able to use support below the other polygon.
@@ -916,7 +917,7 @@ static void generate_initial_areas(
     //FIXME Vojtech: This is not sufficient for support enforcers to work.
     //FIXME There is no account for the support overhang angle.
     //FIXME There is no account for the width of the collision regions.
-    const coord_t extra_outset = std::max(coord_t(0), mesh_config.min_radius - mesh_config.support_line_width) + (min_xy_dist ? mesh_config.support_line_width / 2 : 0)
+    const coord_t extra_outset = std::max(coord_t(0), mesh_config.min_radius - mesh_config.support_line_width / 2) + (min_xy_dist ? mesh_config.support_line_width / 2 : 0)
         //FIXME this is a heuristic value for support enforcers to work.
 //        + 10 * mesh_config.support_line_width;
         ;
@@ -1079,9 +1080,8 @@ static void generate_initial_areas(
             Polygons overhang_regular;
             {
                 const Polygons &overhang_raw = overhangs[layer_idx + z_distance_delta];
-                overhang_regular = mesh_group_settings.support_offset == 0 ? 
-                    overhang_raw :
-                    safe_offset_inc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
+                // When support_offset = 0 safe_offset_inc will only be the difference between overhang_raw and relevant_forbidden, that has to be calculated anyway. 
+                overhang_regular = safe_offset_inc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
                 //check_self_intersections(overhang_regular, "overhang_regular1");
 
                 // offset ensures that areas that could be supported by a part of a support line, are not considered unsupported overhang
