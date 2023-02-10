@@ -656,7 +656,7 @@ void GLGizmoCut3D::render_cut_plane()
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
-    if (can_perform_cut())
+    if (can_perform_cut() && has_valid_contour())
 //        m_plane.set_color({ 0.8f, 0.8f, 0.8f, 0.5f });
         m_plane.set_color({ 0.9f, 0.9f, 0.9f, 0.5f });
     else
@@ -1834,6 +1834,8 @@ void GLGizmoCut3D::render_input_window_warning() const
     }
     if (!m_keep_upper && !m_keep_lower)
         m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Invalid state. \nNo one part is selected for keep after cut"));
+    if (!has_valid_contour())
+        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Warning state. \nCut plane is placed out of object"));
 }
 
 void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
@@ -2038,6 +2040,11 @@ bool GLGizmoCut3D::can_perform_cut() const
     if (m_has_invalid_connector || (!m_keep_upper && !m_keep_lower) || m_connectors_editing)
         return false;
 
+    return true;// has_valid_contour();
+}
+
+bool GLGizmoCut3D::has_valid_contour() const
+{
     const auto clipper = m_c->object_clipper();
     return clipper && clipper->has_valid_contour();
 }

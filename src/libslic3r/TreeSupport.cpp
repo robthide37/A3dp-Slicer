@@ -226,6 +226,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
 {
     std::vector<Polygons> out(print_object.layer_count(), Polygons{});
 
+    const PrintConfig       &print_config           = print_object.print()->config();
     const PrintObjectConfig &config                 = print_object.config();
     const bool               support_auto           = config.support_material.value && config.support_material_auto.value;
     const int                support_enforce_layers = config.support_material_enforce_layers.value;
@@ -242,7 +243,8 @@ void tree_supports_show_error(std::string_view message, bool critical)
 
     size_t num_overhang_layers = support_auto ? out.size() : std::max(size_t(support_enforce_layers), enforcers_layers.size());
     tbb::parallel_for(tbb::blocked_range<LayerIndex>(1, num_overhang_layers),
-        [&print_object, &enforcers_layers, &blockers_layers, support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, enforcer_overhang_offset, &throw_on_cancel, &out]
+        [&print_object, &config, &print_config, &enforcers_layers, &blockers_layers, 
+         support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, enforcer_overhang_offset, &throw_on_cancel, &out]
         (const tbb::blocked_range<LayerIndex> &range) {
         for (LayerIndex layer_id = range.begin(); layer_id < range.end(); ++ layer_id) {
             const Layer   &current_layer  = *print_object.get_layer(layer_id);
@@ -275,6 +277,11 @@ void tree_supports_show_error(std::string_view message, bool critical)
                 }
                 if (! (enforced_layer || blockers_layers.empty() || blockers_layers[layer_id].empty()))
                     overhangs = diff(overhangs, blockers_layers[layer_id], ApplySafetyOffset::Yes);
+                if (config.dont_support_bridges) {
+                    for (const LayerRegion *layerm : current_layer.regions())
+                        remove_bridges_from_contacts(print_config, lower_layer, *layerm, 
+                            float(layerm->flow(frExternalPerimeter).scaled_width()), overhangs);
+                }
             }
             //check_self_intersections(overhangs, "generate_overhangs1");
             if (! enforcers_layers.empty() && ! enforcers_layers[layer_id].empty()) {
