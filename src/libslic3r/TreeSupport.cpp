@@ -496,15 +496,15 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
             Vec2d xf = p0f - foot_pt;
             // Squared distance of "start_pt" from the ray (p0, p1).
             double l2_from_line = xf.squaredNorm();
-            double det = dist2 - l2_from_line;
-
-            if (det > - SCALED_EPSILON) {
+            // Squared distance of an intersection point of a circle with center at the foot point.
+            if (double l2_intersection = dist2 - l2_from_line; 
+                l2_intersection > - SCALED_EPSILON) {
                 // The ray (p0, p1) touches or intersects a circle centered at "start_pt" with radius "dist".
                 // Distance of the circle intersection point from the foot point.
-                double dist_circle_intersection = std::sqrt(std::max(0., det));
-                if ((v - foot_pt).cast<double>().norm() > dist_circle_intersection) {
+                l2_intersection = std::max(l2_intersection, 0.);
+                if ((v - foot_pt).cast<double>().squaredNorm() >= l2_intersection) {
                     // Intersection of the circle with the segment (p0, p1) is on the right side (close to p1) from the foot point.
-                    Point p = p0 + (foot_pt + v * (dist_circle_intersection / sqrt(l2v))).cast<coord_t>();
+                    Point p = p0 + (foot_pt + v * sqrt(l2_intersection / l2v)).cast<coord_t>();
                     validate_range(p);
                     return std::pair<Point, size_t>{ p, i - 1 };
                 }
@@ -576,8 +576,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
                 double next_distance = current_distance;
                 // Get points so that at least min_points are added and they each are current_distance away from each other. If that is impossible, decrease current_distance a bit.
                 // The input are lines, that means that the line from the last to the first vertex does not have to exist, so exclude all points that are on this line!
-                while ((next_point = polyline_sample_next_point_at_distance(part.points, current_point, current_index, next_distance)) &&
-                                     next_point->second < coord_t(part.size()) - 1) {
+                while ((next_point = polyline_sample_next_point_at_distance(part.points, current_point, current_index, next_distance))) {
                     // Not every point that is distance away, is valid, as it may be much closer to another point. This is especially the case when the overhang is very thin.
                     // So this ensures that the points are actually a certain distance from each other.
                     // This assurance is only made on a per polygon basis, as different but close polygon may not be able to use support below the other polygon.

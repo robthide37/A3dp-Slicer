@@ -505,7 +505,7 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
             // 1) Calculate offsets of collision areas in parallel.
             std::vector<Polygons> collision_areas_offsetted(max_required_layer + 1 - min_layer_bottom);
             tbb::parallel_for(tbb::blocked_range<LayerIndex>(min_layer_bottom, max_required_layer + 1),
-                [&outlines, &machine_border = m_machine_border, offset_value = radius + xy_distance, min_layer_bottom, &collision_areas_offsetted, &throw_on_cancel]
+                [&outlines, &machine_border = std::as_const(m_machine_border), offset_value = radius + xy_distance, min_layer_bottom, &collision_areas_offsetted, &throw_on_cancel]
                 (const tbb::blocked_range<LayerIndex> &range) {
                 for (LayerIndex layer_idx = range.begin(); layer_idx != range.end(); ++ layer_idx) {
                     Polygons collision_areas = machine_border;
@@ -684,9 +684,8 @@ void TreeModelVolumes::calculateAvoidance(const std::vector<RadiusLayerPair> &ke
             BOOST_LOG_TRIVIAL(debug) << "Calculation requested for value already calculated?";
             continue;
         }
-        if ((task.to_model && !to_model) || (!task.to_model && !to_build_plate))
-            continue;
-        if (! task.holefree() || task.radius < m_increase_until_radius + m_current_min_xy_dist_delta)
+        if ((task.to_model ? to_model : to_build_plate) &&
+            (! task.holefree() || task.radius < m_increase_until_radius + m_current_min_xy_dist_delta))
             avoidance_tasks.emplace_back(task);
     }
 
