@@ -866,8 +866,11 @@ std::pair<BoundingBoxf3, Transform3d> Selection::get_bounding_box_in_reference_s
     for (unsigned int id : m_list) {
         const GLVolume& vol = *get_volume(id);
         const Transform3d vol_world_rafo = vol.world_matrix();
-        const TriangleMesh* ch = vol.convex_hull();
-        for (const stl_vertex& v : ch->its.vertices) {
+        const TriangleMesh* mesh = vol.convex_hull();
+        if (mesh == nullptr)
+            mesh = &m_model->objects[vol.object_idx()]->volumes[vol.volume_idx()]->mesh();
+        assert(mesh != nullptr);
+        for (const stl_vertex& v : mesh->its.vertices) {
             const Vec3d world_v = vol_world_rafo * v.cast<double>();
             for (int i = 0; i < 3; ++i) {
                 const double i_comp = world_v.dot(axes[i]);
