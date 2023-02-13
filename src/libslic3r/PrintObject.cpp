@@ -1680,7 +1680,7 @@ void PrintObject::bridge_over_infill()
 
                     Lines anchors_and_walls = to_lines(anchors);
                     Lines tmp               = to_lines(max_area);
-                    tmp.insert(anchors_and_walls.end(), tmp.begin(), tmp.end());
+                    anchors_and_walls.insert(anchors_and_walls.end(), tmp.begin(), tmp.end());
 
                     double bridging_angle = 0;
                     {
@@ -1700,7 +1700,7 @@ void PrintObject::bridge_over_infill()
                                     Point a = (start + v * (i * step_size)).cast<coord_t>();
                                     auto [distance, index, p] = lines_tree.distance_from_lines_extra<false>(a);
                                     const Line &l             = lines_tree.get_line(index);
-                                    directions_with_distances.emplace_back(PI - l.direction(), unscaled(distance));
+                                    directions_with_distances.emplace_back(PI - l.direction(), distance);
                                 }
                             }
                         }
@@ -1713,7 +1713,11 @@ void PrintObject::bridge_over_infill()
                             bridging_angle += dir.first * (max_dist - dir.second);
                             acc += (max_dist - dir.second);
                         }
-                        bridging_angle /= acc;
+                        if (acc <= EPSILON || bridging_angle == 0) {
+                            bridging_angle = 0.01;
+                        } else {
+                            bridging_angle /= acc;
+                        }
                     }
 
                     //  TODO maybe get extens of rotated max_area, then fill with vertical lines, make AABB tree rotated for anchors and
@@ -1731,6 +1735,11 @@ void PrintObject::bridge_over_infill()
                             l.b.x()   = coord_t(round(cos_angle * bx - sin_angle * by));
                             l.b.y()   = coord_t(round(cos_angle * by + sin_angle * bx));
                         }
+                    };
+
+                    auto segments_overlap = [](coord_t alow, coord_t ahigh, coord_t blow, coord_t bhigh) {
+                        return (alow >= blow && alow <= bhigh) || (ahigh >= blow && ahigh <= bhigh) || (blow >= alow && blow <= ahigh) ||
+                               (bhigh >= alow && bhigh <= ahigh);
                     };
 
                     Polygons expanded_bridged_area{};
@@ -1756,37 +1765,48 @@ void PrintObject::bridge_over_infill()
                         std::vector<std::vector<std::pair<Point, Point>>> polygon_sections(n_vlines);
                         for (size_t i = 0; i < n_vlines; i++) {
                             auto area_intersections = bridged_area_tree.intersections_with_line<true>(vertical_lines[i]);
-                            if (area_intersections.size() < 2) {
-                                if (area_intersections.size() > 0) {
-                                    polygon_sections[i].emplace_back(area_intersections[0].first, area_intersections[0].first);
+                            for (int intersection_idx = 0; intersection_idx < int(area_intersections.size()) - 1; intersection_idx++) {
+                                if (!bridged_area_tree.outside(
+                                        (area_intersections[intersection_idx].first + area_intersections[intersection_idx + 1].first) / 2)) {
+                                    polygon_sections[i].emplace_back(area_intersections[intersection_idx].first,
+                                                                     area_intersections[intersection_idx + 1].first);
                                 }
-                                continue;
                             }
                             auto anchors_intersections = anchors_and_walls_tree.intersections_with_line<true>(vertical_lines[i]);
-                            for (const auto &intersection : area_intersections) {
-                                auto  high_b = std::upper_bound(anchors_intersections.begin(), anchors_intersections.end(), intersection,
-                                                                [](const std::pair<Point, size_t> left,
-                                                                  const std::pair<Point, size_t> right) {
-                                                                   return left.first.y() > right.first.y();
-                                                               });
-                                Point low, high;
-                                if (high_b == anchors_intersections.end()) {
-                                    assert(false); // should not happen
-                                    continue;
-                                } else if (high_b == anchors_intersections.begin()) {
-                                    low  = high_b->first;
-                                    high = (++high_b)->first;
-                                } else {
-                                    low  = (--high_b)->first;
-                                    high = high_b->first;
+
+                            for (std::pair<Point, Point> &section : polygon_sections[i]) {
+                                auto maybe_below_anchor = std::upper_bound(anchors_intersections.begin(), anchors_intersections.end(),
+                                                                           section.first,
+                                                                           [](const Point &a, const std::pair<Point, size_t> &b) {
+                                                                               return a.y() < b.first.y();
+                                                                           });
+                                if (maybe_below_anchor != anchors_intersections.begin() &&
+                                    maybe_below_anchor != anchors_intersections.end()) {
+                                    section.first = (--maybe_below_anchor)->first;
                                 }
 
-                                if (polygon_sections[i].size() > 0 && polygon_sections[i].back().second.y() >= low.y()) {
-                                    polygon_sections[i].back().second = high;
-                                } else {
-                                    polygon_sections[i].emplace_back(low, high);
+                                auto maybe_upper_anchor = std::upper_bound(anchors_intersections.begin(), anchors_intersections.end(),
+                                                                           section.second,
+                                                                           [](const Point &a, const std::pair<Point, size_t> &b) {
+                                                                               return a.y() < b.first.y();
+                                                                           });
+                                if (maybe_upper_anchor != anchors_intersections.end()) {
+                                    section.second = maybe_upper_anchor->first;
                                 }
                             }
+
+                            for (int section_idx = 0; section_idx < int(polygon_sections[i].size()) - 1; section_idx++) {
+                                std::pair<Point, Point> &section_a = polygon_sections[i][section_idx];
+                                std::pair<Point, Point> &section_b = polygon_sections[i][section_idx + 1];
+                                if (segments_overlap(section_a.first.y(), section_a.second.y(), section_b.first.y(), section_b.second.y())) {
+                                    section_b.first  = section_a.first.y() < section_b.first.y() ? section_a.first : section_b.first;
+                                    section_b.second = section_a.second.y() < section_b.second.y() ? section_b.second : section_a.second;
+                                    section_a.first  = section_a.second;
+                                }
+                            }
+
+                            std::remove_if(polygon_sections[i].begin(), polygon_sections[i].end(),
+                                           [](const std::pair<Point, Point> &s) { return s.first == s.second; });
                         }
 
                         // reconstruct polygon from polygon sections
@@ -1794,11 +1814,6 @@ void PrintObject::bridge_over_infill()
                         {
                             std::vector<Point> lows;
                             std::vector<Point> highs;
-                        };
-
-                        auto segments_overlap = [](coord_t alow, coord_t ahigh, coord_t blow, coord_t bhigh) {
-                            return (alow >= blow && alow <= bhigh) || (ahigh >= blow && ahigh <= bhigh) ||
-                                   (blow >= alow && blow <= ahigh) || (bhigh >= alow && bhigh <= ahigh);
                         };
 
                         std::vector<TracedPoly> current_traced_polys;
