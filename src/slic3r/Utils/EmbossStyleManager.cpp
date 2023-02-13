@@ -304,11 +304,14 @@ void StyleManager::init_trunc_names(float max_width) {
         }
 }
 
-#include "slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp"
-
 // for access to worker
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp" 
+
+// for get DPI
+#include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/MainFrame.hpp"
+#include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 
 void StyleManager::init_style_images(const Vec2i &max_size,
                                     const std::string &text)
@@ -361,8 +364,15 @@ void StyleManager::init_style_images(const Vec2i &max_size,
             style.prop
         });
     }
+
+    auto mf = wxGetApp().mainframe;
+    // dot per inch for monitor
+    int dpi = get_dpi_for_window(mf);
+    // pixel per milimeter
+    double ppm = dpi / ObjectManipulation::in_to_mm;
+
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    StyleImagesData data{std::move(styles), max_size, text, m_temp_style_images};
+    StyleImagesData data{std::move(styles), max_size, text, m_temp_style_images, ppm};
     queue_job(worker, std::make_unique<CreateFontStyleImagesJob>(std::move(data)));
 }
 
