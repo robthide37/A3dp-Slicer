@@ -217,13 +217,7 @@ void GLGizmoScale3D::on_render()
     const auto& [box, box_trafo] = selection.get_bounding_box_in_current_reference_system();
     m_bounding_box = box;
     m_center = box_trafo.translation();
-    m_grabbers_transform = Geometry::translation_transform(m_center);
-    if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
-        const GLVolume& v = *selection.get_first_volume();
-        m_grabbers_transform = m_grabbers_transform * v.get_instance_transformation().get_rotation_matrix();
-        if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
-            m_grabbers_transform = m_grabbers_transform * v.get_volume_transformation().get_rotation_matrix();
-    }
+    m_grabbers_transform = box_trafo;
     m_instance_center = (selection.is_single_full_instance() || selection.is_single_volume_or_modifier()) ? selection.get_first_volume()->get_instance_offset() : m_center;
 
     // x axis
@@ -329,8 +323,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
-            m_grabbers[0].render(true, grabber_mean_size);
-            m_grabbers[1].render(true, grabber_mean_size);
+            render_grabbers(0, 1, grabber_mean_size, true);
             shader->stop_using();
         }
     }
@@ -361,8 +354,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
-            m_grabbers[2].render(true, grabber_mean_size);
-            m_grabbers[3].render(true, grabber_mean_size);
+            render_grabbers(2, 3, grabber_mean_size, true);
             shader->stop_using();
         }
     }
@@ -393,8 +385,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
-            m_grabbers[4].render(true, grabber_mean_size);
-            m_grabbers[5].render(true, grabber_mean_size);
+            render_grabbers(4, 5, grabber_mean_size, true);
             shader->stop_using();
         }
     }
@@ -428,9 +419,7 @@ void GLGizmoScale3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
-            for (int i = 6; i < 10; ++i) {
-                m_grabbers[i].render(true, grabber_mean_size);
-            }
+            render_grabbers(6, 9, grabber_mean_size, true);
             shader->stop_using();
         }
     }
