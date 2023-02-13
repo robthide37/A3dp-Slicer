@@ -1416,30 +1416,28 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
     if (!m_valid)
       return;
 
+    Vec3d relative_scale = scale;
+    if (transformation_type.absolute()) {
+        // converts to relative scale
+        if (m_mode == Instance) {
+            if (is_single_full_instance()) {
+                BoundingBoxf3 current_box = get_bounding_box_in_current_reference_system().first;
+                BoundingBoxf3 original_box;
+                if (transformation_type.world())
+                    original_box = get_full_unscaled_instance_bounding_box();
+                else
+                    original_box = get_full_unscaled_instance_local_bounding_box();
+
+                relative_scale = original_box.size().cwiseProduct(scale).cwiseQuotient(current_box.size());
+            }
+        }
+        transformation_type.set_relative();
+    }
+
     for (unsigned int i : m_list) {
         GLVolume& v = *(*m_volumes)[i];
         const VolumeCache& volume_data = m_cache.volumes_data[i];
         const Geometry::Transformation& inst_trafo = volume_data.get_instance_transform();
-
-        Vec3d relative_scale = scale;
-
-        if (transformation_type.absolute()) {
-            if (m_mode == Instance) {
-                if (is_single_full_instance()) {
-                    BoundingBoxf3 current_box = get_bounding_box_in_current_reference_system().first;
-                    BoundingBoxf3 original_box;
-                    if (transformation_type.world())
-                        original_box = get_full_unscaled_instance_bounding_box();
-                    else
-                        original_box = get_full_unscaled_instance_local_bounding_box();
-
-                    relative_scale = original_box.size().cwiseProduct(scale).cwiseQuotient(current_box.size());
-                }
-            }
-            else {
-            }
-            transformation_type.set_relative();
-        }
 
         if (m_mode == Instance) {
             if (transformation_type.instance()) {
@@ -2940,10 +2938,10 @@ static void verify_instances_rotation_synchronized(const Model &model, const GLV
         assert(idx_volume_first != -1); // object without instances?
         if (idx_volume_first == -1)
             continue;
-        const Transform3d::ConstLinearPart &rotation0 = volumes[idx_volume_first]->get_instance_transformation().get_matrix().linear();
+        const Transform3d::ConstLinearPart& rotation0 = volumes[idx_volume_first]->get_instance_transformation().get_matrix().linear();
         for (int i = idx_volume_first + 1; i < (int)volumes.size(); ++i)
             if (volumes[i]->object_idx() == idx_object) {
-                const Transform3d::ConstLinearPart &rotation = volumes[i]->get_instance_transformation().get_matrix().linear();
+                const Transform3d::ConstLinearPart& rotation = volumes[i]->get_instance_transformation().get_matrix().linear();
                 assert(is_rotation_xy_synchronized(rotation, rotation0));
             }
     }
