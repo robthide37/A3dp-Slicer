@@ -1292,7 +1292,7 @@ void Sidebar::show_info_sizer()
     int inst_idx = selection.get_instance_idx();
     assert(inst_idx >= 0);
 
-    bool imperial_units = wxGetApp().app_config->get("use_inches") == "1";
+    bool imperial_units = wxGetApp().app_config->get_bool("use_inches");
     double koef = imperial_units ? ObjectManipulation::mm_to_in : 1.0f;
 
     ModelVolume* vol = nullptr;
@@ -1388,7 +1388,7 @@ void Sidebar::update_sliced_info_sizer()
             const PrintStatistics& ps = p->plater->fff_print().print_statistics();
             const bool is_wipe_tower = ps.total_wipe_tower_filament > 0;
 
-            bool imperial_units = wxGetApp().app_config->get("use_inches") == "1";
+            bool imperial_units = wxGetApp().app_config->get_bool("use_inches");
             double koef = imperial_units ? ObjectManipulation::in_to_mm : 1000.0;
 
             wxString new_label = imperial_units ? _L("Used Filament (in)") : _L("Used Filament (m)");
@@ -1814,7 +1814,7 @@ struct Plater::priv
     void update_ui_from_settings();
     void update_main_toolbar_tooltips();
 //   std::shared_ptr<ProgressStatusBar> statusbar();
-    std::string get_config(const std::string &key) const;
+    bool get_config_bool(const std::string &key) const;
 
     std::vector<size_t> load_files(const std::vector<fs::path>& input_files, bool load_model, bool load_config, bool used_inches = false);
     std::vector<size_t> load_model_objects(const ModelObjectPtrs& model_objects, bool allow_negative_z = false, bool call_selection_changed = true);
@@ -1860,7 +1860,7 @@ struct Plater::priv
 
     void process_validation_warning(const std::string& warning) const;
 
-    bool background_processing_enabled() const { return this->get_config("background_processing") == "1"; }
+    bool background_processing_enabled() const { return this->get_config_bool("background_processing"); }
     void update_print_volume_state();
     void schedule_background_process();
     // Update background processing thread from the current config and Model.
@@ -2179,7 +2179,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
 
     // updates camera type from .ini file
     camera.enable_update_config_on_type_change(true);
-    camera.set_type(get_config("use_perspective_camera"));
+    camera.set_type(wxGetApp().app_config->get("use_perspective_camera"));
 
     // Load the 3DConnexion device database.
     mouse3d_controller.load_config(*wxGetApp().app_config);
@@ -2266,7 +2266,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
 
     // collapse sidebar according to saved value
     if (wxGetApp().is_editor()) {
-        bool is_collapsed = wxGetApp().app_config->get("collapsed_sidebar") == "1";
+        bool is_collapsed = get_config_bool("collapsed_sidebar");
         sidebar->collapse(is_collapsed);
     }
  }
@@ -2283,7 +2283,7 @@ void Plater::priv::update(unsigned int flags)
 {
     // the following line, when enabled, causes flickering on NVIDIA graphics cards
 //    wxWindowUpdateLocker freeze_guard(q);
-    if (get_config("autocenter") == "1")
+    if (get_config_bool("autocenter"))
         model.center_instances_around_point(this->bed.build_volume().bed_center());
 
     unsigned int update_status = 0;
@@ -2299,7 +2299,7 @@ void Plater::priv::update(unsigned int flags)
     else
         this->schedule_background_process();
 
-    if (get_config("autocenter") == "1" && this->sidebar->obj_manipul()->IsShown())
+    if (get_config_bool("autocenter") && this->sidebar->obj_manipul()->IsShown())
         this->sidebar->obj_manipul()->UpdateAndShow(true);
 }
 
@@ -2314,7 +2314,7 @@ void Plater::priv::select_view(const std::string& direction)
 void Plater::priv::apply_free_camera_correction(bool apply/* = true*/)
 {
     camera.set_type(wxGetApp().app_config->get("use_perspective_camera"));
-    if (apply && wxGetApp().app_config->get("use_free_camera") != "1")
+    if (apply && !wxGetApp().app_config->get_bool("use_free_camera"))
         camera.recover_from_free_camera();
 }
 
@@ -2382,9 +2382,9 @@ void Plater::priv::update_main_toolbar_tooltips()
 //    return main_frame->m_statusbar;
 //}
 
-std::string Plater::priv::get_config(const std::string &key) const
+bool Plater::priv::get_config_bool(const std::string &key) const
 {
-    return wxGetApp().app_config->get(key);
+    return wxGetApp().app_config->get_bool(key);
 }
 
 // After loading of the presets from project, check if they are visible.
@@ -2761,7 +2761,7 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
 #endif /* AUTOPLACEMENT_ON_LOAD */
     for (ModelObject *model_object : model_objects) {
         auto *object = model.add_object(*model_object);
-        object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
+        object->sort_volumes(get_config_bool("order_volumes"));
         std::string object_name = object->name.empty() ? fs::path(object->input_file).filename().string() : object->name;
         obj_idxs.push_back(obj_count++);
 
@@ -3575,7 +3575,7 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
     old_model_object->delete_volume(old_model_object->volumes.size() - 1);
     if (!sinking)
         old_model_object->ensure_on_bed();
-    old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
+    old_model_object->sort_volumes(get_config_bool("order_volumes"));
 
     // if object has just one volume, rename object too
     if (old_model_object->volumes.size() == 1)
@@ -3941,7 +3941,7 @@ void Plater::priv::reload_from_disk()
                 old_model_object->delete_volume(old_model_object->volumes.size() - 1);
                 if (!sinking)
                     old_model_object->ensure_on_bed();
-                old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
+                old_model_object->sort_volumes(get_config_bool("order_volumes"));
 
                 sla::reproject_points_and_holes(old_model_object);
 
@@ -4021,7 +4021,7 @@ void Plater::priv::reload_from_disk()
                 old_model_object->delete_volume(old_model_object->volumes.size() - 1);
                 if (!sinking)
                     old_model_object->ensure_on_bed();
-                old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
+                old_model_object->sort_volumes(get_config_bool("order_volumes"));
 
                 sla::reproject_points_and_holes(old_model_object);
             }
@@ -4275,7 +4275,7 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
 
     if ((evt.status.flags & PrintBase::SlicingStatus::UPDATE_PRINT_STEP_WARNINGS) &&
         static_cast<PrintStep>(evt.status.warning_step) == psAlertWhenSupportsNeeded &&
-        get_app_config()->get("alert_when_supports_needed") != "1") {
+        !get_app_config()->get_bool("alert_when_supports_needed")) {
         // This alerts are from psAlertWhenSupportsNeeded and the respective app settings is not Enabled, so discard the alerts.
     } else if (evt.status.flags &
                (PrintBase::SlicingStatus::UPDATE_PRINT_STEP_WARNINGS | PrintBase::SlicingStatus::UPDATE_PRINT_OBJECT_STEP_WARNINGS)) {
@@ -5054,7 +5054,7 @@ void Plater::priv::show_action_buttons(const bool ready_to_slice_) const
     const bool send_gcode_shown = print_host_opt != nullptr && !print_host_opt->value.empty();
     
     // when a background processing is ON, export_btn and/or send_btn are showing
-    if (wxGetApp().app_config->get("background_processing") == "1")
+    if (get_config_bool("background_processing"))
     {
 	    RemovableDriveManager::RemovableDrivesStatus removable_media_status = wxGetApp().removable_drive_manager()->status();
 		if (sidebar->show_reslice(false) |
@@ -5143,7 +5143,7 @@ void Plater::priv::take_snapshot(const std::string& snapshot_name, const UndoRed
     }
     const GLGizmosManager& gizmos = view3D->get_canvas3d()->get_gizmos_manager();
 
-    if (snapshot_type == UndoRedo::SnapshotType::ProjectSeparator && wxGetApp().app_config->get("clear_undo_redo_stack_on_new_project") == "1")
+    if (snapshot_type == UndoRedo::SnapshotType::ProjectSeparator && get_config_bool("clear_undo_redo_stack_on_new_project"))
         this->undo_redo_stack().clear();
     this->undo_redo_stack().take_snapshot(snapshot_name, model, view3D->get_canvas3d()->get_selection(), gizmos, snapshot_data);
     if (snapshot_type == UndoRedo::SnapshotType::LeavingGizmoWithAction) {
@@ -5650,7 +5650,7 @@ LoadProjectsDialog::LoadProjectsDialog(const std::vector<fs::path>& paths)
 
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
     bool contains_projects = !paths.empty();
-    bool instances_allowed = wxGetApp().app_config->get("single_instance") != "1";
+    bool instances_allowed = !wxGetApp().app_config->get_bool("single_instance");
     if (contains_projects)
         main_sizer->Add(new wxStaticText(this, wxID_ANY,
             get_wraped_wxString(_L("There are several files being loaded, including Project files.") + "\n" + _L("Select an action to apply to all files."))), 0, wxEXPAND | wxALL, 10);
@@ -5895,7 +5895,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
         return true;
     }
     // 1 model (or more and other instances are not allowed), 0 projects - open geometry
-    if (project_paths.empty() && (non_project_paths.size() == 1 || wxGetApp().app_config->get("single_instance") == "1"))
+    if (project_paths.empty() && (non_project_paths.size() == 1 || wxGetApp().app_config->get_bool("single_instance")))
     {
         load_files(non_project_paths, true, false);
         boost::system::error_code ec;
@@ -6036,7 +6036,7 @@ ProjectDropDialog::ProjectDropDialog(const std::string& filename)
 {
     SetFont(wxGetApp().normal_font());
 
-    bool single_instance_only = wxGetApp().app_config->get("single_instance") == "1";
+    bool single_instance_only = wxGetApp().app_config->get_bool("single_instance");
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
     wxArrayString choices;
     choices.reserve(4);
@@ -6144,7 +6144,7 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
                     (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf")))
                     load_type = ProjectDropDialog::LoadType::LoadGeometry;
                 else {
-                    if (wxGetApp().app_config->get("show_drop_project_dialog") == "1") {
+                    if (wxGetApp().app_config->get_bool("show_drop_project_dialog")) {
                         ProjectDropDialog dlg(filename);
                         if (dlg.ShowModal() == wxID_OK) {
                             int choice = dlg.get_action();
@@ -6294,7 +6294,7 @@ void Plater::increase_instances(size_t num)
 //        p->print.get_object(obj_idx)->add_copy(Slic3r::to_2d(offset_vec));
     }
 
-    if (p->get_config("autocenter") == "1")
+    if (p->get_config_bool("autocenter"))
         arrange();
 
     p->update();
@@ -6711,7 +6711,7 @@ void Plater::export_amf()
     wxBusyCursor wait;
     bool export_config = true;
     DynamicPrintConfig cfg = wxGetApp().preset_bundle->full_config_secure();
-    bool full_pathnames = wxGetApp().app_config->get("export_sources_full_pathnames") == "1";
+    bool full_pathnames = wxGetApp().app_config->get_bool("export_sources_full_pathnames");
     if (Slic3r::store_amf(path_u8.c_str(), &p->model, export_config ? &cfg : nullptr, full_pathnames)) {
         // Success
 //        p->statusbar()->set_status_text(format_wxstr(_L("AMF file exported to %s"), path));
@@ -6744,7 +6744,7 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
     DynamicPrintConfig cfg = wxGetApp().preset_bundle->full_config_secure();
     const std::string path_u8 = into_u8(path);
     wxBusyCursor wait;
-    bool full_pathnames = wxGetApp().app_config->get("export_sources_full_pathnames") == "1";
+    bool full_pathnames = wxGetApp().app_config->get_bool("export_sources_full_pathnames");
     ThumbnailData thumbnail_data;
     ThumbnailsParams thumbnail_params = { {}, false, true, true, true };
     p->generate_thumbnail(thumbnail_data, THUMBNAIL_SIZE_3MF.first, THUMBNAIL_SIZE_3MF.second, thumbnail_params, Camera::EType::Ortho);

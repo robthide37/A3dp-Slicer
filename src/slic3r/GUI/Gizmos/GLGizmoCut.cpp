@@ -1757,7 +1757,7 @@ void GLGizmoCut3D::validate_connector_settings()
 
 void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
 {
-    m_imperial_units = wxGetApp().app_config->get("use_inches") == "1";
+    m_imperial_units = wxGetApp().app_config->get_bool("use_inches");
     m_label_width    = m_imgui->get_font_size() * 6.f;
     m_control_width  = m_imgui->get_font_size() * 9.f;
 

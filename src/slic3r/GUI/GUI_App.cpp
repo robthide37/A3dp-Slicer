@@ -1203,7 +1203,7 @@ bool GUI_App::on_init_inner()
         // Now this position is equal to the mainframe position
         wxPoint splashscreen_pos = wxDefaultPosition;
         bool default_splashscreen_pos = true;
-        if (app_config->has("window_mainframe") && app_config->get("restore_win_position") == "1") {
+        if (app_config->has("window_mainframe") && app_config->get_bool("restore_win_position")) {
             auto metrics = WindowMetrics::deserialize(app_config->get("window_mainframe"));
             default_splashscreen_pos = metrics == boost::none;
             if (!default_splashscreen_pos)
@@ -1237,7 +1237,7 @@ bool GUI_App::on_init_inner()
     
     if (! older_data_dir_path.empty()) {
         preset_bundle->import_newer_configs(older_data_dir_path);
-        app_config->save();
+        //app_config->save(); // It looks like redundant call of save. ysFIXME delete after testing
     }
 
     if (is_editor()) {
@@ -1413,7 +1413,6 @@ bool GUI_App::on_init_inner()
             app_config->set("restore_win_position", "0");
         else if (answer == wxID_NO)
             app_config->set("restore_win_position", "1");
-        app_config->save();
     }
 
     return true;
@@ -2889,7 +2888,7 @@ void GUI_App::MacOpenFiles(const wxArrayString &fileNames)
 
 void GUI_App::MacOpenURL(const wxString& url)
 {
-    if (app_config && app_config->get("downloader_url_registered") != "1")
+    if (app_config && !app_config->get_bool("downloader_url_registered"))
     {
         BOOST_LOG_TRIVIAL(error) << "Recieved command to open URL, but it is not allowed in app configuration. URL: " << url;
         return;
@@ -3167,6 +3166,9 @@ void GUI_App::window_pos_save(wxTopLevelWindow* window, const std::string &name)
 
     WindowMetrics metrics = WindowMetrics::from_window(window);
     app_config->set(config_key, metrics.serialize());
+    // save changed app_config here, before all action related to a close of application is processed
+    if (app_config->dirty())
+        app_config->save();
 }
 
 void GUI_App::window_pos_restore(wxTopLevelWindow* window, const std::string &name, bool default_maximized)
@@ -3187,7 +3189,7 @@ void GUI_App::window_pos_restore(wxTopLevelWindow* window, const std::string &na
 
     const wxRect& rect = metrics->get_rect();
 
-    if (app_config->get("restore_win_position") == "1") {
+    if (app_config->get_bool("restore_win_position")) {
         // workaround for crash related to the positioning of the window on secondary monitor
         app_config->set("restore_win_position", (boost::format("crashed_at_%1%_pos") % name).str());
         app_config->save();
@@ -3242,7 +3244,7 @@ bool GUI_App::config_wizard_startup()
         return true;
     } 
 #ifndef __APPLE__    
-    else if (is_editor() && m_last_app_conf_lower_version && app_config->get("downloader_url_registered") == "1") {
+    else if (is_editor() && m_last_app_conf_lower_version && app_config->get_bool("downloader_url_registered")) {
         show_downloader_registration_dialog();
         return true;
     }
@@ -3302,11 +3304,11 @@ bool GUI_App::open_browser_with_warning_dialog(const wxString& url, wxWindow* pa
             }
         }
         if (launch)
-            launch = app_config->get(option_key) != "1";
+            launch = !app_config->get_bool(option_key);
     }
     // warning dialog doesn't containe a "Remember my choice" checkbox
     // and will be shown only when "Suppress to open hyperlink in browser" is ON.
-    else if (app_config->get(option_key) == "1") {
+    else if (app_config->get_bool(option_key)) {
         MessageDialog dialog(parent, _L("Open hyperlink in default browser?"), _L("PrusaSlicer: Open hyperlink"), wxICON_QUESTION | wxYES_NO);
         launch = dialog.ShowModal() == wxID_YES;
     }

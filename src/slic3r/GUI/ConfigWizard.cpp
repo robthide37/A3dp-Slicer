@@ -1298,7 +1298,7 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     append_spacer(VERTICAL_SPACING);
 
     auto *box_presets = new wxCheckBox(this, wxID_ANY, _L("Update built-in Presets automatically"));
-    box_presets->SetValue(app_config->get("preset_update") == "1");
+    box_presets->SetValue(app_config->get_bool("preset_update"));
     append(box_presets);
     append_text(wxString::Format(_L(
         "If enabled, %s downloads updates of built-in system presets in the background."
@@ -1416,7 +1416,7 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
 
     auto* box_allow_downloads = new wxCheckBox(this, wxID_ANY, _L("Allow build-in downloader"));
     // TODO: Do we want it like this? The downloader is allowed for very first time the wizard is run. 
-    bool box_allow_value = (app_config->has("downloader_url_registered") ? app_config->get("downloader_url_registered") == "1" : true);
+    bool box_allow_value = (app_config->has("downloader_url_registered") ? app_config->get_bool("downloader_url_registered") : true);
     box_allow_downloads->SetValue(box_allow_value);
     append(box_allow_downloads);
 
@@ -1517,7 +1517,7 @@ void DownloaderUtils::Worker::deregister()
 
 bool DownloaderUtils::Worker::on_finish() {
     AppConfig* app_config = wxGetApp().app_config;
-    bool ac_value = app_config->get("downloader_url_registered") == "1";
+    bool ac_value = app_config->get_bool("downloader_url_registered");
     BOOST_LOG_TRIVIAL(debug) << "PageDownloader::on_finish_downloader ac_value " << ac_value << " downloader_checked " << downloader_checked;
     if (ac_value && downloader_checked) {
         // already registered but we need to do it again
@@ -1546,7 +1546,7 @@ PageReloadFromDisk::PageReloadFromDisk(ConfigWizard* parent)
     , full_pathnames(false)
 {
     auto* box_pathnames = new wxCheckBox(this, wxID_ANY, _L("Export full pathnames of models and parts sources into 3mf and amf files"));
-    box_pathnames->SetValue(wxGetApp().app_config->get("export_sources_full_pathnames") == "1");
+    box_pathnames->SetValue(wxGetApp().app_config->get_bool("export_sources_full_pathnames"));
     append(box_pathnames);
     append_text(_L(
         "If enabled, allows the Reload from disk command to automatically find and load the files when invoked.\n"
@@ -1595,7 +1595,7 @@ PageMode::PageMode(ConfigWizard *parent)
 
     append_text("\n" + _L("The size of the object can be specified in inches"));
     check_inch = new wxCheckBox(this, wxID_ANY, _L("Use inches"));
-    check_inch->SetValue(wxGetApp().app_config->get("use_inches") == "1");
+    check_inch->SetValue(wxGetApp().app_config->get_bool("use_inches"));
     append(check_inch);
 
     on_activate();
