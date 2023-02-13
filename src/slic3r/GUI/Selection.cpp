@@ -998,7 +998,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
 
     assert(transformation_type.relative() || (transformation_type.absolute() && transformation_type.local()));
 
-    const Transform3d rotation_matrix = Geometry::rotation_transform(rotation);
+    Transform3d rotation_matrix = Geometry::rotation_transform(rotation);
 
     for (unsigned int i : m_list) {
         GLVolume& v = *(*m_volumes)[i];
@@ -1027,6 +1027,8 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                     // ensure that the volume rotates as a rigid body
                     const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
                     const Transform3d cached_vol_rotation_matrix = vol_trafo.get_rotation_matrix();
+                    if ((inst_trafo * vol_trafo).is_left_handed() && !rotation.normalized().isApprox(Vec3d::UnitX()))
+                        rotation_matrix = rotation_matrix.inverse();
                     v.set_volume_transformation(vol_trafo.get_matrix() * cached_vol_rotation_matrix.inverse() * rotation_matrix * cached_vol_rotation_matrix);
                 }
                 else
