@@ -496,15 +496,15 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
             Vec2d xf = p0f - foot_pt;
             // Squared distance of "start_pt" from the ray (p0, p1).
             double l2_from_line = xf.squaredNorm();
-            double det = dist2 - l2_from_line;
-
-            if (det > - SCALED_EPSILON) {
+            // Squared distance of an intersection point of a circle with center at the foot point.
+            if (double l2_intersection = dist2 - l2_from_line; 
+                l2_intersection > - SCALED_EPSILON) {
                 // The ray (p0, p1) touches or intersects a circle centered at "start_pt" with radius "dist".
                 // Distance of the circle intersection point from the foot point.
-                double dist_circle_intersection = std::sqrt(std::max(0., det));
-                if ((v - foot_pt).cast<double>().norm() > dist_circle_intersection) {
+                l2_intersection = std::max(l2_intersection, 0.);
+                if ((v - foot_pt).cast<double>().squaredNorm() >= l2_intersection) {
                     // Intersection of the circle with the segment (p0, p1) is on the right side (close to p1) from the foot point.
-                    Point p = p0 + (foot_pt + v * (dist_circle_intersection / sqrt(l2v))).cast<coord_t>();
+                    Point p = p0 + (foot_pt + v * sqrt(l2_intersection / l2v)).cast<coord_t>();
                     validate_range(p);
                     return std::pair<Point, size_t>{ p, i - 1 };
                 }
@@ -916,7 +916,7 @@ static void generate_initial_areas(
     //FIXME Vojtech: This is not sufficient for support enforcers to work.
     //FIXME There is no account for the support overhang angle.
     //FIXME There is no account for the width of the collision regions.
-    const coord_t extra_outset = std::max(coord_t(0), mesh_config.min_radius - mesh_config.support_line_width) + (min_xy_dist ? mesh_config.support_line_width / 2 : 0)
+    const coord_t extra_outset = std::max(coord_t(0), mesh_config.min_radius - mesh_config.support_line_width / 2) + (min_xy_dist ? mesh_config.support_line_width / 2 : 0)
         //FIXME this is a heuristic value for support enforcers to work.
 //        + 10 * mesh_config.support_line_width;
         ;
@@ -1079,9 +1079,8 @@ static void generate_initial_areas(
             Polygons overhang_regular;
             {
                 const Polygons &overhang_raw = overhangs[layer_idx + z_distance_delta];
-                overhang_regular = mesh_group_settings.support_offset == 0 ? 
-                    overhang_raw :
-                    safe_offset_inc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
+                // When support_offset = 0 safe_offset_inc will only be the difference between overhang_raw and relevant_forbidden, that has to be calculated anyway. 
+                overhang_regular = safe_offset_inc(overhang_raw, mesh_group_settings.support_offset, relevant_forbidden, mesh_config.min_radius * 1.75 + mesh_config.xy_min_distance, 0, 1);
                 //check_self_intersections(overhang_regular, "overhang_regular1");
 
                 // offset ensures that areas that could be supported by a part of a support line, are not considered unsupported overhang
