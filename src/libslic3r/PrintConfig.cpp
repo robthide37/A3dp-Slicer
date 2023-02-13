@@ -4710,12 +4710,6 @@ CLIMiscConfigDef::CLIMiscConfigDef()
                      "or an existing PrusaSlicer window is activated. "
                      "Overrides the \"single_instance\" configuration value from application preferences.");
 
-/*
-    def = this->add("autosave", coString);
-    def->label = L("Autosave");
-    def->tooltip = L("Automatically export current configuration to the specified file.");
-*/
-
     def = this->add("datadir", coString);
     def->label = L("Data directory");
     def->tooltip = L("Load and store settings at the given directory. This is useful for maintaining different profiles or including configurations from a network storage.");

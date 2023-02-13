@@ -464,7 +464,6 @@ void PreferencesDialog::build()
 			m_icon_size_sizer->ShowItems(boost::any_cast<bool>(value));
 			refresh_og(m_optgroup_gui);
 			get_app_config()->set("use_custom_toolbar_size", boost::any_cast<bool>(value) ? "1" : "0");
-			get_app_config()->save();
 			wxGetApp().plater()->get_current_canvas3D()->render();
 			return;
 		}
@@ -768,7 +767,6 @@ void PreferencesDialog::accept(wxEvent&)
 	for (std::map<std::string, std::string>::iterator it = m_values.begin(); it != m_values.end(); ++it)
 		app_config->set(it->first, it->second);
 
-	app_config->save();
 	if (wxGetApp().is_editor()) {
 		wxGetApp().set_label_clr_sys(m_sys_colour->GetColour());
 		wxGetApp().set_label_clr_modified(m_mod_colour->GetColour());
@@ -797,23 +795,17 @@ void PreferencesDialog::revert(wxEvent&)
 {
 	auto app_config = get_app_config();
 
-	bool save_app_config = false;
 	if (m_custom_toolbar_size != atoi(app_config->get("custom_toolbar_size").c_str())) {
 		app_config->set("custom_toolbar_size", (boost::format("%d") % m_custom_toolbar_size).str());
 		m_icon_size_slider->SetValue(m_custom_toolbar_size);
-		save_app_config |= true;
 	}
 	if (m_use_custom_toolbar_size != (get_app_config()->get("use_custom_toolbar_size") == "1")) {
 		app_config->set("use_custom_toolbar_size", m_use_custom_toolbar_size ? "1" : "0");
-		save_app_config |= true;
 
 		m_optgroup_gui->set_value("use_custom_toolbar_size", m_use_custom_toolbar_size);
 		m_icon_size_sizer->ShowItems(m_use_custom_toolbar_size);
 		refresh_og(m_optgroup_gui);
 	}
-	if (save_app_config)
-		app_config->save();
-
 
 	for (auto value : m_values) {
 		const std::string& key = value.first;
@@ -955,7 +947,6 @@ void PreferencesDialog::create_icon_size_slider()
         auto val = m_icon_size_slider->GetValue();
 
 		app_config->set("custom_toolbar_size", (boost::format("%d") % val).str());
-		app_config->save();
 		wxGetApp().plater()->get_current_canvas3D()->render();
 
         if (val_label)

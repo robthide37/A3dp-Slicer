@@ -652,7 +652,8 @@ void MainFrame::shutdown()
 	wxGetApp().other_instance_message_handler()->shutdown(this);
     // Save the slic3r.ini.Usually the ini file is saved from "on idle" callback,
     // but in rare cases it may not have been called yet.
-    wxGetApp().app_config->save();
+    if (wxGetApp().app_config->dirty())
+        wxGetApp().app_config->save();
 //         if (m_plater)
 //             m_plater->print = undef;
 //         Slic3r::GUI::deregister_on_request_update_callback();
@@ -1253,7 +1254,6 @@ void MainFrame::init_menubar_as_editor()
                             recent_projects.push_back(into_u8(m_recent_projects.GetHistoryFile(i)));
                         }
                     wxGetApp().app_config->set_recent_projects(recent_projects);
-                    wxGetApp().app_config->save();
                 }
             }
             }, wxID_FILE1, wxID_FILE9);
@@ -2182,7 +2182,6 @@ void MainFrame::add_to_recent_projects(const wxString& filename)
             recent_projects.push_back(into_u8(m_recent_projects.GetHistoryFile(i)));
         }
         wxGetApp().app_config->set_recent_projects(recent_projects);
-        wxGetApp().app_config->save();
     }
 }
 
