@@ -87,7 +87,7 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 
 	// cache input values for custom toolbar size
 	m_custom_toolbar_size		= atoi(get_app_config()->get("custom_toolbar_size").c_str());
-	m_use_custom_toolbar_size	= get_app_config()->get("use_custom_toolbar_size") == "1";
+	m_use_custom_toolbar_size	= get_app_config()->get_bool("use_custom_toolbar_size");
 
 	// set Field for notify_release to its value
 	if (m_optgroup_gui && m_optgroup_gui->get_field("notify_release") != nullptr) {
@@ -100,10 +100,10 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		auto app_config = get_app_config();
 
 		downloader->set_path_name(app_config->get("url_downloader_dest"));
-		downloader->allow(!app_config->has("downloader_url_registered") || app_config->get("downloader_url_registered") == "1");
+		downloader->allow(!app_config->has("downloader_url_registered") || app_config->get_bool("downloader_url_registered"));
 
 		for (const std::string& opt_key : {"suppress_hyperlinks", "downloader_url_registered"})
-			m_optgroup_other->set_value(opt_key, app_config->get(opt_key) == "1");
+			m_optgroup_other->set_value(opt_key, app_config->get_bool(opt_key));
 
 		// update colors for color pickers of the labels
 		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
@@ -257,25 +257,25 @@ void PreferencesDialog::build()
 		append_bool_option(m_optgroup_general, "remember_output_path", 
 			L("Remember output directory"),
 			L("If this is enabled, Slic3r will prompt the last output directory instead of the one containing the input files."),
-			app_config->has("remember_output_path") ? app_config->get("remember_output_path") == "1" : true);
+			app_config->has("remember_output_path") ? app_config->get_bool("remember_output_path") : true);
 
 		append_bool_option(m_optgroup_general, "autocenter", 
 			L("Auto-center parts"),
 			L("If this is enabled, Slic3r will auto-center objects around the print bed center."),
-			app_config->get("autocenter") == "1");
+			app_config->get_bool("autocenter"));
 
 		append_bool_option(m_optgroup_general, "background_processing", 
 			L("Background processing"),
 			L("If this is enabled, Slic3r will pre-process objects as soon "
 				"as they\'re loaded in order to save time when exporting G-code."),
-			app_config->get("background_processing") == "1");
+			app_config->get_bool("background_processing"));
 
 		append_bool_option(m_optgroup_general, "alert_when_supports_needed", 
 			L("Alert when supports needed"),
 			L("If this is enabled, Slic3r will raise alerts when it detects "
 				"issues in the sliced object, that can be resolved with supports (and brim). "
 				"Examples of such issues are floating object parts, unsupported extrusions and low bed adhesion."),
-			app_config->get("alert_when_supports_needed") == "1");
+			app_config->get_bool("alert_when_supports_needed"));
 
 
 		m_optgroup_general->append_separator();
@@ -284,19 +284,19 @@ void PreferencesDialog::build()
 		append_bool_option(m_optgroup_general, "export_sources_full_pathnames",
 			L("Export sources full pathnames to 3mf and amf"),
 			L("If enabled, allows the Reload from disk command to automatically find and load the files when invoked."),
-			app_config->get("export_sources_full_pathnames") == "1");
+			app_config->get_bool("export_sources_full_pathnames"));
 
 #ifdef _WIN32
 		// Please keep in sync with ConfigWizard
 		append_bool_option(m_optgroup_general, "associate_3mf",
 			L("Associate .3mf files to PrusaSlicer"),
 			L("If enabled, sets PrusaSlicer as default application to open .3mf files."),
-			app_config->get("associate_3mf") == "1");
+			app_config->get_bool("associate_3mf"));
 
 		append_bool_option(m_optgroup_general, "associate_stl",
 			L("Associate .stl files to PrusaSlicer"),
 			L("If enabled, sets PrusaSlicer as default application to open .stl files."),
-			app_config->get("associate_stl") == "1");
+			app_config->get_bool("associate_stl"));
 #endif // _WIN32
 
 		m_optgroup_general->append_separator();
@@ -306,23 +306,23 @@ void PreferencesDialog::build()
 			L("Update built-in Presets automatically"),
 			L("If enabled, Slic3r downloads updates of built-in system presets in the background. These updates are downloaded "
 			  "into a separate temporary location. When a new preset version becomes available it is offered at application startup."),
-			app_config->get("preset_update") == "1");
+			app_config->get_bool("preset_update"));
 
 		append_bool_option(m_optgroup_general, "no_defaults",
 			L("Suppress \" - default - \" presets"),
 			L("Suppress \" - default - \" presets in the Print / Filament / Printer selections once there are any other valid presets available."),
-			app_config->get("no_defaults") == "1");
+			app_config->get_bool("no_defaults"));
 
 		append_bool_option(m_optgroup_general, "no_templates",
 			L("Suppress \" Template \" filament presets"),
 			L("Suppress \" Template \" filament presets in configuration wizard and sidebar visibility."),
-			app_config->get("no_templates") == "1");
+			app_config->get_bool("no_templates"));
 
 		append_bool_option(m_optgroup_general, "show_incompatible_presets",
 			L("Show incompatible print and filament presets"),
 			L("When checked, the print and filament presets are shown in the preset editor "
 			"even if they are marked as incompatible with the active printer"),
-			app_config->get("show_incompatible_presets") == "1");
+			app_config->get_bool("show_incompatible_presets"));
 
 		m_optgroup_general->append_separator();
 
@@ -335,7 +335,7 @@ void PreferencesDialog::build()
 			L("Show drop project dialog"),
 			L("When checked, whenever dragging and dropping a project file on the application, shows a dialog asking to select the action to take on the file to load."),
 #endif
-			app_config->get("show_drop_project_dialog") == "1");
+			app_config->get_bool("show_drop_project_dialog"));
 
 		append_bool_option(m_optgroup_general, "single_instance",
 #if __APPLE__
@@ -346,7 +346,7 @@ void PreferencesDialog::build()
 			L("Allow just a single PrusaSlicer instance"),
 			L("If this is enabled, when starting PrusaSlicer and another instance of the same PrusaSlicer is already running, that instance will be reactivated instead."),
 #endif
-		app_config->has("single_instance") ? app_config->get("single_instance") == "1" : false );
+		app_config->has("single_instance") ? app_config->get_bool("single_instance") : false );
 
 		m_optgroup_general->append_separator();
 
@@ -381,7 +381,7 @@ void PreferencesDialog::build()
 		append_bool_option(m_optgroup_general, "associate_gcode",
 			L("Associate .gcode files to PrusaSlicer G-code Viewer"),
 			L("If enabled, sets PrusaSlicer G-code Viewer as default application to open .gcode files."),
-			app_config->get("associate_gcode") == "1");
+			app_config->get_bool("associate_gcode"));
 	}
 #endif // _WIN32
 
@@ -390,7 +390,7 @@ void PreferencesDialog::build()
 		L("Use Retina resolution for the 3D scene"),
 		L("If enabled, the 3D scene will be rendered in Retina resolution. "
 	      "If you are experiencing 3D performance problems, disabling this option may help."),
-		app_config->get("use_retina_opengl") == "1");
+		app_config->get_bool("use_retina_opengl"));
 #endif
 
 	m_optgroup_general->append_separator();
@@ -399,24 +399,24 @@ void PreferencesDialog::build()
 	append_bool_option(m_optgroup_general, "show_splash_screen",
 		L("Show splash screen"),
 		L("Show splash screen"),
-		app_config->get("show_splash_screen") == "1");
+		app_config->get_bool("show_splash_screen"));
 
 	append_bool_option(m_optgroup_general, "restore_win_position",
 		L("Restore window position on start"),
 		L("If enabled, PrusaSlicer will be open at the position it was closed"),
-		app_config->get("restore_win_position") == "1");
+		app_config->get_bool("restore_win_position"));
 
     // Clear Undo / Redo stack on new project
 	append_bool_option(m_optgroup_general, "clear_undo_redo_stack_on_new_project",
 		L("Clear Undo / Redo stack on new project"),
 		L("Clear Undo / Redo stack on new project or when an existing project is loaded."),
-		app_config->get("clear_undo_redo_stack_on_new_project") == "1");
+		app_config->get_bool("clear_undo_redo_stack_on_new_project"));
 
 #if defined(_WIN32) || defined(__APPLE__)
 	append_bool_option(m_optgroup_general, "use_legacy_3DConnexion",
 		L("Enable support for legacy 3DConnexion devices"),
 		L("If enabled, the legacy 3DConnexion devices settings dialog is available by pressing CTRL+M"),
-		app_config->get("use_legacy_3DConnexion") == "1");
+		app_config->get_bool("use_legacy_3DConnexion"));
 #endif // _WIN32 || __APPLE__
 
 	activate_options_tab(m_optgroup_general);
@@ -434,17 +434,17 @@ void PreferencesDialog::build()
 	append_bool_option(m_optgroup_camera, "use_perspective_camera",
 		L("Use perspective camera"),
 		L("If enabled, use perspective camera. If not enabled, use orthographic camera."),
-		app_config->get("use_perspective_camera") == "1");
+		app_config->get_bool("use_perspective_camera"));
 
 	append_bool_option(m_optgroup_camera, "use_free_camera",
 		L("Use free camera"),
 		L("If enabled, use free camera. If not enabled, use constrained camera."),
-		app_config->get("use_free_camera") == "1");
+		app_config->get_bool("use_free_camera"));
 
 	append_bool_option(m_optgroup_camera, "reverse_mouse_wheel_zoom",
 		L("Reverse direction of zoom with mouse wheel"),
 		L("If enabled, reverses the direction of zoom with mouse wheel"),
-		app_config->get("reverse_mouse_wheel_zoom") == "1");
+		app_config->get_bool("reverse_mouse_wheel_zoom"));
 
 	activate_options_tab(m_optgroup_camera);
 
@@ -492,48 +492,48 @@ void PreferencesDialog::build()
 		L("Sequential slider applied only to top layer"),
 		L("If enabled, changes made using the sequential slider, in preview, apply only to gcode top layer."
 		  "If disabled, changes made using the sequential slider, in preview, apply to the whole gcode."),
-		app_config->get("seq_top_layer_only") == "1");
+		app_config->get_bool("seq_top_layer_only"));
 
 	if (is_editor) {
 		append_bool_option(m_optgroup_gui, "show_collapse_button",
 			L("Show sidebar collapse/expand button"),
 			L("If enabled, the button for the collapse sidebar will be appeared in top right corner of the 3D Scene"),
-			app_config->get("show_collapse_button") == "1");
+			app_config->get_bool("show_collapse_button"));
 /*
 		append_bool_option(m_optgroup_gui, "suppress_hyperlinks",
 			L("Suppress to open hyperlink in browser"),
 			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser."),
 			//L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
 			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
-			app_config->get("suppress_hyperlinks") == "1");
+			app_config->get_bool("suppress_hyperlinks"));
 */
 		append_bool_option(m_optgroup_gui, "color_mapinulation_panel",
 			L("Use colors for axes values in Manipulation panel"),
 			L("If enabled, the axes names and axes values will be colorized according to the axes colors. "
 			  "If disabled, old UI will be used."),
-			app_config->get("color_mapinulation_panel") == "1");
+			app_config->get_bool("color_mapinulation_panel"));
 
 		append_bool_option(m_optgroup_gui, "order_volumes",
 			L("Order object volumes by types"),
 			L("If enabled, volumes will be always ordered inside the object. Correct order is Model Part, Negative Volume, Modifier, Support Blocker and Support Enforcer. "
 			  "If disabled, you can reorder Model Parts, Negative Volumes and Modifiers. But one of the model parts have to be on the first place."),
-			app_config->get("order_volumes") == "1");
+			app_config->get_bool("order_volumes"));
 
 		append_bool_option(m_optgroup_gui, "non_manifold_edges",
 			L("Show non-manifold edges"),
 			L("If enabled, shows non-manifold edges."),
-			app_config->get("non_manifold_edges") == "1");
+			app_config->get_bool("non_manifold_edges"));
 
 		append_bool_option(m_optgroup_gui, "allow_auto_color_change",
 			L("Allow automatically color change"),
 			L("If enabled, related notification will be shown, when sliced object looks like a logo or a sign."),
-			app_config->get("allow_auto_color_change") == "1");
+			app_config->get_bool("allow_auto_color_change"));
 
 #ifdef _MSW_DARK_MODE
 		append_bool_option(m_optgroup_gui, "tabs_as_menu",
 			L("Set settings tabs as menu items (experimental)"),
 			L("If enabled, Settings Tabs will be placed as menu items. If disabled, old UI will be used."),
-			app_config->get("tabs_as_menu") == "1");
+			app_config->get_bool("tabs_as_menu"));
 #endif
 
 		m_optgroup_gui->append_separator();
@@ -541,7 +541,7 @@ void PreferencesDialog::build()
 		append_bool_option(m_optgroup_gui, "show_hints",
 			L("Show \"Tip of the day\" notification after start"),
 			L("If enabled, useful hints are displayed at startup."),
-			app_config->get("show_hints") == "1");
+			app_config->get_bool("show_hints"));
 
 		append_enum_option<NotifyReleaseMode>(m_optgroup_gui, "notify_release",
 			L("Notify about new releases"),
@@ -557,7 +557,7 @@ void PreferencesDialog::build()
 		append_bool_option(m_optgroup_gui, "use_custom_toolbar_size",
 			L("Use custom size for toolbar icons"),
 			L("If enabled, you can change size of toolbar icons manually."),
-			app_config->get("use_custom_toolbar_size") == "1");
+			app_config->get_bool("use_custom_toolbar_size"));
 	}
 
 	activate_options_tab(m_optgroup_gui);
@@ -568,7 +568,7 @@ void PreferencesDialog::build()
 		m_optgroup_gui->get_field("notify_release")->set_value(val, false);
 
 		create_icon_size_slider();
-		m_icon_size_sizer->ShowItems(app_config->get("use_custom_toolbar_size") == "1");
+		m_icon_size_sizer->ShowItems(app_config->get_bool("use_custom_toolbar_size"));
 
 		create_settings_mode_widget();
 		create_settings_text_color_widget();
@@ -594,12 +594,12 @@ void PreferencesDialog::build()
 			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser."),
 			//L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
 			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
-			app_config->get("suppress_hyperlinks") == "1");
+			app_config->get_bool("suppress_hyperlinks"));
 		
 		append_bool_option(m_optgroup_other, "downloader_url_registered",
 			L("Allow downloads from Printables.com"),
 			L("If enabled, PrusaSlicer will allow to download from Printables.com"),
-			app_config->get("downloader_url_registered") == "1");
+			app_config->get_bool("downloader_url_registered"));
 
 		activate_options_tab(m_optgroup_other);
 
@@ -619,7 +619,7 @@ void PreferencesDialog::build()
 		append_bool_option(m_optgroup_render, "use_environment_map",
 			L("Use environment map"),
 			L("If enabled, renders object using the environment map."),
-			app_config->get("use_environment_map") == "1");
+			app_config->get_bool("use_environment_map"));
 
 		activate_options_tab(m_optgroup_render);
 #endif // ENABLE_ENVIRONMENT_MAP
@@ -638,7 +638,7 @@ void PreferencesDialog::build()
 		append_bool_option(m_optgroup_dark_mode, "dark_color_mode",
 			L("Enable dark mode"),
 			L("If enabled, UI will use Dark mode colors. If disabled, old UI will be used."),
-			app_config->get("dark_color_mode") == "1");
+			app_config->get_bool("dark_color_mode"));
 
 		if (wxPlatformInfo::Get().GetOSMajorVersion() >= 10) // Use system menu just for Window newer then Windows 10
 															 // Use menu with ownerdrawn items by default on systems older then Windows 10
@@ -647,7 +647,7 @@ void PreferencesDialog::build()
 			L("Use system menu for application"),
 			L("If enabled, application will use the standart Windows system menu,\n"
 			"but on some combination od display scales it can look ugly. If disabled, old UI will be used."),
-			app_config->get("sys_menu_enabled") == "1");
+			app_config->get_bool("sys_menu_enabled"));
 		}
 
 		activate_options_tab(m_optgroup_dark_mode);
@@ -799,7 +799,7 @@ void PreferencesDialog::revert(wxEvent&)
 		app_config->set("custom_toolbar_size", (boost::format("%d") % m_custom_toolbar_size).str());
 		m_icon_size_slider->SetValue(m_custom_toolbar_size);
 	}
-	if (m_use_custom_toolbar_size != (get_app_config()->get("use_custom_toolbar_size") == "1")) {
+	if (m_use_custom_toolbar_size != (get_app_config()->get_bool("use_custom_toolbar_size"))) {
 		app_config->set("use_custom_toolbar_size", m_use_custom_toolbar_size ? "1" : "0");
 
 		m_optgroup_gui->set_value("use_custom_toolbar_size", m_use_custom_toolbar_size);
@@ -823,17 +823,17 @@ void PreferencesDialog::revert(wxEvent&)
 			continue;
 		}
 		if (key == "old_settings_layout_mode") {
-			m_rb_old_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			m_rb_old_settings_layout_mode->SetValue(app_config->get_bool(key));
 			m_settings_layout_changed = false;
 			continue;
 		}
 		if (key == "new_settings_layout_mode") {
-			m_rb_new_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			m_rb_new_settings_layout_mode->SetValue(app_config->get_bool(key));
 			m_settings_layout_changed = false;
 			continue;
 		}
 		if (key == "dlg_settings_layout_mode") {
-			m_rb_dlg_settings_layout_mode->SetValue(app_config->get(key) == "1");
+			m_rb_dlg_settings_layout_mode->SetValue(app_config->get_bool(key));
 			m_settings_layout_changed = false;
 			continue;
 		}
@@ -846,11 +846,11 @@ void PreferencesDialog::revert(wxEvent&)
 			, m_optgroup_render
 #endif // ENABLE_ENVIRONMENT_MAP
 			}) {
-			if (opt_group->set_value(key, app_config->get(key) == "1"))
+			if (opt_group->set_value(key, app_config->get_bool(key)))
 				break;
 		}
 		if (key == "tabs_as_menu") {
-			m_rb_new_settings_layout_mode->Show(app_config->get(key) != "1");
+			m_rb_new_settings_layout_mode->Show(!app_config->get_bool(key));
 			refresh_og(m_optgroup_gui);
 			continue;
 		}
@@ -993,12 +993,12 @@ void PreferencesDialog::create_settings_mode_widget()
 		});
 	};
 
-	add_radio(&m_rb_old_settings_layout_mode, ++id, app_config->get("old_settings_layout_mode") == "1");
-	add_radio(&m_rb_new_settings_layout_mode, ++id, app_config->get("new_settings_layout_mode") == "1");
-	add_radio(&m_rb_dlg_settings_layout_mode, ++id, app_config->get("dlg_settings_layout_mode") == "1");
+	add_radio(&m_rb_old_settings_layout_mode, ++id, app_config->get_bool("old_settings_layout_mode"));
+	add_radio(&m_rb_new_settings_layout_mode, ++id, app_config->get_bool("new_settings_layout_mode"));
+	add_radio(&m_rb_dlg_settings_layout_mode, ++id, app_config->get_bool("dlg_settings_layout_mode"));
 
 #ifdef _MSW_DARK_MODE
-	if (app_config->get("tabs_as_menu") == "1") {
+	if (app_config->get_bool("tabs_as_menu")) {
 		m_rb_new_settings_layout_mode->Hide();
 		if (m_rb_new_settings_layout_mode->GetValue()) {
 			m_rb_new_settings_layout_mode->SetValue(false);
