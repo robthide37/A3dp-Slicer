@@ -799,8 +799,6 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         }
         // Calculate offset: transformation to wanted position
         Transform3d hit_to_world = m_raycast_manager.get_transformation(hit->tr_key);
-        //priv::reset_skew(hit_to_world);
-
         Transform3d hit_to_instance = hit_to_world * m_surface_drag->instance_inv;
         Transform3d hit_to_volume = hit_to_instance * m_surface_drag->volume_tr.inverse();
         
