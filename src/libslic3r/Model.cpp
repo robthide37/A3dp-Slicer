@@ -1305,7 +1305,9 @@ void ModelObject::synchronize_model_after_cut()
 void ModelObject::apply_cut_attributes(ModelObjectCutAttributes attributes)
 {
     // we don't save cut information, if result will not contains all parts of initial object
-    if (!attributes.has(ModelObjectCutAttribute::KeepUpper) || !attributes.has(ModelObjectCutAttribute::KeepLower))
+    if (!attributes.has(ModelObjectCutAttribute::KeepUpper) || 
+        !attributes.has(ModelObjectCutAttribute::KeepLower) || 
+        attributes.has(ModelObjectCutAttribute::InvalidateCutInfo))
         return;
 
     if (cut_id.id().invalid())
@@ -1425,7 +1427,7 @@ void ModelObject::process_modifier_cut(ModelVolume* volume, const Transform3d& i
         lower->add_volume(*volume);
 }
 
-static void add_cut_volume(TriangleMesh& mesh, ModelObject* object, const ModelVolume* src_volume, const Transform3d& cut_matrix)
+static void add_cut_volume(TriangleMesh& mesh, ModelObject* object, const ModelVolume* src_volume, const Transform3d& cut_matrix, const std::string& suffix = {})
 {
     if (mesh.empty())
         return;
@@ -1433,7 +1435,7 @@ static void add_cut_volume(TriangleMesh& mesh, ModelObject* object, const ModelV
     mesh.transform(cut_matrix);
     ModelVolume* vol = object->add_volume(mesh);
 
-    vol->name = src_volume->name;
+    vol->name = src_volume->name + suffix;
     // Don't copy the config's ID.
     vol->config.assign_config(src_volume->config);
     assert(vol->config.id().valid());
@@ -1478,8 +1480,8 @@ void ModelObject::process_solid_part_cut(ModelVolume* volume, const Transform3d&
     // Add required cut parts to the objects
 
     if (attributes.has(ModelObjectCutAttribute::KeepAsParts)) {
-        add_cut_volume(lower_mesh, lower, volume, cut_matrix);
-        add_cut_volume(upper_mesh, lower, volume, cut_matrix);
+        add_cut_volume(upper_mesh, upper, volume, cut_matrix, "_A");
+        add_cut_volume(lower_mesh, upper, volume, cut_matrix, "_B");
         return;
     }
 
@@ -1566,7 +1568,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
         clone_for_cut(&upper);
 
     ModelObject* lower{ nullptr };
-    if (attributes.has(ModelObjectCutAttribute::KeepLower))
+    if (attributes.has(ModelObjectCutAttribute::KeepLower) && !attributes.has(ModelObjectCutAttribute::KeepAsParts))
         clone_for_cut(&lower);
 
     std::vector<ModelObject*> dowels;
@@ -1614,8 +1616,9 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
 
     ModelObjectPtrs res;
 
-    if (attributes.has(ModelObjectCutAttribute::KeepAsParts) && !lower->volumes.empty()) {
-        res.push_back(lower);
+    if (attributes.has(ModelObjectCutAttribute::KeepAsParts) && !upper->volumes.empty()) {
+        reset_instance_transformation(upper, instance, cut_matrix);
+        res.push_back(upper);
     }
     else {
         if (attributes.has(ModelObjectCutAttribute::KeepUpper) && !upper->volumes.empty()) {

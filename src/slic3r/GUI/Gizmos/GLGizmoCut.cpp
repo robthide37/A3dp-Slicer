@@ -277,6 +277,8 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
 
     if (mouse_event.ShiftDown() && mouse_event.LeftDown())
         return gizmo_event(SLAGizmoEventType::LeftDown, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
+    if (mouse_event.CmdDown() && mouse_event.LeftDown())
+        return false;
     if (cut_line_processing()) {
         if (mouse_event.ShiftDown()) {
             if (mouse_event.Moving()|| mouse_event.Dragging())
@@ -682,8 +684,12 @@ void GLGizmoCut3D::render_cut_plane()
     shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
-    if (can_perform_cut() && has_valid_contour()) 
-        m_plane.model.set_color({ 0.8f, 0.8f, 0.8f, 0.5f });
+    if (can_perform_cut() && has_valid_contour()) {
+        if (m_hover_id == CutPlane)
+            m_plane.model.set_color({ 0.9f, 0.9f, 0.9f, 0.5f });
+        else
+            m_plane.model.set_color({ 0.8f, 0.8f, 0.8f, 0.5f });
+    }
     else
         m_plane.model.set_color({ 1.0f, 0.8f, 0.8f, 0.5f });
     m_plane.model.render();
@@ -1677,8 +1683,7 @@ void GLGizmoCut3D::set_connectors_editing(bool connectors_editing)
 
 void GLGizmoCut3D::flip_cut_plane()
 {
-    m_rotation_m = m_start_dragging_m * rotation_transform(PI * Vec3d::UnitX());
-
+    m_rotation_m = m_rotation_m * rotation_transform(PI * Vec3d::UnitX());
     Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Flip cut plane"), UndoRedo::SnapshotType::GizmoAction);
     m_start_dragging_m = m_rotation_m;
 
@@ -1760,7 +1765,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
         add_vertical_scaled_interval(0.75f);
 
-        m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower);
+        m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower || m_keep_as_parts);
             if (m_imgui->button(has_connectors ? _L("Edit connectors") : _L("Add connectors")))
                 set_connectors_editing(true);
         m_imgui->disabled_end();
@@ -2247,7 +2252,8 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                     only_if(m_place_on_cut_lower, ModelObjectCutAttribute::PlaceOnCutLower) |
                     only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) |
                     only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) |
-                    only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
+                    only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels) |
+                    only_if(!has_connectors, ModelObjectCutAttribute::InvalidateCutInfo));
     }
 }
 
@@ -2482,7 +2488,7 @@ bool GLGizmoCut3D::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_posi
     if (is_dragging() || m_connector_mode == CutConnectorMode::Auto)
         return false;
 
-    if ( m_hover_id < 0 && shift_down &&  ! m_connectors_editing &&
+    if ( (m_hover_id < 0 || m_hover_id == CutPlane) && shift_down &&  ! m_connectors_editing &&
         (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::LeftUp || action == SLAGizmoEventType::Moving) )
         return process_cut_line(action, mouse_position);
 
