@@ -21,8 +21,8 @@ namespace Slic3r {
 namespace GUI {
 
 static const ColorRGBA GRABBER_COLOR = ColorRGBA::YELLOW();
-static const ColorRGBA ABOVE_GRABBER_COLOR = ColorRGBA::CYAN();
-static const ColorRGBA BELOW_GRABBER_COLOR = ColorRGBA::MAGENTA();
+static const ColorRGBA UPPER_PART_COLOR = ColorRGBA::CYAN();
+static const ColorRGBA LOWER_PART_COLOR = ColorRGBA::MAGENTA();
 
 // connector colors
 static const ColorRGBA PLAG_COLOR           = ColorRGBA::YELLOW();
@@ -411,9 +411,18 @@ void GLGizmoCut3D::update_clipper()
 
     // calculate normal for cut plane
     Vec3d normal = m_cut_normal = end - beg;
-    m_cut_normal.normalize();
 
-    if (!is_looking_forward() && m_connectors_editing) {
+    // calculate normal and offset for clipping plane
+    double dist = (m_plane_center - beg).norm();
+    dist = std::clamp(dist, 0.0001, normal.norm());
+    normal.normalize();
+    m_clp_normal = normal;
+    double offset = normal.dot(beg) + dist;
+
+    m_parent.set_color_clip_plane(normal, offset);
+
+    if (!is_looking_forward()) {
+        // recalculate normal and offset for clipping plane, if camera is looking downward to cut plane
         end = beg = m_plane_center;
         beg[Z] = box.center().z() + m_radius;
         end[Z] = box.center().z() - m_radius;
@@ -421,29 +430,20 @@ void GLGizmoCut3D::update_clipper()
         rotate_vec3d_around_plane_center(beg);
         rotate_vec3d_around_plane_center(end);
 
-        // recalculate normal for clipping plane, if camera is looking downward to cut plane
         normal = end - beg;
         if (normal == Vec3d::Zero())
             return;
-    }
 
-    // calculate normal and offset for clipping plane
-    double dist = (m_plane_center - beg).norm();
-    dist = std::clamp(dist, 0.0001, normal.norm());
-    normal.normalize();
-    m_clp_normal = normal;
-    const double offset = normal.dot(beg) + dist;
+        dist = (m_plane_center - beg).norm();
+        dist = std::clamp(dist, 0.0001, normal.norm());
+        normal.normalize();
+        m_clp_normal = normal;
+        offset = normal.dot(beg) + dist;
+    }
 
     m_c->object_clipper()->set_range_and_pos(normal, offset, dist);
 
     put_connectors_on_cut_plane(normal, offset);
-
-    std::array<double, 4> data = m_c->object_clipper()->get_clipping_plane(true)->get_data();
-    // we need to invert the normal for the shader to work properly
-    for (int i = 0; i < 3; ++i) {
-        data[i] = -data[i];
-    }
-    m_parent.set_color_clip_plane(data);
 
     if (m_raycasters.empty())
         on_register_raycasters_for_picking();
@@ -909,7 +909,7 @@ void GLGizmoCut3D::on_set_state()
 {
     if (m_state == On) {
         m_parent.set_use_color_clip_plane(true);
-        m_parent.set_color_clip_plane_colors({ ABOVE_GRABBER_COLOR , BELOW_GRABBER_COLOR });
+        m_parent.set_color_clip_plane_colors({ UPPER_PART_COLOR , LOWER_PART_COLOR });
 
         update_bb();
         m_connectors_editing = !m_selected.empty();
@@ -1826,9 +1826,9 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         add_vertical_scaled_interval(0.5f);
 
         m_imgui->disabled_begin(has_connectors || m_keep_as_parts);
-            render_part_name("A", m_keep_upper, m_imgui->to_ImU32(ABOVE_GRABBER_COLOR));
+            render_part_name("A", m_keep_upper, m_imgui->to_ImU32(UPPER_PART_COLOR));
             ImGui::SameLine(h_shift + ImGui::GetCurrentWindow()->WindowPadding.x);
-            render_part_name("B", m_keep_lower, m_imgui->to_ImU32(BELOW_GRABBER_COLOR));
+            render_part_name("B", m_keep_lower, m_imgui->to_ImU32(LOWER_PART_COLOR));
         m_imgui->disabled_end();
 
         add_vertical_scaled_interval(0.5f);

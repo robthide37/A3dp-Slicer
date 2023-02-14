@@ -452,7 +452,11 @@ public:
     const std::array<double, 4>& get_clipping_plane() const { return m_clipping_plane; }
 
     void set_use_color_clip_plane(bool use) { m_use_color_clip_plane = use; }
-    void set_color_clip_plane(const std::array<double, 4>& coeffs) { m_color_clip_plane = coeffs; }
+    void set_color_clip_plane(const Vec3d& cp_normal, double offset) {
+        for (int i = 0; i < 3; ++i)
+            m_color_clip_plane[i] = -cp_normal[i];
+        m_color_clip_plane[3] = offset;
+    }
     void set_color_clip_plane_colors(const std::array<ColorRGBA, 2>& colors) { m_color_clip_plane_colors = colors; }
 
     bool is_slope_active() const { return m_slope.active; }
