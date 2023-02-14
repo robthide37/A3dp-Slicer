@@ -1736,7 +1736,7 @@ void PrintObject::bridge_over_infill()
                                     if (angle > PI) {
                                         angle -= PI;
                                     }
-                                    angle += PI;
+                                    angle -= PI * 0.5;
                                     directions_with_distances.emplace_back(angle, distance);
                                 }
                             }
@@ -1780,7 +1780,7 @@ void PrintObject::bridge_over_infill()
                     };
 
                     Polygons expanded_bridged_area{};
-                    double aligning_angle = -bridging_angle + PI;
+                    double aligning_angle = -bridging_angle + PI * 0.5;
                     {
                         polygons_rotate(bridged_area, aligning_angle);
                         lines_rotate(anchors_and_walls, cos(aligning_angle), sin(aligning_angle));
@@ -1818,14 +1818,13 @@ void PrintObject::bridge_over_infill()
                             auto anchors_intersections = anchors_and_walls_tree.intersections_with_line<true>(vertical_lines[i]);
 
                             for (Line &section : polygon_sections[i]) {
-                                auto maybe_below_anchor = std::upper_bound(anchors_intersections.begin(), anchors_intersections.end(),
+                                auto maybe_below_anchor = std::upper_bound(anchors_intersections.rbegin(), anchors_intersections.rend(),
                                                                            section.a,
                                                                            [](const Point &a, const std::pair<Point, size_t> &b) {
-                                                                               return a.y() < b.first.y();
+                                                                               return a.y() > b.first.y();
                                                                            });
-                                if (maybe_below_anchor != anchors_intersections.begin() &&
-                                    maybe_below_anchor != anchors_intersections.end()) {
-                                    section.a = (--maybe_below_anchor)->first;
+                                if (maybe_below_anchor != anchors_intersections.rend()) {
+                                    section.a = maybe_below_anchor->first;
                                 }
 
                                 auto maybe_upper_anchor = std::upper_bound(anchors_intersections.begin(), anchors_intersections.end(),
@@ -1848,8 +1847,8 @@ void PrintObject::bridge_over_infill()
                                 }
                             }
 
-                            std::remove_if(polygon_sections[i].begin(), polygon_sections[i].end(),
-                                           [](const Line &s) { return s.a == s.b; });
+                            void(std::remove_if(polygon_sections[i].begin(), polygon_sections[i].end(),
+                                           [](const Line &s) { return s.a == s.b; }));
                         }
 
                         // reconstruct polygon from polygon sections
@@ -1889,8 +1888,8 @@ void PrintObject::bridge_over_infill()
                                 }
                             }
 
-                            std::remove_if(current_traced_polys.begin(), current_traced_polys.end(),
-                                           [](const TracedPoly &tp) { return tp.lows.empty(); });
+                            void(std::remove_if(current_traced_polys.begin(), current_traced_polys.end(),
+                                           [](const TracedPoly &tp) { return tp.lows.empty(); }));
 
                             for (const auto &segment : layer) {
                                 if (used_segments.find(&segment) == used_segments.end()) {
@@ -1983,8 +1982,8 @@ void PrintObject::bridge_over_infill()
                             }
                             region->m_fill_surfaces.surfaces.insert(region->m_fill_surfaces.surfaces.end(), new_surfaces.begin(),
                                                                     new_surfaces.end());
-                            std::remove_if(region->m_fill_surfaces.begin(), region->m_fill_surfaces.end(),
-                                           [](const Surface &s) { return s.empty(); });
+                            void(std::remove_if(region->m_fill_surfaces.begin(), region->m_fill_surfaces.end(),
+                                           [](const Surface &s) { return s.empty(); }));
                         }
                     }
                 }
