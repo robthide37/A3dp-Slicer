@@ -54,8 +54,10 @@ void main()
         discard;
 
     vec4 color;
-	if (use_color_clip_plane)
-		color = (color_clip_plane_dot < 0.0) ? uniform_color_clip_plane_1 : uniform_color_clip_plane_2;
+	if (use_color_clip_plane) {
+		color.rgb = (color_clip_plane_dot < 0.0) ? uniform_color_clip_plane_1.rgb : uniform_color_clip_plane_2.rgb;
+		color.a = uniform_color.a;
+    }
     else
 	    color = uniform_color;
 
