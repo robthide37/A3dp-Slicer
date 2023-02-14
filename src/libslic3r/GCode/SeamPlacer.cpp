@@ -1764,11 +1764,11 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, const uint1
 
     auto get_next_loop_point = [&loop](ExtrusionLoop::ClosestPathPoint current) {
         current.segment_idx += 1;
-        if (current.segment_idx >= loop.paths[current.path_idx].polyline.points.size()) {
+        if (current.segment_idx >= loop.paths[current.path_idx].polyline.size()) {
             current.path_idx = next_idx_modulo(current.path_idx, loop.paths.size());
             current.segment_idx = 0;
         }
-        current.foot_pt = loop.paths[current.path_idx].polyline.points[current.segment_idx];
+        current.foot_pt = loop.paths[current.path_idx].polyline.get_points()[current.segment_idx];
         return current;
     };
 
@@ -1781,9 +1781,9 @@ void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop, const uint1
     size_t closest_perimeter_point_index = 0;
     { // local space for the closest_perimeter_point_index
         Perimeter *closest_perimeter = nullptr;
-        ExtrusionLoop::ClosestPathPoint closest_point{0,0,loop.paths[0].polyline.points[0]};
+        ExtrusionLoop::ClosestPathPoint closest_point{0,0,loop.paths[0].polyline.front()};
         size_t points_count = std::accumulate(loop.paths.begin(), loop.paths.end(), 0, [](size_t acc,const ExtrusionPath& p) {
-           return acc + p.polyline.points.size();
+           return acc + p.polyline.size();
         });
         for (size_t _ = 0; _ < points_count; ++_) {
             Vec2f unscaled_p = unscaled<float>(closest_point.foot_pt);

@@ -99,6 +99,7 @@ public:
     // Is there any valid extrusion assigned to this LayerRegion?
     bool    has_extrusions() const { return !this->perimeters.entities().empty() || !this->fills.entities().empty() || !this->ironings.entities().empty() || !this->thin_fills.entities().empty(); }
 
+    void    simplify_extrusion_entity();
 protected:
     friend class Layer;
     friend class PrintObject;
@@ -171,6 +172,7 @@ public:
     // Is there any valid extrusion assigned to this LayerRegion?
     virtual bool            has_extrusions() const { for (auto layerm : m_regions) if (layerm->has_extrusions()) return true; return false; }
 
+    void simplify_extrusion_path() { for (auto layerm : m_regions) layerm->simplify_extrusion_entity(); }
 protected:
     friend class PrintObject;
     friend std::vector<Layer*> new_layers(PrintObject*, const std::vector<coordf_t>&);
@@ -205,6 +207,7 @@ public:
     // Zero based index of an interface layer, used for alternating direction of interface / contact layers.
     size_t                      interface_id() const { return m_interface_id; }
 
+    void simplify_support_extrusion_path();
 protected:
     friend class PrintObject;
 
