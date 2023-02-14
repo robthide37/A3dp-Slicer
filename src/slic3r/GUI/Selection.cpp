@@ -1031,8 +1031,14 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         rotation_matrix = rotation_matrix.inverse();
                     v.set_volume_transformation(vol_trafo.get_matrix() * cached_vol_rotation_matrix.inverse() * rotation_matrix * cached_vol_rotation_matrix);
                 }
-                else
+                else {
+                    if (transformation_type.local()) {
+                        const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
+                        if ((inst_trafo * vol_trafo).is_left_handed() && !rotation.normalized().isApprox(Vec3d::UnitX()))
+                            rotation_matrix = rotation_matrix.inverse();
+                    }
                     transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
+                }
             }
         }
     }
