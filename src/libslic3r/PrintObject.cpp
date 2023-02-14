@@ -1597,6 +1597,12 @@ void PrintObject::bridge_over_infill()
                 for (size_t region_idx : regions_to_check) {
                     const LayerRegion *region                 = layer->get_region(region_idx);
                     auto               region_internal_solids = region->fill_surfaces().filter_by_type(stInternalSolid);
+
+                    //remove very small solid infills, usually not worth it and many of them may not even contain extrusions in the end.
+                    void(std::remove_if(region_internal_solids.begin(), region_internal_solids.end(), [region](const Surface *s) {
+                        float min_width = float(region->bridging_flow(frSolidInfill).scaled_width()) * 3.f;
+                        return opening_ex({s->expolygon}, min_width).empty();
+                    }));
                     if (!region_internal_solids.empty()) {
                         max_bridge_flow_height[&slice] = std::max(max_bridge_flow_height[&slice],
                                                                   region->bridging_flow(frSolidInfill).height());
@@ -1724,10 +1730,14 @@ void PrintObject::bridge_over_infill()
                                 int   lines_count = int(std::ceil(dist_to_next / scaled(3.0)));
                                 float step_size   = dist_to_next / lines_count;
                                 for (int i = 0; i < lines_count; ++i) {
-                                    Point a = (start + v * (i * step_size)).cast<coord_t>();
+                                    Point a                   = (start + v * (i * step_size)).cast<coord_t>();
                                     auto [distance, index, p] = lines_tree.distance_from_lines_extra<false>(a);
-                                    const Line &l             = lines_tree.get_line(index);
-                                    directions_with_distances.emplace_back(PI - l.direction(), distance);
+                                    double angle              = lines_tree.get_line(index).orientation();
+                                    if (angle > PI) {
+                                        angle -= PI;
+                                    }
+                                    angle += PI;
+                                    directions_with_distances.emplace_back(angle, distance);
                                 }
                             }
                         }
@@ -1770,9 +1780,10 @@ void PrintObject::bridge_over_infill()
                     };
 
                     Polygons expanded_bridged_area{};
+                    double aligning_angle = -bridging_angle + PI;
                     {
-                        polygons_rotate(bridged_area, bridging_angle);
-                        lines_rotate(anchors_and_walls, cos(bridging_angle), sin(bridging_angle));
+                        polygons_rotate(bridged_area, aligning_angle);
+                        lines_rotate(anchors_and_walls, cos(aligning_angle), sin(aligning_angle));
                         BoundingBox bb_x = get_extents(bridged_area);
                         BoundingBox bb_y = get_extents(anchors_and_walls);
 
@@ -1903,77 +1914,84 @@ void PrintObject::bridge_over_infill()
                         for (const auto &s : polygon_sections) {
                             l.insert(l.end(), s.begin(), s.end());
                         }
-                        debug_draw("reconstructed" + std::to_string(lidx), l, anchors_and_walls_tree.get_lines(), to_lines(expanded_bridged_area),
-                                   bridged_area_tree.get_lines());
+                        debug_draw("reconstructed" + std::to_string(lidx), l, anchors_and_walls_tree.get_lines(),
+                                   to_lines(expanded_bridged_area), bridged_area_tree.get_lines());
 #endif
                     }
 
-                    expand_area = diff(expand_area, expanded_bridged_area);
+                    polygons_rotate(expanded_bridged_area, -aligning_angle);
+                    expanded_bridged_area = intersection(expanded_bridged_area, max_area);
+                    expand_area           = diff(expand_area, expanded_bridged_area);
 
                     expanded_briding_surfaces[candidates.first].emplace_back(candidate, expanded_bridged_area, surface_to_region[candidate],
                                                                              bridging_angle);
+
+#ifdef DEBUG_BRIDGE_OVER_INFILL
+                    debug_draw("cadidate_added" + std::to_string(lidx), to_lines(expanded_bridged_area), to_lines(bridged_area),
+                               to_lines(max_area), to_lines(expand_area));
+#endif
                 }
             }
         }
-    // });
+        // });
 
-    BOOST_LOG_TRIVIAL(info) << "Bridge over infill - Directions and expanded surfaces computed" << log_memory_info();
+        BOOST_LOG_TRIVIAL(info) << "Bridge over infill - Directions and expanded surfaces computed" << log_memory_info();
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()),
-                      [po = this, &expanded_briding_surfaces](tbb::blocked_range<size_t> r) {
-                          for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
-                              Layer *layer = po->get_layer(lidx);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this,
+                                                                                 &expanded_briding_surfaces](tbb::blocked_range<size_t> r) {
+            for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
+                Layer *layer = po->get_layer(lidx);
 
-                              for (const LayerSlice &slice : layer->lslices_ex) {
-                                  if (const auto &modified_surfaces = expanded_briding_surfaces.find(&slice);
-                                      modified_surfaces != expanded_briding_surfaces.end()) {
-                                      std::unordered_set<size_t> regions_to_check;
-                                      for (const LayerIsland &island : slice.islands) {
-                                          regions_to_check.insert(island.perimeters.region());
-                                          if (!island.fill_expolygons_composite()) {
-                                              regions_to_check.insert(island.fill_region_id);
-                                          }
-                                      }
+                for (const LayerSlice &slice : layer->lslices_ex) {
+                    if (const auto &modified_surfaces = expanded_briding_surfaces.find(&slice);
+                        modified_surfaces != expanded_briding_surfaces.end()) {
+                        std::unordered_set<size_t> regions_to_check;
+                        for (const LayerIsland &island : slice.islands) {
+                            regions_to_check.insert(island.perimeters.region());
+                            if (!island.fill_expolygons_composite()) {
+                                regions_to_check.insert(island.fill_region_id);
+                            }
+                        }
 
-                                      Polygons cut_from_infill{};
-                                      for (const auto &surface : modified_surfaces->second) {
-                                          cut_from_infill.insert(cut_from_infill.end(), surface.new_polys.begin(), surface.new_polys.end());
-                                      }
+                        Polygons cut_from_infill{};
+                        for (const auto &surface : modified_surfaces->second) {
+                            cut_from_infill.insert(cut_from_infill.end(), surface.new_polys.begin(), surface.new_polys.end());
+                        }
 
-                                      for (size_t region_idx : regions_to_check) {
-                                          LayerRegion *region = layer->get_region(region_idx);
-                                          Surfaces     new_surfaces;
+                        for (size_t region_idx : regions_to_check) {
+                            LayerRegion *region = layer->get_region(region_idx);
+                            Surfaces     new_surfaces;
 
-                                          for (const ModifiedSurface &s : modified_surfaces->second) {
-                                              for (Surface &surface : region->m_fill_surfaces.surfaces) {
-                                                  if (s.original_surface == &surface) {
-                                                      Surface tmp(surface, {});
-                                                      tmp.surface_type = stInternalBridge;
-                                                      tmp.bridge_angle = s.bridge_angle;
-                                                      for (const ExPolygon &expoly : union_ex(s.new_polys)) {
-                                                          new_surfaces.emplace_back(tmp, expoly);
-                                                      }
-                                                      surface.clear();
-                                                  } else if (surface.surface_type == stInternal) {
-                                                      Surface tmp(surface, {});
-                                                      for (const ExPolygon &expoly : diff_ex(surface.expolygon, cut_from_infill)) {
-                                                          new_surfaces.emplace_back(tmp, expoly);
-                                                      }
-                                                      surface.clear();
-                                                  }
-                                              }
-                                          }
-                                          region->m_fill_surfaces.surfaces.insert(region->m_fill_surfaces.surfaces.end(),
-                                                                                  new_surfaces.begin(), new_surfaces.end());
-                                          std::remove_if(region->m_fill_surfaces.begin(), region->m_fill_surfaces.end(),
-                                                         [](const Surface &s) { return s.empty(); });
-                                      }
-                                  }
-                              }
-                          }
-                      });
+                            for (const ModifiedSurface &s : modified_surfaces->second) {
+                                for (Surface &surface : region->m_fill_surfaces.surfaces) {
+                                    if (s.original_surface == &surface) {
+                                        Surface tmp(surface, {});
+                                        tmp.surface_type = stInternalBridge;
+                                        tmp.bridge_angle = s.bridge_angle;
+                                        for (const ExPolygon &expoly : union_ex(s.new_polys)) {
+                                            new_surfaces.emplace_back(tmp, expoly);
+                                        }
+                                        surface.clear();
+                                    } else if (surface.surface_type == stInternal) {
+                                        Surface tmp(surface, {});
+                                        for (const ExPolygon &expoly : diff_ex(surface.expolygon, cut_from_infill)) {
+                                            new_surfaces.emplace_back(tmp, expoly);
+                                        }
+                                        surface.clear();
+                                    }
+                                }
+                            }
+                            region->m_fill_surfaces.surfaces.insert(region->m_fill_surfaces.surfaces.end(), new_surfaces.begin(),
+                                                                    new_surfaces.end());
+                            std::remove_if(region->m_fill_surfaces.begin(), region->m_fill_surfaces.end(),
+                                           [](const Surface &s) { return s.empty(); });
+                        }
+                    }
+                }
+            }
+        });
 
-    BOOST_LOG_TRIVIAL(info) << "Bridge over infill - End" << log_memory_info();
+        BOOST_LOG_TRIVIAL(info) << "Bridge over infill - End" << log_memory_info();
 
 } // void PrintObject::bridge_over_infill()
 
