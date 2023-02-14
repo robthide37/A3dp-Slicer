@@ -1570,11 +1570,8 @@ void PrintObject::bridge_over_infill()
 
     std::unordered_map<const LayerSlice *, std::vector<ModifiedSurface>> expanded_briding_surfaces;
 
-    // tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this,
-    //                                                                          &expanded_briding_surfaces](tbb::blocked_range<size_t> r) {
-        auto r = tbb::blocked_range<size_t>{0, this->layer_count()};
-        auto po = this;
-
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this,
+                                                                             &expanded_briding_surfaces](tbb::blocked_range<size_t> r) {
         for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
             const Layer *layer = po->get_layer(lidx);
 
@@ -1601,7 +1598,7 @@ void PrintObject::bridge_over_infill()
                     //remove very small solid infills, usually not worth it and many of them may not even contain extrusions in the end.
                     void(std::remove_if(region_internal_solids.begin(), region_internal_solids.end(), [region](const Surface *s) {
                         float min_width = float(region->bridging_flow(frSolidInfill).scaled_width()) * 3.f;
-                        return opening_ex({s->expolygon}, min_width).empty();
+                        return offset_ex({s->expolygon}, -min_width).empty();
                     }));
                     if (!region_internal_solids.empty()) {
                         max_bridge_flow_height[&slice] = std::max(max_bridge_flow_height[&slice],
@@ -1736,7 +1733,7 @@ void PrintObject::bridge_over_infill()
                                     if (angle > PI) {
                                         angle -= PI;
                                     }
-                                    angle -= PI * 0.5;
+                                    angle += PI * 0.5;
                                     directions_with_distances.emplace_back(angle, distance);
                                 }
                             }
@@ -1757,10 +1754,6 @@ void PrintObject::bridge_over_infill()
                         }
                     }
 
-                    //  TODO maybe get extens of rotated max_area, then fill with vertical lines, make AABB tree rotated for anchors and
-                    //  walls and also
-                    // for bridged area
-                    // then cut off the vertical lines, compose the final polygon, and rotate back
                     auto lines_rotate = [](Lines &lines, double cos_angle, double sin_angle) {
                         for (Line &l : lines) {
                             double ax = double(l.a.x());
@@ -1932,7 +1925,7 @@ void PrintObject::bridge_over_infill()
                 }
             }
         }
-        // });
+        });
 
         BOOST_LOG_TRIVIAL(info) << "Bridge over infill - Directions and expanded surfaces computed" << log_memory_info();
 
