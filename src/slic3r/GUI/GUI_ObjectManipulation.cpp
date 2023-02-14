@@ -951,7 +951,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
 
         show_drop_to_bed = std::abs(min_z) > EPSILON;
         const GLVolume* volume = selection.get_first_volume();
-        Geometry::Transformation trafo = selection.is_single_full_instance() ? volume->get_instance_transformation() : volume->get_volume_transformation();
+        const Geometry::Transformation trafo = selection.is_single_full_instance() ? volume->get_instance_transformation() : volume->get_volume_transformation();
 
         const Geometry::TransformationSVD trafo_svd(trafo);
         show_rotation = trafo_svd.rotation;
