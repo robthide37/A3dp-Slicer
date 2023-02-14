@@ -1047,14 +1047,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
     if (m_mode == Instance) {
         int rot_axis_max = 0;
         rotation.cwiseAbs().maxCoeff(&rot_axis_max);
-        SyncRotationType synch;
-        if (transformation_type.world() && rot_axis_max == 2)
-            synch = SyncRotationType::NONE;
-        else if (transformation_type.instance())
-            synch = SyncRotationType::FULL;
-        else
-            synch = SyncRotationType::GENERAL;
-        synchronize_unselected_instances(synch);
+        synchronize_unselected_instances((transformation_type.world() && rot_axis_max == 2) ? SyncRotationType::NONE : SyncRotationType::GENERAL);
     }
     else if (m_mode == Volume)
         synchronize_unselected_volumes();
@@ -1483,7 +1476,9 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
 
 #if !DISABLE_INSTANCES_SYNCH
     if (m_mode == Instance)
-        synchronize_unselected_instances(SyncRotationType::NONE);
+        // even if there is no rotation, we pass SyncRotationType::GENERAL to force 
+        // synchronize_unselected_instances() to apply the scale to the other instances
+        synchronize_unselected_instances(SyncRotationType::GENERAL);
     else if (m_mode == Volume)
         synchronize_unselected_volumes();
 #endif // !DISABLE_INSTANCES_SYNCH
