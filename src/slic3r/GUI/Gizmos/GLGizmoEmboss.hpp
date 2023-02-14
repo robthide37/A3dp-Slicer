@@ -112,6 +112,11 @@ private:
     void draw_height(bool use_inch);
     void draw_depth(bool use_inch);
 
+    // call after set m_style_manager.get_style().prop.size_in_mm
+    bool set_height();
+    // call after set m_style_manager.get_style().prop.emboss
+    bool set_depth();
+
     bool draw_italic_button();
     bool draw_bold_button();
     void draw_advanced();
@@ -336,6 +341,9 @@ private:
 
         Transform3d f_tr = Transform3d::Identity();
         Transform3d t_tr = Transform3d::Identity();
+
+        std::optional<double> y_scale;
+        std::optional<double> z_scale;
     };
     // Keep data about dragging only during drag&drop
     std::optional<SurfaceDrag> m_surface_drag;

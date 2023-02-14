@@ -467,21 +467,20 @@ Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolu
     }
     return nearest_offset;
 }
-namespace priv {
 
-static bool allign_z(const Vec3d &z_t, Transform3d &rotate)
+namespace priv {
+static bool allign_vec(const Vec3d &z_f, const Vec3d &z_t, Transform3d &rotate)
 {
-    // Transformed unit vector Z direction (f)rom, (t)o
-    const Vec3d& z_f = Vec3d::UnitZ();
-    Vec3d z_t_norm = z_t.normalized();
-    double cos_angle = z_t_norm.dot(z_f);
+    Vec3d  z_f_norm  = z_f.normalized();
+    Vec3d  z_t_norm  = z_t.normalized();
+    double cos_angle = z_t_norm.dot(z_f_norm);
 
     // Calculate rotation of Z-vectors from current to wanted position
     rotate = Transform3d::Identity();
 
     if (cos_angle == 0.) {
         // check that direction is not same
-        if (z_t_norm.z() > 0.) 
+        if (z_t_norm.z() > 0.)
             return false;
 
         // opposit direction of z_t and z_f (a.k.a. angle 180 DEG)
@@ -494,11 +493,185 @@ static bool allign_z(const Vec3d &z_t, Transform3d &rotate)
 
     // Calculate only when angle is not zero
     // Calculate rotation axe from current to wanted inside instance
-    Vec3d axe = z_t_norm.cross(z_f);
+    Vec3d axe = z_t_norm.cross(z_f_norm);
     axe.normalize();
     double angle = acos(cos_angle);
-    rotate = Eigen::AngleAxis(-angle, axe);
+    rotate       = Eigen::AngleAxis(-angle, axe);
     return true;
+}
+
+static bool allign_z(const Vec3d &z_t, Transform3d &rotate)
+{
+    // Transformed unit vector Z direction (f)rom, (t)o
+    const Vec3d& z_f = Vec3d::UnitZ();
+    return allign_vec(Vec3d::UnitZ(), z_t, rotate);
+}
+
+ // Calculate scale in world
+static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
+{
+    Vec3d  from_dir   = from * dir;
+    Vec3d  to_dir     = to * dir;
+    double from_scale_sq = from_dir.squaredNorm();
+    double to_scale_sq   = to_dir.squaredNorm();
+    if (is_approx(from_scale_sq, to_scale_sq, 1e-3))
+        return {}; // no scale
+    return sqrt(from_scale_sq / to_scale_sq);
+};
+
+// Copy from branch et_transformation --> Geometry
+// suggested by @bubnikv
+void reset_skew(Transform3d& m)
+{
+    auto new_scale_factor = [](const Matrix3d& s) {
+        return pow(s(0, 0) * s(1, 1) * s(2, 2), 1. / 3.); // scale average
+    };
+
+    const Eigen::JacobiSVD<Matrix3d> svd(m.linear(), Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Matrix3d u = svd.matrixU();
+    Matrix3d v = svd.matrixV();
+    Matrix3d s = svd.singularValues().asDiagonal();
+
+    //Matrix3d mirror;
+    m = Eigen::Translation3d(m.translation()) * Transform3d(u * Eigen::Scaling(new_scale_factor(s)) * v.transpose());//  * mirror;
+}
+
+// Multiply from right
+static Transform3d surface_transformR(const Vec3d &p, const Vec3d &n, const Transform3d &v, const Transform3d &i) {
+    Transform3d to_volume = (i * v).inverse();
+    Vec3d offset_volume = to_volume * p;
+    Transform3d translate{Eigen::Translation<double, 3>(offset_volume)};
+
+    Transform3d rotate;
+    // normal transformed to volume
+    Vec3d z_t = to_volume.linear() * n;
+    bool  exist_rotate = priv::allign_z(z_t, rotate);
+    return v * translate * rotate;
+}
+
+/// <summary>
+/// Create transformation for volume to move over surface
+/// Multiply from Left side - NOT WORK - with scaled instances
+/// </summary>
+/// <param name="p">Point in world coordinate</param>
+/// <param name="n">Normal in world coordinate - orientation</param>
+/// <param name="v">Original volume transformation</param>
+/// <param name="i">Instance transformation</param>
+/// <returns>Transformation of volume to lay on surface</returns>
+static Transform3d surface_transformL(const Vec3d &p, const Vec3d &n, const Transform3d &v, const Transform3d &i) {
+    // w .. original world
+    Transform3d w = i * v;
+        
+    // remove already existing of skew before calc rotation
+    // priv::reset_skew(w);
+
+    // z .. unit z vector in world coordinate
+    Vec3d z = w.linear() * Vec3d::UnitZ();
+    Transform3d rot = Transform3d::Identity();
+    bool exist_rot = priv::allign_vec(z, n, rot);
+
+    // rot_w .. new rotation applied on world
+    Transform3d rot_w = rot * w;
+
+    // p0 .. Zero of volume in world
+    Vec3d p0 = rot_w * Vec3d::Zero();
+    Vec3d offset = p - p0; // in world
+    Transform3d tr{Eigen::Translation<double, 3>(offset)};
+    
+    // w2 .. wanted world transformation
+    Transform3d w2 = tr * rot_w;
+
+    //priv::reset_skew(w2);
+        
+    // _  .. inverse
+    // i_ .. instance inverse
+    Transform3d i_ = i.inverse();
+
+    // w = i * v              \\ left multiply by i_
+    // i_ * w = i_ * i * v
+    // v = i_ * w
+    return  i_ * w2;
+    // NOTE: Do not keep scale of text when move over scaled instance
+}
+
+// transformation inside of instance
+static Transform3d surface_transform2(const Vec3d &p, const Vec3d &n, const Transform3d &v, const Transform3d &i)
+{
+    // _  .. inverse
+    // i_ .. instance inverse
+    Transform3d i_ = i.inverse();
+    Vec3d pp = i_ * p;
+    Vec3d nn = i_.linear() * n.normalized();
+    nn.normalize();
+
+    // z .. unit z vector in world coordinate
+    Vec3d z = v * Vec3d::UnitZ();
+    z.normalize();
+
+    Transform3d rot = Transform3d::Identity();
+    bool exist_rot = priv::allign_vec(z, nn, rot);
+
+    // rot_w .. new rotation applied on world
+    Transform3d rotated = rot * v;
+
+    // p0 .. Zero of volume in world
+    Vec3d p0 = rotated * Vec3d::Zero();
+    Vec3d offset = pp - p0; // in world
+    Transform3d tr{Eigen::Translation<double, 3>(offset)};
+    Transform3d volume_new = tr * rotated;
+    //return volume_new;
+
+    // Remove skew in world
+    Transform3d world_new = i * volume_new;
+    reset_skew(world_new);
+    volume_new = i_ * world_new;
+
+    return volume_new;
+}
+
+// work in space defined by SVD
+static Transform3d surface_transform3(const Vec3d &p, const Vec3d &n, const Transform3d &v, const Transform3d &i) {
+    // w .. original world
+    Transform3d w = i * v;
+
+    const Eigen::JacobiSVD<Matrix3d> svd1(w.linear(), Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Matrix3d u1 = svd1.matrixU();
+    Matrix3d v1 = svd1.matrixV();
+    Matrix3d s1 = svd1.singularValues().asDiagonal();
+    Transform3d tr1(Eigen::Translation3d(w.translation()));
+    //Transform3d test = tr1 * Transform3d(u1 * s1 * v1.transpose());
+
+    // modification of world
+    Transform3d mod(s1 * v1.transpose());
+    Transform3d mod_ = mod.inverse();
+    Transform3d w_mod = w * mod_;
+
+    Vec3d nn = mod_.linear() * n;
+    // z .. unit z vector in world coordinate
+    Vec3d z = w_mod.linear() * Vec3d::UnitZ();
+    Transform3d rot = Transform3d::Identity();
+    bool exist_rot = priv::allign_vec(z, nn, rot);
+
+    // rot_w .. new rotation applied on world
+    Transform3d rot_w = rot * w;
+
+    // p0 .. Zero of volume in world
+    Vec3d p0 = rot_w * Vec3d::Zero();
+    Vec3d offset = p - p0; // in world
+    Transform3d tr{Eigen::Translation<double, 3>(offset)};
+    
+    // w2 .. wanted world transformation
+    Transform3d w2 = tr * rot_w;
+        
+    // _  .. inverse
+    // i_ .. instance inverse
+    Transform3d i_ = i.inverse();
+
+    // w = i * v              \\ left multiply by i_
+    // i_ * w = i_ * i * v
+    // v = i_ * w
+    return  i_ * w2;
+    // NOTE: Do not keep scale of text when move over scaled instance
 }
 
 }
@@ -512,7 +685,19 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         m_parent.do_move(L("Surface move"));
 
         // Update surface by new position
-        if (m_volume->text_configuration->style.prop.use_surface)
+        bool need_process = m_volume->text_configuration->style.prop.use_surface;
+        
+        if (m_surface_drag->y_scale.has_value()) {
+            m_style_manager.get_style().prop.size_in_mm *= (*m_surface_drag->y_scale);
+            need_process |= set_height();
+        }
+
+        if (m_surface_drag->z_scale.has_value()) {
+            m_style_manager.get_style().prop.emboss *= (*m_surface_drag->z_scale);
+            need_process |= set_depth();
+        }
+
+        if (need_process)
             process();
 
         // calculate scale
@@ -612,45 +797,52 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             m_parent.set_as_dirty();
             return true;
         }
-
         // Calculate offset: transformation to wanted position
-        Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
-        Transform3d hit_to_instance = object_trmat * m_surface_drag->instance_inv;
+        Transform3d hit_to_world = m_raycast_manager.get_transformation(hit->tr_key);
+        //priv::reset_skew(hit_to_world);
+
+        Transform3d hit_to_instance = hit_to_world * m_surface_drag->instance_inv;
         Transform3d hit_to_volume = hit_to_instance * m_surface_drag->volume_tr.inverse();
-        Vec3d offset_volume = hit_to_volume * hit->position.cast<double>();
+        
+        Vec3d hit_position = hit->position.cast<double>();
+        Vec3d offset_volume = hit_to_volume * hit_position;
         Transform3d translate{Eigen::Translation<double, 3>(offset_volume)};
 
         Transform3d rotate;
         // normal transformed to volume
-        Vec3d z_t = hit_to_volume.linear() * hit->normal.cast<double>();
+        Vec3d hit_normal = hit->normal.cast<double>();
+        Vec3d z_t = hit_to_volume.linear() * hit_normal;
         bool exist_rotate = priv::allign_z(z_t, rotate);
+        // Edit position from right
+        Transform3d volume_new = m_surface_drag->volume_tr * translate * rotate;
 
-        Transform3d volume_tr = m_surface_drag->volume_tr * translate * rotate;
-        assert(volume_tr.matrix()(0, 0) == volume_tr.matrix()(0, 0)); // Check valid transformation not a NAN
-        if (volume_tr.matrix()(0, 0) != volume_tr.matrix()(0, 0))
+        const Transform3d &instance = m_surface_drag->gl_volume->get_instance_transformation().get_matrix();
+        const Transform3d &volume   = m_surface_drag->volume_tr;
+
+        Vec3d hit_position_world = hit_to_world * hit_position;
+        Vec3d hit_normal_world   = hit_to_world.linear() * hit_normal; 
+
+        // REWRITE transformation
+        Transform3d volume_R = priv::surface_transformR(hit_position_world, hit_normal_world, volume, instance);
+        Transform3d volume_L = priv::surface_transformL(hit_position_world, hit_normal_world, volume, instance);
+        Transform3d volume_2 = priv::surface_transform2(hit_position_world, hit_normal_world, volume, instance);
+        Transform3d volume_3 = priv::surface_transform3(hit_position_world, hit_normal_world, volume, instance);
+        //volume_new = volume_L;
+
+        assert(volume_new.matrix()(0, 0) == volume_new.matrix()(0, 0)); // Check valid transformation not a NAN
+        if (volume_new.matrix()(0, 0) != volume_new.matrix()(0, 0))
             return true;
 
         // Check scale in world
-        
-        // current transformation from volume to world
-        Transform3d current_world = m_surface_drag->instance_inv.inverse() * m_surface_drag->volume_tr;
+        // Calculate Scale to keep size after move over scaled surface
+        Transform3d current_world = instance * volume;
         auto current_world_linear = current_world.linear();
 
-        Transform3d wanted_world = m_surface_drag->instance_inv.inverse() * volume_tr;
+        Transform3d wanted_world = instance * volume_new;
         auto wanted_world_linear = wanted_world.linear();
 
-        // Calculate scale in world
-        auto calc_scale = [&current_world_linear, wanted_world_linear](const Vec3d &dir) -> double {
-            Vec3d  current    = current_world_linear * dir;
-            Vec3d  wanted     = wanted_world_linear * dir;
-            double current_sq = current.squaredNorm();
-            double wanted_sq  = wanted.squaredNorm();
-            return sqrt(current_sq / wanted_sq);
-        };
-        double y_scale = calc_scale(Vec3d::UnitY());
-        double z_scale = calc_scale(Vec3d::UnitZ());
-        Transform3d scale(Eigen::Scaling(1., y_scale, z_scale));
-        volume_tr = volume_tr * scale;
+        m_surface_drag->y_scale = priv::calc_scale(current_world_linear, wanted_world_linear, Vec3d::UnitY());
+        m_surface_drag->z_scale = priv::calc_scale(current_world_linear, wanted_world_linear, Vec3d::UnitZ());
 
         // recalculate rotation for scaled volume
         //Transform3d hit_to_volume2 = hit_to_instance * (m_surface_drag->volume_tr*scale).inverse();
@@ -661,13 +853,13 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         const TextConfiguration &tc = *m_volume->text_configuration;
         // fix baked transformation from .3mf store process
         if (tc.fix_3mf_tr.has_value())
-            volume_tr = volume_tr * (*tc.fix_3mf_tr);
+            volume_new = volume_new * (*tc.fix_3mf_tr);
 
         // apply move in Z direction for move with flat surface above texture
         const FontProp &prop = tc.style.prop;
         if (!prop.use_surface && prop.distance.has_value()) {
             Vec3d translate = Vec3d::UnitZ() * (*prop.distance);
-            volume_tr.translate(translate);
+            volume_new.translate(translate);
         }
 
         // Update transformation forf all instances
@@ -675,7 +867,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             if (vol->object_idx() != m_surface_drag->gl_volume->object_idx() || 
                 vol->volume_idx() != m_surface_drag->gl_volume->volume_idx())
                 continue;
-            vol->set_volume_transformation(volume_tr);
+            vol->set_volume_transformation(volume_new);
         }
 
         // update scale of selected volume --> should be approx the same
@@ -1136,10 +1328,12 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
 
 EmbossStyles GLGizmoEmboss::create_default_styles()
 {
+    wxFontEnumerator::InvalidateCache();
+    wxArrayString facenames = wxFontEnumerator::GetFacenames(Facenames::encoding);
+
     wxFont wx_font_normal = *wxNORMAL_FONT;
 #ifdef __APPLE__
     // Set normal font to helvetica when possible
-    wxArrayString facenames = wxFontEnumerator::GetFacenames(Facenames::encoding);
     for (const wxString &facename : facenames) {
         if (facename.IsSameAs("Helvetica")) {
             wx_font_normal = wxFont(wxFontInfo().FaceName(facename).Encoding(Facenames::encoding));
@@ -1181,7 +1375,6 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
 
     // No valid style in defult list
     // at least one style must contain loadable font
-    wxArrayString facenames = wxFontEnumerator::GetFacenames(wxFontEncoding::wxFONTENCODING_SYSTEM);
     wxFont wx_font;
     for (const wxString &face : facenames) {
         wx_font = wxFont(face);
@@ -3082,6 +3275,31 @@ void GLGizmoEmboss::draw_style_edit() {
 #endif // SHOW_WX_WEIGHT_INPUT 
 }
 
+bool GLGizmoEmboss::set_height() {
+    float &value = m_style_manager.get_style().prop.size_in_mm;
+
+    // size can't be zero or negative
+    priv::Limits::apply(value, priv::limits.size_in_mm);
+
+    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
+        assert(false);
+        return false;
+    }
+    
+    // only different value need process
+    if (is_approx(value, m_volume->text_configuration->style.prop.size_in_mm))
+        return false;
+    
+    // store font size into path serialization
+    const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
+    if (wx_font_opt.has_value()) {
+        wxFont wx_font = *wx_font_opt;
+        wx_font.SetPointSize(static_cast<int>(value));
+        m_style_manager.set_wx_font(wx_font);
+    }
+    return true;
+}
+
 void GLGizmoEmboss::draw_height(bool use_inch)
 {
     float &value = m_style_manager.get_style().prop.size_in_mm;
@@ -3090,24 +3308,21 @@ void GLGizmoEmboss::draw_height(bool use_inch)
     const char *size_format = ((use_inch) ? "%.2f in" : "%.1f mm");
     const std::string revert_text_size = _u8L("Revert text size.");
     const std::string& name = m_gui_cfg->translations.size;
-    if (rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, m_scale_height)) {
-        // size can't be zero or negative
-        priv::Limits::apply(value, priv::limits.size_in_mm);
-        // only different value need process
-        if (!is_approx(value, m_volume->text_configuration->style.prop.size_in_mm)) {
-            // store font size into path
-            EmbossStyle &style = m_style_manager.get_style();
-            if (style.type == WxFontUtils::get_actual_type()) {
-                const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
-                if (wx_font_opt.has_value()) {
-                    wxFont wx_font = *wx_font_opt;
-                    wx_font.SetPointSize(static_cast<int>(value));
-                    m_style_manager.set_wx_font(wx_font);
-                }
-            }
+    if (rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, m_scale_height))
+        if (set_height())
             process();
-        }    
-    }
+}
+
+
+bool GLGizmoEmboss::set_depth()
+{
+    float &value = m_style_manager.get_style().prop.emboss;
+
+    // size can't be zero or negative
+    priv::Limits::apply(value, priv::limits.emboss);
+
+    // only different value need process
+    return !is_approx(value, m_volume->text_configuration->style.prop.emboss);
 }
 
 void GLGizmoEmboss::draw_depth(bool use_inch)
@@ -3118,11 +3333,9 @@ void GLGizmoEmboss::draw_depth(bool use_inch)
     const std::string  revert_emboss_depth = _u8L("Revert embossed depth.");
     const char *size_format = ((use_inch) ? "%.3f in" : "%.2f mm");
     const std::string  name = m_gui_cfg->translations.depth;
-    if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1f, 1.f, size_format, use_inch, m_scale_depth)) {
-        // size can't be zero or negative
-        priv::Limits::apply(value, priv::limits.emboss);
-        process();
-    }
+    if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1f, 1.f, size_format, use_inch, m_scale_depth))
+        if (set_depth())
+            process();    
 }
 
 
@@ -3977,14 +4190,17 @@ bool priv::start_create_volume_on_surface_job(
     if (!hit.has_value())
         return false;
 
-    Transform3d hit_object_trmat = raycaster.get_transformation(hit->tr_key);
-    Transform3d hit_instance_trmat = gl_volume->get_instance_transformation().get_matrix();
+    Transform3d hit_to_world = raycaster.get_transformation(hit->tr_key);
+    // priv::reset_skew(hit_to_world);
+    Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
 
     // Create result volume transformation
-    Transform3d     surface_trmat = create_transformation_onto_surface(hit->position, hit->normal);
-    const FontProp &font_prop     = emboss_data.text_configuration.style.prop;
+    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal);
+    const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
-    Transform3d volume_trmat = hit_instance_trmat.inverse() * hit_object_trmat * surface_trmat;
+    Transform3d world_new = hit_to_world * surface_trmat;
+    // priv::reset_skew(world_new);
+    Transform3d volume_trmat = instance.inverse() * world_new;    
     start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     return true;
 }
