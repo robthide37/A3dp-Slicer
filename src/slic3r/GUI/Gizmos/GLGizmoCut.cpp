@@ -1068,25 +1068,16 @@ bool GLGizmoCut3D::on_is_activable() const
     if (object_idx < 0 || selection.is_wipe_tower())
         return false;
 
-    bool is_dowel_object = false;
-    if (const ModelObject* mo = wxGetApp().plater()->model().objects[object_idx]; mo->is_cut()) {
-        int solid_connector_cnt = 0;
-        int connectors_cnt = 0;
-        for (const ModelVolume* volume : mo->volumes) {
-            if (volume->is_cut_connector()) {
-                connectors_cnt++;
-                if (volume->is_model_part())
-                    solid_connector_cnt++;
-            }
-            if (connectors_cnt > 1)
-                break;
-        }
-        is_dowel_object = connectors_cnt == 1 && solid_connector_cnt == 1;
+    if (const ModelObject* mo = wxGetApp().plater()->model().objects[object_idx];
+        mo->is_cut() && mo->volumes.size() == 1) {
+        const ModelVolume* volume = mo->volumes[0];
+        if (volume->is_cut_connector() && volume->cut_info.connector_type == CutConnectorType::Dowel)
+            return false;
     }
 
     // This is assumed in GLCanvas3D::do_rotate, do not change this
     // without updating that function too.
-    return selection.is_single_full_instance() && !is_dowel_object && !m_parent.is_layers_editing_enabled();
+    return selection.is_single_full_instance() && !m_parent.is_layers_editing_enabled();
 }
 
 bool GLGizmoCut3D::on_is_selectable() const
