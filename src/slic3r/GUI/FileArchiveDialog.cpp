@@ -275,6 +275,7 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
     topSizer->Add(m_avc, 1, wxEXPAND | wxALL, 10);
     topSizer->Add(btn_sizer, 0, wxEXPAND | wxALL, 10);
     this->SetSizer(topSizer);
+    SetMinSize(wxSize(40 * em, 30 * em));
 
     for (const wxString& id : {_L("All"), _L("None"), _L("Open"), _L("Cancel") })
         wxGetApp().UpdateDarkUI(static_cast<wxButton*>(FindWindowByLabel(id, this)));
@@ -288,9 +289,8 @@ void FileArchiveDialog::on_dpi_changed(const wxRect& suggested_rect)
     //for (auto btn : { m_save_btn, m_transfer_btn, m_discard_btn })
     //    if (btn) btn->msw_rescale();
 
-    const wxSize& size = wxSize(70 * em, 30 * em);
-    SetMinSize(size);
-
+    const wxSize& size = wxSize(45 * em, 40 * em);
+    SetSize(size);
     //m_tree->Rescale(em);
 
     Fit();
