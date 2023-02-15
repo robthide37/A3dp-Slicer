@@ -292,6 +292,13 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("support_material_bottom_contact_distance", have_support_material && ! have_support_soluble);
     toggle_field("support_material_closing_radius", have_support_material && support_material_style == smsSnug);
 
+    const bool has_organic_supports = support_material_style == smsOrganic && 
+                                     (config->opt_bool("support_material") || 
+                                      config->opt_int("support_material_enforce_layers") > 0);
+    for (const std::string& key : { "support_tree_angle", "support_tree_angle_slow", "support_tree_branch_diameter",
+                                    "support_tree_branch_diameter_angle", "support_tree_tip_diameter", "support_tree_top_rate" })
+        toggle_field(key, has_organic_supports);
+
     for (auto el : { "support_material_bottom_interface_layers", "support_material_interface_spacing", "support_material_interface_extruder",
                     "support_material_interface_speed", "support_material_interface_contact_loops" })
         toggle_field(el, have_support_material && have_support_interface);

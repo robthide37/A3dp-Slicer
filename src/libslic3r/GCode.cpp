@@ -230,6 +230,8 @@ namespace Slic3r {
 
         std::string tcr_rotated_gcode = post_process_wipe_tower_moves(tcr, wipe_tower_offset, wipe_tower_rotation);
 
+        gcode += gcodegen.writer().unlift(); // Make sure there is no z-hop (in most cases, there isn't).
+
         double current_z = gcodegen.writer().get_position().z();
         if (z == -1.) // in case no specific z was provided, print at current_z pos
             z = current_z;

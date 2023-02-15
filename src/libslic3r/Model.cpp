@@ -1352,11 +1352,11 @@ void ModelVolume::apply_tolerance()
     vol->set_offset(pos);
 */
     // make a "hole" wider
-    sf[X] *= 1. + double(cut_info.radius_tolerance);
-    sf[Y] *= 1. + double(cut_info.radius_tolerance);
+    sf[X] += double(cut_info.radius_tolerance);
+    sf[Y] += double(cut_info.radius_tolerance);
 
     // make a "hole" dipper
-    sf[Z] *= 1. + double(cut_info.height_tolerance);
+    sf[Z] += double(cut_info.height_tolerance);
 
     set_scaling_factor(sf);
 }

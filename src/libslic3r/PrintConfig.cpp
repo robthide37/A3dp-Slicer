@@ -2786,7 +2786,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(true));
 
     def = this->add("support_tree_angle", coFloat);
-    def->label = L("Tree Support Maximum Branch Angle");
+    def->label = L("Maximum Branch Angle");
     def->category = L("Support material");
     def->tooltip = L("The maximum angle of the branches, when the branches have to avoid the model. "
                      "Use a lower angle to make them more vertical and more stable. Use a higher angle to be able to have more reach.");
@@ -2797,7 +2797,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(40));
 
     def = this->add("support_tree_angle_slow", coFloat);
-    def->label = L("Tree Support Preferred Branch Angle");
+    def->label = L("Preferred Branch Angle");
     def->category = L("Support material");
     def->tooltip = L("The preferred angle of the branches, when they do not have to avoid the model. "
                      "Use a lower angle to make them more vertical and more stable. Use a higher angle for branches to merge faster.");
@@ -2808,18 +2808,18 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(25));
 
     def = this->add("support_tree_tip_diameter", coFloat);
-    def->label = L("Tree Support Tip Diameter");
+    def->label = L("Tip Diameter");
     def->category = L("Support material");
-    def->tooltip = L("The diameter of the top of the tip of the branches of tree support.");
+    def->tooltip = L("The diameter of the top of the tip of the branches of organic support.");
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.8));
 
     def = this->add("support_tree_branch_diameter", coFloat);
-    def->label = L("Tree Support Branch Diameter");
+    def->label = L("Branch Diameter");
     def->category = L("Support material");
-    def->tooltip = L("The diameter of the thinnest branches of tree support. Thicker branches are more sturdy. "
+    def->tooltip = L("The diameter of the thinnest branches of organic support. Thicker branches are more sturdy. "
                      "Branches towards the base will be thicker than this.");
     def->sidetext = L("mm");
     def->min = 0;
@@ -2827,11 +2827,11 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(2));
 
     def = this->add("support_tree_branch_diameter_angle", coFloat);
-    def->label = L("Tree Support Branch Diameter Angle");
+    def->label = L("Branch Diameter Angle");
     def->category = L("Support material");
     def->tooltip = L("The angle of the branches' diameter as they gradually become thicker towards the bottom. "
                      "An angle of 0 will cause the branches to have uniform thickness over their length. "
-                     "A bit of an angle can increase stability of the tree support.");
+                     "A bit of an angle can increase stability of the organic support.");
     def->sidetext = L("°");
     def->min = 0;
     def->max = 15;
@@ -2839,7 +2839,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(5));
 
     def = this->add("support_tree_top_rate", coPercent);
-    def->label = L("Tree Support Branch Density");
+    def->label = L("Branch Density");
     def->category = L("Support material");
     def->tooltip = L("Adjusts the density of the support structure used to generate the tips of the branches. "
                      "A higher value results in better overhangs, but the supports are harder to remove. "
@@ -4709,12 +4709,6 @@ CLIMiscConfigDef::CLIMiscConfigDef()
     def->tooltip = L("If enabled, the command line arguments are sent to an existing instance of GUI PrusaSlicer, "
                      "or an existing PrusaSlicer window is activated. "
                      "Overrides the \"single_instance\" configuration value from application preferences.");
-
-/*
-    def = this->add("autosave", coString);
-    def->label = L("Autosave");
-    def->tooltip = L("Automatically export current configuration to the specified file.");
-*/
 
     def = this->add("datadir", coString);
     def->label = L("Data directory");

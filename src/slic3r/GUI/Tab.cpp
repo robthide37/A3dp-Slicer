@@ -1526,7 +1526,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("dont_support_bridges", category_path + "dont-support-bridges");
         optgroup->append_single_option_line("support_material_synchronize_layers", category_path + "synchronize-with-object-layers");
 
-        optgroup = page->new_optgroup(L("Tree supports"));
+        optgroup = page->new_optgroup(L("Organic supports"));
         optgroup->append_single_option_line("support_tree_angle", category_path + "tree_angle");
         optgroup->append_single_option_line("support_tree_angle_slow", category_path + "tree_angle_slow");
         optgroup->append_single_option_line("support_tree_branch_diameter", category_path + "tree_branch_diameter");

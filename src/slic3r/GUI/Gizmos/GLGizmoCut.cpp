@@ -501,42 +501,42 @@ bool GLGizmoCut3D::render_double_input(const std::string& label, double& value_i
 
 bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in)
 {
-    ImGui::AlignTextToFramePadding();
-    m_imgui->text(label);
-    ImGui::SameLine(m_label_width);
-    ImGui::PushItemWidth(m_control_width * 0.85f);
-
-    float value = value_in;
-    if (m_imperial_units)
-        value *= float(ObjectManipulation::mm_to_in);
-    float old_val = value;
-
     constexpr float UndefMinVal = -0.1f;
+    const float f_mm_to_in = static_cast<float>(ObjectManipulation::mm_to_in);
+
+    auto render_slider = [this, UndefMinVal, f_mm_to_in]
+                         (const std::string& label, float& val, float def_val, float max_val, const wxString& tooltip) {
+        float min_val = val < 0.f ? UndefMinVal : def_val;
+        float value = val;
+        if (m_imperial_units) {
+            min_val *= f_mm_to_in;
+            value   *= f_mm_to_in;
+        }
+        const float old_val = value;
+        const std::string format = val < 0.f ? UndefLabel : (m_imperial_units ? "%.4f  " + _u8L("in") : "%.2f  " + _u8L("mm"));
+
+        m_imgui->slider_float(label.c_str(), &value, min_val, max_val, format.c_str(), 1.f, true, tooltip);
+        val = value * (m_imperial_units ? static_cast<float>(ObjectManipulation::in_to_mm) : 1.f);
+
+        return !is_approx(old_val, value);
+    };
 
     const BoundingBoxf3 bbox = bounding_box();
-    float mean_size = float((bbox.size().x() + bbox.size().y() + bbox.size().z()) / 9.0);
-    float min_size  = value_in < 0.f ? UndefMinVal : 1.f;
-    if (m_imperial_units) {
-        mean_size *= float(ObjectManipulation::mm_to_in);
-        min_size  *= float(ObjectManipulation::mm_to_in);
-    }
-    std::string format = value_in < 0.f ? UndefLabel :
-                         m_imperial_units ? "%.4f  " + _u8L("in") : "%.2f  " + _u8L("mm");
+    const float mean_size = float((bbox.size().x() + bbox.size().y() + bbox.size().z()) / 9.0) * (m_imperial_units ? f_mm_to_in : 1.f);
 
-    m_imgui->slider_float(("##" + label).c_str(), &value, min_size, mean_size, format.c_str());
-    value_in = value * float(m_imperial_units ? ObjectManipulation::in_to_mm : 1.0);
+    ImGuiWrapper::text(label);
 
-    ImGui::SameLine(m_label_width + m_control_width + 3);
-    ImGui::PushItemWidth(m_control_width * 0.3f);
+    ImGui::SameLine(m_label_width);
+    ImGui::PushItemWidth(m_control_width * 0.7f);
 
-    float old_tolerance, tolerance = old_tolerance = tolerance_in * 100.f;
-    std::string format_t = tolerance_in < 0.f ? UndefLabel : "%.f %%";
-    float min_tolerance  = tolerance_in < 0.f ? UndefMinVal : 0.f;
+    const bool is_value_changed = render_slider("##" + label, value_in, 1.f, mean_size, _L("Value"));
+    
+    ImGui::SameLine();
+    ImGui::PushItemWidth(m_control_width * 0.45f);
 
-    m_imgui->slider_float(("##tolerance_" + label).c_str(), &tolerance, min_tolerance, 20.f, format_t.c_str(), 1.f, true, _L("Tolerance"));
-    tolerance_in = tolerance * 0.01f;
+    const bool is_tolerance_changed = render_slider("##tolerance_" + label, tolerance_in, 0.f, 0.5f * mean_size, _L("Tolerance"));
 
-    return !is_approx(old_val, value) || !is_approx(old_tolerance, tolerance);
+    return is_value_changed || is_tolerance_changed;
 }
 
 void GLGizmoCut3D::render_move_center_input(int axis)
@@ -1597,7 +1597,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
             if (m_connector_size > 0)
                 connectors[idx].radius           = 0.5f * m_connector_size;
             if (m_connector_size_tolerance >= 0)
-                connectors[idx].radius_tolerance = m_connector_size_tolerance;
+                connectors[idx].radius_tolerance = 0.5f * m_connector_size_tolerance;
         });
 
     ImGui::Separator();
@@ -1757,7 +1757,7 @@ void GLGizmoCut3D::validate_connector_settings()
 
 void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
 {
-    m_imperial_units = wxGetApp().app_config->get("use_inches") == "1";
+    m_imperial_units = wxGetApp().app_config->get_bool("use_inches");
     m_label_width    = m_imgui->get_font_size() * 6.f;
     m_control_width  = m_imgui->get_font_size() * 9.f;
 
@@ -1809,7 +1809,7 @@ void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
         m_connector_depth_ratio             = depth_ratio;
         m_connector_depth_ratio_tolerance   = depth_ratio_tolerance;
         m_connector_size                    = 2.f * radius;
-        m_connector_size_tolerance          = radius_tolerance;
+        m_connector_size_tolerance          = 2.f * radius_tolerance;
         m_connector_type                    = type;
         m_connector_style                   = size_t(style);
         m_connector_shape_id                = size_t(shape);
@@ -2260,7 +2260,7 @@ bool GLGizmoCut3D::add_connector(CutConnectors& connectors, const Vec2d& mouse_p
 
         connectors.emplace_back(pos, m_rotation_m,
                                 m_connector_size * 0.5f, m_connector_depth_ratio,
-                                m_connector_size_tolerance, m_connector_depth_ratio_tolerance,
+                                m_connector_size_tolerance * 0.5f, m_connector_depth_ratio_tolerance,
                                 CutConnectorAttributes( CutConnectorType(m_connector_type),
                                                         CutConnectorStyle(m_connector_style),
                                                         CutConnectorShape(m_connector_shape_id)));

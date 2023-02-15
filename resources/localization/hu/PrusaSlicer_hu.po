@@ -11832,7 +11832,7 @@ msgstr ""
 
 #: src/slic3r/Utils/PresetUpdater.cpp:1171
 msgid ""
-"Configuration Updates causes a lost of preset modification.\n"
+"Configuration Updates causes a loss of preset modification.\n"
 "So, check unsaved changes and save them if necessary."
 msgstr ""
 "A Konfigurációs frissítések hatására az előre beállított módosítások "

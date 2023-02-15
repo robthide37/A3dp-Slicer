@@ -118,8 +118,8 @@ static const wxString axes_color_back[] = { "#f5dcdc", "#dcf5dc", "#dcdcf5" };
 ObjectManipulation::ObjectManipulation(wxWindow* parent) :
     OG_Settings(parent, true)
 {
-    m_imperial_units = wxGetApp().app_config->get("use_inches") == "1";
-    m_use_colors     = wxGetApp().app_config->get("color_mapinulation_panel") == "1";
+    m_imperial_units = wxGetApp().app_config->get_bool("use_inches");
+    m_use_colors     = wxGetApp().app_config->get_bool("color_mapinulation_panel");
 
     m_manifold_warning_bmp = ScalableBitmap(parent, "exclamation");
 
@@ -647,8 +647,8 @@ void ObjectManipulation::DisableUnuniformScale()
 
 void ObjectManipulation::update_ui_from_settings()
 {
-    if (m_imperial_units != (wxGetApp().app_config->get("use_inches") == "1")) {
-        m_imperial_units = wxGetApp().app_config->get("use_inches") == "1";
+    if (m_imperial_units != wxGetApp().app_config->get_bool("use_inches")) {
+        m_imperial_units  = wxGetApp().app_config->get_bool("use_inches");
 
         auto update_unit_text = [](const wxString& new_unit_text, wxStaticText* widget) {
             widget->SetLabel(new_unit_text);
@@ -672,8 +672,8 @@ void ObjectManipulation::update_ui_from_settings()
     }
     m_check_inch->SetValue(m_imperial_units);
 
-    if (m_use_colors != (wxGetApp().app_config->get("color_mapinulation_panel") == "1")) {
-        m_use_colors = wxGetApp().app_config->get("color_mapinulation_panel") == "1";
+    if (m_use_colors != wxGetApp().app_config->get_bool("color_mapinulation_panel")) {
+        m_use_colors  = wxGetApp().app_config->get_bool("color_mapinulation_panel");
         // update colors for edit-boxes
         int axis_id = 0;
         for (ManipulationEditor* editor : m_editors) {

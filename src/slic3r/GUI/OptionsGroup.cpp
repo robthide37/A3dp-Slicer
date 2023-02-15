@@ -1052,7 +1052,7 @@ void ogStaticText::SetPathEnd(const std::string& link)
         event.Skip();
     } );
     Bind(wxEVT_ENTER_WINDOW, [this, link](wxMouseEvent& event) {
-        SetToolTip(OptionsGroup::get_url(get_app_config()->get("suppress_hyperlinks") != "1" ? link : std::string()));
+        SetToolTip(OptionsGroup::get_url(!get_app_config()->get_bool("suppress_hyperlinks") ? link : std::string()));
         FocusText(true); 
         event.Skip(); 
     });
@@ -1061,7 +1061,7 @@ void ogStaticText::SetPathEnd(const std::string& link)
 
 void ogStaticText::FocusText(bool focus)
 {
-    if (get_app_config()->get("suppress_hyperlinks") == "1")
+    if (get_app_config()->get_bool("suppress_hyperlinks"))
         return;
 
     SetFont(focus ? Slic3r::GUI::wxGetApp().link_font() :
