@@ -1695,7 +1695,7 @@ void PrintObject::bridge_over_infill()
                         intersection(bridged_area,
                                      lower_layers_sparse_infill); // cut off parts which are not over sparse infill - material overflow
 
-                    if (bridged_area.empty()) {
+                    if (shrink(bridged_area, 3.0 * flow.scaled_width()).empty()) {
                         continue;
                     }
 
@@ -1980,6 +1980,9 @@ void PrintObject::bridge_over_infill()
                                 for (Surface &surface : region->m_fill_surfaces.surfaces) {
                                     if (s.original_surface == &surface) {
                                         Surface tmp(surface, {});
+                                        for (const ExPolygon &expoly : diff_ex(surface.expolygon, s.new_polys)) {
+                                            new_surfaces.emplace_back(tmp, expoly);
+                                        }
                                         tmp.surface_type = stInternalBridge;
                                         tmp.bridge_angle = s.bridge_angle;
                                         for (const ExPolygon &expoly : union_ex(s.new_polys)) {
