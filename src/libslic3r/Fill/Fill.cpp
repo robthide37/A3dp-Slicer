@@ -442,6 +442,14 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
     for (SurfaceFill &surface_fill : surface_fills) {
+		//skip patterns for which additional input is nullptr
+		switch (surface_fill.params.pattern) {
+			case ipLightning: if (lightning_generator == nullptr) continue; break;
+			case ipAdaptiveCubic: if (adaptive_fill_octree == nullptr) continue; break;
+			case ipSupportCubic: if (support_fill_octree == nullptr) continue; break;
+			default: break;
+		}
+
         // Create the filler object.
         std::unique_ptr<Fill> f = std::unique_ptr<Fill>(Fill::new_from_type(surface_fill.params.pattern));
         f->set_bounding_box(bbox);

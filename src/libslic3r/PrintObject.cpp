@@ -1638,6 +1638,17 @@ void PrintObject::bridge_over_infill()
                     continue;
                 }
 
+                auto region_has_anchorable_sparse_infill = [](const LayerRegion* layer_region) {
+                    switch (layer_region->region().config().fill_pattern.value) {
+                    case ipAdaptiveCubic: return false;
+                    case ipSupportCubic: return false;
+                    case ipLightning: return false;
+                    default: break;
+                    }
+
+                    return layer_region->region().config().fill_density.value < 100;
+                };
+
                 // Gather lower layers sparse infill areas, to depth defined by used bridge flow
                 Polygons          lower_layers_sparse_infill{};
                 double            bottom_z      = layer->print_z - max_bridge_flow_height[candidates.first] - EPSILON;
@@ -1660,7 +1671,7 @@ void PrintObject::bridge_over_infill()
 
                         for (size_t region_idx : regions_under_to_check) {
                             const LayerRegion *region = po->get_layer(i)->get_region(region_idx);
-                            if (region->region().config().fill_density.value < 100) {
+                            if (region_has_anchorable_sparse_infill(region)) {
                                 for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
                                     Polygons p = to_polygons(surface->expolygon);
                                     lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), p.begin(), p.end());
@@ -1703,7 +1714,7 @@ void PrintObject::bridge_over_infill()
                     closing(max_area, flow.scaled_width());
 
                     Polylines anchors = intersection_pl(lower_layer_polylines, max_area);
-                    anchors           = diff_pl(anchors, shrink(bridged_area, flow.scaled_width()));
+                    anchors           = diff_pl(anchors, bridged_area);
 
                     Lines anchors_and_walls = to_lines(anchors);
                     Lines tmp               = to_lines(max_area);
@@ -1716,9 +1727,9 @@ void PrintObject::bridge_over_infill()
 
                     double bridging_angle = 0;
                     {
-                        AABBTreeLines::LinesDistancer<Line> lines_tree{anchors_and_walls};
+                        AABBTreeLines::LinesDistancer<Line> lines_tree{anchors.empty() ? anchors_and_walls : to_lines(anchors)};
 
-                        std::vector<std::pair<double, double>> directions_with_distances;
+                        std::map<double, int> counted_directions;
                         for (const Polygon &p : bridged_area) {
                             for (int point_idx = 0; point_idx < int(p.points.size()) - 1; ++point_idx) {
                                 Vec2d  start        = p.points[point_idx].cast<double>();
@@ -1736,23 +1747,52 @@ void PrintObject::bridge_over_infill()
                                         angle -= PI;
                                     }
                                     angle += PI * 0.5;
-                                    directions_with_distances.emplace_back(angle, distance);
+                                    counted_directions[angle]++;
                                 }
                             }
                         }
-                        double max_dist = directions_with_distances[0].second;
-                        for (const auto &dir : directions_with_distances) {
-                            max_dist = std::max(max_dist, dir.second);
+
+                        std::pair<double, int> best_dir{0, 0};
+                        // sliding window accumulation 
+                        for (const auto &dir : counted_directions) {
+                            int    score_acc          = 0;
+                            double dir_acc            = 0;
+                            double window_start_angle = dir.first - PI * 0.2;
+                            double window_end_angle   = dir.first + PI * 0.2;
+                            for (auto dirs_window = counted_directions.lower_bound(window_start_angle);
+                                 dirs_window != counted_directions.upper_bound(window_end_angle); dirs_window++) {
+                                dir_acc += dirs_window->first * dirs_window->second;
+                                score_acc += dirs_window->second;
+                            }
+                            // current span of directions is 0.5 PI to 1.5 PI (due to the aproach.). Edge values should also account for the
+                            //  opposite direction.
+                            if (window_start_angle < 0.5 * PI) {
+                                for (auto dirs_window = counted_directions.lower_bound(1.5 * PI - (0.5 * PI - window_start_angle));
+                                     dirs_window != counted_directions.end(); dirs_window++) {
+                                    dir_acc += dirs_window->first *  dirs_window->second;
+                                    score_acc += dirs_window->second;
+                                }
+                            }
+                            if (window_start_angle > 1.5 * PI) {
+                                for (auto dirs_window = counted_directions.begin();
+                                     dirs_window != counted_directions.upper_bound(window_start_angle - 1.5 * PI); dirs_window++) {
+                                    dir_acc += dirs_window->first *  dirs_window->second;
+                                    score_acc += dirs_window->second;
+                                }
+                            }
+
+                            if (score_acc > best_dir.second) {
+                                best_dir = {dir_acc / score_acc, score_acc};
+                            }
                         }
-                        double acc = 0;
-                        for (const auto &dir : directions_with_distances) {
-                            bridging_angle += dir.first * (max_dist - dir.second);
-                            acc += (max_dist - dir.second);
-                        }
-                        if (acc <= EPSILON || bridging_angle == 0) {
+                        bridging_angle = best_dir.first;
+                        if (bridging_angle == 0) {
                             bridging_angle = 0.001;
-                        } else {
-                            bridging_angle /= acc;
+                        }
+                        switch (surface_to_region[candidate]->region().config().fill_pattern.value) {
+                        case ipHilbertCurve: bridging_angle += 0.25 * PI; break;
+                        case ipOctagramSpiral: bridging_angle += (1.0 / 16.0) * PI; break;
+                        default: break;
                         }
                     }
 
