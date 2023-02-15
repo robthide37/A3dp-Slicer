@@ -2,6 +2,8 @@
 
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/Geometry/ConvexHull.hpp"
 
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -10,6 +12,7 @@
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/format.hpp"
+
 
 #include "libnest2d/common.hpp"
 
@@ -76,6 +79,7 @@ void ArrangeJob::clear_input()
     m_selected.reserve(count + 1 /* for optional wti */);
     m_unselected.reserve(count + 1 /* for optional wti */);
     m_unprintable.reserve(cunprint /* for optional wti */);
+    m_min_inflation = 0;
 }
 
 void ArrangeJob::prepare_all() {
@@ -145,6 +149,50 @@ void ArrangeJob::prepare_selected() {
     for (auto &p : m_unselected) p.translation(X) -= p.bed_idx * stride;
 }
 
+static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
+                                        const SLAPrintObject &po,
+                                        const ModelInstance &inst,
+                                        coord_t min_infl)
+{
+    auto laststep = po.last_completed_step();
+
+    if (laststep < slaposCount && laststep > slaposSupportTree) {
+        auto omesh = po.get_mesh_to_print();
+        auto &smesh = po.support_mesh();
+
+        Vec3d rotation = inst.get_rotation();
+        rotation.z()   = 0.;
+        Transform3f trafo_instance =
+            Geometry::assemble_transform(inst.get_offset().z() * Vec3d::UnitZ(),
+                                         rotation,
+                                         inst.get_scaling_factor(),
+                                         inst.get_mirror()).cast<float>();
+
+        trafo_instance = trafo_instance * po.trafo().cast<float>().inverse();
+
+        auto polys = reserve_vector<Polygon>(3);
+        auto zlvl = -po.get_elevation();
+
+        if (omesh) {
+            polys.emplace_back(its_convex_hull_2d_above(*omesh, trafo_instance, zlvl));
+            ret.poly.contour = polys.back();
+            ret.poly.holes = {};
+        }
+
+        polys.emplace_back(its_convex_hull_2d_above(smesh.its, trafo_instance, zlvl));
+        ret.poly.contour = Geometry::convex_hull(polys);
+        ret.poly.holes = {};
+
+        // The 1.1 multiplier is a safety gap, as the offset might be bigger
+        // in sharp edges of a polygon, depending on clipper's offset algorithm
+        coord_t infl = 1.1 * scaled(po.config().pad_brim_size.getFloat() +
+                                     po.config().pad_around_object.getBool() *
+                                         po.config().pad_object_gap.getFloat());
+
+        ret.inflation = std::max(infl, min_infl);
+    }
+}
+
 arrangement::ArrangePolygon ArrangeJob::get_arrange_poly_(ModelInstance *mi)
 {
     arrangement::ArrangePolygon ap = get_arrange_poly(mi, m_plater);
@@ -156,12 +204,28 @@ arrangement::ArrangePolygon ArrangeJob::get_arrange_poly_(ModelInstance *mi)
             m_unarranged.emplace_back(mi);
     };
 
+    if (m_plater->printer_technology() == ptSLA) {
+        auto obj_id = mi->get_object()->id();
+        const SLAPrintObject *po =
+            m_plater->sla_print().get_print_object_by_model_object_id(obj_id);
+
+        if (po) {
+            update_arrangepoly_slaprint(ap, *po, *mi, m_min_inflation);
+            m_min_inflation = std::max(m_min_inflation, ap.inflation);
+        }
+    } else {
+        // TODO: get fff supports outline
+    }
+
     return ap;
 }
 
 void ArrangeJob::prepare()
 {
     wxGetKeyState(WXK_SHIFT) ? prepare_selected() : prepare_all();
+    for (auto &ap : m_selected) {
+        ap.inflation = m_min_inflation;
+    }
 }
 
 void ArrangeJob::process(Ctl &ctl)
@@ -286,7 +350,9 @@ template<>
 arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
                                              const Plater * plater)
 {
-    return get_arrange_poly(PtrWrapper{inst}, plater);
+    auto ap = get_arrange_poly(PtrWrapper{inst}, plater);
+
+    return ap;
 }
 
 arrangement::ArrangeParams get_arrange_params(Plater *p)

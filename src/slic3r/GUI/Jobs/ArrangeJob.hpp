@@ -21,6 +21,8 @@ class ArrangeJob : public Job
 
     ArrangePolygons m_selected, m_unselected, m_unprintable;
     std::vector<ModelInstance*> m_unarranged;
+    coord_t m_min_inflation = 0;
+
     Plater *m_plater;
 
     // clear m_selected and m_unselected, reserve space for next usage

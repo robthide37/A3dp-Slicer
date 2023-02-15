@@ -583,8 +583,12 @@ static void process_arrangeable(const ArrangePolygon &arrpoly,
     outp.emplace_back(std::move(p));
     outp.back().rotation(rotation);
     outp.back().translation({offs.x(), offs.y()});
+    outp.back().inflate(arrpoly.inflation);
     outp.back().binId(arrpoly.bed_idx);
     outp.back().priority(arrpoly.priority);
+    outp.back().setOnPackedFn([&arrpoly](Item &itm){
+        itm.inflate(-arrpoly.inflation);
+    });
 }
 
 template<class Fn> auto call_with_bed(const Points &bed, Fn &&fn)
