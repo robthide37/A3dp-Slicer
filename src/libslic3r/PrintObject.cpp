@@ -1525,7 +1525,7 @@ void PrintObject::discover_vertical_shells()
     } // for each region
 } // void PrintObject::discover_vertical_shells()
 
-#define DEBUG_BRIDGE_OVER_INFILL
+// #define DEBUG_BRIDGE_OVER_INFILL
 #ifdef DEBUG_BRIDGE_OVER_INFILL
 template<typename T> void debug_draw(std::string name, const T& a, const T& b, const T& c, const T& d)
 {
@@ -1633,24 +1633,18 @@ void PrintObject::bridge_over_infill()
                     continue;
                 };
 
-                if (expansion_space[candidates.first].empty()){
-                    // there is no expansion space to which can anchors on this island, skip
-                    continue;
-                }
-
-                auto region_has_anchorable_sparse_infill = [](const LayerRegion* layer_region) {
+                auto region_has_special_infill = [](const LayerRegion *layer_region) {
                     switch (layer_region->region().config().fill_pattern.value) {
-                    case ipAdaptiveCubic: return false;
-                    case ipSupportCubic: return false;
-                    case ipLightning: return false;
-                    default: break;
+                    case ipAdaptiveCubic: return true;
+                    case ipSupportCubic: return true;
+                    case ipLightning: return true;
+                    default: return false;
                     }
-
-                    return layer_region->region().config().fill_density.value < 100;
                 };
 
                 // Gather lower layers sparse infill areas, to depth defined by used bridge flow
                 Polygons          lower_layers_sparse_infill{};
+                Polygons          special_infill{};
                 double            bottom_z      = layer->print_z - max_bridge_flow_height[candidates.first] - EPSILON;
                 LayerSlice::Links current_links = candidates.first->overlaps_below;
                 LayerSlice::Links next_links{};
@@ -1671,20 +1665,32 @@ void PrintObject::bridge_over_infill()
 
                         for (size_t region_idx : regions_under_to_check) {
                             const LayerRegion *region = po->get_layer(i)->get_region(region_idx);
-                            if (region_has_anchorable_sparse_infill(region)) {
+                            if (region->region().config().fill_density.value < 100 && !region_has_special_infill(region)) {
                                 for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
                                     Polygons p = to_polygons(surface->expolygon);
                                     lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), p.begin(), p.end());
+                                }
+                            } else if (region_has_special_infill(region)) {
+                                for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
+                                    Polygons p = to_polygons(surface->expolygon);
+                                    special_infill.insert(special_infill.end(), p.begin(), p.end());
                                 }
                             }
                         }
                     }
                     current_links = next_links;
                 }
+
+                lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), special_infill.begin(), special_infill.end());
+
                 if (lower_layers_sparse_infill.empty()) {
                     continue;
                 }
-                lower_layers_sparse_infill = union_(lower_layers_sparse_infill);
+
+                if (expansion_space[candidates.first].empty() && special_infill.empty()) {
+                    // there is no expansion space to which can anchors expand on this island, skip
+                    continue;
+                }
 
                 Polygons expand_area;
                 for (const Surface *sparse_infill : expansion_space[candidates.first]) {
@@ -1714,6 +1720,16 @@ void PrintObject::bridge_over_infill()
                     closing(max_area, flow.scaled_width());
 
                     Polylines anchors = intersection_pl(lower_layer_polylines, max_area);
+                    if (!special_infill.empty()) {
+                        auto part_over_special_infill = intersection(special_infill, bridged_area);
+                        auto artificial_boundary = to_polylines(expand(part_over_special_infill, flow.scaled_width())); 
+                        anchors.insert(anchors.end(), artificial_boundary.begin(), artificial_boundary.end());
+
+#ifdef DEBUG_BRIDGE_OVER_INFILL
+                        debug_draw(std::to_string(lidx) + "special", to_lines(part_over_special_infill), to_lines(artificial_boundary),
+                                   to_lines(anchors), to_lines(expand_area));
+#endif
+                    }
                     anchors           = diff_pl(anchors, bridged_area);
 
                     Lines anchors_and_walls = to_lines(anchors);
