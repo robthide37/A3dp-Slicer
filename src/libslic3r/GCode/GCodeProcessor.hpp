@@ -546,6 +546,7 @@ namespace Slic3r {
         unsigned char m_extruder_id;
         ExtruderColors m_extruder_colors;
         ExtruderTemps m_extruder_temps;
+        ExtruderTemps m_extruder_temps_config;
         float m_parking_position;
         float m_extra_loading_move;
         float m_extruded_last_z;

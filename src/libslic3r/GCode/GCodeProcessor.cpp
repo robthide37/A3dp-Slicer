@@ -558,8 +558,8 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     m_flavor = config.gcode_flavor;
 
 #if ENABLE_GCODE_POSTPROCESS_BACKTRACE
-    m_result.backtrace_enabled = config.printer_model.value == "MK3MMU2" || config.printer_model.value == "MK3SMMU2S" ||
-        config.printer_model.value == "MK2.5MMU2" || config.printer_model.value == "MK2.5SMMU2S" || config.printer_model.value == "MK2SMM";
+    m_result.backtrace_enabled = true; /*config.printer_model.value == "MK3MMU2" || config.printer_model.value == "MK3SMMU2S" ||
+        config.printer_model.value == "MK2.5MMU2" || config.printer_model.value == "MK2.5SMMU2S" || config.printer_model.value == "MK2SMM";*/
 #endif // ENABLE_GCODE_POSTPROCESS_BACKTRACE
 
     size_t extruders_count = config.nozzle_diameter.values.size();
@@ -571,10 +571,12 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     m_result.filament_densities.resize(extruders_count);
     m_result.filament_cost.resize(extruders_count);
     m_extruder_temps.resize(extruders_count);
+    m_extruder_temps_config.resize(extruders_count);
 
     for (size_t i = 0; i < extruders_count; ++ i) {
         m_extruder_offsets[i]           = to_3d(config.extruder_offset.get_at(i).cast<float>().eval(), 0.f);
         m_extruder_colors[i]            = static_cast<unsigned char>(i);
+        m_extruder_temps_config[i]      = static_cast<int>(config.temperature.get_at(i));
         m_result.filament_diameters[i]  = static_cast<float>(config.filament_diameter.get_at(i));
         m_result.filament_densities[i]  = static_cast<float>(config.filament_density.get_at(i));
         m_result.filament_cost[i]       = static_cast<float>(config.filament_cost.get_at(i));
@@ -3980,10 +3982,17 @@ void GCodeProcessor::post_process()
     // add lines XXX to exported gcode
     auto process_line_T = [this, &export_lines](const std::string& gcode_line, const size_t g1_lines_counter, const ExportLines::Backtrace& backtrace) {
         const std::string cmd = GCodeReader::GCodeLine::extract_cmd(gcode_line);
-        export_lines.insert_lines(backtrace, cmd, [](unsigned int id, float time, float time_diff) {
-            const std::string out = "XYYY ; id:" + std::to_string(id) + " time:" + std::to_string(time) + " time diff:" + std::to_string(time_diff) + "\n";
-            return out;
-        });
+        if (cmd.size() >= 2) {
+            std::stringstream ss(cmd.substr(1));
+            int tool_number = -1;
+            ss >> tool_number;
+            if (tool_number != -1)
+                export_lines.insert_lines(backtrace, cmd, [tool_number, this](unsigned int id, float time, float time_diff) {
+                    //const std::string out = "XYYY ; id:" + std::to_string(id) + " time:" + std::to_string(time) + " time diff:" + std::to_string(time_diff) + "\n";
+                    const std::string out = "M117 tool " + std::to_string(tool_number) + " in " + std::to_string(int(std::round(time_diff))) + "s to " + std::to_string(int(m_extruder_temps_config[tool_number])) + "\n";
+                    return out;
+                });
+        }
     };
 #endif // ENABLE_GCODE_POSTPROCESS_BACKTRACE
 
