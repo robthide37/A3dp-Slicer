@@ -1194,7 +1194,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         m_placeholder_parser.set("first_layer_print_size", new ConfigOptionFloats({ bbox.size().x(), bbox.size().y() }));
 
         std::vector<unsigned char> is_extruder_used(print.config().nozzle_diameter.size(), 0);
-        for (unsigned int extruder_id : print.extruders())
+        for (unsigned int extruder_id : tool_ordering.all_extruders())
             is_extruder_used[extruder_id] = true;
         m_placeholder_parser.set("is_extruder_used", new ConfigOptionBools(is_extruder_used));
     }
