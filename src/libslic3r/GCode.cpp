@@ -5117,7 +5117,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string &descri
     std::string descr = description.empty() ? ExtrusionEntity::role_to_string(path.role()) : description;
     std::string gcode = this->_before_extrude(path, descr, speed);
 
-    std::function<void(std::string, Line, double, std::string)> func = [this](std::string& gcode, const Line& line, double e_per_mm, const std::string& comment) {
+    std::function<void(std::string&, const Line&, double, const std::string&)> func = [this](std::string& gcode, const Line& line, double e_per_mm, const std::string& comment) {
         if (line.a == line.b) return; //todo: investigate if it happens (it happens in perimeters)
         gcode += m_writer.extrude_to_xy(
             this->point_to_gcode(line.b),

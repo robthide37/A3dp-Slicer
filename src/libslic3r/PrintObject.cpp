@@ -657,19 +657,20 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
             if (enable_arc_fitting) {
                 coordf_t scaled_resolution = scale_d(print_config.resolution.value);
                 if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
+                const ConfigOptionFloatOrPercent& arc_fitting_tolerance = print_config.arc_fitting_tolerance;
 
                 GetPathsVisitor visitor;
                 this->m_skirt.visit(visitor);
                 this->m_brim.visit(visitor);
                 tbb::parallel_for(
                     tbb::blocked_range<size_t>(0, visitor.paths.size() + visitor.paths3D.size()),
-                    [this, &visitor, scaled_resolution](const tbb::blocked_range<size_t>& range) {
+                    [this, &visitor, scaled_resolution, &arc_fitting_tolerance](const tbb::blocked_range<size_t>& range) {
                         size_t path_idx = range.begin();
                         for (; path_idx < range.end() && path_idx < visitor.paths.size(); ++path_idx) {
-                            visitor.paths[path_idx]->simplify(scaled_resolution, true);
+                            visitor.paths[path_idx]->simplify(scaled_resolution, true, arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width));
                         }
                         for (; path_idx < range.end() && path_idx - visitor.paths.size() < visitor.paths3D.size(); ++path_idx) {
-                            visitor.paths3D[path_idx - visitor.paths.size()]->simplify(scaled_resolution, true);
+                            visitor.paths3D[path_idx - visitor.paths.size()]->simplify(scaled_resolution, true, arc_fitting_tolerance.get_abs_value(visitor.paths3D[path_idx - visitor.paths.size()]->width));
                         }
                     }
                 );

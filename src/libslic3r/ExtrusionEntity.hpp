@@ -256,7 +256,7 @@ public:
     // Currently not used.
     void subtract_expolygons(const ExPolygonCollection &collection, ExtrusionEntityCollection* retval) const;
     void clip_end(coordf_t distance);
-    virtual void simplify(coordf_t tolerance, bool with_fitting_arc);
+    virtual void simplify(coordf_t tolerance, bool with_fitting_arc, double fitting_arc_tolerance);
     double length() const override;
     ExtrusionRole role() const override { return m_role; }
     void set_role(ExtrusionRole new_role) { m_role = new_role; }
@@ -317,7 +317,7 @@ public:
     }
 
     //TODO: simplify only for points that have the same z-offset
-    void simplify(double tolerance, bool use_arc_fitting) override;
+    void simplify(double tolerance, bool use_arc_fitting, double fitting_arc_tolerance) override;
 };
 typedef std::vector<ExtrusionPath3D> ExtrusionPaths3D;
 
@@ -670,13 +670,14 @@ public:
 class SimplifyVisitor : public ExtrusionVisitorRecursive {
     bool m_use_arc_fitting;
     coordf_t m_scaled_resolution;
+    const ConfigOptionFloatOrPercent* m_arc_fitting_tolearance;
 public:
-    SimplifyVisitor(coordf_t scaled_resolution, bool use_arc_fitting) : m_scaled_resolution(scaled_resolution), m_use_arc_fitting(use_arc_fitting) {}
+    SimplifyVisitor(coordf_t scaled_resolution, bool use_arc_fitting, const ConfigOptionFloatOrPercent* arc_fitting_tolearance) : m_scaled_resolution(scaled_resolution), m_use_arc_fitting(use_arc_fitting), m_arc_fitting_tolearance(arc_fitting_tolearance){}
     virtual void use(ExtrusionPath& path) override {
-        path.simplify(m_scaled_resolution, m_use_arc_fitting);
+        path.simplify(m_scaled_resolution, m_use_arc_fitting, scale_d(m_arc_fitting_tolearance->get_abs_value(path.width)));
     }
     virtual void use(ExtrusionPath3D& path3D) override {
-        path3D.simplify(m_scaled_resolution, m_use_arc_fitting);
+        path3D.simplify(m_scaled_resolution, m_use_arc_fitting, scale_d(m_arc_fitting_tolearance->get_abs_value(path3D.width)));
     }
 };
 class GetPathsVisitor : public ExtrusionVisitorRecursive {

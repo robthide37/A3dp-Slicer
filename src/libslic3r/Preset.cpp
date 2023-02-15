@@ -782,6 +782,7 @@ static std::vector<std::string> s_Preset_machine_limits_options {
 
 static std::vector<std::string> s_Preset_printer_options {
 	"arc_fitting",
+    "arc_fitting_tolerance",
     "printer_technology",
     "bed_shape", "bed_custom_texture", "bed_custom_model", "z_offset", "init_z_rotate",
     "fan_kickstart",

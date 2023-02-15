@@ -622,7 +622,7 @@ void LayerRegion::simplify_extrusion_entity()
     if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
 
     //call simplify for all paths
-    SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting };
+    SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting, &print_config.arc_fitting_tolerance };
     this->perimeters.visit(visitor);
     this->fills.visit(visitor);
     this->ironings.visit(visitor);

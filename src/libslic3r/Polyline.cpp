@@ -502,11 +502,11 @@ void PolylineOrArc::clip_first_point() {
     }
 }
 
-void PolylineOrArc::simplify(coordf_t tolerance, bool with_fitting_arc)
+void PolylineOrArc::simplify(coordf_t tolerance, bool with_fitting_arc, double fit_percent_tolerance)
 {
     if (with_fitting_arc) {
         //BBS: do arc fit first, then use DP simplify to handle the straight part to reduce point.
-        Slic3r::Geometry::ArcFitter::do_arc_fitting_and_simplify(this->points, this->m_fitting_result, tolerance);
+        Slic3r::Geometry::ArcFitter::do_arc_fitting_and_simplify(this->points, this->m_fitting_result, tolerance, fit_percent_tolerance);
     } else {
         this->points = MultiPoint::_douglas_peucker(this->points, tolerance);
         this->m_fitting_result.clear();

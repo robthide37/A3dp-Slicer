@@ -404,7 +404,7 @@ void SupportLayer::simplify_support_extrusion_path() {
     coordf_t scaled_resolution = scale_d(print_config.resolution.value);
     if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
 
-    SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting };
+    SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting, &print_config.arc_fitting_tolerance };
     this->support_fills.visit(visitor);
 }
 

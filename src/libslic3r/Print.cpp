@@ -316,6 +316,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
         } else if (
             opt_key == "first_layer_extrusion_width"
             || opt_key == "arc_fitting"
+            || opt_key == "arc_fitting_tolerance"
             || opt_key == "min_layer_height"
             || opt_key == "max_layer_height"
             || opt_key == "filament_max_overlap"
@@ -1232,9 +1233,10 @@ void Print::process()
             obj->simplify_extrusion_path();
         }
         //also simplify object skirt & brim
-        if (enable_arc_fitting) {
+        if (enable_arc_fitting && (!this->m_skirt.empty() || !this->m_brim.empty())) {
             coordf_t scaled_resolution = scale_d(config().resolution.value);
             if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
+            const ConfigOptionFloatOrPercent& arc_fitting_tolerance = config().arc_fitting_tolerance;
 
             this->set_status(0, L("Optimizing skirt & brim %s%%"), { std::to_string(0) }, PrintBase::SlicingStatus::SECONDARY_STATE);
             std::atomic<int> atomic_count{ 0 };
@@ -1243,15 +1245,15 @@ void Print::process()
             this->m_brim.visit(visitor);
             tbb::parallel_for(
                 tbb::blocked_range<size_t>(0, visitor.paths.size() + visitor.paths3D.size()),
-                [this, &visitor, scaled_resolution, &atomic_count](const tbb::blocked_range<size_t>& range) {
+                [this, &visitor, scaled_resolution, &arc_fitting_tolerance, &atomic_count](const tbb::blocked_range<size_t>& range) {
                     size_t path_idx = range.begin();
                     for (; path_idx < range.end() && path_idx < visitor.paths.size(); ++path_idx) {
-                        visitor.paths[path_idx]->simplify(scaled_resolution, true);
+                        visitor.paths[path_idx]->simplify(scaled_resolution, true, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width)));
                         int nb_items_done = (++atomic_count);
                         this->set_status(int((nb_items_done * 100) / (visitor.paths.size() + visitor.paths3D.size())), L("Optimizing skirt & brim %s%%"), { std::to_string(int(100*nb_items_done / double(visitor.paths.size() + visitor.paths3D.size()))) }, PrintBase::SlicingStatus::SECONDARY_STATE);
                     }
                     for (; path_idx < range.end() && path_idx - visitor.paths.size() < visitor.paths3D.size(); ++path_idx) {
-                        visitor.paths3D[path_idx - visitor.paths.size()]->simplify(scaled_resolution, true);
+                        visitor.paths3D[path_idx - visitor.paths.size()]->simplify(scaled_resolution, true, scale_d(arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width)));
                         int nb_items_done = (++atomic_count);
                         this->set_status(int((nb_items_done * 100) / (visitor.paths.size() + visitor.paths3D.size())), L("Optimizing skirt & brim %s%%"), { std::to_string(int(100*nb_items_done / double(visitor.paths.size() + visitor.paths3D.size()))) }, PrintBase::SlicingStatus::SECONDARY_STATE);
                     }

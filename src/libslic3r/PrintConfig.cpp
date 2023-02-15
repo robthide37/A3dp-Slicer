@@ -588,6 +588,16 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("arc_fitting_tolerance", coFloatOrPercent);
+    def->label = L("Arc fitting tolerance");
+    def->sidetext = L("mm or %");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("When using the arc_fitting option, allow the curve to deviate a cetain % from the collection of strait paths."
+        "\nCan be a mm value or a percentage of the current extrusion width.");
+    def->mode = comAdvancedE | comSuSi;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloatOrPercent(5, true));
+
     def = this->add("avoid_crossing_perimeters", coBool);
     def->label = L("Avoid crossing perimeters");
     def->category = OptionCategory::perimeter;
@@ -7498,7 +7508,8 @@ void ModelConfig::convert_from_prusa(const DynamicPrintConfig& global_config) {
 
 std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "allow_empty_layers",
-"arc_fitting"
+"arc_fitting",
+"arc_fitting_tolerance",
 "avoid_crossing_not_first_layer",
 "bridge_fill_pattern",
 "bridge_internal_acceleration",

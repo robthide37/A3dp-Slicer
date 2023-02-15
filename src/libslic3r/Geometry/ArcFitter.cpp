@@ -5,7 +5,7 @@
 
 namespace Slic3r { namespace Geometry {
 
-void ArcFitter::do_arc_fitting(const Points& points, std::vector<PathFittingData>& result, double tolerance)
+void ArcFitter::do_arc_fitting(const Points& points, std::vector<PathFittingData>& result, double tolerance, double fit_percent_tolerance)
 {
 #ifdef DEBUG_ARC_FITTING
     static int irun = 0;
@@ -51,7 +51,7 @@ void ArcFitter::do_arc_fitting(const Points& points, std::vector<PathFittingData
         can_fit = ArcSegment::try_create_arc(current_segment, target_arc, Polyline(current_segment).length(),
                                              DEFAULT_SCALED_MAX_RADIUS,
                                              tolerance,
-                                             DEFAULT_ARC_LENGTH_PERCENT_TOLERANCE);
+                                             fit_percent_tolerance);
         if (can_fit) {
             //BBS: can be fit as arc, then save arc data temperarily
             last_arc = target_arc;
@@ -93,11 +93,11 @@ void ArcFitter::do_arc_fitting(const Points& points, std::vector<PathFittingData
     result.shrink_to_fit();
 }
 
-void ArcFitter::do_arc_fitting_and_simplify(Points& points, std::vector<PathFittingData>& result, double tolerance)
+void ArcFitter::do_arc_fitting_and_simplify(Points& points, std::vector<PathFittingData>& result, double tolerance, double fit_circle_tolerance)
 {
     //BBS: 1 do arc fit first
     if (abs(tolerance) > SCALED_EPSILON)
-        ArcFitter::do_arc_fitting(points, result, tolerance);
+        ArcFitter::do_arc_fitting(points, result, fit_circle_tolerance, DEFAULT_ARC_LENGTH_PERCENT_TOLERANCE);
     else
         result.push_back(PathFittingData{ 0, points.size() - 1, EMovePathType::Linear_move, ArcSegment() });
 

@@ -43,17 +43,17 @@ void ExtrusionPath::clip_end(coordf_t distance)
     this->polyline.clip_end(distance);
 }
 
-void ExtrusionPath::simplify(coordf_t tolerance, bool with_fitting_arc)
+void ExtrusionPath::simplify(coordf_t tolerance, bool with_fitting_arc, double fitting_arc_tolerance)
 {
-    this->polyline.simplify(tolerance, with_fitting_arc);
+    this->polyline.simplify(tolerance, with_fitting_arc, fitting_arc_tolerance);
 }
 
-void ExtrusionPath3D::simplify(coordf_t tolerance, bool with_fitting_arc)
+void ExtrusionPath3D::simplify(coordf_t tolerance, bool with_fitting_arc, double fitting_arc_tolerance)
 {
     //TODO: simplify but only for sub-path with same zheight.
-    if (with_fitting_arc) {
-        this->polyline.simplify(tolerance, true);
-    }
+    //if (with_fitting_arc) {
+    //    this->polyline.simplify(tolerance, with_fitting_arc, fitting_arc_tolerance);
+    //}
 }
 
 double ExtrusionPath::length() const

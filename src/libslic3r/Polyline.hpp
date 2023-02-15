@@ -356,7 +356,7 @@ public:
     }
 
     Points equally_spaced_points(coordf_t distance) const;
-    void simplify(coordf_t tolerance, bool with_fitting_arc);
+    void simplify(coordf_t tolerance, bool with_fitting_arc, double fit_tolerance);
 
     //split& & clip
     //    template <class T> void simplify_by_visibility(const T &area);
