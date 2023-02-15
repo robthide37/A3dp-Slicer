@@ -182,8 +182,8 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
 
     wxBoxSizer* topSizer = new wxBoxSizer(wxVERTICAL);
 
-    m_avc = new ArchiveViewCtrl(this, wxSize(60 * em, 30 * em));
-    m_avc->AppendToggleColumn(L"\u2714", 0, wxDATAVIEW_CELL_ACTIVATABLE, 6 * em);
+    m_avc = new ArchiveViewCtrl(this, wxSize(45 * em, 30 * em));
+    wxDataViewColumn*  toggle_column = m_avc->AppendToggleColumn(L"\u2714", 0, wxDATAVIEW_CELL_ACTIVATABLE, 6 * em);
     m_avc->AppendTextColumn("filename", 1);
     
     std::vector<std::shared_ptr<ArchiveViewNode>> stack;
@@ -238,11 +238,12 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
     // sorting files will help adjust_stack function to not create multiple same folders
     std::sort(filtered_entries.begin(), filtered_entries.end(), [](const boost::filesystem::path& p1, const boost::filesystem::path& p2){ return p1.string() > p2.string(); });
     size_t entry_count = 0;
+    size_t depth = 1;
     for (const boost::filesystem::path& path : filtered_entries)
     {
         std::shared_ptr<ArchiveViewNode> parent(nullptr);
 
-        adjust_stack(path, stack);
+        depth = std::max(depth, adjust_stack(path, stack));
         if (!stack.empty())
             parent = stack.back();
         if (std::regex_match(path.extension().string(), pattern_drop)) { // this leaves out non-compatible files 
@@ -252,6 +253,8 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
     }
     if (entry_count == 1)
         on_all_button();
+
+    toggle_column->SetWidth((4 + depth) * em);
 
     wxBoxSizer* btn_sizer = new wxBoxSizer(wxHORIZONTAL);
 
