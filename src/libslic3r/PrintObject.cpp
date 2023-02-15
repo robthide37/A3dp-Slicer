@@ -718,15 +718,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "first_layer_extrusion_width") {
             steps.emplace_back(posInfill);
         } else if (opt_key == "fill_pattern") {
-            steps.emplace_back(posInfill);
-
-            const auto *old_fill_pattern = old_config.option<ConfigOptionEnum<InfillPattern>>(opt_key);
-            const auto *new_fill_pattern = new_config.option<ConfigOptionEnum<InfillPattern>>(opt_key);
-            assert(old_fill_pattern && new_fill_pattern);
-            // We need to recalculate infill surfaces when infill_only_where_needed is enabled, and we are switching from
-            // the Lightning infill to another infill or vice versa.
-            if (m_config.infill_only_where_needed && (new_fill_pattern->value == ipLightning || old_fill_pattern->value == ipLightning))
-                steps.emplace_back(posPrepareInfill);
+            steps.emplace_back(posPrepareInfill);
         } else if (opt_key == "fill_density") {
             // One likely wants to reslice only when switching between zero infill to simulate boolean difference (subtracting volumes),
             // normal infill and 100% (solid) infill.
@@ -1641,6 +1633,11 @@ void PrintObject::bridge_over_infill()
                     continue;
                 };
 
+                if (expansion_space[candidates.first].empty()){
+                    // there is no expansion space to which can anchors on this island, skip
+                    continue;
+                }
+
                 // Gather lower layers sparse infill areas, to depth defined by used bridge flow
                 Polygons          lower_layers_sparse_infill{};
                 double            bottom_z      = layer->print_z - max_bridge_flow_height[candidates.first] - EPSILON;
@@ -1663,9 +1660,11 @@ void PrintObject::bridge_over_infill()
 
                         for (size_t region_idx : regions_under_to_check) {
                             const LayerRegion *region = po->get_layer(i)->get_region(region_idx);
-                            for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
-                                Polygons p = to_polygons(surface->expolygon);
-                                lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), p.begin(), p.end());
+                            if (region->region().config().fill_density.value < 100) {
+                                for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
+                                    Polygons p = to_polygons(surface->expolygon);
+                                    lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), p.begin(), p.end());
+                                }
                             }
                         }
                     }
