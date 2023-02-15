@@ -435,6 +435,7 @@ void DesktopIntegrationDialog::perform_desktop_integration(bool perform_download
             "Type=Application\n"
             "MimeType=x-scheme-handler/prusaslicer;\n"
             "StartupNotify=false\n"
+            "NoDisplay=true\n"
             , name_suffix, version_suffix, excutable_path, version_suffix);
         
         // desktop file for downloader as part of main app
@@ -487,12 +488,7 @@ void DesktopIntegrationDialog::undo_desktop_intgration()
             std::remove(path.c_str());
         }
     }
-    // URL Protocol
-    path = std::string(app_config->get("desktop_integration_URL_path"));
-    if (!path.empty()) {
-        BOOST_LOG_TRIVIAL(debug) << "removing " << path;
-        std::remove(path.c_str());  
-    }
+    // URL Protocol - removed only by undo_downloader_registration  now
     wxGetApp().plater()->get_notification_manager()->push_notification(NotificationType::UndoDesktopIntegrationSuccess);
 }
 
