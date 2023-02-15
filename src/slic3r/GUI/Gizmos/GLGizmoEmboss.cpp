@@ -375,6 +375,7 @@ static Vec2d calc_mouse_to_center_text_offset(const Vec2d &mouse, const ModelVol
 /// <param name="selection">Containe what is selected</param>
 /// <returns>Slected when only one volume otherwise nullptr</returns>
 static const GLVolume *get_gl_volume(const Selection &selection);
+static GLVolume *get_gl_volume(const GLCanvas3D &canvas);
 
 /// <summary>
 /// Get transformation to world
@@ -395,11 +396,25 @@ static void change_window_position(std::optional<ImVec2> &output_window_offset, 
 } // namespace priv
 
 const GLVolume *priv::get_gl_volume(const Selection &selection) {
+    // return selection.get_first_volume();
     const auto &list = selection.get_volume_idxs();
     if (list.size() != 1)
         return nullptr;
     unsigned int volume_idx = *list.begin();
     return selection.get_volume(volume_idx);
+}
+
+GLVolume *priv::get_gl_volume(const GLCanvas3D &canvas) {
+    const GLVolume *gl_volume = get_gl_volume(canvas.get_selection());
+    if (gl_volume == nullptr)
+        return nullptr;
+
+    const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;
+    for (GLVolume *v : gl_volumes)
+        if (v->composite_id == gl_volume->composite_id)
+            return v;
+    
+    return nullptr;
 }
 
 Transform3d priv::world_matrix(const GLVolume *gl_volume, const Model *model)
@@ -536,17 +551,40 @@ void reset_skew(Transform3d& m)
     m = Eigen::Translation3d(m.translation()) * Transform3d(u * Eigen::Scaling(new_scale_factor(s)) * v.transpose());//  * mirror;
 }
 
+void reset_skew_respect_z(Transform3d &m)
+{
+    Vec3d z_before = m * Vec3d::UnitZ();
+    priv::reset_skew(m);
+    Vec3d z_after = m * Vec3d::UnitZ();
+
+    Transform3d rot; // = Transform3d::Identity();
+    if (priv::allign_vec(z_after, z_before, rot))
+        m = rot * m;
+}
+
 // Multiply from right
 static Transform3d surface_transformR(const Vec3d &p, const Vec3d &n, const Transform3d &v, const Transform3d &i) {
     Transform3d to_volume = (i * v).inverse();
     Vec3d offset_volume = to_volume * p;
     Transform3d translate{Eigen::Translation<double, 3>(offset_volume)};
+    
+    // new transformation for volume
+    Transform3d v_new = v * translate;
 
+    // rotation when exists
     Transform3d rotate;
+
     // normal transformed to volume
     Vec3d z_t = to_volume.linear() * n;
-    bool  exist_rotate = priv::allign_z(z_t, rotate);
-    return v * translate * rotate;
+    if (priv::allign_z(z_t, rotate))
+        v_new = v_new * rotate;    
+
+    // Reset skew in world
+    Transform3d w_new = i * v_new;
+    priv::reset_skew_respect_z(w_new);
+    v_new = i.inverse() * w_new;
+
+    return v_new;
 }
 
 /// <summary>
@@ -581,7 +619,7 @@ static Transform3d surface_transformL(const Vec3d &p, const Vec3d &n, const Tran
     // w2 .. wanted world transformation
     Transform3d w2 = tr * rot_w;
 
-    //priv::reset_skew(w2);
+    //priv::reset_skew_respect_z(w2);
         
     // _  .. inverse
     // i_ .. instance inverse
@@ -721,15 +759,15 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         if (m_volume == nullptr)
             return false;
 
-        // must exist hover object
-        int hovered_id = m_parent.get_first_hover_volume_idx();
-        if (hovered_id < 0)
+        if (m_parent.get_first_hover_volume_idx() < 0)
             return false;
 
-        GLVolume *gl_volume = m_parent.get_volumes().volumes[hovered_id];
-        const ModelObjectPtrs &objects = m_parent.get_model()->objects;
+        GLVolume *gl_volume = priv::get_gl_volume(m_parent);
+        if (gl_volume == nullptr)
+            return false;
 
         // hovered object must be actual text volume
+        const ModelObjectPtrs &objects = m_parent.get_model()->objects;
         if (m_volume != priv::get_model_volume(gl_volume, objects))
             return false;
 
@@ -825,7 +863,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Transform3d volume_L = priv::surface_transformL(hit_position_world, hit_normal_world, volume, instance);
         Transform3d volume_2 = priv::surface_transform2(hit_position_world, hit_normal_world, volume, instance);
         Transform3d volume_3 = priv::surface_transform3(hit_position_world, hit_normal_world, volume, instance);
-        //volume_new = volume_L;
+        volume_new = volume_R;
 
         assert(volume_new.matrix()(0, 0) == volume_new.matrix()(0, 0)); // Check valid transformation not a NAN
         if (volume_new.matrix()(0, 0) != volume_new.matrix()(0, 0))
@@ -3701,6 +3739,21 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::SetTooltip("%s", _u8L("Use camera direction for text orientation").c_str());
     }
 
+    ImGui::SameLine();
+    if (ImGui::Button(_u8L("Reset scale").c_str())) {
+        GLVolume *gl_volume = priv::get_gl_volume(m_parent);
+        if (gl_volume != nullptr) {
+            Transform3d w = gl_volume->world_matrix();
+            priv::reset_skew_respect_z(w);            
+            Transform3d i = gl_volume->get_instance_transformation().get_matrix();
+            Transform3d v_new = i.inverse() * w;
+            gl_volume->set_volume_transformation(v_new);
+            m_parent.do_move(L("Reset scale"));
+        }
+    } else if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", _u8L("Reset skew of text to be normal in world").c_str());
+    }
+
 #ifdef ALLOW_DEBUG_MODE
     ImGui::Text("family = %s", (font_prop.family.has_value() ?
                                     font_prop.family->c_str() :
@@ -4197,7 +4250,10 @@ bool priv::start_create_volume_on_surface_job(
     const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
     Transform3d world_new = hit_to_world * surface_trmat;
-    // priv::reset_skew(world_new);
+
+    // Reset skew    
+    priv::reset_skew_respect_z(world_new);    
+
     Transform3d volume_trmat = instance.inverse() * world_new;    
     start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     return true;
