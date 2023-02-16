@@ -2,6 +2,7 @@
 
 #include "libslic3r/BuildVolume.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Print.hpp"
 #include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 
@@ -79,7 +80,6 @@ void ArrangeJob::clear_input()
     m_selected.reserve(count + 1 /* for optional wti */);
     m_unselected.reserve(count + 1 /* for optional wti */);
     m_unprintable.reserve(cunprint /* for optional wti */);
-    m_min_inflation = 0;
 }
 
 void ArrangeJob::prepare_all() {
@@ -151,8 +151,7 @@ void ArrangeJob::prepare_selected() {
 
 static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
                                         const SLAPrintObject &po,
-                                        const ModelInstance &inst,
-                                        coord_t min_infl)
+                                        const ModelInstance &inst)
 {
     auto laststep = po.last_completed_step();
 
@@ -189,8 +188,20 @@ static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
                                      po.config().pad_around_object.getBool() *
                                          po.config().pad_object_gap.getFloat());
 
-        ret.inflation = std::max(infl, min_infl);
+        ret.inflation = infl;
     }
+}
+
+static coord_t brim_offset(const PrintObject &po, const ModelInstance &inst)
+{
+    const BrimType brim_type         = po.config().brim_type.value;
+    const float    brim_separation   = po.config().brim_separation.getFloat();
+    const float    brim_width        = po.config().brim_width.getFloat();
+    const bool     has_outer_brim    = brim_type == BrimType::btOuterOnly ||
+                                       brim_type == BrimType::btOuterAndInner;
+
+    // How wide is the brim? (in scaled units)
+    return  has_outer_brim ? scaled(brim_width + brim_separation) : 0;
 }
 
 arrangement::ArrangePolygon ArrangeJob::get_arrange_poly_(ModelInstance *mi)
@@ -204,27 +215,40 @@ arrangement::ArrangePolygon ArrangeJob::get_arrange_poly_(ModelInstance *mi)
             m_unarranged.emplace_back(mi);
     };
 
-    if (m_plater->printer_technology() == ptSLA) {
-        auto obj_id = mi->get_object()->id();
-        const SLAPrintObject *po =
-            m_plater->sla_print().get_print_object_by_model_object_id(obj_id);
+    return ap;
+}
 
-        if (po) {
-            update_arrangepoly_slaprint(ap, *po, *mi, m_min_inflation);
-            m_min_inflation = std::max(m_min_inflation, ap.inflation);
-        }
-    } else {
-        // TODO: get fff supports outline
+coord_t get_skirt_offset(const Plater* plater) {
+    float skirt_inset = 0.f;
+    // Try to subtract the skirt from the bed shape so we don't arrange outside of it.
+    if (plater->printer_technology() == ptFFF && plater->fff_print().has_skirt()) {
+        const auto& print = plater->fff_print();
+        skirt_inset = print.config().skirts.value * print.skirt_flow().width() +
+                                  print.config().skirt_distance.value;
     }
 
-    return ap;
+    return scaled(skirt_inset);
 }
 
 void ArrangeJob::prepare()
 {
     wxGetKeyState(WXK_SHIFT) ? prepare_selected() : prepare_all();
+
+    coord_t min_offset = 0;
     for (auto &ap : m_selected) {
-        ap.inflation = m_min_inflation;
+        min_offset = std::max(ap.inflation, min_offset);
+    }
+
+    if (m_plater->printer_technology() == ptSLA) {
+        // Apply the max offset for all the objects
+        for (auto &ap : m_selected) {
+            ap.inflation = min_offset;
+        }
+    } else { // it's fff, brims only need to be minded from bed edges
+        for (auto &ap : m_selected) {
+            ap.inflation = 0;
+        }
+        m_min_bed_inset = min_offset;
     }
 }
 
@@ -238,6 +262,8 @@ void ArrangeJob::process(Ctl &ctl)
            prepare();
            params = get_arrange_params(m_plater);
            get_bed_shape(*m_plater->config(), bed);
+           coord_t min_inset = get_skirt_offset(m_plater) + m_min_bed_inset;
+           params.min_bed_distance = std::max(params.min_bed_distance, min_inset);
     }).wait();
 
     auto count  = unsigned(m_selected.size() + m_unprintable.size());
@@ -351,6 +377,23 @@ arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
                                              const Plater * plater)
 {
     auto ap = get_arrange_poly(PtrWrapper{inst}, plater);
+
+    auto obj_id = inst->get_object()->id();
+    if (plater->printer_technology() == ptSLA) {
+        const SLAPrintObject *po =
+            plater->sla_print().get_print_object_by_model_object_id(obj_id);
+
+        if (po) {
+            update_arrangepoly_slaprint(ap, *po, *inst);
+        }
+    } else {
+        const PrintObject *po =
+            plater->fff_print().get_print_object_by_model_object_id(obj_id);
+
+        if (po) {
+            ap.inflation = brim_offset(*po, *inst);
+        }
+    }
 
     return ap;
 }

@@ -21,7 +21,7 @@ class ArrangeJob : public Job
 
     ArrangePolygons m_selected, m_unselected, m_unprintable;
     std::vector<ModelInstance*> m_unarranged;
-    coord_t m_min_inflation = 0;
+    coord_t m_min_bed_inset = 0.;
 
     Plater *m_plater;
 
@@ -103,6 +103,8 @@ arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
                                              const Plater * plater);
 
 arrangement::ArrangeParams get_arrange_params(Plater *p);
+
+coord_t get_skirt_offset(const Plater* plater);
 
 }} // namespace Slic3r::GUI
 
