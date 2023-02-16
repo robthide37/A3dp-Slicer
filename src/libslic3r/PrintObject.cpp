@@ -1575,26 +1575,38 @@ void PrintObject::bridge_over_infill()
             std::unordered_map<const LayerSlice *, float>            max_bridge_flow_height;
             std::unordered_map<const Surface *, const LayerRegion *> surface_to_region;
             for (const LayerSlice &slice : layer->lslices_ex) {
-                std::unordered_set<size_t> regions_to_check;
+                AABBTreeLines::LinesDistancer<Line> slice_island_tree{to_lines(layer->lslices[int(&slice - layer->lslices_ex.data())])};
+                std::unordered_set<const LayerRegion *> regions_to_check;
+
+                // If there is composite island we have to check all regions on the layer. otherwise, only some regions are needed to be checked
                 for (const LayerIsland &island : slice.islands) {
-                    regions_to_check.insert(island.perimeters.region());
+                    regions_to_check.insert(layer->regions()[island.perimeters.region()]);
                     if (!island.fill_expolygons_composite()) {
-                        regions_to_check.insert(island.fill_region_id);
+                        regions_to_check.insert(layer->regions()[island.fill_region_id]);
+                    } else {
+                        for (const auto& r : layer->regions()) {
+                            regions_to_check.insert(r);
+                        }
+                        break;
                     }
                 }
 
-                for (size_t region_idx : regions_to_check) {
-                    const LayerRegion *region                 = layer->get_region(region_idx);
+                for ( const LayerRegion *region : regions_to_check) {
                     SurfacesPtr        region_internal_solids = region->fill_surfaces().filter_by_type(stInternalSolid);
 
                     // remove very small solid infills, usually not worth it and many of them may not even contain extrusions in the end.
-                    region_internal_solids.erase(std::remove_if(region_internal_solids.begin(), region_internal_solids.end(),
-                                                                [region](const Surface *s) {
-                                                                    float min_width =
-                                                                        float(region->bridging_flow(frSolidInfill).scaled_width()) * 3.f;
-                                                                    return offset_ex({s->expolygon}, -min_width).empty();
-                                                                }),
-                                                 region_internal_solids.end());
+                    region_internal_solids
+                        .erase(std::remove_if(region_internal_solids.begin(), region_internal_solids.end(),
+                                              [slice_island_tree, region](const Surface *s) {
+                                                  float min_width = float(region->bridging_flow(frSolidInfill).scaled_spacing()) * 3.f;
+                                                  if (slice_island_tree.distance_from_lines<true>(s->expolygon.contour.first_point()) >
+                                                      min_width / 3.0) {
+                                                      return true;
+                                                  }
+                                                  return area(offset_ex({s->expolygon}, -min_width)) <
+                                                         min_width * region->bridging_flow(frSolidInfill).scaled_width();
+                                              }),
+                               region_internal_solids.end());
                     if (!region_internal_solids.empty()) {
                         max_bridge_flow_height[&slice] = std::max(max_bridge_flow_height[&slice],
                                                                   region->bridging_flow(frSolidInfill).height());
@@ -1645,46 +1657,56 @@ void PrintObject::bridge_over_infill()
                 // Gather lower layers sparse infill areas, to depth defined by used bridge flow
                 Polygons          lower_layers_sparse_infill{};
                 Polygons          special_infill{};
-                double            bottom_z      = layer->print_z - max_bridge_flow_height[candidates.first] - EPSILON;
-                LayerSlice::Links current_links = candidates.first->overlaps_below;
-                LayerSlice::Links next_links{};
-                for (int i = int(lidx) - 1; i >= 0; --i) {
-                    // Stop iterating if layer is lower than bottom_z.
-                    if (po->get_layer(i)->print_z < bottom_z)
-                        break;
-                    for (const auto &link : current_links) {
-                        const LayerSlice &slice_below = po->get_layer(i)->lslices_ex[link.slice_idx];
-                        next_links.insert(next_links.end(), slice_below.overlaps_below.begin(), slice_below.overlaps_below.end());
-                        std::unordered_set<size_t> regions_under_to_check;
-                        for (const LayerIsland &island : slice_below.islands) {
-                            regions_under_to_check.insert(island.perimeters.region());
-                            if (!island.fill_expolygons_composite()) {
-                                regions_under_to_check.insert(island.fill_region_id);
+                {
+                    double            bottom_z      = layer->print_z - max_bridge_flow_height[candidates.first] - EPSILON;
+                    LayerSlice::Links current_links = candidates.first->overlaps_below;
+                    LayerSlice::Links next_links{};
+                    for (int i = int(lidx) - 1; i >= 0; --i) {
+                        // Stop iterating if layer is lower than bottom_z.
+                        if (po->get_layer(i)->print_z < bottom_z)
+                            break;
+                        for (const auto &link : current_links) {
+                            const LayerSlice &slice_below = po->get_layer(i)->lslices_ex[link.slice_idx];
+                            next_links.insert(next_links.end(), slice_below.overlaps_below.begin(), slice_below.overlaps_below.end());
+                            std::unordered_set<const LayerRegion *> regions_under_to_check;
+                            for (const LayerIsland &island : slice_below.islands) {
+                                regions_under_to_check.insert(po->get_layer(i)->regions()[island.perimeters.region()]);
+                                if (!island.fill_expolygons_composite()) {
+                                    regions_under_to_check.insert(po->get_layer(i)->regions()[island.fill_region_id]);
+                                } else {
+                                    for (const auto &r : po->get_layer(i)->regions()) {
+                                        regions_under_to_check.insert(r);
+                                    }
+                                    break;
+                                }
                             }
-                        }
 
-                        for (size_t region_idx : regions_under_to_check) {
-                            const LayerRegion *region = po->get_layer(i)->get_region(region_idx);
-                            if (region->region().config().fill_density.value < 100 && !region_has_special_infill(region)) {
-                                for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
-                                    Polygons p = to_polygons(surface->expolygon);
-                                    lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), p.begin(), p.end());
-                                }
-                            } else if (region_has_special_infill(region)) {
-                                for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
-                                    Polygons p = to_polygons(surface->expolygon);
-                                    special_infill.insert(special_infill.end(), p.begin(), p.end());
+                            for (const LayerRegion *region : regions_under_to_check) {
+                                if (region->region().config().fill_density.value < 100 && !region_has_special_infill(region)) {
+                                    for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
+                                        Polygons p = to_polygons(surface->expolygon);
+                                        lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), p.begin(), p.end());
+                                    }
+                                } else if (region_has_special_infill(region)) {
+                                    for (const Surface *surface : region->fill_surfaces().filter_by_type(stInternal)) {
+                                        Polygons p = to_polygons(surface->expolygon);
+                                        special_infill.insert(special_infill.end(), p.begin(), p.end());
+                                    }
                                 }
                             }
                         }
+                        current_links = next_links;
                     }
-                    current_links = next_links;
-                }
 
-                lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), special_infill.begin(), special_infill.end());
+                    lower_layers_sparse_infill = intersection(lower_layers_sparse_infill,
+                                                              layer->lslices[int(candidates.first - layer->lslices_ex.data())]);
+                    special_infill = intersection(special_infill, layer->lslices[int(candidates.first - layer->lslices_ex.data())]);
 
-                if (lower_layers_sparse_infill.empty()) {
-                    continue;
+                    lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), special_infill.begin(), special_infill.end());
+
+                    if (lower_layers_sparse_infill.empty()) {
+                        continue;
+                    }
                 }
 
                 if (expansion_space[candidates.first].empty() && special_infill.empty()) {
@@ -1711,18 +1733,18 @@ void PrintObject::bridge_over_infill()
                         intersection(bridged_area,
                                      lower_layers_sparse_infill); // cut off parts which are not over sparse infill - material overflow
 
-                    if (shrink(bridged_area, 3.0 * flow.scaled_width()).empty()) {
+                    if (area(shrink(bridged_area, 3.0 * flow.scaled_spacing())) < 9.0 * flow.scaled_spacing() * flow.scaled_spacing()) {
                         continue;
                     }
 
                     Polygons max_area = expand_area;
                     max_area.insert(max_area.end(), bridged_area.begin(), bridged_area.end());
-                    closing(max_area, flow.scaled_width());
+                    max_area = closing(max_area, flow.scaled_spacing());
 
                     Polylines anchors = intersection_pl(lower_layer_polylines, max_area);
                     if (!special_infill.empty()) {
                         auto part_over_special_infill = intersection(special_infill, bridged_area);
-                        auto artificial_boundary = to_polylines(expand(part_over_special_infill, flow.scaled_width())); 
+                        auto artificial_boundary = to_polylines(expand(part_over_special_infill, 0.5 * flow.scaled_width())); 
                         anchors.insert(anchors.end(), artificial_boundary.begin(), artificial_boundary.end());
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
@@ -1990,11 +2012,11 @@ void PrintObject::bridge_over_infill()
 
                     polygons_rotate(expanded_bridged_area, -aligning_angle);
                     expanded_bridged_area = intersection(expanded_bridged_area, max_area);
+                    expanded_bridged_area = opening(expanded_bridged_area, flow.scaled_spacing());
                     expand_area           = diff(expand_area, expanded_bridged_area);
 
                     expanded_briding_surfaces[candidates.first].emplace_back(candidate, expanded_bridged_area, surface_to_region[candidate],
                                                                              bridging_angle);
-
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                     debug_draw(std::to_string(lidx) + "cadidate_added", to_lines(expanded_bridged_area), to_lines(bridged_area),
                                to_lines(max_area), to_lines(expand_area));
@@ -2014,11 +2036,16 @@ void PrintObject::bridge_over_infill()
                 for (const LayerSlice &slice : layer->lslices_ex) {
                     if (const auto &modified_surfaces = expanded_briding_surfaces.find(&slice);
                         modified_surfaces != expanded_briding_surfaces.end()) {
-                        std::unordered_set<size_t> regions_to_check;
+                        std::unordered_set<LayerRegion *> regions_to_check;
                         for (const LayerIsland &island : slice.islands) {
-                            regions_to_check.insert(island.perimeters.region());
+                            regions_to_check.insert(layer->regions()[island.perimeters.region()]);
                             if (!island.fill_expolygons_composite()) {
-                                regions_to_check.insert(island.fill_region_id);
+                                regions_to_check.insert(layer->regions()[island.fill_region_id]);
+                            } else {
+                                for (LayerRegion *r : layer->regions()) {
+                                    regions_to_check.insert(r);
+                                }
+                                break;
                             }
                         }
 
@@ -2027,9 +2054,8 @@ void PrintObject::bridge_over_infill()
                             cut_from_infill.insert(cut_from_infill.end(), surface.new_polys.begin(), surface.new_polys.end());
                         }
 
-                        for (size_t region_idx : regions_to_check) {
-                            LayerRegion *region = layer->get_region(region_idx);
-                            Surfaces     new_surfaces;
+                        for (LayerRegion *region : regions_to_check) {
+                            Surfaces new_surfaces;
 
                             for (const ModifiedSurface &s : modified_surfaces->second) {
                                 for (Surface &surface : region->m_fill_surfaces.surfaces) {
