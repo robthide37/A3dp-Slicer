@@ -3320,11 +3320,9 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             return_state |= UPDATE_BACKGROUND_PROCESS_INVALID;
             if (printer_technology == ptFFF) {
                 const Print* print = background_process.fff_print();
-                Polygons polygons;
-                if (print->config().complete_objects)
-                    Print::sequential_print_horizontal_clearance_valid(*print, &polygons);
-                view3D->get_canvas3d()->set_sequential_print_clearance_visible(true);
-                view3D->get_canvas3d()->set_sequential_print_clearance_render_fill(true);
+                const Polygons polygons = print->get_sequential_print_clearance_polygons();
+                view3D->get_canvas3d()->set_sequential_print_clearance_visible(!polygons.empty());
+                view3D->get_canvas3d()->set_sequential_print_clearance_render_fill(!polygons.empty());
                 view3D->get_canvas3d()->set_sequential_print_clearance_polygons(polygons);
             }
         }
