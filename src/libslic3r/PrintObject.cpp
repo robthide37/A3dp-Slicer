@@ -1560,10 +1560,10 @@ void PrintObject::bridge_over_infill()
         double             bridge_angle;
     };
 
-    std::unordered_map<const LayerSlice *, std::vector<ModifiedSurface>> expanded_briding_surfaces;
+    std::unordered_map<const LayerSlice *, std::vector<ModifiedSurface>> briding_surfaces;
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this,
-                                                                             &expanded_briding_surfaces](tbb::blocked_range<size_t> r) {
+                                                                             &briding_surfaces](tbb::blocked_range<size_t> r) {
         for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
             const Layer *layer = po->get_layer(lidx);
 
@@ -1710,7 +1710,11 @@ void PrintObject::bridge_over_infill()
                 }
 
                 if (expansion_space[candidates.first].empty() && special_infill.empty()) {
-                    // there is no expansion space to which can anchors expand on this island, skip
+                    // there is no expansion space to which can anchors expand on this island, add back original polygons and skip the island
+                    for (const Surface *candidate : candidates.second) {
+                        briding_surfaces[candidates.first].emplace_back(candidate, to_polygons(candidate->expolygon),
+                                                                        surface_to_region[candidate], 0);
+                    }
                     continue;
                 }
 
@@ -2015,7 +2019,7 @@ void PrintObject::bridge_over_infill()
                     expanded_bridged_area = opening(expanded_bridged_area, flow.scaled_spacing());
                     expand_area           = diff(expand_area, expanded_bridged_area);
 
-                    expanded_briding_surfaces[candidates.first].emplace_back(candidate, expanded_bridged_area, surface_to_region[candidate],
+                    briding_surfaces[candidates.first].emplace_back(candidate, expanded_bridged_area, surface_to_region[candidate],
                                                                              bridging_angle);
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                     debug_draw(std::to_string(lidx) + "cadidate_added", to_lines(expanded_bridged_area), to_lines(bridged_area),
@@ -2029,13 +2033,13 @@ void PrintObject::bridge_over_infill()
         BOOST_LOG_TRIVIAL(info) << "Bridge over infill - Directions and expanded surfaces computed" << log_memory_info();
 
         tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this,
-                                                                                 &expanded_briding_surfaces](tbb::blocked_range<size_t> r) {
+                                                                                 &briding_surfaces](tbb::blocked_range<size_t> r) {
             for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
                 Layer *layer = po->get_layer(lidx);
 
                 for (const LayerSlice &slice : layer->lslices_ex) {
-                    if (const auto &modified_surfaces = expanded_briding_surfaces.find(&slice);
-                        modified_surfaces != expanded_briding_surfaces.end()) {
+                    if (const auto &modified_surfaces = briding_surfaces.find(&slice);
+                        modified_surfaces != briding_surfaces.end()) {
                         std::unordered_set<LayerRegion *> regions_to_check;
                         for (const LayerIsland &island : slice.islands) {
                             regions_to_check.insert(layer->regions()[island.perimeters.region()]);
