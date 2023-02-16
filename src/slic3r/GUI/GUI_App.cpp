@@ -3085,7 +3085,7 @@ void GUI_App::show_downloader_registration_dialog()
         downloader_worker->perform_register(app_config->get("url_downloader_dest"));
 #ifdef __linux__
         if (downloader_worker->get_perform_registration_linux())
-            DesktopIntegrationDialog::perform_desktop_integration(true);
+            DesktopIntegrationDialog::perform_downloader_desktop_integration();
 #endif // __linux__
     } else {
         app_config->set("downloader_url_registered", "0");

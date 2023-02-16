@@ -3036,8 +3036,10 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 #ifdef __linux__
     // Desktop integration on Linux
     BOOST_LOG_TRIVIAL(debug) << "ConfigWizard::priv::apply_config integrate_desktop" << page_welcome->integrate_desktop()  << " perform_registration_linux " << page_downloader->m_downloader->get_perform_registration_linux();
-    if (page_welcome->integrate_desktop() || page_downloader->m_downloader->get_perform_registration_linux())
-        DesktopIntegrationDialog::perform_desktop_integration(page_downloader->m_downloader->get_perform_registration_linux());
+    if (page_welcome->integrate_desktop())
+        DesktopIntegrationDialog::perform_desktop_integration();
+    if (page_downloader->m_downloader->get_perform_registration_linux())
+        DesktopIntegrationDialog::perform_downloader_desktop_integration();
 #endif
 
     // Decide whether to create snapshot based on run_reason and the reset profile checkbox
