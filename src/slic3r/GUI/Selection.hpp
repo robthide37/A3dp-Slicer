@@ -499,10 +499,6 @@ public:
         NONE = 0,
         // Synchronize after rotation by an axis not parallel with Z.
         GENERAL = 1,
-#if ENABLE_WORLD_COORDINATE
-        // Fully synchronize rotation.
-        FULL = 2,
-#endif // ENABLE_WORLD_COORDINATE
     };
     void synchronize_unselected_instances(SyncRotationType sync_rotation_type);
     void synchronize_unselected_volumes();
