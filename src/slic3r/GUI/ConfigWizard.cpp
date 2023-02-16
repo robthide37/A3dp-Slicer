@@ -3175,7 +3175,8 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
     // apply materials in app_config
     for (const std::string& section_name : {AppConfig::SECTION_FILAMENTS, AppConfig::SECTION_MATERIALS})
-        app_config->set_section(section_name, appconfig_new.get_section(section_name));
+        if (appconfig_new.has_section(section_name))
+            app_config->set_section(section_name, appconfig_new.get_section(section_name));
 
     app_config->set_vendors(appconfig_new);
 
