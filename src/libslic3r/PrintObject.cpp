@@ -1799,8 +1799,8 @@ void PrintObject::bridge_over_infill()
                         for (const auto &dir : counted_directions) {
                             int    score_acc          = 0;
                             double dir_acc            = 0;
-                            double window_start_angle = dir.first - PI * 0.2;
-                            double window_end_angle   = dir.first + PI * 0.2;
+                            double window_start_angle = dir.first - PI * 0.1;
+                            double window_end_angle   = dir.first + PI * 0.1;
                             for (auto dirs_window = counted_directions.lower_bound(window_start_angle);
                                  dirs_window != counted_directions.upper_bound(window_end_angle); dirs_window++) {
                                 dir_acc += dirs_window->first * dirs_window->second;
