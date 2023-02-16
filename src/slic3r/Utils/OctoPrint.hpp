@@ -94,7 +94,7 @@ public:
     virtual PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint; }
 
     // gets possible storage to be uploaded to. This allows different printer to have different storage. F.e. local vs sdcard vs usb.
-    bool get_storage(wxArrayString& /* storage */) const override;
+    bool get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override;
 protected:
     bool test(wxString& curl_msg) const override;
     bool validate_version_text(const boost::optional<std::string>& version_text) const override;
