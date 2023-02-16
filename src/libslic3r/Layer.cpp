@@ -105,7 +105,7 @@ static void connect_layer_slices(
     const coord_t                                    offset_below,
     const coord_t                                    offset_above
 #ifndef NDEBUG
-    , const coord_t                                    offset_end
+    , const coord_t                                  offset_end
 #endif // NDEBUG
     )
 {
@@ -127,9 +127,7 @@ static void connect_layer_slices(
         {
 #ifndef NDEBUG
             auto assert_intersection_valid = [this](int i, int j) {
-                assert(i != j);
-                if (i > j)
-                    std::swap(i, j);
+                assert(i < j);
                 assert(i >= m_offset_below);
                 assert(i < m_offset_above);
                 assert(j >= m_offset_above);
@@ -140,35 +138,47 @@ static void connect_layer_slices(
             if (polynode.Contour.size() >= 3) {
                 // If there is an intersection point, it should indicate which contours (one from layer below, the other from layer above) intersect.
                 // Otherwise the contour is fully inside another contour.
-                int32_t i = 0, j = 0;
+                int32_t i = -1, j = -1;
                 for (int icontour = 0; icontour <= polynode.ChildCount(); ++ icontour) {
-                    const bool                first   = icontour == 0;
-                    const ClipperLib_Z::Path &contour = first ? polynode.Contour : polynode.Childs[icontour - 1]->Contour;
+                    const ClipperLib_Z::Path &contour = icontour == 0 ? polynode.Contour : polynode.Childs[icontour - 1]->Contour;
                     if (contour.size() >= 3) {
-                        if (first) {
-                            i = contour.front().z();
-                            j = i;
-                            if (i < 0) {
-                                std::tie(i, j) = m_intersections[-i - 1];
-                                assert(assert_intersection_valid(i, j));
-                                goto end;
-                            }
-                        }
-                        for (const ClipperLib_Z::IntPoint& pt : contour) {
+                        for (const ClipperLib_Z::IntPoint &pt : contour) {
                             j = pt.z();
                             if (j < 0) {
-                                std::tie(i, j) = m_intersections[-j - 1];
-                                assert(assert_intersection_valid(i, j));
+                                const auto &intersection = m_intersections[-j - 1];
+                                assert(intersection.first <= intersection.second);
+                                if (intersection.second < m_offset_above) {
+                                    // Ignore intersection of polygons on the 1st layer.
+                                    assert(intersection.first >= m_offset_below);
+                                    j = i;
+                                } else if (intersection.first >= m_offset_above) {
+                                    // Ignore intersection of polygons on the 2nd layer
+                                    assert(intersection.second < m_offset_end);
+                                    j = i;
+                                } else {
+                                    std::tie(i, j) = m_intersections[-j - 1];
+                                    assert(assert_intersection_valid(i, j));
+                                    goto end;
+                                }
+                            } else if (i == -1) {
+                                // First source contour of this expolygon was found.
+                                i = j;
+                            } else if (i != j) {
+                                // Second source contour of this expolygon was found.
+                                if (i > j)
+                                    std::swap(i, j);
+                                assert_intersection_valid(i, j);
                                 goto end;
                             }
-                            else if (i != j)
-                                goto end;
                         }
                     }
                 }
             end:
                 bool found = false;
-                if (i == j) {
+                if (i == -1) {
+                    // This should not happen. It may only happen if the source contours had just self intersections or intersections with contours at the same layer.
+                    assert(false);
+                } else if (i == j) {
                     // The contour is completely inside another contour.
                     Point pt(polynode.Contour.front().x(), polynode.Contour.front().y());
                     if (i < m_offset_above) {
@@ -202,8 +212,6 @@ static void connect_layer_slices(
                     }
                 } else {
                     assert(assert_intersection_valid(i, j));
-                    if (i > j)
-                        std::swap(i, j);
                     i -= m_offset_below;
                     j -= m_offset_above;
                     assert(i >= 0 && i < m_below.lslices_ex.size());
