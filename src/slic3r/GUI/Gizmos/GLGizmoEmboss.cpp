@@ -559,7 +559,7 @@ void reset_skew_respect_z(Transform3d &m)
 
     Transform3d rot; // = Transform3d::Identity();
     if (priv::allign_vec(z_after, z_before, rot))
-        m = rot * m;
+        m = m * rot;
 }
 
 // Multiply from right
@@ -3489,21 +3489,33 @@ std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, Raycas
     std::optional<RaycastManager::Hit> hit_opt = raycast_manager.unproject(point, direction, &cond);
 
     // Try to find closest point when no hit object in emboss direction
-    if (!hit_opt.has_value())
-        hit_opt = raycast_manager.closest(point);
+    if (!hit_opt.has_value()) {
+        std::optional<RaycastManager::ClosePoint> close_point_opt = raycast_manager.closest(point);
 
-    // It should NOT appear. Closest point always exists.
-    if (!hit_opt.has_value())
-        return {};
+        // It should NOT appear. Closest point always exists.
+        assert(close_point_opt.has_value());
+        if (!close_point_opt.has_value())
+            return {};
+
+        // It is no neccesary to move with origin by very small value
+        if (close_point_opt->squared_distance < EPSILON)
+            return {};
+
+        const RaycastManager::ClosePoint &close_point = *close_point_opt;
+        Transform3d hit_tr = raycast_manager.get_transformation(close_point.tr_key);
+        Vec3d    hit_world = hit_tr * close_point.point;
+        Vec3d offset_world = hit_world - point; // vector in world
+        Vec3d offset_volume = to_world.inverse().linear() * offset_world;
+        return offset_volume;
+    }
 
     // It is no neccesary to move with origin by very small value
-    if (hit_opt->squared_distance < EPSILON)
-        return {};
-
     const RaycastManager::Hit &hit = *hit_opt;
-    Transform3d hit_tr       = raycast_manager.get_transformation(hit.tr_key);
-    Vec3d       hit_world    = hit_tr * hit.position.cast<double>();
-    Vec3d       offset_world = hit_world - point; // vector in world
+    if (hit.squared_distance < EPSILON)
+        return {};
+    Transform3d hit_tr = raycast_manager.get_transformation(hit.tr_key);
+    Vec3d hit_world    = hit_tr * hit.position;
+    Vec3d offset_world = hit_world - point; // vector in world
     // TIP: It should be close to only z move
     Vec3d offset_volume = to_world.inverse().linear() * offset_world;
     return offset_volume;
@@ -4246,7 +4258,7 @@ bool priv::start_create_volume_on_surface_job(
     Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
 
     // Create result volume transformation
-    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal);
+    Transform3d     surface_trmat = create_transformation_onto_surface(hit->position.cast<float>(), hit->normal.cast<float>());
     const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
     Transform3d world_new = hit_to_world * surface_trmat;
