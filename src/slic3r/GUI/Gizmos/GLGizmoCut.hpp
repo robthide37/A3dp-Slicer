@@ -6,6 +6,7 @@
 #include "slic3r/GUI/GLModel.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Model.hpp"
+#include "imgui/imgui.h"
 
 namespace Slic3r {
 
@@ -20,6 +21,14 @@ enum class SLAGizmoEventType : unsigned char;
 
 class GLGizmoCut3D : public GLGizmoBase
 {
+    enum GrabberID {
+        X = 0,
+        Y,
+        Z,
+        CutPlane,
+        Count,
+    };
+
     Transform3d                 m_rotation_m{ Transform3d::Identity() };
     double                      m_snap_step{ 1.0 };
     int                         m_connectors_group_id;
@@ -57,10 +66,10 @@ class GLGizmoCut3D : public GLGizmoBase
 
     Vec2d           m_ldown_mouse_position{ Vec2d::Zero() };
 
-    GLModel m_plane;
     GLModel m_grabber_connection;
     GLModel m_cut_line;
 
+    PickingModel m_plane;
     PickingModel m_sphere;
     PickingModel m_cone;
     std::map<CutConnectorAttributes, PickingModel> m_shapes;
@@ -90,6 +99,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
+    bool m_keep_as_parts{ false };
     bool m_place_on_cut_upper{ true };
     bool m_place_on_cut_lower{ false };
     bool m_rotate_upper{ false };
@@ -121,6 +131,7 @@ class GLGizmoCut3D : public GLGizmoBase
     GLSelectionRectangle m_selection_rectangle;
 
     bool m_has_invalid_connector{ false };
+    bool m_was_cut_plane_dragged { false };
 
     bool                                        m_show_shortcuts{ false };
     std::vector<std::pair<wxString, wxString>>  m_shortcuts;
@@ -153,6 +164,8 @@ class GLGizmoCut3D : public GLGizmoBase
     size_t m_connector_shape_id;
 
     std::vector<std::string> m_axis_names;
+
+    std::map<std::string, wxString> m_part_orientation_names;
 
 public:
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -192,7 +205,7 @@ protected:
     void               on_set_hover_id() override;
     bool               on_is_activable() const override;
     bool               on_is_selectable() const override;
-    Vec3d              mouse_position_in_local_plane(Axis axis, const Linef3&mouse_ray) const;
+    Vec3d              mouse_position_in_local_plane(GrabberID axis, const Linef3&mouse_ray) const;
     void               dragging_grabber_z(const GLGizmoBase::UpdateData &data);
     void               dragging_grabber_xy(const GLGizmoBase::UpdateData &data);
     void               dragging_connector(const GLGizmoBase::UpdateData &data);
@@ -211,6 +224,12 @@ protected:
     void render_build_size();
     void reset_cut_plane();
     void set_connectors_editing(bool connectors_editing);
+    void flip_cut_plane();
+    void render_flip_plane_button(bool disable_pred = false);
+    void add_vertical_scaled_interval(float interval);
+    void add_horizontal_scaled_interval(float interval);
+    void add_horizontal_shift(float shift);
+    void render_color_marker(float size, const ImU32& color);
     void render_cut_plane_input_window(CutConnectors &connectors);
     void init_input_window_data(CutConnectors &connectors);
     void render_input_window_warning() const;
@@ -258,7 +277,7 @@ private:
     void render_cut_plane();
     void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
     void render_line(GLModel& line_model, const ColorRGBA& color, Transform3d view_model_matrix, float width);
-    void render_rotation_snapping(Axis axis, const ColorRGBA& color);
+    void render_rotation_snapping(GrabberID axis, const ColorRGBA& color);
     void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix);
     void render_cut_plane_grabbers();
     void render_cut_line();
