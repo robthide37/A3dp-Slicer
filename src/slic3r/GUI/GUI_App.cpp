@@ -79,7 +79,6 @@
 #include "DesktopIntegrationDialog.hpp"
 #include "SendSystemInfoDialog.hpp"
 #include "Downloader.hpp"
-#include "ConfigWizard_private.hpp"
 
 #include "BitmapCache.hpp"
 #include "Notebook.hpp"
@@ -2890,6 +2889,7 @@ void GUI_App::MacOpenURL(const wxString& url)
 {
     if (app_config && !app_config->get_bool("downloader_url_registered"))
     {
+        notification_manager()->push_notification(NotificationType::URLNotRegistered);
         BOOST_LOG_TRIVIAL(error) << "Recieved command to open URL, but it is not allowed in app configuration. URL: " << url;
         return;
     }
@@ -3081,11 +3081,11 @@ void GUI_App::show_downloader_registration_dialog()
             ), SLIC3R_APP_NAME, SLIC3R_VERSION)
         , true, wxYES_NO);
     if (msg.ShowModal() == wxID_YES) {
-        auto downloader = new DownloaderUtils::Worker(nullptr);
-        downloader->perform_register(app_config->get("url_downloader_dest"));
+        auto downloader_worker = new DownloaderUtils::Worker(nullptr);
+        downloader_worker->perform_register(app_config->get("url_downloader_dest"));
 #ifdef __linux__
-        if (downloader->get_perform_registration_linux())
-            DesktopIntegrationDialog::perform_desktop_integration(true);
+        if (downloader_worker->get_perform_registration_linux())
+            DesktopIntegrationDialog::perform_downloader_desktop_integration();
 #endif // __linux__
     } else {
         app_config->set("downloader_url_registered", "0");
