@@ -53,22 +53,7 @@ void Layer::make_slices()
         this->lslices = slices;
     }
 
-    // prepare lslices ordered by print order
-    this->lslice_indices_sorted_by_print_order.clear();
-    this->lslice_indices_sorted_by_print_order.reserve(lslices.size());
-    // prepare ordering points
-    Points ordering_points;
-    ordering_points.reserve( this->lslices.size());
-    for (const ExPolygon &ex :  this->lslices)
-        ordering_points.push_back(ex.contour.first_point());
-    
-    // sort slices
-    std::vector<Points::size_type> order = chain_points(ordering_points);
-
-    // populate slices vector
-    for (size_t i : order) {
-        this->lslice_indices_sorted_by_print_order.emplace_back(i);
-    }
+    this->lslice_indices_sorted_by_print_order = chain_expolygons(this->lslices);
 }
 
 // used by Layer::build_up_down_graph()
