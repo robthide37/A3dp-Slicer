@@ -10,7 +10,7 @@
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
 #include "GLCanvas3D.hpp"
-#include "ConfigWizard_private.hpp"
+#include "ConfigWizard.hpp"
 
 #include <boost/dll/runtime_symbol_info.hpp>
 
@@ -712,7 +712,7 @@ void PreferencesDialog::accept(wxEvent&)
 			return;
 #ifdef __linux__
 		if( downloader->get_perform_registration_linux()) 
-			DesktopIntegrationDialog::perform_desktop_integration(true);
+			DesktopIntegrationDialog::perform_downloader_desktop_integration();
 #endif // __linux__
 	}
 

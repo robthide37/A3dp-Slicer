@@ -43,6 +43,9 @@ class GLGizmoCut3D : public GLGizmoBase
     Vec3d m_bb_center{ Vec3d::Zero() };
     Vec3d m_center_offset{ Vec3d::Zero() };
 
+    BoundingBoxf3 m_bounding_box;
+    BoundingBoxf3 m_transformed_bounding_box;
+
     // values from RotationGizmo
     double m_radius{ 0.0 };
     double m_grabber_radius{ 0.0 };
@@ -193,7 +196,7 @@ public:
     void invalidate_cut_plane();
 
     BoundingBoxf3   bounding_box() const;
-    BoundingBoxf3   transformed_bounding_box(const Vec3d& plane_center, bool revert_move = false) const;
+    BoundingBoxf3   transformed_bounding_box(const Vec3d& plane_center) const;
 
 protected:
     bool               on_init() override;
@@ -263,7 +266,6 @@ private:
     void render_connect_mode_radio_button(CutConnectorMode mode);
     bool render_reset_button(const std::string& label_id, const std::string& tooltip) const;
     bool render_connect_type_radio_button(CutConnectorType type);
-    Transform3d get_volume_transformation(const ModelVolume* volume) const;
     bool is_outside_of_cut_contour(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos);
     bool is_conflict_for_connector(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos);
     void render_connectors();
