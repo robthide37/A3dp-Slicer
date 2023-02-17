@@ -1315,10 +1315,12 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     box_presets->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &event) { this->preset_update = event.IsChecked(); });
 }
 
+
+
 namespace DownloaderUtils
 {
+namespace {
 #ifdef _WIN32
-
     wxString get_downloads_path()
     {
         wxString ret;
@@ -1330,7 +1332,6 @@ namespace DownloaderUtils
         CoTaskMemFree(path);
         return ret;
     }
-
 #elif  __APPLE__
     wxString get_downloads_path()
     {
@@ -1348,9 +1349,8 @@ namespace DownloaderUtils
         }
         return wxString();
     }
-
 #endif
-
+ }
 Worker::Worker(wxWindow* parent)
 : wxBoxSizer(wxHORIZONTAL)
 , m_parent(parent)
@@ -1432,16 +1432,16 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
     )));
 #endif
 
-    box_allow_downloads->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) { this->downloader->allow(event.IsChecked()); });
+    box_allow_downloads->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) { this->m_downloader->allow(event.IsChecked()); });
 
-    downloader = new DownloaderUtils::Worker(this);
-    append(downloader);
-    downloader->allow(box_allow_value);
+    m_downloader = new DownloaderUtils::Worker(this);
+    append(m_downloader);
+    m_downloader->allow(box_allow_value);
 }
 
 bool PageDownloader::on_finish_downloader() const
 {
-    return downloader->on_finish();
+    return m_downloader->on_finish();
 }
 
 bool DownloaderUtils::Worker::perform_register(const std::string& path_override/* = {}*/)
@@ -3035,9 +3035,11 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
 #ifdef __linux__
     // Desktop integration on Linux
-    BOOST_LOG_TRIVIAL(debug) << "ConfigWizard::priv::apply_config integrate_desktop" << page_welcome->integrate_desktop()  << " perform_registration_linux " << page_downloader->downloader->get_perform_registration_linux();
-    if (page_welcome->integrate_desktop() || page_downloader->downloader->get_perform_registration_linux())
-        DesktopIntegrationDialog::perform_desktop_integration(page_downloader->downloader->get_perform_registration_linux());
+    BOOST_LOG_TRIVIAL(debug) << "ConfigWizard::priv::apply_config integrate_desktop" << page_welcome->integrate_desktop()  << " perform_registration_linux " << page_downloader->m_downloader->get_perform_registration_linux();
+    if (page_welcome->integrate_desktop())
+        DesktopIntegrationDialog::perform_desktop_integration();
+    if (page_downloader->m_downloader->get_perform_registration_linux())
+        DesktopIntegrationDialog::perform_downloader_desktop_integration();
 #endif
 
     // Decide whether to create snapshot based on run_reason and the reset profile checkbox
@@ -3175,7 +3177,8 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
     // apply materials in app_config
     for (const std::string& section_name : {AppConfig::SECTION_FILAMENTS, AppConfig::SECTION_MATERIALS})
-        app_config->set_section(section_name, appconfig_new.get_section(section_name));
+        if (appconfig_new.has_section(section_name))
+            app_config->set_section(section_name, appconfig_new.get_section(section_name));
 
     app_config->set_vendors(appconfig_new);
 

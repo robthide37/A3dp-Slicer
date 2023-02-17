@@ -269,7 +269,8 @@ void set_current_thread_qos()
 #ifdef __APPLE__
 	// OSX specific: Set Quality of Service to "user initiated", so that the threads will be scheduled to high performance
 	// cores if available.
-	pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
+	// With QOS_CLASS_USER_INITIATED the worker threads drop priority once slicer loses user focus.
+	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
 #endif // __APPLE__
 }
 

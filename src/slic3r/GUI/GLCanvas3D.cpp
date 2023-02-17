@@ -3947,8 +3947,8 @@ void GLCanvas3D::update_sequential_clearance()
     // the results are then cached for following displacements
     if (m_sequential_print_clearance_first_displacement) {
         m_sequential_print_clearance.m_hull_2d_cache.clear();
-        float shrink_factor = static_cast<float>(scale_(0.5 * fff_print()->config().extruder_clearance_radius.value - EPSILON));
-        double mitter_limit = scale_(0.1);
+        const float shrink_factor = static_cast<float>(scale_(0.5 * fff_print()->config().extruder_clearance_radius.value - EPSILON));
+        const double mitter_limit = scale_(0.1);
         m_sequential_print_clearance.m_hull_2d_cache.reserve(m_model->objects.size());
         for (size_t i = 0; i < m_model->objects.size(); ++i) {
             ModelObject* model_object = m_model->objects[i];
@@ -3956,7 +3956,7 @@ void GLCanvas3D::update_sequential_clearance()
 #if ENABLE_WORLD_COORDINATE
             Geometry::Transformation trafo = model_instance0->get_transformation();
             trafo.set_offset({ 0.0, 0.0, model_instance0->get_offset().z() });
-            Polygon hull_2d = offset(model_object->convex_hull_2d(trafo.get_matrix()),
+            const Polygon hull_2d = offset(model_object->convex_hull_2d(trafo.get_matrix()),
                 // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
                 // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
                 shrink_factor,
@@ -3984,13 +3984,8 @@ void GLCanvas3D::update_sequential_clearance()
     polygons.reserve(instances_count);
     for (size_t i = 0; i < instance_transforms.size(); ++i) {
         const auto& instances = instance_transforms[i];
-        double rotation_z0 = instances.front()->get_rotation().z();
         for (const auto& instance : instances) {
-            Geometry::Transformation transformation;
-            const Vec3d& offset = instance->get_offset();
-            transformation.set_offset({ offset.x(), offset.y(), 0.0 });
-            transformation.set_rotation(Z, instance->get_rotation().z() - rotation_z0);
-            const Transform3d& trafo = transformation.get_matrix();
+            const Transform3d& trafo = instance->get_matrix();
             const Pointf3s& hull_2d = m_sequential_print_clearance.m_hull_2d_cache[i];
             Points inst_pts;
             inst_pts.reserve(hull_2d.size());
@@ -7060,7 +7055,7 @@ void GLCanvas3D::GizmoHighlighter::init(GLGizmosManager* manager, GLGizmosManage
 {
     if (m_timer.IsRunning())
         invalidate();
-    if (!gizmo || !canvas)
+    if (gizmo == GLGizmosManager::EType::Undefined || !canvas)
         return;
 
     m_timer.Start(300, false);

@@ -1038,25 +1038,50 @@ void ogStaticText::SetText(const wxString& value, bool wrap/* = true*/)
 
 void ogStaticText::SetPathEnd(const std::string& link)
 {
+#ifndef __linux__
+
+    Bind(wxEVT_ENTER_WINDOW, [this, link](wxMouseEvent& event) {
+        SetToolTip(OptionsGroup::get_url(get_app_config()->get("suppress_hyperlinks") != "1" ? link : std::string()));
+        FocusText(true);
+        event.Skip();
+    });
+    Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& event) { FocusText(false); event.Skip(); });
+
     Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) {
         if (HasCapture())
             return;
         this->CaptureMouse();
         event.Skip();
-    } );
+    });
     Bind(wxEVT_LEFT_UP, [link, this](wxMouseEvent& event) {
         if (!HasCapture())
             return;
         ReleaseMouse();
         OptionsGroup::launch_browser(link);
         event.Skip();
-    } );
-    Bind(wxEVT_ENTER_WINDOW, [this, link](wxMouseEvent& event) {
-        SetToolTip(OptionsGroup::get_url(!get_app_config()->get_bool("suppress_hyperlinks") ? link : std::string()));
-        FocusText(true); 
-        event.Skip(); 
     });
-    Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent& event) { FocusText(false); event.Skip(); });
+
+#else
+
+    // Workaround: On Linux wxStaticText doesn't receive wxEVT_ENTER(LEAVE)_WINDOW events,
+    // so implement this behaviour trough wxEVT_MOTION events for this control and it's parent
+    Bind(wxEVT_MOTION, [link, this](wxMouseEvent& event) {
+        SetToolTip(OptionsGroup::get_url(!get_app_config()->get_bool("suppress_hyperlinks") ? link : std::string()));
+        FocusText(true);
+        event.Skip();
+    });
+    GetParent()->Bind(wxEVT_MOTION, [this](wxMouseEvent& event) {
+        FocusText(false);
+        event.Skip();
+    });
+
+    // On Linux a mouse capturing causes a totally application freeze
+    Bind(wxEVT_LEFT_UP, [link, this](wxMouseEvent& event) {
+        OptionsGroup::launch_browser(link);
+        event.Skip();
+    });
+
+#endif
 }
 
 void ogStaticText::FocusText(bool focus)
@@ -1065,7 +1090,10 @@ void ogStaticText::FocusText(bool focus)
         return;
 
     SetFont(focus ? Slic3r::GUI::wxGetApp().link_font() :
-                    Slic3r::GUI::wxGetApp().normal_font());
+        Slic3r::GUI::wxGetApp().normal_font());
+#ifdef __linux__
+    this->GetContainingSizer()->Layout();
+#endif
     Refresh();
 }
 
