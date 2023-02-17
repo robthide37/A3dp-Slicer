@@ -424,8 +424,12 @@ void PrintObject::generate_support_spots()
                                                  float(this->print()->m_config.perimeter_acceleration.getFloat()),
                                                  this->config().raft_layers.getInt(), this->config().brim_type.value,
                                                  float(this->config().brim_width.getFloat())};
-            auto [supp_points, partial_objects]              = SupportSpotsGenerator::full_search(this, cancel_func, params);
-            this->m_shared_regions->generated_support_points = {this->trafo_centered(), supp_points, partial_objects};
+            auto [supp_points, partial_objects] = SupportSpotsGenerator::full_search(this, cancel_func, params);
+            Transform3d po_transform            = this->trafo_centered();
+            if (this->layer_count() > 0) {
+                po_transform = Geometry::translation_transform(Vec3d{0, 0, this->layers().front()->bottom_z()}) * po_transform;
+            }
+            this->m_shared_regions->generated_support_points = {po_transform, supp_points, partial_objects};
             m_print->throw_if_canceled();
         }
         BOOST_LOG_TRIVIAL(debug) << "Searching support spots - end";
