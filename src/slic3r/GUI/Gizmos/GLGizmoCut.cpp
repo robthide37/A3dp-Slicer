@@ -2537,8 +2537,7 @@ CommonGizmosDataID GLGizmoCut3D::on_get_requirements() const {
     return CommonGizmosDataID(
                 int(CommonGizmosDataID::SelectionInfo)
               | int(CommonGizmosDataID::InstancesHider)
-              | int(CommonGizmosDataID::ObjectClipper)
-              | int(CommonGizmosDataID::Raycaster));
+              | int(CommonGizmosDataID::ObjectClipper));
 }
 
 void GLGizmoCut3D::data_changed()
