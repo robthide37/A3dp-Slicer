@@ -561,23 +561,11 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // write transformation from UI into model
         m_parent.do_move(L("Surface move"));
 
-        // Update surface by new position
-        bool need_process = m_volume->text_configuration->style.prop.use_surface;
-        
-        //if (m_surface_drag->y_scale.has_value()) {
-        //    m_style_manager.get_style().prop.size_in_mm *= (*m_surface_drag->y_scale);
-        //    need_process |= set_height();
-        //}
-
-        //if (m_surface_drag->z_scale.has_value()) {
-        //    m_style_manager.get_style().prop.emboss *= (*m_surface_drag->z_scale);
-        //    need_process |= set_depth();
-        //}
-
-        if (need_process)
+        // Update surface by new position        
+        if (m_volume->text_configuration->style.prop.use_surface)
             process();
 
-        // calculate scale
+        // Show correct value of height & depth inside of inputs
         calculate_scale();
 
         // allow moving with object again
@@ -3557,15 +3545,24 @@ void GLGizmoEmboss::draw_advanced()
     }
 
     ImGui::SameLine();
-    if (ImGui::Button(_u8L("Reset scale").c_str())) {
+    if (ImGui::Button(_u8L("Reset Up").c_str())) {
         GLVolume *gl_volume = priv::get_gl_volume(m_parent);
         if (gl_volume != nullptr) {
-            //Transform3d w = gl_volume->world_matrix();
-            //priv::reset_skew_respect_z(w);            
-            //Transform3d i = gl_volume->get_instance_transformation().get_matrix();
-            //Transform3d v_new = i.inverse() * w;
-            //gl_volume->set_volume_transformation(v_new);
-            //m_parent.do_move(L("Reset scale"));
+            Transform3d world = gl_volume->world_matrix();
+            auto world_linear = world.linear();
+            Vec3d z_world = world_linear.col(2);
+            z_world.normalize();
+            Vec3d wanted_up = suggest_up(z_world);
+
+            Vec3d y_world = world_linear.col(1);
+            auto z_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(y_world, wanted_up);
+            Transform3d world_new = z_rotation * world;
+            auto world_new_linear = world_new.linear();
+            Transform3d volume_new = gl_volume->get_volume_transformation().get_matrix();
+            Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
+            volume_new.linear() = instance.linear().inverse() * world_new.linear();
+            gl_volume->set_volume_transformation(volume_new);
+            m_parent.do_move(L("Reset up vector"));
         }
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Reset skew of text to be normal in world").c_str());
