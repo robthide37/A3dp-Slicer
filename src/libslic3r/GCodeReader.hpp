@@ -79,7 +79,8 @@ public:
         static std::string extract_cmd(const std::string& gcode_line) {
             GCodeLine temp;
             temp.m_raw = gcode_line;
-            return temp.cmd().data();
+            const std::string_view cmd = temp.cmd();
+            return { cmd.begin(), cmd.end() };
         }
 #endif // ENABLE_GCODE_POSTPROCESS_BACKTRACE
 
