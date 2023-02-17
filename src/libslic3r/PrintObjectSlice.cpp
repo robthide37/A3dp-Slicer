@@ -1,9 +1,10 @@
+#include "ClipperUtils.hpp"
 #include "ElephantFootCompensation.hpp"
 #include "I18N.hpp"
 #include "Layer.hpp"
 #include "MultiMaterialSegmentation.hpp"
 #include "Print.hpp"
-#include "ClipperUtils.hpp"
+#include "ShortestPath.hpp"
 
 #include <boost/log/trivial.hpp>
 
@@ -398,6 +399,10 @@ static std::vector<std::vector<ExPolygons>> slices_to_regions(
     return slices_by_region;
 }
 
+// Layer::slicing_errors is no more set since 1.41.1 or possibly earlier, thus this code
+// was not really functional for a long day and nobody missed it.
+// Could we reuse this fixing code one day?
+/*
 std::string fix_slicing_errors(LayerPtrs &layers, const std::function<void()> &throw_if_canceled)
 {
     // Collect layers with slicing errors.
@@ -480,6 +485,7 @@ std::string fix_slicing_errors(LayerPtrs &layers, const std::function<void()> &t
         "The model has overlapping or self-intersecting facets. I tried to repair it, "
         "however you might want to check the results or repair the input file and retry.\n";
 }
+*/
 
 // Called by make_perimeters()
 // 1) Decides Z positions of the layers,
@@ -502,12 +508,18 @@ void PrintObject::slice()
     m_layers = new_layers(this, generate_object_layers(m_slicing_params, layer_height_profile));
     this->slice_volumes();
     m_print->throw_if_canceled();
+#if 0
+    // Layer::slicing_errors is no more set since 1.41.1 or possibly earlier, thus this code
+    // was not really functional for a long day and nobody missed it.
+    // Could we reuse this fixing code one day?
+
     // Fix the model.
     //FIXME is this the right place to do? It is done repeateadly at the UI and now here at the backend.
     std::string warning = fix_slicing_errors(m_layers, [this](){ m_print->throw_if_canceled(); });
     m_print->throw_if_canceled();
     if (! warning.empty())
         BOOST_LOG_TRIVIAL(info) << warning;
+#endif
     // Update bounding boxes, back up raw slices of complex models.
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, m_layers.size()),
@@ -799,8 +811,12 @@ void PrintObject::slice_volumes()
 	    if (elephant_foot_compensation_scaled > 0.f && ! m_layers.empty()) {
 	    	// The Elephant foot has been compensated, therefore the 1st layer's lslices are shrank with the Elephant foot compensation value.
 	    	// Store the uncompensated value there.
-	    	assert(m_layers.front()->id() == 0);
-			m_layers.front()->lslices = std::move(lslices_1st_layer);
+            //FIXME is this operation needed? MMU painting and brim now have to do work arounds to work with compensated layer, not with the uncompensated layer.
+            // There may be subtle issues removing this block such as support raft sticking too well with the first object layer.
+            Layer &layer = *m_layers.front();
+	    	assert(layer.id() == 0);
+			layer.lslices = std::move(lslices_1st_layer);
+            layer.lslice_indices_sorted_by_print_order = chain_expolygons(layer.lslices);
 		}
 	}
 
