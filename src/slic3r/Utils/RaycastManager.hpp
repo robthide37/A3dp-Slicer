@@ -114,10 +114,9 @@ public:
     /// <param name="mouse_pos">Position of mouse on screen</param>
     /// <param name="camera">Projection params</param>
     /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
-    /// <returns>Position on surface, normal direction and transformation key, which define hitted object instance</returns>
-    std::optional<Hit> unproject(const Vec2d &mouse_pos, 
-                                 const Camera &camera,
-                                 const ISkip *skip = nullptr) const;
+    /// <returns>Position on surface, normal direction in world coorinate
+    /// + key, to know hitted instance and volume</returns>
+    std::optional<Hit> ray_from_camera(const Vec2d &mouse_pos, const Camera &camera, const ISkip *skip = nullptr) const;
 
     /// <summary>
     /// Unproject Ray(point direction) on mesh by MeshRaycasters

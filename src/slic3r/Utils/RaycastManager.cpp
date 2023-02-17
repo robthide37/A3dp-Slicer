@@ -19,14 +19,6 @@ static bool is_lower_key(const RaycastManager::TrKey &k1, const RaycastManager::
     return k1.first < k2.first || k1.first == k2.first && k1.second < k2.second; }
 static bool is_lower(const RaycastManager::TrItem &i1, const RaycastManager::TrItem &i2) {
     return is_lower_key(i1.first, i2.first); };
-
-    // Copy functionality from MeshRaycaster::unproject_on_mesh without filtering
-using SurfacePoint = RaycastManager::SurfacePoint<double>;
-static std::optional<SurfacePoint> unproject_on_mesh(const AABBMesh    &aabb_mesh,
-                                                     const Vec2d       &mouse_pos,
-                                                     const Transform3d &transformation,
-                                                     const Camera      &camera);
-
 }
 
 void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
@@ -108,11 +100,21 @@ void RaycastManager::actualize(const ModelInstance *instance, const ISkip *skip)
     if (need_sort)
         std::sort(m_transformations.begin(), m_transformations.end(), priv::is_lower);
 }
-
-std::optional<RaycastManager::Hit> RaycastManager::unproject(
+ 
+std::optional<RaycastManager::Hit> RaycastManager::ray_from_camera(
     const Vec2d &mouse_pos, const Camera &camera, const ISkip *skip) const
 {
-    std::optional<Hit> closest;
+    // Improve it is not neccessaru to use AABBMesh and calc normal in 
+
+    struct Result
+    {
+        const AABBMesh *mesh = nullptr;
+        double squared_distance;
+        int face;
+        Vec3d hit_world;
+        const Transform3d *tramsformation;
+        const TrKey *key;
+    }result;
     for (const auto &item : m_transformations) { 
         const TrKey &key = item.first;
         size_t volume_id = key.second;
@@ -120,18 +122,46 @@ std::optional<RaycastManager::Hit> RaycastManager::unproject(
         const AABBMesh *mesh = priv::get_mesh(m_meshes, volume_id);
         if (mesh == nullptr) continue;
         const Transform3d &transformation = item.second;
-        auto surface_point_opt = 
-            priv::unproject_on_mesh(*mesh, mouse_pos, transformation, camera);
-        if (!surface_point_opt.has_value())
+
+        Vec3d point;
+        Vec3d direction;
+        CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
+        Transform3d inv = transformation.inverse();
+        point           = inv * point;
+        direction       = inv.linear() * direction;
+        std::vector<AABBMesh::hit_result> hits = mesh->query_ray_hits(point, direction);
+        if (hits.empty()) continue; // no intersection found
+
+        const AABBMesh::hit_result &hit = hits.front();
+
+        // convert to world
+        Vec3d hit_world = transformation * hit.position();
+        double squared_distance = (camera.get_position() - hit_world).squaredNorm();
+        if (result.mesh != nullptr &&
+            result.squared_distance < squared_distance)
             continue;
-        Vec3d act_hit_tr = transformation * surface_point_opt->position.cast<double>();
-        double squared_distance = (camera.get_position() - act_hit_tr).squaredNorm();
-        if (closest.has_value() &&
-            closest->squared_distance < squared_distance)
-            continue;
-        closest = Hit{*surface_point_opt, key, squared_distance};
+
+        result.mesh = mesh;
+        result.squared_distance = squared_distance;
+        result.face = hit.face();
+        result.hit_world = hit_world;
+        result.tramsformation = &transformation;
+        result.key = &key;
     }
-    return closest;
+
+    if (result.mesh == nullptr)
+        return {};
+
+    const Vec3i tri = result.mesh->indices(result.face);
+    Vec3d pts[3];
+    auto tr = result.tramsformation->linear();
+    for (int i = 0; i < 3; ++i)
+        pts[i] = tr * result.mesh->vertices(tri[i]).cast<double>();
+    Vec3d normal_world = (pts[1] - pts[0]).cross(pts[2] - pts[1]);
+    normal_world.normalize();
+
+    SurfacePoint<double> point_world{result.hit_world, normal_world};
+    return RaycastManager::Hit{point_world, *result.key, result.squared_distance};
 }
 
 std::optional<RaycastManager::Hit> RaycastManager::unproject(const Vec3d &point, const Vec3d &direction, const ISkip *skip) const
@@ -239,26 +269,6 @@ void priv::actualize(RaycastManager::Meshes &meshes, const ModelVolumePtrs &volu
         auto is_lower = [](const RaycastManager::Mesh &m1, const RaycastManager::Mesh &m2) { return m1.first < m2.first; };
         std::sort(meshes.begin(), meshes.end(), is_lower);
     }
-}
-
-std::optional<priv::SurfacePoint> priv::unproject_on_mesh(const AABBMesh    &aabb_mesh,
-                                                          const Vec2d       &mouse_pos,
-                                                          const Transform3d &transformation,
-                                                          const Camera      &camera)
-{
-    Vec3d point;
-    Vec3d direction;
-    CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
-    Transform3d inv = transformation.inverse();
-    point           = inv * point;
-    direction       = inv.linear() * direction;
-    std::vector<AABBMesh::hit_result> hits = aabb_mesh.query_ray_hits(point, direction);
-
-    if (hits.empty())
-        return {}; // no intersection found
-
-    const AABBMesh::hit_result &hit = hits.front();
-    return priv::SurfacePoint{hit.position(), hit.normal()};
 }
 
 const Slic3r::AABBMesh *priv::get_mesh(const RaycastManager::Meshes &meshes, size_t volume_id)

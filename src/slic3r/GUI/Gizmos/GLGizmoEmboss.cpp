@@ -828,42 +828,38 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Vec2d mouse_pos = mouse_coord.cast<double>();
         Vec2d offseted_mouse = mouse_pos + m_surface_drag->mouse_offset;
         const Camera &camera = wxGetApp().plater()->get_camera();
-        auto hit = m_raycast_manager.unproject(offseted_mouse, camera, &m_surface_drag->condition);
+        auto hit = m_raycast_manager.ray_from_camera(offseted_mouse, camera, &m_surface_drag->condition);
         m_surface_drag->exist_hit = hit.has_value();
         if (!hit.has_value()) {
             // cross hair need redraw
             m_parent.set_as_dirty();
             return true;
         }
-        // Calculate offset: transformation to wanted position
-        Transform3d hit_to_world = m_raycast_manager.get_transformation(hit->tr_key);
-        Transform3d hit_to_instance = hit_to_world * m_surface_drag->instance_inv;
-        Transform3d hit_to_volume = hit_to_instance * m_surface_drag->volume_tr.inverse();
-        
-        Vec3d hit_position = hit->position.cast<double>();
-        Vec3d offset_volume = hit_to_volume * hit_position;
-        Transform3d translate{Eigen::Translation<double, 3>(offset_volume)};
-
-        Transform3d rotate;
-        // normal transformed to volume
-        Vec3d hit_normal = hit->normal.cast<double>();
-        Vec3d z_t = hit_to_volume.linear() * hit_normal;
-        bool exist_rotate = priv::allign_z(z_t, rotate);
-        // Edit position from right
-        Transform3d volume_new = m_surface_drag->volume_tr * translate * rotate;
 
         const Transform3d &instance = m_surface_drag->gl_volume->get_instance_transformation().get_matrix();
         const Transform3d &volume   = m_surface_drag->volume_tr;
 
-        Vec3d hit_position_world = hit_to_world * hit_position;
-        Vec3d hit_normal_world   = hit_to_world.linear() * hit_normal; 
+        // Calculate offset: transformation to wanted position
+        Transform3d text_to_world_old = instance * volume;
+        {
+            // Reset skew of the text Z axis:
+            // Project the old Z axis into a new Z axis, which is perpendicular to the old XY plane.
+            Vec3d old_z = text_to_world_old.linear().col(2);
+            Vec3d new_z = text_to_world_old.linear().col(0).cross(text_to_world_old.linear().col(1));
+            text_to_world_old.linear().col(2) = new_z * (old_z.dot(new_z) / new_z.squaredNorm());
+        }
 
-        // REWRITE transformation
-        Transform3d volume_R = priv::surface_transformR(hit_position_world, hit_normal_world, volume, instance);
-        Transform3d volume_L = priv::surface_transformL(hit_position_world, hit_normal_world, volume, instance);
-        Transform3d volume_2 = priv::surface_transform2(hit_position_world, hit_normal_world, volume, instance);
-        Transform3d volume_3 = priv::surface_transform3(hit_position_world, hit_normal_world, volume, instance);
-        volume_new = volume_R;
+        // normal transformed to volume
+        Vec3d text_z_world = text_to_world_old.linear() * Vec3d::UnitZ();
+        auto z_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(text_z_world, hit->normal);
+        Transform3d text_to_world_new = z_rotation * text_to_world_old;
+
+        // Fix up vector ??
+        //auto  y_rotation   = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(text_y_world, hit->normal);
+
+        // Edit position from right
+        Transform3d volume_new{Eigen::Translation<double, 3>(m_surface_drag->instance_inv * hit->position)};
+        volume_new.linear() = instance.linear().inverse() * text_to_world_new.linear();
 
         assert(volume_new.matrix()(0, 0) == volume_new.matrix()(0, 0)); // Check valid transformation not a NAN
         if (volume_new.matrix()(0, 0) != volume_new.matrix()(0, 0))
@@ -871,14 +867,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
         // Check scale in world
         // Calculate Scale to keep size after move over scaled surface
-        Transform3d current_world = instance * volume;
-        auto current_world_linear = current_world.linear();
-
-        Transform3d wanted_world = instance * volume_new;
-        auto wanted_world_linear = wanted_world.linear();
-
-        m_surface_drag->y_scale = priv::calc_scale(current_world_linear, wanted_world_linear, Vec3d::UnitY());
-        m_surface_drag->z_scale = priv::calc_scale(current_world_linear, wanted_world_linear, Vec3d::UnitZ());
+        m_surface_drag->y_scale = priv::calc_scale(text_to_world_old.linear(), text_to_world_new.linear(), Vec3d::UnitY());
+        m_surface_drag->z_scale = priv::calc_scale(text_to_world_old.linear(), text_to_world_new.linear(), Vec3d::UnitZ());
 
         // recalculate rotation for scaled volume
         //Transform3d hit_to_volume2 = hit_to_instance * (m_surface_drag->volume_tr*scale).inverse();
@@ -4245,7 +4235,7 @@ bool priv::start_create_volume_on_surface_job(
     raycaster.actualize(obj, &cond);
 
     const Camera &camera = plater->get_camera();
-    std::optional<RaycastManager::Hit> hit = raycaster.unproject(screen_coor, camera);
+    std::optional<RaycastManager::Hit> hit = raycaster.ray_from_camera(screen_coor, camera, &cond);
 
     // context menu for add text could be open only by right click on an
     // object. After right click, object is selected and object_idx is set
@@ -4253,15 +4243,14 @@ bool priv::start_create_volume_on_surface_job(
     if (!hit.has_value())
         return false;
 
-    Transform3d hit_to_world = raycaster.get_transformation(hit->tr_key);
     // priv::reset_skew(hit_to_world);
     Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
 
     // Create result volume transformation
-    Transform3d     surface_trmat = create_transformation_onto_surface(hit->position.cast<float>(), hit->normal.cast<float>());
+    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal);
     const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
-    Transform3d world_new = hit_to_world * surface_trmat;
+    Transform3d world_new = surface_trmat;
 
     // Reset skew    
     priv::reset_skew_respect_z(world_new);    
