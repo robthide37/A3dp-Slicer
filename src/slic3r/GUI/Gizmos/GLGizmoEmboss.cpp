@@ -229,13 +229,17 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     
     GLVolume *gl_volume = priv::get_hovered_gl_volume(m_parent);
     DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
-    // Try to cast ray into scene and find object for add volume 
-    if (priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager))
-        // object found
-        return;
-
-    // object is not under mouse position soo create object on plater
-    priv::start_create_object_job(emboss_data, mouse_pos);
+    if (gl_volume != nullptr) {
+        // Try to cast ray into scene and find object for add volume
+        if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager)) {
+            // When model is broken. It could appear that hit miss the object.
+            // So add part near by in simmilar manner as right panel do
+            create_volume(volume_type);
+        }
+    } else {
+        // object is not under mouse position soo create object on plater
+        priv::start_create_object_job(emboss_data, mouse_pos);    
+    }
 }
 
 // Designed for create volume without information of mouse in scene
@@ -266,8 +270,9 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
     const GLVolume *vol = nullptr;
     const Camera &camera = wxGetApp().plater()->get_camera();
     priv::find_closest_volume(selection, screen_center, camera, objects, &coor, &vol);
-    if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager)) {
-        assert(vol != nullptr);
+    if (vol == nullptr) {
+        priv::start_create_object_job(emboss_data, screen_center);
+    } else if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager)) {
         // in centroid of convex hull is not hit with object
         // soo create transfomation on border of object
         
@@ -370,6 +375,7 @@ static Vec2d calc_mouse_to_center_text_offset(const Vec2d &mouse, const ModelVol
 /// <param name="selection">Containe what is selected</param>
 /// <returns>Slected when only one volume otherwise nullptr</returns>
 static const GLVolume *get_gl_volume(const Selection &selection);
+static GLVolume *get_gl_volume(const GLCanvas3D &canvas);
 
 /// <summary>
 /// Get transformation to world
@@ -390,11 +396,25 @@ static void change_window_position(std::optional<ImVec2> &output_window_offset, 
 } // namespace priv
 
 const GLVolume *priv::get_gl_volume(const Selection &selection) {
+    // return selection.get_first_volume();
     const auto &list = selection.get_volume_idxs();
     if (list.size() != 1)
         return nullptr;
     unsigned int volume_idx = *list.begin();
     return selection.get_volume(volume_idx);
+}
+
+GLVolume *priv::get_gl_volume(const GLCanvas3D &canvas) {
+    const GLVolume *gl_volume = get_gl_volume(canvas.get_selection());
+    if (gl_volume == nullptr)
+        return nullptr;
+
+    const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;
+    for (GLVolume *v : gl_volumes)
+        if (v->composite_id == gl_volume->composite_id)
+            return v;
+    
+    return nullptr;
 }
 
 Transform3d priv::world_matrix(const GLVolume *gl_volume, const Model *model)
@@ -463,14 +483,98 @@ Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolu
     return nearest_offset;
 }
 
+namespace priv {
+static bool allign_vec(const Vec3d &z_f, const Vec3d &z_t, Transform3d &rotate)
+{
+    Vec3d  z_f_norm  = z_f.normalized();
+    Vec3d  z_t_norm  = z_t.normalized();
+    double cos_angle = z_t_norm.dot(z_f_norm);
+
+    // Calculate rotation of Z-vectors from current to wanted position
+    rotate = Transform3d::Identity();
+
+    if (cos_angle == 0.) {
+        // check that direction is not same
+        if (z_t_norm.z() > 0.)
+            return false;
+
+        // opposit direction of z_t and z_f (a.k.a. angle 180 DEG)
+        rotate = Eigen::AngleAxis(M_PI, Vec3d::UnitX());
+        return true;
+    } else if (cos_angle >= 1. || cos_angle <= -1.) {
+        // bad cas angle value almost zero angle so no rotation
+        return false;
+    }
+
+    // Calculate only when angle is not zero
+    // Calculate rotation axe from current to wanted inside instance
+    Vec3d axe = z_t_norm.cross(z_f_norm);
+    axe.normalize();
+    double angle = acos(cos_angle);
+    rotate       = Eigen::AngleAxis(-angle, axe);
+    return true;
+}
+
+static bool allign_z(const Vec3d &z_t, Transform3d &rotate)
+{
+    // Transformed unit vector Z direction (f)rom, (t)o
+    const Vec3d& z_f = Vec3d::UnitZ();
+    return allign_vec(Vec3d::UnitZ(), z_t, rotate);
+}
+
+ // Calculate scale in world
+static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
+{
+    Vec3d  from_dir   = from * dir;
+    Vec3d  to_dir     = to * dir;
+    double from_scale_sq = from_dir.squaredNorm();
+    double to_scale_sq   = to_dir.squaredNorm();
+    if (is_approx(from_scale_sq, to_scale_sq, 1e-3))
+        return {}; // no scale
+    return sqrt(from_scale_sq / to_scale_sq);
+};
+
+// Copy from branch et_transformation --> Geometry
+// suggested by @bubnikv
+void reset_skew(Transform3d& m)
+{
+    auto new_scale_factor = [](const Matrix3d& s) {
+        return pow(s(0, 0) * s(1, 1) * s(2, 2), 1. / 3.); // scale average
+    };
+
+    const Eigen::JacobiSVD<Matrix3d> svd(m.linear(), Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Matrix3d u = svd.matrixU();
+    Matrix3d v = svd.matrixV();
+    Matrix3d s = svd.singularValues().asDiagonal();
+
+    //Matrix3d mirror;
+    m = Eigen::Translation3d(m.translation()) * Transform3d(u * Eigen::Scaling(new_scale_factor(s)) * v.transpose());//  * mirror;
+}
+
+}
+
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
-    auto do_move = [&]() {
+    // Fix when leave window during dragging
+    // Fix when click right button
+    if (m_surface_drag.has_value() && !mouse_event.Dragging()) {
         // write transformation from UI into model
         m_parent.do_move(L("Surface move"));
 
         // Update surface by new position
-        if (m_volume->text_configuration->style.prop.use_surface)
+        bool need_process = m_volume->text_configuration->style.prop.use_surface;
+        
+        //if (m_surface_drag->y_scale.has_value()) {
+        //    m_style_manager.get_style().prop.size_in_mm *= (*m_surface_drag->y_scale);
+        //    need_process |= set_height();
+        //}
+
+        //if (m_surface_drag->z_scale.has_value()) {
+        //    m_style_manager.get_style().prop.emboss *= (*m_surface_drag->z_scale);
+        //    need_process |= set_depth();
+        //}
+
+        if (need_process)
             process();
 
         // calculate scale
@@ -479,14 +583,14 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // allow moving with object again
         m_parent.enable_moving(true);
         m_surface_drag.reset();
-    };
 
-    if (mouse_event.Moving()) {
-        // Fix when leave window during dragging and move cursor back
-        if (m_surface_drag.has_value())
-            do_move();
-        return false;
+        // only left up is correct 
+        // otherwise it is fix state and return false
+        return mouse_event.LeftUp();
     }
+
+    if (mouse_event.Moving())
+        return false;
 
     // detect start text dragging
     if (mouse_event.LeftDown()) {
@@ -494,15 +598,15 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         if (m_volume == nullptr)
             return false;
 
-        // must exist hover object
-        int hovered_id = m_parent.get_first_hover_volume_idx();
-        if (hovered_id < 0)
+        if (m_parent.get_first_hover_volume_idx() < 0)
             return false;
 
-        GLVolume *gl_volume = m_parent.get_volumes().volumes[hovered_id];
-        const ModelObjectPtrs &objects = m_parent.get_model()->objects;
+        GLVolume *gl_volume = priv::get_gl_volume(m_parent);
+        if (gl_volume == nullptr)
+            return false;
 
         // hovered object must be actual text volume
+        const ModelObjectPtrs &objects = m_parent.get_model()->objects;
         if (m_volume != priv::get_model_volume(gl_volume, objects))
             return false;
 
@@ -535,8 +639,16 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
         Vec2d mouse_pos = mouse_coord.cast<double>();
         Vec2d mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
-        Transform3d instance_inv = gl_volume->get_instance_transformation().get_matrix().inverse();
-        m_surface_drag = SurfaceDrag{mouse_offset, instance_inv, gl_volume, condition};
+        Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
+        TextConfiguration &tc = *m_volume->text_configuration;
+        // fix baked transformation from .3mf store process
+        if (tc.fix_3mf_tr.has_value())
+            volume_tr = volume_tr * tc.fix_3mf_tr->inverse();
+
+        Transform3d instance_tr = gl_volume->get_instance_transformation().get_matrix();
+        Transform3d instance_tr_inv = instance_tr.inverse();
+        Transform3d world_tr = instance_tr * volume_tr;
+        m_surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume, condition};
 
         // Cancel job to prevent interuption of dragging (duplicit result)
         if (m_job_cancel != nullptr) 
@@ -557,44 +669,69 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Vec2d mouse_pos = mouse_coord.cast<double>();
         Vec2d offseted_mouse = mouse_pos + m_surface_drag->mouse_offset;
         const Camera &camera = wxGetApp().plater()->get_camera();
-        auto hit = m_raycast_manager.unproject(offseted_mouse, camera, &m_surface_drag->condition);
+        auto hit = m_raycast_manager.ray_from_camera(offseted_mouse, camera, &m_surface_drag->condition);
+        m_surface_drag->exist_hit = hit.has_value();
         if (!hit.has_value()) {
             // cross hair need redraw
             m_parent.set_as_dirty();
             return true;
         }
 
-        // Calculate temporary position
-        Transform3d object_trmat = m_raycast_manager.get_transformation(hit->tr_key);
-        Transform3d trmat = create_transformation_onto_surface(hit->position, hit->normal);
+        auto world_linear = m_surface_drag->world.linear();
+        // Calculate offset: transformation to wanted position
+        {
+            // Reset skew of the text Z axis:
+            // Project the old Z axis into a new Z axis, which is perpendicular to the old XY plane.
+            Vec3d old_z = world_linear.col(2);
+            Vec3d new_z = world_linear.col(0).cross(world_linear.col(1));
+            world_linear.col(2) = new_z * (old_z.dot(new_z) / new_z.squaredNorm());
+        }
 
-        TextConfiguration &tc = *m_volume->text_configuration;
-        const FontProp& font_prop = tc.style.prop;
-        apply_transformation(font_prop, trmat);
+        Vec3d text_z_world = world_linear.col(2); // world_linear * Vec3d::UnitZ()
+        auto z_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(text_z_world, hit->normal);
+        Transform3d world_new = z_rotation * m_surface_drag->world;
+        auto world_new_linear = world_new.linear();
 
+        // Fix up vector ??
+        //auto y_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(text_y_world, hit->normal);
+
+        // Edit position from right
+        Transform3d volume_new{Eigen::Translation<double, 3>(m_surface_drag->instance_inv * hit->position)};
+        volume_new.linear() = m_surface_drag->instance_inv.linear() * world_new_linear;
+
+        // Check that transformation matrix is valid transformation
+        assert(volume_new.matrix()(0, 0) == volume_new.matrix()(0, 0)); // Check valid transformation not a NAN
+        if (volume_new.matrix()(0, 0) != volume_new.matrix()(0, 0))
+            return true;
+
+        // Check that scale in world did not changed
+        assert(!priv::calc_scale(world_linear, world_new_linear, Vec3d::UnitY()).has_value());
+        assert(!priv::calc_scale(world_linear, world_new_linear, Vec3d::UnitZ()).has_value());
+
+        const TextConfiguration &tc = *m_volume->text_configuration;
         // fix baked transformation from .3mf store process
         if (tc.fix_3mf_tr.has_value())
-            trmat = trmat * (*tc.fix_3mf_tr);
+            volume_new = volume_new * (*tc.fix_3mf_tr);
 
-        // volume transfomration in world coor
-        Transform3d world = object_trmat * trmat;
-        Transform3d volume_tr = m_surface_drag->instance_inv * world;
+        // apply move in Z direction for move with flat surface above texture
+        const FontProp &prop = tc.style.prop;
+        if (!prop.use_surface && prop.distance.has_value()) {
+            Vec3d translate = Vec3d::UnitZ() * (*prop.distance);
+            volume_new.translate(translate);
+        }
 
-        // Update transformation inside of  instances
+        // Update transformation for all instances
         for (GLVolume *vol : m_parent.get_volumes().volumes) {
             if (vol->object_idx() != m_surface_drag->gl_volume->object_idx() || 
                 vol->volume_idx() != m_surface_drag->gl_volume->volume_idx())
                 continue;
-            vol->set_volume_transformation(volume_tr);
+            vol->set_volume_transformation(volume_new);
         }
 
-        // calculate scale
+        // update scale of selected volume --> should be approx the same
         calculate_scale();
 
         m_parent.set_as_dirty();
-        return true;
-    } else if (mouse_event.LeftUp()) {
-        do_move();
         return true;
     }
     return false;
@@ -774,7 +911,13 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         ImVec2 center(
             mouse_pos.x + m_surface_drag->mouse_offset.x(),
             mouse_pos.y + m_surface_drag->mouse_offset.y());
-        priv::draw_cross_hair(center);
+        ImU32 color = ImGui::GetColorU32(
+            m_surface_drag->exist_hit ? 
+                ImVec4(1.f, 1.f, 1.f, .75f) : // transparent white
+                ImVec4(1.f, .3f, .3f, .75f)
+        ); // Warning color
+        const float radius = 16.f;
+        priv::draw_cross_hair(center, radius, color);
     }
 
 #ifdef SHOW_FINE_POSITION
@@ -1026,19 +1169,25 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
 
 EmbossStyles GLGizmoEmboss::create_default_styles()
 {
-    wxFont wx_font_normal = *wxNORMAL_FONT;
-    wxFont wx_font_small = *wxSMALL_FONT;
+    wxFontEnumerator::InvalidateCache();
+    wxArrayString facenames = wxFontEnumerator::GetFacenames(Facenames::encoding);
 
+    wxFont wx_font_normal = *wxNORMAL_FONT;
 #ifdef __APPLE__
-    wx_font_normal.SetFaceName("Helvetica");
-    wx_font_small.SetFaceName("Helvetica");
+    // Set normal font to helvetica when possible
+    for (const wxString &facename : facenames) {
+        if (facename.IsSameAs("Helvetica")) {
+            wx_font_normal = wxFont(wxFontInfo().FaceName(facename).Encoding(Facenames::encoding));
+            break;
+        }
+    }
 #endif // __APPLE__
 
     // https://docs.wxwidgets.org/3.0/classwx_font.html
     // Predefined objects/pointers: wxNullFont, wxNORMAL_FONT, wxSMALL_FONT, wxITALIC_FONT, wxSWISS_FONT
     EmbossStyles styles = {
         WxFontUtils::create_emboss_style(wx_font_normal, _u8L("NORMAL")), // wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT)
-        WxFontUtils::create_emboss_style(wx_font_normal, _u8L("SMALL")),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
+        WxFontUtils::create_emboss_style(*wxSMALL_FONT, _u8L("SMALL")),  // A font using the wxFONTFAMILY_SWISS family and 2 points smaller than wxNORMAL_FONT.
         WxFontUtils::create_emboss_style(*wxITALIC_FONT, _u8L("ITALIC")), // A font using the wxFONTFAMILY_ROMAN family and wxFONTSTYLE_ITALIC style and of the same size of wxNORMAL_FONT.
         WxFontUtils::create_emboss_style(*wxSWISS_FONT, _u8L("SWISS")),  // A font identic to wxNORMAL_FONT except for the family used which is wxFONTFAMILY_SWISS.
         WxFontUtils::create_emboss_style(wxFont(10, wxFONTFAMILY_MODERN, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD), _u8L("MODERN")),        
@@ -1067,7 +1216,6 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
 
     // No valid style in defult list
     // at least one style must contain loadable font
-    wxArrayString facenames = wxFontEnumerator::GetFacenames(wxFontEncoding::wxFONTENCODING_SYSTEM);
     wxFont wx_font;
     for (const wxString &face : facenames) {
         wx_font = wxFont(face);
@@ -1615,9 +1763,9 @@ void GLGizmoEmboss::draw_text_input()
         auto &ff         = m_style_manager.get_font_file_with_cache();
         float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file, scale);
         if (imgui_size > StyleManager::max_imgui_font_size)
-            append_warning(_u8L("To tall"), _u8L("Diminished font height inside text input."));
+            append_warning(_u8L("Too tall"), _u8L("Diminished font height inside text input."));
         if (imgui_size < StyleManager::min_imgui_font_size)
-            append_warning(_u8L("To small"), _u8L("Enlarged font height inside text input."));
+            append_warning(_u8L("Too small"), _u8L("Enlarged font height inside text input."));
         if (!who.empty()) warning = GUI::format(_L("%1% is NOT shown."), who);
     }
 
@@ -2968,6 +3116,31 @@ void GLGizmoEmboss::draw_style_edit() {
 #endif // SHOW_WX_WEIGHT_INPUT 
 }
 
+bool GLGizmoEmboss::set_height() {
+    float &value = m_style_manager.get_style().prop.size_in_mm;
+
+    // size can't be zero or negative
+    priv::Limits::apply(value, priv::limits.size_in_mm);
+
+    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
+        assert(false);
+        return false;
+    }
+    
+    // only different value need process
+    if (is_approx(value, m_volume->text_configuration->style.prop.size_in_mm))
+        return false;
+    
+    // store font size into path serialization
+    const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
+    if (wx_font_opt.has_value()) {
+        wxFont wx_font = *wx_font_opt;
+        wx_font.SetPointSize(static_cast<int>(value));
+        m_style_manager.set_wx_font(wx_font);
+    }
+    return true;
+}
+
 void GLGizmoEmboss::draw_height(bool use_inch)
 {
     float &value = m_style_manager.get_style().prop.size_in_mm;
@@ -2976,24 +3149,21 @@ void GLGizmoEmboss::draw_height(bool use_inch)
     const char *size_format = ((use_inch) ? "%.2f in" : "%.1f mm");
     const std::string revert_text_size = _u8L("Revert text size.");
     const std::string& name = m_gui_cfg->translations.size;
-    if (rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, m_scale_height)) {
-        // size can't be zero or negative
-        priv::Limits::apply(value, priv::limits.size_in_mm);
-        // only different value need process
-        if (!is_approx(value, m_volume->text_configuration->style.prop.size_in_mm)) {
-            // store font size into path
-            EmbossStyle &style = m_style_manager.get_style();
-            if (style.type == WxFontUtils::get_actual_type()) {
-                const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
-                if (wx_font_opt.has_value()) {
-                    wxFont wx_font = *wx_font_opt;
-                    wx_font.SetPointSize(static_cast<int>(value));
-                    m_style_manager.set_wx_font(wx_font);
-                }
-            }
+    if (rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, m_scale_height))
+        if (set_height())
             process();
-        }    
-    }
+}
+
+
+bool GLGizmoEmboss::set_depth()
+{
+    float &value = m_style_manager.get_style().prop.emboss;
+
+    // size can't be zero or negative
+    priv::Limits::apply(value, priv::limits.emboss);
+
+    // only different value need process
+    return !is_approx(value, m_volume->text_configuration->style.prop.emboss);
 }
 
 void GLGizmoEmboss::draw_depth(bool use_inch)
@@ -3004,11 +3174,9 @@ void GLGizmoEmboss::draw_depth(bool use_inch)
     const std::string  revert_emboss_depth = _u8L("Revert embossed depth.");
     const char *size_format = ((use_inch) ? "%.3f in" : "%.2f mm");
     const std::string  name = m_gui_cfg->translations.depth;
-    if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1f, 1.f, size_format, use_inch, m_scale_depth)) {
-        // size can't be zero or negative
-        priv::Limits::apply(value, priv::limits.emboss);
-        process();
-    }
+    if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1f, 1.f, size_format, use_inch, m_scale_depth))
+        if (set_depth())
+            process();    
 }
 
 
@@ -3126,21 +3294,33 @@ std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, Raycas
     std::optional<RaycastManager::Hit> hit_opt = raycast_manager.unproject(point, direction, &cond);
 
     // Try to find closest point when no hit object in emboss direction
-    if (!hit_opt.has_value())
-        hit_opt = raycast_manager.closest(point);
+    if (!hit_opt.has_value()) {
+        std::optional<RaycastManager::ClosePoint> close_point_opt = raycast_manager.closest(point);
 
-    // It should NOT appear. Closest point always exists.
-    if (!hit_opt.has_value())
-        return {};
+        // It should NOT appear. Closest point always exists.
+        assert(close_point_opt.has_value());
+        if (!close_point_opt.has_value())
+            return {};
+
+        // It is no neccesary to move with origin by very small value
+        if (close_point_opt->squared_distance < EPSILON)
+            return {};
+
+        const RaycastManager::ClosePoint &close_point = *close_point_opt;
+        Transform3d hit_tr = raycast_manager.get_transformation(close_point.tr_key);
+        Vec3d    hit_world = hit_tr * close_point.point;
+        Vec3d offset_world = hit_world - point; // vector in world
+        Vec3d offset_volume = to_world.inverse().linear() * offset_world;
+        return offset_volume;
+    }
 
     // It is no neccesary to move with origin by very small value
-    if (hit_opt->squared_distance < EPSILON)
-        return {};
-
     const RaycastManager::Hit &hit = *hit_opt;
-    Transform3d hit_tr       = raycast_manager.get_transformation(hit.tr_key);
-    Vec3d       hit_world    = hit_tr * hit.position.cast<double>();
-    Vec3d       offset_world = hit_world - point; // vector in world
+    if (hit.squared_distance < EPSILON)
+        return {};
+    Transform3d hit_tr = raycast_manager.get_transformation(hit.tr_key);
+    Vec3d hit_world    = hit_tr * hit.position;
+    Vec3d offset_world = hit_world - point; // vector in world
     // TIP: It should be close to only z move
     Vec3d offset_volume = to_world.inverse().linear() * offset_world;
     return offset_volume;
@@ -3374,6 +3554,21 @@ void GLGizmoEmboss::draw_advanced()
             process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Use camera direction for text orientation").c_str());
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button(_u8L("Reset scale").c_str())) {
+        GLVolume *gl_volume = priv::get_gl_volume(m_parent);
+        if (gl_volume != nullptr) {
+            //Transform3d w = gl_volume->world_matrix();
+            //priv::reset_skew_respect_z(w);            
+            //Transform3d i = gl_volume->get_instance_transformation().get_matrix();
+            //Transform3d v_new = i.inverse() * w;
+            //gl_volume->set_volume_transformation(v_new);
+            //m_parent.do_move(L("Reset scale"));
+        }
+    } else if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", _u8L("Reset skew of text to be normal in world").c_str());
     }
 
 #ifdef ALLOW_DEBUG_MODE
@@ -3841,7 +4036,9 @@ GLVolume * priv::get_hovered_gl_volume(const GLCanvas3D &canvas) {
 bool priv::start_create_volume_on_surface_job(
     DataBase &emboss_data, ModelVolumeType volume_type, const Vec2d &screen_coor, const GLVolume *gl_volume, RaycastManager &raycaster)
 {
+    assert(gl_volume != nullptr);
     if (gl_volume == nullptr) return false;
+
     Plater *plater = wxGetApp().plater();
     const ModelObjectPtrs &objects = plater->model().objects;
 
@@ -3853,21 +4050,27 @@ bool priv::start_create_volume_on_surface_job(
     raycaster.actualize(obj, &cond);
 
     const Camera &camera = plater->get_camera();
-    std::optional<RaycastManager::Hit> hit = raycaster.unproject(screen_coor, camera);
+    std::optional<RaycastManager::Hit> hit = raycaster.ray_from_camera(screen_coor, camera, &cond);
 
     // context menu for add text could be open only by right click on an
     // object. After right click, object is selected and object_idx is set
     // also hit must exist. But there is options to add text by object list
-    if (!hit.has_value()) return false;
+    if (!hit.has_value())
+        return false;
 
-    Transform3d hit_object_trmat = raycaster.get_transformation(hit->tr_key);
-    Transform3d hit_instance_trmat = gl_volume->get_instance_transformation().get_matrix();
+    // priv::reset_skew(hit_to_world);
+    Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
 
     // Create result volume transformation
-    Transform3d     surface_trmat = create_transformation_onto_surface(hit->position, hit->normal);
-    const FontProp &font_prop     = emboss_data.text_configuration.style.prop;
+    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal);
+    const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
-    Transform3d volume_trmat = hit_instance_trmat.inverse() * hit_object_trmat * surface_trmat;
+    Transform3d world_new = surface_trmat;
+
+    // Reset skew    
+    //priv::reset_skew_respect_z(world_new);    
+
+    Transform3d volume_trmat = instance.inverse() * world_new;    
     start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     return true;
 }

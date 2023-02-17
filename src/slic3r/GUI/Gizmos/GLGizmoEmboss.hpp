@@ -112,6 +112,11 @@ private:
     void draw_height(bool use_inch);
     void draw_depth(bool use_inch);
 
+    // call after set m_style_manager.get_style().prop.size_in_mm
+    bool set_height();
+    // call after set m_style_manager.get_style().prop.emboss
+    bool set_depth();
+
     bool draw_italic_button();
     bool draw_bold_button();
     void draw_advanced();
@@ -255,7 +260,7 @@ private:
         std::vector<wxString> bad   = {};
 
         // Configuration of font encoding
-        const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
+        static const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
 
         // Identify if preview texture exists
         GLuint texture_id = 0;
@@ -312,6 +317,9 @@ private:
         // hold screen coor offset of cursor from object center
         Vec2d mouse_offset;
 
+        // Start dragging text transformations to world
+        Transform3d world;
+
         // Invers transformation of text volume instance
         // Help convert world transformation to instance space
         Transform3d instance_inv;
@@ -321,6 +329,8 @@ private:
 
         // condition for raycaster
         RaycastManager::AllowVolumes condition;
+
+        bool exist_hit = true;
     };
     // Keep data about dragging only during drag&drop
     std::optional<SurfaceDrag> m_surface_drag;
