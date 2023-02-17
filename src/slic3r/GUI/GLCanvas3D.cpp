@@ -3972,8 +3972,9 @@ void GLCanvas3D::update_sequential_clearance()
 
             Pointf3s& cache_hull_2d = m_sequential_print_clearance.m_hull_2d_cache.emplace_back(Pointf3s());
             cache_hull_2d.reserve(hull_2d.points.size());
+            const Transform3d inv_trafo = trafo.get_matrix().inverse();
             for (const Point& p : hull_2d.points) {
-                cache_hull_2d.emplace_back(unscale<double>(p.x()), unscale<double>(p.y()), 0.0);
+                cache_hull_2d.emplace_back(inv_trafo * Vec3d(unscale<double>(p.x()), unscale<double>(p.y()), 0.0));
             }
         }
         m_sequential_print_clearance_first_displacement = false;
