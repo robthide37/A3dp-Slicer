@@ -185,6 +185,7 @@ struct ThickPolyline {
 
     const Point& first_point()  const { return this->points.front(); }
     const Point& last_point()   const { return this->points.back(); }
+    size_t       size()         const { return this->points.size(); }
     bool         is_valid()     const { return this->points.size() >= 2; }
     double       length()       const { return Slic3r::length(this->points); }
 

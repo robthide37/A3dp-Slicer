@@ -659,7 +659,10 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const size_t &slice_i
         if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btOuterOnly) {
             Polygon brim_hole = slice_poly.contour;
             brim_hole.reverse();
-            brim.push_back(ExPolygon{expand(slice_poly.contour, scale_(params.brim_width)).front(), brim_hole});
+            Polygons c = expand(slice_poly.contour, scale_(params.brim_width)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
+            if (!c.empty()) {
+                brim.push_back(ExPolygon{c.front(), brim_hole});
+            }
         }
         if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btInnerOnly) {
             Polygons brim_contours = slice_poly.holes;
@@ -951,7 +954,7 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po,
             float unchecked_dist = params.min_distance_between_support_points + 1.0f;
 
             for (const ExtrusionLine &line : current_slice_ext_perims_lines) {
-                if ((unchecked_dist + line.len < params.min_distance_between_support_points && line.curled_up_height < 0.3f) ||
+                if ((unchecked_dist + line.len < params.min_distance_between_support_points && line.curled_up_height < params.curling_tolerance_limit) ||
                     line.len < EPSILON) {
                     unchecked_dist += line.len;
                 } else {
@@ -1074,14 +1077,14 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
         }
 
         for (const ExtrusionLine &line : current_layer_lines) {
-            if (line.curled_up_height > 0.3f) {
+            if (line.curled_up_height > params.curling_tolerance_limit) {
                 l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)});
             }
         }
 
 #ifdef DEBUG_FILES
         for (const ExtrusionLine &line : current_layer_lines) {
-            if (line.curled_up_height > 0.3f) {
+            if (line.curled_up_height > params.curling_tolerance_limit) {
                 Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
                 fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
             }
@@ -1147,14 +1150,14 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
         }
 
         for (const ExtrusionLine &line : current_layer_lines) {
-            if (line.curled_up_height > 0.3f) {
+            if (line.curled_up_height > params.curling_tolerance_limit) {
                 l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)});
             }
         }
 
 #ifdef DEBUG_FILES
         for (const ExtrusionLine &line : current_layer_lines) {
-            if (line.curled_up_height > 0.3f) {
+            if (line.curled_up_height > params.curling_tolerance_limit) {
                 Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
                 fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
             }
@@ -1182,7 +1185,8 @@ std::vector<std::pair<SupportPointCause, bool>> gather_issues(const SupportPoint
     std::sort(partial_objects.begin(), partial_objects.end(),
               [](const PartialObject &left, const PartialObject &right) { return left.volume > right.volume; });
 
-    float max_volume_part              = partial_objects.front().volume;
+    // Object may have zero extrusions and thus no partial objects. (e.g. very tiny object)
+    float max_volume_part = partial_objects.empty() ? 0.0f : partial_objects.front().volume;
     for (const PartialObject &p : partial_objects) {
         if (p.volume > max_volume_part / 200.0f && !p.connected_to_bed) {
                 result.emplace_back(SupportPointCause::UnstableFloatingPart, true);

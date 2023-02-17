@@ -122,6 +122,7 @@ private:
     bool            m_initialized { false };
     bool            m_post_initialized { false };
     bool            m_app_conf_exists{ false };
+    bool            m_last_app_conf_lower_version{ false };
     EAppMode        m_app_mode{ EAppMode::Editor };
     bool            m_is_recreating_gui{ false };
 #ifdef __linux__
@@ -305,8 +306,8 @@ public:
     Plater*              plater();
     const Plater*        plater() const;
     Model&      		 model();
-    NotificationManager * notification_manager();
-    GalleryDialog *     gallery_dialog();
+    NotificationManager* notification_manager();
+    GalleryDialog *      gallery_dialog();
     Downloader*          downloader();
 
     // Parameters extracted from the command line to be passed to GUI after initialization.
@@ -343,6 +344,7 @@ public:
     bool            may_switch_to_SLA_preset(const wxString& caption);
     bool            run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage start_page = ConfigWizard::SP_WELCOME);
     void            show_desktop_integration_dialog();
+    void            show_downloader_registration_dialog();
 
 #if ENABLE_THUMBNAIL_GENERATOR_DEBUG
     // temporary and debug only -> extract thumbnails from selected gcode and save them as png files
