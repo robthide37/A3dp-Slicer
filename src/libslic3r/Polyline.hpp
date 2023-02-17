@@ -153,6 +153,25 @@ inline void polylines_append(Polylines &dst, Polylines &&src)
     }
 }
 
+// Merge polylines at their respective end points.
+// dst_first: the merge point is at dst.begin() or dst.end()?
+// src_first: the merge point is at src.begin() or src.end()?
+// The orientation of the resulting polyline is unknown, the output polyline may start
+// either with src piece or dst piece.
+template<typename PointType>
+inline void polylines_merge(std::vector<PointType> &dst, bool dst_first, std::vector<PointType> &&src, bool src_first)
+{
+    if (dst_first) {
+        if (src_first)
+            std::reverse(dst.begin(), dst.end());
+        else
+            std::swap(dst, src);
+    } else if (! src_first)
+        std::reverse(src.begin(), src.end());
+    // Merge src into dst.
+    append(dst, std::move(src));
+}
+
 const Point& leftmost_point(const Polylines &polylines);
 
 bool remove_degenerate(Polylines &polylines);
@@ -166,6 +185,7 @@ struct ThickPolyline {
 
     const Point& first_point()  const { return this->points.front(); }
     const Point& last_point()   const { return this->points.back(); }
+    size_t       size()         const { return this->points.size(); }
     bool         is_valid()     const { return this->points.size() >= 2; }
     double       length()       const { return Slic3r::length(this->points); }
 
@@ -178,6 +198,11 @@ struct ThickPolyline {
     }
 
     void clip_end(double distance);
+
+    // Make this closed ThickPolyline starting in the specified index.
+    // Be aware that this method can be applicable just for closed ThickPolyline.
+    // On open ThickPolyline make no effect.
+    void start_at_index(int index);
 
     Points                  points;
     std::vector<coordf_t>   width;

@@ -222,6 +222,12 @@ static t_config_enum_values s_keys_map_PerimeterGeneratorType {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PerimeterGeneratorType)
 
+static t_config_enum_values s_keys_map_EnsuringInfillPattern {
+    { "bounded_rectilinear", int(EnsuringInfillPattern::eipBoundedRectilinear) },
+    { "concentric", int(EnsuringInfillPattern::eipConcentric) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(EnsuringInfillPattern)
+
 static void assign_printer_technology_to_unknown(t_optiondef_map &options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options)
@@ -3212,6 +3218,17 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloatOrPercent(85, true));
+
+    def = this->add("ensure_vertical_shell_infill", coEnum);
+    def->label = L("Ensure vertical shell infill");
+    def->category = L("Layers and Perimeters");
+    def->tooltip = L("Ensure vertical shell infill.");
+    def->set_enum<EnsuringInfillPattern>({
+        { "bounded_rectilinear",    L("Bounded Rectilinear") },
+        { "concentric",             L("Concentric") }
+        });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<EnsuringInfillPattern>(EnsuringInfillPattern::eipBoundedRectilinear));
 
     // Declare retract values for filament profile, overriding the printer's extruder profile.
     for (const char *opt_key : {

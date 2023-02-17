@@ -39,6 +39,9 @@ static constexpr const Slic3r::ClipperLib::JoinType DefaultLineJoinType     = Sl
 // Miter limit is ignored for jtSquare.
 static constexpr const double                       DefaultLineMiterLimit   = 0.;
 
+// Decimation factor applied on input contour when doing offset, multiplied by the offset distance.
+static constexpr const double                       ClipperOffsetShortestEdgeFactor = 0.005;
+
 enum class ApplySafetyOffset {
     No,
     Yes
@@ -601,6 +604,6 @@ Polygons  variable_offset_outer(const ExPolygon &expoly, const std::vector<std::
 ExPolygons variable_offset_outer_ex(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit = 2.);
 ExPolygons variable_offset_inner_ex(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit = 2.);
 
-}
+} // namespace Slic3r
 
-#endif
+#endif // slic3r_ClipperUtils_hpp_

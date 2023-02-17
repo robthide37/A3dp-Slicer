@@ -463,7 +463,7 @@ static std::vector<std::string> s_Preset_print_options {
     "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_brim_width", "wipe_tower_bridging", "single_extruder_multi_material_priming", "mmu_segmented_region_max_width",
     "wipe_tower_no_sparse_layers", "compatible_printers", "compatible_printers_condition", "inherits",
     "perimeter_generator", "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle",
-    "wall_distribution_count", "min_feature_size", "min_bead_width"
+    "wall_distribution_count", "min_feature_size", "min_bead_width", "ensure_vertical_shell_infill"
 };
 
 static std::vector<std::string> s_Preset_filament_options {
@@ -785,7 +785,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
 {
     // Load the preset over a default preset, so that the missing fields are filled in from the default preset.
     DynamicPrintConfig cfg(this->default_preset_for(combined_config).config);
-    t_config_option_keys keys = std::move(cfg.keys());
+    t_config_option_keys keys = cfg.keys();
     cfg.apply_only(combined_config, keys, true);
     std::string                 &inherits = Preset::inherits(cfg);
     if (select == LoadAndSelect::Never) {
