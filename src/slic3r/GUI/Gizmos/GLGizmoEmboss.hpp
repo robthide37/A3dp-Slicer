@@ -317,12 +317,12 @@ private:
         // hold screen coor offset of cursor from object center
         Vec2d mouse_offset;
 
+        // Start dragging text transformations to world
+        Transform3d world;
+
         // Invers transformation of text volume instance
         // Help convert world transformation to instance space
         Transform3d instance_inv;
-
-        // Start dragging volume transformation
-        Transform3d volume_tr;
 
         // Dragged gl volume
         GLVolume *gl_volume;
@@ -331,19 +331,6 @@ private:
         RaycastManager::AllowVolumes condition;
 
         bool exist_hit = true;
-
-        // Visuzalization
-        Vec3d from = Vec3d::Zero();
-        Vec3d to = Vec3d::Zero();
-
-        Vec3d from_dir = Vec3d::UnitZ();
-        Vec3d to_dir = Vec3d::UnitZ();
-
-        Transform3d f_tr = Transform3d::Identity();
-        Transform3d t_tr = Transform3d::Identity();
-
-        std::optional<double> y_scale;
-        std::optional<double> z_scale;
     };
     // Keep data about dragging only during drag&drop
     std::optional<SurfaceDrag> m_surface_drag;

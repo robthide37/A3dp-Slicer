@@ -551,167 +551,6 @@ void reset_skew(Transform3d& m)
     m = Eigen::Translation3d(m.translation()) * Transform3d(u * Eigen::Scaling(new_scale_factor(s)) * v.transpose());//  * mirror;
 }
 
-void reset_skew_respect_z(Transform3d &m)
-{
-    Vec3d z_before = m * Vec3d::UnitZ();
-    priv::reset_skew(m);
-    Vec3d z_after = m * Vec3d::UnitZ();
-
-    Transform3d rot; // = Transform3d::Identity();
-    if (priv::allign_vec(z_after, z_before, rot))
-        m = m * rot;
-}
-
-// Multiply from right
-static Transform3d surface_transformR(const Vec3d &p, const Vec3d &n, const Transform3d &v, const Transform3d &i) {
-    Transform3d to_volume = (i * v).inverse();
-    Vec3d offset_volume = to_volume * p;
-    Transform3d translate{Eigen::Translation<double, 3>(offset_volume)};
-    
-    // new transformation for volume
-    Transform3d v_new = v * translate;
-
-    // rotation when exists
-    Transform3d rotate;
-
-    // normal transformed to volume
-    Vec3d z_t = to_volume.linear() * n;
-    if (priv::allign_z(z_t, rotate))
-        v_new = v_new * rotate;    
-
-    // Reset skew in world
-    Transform3d w_new = i * v_new;
-    priv::reset_skew_respect_z(w_new);
-    v_new = i.inverse() * w_new;
-
-    return v_new;
-}
-
-/// <summary>
-/// Create transformation for volume to move over surface
-/// Multiply from Left side - NOT WORK - with scaled instances
-/// </summary>
-/// <param name="p">Point in world coordinate</param>
-/// <param name="n">Normal in world coordinate - orientation</param>
-/// <param name="v">Original volume transformation</param>
-/// <param name="i">Instance transformation</param>
-/// <returns>Transformation of volume to lay on surface</returns>
-static Transform3d surface_transformL(const Vec3d &p, const Vec3d &n, const Transform3d &v, const Transform3d &i) {
-    // w .. original world
-    Transform3d w = i * v;
-        
-    // remove already existing of skew before calc rotation
-    // priv::reset_skew(w);
-
-    // z .. unit z vector in world coordinate
-    Vec3d z = w.linear() * Vec3d::UnitZ();
-    Transform3d rot = Transform3d::Identity();
-    bool exist_rot = priv::allign_vec(z, n, rot);
-
-    // rot_w .. new rotation applied on world
-    Transform3d rot_w = rot * w;
-
-    // p0 .. Zero of volume in world
-    Vec3d p0 = rot_w * Vec3d::Zero();
-    Vec3d offset = p - p0; // in world
-    Transform3d tr{Eigen::Translation<double, 3>(offset)};
-    
-    // w2 .. wanted world transformation
-    Transform3d w2 = tr * rot_w;
-
-    //priv::reset_skew_respect_z(w2);
-        
-    // _  .. inverse
-    // i_ .. instance inverse
-    Transform3d i_ = i.inverse();
-
-    // w = i * v              \\ left multiply by i_
-    // i_ * w = i_ * i * v
-    // v = i_ * w
-    return  i_ * w2;
-    // NOTE: Do not keep scale of text when move over scaled instance
-}
-
-// transformation inside of instance
-static Transform3d surface_transform2(const Vec3d &p, const Vec3d &n, const Transform3d &v, const Transform3d &i)
-{
-    // _  .. inverse
-    // i_ .. instance inverse
-    Transform3d i_ = i.inverse();
-    Vec3d pp = i_ * p;
-    Vec3d nn = i_.linear() * n.normalized();
-    nn.normalize();
-
-    // z .. unit z vector in world coordinate
-    Vec3d z = v * Vec3d::UnitZ();
-    z.normalize();
-
-    Transform3d rot = Transform3d::Identity();
-    bool exist_rot = priv::allign_vec(z, nn, rot);
-
-    // rot_w .. new rotation applied on world
-    Transform3d rotated = rot * v;
-
-    // p0 .. Zero of volume in world
-    Vec3d p0 = rotated * Vec3d::Zero();
-    Vec3d offset = pp - p0; // in world
-    Transform3d tr{Eigen::Translation<double, 3>(offset)};
-    Transform3d volume_new = tr * rotated;
-    //return volume_new;
-
-    // Remove skew in world
-    Transform3d world_new = i * volume_new;
-    reset_skew(world_new);
-    volume_new = i_ * world_new;
-
-    return volume_new;
-}
-
-// work in space defined by SVD
-static Transform3d surface_transform3(const Vec3d &p, const Vec3d &n, const Transform3d &v, const Transform3d &i) {
-    // w .. original world
-    Transform3d w = i * v;
-
-    const Eigen::JacobiSVD<Matrix3d> svd1(w.linear(), Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Matrix3d u1 = svd1.matrixU();
-    Matrix3d v1 = svd1.matrixV();
-    Matrix3d s1 = svd1.singularValues().asDiagonal();
-    Transform3d tr1(Eigen::Translation3d(w.translation()));
-    //Transform3d test = tr1 * Transform3d(u1 * s1 * v1.transpose());
-
-    // modification of world
-    Transform3d mod(s1 * v1.transpose());
-    Transform3d mod_ = mod.inverse();
-    Transform3d w_mod = w * mod_;
-
-    Vec3d nn = mod_.linear() * n;
-    // z .. unit z vector in world coordinate
-    Vec3d z = w_mod.linear() * Vec3d::UnitZ();
-    Transform3d rot = Transform3d::Identity();
-    bool exist_rot = priv::allign_vec(z, nn, rot);
-
-    // rot_w .. new rotation applied on world
-    Transform3d rot_w = rot * w;
-
-    // p0 .. Zero of volume in world
-    Vec3d p0 = rot_w * Vec3d::Zero();
-    Vec3d offset = p - p0; // in world
-    Transform3d tr{Eigen::Translation<double, 3>(offset)};
-    
-    // w2 .. wanted world transformation
-    Transform3d w2 = tr * rot_w;
-        
-    // _  .. inverse
-    // i_ .. instance inverse
-    Transform3d i_ = i.inverse();
-
-    // w = i * v              \\ left multiply by i_
-    // i_ * w = i_ * i * v
-    // v = i_ * w
-    return  i_ * w2;
-    // NOTE: Do not keep scale of text when move over scaled instance
-}
-
 }
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
@@ -725,15 +564,15 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         // Update surface by new position
         bool need_process = m_volume->text_configuration->style.prop.use_surface;
         
-        if (m_surface_drag->y_scale.has_value()) {
-            m_style_manager.get_style().prop.size_in_mm *= (*m_surface_drag->y_scale);
-            need_process |= set_height();
-        }
+        //if (m_surface_drag->y_scale.has_value()) {
+        //    m_style_manager.get_style().prop.size_in_mm *= (*m_surface_drag->y_scale);
+        //    need_process |= set_height();
+        //}
 
-        if (m_surface_drag->z_scale.has_value()) {
-            m_style_manager.get_style().prop.emboss *= (*m_surface_drag->z_scale);
-            need_process |= set_depth();
-        }
+        //if (m_surface_drag->z_scale.has_value()) {
+        //    m_style_manager.get_style().prop.emboss *= (*m_surface_drag->z_scale);
+        //    need_process |= set_depth();
+        //}
 
         if (need_process)
             process();
@@ -800,14 +639,16 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
         Vec2d mouse_pos = mouse_coord.cast<double>();
         Vec2d mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
-        Transform3d instance_inv = gl_volume->get_instance_transformation().get_matrix().inverse();
         Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
         TextConfiguration &tc = *m_volume->text_configuration;
         // fix baked transformation from .3mf store process
         if (tc.fix_3mf_tr.has_value())
             volume_tr = volume_tr * tc.fix_3mf_tr->inverse();
 
-        m_surface_drag = SurfaceDrag{mouse_offset, instance_inv, volume_tr, gl_volume, condition};
+        Transform3d instance_tr = gl_volume->get_instance_transformation().get_matrix();
+        Transform3d instance_tr_inv = instance_tr.inverse();
+        Transform3d world_tr = instance_tr * volume_tr;
+        m_surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume, condition};
 
         // Cancel job to prevent interuption of dragging (duplicit result)
         if (m_job_cancel != nullptr) 
@@ -836,45 +677,36 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             return true;
         }
 
-        const Transform3d &instance = m_surface_drag->gl_volume->get_instance_transformation().get_matrix();
-        const Transform3d &volume   = m_surface_drag->volume_tr;
-
+        auto world_linear = m_surface_drag->world.linear();
         // Calculate offset: transformation to wanted position
-        Transform3d text_to_world_old = instance * volume;
         {
             // Reset skew of the text Z axis:
             // Project the old Z axis into a new Z axis, which is perpendicular to the old XY plane.
-            Vec3d old_z = text_to_world_old.linear().col(2);
-            Vec3d new_z = text_to_world_old.linear().col(0).cross(text_to_world_old.linear().col(1));
-            text_to_world_old.linear().col(2) = new_z * (old_z.dot(new_z) / new_z.squaredNorm());
+            Vec3d old_z = world_linear.col(2);
+            Vec3d new_z = world_linear.col(0).cross(world_linear.col(1));
+            world_linear.col(2) = new_z * (old_z.dot(new_z) / new_z.squaredNorm());
         }
 
-        // normal transformed to volume
-        Vec3d text_z_world = text_to_world_old.linear() * Vec3d::UnitZ();
+        Vec3d text_z_world = world_linear.col(2); // world_linear * Vec3d::UnitZ()
         auto z_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(text_z_world, hit->normal);
-        Transform3d text_to_world_new = z_rotation * text_to_world_old;
+        Transform3d world_new = z_rotation * m_surface_drag->world;
+        auto world_new_linear = world_new.linear();
 
         // Fix up vector ??
-        //auto  y_rotation   = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(text_y_world, hit->normal);
+        //auto y_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(text_y_world, hit->normal);
 
         // Edit position from right
         Transform3d volume_new{Eigen::Translation<double, 3>(m_surface_drag->instance_inv * hit->position)};
-        volume_new.linear() = instance.linear().inverse() * text_to_world_new.linear();
+        volume_new.linear() = m_surface_drag->instance_inv.linear() * world_new_linear;
 
+        // Check that transformation matrix is valid transformation
         assert(volume_new.matrix()(0, 0) == volume_new.matrix()(0, 0)); // Check valid transformation not a NAN
         if (volume_new.matrix()(0, 0) != volume_new.matrix()(0, 0))
             return true;
 
-        // Check scale in world
-        // Calculate Scale to keep size after move over scaled surface
-        m_surface_drag->y_scale = priv::calc_scale(text_to_world_old.linear(), text_to_world_new.linear(), Vec3d::UnitY());
-        m_surface_drag->z_scale = priv::calc_scale(text_to_world_old.linear(), text_to_world_new.linear(), Vec3d::UnitZ());
-
-        // recalculate rotation for scaled volume
-        //Transform3d hit_to_volume2 = hit_to_instance * (m_surface_drag->volume_tr*scale).inverse();
-        //z_t = hit_to_volume2.linear() * hit->normal.cast<double>();
-        //bool exist_rotate2 = priv::allign_z(z_t, rotate);
-        //volume_tr = m_surface_drag->volume_tr * translate * rotate * scale;
+        // Check that scale in world did not changed
+        assert(!priv::calc_scale(world_linear, world_new_linear, Vec3d::UnitY()).has_value());
+        assert(!priv::calc_scale(world_linear, world_new_linear, Vec3d::UnitZ()).has_value());
 
         const TextConfiguration &tc = *m_volume->text_configuration;
         // fix baked transformation from .3mf store process
@@ -888,7 +720,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             volume_new.translate(translate);
         }
 
-        // Update transformation forf all instances
+        // Update transformation for all instances
         for (GLVolume *vol : m_parent.get_volumes().volumes) {
             if (vol->object_idx() != m_surface_drag->gl_volume->object_idx() || 
                 vol->volume_idx() != m_surface_drag->gl_volume->volume_idx())
@@ -936,23 +768,6 @@ bool GLGizmoEmboss::on_init()
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 
 void GLGizmoEmboss::on_render() {
-    // Render debug view to surface move
-    if (m_surface_drag.has_value()) {
-        auto glvol = priv::get_gl_volume(m_parent.get_selection());
-        auto      tr    = glvol->get_instance_transformation().get_matrix();
-        CoordAxes from;
-        from.set_origin(m_surface_drag->from);
-        //from.render(tr, 2.);
-
-        CoordAxes to;
-        to.set_origin(m_surface_drag->to);
-        //to.render(tr, 2.);
-
-        CoordAxes axe;
-        axe.render(m_surface_drag->f_tr);
-        axe.render(m_surface_drag->t_tr);
-    }
-
     // no volume selected
     if (m_volume == nullptr ||
         priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr)
@@ -3745,12 +3560,12 @@ void GLGizmoEmboss::draw_advanced()
     if (ImGui::Button(_u8L("Reset scale").c_str())) {
         GLVolume *gl_volume = priv::get_gl_volume(m_parent);
         if (gl_volume != nullptr) {
-            Transform3d w = gl_volume->world_matrix();
-            priv::reset_skew_respect_z(w);            
-            Transform3d i = gl_volume->get_instance_transformation().get_matrix();
-            Transform3d v_new = i.inverse() * w;
-            gl_volume->set_volume_transformation(v_new);
-            m_parent.do_move(L("Reset scale"));
+            //Transform3d w = gl_volume->world_matrix();
+            //priv::reset_skew_respect_z(w);            
+            //Transform3d i = gl_volume->get_instance_transformation().get_matrix();
+            //Transform3d v_new = i.inverse() * w;
+            //gl_volume->set_volume_transformation(v_new);
+            //m_parent.do_move(L("Reset scale"));
         }
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Reset skew of text to be normal in world").c_str());
@@ -4253,7 +4068,7 @@ bool priv::start_create_volume_on_surface_job(
     Transform3d world_new = surface_trmat;
 
     // Reset skew    
-    priv::reset_skew_respect_z(world_new);    
+    //priv::reset_skew_respect_z(world_new);    
 
     Transform3d volume_trmat = instance.inverse() * world_new;    
     start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
