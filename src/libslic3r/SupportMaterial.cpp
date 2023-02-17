@@ -799,10 +799,6 @@ public:
         )
     {
         switch (m_style) {
-        case smsTree:
-        case smsOrganic:
-            assert(false);
-            [[fallthrough]];
         case smsGrid:
         {
     #ifdef SUPPORT_USE_AGG_RASTERIZER
@@ -893,6 +889,10 @@ public:
                 polygons_rotate(out, m_support_angle);
             return out;
         }
+        case smsTree:
+        case smsOrganic:
+//            assert(false);
+            [[fallthrough]];
         case smsSnug:
             // Merge the support polygons by applying morphological closing and inwards smoothing.
             auto closing_distance   = scaled<float>(m_support_material_closing_radius);
@@ -1763,7 +1763,7 @@ static inline void fill_contact_layer(
 #endif // SLIC3R_DEBUG
         ));
     // 2) infill polygons, expand them by half the extrusion width + a tiny bit of extra.
-    bool reduce_interfaces = object_config.support_material_style.value != smsSnug && layer_id > 0 && !slicing_params.soluble_interface;
+    bool reduce_interfaces = object_config.support_material_style.value == smsGrid && layer_id > 0 && !slicing_params.soluble_interface;
     if (reduce_interfaces) {
         // Reduce the amount of dense interfaces: Do not generate dense interfaces below overhangs with 60% overhang of the extrusions.
         Polygons dense_interface_polygons = diff(overhang_polygons, lower_layer_polygons_for_dense_interface());
@@ -3045,7 +3045,7 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> PrintObjectSuppo
         m_object_config->support_material_interface_extruder.value > 0 && m_print_config->filament_soluble.get_at(m_object_config->support_material_interface_extruder.value - 1) && 
         // Base extruder: Either "print with active extruder" not soluble.
         (m_object_config->support_material_extruder.value == 0 || ! m_print_config->filament_soluble.get_at(m_object_config->support_material_extruder.value - 1));
-    bool   snug_supports                 = m_object_config->support_material_style.value == smsSnug;
+    bool   snug_supports                 = m_object_config->support_material_style.value != smsGrid;
     int num_interface_layers_top         = m_object_config->support_material_interface_layers;
     int num_interface_layers_bottom      = m_object_config->support_material_bottom_interface_layers;
     if (num_interface_layers_bottom < 0)
@@ -4227,7 +4227,7 @@ void generate_support_toolpaths(
     }
 
     // Insert the raft base layers.
-    size_t n_raft_layers = size_t(std::max(0, int(slicing_params.raft_layers()) - 1));
+    size_t n_raft_layers = std::min<int>(support_layers.size(), std::max(0, int(slicing_params.raft_layers()) - 1));
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n_raft_layers),
         [&support_layers, &raft_layers, &config, &support_params, &slicing_params,
             &bbox_object, raft_angle_1st_layer, raft_angle_base, raft_angle_interface, link_max_length_factor]
@@ -4356,7 +4356,7 @@ void generate_support_toolpaths(
         {
             SupportLayer &support_layer = *support_layers[support_layer_id];
             LayerCache   &layer_cache   = layer_caches[support_layer_id];
-            float         interface_angle_delta = config.support_material_style.value == smsSnug || config.support_material_style.value == smsTree || config.support_material_style.value == smsOrganic ? 
+            float         interface_angle_delta = config.support_material_style.value != smsGrid ? 
                 (support_layer.interface_id() & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.) :
                 0;
 
