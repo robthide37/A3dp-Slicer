@@ -620,8 +620,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "slicing_mode") {
             steps.emplace_back(posSlice);
 		} else if (
-               opt_key == "clip_multipart_objects"
-            || opt_key == "elefant_foot_compensation"
+               opt_key == "elefant_foot_compensation"
             || opt_key == "support_material_contact_distance" 
             || opt_key == "xy_size_compensation") {
             steps.emplace_back(posSlice);
@@ -1792,6 +1791,8 @@ bool PrintObject::update_layer_height_profile(const ModelObject &model_object, c
         // use the constructor because the assignement is crashing on ASAN OsX
         layer_height_profile = std::vector<coordf_t>(model_object.layer_height_profile.get());
 //        layer_height_profile = model_object.layer_height_profile;
+        // The layer height returned is sampled with high density for the UI layer height painting
+        // and smoothing tool to work.
         updated = true;
     }
 
@@ -1806,6 +1807,7 @@ bool PrintObject::update_layer_height_profile(const ModelObject &model_object, c
     if (layer_height_profile.empty()) {
         //layer_height_profile = layer_height_profile_adaptive(slicing_parameters, model_object.layer_config_ranges, model_object.volumes);
         layer_height_profile = layer_height_profile_from_ranges(slicing_parameters, model_object.layer_config_ranges);
+        // The layer height profile is already compressed.
         updated = true;
     }
     return updated;

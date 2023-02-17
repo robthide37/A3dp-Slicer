@@ -316,7 +316,7 @@ enum class ModelVolumeType : int {
     SUPPORT_ENFORCER,
 };
 
-enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, FlipUpper, FlipLower, PlaceOnCutUpper, PlaceOnCutLower, CreateDowels };
+enum class ModelObjectCutAttribute : int { KeepUpper, KeepLower, KeepAsParts, FlipUpper, FlipLower, PlaceOnCutUpper, PlaceOnCutLower, CreateDowels, InvalidateCutInfo };
 using ModelObjectCutAttributes = enum_bitmask<ModelObjectCutAttribute>;
 ENABLE_ENUM_BITMASK_OPERATORS(ModelObjectCutAttribute);
 
@@ -385,7 +385,11 @@ public:
     bool                    is_mm_painted() const;
     // Checks if object contains just one volume and it's a text
     bool                    is_text() const;
-     
+    // This object may have a varying layer height by painting or by a table.
+    // Even if true is returned, the layer height profile may be "flat" with no difference to default layering.
+    bool                    has_custom_layering() const 
+        { return ! this->layer_config_ranges.empty() || ! this->layer_height_profile.empty(); }
+
     ModelInstance*          add_instance();
     ModelInstance*          add_instance(const ModelInstance &instance);
     ModelInstance*          add_instance(const Vec3d &offset, const Vec3d &scaling_factor, const Vec3d &rotation, const Vec3d &mirror);

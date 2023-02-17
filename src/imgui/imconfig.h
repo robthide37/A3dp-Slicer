@@ -150,6 +150,8 @@ namespace ImGui
 //    const wchar_t CustomSupportsMarker     = 0x1D;
 //    const wchar_t CustomSeamMarker         = 0x1E;
 //    const wchar_t MmuSegmentationMarker    = 0x1F;
+    const wchar_t PlugMarker               = 0x1C;
+    const wchar_t DowelMarker              = 0x1D;
     // Do not forget use following letters only in wstring
     const wchar_t DocumentationButton      = 0x2600;
     const wchar_t DocumentationHoverButton = 0x2601;
