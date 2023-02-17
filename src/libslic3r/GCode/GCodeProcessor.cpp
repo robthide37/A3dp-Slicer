@@ -4018,10 +4018,10 @@ void GCodeProcessor::post_process()
     unsigned int line_id = 0;
 #if ENABLE_GCODE_POSTPROCESS_BACKTRACE
     // Backtrace data for Tx gcode lines
-    static const ExportLines::Backtrace backtrace_T = { 60.0f, 10 };
+    static const ExportLines::Backtrace backtrace_T = { 120.0f, 10 };
     // In case there are multiple sources of backtracing, keeps track of the longest backtrack time needed
     // to flush the backtrace cache accordingly
-    float max_backtrace_time = 60.0f;
+    float max_backtrace_time = 120.0f;
 #else
     std::vector<std::pair<unsigned int, unsigned int>> offsets;
 #endif // ENABLE_GCODE_POSTPROCESS_BACKTRACE
