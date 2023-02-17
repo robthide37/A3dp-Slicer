@@ -3989,7 +3989,7 @@ void GCodeProcessor::post_process()
             if (tool_number != -1)
                 export_lines.insert_lines(backtrace, cmd, [tool_number, this](unsigned int id, float time, float time_diff) {
                     //const std::string out = "XYYY ; id:" + std::to_string(id) + " time:" + std::to_string(time) + " time diff:" + std::to_string(time_diff) + "\n";
-                    const std::string out = "M117 tool " + std::to_string(tool_number) + " in " + std::to_string(int(std::round(time_diff))) + "s to " + std::to_string(int(m_extruder_temps_config[tool_number])) + "\n";
+                    const std::string out = "M104 T" + std::to_string(tool_number) + " P" + std::to_string(int(std::round(time_diff))) + " S" + std::to_string(int(m_extruder_temps_config[tool_number])) + "\n";
                     return out;
                 });
         }
