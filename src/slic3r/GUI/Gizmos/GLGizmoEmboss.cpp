@@ -680,8 +680,19 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Transform3d world_new = z_rotation * m_surface_drag->world;
         auto world_new_linear = world_new.linear();
 
-        // Fix up vector ??
-        //auto y_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(text_y_world, hit->normal);
+        if (true) 
+        {
+            // Fix direction of up vector
+            Vec3d z_world = world_new_linear.col(2);
+            z_world.normalize();
+            Vec3d wanted_up = suggest_up(z_world);
+
+            Vec3d y_world = world_new_linear.col(1);
+            auto y_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(y_world, wanted_up);
+
+            world_new = y_rotation * world_new;
+            world_new_linear = world_new.linear();
+        }
 
         // Edit position from right
         Transform3d volume_new{Eigen::Translation<double, 3>(m_surface_drag->instance_inv * hit->position)};
@@ -701,12 +712,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         if (tc.fix_3mf_tr.has_value())
             volume_new = volume_new * (*tc.fix_3mf_tr);
 
-        // apply move in Z direction for move with flat surface above texture
-        const FontProp &prop = tc.style.prop;
-        if (!prop.use_surface && prop.distance.has_value()) {
-            Vec3d translate = Vec3d::UnitZ() * (*prop.distance);
-            volume_new.translate(translate);
-        }
+        // apply move in Z direction and rotation by up vector
+        apply_transformation(tc.style.prop, volume_new);
 
         // Update transformation for all instances
         for (GLVolume *vol : m_parent.get_volumes().volumes) {
