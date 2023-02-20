@@ -598,14 +598,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.f));
 
-    def = this->add("clip_multipart_objects", coBool);
-    def->label = L("Clip multi-part objects");
-    def->tooltip = L("When printing multi-material objects, this settings will make Slic3r "
-                   "to clip the overlapping object parts one by the other "
-                   "(2nd part will be clipped by the 1st, 3rd part will be clipped by the 1st and 2nd etc).");
-    def->mode = comExpert;
-    def->set_default_value(new ConfigOptionBool(true));
-
     def = this->add("colorprint_heights", coFloats);
     def->label = L("Colorprint height");
     def->tooltip = L("Heights at which a filament change is to occur.");
@@ -1398,11 +1390,30 @@ void PrintConfigDef::init_fff_params()
     def = this->add("infill_acceleration", coFloat);
     def->label = L("Infill");
     def->tooltip = L("This is the acceleration your printer will use for infill. Set zero to disable "
-                   "acceleration control for infill.");
+                     "acceleration control for infill.");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("solid_infill_acceleration", coFloat);
+    def->label = L("Solid infill");
+    def->tooltip = L("This is the acceleration your printer will use for solid infill. Set zero to use "
+                     "the value for infill.");
+    def->sidetext = L("mm/s²");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("top_solid_infill_acceleration", coFloat);
+    def->label = L("Top solid infill");
+    def->tooltip = L("This is the acceleration your printer will use for top solid infill. Set zero to use "
+                     "the value for solid infill.");
+    def->sidetext = L("mm/s²");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+    
 
     def = this->add("infill_every_layers", coInt);
     def->label = L("Combine infill every");
@@ -1946,6 +1957,14 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Perimeters");
     def->tooltip = L("This is the acceleration your printer will use for perimeters. "
                      "Set zero to disable acceleration control for perimeters.");
+    def->sidetext = L("mm/s²");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
+
+    def = this->add("external_perimeter_acceleration", coFloat);
+    def->label = L("External perimeters");
+    def->tooltip = L("This is the acceleration your printer will use for external perimeters. "
+                     "Set zero to use the value for perimeters.");
     def->sidetext = L("mm/s²");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
@@ -4025,6 +4044,22 @@ void PrintConfigDef::init_sla_params()
     def->set_default_value(new ConfigOptionFloat(0.001));
 }
 
+// Ignore the following obsolete configuration keys:
+static std::set<std::string> PrintConfigDef_ignore = {
+    "clip_multipart_objects",
+    "duplicate_x", "duplicate_y", "gcode_arcs", "multiply_x", "multiply_y",
+    "support_material_tool", "acceleration", "adjust_overhang_flow",
+    "standby_temperature", "scale", "rotate", "duplicate", "duplicate_grid",
+    "start_perimeters_at_concave_points", "start_perimeters_at_non_overhang", "randomize_start",
+    "seal_position", "vibration_limit", "bed_size",
+    "print_center", "g0", "threads", "pressure_advance", "wipe_tower_per_color_wipe",
+    "serial_port", "serial_speed",
+    // Introduced in some PrusaSlicer 2.3.1 alpha, later renamed or removed.
+    "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
+    // Introduced in PrusaSlicer 2.3.0-alpha2, later replaced by automatic calculation based on extrusion width.
+    "wall_add_middle_threshold", "wall_split_middle_threshold",
+};
+
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
 {
     // handle legacy options
@@ -4098,32 +4133,17 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         }
     }*/
 
-    // Ignore the following obsolete configuration keys:
-    static std::set<std::string> ignore = {
-        "duplicate_x", "duplicate_y", "gcode_arcs", "multiply_x", "multiply_y",
-        "support_material_tool", "acceleration", "adjust_overhang_flow",
-        "standby_temperature", "scale", "rotate", "duplicate", "duplicate_grid",
-        "start_perimeters_at_concave_points", "start_perimeters_at_non_overhang", "randomize_start",
-        "seal_position", "vibration_limit", "bed_size",
-        "print_center", "g0", "threads", "pressure_advance", "wipe_tower_per_color_wipe",
-        "serial_port", "serial_speed",
-        // Introduced in some PrusaSlicer 2.3.1 alpha, later renamed or removed.
-        "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
-        // Introduced in PrusaSlicer 2.3.0-alpha2, later replaced by automatic calculation based on extrusion width.
-        "wall_add_middle_threshold", "wall_split_middle_threshold",
-    };
-
     // In PrusaSlicer 2.3.0-alpha0 the "monotonous" infill was introduced, which was later renamed to "monotonic".
     if (value == "monotonous" && (opt_key == "top_fill_pattern" || opt_key == "bottom_fill_pattern" || opt_key == "fill_pattern"))
         value = "monotonic";
 
-    if (ignore.find(opt_key) != ignore.end()) {
-        opt_key = "";
+    if (PrintConfigDef_ignore.find(opt_key) != PrintConfigDef_ignore.end()) {
+        opt_key = {};
         return;
     }
 
     if (! print_config_def.has(opt_key)) {
-        opt_key = "";
+        opt_key = {};
         return;
     }
 }

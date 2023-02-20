@@ -734,11 +734,14 @@ bool PrusaLink::get_storage(wxArrayString& output) const
                 const auto path = section.second.get_optional<std::string>("path");
                 const auto space = section.second.get_optional<std::string>("free_space");
                 const auto read_only = section.second.get_optional<bool>("read_only");
+                const auto ro = section.second.get_optional<bool>("ro"); // In PrusaLink 0.7.0RC2 "read_only" value is stored under "ro".
                 const auto available = section.second.get_optional<bool>("available");
                 if (path && (!available || *available)) {
                     StorageInfo si;
                     si.name = boost::nowide::widen(*path);
-                    si.read_only = read_only ? *read_only : false; // If read_only is missing, assume it is NOT read only.
+                    // If read_only is missing, assume it is NOT read only.
+                    // si.read_only = read_only ? *read_only : false; // version without "ro"
+                    si.read_only = (read_only ? *read_only : (ro ? *ro : false));
                     si.free_space = space ? std::stoll(*space) : 1;  // If free_space is missing, assume there is free space.
                     storage.emplace_back(std::move(si));
                 }

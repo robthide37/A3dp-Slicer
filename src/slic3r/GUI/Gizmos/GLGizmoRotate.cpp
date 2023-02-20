@@ -239,10 +239,10 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
     m_bounding_box = box;
     m_center = box_trafo.translation();
     m_orient_matrix = Geometry::translation_transform(m_center);
-    if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
+    if (!wxGetApp().obj_manipul()->is_world_coordinates() || m_force_local_coordinate) {
         const GLVolume& v = *selection.get_first_volume();
         m_orient_matrix = m_orient_matrix * v.get_instance_transformation().get_rotation_matrix();
-        if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates())
+        if (selection.is_single_volume_or_modifier() && wxGetApp().obj_manipul()->is_local_coordinates() || m_force_local_coordinate)
             m_orient_matrix = m_orient_matrix * v.get_volume_transformation().get_rotation_matrix();
     }
 

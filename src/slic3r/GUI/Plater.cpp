@@ -3116,38 +3116,6 @@ void Plater::priv::mirror(Axis axis)
     view3D->mirror_selection(axis);
 }
 
-void Plater::find_new_position(const ModelInstancePtrs &instances)
-{
-    arrangement::ArrangePolygons movable, fixed;
-    arrangement::ArrangeParams arr_params = get_arrange_params(this);
-    
-    for (const ModelObject *mo : p->model.objects)
-        for (ModelInstance *inst : mo->instances) {
-            auto it = std::find(instances.begin(), instances.end(), inst);
-            auto arrpoly = get_arrange_poly(inst, this);
-
-            if (it == instances.end())
-                fixed.emplace_back(std::move(arrpoly));
-            else {
-                arrpoly.setter = [it](const arrangement::ArrangePolygon &p) {
-                    if (p.is_arranged() && p.bed_idx == 0) {
-                        Vec2d t = p.translation.cast<double>();
-                        (*it)->apply_arrange_result(t, p.rotation);
-                    }
-                };
-                movable.emplace_back(std::move(arrpoly));
-            }
-        }
-    
-    if (auto wt = get_wipe_tower_arrangepoly(*this))
-        fixed.emplace_back(*wt);
-    
-    arrangement::arrange(movable, fixed, this->build_volume().polygon(), arr_params);
-
-    for (auto & m : movable)
-        m.apply();
-}
-
 void Plater::priv::split_object()
 {
     int obj_idx = get_selected_object_idx();
