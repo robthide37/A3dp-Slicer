@@ -3378,9 +3378,9 @@ void GCodeProcessor::process_T(const std::string_view command)
                         extra_time += m_kissslicer_toolchange_time_correction;
                     simulate_st_synchronize(extra_time);
 
-                    // specific to single extruder multi material, set the extruder temperature
-                    // if not done yet
-                    if (m_single_extruder_multi_material && m_extruder_temps[m_extruder_id] == 0.0f)
+                    // specific to single extruder multi material, set the new extruder temperature
+                    // to match the old one
+                    if (m_single_extruder_multi_material)
                         m_extruder_temps[m_extruder_id] = m_extruder_temps[old_extruder_id];
 
                     m_result.extruders_count = std::max<size_t>(m_result.extruders_count, m_extruder_id + 1);
