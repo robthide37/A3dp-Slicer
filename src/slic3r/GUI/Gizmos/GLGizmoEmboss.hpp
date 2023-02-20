@@ -89,6 +89,7 @@ private:
     void set_volume_by_selection();
     // load text configuration from volume into gizmo
     bool set_volume(ModelVolume *volume); 
+    void reset_volume();
 
     // create volume from text - main functionality
     bool process();

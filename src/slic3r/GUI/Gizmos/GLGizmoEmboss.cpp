@@ -586,11 +586,15 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         if (m_volume == nullptr)
             return false;
 
-        if (m_parent.get_first_hover_volume_idx() < 0)
-            return false;
-
         GLVolume *gl_volume = priv::get_gl_volume(m_parent);
         if (gl_volume == nullptr)
+            return false;
+
+        // is text hovered?
+        const GLVolumePtrs& gl_volumes = m_parent.get_volumes().volumes;
+        int hovered_idx = m_parent.get_first_hover_volume_idx();
+        if (hovered_idx < 0 || hovered_idx >= gl_volumes.size() || 
+            gl_volumes[hovered_idx] != gl_volume)
             return false;
 
         // hovered object must be actual text volume
@@ -1005,7 +1009,7 @@ void GLGizmoEmboss::on_set_state()
                 _u8L("ERROR: Wait until ends or Cancel process."));
             return;
         }
-        set_volume(nullptr);
+        reset_volume();
         // Store order and last activ index into app.ini
         // TODO: what to do when can't store into file?
         m_style_manager.store_styles_to_app_config(false);
@@ -1015,7 +1019,7 @@ void GLGizmoEmboss::on_set_state()
         wxFontEnumerator::InvalidateCache();
 
         // Try(when exist) set text configuration by volume 
-        set_volume(priv::get_selected_volume(m_parent.get_selection()));
+        set_volume_by_selection();
 
         // when open window by "T" and no valid volume is selected, so Create new one
         if (m_volume == nullptr ||
@@ -1248,25 +1252,22 @@ void GLGizmoEmboss::set_volume_by_selection()
         m_volume != vol) // when update volume it changed id BUT not pointer
         ImGuiWrapper::left_inputs();
 
+    if (vol == nullptr) {
+        reset_volume();
+        return;
+    }
+
     // is select embossed volume?
     set_volume(vol);
 }
 
 bool GLGizmoEmboss::set_volume(ModelVolume *volume)
 {
-    if (volume == nullptr) {
-        if (m_volume == nullptr)
-            return false;
-        m_volume = nullptr;
-        // TODO: check if it is neccessary to set default text
-        // Idea is to set default text when create object
-        set_default_text();
-        return false;
-    }
+    assert(volume != nullptr);
     const std::optional<TextConfiguration> tc_opt = volume->text_configuration;
     if (!tc_opt.has_value()) return false;
-    const TextConfiguration &tc    = *tc_opt;
-    const EmbossStyle       &style = tc.style;
+    const TextConfiguration &tc = *tc_opt;
+    const EmbossStyle    &style = tc.style;
 
     // Could exist OS without getter on face_name,
     // but it is able to restore font from descriptor
@@ -1375,6 +1376,18 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();
     return true;
+}
+
+void GLGizmoEmboss::reset_volume()
+{
+    if (m_volume == nullptr)
+        return; // already reseted
+
+    m_volume = nullptr;
+    m_volume_id.id = 0;
+    // TODO: check if it is neccessary to set default text
+    // Idea is to set default text when create object
+    set_default_text();
 }
 
 void GLGizmoEmboss::calculate_scale() {
@@ -4069,12 +4082,8 @@ bool priv::start_create_volume_on_surface_job(
     Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal);
     const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
-    Transform3d world_new = surface_trmat;
-
-    // Reset skew    
-    //priv::reset_skew_respect_z(world_new);    
-
-    Transform3d volume_trmat = instance.inverse() * world_new;    
+    // new transformation in world coor is surface_trmat
+    Transform3d volume_trmat = instance.inverse() * surface_trmat;    
     start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     return true;
 }
