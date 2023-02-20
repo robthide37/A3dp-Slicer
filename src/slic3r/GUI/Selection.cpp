@@ -1024,22 +1024,13 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
             }
             else {
                 if (transformation_type.instance()) {
-                    const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
-                    const Geometry::Transformation world_trafo = inst_trafo * vol_trafo;
                     // ensure proper sign of rotation for mirrored objects
-                    if (world_trafo.is_left_handed() && !rotation.normalized().isApprox(Vec3d::UnitX()))
+                    if (inst_trafo.is_left_handed() && !rotation.normalized().isApprox(Vec3d::UnitX()))
                         rotation_matrix = rotation_matrix.inverse();
 
                     // ensure that the volume rotates as a rigid body
-                    const Geometry::TransformationSVD world_svd(world_trafo);
-                    if (world_svd.anisotropic_scale) {
-                        const Transform3d vol_scale_matrix = vol_trafo.get_scaling_factor_matrix();
-                        rotation_matrix = vol_scale_matrix.inverse() * rotation_matrix * vol_scale_matrix;
-                    }
-                    const Transform3d vol_rotation_matrix = vol_trafo.get_rotation_matrix();
-                    rotation_matrix = vol_rotation_matrix.inverse() * rotation_matrix * vol_rotation_matrix;
-
-                    v.set_volume_transformation(vol_trafo.get_matrix() * rotation_matrix);
+                    const Transform3d inst_scale_matrix = inst_trafo.get_scaling_factor_matrix();
+                    rotation_matrix = inst_scale_matrix.inverse() * rotation_matrix * inst_scale_matrix;
                 }
                 else {
                     if (transformation_type.local()) {
@@ -1056,8 +1047,8 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                             rotation_matrix = vol_scale_matrix.inverse() * rotation_matrix * vol_scale_matrix;
                         }
                     }
-                    transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
                 }
+                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
             }
         }
     }
