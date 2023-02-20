@@ -97,28 +97,28 @@ void ArrangeJob::prepare_all() {
 
 void ArrangeJob::prepare_selected() {
     clear_input();
-    
+
     Model &model = m_plater->model();
     double stride = bed_stride(m_plater);
-    
+
     std::vector<const Selection::InstanceIdxsList *>
             obj_sel(model.objects.size(), nullptr);
     
     for (auto &s : m_plater->get_selection().get_content())
         if (s.first < int(obj_sel.size()))
             obj_sel[size_t(s.first)] = &s.second;
-    
+
     // Go through the objects and check if inside the selection
     for (size_t oidx = 0; oidx < model.objects.size(); ++oidx) {
         const Selection::InstanceIdxsList * instlist = obj_sel[oidx];
         ModelObject *mo = model.objects[oidx];
-        
+
         std::vector<bool> inst_sel(mo->instances.size(), false);
-        
+
         if (instlist)
             for (auto inst_id : *instlist)
                 inst_sel[size_t(inst_id)] = true;
-        
+
         for (size_t i = 0; i < inst_sel.size(); ++i) {
             ModelInstance * mi = mo->instances[i];
             ArrangePolygon &&ap = get_arrange_poly_(mi);
@@ -127,11 +127,11 @@ void ArrangeJob::prepare_selected() {
                         (inst_sel[i] ? m_selected :
                                        m_unselected) :
                         m_unprintable;
-            
+
             cont.emplace_back(std::move(ap));
         }
     }
-    
+
     if (auto wti = get_wipe_tower(*m_plater)) {
         ArrangePolygon &&ap = get_arrange_poly(wti, m_plater);
 
@@ -139,20 +139,34 @@ void ArrangeJob::prepare_selected() {
                                                                  m_unselected;
         cont.emplace_back(std::move(ap));
     }
-    
+
     // If the selection was empty arrange everything
-    if (m_selected.empty()) m_selected.swap(m_unselected);
-    
+    if (m_selected.empty())
+        m_selected.swap(m_unselected);
+
     // The strides have to be removed from the fixed items. For the
     // arrangeable (selected) items bed_idx is ignored and the
     // translation is irrelevant.
-    for (auto &p : m_unselected) p.translation(X) -= p.bed_idx * stride;
+    for (auto &p : m_unselected)
+        p.translation(X) -= p.bed_idx * stride;
 }
 
 static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
                                         const SLAPrintObject &po,
                                         const ModelInstance &inst)
 {
+    // The 1.1 multiplier is a safety gap, as the offset might be bigger
+    // in sharp edges of a polygon, depending on clipper's offset algorithm
+    coord_t pad_infl = 0;
+    {
+        double infl = po.config().pad_enable.getBool() * (
+                        po.config().pad_brim_size.getFloat() +
+                        po.config().pad_around_object.getBool() *
+                          po.config().pad_object_gap.getFloat() );
+
+        pad_infl = scaled(1.1 * infl);
+    }
+
     auto laststep = po.last_completed_step();
 
     if (laststep < slaposCount && laststep > slaposSupportTree) {
@@ -181,15 +195,9 @@ static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
         polys.emplace_back(its_convex_hull_2d_above(smesh.its, trafo_instance, zlvl));
         ret.poly.contour = Geometry::convex_hull(polys);
         ret.poly.holes = {};
-
-        // The 1.1 multiplier is a safety gap, as the offset might be bigger
-        // in sharp edges of a polygon, depending on clipper's offset algorithm
-        coord_t infl = 1.1 * scaled(po.config().pad_brim_size.getFloat() +
-                                     po.config().pad_around_object.getBool() *
-                                         po.config().pad_object_gap.getFloat());
-
-        ret.inflation = infl;
     }
+
+    ret.inflation = pad_infl;
 }
 
 static coord_t brim_offset(const PrintObject &po, const ModelInstance &inst)
