@@ -103,7 +103,11 @@ static const struct Limits
         }
         return false;
     }
+
 } limits;
+
+// Define where is up vector on model
+constexpr double up_limit = 0.9;
 
 static bool is_text_empty(const std::string &text){
     return text.empty() ||
@@ -1239,7 +1243,8 @@ void GLGizmoEmboss::set_default_text(){ m_text = _u8L("Embossed text"); }
 
 void GLGizmoEmboss::set_volume_by_selection()
 {
-    ModelVolume *vol = priv::get_selected_volume(m_parent.get_selection());
+    const Selection &selection = m_parent.get_selection();
+    ModelVolume *vol = priv::get_selected_volume(selection);
     // is same volume selected?
     if (vol != nullptr && vol->id() == m_volume_id) 
         return;
@@ -1259,6 +1264,13 @@ void GLGizmoEmboss::set_volume_by_selection()
 
     // is select embossed volume?
     set_volume(vol);
+
+    // Check if user changed up vector by rotation or scale out of emboss gizmo
+    if (m_volume != nullptr) {
+        Transform3d world = selection.get_first_volume()->world_matrix();
+        std::optional<float> angle = calc_up(world, priv::up_limit);
+        m_volume->text_configuration->style.prop.angle = angle;
+    }
 }
 
 bool GLGizmoEmboss::set_volume(ModelVolume *volume)
@@ -3563,31 +3575,6 @@ void GLGizmoEmboss::draw_advanced()
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Use camera direction for text orientation").c_str());
     }
-
-    ImGui::SameLine();
-    if (ImGui::Button(_u8L("Reset Up").c_str())) {
-        GLVolume *gl_volume = priv::get_gl_volume(m_parent);
-        if (gl_volume != nullptr) {
-            Transform3d world = gl_volume->world_matrix();
-            auto world_linear = world.linear();
-            Vec3d z_world = world_linear.col(2);
-            z_world.normalize();
-            Vec3d wanted_up = suggest_up(z_world);
-
-            Vec3d y_world = world_linear.col(1);
-            auto z_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(y_world, wanted_up);
-            Transform3d world_new = z_rotation * world;
-            auto world_new_linear = world_new.linear();
-            Transform3d volume_new = gl_volume->get_volume_transformation().get_matrix();
-            Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
-            volume_new.linear() = instance.linear().inverse() * world_new.linear();
-            gl_volume->set_volume_transformation(volume_new);
-            m_parent.do_move(L("Reset up vector"));
-        }
-    } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", _u8L("Reset skew of text to be normal in world").c_str());
-    }
-
 #ifdef ALLOW_DEBUG_MODE
     ImGui::Text("family = %s", (font_prop.family.has_value() ?
                                     font_prop.family->c_str() :
@@ -4079,7 +4066,7 @@ bool priv::start_create_volume_on_surface_job(
     Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
 
     // Create result volume transformation
-    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal);
+    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal, priv::up_limit);
     const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
     // new transformation in world coor is surface_trmat
