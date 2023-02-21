@@ -298,7 +298,7 @@ namespace Emboss
     /// <param name="up_limit">Is compared with normal.z to suggest up direction</param>
     /// <returns>Transformation onto surface point</returns>
     Transform3d create_transformation_onto_surface(
-        const Vec3d &position, const Vec3d &normal, float up_limit = 0.9f);
+        const Vec3d &position, const Vec3d &normal, double up_limit = 0.9);
 
     class ProjectZ : public IProjection
     {

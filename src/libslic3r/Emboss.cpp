@@ -1588,7 +1588,7 @@ std::optional<float> Emboss::calc_up(const Transform3d &tr, double up_limit)
 
 Transform3d Emboss::create_transformation_onto_surface(const Vec3d &position,
                                                        const Vec3d &normal,
-                                                       float        up_limit)
+                                                       double       up_limit)
 {
     // is normalized ?
     assert(is_approx(normal.squaredNorm(), 1.));

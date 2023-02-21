@@ -488,44 +488,6 @@ Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolu
 }
 
 namespace priv {
-static bool allign_vec(const Vec3d &z_f, const Vec3d &z_t, Transform3d &rotate)
-{
-    Vec3d  z_f_norm  = z_f.normalized();
-    Vec3d  z_t_norm  = z_t.normalized();
-    double cos_angle = z_t_norm.dot(z_f_norm);
-
-    // Calculate rotation of Z-vectors from current to wanted position
-    rotate = Transform3d::Identity();
-
-    if (cos_angle == 0.) {
-        // check that direction is not same
-        if (z_t_norm.z() > 0.)
-            return false;
-
-        // opposit direction of z_t and z_f (a.k.a. angle 180 DEG)
-        rotate = Eigen::AngleAxis(M_PI, Vec3d::UnitX());
-        return true;
-    } else if (cos_angle >= 1. || cos_angle <= -1.) {
-        // bad cas angle value almost zero angle so no rotation
-        return false;
-    }
-
-    // Calculate only when angle is not zero
-    // Calculate rotation axe from current to wanted inside instance
-    Vec3d axe = z_t_norm.cross(z_f_norm);
-    axe.normalize();
-    double angle = acos(cos_angle);
-    rotate       = Eigen::AngleAxis(-angle, axe);
-    return true;
-}
-
-static bool allign_z(const Vec3d &z_t, Transform3d &rotate)
-{
-    // Transformed unit vector Z direction (f)rom, (t)o
-    const Vec3d& z_f = Vec3d::UnitZ();
-    return allign_vec(Vec3d::UnitZ(), z_t, rotate);
-}
-
  // Calculate scale in world
 static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
 {
@@ -537,24 +499,6 @@ static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to
         return {}; // no scale
     return sqrt(from_scale_sq / to_scale_sq);
 };
-
-// Copy from branch et_transformation --> Geometry
-// suggested by @bubnikv
-void reset_skew(Transform3d& m)
-{
-    auto new_scale_factor = [](const Matrix3d& s) {
-        return pow(s(0, 0) * s(1, 1) * s(2, 2), 1. / 3.); // scale average
-    };
-
-    const Eigen::JacobiSVD<Matrix3d> svd(m.linear(), Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Matrix3d u = svd.matrixU();
-    Matrix3d v = svd.matrixV();
-    Matrix3d s = svd.singularValues().asDiagonal();
-
-    //Matrix3d mirror;
-    m = Eigen::Translation3d(m.translation()) * Transform3d(u * Eigen::Scaling(new_scale_factor(s)) * v.transpose());//  * mirror;
-}
-
 }
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
@@ -1529,7 +1473,7 @@ bool GLGizmoEmboss::process()
         // check that there is not unexpected volume type
         assert(is_outside || m_volume->is_negative_volume() ||
                m_volume->is_modifier());
-        UpdateSurfaceVolumeData surface_data{std::move(data), text_tr, is_outside, std::move(sources)};
+        UpdateSurfaceVolumeData surface_data{std::move(data), {text_tr, is_outside, std::move(sources)}};
         job = std::make_unique<UpdateSurfaceVolumeJob>(std::move(surface_data));                  
     } else {
         job = std::make_unique<UpdateJob>(std::move(data));
