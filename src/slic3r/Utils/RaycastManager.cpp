@@ -1,16 +1,11 @@
 #include "RaycastManager.hpp"
 #include <utility>
 
-// include for earn camera
-#include "slic3r/GUI/GUI_App.hpp" 
-#include "slic3r/GUI/Plater.hpp"
-#include "slic3r/GUI/CameraUtils.hpp"
-
 using namespace Slic3r::GUI;
 
 namespace priv {
 using namespace Slic3r;
-static void actualize(RaycastManager::Meshes &meshes, const ModelVolumePtrs &volumes, const RaycastManager::ISkip *skip);
+static void actualize(RaycastManager::Meshes &meshes, const ModelVolumePtrs &volumes, const RaycastManager::ISkip *skip, RaycastManager::Meshes *input = nullptr);
 static const AABBMesh * get_mesh(const RaycastManager::Meshes &meshes, size_t volume_id);
 static RaycastManager::TrKey create_key(const ModelVolume* volume, const ModelInstance* instance){ 
     return std::make_pair(instance->id().id, volume->id().id); }
@@ -21,10 +16,10 @@ static bool is_lower(const RaycastManager::TrItem &i1, const RaycastManager::TrI
     return is_lower_key(i1.first, i2.first); };
 }
 
-void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
+void RaycastManager::actualize(const ModelObject *object, const ISkip *skip, Meshes *meshes)
 {
     // actualize MeshRaycaster
-    priv::actualize(m_meshes, object->volumes, skip);
+    priv::actualize(m_meshes, object->volumes, skip, meshes);
 
     // check if inscance was removed
     std::vector<bool> removed_transf(m_transformations.size(), {true});
@@ -61,11 +56,12 @@ void RaycastManager::actualize(const ModelObject *object, const ISkip *skip)
         std::sort(m_transformations.begin(), m_transformations.end(), priv::is_lower);
 }
 
-void RaycastManager::actualize(const ModelInstance *instance, const ISkip *skip) {
+void RaycastManager::actualize(const ModelInstance *instance, const ISkip *skip, Meshes *meshes)
+{
     const ModelVolumePtrs &volumes = instance->get_object()->volumes;
 
     // actualize MeshRaycaster
-    priv::actualize(m_meshes, volumes, skip);
+    priv::actualize(m_meshes, volumes, skip, meshes);
 
     // check if inscance was removed
     std::vector<bool> removed_transf(m_transformations.size(), {true});
@@ -101,11 +97,9 @@ void RaycastManager::actualize(const ModelInstance *instance, const ISkip *skip)
         std::sort(m_transformations.begin(), m_transformations.end(), priv::is_lower);
 }
  
-std::optional<RaycastManager::Hit> RaycastManager::ray_from_camera(
-    const Vec2d &mouse_pos, const Camera &camera, const ISkip *skip) const
+std::optional<RaycastManager::Hit> RaycastManager::first_hit(const Vec3d& point, const Vec3d& direction, const ISkip *skip) const
 {
-    // Improve it is not neccessaru to use AABBMesh and calc normal in 
-
+    // Improve: it is not neccessaru to use AABBMesh and calc normal for every hit
     struct Result
     {
         const AABBMesh *mesh = nullptr;
@@ -115,6 +109,7 @@ std::optional<RaycastManager::Hit> RaycastManager::ray_from_camera(
         const Transform3d *tramsformation;
         const TrKey *key;
     }result;
+
     for (const auto &item : m_transformations) { 
         const TrKey &key = item.first;
         size_t volume_id = key.second;
@@ -122,24 +117,23 @@ std::optional<RaycastManager::Hit> RaycastManager::ray_from_camera(
         const AABBMesh *mesh = priv::get_mesh(m_meshes, volume_id);
         if (mesh == nullptr) continue;
         const Transform3d &transformation = item.second;
-
-        Vec3d point;
-        Vec3d direction;
-        CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
         Transform3d inv = transformation.inverse();
-        point           = inv * point;
-        direction       = inv.linear() * direction;
-        std::vector<AABBMesh::hit_result> hits = mesh->query_ray_hits(point, direction);
+
+        // transform input into mesh world
+        Vec3d point_    = inv * point;
+        Vec3d direction_= inv.linear() * direction;
+
+        std::vector<AABBMesh::hit_result> hits = mesh->query_ray_hits(point_, direction_);
         if (hits.empty()) continue; // no intersection found
 
         const AABBMesh::hit_result &hit = hits.front();
 
         // convert to world
         Vec3d hit_world = transformation * hit.position();
-        double squared_distance = (camera.get_position() - hit_world).squaredNorm();
+        double squared_distance = (point - hit_world).squaredNorm();
         if (result.mesh != nullptr &&
             result.squared_distance < squared_distance)
-            continue;
+            continue; // exist closer one
 
         result.mesh = mesh;
         result.squared_distance = squared_distance;
@@ -152,6 +146,8 @@ std::optional<RaycastManager::Hit> RaycastManager::ray_from_camera(
     if (result.mesh == nullptr)
         return {};
 
+    // Calculate normal from transformed triangle
+    // NOTE: Anisotropic transformation of normal is not perpendiculat to triangle
     const Vec3i tri = result.mesh->indices(result.face);
     Vec3d pts[3];
     auto tr = result.tramsformation->linear();
@@ -164,7 +160,7 @@ std::optional<RaycastManager::Hit> RaycastManager::ray_from_camera(
     return RaycastManager::Hit{point_world, *result.key, result.squared_distance};
 }
 
-std::optional<RaycastManager::Hit> RaycastManager::unproject(const Vec3d &point, const Vec3d &direction, const ISkip *skip) const
+std::optional<RaycastManager::Hit> RaycastManager::closest_hit(const Vec3d &point, const Vec3d &direction, const ISkip *skip) const
 {
     std::optional<Hit> closest;
     for (const auto &item : m_transformations) { 
@@ -236,7 +232,7 @@ Slic3r::Transform3d RaycastManager::get_transformation(const TrKey &tr_key) cons
     return item->second;
 }
 
-void priv::actualize(RaycastManager::Meshes &meshes, const ModelVolumePtrs &volumes, const RaycastManager::ISkip *skip)
+void priv::actualize(RaycastManager::Meshes &meshes, const ModelVolumePtrs &volumes, const RaycastManager::ISkip *skip, RaycastManager::Meshes* inputs)
 {
     // check if volume was removed
     std::vector<bool> removed_meshes(meshes.size(), {true});
@@ -248,6 +244,16 @@ void priv::actualize(RaycastManager::Meshes &meshes, const ModelVolumePtrs &volu
             continue;
         auto item = std::find_if(meshes.begin(), meshes.end(), [oid](const RaycastManager::Mesh &it) -> bool { return oid == it.first; });
         if (item == meshes.end()) {
+            // exist AABB in inputs ?
+            if (inputs != nullptr) {
+                auto input = std::find_if(inputs->begin(), inputs->end(),
+                                         [oid](const RaycastManager::Mesh &it) -> bool { return oid == it.first; });
+                if (input != inputs->end()) {
+                    meshes.emplace_back(std::move(*input));
+                    continue;
+                }
+            }
+
             // add new raycaster
             bool calculate_epsilon = true;
             auto mesh = std::make_unique<AABBMesh>(volume->mesh(), calculate_epsilon);

@@ -7,7 +7,6 @@
 #include "libslic3r/Point.hpp" // Transform3d
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/Model.hpp" // ModelObjectPtrs, ModelObject, ModelInstance, ModelVolume
-#include "slic3r/GUI/Camera.hpp"
 
 namespace Slic3r::GUI{
 
@@ -86,8 +85,9 @@ public:
     /// </summary>
     /// <param name="object">Model representation</param>
     /// <param name="skip">Condifiton for skip actualization</param>
-    void actualize(const ModelObject *object, const ISkip *skip = nullptr);
-    void actualize(const ModelInstance *instance, const ISkip *skip = nullptr);
+    /// <param name="meshes">Speed up for already created AABBtrees</param>
+    void actualize(const ModelObject *object, const ISkip *skip = nullptr, Meshes *meshes = nullptr);
+    void actualize(const ModelInstance *instance, const ISkip *skip = nullptr, Meshes* meshes = nullptr);
 
     class SkipVolume: public ISkip
     {
@@ -109,24 +109,24 @@ public:
     };
 
     /// <summary>
-    /// Unproject on mesh by Mesh raycasters
+    /// Unproject on mesh and return closest hit to point in given direction
     /// </summary>
-    /// <param name="mouse_pos">Position of mouse on screen</param>
-    /// <param name="camera">Projection params</param>
+    /// <param name="point">Position in space</param>
+    /// <param name="direction">Casted ray direction</param>
     /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
     /// <returns>Position on surface, normal direction in world coorinate
     /// + key, to know hitted instance and volume</returns>
-    std::optional<Hit> ray_from_camera(const Vec2d &mouse_pos, const Camera &camera, const ISkip *skip = nullptr) const;
+    std::optional<Hit> first_hit(const Vec3d &point, const Vec3d &direction, const ISkip *skip = nullptr) const;
 
     /// <summary>
-    /// Unproject Ray(point direction) on mesh by MeshRaycasters
+    /// Unproject Ray(point direction) on mesh to find closest hit of surface in given direction
     /// NOTE: It inspect also oposit direction of ray !!
     /// </summary>
     /// <param name="point">Start point for ray</param>
-    /// <param name="direction">Direction of ray</param>
+    /// <param name="direction">Direction of ray, orientation doesn't matter, both are used</param>
     /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
     /// <returns>Position on surface, normal direction and transformation key, which define hitted object instance</returns>
-    std::optional<Hit> unproject(const Vec3d &point, const Vec3d &direction, const ISkip *skip = nullptr) const;
+    std::optional<Hit> closest_hit(const Vec3d &point, const Vec3d &direction, const ISkip *skip = nullptr) const;
 
     /// <summary>
     /// Search of closest point

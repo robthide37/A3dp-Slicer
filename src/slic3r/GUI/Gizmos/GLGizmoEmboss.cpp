@@ -168,6 +168,19 @@ static void start_create_volume_job(const ModelObject *object,
 static GLVolume *get_hovered_gl_volume(const GLCanvas3D &canvas);
 
 /// <summary>
+/// Unproject on mesh by Mesh raycasters
+/// </summary>
+/// <param name="mouse_pos">Position of mouse on screen</param>
+/// <param name="camera">Projection params</param>
+/// <param name="skip">Define which caster will be skipped, null mean no skip</param>
+/// <returns>Position on surface, normal direction in world coorinate
+/// + key, to know hitted instance and volume</returns>
+static std::optional<RaycastManager::Hit> ray_from_camera(const RaycastManager &raycaster,
+                                                          const Vec2d          &mouse_pos,
+                                                          const Camera         &camera,
+                                                          const RaycastManager::ISkip *skip);
+
+/// <summary>
 /// Start job for add new volume on surface of object defined by screen coor
 /// </summary>
 /// <param name="emboss_data">Define params of text</param>
@@ -175,12 +188,14 @@ static GLVolume *get_hovered_gl_volume(const GLCanvas3D &canvas);
 /// <param name="screen_coor">Mouse position which define position</param>
 /// <param name="gl_volume">Volume to find surface for create</param>
 /// <param name="raycaster">Ability to ray cast to model</param>
+/// <param name="canvas">Contain already used scene RayCasters</param>
 /// <returns>True when start creation, False when there is no hit surface by screen coor</returns>
 static bool start_create_volume_on_surface_job(DataBase         &emboss_data,
                                                ModelVolumeType   volume_type,
                                                const Vec2d      &screen_coor,
                                                const GLVolume   *gl_volume,
-                                               RaycastManager   &raycaster);
+                                               RaycastManager   &raycaster,
+                                               GLCanvas3D       &canvas);
 
 /// <summary>
 /// Find volume in selected object with closest convex hull to screen center.
@@ -235,7 +250,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
     if (gl_volume != nullptr) {
         // Try to cast ray into scene and find object for add volume
-        if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager)) {
+        if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager, m_parent)) {
             // When model is broken. It could appear that hit miss the object.
             // So add part near by in simmilar manner as right panel do
             create_volume(volume_type);
@@ -276,7 +291,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
     priv::find_closest_volume(selection, screen_center, camera, objects, &coor, &vol);
     if (vol == nullptr) {
         priv::start_create_object_job(emboss_data, screen_center);
-    } else if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager)) {
+    } else if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager, m_parent)) {
         // in centroid of convex hull is not hit with object
         // soo create transfomation on border of object
         
@@ -499,6 +514,29 @@ static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to
         return {}; // no scale
     return sqrt(from_scale_sq / to_scale_sq);
 };
+
+RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::AllowVolumes& condition)
+{
+    SceneRaycaster::EType type = SceneRaycaster::EType::Volume;
+    auto scene_casters = canvas.get_raycasters_for_picking(type);
+    const std::vector<std::shared_ptr<SceneRaycasterItem>> &casters = *scene_casters;
+    const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;
+    const ModelObjectPtrs &objects = canvas.get_model()->objects;
+
+    RaycastManager::Meshes meshes;
+    for (const std::shared_ptr<SceneRaycasterItem> &caster : casters) {
+        int index = SceneRaycaster::decode_id(type, caster->get_id());
+        if (index < 0 || index >= gl_volumes.size()) continue;
+        const GLVolume *gl_volume = gl_volumes[index];
+        const ModelVolume *volume = priv::get_model_volume(gl_volume, objects);
+        size_t             id     = volume->id().id;
+        if (condition.skip(id))
+            continue;
+        auto mesh = std::make_unique<AABBMesh>(caster->get_raycaster()->get_aabb_mesh());
+        meshes.emplace_back(std::make_pair(id, std::move(mesh)));
+    }
+    return meshes;
+}
 }
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
@@ -568,12 +606,12 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
                 allowed_volumes_id.emplace_back(v->id().id);
             }
         }        
-        RaycastManager::AllowVolumes condition(std::move(allowed_volumes_id));
-
+        RaycastManager::AllowVolumes condition(std::move(allowed_volumes_id));                
+        RaycastManager::Meshes meshes = priv::create_meshes(m_parent, condition);
         // initialize raycasters
         // INFO: It could slows down for big objects
         // (may be move to thread and do not show drag until it finish)
-        m_raycast_manager.actualize(instance, &condition);
+        m_raycast_manager.actualize(instance, &condition, &meshes);
                 
         // wxCoord == int --> wx/types.h
         Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
@@ -609,7 +647,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         Vec2d mouse_pos = mouse_coord.cast<double>();
         Vec2d offseted_mouse = mouse_pos + m_surface_drag->mouse_offset;
         const Camera &camera = wxGetApp().plater()->get_camera();
-        auto hit = m_raycast_manager.ray_from_camera(offseted_mouse, camera, &m_surface_drag->condition);
+        auto hit = priv::ray_from_camera(m_raycast_manager, offseted_mouse, camera, &m_surface_drag->condition);
         m_surface_drag->exist_hit = hit.has_value();
         if (!hit.has_value()) {
             // cross hair need redraw
@@ -3255,7 +3293,7 @@ std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, Raycas
     Vec3d direction = to_world.linear() * (-Vec3d::UnitZ());
 
     // ray in direction of text projection(from volume zero to z-dir)
-    std::optional<RaycastManager::Hit> hit_opt = raycast_manager.unproject(point, direction, &cond);
+    std::optional<RaycastManager::Hit> hit_opt = raycast_manager.closest_hit(point, direction, &cond);
 
     // Try to find closest point when no hit object in emboss direction
     if (!hit_opt.has_value()) {
@@ -3981,8 +4019,19 @@ GLVolume * priv::get_hovered_gl_volume(const GLCanvas3D &canvas) {
     return volumes[hovered_id];
 }
 
+std::optional<RaycastManager::Hit> priv::ray_from_camera(const RaycastManager        &raycaster,
+                                                         const Vec2d                 &mouse_pos,
+                                                         const Camera                &camera,
+                                                         const RaycastManager::ISkip *skip)
+{
+    Vec3d point;
+    Vec3d direction;
+    CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);    
+    return raycaster.first_hit(point, direction, skip);
+}
+
 bool priv::start_create_volume_on_surface_job(
-    DataBase &emboss_data, ModelVolumeType volume_type, const Vec2d &screen_coor, const GLVolume *gl_volume, RaycastManager &raycaster)
+    DataBase &emboss_data, ModelVolumeType volume_type, const Vec2d &screen_coor, const GLVolume *gl_volume, RaycastManager &raycaster, GLCanvas3D& canvas)
 {
     assert(gl_volume != nullptr);
     if (gl_volume == nullptr) return false;
@@ -3995,10 +4044,12 @@ bool priv::start_create_volume_on_surface_job(
     ModelObject *obj = objects[object_idx];
     size_t vol_id = obj->volumes[gl_volume->volume_idx()]->id().id;
     auto cond = RaycastManager::AllowVolumes({vol_id});
-    raycaster.actualize(obj, &cond);
+
+    RaycastManager::Meshes meshes = priv::create_meshes(canvas, cond);
+    raycaster.actualize(obj, &cond, &meshes);
 
     const Camera &camera = plater->get_camera();
-    std::optional<RaycastManager::Hit> hit = raycaster.ray_from_camera(screen_coor, camera, &cond);
+    std::optional<RaycastManager::Hit> hit = priv::ray_from_camera(raycaster, screen_coor, camera, &cond);
 
     // context menu for add text could be open only by right click on an
     // object. After right click, object is selected and object_idx is set
