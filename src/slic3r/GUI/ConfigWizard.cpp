@@ -2881,9 +2881,9 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 			if (only_for_model_id.empty())
 				ask_and_select_default_materials(
 					_L("The following FFF printer models have no filament selected:") +
-					"\n\n\t" +
+					"\n\n" +
 					printer_model_list(printer_models_without_material) +
-					"\n\n\t" +
+					"\n\n" +
 					_L("Do you want to select default filaments for these FFF printer models?"),
 					printer_models_without_material,
 					T_FFF);
@@ -2899,9 +2899,9 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 	        if (only_for_model_id.empty())
 	            ask_and_select_default_materials(
 					_L("The following SLA printer models have no materials selected:") +
-	            	"\n\n\t" +
+	            	"\n\n" +
 				   	printer_model_list(printer_models_without_material) +
-					"\n\n\t" +
+					"\n\n" +
 					_L("Do you want to select default SLA materials for these printer models?"),
 					printer_models_without_material,
 	            	T_SLA);
