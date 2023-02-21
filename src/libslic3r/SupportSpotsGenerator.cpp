@@ -1043,6 +1043,7 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
     AABBTreeLines::LinesDistancer<ExtrusionLine> prev_layer_lines{};
 
     for (SupportLayer *l : layers) {
+        l->malformed_lines.clear();
         std::vector<ExtrusionLine> current_layer_lines;
 
         for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities) {
@@ -1114,6 +1115,7 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
     LD prev_layer_lines{};
 
     for (Layer *l : layers) {
+        l->malformed_lines.clear();
         std::vector<Linef> boundary_lines = l->lower_layer != nullptr ? to_unscaled_linesf(l->lower_layer->lslices) : std::vector<Linef>();
         AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary{std::move(boundary_lines)};
         std::vector<ExtrusionLine>           current_layer_lines;
