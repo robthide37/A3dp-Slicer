@@ -3581,7 +3581,8 @@ void GCodeProcessor::post_process()
         }
 
         // Insert the gcode lines required by the command cmd by backtracing into the cache
-        void insert_lines(const Backtrace& backtrace, const std::string& cmd, std::function<std::string(unsigned int, float, float)> line_inserter) {
+        void insert_lines(const Backtrace& backtrace, const std::string& cmd, std::function<std::string(unsigned int, float, float)> line_inserter,
+            std::function<std::string(const std::string&)> line_replacer) {
             assert(!m_lines.empty());
             const float time_step = backtrace.time_step();
             size_t rev_it_dist = 0; // distance from the end of the cache of the starting point of the backtrace
@@ -3594,6 +3595,7 @@ void GCodeProcessor::post_process()
 
                 // backtrace into the cache to find the place where to insert the line
                 while (rev_it != m_lines.rend() && rev_it->time > time_threshold_i && GCodeReader::GCodeLine::extract_cmd(rev_it->line) != cmd) {
+                    rev_it->line = line_replacer(rev_it->line);
                     ++rev_it;
                 }
 
@@ -3987,11 +3989,28 @@ void GCodeProcessor::post_process()
             int tool_number = -1;
             ss >> tool_number;
             if (tool_number != -1)
-                export_lines.insert_lines(backtrace, cmd, [tool_number, this](unsigned int id, float time, float time_diff) {
-                    //const std::string out = "XYYY ; id:" + std::to_string(id) + " time:" + std::to_string(time) + " time diff:" + std::to_string(time_diff) + "\n";
-                    const std::string out = "M104 T" + std::to_string(tool_number) + " P" + std::to_string(int(std::round(time_diff))) + " S" + std::to_string(int(m_extruder_temps_config[tool_number])) + "\n";
-                    return out;
-                });
+                export_lines.insert_lines(backtrace, cmd,
+                    // line inserter
+                    [tool_number, this](unsigned int id, float time, float time_diff) {
+                        //const std::string out = "XYYY ; id:" + std::to_string(id) + " time:" + std::to_string(time) + " time diff:" + std::to_string(time_diff) + "\n";
+                        const std::string out = "M104 T" + std::to_string(tool_number) + " P" + std::to_string(int(std::round(time_diff))) + " S" + std::to_string(int(m_extruder_temps_config[tool_number])) + "\n";
+                        return out;
+                    },
+                    // line replacer
+                    [tool_number](const std::string& line) {
+                        if (GCodeReader::GCodeLine::cmd_is(line, "M104")) {
+                            GCodeReader::GCodeLine gline;
+                            GCodeReader reader;
+                            reader.parse_line(line, [&gline](GCodeReader& reader, const GCodeReader::GCodeLine& l) { gline = l; });
+
+                            float val;
+                            if (gline.has_value('T', val)) {
+                                if (static_cast<int>(val) == tool_number)
+                                    return std::string("; removed M104\n");
+                            }
+                        }
+                        return line;
+                    });
         }
     };
 #endif // ENABLE_GCODE_POSTPROCESS_BACKTRACE
