@@ -1690,9 +1690,11 @@ void PrintObject::bridge_over_infill()
                 Polygons special_infill{};
                 Polygons not_sparse_infill{};
                 {
-                    double            bottom_z      = layer->print_z - max_bridge_flow_height[candidates.first] - EPSILON;
-                    LayerSlice::Links current_links = candidates.first->overlaps_below;
-                    LayerSlice::Links next_links{};
+                    double                        bottom_z = layer->print_z - max_bridge_flow_height[candidates.first] - EPSILON;
+                    std::vector<LayerSlice::Link> current_links{};
+                    current_links.insert(current_links.end(), candidates.first->overlaps_below.begin(),
+                                         candidates.first->overlaps_below.end());
+                    std::vector<LayerSlice::Link> next_links{};
                     for (int i = int(lidx) - 1; i >= 0; --i) {
                         // Stop iterating if layer is lower than bottom_z.
                         if (po->get_layer(i)->print_z < bottom_z)
