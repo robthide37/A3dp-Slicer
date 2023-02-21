@@ -1041,10 +1041,9 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                             rotation_matrix = rotation_matrix.inverse();
 
                         // ensure that the volume rotates as a rigid body
-                        const Geometry::TransformationSVD svd(world_trafo);
-                        if (svd.anisotropic_scale) {
-                            const Transform3d vol_scale_matrix = vol_trafo.get_scaling_factor_matrix();
-                            rotation_matrix = vol_scale_matrix.inverse() * rotation_matrix * vol_scale_matrix;
+                        if (Geometry::TransformationSVD(world_trafo).anisotropic_scale) {
+                            const Transform3d inst_scale_matrix = inst_trafo.get_scaling_factor_matrix();
+                            rotation_matrix = inst_scale_matrix.inverse() * rotation_matrix * inst_scale_matrix;
                         }
                     }
                 }
@@ -2762,6 +2761,7 @@ void Selection::render_debug_window() const
         return;
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
+    ImGui::SetNextWindowCollapsed(true, ImGuiCond_Once);
     imgui.begin(std::string("Selection matrices"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
 
     auto volume_name = [this](size_t id) {
