@@ -5479,6 +5479,17 @@ void Plater::add_model(bool imperial_units/* = false*/)
         wxGetApp().mainframe->update_title();
 }
 
+void Plater::import_zip_archive()
+{
+   wxString input_file;
+   wxGetApp().import_zip(this, input_file);
+   if (input_file.empty())
+       return;
+
+   fs::path path = into_path(input_file);
+   preview_zip_archive(path);
+}
+
 void Plater::import_sl1_archive()
 {
     auto &w = get_ui_job_worker();
