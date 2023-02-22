@@ -535,20 +535,16 @@ void PrintConfigDef::init_fff_params()
     def->label      = L("Enable dynamic overhang speeds");
     def->category   = L("Speed");
     def->tooltip    = L("This setting enables dynamic speed control on overhangs."
-                        "Controls overhang levels, expressed as a percentage of overlap of the extrusion with the previous layer - "
-                        "100% represents full overlap - no overhang is present, while 0% represents full overhang (floating extrusion). "
-                        "Each overhang level then corresponds with the overhang speed below. Speeds for overhang levels in between are "
-                        "calculated via linear interpolation."
-                        "If you set multiple different speeds for the same overhang level, only the largest speed is used. "
-                        "This setting controls the speed on the overhang with the overlap value set above. "
-                        "The speed of the extrusion is calculated as a linear interpolation of the speeds for higher and lower overlap. "
-                        "If set as percentage, the speed is calculated over the external perimeter speed."
+                        "Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer - "
+                        "100% represents full overlap - no overhang is present, while 0% represents full overhang (floating extrusion, bridge). "
+                        "You can set speed for each overhang size listed below. Speeds for overhang levels in between are "
+                        "calculated via linear interpolation. If set as percentage, the speed is calculated over the external perimeter speed."
     );
     def->mode       = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
 
     def             = this->add("overhang_speed_0", coFloatOrPercent);
-    def->full_label = L("speed for 0\% overlap (bridge)");
+    def->label      = L("speed for 0\% overlap (bridge)");
     def->category   = L("Speed");
     def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
     def->sidetext   = L("mm/s or %");
@@ -557,7 +553,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def             = this->add("overhang_speed_1", coFloatOrPercent);
-    def->full_label = L("speed for 20\% overlap");
+    def->label      = L("speed for 20\% overlap");
     def->category   = L("Speed");
     def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
     def->sidetext   = L("mm/s or %");
@@ -566,7 +562,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(20, false));
 
     def             = this->add("overhang_speed_2", coFloatOrPercent);
-    def->full_label = L("speed for 40\% overlap");
+    def->label      = L("speed for 40\% overlap");
     def->category   = L("Speed");
     def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
     def->sidetext   = L("mm/s or %");
@@ -575,7 +571,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(25, false));
 
     def             = this->add("overhang_speed_3", coFloatOrPercent);
-    def->full_label = L("speed for 60\% overlap");
+    def->label      = L("speed for 60\% overlap");
     def->category   = L("Speed");
     def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
     def->sidetext   = L("mm/s or %");
@@ -584,7 +580,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(25, false));
 
     def             = this->add("overhang_speed_4", coFloatOrPercent);
-    def->full_label = L("speed for 80\% overlap");
+    def->label      = L("speed for 80\% overlap");
     def->category   = L("Speed");
     def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
     def->sidetext   = L("mm/s or %");
