@@ -119,10 +119,14 @@ namespace Slic3r {
                 // we assume that heating is always slower than cooling, so no need to block
                 gcode += gcodegen.writer().set_temperature
                 (this->_get_temp(gcodegen) + gcodegen.config().standby_temperature_delta.value, false, extruder_id);
+                gcode.pop_back();
+                gcode += " ;cooldown\n";
             }
         } else {
             // Use the value from filament settings. That one is absolute, not delta.
             gcode += gcodegen.writer().set_temperature(filament_idle_temp.get_at(extruder_id), false, extruder_id);
+            gcode.pop_back();
+            gcode += " ;cooldown\n";
         }
 
         return gcode;

@@ -4004,7 +4004,7 @@ void GCodeProcessor::post_process()
                             reader.parse_line(line, [&gline](GCodeReader& reader, const GCodeReader::GCodeLine& l) { gline = l; });
 
                             float val;
-                            if (gline.has_value('T', val)) {
+                            if (gline.has_value('T', val) && gline.raw().find("cooldown") != std::string::npos) {
                                 if (static_cast<int>(val) == tool_number)
                                     return std::string("; removed M104\n");
                             }
