@@ -534,19 +534,19 @@ void PrintConfigDef::init_fff_params()
     def             = this->add("enable_dynamic_overhang_speeds", coBool);
     def->label      = L("Enable dynamic overhang speeds");
     def->category   = L("Speed");
-    def->tooltip    = L("This setting enables dynamic speed control on overhangs."
-                        "Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer - "
-                        "100% represents full overlap - no overhang is present, while 0% represents full overhang (floating extrusion, bridge). "
-                        "You can set speed for each overhang size listed below. Speeds for overhang levels in between are "
-                        "calculated via linear interpolation. If set as percentage, the speed is calculated over the external perimeter speed."
-    );
+    def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
     def->mode       = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
+
+    auto overhang_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
+                        "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
+                        "Speeds for overhang sizes in between are calculated via linear interpolation. "
+                        "If set as percentage, the speed is calculated over the external perimeter speed.");
 
     def             = this->add("overhang_speed_0", coFloatOrPercent);
     def->label      = L("speed for 0\% overlap (bridge)");
     def->category   = L("Speed");
-    def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
+    def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
     def->mode       = comAdvanced;
@@ -555,7 +555,7 @@ void PrintConfigDef::init_fff_params()
     def             = this->add("overhang_speed_1", coFloatOrPercent);
     def->label      = L("speed for 20\% overlap");
     def->category   = L("Speed");
-    def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
+    def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
     def->mode       = comAdvanced;
@@ -564,7 +564,7 @@ void PrintConfigDef::init_fff_params()
     def             = this->add("overhang_speed_2", coFloatOrPercent);
     def->label      = L("speed for 40\% overlap");
     def->category   = L("Speed");
-    def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
+    def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
     def->mode       = comAdvanced;
@@ -573,7 +573,7 @@ void PrintConfigDef::init_fff_params()
     def             = this->add("overhang_speed_3", coFloatOrPercent);
     def->label      = L("speed for 60\% overlap");
     def->category   = L("Speed");
-    def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
+    def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
     def->mode       = comAdvanced;
@@ -582,7 +582,7 @@ void PrintConfigDef::init_fff_params()
     def             = this->add("overhang_speed_4", coFloatOrPercent);
     def->label      = L("speed for 80\% overlap");
     def->category   = L("Speed");
-    def->tooltip    = L("Controls the speed for the corresponding extrusion overlap value.");
+    def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
     def->mode       = comAdvanced;
