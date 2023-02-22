@@ -2930,19 +2930,19 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             + float_to_string_decimal_point(m_last_height) + "\n";
     }
 
-    std::string comment;
+    std::string cooling_marker_setspeed_comments;
     if (m_enable_cooling_markers) {
         if (path.role().is_bridge())
             gcode += ";_BRIDGE_FAN_START\n";
         else
-            comment = ";_EXTRUDE_SET_SPEED";
+            cooling_marker_setspeed_comments = ";_EXTRUDE_SET_SPEED";
         if (path.role() == ExtrusionRole::ExternalPerimeter)
-            comment += ";_EXTERNAL_PERIMETER";
+            cooling_marker_setspeed_comments += ";_EXTERNAL_PERIMETER";
     }
 
     if (!variable_speed) {
         // F is mm per minute.
-        gcode += m_writer.set_speed(F, "", comment);
+        gcode += m_writer.set_speed(F, "", cooling_marker_setspeed_comments);
         double path_length = 0.;
         std::string comment;
         if (m_config.gcode_comments) {
@@ -2966,7 +2966,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             marked_comment += description_bridge;
         }
         double last_set_speed = new_points[0].speed * 60.0;
-        gcode += m_writer.set_speed(last_set_speed, "", comment);
+        gcode += m_writer.set_speed(last_set_speed, "", cooling_marker_setspeed_comments);
         Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
         for (size_t i = 1; i < new_points.size(); i++) {
             const ProcessedPoint& processed_point = new_points[i];
@@ -2976,7 +2976,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             prev = p;
             double new_speed = processed_point.speed * 60.0;
             if (last_set_speed != new_speed) {
-                gcode += m_writer.set_speed(new_speed, "", comment);
+                gcode += m_writer.set_speed(new_speed, "", cooling_marker_setspeed_comments);
                 last_set_speed = new_speed;
             }
         }
