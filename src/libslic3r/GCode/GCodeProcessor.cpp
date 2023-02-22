@@ -2402,7 +2402,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         if (m_forced_height > 0.0f)
             m_height = m_forced_height;
         else if (m_layer_id == 0)
-            m_height = (m_end_position[Z] <= double(m_first_layer_height)) ? m_end_position[Z] : m_first_layer_height;
+            m_height = std::min((float)m_end_position[Z], m_first_layer_height + m_z_offset);
         else if (line.comment() != INTERNAL_G2G3_TAG){
             if (m_end_position[Z] > m_extruded_last_z + EPSILON && delta_pos[Z] == 0.0)
                 m_height = m_end_position[Z] - m_extruded_last_z;
