@@ -512,6 +512,7 @@ WipeTower::WipeTower(const PrintConfig& config, const std::vector<std::vector<fl
     m_wipe_tower_width(float(config.wipe_tower_width)),
     m_wipe_tower_rotation_angle(float(config.wipe_tower_rotation_angle)),
     m_wipe_tower_brim_width(float(config.wipe_tower_brim_width)),
+    m_extra_spacing(float(config.wipe_tower_extra_spacing/100.)),
     m_y_shift(0.f),
     m_z_pos(0.f),
     m_bridging(float(config.wipe_tower_bridging)),
@@ -1333,8 +1334,6 @@ void WipeTower::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &
 {
 	if (m_plan.empty())
         return;
-
-    m_extra_spacing = 1.f;
 
 	plan_tower();
     for (int i=0;i<5;++i) {
