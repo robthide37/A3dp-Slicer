@@ -1554,7 +1554,6 @@ void TabPrint::build()
         optgroup->append_single_option_line("overhang_speed_1");
         optgroup->append_single_option_line("overhang_speed_2");
         optgroup->append_single_option_line("overhang_speed_3");
-        optgroup->append_single_option_line("overhang_speed_4");
 
         optgroup = page->new_optgroup(L("Speed for non-print moves"));
         optgroup->append_single_option_line("travel_speed");
@@ -1988,6 +1987,13 @@ void TabFilament::build()
         optgroup->append_single_option_line("disable_fan_first_layers", category_path + "fan-settings");
         optgroup->append_single_option_line("full_fan_speed_layer", category_path + "fan-settings");
 
+        optgroup = page->new_optgroup(L("Dynamic fan speeds"), 25);
+        optgroup->append_single_option_line("enable_dynamic_fan_speeds", category_path + "dynamic-fan-speeds");
+        optgroup->append_single_option_line("overhang_fan_speed_0", category_path + "dynamic-fan-speeds");
+        optgroup->append_single_option_line("overhang_fan_speed_1", category_path + "dynamic-fan-speeds");
+        optgroup->append_single_option_line("overhang_fan_speed_2", category_path + "dynamic-fan-speeds");
+        optgroup->append_single_option_line("overhang_fan_speed_3", category_path + "dynamic-fan-speeds");
+
         optgroup = page->new_optgroup(L("Cooling thresholds"), 25);
         optgroup->append_single_option_line("fan_below_layer_time", category_path + "cooling-thresholds");
         optgroup->append_single_option_line("slowdown_below_layer_time", category_path + "cooling-thresholds");
@@ -2140,6 +2146,11 @@ void TabFilament::toggle_options()
 
         for (auto el : { "min_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer" })
             toggle_option(el, fan_always_on);
+
+        bool dynamic_fan_speeds = m_config->opt_bool("enable_dynamic_fan_speeds", 0);
+        for (int i = 0; i < 4; i++) {
+        toggle_option("overhang_fan_speed_"+std::to_string(i),dynamic_fan_speeds);
+        }
     }
 
     if (m_active_page->title() == "Filament Overrides")

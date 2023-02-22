@@ -535,7 +535,7 @@ void PrintConfigDef::init_fff_params()
     def->label      = L("Enable dynamic overhang speeds");
     def->category   = L("Speed");
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
-    def->mode       = comAdvanced;
+    def->mode       = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
     auto overhang_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
@@ -549,44 +549,82 @@ void PrintConfigDef::init_fff_params()
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
-    def->mode       = comAdvanced;
+    def->mode       = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def             = this->add("overhang_speed_1", coFloatOrPercent);
-    def->label      = L("speed for 20\% overlap");
+    def->label      = L("speed for 25\% overlap");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
-    def->mode       = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(20, false));
+    def->mode       = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def             = this->add("overhang_speed_2", coFloatOrPercent);
-    def->label      = L("speed for 40\% overlap");
+    def->label      = L("speed for 50\% overlap");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
-    def->mode       = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(25, false));
+    def->mode       = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(20, false));
 
     def             = this->add("overhang_speed_3", coFloatOrPercent);
-    def->label      = L("speed for 60\% overlap");
+    def->label      = L("speed for 75\% overlap");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
-    def->mode       = comAdvanced;
+    def->mode       = comExpert;
     def->set_default_value(new ConfigOptionFloatOrPercent(25, false));
 
-    def             = this->add("overhang_speed_4", coFloatOrPercent);
-    def->label      = L("speed for 80\% overlap");
-    def->category   = L("Speed");
-    def->tooltip    = overhang_speed_setting_description;
-    def->sidetext   = L("mm/s or %");
-    def->min        = 0;
-    def->mode       = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatOrPercent(25, false));
+    def          = this->add("enable_dynamic_fan_speeds", coBools);
+    def->label   = L("Enable dynamic fan speeds");
+    def->tooltip = L("This setting enables dynamic fan speed control on overhangs.");
+    def->mode    = comExpert;
+    def->set_default_value(new ConfigOptionBools{false});
+
+    auto fan_speed_setting_description = L(
+        "Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
+        "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
+        "Fan speeds for overhang sizes in between are calculated via linear interpolation. ");
+
+    def           = this->add("overhang_fan_speed_0", coInts);
+    def->label    = L("speed for 0\% overlap (bridge)");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{100});
+
+    def           = this->add("overhang_fan_speed_1", coInts);
+    def->label    = L("speed for 25\% overlap");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{75});
+
+    def           = this->add("overhang_fan_speed_2", coInts);
+    def->label    = L("speed for 50\% overlap");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{50});
+
+    def           = this->add("overhang_fan_speed_3", coInts);
+    def->label    = L("speed for 75\% overlap");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{25});
 
     def = this->add("brim_width", coFloat);
     def->label = L("Brim width");

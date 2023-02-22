@@ -769,7 +769,6 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "overhang_speed_1"
             || opt_key == "overhang_speed_2"
             || opt_key == "overhang_speed_3"
-            || opt_key == "overhang_speed_4"
             || opt_key == "external_perimeter_speed"
             || opt_key == "infill_speed"
             || opt_key == "perimeter_speed"
