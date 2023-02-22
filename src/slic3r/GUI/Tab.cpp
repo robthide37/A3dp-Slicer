@@ -1549,18 +1549,12 @@ void TabPrint::build()
         optgroup->append_single_option_line("ironing_speed");
 
         optgroup = page->new_optgroup(L("Dynamic overhang speed"));
-        auto append_option_line = [](ConfigOptionsGroupShp optgroup, std::string opt_key) {
-            auto option = optgroup->get_option(opt_key, 0);
-            auto line   = Line{option.opt.full_label, ""};
-            line.append_option(option);
-            line.append_option(optgroup->get_option(opt_key, 1));
-            line.append_option(optgroup->get_option(opt_key, 2));
-            line.append_option(optgroup->get_option(opt_key, 3));
-            optgroup->append_line(line);
-        };
         optgroup->append_single_option_line("enable_dynamic_overhang_speeds");
-	    append_option_line(optgroup,"overhang_overlap_levels");
-        append_option_line(optgroup,"dynamic_overhang_speeds");
+        optgroup->append_single_option_line("overhang_speed_0");
+        optgroup->append_single_option_line("overhang_speed_1");
+        optgroup->append_single_option_line("overhang_speed_2");
+        optgroup->append_single_option_line("overhang_speed_3");
+        optgroup->append_single_option_line("overhang_speed_4");
 
         optgroup = page->new_optgroup(L("Speed for non-print moves"));
         optgroup->append_single_option_line("travel_speed");

@@ -257,26 +257,25 @@ public:
         next_layer_boundaries[object] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(layer->lslices)};
     }
 
-    std::vector<ProcessedPoint> estimate_extrusion_quality(const ExtrusionPath                &path,
-                                                           const ConfigOptionPercents         &overlaps,
-                                                           const ConfigOptionFloatsOrPercents &speeds,
-                                                           float                               ext_perimeter_speed,
-                                                           float                               original_speed)
+    std::vector<ProcessedPoint> estimate_extrusion_quality(const ExtrusionPath                                          &path,
+                                                           const std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_w_speeds,
+                                                           float ext_perimeter_speed,
+                                                           float original_speed)
     {
-        size_t                               speed_sections_count = std::min(overlaps.values.size(), speeds.values.size());
-        float speed_base = ext_perimeter_speed > 0 ? ext_perimeter_speed : original_speed;
+        float                                speed_base = ext_perimeter_speed > 0 ? ext_perimeter_speed : original_speed;
         std::vector<std::pair<float, float>> speed_sections;
-        for (size_t i = 0; i < speed_sections_count; i++) {
-            float distance = path.width * (1.0 - (overlaps.get_at(i) / 100.0));
-            float speed    = speeds.get_at(i).percent ? (speed_base * speeds.get_at(i).value / 100.0) : speeds.get_at(i).value;
+        for (size_t i = 0; i < overhangs_w_speeds.size(); i++) {
+            float distance = path.width * (1.0 - (overhangs_w_speeds[i].first / 100.0));
+            float speed    = overhangs_w_speeds[i].second.percent ? (speed_base * overhangs_w_speeds[i].second.value / 100.0) :
+                                                                  overhangs_w_speeds[i].second.value;
             speed_sections.push_back({distance, speed});
         }
-        std::sort(speed_sections.begin(), speed_sections.end(),
-                  [](const std::pair<float, float> &a, const std::pair<float, float> &b) { 
-                    if (a.first == b.first) {
-                        return a.second > b.second;
-                    }
-                    return a.first < b.first; });
+        std::sort(speed_sections.begin(), speed_sections.end(), [](const std::pair<float, float> &a, const std::pair<float, float> &b) {
+            if (a.first == b.first) {
+                return a.second > b.second;
+            }
+            return a.first < b.first;
+        });
 
         std::pair<float, float> last_section{INFINITY, 0};
         for (auto &section : speed_sections) {
