@@ -364,7 +364,7 @@ void GLGizmoCut3D::shift_cut_z(double delta)
 {
     Vec3d new_cut_center = m_plane_center;
     new_cut_center[Z] += delta;
-    set_center(new_cut_center);
+    set_center(new_cut_center, true);
 }
 
 void GLGizmoCut3D::rotate_vec3d_around_plane_center(Vec3d&vec)
