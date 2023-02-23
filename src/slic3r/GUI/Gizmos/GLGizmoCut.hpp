@@ -35,6 +35,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
     // archived values 
     Vec3d m_ar_plane_center { Vec3d::Zero() };
+    Transform3d m_start_dragging_m{ Transform3d::Identity() };
 
     Vec3d m_plane_center{ Vec3d::Zero() };
     // data to check position of the cut palne center on gizmo activation
@@ -57,7 +58,6 @@ class GLGizmoCut3D : public GLGizmoBase
     double m_snap_fine_out_radius{ 0.0 };
 
     // dragging angel in hovered axes
-    Transform3d m_start_dragging_m{ Transform3d::Identity() };
     double m_angle{ 0.0 };
 
     TriangleMesh    m_connector_mesh;
@@ -194,7 +194,7 @@ public:
     void invalidate_cut_plane();
 
     BoundingBoxf3   bounding_box() const;
-    BoundingBoxf3   transformed_bounding_box(const Vec3d& plane_center) const;
+    BoundingBoxf3   transformed_bounding_box(const Vec3d& plane_center, const Transform3d& rotation_m = Transform3d::Identity()) const;
 
 protected:
     bool               on_init() override;
