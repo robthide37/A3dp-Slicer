@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <math.h>
+#include <string>
 #include <string_view>
 
 #include <boost/algorithm/string.hpp>
@@ -2989,7 +2990,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         double last_set_speed     = new_points[0].speed * 60.0;
         double last_set_fan_speed = new_points[0].fan_speed;
         gcode += m_writer.set_speed(last_set_speed, "", cooling_marker_setspeed_comments);
-        gcode += m_writer.set_fan(last_set_fan_speed);
+        gcode += ";_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
         Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
         for (size_t i = 1; i < new_points.size(); i++) {
             const ProcessedPoint &processed_point = new_points[i];
@@ -3003,10 +3004,11 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
                 last_set_speed = new_speed;
             }
             if (last_set_fan_speed != processed_point.fan_speed) {
-                gcode += m_writer.set_fan(processed_point.fan_speed);
                 last_set_fan_speed = processed_point.fan_speed;
+                gcode += ";_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
             }
         }
+        gcode += ";_RESET_FAN_SPEED\n";
     }
 
     if (m_enable_cooling_markers)
