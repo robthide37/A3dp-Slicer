@@ -146,18 +146,19 @@ void MeshClipper::render_contour(const ColorRGBA& color)
         curr_shader->start_using();
 }
 
-bool MeshClipper::is_projection_inside_cut(const Vec3d& point_in, bool respect_disabled_contour) const
+int MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
 {
     if (!m_result || m_result->cut_islands.empty())
-        return false;
+        return -1;
     Vec3d point = m_result->trafo.inverse() * point_in;
     Point pt_2d = Point::new_scale(Vec2d(point.x(), point.y()));
 
-    for (const CutIsland& isl : m_result->cut_islands) {
+    for (int i=0; i<int(m_result->cut_islands.size()); ++i) {
+        const CutIsland& isl = m_result->cut_islands[i];
         if (isl.expoly_bb.contains(pt_2d) && isl.expoly.contains(pt_2d))
-            return respect_disabled_contour ? !isl.disabled : true;
+            return i; // TODO: handle intersecting contours
     }
-    return false;
+    return -1;
 }
 
 bool MeshClipper::has_valid_contour() const
@@ -165,23 +166,6 @@ bool MeshClipper::has_valid_contour() const
     return m_result && std::any_of(m_result->cut_islands.begin(), m_result->cut_islands.end(), [](const CutIsland& isl) { return !isl.expoly.empty(); });
 }
 
-bool MeshClipper::has_disable_contour() const
-{
-    return m_result && std::any_of(m_result->cut_islands.begin(), m_result->cut_islands.end(), [](const CutIsland& isl) { return isl.disabled; });
-}
-
-void MeshClipper::pass_mouse_click(const Vec3d& point_in)
-{
-    if (! m_result || m_result->cut_islands.empty())
-        return;
-    Vec3d point = m_result->trafo.inverse() * point_in;
-    Point pt_2d = Point::new_scale(Vec2d(point.x(), point.y()));
-
-    for (CutIsland& isl : m_result->cut_islands) {
-        if (isl.expoly_bb.contains(pt_2d) && isl.expoly.contains(pt_2d))
-            isl.disabled = ! isl.disabled;
-    }
-}
 
 void MeshClipper::recalculate_triangles()
 {

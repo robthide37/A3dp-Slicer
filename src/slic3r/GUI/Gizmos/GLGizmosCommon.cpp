@@ -388,10 +388,26 @@ void ObjectClipper::render_cut() const
     }
 }
 
-bool ObjectClipper::is_projection_inside_cut(const Vec3d& point, bool respect_disabled_contour) const
+
+int ObjectClipper::get_number_of_contours() const
 {
-    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(),
-        [point, respect_disabled_contour](const auto& cl) { return cl.first->is_projection_inside_cut(point, respect_disabled_contour); });
+    int sum = 0;
+    for (const auto& [clipper, trafo] : m_clippers)
+        sum += clipper->get_number_of_contours();
+    return sum;
+}
+
+int ObjectClipper::is_projection_inside_cut(const Vec3d& point) const
+{
+    if (m_clp_ratio == 0.)
+        return -1;
+    int idx_offset = 0;
+    for (const auto& [clipper, trafo] : m_clippers) {
+        if (int idx = clipper->is_projection_inside_cut(point); idx != -1)
+            return idx_offset + idx;
+        idx_offset += clipper->get_number_of_contours();
+    }
+    return -1;
 }
 
 bool ObjectClipper::has_valid_contour() const
@@ -399,10 +415,6 @@ bool ObjectClipper::has_valid_contour() const
     return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [](const auto& cl) { return cl.first->has_valid_contour(); });
 }
 
-bool ObjectClipper::has_disable_contour() const
-{
-    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [](const auto& cl) { return cl.first->has_disable_contour(); });
-}
 
 void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal)
 {
@@ -442,16 +454,6 @@ void ObjectClipper::set_behavior(bool hide_clipped, bool fill_cut, double contou
         clipper.first->set_behaviour(fill_cut, contour_width);
 }
 
-void ObjectClipper::pass_mouse_click(const Vec3d& pt)
-{
-    for (auto& clipper : m_clippers)
-        clipper.first->pass_mouse_click(pt);
-}
-
-std::vector<Vec3d> ObjectClipper::get_disabled_contours() const
-{
-    return std::vector<Vec3d>();
-}
 
 void SupportsClipper::on_update()
 {

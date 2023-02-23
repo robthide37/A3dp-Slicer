@@ -118,11 +118,10 @@ public:
     void render_cut(const ColorRGBA& color);
     void render_contour(const ColorRGBA& color);
 
-    void pass_mouse_click(const Vec3d& pt);
-
-    bool is_projection_inside_cut(const Vec3d& point, bool respect_disabled_contour) const;
+    // Returns index of the contour which was clicked, -1 otherwise.
+    int is_projection_inside_cut(const Vec3d& point) const;
     bool has_valid_contour() const;
-    bool has_disable_contour() const;
+    int get_number_of_contours() const { return m_result ? m_result->cut_islands.size() : 0; }
 
 private:
     void recalculate_triangles();

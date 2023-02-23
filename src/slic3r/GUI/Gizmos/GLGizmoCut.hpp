@@ -137,10 +137,25 @@ class GLGizmoCut3D : public GLGizmoBase
     bool m_was_cut_plane_dragged { false };
     bool m_was_contour_selected { false };
 
-    std::vector<GLModel>                    m_cut_by_contour_glmodels;
-    ModelObjectPtrs                         m_cut_by_contour_objects;
-    // attributes for disabled contours <pos, norm>
-    std::vector<std::pair<Vec3d, Vec3d>>    m_disabled_contours;
+    struct PartSelection {
+        PartSelection() = default;
+        PartSelection(ModelObject* mo, const Vec3d& center, const Vec3d& normal);
+
+        void render(const Vec3d* normal = nullptr);
+        void toggle_selection(const Vec2d& mouse_pos);
+
+        struct Part {
+            GLModel glmodel;
+            MeshRaycaster raycaster;
+            bool selected;
+            bool upper;
+        };
+        ModelObject* model_object; // FIXME: Ownership !
+        std::vector<Part> parts;
+        bool valid = false;
+    };
+
+    PartSelection m_part_selection;
 
     bool                                        m_show_shortcuts{ false };
     std::vector<std::pair<wxString, wxString>>  m_shortcuts;
@@ -299,7 +314,6 @@ private:
     void init_picking_models();
     void init_rendering_items();
     void render_clipper_cut();
-    void render_colored_parts();
     void clear_selection();
     void reset_connectors();
     void init_connector_shapes();

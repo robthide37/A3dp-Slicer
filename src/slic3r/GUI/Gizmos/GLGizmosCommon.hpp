@@ -247,12 +247,10 @@ public:
     void set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos);
     void set_behavior(bool hide_clipped, bool fill_cut, double contour_width);
     
-    void pass_mouse_click(const Vec3d& pt);
-    std::vector<Vec3d> get_disabled_contours() const;
+    int get_number_of_contours() const;
 
-    bool is_projection_inside_cut(const Vec3d& point_in, bool respect_disabled_contour) const;
+    int is_projection_inside_cut(const Vec3d& point_in) const;
     bool has_valid_contour() const;
-    bool has_disable_contour() const;
 
 
 protected:
