@@ -57,8 +57,9 @@ static std::string get_file_path(const wxFont& font) {
     wxCFTypeRef(url).GetValue(file_uri);
     wxURI uri(file_uri);
     const wxString &path = uri.GetPath();
-    BOOST_LOG_TRIVIAL(trace) << "input uri(" << file_uri.c_str() << ") convert to path(" << path.c_str() << ").";
-    return std::string(path.c_str());
+    std::string path_str(wxURI::Unescape(path).c_str());
+    BOOST_LOG_TRIVIAL(trace) << "input uri(" << file_uri.c_str() << ") convert to path(" << path.c_str() << ") string(" << path_str << ").";
+    return path_str;
 }    
 #endif // __APPLE__
 } // namespace
