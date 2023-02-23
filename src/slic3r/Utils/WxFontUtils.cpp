@@ -55,13 +55,10 @@ static std::string get_file_path(const wxFont& font) {
     if (url == NULL) return {};
     wxString file_uri;
     wxCFTypeRef(url).GetValue(file_uri);
-    std::string file_path(wxURI::Unescape(file_uri).c_str());
-    size_t start = std::string("file://").size();
-    if (file_path.empty() || file_path.size() <= start)
-        return {};
-    // remove prefix file://
-    file_path = file_path.substr(start, file_path.size() - start);
-    return file_path;
+    wxURI uri(file_uri);
+    const wxString &path = uri.GetPath();
+    BOOST_LOG_TRIVIAL(trace) << "input uri(" << file_uri.c_str() << ") convert to path(" << path.c_str() << ").";
+    return std::string(path.c_str());
 }    
 #endif // __APPLE__
 } // namespace
