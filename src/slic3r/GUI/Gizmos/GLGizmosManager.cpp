@@ -623,7 +623,7 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
         else if (m_current == Cut) {
             auto do_move = [this, &processed](double delta_z) {
                 GLGizmoCut3D* cut = dynamic_cast<GLGizmoCut3D*>(get_current());
-                cut->shift_cut_z(delta_z);
+                cut->shift_cut(delta_z);
                 processed = true;
             };
 

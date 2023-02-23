@@ -360,11 +360,12 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
     return false;
 }
 
-void GLGizmoCut3D::shift_cut_z(double delta)
+void GLGizmoCut3D::shift_cut(double delta)
 {
-    Vec3d new_cut_center = m_plane_center;
-    new_cut_center[Z] += delta;
-    set_center(new_cut_center);
+    Vec3d starting_vec = m_rotation_m * Vec3d::UnitZ();
+    if (starting_vec.norm() != 0.0)
+        starting_vec.normalize();
+    set_center(m_plane_center + starting_vec * delta, true);
 }
 
 void GLGizmoCut3D::rotate_vec3d_around_plane_center(Vec3d&vec)
@@ -1175,9 +1176,10 @@ void GLGizmoCut3D::dragging_grabber_xy(const GLGizmoBase::UpdateData &data)
     rotation[m_hover_id] = theta;
 
     const Transform3d rotation_tmp = m_start_dragging_m * rotation_transform(rotation);
-    if (m_rotation_m.rotation() != rotation_tmp.rotation())
-        m_transformed_bounding_box = transformed_bounding_box(m_plane_center);
+    const bool update_tbb = m_rotation_m.rotation() != rotation_tmp.rotation();
     m_rotation_m = rotation_tmp;
+    if (update_tbb)
+        m_transformed_bounding_box = transformed_bounding_box(m_plane_center);
 
     m_angle = theta;
     while (m_angle > two_pi)
@@ -1647,6 +1649,8 @@ void GLGizmoCut3D::set_connectors_editing(bool connectors_editing)
 void GLGizmoCut3D::flip_cut_plane()
 {
     m_rotation_m = m_rotation_m * rotation_transform(PI * Vec3d::UnitX());
+    m_transformed_bounding_box = transformed_bounding_box(m_plane_center);
+
     Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Flip cut plane"), UndoRedo::SnapshotType::GizmoAction);
     m_start_dragging_m = m_rotation_m;
 
@@ -2303,6 +2307,8 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
             m.matrix().block(0, 0, 3, 3) = q.setFromTwoVectors(Vec3d::UnitZ(), cross_dir).toRotationMatrix();
 
             m_rotation_m = m;
+            // update transformed bb
+            m_transformed_bounding_box = transformed_bounding_box(m_plane_center);
             m_angle_arc.reset();
 
             set_center(m_plane_center + cross_dir * (cross_dir.dot(pt - m_plane_center)), true);
