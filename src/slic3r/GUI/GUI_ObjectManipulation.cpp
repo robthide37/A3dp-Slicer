@@ -506,6 +506,10 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         else
             return;
 
+        // Synchronize instances/volumes.
+        selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
+        selection.synchronize_unselected_volumes();
+
         canvas->do_scale(L("Reset scale"));
         UpdateAndShow(true);
 #else
