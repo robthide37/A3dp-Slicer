@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <iterator>
 #include <limits>
 #include <numeric>
 #include <unordered_map>
@@ -293,13 +294,13 @@ public:
             auto interpolate_speed = [](const std::map<float, float> &values, float distance) {
                 auto upper_dist = values.lower_bound(distance);
                 if (upper_dist == values.end()) {
-                    return values.rend()->second;
+                    return values.rbegin()->second;
                 }
                 if (upper_dist == values.begin()) {
                     return upper_dist->second;
                 }
 
-                auto  lower_dist = --upper_dist;
+                auto  lower_dist = std::prev(upper_dist);
                 float t          = (distance - lower_dist->first) / (upper_dist->first - lower_dist->first);
                 return (1.0f - t) * lower_dist->second + t * upper_dist->second;
             };

@@ -98,6 +98,10 @@ void OptionsSearcher::append_options(DynamicPrintConfig* config, Preset::Type ty
             suffix_local = " " + _(suffix);
             suffix = " " + suffix;
         }
+        else if (gc.group == "Dynamic overhang speed" && id >= 0) {
+            suffix = " " + std::to_string(id+1);
+            suffix_local = suffix;
+        }
 
         if (!label.IsEmpty())
             options.emplace_back(Option{ boost::nowide::widen(key), type,

@@ -2874,21 +2874,20 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         !this->on_first_layer() && path.role().is_perimeter()) {
         std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_with_speeds = {{100, ConfigOptionFloatOrPercent{speed, false}}};
         if (this->m_config.enable_dynamic_overhang_speeds) {
-            std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_with_speeds = {{0, m_config.overhang_speed_0},
-                                                                                             {25, m_config.overhang_speed_1},
-                                                                                             {50, m_config.overhang_speed_2},
-                                                                                             {75, m_config.overhang_speed_3},
-                                                                                             {100,
-                                                                                              ConfigOptionFloatOrPercent{speed, false}}};
+            overhangs_with_speeds = {{0, m_config.overhang_speed_0},
+                                     {25, m_config.overhang_speed_1},
+                                     {50, m_config.overhang_speed_2},
+                                     {75, m_config.overhang_speed_3},
+                                     {100, ConfigOptionFloatOrPercent{speed, false}}};
         }
 
         std::vector<std::pair<int, ConfigOptionInts>> overhang_w_fan_speeds = {{100, ConfigOptionInts{0}}};
         if (this->m_config.enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())) {
-            std::vector<std::pair<int, ConfigOptionInts>> overhang_w_fan_speeds = {{0, m_config.overhang_fan_speed_0},
-                                                                                   {25, m_config.overhang_fan_speed_1},
-                                                                                   {50, m_config.overhang_fan_speed_2},
-                                                                                   {75, m_config.overhang_fan_speed_3},
-                                                                                   {100, ConfigOptionInts{0}}};
+            overhang_w_fan_speeds = {{0, m_config.overhang_fan_speed_0},
+                                     {25, m_config.overhang_fan_speed_1},
+                                     {50, m_config.overhang_fan_speed_2},
+                                     {75, m_config.overhang_fan_speed_3},
+                                     {100, ConfigOptionInts{0}}};
         }
 
         double external_perim_reference_speed = std::min(m_config.get_abs_value("external_perimeter_speed"),
