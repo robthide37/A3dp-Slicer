@@ -13,7 +13,7 @@ class PrintObjectConfig;
 
 // Support layer type to be used by SupportGeneratorLayer. This type carries a much more detailed information
 // about the support layer type than the final support layers stored in a PrintObject.
-enum SupporLayerType {
+enum class SupporLayerType {
 	Unknown = 0,
 	// Ratft base layer, to be printed with the support material.
 	RaftBase,

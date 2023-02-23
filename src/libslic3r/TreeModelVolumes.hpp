@@ -244,7 +244,7 @@ public:
      * Knowledge about branch angle is used to only calculate avoidances and collisions that may actually be needed.
      * Not calling precalculate() will cause the class to lazily calculate avoidances and collisions as needed, which will be a lot slower on systems with more then one or two cores!
      */
-    void precalculate(const coord_t max_layer, std::function<void()> throw_on_cancel);
+    void precalculate(const PrintObject& print_object, const coord_t max_layer, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
@@ -617,6 +617,9 @@ private:
      * \brief Smallest radius a branch can have. This is the radius of a SupportElement with DTT=0.
      */
     coord_t m_radius_0;
+
+    // Z heights of the raft layers (additional layers below the object, last raft layer aligned with the bottom of the first object layer).
+    std::vector<double>         m_raft_layers;
 
     /*!
      * \brief Caches for the collision, avoidance and areas on the model where support can be placed safely
