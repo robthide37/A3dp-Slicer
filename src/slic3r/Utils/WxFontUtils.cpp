@@ -43,6 +43,20 @@ static bool is_valid_ttf(std::string_view file_path)
     return true;
 }
 
+static std::string get_path_from_file_uri(const wxString &file_uri)
+{
+    wxURI uri(file_uri);
+    const wxString &path = uri.GetPath();
+    BOOST_LOG_TRIVIAL(trace) << "input uri(" << file_uri.c_str() << ") convert to path(" << path.c_str() << ").";
+    std::string file_path(path.c_str());
+    size_t start = std::string("file://").size();
+    if (file_path.empty() || file_path.size() <= start)
+        return {};
+    // remove prefix file://
+    file_path = file_path.substr(start, file_path.size() - start);
+    return file_path;
+}
+
 // get filepath from wxFont on Mac OsX
 static std::string get_file_path(const wxFont& font) {
     const wxNativeFontInfo *info = font.GetNativeFontInfo();
@@ -55,13 +69,7 @@ static std::string get_file_path(const wxFont& font) {
     if (url == NULL) return {};
     wxString file_uri;
     wxCFTypeRef(url).GetValue(file_uri);
-    std::string file_path(wxURI::Unescape(file_uri).c_str());
-    size_t start = std::string("file://").size();
-    if (file_path.empty() || file_path.size() <= start)
-        return {};
-    // remove prefix file://
-    file_path = file_path.substr(start, file_path.size() - start);
-    return file_path;
+    return get_path_from_file_uri(file_uri);    
 }    
 #endif // __APPLE__
 } // namespace
