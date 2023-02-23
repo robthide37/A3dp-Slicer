@@ -1972,31 +1972,30 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         // Should the wipe tower be visualized ?
         unsigned int extruders_count = (unsigned int)dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"))->values.size();
 
-        bool wt = dynamic_cast<const ConfigOptionBool*>(m_config->option("wipe_tower"))->value;
-        bool co = dynamic_cast<const ConfigOptionBool*>(m_config->option("complete_objects"))->value;
+        const bool wt = dynamic_cast<const ConfigOptionBool*>(m_config->option("wipe_tower"))->value;
+        const bool co = dynamic_cast<const ConfigOptionBool*>(m_config->option("complete_objects"))->value;
 
         if (extruders_count > 1 && wt && !co) {
             // Height of a print (Show at least a slab)
-            double height = std::max(m_model->bounding_box().max(2), 10.0);
+            const double height = std::max(m_model->bounding_box().max.z(), 10.0);
 
-            float x = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_x"))->value;
-            float y = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_y"))->value;
-            float w = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_width"))->value;
-            float a = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_rotation_angle"))->value;
+            const float x = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_x"))->value;
+            const float y = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_y"))->value;
+            const float w = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_width"))->value;
+            const float a = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_rotation_angle"))->value;
+            const float bw = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_brim_width"))->value;
 
             const Print *print = m_process->fff_print();
-
-            float depth = print->wipe_tower_data(extruders_count).depth;
-            float brim_width = print->wipe_tower_data(extruders_count).brim_width;
+            const float depth = print->wipe_tower_data(extruders_count).depth;
 
 #if ENABLE_OPENGL_ES
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
-                brim_width, &m_wipe_tower_mesh);
+                bw, &m_wipe_tower_mesh);
 #else
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
-                brim_width);
+                bw);
 #endif // ENABLE_OPENGL_ES
             if (volume_idx_wipe_tower_old != -1)
                 map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
