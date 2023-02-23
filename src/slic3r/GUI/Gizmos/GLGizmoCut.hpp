@@ -187,7 +187,7 @@ public:
     /// <returns>Return True when use the information otherwise False.</returns>
     bool on_mouse(const wxMouseEvent &mouse_event) override;
 
-    void shift_cut_z(double delta);
+    void shift_cut(double delta);
     void rotate_vec3d_around_plane_center(Vec3d&vec);
     void put_connectors_on_cut_plane(const Vec3d& cp_normal, double cp_offset);
     void update_clipper();
