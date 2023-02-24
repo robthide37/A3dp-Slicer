@@ -3828,9 +3828,8 @@ void GLGizmoEmboss::draw_transparent_icon()
         size_uv.x/icon.size.x,
         size_uv.y/icon.size.y);
     // reduce uv coors to one pixel
-    icon.br = ImVec2(
-        icon.tl.x + one_px.x,
-        icon.tl.y + one_px.y);
+    icon.tl = ImVec2(0, 0);
+    icon.br = one_px;
     IconManager::draw(icon);
 }
 
