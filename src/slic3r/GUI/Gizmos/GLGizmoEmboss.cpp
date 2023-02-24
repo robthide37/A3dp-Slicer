@@ -2183,7 +2183,6 @@ void GLGizmoEmboss::draw_font_list()
     const char *popup_id = "##font_list_popup";
     const char *input_id = "##font_list_input";
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
-    ImGuiInputTextFlags input_flags = ImGuiInputTextFlags_CharsUppercase;
 
     // change color of hint to normal text
     bool is_popup_open = ImGui::IsPopupOpen(popup_id);
@@ -2195,11 +2194,18 @@ void GLGizmoEmboss::draw_font_list()
         m_face_names.search.clear();
     }
 
-    if (ImGui::InputTextWithHint(input_id, selected, &m_face_names.search, input_flags)) {
+    if (ImGui::InputTextWithHint(input_id, selected, &m_face_names.search)) {
         // update filtration result        
         m_face_names.hide = std::vector<bool>(m_face_names.faces.size(), {false});
+
+        // search to uppercase
+        std::string search = m_face_names.search; // copy
+        std::transform(search.begin(), search.end(), search.begin(), ::toupper);
+
         for (FaceName &face : m_face_names.faces) {
-            size_t      index = &face - &m_face_names.faces.front();
+            size_t index = &face - &m_face_names.faces.front();
+
+            // font name to uppercase
             std::string name(face.wx_name.ToUTF8().data());
             std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
