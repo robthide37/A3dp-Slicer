@@ -1,5 +1,6 @@
 #include "JumpPointSearch.hpp"
 #include "BoundingBox.hpp"
+#include "ExPolygon.hpp"
 #include "Point.hpp"
 #include "libslic3r/AStar.hpp"
 #include "libslic3r/KDTreeIndirect.hpp"
@@ -181,17 +182,18 @@ public:
 void JPSPathFinder::clear()
 {
     inpassable.clear();
-    obstacle_max = Pixel(std::numeric_limits<coord_t>::min(), std::numeric_limits<coord_t>::min());
-    obstacle_min = Pixel(std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max());
+    max_search_box.max = Pixel(std::numeric_limits<coord_t>::min(), std::numeric_limits<coord_t>::min());
+    max_search_box.min = Pixel(std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max());
+    add_obstacles(bed_shape);
 }
 
 void JPSPathFinder::add_obstacles(const Lines &obstacles)
 {
     auto store_obstacle = [&](coord_t x, coord_t y) {
-        obstacle_max.x() = std::max(obstacle_max.x(), x);
-        obstacle_max.y() = std::max(obstacle_max.y(), y);
-        obstacle_min.x() = std::min(obstacle_min.x(), x);
-        obstacle_min.y() = std::min(obstacle_min.y(), y);
+        max_search_box.max.x() = std::max(max_search_box.max.x(), x);
+        max_search_box.max.y() = std::max(max_search_box.max.y(), y);
+        max_search_box.min.x() = std::min(max_search_box.min.x(), x);
+        max_search_box.min.y() = std::min(max_search_box.min.y(), y);
         inpassable.insert(Pixel{x, y});
         return true;
     };
@@ -240,9 +242,9 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
         });
     }
 
-    BoundingBox search_box({start, end, obstacle_max, obstacle_min});
-    search_box.max += Pixel(1, 1);
-    search_box.min -= Pixel(1, 1);
+    BoundingBox search_box = max_search_box;
+    search_box.max -= Pixel(1, 1);
+    search_box.min += Pixel(1, 1);
 
     BoundingBox bounding_square(Points{start, end});
     bounding_square.max += Pixel(5, 5);
