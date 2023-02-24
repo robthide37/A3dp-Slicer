@@ -91,20 +91,40 @@ public:
     /// </summary>
     void release();
 
-    /// <summary>
-    /// Draw imgui image with icon
-    /// </summary>
-    /// <param name="icon">Place in texture</param>
-    /// <param name="size">[optional]Size of image, wen zero than use same size as stored texture</param>
-    /// <param name="tint_col">viz ImGui::Image </param>
-    /// <param name="border_col">viz ImGui::Image </param>
-    static void draw(const Icon &icon, const ImVec2 &size = ImVec2(0, 0), const ImVec4& tint_col = ImVec4(1,1,1,1), const ImVec4& border_col = ImVec4(0,0,0,0));
-
 private:        
     // keep data stored on GPU
     GLTexture m_icons_texture;
     Icons m_icons;
 };
+
+/// <summary>
+/// Draw imgui image with icon
+/// </summary>
+/// <param name="icon">Place in texture</param>
+/// <param name="size">[optional]Size of image, wen zero than use same size as stored texture</param>
+/// <param name="tint_col">viz ImGui::Image </param>
+/// <param name="border_col">viz ImGui::Image </param>
+void draw(const IconManager::Icon &icon,
+          const ImVec2            &size       = ImVec2(0, 0),
+          const ImVec4            &tint_col   = ImVec4(1, 1, 1, 1),
+          const ImVec4            &border_col = ImVec4(0, 0, 0, 0));
+
+/// <summary>
+/// Draw icon which change on hover
+/// </summary>
+/// <param name="icon">Draw when no hover</param>
+/// <param name="icon_hover">Draw when hover</param>
+/// <returns>True when click, otherwise False</returns>
+bool clickable(const IconManager::Icon &icon, const IconManager::Icon &icon_hover);
+
+/// <summary>
+/// Use icon as button with 3 states activ hover and disabled 
+/// </summary>
+/// <param name="activ">Not disabled not hovered image</param>
+/// <param name="hover">Hovered image</param>
+/// <param name="disable">Disabled image</param>
+/// <returns>True when click on enabled, otherwise False</returns>
+bool button(const IconManager::Icon &activ, const IconManager::Icon &hover, const IconManager::Icon &disable, bool disabled = false);
 
 } // namespace Slic3r::GUI
 #endif // slic3r_IconManager_hpp_

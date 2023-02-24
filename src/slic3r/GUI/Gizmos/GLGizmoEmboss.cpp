@@ -2798,7 +2798,7 @@ bool GLGizmoEmboss::draw_italic_button()
     const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font(); 
     const auto& ff = m_style_manager.get_font_file_with_cache();
     if (!wx_font_opt.has_value() || !ff.has_value()) { 
-        draw_icon(IconType::italic, IconState::disabled);
+        draw(*m_icons[(int) IconType::italic][(int)IconState::disabled]);
         return false;
     }
     const wxFont& wx_font = *wx_font_opt;
@@ -2807,8 +2807,8 @@ bool GLGizmoEmboss::draw_italic_button()
     bool is_font_italic = skew.has_value() || WxFontUtils::is_italic(wx_font);
     if (is_font_italic) {
         // unset italic
-        if (draw_clickable(IconType::italic, IconState::hovered,
-                           IconType::unitalic, IconState::hovered)) {
+        if (clickable(get_icon(IconType::italic, IconState::hovered),
+                      get_icon(IconType::unitalic, IconState::hovered))) {
             skew.reset();
             if (wx_font.GetStyle() != wxFontStyle::wxFONTSTYLE_NORMAL) {
                 wxFont new_wx_font = wx_font; // copy
@@ -2845,7 +2845,7 @@ bool GLGizmoEmboss::draw_bold_button() {
     const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
     const auto& ff = m_style_manager.get_font_file_with_cache();
     if (!wx_font_opt.has_value() || !ff.has_value()) {
-        draw_icon(IconType::bold, IconState::disabled);
+        draw(get_icon(IconType::bold, IconState::disabled));
         return false;
     }
     const wxFont &wx_font = *wx_font_opt;
@@ -2854,8 +2854,8 @@ bool GLGizmoEmboss::draw_bold_button() {
     bool is_font_bold = boldness.has_value() || WxFontUtils::is_bold(wx_font);
     if (is_font_bold) {
         // unset bold
-        if (draw_clickable(IconType::bold, IconState::hovered,
-                           IconType::unbold, IconState::hovered)) {
+        if (clickable(get_icon(IconType::bold, IconState::hovered),
+                      get_icon(IconType::unbold, IconState::hovered))) {
             boldness.reset();
             if (wx_font.GetWeight() != wxFontWeight::wxFONTWEIGHT_NORMAL) {
                 wxFont new_wx_font = wx_font; // copy
@@ -3800,67 +3800,14 @@ void GLGizmoEmboss::init_icons()
     m_icons = m_icon_manager.init(filenames, size, type);
 }
 
-void GLGizmoEmboss::draw_icon(IconType icon, IconState state, ImVec2 size)
+const IconManager::Icon &GLGizmoEmboss::get_icon(IconType type, IconState state) { return *m_icons[(unsigned) type][(unsigned) state]; }
+bool GLGizmoEmboss::draw_button(IconType type, bool disable)
 {
-    // canot draw count
-    assert(icon != IconType::_count);
-    if (icon == IconType::_count) return;
-
-    const auto &i = *m_icons[static_cast<int>(icon)][static_cast<int>(state)];
-    IconManager::draw(i);
-}
-
-void GLGizmoEmboss::draw_transparent_icon()
-{
-    // use top left corner of first icon
-    IconManager::Icon icon = *m_icons.front().front(); // copy
-
-    if (!icon.is_valid()) {
-        ImGui::Text("▯");
-        return;
-    }
-
-    // size UV texture coors [in texture ratio]
-    ImVec2 size_uv(
-        icon.br.x-icon.tl.x,
-        icon.br.y-icon.tl.y);
-    ImVec2 one_px(
-        size_uv.x/icon.size.x,
-        size_uv.y/icon.size.y);
-    // reduce uv coors to one pixel
-    icon.tl = ImVec2(0, 0);
-    icon.br = one_px;
-    IconManager::draw(icon);
-}
-
-bool GLGizmoEmboss::draw_clickable(
-    IconType icon, IconState state, 
-    IconType hover_icon, IconState hover_state)
-{
-    // check of hover
-    float cursor_x = ImGui::GetCursorPosX();
-    draw_transparent_icon();
-    ImGui::SameLine(cursor_x);
-
-    if (ImGui::IsItemHovered()) {
-        // redraw image
-        draw_icon(hover_icon, hover_state);
-    } else {
-        // redraw normal image
-        draw_icon(icon, state);
-    }
-    return ImGui::IsItemClicked();
-}
-
-bool GLGizmoEmboss::draw_button(IconType icon, bool disable)
-{
-    if (disable) {
-        draw_icon(icon, IconState::disabled);
-        return false;
-    }
-    return draw_clickable(
-        icon, IconState::activable,
-        icon, IconState::hovered
+    return Slic3r::GUI::button(
+        get_icon(type, IconState::activable),
+        get_icon(type, IconState::hovered),
+        get_icon(type, IconState::disabled),
+        disable
     );
 }
 

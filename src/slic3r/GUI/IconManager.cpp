@@ -8,6 +8,7 @@ namespace priv {
 // set shared pointer to point on bad texture
 static void clear(IconManager::Icons &icons);
 static const std::vector<std::pair<int, bool>>& get_states(IconManager::RasterType type);
+static void draw_transparent_icon(const IconManager::Icon &icon); // only help function
 }
 
 IconManager::~IconManager() {
@@ -94,19 +95,6 @@ void IconManager::release() {
 	BOOST_LOG_TRIVIAL(error) << "Not implemented yet";
 }
 
-void IconManager::draw(const Icon &icon, const ImVec2 &size, const ImVec4 &tint_col, const ImVec4 &border_col)
-{
-    // is icon loaded
-    if (!icon.is_valid()) {
-        ImGui::Text("?");
-        return;
-    }
-
-    ImTextureID id = (void *) icon.tex_id;
-    const ImVec2 &s = (size.x < 1 || size.y < 1) ? icon.size : size;
-    ImGui::Image(id, s, icon.tl, icon.br, tint_col, border_col);
-}
-
 void priv::clear(IconManager::Icons &icons) {
     std::string message;
 	for (auto &icon : icons) {
@@ -148,3 +136,69 @@ const std::vector<std::pair<int, bool>> &priv::get_states(IconManager::RasterTyp
     default: return color;
     }
 }
+
+void priv::draw_transparent_icon(const IconManager::Icon &icon)
+{
+    // Check input
+    if (!icon.is_valid()) {
+        assert(false);
+        BOOST_LOG_TRIVIAL(warning) << "Drawing invalid Icon.";
+        ImGui::Text("?");
+        return;
+    }
+
+    // size UV texture coors [in texture ratio]
+    ImVec2 size_uv(icon.br.x - icon.tl.x, icon.br.y - icon.tl.y);
+    ImVec2 one_px(size_uv.x / icon.size.x, size_uv.y / icon.size.y);
+
+    // use top left corner of first icon
+    IconManager::Icon icon_px = icon; // copy
+    // reduce uv coors to one pixel
+    icon_px.tl = ImVec2(0, 0);
+    icon_px.br = one_px;
+    draw(icon_px);
+}
+
+namespace Slic3r::GUI {
+
+void draw(const IconManager::Icon &icon, const ImVec2 &size, const ImVec4 &tint_col, const ImVec4 &border_col)
+{
+    // Check input
+    if (!icon.is_valid()) {
+        assert(false);
+        BOOST_LOG_TRIVIAL(warning) << "Drawing invalid Icon.";
+        ImGui::Text("?");
+        return;
+    }
+
+    ImTextureID   id = (void *) icon.tex_id;
+    const ImVec2 &s  = (size.x < 1 || size.y < 1) ? icon.size : size;
+    ImGui::Image(id, s, icon.tl, icon.br, tint_col, border_col);
+}
+
+bool clickable(const IconManager::Icon &icon, const IconManager::Icon &icon_hover)
+{
+    // check of hover
+    float cursor_x = ImGui::GetCursorPosX();
+    priv::draw_transparent_icon(icon);
+    ImGui::SameLine(cursor_x);
+    if (ImGui::IsItemHovered()) {
+        // redraw image
+        draw(icon_hover);
+    } else {
+        // redraw normal image
+        draw(icon);
+    }
+    return ImGui::IsItemClicked();
+}
+
+bool button(const IconManager::Icon &activ, const IconManager::Icon &hover, const IconManager::Icon &disable, bool disabled)
+{
+    if (disabled) {
+        draw(disable);
+        return false;
+    }
+    return clickable(activ, hover);
+}
+
+} // namespace Slic3r::GUI

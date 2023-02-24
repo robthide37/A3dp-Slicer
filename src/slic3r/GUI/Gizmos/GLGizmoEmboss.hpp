@@ -361,10 +361,8 @@ private:
         // automatic calc of icon's count
         _count
     };
-    enum class IconState: unsigned { activable = 0, hovered /*1*/, disabled /*2*/};
-    void draw_icon(IconType icon, IconState state, ImVec2 size = ImVec2(0,0));
-    void draw_transparent_icon();
-    bool draw_clickable(IconType icon, IconState state, IconType hover_icon, IconState hover_state);
+    enum class IconState : unsigned { activable = 0, hovered /*1*/, disabled /*2*/ };
+    const IconManager::Icon& get_icon(IconType type, IconState state);
     bool draw_button(IconType icon, bool disable = false);
 
     // only temporary solution
