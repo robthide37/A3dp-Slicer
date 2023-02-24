@@ -902,7 +902,7 @@ void GLGizmoCut3D::on_set_state()
 
         update_bb();
         m_connectors_editing = !m_selected.empty();
-        m_transformed_bounding_box = transformed_bounding_box(m_plane_center);
+        m_transformed_bounding_box = transformed_bounding_box(m_plane_center, m_rotation_m);
 
         // initiate archived values
         m_ar_plane_center   = m_plane_center;
