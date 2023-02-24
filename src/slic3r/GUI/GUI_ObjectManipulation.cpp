@@ -446,7 +446,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
     m_reset_rotation_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
         GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
         Selection& selection = canvas->get_selection();
-
+        selection.setup_cache();
 #if ENABLE_WORLD_COORDINATE
         if (selection.is_single_volume_or_modifier()) {
             GLVolume* vol = const_cast<GLVolume*>(selection.get_first_volume());
@@ -468,9 +468,11 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         else
             return;
 
-        // Update rotation at the GLVolumes.
-        selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
+        // Synchronize instances/volumes.
+
+        selection.synchronize_unselected_instances(Selection::SyncRotationType::RESET);
         selection.synchronize_unselected_volumes();
+
         // Copy rotation values from GLVolumes into Model (ModelInstance / ModelVolume), trigger background processing.
         canvas->do_rotate(L("Reset Rotation"));
 
