@@ -2210,7 +2210,7 @@ void GLGizmoEmboss::draw_font_list()
             std::transform(name.begin(), name.end(), name.begin(), ::toupper);
 
             // It should use C++ 20 feature https://en.cppreference.com/w/cpp/string/basic_string/starts_with
-            bool start_with = boost::starts_with(name, m_face_names.search);
+            bool start_with = boost::starts_with(name, search);
             m_face_names.hide[index] = !start_with; 
         }
     }
