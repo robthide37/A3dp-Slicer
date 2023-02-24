@@ -490,6 +490,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 #if ENABLE_WORLD_COORDINATE
         GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
         Selection& selection = canvas->get_selection();
+        selection.setup_cache();
         if (selection.is_single_volume_or_modifier()) {
             GLVolume* vol = const_cast<GLVolume*>(selection.get_first_volume());
             Geometry::Transformation trafo = vol->get_volume_transformation();
