@@ -3010,7 +3010,12 @@ void Selection::synchronize_unselected_instances(SyncRotationType sync_rotation_
             const Transform3d& old_inst_trafo_j = m_cache.volumes_data[j].get_instance_transform().get_matrix();
             assert(is_rotation_xy_synchronized(old_inst_trafo_i, old_inst_trafo_j));
             Transform3d        new_inst_trafo_j = volume_j->get_instance_transformation().get_matrix();
-            if (sync_rotation_type != SyncRotationType::NONE || mirrored)
+            if (sync_rotation_type == SyncRotationType::RESET) {
+                Geometry::Transformation new_inst_trafo_j_no_rotation(new_inst_trafo_j);
+                new_inst_trafo_j_no_rotation.reset_rotation();
+                new_inst_trafo_j = new_inst_trafo_j_no_rotation.get_matrix();
+            }
+            else if (sync_rotation_type != SyncRotationType::NONE || mirrored)
                 new_inst_trafo_j.linear() = (old_inst_trafo_j.linear() * old_inst_trafo_i.linear().inverse()) * curr_inst_trafo_i.linear();
             if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptSLA)
                 new_inst_trafo_j.translation().z() = curr_inst_trafo_i.translation().z();
