@@ -3795,23 +3795,9 @@ void GLGizmoEmboss::init_icons()
     std::string path = resources_dir() + "/icons/";
     for (std::string &filename : filenames) filename = path + filename;
 
-    // state order has to match the enum IconState
-    std::vector<std::pair<int, bool>> states;
-    states.push_back(std::make_pair(1, false)); // Activable
-    states.push_back(std::make_pair(0, false));  // Hovered
-    states.push_back(std::make_pair(2, false)); // Disabled
-
-    bool compress = false;
-    bool is_loaded = m_icons_texture.load_from_svg_files_as_sprites_array(
-        filenames, states, m_gui_cfg->icon_width, compress);
-
-    if (!is_loaded ||
-        (size_t)m_icons_texture.get_width() < (states.size() * m_gui_cfg->icon_width) ||
-        (size_t)m_icons_texture.get_height() < (filenames.size() * m_gui_cfg->icon_width)) { 
-        // bad load of icons, but all usage of m_icons_texture check that texture is initialized
-        assert(false);
-        m_icons_texture.reset();
-    }
+    ImVec2 size(m_gui_cfg->icon_width, m_gui_cfg->icon_width);
+    auto type = IconManager::RasterType::color_wite_gray;
+    m_icons = m_icon_manager.init(filenames, size, type);
 }
 
 void GLGizmoEmboss::draw_icon(IconType icon, IconState state, ImVec2 size)
@@ -3820,48 +3806,32 @@ void GLGizmoEmboss::draw_icon(IconType icon, IconState state, ImVec2 size)
     assert(icon != IconType::_count);
     if (icon == IconType::_count) return;
 
-    unsigned int icons_texture_id = m_icons_texture.get_id();
-    int          tex_width        = m_icons_texture.get_width();
-    int          tex_height       = m_icons_texture.get_height();
-    // is icon loaded
-    if ((icons_texture_id == 0) || (tex_width <= 1) || (tex_height <= 1)){
-        ImGui::Text("▮");
-        return;
-    }
-        
-    int icon_width = m_gui_cfg->icon_width;
-    ImTextureID tex_id = (void *) (intptr_t) (GLuint) icons_texture_id;
-    int start_x = static_cast<unsigned>(state) * (icon_width + 1) + 1,
-        start_y = static_cast<unsigned>(icon) * (icon_width + 1) + 1;
-
-    ImVec2 uv0(start_x / (float) tex_width, 
-               start_y / (float) tex_height);
-    ImVec2 uv1((start_x + icon_width) / (float) tex_width,
-               (start_y + icon_width) / (float) tex_height);
-        
-    if (size.x < 1 || size.y < 1)
-        size = ImVec2(m_gui_cfg->icon_width, m_gui_cfg->icon_width);
-
-    ImGui::Image(tex_id, size, uv0, uv1);
+    const auto &i = *m_icons[static_cast<int>(icon)][static_cast<int>(state)];
+    IconManager::draw(i);
 }
 
 void GLGizmoEmboss::draw_transparent_icon()
 {
-    unsigned int icons_texture_id = m_icons_texture.get_id();
-    int          tex_width        = m_icons_texture.get_width();
-    int          tex_height       = m_icons_texture.get_height();
-    // is icon loaded
-    if ((icons_texture_id == 0) || (tex_width <= 1) || (tex_height <= 1)) {
+    // use top left corner of first icon
+    IconManager::Icon icon = *m_icons.front().front(); // copy
+
+    if (!icon.is_valid()) {
         ImGui::Text("▯");
         return;
     }
 
-    ImTextureID tex_id = (void *) (intptr_t) (GLuint) icons_texture_id;
-    int    icon_width = m_gui_cfg->icon_width;
-    ImVec2 icon_size(icon_width, icon_width);
-    ImVec2 pixel_size(1.f / tex_width, 1.f / tex_height);
-    // zero pixel is transparent in texture
-    ImGui::Image(tex_id, icon_size, ImVec2(0, 0), pixel_size);
+    // size UV texture coors [in texture ratio]
+    ImVec2 size_uv(
+        icon.br.x-icon.tl.x,
+        icon.br.y-icon.tl.y);
+    ImVec2 one_px(
+        size_uv.x/icon.size.x,
+        size_uv.y/icon.size.y);
+    // reduce uv coors to one pixel
+    icon.br = ImVec2(
+        icon.tl.x + one_px.x,
+        icon.tl.y + one_px.y);
+    IconManager::draw(icon);
 }
 
 bool GLGizmoEmboss::draw_clickable(

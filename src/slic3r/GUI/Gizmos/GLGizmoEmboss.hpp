@@ -5,15 +5,12 @@
 // which overrides our localization "L" macro.
 #include "GLGizmoBase.hpp"
 #include "GLGizmoRotate.hpp"
-#include "slic3r/GUI/GLTexture.hpp"
+#include "slic3r/GUI/IconManager.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/Utils/EmbossStyleManager.hpp"
 
-#include "admesh/stl.h" // indexed_triangle_set
 #include <optional>
 #include <memory>
-#include <mutex>
-#include <thread>
 #include <atomic>
 
 #include "libslic3r/Emboss.hpp"
@@ -33,7 +30,6 @@ namespace Slic3r{
 }
 
 namespace Slic3r::GUI {
-class MeshRaycaster;
 class GLGizmoEmboss : public GLGizmoBase
 {
 public:
@@ -346,7 +342,9 @@ private:
     void calculate_scale();
 
     // drawing icons
-    GLTexture m_icons_texture;
+    IconManager m_icon_manager;
+    std::vector<IconManager::Icons> m_icons;
+
     void init_icons();
     enum class IconType : unsigned {
         rename = 0,
