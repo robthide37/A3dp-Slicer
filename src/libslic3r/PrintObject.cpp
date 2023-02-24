@@ -1671,7 +1671,7 @@ void PrintObject::bridge_over_infill()
                 }
             }
 
-            for (const std::pair<const LayerSlice *, SurfacesPtr> candidates : bridging_surface_candidates) {
+            for (std::pair<const LayerSlice *, SurfacesPtr> candidates : bridging_surface_candidates) {
                 if (candidates.second.empty()) {
                     continue;
                 };
@@ -1733,6 +1733,7 @@ void PrintObject::bridge_over_infill()
                             }
                         }
                         current_links = next_links;
+                        next_links.clear();
                     }
 
                     lower_layers_sparse_infill = intersection(lower_layers_sparse_infill,
@@ -1763,6 +1764,18 @@ void PrintObject::bridge_over_infill()
                     Polygons a = to_polygons(sparse_infill->expolygon);
                     expand_area.insert(expand_area.end(), a.begin(), a.end());
                 }
+
+                // Presort the candidate polygons. This will help choose the same angle for neighbournig surfaces, that would otherwise
+                // compete over anchoring sparse infill lines, leaving one area unachored
+                std::sort(candidates.second.begin(), candidates.second.end(), [](const Surface* left, const Surface* right){
+                    auto a = get_extents(left->expolygon);
+                    auto b = get_extents(right->expolygon);
+
+                    if (a.min.x() == b.min.x()) {
+                        return a.min.y() < b.min.y();
+                    };
+                    return a.min.x() < b.min.x();
+                });
 
                 // Lower layers sparse infill sections gathered
                 // now we can intersected them with bridging surface candidates to get actual areas that need and can accumulate
@@ -1807,7 +1820,14 @@ void PrintObject::bridge_over_infill()
 #endif
 
                     double bridging_angle = 0;
-                    {
+                    Polygons tmp_expanded_area  = expand(bridged_area, 3.0 * flow.scaled_spacing());
+                    for (const ModifiedSurface& s : bridging_surfaces[candidates.first]) {
+                        if (!intersection(s.new_polys, tmp_expanded_area).empty()) {
+                            bridging_angle = s.bridge_angle;
+                            break;
+                        }
+                    }
+                    if (bridging_angle == 0) {
                         AABBTreeLines::LinesDistancer<Line> lines_tree{anchors.empty() ? anchors_and_walls : to_lines(anchors)};
 
                         std::map<double, int> counted_directions;
