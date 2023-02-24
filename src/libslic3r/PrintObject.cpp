@@ -397,6 +397,7 @@ void PrintObject::infill()
     this->prepare_infill();
 
     if (this->set_started(posInfill)) {
+        m_print->set_status(45, L("making infill"));
         auto [adaptive_fill_octree, support_fill_octree] = this->prepare_adaptive_infill_data();
         auto lightning_generator                         = this->prepare_lightning_infill_data();
 
@@ -1658,18 +1659,8 @@ void PrintObject::bridge_over_infill()
                 continue;
             }
 
-            // Now, temporarily fill the previous layer and extract the extrusions.
-            // TODO - the make_fills function does a lot of work, some of it is not needed (e.g. sorting the paths)
-            // It would be nice to have a function that only creates the fill polylines, ideally without modifying the global state
-            po->get_layer(lidx)->lower_layer->make_fills(nullptr, nullptr, nullptr);
-            Polylines lower_layer_polylines;
-            for (const LayerRegion *region : layer->lower_layer->m_regions) {
-                for (const ExtrusionEntity *ee : region->fills().entities) {
-                    assert(ee->is_collection());
-                    auto region_polylines = dynamic_cast<const ExtrusionEntityCollection *>(ee)->as_polylines();
-                    lower_layer_polylines.insert(lower_layer_polylines.end(), region_polylines.begin(), region_polylines.end());
-                }
-            }
+            // generate sparse infill polylines from lower layers to get anchorable polylines
+            Polylines lower_layer_polylines = po->get_layer(lidx)->lower_layer->generate_sparse_infill_polylines_for_anchoring();
 
             for (std::pair<const LayerSlice *, SurfacesPtr> candidates : bridging_surface_candidates) {
                 if (candidates.second.empty()) {
@@ -1786,7 +1777,7 @@ void PrintObject::bridge_over_infill()
                     assert(candidate->surface_type == stInternalSolid);
                     Polygons bridged_area               = expand(to_polygons(candidate->expolygon), flow.scaled_spacing());
                     Polygons infill_region              = to_polygons(surface_to_region[candidate]->fill_expolygons());
-                    bool touches_perimeter = !diff(bridged_area, infill_region).empty();
+                    bool     touches_perimeter          = !diff(bridged_area, infill_region).empty();
                     bool     touches_solid_region_under = !intersection(bridged_area, not_sparse_infill).empty();
 
                     bridged_area =
