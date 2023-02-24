@@ -1627,15 +1627,15 @@ void PrintObject::bridge_over_infill()
                 for ( const LayerRegion *region : regions_to_check) {
                     SurfacesPtr        region_internal_solids = region->fill_surfaces().filter_by_type(stInternalSolid);
 
-                    // remove very small solid infills, usually not worth it and many of them may not even contain extrusions in the end.
+                    // filter out surfaces not from this island... TODO sotre this info in the Z-Graph, so that this filtering is not needed
+                    // NOTE: we are keeping even very small internal ensuring overhangs here. The aim is to later differentiate between expanding wall ensuring regions
+                    // where briding them would be conterproductive, and small ensuring islands that expand into large ones, where bridging is quite necessary
                     region_internal_solids.erase(std::remove_if(region_internal_solids.begin(), region_internal_solids.end(),
-                                                                [slice_island_tree, region](const Surface *s) {
-                                                                    float spacing = float(
-                                                                        region->bridging_flow(frSolidInfill, true).scaled_spacing());
+                                                                [slice_island_tree](const Surface *s) {
                                                                     if (slice_island_tree.outside(s->expolygon.contour.first_point()) > 0) {
                                                                         return true;
                                                                     }
-                                                                    return offset({s->expolygon}, -3.0 * spacing).empty();
+                                                                    return false;
                                                                 }),
                                                  region_internal_solids.end());
                     if (!region_internal_solids.empty()) {
@@ -1744,7 +1744,7 @@ void PrintObject::bridge_over_infill()
 
                     lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), special_infill.begin(), special_infill.end());
 
-                    if (shrink(lower_layers_sparse_infill, 6.0 * scaled(max_bridge_flow_height[candidates.first])).empty()) {
+                    if (shrink(lower_layers_sparse_infill, 3.0 * scaled(max_bridge_flow_height[candidates.first])).empty()) {
                         continue;
                     }
                 }
@@ -1784,12 +1784,16 @@ void PrintObject::bridge_over_infill()
                 for (const Surface *candidate : candidates.second) {
                     const Flow &flow = surface_to_region[candidate]->bridging_flow(frSolidInfill, true);
                     assert(candidate->surface_type == stInternalSolid);
-                    Polygons bridged_area = expand(to_polygons(candidate->expolygon), flow.scaled_spacing());
+                    Polygons bridged_area               = expand(to_polygons(candidate->expolygon), flow.scaled_spacing());
+                    Polygons infill_region              = to_polygons(surface_to_region[candidate]->fill_expolygons());
+                    bool touches_perimeter = !diff(bridged_area, infill_region).empty();
+                    bool     touches_solid_region_under = !intersection(bridged_area, not_sparse_infill).empty();
+
                     bridged_area =
                         intersection(bridged_area,
                                      lower_layers_sparse_infill); // cut off parts which are not over sparse infill - material overflow
 
-                    if (shrink(bridged_area, 4.0 * flow.scaled_spacing()).empty()) {
+                    if ((touches_perimeter || touches_solid_region_under) && shrink(bridged_area, 5.0 * flow.scaled_spacing()).empty()) {
                         continue;
                     }
 
