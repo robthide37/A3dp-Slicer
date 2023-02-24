@@ -612,5 +612,22 @@ void LayerRegion::export_region_fill_surfaces_to_svg_debug(const char *name) con
     this->export_region_fill_surfaces_to_svg(debug_out_path("LayerRegion-fill_surfaces-%s-%d.svg", name, idx ++).c_str());
 }
 
+void LayerRegion::simplify_extrusion_entity()
+{
+
+    const PrintConfig& print_config = this->layer()->object()->print()->config();
+    const bool spiral_mode = print_config.spiral_vase;
+    const bool enable_arc_fitting = print_config.arc_fitting && !spiral_mode;
+    coordf_t scaled_resolution = scale_d(print_config.resolution.value);
+    if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
+
+    //call simplify for all paths
+    SimplifyVisitor visitor{ scaled_resolution , enable_arc_fitting, &print_config.arc_fitting_tolerance };
+    this->perimeters.visit(visitor);
+    this->fills.visit(visitor);
+    this->ironings.visit(visitor);
+    this->milling.visit(visitor);
+}
+
 }
  

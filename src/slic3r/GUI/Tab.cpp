@@ -3350,6 +3350,10 @@ void TabPrinter::toggle_options()
     bool have_remaining_times = m_config->opt_bool("remaining_times");
     field = get_field("remaining_times_type");
     if (field) field->toggle(have_remaining_times);
+	
+    bool have_arc_fitting = m_config->opt_bool("arc_fitting");
+    field = get_field("arc_fitting_tolerance");
+    if (field) field->toggle(have_arc_fitting);
 
     auto flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
     bool is_marlin_flavor = flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware;

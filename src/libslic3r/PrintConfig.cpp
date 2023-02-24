@@ -580,6 +580,24 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("arc_fitting", coBool);
+    def->label = L("Arc fitting");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("Enable this to get a G-code file which has G2 and G3 moves. "
+        "And the fitting tolerance is same with resolution");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("arc_fitting_tolerance", coFloatOrPercent);
+    def->label = L("Arc fitting tolerance");
+    def->sidetext = L("mm or %");
+    def->category = OptionCategory::firmware;
+    def->tooltip = L("When using the arc_fitting option, allow the curve to deviate a cetain % from the collection of strait paths."
+        "\nCan be a mm value or a percentage of the current extrusion width.");
+    def->mode = comAdvancedE | comSuSi;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloatOrPercent(5, true));
+
     def = this->add("avoid_crossing_perimeters", coBool);
     def->label = L("Avoid crossing perimeters");
     def->category = OptionCategory::perimeter;
@@ -2555,9 +2573,9 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::fuzzy_skin;
     def->tooltip = L("Fuzzy skin type."
         "\nNone: setting disabled."
-        "\Outside walls: Apply fuzzy skin only on the external perimeters of the outside (not the holes)."
-        "\External walls: Apply fuzzy skin only on all external perimeters."
-        "\All perimeters: Apply fuzzy skin on all perimeters (external, internal and gapfill).");
+        "\nOutside walls: Apply fuzzy skin only on the external perimeters of the outside (not the holes)."
+        "\nExternal walls: Apply fuzzy skin only on all external perimeters."
+        "\nAll perimeters: Apply fuzzy skin on all perimeters (external, internal and gapfill).");
     def->enum_keys_map = &ConfigOptionEnum<FuzzySkinType>::get_enum_values();
     def->enum_values.push_back("none");
     def->enum_values.push_back("external");
@@ -7490,6 +7508,8 @@ void ModelConfig::convert_from_prusa(const DynamicPrintConfig& global_config) {
 
 std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "allow_empty_layers",
+"arc_fitting",
+"arc_fitting_tolerance",
 "avoid_crossing_not_first_layer",
 "bridge_fill_pattern",
 "bridge_internal_acceleration",

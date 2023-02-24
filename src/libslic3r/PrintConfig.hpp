@@ -984,6 +984,8 @@ PRINT_CONFIG_CLASS_DEFINE(
 PRINT_CONFIG_CLASS_DEFINE(
     GCodeConfig,
 
+    ((ConfigOptionBool,                arc_fitting))
+    ((ConfigOptionFloatOrPercent,      arc_fitting_tolerance))
     ((ConfigOptionString,              before_layer_gcode))
     ((ConfigOptionString,              between_objects_gcode))
     ((ConfigOptionFloats,              deretract_speed))
