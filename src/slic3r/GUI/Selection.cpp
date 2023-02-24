@@ -1056,7 +1056,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
     if (m_mode == Instance) {
         int rot_axis_max = 0;
         rotation.cwiseAbs().maxCoeff(&rot_axis_max);
-        synchronize_unselected_instances((transformation_type.world() && rot_axis_max == 2) ? SyncRotationType::NONE : SyncRotationType::GENERAL);
+        synchronize_unselected_instances((rot_axis_max == 2) ? SyncRotationType::NONE : SyncRotationType::GENERAL);
     }
     else if (m_mode == Volume)
         synchronize_unselected_volumes();
