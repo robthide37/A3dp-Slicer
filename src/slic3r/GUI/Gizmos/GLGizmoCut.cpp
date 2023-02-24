@@ -245,15 +245,17 @@ std::string GLGizmoCut3D::get_tooltip() const
         double koef = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
         std::string unit_str = " " + (m_imperial_units ? _u8L("inch") : _u8L("mm"));
         const BoundingBoxf3& tbb = m_transformed_bounding_box;
+
+        const std::string name = m_keep_as_parts ? _u8L("Part") : _u8L("Object");
         if (tbb.max.z() >= 0.0) {
             double top = (tbb.min.z() <= 0.0 ? tbb.max.z() : tbb.size().z()) * koef;
-            tooltip += format(top, 2) + " " + unit_str + " (" + _u8L("Top part") + ")";
+            tooltip += format(static_cast<float>(top), 2) + " " + unit_str + " (" + name + " A)";
             if (tbb.min.z() <= 0.0)
                 tooltip += "\n";
         }
         if (tbb.min.z() <= 0.0) {
             double bottom = (tbb.max.z() <= 0.0 ? tbb.size().z() : (tbb.min.z() * (-1))) * koef;
-            tooltip += format(bottom, 2) + " " + unit_str + " (" + _u8L("Bottom part") + ")";
+            tooltip += format(static_cast<float>(bottom), 2) + " " + unit_str + " (" + name + " B)";
         }
         return tooltip;
     }
@@ -362,11 +364,8 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
 
 void GLGizmoCut3D::shift_cut(double delta)
 {
-    Vec3d starting_vec = m_rotation_m * Vec3d::UnitZ();
-    if (starting_vec.norm() != 0.0)
-        starting_vec.normalize();
     Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Move cut plane"), UndoRedo::SnapshotType::GizmoAction);
-    set_center(m_plane_center + starting_vec * delta, true);
+    set_center(m_plane_center + m_cut_normal * delta, true);
     m_ar_plane_center = m_plane_center;
 }
 
@@ -405,18 +404,15 @@ bool GLGizmoCut3D::is_looking_forward() const
 void GLGizmoCut3D::update_clipper()
 {
     // update cut_normal
-    Vec3d beg, end = beg = m_bb_center;
-    beg[Z] -= m_radius;
-    end[Z] += m_radius;
-
-    rotate_vec3d_around_plane_center(beg);
-    rotate_vec3d_around_plane_center(end);
-
-    // calculate normal for cut plane
-    Vec3d normal = m_cut_normal = end - beg;
+    Vec3d normal = m_rotation_m * Vec3d::UnitZ();
+    normal.normalize();
+    m_cut_normal = normal;
 
     // calculate normal and offset for clipping plane
-    normal.normalize();
+    Vec3d beg = m_bb_center;
+    beg[Z] -= m_radius;
+    rotate_vec3d_around_plane_center(beg);
+
     m_clp_normal  = normal;
     double offset = normal.dot(m_plane_center);
     double dist   = normal.dot(beg);
@@ -425,17 +421,13 @@ void GLGizmoCut3D::update_clipper()
 
     if (!is_looking_forward()) {
         // recalculate normal and offset for clipping plane, if camera is looking downward to cut plane
-        end = beg = m_bb_center;
-        beg[Z] += m_radius;
-        end[Z] -= m_radius;
-
-        rotate_vec3d_around_plane_center(beg);
-        rotate_vec3d_around_plane_center(end);
-
-        normal = end - beg;
-        if (normal == Vec3d::Zero())
-            return;
+        normal = m_rotation_m * (-1. * Vec3d::UnitZ());
         normal.normalize();
+
+        beg = m_bb_center;
+        beg[Z] += m_radius;
+        rotate_vec3d_around_plane_center(beg);
+
         m_clp_normal = normal;
         offset       = normal.dot(m_plane_center);
         dist         = normal.dot(beg);
@@ -2142,10 +2134,7 @@ void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, bool &create_dowel
             }
             else {
                 // calculate shift of the connector center regarding to the position on the cut plane
-                Vec3d shifted_center = m_plane_center + Vec3d::UnitZ();
-                rotate_vec3d_around_plane_center(shifted_center);
-                Vec3d norm = (shifted_center - m_plane_center).normalized();
-                connector.pos += norm * 0.5 * double(connector.height);
+                connector.pos += m_cut_normal * 0.5 * double(connector.height);
             }
         }
         mo->apply_cut_connectors(_u8L("Connector"));

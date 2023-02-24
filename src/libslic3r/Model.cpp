@@ -1347,12 +1347,7 @@ void ModelVolume::apply_tolerance()
         return;
 
     Vec3d sf = get_scaling_factor();
-/*
-    // correct Z offset in respect to the new size
-    Vec3d pos = vol->get_offset();
-    pos[Z] += sf[Z] * 0.5 * vol->cut_info.height_tolerance;
-    vol->set_offset(pos);
-*/
+
     // make a "hole" wider
     sf[X] += double(cut_info.radius_tolerance);
     sf[Y] += double(cut_info.radius_tolerance);
@@ -1361,6 +1356,17 @@ void ModelVolume::apply_tolerance()
     sf[Z] += double(cut_info.height_tolerance);
 
     set_scaling_factor(sf);
+
+    // correct offset in respect to the new depth
+    Vec3d rot_norm = Geometry::rotation_transform(get_rotation()) * Vec3d::UnitZ();
+    if (rot_norm.norm() != 0.0)
+        rot_norm.normalize();
+
+    double z_offset = 0.5 * static_cast<double>(cut_info.height_tolerance);
+    if (cut_info.connector_type == CutConnectorType::Plug)
+        z_offset -= 0.05; // add small Z offset to better preview
+
+    set_offset(get_offset() + rot_norm * z_offset);
 }
 
 void ModelObject::process_connector_cut(ModelVolume* volume, ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower, 
