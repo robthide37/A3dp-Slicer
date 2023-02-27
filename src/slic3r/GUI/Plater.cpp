@@ -4988,7 +4988,16 @@ bool Plater::priv::can_decrease_instances(int obj_idx /*= -1*/) const
 
     if (obj_idx < 0)
         obj_idx = get_selected_object_idx();
-    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) && 
+
+    if (obj_idx < 0) {
+        if (const auto obj_ids = get_selection().get_object_idxs(); !obj_ids.empty())
+            for (const size_t obj_id : obj_ids)
+                if (can_decrease_instances(obj_id))
+                    return true;
+        return false;
+    }
+
+    return  obj_idx < (int)model.objects.size() && 
             (model.objects[obj_idx]->instances.size() > 1) &&
             !sidebar->obj_list()->has_selected_cut_object();
 }
@@ -6254,6 +6263,13 @@ void Plater::increase_instances(size_t num, int obj_idx/* = -1*/)
     if (obj_idx < 0)
         obj_idx = p->get_selected_object_idx();
 
+    if (obj_idx < 0) {
+        if (const auto obj_idxs = get_selection().get_object_idxs(); !obj_idxs.empty())
+            for (const size_t obj_id : obj_idxs)
+                increase_instances(1, int(obj_id));
+        return;
+    }
+
     ModelObject* model_object = p->model.objects[obj_idx];
     ModelInstance* model_instance = model_object->instances.back();
 
@@ -6288,6 +6304,13 @@ void Plater::decrease_instances(size_t num, int obj_idx/* = -1*/)
 
     if (obj_idx < 0)
         obj_idx = p->get_selected_object_idx();
+
+    if (obj_idx < 0) {
+        if (const auto obj_ids = get_selection().get_object_idxs(); !obj_ids.empty())
+            for (const size_t obj_id : obj_ids)
+                decrease_instances(1, int(obj_id));
+        return;
+    }
 
     ModelObject* model_object = p->model.objects[obj_idx];
     if (model_object->instances.size() > num) {

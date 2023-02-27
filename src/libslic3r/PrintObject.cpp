@@ -2226,9 +2226,11 @@ void PrintObject::combine_infill()
 
 void PrintObject::_generate_support_material()
 {
-    if (m_config.support_material_style == smsTree || m_config.support_material_style == smsOrganic) {
+    if (this->has_support() && (m_config.support_material_style == smsTree || m_config.support_material_style == smsOrganic)) {
         fff_tree_support_generate(*this, std::function<void()>([this](){ this->throw_if_canceled(); }));
     } else {
+        // If support style is set to Organic however only raft will be built but no support,
+        // build snug raft instead.
         PrintObjectSupportMaterial support_material(this, m_slicing_params);
         support_material.generate(*this);
     }
