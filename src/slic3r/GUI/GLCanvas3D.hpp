@@ -550,8 +550,10 @@ private:
 
     PrinterTechnology current_printer_technology() const;
 
+    static bool is_arrange_alignment_enabled();
+
     template<class Self>
-    static auto & get_arrange_settings(Self *self) {
+    static auto & get_arrange_settings_ref(Self *self) {
         PrinterTechnology ptech = self->current_printer_technology();
 
         auto *ptr = &self->m_arrange_settings_fff;
@@ -569,8 +571,22 @@ private:
         return *ptr;
     }
 
-    ArrangeSettings &get_arrange_settings() { return get_arrange_settings(this); }
+public:
+    ArrangeSettings get_arrange_settings() const {
+        const ArrangeSettings &settings = get_arrange_settings_ref(this);
+        ArrangeSettings ret = settings;
+        if (&settings == &m_arrange_settings_fff_seq_print) {
+            ret.distance = std::max(ret.distance,
+                                    float(min_object_distance(*m_config)));
+        }
 
+        if (!is_arrange_alignment_enabled())
+            ret.alignment = -1;
+
+        return ret;
+    }
+
+private:
     void load_arrange_settings();
 
     class SequentialPrintClearance
@@ -901,17 +917,6 @@ public:
 
     void highlight_toolbar_item(const std::string& item_name);
     void highlight_gizmo(const std::string& gizmo_name);
-
-    ArrangeSettings get_arrange_settings() const {
-        const ArrangeSettings &settings = get_arrange_settings(this);
-        ArrangeSettings ret = settings;
-        if (&settings == &m_arrange_settings_fff_seq_print) {
-            ret.distance = std::max(ret.distance,
-                                    float(min_object_distance(*m_config)));
-        }
-
-        return ret;
-    }
 
     // Timestamp for FPS calculation and notification fade-outs.
     static int64_t timestamp_now() {

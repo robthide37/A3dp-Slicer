@@ -292,7 +292,7 @@ arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
 arrangement::ArrangeParams get_arrange_params(Plater *p)
 {
     const GLCanvas3D::ArrangeSettings &settings =
-        static_cast<const GLCanvas3D*>(p->canvas3D())->get_arrange_settings();
+        p->canvas3D()->get_arrange_settings();
 
     arrangement::ArrangeParams params;
     params.allow_rotations  = settings.enable_rotation;
@@ -302,7 +302,9 @@ arrangement::ArrangeParams get_arrange_params(Plater *p)
     arrangement::Pivots pivot = arrangement::Pivots::Center;
 
     int pivot_max = static_cast<int>(arrangement::Pivots::TopRight);
-    if (settings.alignment > pivot_max) {
+    if (settings.alignment < 0) {
+        pivot = arrangement::Pivots::Center;
+    } else if (settings.alignment > pivot_max) {
         // means it should be random
         std::random_device rd{};
         std::mt19937 rng(rd());

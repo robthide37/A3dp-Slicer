@@ -106,18 +106,15 @@ void FillBedJob::prepare()
 void FillBedJob::process(Ctl &ctl)
 {
     auto statustxt = _u8L("Filling bed");
-    ctl.call_on_main_thread([this] { prepare(); }).wait();
+    arrangement::ArrangeParams params;
+    ctl.call_on_main_thread([this, &params] {
+           prepare();
+           params = get_arrange_params(m_plater);
+    }).wait();
     ctl.update_status(0, statustxt);
 
-    if (m_object_idx == -1 || m_selected.empty()) return;
-
-    const GLCanvas3D::ArrangeSettings &settings =
-        static_cast<const GLCanvas3D*>(m_plater->canvas3D())->get_arrange_settings();
-
-    arrangement::ArrangeParams params;
-    params.allow_rotations  = settings.enable_rotation;
-    params.min_obj_distance = scaled(settings.distance);
-    params.min_bed_distance = scaled(settings.distance_from_bed);
+    if (m_object_idx == -1 || m_selected.empty())
+        return;
 
     bool do_stop = false;
     params.stopcondition = [&ctl, &do_stop]() {
