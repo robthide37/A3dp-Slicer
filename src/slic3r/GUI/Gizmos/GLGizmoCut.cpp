@@ -289,11 +289,28 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
                 gizmo_event(SLAGizmoEventType::LeftUp, mouse_pos, mouse_event.ShiftDown(), mouse_event.AltDown(), mouse_event.CmdDown());
         }
         else if (m_hover_id == CutPlane) {
-            if (mouse_event.LeftDown())
-                m_was_cut_plane_dragged = false;
-            else if (mouse_event.LeftUp() && !m_was_cut_plane_dragged)
+            if (mouse_event.LeftDown()) {
+                m_was_cut_plane_dragged = m_was_contour_selected = false;
+
+                // disable / enable current contour
+                Vec3d pos;
+                Vec3d pos_world;
+                m_was_contour_selected = unproject_on_cut_plane(mouse_pos.cast<double>(), pos, pos_world, false);
+                if (m_was_contour_selected) {
+                    // Following would inform the clipper about the mouse click, so it can
+                    // toggle the respective contour as disabled.
+                    m_c->object_clipper()->pass_mouse_click(pos_world);
+                    process_contours();
+                    return true;
+                }
+
+            }
+            else if (mouse_event.LeftUp() && !m_was_cut_plane_dragged && !m_was_contour_selected)
                 flip_cut_plane();
         }
+
+        if (!m_cut_by_contour_glmodels.empty())
+            m_parent.toggle_model_objects_visibility(false);
         return true;
     }
 
@@ -429,6 +446,9 @@ void GLGizmoCut3D::update_clipper()
         on_register_raycasters_for_picking();
     else
         update_raycasters_for_picking_transform();
+
+    if (!m_c->object_clipper()->has_disable_contour())
+        reset_cut_by_contours();
 }
 
 void GLGizmoCut3D::set_center(const Vec3d& center, bool update_tbb /*=false*/)
@@ -559,6 +579,8 @@ void GLGizmoCut3D::render_move_center_input(int axis)
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Move cut plane"), UndoRedo::SnapshotType::GizmoAction);
         set_center(move, true);
         m_ar_plane_center = m_plane_center;
+
+        reset_cut_by_contours();
     }
 }
 
@@ -1160,10 +1182,14 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
 {
     if (m_hover_id < 0)
         return;
-    if (m_hover_id == Z || m_hover_id == CutPlane)
+    if (m_hover_id == Z || m_hover_id == CutPlane) {
         dragging_grabber_z(data);
-    else if (m_hover_id == X || m_hover_id == Y)
+        reset_cut_by_contours();
+    }
+    else if (m_hover_id == X || m_hover_id == Y) {
         dragging_grabber_xy(data);
+        reset_cut_by_contours();
+    }
     else if (m_hover_id >= m_connectors_group_id && m_connector_mode == CutConnectorMode::Manual)
         dragging_connector(data);
 }
@@ -1358,6 +1384,31 @@ void GLGizmoCut3D::render_clipper_cut()
         ::glEnable(GL_DEPTH_TEST);
 }
 
+void GLGizmoCut3D::render_colored_parts()
+{
+    if (m_cut_by_contour_glmodels.empty())
+        return;
+    assert(m_cut_by_contour_objects[0]->volumes.size() == m_cut_by_contour_glmodels.size());
+
+    if (GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light")) {
+        const Camera&       camera          = wxGetApp().plater()->get_camera();
+
+        shader->start_using();
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+
+        const Vec3d         inst_offset     = m_cut_by_contour_objects[0]->instances[0]->get_offset();
+        const Transform3d   view_inst_matrix= camera.get_view_matrix() * translation_transform(inst_offset);
+
+        for (size_t id = 0; id < m_cut_by_contour_glmodels.size(); id++) {
+            const Vec3d volume_offset = m_cut_by_contour_objects[0]->volumes[id]->get_offset();
+            shader->set_uniform("view_model_matrix", view_inst_matrix * translation_transform(volume_offset));
+            m_cut_by_contour_glmodels[id].render();
+        }
+
+        shader->stop_using();
+    }
+}
+
 void GLGizmoCut3D::on_render()
 {
     if (m_state == On) {
@@ -1373,6 +1424,9 @@ void GLGizmoCut3D::on_render()
     init_rendering_items();
 
     render_connectors();
+
+    if (!m_connectors_editing)
+        render_colored_parts();
 
     render_clipper_cut();
 
@@ -1587,6 +1641,8 @@ void GLGizmoCut3D::reset_cut_plane()
     set_center(m_bb_center);
     m_start_dragging_m = m_rotation_m = Transform3d::Identity();
     m_ar_plane_center  = m_plane_center;
+
+    reset_cut_by_contours();
 }
 
 void GLGizmoCut3D::invalidate_cut_plane()
@@ -1621,6 +1677,62 @@ void GLGizmoCut3D::flip_cut_plane()
     m_start_dragging_m = m_rotation_m;
 
     update_clipper();
+}
+
+void GLGizmoCut3D::reset_cut_by_contours()
+{
+    if (!m_cut_by_contour_objects.empty()) {
+        m_cut_by_contour_objects.clear();
+        m_cut_by_contour_glmodels.clear();
+        m_disabled_contours.clear();
+
+        m_parent.toggle_model_objects_visibility(true);
+    }
+}
+
+void GLGizmoCut3D::process_contours()
+{
+    reset_cut_by_contours();
+
+    if (!m_c->object_clipper()->has_disable_contour())
+        return;
+
+    const Selection& selection = m_parent.get_selection();
+    const ModelObjectPtrs& model_objects = selection.get_model()->objects;
+
+    wxBusyCursor wait;
+    
+    const int instance_idx = selection.get_instance_idx();
+    const int object_idx = selection.get_object_idx();
+
+    m_cut_by_contour_objects = model_objects[object_idx]->cut(instance_idx, get_cut_matrix(selection),
+        ModelObjectCutAttribute::KeepUpper |
+        ModelObjectCutAttribute::KeepLower |
+        ModelObjectCutAttribute::KeepAsParts |
+        ModelObjectCutAttribute::InvalidateCutInfo);
+
+    assert(m_cut_by_contour_objects.size() == 1);
+
+    const ModelVolumePtrs& volumes = m_cut_by_contour_objects[0]->volumes;
+
+    // split to parts
+    for (int id = int(volumes.size())-1; id >= 0; id--)
+        if (volumes[id]->is_splittable())
+            volumes[id]->split(1);
+
+    m_cut_by_contour_glmodels.reserve(volumes.size());
+    for (const ModelVolume* volume : volumes) {
+        assert(volume != nullptr);
+
+        GLModel glmodel;
+        // any condition to test
+        if (volume->name.find("_A") != std::string::npos)
+            glmodel.set_color({ 0.5f, 0.9f, 0.9f, 0.5f }); // glmodel.set_color(UPPER_PART_COLOR);
+        else
+            glmodel.set_color({ 0.9f, 0.5f, 0.9f, 0.5f }); // glmodel.set_color(LOWER_PART_COLOR); 
+
+        m_cut_by_contour_glmodels.push_back(glmodel);
+    }
 }
 
 void GLGizmoCut3D::render_flip_plane_button(bool disable_pred /*=false*/)
@@ -1949,7 +2061,7 @@ void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
 bool GLGizmoCut3D::is_outside_of_cut_contour(size_t idx, const CutConnectors& connectors, const Vec3d cur_pos)
 {
     // check if connector pos is out of clipping plane
-    if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(cur_pos)) {
+    if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(cur_pos, true)) {
         m_info_stats.outside_cut_contour++;
         return true;
     }
@@ -1975,7 +2087,7 @@ bool GLGizmoCut3D::is_outside_of_cut_contour(size_t idx, const CutConnectors& co
     its_transform(mesh, translation_transform(cur_pos) * m_rotation_m);
 
     for (auto vertex : vertices) {
-        if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(vertex.cast<double>())) {
+        if (m_c->object_clipper() && !m_c->object_clipper()->is_projection_inside_cut(vertex.cast<double>(), true)) {
             m_info_stats.outside_cut_contour++;
             return true;
         }
@@ -2132,6 +2244,24 @@ void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, bool &create_dowel
     }
 }
 
+Transform3d GLGizmoCut3D::get_cut_matrix(const Selection& selection)
+{
+    const int instance_idx = selection.get_instance_idx();
+    const int object_idx = selection.get_object_idx();
+    ModelObject* mo = selection.get_model()->objects[object_idx];
+    if (!mo)
+        return Transform3d::Identity();
+
+    // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
+    const double sla_shift_z = selection.get_first_volume()->get_sla_shift_z();
+
+    const Vec3d instance_offset = mo->instances[instance_idx]->get_offset();
+    Vec3d cut_center_offset = m_plane_center - instance_offset;
+    cut_center_offset[Z] -= sla_shift_z;
+
+    return translation_transform(cut_center_offset) * m_rotation_m;
+}
+
 void GLGizmoCut3D::perform_cut(const Selection& selection)
 {
     if (!can_perform_cut())
@@ -2149,13 +2279,6 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     // deactivate CutGizmo and than perform a cut
     m_parent.reset_all_gizmos();
 
-    // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
-    const double sla_shift_z    = selection.get_first_volume()->get_sla_shift_z();
-
-    const Vec3d instance_offset = mo->instances[instance_idx]->get_offset();
-    Vec3d cut_center_offset     = m_plane_center - instance_offset;
-    cut_center_offset[Z] -= sla_shift_z;
-
     // perform cut
     {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
@@ -2165,7 +2288,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         // update connectors pos as offset of its center before cut performing
         apply_connectors_in_model(mo, create_dowels_as_separate_object);
 
-        plater->cut(object_idx, instance_idx, translation_transform(cut_center_offset) * m_rotation_m,
+        plater->cut(object_idx, instance_idx, get_cut_matrix(selection),
                     only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
                     only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
                     only_if(has_connectors ? false: m_keep_as_parts, ModelObjectCutAttribute::KeepAsParts) |
@@ -2182,7 +2305,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
 // Unprojects the mouse position on the mesh and saves hit point and normal of the facet into pos_and_normal
 // Return false if no intersection was found, true otherwise.
-bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& pos, Vec3d& pos_world)
+bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& pos, Vec3d& pos_world, bool respect_disabled_contour/* = true*/)
 {
     const float sla_shift = m_c->selection_info()->get_sla_shift();
 
@@ -2204,7 +2327,7 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& po
     } else
         return false;
     
-    if (! m_c->object_clipper()->is_projection_inside_cut(hit))
+    if (! m_c->object_clipper()->is_projection_inside_cut(hit, respect_disabled_contour))
         return false;
 
     // recalculate hit to object's local position
@@ -2284,6 +2407,8 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
     }
 
     if (cut_line_processing()) {
+        reset_cut_by_contours();
+
         m_line_end = pt;
         if (action == SLAGizmoEventType::LeftDown || action == SLAGizmoEventType::LeftUp) {
             Vec3d line_dir = m_line_end - m_line_beg;

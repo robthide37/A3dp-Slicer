@@ -135,6 +135,12 @@ class GLGizmoCut3D : public GLGizmoBase
 
     bool m_has_invalid_connector{ false };
     bool m_was_cut_plane_dragged { false };
+    bool m_was_contour_selected { false };
+
+    std::vector<GLModel>                    m_cut_by_contour_glmodels;
+    ModelObjectPtrs                         m_cut_by_contour_objects;
+    // attributes for disabled contours <pos, norm>
+    std::vector<std::pair<Vec3d, Vec3d>>    m_disabled_contours;
 
     bool                                        m_show_shortcuts{ false };
     std::vector<std::pair<wxString, wxString>>  m_shortcuts;
@@ -176,7 +182,7 @@ public:
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
     std::string get_tooltip() const override;
-    bool unproject_on_cut_plane(const Vec2d& mouse_pos, Vec3d& pos, Vec3d& pos_world);
+    bool unproject_on_cut_plane(const Vec2d& mouse_pos, Vec3d& pos, Vec3d& pos_world, bool respect_disabled_contour = true);
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
     bool is_in_editing_mode() const override { return m_connectors_editing; }
@@ -229,6 +235,8 @@ protected:
     void reset_cut_plane();
     void set_connectors_editing(bool connectors_editing);
     void flip_cut_plane();
+    void process_contours();
+    void reset_cut_by_contours();
     void render_flip_plane_button(bool disable_pred = false);
     void add_vertical_scaled_interval(float interval);
     void add_horizontal_scaled_interval(float interval);
@@ -257,6 +265,7 @@ protected:
     std::string get_action_snapshot_name() const override   { return _u8L("Cut gizmo editing"); }
 
     void data_changed(bool is_serializing) override; 
+    Transform3d get_cut_matrix(const Selection& selection);
 
 private:
     void set_center(const Vec3d& center, bool update_tbb = false);
@@ -290,6 +299,7 @@ private:
     void init_picking_models();
     void init_rendering_items();
     void render_clipper_cut();
+    void render_colored_parts();
     void clear_selection();
     void reset_connectors();
     void init_connector_shapes();

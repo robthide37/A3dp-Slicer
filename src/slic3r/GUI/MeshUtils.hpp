@@ -120,8 +120,9 @@ public:
 
     void pass_mouse_click(const Vec3d& pt);
 
-    bool is_projection_inside_cut(const Vec3d& point) const;
+    bool is_projection_inside_cut(const Vec3d& point, bool respect_disabled_contour) const;
     bool has_valid_contour() const;
+    bool has_disable_contour() const;
 
 private:
     void recalculate_triangles();

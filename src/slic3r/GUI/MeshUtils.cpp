@@ -146,7 +146,7 @@ void MeshClipper::render_contour(const ColorRGBA& color)
         curr_shader->start_using();
 }
 
-bool MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
+bool MeshClipper::is_projection_inside_cut(const Vec3d& point_in, bool respect_disabled_contour) const
 {
     if (!m_result || m_result->cut_islands.empty())
         return false;
@@ -155,7 +155,7 @@ bool MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
 
     for (const CutIsland& isl : m_result->cut_islands) {
         if (isl.expoly_bb.contains(pt_2d) && isl.expoly.contains(pt_2d))
-            return !isl.disabled;
+            return respect_disabled_contour ? !isl.disabled : true;
     }
     return false;
 }
@@ -165,6 +165,10 @@ bool MeshClipper::has_valid_contour() const
     return m_result && std::any_of(m_result->cut_islands.begin(), m_result->cut_islands.end(), [](const CutIsland& isl) { return !isl.expoly.empty(); });
 }
 
+bool MeshClipper::has_disable_contour() const
+{
+    return m_result && std::any_of(m_result->cut_islands.begin(), m_result->cut_islands.end(), [](const CutIsland& isl) { return isl.disabled; });
+}
 
 void MeshClipper::pass_mouse_click(const Vec3d& point_in)
 {

@@ -1565,7 +1565,6 @@ void ModelObject::process_volume_cut(ModelVolume* volume, const Transform3d& ins
     if (attributes.has(ModelObjectCutAttribute::KeepLower))
         lower_mesh = TriangleMesh(lower_its);
 }
-
 void ModelObject::process_solid_part_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
                                        ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower, Vec3d& local_displace)
 {

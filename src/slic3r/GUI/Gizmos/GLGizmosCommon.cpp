@@ -388,14 +388,20 @@ void ObjectClipper::render_cut() const
     }
 }
 
-bool ObjectClipper::is_projection_inside_cut(const Vec3d& point) const
+bool ObjectClipper::is_projection_inside_cut(const Vec3d& point, bool respect_disabled_contour) const
 {
-    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [point](const auto& cl) { return cl.first->is_projection_inside_cut(point); });
+    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(),
+        [point, respect_disabled_contour](const auto& cl) { return cl.first->is_projection_inside_cut(point, respect_disabled_contour); });
 }
 
 bool ObjectClipper::has_valid_contour() const
 {
     return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [](const auto& cl) { return cl.first->has_valid_contour(); });
+}
+
+bool ObjectClipper::has_disable_contour() const
+{
+    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [](const auto& cl) { return cl.first->has_disable_contour(); });
 }
 
 void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal)
