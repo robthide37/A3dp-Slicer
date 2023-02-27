@@ -116,24 +116,30 @@ TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings& mes
 
     if (slicing_params.raft_layers() > 0) {
         // Fill in raft_layers with the heights of the layers below the first object layer.
+        // First layer
         double z = slicing_params.first_print_layer_height;
         this->raft_layers.emplace_back(z);
+        // Raft base layers
         for (size_t i = 1; i < slicing_params.base_raft_layers; ++ i) {
             z += slicing_params.base_raft_layer_height;
             this->raft_layers.emplace_back(z);
         }
+        // Raft interface layers
         for (size_t i = 0; i + 1 < slicing_params.interface_raft_layers; ++ i) {
             z += slicing_params.interface_raft_layer_height;
             this->raft_layers.emplace_back(z);
         }
-        assert(is_approx(z, slicing_params.raft_interface_top_z));
-        double dist_to_go = slicing_params.object_print_z_min - z;
-        assert(dist_to_go > slicing_params.min_layer_height - EPSILON);
-        auto nsteps = int(ceil(dist_to_go / slicing_params.max_suport_layer_height));
-        double step = dist_to_go / nsteps;
-        for (size_t i = 0; i < nsteps; ++ i) {
-            z += step;
-            this->raft_layers.emplace_back(z);
+        // Raft contact layer
+        z = slicing_params.raft_contact_top_z;
+        this->raft_layers.emplace_back(z);
+        if (double dist_to_go = slicing_params.object_print_z_min - z; dist_to_go > EPSILON) {
+            // Layers between the raft contacts and bottom of the object.
+            auto nsteps = int(ceil(dist_to_go / slicing_params.max_suport_layer_height));
+            double step = dist_to_go / nsteps;
+            for (size_t i = 0; i < nsteps; ++ i) {
+                z += step;
+                this->raft_layers.emplace_back(z);
+            }
         }
     }
 }
@@ -401,6 +407,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
         }
     });
 
+#if 0
     if (num_raft_layers > 0) {
         const Layer   &first_layer = *print_object.get_layer(0);
         // Final overhangs.
@@ -423,6 +430,7 @@ void tree_supports_show_error(std::string_view message, bool critical)
         out[num_raft_layers] = std::move(overhangs);
         throw_on_cancel();
     }
+#endif
 
     return out;
 }
@@ -1053,13 +1061,30 @@ static void generate_initial_areas(
         std::max<coord_t>(round_up_divide(mesh_config.xy_distance, max_overhang_speed / 2), 2 * mesh_config.z_distance_top_layers) :
         0;
 
-    //FIXME 
     const size_t num_raft_layers     = config.raft_layers.size();
     const size_t num_support_layers  = size_t(std::max(0, int(print_object.layer_count()) + int(num_raft_layers) - int(z_distance_delta)));
     const size_t first_support_layer = std::max(int(num_raft_layers) - int(z_distance_delta), 1);
-    std::vector<std::unordered_set<Point, PointHash>> already_inserted(num_support_layers);
+    size_t       first_tree_layer    = 0;
+
+    size_t raft_contact_layer_idx = std::numeric_limits<size_t>::max();
+    if (num_raft_layers > 0 && print_object.layer_count() > 0) {
+        // Produce raft contact layer outside of the tree support loop, so that no trees will be generated for the raft contact layer.
+        // Raft layers supporting raft contact interface will be produced by the classic raft generator.
+        // Find the raft contact layer.
+        raft_contact_layer_idx = config.raft_layers.size() - 1;
+        while (raft_contact_layer_idx > 0 && config.raft_layers[raft_contact_layer_idx] > print_object.slicing_parameters().raft_contact_top_z + EPSILON)
+            -- raft_contact_layer_idx;
+        // Create the raft contact layer.
+        SupportGeneratorLayer &raft_contact_layer = layer_allocate(layer_storage, SupporLayerType::TopContact, print_object.slicing_parameters(), config, raft_contact_layer_idx);
+        top_contacts[raft_contact_layer_idx] = &raft_contact_layer;
+        const ExPolygons &lslices   = print_object.get_layer(0)->lslices;
+        double            expansion = print_object.config().raft_expansion.value;
+        raft_contact_layer.polygons = expansion > 0 ? expand(lslices, scaled<float>(expansion)) : to_polygons(lslices);
+        first_tree_layer = print_object.slicing_parameters().raft_layers() - 1;
+    }
 
     std::mutex mutex_layer_storage, mutex_movebounds;
+    std::vector<std::unordered_set<Point, PointHash>> already_inserted(num_support_layers);
     tbb::parallel_for(tbb::blocked_range<size_t>(first_support_layer, num_support_layers),
         [&print_object, &volumes, &config, &overhangs, &mesh_config, &mesh_group_settings, &support_params, 
          z_distance_delta, min_xy_dist, force_tip_to_roof, roof_enabled, support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
@@ -1408,6 +1433,49 @@ static void generate_initial_areas(
             }
         }
     });
+
+    // Remove tree tips that start below the raft contact,
+    // remove interface layers below the raft contact.
+    for (size_t i = 0; i < first_tree_layer; ++i) {
+        top_contacts[i] = nullptr;
+        move_bounds[i].clear();
+    }
+    if (raft_contact_layer_idx != std::numeric_limits<coord_t>::max() && print_object.config().raft_expansion.value > 0) {
+        // If any tips at first_tree_layer now are completely inside the expanded raft layer, remove them as well before they are propagated to the ground.
+        Polygons &raft_polygons = top_contacts[raft_contact_layer_idx]->polygons;
+        EdgeGrid::Grid grid(get_extents(raft_polygons).inflated(SCALED_EPSILON));
+        grid.create(raft_polygons, Polylines{}, coord_t(scale_(10.)));
+        SupportElements &first_layer_move_bounds = move_bounds[first_tree_layer];
+        double threshold = scaled<double>(print_object.config().raft_expansion.value) * 2.;
+        first_layer_move_bounds.erase(std::remove_if(first_layer_move_bounds.begin(), first_layer_move_bounds.end(),
+            [&grid, threshold](const SupportElement &el) {
+                coordf_t dist;
+                if (grid.signed_distance_edges(el.state.result_on_layer, threshold, dist)) {
+                    assert(std::abs(dist) < threshold + SCALED_EPSILON);
+                    // Support point is inside the expanded raft, remove it.
+                    return dist < - 0.;
+                }
+                return false;
+            }), first_layer_move_bounds.end());
+#if 0
+        // Remove the remaining tips from the raft: Closing operation on tip circles.
+        if (! first_layer_move_bounds.empty()) {
+            const double eps = 0.1;
+            // All tips supporting this layer are expected to have the same radius.
+            double       radius = config.getRadius(first_layer_move_bounds.front().state);
+            // Connect the tips with the following closing radius.
+            double       closing_distance = radius;
+            Polygon      circle = make_circle(radius + closing_distance, eps);
+            Polygons     circles;
+            circles.reserve(first_layer_move_bounds.size());
+            for (const SupportElement &el : first_layer_move_bounds) {
+                circles.emplace_back(circle);
+                circles.back().translate(el.state.result_on_layer);
+            }
+            raft_polygons = diff(raft_polygons, offset(union_(circles), - closing_distance));
+        }
+#endif
+    }
 }
 
 static unsigned int move_inside(const Polygons &polygons, Point &from, int distance = 0, int64_t maxDist2 = std::numeric_limits<int64_t>::max())
@@ -4217,8 +4285,6 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         // Produce the support G-code.
         // Used by both classic and tree supports.
         SupportParameters support_params(print_object);
-        support_params.with_sheath = true;
-        support_params.support_density = 0;
         SupportGeneratorLayersPtr interface_layers, base_interface_layers;
         SupportGeneratorLayersPtr raft_layers = generate_raft_base(print_object, support_params, print_object.slicing_parameters(), top_contacts, interface_layers, base_interface_layers, intermediate_layers, layer_storage);
 #if 1 //#ifdef SLIC3R_DEBUG
