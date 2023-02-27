@@ -1004,8 +1004,10 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             Vec3d pos = connector.pos + instance_offset;
             if (connector.attribs.type == CutConnectorType::Dowel &&
                 connector.attribs.style == CutConnectorStyle::Prism) {
-                pos -= height * m_clp_normal;
-                height *= 2;
+                if (is_looking_forward())
+                    pos -= static_cast<double>(height - 0.05f) * m_clp_normal;
+                else
+                    pos += 0.05 * m_clp_normal;
             }
             pos[Z] += sla_shift;
 
@@ -2089,11 +2091,19 @@ void GLGizmoCut3D::render_connectors()
         const Camera& camera = wxGetApp().plater()->get_camera();
         if (connector.attribs.type  == CutConnectorType::Dowel &&
             connector.attribs.style == CutConnectorStyle::Prism) {
-            if (is_looking_forward())
-                pos -= height * m_clp_normal;
-            else
-                pos += height * m_clp_normal;
-            height *= 2;
+            if (m_connectors_editing) {
+                if (is_looking_forward())
+                    pos -= static_cast<double>(height-0.05f) * m_clp_normal;
+                else 
+                    pos += 0.05 * m_clp_normal;
+            }
+            else {
+                if (is_looking_forward())
+                    pos -= static_cast<double>(height) * m_clp_normal;
+                else
+                    pos += static_cast<double>(height) * m_clp_normal;
+                height *= 2;
+            }
         }
         else if (!is_looking_forward())
             pos += 0.05 * m_clp_normal;
