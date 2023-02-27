@@ -2867,8 +2867,9 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Branch Density");
     def->category = L("Support material");
     def->tooltip = L("Adjusts the density of the support structure used to generate the tips of the branches. "
-                     "A higher value results in better overhangs, but the supports are harder to remove. "
-                     "Use Support Roof for very high values or ensure support density is similarly high at the top.");
+                     "A higher value results in better overhangs but the supports are harder to remove, "
+                     "thus it is recommended to enable top support interfaces instead of a high branch density value "
+                     "if dense interfaces are needed.");
     def->sidetext = L("%");
     def->min = 5;
     def->max_literal = 35;
@@ -3671,7 +3672,7 @@ void PrintConfigDef::init_sla_params()
     def = this->add_nullable("idle_temperature", coInts);
     def->label = L("Idle temperature");
     def->tooltip = L("Nozzle temperature when the tool is currently not used in multi-tool setups."
-                     "This is only used when 'Ooze prevention is active in Print Settings.'");
+                     "This is only used when 'Ooze prevention' is active in Print Settings.");
     def->sidetext = L("°C");
     def->min = 0;
     def->max = max_temp;

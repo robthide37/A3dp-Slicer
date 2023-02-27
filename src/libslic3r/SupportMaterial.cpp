@@ -1320,7 +1320,7 @@ void remove_bridges_from_contacts(
         bridges = union_(bridges);
     }
     // remove the entire bridges and only support the unsupported edges
-    //FIXME the bridged regions are already collected as layerm.bridged. Use it?
+    //FIXME the brided regions are already collected as layerm.bridged. Use it?
     for (const Surface &surface : layerm.fill_surfaces())
         if (surface.surface_type == stBottomBridge && surface.bridge_angle >= 0.0)
             polygons_append(bridges, surface.expolygon);
@@ -2011,11 +2011,11 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::top_contact_layers(
 // Find the bottom contact layers above the top surfaces of this layer.
 static inline SupportGeneratorLayer* detect_bottom_contacts(
     const SlicingParameters                          &slicing_params,
-    const SupportParameters  &support_params,
+    const SupportParameters                          &support_params,
     const PrintObject                                &object,
     const Layer                                      &layer,
     // Existing top contact layers, to which this newly created bottom contact layer will be snapped to guarantee a minimum layer height.
-    const SupportGeneratorLayersPtr    &top_contacts,
+    const SupportGeneratorLayersPtr                  &top_contacts,
     // First top contact layer index overlapping with this new bottom interface layer.
     size_t                                            contact_idx,
     // To allocate a new layer from.
@@ -2888,6 +2888,7 @@ SupportGeneratorLayersPtr generate_raft_base(
     // If there is brim to be generated, calculate the trimming regions.
     Polygons brim;
     if (object.has_brim()) {
+        // The object does not have a raft.
         // Calculate the area covered by the brim.
         const BrimType brim_type       = object.config().brim_type;
         const bool     brim_outer      = brim_type == btOuterOnly || brim_type == btOuterAndInner;
@@ -2948,12 +2949,20 @@ SupportGeneratorLayersPtr generate_raft_base(
     if (slicing_params.raft_layers() > 1) {
         Polygons base;
         Polygons columns;
+        Polygons first_layer;
         if (columns_base != nullptr) {
-            base = columns_base->polygons;
-            columns = base;
-            if (! interface_polygons.empty())
-                // Trim the 1st layer columns with the inflated interface polygons.
-                columns = diff(columns, interface_polygons);
+            if (columns_base->print_z > slicing_params.raft_contact_top_z - EPSILON) {
+                // Classic supports with colums above the raft interface.
+                base = columns_base->polygons;
+                columns = base;
+                if (! interface_polygons.empty())
+                    // Trim the 1st layer columns with the inflated interface polygons.
+                    columns = diff(columns, interface_polygons);
+            } else {
+                // Organic supports with raft on print bed.
+                assert(is_approx(columns_base->print_z, slicing_params.first_print_layer_height));
+                first_layer = columns_base->polygons;
+            }
         }
         if (! interface_polygons.empty()) {
             // Merge the untrimmed columns base with the expanded raft interface, to be used for the support base and interface.
@@ -2967,7 +2976,8 @@ SupportGeneratorLayersPtr generate_raft_base(
             new_layer.print_z = slicing_params.first_print_layer_height;
             new_layer.height  = slicing_params.first_print_layer_height;
             new_layer.bottom_z = 0.;
-            new_layer.polygons = inflate_factor_1st_layer > 0 ? expand(base, inflate_factor_1st_layer) : base;
+            first_layer = union_(std::move(first_layer), base);
+            new_layer.polygons = inflate_factor_1st_layer > 0 ? expand(first_layer, inflate_factor_1st_layer) : first_layer;
         }
         // Insert the base layers.
         for (size_t i = 1; i < slicing_params.base_raft_layers; ++ i) {
@@ -3492,12 +3502,7 @@ static inline void fill_expolygons_with_sheath_generate_paths(
     if (polygons.empty())
         return;
 
-    if (with_sheath) {
-        if (density == 0) {
-            tree_supports_generate_paths(dst, polygons, flow);
-            return;
-        }
-    } else {
+    if (! with_sheath) {
         fill_expolygons_generate_paths(dst, closing_ex(polygons, float(SCALED_EPSILON)), filler, density, role, flow);
         return;
     }
@@ -4227,9 +4232,9 @@ void generate_support_toolpaths(
     }
 
     // Insert the raft base layers.
-    size_t n_raft_layers = std::min<int>(support_layers.size(), std::max(0, int(slicing_params.raft_layers()) - 1));
+    auto n_raft_layers = std::min<size_t>(support_layers.size(), std::max(0, int(slicing_params.raft_layers()) - 1));
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n_raft_layers),
-        [&support_layers, &raft_layers, &config, &support_params, &slicing_params,
+        [&support_layers, &raft_layers, &intermediate_layers, &config, &support_params, &slicing_params,
             &bbox_object, raft_angle_1st_layer, raft_angle_base, raft_angle_interface, link_max_length_factor]
             (const tbb::blocked_range<size_t>& range) {
         for (size_t support_layer_id = range.begin(); support_layer_id < range.end(); ++ support_layer_id)
@@ -4244,16 +4249,24 @@ void generate_support_toolpaths(
             filler_interface->set_bounding_box(bbox_object);
             filler_support->set_bounding_box(bbox_object);
 
+            // Print the tree supports cutting through the raft with the exception of the 1st layer, where a full support layer will be printed below
+            // both the raft and the trees.
+            // Trim the raft layers with the tree polygons.
+            const Polygons &tree_polygons =
+                support_layer_id > 0 && support_layer_id < intermediate_layers.size() && is_approx(intermediate_layers[support_layer_id]->print_z, support_layer.print_z) ?
+                intermediate_layers[support_layer_id]->polygons : Polygons();
+
             // Print the support base below the support columns, or the support base for the support columns plus the contacts.
             if (support_layer_id > 0) {
                 const Polygons &to_infill_polygons = (support_layer_id < slicing_params.base_raft_layers) ? 
                     raft_layer.polygons :
                     //FIXME misusing contact_polygons for support columns.
                     ((raft_layer.contact_polygons == nullptr) ? Polygons() : *raft_layer.contact_polygons);
+                // Trees may cut through the raft layers down to a print bed.
+                Flow flow(float(support_params.support_material_flow.width()), float(raft_layer.height), support_params.support_material_flow.nozzle_diameter());
+                assert(!raft_layer.bridging);
                 if (! to_infill_polygons.empty()) {
-                    assert(! raft_layer.bridging);
-                    Flow flow(float(support_params.support_material_flow.width()), float(raft_layer.height), support_params.support_material_flow.nozzle_diameter());
-                    Fill * filler = filler_support.get();
+                    Fill *filler = filler_support.get();
                     filler->angle = raft_angle_base;
                     filler->spacing = support_params.support_material_flow.spacing();
                     filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / support_params.support_density));
@@ -4261,13 +4274,15 @@ void generate_support_toolpaths(
                         // Destination
                         support_layer.support_fills.entities,
                         // Regions to fill
-                        to_infill_polygons,
+                        tree_polygons.empty() ? to_infill_polygons : diff(to_infill_polygons, tree_polygons),
                         // Filler and its parameters
                         filler, float(support_params.support_density),
                         // Extrusion parameters
                         ExtrusionRole::SupportMaterial, flow,
                         support_params.with_sheath, false);
                 }
+                if (! tree_polygons.empty())
+                    tree_supports_generate_paths(support_layer.support_fills.entities, tree_polygons, flow);
             }
 
             Fill *filler = filler_interface.get();
@@ -4293,7 +4308,7 @@ void generate_support_toolpaths(
                 // Destination
                 support_layer.support_fills.entities, 
                 // Regions to fill
-                raft_layer.polygons,
+                tree_polygons.empty() ? raft_layer.polygons : diff(raft_layer.polygons, tree_polygons),
                 // Filler and its parameters
                 filler, density,
                 // Extrusion parameters
@@ -4491,6 +4506,7 @@ void generate_support_toolpaths(
                 float density = float(support_params.support_density);
                 bool  sheath  = support_params.with_sheath;
                 bool  no_sort = false;
+                bool  done    = false;
                 if (base_layer.layer->bottom_z < EPSILON) {
                     // Base flange (the 1st layer).
                     filler = filler_first_layer;
@@ -4504,18 +4520,21 @@ void generate_support_toolpaths(
                     filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / density));
                     sheath  = true;
                     no_sort = true;
+                } else if (config.support_material_style == SupportMaterialStyle::smsOrganic) {
+                    tree_supports_generate_paths(base_layer.extrusions, base_layer.polygons_to_extrude(), flow);
+                    done = true;
                 }
-                fill_expolygons_with_sheath_generate_paths(
-                    // Destination
-                    base_layer.extrusions,
-                    // Regions to fill
-                    base_layer.polygons_to_extrude(),
-                    // Filler and its parameters
-                    filler, density,
-                    // Extrusion parameters
-                    ExtrusionRole::SupportMaterial, flow,
-                    sheath, no_sort);
-
+                if (! done)
+                    fill_expolygons_with_sheath_generate_paths(
+                        // Destination
+                        base_layer.extrusions,
+                        // Regions to fill
+                        base_layer.polygons_to_extrude(),
+                        // Filler and its parameters
+                        filler, density,
+                        // Extrusion parameters
+                        ExtrusionRole::SupportMaterial, flow,
+                        sheath, no_sort);
             }
 
             // Merge base_interface_layers to base_layers to avoid unneccessary retractions

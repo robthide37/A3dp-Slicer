@@ -228,7 +228,7 @@ enum class CutConnectorType : int {
 };
 
 enum class CutConnectorStyle : int {
-    Prizm
+    Prism
     , Frustum
     , Undef
     //,Claw
@@ -246,7 +246,7 @@ enum class CutConnectorShape : int {
 struct CutConnectorAttributes
 {
     CutConnectorType    type{ CutConnectorType::Plug };
-    CutConnectorStyle   style{ CutConnectorStyle::Prizm };
+    CutConnectorStyle   style{ CutConnectorStyle::Prism };
     CutConnectorShape   shape{ CutConnectorShape::Circle };
 
     CutConnectorAttributes() {}
@@ -459,10 +459,13 @@ public:
     void synchronize_model_after_cut();
     void apply_cut_attributes(ModelObjectCutAttributes attributes);
     void clone_for_cut(ModelObject **obj);
-    void process_connector_cut(ModelVolume* volume, ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower,
+    void process_connector_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
+                               ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower,
                                std::vector<ModelObject*>& dowels, Vec3d& local_dowels_displace);
     void process_modifier_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& inverse_cut_matrix,
                               ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower);
+    void process_volume_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
+                            ModelObjectCutAttributes attributes, TriangleMesh& upper_mesh, TriangleMesh& lower_mesh);
     void process_solid_part_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
                                 ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower, Vec3d& local_displace);
     ModelObjectPtrs cut(size_t instance, const Transform3d&cut_matrix, ModelObjectCutAttributes attributes);

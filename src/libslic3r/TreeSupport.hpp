@@ -40,6 +40,7 @@ namespace Slic3r
 class Print;
 class PrintObject;
 class SupportGeneratorLayer;
+struct SlicingParameters;
 using SupportGeneratorLayerStorage  = std::deque<SupportGeneratorLayer>;
 using SupportGeneratorLayersPtr     = std::vector<SupportGeneratorLayer*>;
 
@@ -255,64 +256,7 @@ struct SupportElement
 struct TreeSupportSettings
 {
     TreeSupportSettings() = default; // required for the definition of the config variable in the TreeSupportGenerator class.
-
-    explicit TreeSupportSettings(const TreeSupportMeshGroupSettings& mesh_group_settings)
-        : angle(mesh_group_settings.support_tree_angle),
-          angle_slow(mesh_group_settings.support_tree_angle_slow),
-          support_line_width(mesh_group_settings.support_line_width),
-          layer_height(mesh_group_settings.layer_height),
-          branch_radius(mesh_group_settings.support_tree_branch_diameter / 2),
-          min_radius(mesh_group_settings.support_tree_tip_diameter / 2), // The actual radius is 50 microns larger as the resulting branches will be increased by 50 microns to avoid rounding errors effectively increasing the xydistance
-          maximum_move_distance((angle < M_PI / 2.) ? (coord_t)(tan(angle) * layer_height) : std::numeric_limits<coord_t>::max()),
-          maximum_move_distance_slow((angle_slow < M_PI / 2.) ? (coord_t)(tan(angle_slow) * layer_height) : std::numeric_limits<coord_t>::max()),
-          support_bottom_layers(mesh_group_settings.support_bottom_enable ? (mesh_group_settings.support_bottom_height + layer_height / 2) / layer_height : 0),
-          tip_layers(std::max((branch_radius - min_radius) / (support_line_width / 3), branch_radius / layer_height)), // Ensure lines always stack nicely even if layer height is large
-          diameter_angle_scale_factor(sin(mesh_group_settings.support_tree_branch_diameter_angle) * layer_height / branch_radius),
-          max_to_model_radius_increase(mesh_group_settings.support_tree_max_diameter_increase_by_merges_when_support_to_model / 2),
-          min_dtt_to_model(round_up_divide(mesh_group_settings.support_tree_min_height_to_model, layer_height)),
-          increase_radius_until_radius(mesh_group_settings.support_tree_branch_diameter / 2),
-          increase_radius_until_layer(increase_radius_until_radius <= branch_radius ? tip_layers * (increase_radius_until_radius / branch_radius) : (increase_radius_until_radius - branch_radius) / (branch_radius * diameter_angle_scale_factor)),
-          support_rests_on_model(! mesh_group_settings.support_material_buildplate_only),
-          xy_distance(mesh_group_settings.support_xy_distance),
-          xy_min_distance(std::min(mesh_group_settings.support_xy_distance, mesh_group_settings.support_xy_distance_overhang)),
-          bp_radius(mesh_group_settings.support_tree_bp_diameter / 2),
-          diameter_scale_bp_radius(std::min(sin(0.7) * layer_height / branch_radius, 1.0 / (branch_radius / (support_line_width / 2.0)))), // Either 40? or as much as possible so that 2 lines will overlap by at least 50%, whichever is smaller.
-          z_distance_top_layers(round_up_divide(mesh_group_settings.support_top_distance, layer_height)),
-          z_distance_bottom_layers(round_up_divide(mesh_group_settings.support_bottom_distance, layer_height)),
-          performance_interface_skip_layers(round_up_divide(mesh_group_settings.support_interface_skip_height, layer_height)),
-//              support_infill_angles(mesh_group_settings.support_infill_angles),
-          support_roof_angles(mesh_group_settings.support_roof_angles),
-          roof_pattern(mesh_group_settings.support_roof_pattern),
-          support_pattern(mesh_group_settings.support_pattern),
-          support_roof_line_width(mesh_group_settings.support_roof_line_width),
-          support_line_spacing(mesh_group_settings.support_line_spacing),
-          support_bottom_offset(mesh_group_settings.support_bottom_offset),
-          support_wall_count(mesh_group_settings.support_wall_count),
-          resolution(mesh_group_settings.resolution),
-          support_roof_line_distance(mesh_group_settings.support_roof_line_distance), // in the end the actual infill has to be calculated to subtract interface from support areas according to interface_preference.
-          settings(mesh_group_settings),
-          min_feature_size(mesh_group_settings.min_feature_size)
-
-
-    {
-        layer_start_bp_radius = (bp_radius - branch_radius) / (branch_radius * diameter_scale_bp_radius);
-
-        if (TreeSupportSettings::soluble) {
-            // safeOffsetInc can only work in steps of the size xy_min_distance in the worst case => xy_min_distance has to be a bit larger than 0 in this worst case and should be large enough for performance to not suffer extremely
-            // When for all meshes the z bottom and top distance is more than one layer though the worst case is xy_min_distance + min_feature_size
-            // This is not the best solution, but the only one to ensure areas can not lag though walls at high maximum_move_distance.
-            xy_min_distance = std::max(xy_min_distance, scaled<coord_t>(0.1));
-            xy_distance     = std::max(xy_distance, xy_min_distance);
-        }
-        
-
-//            const std::unordered_map<std::string, InterfacePreference> interface_map = { { "support_area_overwrite_interface_area", InterfacePreference::SupportAreaOverwritesInterface }, { "interface_area_overwrite_support_area", InterfacePreference::InterfaceAreaOverwritesSupport }, { "support_lines_overwrite_interface_area", InterfacePreference::SupportLinesOverwriteInterface }, { "interface_lines_overwrite_support_area", InterfacePreference::InterfaceLinesOverwriteSupport }, { "nothing", InterfacePreference::Nothing } };
-//            interface_preference = interface_map.at(mesh_group_settings.get<std::string>("support_interface_priority"));
-//FIXME this was the default
-//            interface_preference = InterfacePreference::SupportLinesOverwriteInterface;
-        //interface_preference = InterfacePreference::SupportAreaOverwritesInterface;
-        interface_preference = InterfacePreference::InterfaceAreaOverwritesSupport;
-    }
+    explicit TreeSupportSettings(const TreeSupportMeshGroupSettings &mesh_group_settings, const SlicingParameters &slicing_params);
 
 private:
     double angle;
@@ -466,6 +410,9 @@ public:
      */
     coord_t min_feature_size;
 
+    // Extra raft layers below the object.
+    std::vector<coordf_t> raft_layers;
+
   public:
     bool operator==(const TreeSupportSettings& other) const
     {
@@ -497,6 +444,7 @@ public:
                          settings.get<int>("meshfix_maximum_extrusion_area_deviation") == other.settings.get<int>("meshfix_maximum_extrusion_area_deviation"))
                     )
 #endif
+               && raft_layers == other.raft_layers
             ;
     }
 

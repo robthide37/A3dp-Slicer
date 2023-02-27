@@ -1168,7 +1168,7 @@ void PresetUpdater::slic3r_update_notify()
 
 static bool reload_configs_update_gui()
 {
-	wxString header = _L("Configuration Updates causes a loss of preset modification.\n"
+	wxString header = _L("Configuration Update will cause the preset modification to be lost.\n"
 						 "So, check unsaved changes and save them if necessary.");
 	if (!GUI::wxGetApp().check_and_save_current_preset_changes(_L("Updating"), header, false ))
 		return false;
