@@ -757,7 +757,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
             m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
             m_new_size = volume->get_instance_scaling_factor().cwiseProduct(wxGetApp().model().objects[volume->object_idx()]->raw_mesh_bounding_box().size());
 #endif // ENABLE_WORLD_COORDINATE
-            m_new_scale = volume->get_instance_scaling_factor() * 100.0;
+            m_new_scale = m_new_size.cwiseQuotient(selection.get_full_unscaled_instance_local_bounding_box().size()) * 100.0;
         }
 
         m_new_enabled  = true;
