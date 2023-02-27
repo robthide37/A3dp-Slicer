@@ -1300,8 +1300,7 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(const Vec3d& plane_center, 
 void GLGizmoCut3D::update_bb()
 {
     const BoundingBoxf3 box = bounding_box();
-    CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info();
-    if (!box.defined || !selection || !selection->model_object())
+    if (!box.defined)
         return;
     if (m_max_pos != box.max || m_min_pos != box.min) {
 
@@ -1339,7 +1338,8 @@ void GLGizmoCut3D::update_bb()
         on_unregister_raycasters_for_picking();
 
         clear_selection();
-        if (selection->model_object())
+        if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info();
+            selection && selection->model_object())
             m_selected.resize(selection->model_object()->cut_connectors.size(), false);
     }
 }
