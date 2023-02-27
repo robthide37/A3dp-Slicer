@@ -1777,15 +1777,22 @@ void PrintObject::bridge_over_infill()
                     assert(candidate->surface_type == stInternalSolid);
                     Polygons bridged_area               = expand(to_polygons(candidate->expolygon), flow.scaled_spacing());
                     Polygons infill_region              = to_polygons(surface_to_region[candidate]->fill_expolygons());
-                    bool     touches_perimeter          = !diff(bridged_area, infill_region).empty();
-                    bool     touches_solid_region_under = !intersection(bridged_area, not_sparse_infill).empty();
 
                     bridged_area =
                         intersection(bridged_area,
                                      lower_layers_sparse_infill); // cut off parts which are not over sparse infill - material overflow
 
-                    if ((touches_perimeter || touches_solid_region_under) && shrink(bridged_area, 5.0 * flow.scaled_spacing()).empty()) {
-                        continue;
+                    {
+                        Polygons area_without_perimeter_boundary_sections     = intersection(bridged_area,
+                                                                                             closing(infill_region, flow.scaled_width(),
+                                                                                                     flow.scaled_width() +
+                                                                                                         4.0 * flow.scaled_spacing()));
+                        Polygons and_further_without_solid_supported_sections = diff(area_without_perimeter_boundary_sections,
+                                                                                     expand(not_sparse_infill, 4.0 * flow.scaled_spacing()));
+
+                        if (and_further_without_solid_supported_sections.empty()) {
+                            continue;
+                        }
                     }
 
                     Polygons max_area = expand_area;
