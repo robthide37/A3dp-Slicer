@@ -200,7 +200,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     : GLGizmoBase(parent, icon_filename, sprite_id)
     , m_connectors_group_id (GrabberID::Count)
     , m_connector_type (CutConnectorType::Plug)
-    , m_connector_style (size_t(CutConnectorStyle::Prizm))
+    , m_connector_style (size_t(CutConnectorStyle::Prism))
     , m_connector_shape_id (size_t(CutConnectorShape::Circle))
 {
     m_modes = { _u8L("Planar")//, _u8L("Grid")
@@ -219,7 +219,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
         m_connector_types.push_back(type_label);
     }
 
-    m_connector_styles = { _u8L("Prizm"), _u8L("Frustum")
+    m_connector_styles = { _u8L("Prism"), _u8L("Frustum")
 //              , _u8L("Claw")
     };
 
@@ -1003,7 +1003,7 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             // recalculate connector position to world position
             Vec3d pos = connector.pos + instance_offset;
             if (connector.attribs.type == CutConnectorType::Dowel &&
-                connector.attribs.style == CutConnectorStyle::Prizm) {
+                connector.attribs.style == CutConnectorStyle::Prism) {
                 pos -= height * m_clp_normal;
                 height *= 2;
             }
@@ -1551,7 +1551,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
 
     m_imgui->disabled_begin(m_connector_type == CutConnectorType::Dowel);
     if (type_changed && m_connector_type == CutConnectorType::Dowel) {
-        m_connector_style = size_t(CutConnectorStyle::Prizm);
+        m_connector_style = size_t(CutConnectorStyle::Prism);
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
     }
     if (render_combo(_u8L("Style"), m_connector_styles, m_connector_style))
@@ -1603,7 +1603,7 @@ void GLGizmoCut3D::render_build_size()
                      ",  Z: " + double_to_string(tbb_sz.z() * koef, 2) + unit_str;
 
     ImGui::AlignTextToFramePadding();
-    m_imgui->text(_L("Build size"));
+    m_imgui->text(_L("Build Volume"));
     ImGui::SameLine(m_label_width);
     m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, size);
 }
@@ -1852,7 +1852,7 @@ void GLGizmoCut3D::validate_connector_settings()
     if (m_connector_type == CutConnectorType::Undef)
         m_connector_type = CutConnectorType::Plug;
     if (m_connector_style == size_t(CutConnectorStyle::Undef))
-        m_connector_style = size_t(CutConnectorStyle::Prizm);
+        m_connector_style = size_t(CutConnectorStyle::Prism);
     if (m_connector_shape_id == size_t(CutConnectorShape::Undef))
         m_connector_shape_id = size_t(CutConnectorShape::Circle);
 }
@@ -2088,7 +2088,7 @@ void GLGizmoCut3D::render_connectors()
 
         const Camera& camera = wxGetApp().plater()->get_camera();
         if (connector.attribs.type  == CutConnectorType::Dowel &&
-            connector.attribs.style == CutConnectorStyle::Prizm) {
+            connector.attribs.style == CutConnectorStyle::Prism) {
             if (is_looking_forward())
                 pos -= height * m_clp_normal;
             else
@@ -2128,7 +2128,7 @@ void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, bool &create_dowel
             connector.rotation_m = m_rotation_m;
 
             if (connector.attribs.type == CutConnectorType::Dowel) {
-                if (connector.attribs.style == CutConnectorStyle::Prizm)
+                if (connector.attribs.style == CutConnectorStyle::Prism)
                     connector.height *= 2;
                 create_dowels_as_separate_object = true;
             }
@@ -2244,7 +2244,7 @@ void GLGizmoCut3D::reset_connectors()
 void GLGizmoCut3D::init_connector_shapes()
 {
     for (const CutConnectorType& type : {CutConnectorType::Dowel, CutConnectorType::Plug})
-        for (const CutConnectorStyle& style : {CutConnectorStyle::Frustum, CutConnectorStyle::Prizm})
+        for (const CutConnectorStyle& style : {CutConnectorStyle::Frustum, CutConnectorStyle::Prism})
             for (const CutConnectorShape& shape : {CutConnectorShape::Circle, CutConnectorShape::Hexagon, CutConnectorShape::Square, CutConnectorShape::Triangle}) {
                 const CutConnectorAttributes attribs = { type, style, shape };
                 const indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);

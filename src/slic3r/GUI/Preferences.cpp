@@ -598,7 +598,7 @@ void PreferencesDialog::build()
 		
 		append_bool_option(m_optgroup_other, "downloader_url_registered",
 			L("Allow downloads from Printables.com"),
-			L("If enabled, PrusaSlicer will allow to download from Printables.com"),
+			L("If enabled, PrusaSlicer will be allowed to download from Printables.com"),
 			app_config->get_bool("downloader_url_registered"));
 
 		activate_options_tab(m_optgroup_other);
@@ -645,7 +645,7 @@ void PreferencesDialog::build()
 		{
 		append_bool_option(m_optgroup_dark_mode, "sys_menu_enabled",
 			L("Use system menu for application"),
-			L("If enabled, application will use the standart Windows system menu,\n"
+			L("If enabled, application will use the standard Windows system menu,\n"
 			"but on some combination od display scales it can look ugly. If disabled, old UI will be used."),
 			app_config->get_bool("sys_menu_enabled"));
 		}

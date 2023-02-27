@@ -179,6 +179,10 @@ struct TreeSupportMeshGroupSettings {
     // Tree Support Branch Density
     // Adjusts the density of the support structure used to generate the tips of the branches. A higher value results in better overhangs,
     // but the supports are harder to remove. Use Support Roof for very high values or ensure support density is similarly high at the top.
+    // ->
+    // Adjusts the density of the support structure used to generate the tips of the branches.
+    // A higher value results in better overhangs but the supports are harder to remove, thus it is recommended to enable top support interfaces
+    // instead of a high branch density value if dense interfaces are needed.
     // 5%-35%
     double                          support_tree_top_rate                   { 15. };
     // Tree Support Tip Diameter

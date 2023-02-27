@@ -228,7 +228,7 @@ enum class CutConnectorType : int {
 };
 
 enum class CutConnectorStyle : int {
-    Prizm
+    Prism
     , Frustum
     , Undef
     //,Claw
@@ -246,7 +246,7 @@ enum class CutConnectorShape : int {
 struct CutConnectorAttributes
 {
     CutConnectorType    type{ CutConnectorType::Plug };
-    CutConnectorStyle   style{ CutConnectorStyle::Prizm };
+    CutConnectorStyle   style{ CutConnectorStyle::Prism };
     CutConnectorShape   shape{ CutConnectorShape::Circle };
 
     CutConnectorAttributes() {}
