@@ -86,8 +86,8 @@ public:
     /// <param name="object">Model representation</param>
     /// <param name="skip">Condifiton for skip actualization</param>
     /// <param name="meshes">Speed up for already created AABBtrees</param>
-    void actualize(const ModelObject *object, const ISkip *skip = nullptr, Meshes *meshes = nullptr);
-    void actualize(const ModelInstance *instance, const ISkip *skip = nullptr, Meshes* meshes = nullptr);
+    void actualize(const ModelObject &object, const ISkip *skip = nullptr, Meshes *meshes = nullptr);
+    void actualize(const ModelInstance &instance, const ISkip *skip = nullptr, Meshes* meshes = nullptr);
 
     class SkipVolume: public ISkip
     {

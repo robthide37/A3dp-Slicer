@@ -7,8 +7,8 @@ namespace priv {
 using namespace Slic3r;
 static void actualize(RaycastManager::Meshes &meshes, const ModelVolumePtrs &volumes, const RaycastManager::ISkip *skip, RaycastManager::Meshes *input = nullptr);
 static const AABBMesh * get_mesh(const RaycastManager::Meshes &meshes, size_t volume_id);
-static RaycastManager::TrKey create_key(const ModelVolume* volume, const ModelInstance* instance){ 
-    return std::make_pair(instance->id().id, volume->id().id); }
+static RaycastManager::TrKey create_key(const ModelVolume& volume, const ModelInstance& instance){ 
+    return std::make_pair(instance.id().id, volume.id().id); }
 static RaycastManager::TrItems::iterator find(RaycastManager::TrItems &items, const RaycastManager::TrKey &key);
 static bool is_lower_key(const RaycastManager::TrKey &k1, const RaycastManager::TrKey &k2) {
     return k1.first < k2.first || k1.first == k2.first && k1.second < k2.second; }
@@ -16,23 +16,23 @@ static bool is_lower(const RaycastManager::TrItem &i1, const RaycastManager::TrI
     return is_lower_key(i1.first, i2.first); };
 }
 
-void RaycastManager::actualize(const ModelObject *object, const ISkip *skip, Meshes *meshes)
+void RaycastManager::actualize(const ModelObject &object, const ISkip *skip, Meshes *meshes)
 {
     // actualize MeshRaycaster
-    priv::actualize(m_meshes, object->volumes, skip, meshes);
+    priv::actualize(m_meshes, object.volumes, skip, meshes);
 
     // check if inscance was removed
     std::vector<bool> removed_transf(m_transformations.size(), {true});
 
     bool need_sort = false;
     // actualize transformation matrices
-    for (const ModelVolume *volume : object->volumes) {
+    for (const ModelVolume *volume : object.volumes) {
         if (skip != nullptr && skip->skip(volume->id().id)) continue;
         const Transform3d &volume_tr = volume->get_matrix();
-        for (const ModelInstance *instance : object->instances) {
+        for (const ModelInstance *instance : object.instances) {
             const Transform3d &instrance_tr = instance->get_matrix();
             Transform3d transformation = instrance_tr * volume_tr;
-            TrKey key = priv::create_key(volume, instance);
+            TrKey key = priv::create_key(*volume, *instance);
             auto item = priv::find(m_transformations, key);
             if (item != m_transformations.end()) {
                 // actualize transformation all the time
@@ -56,9 +56,9 @@ void RaycastManager::actualize(const ModelObject *object, const ISkip *skip, Mes
         std::sort(m_transformations.begin(), m_transformations.end(), priv::is_lower);
 }
 
-void RaycastManager::actualize(const ModelInstance *instance, const ISkip *skip, Meshes *meshes)
+void RaycastManager::actualize(const ModelInstance &instance, const ISkip *skip, Meshes *meshes)
 {
-    const ModelVolumePtrs &volumes = instance->get_object()->volumes;
+    const ModelVolumePtrs &volumes = instance.get_object()->volumes;
 
     // actualize MeshRaycaster
     priv::actualize(m_meshes, volumes, skip, meshes);
@@ -72,9 +72,9 @@ void RaycastManager::actualize(const ModelInstance *instance, const ISkip *skip,
         if (skip != nullptr && skip->skip(volume->id().id))
             continue;
         const Transform3d &volume_tr = volume->get_matrix();
-        const Transform3d &instrance_tr   = instance->get_matrix();
+        const Transform3d &instrance_tr   = instance.get_matrix();
         Transform3d        transformation = instrance_tr * volume_tr;
-        TrKey key = priv::create_key(volume, instance);
+        TrKey key = priv::create_key(*volume, instance);
         auto item = priv::find(m_transformations, key);
         if (item != m_transformations.end()) {
             // actualize transformation all the time

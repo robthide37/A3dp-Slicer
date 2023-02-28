@@ -104,11 +104,14 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
             gl_volumes[hovered_idx] != gl_volume)
             return false;
 
-        const ModelObject   *object   = get_model_object(*gl_volume, canvas.get_model()->objects);
+        const ModelObject *object = get_model_object(*gl_volume, canvas.get_model()->objects);
+        assert(object != nullptr);
+        if (object == nullptr)
+            return false;
+
         const ModelInstance *instance = get_model_instance(*gl_volume, *object);
         const ModelVolume   *volume   = get_model_volume(*gl_volume, *object);
-
-        assert(object != nullptr && instance != nullptr && volume != nullptr);
+        assert(instance != nullptr && volume != nullptr);
         if (object == nullptr || instance == nullptr || volume == nullptr)
             return false;
 
@@ -131,7 +134,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         // initialize raycasters
         // INFO: It could slows down for big objects
         // (may be move to thread and do not show drag until it finish)
-        raycast_manager.actualize(instance, &condition, &meshes);
+        raycast_manager.actualize(*instance, &condition, &meshes);
 
         // wxCoord == int --> wx/types.h
         Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
@@ -240,6 +243,94 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         return true;
     }
     return false;
+}
+
+std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastManager &raycast_manager) {
+    const GLVolume *gl_volume_ptr = get_selected_gl_volume(selection);
+    if (gl_volume_ptr == nullptr)
+        return {};
+    const GLVolume& gl_volume = *gl_volume_ptr;
+
+    const ModelObjectPtrs &objects = selection.get_model()->objects;
+    const ModelVolume* volume = get_model_volume(gl_volume, objects);
+    if (volume == nullptr)
+        return {};
+
+    const ModelInstance* instance = get_model_instance(gl_volume, objects);
+    if (instance == nullptr)
+        return {};
+
+    // Move object on surface
+    auto cond = RaycastManager::SkipVolume(volume->id().id);
+    raycast_manager.actualize(*instance, &cond);
+
+    Transform3d to_world = world_matrix_fixed(gl_volume, selection.get_model()->objects);
+    Vec3d point     = to_world * Vec3d::Zero();
+    Vec3d direction = to_world.linear() * (-Vec3d::UnitZ());
+
+    // ray in direction of text projection(from volume zero to z-dir)
+    std::optional<RaycastManager::Hit> hit_opt = raycast_manager.closest_hit(point, direction, &cond);
+
+    // Try to find closest point when no hit object in emboss direction
+    if (!hit_opt.has_value()) {
+        std::optional<RaycastManager::ClosePoint> close_point_opt = raycast_manager.closest(point);
+
+        // It should NOT appear. Closest point always exists.
+        assert(close_point_opt.has_value());
+        if (!close_point_opt.has_value())
+            return {};
+
+        // It is no neccesary to move with origin by very small value
+        if (close_point_opt->squared_distance < EPSILON)
+            return {};
+
+        const RaycastManager::ClosePoint &close_point = *close_point_opt;
+        Transform3d hit_tr = raycast_manager.get_transformation(close_point.tr_key);
+        Vec3d    hit_world = hit_tr * close_point.point;
+        Vec3d offset_world = hit_world - point; // vector in world
+        Vec3d offset_volume = to_world.inverse().linear() * offset_world;
+        return offset_volume;
+    }
+
+    // It is no neccesary to move with origin by very small value
+    const RaycastManager::Hit &hit = *hit_opt;
+    if (hit.squared_distance < EPSILON)
+        return {};
+    Transform3d hit_tr = raycast_manager.get_transformation(hit.tr_key);
+    Vec3d hit_world    = hit_tr * hit.position;
+    Vec3d offset_world = hit_world - point; // vector in world
+    // TIP: It should be close to only z move
+    Vec3d offset_volume = to_world.inverse().linear() * offset_world;
+    return offset_volume;
+}
+
+Transform3d world_matrix_fixed(const GLVolume &gl_volume, const ModelObjectPtrs &objects)
+{
+    Transform3d res = gl_volume.world_matrix();
+
+    const ModelVolume *mv = get_model_volume(gl_volume, objects);
+    if (!mv)
+        return res;
+
+    const std::optional<TextConfiguration> &tc = mv->text_configuration;
+    if (!tc.has_value())
+        return res;
+
+    const std::optional<Transform3d> &fix = tc->fix_3mf_tr;
+    if (!fix.has_value())
+        return res;
+
+    return res * fix->inverse();
+}
+
+Transform3d world_matrix_fixed(const Selection &selection)
+{
+    const GLVolume *gl_volume = get_selected_gl_volume(selection);
+    assert(gl_volume != nullptr);
+    if (gl_volume == nullptr)
+        return Transform3d::Identity();
+
+    return world_matrix_fixed(*gl_volume, selection.get_model()->objects);
 }
 
 } // namespace Slic3r::GUI

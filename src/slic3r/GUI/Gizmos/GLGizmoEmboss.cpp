@@ -346,52 +346,12 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 
 namespace priv {
 /// <summary>
-/// Get transformation to world
-/// - use fix after store to 3mf when exists
-/// </summary>
-/// <param name="gl_volume">Scene volume</param>
-/// <param name="model">To identify MovelVolume with fix transformation</param>
-/// <returns></returns>
-static Transform3d world_matrix(const GLVolume *gl_volume, const Model *model);
-static Transform3d world_matrix(const Selection &selection);
-
-/// <summary>
 /// Change position of emboss window
 /// </summary>
 /// <param name="output_window_offset"></param>
 /// <param name="try_to_fix">When True Only move to be full visible otherwise reset position</param>
 static void change_window_position(std::optional<ImVec2> &output_window_offset, bool try_to_fix);
 } // namespace priv
-
-Transform3d priv::world_matrix(const GLVolume *gl_volume, const Model *model)
-{
-    if (!gl_volume)
-        return Transform3d::Identity();
-    Transform3d res = gl_volume->world_matrix();
-
-    if (!model)
-        return res;
-
-    const ModelVolume* mv = get_model_volume(*gl_volume, model->objects);
-    if (!mv)
-        return res;
-
-    const std::optional<TextConfiguration> &tc = mv->text_configuration;
-    if (!tc.has_value())
-        return res;
-    
-    const std::optional<Transform3d> &fix = tc->fix_3mf_tr;
-    if (!fix.has_value())
-        return res;
-
-    return res * fix->inverse();
-}
-
-Transform3d priv::world_matrix(const Selection &selection)
-{
-    const GLVolume *gl_volume = get_selected_gl_volume(selection);
-    return world_matrix(gl_volume, selection.get_model());
-}
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
@@ -1115,17 +1075,6 @@ static inline void execute_job(std::shared_ptr<Job> j)
     });
 }
 
-namespace priv {
-/// <summary>
-/// Calculate translation of text volume onto surface of model
-/// </summary>
-/// <param name="volume">Text</param>
-/// <param name="raycast_manager">AABB trees of object. Actualize object containing text</param>
-/// <param name="selection">Transformation of actual instance</param>
-/// <returns>Offset of volume in volume coordinate</returns>
-std::optional<Vec3d> calc_surface_offset(const ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection);
-} // namespace priv
-
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
@@ -1160,7 +1109,7 @@ bool GLGizmoEmboss::process()
 
         // when it is new applying of use surface than move origin onto surfaca
         if (!m_volume->text_configuration->style.prop.use_surface) {
-            auto offset = priv::calc_surface_offset(*m_volume, m_raycast_manager, m_parent.get_selection());
+            auto offset = calc_surface_offset(m_parent.get_selection(), m_raycast_manager);
             if (offset.has_value())
                 text_tr *= Eigen::Translation<double, 3>(*offset);
         }
@@ -1231,7 +1180,7 @@ bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
     if (sel.is_empty()) return false;
     
     // camera direction transformed into volume coordinate system    
-    Transform3d to_world = priv::world_matrix(sel);
+    Transform3d to_world = world_matrix_fixed(sel);
     Vec3d cam_dir_tr = to_world.inverse().linear() * cam_dir;
     cam_dir_tr.normalize();
 
@@ -2949,53 +2898,6 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     m_parent.do_rotate(snapshot_name);
 }
 
-std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection) {
-    // Move object on surface
-    auto cond = RaycastManager::SkipVolume(volume.id().id);
-    raycast_manager.actualize(volume.get_object(), &cond);
-
-    //const Selection &selection = m_parent.get_selection();
-    const GLVolume *gl_volume = get_selected_gl_volume(selection);
-    Transform3d to_world = priv::world_matrix(gl_volume, selection.get_model());
-    Vec3d point     = to_world * Vec3d::Zero();
-    Vec3d direction = to_world.linear() * (-Vec3d::UnitZ());
-
-    // ray in direction of text projection(from volume zero to z-dir)
-    std::optional<RaycastManager::Hit> hit_opt = raycast_manager.closest_hit(point, direction, &cond);
-
-    // Try to find closest point when no hit object in emboss direction
-    if (!hit_opt.has_value()) {
-        std::optional<RaycastManager::ClosePoint> close_point_opt = raycast_manager.closest(point);
-
-        // It should NOT appear. Closest point always exists.
-        assert(close_point_opt.has_value());
-        if (!close_point_opt.has_value())
-            return {};
-
-        // It is no neccesary to move with origin by very small value
-        if (close_point_opt->squared_distance < EPSILON)
-            return {};
-
-        const RaycastManager::ClosePoint &close_point = *close_point_opt;
-        Transform3d hit_tr = raycast_manager.get_transformation(close_point.tr_key);
-        Vec3d    hit_world = hit_tr * close_point.point;
-        Vec3d offset_world = hit_world - point; // vector in world
-        Vec3d offset_volume = to_world.inverse().linear() * offset_world;
-        return offset_volume;
-    }
-
-    // It is no neccesary to move with origin by very small value
-    const RaycastManager::Hit &hit = *hit_opt;
-    if (hit.squared_distance < EPSILON)
-        return {};
-    Transform3d hit_tr = raycast_manager.get_transformation(hit.tr_key);
-    Vec3d hit_world    = hit_tr * hit.position;
-    Vec3d offset_world = hit_world - point; // vector in world
-    // TIP: It should be close to only z move
-    Vec3d offset_volume = to_world.inverse().linear() * offset_world;
-    return offset_volume;
-}
-
 void GLGizmoEmboss::draw_advanced()
 {
     const auto &ff = m_style_manager.get_font_file_with_cache();
@@ -3610,7 +3512,7 @@ bool priv::start_create_volume_on_surface_job(
     auto cond = RaycastManager::AllowVolumes({vol_id});
 
     RaycastManager::Meshes meshes = create_meshes(canvas, cond);
-    raycaster.actualize(obj, &cond, &meshes);
+    raycaster.actualize(*obj, &cond, &meshes);
 
     const Camera &camera = plater->get_camera();
     std::optional<RaycastManager::Hit> hit = ray_from_camera(raycaster, screen_coor, camera, &cond);

@@ -12,6 +12,7 @@ class GLVolume;
 
 namespace Slic3r::GUI {
 class GLCanvas3D;
+class Selection;
 struct Camera;
 
 // Data for drag&drop over surface with mouse
@@ -37,11 +38,48 @@ struct SurfaceDrag
     bool exist_hit = true;
 };
 
+/// <summary>
+/// Mouse event handler, when move(drag&drop) volume over model surface
+/// NOTE: Dragged volume has to be selected. And also has to be hovered on start of dragging.
+/// </summary>
+/// <param name="mouse_event">Contain type of event and mouse position</param>
+/// <param name="camera">Actual viewport of camera</param>
+/// <param name="surface_drag">Structure which keep information about dragging</param>
+/// <param name="canvas">Contain gl_volumes and selection</param>
+/// <param name="raycast_manager">AABB trees for raycast in object
+/// Refresh state inside of function </param>
+/// <returns>True when event is processed otherwise false</returns>
 bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
                            const Camera               &camera,
                            std::optional<SurfaceDrag> &surface_drag,
                            GLCanvas3D                 &canvas,
                            RaycastManager             &raycast_manager);
+
+/// <summary>
+/// Calculate translation of volume onto surface of model
+/// </summary>
+/// <param name="selection">Must contain only one selected volume, Transformation of current instance</param>
+/// <param name="raycast_manager">AABB trees of object. Actualize object</param>
+/// <returns>Offset of volume in volume coordinate</returns>
+std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastManager &raycast_manager);
+
+/// <summary>
+/// Get transformation to world
+/// - use fix after store to 3mf when exists
+/// </summary>
+/// <param name="gl_volume">Scene volume</param>
+/// <param name="objects">To identify Model volume with fix transformation</param>
+/// <returns>Fixed Transformation of gl_volume</returns>
+Transform3d world_matrix_fixed(const GLVolume &gl_volume, const ModelObjectPtrs& objects);
+
+/// <summary>
+/// Get transformation to world
+/// - use fix after store to 3mf when exists
+/// NOTE: when not one volume selected return identity
+/// </summary>
+/// <param name="selection">Selected volume</param>
+/// <returns>Fixed Transformation of selected volume in selection</returns>
+Transform3d world_matrix_fixed(const Selection &selection);
 
 } // namespace Slic3r::GUI
 #endif // slic3r_SurfaceDrag_hpp_
