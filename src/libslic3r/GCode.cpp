@@ -2960,8 +2960,6 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
             acceleration = m_config.first_layer_acceleration.value;
         } else if (this->object_layer_over_raft() && m_config.first_layer_acceleration_over_raft.value > 0) {
             acceleration = m_config.first_layer_acceleration_over_raft.value;
-        } else if (m_config.perimeter_acceleration.value > 0 && is_perimeter(path.role())) {
-            acceleration = m_config.perimeter_acceleration.value;
         } else if (m_config.bridge_acceleration.value > 0 && is_bridge(path.role())) {
             acceleration = m_config.bridge_acceleration.value;
         } else if (m_config.top_solid_infill_acceleration > 0 && path.role() == erTopSolidInfill) {
@@ -2970,8 +2968,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, std::string description, 
             acceleration = m_config.solid_infill_acceleration.value;
         } else if (m_config.infill_acceleration.value > 0 && is_infill(path.role())) {
             acceleration = m_config.infill_acceleration.value;
-       } else if (m_config.external_perimeter_acceleration > 0 && path.role() == erExternalPerimeter) {
+        } else if (m_config.external_perimeter_acceleration > 0 && path.role() == erExternalPerimeter) {
            acceleration = m_config.external_perimeter_acceleration.value;
+        } else if (m_config.perimeter_acceleration.value > 0 && is_perimeter(path.role())) {
+            acceleration = m_config.perimeter_acceleration.value;
         } else {
             acceleration = m_config.default_acceleration.value;
         }
