@@ -1479,7 +1479,7 @@ void PrintObject::discover_vertical_shells()
                         // Open to remove (filter out) regions narrower than a bit less than an infill extrusion line width.
                         // Such narrow regions are difficult to fill in with a gap fill algorithm (or Arachne), however they are most likely
                         // not needed for print stability / quality.
-                        const float narrow_ensure_vertical_wall_thickness_region_radius = 0.5f * 0.65f * min_perimeter_infill_spacing;
+                        const float narrow_ensure_vertical_wall_thickness_region_radius = 0.5f * 0.85f * min_perimeter_infill_spacing;
                         // Then close gaps narrower than 1.2 * line width, such gaps are difficult to fill in with sparse infill,
                         // thus they will be merged into the solid infill.
                         const float narrow_sparse_infill_region_radius                  = 0.5f * 1.2f * min_perimeter_infill_spacing;
@@ -1492,6 +1492,11 @@ void PrintObject::discover_vertical_shells()
                             narrow_ensure_vertical_wall_thickness_region_radius + narrow_sparse_infill_region_radius, ClipperLib::jtSquare),
                             // Finally expand the infill a bit to remove tiny gaps between solid infill and the other regions.
                             narrow_sparse_infill_region_radius - tiny_overlap_radius, ClipperLib::jtSquare);
+
+                        // The opening operation may cause scattered tiny drops on the smooth parts of the model. 
+                        shell.erase(std::remove_if(shell.begin(), shell.end(), [&min_perimeter_infill_spacing](const Polygon& p){
+                            return p.area() < min_perimeter_infill_spacing * scaled(8.0);
+                        }), shell.end());
                     }
                     if (shell.empty())
                         continue;
