@@ -3198,6 +3198,8 @@ bool GLGizmoEmboss::choose_true_type_file()
 }
 #endif // ALLOW_ADD_FONT_BY_FILE
 
+
+#ifdef ALLOW_DEBUG_MODE
 bool GLGizmoEmboss::choose_svg_file()
 {
     wxArrayString input_files;
@@ -3231,6 +3233,7 @@ bool GLGizmoEmboss::choose_svg_file()
     // svg.draw(polys);
     //return add_volume(name, its);
 }
+#endif // ALLOW_DEBUG_MODE
 
 void GLGizmoEmboss::create_notification_not_valid_font(
     const TextConfiguration &tc)

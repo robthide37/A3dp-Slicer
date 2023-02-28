@@ -153,10 +153,6 @@ private:
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
 
-    bool choose_font_by_wxdialog();
-    bool choose_true_type_file();
-    bool choose_svg_file();
-
     // When open text loaded from .3mf it could be written with unknown font
     bool m_is_unknown_font;
     void create_notification_not_valid_font(const TextConfiguration& tc);
