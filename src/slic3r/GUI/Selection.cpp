@@ -1042,7 +1042,14 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                         const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
                         const Transform3d vol_matrix_no_offset = vol_trafo.get_matrix_no_offset();
                         const Transform3d inst_scale_matrix = inst_trafo.get_scaling_factor_matrix();
-                        const Transform3d vol_rotation_matrix = vol_trafo.get_rotation_matrix();
+                        Transform3d vol_rotation_matrix = vol_trafo.get_rotation_matrix();
+                        if (vol_trafo.is_left_handed()) {
+                            Geometry::TransformationSVD vol_svd(vol_trafo);
+                            vol_rotation_matrix = vol_svd.u * vol_svd.v.transpose();
+                            // ensure the rotation has the proper direction
+                            if (!rotation.normalized().cwiseAbs().isApprox(Vec3d::UnitX()))
+                                rotation_matrix = rotation_matrix.inverse();
+                        }
                         rotation_matrix = vol_matrix_no_offset.inverse() * inst_scale_matrix.inverse() * vol_rotation_matrix * rotation_matrix *
                             vol_rotation_matrix.inverse() * inst_scale_matrix * vol_matrix_no_offset;
                     }
