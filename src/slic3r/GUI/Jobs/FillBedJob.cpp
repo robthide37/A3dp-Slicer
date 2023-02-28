@@ -104,14 +104,10 @@ void FillBedJob::prepare()
 
 void FillBedJob::process()
 {
-    if (m_object_idx == -1 || m_selected.empty()) return;
+    if (m_object_idx == -1 || m_selected.empty())
+        return;
 
-    const GLCanvas3D::ArrangeSettings &settings =
-        static_cast<const GLCanvas3D*>(m_plater->canvas3D())->get_arrange_settings();
-
-    arrangement::ArrangeParams params;
-    params.allow_rotations  = settings.enable_rotation;
-    params.min_obj_distance = scaled(settings.distance);
+    arrangement::ArrangeParams params = get_arrange_params(m_plater);
 
     bool do_stop = false;
     params.stopcondition = [this, &do_stop]() {
