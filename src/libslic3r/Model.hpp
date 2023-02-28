@@ -606,6 +606,19 @@ private:
     mutable BoundingBoxf3 m_raw_mesh_bounding_box;
     mutable bool          m_raw_mesh_bounding_box_valid { false };
 
+    // Only use this method if now the source and dest ModelObjects are equal, for example they were synchronized by Print::apply().
+    void copy_transformation_caches(const ModelObject &src) {
+        m_bounding_box_approx             = src.m_bounding_box_approx;
+        m_bounding_box_approx_valid       = src.m_bounding_box_approx_valid;
+        m_bounding_box_exact              = src.m_bounding_box_exact;
+        m_bounding_box_exact_valid        = src.m_bounding_box_exact_valid;
+        m_min_max_z_valid                 = src.m_min_max_z_valid;
+        m_raw_bounding_box                = src.m_raw_bounding_box;
+        m_raw_bounding_box_valid          = src.m_raw_bounding_box_valid;
+        m_raw_mesh_bounding_box           = src.m_raw_mesh_bounding_box;
+        m_raw_mesh_bounding_box_valid     = src.m_raw_mesh_bounding_box_valid;
+    }
+
     // Called by Print::apply() to set the model pointer after making a copy.
     friend class Print;
     friend class SLAPrint;

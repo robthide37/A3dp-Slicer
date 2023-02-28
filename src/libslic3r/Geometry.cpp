@@ -918,4 +918,30 @@ double rotation_diff_z(const Transform3d &trafo_from, const Transform3d &trafo_t
     return atan2(vx.y(), vx.x());
 }
 
+bool trafos_differ_in_rotation_by_z_and_mirroring_by_xy_only(const Transform3d &t1, const Transform3d &t2)
+{
+    if (std::abs(t1.translation().z() - t2.translation().z()) > EPSILON)
+        // One of the object is higher than the other above the build plate (or below the build plate).
+        return false;
+    Matrix3d m1 = t1.matrix().block<3, 3>(0, 0);
+    Matrix3d m2 = t2.matrix().block<3, 3>(0, 0);
+    Matrix3d m = m2.inverse() * m1;
+    Vec3d    z = m.block<3, 1>(0, 2);
+    if (std::abs(z.x()) > EPSILON || std::abs(z.y()) > EPSILON || std::abs(z.z() - 1.) > EPSILON)
+        // Z direction or length changed.
+        return false;
+    // Z still points in the same direction and it has the same length.
+    Vec3d    x = m.block<3, 1>(0, 0);
+    Vec3d    y = m.block<3, 1>(0, 1);
+    if (std::abs(x.z()) > EPSILON || std::abs(y.z()) > EPSILON)
+        return false;
+    double   lx2 = x.squaredNorm();
+    double   ly2 = y.squaredNorm();
+    if (lx2 - 1. > EPSILON * EPSILON || ly2 - 1. > EPSILON * EPSILON)
+        return false;
+    // Verify whether the vectors x, y are still perpendicular.
+    double   d   = x.dot(y);
+    return std::abs(d * d) < EPSILON * lx2 * ly2;
+}
+
 }} // namespace Slic3r::Geometry
