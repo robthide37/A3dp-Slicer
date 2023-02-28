@@ -993,6 +993,30 @@ inline SupportGeneratorLayer& layer_allocate(
     return layer_initialize(layer_storage.back(), layer_type, slicing_params, config, layer_idx);
 }
 
+int generate_raft_contact(
+    const PrintObject               &print_object,
+    const TreeSupportSettings       &config,
+    SupportGeneratorLayersPtr       &top_contacts,
+    SupportGeneratorLayerStorage    &layer_storage)
+{
+    int raft_contact_layer_idx = -1;
+    if (print_object.has_raft() && print_object.layer_count() > 0) {
+        // Produce raft contact layer outside of the tree support loop, so that no trees will be generated for the raft contact layer.
+        // Raft layers supporting raft contact interface will be produced by the classic raft generator.
+        // Find the raft contact layer.
+        raft_contact_layer_idx = int(config.raft_layers.size()) - 1;
+        while (raft_contact_layer_idx > 0 && config.raft_layers[raft_contact_layer_idx] > print_object.slicing_parameters().raft_contact_top_z + EPSILON)
+            -- raft_contact_layer_idx;
+        // Create the raft contact layer.
+        SupportGeneratorLayer &raft_contact_layer = layer_allocate(layer_storage, SupporLayerType::TopContact, print_object.slicing_parameters(), config, raft_contact_layer_idx);
+        top_contacts[raft_contact_layer_idx] = &raft_contact_layer;
+        const ExPolygons &lslices   = print_object.get_layer(0)->lslices;
+        double            expansion = print_object.config().raft_expansion.value;
+        raft_contact_layer.polygons = expansion > 0 ? expand(lslices, scaled<float>(expansion)) : to_polygons(lslices);
+    }
+    return raft_contact_layer_idx;
+}
+
 using SupportElements = std::deque<SupportElement>;
 /*!
  * \brief Creates the initial influence areas (that can later be propagated down) by placing them below the overhang.
@@ -1066,24 +1090,7 @@ static void generate_initial_areas(
     const size_t num_raft_layers     = config.raft_layers.size();
     const size_t num_support_layers  = size_t(std::max(0, int(print_object.layer_count()) + int(num_raft_layers) - int(z_distance_delta)));
     const size_t first_support_layer = std::max(int(num_raft_layers) - int(z_distance_delta), 1);
-    size_t       first_tree_layer    = 0;
-
-    size_t raft_contact_layer_idx = std::numeric_limits<size_t>::max();
-    if (num_raft_layers > 0 && print_object.layer_count() > 0) {
-        // Produce raft contact layer outside of the tree support loop, so that no trees will be generated for the raft contact layer.
-        // Raft layers supporting raft contact interface will be produced by the classic raft generator.
-        // Find the raft contact layer.
-        raft_contact_layer_idx = config.raft_layers.size() - 1;
-        while (raft_contact_layer_idx > 0 && config.raft_layers[raft_contact_layer_idx] > print_object.slicing_parameters().raft_contact_top_z + EPSILON)
-            -- raft_contact_layer_idx;
-        // Create the raft contact layer.
-        SupportGeneratorLayer &raft_contact_layer = layer_allocate(layer_storage, SupporLayerType::TopContact, print_object.slicing_parameters(), config, raft_contact_layer_idx);
-        top_contacts[raft_contact_layer_idx] = &raft_contact_layer;
-        const ExPolygons &lslices   = print_object.get_layer(0)->lslices;
-        double            expansion = print_object.config().raft_expansion.value;
-        raft_contact_layer.polygons = expansion > 0 ? expand(lslices, scaled<float>(expansion)) : to_polygons(lslices);
-        first_tree_layer = print_object.slicing_parameters().raft_layers() - 1;
-    }
+    const int    raft_contact_layer_idx = generate_raft_contact(print_object, config, top_contacts, layer_storage);
 
     std::mutex mutex_layer_storage, mutex_movebounds;
     std::vector<std::unordered_set<Point, PointHash>> already_inserted(num_support_layers);
@@ -1436,47 +1443,50 @@ static void generate_initial_areas(
         }
     });
 
-    // Remove tree tips that start below the raft contact,
-    // remove interface layers below the raft contact.
-    for (size_t i = 0; i < first_tree_layer; ++i) {
-        top_contacts[i] = nullptr;
-        move_bounds[i].clear();
-    }
-    if (raft_contact_layer_idx != std::numeric_limits<size_t>::max() && print_object.config().raft_expansion.value > 0) {
-        // If any tips at first_tree_layer now are completely inside the expanded raft layer, remove them as well before they are propagated to the ground.
-        Polygons &raft_polygons = top_contacts[raft_contact_layer_idx]->polygons;
-        EdgeGrid::Grid grid(get_extents(raft_polygons).inflated(SCALED_EPSILON));
-        grid.create(raft_polygons, Polylines{}, coord_t(scale_(10.)));
-        SupportElements &first_layer_move_bounds = move_bounds[first_tree_layer];
-        double threshold = scaled<double>(print_object.config().raft_expansion.value) * 2.;
-        first_layer_move_bounds.erase(std::remove_if(first_layer_move_bounds.begin(), first_layer_move_bounds.end(),
-            [&grid, threshold](const SupportElement &el) {
-                coordf_t dist;
-                if (grid.signed_distance_edges(el.state.result_on_layer, threshold, dist)) {
-                    assert(std::abs(dist) < threshold + SCALED_EPSILON);
-                    // Support point is inside the expanded raft, remove it.
-                    return dist < - 0.;
-                }
-                return false;
-            }), first_layer_move_bounds.end());
-#if 0
-        // Remove the remaining tips from the raft: Closing operation on tip circles.
-        if (! first_layer_move_bounds.empty()) {
-            const double eps = 0.1;
-            // All tips supporting this layer are expected to have the same radius.
-            double       radius = config.getRadius(first_layer_move_bounds.front().state);
-            // Connect the tips with the following closing radius.
-            double       closing_distance = radius;
-            Polygon      circle = make_circle(radius + closing_distance, eps);
-            Polygons     circles;
-            circles.reserve(first_layer_move_bounds.size());
-            for (const SupportElement &el : first_layer_move_bounds) {
-                circles.emplace_back(circle);
-                circles.back().translate(el.state.result_on_layer);
-            }
-            raft_polygons = diff(raft_polygons, offset(union_(circles), - closing_distance));
+    if (raft_contact_layer_idx >= 0) {
+        const size_t first_tree_layer = print_object.slicing_parameters().raft_layers() - 1;
+        // Remove tree tips that start below the raft contact,
+        // remove interface layers below the raft contact.
+        for (size_t i = 0; i < first_tree_layer; ++i) {
+            top_contacts[i] = nullptr;
+            move_bounds[i].clear();
         }
-#endif
+        if (raft_contact_layer_idx >= 0 && print_object.config().raft_expansion.value > 0) {
+            // If any tips at first_tree_layer now are completely inside the expanded raft layer, remove them as well before they are propagated to the ground.
+            Polygons &raft_polygons = top_contacts[raft_contact_layer_idx]->polygons;
+            EdgeGrid::Grid grid(get_extents(raft_polygons).inflated(SCALED_EPSILON));
+            grid.create(raft_polygons, Polylines{}, coord_t(scale_(10.)));
+            SupportElements &first_layer_move_bounds = move_bounds[first_tree_layer];
+            double threshold = scaled<double>(print_object.config().raft_expansion.value) * 2.;
+            first_layer_move_bounds.erase(std::remove_if(first_layer_move_bounds.begin(), first_layer_move_bounds.end(),
+                [&grid, threshold](const SupportElement &el) {
+                    coordf_t dist;
+                    if (grid.signed_distance_edges(el.state.result_on_layer, threshold, dist)) {
+                        assert(std::abs(dist) < threshold + SCALED_EPSILON);
+                        // Support point is inside the expanded raft, remove it.
+                        return dist < - 0.;
+                    }
+                    return false;
+                }), first_layer_move_bounds.end());
+    #if 0
+            // Remove the remaining tips from the raft: Closing operation on tip circles.
+            if (! first_layer_move_bounds.empty()) {
+                const double eps = 0.1;
+                // All tips supporting this layer are expected to have the same radius.
+                double       radius = config.getRadius(first_layer_move_bounds.front().state);
+                // Connect the tips with the following closing radius.
+                double       closing_distance = radius;
+                Polygon      circle = make_circle(radius + closing_distance, eps);
+                Polygons     circles;
+                circles.reserve(first_layer_move_bounds.size());
+                for (const SupportElement &el : first_layer_move_bounds) {
+                    circles.emplace_back(circle);
+                    circles.back().translate(el.state.result_on_layer);
+                }
+                raft_polygons = diff(raft_polygons, offset(union_(circles), - closing_distance));
+            }
+    #endif
+        }
     }
 }
 
@@ -4203,79 +4213,90 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         std::vector<Polygons>        overhangs = generate_overhangs(config, *print.get_object(processing.second.front()), throw_on_cancel);
 
         // ### Precalculate avoidances, collision etc.
-        size_t num_support_layers = precalculate(print, overhangs, processing.first, processing.second, volumes, throw_on_cancel);
-        if (num_support_layers == 0)
-            continue;
-
-        auto t_precalc = std::chrono::high_resolution_clock::now();
-
-        // value is the area where support may be placed. As this is calculated in CreateLayerPathing it is saved and reused in draw_areas
-        std::vector<SupportElements> move_bounds(num_support_layers);
-
-        // ### Place tips of the support tree
-        SupportGeneratorLayersPtr    bottom_contacts(num_support_layers, nullptr);
-        SupportGeneratorLayersPtr    top_contacts(num_support_layers, nullptr);
-        SupportGeneratorLayersPtr    top_interface_layers(num_support_layers, nullptr);
-        SupportGeneratorLayersPtr    intermediate_layers(num_support_layers, nullptr);
+        
         SupportGeneratorLayerStorage layer_storage;
+        SupportGeneratorLayersPtr    top_contacts;
+        SupportGeneratorLayersPtr    bottom_contacts;
+        SupportGeneratorLayersPtr    top_interface_layers;
+        SupportGeneratorLayersPtr    intermediate_layers;
 
-        for (size_t mesh_idx : processing.second)
-            generate_initial_areas(*print.get_object(mesh_idx), volumes, config, overhangs, move_bounds, top_contacts, top_interface_layers, layer_storage, throw_on_cancel);
-        auto t_gen = std::chrono::high_resolution_clock::now();
+        if (size_t num_support_layers = precalculate(print, overhangs, processing.first, processing.second, volumes, throw_on_cancel);
+            num_support_layers > 0) {
 
-#ifdef TREESUPPORT_DEBUG_SVG
-        for (size_t layer_idx = 0; layer_idx < move_bounds.size(); ++layer_idx) {
-            Polygons polys;
-            for (auto& area : move_bounds[layer_idx])
-                append(polys, area.influence_area);
-            if (auto begin = move_bounds[layer_idx].begin(); begin != move_bounds[layer_idx].end())
-                SVG::export_expolygons(debug_out_path("treesupport-initial_areas-%d.svg", layer_idx),
-                    { { { union_ex(volumes.getWallRestriction(config.getCollisionRadius(begin->state), layer_idx, begin->state.use_min_xy_dist)) },
-                        { "wall_restricrictions", "gray", 0.5f } },
-                      { { union_ex(polys) }, { "parent", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
+            auto t_precalc = std::chrono::high_resolution_clock::now();
+
+            // value is the area where support may be placed. As this is calculated in CreateLayerPathing it is saved and reused in draw_areas
+            std::vector<SupportElements> move_bounds(num_support_layers);
+
+            // ### Place tips of the support tree
+            top_contacts        .assign(num_support_layers, nullptr);
+            bottom_contacts     .assign(num_support_layers, nullptr);
+            top_interface_layers.assign(num_support_layers, nullptr);
+            intermediate_layers .assign(num_support_layers, nullptr);
+
+            for (size_t mesh_idx : processing.second)
+                generate_initial_areas(*print.get_object(mesh_idx), volumes, config, overhangs, move_bounds, top_contacts, top_interface_layers, layer_storage, throw_on_cancel);
+            auto t_gen = std::chrono::high_resolution_clock::now();
+
+    #ifdef TREESUPPORT_DEBUG_SVG
+            for (size_t layer_idx = 0; layer_idx < move_bounds.size(); ++layer_idx) {
+                Polygons polys;
+                for (auto& area : move_bounds[layer_idx])
+                    append(polys, area.influence_area);
+                if (auto begin = move_bounds[layer_idx].begin(); begin != move_bounds[layer_idx].end())
+                    SVG::export_expolygons(debug_out_path("treesupport-initial_areas-%d.svg", layer_idx),
+                        { { { union_ex(volumes.getWallRestriction(config.getCollisionRadius(begin->state), layer_idx, begin->state.use_min_xy_dist)) },
+                            { "wall_restricrictions", "gray", 0.5f } },
+                          { { union_ex(polys) }, { "parent", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
+            }
+    #endif // TREESUPPORT_DEBUG_SVG
+
+            // ### Propagate the influence areas downwards. This is an inherently serial operation.
+            create_layer_pathing(volumes, config, move_bounds, throw_on_cancel);
+            auto t_path = std::chrono::high_resolution_clock::now();
+
+            // ### Set a point in each influence area
+            create_nodes_from_area(volumes, config, move_bounds, throw_on_cancel);
+            auto t_place = std::chrono::high_resolution_clock::now();
+
+            // ### draw these points as circles
+            
+            if (print_object.config().support_material_style == smsTree)
+                draw_areas(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
+                    bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
+            else {
+                assert(print_object.config().support_material_style == smsOrganic);
+                indexed_triangle_set branches = draw_branches(*print.get_object(processing.second.front()), volumes, config, move_bounds, throw_on_cancel);
+                // Reduce memory footprint. After this point only slice_branches() will use volumes and from that only collisions with zero radius will be used.
+                volumes.clear_all_but_object_collision();
+                slice_branches(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, branches,
+                    bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
+            }
+
+            auto t_draw = std::chrono::high_resolution_clock::now();
+            auto dur_pre_gen = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_precalc - t_start).count();
+            auto dur_gen = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_gen - t_precalc).count();
+            auto dur_path = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_path - t_gen).count();
+            auto dur_place = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_place - t_path).count();
+            auto dur_draw = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_draw - t_place).count();
+            auto dur_total = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_draw - t_start).count();
+            BOOST_LOG_TRIVIAL(info) <<
+                "Total time used creating Tree support for the currently grouped meshes: " << dur_total << " ms. "
+                "Different subtasks:\nCalculating Avoidance: " << dur_pre_gen << " ms "
+                "Creating inital influence areas: " << dur_gen << " ms "
+                "Influence area creation: " << dur_path << "ms "
+                "Placement of Points in InfluenceAreas: " << dur_place << "ms "
+                "Drawing result as support " << dur_draw << " ms";
+    //        if (config.branch_radius==2121)
+    //            BOOST_LOG_TRIVIAL(error) << "Why ask questions when you already know the answer twice.\n (This is not a real bug, please dont report it.)";
+            
+            move_bounds.clear();
+        } else {
+            top_contacts.assign(config.raft_layers.size(), nullptr);
+            if (generate_raft_contact(print_object, config, top_contacts, layer_storage) < 0)
+                // No raft.
+                continue;
         }
-#endif // TREESUPPORT_DEBUG_SVG
-
-        // ### Propagate the influence areas downwards. This is an inherently serial operation.
-        create_layer_pathing(volumes, config, move_bounds, throw_on_cancel);
-        auto t_path = std::chrono::high_resolution_clock::now();
-
-        // ### Set a point in each influence area
-        create_nodes_from_area(volumes, config, move_bounds, throw_on_cancel);
-        auto t_place = std::chrono::high_resolution_clock::now();
-
-        // ### draw these points as circles
-        
-        if (print_object.config().support_material_style == smsTree)
-            draw_areas(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, 
-                bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
-        else {
-            assert(print_object.config().support_material_style == smsOrganic);
-            indexed_triangle_set branches = draw_branches(*print.get_object(processing.second.front()), volumes, config, move_bounds, throw_on_cancel);
-            // Reduce memory footprint. After this point only slice_branches() will use volumes and from that only collisions with zero radius will be used.
-            volumes.clear_all_but_object_collision();
-            slice_branches(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, branches,
-                bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
-        }
-
-        auto t_draw = std::chrono::high_resolution_clock::now();
-        auto dur_pre_gen = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_precalc - t_start).count();
-        auto dur_gen = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_gen - t_precalc).count();
-        auto dur_path = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_path - t_gen).count();
-        auto dur_place = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_place - t_path).count();
-        auto dur_draw = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_draw - t_place).count();
-        auto dur_total = 0.001 * std::chrono::duration_cast<std::chrono::microseconds>(t_draw - t_start).count();
-        BOOST_LOG_TRIVIAL(info) <<
-            "Total time used creating Tree support for the currently grouped meshes: " << dur_total << " ms. "
-            "Different subtasks:\nCalculating Avoidance: " << dur_pre_gen << " ms "
-            "Creating inital influence areas: " << dur_gen << " ms "
-            "Influence area creation: " << dur_path << "ms "
-            "Placement of Points in InfluenceAreas: " << dur_place << "ms "
-            "Drawing result as support " << dur_draw << " ms";
-//        if (config.branch_radius==2121)
-//            BOOST_LOG_TRIVIAL(error) << "Why ask questions when you already know the answer twice.\n (This is not a real bug, please dont report it.)";
-        
-        move_bounds.clear();
 
         auto remove_undefined_layers = [](SupportGeneratorLayersPtr &layers) {
             layers.erase(std::remove_if(layers.begin(), layers.end(), [](const SupportGeneratorLayer* ptr) { return ptr == nullptr; }), layers.end());
@@ -4343,7 +4364,9 @@ void fff_tree_support_generate(PrintObject &print_object, std::function<void()> 
             break;
         ++idx;
     }
-    FFFTreeSupport::generate_support_areas(*print_object.print(), BuildVolume(Pointfs{ Vec2d{ -300., -300. }, Vec2d{ -300., +300. }, Vec2d{ +300., +300. }, Vec2d{ +300., -300. } }, 0.), { idx }, throw_on_cancel);
+    FFFTreeSupport::generate_support_areas(*print_object.print(), 
+        BuildVolume(Pointfs{ Vec2d{ -300., -300. }, Vec2d{ -300., +300. }, Vec2d{ +300., +300. }, Vec2d{ +300., -300. } }, 0.), { idx }, 
+        throw_on_cancel);
 }
 
 } // namespace Slic3r
