@@ -1440,7 +1440,7 @@ static void generate_initial_areas(
         top_contacts[i] = nullptr;
         move_bounds[i].clear();
     }
-    if (raft_contact_layer_idx != std::numeric_limits<coord_t>::max() && print_object.config().raft_expansion.value > 0) {
+    if (raft_contact_layer_idx != std::numeric_limits<size_t>::max() && print_object.config().raft_expansion.value > 0) {
         // If any tips at first_tree_layer now are completely inside the expanded raft layer, remove them as well before they are propagated to the ground.
         Polygons &raft_polygons = top_contacts[raft_contact_layer_idx]->polygons;
         EdgeGrid::Grid grid(get_extents(raft_polygons).inflated(SCALED_EPSILON));

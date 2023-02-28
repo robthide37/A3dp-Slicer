@@ -2246,7 +2246,7 @@ void GCodeViewer::load_shells(const Print& print)
 
     if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF) {
         // adds wipe tower's volume
-        const double max_z = print.objects()[0]->model_object()->get_model()->bounding_box().max(2);
+        const double max_z = print.objects()[0]->model_object()->get_model()->max_z();
         const PrintConfig& config = print.config();
         const size_t extruders_count = config.nozzle_diameter.size();
         if (extruders_count > 1 && config.wipe_tower && !config.complete_objects) {

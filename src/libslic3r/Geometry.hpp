@@ -584,6 +584,13 @@ inline bool is_rotation_ninety_degrees(const Vec3d &rotation)
     return is_rotation_ninety_degrees(rotation.x()) && is_rotation_ninety_degrees(rotation.y()) && is_rotation_ninety_degrees(rotation.z());
 }
 
+// Returns true if one transformation may be converted into another transformation by
+// rotation around Z and by mirroring in X / Y only. Two objects sharing such transformation
+// may share support structures and they share Z height.
+bool trafos_differ_in_rotation_by_z_and_mirroring_by_xy_only(const Transform3d &t1, const Transform3d &t2);
+inline bool trafos_differ_in_rotation_by_z_and_mirroring_by_xy_only(const Transformation &t1, const Transformation &t2)
+    { return trafos_differ_in_rotation_by_z_and_mirroring_by_xy_only(t1.get_matrix(), t2.get_matrix()); }
+
 template <class Tout = double, class Tin>
 std::pair<Tout, Tout> dir_to_spheric(const Vec<3, Tin> &n, Tout norm = 1.)
 {
