@@ -56,6 +56,7 @@
 #define SHOW_WX_WEIGHT_INPUT
 #define DRAW_PLACE_TO_ADD_TEXT // Interactive draw of window position 
 #define ALLOW_OPEN_NEAR_VOLUME
+#define EXECUTE_PROCESS_ON_MAIN_THREAD // debug execution on main thread
 #endif // ALLOW_DEBUG_MODE
 
 using namespace Slic3r;
@@ -228,7 +229,15 @@ enum class IconState : unsigned { activable = 0, hovered /*1*/, disabled /*2*/ }
 // selector for icon by enum
 const IconManager::Icon &get_icon(const IconManager::VIcons& icons, IconType type, IconState state);
 // short call of Slic3r::GUI::button
-bool draw_button(const IconManager::VIcons& icons, IconType type, bool disable = false);
+static bool draw_button(const IconManager::VIcons& icons, IconType type, bool disable = false);
+
+/// <summary>
+/// Apply camera direction for emboss direction
+/// </summary>
+/// <param name="camera">Define view vector</param>
+/// <param name="canvas">Containe Selected Model to modify</param>
+/// <returns>True when apply change otherwise false</returns>
+static bool apply_camera_dir(const Camera &camera, GLCanvas3D &canvas);
 
 } // namespace priv
 
@@ -343,15 +352,6 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
     }
     return used;
 }
-
-namespace priv {
-/// <summary>
-/// Change position of emboss window
-/// </summary>
-/// <param name="output_window_offset"></param>
-/// <param name="try_to_fix">When True Only move to be full visible otherwise reset position</param>
-static void change_window_position(std::optional<ImVec2> &output_window_offset, bool try_to_fix);
-} // namespace priv
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
@@ -604,22 +604,14 @@ namespace priv {
 /// Move window for edit emboss text near to embossed object
 /// NOTE: embossed object must be selected
 /// </summary>
-ImVec2 calc_fine_position(const Selection &selection, const ImVec2 &windows_size, const Size &canvas_size)
-{
-    const Selection::IndicesList indices = selection.get_volume_idxs();
-    // no selected volume
-    if (indices.empty()) return {};
-    const GLVolume *volume = selection.get_volume(*indices.begin());
-    // bad volume selected (e.g. deleted one)
-    if (volume == nullptr) return {};
+static ImVec2 calc_fine_position(const Selection &selection, const ImVec2 &windows_size, const Size &canvas_size);
 
-    const Camera   &camera = wxGetApp().plater()->get_camera();
-    Slic3r::Polygon hull   = CameraUtils::create_hull2d(camera, *volume);
-
-    ImVec2 c_size(canvas_size.get_width(), canvas_size.get_height());
-    ImVec2 offset       = ImGuiWrapper::suggest_location(windows_size, hull, c_size);
-    return offset;
-}
+/// <summary>
+/// Change position of emboss window
+/// </summary>
+/// <param name="output_window_offset"></param>
+/// <param name="try_to_fix">When True Only move to be full visible otherwise reset position</param>
+static void change_window_position(std::optional<ImVec2> &output_window_offset, bool try_to_fix);
 } // namespace priv
 
 void GLGizmoEmboss::on_set_state()
@@ -1056,6 +1048,8 @@ void GLGizmoEmboss::calculate_scale() {
         m_style_manager.clear_imgui_font();
 }
 
+#ifdef EXECUTE_PROCESS_ON_MAIN_THREAD
+namespace priv {
 // Run Job on main thread (blocking) - ONLY DEBUG
 static inline void execute_job(std::shared_ptr<Job> j)
 {
@@ -1074,6 +1068,8 @@ static inline void execute_job(std::shared_ptr<Job> j)
         j->finalize(false, e_ptr);
     });
 }
+} // namespace priv
+#endif
 
 bool GLGizmoEmboss::process()
 {
@@ -1124,12 +1120,13 @@ bool GLGizmoEmboss::process()
         job = std::make_unique<UpdateJob>(std::move(data));
     }
 
-    //*    
+#ifndef EXECUTE_PROCESS_ON_MAIN_THREAD
     auto &worker = wxGetApp().plater()->get_ui_job_worker();
     queue_job(worker, std::move(job));
-    /*/ // Run Job on main thread (blocking) - ONLY DEBUG
-    execute_job(std::move(job));
-    // */
+#else 
+    // Run Job on main thread (blocking) - ONLY DEBUG
+    priv::execute_job(std::move(job));
+#endif // EXECUTE_PROCESS_ON_MAIN_THREAD
 
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();
@@ -1160,62 +1157,6 @@ void GLGizmoEmboss::close()
     auto& mng = m_parent.get_gizmos_manager();
     if (mng.get_current_type() == GLGizmosManager::Emboss)
         mng.open_gizmo(GLGizmosManager::Emboss);
-}
-
-namespace priv {
-
-/// <summary>
-/// Apply camera direction for emboss direction
-/// </summary>
-/// <param name="camera">Define view vector</param>
-/// <param name="canvas">Containe Selected Model to modify</param>
-/// <returns>True when apply change otherwise false</returns>
-static bool apply_camera_dir(const Camera &camera, GLCanvas3D &canvas);
-}
-
-bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
-    const Vec3d &cam_dir = camera.get_dir_forward();
-
-    Selection &sel = canvas.get_selection();
-    if (sel.is_empty()) return false;
-    
-    // camera direction transformed into volume coordinate system    
-    Transform3d to_world = world_matrix_fixed(sel);
-    Vec3d cam_dir_tr = to_world.inverse().linear() * cam_dir;
-    cam_dir_tr.normalize();
-
-    Vec3d emboss_dir(0., 0., -1.);
-
-    // check wether cam_dir is already used
-    if (is_approx(cam_dir_tr, emboss_dir)) return false;
-
-    assert(sel.get_volume_idxs().size() == 1);
-    GLVolume *gl_volume = sel.get_volume(*sel.get_volume_idxs().begin());
-
-    Transform3d vol_rot;
-    Transform3d vol_tr = gl_volume->get_volume_transformation().get_matrix();
-    // check whether cam_dir is opposit to emboss dir
-    if (is_approx(cam_dir_tr, -emboss_dir)) {
-        // rotate 180 DEG by y
-        vol_rot = Eigen::AngleAxis(M_PI_2, Vec3d(0., 1., 0.));
-    } else {
-        // calc params for rotation
-        Vec3d axe = emboss_dir.cross(cam_dir_tr);
-        axe.normalize();
-        double angle = std::acos(emboss_dir.dot(cam_dir_tr));
-        vol_rot = Eigen::AngleAxis(angle, axe);
-    }
-
-    Vec3d offset = vol_tr * Vec3d::Zero();
-    Vec3d offset_inv = vol_rot.inverse() * offset;
-    Transform3d res = vol_tr * 
-        Eigen::Translation<double, 3>(-offset) * 
-        vol_rot * 
-        Eigen::Translation<double, 3>(offset_inv);
-    //Transform3d res = vol_tr * vol_rot;
-    gl_volume->set_volume_transformation(Geometry::Transformation(res));
-    get_model_volume(*gl_volume, sel.get_model()->objects)->set_transformation(res);
-    return true;
 }
 
 void GLGizmoEmboss::draw_window()
@@ -3570,6 +3511,25 @@ void priv::find_closest_volume(const Selection       &selection,
     }
 }
 
+ImVec2 priv::calc_fine_position(const Selection &selection, const ImVec2 &windows_size, const Size &canvas_size)
+{
+    const Selection::IndicesList indices = selection.get_volume_idxs();
+    // no selected volume
+    if (indices.empty())
+        return {};
+    const GLVolume *volume = selection.get_volume(*indices.begin());
+    // bad volume selected (e.g. deleted one)
+    if (volume == nullptr)
+        return {};
+
+    const Camera   &camera = wxGetApp().plater()->get_camera();
+    Slic3r::Polygon hull   = CameraUtils::create_hull2d(camera, *volume);
+
+    ImVec2 c_size(canvas_size.get_width(), canvas_size.get_height());
+    ImVec2 offset = ImGuiWrapper::suggest_location(windows_size, hull, c_size);
+    return offset;
+}
+
 // Need internals to get window
 #include "imgui/imgui_internal.h"
 void priv::change_window_position(std::optional<ImVec2>& output_window_offset, bool try_to_fix) {
@@ -3604,6 +3564,52 @@ void priv::change_window_position(std::optional<ImVec2>& output_window_offset, b
 
     if (!try_to_fix && output_window_offset.has_value())
         output_window_offset = ImVec2(-1, -1); // Cannot 
+}
+
+
+bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
+    const Vec3d &cam_dir = camera.get_dir_forward();
+
+    Selection &sel = canvas.get_selection();
+    if (sel.is_empty()) return false;
+    
+    // camera direction transformed into volume coordinate system    
+    Transform3d to_world = world_matrix_fixed(sel);
+    Vec3d cam_dir_tr = to_world.inverse().linear() * cam_dir;
+    cam_dir_tr.normalize();
+
+    Vec3d emboss_dir(0., 0., -1.);
+
+    // check wether cam_dir is already used
+    if (is_approx(cam_dir_tr, emboss_dir)) return false;
+
+    assert(sel.get_volume_idxs().size() == 1);
+    GLVolume *gl_volume = sel.get_volume(*sel.get_volume_idxs().begin());
+
+    Transform3d vol_rot;
+    Transform3d vol_tr = gl_volume->get_volume_transformation().get_matrix();
+    // check whether cam_dir is opposit to emboss dir
+    if (is_approx(cam_dir_tr, -emboss_dir)) {
+        // rotate 180 DEG by y
+        vol_rot = Eigen::AngleAxis(M_PI_2, Vec3d(0., 1., 0.));
+    } else {
+        // calc params for rotation
+        Vec3d axe = emboss_dir.cross(cam_dir_tr);
+        axe.normalize();
+        double angle = std::acos(emboss_dir.dot(cam_dir_tr));
+        vol_rot = Eigen::AngleAxis(angle, axe);
+    }
+
+    Vec3d offset = vol_tr * Vec3d::Zero();
+    Vec3d offset_inv = vol_rot.inverse() * offset;
+    Transform3d res = vol_tr * 
+        Eigen::Translation<double, 3>(-offset) * 
+        vol_rot * 
+        Eigen::Translation<double, 3>(offset_inv);
+    //Transform3d res = vol_tr * vol_rot;
+    gl_volume->set_volume_transformation(Geometry::Transformation(res));
+    get_model_volume(*gl_volume, sel.get_model()->objects)->set_transformation(res);
+    return true;
 }
 
 // any existing icon filename to not influence GUI
