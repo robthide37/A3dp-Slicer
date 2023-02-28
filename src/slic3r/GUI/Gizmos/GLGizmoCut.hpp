@@ -139,10 +139,11 @@ class GLGizmoCut3D : public GLGizmoBase
 
     struct PartSelection {
         PartSelection() = default;
-        PartSelection(ModelObject* mo, const Vec3d& center, const Vec3d& normal);
+        PartSelection(ModelObject* mo, int instance_idx, const Vec3d& center, const Vec3d& normal);
 
         void render(const Vec3d* normal = nullptr);
         void toggle_selection(const Vec2d& mouse_pos);
+        void turn_over_selection();
 
         struct Part {
             GLModel glmodel;
@@ -151,11 +152,13 @@ class GLGizmoCut3D : public GLGizmoBase
             bool upper;
         };
         ModelObject* model_object; // FIXME: Ownership !
+        int instance_idx;
         std::vector<Part> parts;
         bool valid = false;
     };
 
     PartSelection m_part_selection;
+    ModelObjectPtrs m_cut_part_ptrs;
 
     bool                                        m_show_shortcuts{ false };
     std::vector<std::pair<wxString, wxString>>  m_shortcuts;

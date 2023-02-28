@@ -892,6 +892,7 @@ void GLGizmoCut3D::on_set_state()
         // initiate archived values
         m_ar_plane_center   = m_plane_center;
         m_start_dragging_m  = m_rotation_m;
+        reset_cut_by_contours();
 
         m_parent.request_extra_frame();
     }
@@ -1116,6 +1117,8 @@ void GLGizmoCut3D::dragging_grabber_z(const GLGizmoBase::UpdateData &data)
         projection = m_snap_step * std::round(projection / m_snap_step);
 
     const Vec3d shift = starting_vec * projection;
+    if (shift != Vec3d::Zero())
+        reset_cut_by_contours();
 
     // move  cut plane center
     set_center(m_plane_center + shift, true);
@@ -1153,6 +1156,9 @@ void GLGizmoCut3D::dragging_grabber_xy(const GLGizmoBase::UpdateData &data)
     if (m_hover_id == X)
         theta += 0.5 * PI;
 
+    if (!is_approx(theta, 0.0))
+        reset_cut_by_contours();
+
     Vec3d rotation = Vec3d::Zero();
     rotation[m_hover_id] = theta;
 
@@ -1187,14 +1193,10 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
 {
     if (m_hover_id < 0)
         return;
-    if (m_hover_id == Z || m_hover_id == CutPlane) {
+    if (m_hover_id == Z || m_hover_id == CutPlane)
         dragging_grabber_z(data);
-        reset_cut_by_contours();
-    }
-    else if (m_hover_id == X || m_hover_id == Y) {
+    else if (m_hover_id == X || m_hover_id == Y)
         dragging_grabber_xy(data);
-        reset_cut_by_contours();
-    }
     else if (m_hover_id >= m_connectors_group_id && m_connector_mode == CutConnectorMode::Manual)
         dragging_connector(data);
 }
@@ -1301,6 +1303,7 @@ void GLGizmoCut3D::update_bb()
         m_bounding_box = box;
 
         invalidate_cut_plane();
+        reset_cut_by_contours();
 
         m_max_pos = box.max;
         m_min_pos = box.min;
@@ -1402,11 +1405,14 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal)
 
         // FIXME: Cache the transforms.
 
-        const Vec3d         inst_offset     = model_object->instances[0]->get_offset();
+        const Vec3d         inst_offset     = model_object->instances[instance_idx]->get_offset();
         const Transform3d   view_inst_matrix= camera.get_view_matrix() * translation_transform(inst_offset);
 
+        const bool is_looking_forward = normal && camera.get_dir_forward().dot(*normal) < 0.05;
+
         for (size_t id=0; id<parts.size(); ++id) {
-            if (normal && camera.get_dir_forward().dot(*normal) < 0 && parts[id].selected)
+            if (normal && (( is_looking_forward &&  parts[id].selected) ||
+                           (!is_looking_forward && !parts[id].selected)   ) )
                 continue;
             const Vec3d volume_offset = model_object->volumes[id]->get_offset();
             shader->set_uniform("view_model_matrix", view_inst_matrix * translation_transform(volume_offset));
@@ -1419,7 +1425,6 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal)
     }
 }
 
-
 void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
 {
     // FIXME: Cache the transforms.
@@ -1430,12 +1435,18 @@ void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
     
     for (size_t id=0; id<parts.size(); ++id) {
         const Vec3d volume_offset = model_object->volumes[id]->get_offset();
-        Transform3d tr = model_object->instances.front()->get_matrix() * model_object->volumes[id]->get_matrix();
+        Transform3d tr = model_object->instances[instance_idx]->get_matrix() * model_object->volumes[id]->get_matrix();
         if (parts[id].raycaster.unproject_on_mesh(mouse_pos, tr, camera, pos, normal)) {
             parts[id].selected = ! parts[id].selected;
             return;
         }            
     }
+}
+
+void GLGizmoCut3D::PartSelection::turn_over_selection()
+{
+    for (Part& part : parts)
+        part.selected = !part.selected;
 }
 
 void GLGizmoCut3D::on_render()
@@ -1708,12 +1719,14 @@ void GLGizmoCut3D::flip_cut_plane()
     m_start_dragging_m = m_rotation_m;
 
     update_clipper();
+    m_part_selection.turn_over_selection();
 }
 
 
-GLGizmoCut3D::PartSelection::PartSelection(ModelObject* mo, const Vec3d& center, const Vec3d& normal)
+GLGizmoCut3D::PartSelection::PartSelection(ModelObject* mo, int instance_idx_in, const Vec3d& center, const Vec3d& normal)
 {
     model_object = mo; // FIXME: Ownership.
+    instance_idx = instance_idx_in;
 
     const ModelVolumePtrs& volumes = mo->volumes;
 
@@ -1730,7 +1743,7 @@ GLGizmoCut3D::PartSelection::PartSelection(ModelObject* mo, const Vec3d& center,
         parts.back().glmodel.init_from(volume->mesh());
 
         // Now check whether this part is below or above the plane.
-        Transform3d tr = (model_object->instances.front()->get_matrix() * volume->get_matrix()).inverse();
+        Transform3d tr = (model_object->instances[instance_idx]->get_matrix() * volume->get_matrix()).inverse();
         Vec3f pos = (tr * center).cast<float>();
         Vec3f norm = (tr.linear().inverse().transpose() * normal).cast<float>();
         for (const Vec3f& v : volume->mesh().its.vertices) {
@@ -1749,7 +1762,10 @@ GLGizmoCut3D::PartSelection::PartSelection(ModelObject* mo, const Vec3d& center,
 void GLGizmoCut3D::reset_cut_by_contours()
 {
     m_part_selection = PartSelection();
-    m_parent.toggle_model_objects_visibility(true);
+
+    const Selection& selection = m_parent.get_selection();
+    const ModelObjectPtrs& model_objects = selection.get_model()->objects;
+    m_parent.toggle_model_objects_visibility(true, model_objects[selection.get_object_idx()], selection.get_instance_idx());
 }
 
 void GLGizmoCut3D::process_contours()
@@ -1763,14 +1779,14 @@ void GLGizmoCut3D::process_contours()
     const int instance_idx = selection.get_instance_idx();
     const int object_idx = selection.get_object_idx();
 
-    ModelObjectPtrs moptrs = model_objects[object_idx]->cut(instance_idx, get_cut_matrix(selection),
+    m_cut_part_ptrs.clear();
+    m_cut_part_ptrs = model_objects[object_idx]->cut(instance_idx, get_cut_matrix(selection),
         ModelObjectCutAttribute::KeepUpper |
         ModelObjectCutAttribute::KeepLower |
-        ModelObjectCutAttribute::KeepAsParts |
-        ModelObjectCutAttribute::InvalidateCutInfo);
+        ModelObjectCutAttribute::KeepAsParts);
+    assert(m_cut_part_ptrs.size() == 1);
 
-    assert(moptrs.size() == 1);
-    m_part_selection = PartSelection(moptrs.front(), m_plane_center, m_cut_normal);
+    m_part_selection = PartSelection(m_cut_part_ptrs.front(), instance_idx, m_plane_center, m_cut_normal);
     m_parent.toggle_model_objects_visibility(false);
 }
 
@@ -1919,7 +1935,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGuiWrapper::text(_L("Cut result") + ": ");
         add_vertical_scaled_interval(0.5f);
 
-        m_imgui->disabled_begin(has_connectors || m_keep_as_parts);
+        m_imgui->disabled_begin(has_connectors || m_keep_as_parts || m_part_selection.valid);
             render_part_name("A", m_keep_upper, m_imgui->to_ImU32(UPPER_PART_COLOR));
             ImGui::SameLine(h_shift + ImGui::GetCurrentWindow()->WindowPadding.x);
             render_part_name("B", m_keep_lower, m_imgui->to_ImU32(LOWER_PART_COLOR));
@@ -1937,6 +1953,9 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
         m_imgui->disabled_begin(has_connectors);
             ImGuiWrapper::text(_L("Cut into") + ":");
+
+            if (m_part_selection.valid)
+                m_keep_as_parts = false;
 
             add_horizontal_scaled_interval(1.2f);
             // TRN CutGizmo: RadioButton Cut into ...
@@ -2322,21 +2341,88 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
 
+        const bool cut_by_contour = m_part_selection.valid && !m_cut_part_ptrs.empty();
+        ModelObject* cut_mo = cut_by_contour ? m_cut_part_ptrs.front() : nullptr;
+        if (cut_mo)
+            cut_mo->cut_connectors = mo->cut_connectors;
+
         bool create_dowels_as_separate_object = false;
         const bool has_connectors = !mo->cut_connectors.empty();
         // update connectors pos as offset of its center before cut performing
-        apply_connectors_in_model(mo, create_dowels_as_separate_object);
+        apply_connectors_in_model(cut_mo ? cut_mo : mo , create_dowels_as_separate_object);
 
-        plater->cut(object_idx, instance_idx, get_cut_matrix(selection),
-                    only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
-                    only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
-                    only_if(has_connectors ? false: m_keep_as_parts, ModelObjectCutAttribute::KeepAsParts) |
-                    only_if(m_place_on_cut_upper, ModelObjectCutAttribute::PlaceOnCutUpper) |
-                    only_if(m_place_on_cut_lower, ModelObjectCutAttribute::PlaceOnCutLower) |
-                    only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) |
-                    only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) |
-                    only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels) |
-                    only_if(!has_connectors, ModelObjectCutAttribute::InvalidateCutInfo));
+        wxBusyCursor wait;
+
+        const Transform3d cut_matrix = get_cut_matrix(selection);
+
+        ModelObjectCutAttributes attributes = only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
+                                              only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
+                                              only_if(has_connectors ? false : m_keep_as_parts, ModelObjectCutAttribute::KeepAsParts) |
+                                              only_if(m_place_on_cut_upper, ModelObjectCutAttribute::PlaceOnCutUpper) |
+                                              only_if(m_place_on_cut_lower, ModelObjectCutAttribute::PlaceOnCutLower) |
+                                              only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) |
+                                              only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) |
+                                              only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels) |
+                                              only_if(!has_connectors, ModelObjectCutAttribute::InvalidateCutInfo);
+
+        ModelObjectPtrs cut_object_ptrs;
+        if (cut_by_contour) {
+            // apply cut attributes for object
+            cut_mo->apply_cut_attributes(ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepUpper | 
+                                         only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
+
+            // Clone the object to duplicate instances, materials etc.
+            ModelObject* upper{ nullptr };
+            cut_mo->clone_for_cut(&upper);
+            ModelObject* lower{ nullptr };
+            cut_mo->clone_for_cut(&lower);
+
+            auto add_cut_objects = [this, &instance_idx, &cut_matrix](ModelObjectPtrs& cut_objects, ModelObject* upper, ModelObject* lower, bool invalidate_cut = true) {
+                if (!upper->volumes.empty()) {
+                    ModelObject::reset_instance_transformation(upper, instance_idx, cut_matrix, m_place_on_cut_upper, m_rotate_upper);
+                    if (invalidate_cut)
+                        upper->invalidate_cut();
+                    cut_objects.push_back(upper);
+                }
+                if (!lower->volumes.empty()) {
+                    ModelObject::reset_instance_transformation(lower, instance_idx, cut_matrix, m_place_on_cut_lower, m_place_on_cut_lower || m_rotate_lower);
+                    if (invalidate_cut)
+                        lower->invalidate_cut();
+                    cut_objects.push_back(lower);
+                }
+            };
+
+            const size_t cut_parts_cnt = m_part_selection.parts.size();
+            for (size_t id = 0; id < cut_parts_cnt; ++id)
+                (m_part_selection.parts[id].selected ? upper : lower)->add_volume(*(cut_mo->volumes[id]));
+
+            ModelVolumePtrs& volumes = cut_mo->volumes;
+            if (volumes.size() == cut_parts_cnt)
+                add_cut_objects(cut_object_ptrs, upper, lower);
+            else if (volumes.size() > cut_parts_cnt) {
+                for (size_t id = 0; id < cut_parts_cnt; id++)
+                    delete *(volumes.begin() + id);
+                volumes.erase(volumes.begin(), volumes.begin() + cut_parts_cnt);
+
+                const auto cut_connectors_obj = cut_mo->cut(instance_idx, get_cut_matrix(selection), attributes);
+                assert(create_dowels_as_separate_object ? cut_connectors_obj.size() >= 3 : cut_connectors_obj.size() == 2);
+
+                for (const ModelVolume* volume : cut_connectors_obj[0]->volumes)
+                     upper->add_volume(*volume, volume->type());
+                for (const ModelVolume* volume : cut_connectors_obj[1]->volumes)
+                     lower->add_volume(*volume, volume->type());
+
+                add_cut_objects(cut_object_ptrs, upper, lower, false);
+
+                if (cut_connectors_obj.size() >= 3)
+                    for (size_t id = 2; id < cut_connectors_obj.size(); id++)
+                        cut_object_ptrs.push_back(cut_connectors_obj[id]);
+            }
+        }
+        else
+            cut_object_ptrs = mo->cut(instance_idx, cut_matrix, attributes);
+
+        plater->cut(object_idx, cut_object_ptrs);
     }
 }
 
