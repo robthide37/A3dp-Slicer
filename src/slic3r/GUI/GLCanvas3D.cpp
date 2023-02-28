@@ -1063,17 +1063,16 @@ PrinterTechnology GLCanvas3D::current_printer_technology() const
     return m_process->current_printer_technology();
 }
 
-bool GLCanvas3D::is_arrange_alignment_enabled()
+bool GLCanvas3D::is_arrange_alignment_enabled() const
 {
-    static constexpr const char *ALIGN_ONLY_FOR = "MINI";
+    static constexpr const char *ALIGN_ONLY_FOR = "XL";
 
     bool ret = false;
 
-    const Preset &preset = wxGetApp().preset_bundle->get_presets(Preset::TYPE_PRINTER).get_selected_preset();
+    auto *printer_model = m_config->opt<ConfigOptionString>("printer_model");
 
-    auto *printermodel = PresetUtils::system_printer_model(preset);
-    if (printermodel)
-        ret = printermodel->family == ALIGN_ONLY_FOR;
+    if (printer_model)
+        ret = boost::algorithm::contains(printer_model->value, ALIGN_ONLY_FOR);
 
     return ret;
 }

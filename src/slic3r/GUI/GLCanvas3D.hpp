@@ -550,7 +550,7 @@ private:
 
     PrinterTechnology current_printer_technology() const;
 
-    static bool is_arrange_alignment_enabled();
+    bool is_arrange_alignment_enabled() const;
 
     template<class Self>
     static auto & get_arrange_settings_ref(Self *self) {
