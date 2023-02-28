@@ -162,8 +162,62 @@ private:
     void create_notification_not_valid_font(const TextConfiguration& tc);
     void remove_notification_not_valid_font();
     
-    struct GuiCfg;
-    std::unique_ptr<const GuiCfg> m_gui_cfg = nullptr;
+    // This configs holds GUI layout size given by translated texts.
+    // etc. When language changes, GUI is recreated and this class constructed again,
+    // so the change takes effect. (info by GLGizmoFdmSupports.hpp)
+    struct GuiCfg
+    {
+        // Detect invalid config values when change monitor DPI
+        double screen_scale;
+        float  main_toolbar_height;
+
+        // Zero means it is calculated in init function
+        ImVec2       minimal_window_size                  = ImVec2(0, 0);
+        ImVec2       minimal_window_size_with_advance     = ImVec2(0, 0);
+        ImVec2       minimal_window_size_with_collections = ImVec2(0, 0);
+        float        height_of_volume_type_selector       = 0.f;
+        float        input_width                          = 0.f;
+        float        delete_pos_x                         = 0.f;
+        float        max_style_name_width                 = 0.f;
+        unsigned int icon_width                           = 0;
+
+        // maximal width and height of style image
+        Vec2i max_style_image_size = Vec2i(0, 0);
+
+        float indent                = 0.f;
+        float input_offset          = 0.f;
+        float advanced_input_offset = 0.f;
+
+        ImVec2 text_size;
+
+        // maximal size of face name image
+        Vec2i face_name_size             = Vec2i(100, 0);
+        float face_name_max_width        = 100.f;
+        float face_name_texture_offset_x = 105.f;
+
+        // maximal texture generate jobs running at once
+        unsigned int max_count_opened_font_files = 10;
+
+        // Only translations needed for calc GUI size
+        struct Translations
+        {
+            std::string font;
+            std::string size;
+            std::string depth;
+            std::string use_surface;
+
+            // advanced
+            std::string char_gap;
+            std::string line_gap;
+            std::string boldness;
+            std::string italic;
+            std::string surface_distance;
+            std::string angle;
+            std::string collection;
+        };
+        Translations translations;
+    };
+    std::optional<const GuiCfg> m_gui_cfg; 
     static GuiCfg create_gui_configuration();
 
     // Is open tree with advanced options

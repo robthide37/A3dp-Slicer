@@ -3,18 +3,19 @@
 #include "libslic3r/Model.hpp" // ModelVolume
 #include "GLCanvas3D.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
-
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
-
 #include "libslic3r/Emboss.hpp"
 
-// getter on camera needs
-//#include "slic3r/GUI/GUI_App.hpp"
-//#include "Plater.hpp"
-
 namespace Slic3r::GUI {
-
+    
+/// <summary>
+/// Calculate offset from mouse position to center of text
+/// </summary>
+/// <param name="screen_coor">Position on screen[in Px] e.g. mouse position</param>
+/// <param name="volume">Selected volume(text)</param>
+/// <param name="camera">Actual position and view direction of camera</param>
+/// <returns>Offset in screen coordinate</returns>
 static Vec2d calc_screen_offset_to_volume_center(const Vec2d &screen_coor, const ModelVolume &volume, const Camera &camera)
 {
     const Transform3d &volume_tr = volume.get_matrix();

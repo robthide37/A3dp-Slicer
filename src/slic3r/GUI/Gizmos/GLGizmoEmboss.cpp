@@ -120,62 +120,6 @@ template<typename T> void to_range_pi_pi(T& angle)
 } // namespace priv
 using namespace priv;
 
-// This configs holds GUI layout size given by translated texts.
-// etc. When language changes, GUI is recreated and this class constructed again,
-// so the change takes effect. (info by GLGizmoFdmSupports.hpp)
-struct GLGizmoEmboss::GuiCfg
-{
-    // Detect invalid config values when change monitor DPI
-    double screen_scale;
-    float  main_toolbar_height;
-
-    // Zero means it is calculated in init function
-    ImVec2       minimal_window_size                  = ImVec2(0, 0);
-    ImVec2       minimal_window_size_with_advance     = ImVec2(0, 0);
-    ImVec2       minimal_window_size_with_collections = ImVec2(0, 0);
-    float        height_of_volume_type_selector       = 0.f;
-    float        input_width                          = 0.f;
-    float        delete_pos_x                         = 0.f;
-    float        max_style_name_width                 = 0.f;
-    unsigned int icon_width                           = 0;
-
-    // maximal width and height of style image
-    Vec2i max_style_image_size = Vec2i(0, 0);
-
-    float indent                = 0.f;
-    float input_offset          = 0.f;
-    float advanced_input_offset = 0.f;
-
-    ImVec2 text_size;
-
-    // maximal size of face name image
-    Vec2i face_name_size             = Vec2i(100, 0);
-    float face_name_max_width        = 100.f;
-    float face_name_texture_offset_x = 105.f;
-
-    // maximal texture generate jobs running at once
-    unsigned int max_count_opened_font_files = 10;
-
-    // Only translations needed for calc GUI size
-    struct Translations
-    {
-        std::string font;
-        std::string size;
-        std::string depth;
-        std::string use_surface;
-
-        // advanced
-        std::string char_gap;
-        std::string line_gap;
-        std::string boldness;
-        std::string italic;
-        std::string surface_distance;
-        std::string angle;
-        std::string collection;
-    };
-    Translations translations;
-}; 
-
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
     , m_volume(nullptr)
@@ -403,14 +347,6 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 
 namespace priv {
 /// <summary>
-/// Calculate offset from mouse position to center of text
-/// </summary>
-/// <param name="mouse">Screan mouse position</param>
-/// <param name="mv">Selected volume(text)</param>
-/// <returns>Offset in screan coordinate</returns>
-static Vec2d calc_mouse_to_center_text_offset(const Vec2d &mouse, const ModelVolume &mv);
-
-/// <summary>
 /// Get transformation to world
 /// - use fix after store to 3mf when exists
 /// </summary>
@@ -456,43 +392,6 @@ Transform3d priv::world_matrix(const Selection &selection)
 {
     const GLVolume *gl_volume = get_selected_gl_volume(selection);
     return world_matrix(gl_volume, selection.get_model());
-}
-
-Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolume& mv) {
-    const Transform3d &volume_tr   = mv.get_matrix();
-    const Camera      &camera      = wxGetApp().plater()->get_camera();
-    assert(mv.text_configuration.has_value());
-
-    auto calc_offset = [&mouse, &volume_tr, &camera, &mv]
-    (const Transform3d &instrance_tr) -> Vec2d {
-        Transform3d to_world = instrance_tr * volume_tr;  
-
-        // Use fix of .3mf loaded tranformation when exist
-        if (mv.text_configuration->fix_3mf_tr.has_value())
-            to_world = to_world * (*mv.text_configuration->fix_3mf_tr);        
-        // zero point of volume in world coordinate system
-        Vec3d volume_center = to_world.translation();
-        // screen coordinate of volume center
-        Vec2i coor = CameraUtils::project(camera, volume_center);
-        return coor.cast<double>() - mouse;
-    };
-
-    auto object = mv.get_object();
-    assert(!object->instances.empty());
-    // Speed up for one instance
-    if (object->instances.size() == 1) 
-        return calc_offset(object->instances.front()->get_matrix());
-
-    Vec2d  nearest_offset;
-    double nearest_offset_size = std::numeric_limits<double>::max();
-    for (const ModelInstance *instance : object->instances) {        
-        Vec2d offset = calc_offset(instance->get_matrix());
-        double offset_size = offset.norm();
-        if (nearest_offset_size < offset_size) continue;
-        nearest_offset_size = offset_size;
-        nearest_offset      = offset;
-    }
-    return nearest_offset;
 }
 
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
@@ -679,7 +578,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     // Configuration creation
     double screen_scale = wxDisplay(wxGetApp().plater()).GetScaleFactor();
     float  main_toolbar_height = m_parent.get_main_toolbar_height();
-    if (m_gui_cfg == nullptr || // Exist configuration - first run
+    if (!m_gui_cfg.has_value() ||                   // Exist configuration - first run
         m_gui_cfg->screen_scale != screen_scale || // change of DPI
         m_gui_cfg->main_toolbar_height != main_toolbar_height // change size of view port
         ) {
@@ -687,7 +586,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         GuiCfg cfg = create_gui_configuration();
         cfg.screen_scale = screen_scale;
         cfg.main_toolbar_height = main_toolbar_height;
-        m_gui_cfg = std::make_unique<const GuiCfg>(std::move(cfg));
+        m_gui_cfg.emplace(std::move(cfg));
         // set position near toolbar
         m_set_window_offset = ImVec2(-1.f, -1.f);
 
@@ -816,7 +715,7 @@ void GLGizmoEmboss::on_set_state()
         // Try(when exist) set text configuration by volume 
         set_volume_by_selection();
 
-        // when open window by "T" and no valid volume is selected, so Create new one
+        // when open window by "T" and no valid volume is selected, so Create new one 
         if (m_volume == nullptr ||
             get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr ) { 
             // reopen gizmo when new object is created
@@ -832,7 +731,7 @@ void GLGizmoEmboss::on_set_state()
         if (m_allow_open_near_volume) {
             m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
         } else {
-            if (m_gui_cfg != nullptr)
+            if (m_gui_cfg.has_value())
                 priv::change_window_position(m_set_window_offset, false);
             else
                 m_set_window_offset = ImVec2(-1, -1);
@@ -3073,7 +2972,7 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
 
 std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, RaycastManager &raycast_manager, const Selection &selection) {
     // Move object on surface
-    auto cond = RaycastManager::SkipVolume({volume.id().id});
+    auto cond = RaycastManager::SkipVolume(volume.id().id);
     raycast_manager.actualize(volume.get_object(), &cond);
 
     //const Selection &selection = m_parent.get_selection();
@@ -3690,8 +3589,8 @@ void priv::start_create_volume_job(const ModelObject *object,
             bool is_outside = volume_type == ModelVolumeType::MODEL_PART;
             // check that there is not unexpected volume type
             assert(is_outside || volume_type == ModelVolumeType::NEGATIVE_VOLUME || volume_type == ModelVolumeType::PARAMETER_MODIFIER);
-            CreateSurfaceVolumeData surface_data{std::move(emboss_data), volume_trmat, is_outside,
-                                                 std::move(sources),     volume_type,  object->id()};
+            SurfaceVolumeData sfvd{volume_trmat, is_outside, std::move(sources)};
+            CreateSurfaceVolumeData surface_data{std::move(emboss_data), std::move(sfvd), volume_type, object->id()};
             job = std::make_unique<CreateSurfaceVolumeJob>(std::move(surface_data));
         }
     }
