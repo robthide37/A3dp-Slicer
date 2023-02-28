@@ -1338,7 +1338,8 @@ void GLGizmoCut3D::update_bb()
         on_unregister_raycasters_for_picking();
 
         clear_selection();
-        if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info())
+        if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info();
+            selection && selection->model_object())
             m_selected.resize(selection->model_object()->cut_connectors.size(), false);
     }
 }
