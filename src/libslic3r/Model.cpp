@@ -1241,7 +1241,7 @@ indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes conn
         break;
     }
 
-    if (connector_attributes.style == CutConnectorStyle::Prizm)
+    if (connector_attributes.style == CutConnectorStyle::Prism)
         connector_mesh = its_make_cylinder(1.0, 1.0, (2 * PI / sectorCount));
     else if (connector_attributes.type == CutConnectorType::Plug)
         connector_mesh = its_make_cone(1.0, 1.0, (2 * PI / sectorCount));
@@ -1347,12 +1347,7 @@ void ModelVolume::apply_tolerance()
         return;
 
     Vec3d sf = get_scaling_factor();
-/*
-    // correct Z offset in respect to the new size
-    Vec3d pos = vol->get_offset();
-    pos[Z] += sf[Z] * 0.5 * vol->cut_info.height_tolerance;
-    vol->set_offset(pos);
-*/
+
     // make a "hole" wider
     sf[X] += double(cut_info.radius_tolerance);
     sf[Y] += double(cut_info.radius_tolerance);
@@ -1361,9 +1356,39 @@ void ModelVolume::apply_tolerance()
     sf[Z] += double(cut_info.height_tolerance);
 
     set_scaling_factor(sf);
+
+    // correct offset in respect to the new depth
+    Vec3d rot_norm = Geometry::rotation_transform(get_rotation()) * Vec3d::UnitZ();
+    if (rot_norm.norm() != 0.0)
+        rot_norm.normalize();
+
+    double z_offset = 0.5 * static_cast<double>(cut_info.height_tolerance);
+    if (cut_info.connector_type == CutConnectorType::Plug)
+        z_offset -= 0.05; // add small Z offset to better preview
+
+    set_offset(get_offset() + rot_norm * z_offset);
 }
 
-void ModelObject::process_connector_cut(ModelVolume* volume, ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower, 
+static void add_cut_volume(TriangleMesh& mesh, ModelObject* object, const ModelVolume* src_volume, const Transform3d& cut_matrix, const std::string& suffix = {}, ModelVolumeType type = ModelVolumeType::MODEL_PART)
+{
+    if (mesh.empty())
+        return;
+
+    mesh.transform(cut_matrix);
+    ModelVolume* vol = object->add_volume(mesh);
+    vol->set_type(type);
+
+    vol->name = src_volume->name + suffix;
+    // Don't copy the config's ID.
+    vol->config.assign_config(src_volume->config);
+    assert(vol->config.id().valid());
+    assert(vol->config.id() != src_volume->config.id());
+    vol->set_material(src_volume->material_id(), *src_volume->material());
+    vol->cut_info = src_volume->cut_info;
+}
+
+void ModelObject::process_connector_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix, 
+                                        ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower,
                                         std::vector<ModelObject*>& dowels, Vec3d& local_dowels_displace)
 {
     assert(volume->cut_info.is_connector);
@@ -1373,39 +1398,53 @@ void ModelObject::process_connector_cut(ModelVolume* volume, ModelObjectCutAttri
 
     // ! Don't apply instance transformation for the conntectors.
     // This transformation is already there
-    if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
-        ModelVolume* vol = upper->add_volume(*volume);
-        vol->set_transformation(volume_matrix);
-        vol->apply_tolerance();
-    }
-    if (attributes.has(ModelObjectCutAttribute::KeepLower)) {
-        ModelVolume* vol = lower->add_volume(*volume);
-        vol->set_transformation(volume_matrix);
-
-        if (volume->cut_info.connector_type == CutConnectorType::Dowel)
+    if (volume->cut_info.connector_type != CutConnectorType::Dowel) {
+        if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
+            ModelVolume* vol = upper->add_volume(*volume);
+            vol->set_transformation(volume_matrix);
             vol->apply_tolerance();
-        else
+        }
+        if (attributes.has(ModelObjectCutAttribute::KeepLower)) {
+            ModelVolume* vol = lower->add_volume(*volume);
+            vol->set_transformation(volume_matrix);
             // for lower part change type of connector from NEGATIVE_VOLUME to MODEL_PART if this connector is a plug
             vol->set_type(ModelVolumeType::MODEL_PART);
+        }
     }
-    if (volume->cut_info.connector_type == CutConnectorType::Dowel &&
-        attributes.has(ModelObjectCutAttribute::CreateDowels)) {
-        ModelObject* dowel{ nullptr };
-        // Clone the object to duplicate instances, materials etc.
-        clone_for_cut(&dowel);
+    else {
+        if (attributes.has(ModelObjectCutAttribute::CreateDowels)) {
+            ModelObject* dowel{ nullptr };
+            // Clone the object to duplicate instances, materials etc.
+            clone_for_cut(&dowel);
 
-        // add one more solid part same as connector if this connector is a dowel
-        ModelVolume* vol = dowel->add_volume(*volume);
-        vol->set_type(ModelVolumeType::MODEL_PART);
+            // add one more solid part same as connector if this connector is a dowel
+            ModelVolume* vol = dowel->add_volume(*volume);
+            vol->set_type(ModelVolumeType::MODEL_PART);
 
-        // But discard rotation and Z-offset for this volume
-        vol->set_rotation(Vec3d::Zero());
-        vol->set_offset(Z, 0.0);
+            // But discard rotation and Z-offset for this volume
+            vol->set_rotation(Vec3d::Zero());
+            vol->set_offset(Z, 0.0);
 
-        // Compute the displacement (in instance coordinates) to be applied to place the dowels
-        local_dowels_displace = lower->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(1.0, 1.0, 0.0));
+            // Compute the displacement (in instance coordinates) to be applied to place the dowels
+            local_dowels_displace = lower->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(1.0, 1.0, 0.0));
 
-        dowels.push_back(dowel);
+            dowels.push_back(dowel);
+        }
+
+        // Cut the dowel
+        volume->apply_tolerance();
+
+        // Perform cut
+        TriangleMesh upper_mesh, lower_mesh;
+        process_volume_cut(volume, instance_matrix, cut_matrix, attributes, upper_mesh, lower_mesh);
+
+        // add small Z offset to better preview
+        upper_mesh.translate((-0.05 * Vec3d::UnitZ()).cast<float>());
+        lower_mesh.translate((0.05 * Vec3d::UnitZ()).cast<float>());
+
+        // Add cut parts to the related objects
+        add_cut_volume(upper_mesh, upper, volume, cut_matrix, "_A", volume->type());
+        add_cut_volume(lower_mesh, lower, volume, cut_matrix, "_B", volume->type());
     }
 }
 
@@ -1427,25 +1466,8 @@ void ModelObject::process_modifier_cut(ModelVolume* volume, const Transform3d& i
         lower->add_volume(*volume);
 }
 
-static void add_cut_volume(TriangleMesh& mesh, ModelObject* object, const ModelVolume* src_volume, const Transform3d& cut_matrix, const std::string& suffix = {})
-{
-    if (mesh.empty())
-        return;
-
-    mesh.transform(cut_matrix);
-    ModelVolume* vol = object->add_volume(mesh);
-
-    vol->name = src_volume->name + suffix;
-    // Don't copy the config's ID.
-    vol->config.assign_config(src_volume->config);
-    assert(vol->config.id().valid());
-    assert(vol->config.id() != src_volume->config.id());
-    vol->set_material(src_volume->material_id(), *src_volume->material());
-    vol->cut_info = src_volume->cut_info;
-}
-
-void ModelObject::process_solid_part_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
-                                       ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower, Vec3d& local_displace)
+void ModelObject::process_volume_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
+                                     ModelObjectCutAttributes attributes, TriangleMesh& upper_mesh, TriangleMesh& lower_mesh)
 {
     const auto volume_matrix = volume->get_matrix();
 
@@ -1459,23 +1481,20 @@ void ModelObject::process_solid_part_cut(ModelVolume* volume, const Transform3d&
     TriangleMesh mesh(volume->mesh());
     mesh.transform(invert_cut_matrix * instance_matrix * volume_matrix, true);
 
-    volume->reset_mesh();
-    // Reset volume transformation except for offset
-    const Vec3d offset = volume->get_offset();
-    volume->set_transformation(Geometry::Transformation());
-    volume->set_offset(offset);
+    indexed_triangle_set upper_its, lower_its;
+    cut_mesh(mesh.its, 0.0f, &upper_its, &lower_its);
+    if (attributes.has(ModelObjectCutAttribute::KeepUpper))
+        upper_mesh = TriangleMesh(upper_its);
+    if (attributes.has(ModelObjectCutAttribute::KeepLower))
+        lower_mesh = TriangleMesh(lower_its);
+}
 
+void ModelObject::process_solid_part_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
+                                       ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower, Vec3d& local_displace)
+{
     // Perform cut
-
     TriangleMesh upper_mesh, lower_mesh;
-    {
-        indexed_triangle_set upper_its, lower_its;
-        cut_mesh(mesh.its, 0.0f, &upper_its, &lower_its);
-        if (attributes.has(ModelObjectCutAttribute::KeepUpper))
-            upper_mesh = TriangleMesh(upper_its);
-        if (attributes.has(ModelObjectCutAttribute::KeepLower))
-            lower_mesh = TriangleMesh(lower_its);
-    }
+    process_volume_cut(volume, instance_matrix, cut_matrix, attributes, upper_mesh, lower_mesh);
 
     // Add required cut parts to the objects
 
@@ -1606,7 +1625,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
             if (volume->cut_info.is_processed)
                 process_modifier_cut(volume, instance_matrix, inverse_cut_matrix, attributes, upper, lower);
             else
-                process_connector_cut(volume, attributes, upper, lower, dowels, local_dowels_displace);
+                process_connector_cut(volume, instance_matrix, cut_matrix, attributes, upper, lower, dowels, local_dowels_displace);
         }
         else if (!volume->mesh().empty())
             process_solid_part_cut(volume, instance_matrix, cut_matrix, attributes, upper, lower, local_displace);

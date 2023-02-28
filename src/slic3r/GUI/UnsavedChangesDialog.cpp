@@ -1593,7 +1593,7 @@ void DiffPresetDialog::create_buttons()
     });
     m_transfer_btn->Bind(wxEVT_ENTER_WINDOW, [this, show_in_bottom_info](wxMouseEvent& e) {
         show_in_bottom_info(_L("Transfer the selected options from left preset to the right.\n"
-                            "Note: New modified presets will be selected in setting stabs after close this dialog."), e); });
+                            "Note: New modified presets will be selected in settings tabs after close this dialog."), e); });
 
     // Save
     m_save_btn = new ScalableButton(this, wxID_ANY, "save", _L("Save"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, 24);
