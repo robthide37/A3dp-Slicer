@@ -85,7 +85,13 @@ template<class PConf>
 void fill_config(PConf& pcfg, const ArrangeParams &params) {
 
     // Align the arranged pile into the center of the bin
-    pcfg.alignment = PConf::Alignment::CENTER;
+    switch (params.alignment) {
+    case Pivots::Center: pcfg.alignment = PConf::Alignment::CENTER; break;
+    case Pivots::BottomLeft: pcfg.alignment = PConf::Alignment::BOTTOM_LEFT; break;
+    case Pivots::BottomRight: pcfg.alignment = PConf::Alignment::BOTTOM_RIGHT; break;
+    case Pivots::TopLeft: pcfg.alignment = PConf::Alignment::TOP_LEFT; break;
+    case Pivots::TopRight: pcfg.alignment = PConf::Alignment::TOP_RIGHT; break;
+    }
 
     // Start placing the items from the center of the print bed
     pcfg.starting_point = PConf::Alignment::CENTER;
@@ -611,6 +617,12 @@ template<class Fn> auto call_with_bed(const Points &bed, Fn &&fn)
         else
             return fn(Polygon(bed));
     }
+}
+
+bool is_box(const Points &bed)
+{
+    return !bed.empty() &&
+           ((1.0 - poly_area(bed) / area(BoundingBox(bed))) < 1e-3);
 }
 
 template<>

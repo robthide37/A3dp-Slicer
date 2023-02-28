@@ -931,6 +931,19 @@ void GLCanvas3D::load_arrange_settings()
     std::string en_rot_sla_str =
         wxGetApp().app_config->get("arrange", "enable_rotation_sla");
 
+//    std::string alignment_fff_str =
+//        wxGetApp().app_config->get("arrange", "alignment_fff");
+
+//    std::string alignment_fff_seqp_str =
+//        wxGetApp().app_config->get("arrange", "alignment_fff_seq_pring");
+
+//    std::string alignment_sla_str =
+//        wxGetApp().app_config->get("arrange", "alignment_sla");
+
+    // Override default alignment and save save/load it to a temporary slot "alignment_xl"
+    std::string alignment_xl_str =
+        wxGetApp().app_config->get("arrange", "alignment_xl");
+
     if (!dist_fff_str.empty())
         m_arrange_settings_fff.distance = std::stof(dist_fff_str);
 
@@ -948,11 +961,43 @@ void GLCanvas3D::load_arrange_settings()
 
     if (!en_rot_sla_str.empty())
         m_arrange_settings_sla.enable_rotation = (en_rot_sla_str == "1" || en_rot_sla_str == "yes");
+
+//    if (!alignment_sla_str.empty())
+//        m_arrange_settings_sla.alignment = std::stoi(alignment_sla_str);
+
+//    if (!alignment_fff_str.empty())
+//        m_arrange_settings_fff.alignment = std::stoi(alignment_fff_str);
+
+//    if (!alignment_fff_seqp_str.empty())
+//        m_arrange_settings_fff_seq_print.alignment = std::stoi(alignment_fff_seqp_str);
+
+    // Override default alignment and save save/load it to a temporary slot "alignment_xl"
+    int arr_alignment = static_cast<int>(arrangement::Pivots::BottomLeft);
+    if (!alignment_xl_str.empty())
+        arr_alignment = std::stoi(alignment_xl_str);
+
+    m_arrange_settings_sla.alignment = arr_alignment ;
+    m_arrange_settings_fff.alignment = arr_alignment ;
+    m_arrange_settings_fff_seq_print.alignment = arr_alignment ;
 }
 
 PrinterTechnology GLCanvas3D::current_printer_technology() const
 {
     return m_process->current_printer_technology();
+}
+
+bool GLCanvas3D::is_arrange_alignment_enabled() const
+{
+    static constexpr const char *ALIGN_ONLY_FOR = "XL";
+
+    bool ret = false;
+
+    auto *printer_model = m_config->opt<ConfigOptionString>("printer_model");
+
+    if (printer_model)
+        ret = boost::algorithm::contains(printer_model->value, ALIGN_ONLY_FOR);
+
+    return ret;
 }
 
 GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)
@@ -4019,14 +4064,16 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     imgui->begin(_L("Arrange options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
     ArrangeSettings settings = get_arrange_settings();
-    ArrangeSettings &settings_out = get_arrange_settings();
+    ArrangeSettings &settings_out = get_arrange_settings_ref(this);
 
     auto &appcfg = wxGetApp().app_config;
     PrinterTechnology ptech = current_printer_technology();
 
     bool settings_changed = false;
     float dist_min = 0.f;
-    std::string dist_key = "min_object_distance", rot_key = "enable_rotation";
+    std::string dist_key = "min_object_distance";
+    std::string rot_key = "enable_rotation";
+    std::string align_key = "alignment";
     std::string postfix;
 
     if (ptech == ptSLA) {
@@ -4044,7 +4091,8 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     }
 
     dist_key += postfix;
-    rot_key  += postfix;
+    rot_key += postfix;
+    align_key += postfix;
 
     imgui->text(GUI::format_wxstr(_L("Press %1%left mouse button to enter the exact value"), shortkey_ctrl_prefix()));
 
@@ -4058,6 +4106,14 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     if (imgui->checkbox(_L("Enable rotations (slow)"), settings.enable_rotation)) {
         settings_out.enable_rotation = settings.enable_rotation;
         appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation? "1" : "0");
+        settings_changed = true;
+    }
+
+    Points bed = m_config ? get_bed_shape(*m_config) : Points{};
+
+    if (arrangement::is_box(bed) && settings.alignment >= 0 && imgui->combo(_("Alignment"), {"Center", "Top left", "Bottom left", "Bottom right", "Top right", "Random"}, settings.alignment)) {
+        settings_out.alignment = settings.alignment;
+        appcfg->set("arrange", align_key.c_str(), std::to_string(settings_out.alignment));
         settings_changed = true;
     }
 
