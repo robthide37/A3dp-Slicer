@@ -18,7 +18,7 @@
 // TODO: remove include
 #include "libslic3r/SVG.hpp"      // debug store
 #include "libslic3r/Geometry.hpp" // covex hull 2d
-#include "libslic3r/Timer.hpp" // covex hull 2d
+#include "libslic3r/Timer.hpp" 
 
 #include "libslic3r/NSVGUtils.hpp"
 #include "libslic3r/Model.hpp"
@@ -109,11 +109,6 @@ static const struct Limits
 // Define where is up vector on model
 constexpr double up_limit = 0.9;
 
-static bool is_text_empty(const std::string &text){
-    return text.empty() ||
-           text.find_first_not_of(" \n\t\r") == std::string::npos;
-}
-
 // Normalize radian angle from -PI to PI
 template<typename T> void to_range_pi_pi(T& angle)
 {
@@ -123,6 +118,63 @@ template<typename T> void to_range_pi_pi(T& angle)
     }
 }
 } // namespace priv
+using namespace priv;
+
+// This configs holds GUI layout size given by translated texts.
+// etc. When language changes, GUI is recreated and this class constructed again,
+// so the change takes effect. (info by GLGizmoFdmSupports.hpp)
+struct GLGizmoEmboss::GuiCfg
+{
+    // Detect invalid config values when change monitor DPI
+    double screen_scale;
+    float  main_toolbar_height;
+
+    // Zero means it is calculated in init function
+    ImVec2       minimal_window_size                  = ImVec2(0, 0);
+    ImVec2       minimal_window_size_with_advance     = ImVec2(0, 0);
+    ImVec2       minimal_window_size_with_collections = ImVec2(0, 0);
+    float        height_of_volume_type_selector       = 0.f;
+    float        input_width                          = 0.f;
+    float        delete_pos_x                         = 0.f;
+    float        max_style_name_width                 = 0.f;
+    unsigned int icon_width                           = 0;
+
+    // maximal width and height of style image
+    Vec2i max_style_image_size = Vec2i(0, 0);
+
+    float indent                = 0.f;
+    float input_offset          = 0.f;
+    float advanced_input_offset = 0.f;
+
+    ImVec2 text_size;
+
+    // maximal size of face name image
+    Vec2i face_name_size             = Vec2i(100, 0);
+    float face_name_max_width        = 100.f;
+    float face_name_texture_offset_x = 105.f;
+
+    // maximal texture generate jobs running at once
+    unsigned int max_count_opened_font_files = 10;
+
+    // Only translations needed for calc GUI size
+    struct Translations
+    {
+        std::string font;
+        std::string size;
+        std::string depth;
+        std::string use_surface;
+
+        // advanced
+        std::string char_gap;
+        std::string line_gap;
+        std::string boldness;
+        std::string italic;
+        std::string surface_distance;
+        std::string angle;
+        std::string collection;
+    };
+    Translations translations;
+}; 
 
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
@@ -141,7 +193,6 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
 
 // Private namespace with helper function for create volume
 namespace priv {
-
 /// <summary>
 /// Prepare data for emboss
 /// </summary>
@@ -164,21 +215,6 @@ static void start_create_volume_job(const ModelObject *object,
                                     const Transform3d  volume_trmat,
                                     DataBase          &emboss_data,
                                     ModelVolumeType    volume_type);
-
-static GLVolume *get_hovered_gl_volume(const GLCanvas3D &canvas);
-
-/// <summary>
-/// Unproject on mesh by Mesh raycasters
-/// </summary>
-/// <param name="mouse_pos">Position of mouse on screen</param>
-/// <param name="camera">Projection params</param>
-/// <param name="skip">Define which caster will be skipped, null mean no skip</param>
-/// <returns>Position on surface, normal direction in world coorinate
-/// + key, to know hitted instance and volume</returns>
-static std::optional<RaycastManager::Hit> ray_from_camera(const RaycastManager &raycaster,
-                                                          const Vec2d          &mouse_pos,
-                                                          const Camera         &camera,
-                                                          const RaycastManager::ISkip *skip);
 
 /// <summary>
 /// Start job for add new volume on surface of object defined by screen coor
@@ -220,13 +256,26 @@ static void find_closest_volume(const Selection       &selection,
 /// <param name="coor">Screen coordinat, where to create new object laying on bed</param>
 static void start_create_object_job(DataBase &emboss_data, const Vec2d &coor);
 
-/// <summary>
-/// Search if exist model volume for given id in object lists
-/// </summary>
-/// <param name="objects">List to search volume</param>
-/// <param name="volume_id">Unique Identifier of volume</param>
-/// <returns>Volume when found otherwise nullptr</returns>
-static const ModelVolume *get_volume(const ModelObjectPtrs &objects, const ObjectID &volume_id);
+// Have to match order of files in function GLGizmoEmboss::init_icons()
+enum class IconType : unsigned {
+    rename = 0,
+    erase,
+    add,
+    save,
+    undo,
+    italic,
+    unitalic,
+    bold,
+    unbold,
+    system_selector,
+    open_file,
+    // automatic calc of icon's count
+    _count
+};
+// Define rendered version of icon
+enum class IconState : unsigned { activable = 0, hovered /*1*/, disabled /*2*/ };
+const IconManager::Icon &get_icon(const IconManager::VIcons& icons, IconType type, IconState state);
+bool draw_button(const IconManager::VIcons& icons, IconType type, bool disable = false);
 
 } // namespace priv
 
@@ -246,7 +295,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     m_style_manager.discard_style_changes();
     set_default_text();
     
-    GLVolume *gl_volume = priv::get_hovered_gl_volume(m_parent);
+    GLVolume *gl_volume = get_first_hovered_gl_volume(m_parent);
     DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
     if (gl_volume != nullptr) {
         // Try to cast ray into scene and find object for add volume
@@ -353,33 +402,6 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 }
 
 namespace priv {
-
-/// <summary>
-/// Access to model from gl_volume
-/// TODO: it is more general function --> move to utils
-/// </summary>
-/// <param name="gl_volume">Volume to model belongs to</param>
-/// <param name="object">Object containing gl_volume</param>
-/// <returns>Model for volume</returns>
-static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObject *object);
-
-/// <summary>
-/// Access to model from gl_volume
-/// TODO: it is more general function --> move to utils
-/// </summary>
-/// <param name="gl_volume">Volume to model belongs to</param>
-/// <param name="objects">All objects</param>
-/// <returns>Model for volume</returns>
-static ModelVolume *get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs &objects);
-
-/// <summary>
-/// Access to model by selection
-/// TODO: it is more general function --> move to select utils
-/// </summary>
-/// <param name="selection">Actual selection</param>
-/// <returns>Model from selection</returns>
-static ModelVolume *get_selected_volume(const Selection &selection);
-
 /// <summary>
 /// Calculate offset from mouse position to center of text
 /// </summary>
@@ -387,14 +409,6 @@ static ModelVolume *get_selected_volume(const Selection &selection);
 /// <param name="mv">Selected volume(text)</param>
 /// <returns>Offset in screan coordinate</returns>
 static Vec2d calc_mouse_to_center_text_offset(const Vec2d &mouse, const ModelVolume &mv);
-
-/// <summary>
-/// Access to one selected volume
-/// </summary>
-/// <param name="selection">Containe what is selected</param>
-/// <returns>Slected when only one volume otherwise nullptr</returns>
-static const GLVolume *get_gl_volume(const Selection &selection);
-static GLVolume *get_gl_volume(const GLCanvas3D &canvas);
 
 /// <summary>
 /// Get transformation to world
@@ -414,28 +428,6 @@ static Transform3d world_matrix(const Selection &selection);
 static void change_window_position(std::optional<ImVec2> &output_window_offset, bool try_to_fix);
 } // namespace priv
 
-const GLVolume *priv::get_gl_volume(const Selection &selection) {
-    // return selection.get_first_volume();
-    const auto &list = selection.get_volume_idxs();
-    if (list.size() != 1)
-        return nullptr;
-    unsigned int volume_idx = *list.begin();
-    return selection.get_volume(volume_idx);
-}
-
-GLVolume *priv::get_gl_volume(const GLCanvas3D &canvas) {
-    const GLVolume *gl_volume = get_gl_volume(canvas.get_selection());
-    if (gl_volume == nullptr)
-        return nullptr;
-
-    const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;
-    for (GLVolume *v : gl_volumes)
-        if (v->composite_id == gl_volume->composite_id)
-            return v;
-    
-    return nullptr;
-}
-
 Transform3d priv::world_matrix(const GLVolume *gl_volume, const Model *model)
 {
     if (!gl_volume)
@@ -444,7 +436,8 @@ Transform3d priv::world_matrix(const GLVolume *gl_volume, const Model *model)
 
     if (!model)
         return res;
-    ModelVolume* mv = get_model_volume(gl_volume, model->objects);
+
+    const ModelVolume* mv = get_model_volume(*gl_volume, model->objects);
     if (!mv)
         return res;
 
@@ -461,7 +454,7 @@ Transform3d priv::world_matrix(const GLVolume *gl_volume, const Model *model)
 
 Transform3d priv::world_matrix(const Selection &selection)
 {
-    const GLVolume *gl_volume = get_gl_volume(selection);
+    const GLVolume *gl_volume = get_selected_gl_volume(selection);
     return world_matrix(gl_volume, selection.get_model());
 }
 
@@ -502,231 +495,47 @@ Vec2d priv::calc_mouse_to_center_text_offset(const Vec2d& mouse, const ModelVolu
     return nearest_offset;
 }
 
-namespace priv {
- // Calculate scale in world
-static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
-{
-    Vec3d  from_dir   = from * dir;
-    Vec3d  to_dir     = to * dir;
-    double from_scale_sq = from_dir.squaredNorm();
-    double to_scale_sq   = to_dir.squaredNorm();
-    if (is_approx(from_scale_sq, to_scale_sq, 1e-3))
-        return {}; // no scale
-    return sqrt(from_scale_sq / to_scale_sq);
-};
-
-RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::AllowVolumes& condition)
-{
-    SceneRaycaster::EType type = SceneRaycaster::EType::Volume;
-    auto scene_casters = canvas.get_raycasters_for_picking(type);
-    const std::vector<std::shared_ptr<SceneRaycasterItem>> &casters = *scene_casters;
-    const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;
-    const ModelObjectPtrs &objects = canvas.get_model()->objects;
-
-    RaycastManager::Meshes meshes;
-    for (const std::shared_ptr<SceneRaycasterItem> &caster : casters) {
-        int index = SceneRaycaster::decode_id(type, caster->get_id());
-        if (index < 0 || index >= gl_volumes.size()) continue;
-        const GLVolume *gl_volume = gl_volumes[index];
-        const ModelVolume *volume = priv::get_model_volume(gl_volume, objects);
-        size_t             id     = volume->id().id;
-        if (condition.skip(id))
-            continue;
-        auto mesh = std::make_unique<AABBMesh>(caster->get_raycaster()->get_aabb_mesh());
-        meshes.emplace_back(std::make_pair(id, std::move(mesh)));
-    }
-    return meshes;
-}
-}
-
 bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
-    // Fix when leave window during dragging
-    // Fix when click right button
-    if (m_surface_drag.has_value() && !mouse_event.Dragging()) {
-        // write transformation from UI into model
-        m_parent.do_move(L("Surface move"));
+    // exist selected volume?
+    if (m_volume == nullptr)
+        return false;
+    
+    const Camera &camera = wxGetApp().plater()->get_camera();
+    bool was_dragging = m_surface_drag.has_value();
+    bool res = on_mouse_surface_drag(mouse_event, camera, m_surface_drag, m_parent, m_raycast_manager);
+    bool is_dragging = m_surface_drag.has_value();
 
-        // Update surface by new position        
+    // End with surface dragging?
+    if (was_dragging && !is_dragging) {
+        // Update surface by new position
         if (m_volume->text_configuration->style.prop.use_surface)
             process();
 
         // Show correct value of height & depth inside of inputs
         calculate_scale();
-
-        // allow moving with object again
-        m_parent.enable_moving(true);
-        m_surface_drag.reset();
-
-        // only left up is correct 
-        // otherwise it is fix state and return false
-        return mouse_event.LeftUp();
     }
 
-    if (mouse_event.Moving())
-        return false;
-
-    // detect start text dragging
-    if (mouse_event.LeftDown()) {
-        // exist selected volume?
-        if (m_volume == nullptr)
-            return false;
-
-        GLVolume *gl_volume = priv::get_gl_volume(m_parent);
-        if (gl_volume == nullptr)
-            return false;
-
-        // is text hovered?
-        const GLVolumePtrs& gl_volumes = m_parent.get_volumes().volumes;
-        int hovered_idx = m_parent.get_first_hover_volume_idx();
-        if (hovered_idx < 0 || hovered_idx >= gl_volumes.size() || 
-            gl_volumes[hovered_idx] != gl_volume)
-            return false;
-
-        // hovered object must be actual text volume
-        const ModelObjectPtrs &objects = m_parent.get_model()->objects;
-        if (m_volume != priv::get_model_volume(gl_volume, objects))
-            return false;
-
-        const ModelInstancePtrs instances = m_volume->get_object()->instances;
-        int instance_id = gl_volume->instance_idx();
-        if (instance_id < 0 || static_cast<size_t>(instance_id) >= instances.size())
-            return false; // should not happen
-        const ModelInstance *instance = instances[instance_id];
-
-        const ModelVolumePtrs &volumes = m_volume->get_object()->volumes;
-        std::vector<size_t> allowed_volumes_id;
-        if (volumes.size() > 1) {
-            allowed_volumes_id.reserve(volumes.size() - 1);
-            for (auto &v : volumes) {
-                if (v->id() == m_volume->id())
-                    continue;
-                if (!v->is_model_part())
-                    continue;
-                allowed_volumes_id.emplace_back(v->id().id);
-            }
-        }        
-        RaycastManager::AllowVolumes condition(std::move(allowed_volumes_id));                
-        RaycastManager::Meshes meshes = priv::create_meshes(m_parent, condition);
-        // initialize raycasters
-        // INFO: It could slows down for big objects
-        // (may be move to thread and do not show drag until it finish)
-        m_raycast_manager.actualize(instance, &condition, &meshes);
-                
-        // wxCoord == int --> wx/types.h
-        Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
-        Vec2d mouse_pos = mouse_coord.cast<double>();
-        Vec2d mouse_offset = priv::calc_mouse_to_center_text_offset(mouse_pos, *m_volume);
-        Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
-        TextConfiguration &tc = *m_volume->text_configuration;
-        // fix baked transformation from .3mf store process
-        if (tc.fix_3mf_tr.has_value())
-            volume_tr = volume_tr * tc.fix_3mf_tr->inverse();
-
-        Transform3d instance_tr = gl_volume->get_instance_transformation().get_matrix();
-        Transform3d instance_tr_inv = instance_tr.inverse();
-        Transform3d world_tr = instance_tr * volume_tr;
-        m_surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume, condition};
-
+    // Start with dragging
+    else if (!was_dragging && is_dragging) {
         // Cancel job to prevent interuption of dragging (duplicit result)
-        if (m_job_cancel != nullptr) 
+        if (m_job_cancel != nullptr)
             m_job_cancel->store(true);
-
-        // disable moving with object by mouse
-        m_parent.enable_moving(false);
-        return true;
     }
 
-    // Dragging starts out of window
-    if (!m_surface_drag.has_value())
-        return false;
-
-    if (mouse_event.Dragging()) {
-        // wxCoord == int --> wx/types.h
-        Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
-        Vec2d mouse_pos = mouse_coord.cast<double>();
-        Vec2d offseted_mouse = mouse_pos + m_surface_drag->mouse_offset;
-        const Camera &camera = wxGetApp().plater()->get_camera();
-        auto hit = priv::ray_from_camera(m_raycast_manager, offseted_mouse, camera, &m_surface_drag->condition);
-        m_surface_drag->exist_hit = hit.has_value();
-        if (!hit.has_value()) {
-            // cross hair need redraw
-            m_parent.set_as_dirty();
-            return true;
-        }
-
-        auto world_linear = m_surface_drag->world.linear();
-        // Calculate offset: transformation to wanted position
-        {
-            // Reset skew of the text Z axis:
-            // Project the old Z axis into a new Z axis, which is perpendicular to the old XY plane.
-            Vec3d old_z = world_linear.col(2);
-            Vec3d new_z = world_linear.col(0).cross(world_linear.col(1));
-            world_linear.col(2) = new_z * (old_z.dot(new_z) / new_z.squaredNorm());
-        }
-
-        Vec3d text_z_world = world_linear.col(2); // world_linear * Vec3d::UnitZ()
-        auto z_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(text_z_world, hit->normal);
-        Transform3d world_new = z_rotation * m_surface_drag->world;
-        auto world_new_linear = world_new.linear();
-
-        if (true) 
-        {
-            // Fix direction of up vector
-            Vec3d z_world = world_new_linear.col(2);
-            z_world.normalize();
-            Vec3d wanted_up = suggest_up(z_world);
-
-            Vec3d y_world = world_new_linear.col(1);
-            auto y_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(y_world, wanted_up);
-
-            world_new = y_rotation * world_new;
-            world_new_linear = world_new.linear();
-        }
-
-        // Edit position from right
-        Transform3d volume_new{Eigen::Translation<double, 3>(m_surface_drag->instance_inv * hit->position)};
-        volume_new.linear() = m_surface_drag->instance_inv.linear() * world_new_linear;
-
-        // Check that transformation matrix is valid transformation
-        assert(volume_new.matrix()(0, 0) == volume_new.matrix()(0, 0)); // Check valid transformation not a NAN
-        if (volume_new.matrix()(0, 0) != volume_new.matrix()(0, 0))
-            return true;
-
-        // Check that scale in world did not changed
-        assert(!priv::calc_scale(world_linear, world_new_linear, Vec3d::UnitY()).has_value());
-        assert(!priv::calc_scale(world_linear, world_new_linear, Vec3d::UnitZ()).has_value());
-
-        const TextConfiguration &tc = *m_volume->text_configuration;
-        // fix baked transformation from .3mf store process
-        if (tc.fix_3mf_tr.has_value())
-            volume_new = volume_new * (*tc.fix_3mf_tr);
-
-        // apply move in Z direction and rotation by up vector
-        apply_transformation(tc.style.prop, volume_new);
-
-        // Update transformation for all instances
-        for (GLVolume *vol : m_parent.get_volumes().volumes) {
-            if (vol->object_idx() != m_surface_drag->gl_volume->object_idx() || 
-                vol->volume_idx() != m_surface_drag->gl_volume->volume_idx())
-                continue;
-            vol->set_volume_transformation(volume_new);
-        }
-
+    // during drag
+    else if (was_dragging && is_dragging) {
         // update scale of selected volume --> should be approx the same
         calculate_scale();
-
-        m_parent.set_as_dirty();
-        return true;
     }
-    return false;
+    return res;
 }
 
 bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
 {
     // not selected volume
     if (m_volume == nullptr ||
-        priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ||
+        get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr ||
         !m_volume->text_configuration.has_value()) return false;
 
     if (on_mouse_for_rotation(mouse_event)) return true;
@@ -755,7 +564,7 @@ std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 void GLGizmoEmboss::on_render() {
     // no volume selected
     if (m_volume == nullptr ||
-        priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr)
+        get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr)
         return;
     Selection &selection = m_parent.get_selection();
     if (selection.is_empty()) return;
@@ -861,7 +670,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     set_volume_by_selection();
     // Do not render window for not selected text volume
     if (m_volume == nullptr ||
-        priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ||
+        get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr ||
         !m_volume->text_configuration.has_value()) {
         close();
         return;
@@ -870,15 +679,15 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     // Configuration creation
     double screen_scale = wxDisplay(wxGetApp().plater()).GetScaleFactor();
     float  main_toolbar_height = m_parent.get_main_toolbar_height();
-    if (!m_gui_cfg.has_value() || // Exist configuration - first run
+    if (m_gui_cfg == nullptr || // Exist configuration - first run
         m_gui_cfg->screen_scale != screen_scale || // change of DPI
         m_gui_cfg->main_toolbar_height != main_toolbar_height // change size of view port
         ) {
         // Create cache for gui offsets
-        GuiCfg cfg       = create_gui_configuration();
+        GuiCfg cfg = create_gui_configuration();
         cfg.screen_scale = screen_scale;
         cfg.main_toolbar_height = main_toolbar_height;
-        m_gui_cfg.emplace(std::move(cfg));
+        m_gui_cfg = std::make_unique<const GuiCfg>(std::move(cfg));
         // set position near toolbar
         m_set_window_offset = ImVec2(-1.f, -1.f);
 
@@ -1009,13 +818,13 @@ void GLGizmoEmboss::on_set_state()
 
         // when open window by "T" and no valid volume is selected, so Create new one
         if (m_volume == nullptr ||
-            priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ) { 
+            get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr ) { 
             // reopen gizmo when new object is created
             GLGizmoBase::m_state = GLGizmoBase::Off;
             if (wxGetApp().get_mode() == comSimple)
                 // It's impossible to add a part in simple mode
                 return;
-            // start creating new object
+            // start creating new object 
             create_volume(ModelVolumeType::MODEL_PART);
         }
 
@@ -1023,7 +832,7 @@ void GLGizmoEmboss::on_set_state()
         if (m_allow_open_near_volume) {
             m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
         } else {
-            if (m_gui_cfg.has_value())
+            if (m_gui_cfg != nullptr)
                 priv::change_window_position(m_set_window_offset, false);
             else
                 m_set_window_offset = ImVec2(-1, -1);
@@ -1226,7 +1035,7 @@ void GLGizmoEmboss::set_default_text(){ m_text = _u8L("Embossed text"); }
 void GLGizmoEmboss::set_volume_by_selection()
 {
     const Selection &selection = m_parent.get_selection();
-    ModelVolume *vol = priv::get_selected_volume(selection);
+    ModelVolume *vol = get_selected_volume(selection);
     // is same volume selected?
     if (vol != nullptr && vol->id() == m_volume_id) 
         return;
@@ -1351,7 +1160,7 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
         
     // The change of volume could show or hide part with setter on volume type
     if (m_volume == nullptr || 
-        priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ||
+        get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr ||
         (m_volume->get_object()->volumes.size() == 1) != 
         (volume->get_object()->volumes.size() == 1)){
         m_should_set_minimal_windows_size = true;
@@ -1407,35 +1216,6 @@ void GLGizmoEmboss::calculate_scale() {
     // Change of scale has to change font imgui font size
     if (exist_change)
         m_style_manager.clear_imgui_font();
-}
-
-ModelVolume *priv::get_model_volume(const GLVolume *gl_volume, const ModelObject *object)
-{
-    int volume_id = gl_volume->volume_idx();
-    if (volume_id < 0 || static_cast<size_t>(volume_id) >= object->volumes.size()) return nullptr;
-    return object->volumes[volume_id];
-}
-
-ModelVolume *priv::get_model_volume(const GLVolume *gl_volume, const ModelObjectPtrs &objects)
-{
-    int object_id = gl_volume->object_idx();
-    if (object_id < 0 || static_cast<size_t>(object_id) >= objects.size()) return nullptr;
-    return get_model_volume(gl_volume, objects[object_id]);
-}
-
-ModelVolume *priv::get_selected_volume(const Selection &selection)
-{
-    int object_idx = selection.get_object_idx();
-    // is more object selected?
-    if (object_idx == -1) return nullptr;
-
-    auto volume_idxs = selection.get_volume_idxs();
-    // is more volumes selected?
-    if (volume_idxs.size() != 1) return nullptr;
-    unsigned int    vol_id_gl = *volume_idxs.begin();
-    const GLVolume *vol_gl    = selection.get_volume(vol_id_gl);
-    const ModelObjectPtrs &objects = selection.get_model()->objects;
-    return get_model_volume(vol_gl, objects);
 }
 
 // Run Job on main thread (blocking) - ONLY DEBUG
@@ -1529,6 +1309,10 @@ bool GLGizmoEmboss::process()
     return true;
 }
 
+namespace priv {
+static bool is_text_empty(const std::string &text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
+}
+
 void GLGizmoEmboss::close()
 {
     // remove volume when text is empty
@@ -1579,10 +1363,10 @@ bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
     if (is_approx(cam_dir_tr, emboss_dir)) return false;
 
     assert(sel.get_volume_idxs().size() == 1);
-    GLVolume *vol = sel.get_volume(*sel.get_volume_idxs().begin());
+    GLVolume *gl_volume = sel.get_volume(*sel.get_volume_idxs().begin());
 
     Transform3d vol_rot;
-    Transform3d vol_tr = vol->get_volume_transformation().get_matrix();
+    Transform3d vol_tr = gl_volume->get_volume_transformation().get_matrix();
     // check whether cam_dir is opposit to emboss dir
     if (is_approx(cam_dir_tr, -emboss_dir)) {
         // rotate 180 DEG by y
@@ -1602,8 +1386,8 @@ bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
         vol_rot * 
         Eigen::Translation<double, 3>(offset_inv);
     //Transform3d res = vol_tr * vol_rot;
-    vol->set_volume_transformation(Geometry::Transformation(res));
-    priv::get_model_volume(vol, sel.get_model()->objects)->set_transformation(res);
+    gl_volume->set_volume_transformation(Geometry::Transformation(res));
+    get_model_volume(*gl_volume, sel.get_model()->objects)->set_transformation(res);
     return true;
 }
 
@@ -2467,7 +2251,7 @@ void GLGizmoEmboss::draw_style_rename_button()
     bool can_rename = m_style_manager.exist_stored_style();
     std::string title = _u8L("Rename style");
     const char * popup_id = title.c_str();
-    if (draw_button(IconType::rename, !can_rename)) {
+    if (priv::draw_button(m_icons, IconType::rename, !can_rename)) {
         assert(m_style_manager.get_stored_style());
         ImGui::OpenPopup(popup_id);
     }
@@ -2484,7 +2268,7 @@ void GLGizmoEmboss::draw_style_rename_button()
 
 void GLGizmoEmboss::draw_style_save_button(bool is_modified)
 {
-    if (draw_button(IconType::save, !is_modified)) {
+    if (draw_button(m_icons, IconType::save, !is_modified)) {
         // save styles to app config
         m_style_manager.store_styles_to_app_config();
     }else if (ImGui::IsItemHovered()) {
@@ -2554,7 +2338,7 @@ void GLGizmoEmboss::draw_style_add_button()
     const char *popup_id = title.c_str();
     // save as new style
     ImGui::SameLine();
-    if (draw_button(IconType::add, !can_add)) {
+    if (draw_button(m_icons, IconType::add, !can_add)) {
         if (!m_style_manager.exist_stored_style()) {
             m_style_manager.store_styles_to_app_config(wxGetApp().app_config);
         } else {
@@ -2585,7 +2369,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
     std::string title = _u8L("Remove style");
     const char * popup_id = title.c_str();
     static size_t next_style_index = std::numeric_limits<size_t>::max();
-    if (draw_button(IconType::erase, !can_delete)) {
+    if (draw_button(m_icons, IconType::erase, !can_delete)) {
         while (true) {
             // NOTE: can't use previous loaded activ index -> erase could change index
             size_t active_index = m_style_manager.get_style_index();
@@ -2807,8 +2591,8 @@ bool GLGizmoEmboss::draw_italic_button()
     bool is_font_italic = skew.has_value() || WxFontUtils::is_italic(wx_font);
     if (is_font_italic) {
         // unset italic
-        if (clickable(get_icon(IconType::italic, IconState::hovered),
-                      get_icon(IconType::unitalic, IconState::hovered))) {
+        if (clickable(get_icon(m_icons, IconType::italic, IconState::hovered),
+                      get_icon(m_icons, IconType::unitalic, IconState::hovered))) {
             skew.reset();
             if (wx_font.GetStyle() != wxFontStyle::wxFONTSTYLE_NORMAL) {
                 wxFont new_wx_font = wx_font; // copy
@@ -2822,7 +2606,7 @@ bool GLGizmoEmboss::draw_italic_button()
             ImGui::SetTooltip("%s", _u8L("Unset italic").c_str());
     } else {
         // set italic
-        if (draw_button(IconType::italic)) {
+        if (draw_button(m_icons, IconType::italic)) {
             wxFont new_wx_font = wx_font; // copy
             auto new_ff = WxFontUtils::set_italic(new_wx_font, *ff.font_file);
             if (new_ff != nullptr) {
@@ -2845,7 +2629,7 @@ bool GLGizmoEmboss::draw_bold_button() {
     const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
     const auto& ff = m_style_manager.get_font_file_with_cache();
     if (!wx_font_opt.has_value() || !ff.has_value()) {
-        draw(get_icon(IconType::bold, IconState::disabled));
+        draw(get_icon(m_icons, IconType::bold, IconState::disabled));
         return false;
     }
     const wxFont &wx_font = *wx_font_opt;
@@ -2854,8 +2638,8 @@ bool GLGizmoEmboss::draw_bold_button() {
     bool is_font_bold = boldness.has_value() || WxFontUtils::is_bold(wx_font);
     if (is_font_bold) {
         // unset bold
-        if (clickable(get_icon(IconType::bold, IconState::hovered),
-                      get_icon(IconType::unbold, IconState::hovered))) {
+        if (clickable(get_icon(m_icons, IconType::bold, IconState::hovered),
+                      get_icon(m_icons, IconType::unbold, IconState::hovered))) {
             boldness.reset();
             if (wx_font.GetWeight() != wxFontWeight::wxFONTWEIGHT_NORMAL) {
                 wxFont new_wx_font = wx_font; // copy
@@ -2869,7 +2653,7 @@ bool GLGizmoEmboss::draw_bold_button() {
             ImGui::SetTooltip("%s", _u8L("Unset bold").c_str());
     } else {
         // set bold
-        if (draw_button(IconType::bold)) {
+        if (draw_button(m_icons, IconType::bold)) {
             wxFont new_wx_font = wx_font; // copy
             auto new_ff = WxFontUtils::set_bold(new_wx_font, *ff.font_file);
             if (new_ff != nullptr) {
@@ -2922,7 +2706,7 @@ bool GLGizmoEmboss::revertible(const std::string &name,
     // render revert changes button
     if (changed) {        
         ImGui::SameLine(undo_offset);
-        if (draw_button(IconType::undo)) {
+        if (draw_button(m_icons, IconType::undo)) {
             value = *default_value;
             return true;
         } else if (ImGui::IsItemHovered())
@@ -3074,7 +2858,7 @@ void GLGizmoEmboss::draw_style_edit() {
     EmbossStyle &style = m_style_manager.get_style();
     if (exist_change_in_font) {
         ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
-        if (draw_button(IconType::undo)) {
+        if (draw_button(m_icons, IconType::undo)) {
             const EmbossStyle *stored_style = m_style_manager.get_stored_style();
             style.path = stored_style->path;
             style.prop.boldness = stored_style->prop.boldness;
@@ -3293,7 +3077,7 @@ std::optional<Vec3d> priv::calc_surface_offset(const ModelVolume &volume, Raycas
     raycast_manager.actualize(volume.get_object(), &cond);
 
     //const Selection &selection = m_parent.get_selection();
-    const GLVolume *gl_volume = priv::get_gl_volume(selection);
+    const GLVolume *gl_volume = get_selected_gl_volume(selection);
     Transform3d to_world = priv::world_matrix(gl_volume, selection.get_model());
     Vec3d point     = to_world * Vec3d::Zero();
     Vec3d direction = to_world.linear() * (-Vec3d::UnitZ());
@@ -3555,7 +3339,7 @@ void GLGizmoEmboss::draw_advanced()
     }
 
     if (ImGui::Button(_u8L("Set text to face camera").c_str())) {
-        assert(priv::get_selected_volume(m_parent.get_selection()) == m_volume);
+        assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam         = wxGetApp().plater()->get_camera();
         bool          use_surface = m_style_manager.get_style().prop.use_surface;
         if (priv::apply_camera_dir(cam, m_parent) && use_surface)
@@ -3800,13 +3584,13 @@ void GLGizmoEmboss::init_icons()
     m_icons = m_icon_manager.init(filenames, size, type);
 }
 
-const IconManager::Icon &GLGizmoEmboss::get_icon(IconType type, IconState state) { return *m_icons[(unsigned) type][(unsigned) state]; }
-bool GLGizmoEmboss::draw_button(IconType type, bool disable)
+const IconManager::Icon &priv::get_icon(const IconManager::VIcons& icons, IconType type, IconState state) { return *icons[(unsigned) type][(unsigned) state]; }
+bool priv::draw_button(const IconManager::VIcons &icons, IconType type, bool disable)
 {
     return Slic3r::GUI::button(
-        get_icon(type, IconState::activable),
-        get_icon(type, IconState::hovered),
-        get_icon(type, IconState::disabled),
+        get_icon(icons, type, IconState::activable),
+        get_icon(icons, type, IconState::hovered),
+        get_icon(icons, type, IconState::disabled),
         disable
     );
 }
@@ -3921,37 +3705,6 @@ void priv::start_create_volume_job(const ModelObject *object,
     queue_job(worker, std::move(job));
 }
 
-const ModelVolume *priv::get_volume(const ModelObjectPtrs &objects, const ObjectID &volume_id)
-{
-    for (const ModelObject *obj : objects)
-        for (const ModelVolume *vol : obj->volumes)
-            if (vol->id() == volume_id)
-                return vol;
-    return nullptr;
-};
-
-GLVolume * priv::get_hovered_gl_volume(const GLCanvas3D &canvas) {
-    int hovered_id_signed = canvas.get_first_hover_volume_idx();
-    if (hovered_id_signed < 0) return nullptr;
-
-    size_t hovered_id = static_cast<size_t>(hovered_id_signed);
-    const GLVolumePtrs &volumes = canvas.get_volumes().volumes;
-    if (hovered_id >= volumes.size()) return nullptr;
-
-    return volumes[hovered_id];
-}
-
-std::optional<RaycastManager::Hit> priv::ray_from_camera(const RaycastManager        &raycaster,
-                                                         const Vec2d                 &mouse_pos,
-                                                         const Camera                &camera,
-                                                         const RaycastManager::ISkip *skip)
-{
-    Vec3d point;
-    Vec3d direction;
-    CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);    
-    return raycaster.first_hit(point, direction, skip);
-}
-
 bool priv::start_create_volume_on_surface_job(
     DataBase &emboss_data, ModelVolumeType volume_type, const Vec2d &screen_coor, const GLVolume *gl_volume, RaycastManager &raycaster, GLCanvas3D& canvas)
 {
@@ -3967,11 +3720,11 @@ bool priv::start_create_volume_on_surface_job(
     size_t vol_id = obj->volumes[gl_volume->volume_idx()]->id().id;
     auto cond = RaycastManager::AllowVolumes({vol_id});
 
-    RaycastManager::Meshes meshes = priv::create_meshes(canvas, cond);
+    RaycastManager::Meshes meshes = create_meshes(canvas, cond);
     raycaster.actualize(obj, &cond, &meshes);
 
     const Camera &camera = plater->get_camera();
-    std::optional<RaycastManager::Hit> hit = priv::ray_from_camera(raycaster, screen_coor, camera, &cond);
+    std::optional<RaycastManager::Hit> hit = ray_from_camera(raycaster, screen_coor, camera, &cond);
 
     // context menu for add text could be open only by right click on an
     // object. After right click, object is selected and object_idx is set
@@ -4009,7 +3762,7 @@ void priv::find_closest_volume(const Selection       &selection,
     double center_sq_distance = std::numeric_limits<double>::max();
     for (unsigned int id : indices) {
         const GLVolume *gl_volume = selection.get_volume(id);
-        ModelVolume *volume = priv::get_model_volume(gl_volume, objects);
+        const ModelVolume *volume = get_model_volume(*gl_volume, objects);
         if (!volume->is_model_part()) continue;        
         Slic3r::Polygon hull = CameraUtils::create_hull2d(camera, *gl_volume);
         Vec2d c = hull.centroid().cast<double>();

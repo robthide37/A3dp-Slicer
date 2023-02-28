@@ -144,6 +144,29 @@ public:
     Transform3d get_transformation(const TrKey &tr_key) const;
 };
 
+class GLCanvas3D;
+/// <summary>
+/// Use scene Raycasters and prepare data for actualize RaycasterManager
+/// </summary>
+/// <param name="canvas">contain Scene raycasters</param>
+/// <param name="condition">Limit for scene casters</param>
+/// <returns>Meshes</returns>
+RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::AllowVolumes &condition);
+
+struct Camera;
+/// <summary>
+/// Unproject on mesh by Mesh raycasters
+/// </summary>
+/// <param name="mouse_pos">Position of mouse on screen</param>
+/// <param name="camera">Projection params</param>
+/// <param name="skip">Define which caster will be skipped, null mean no skip</param>
+/// <returns>Position on surface, normal direction in world coorinate
+/// + key, to know hitted instance and volume</returns>
+std::optional<RaycastManager::Hit> ray_from_camera(const RaycastManager        &raycaster,
+                                                   const Vec2d                 &mouse_pos,
+                                                   const Camera                &camera,
+                                                   const RaycastManager::ISkip *skip);
+
 } // namespace Slic3r::GUI
 
 #endif // slic3r_RaycastManager_hpp_

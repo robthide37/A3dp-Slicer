@@ -295,3 +295,47 @@ RaycastManager::TrItems::iterator priv::find(RaycastManager::TrItems &items, con
         return items.end();
     return it;
 }
+
+#include "slic3r/GUI/GLCanvas3D.hpp"
+#include "slic3r/GUI/Camera.hpp"
+#include "slic3r/GUI/CameraUtils.hpp"
+
+namespace Slic3r::GUI{
+
+RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::AllowVolumes &condition)
+{
+    SceneRaycaster::EType                                   type          = SceneRaycaster::EType::Volume;
+    auto                                                    scene_casters = canvas.get_raycasters_for_picking(type);
+    const std::vector<std::shared_ptr<SceneRaycasterItem>> &casters       = *scene_casters;
+    const GLVolumePtrs                                     &gl_volumes    = canvas.get_volumes().volumes;
+    const ModelObjectPtrs                                  &objects       = canvas.get_model()->objects;
+
+    RaycastManager::Meshes meshes;
+    for (const std::shared_ptr<SceneRaycasterItem> &caster : casters) {
+        int index = SceneRaycaster::decode_id(type, caster->get_id());
+        if (index < 0 || index >= gl_volumes.size())
+            continue;
+        const GLVolume    *gl_volume = gl_volumes[index];
+        const ModelVolume *volume    = get_model_volume(*gl_volume, objects);
+        size_t             id        = volume->id().id;
+        if (condition.skip(id))
+            continue;
+        auto mesh = std::make_unique<AABBMesh>(caster->get_raycaster()->get_aabb_mesh());
+        meshes.emplace_back(std::make_pair(id, std::move(mesh)));
+    }
+    return meshes;
+}
+
+
+std::optional<RaycastManager::Hit> ray_from_camera(const RaycastManager        &raycaster,
+                                                   const Vec2d                 &mouse_pos,
+                                                   const Camera                &camera,
+                                                   const RaycastManager::ISkip *skip)
+{
+    Vec3d point;
+    Vec3d direction;
+    CameraUtils::ray_from_screen_pos(camera, mouse_pos, point, direction);
+    return raycaster.first_hit(point, direction, skip);
+}
+
+} // namespace Slic3r::GUI

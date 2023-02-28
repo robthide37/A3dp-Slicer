@@ -63,6 +63,8 @@ public:
         // && size.x > 0 && size.y > 0 && tl.x != br.x && tl.y != br.y;        
     };
     using Icons = std::vector<std::shared_ptr<Icon> >;
+    // Vector of icons, each vector contain multiple use of a SVG render
+    using VIcons = std::vector<Icons>; 
 
     /// <summary>
     /// Initialize raster texture on GPU with given images
@@ -71,7 +73,7 @@ public:
     /// <param name="input">Define files and its </param>
     /// <returns>Rasterized icons stored on GPU,
     /// Same size and order as input, each item of vector is set of texture in order by RasterType</returns>
-    std::vector<Icons> init(const InitTypes &input);
+    VIcons init(const InitTypes &input);
 
     /// <summary>
     /// Initialize multiple icons with same settings for size and type
@@ -83,7 +85,7 @@ public:
     /// together color, white and gray = RasterType::color | RasterType::white_only_data | RasterType::gray_only_data</param>
     /// <returns>Rasterized icons stored on GPU,
     /// Same size and order as file_paths, each item of vector is set of texture in order by RasterType</returns>
-    std::vector<Icons> init(const std::vector<std::string> &file_paths, const ImVec2 &size, RasterType type = RasterType::color);
+    VIcons init(const std::vector<std::string> &file_paths, const ImVec2 &size, RasterType type = RasterType::color);
     
     /// <summary>
     /// Release icons which are hold only by this manager

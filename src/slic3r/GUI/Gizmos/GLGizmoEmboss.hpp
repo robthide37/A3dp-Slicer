@@ -6,6 +6,7 @@
 #include "GLGizmoBase.hpp"
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/IconManager.hpp"
+#include "slic3r/GUI/SurfaceDrag.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/Utils/EmbossStyleManager.hpp"
 
@@ -25,7 +26,6 @@ class wxFont;
 namespace Slic3r{
     class AppConfig;
     class GLVolume;
-
     enum class ModelVolumeType : int;
 }
 
@@ -145,7 +145,7 @@ private:
     template<typename T, typename Draw>
     bool revertible(const std::string &name, T &value, const T *default_value, const std::string &undo_tooltip, float undo_offset, Draw draw);
 
-    bool   m_should_set_minimal_windows_size = false;
+    bool m_should_set_minimal_windows_size = false;
     void set_minimal_window_size(bool is_advance_edit_style);
     ImVec2 get_minimal_window_size() const;
 
@@ -161,65 +161,12 @@ private:
     bool m_is_unknown_font;
     void create_notification_not_valid_font(const TextConfiguration& tc);
     void remove_notification_not_valid_font();
-
-    // This configs holds GUI layout size given by translated texts.
-    // etc. When language changes, GUI is recreated and this class constructed again,
-    // so the change takes effect. (info by GLGizmoFdmSupports.hpp)
-    struct GuiCfg
-    {
-        // Detect invalid config values when change monitor DPI
-        double screen_scale;
-        float  main_toolbar_height;
-
-        // Zero means it is calculated in init function
-        ImVec2 minimal_window_size              = ImVec2(0, 0);
-        ImVec2 minimal_window_size_with_advance = ImVec2(0, 0);
-        ImVec2 minimal_window_size_with_collections = ImVec2(0, 0);
-        float height_of_volume_type_selector = 0.f;
-        float input_width                    = 0.f;
-        float delete_pos_x                   = 0.f;
-        float max_style_name_width           = 0.f;
-        unsigned int icon_width              = 0;
-
-        // maximal width and height of style image
-        Vec2i max_style_image_size = Vec2i(0, 0);
-
-        float indent = 0.f;
-        float input_offset          = 0.f;
-        float advanced_input_offset = 0.f;
-
-        ImVec2 text_size;
-
-        // maximal size of face name image
-        Vec2i face_name_size = Vec2i(100, 0);
-        float face_name_max_width = 100.f;
-        float face_name_texture_offset_x = 105.f;
-
-        // maximal texture generate jobs running at once
-        unsigned int max_count_opened_font_files = 10;
-
-        // Only translations needed for calc GUI size
-        struct Translations
-        {
-            std::string font;
-            std::string size;
-            std::string depth;
-            std::string use_surface;
-
-            // advanced
-            std::string char_gap;
-            std::string line_gap;
-            std::string boldness;
-            std::string italic;
-            std::string surface_distance;
-            std::string angle;
-            std::string collection;
-        };
-        Translations translations;
-    };
-    std::optional<const GuiCfg> m_gui_cfg;
+    
+    struct GuiCfg;
+    std::unique_ptr<const GuiCfg> m_gui_cfg = nullptr;
     static GuiCfg create_gui_configuration();
 
+    // Is open tree with advanced options
     bool m_is_advanced_edit_style = false;
 
     // when true window will appear near to text volume when open
@@ -228,6 +175,7 @@ private:
     // setted only when wanted to use - not all the time
     std::optional<ImVec2> m_set_window_offset;
 
+    // Keep information about stored styles and loaded actual style to compare with
     Emboss::StyleManager m_style_manager;
 
     struct FaceName{
@@ -290,7 +238,8 @@ private:
     // Text to emboss
     std::string m_text;
 
-    // actual volume
+    // current selected volume 
+    // NOTE: Be carefull could be uninitialized (removed from Model)
     ModelVolume *m_volume;
 
     // When work with undo redo stack there could be situation that 
@@ -308,27 +257,6 @@ private:
     // Value is set only when dragging rotation to calculate actual angle
     std::optional<float> m_rotate_start_angle;
 
-    // Data for drag&drop over surface with mouse
-    struct SurfaceDrag
-    {
-        // hold screen coor offset of cursor from object center
-        Vec2d mouse_offset;
-
-        // Start dragging text transformations to world
-        Transform3d world;
-
-        // Invers transformation of text volume instance
-        // Help convert world transformation to instance space
-        Transform3d instance_inv;
-
-        // Dragged gl volume
-        GLVolume *gl_volume;
-
-        // condition for raycaster
-        RaycastManager::AllowVolumes condition;
-
-        bool exist_hit = true;
-    };
     // Keep data about dragging only during drag&drop
     std::optional<SurfaceDrag> m_surface_drag;
 
@@ -343,27 +271,8 @@ private:
 
     // drawing icons
     IconManager m_icon_manager;
-    std::vector<IconManager::Icons> m_icons;
-
+    IconManager::VIcons m_icons;
     void init_icons();
-    enum class IconType : unsigned {
-        rename = 0,
-        erase,
-        add,
-        save,
-        undo,
-        italic,
-        unitalic,
-        bold,
-        unbold,
-        system_selector,
-        open_file,
-        // automatic calc of icon's count
-        _count
-    };
-    enum class IconState : unsigned { activable = 0, hovered /*1*/, disabled /*2*/ };
-    const IconManager::Icon& get_icon(IconType type, IconState state);
-    bool draw_button(IconType icon, bool disable = false);
 
     // only temporary solution
     static const std::string M_ICON_FILENAME;
