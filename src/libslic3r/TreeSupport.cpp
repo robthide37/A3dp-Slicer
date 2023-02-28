@@ -130,8 +130,10 @@ TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings& mes
             this->raft_layers.emplace_back(z);
         }
         // Raft contact layer
-        z = slicing_params.raft_contact_top_z;
-        this->raft_layers.emplace_back(z);
+        if (slicing_params.raft_layers() > 1) {
+            z = slicing_params.raft_contact_top_z;
+            this->raft_layers.emplace_back(z);
+        }
         if (double dist_to_go = slicing_params.object_print_z_min - z; dist_to_go > EPSILON) {
             // Layers between the raft contacts and bottom of the object.
             auto nsteps = int(ceil(dist_to_go / slicing_params.max_suport_layer_height));
