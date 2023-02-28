@@ -228,6 +228,45 @@ bool StyleManager::load_style(const EmbossStyle &style, const wxFont &font)
     return true;
 }
 
+bool StyleManager::is_font_changed() const
+{
+    const std::optional<wxFont> &wx_font_opt = get_wx_font();
+    if (!wx_font_opt.has_value())
+        return false;
+    if (!exist_stored_style())
+        return false;
+    const EmbossStyle *stored_style = get_stored_style();
+    if (stored_style == nullptr)
+        return false;
+
+    const std::optional<wxFont> &wx_font_stored_opt = get_stored_wx_font();
+    if (!wx_font_stored_opt.has_value())
+        return false;
+
+    const wxFont &wx_font = *wx_font_opt;
+    const wxFont &wx_font_stored = *wx_font_stored_opt;
+    const FontProp &prop = get_style().prop;
+    const FontProp &prop_stored = stored_style->prop;
+
+    // Exist change in face name?
+    if(wx_font_stored.GetFaceName() != wx_font.GetFaceName()) return true;
+
+    const std::optional<float> &skew = prop.skew;
+    bool is_italic = skew.has_value() || WxFontUtils::is_italic(wx_font);
+    const std::optional<float> &skew_stored = prop_stored.skew;
+    bool is_stored_italic = skew_stored.has_value() || WxFontUtils::is_italic(wx_font_stored);
+    // is italic changed
+    if (is_italic != is_stored_italic)
+        return true;
+
+    const std::optional<float> &boldness = prop.boldness;
+    bool is_bold = boldness.has_value() || WxFontUtils::is_bold(wx_font);
+    const std::optional<float> &boldness_stored = prop_stored.boldness;
+    bool is_stored_bold = boldness_stored.has_value() || WxFontUtils::is_bold(wx_font_stored);
+    // is bold changed
+    return is_bold != is_stored_bold;
+}
+
 bool StyleManager::is_active_font() { return m_style_cache.font_file.has_value(); }
 
 const EmbossStyle* StyleManager::get_stored_style() const

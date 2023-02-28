@@ -124,7 +124,13 @@ public:
 
     // True when activ style has same name as some of stored style
     bool exist_stored_style() const { return m_style_cache.style_index != std::numeric_limits<size_t>::max(); }
-        
+    
+    /// <summary>
+    /// check whether current style differ to selected
+    /// </summary>
+    /// <returns></returns>
+    bool is_font_changed() const;
+
     /// <summary>
     /// Setter on wx_font when changed
     /// </summary>

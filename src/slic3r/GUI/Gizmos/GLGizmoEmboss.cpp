@@ -2558,46 +2558,6 @@ bool GLGizmoEmboss::rev_checkbox(const std::string &name,
                       undo_offset, draw_offseted_input);
 }
 
-bool is_font_changed(
-    const wxFont &wx_font, const wxFont &wx_font_stored, 
-    const FontProp &prop, const FontProp &prop_stored)
-{
-    // Exist change in face name?
-    if(wx_font_stored.GetFaceName() != wx_font.GetFaceName()) return true;
-
-    const std::optional<float> &skew = prop.skew;
-    bool is_italic = skew.has_value() || WxFontUtils::is_italic(wx_font);
-    const std::optional<float> &skew_stored = prop_stored.skew;
-    bool is_stored_italic = skew_stored.has_value() || WxFontUtils::is_italic(wx_font_stored);
-    // is italic changed
-    if (is_italic != is_stored_italic)
-        return true;
-
-    const std::optional<float> &boldness = prop.boldness;
-    bool is_bold = boldness.has_value() || WxFontUtils::is_bold(wx_font);
-    const std::optional<float> &boldness_stored = prop_stored.boldness;
-    bool is_stored_bold = boldness_stored.has_value() || WxFontUtils::is_bold(wx_font_stored);
-    // is bold changed
-    return is_bold != is_stored_bold;
-}
-
-bool is_font_changed(const StyleManager &mng) {
-    const std::optional<wxFont> &wx_font_opt = mng.get_wx_font();
-    if (!wx_font_opt.has_value())
-        return false;
-    if (!mng.exist_stored_style())
-        return false;
-    const EmbossStyle *stored_style = mng.get_stored_style();
-    if (stored_style == nullptr)
-        return false;
-
-    const std::optional<wxFont> &wx_font_stored_opt = mng.get_stored_wx_font();
-    if (!wx_font_stored_opt.has_value())
-        return false;
-
-    return is_font_changed(*wx_font_opt, *wx_font_stored_opt, mng.get_style().prop, stored_style->prop);
-}
-
 void GLGizmoEmboss::draw_style_edit() {
     const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
     assert(wx_font_opt.has_value());
@@ -2606,7 +2566,7 @@ void GLGizmoEmboss::draw_style_edit() {
         return;
     }
     bool exist_stored_style = m_style_manager.exist_stored_style();
-    bool exist_change_in_font = is_font_changed(m_style_manager);
+    bool exist_change_in_font = m_style_manager.is_font_changed();
     const GuiCfg::Translations &tr = m_gui_cfg->translations;
     if (exist_change_in_font || !exist_stored_style)
         ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, tr.font);
@@ -2714,7 +2674,6 @@ void GLGizmoEmboss::draw_height(bool use_inch)
             process();
 }
 
-
 bool GLGizmoEmboss::set_depth()
 {
     float &value = m_style_manager.get_style().prop.emboss;
@@ -2738,7 +2697,6 @@ void GLGizmoEmboss::draw_depth(bool use_inch)
         if (set_depth())
             process();    
 }
-
 
 bool GLGizmoEmboss::rev_slider(const std::string &name,
                                std::optional<int>& value,
@@ -3170,6 +3128,19 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
 }
 #endif // ALLOW_ADD_FONT_BY_OS_SELECTOR
 
+#if defined ALLOW_ADD_FONT_BY_FILE or defined ALLOW_DEBUG_MODE
+namespace priv {
+static std::string get_file_name(const std::string &file_path)
+{
+    size_t pos_last_delimiter = file_path.find_last_of("/\\");
+    size_t pos_point          = file_path.find_last_of('.');
+    size_t offset             = pos_last_delimiter + 1;
+    size_t count              = pos_point - pos_last_delimiter - 1;
+    return file_path.substr(offset, count);
+}
+} // namespace priv
+#endif // ALLOW_ADD_FONT_BY_FILE || ALLOW_DEBUG_MODE
+
 #ifdef ALLOW_ADD_FONT_BY_FILE
 bool GLGizmoEmboss::choose_true_type_file()
 {
@@ -3185,7 +3156,7 @@ bool GLGizmoEmboss::choose_true_type_file()
     // use first valid font
     for (auto &input_file : input_files) {
         std::string path = std::string(input_file.c_str());
-        std::string name = get_file_name(path);
+        std::string name = priv::get_file_name(path);
         //make_unique_name(name, m_font_list);
         const FontProp& prop = m_style_manager.get_font_prop();
         EmbossStyle style{ name, path, EmbossStyle::Type::file_path, prop };
@@ -3197,7 +3168,6 @@ bool GLGizmoEmboss::choose_true_type_file()
     return false;
 }
 #endif // ALLOW_ADD_FONT_BY_FILE
-
 
 #ifdef ALLOW_DEBUG_MODE
 bool GLGizmoEmboss::choose_svg_file()
@@ -3213,7 +3183,7 @@ bool GLGizmoEmboss::choose_svg_file()
     if (input_files.size() != 1) return false;
     auto &      input_file = input_files.front();
     std::string path       = std::string(input_file.c_str());
-    std::string name       = get_file_name(path);
+    std::string name       = priv::get_file_name(path);
 
     NSVGimage *image = nsvgParseFromFile(path.c_str(), "mm", 96.0f);
     ExPolygons polys = NSVGUtils::to_ExPolygons(image);
@@ -3329,15 +3299,6 @@ bool GLGizmoEmboss::is_text_object(const ModelVolume *text) {
         if (v->type() == ModelVolumeType::MODEL_PART) return false;
     }
     return true;
-}
-
-std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
-{
-    size_t pos_last_delimiter = file_path.find_last_of("/\\");
-    size_t pos_point          = file_path.find_last_of('.');
-    size_t offset             = pos_last_delimiter + 1;
-    size_t count              = pos_point - pos_last_delimiter - 1;
-    return file_path.substr(offset, count);
 }
 
 /////////////
