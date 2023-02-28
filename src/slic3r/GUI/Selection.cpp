@@ -1006,9 +1006,17 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
         if (m_mode == Instance && !is_wipe_tower()) {
             assert(is_from_fully_selected_instance(i));
             if (transformation_type.instance()) {
-                // ensure that the instance rotates as a rigid body
+               // ensure that the instance rotates as a rigid body
+                Transform3d inst_rotation_matrix = inst_trafo.get_rotation_matrix();
+                if (inst_trafo.is_left_handed()) {
+                    Geometry::TransformationSVD inst_svd(inst_trafo);
+                    inst_rotation_matrix = inst_svd.u * inst_svd.v.transpose();
+                    // ensure the rotation has the proper direction
+                    if (!rotation.normalized().cwiseAbs().isApprox(Vec3d::UnitX()))
+                        rotation_matrix = rotation_matrix.inverse();
+                }
+
                 const Transform3d inst_matrix_no_offset = inst_trafo.get_matrix_no_offset();
-                const Transform3d inst_rotation_matrix = inst_trafo.get_rotation_matrix();
                 rotation_matrix = inst_matrix_no_offset.inverse() * inst_rotation_matrix * rotation_matrix * inst_rotation_matrix.inverse() * inst_matrix_no_offset;
 
                 // rotate around selection center
