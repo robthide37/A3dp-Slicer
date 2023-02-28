@@ -174,8 +174,11 @@ std::string WxFontUtils::store_wxFont(const wxFont &font)
 
 wxFont WxFontUtils::load_wxFont(const std::string &font_descriptor)
 {
+    BOOST_LOG_TRIVIAL(trace) << "'" << font_descriptor << "'font descriptor string param of load_wxFont()";
     wxString font_descriptor_wx(font_descriptor);
+    BOOST_LOG_TRIVIAL(trace) << "'" << font_descriptor_wx.c_str() << "' wx string descriptor";
     wxFont wx_font(font_descriptor_wx);
+    BOOST_LOG_TRIVIAL(trace) << "loaded font is '" << get_human_readable_name(wx_font) << "'.";
     return wx_font;
 }
 
