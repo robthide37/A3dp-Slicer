@@ -137,6 +137,14 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
 
 // Private namespace with helper function for create volume
 namespace priv {
+
+/// <summary>
+/// Check if volume type is possible use for new text volume
+/// </summary>
+/// <param name="volume_type">Type</param>
+/// <returns>True when allowed otherwise false</returns>
+static bool is_valid(ModelVolumeType volume_type);
+
 /// <summary>
 /// Prepare data for emboss
 /// </summary>
@@ -145,8 +153,6 @@ namespace priv {
 /// <param name="cancel">Cancel for previous job</param>
 /// <returns>Base data for emboss text</returns>
 static DataBase create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>> &cancel);
-
-static bool is_valid(ModelVolumeType volume_type);
 
 /// <summary>
 /// Start job for add new volume to object with given transformation
@@ -200,6 +206,7 @@ static void find_closest_volume(const Selection       &selection,
 /// <param name="coor">Screen coordinat, where to create new object laying on bed</param>
 static void start_create_object_job(DataBase &emboss_data, const Vec2d &coor);
 
+// Loaded icons enum
 // Have to match order of files in function GLGizmoEmboss::init_icons()
 enum class IconType : unsigned {
     rename = 0,
@@ -218,20 +225,12 @@ enum class IconType : unsigned {
 };
 // Define rendered version of icon
 enum class IconState : unsigned { activable = 0, hovered /*1*/, disabled /*2*/ };
+// selector for icon by enum
 const IconManager::Icon &get_icon(const IconManager::VIcons& icons, IconType type, IconState state);
+// short call of Slic3r::GUI::button
 bool draw_button(const IconManager::VIcons& icons, IconType type, bool disable = false);
 
 } // namespace priv
-
-bool priv::is_valid(ModelVolumeType volume_type){
-    if (volume_type == ModelVolumeType::MODEL_PART ||
-        volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
-        volume_type == ModelVolumeType::PARAMETER_MODIFIER)
-        return true;
-
-    BOOST_LOG_TRIVIAL(error) << "Can't create embossed volume with this type: " << (int)volume_type;
-    return false;
-}
 
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
@@ -350,7 +349,7 @@ namespace priv {
 /// Get transformation to world
 /// - use fix after store to 3mf when exists
 /// </summary>
-/// <param name="gl_volume"></param>
+/// <param name="gl_volume">Scene volume</param>
 /// <param name="model">To identify MovelVolume with fix transformation</param>
 /// <returns></returns>
 static Transform3d world_matrix(const GLVolume *gl_volume, const Model *model);
@@ -544,26 +543,6 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
 }
 #endif // SHOW_OFFSET_DURING_DRAGGING
 
-namespace priv {
-static void draw_cross_hair(const ImVec2 &position,
-                            float         radius       = 16.f,
-                            ImU32         color        = ImGui::GetColorU32(ImVec4(1.f, 1.f, 1.f, .75f)),
-                            int           num_segments = 0,
-                            float         thickness    = 4.f);
-} // namespace priv
-
-void priv::draw_cross_hair(const ImVec2 &position, float radius, ImU32 color, int num_segments, float thickness)
-{
-    auto draw_list = ImGui::GetOverlayDrawList();
-    draw_list->AddCircle(position, radius, color, num_segments, thickness);
-    auto dirs = {ImVec2{0, 1}, ImVec2{1, 0}, ImVec2{0, -1}, ImVec2{-1, 0}};
-    for (const ImVec2 &dir : dirs) {
-        ImVec2 start(position.x + dir.x * 0.5 * radius, position.y + dir.y * 0.5 * radius);
-        ImVec2 end(position.x + dir.x * 1.5 * radius, position.y + dir.y * 1.5 * radius);
-        draw_list->AddLine(start, end, color, thickness);
-    }
-}
-
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
     set_volume_by_selection();
@@ -610,7 +589,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
                 ImVec4(1.f, .3f, .3f, .75f)
         ); // Warning color
         const float radius = 16.f;
-        priv::draw_cross_hair(center, radius, color);
+        ImGuiWrapper::draw_cross_hair(center, radius, color);
     }
 
 #ifdef SHOW_FINE_POSITION
@@ -3518,6 +3497,16 @@ std::string GLGizmoEmboss::get_file_name(const std::string &file_path)
 /////////////
 // priv namespace implementation
 ///////////////
+
+bool priv::is_valid(ModelVolumeType volume_type)
+{
+    if (volume_type == ModelVolumeType::MODEL_PART || volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
+        volume_type == ModelVolumeType::PARAMETER_MODIFIER)
+        return true;
+
+    BOOST_LOG_TRIVIAL(error) << "Can't create embossed volume with this type: " << (int) volume_type;
+    return false;
+}
 
 DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>>& cancel)
 {

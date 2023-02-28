@@ -200,6 +200,20 @@ public:
                      float thickness = 3.f);
 
     /// <summary>
+    /// Draw symbol of cross hair
+    /// </summary>
+    /// <param name="position">Center of cross hair</param>
+    /// <param name="radius">Circle radius</param>
+    /// <param name="color">Color of symbol</param>
+    /// <param name="num_segments">Precission of circle</param>
+    /// <param name="thickness">Thickness of Line in symbol</param>
+    static void draw_cross_hair(const ImVec2 &position,
+                                float         radius       = 16.f,
+                                ImU32         color        = ImGui::GetColorU32(ImVec4(1.f, 1.f, 1.f, .75f)),
+                                int           num_segments = 0,
+                                float         thickness    = 4.f);
+
+    /// <summary>
     /// Check that font ranges contain all chars in string
     /// (rendered Unicodes are stored in GlyphRanges)
     /// </summary>

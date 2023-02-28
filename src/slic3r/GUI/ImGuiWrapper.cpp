@@ -1514,6 +1514,17 @@ void ImGuiWrapper::draw(
     }
 }
 
+void ImGuiWrapper::draw_cross_hair(const ImVec2 &position, float radius, ImU32 color, int num_segments, float thickness) {
+    auto draw_list = ImGui::GetOverlayDrawList();
+    draw_list->AddCircle(position, radius, color, num_segments, thickness);
+    auto dirs = {ImVec2{0, 1}, ImVec2{1, 0}, ImVec2{0, -1}, ImVec2{-1, 0}};
+    for (const ImVec2 &dir : dirs) {
+        ImVec2 start(position.x + dir.x * 0.5 * radius, position.y + dir.y * 0.5 * radius);
+        ImVec2 end(position.x + dir.x * 1.5 * radius, position.y + dir.y * 1.5 * radius);
+        draw_list->AddLine(start, end, color, thickness);
+    }
+}
+
 bool ImGuiWrapper::contain_all_glyphs(const ImFont      *font,
                                      const std::string &text)
 {
