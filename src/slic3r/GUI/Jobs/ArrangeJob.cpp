@@ -169,11 +169,11 @@ void ArrangeJob::process(Ctl &ctl)
     static const auto arrangestr = _u8L("Arranging");
 
     arrangement::ArrangeParams params;
-    Points bedpts;
-    ctl.call_on_main_thread([this, &params, &bedpts]{
+    arrangement::ArrangeBed bed;
+    ctl.call_on_main_thread([this, &params, &bed]{
            prepare();
            params = get_arrange_params(m_plater);
-           bedpts = get_bed_shape(*m_plater->config());
+           get_bed_shape(*m_plater->config(), bed);
     }).wait();
 
     auto count  = unsigned(m_selected.size() + m_unprintable.size());
@@ -192,13 +192,13 @@ void ArrangeJob::process(Ctl &ctl)
 
     ctl.update_status(0, arrangestr);
 
-    arrangement::arrange(m_selected, m_unselected, bedpts, params);
+    arrangement::arrange(m_selected, m_unselected, bed, params);
 
     params.progressind = [this, count, &ctl](unsigned st) {
         if (st > 0) ctl.update_status(int(count - st) * 100 / status_range(), arrangestr);
     };
 
-    arrangement::arrange(m_unprintable, {}, bedpts, params);
+    arrangement::arrange(m_unprintable, {}, bed, params);
 
     // finalize just here.
     ctl.update_status(int(count) * 100 / status_range(), ctl.was_canceled() ?

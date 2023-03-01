@@ -4790,6 +4790,15 @@ Points get_bed_shape(const DynamicPrintConfig &config)
     return to_points(bed_shape_opt->values);
 }
 
+void get_bed_shape(const DynamicPrintConfig &cfg, arrangement::ArrangeBed &out)
+{
+    if (is_XL_printer(cfg)) {
+        out = arrangement::SegmentedRectangleBed{get_extents(get_bed_shape(cfg)), 4, 4};
+    } else {
+        out = arrangement::to_arrange_bed(get_bed_shape(cfg));
+    }
+}
+
 Points get_bed_shape(const PrintConfig &cfg)
 {
     return to_points(cfg.bed_shape.values);
@@ -4812,6 +4821,20 @@ std::string get_sla_suptree_prefix(const DynamicPrintConfig &config)
     }
 
     return slatree;
+}
+
+bool is_XL_printer(const DynamicPrintConfig &cfg)
+{
+    static constexpr const char *ALIGN_ONLY_FOR = "XL";
+
+    bool ret = false;
+
+    auto *printer_model = cfg.opt<ConfigOptionString>("printer_model");
+
+    if (printer_model)
+        ret = boost::algorithm::contains(printer_model->value, ALIGN_ONLY_FOR);
+
+    return ret;
 }
 
 } // namespace Slic3r

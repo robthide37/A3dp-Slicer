@@ -599,11 +599,11 @@ template<class Fn> auto call_with_bed(const Points &bed, Fn &&fn)
         auto      parea = poly_area(bed);
 
         if ((1.0 - parea / area(bb)) < 1e-3)
-            return fn(bb);
+            return fn(RectangleBed{bb});
         else if (!std::isnan(circ.radius()))
             return fn(circ);
         else
-            return fn(Polygon(bed));
+            return fn(IrregularBed{ExPolygon(bed)});
     }
 }
 
@@ -619,9 +619,7 @@ void arrange(ArrangePolygons &      items,
              const Points &         bed,
              const ArrangeParams &  params)
 {
-    call_with_bed(bed, [&](const auto &bin) {
-        arrange(items, excludes, bin, params);
-    });
+    arrange(items, excludes, to_arrange_bed(bed), params);
 }
 
 template<class BedT>
@@ -660,6 +658,86 @@ template void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, c
 template void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const CircleBed &bed, const ArrangeParams &params);
 template void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const Polygon &bed, const ArrangeParams &params);
 template void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const InfiniteBed &bed, const ArrangeParams &params);
+
+ArrangeBed to_arrange_bed(const Points &bedpts)
+{
+    ArrangeBed ret;
+
+    call_with_bed(bedpts, [&](const auto &bed) {
+        ret = bed;
+    });
+
+    return ret;
+}
+
+void arrange(ArrangePolygons &items,
+             const ArrangePolygons &excludes,
+             const SegmentedRectangleBed &bed,
+             const ArrangeParams &params)
+{
+    arrange(items, excludes, bed.bb, params);
+
+    if (! excludes.empty())
+        return;
+
+    auto it = std::max_element(items.begin(), items.end(),
+                               [](auto &i1, auto &i2) {
+                                   return i1.bed_idx < i1.bed_idx;
+                               });
+
+    size_t beds = 0;
+    if (it != items.end())
+        beds = it->bed_idx + 1;
+
+    std::vector<BoundingBox> pilebb(beds);
+
+    for (auto &itm : items) {
+        if (itm.bed_idx >= 0)
+            pilebb[itm.bed_idx].merge(get_extents(itm.transformed_poly()));
+    }
+
+    auto piecesz = unscaled(bed.bb).size();
+    piecesz.x() /= bed.segments.x();
+    piecesz.y() /= bed.segments.y();
+
+    for (size_t bedidx = 0; bedidx < beds; ++bedidx) {
+        BoundingBox bb;
+        auto pilesz = unscaled(pilebb[bedidx]).size();
+        bb.max.x() = scaled(std::ceil(pilesz.x() / piecesz.x()) * piecesz.x());
+        bb.max.y() = scaled(std::ceil(pilesz.y() / piecesz.y()) * piecesz.y());
+        coord_t offs = params.min_bed_distance;
+        switch (params.alignment) {
+        case Pivots::BottomLeft:
+            bb.translate((bed.bb.min - bb.min) + Point{offs, offs});
+            break;
+        case Pivots::TopRight:
+            bb.translate((bed.bb.max - bb.max) - Point{offs, offs});
+            break;
+        case Pivots::BottomRight: {
+            Point bedref{bed.bb.max.x(), bed.bb.min.y()};
+            Point bbref {bb.max.x(), bb.min.y()};
+            bb.translate((bedref - bbref) + Point{-offs, offs});
+            break;
+        }
+        case Pivots::TopLeft: {
+            Point bedref{bed.bb.min.x(), bed.bb.max.y()};
+            Point bbref {bb.min.x(), bb.max.y()};
+            bb.translate((bedref - bbref) + Point{offs, -offs});
+            break;
+        }
+        case Pivots::Center: {
+            bb.translate(bed.bb.center() - bb.center());
+            break;
+        }
+        }
+
+        Vec2crd d = bb.center() - pilebb[bedidx].center();
+
+        for (auto &itm : items)
+            if (itm.bed_idx == bedidx)
+                itm.translation += d;
+    }
+}
 
 } // namespace arr
 } // namespace Slic3r
