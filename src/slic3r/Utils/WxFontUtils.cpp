@@ -169,6 +169,13 @@ std::string WxFontUtils::store_wxFont(const wxFont &font)
 {
     // wxString os = wxPlatformInfo::Get().GetOperatingSystemIdName();
     wxString font_descriptor = font.GetNativeFontInfoDesc();
+    BOOST_LOG_TRIVIAL(trace) << "'" << font_descriptor << "' wx string get from GetNativeFontInfoDesc. wxFont " << 
+        "IsOk(" << font.IsOk() << "), " <<
+        "isNull(" << font.IsNull() << ")" <<
+        "IsFree(" << font.IsFree() << "), " <<
+        "IsFixedWidth(" << font.IsFixedWidth() << "), " <<
+        "IsUsingSizeInPixels(" << font.IsUsingSizeInPixels() << "), " <<
+        "Encoding(" << (int)font.GetEncoding() << "), " ;
     return std::string(font_descriptor.c_str());
 }
 
