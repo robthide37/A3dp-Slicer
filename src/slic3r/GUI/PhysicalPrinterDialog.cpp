@@ -522,16 +522,20 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
 {
     if (m_presets.empty())
         return;
+
     bool all_presets_are_from_mk3_family = true;
 
     for (PresetForPrinter* prstft : m_presets) {
         std::string preset_name = prstft->get_preset_name();
         if (Preset* preset = wxGetApp().preset_bundle->printers.find_preset(preset_name)) {
             std::string model_id = preset->config.opt_string("printer_model");
-            auto model_supports_prusalink = [](const std::string &model) {
-                return model.size() >= 3 &&
-                    ((boost::starts_with(model, "MK") && model[2] > '2' && model[2] <= '9') ||
-                      boost::starts_with(model, "MINI"));
+            auto model_supports_prusalink = [](const std::string& model) {
+                return model.size() >= 2 &&
+                    ((boost::starts_with(model, "MK") && model[2] > '2' && model[2] <= '9')
+                        || boost::starts_with(model, "MINI")
+                        || boost::starts_with(model, "MK2.5")
+                        || boost::starts_with(model, "XL")
+                        );
             };
             if (preset->vendor) {
                 if (preset->vendor->name == "Prusa Research") {
