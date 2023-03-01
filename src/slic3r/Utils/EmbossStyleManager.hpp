@@ -116,8 +116,8 @@ public:
     const ImFontAtlas &get_atlas() const     { return m_style_cache.atlas; } 
     const FontProp    &get_font_prop() const { return get_style().prop; }
           FontProp    &get_font_prop()       { return get_style().prop; }
-    const std::optional<wxFont> &get_wx_font()        const { return m_style_cache.wx_font; }
-    const std::optional<wxFont> &get_stored_wx_font() const { return m_style_cache.stored_wx_font; }
+    const wxFont &get_wx_font()        const { return m_style_cache.wx_font; }
+    const wxFont &get_stored_wx_font() const { return m_style_cache.stored_wx_font; }
     Slic3r::Emboss::FontFileWithCache &get_font_file_with_cache()   { return m_style_cache.font_file; }
     bool has_collections() const { return m_style_cache.font_file.font_file != nullptr && 
                                           m_style_cache.font_file.font_file->infos.size() > 1; }
@@ -227,7 +227,7 @@ private:
         ImFontAtlas atlas = {};
 
         // wx widget font
-        std::optional<wxFont> wx_font = {};
+        wxFont wx_font = {};
 
         // cache for view font name with maximal width in imgui
         std::string truncated_name; 
@@ -236,7 +236,7 @@ private:
         EmbossStyle style = {};
 
         // cache for stored wx font to not create every frame
-        std::optional<wxFont> stored_wx_font;
+        wxFont stored_wx_font = {};
 
         // index into m_style_items
         size_t style_index = std::numeric_limits<size_t>::max();

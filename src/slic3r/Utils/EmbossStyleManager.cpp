@@ -230,8 +230,8 @@ bool StyleManager::load_style(const EmbossStyle &style, const wxFont &font)
 
 bool StyleManager::is_font_changed() const
 {
-    const std::optional<wxFont> &wx_font_opt = get_wx_font();
-    if (!wx_font_opt.has_value())
+    const wxFont &wx_font = get_wx_font();
+    if (!wx_font.IsOk())
         return false;
     if (!exist_stored_style())
         return false;
@@ -239,12 +239,10 @@ bool StyleManager::is_font_changed() const
     if (stored_style == nullptr)
         return false;
 
-    const std::optional<wxFont> &wx_font_stored_opt = get_stored_wx_font();
-    if (!wx_font_stored_opt.has_value())
+    const wxFont &wx_font_stored = get_stored_wx_font();
+    if (!wx_font_stored.IsOk())
         return false;
 
-    const wxFont &wx_font = *wx_font_opt;
-    const wxFont &wx_font_stored = *wx_font_stored_opt;
     const FontProp &prop = get_style().prop;
     const FontProp &prop_stored = stored_style->prop;
 
@@ -533,7 +531,7 @@ bool StyleManager::set_wx_font(const wxFont &wx_font) {
 bool StyleManager::set_wx_font(const wxFont &wx_font, std::unique_ptr<FontFile> font_file)
 {
     if (font_file == nullptr) return false;
-    m_style_cache.wx_font   = wx_font; // copy
+    m_style_cache.wx_font = wx_font; // copy
     m_style_cache.font_file = 
         FontFileWithCache(std::move(font_file));
 

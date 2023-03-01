@@ -59,6 +59,8 @@
 #define EXECUTE_PROCESS_ON_MAIN_THREAD // debug execution on main thread
 #endif // ALLOW_DEBUG_MODE
 
+//#define USE_PIXEL_SIZE_IN_WX_FONT
+
 using namespace Slic3r;
 using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
@@ -1694,11 +1696,13 @@ bool GLGizmoEmboss::select_facename(const wxString &facename)
     if (!wxFontEnumerator::IsValidFacename(facename)) return false;
     // Select font
     const wxFontEncoding &encoding = m_face_names.encoding;
-    wxFont                wx_font(wxFontInfo().FaceName(facename).Encoding(encoding));
+    wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(encoding));
     if (!wx_font.IsOk()) return false;
+#ifdef USE_PIXEL_SIZE_IN_WX_FONT
     // wx font could change source file by size of font
     int point_size = static_cast<int>(m_style_manager.get_font_prop().size_in_mm);
     wx_font.SetPointSize(point_size);
+#endif // USE_PIXEL_SIZE_IN_WX_FONT
     if (!m_style_manager.set_wx_font(wx_font)) return false;
     process();
     return true;
@@ -1709,9 +1713,9 @@ void GLGizmoEmboss::draw_font_list()
     // Set partial
     wxString actual_face_name;
     if (m_style_manager.is_active_font()) {
-        const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
-        if (wx_font_opt.has_value())
-            actual_face_name = wx_font_opt->GetFaceName();
+        const wxFont &wx_font = m_style_manager.get_wx_font();
+        if (wx_font.IsOk())
+            actual_face_name = wx_font.GetFaceName();
     }
     // name of actual selected font
     const char * selected = (!actual_face_name.empty()) ?
@@ -2347,13 +2351,12 @@ void GLGizmoEmboss::draw_style_list() {
 
 bool GLGizmoEmboss::draw_italic_button()
 {
-    const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font(); 
+    const wxFont &wx_font = m_style_manager.get_wx_font(); 
     const auto& ff = m_style_manager.get_font_file_with_cache();
-    if (!wx_font_opt.has_value() || !ff.has_value()) { 
+    if (!wx_font.IsOk() || !ff.has_value()) { 
         draw(*m_icons[(int) IconType::italic][(int)IconState::disabled]);
         return false;
     }
-    const wxFont& wx_font = *wx_font_opt;
 
     std::optional<float> &skew = m_style_manager.get_font_prop().skew;
     bool is_font_italic = skew.has_value() || WxFontUtils::is_italic(wx_font);
@@ -2394,13 +2397,12 @@ bool GLGizmoEmboss::draw_italic_button()
 }
 
 bool GLGizmoEmboss::draw_bold_button() {
-    const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
+    const wxFont &wx_font = m_style_manager.get_wx_font();
     const auto& ff = m_style_manager.get_font_file_with_cache();
-    if (!wx_font_opt.has_value() || !ff.has_value()) {
+    if (!wx_font.IsOk() || !ff.has_value()) {
         draw(get_icon(m_icons, IconType::bold, IconState::disabled));
         return false;
     }
-    const wxFont &wx_font = *wx_font_opt;
     
     std::optional<float> &boldness = m_style_manager.get_font_prop().boldness;
     bool is_font_bold = boldness.has_value() || WxFontUtils::is_bold(wx_font);
@@ -2558,13 +2560,18 @@ bool GLGizmoEmboss::rev_checkbox(const std::string &name,
                       undo_offset, draw_offseted_input);
 }
 
-void GLGizmoEmboss::draw_style_edit() {
-    const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
-    assert(wx_font_opt.has_value());
-    if (!wx_font_opt.has_value()) {
-        ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("WxFont is not loaded properly.").c_str());
-        return;
+void GLGizmoEmboss::draw_style_edit()
+{
+    {
+        // Check correct WxFont
+        const wxFont &wx_font = m_style_manager.get_wx_font();
+        assert(wx_font.IsOk());
+        if (!wx_font.IsOk()) {
+            ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("WxFont is not loaded properly.").c_str());
+            return;
+        }
     }
+
     bool exist_stored_style = m_style_manager.exist_stored_style();
     bool exist_change_in_font = m_style_manager.is_font_changed();
     const GuiCfg::Translations &tr = m_gui_cfg->translations;
@@ -2651,13 +2658,15 @@ bool GLGizmoEmboss::set_height() {
     if (is_approx(value, m_volume->text_configuration->style.prop.size_in_mm))
         return false;
     
+#ifdef USE_PIXEL_SIZE_IN_WX_FONT
     // store font size into path serialization
-    const std::optional<wxFont> &wx_font_opt = m_style_manager.get_wx_font();
-    if (wx_font_opt.has_value()) {
-        wxFont wx_font = *wx_font_opt;
-        wx_font.SetPointSize(static_cast<int>(value));
-        m_style_manager.set_wx_font(wx_font);
+    const wxFont &wx_font = m_style_manager.get_wx_font();
+    if (wx_font.IsOk()) {
+        wxFont wx_font_new = wx_font; // copy
+        wx_font_new.SetPointSize(static_cast<int>(value));
+        m_style_manager.set_wx_font(wx_font_new);
     }
+#endif
     return true;
 }
 
@@ -3226,9 +3235,9 @@ void GLGizmoEmboss::create_notification_not_valid_font(
 
     std::string face_name_by_wx;
     if (!face_name_opt.has_value()) {
-        const auto& wx_font = m_style_manager.get_wx_font();
-        if (wx_font.has_value()) {
-            wxString wx_face_name = wx_font->GetFaceName();
+        const wxFont& wx_font = m_style_manager.get_wx_font();
+        if (wx_font.IsOk()) {
+            wxString wx_face_name = wx_font.GetFaceName();
             face_name_by_wx = std::string((const char *) wx_face_name.ToUTF8());
         }
     }
@@ -3331,10 +3340,8 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &st
     const EmbossStyle &es = style_manager.get_style();
     // actualize font path - during changes in gui it could be corrupted
     // volume must store valid path
-    assert(style_manager.get_wx_font().has_value());
-    assert(style_manager.get_wx_font()->IsOk());
-    assert(es.path.compare(WxFontUtils::store_wxFont(*style_manager.get_wx_font())) == 0);
-    // style.path = WxFontUtils::store_wxFont(*m_style_manager.get_wx_font());
+    assert(style_manager.get_wx_font().IsOk());
+    assert(es.path.compare(WxFontUtils::store_wxFont(style_manager.get_wx_font())) == 0);
     TextConfiguration tc{es, text};
 
     // Cancel previous Job, when it is in process
