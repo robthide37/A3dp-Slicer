@@ -10,6 +10,7 @@
 #include "GCodeProcessor.hpp"
 #include "BoundingBox.hpp"
 #include "LocalesUtils.hpp"
+#include "Geometry.hpp"
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -1170,35 +1171,94 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
                       ";------------------\n\n\n\n\n\n\n");
     }
 
-    // outer perimeter (always):
-    writer.rectangle(wt_box, feedrate);
+    // This block creates the stabilization cone.
+    // First define a lambda to draw the rectangle with stabilization.
+    auto supported_rectangle = [this, &writer](const box_coordinates& wt_box, double feedrate) -> Polygon {
+        const auto [R, support_scale] = get_wipe_tower_cone_base(m_wipe_tower_width, m_wipe_tower_height, m_wipe_tower_depth);
+
+        double r = std::tan(Geometry::deg2rad(15.)) * (m_wipe_tower_height - m_layer_info->z);
+        Vec2f center = (wt_box.lu + wt_box.rd) / 2.;
+        double w = wt_box.lu.y() - wt_box.ld.y();
+        enum Type {
+            Arc,
+            Corner,
+            ArcStart,
+            ArcEnd
+        };
+
+        std::vector<std::pair<Vec2f, Type>> pts = {{wt_box.ru, Corner}};        
+        if (double alpha_start = std::asin((0.5*w)/r); ! std::isnan(alpha_start) && r > 0.5*w+0.01) {
+            for (double alpha = alpha_start; alpha < M_PI-alpha_start+0.001; alpha+=(M_PI-2*alpha_start) / 20.)
+                pts.emplace_back(Vec2f(center.x() + r*std::cos(alpha)/support_scale, center.y() + r*std::sin(alpha)), alpha == alpha_start ? ArcStart : Arc);
+            pts.back().second = ArcEnd;
+        }        
+        pts.emplace_back(wt_box.lu, Corner);
+        pts.emplace_back(wt_box.ld, Corner);
+        for (int i=int(pts.size())-3; i>0; --i)
+            pts.emplace_back(Vec2f(pts[i].first.x(), 2*center.y()-pts[i].first.y()), i == int(pts.size())-3 ? ArcStart : i == 1 ? ArcEnd : Arc);
+        pts.emplace_back(wt_box.rd, Corner);
+
+        // Find the closest corner and travel to it.
+        int start_i = 0;
+        double min_dist = std::numeric_limits<double>::max();
+        for (int i=0; i<int(pts.size()); ++i) {
+            if (pts[i].second == Corner) {
+                double dist = (pts[i].first - Vec2f(writer.x(), writer.y())).squaredNorm();
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    start_i = i;
+                }
+            }
+        }
+        writer.travel(pts[start_i].first);
+
+        // Now actually extrude the boundary:
+        int i = start_i+1 == int(pts.size()) ? 0 : start_i + 1;
+        while (i != start_i) {
+            writer.extrude(pts[i].first, feedrate);
+            if (++i == int(pts.size()))
+                i = 0;
+        }
+        writer.extrude(pts[start_i].first, feedrate);
+
+        // Return the polygon.
+        Polygon out;
+        for (const auto& [pt, tag] : pts)
+            out.points.push_back(Point::new_scale(pt));    
+        return out;
+    };
+
+    // outer contour (always)
+    Polygon poly = supported_rectangle(wt_box, feedrate);
 
     // brim (first layer only)
     if (first_layer) {
         box_coordinates box = wt_box;
         float spacing = m_perimeter_width - m_layer_height*float(1.-M_PI_4);
-        // How many perimeters shall the brim have?
         size_t loops_num = (m_wipe_tower_brim_width + spacing/2.f) / spacing;
-
+        
         for (size_t i = 0; i < loops_num; ++ i) {
-            box.expand(spacing);
-            writer.rectangle(box);
+            poly = offset(poly, scale_(spacing)).front();
+            int cp = poly.closest_point_index(Point::new_scale(writer.x(), writer.y()));
+            writer.travel(unscale(poly.points[cp]).cast<float>());
+            for (int i=cp+1; true; ++i ) {
+                if (i==int(poly.points.size()))
+                    i = 0;
+                writer.extrude(unscale(poly.points[i]).cast<float>());
+                if (i == cp)
+                    break;
+            }
         }
 
         // Save actual brim width to be later passed to the Print object, which will use it
         // for skirt calculation and pass it to GLCanvas for precise preview box
-        m_wipe_tower_brim_width_real = wt_box.ld.x() - box.ld.x() + spacing/2.f;
-        wt_box = box;
+        m_wipe_tower_brim_width_real = loops_num * spacing;
     }
 
-    // Now prepare future wipe. box contains rectangle that was extruded last (ccw).
-    Vec2f target = (writer.pos() == wt_box.ld ? wt_box.rd :
-                   (writer.pos() == wt_box.rd ? wt_box.ru :
-                   (writer.pos() == wt_box.ru ? wt_box.lu :
-                    wt_box.ld)));
-    writer.add_wipe_point(writer.pos())
-          .add_wipe_point(target);
-
+    // Now prepare future wipe.
+    int i = poly.closest_point_index(Point::new_scale(writer.x(), writer.y()));
+    writer.add_wipe_point(writer.pos());
+    writer.add_wipe_point(unscale(poly.points[i==0 ? int(poly.points.size())-1 : i-1]).cast<float>());
 
     // Ask our writer about how much material was consumed.
     // Skip this in case the layer is sparse and config option to not print sparse layers is enabled.
@@ -1207,6 +1267,24 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
             m_used_filament_length[m_current_tool] += writer.get_and_reset_used_filament_length();
 
     return construct_tcr(writer, false, old_tool);
+}
+
+// Static method to get the radius and x-scaling of the stabilizing cone base.
+std::pair<double, double> WipeTower::get_wipe_tower_cone_base(double width, double height, double depth)
+{
+    const double angle_deg = 15.;
+    double R = std::tan(Geometry::deg2rad(angle_deg)) * height;
+    double fake_width = 0.66 * width;
+    double diag = std::hypot(fake_width / 2., depth / 2.);
+    double support_scale = 1.;
+    if (R > diag) {
+        double w = fake_width;
+        double sin = 0.5 * depth / diag;
+        double tan = depth / w;
+        double t = (R - diag) * sin;
+        support_scale = (w / 2. + t / tan + t * tan) / (w / 2.);
+    }
+    return std::make_pair(R, support_scale);
 }
 
 // Appends a toolchange into m_plan and calculates neccessary depth of the corresponding box
@@ -1251,6 +1329,7 @@ void WipeTower::plan_tower()
 	m_wipe_tower_depth = 0.f;
 	for (auto& layer : m_plan)
 		layer.depth = 0.f;
+    m_wipe_tower_height = m_plan.empty() ? 0.f : m_plan.back().z;
 	
     for (int layer_index = int(m_plan.size()) - 1; layer_index >= 0; --layer_index)
 	{
@@ -1357,7 +1436,7 @@ void WipeTower::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &
     m_old_temperature = -1; // reset last temperature written in the gcode
 
     std::vector<WipeTower::ToolChangeResult> layer_result;
-	for (auto layer : m_plan)
+	for (const WipeTower::WipeTowerInfo& layer : m_plan)
 	{
         set_layer(layer.z, layer.height, 0, false/*layer.z == m_plan.front().z*/, layer.z == m_plan.back().z);
         m_internal_rotation += 180.f;

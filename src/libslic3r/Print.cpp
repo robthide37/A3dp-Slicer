@@ -1134,23 +1134,34 @@ Polygons Print::first_layer_islands() const
 
 std::vector<Point> Print::first_layer_wipe_tower_corners() const
 {
-    std::vector<Point> corners;
+    std::vector<Point> pts_scaled;
+
     if (has_wipe_tower() && ! m_wipe_tower_data.tool_changes.empty()) {
         double width = m_config.wipe_tower_width + 2*m_wipe_tower_data.brim_width;
         double depth = m_wipe_tower_data.depth + 2*m_wipe_tower_data.brim_width;
         Vec2d pt0(-m_wipe_tower_data.brim_width, -m_wipe_tower_data.brim_width);
-        for (Vec2d pt : {
-                pt0,
-                Vec2d(pt0.x()+width, pt0.y()      ),
-                Vec2d(pt0.x()+width, pt0.y()+depth),
-                Vec2d(pt0.x(),       pt0.y()+depth)
-            }) {
+        
+        // First the corners.
+        std::vector<Vec2d> pts = { pt0,
+                                   Vec2d(pt0.x()+width, pt0.y()),
+                                   Vec2d(pt0.x()+width, pt0.y()+depth),
+                                   Vec2d(pt0.x(),pt0.y()+depth)
+                                 };
+
+        // Now the stabilization cone.
+        Vec2d center = (pts[0] + pts[2])/2.;
+        const auto [cone_R, cone_x_scale] = WipeTower::get_wipe_tower_cone_base(m_config.wipe_tower_width, m_wipe_tower_data.height, m_wipe_tower_data.depth);
+        double r = cone_R + m_wipe_tower_data.brim_width;
+        for (double alpha = 0.; alpha<2*M_PI; alpha += M_PI/20.)
+            pts.emplace_back(center + r*Vec2d(std::cos(alpha)/cone_x_scale, std::sin(alpha)));
+
+        for (Vec2d& pt : pts) {
             pt = Eigen::Rotation2Dd(Geometry::deg2rad(m_config.wipe_tower_rotation_angle.value)) * pt;
             pt += Vec2d(m_config.wipe_tower_x.value, m_config.wipe_tower_y.value);
-            corners.emplace_back(Point(scale_(pt.x()), scale_(pt.y())));
+            pts_scaled.emplace_back(Point(scale_(pt.x()), scale_(pt.y())));
         }
     }
-    return corners;
+    return pts_scaled;
 }
 
 void Print::finalize_first_layer_convex_hull()
@@ -1448,6 +1459,7 @@ void Print::_make_wipe_tower()
     wipe_tower.generate(m_wipe_tower_data.tool_changes);
     m_wipe_tower_data.depth = wipe_tower.get_depth();
     m_wipe_tower_data.brim_width = wipe_tower.get_brim_width();
+    m_wipe_tower_data.height = wipe_tower.get_wipe_tower_height();
 
     // Unload the current filament over the purge tower.
     coordf_t layer_height = m_objects.front()->config().layer_height.value;
