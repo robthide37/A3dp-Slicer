@@ -702,8 +702,12 @@ bool PrusaLink::get_storage(wxArrayString& storage_path, wxArrayString& storage_
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get storage at: %2%") % name % url;
 
+    wxString wlang = GUI::wxGetApp().current_language_code();
+    std::string lang = GUI::format(wlang.SubString(0, 1));
+
     auto http = Http::get(std::move(url));
     set_auth(http);
+    http.header("Accept-Language", lang);
     http.on_error([&](std::string body, std::string error, unsigned status) {
         BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error getting storage: %2%, HTTP %3%, body: `%4%`") % name % error % status % body;
         error_msg = L"\n\n" + boost::nowide::widen(error);
