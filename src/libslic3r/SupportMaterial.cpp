@@ -2954,7 +2954,7 @@ SupportGeneratorLayersPtr generate_raft_base(
         Polygons columns;
         Polygons first_layer;
         if (columns_base != nullptr) {
-            if (columns_base->print_z > slicing_params.raft_contact_top_z - EPSILON) {
+            if (columns_base->bottom_print_z() > slicing_params.raft_interface_top_z - EPSILON) {
                 // Classic supports with colums above the raft interface.
                 base = columns_base->polygons;
                 columns = base;

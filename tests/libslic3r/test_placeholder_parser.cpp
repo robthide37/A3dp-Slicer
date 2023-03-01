@@ -24,6 +24,8 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
     // a percent to what.
     config.option<ConfigOptionFloatOrPercent>("first_layer_speed")->value = 50.;
     config.option<ConfigOptionFloatOrPercent>("first_layer_speed")->percent = true;
+    ConfigOptionFloatsNullable *opt_filament_retract_length = config.option<ConfigOptionFloatsNullable>("filament_retract_length", true);
+    opt_filament_retract_length->values = { 5., ConfigOptionFloatsNullable::nil_value(), 3. };
 
     parser.apply_config(config);
 	parser.set("foo", 0);
@@ -34,6 +36,9 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
     SECTION("nested config options (legacy syntax)") { REQUIRE(parser.process("[temperature_[foo]]") == "357"); }
     SECTION("array reference") { REQUIRE(parser.process("{temperature[foo]}") == "357"); }
     SECTION("whitespaces and newlines are maintained") { REQUIRE(parser.process("test [ temperature_ [foo] ] \n hu") == "test 357 \n hu"); }
+    SECTION("nullable is not null") { REQUIRE(parser.process("{is_nil(filament_retract_length[0])}") == "false"); }
+    SECTION("nullable is null") { REQUIRE(parser.process("{is_nil(filament_retract_length[1])}") == "true"); }
+    SECTION("nullable is not null 2") { REQUIRE(parser.process("{is_nil(filament_retract_length[2])}") == "false"); }
 
     // Test the math expressions.
     SECTION("math: 2*3") { REQUIRE(parser.process("{2*3}") == "6"); }

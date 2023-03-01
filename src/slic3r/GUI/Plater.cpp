@@ -2683,7 +2683,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         instance->set_offset(-model_object->origin_translation);
                     }
                 }
-                model_object->ensure_on_bed(is_project_file);
+                if (!model_object->instances.empty())
+                  model_object->ensure_on_bed(is_project_file);
             }
 
             if (one_by_one) {
@@ -5476,6 +5477,17 @@ void Plater::add_model(bool imperial_units/* = false*/)
     Plater::TakeSnapshot snapshot(this, snapshot_label);
     if (! load_files(paths, true, false, imperial_units).empty())
         wxGetApp().mainframe->update_title();
+}
+
+void Plater::import_zip_archive()
+{
+   wxString input_file;
+   wxGetApp().import_zip(this, input_file);
+   if (input_file.empty())
+       return;
+
+   fs::path path = into_path(input_file);
+   preview_zip_archive(path);
 }
 
 void Plater::import_sl1_archive()

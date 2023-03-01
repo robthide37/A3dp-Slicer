@@ -547,18 +547,19 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
     } link, connect;
     // allowed models are: all MINI, all MK3 and newer, MK2.5 and MK2.5S  
     auto model_supports_prusalink = [](const std::string& model) {
-        return model.size() >= 3 &&
+        return model.size() >= 2 &&
                 (( boost::starts_with(model, "MK") && model[2] > '2' && model[2] <= '9')
                 || boost::starts_with(model, "MINI")
                 || boost::starts_with(model, "MK2.5")
-                //|| boost::starts_with(model, "MK2.5S")
+                || boost::starts_with(model, "XL")
                 );
     };
     // allowed models are: all MK3/S and MK2.5/S
     auto model_supports_prusaconnect = [](const std::string& model) {
-        return model.size() >= 3 &&
-                (boost::starts_with(model, "MK3")
+        return model.size() >= 2 &&
+                ((boost::starts_with(model, "MK") && model[2] > '2' && model[2] <= '9')
                 || boost::starts_with(model, "MK2.5")
+                || boost::starts_with(model, "XL")
                 );
     };
 

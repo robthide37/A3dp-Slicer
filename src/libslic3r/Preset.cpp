@@ -879,7 +879,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
     // Insert a new profile.
     Preset &preset = this->load_preset(path, new_name, std::move(cfg), select == LoadAndSelect::Always);
     preset.is_external = true;
-    if (&this->get_selected_preset() == &preset)
+    if (this->m_idx_selected != size_t(-1) && &this->get_selected_preset() == &preset)
         this->get_edited_preset().is_external = true;
 
     return std::make_pair(&preset, false);

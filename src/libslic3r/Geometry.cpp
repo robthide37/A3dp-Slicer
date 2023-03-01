@@ -860,14 +860,26 @@ TransformationSVD::TransformationSVD(const Transform3d& trafo)
         rotation_90_degrees = true;
         for (int i = 0; i < 3; ++i) {
             const Vec3d row = v.row(i).cwiseAbs();
-            size_t num_zeros = is_approx(row[0], 0.) + is_approx(row[1], 0.) + is_approx(row[2], 0.);
-            size_t num_ones  = is_approx(row[0], 1.) + is_approx(row[1], 1.) + is_approx(row[2], 1.);
+            const size_t num_zeros = is_approx(row[0], 0.) + is_approx(row[1], 0.) + is_approx(row[2], 0.);
+            const size_t num_ones  = is_approx(row[0], 1.) + is_approx(row[1], 1.) + is_approx(row[2], 1.);
             if (num_zeros != 2 || num_ones != 1) {
                 rotation_90_degrees = false;
                 break;
             }
         }
-        skew = ! rotation_90_degrees;
+        // Detect skew by brute force: check if the axes are still orthogonal after transformation
+        const Matrix3d trafo_linear = trafo.linear();
+        const std::array<Vec3d, 3> axes = { Vec3d::UnitX(), Vec3d::UnitY(), Vec3d::UnitZ() };
+        std::array<Vec3d, 3> transformed_axes;
+        for (int i = 0; i < 3; ++i) {
+            transformed_axes[i] = trafo_linear * axes[i];
+        }
+        skew = std::abs(transformed_axes[0].dot(transformed_axes[1])) > EPSILON ||
+               std::abs(transformed_axes[1].dot(transformed_axes[2])) > EPSILON ||
+               std::abs(transformed_axes[2].dot(transformed_axes[0])) > EPSILON;
+
+        // This following old code does not work under all conditions. The v matrix can become non diagonal (see SPE-1492) 
+//        skew = ! rotation_90_degrees;
     } else
         skew = false;
 }

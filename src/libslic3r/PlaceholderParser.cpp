@@ -881,6 +881,38 @@ namespace client
             output.it_range = boost::iterator_range<Iterator>(opt.it_range.begin(), it_end);
         }
 
+        // Return a boolean value, true if the scalar variable referenced by "opt" is nullable and it has a nil value.
+        template <typename Iterator>
+        static void is_nil_test_scalar(
+            const MyContext                 *ctx,
+            OptWithPos<Iterator>            &opt,
+            expr<Iterator>                  &output)
+        {
+            if (opt.opt->is_vector())
+                ctx->throw_exception("Referencing a vector variable when scalar is expected", opt.it_range);
+            output.set_b(opt.opt->is_nil());
+            output.it_range = opt.it_range;
+        }
+
+        // Return a boolean value, true if an element of a vector variable referenced by "opt[index]" is nullable and it has a nil value.
+        template <typename Iterator>
+        static void is_nil_test_vector(
+            const MyContext                 *ctx,
+            OptWithPos<Iterator>            &opt,
+            int                             &index,
+            Iterator                         it_end,
+            expr<Iterator>                  &output)
+        {
+            if (opt.opt->is_scalar())
+                ctx->throw_exception("Referencing a scalar variable when vector is expected", opt.it_range);
+            const ConfigOptionVectorBase *vec = static_cast<const ConfigOptionVectorBase*>(opt.opt);
+            if (vec->empty())
+                ctx->throw_exception("Indexing an empty vector variable", opt.it_range);
+            size_t idx = (index < 0) ? 0 : (index >= int(vec->size())) ? 0 : size_t(index);
+            output.set_b(static_cast<const ConfigOptionVectorBase*>(opt.opt)->is_nil(idx));
+            output.it_range = boost::iterator_range<Iterator>(opt.it_range.begin(), it_end);
+        }
+
         // Verify that the expression returns an integer, which may be used
         // to address a vector.
         template <typename Iterator>
@@ -979,6 +1011,7 @@ namespace client
         { "unary_expression",           "Expecting an expression." },
         { "optional_parameter",         "Expecting a closing brace or an optional parameter." },
         { "scalar_variable_reference",  "Expecting a scalar variable reference."},
+        { "is_nil_test",                "Expecting a scalar variable reference."},
         { "variable_reference",         "Expecting a variable reference."},
         { "regular_expression",         "Expecting a regular expression."}
     };
@@ -1265,6 +1298,7 @@ namespace client
                                                                     [ px::bind(&expr<Iterator>::template digits<true>, _val, _2, _3) ]
                 |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1, _val) ]
                 |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
+                |   (kw["is_nil"] > '(' > is_nil_test(_r1) > ')')   [_val = _1]
                 |   (strict_double > iter_pos)                      [ px::bind(&FactorActions::double_, _1, _2, _val) ]
                 |   (int_      > iter_pos)                          [ px::bind(&FactorActions::int_,    _1, _2, _val) ]
                 |   (kw[bool_] > iter_pos)                          [ px::bind(&FactorActions::bool_,   _1, _2, _val) ]
@@ -1292,6 +1326,15 @@ namespace client
                 [ px::bind(&MyContext::resolve_variable<Iterator>, _r1, _1, _val) ];
             variable_reference.name("variable reference");
 
+            is_nil_test = 
+                variable_reference(_r1)[_a=_1] >>
+                (
+                        ('[' > additive_expression(_r1)[px::bind(&MyContext::evaluate_index<Iterator>, _1, _b)] > ']' > 
+                            iter_pos[px::bind(&MyContext::is_nil_test_vector<Iterator>, _r1, _a, _b, _1, _val)])
+                    |   eps[px::bind(&MyContext::is_nil_test_scalar<Iterator>, _r1, _a, _val)]
+                );
+            is_nil_test.name("is_nil test");
+
             regular_expression = raw[lexeme['/' > *((utf8char - char_('\\') - char_('/')) | ('\\' > char_)) > '/']];
             regular_expression.name("regular_expression");
 
@@ -1301,6 +1344,7 @@ namespace client
                 ("zdigits")
                 ("if")
                 ("int")
+                ("is_nil")
                 //("inf")
                 ("else")
                 ("elsif")
@@ -1335,6 +1379,7 @@ namespace client
                 debug(optional_parameter);
                 debug(scalar_variable_reference);
                 debug(variable_reference);
+                debug(is_nil_test);
                 debug(regular_expression);
             }
         }
@@ -1380,6 +1425,8 @@ namespace client
         qi::rule<Iterator, expr<Iterator>(const MyContext*), qi::locals<OptWithPos<Iterator>, int>, spirit_encoding::space_type> scalar_variable_reference;
         // Rule to translate an identifier to a ConfigOption, or to fail.
         qi::rule<Iterator, OptWithPos<Iterator>(const MyContext*), spirit_encoding::space_type> variable_reference;
+        // Evaluating whether a nullable variable is nil.
+        qi::rule<Iterator, expr<Iterator>(const MyContext*), qi::locals<OptWithPos<Iterator>, int>, spirit_encoding::space_type> is_nil_test;
 
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, bool>, spirit_encoding::space_type> if_else_output;
 //        qi::rule<Iterator, std::string(const MyContext*), qi::locals<expr<Iterator>, bool, std::string>, spirit_encoding::space_type> switch_output;
