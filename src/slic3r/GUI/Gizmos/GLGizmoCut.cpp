@@ -200,7 +200,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     : GLGizmoBase(parent, icon_filename, sprite_id)
     , m_connectors_group_id (GrabberID::Count)
     , m_connector_type (CutConnectorType::Plug)
-    , m_connector_style (size_t(CutConnectorStyle::Prizm))
+    , m_connector_style (size_t(CutConnectorStyle::Prism))
     , m_connector_shape_id (size_t(CutConnectorShape::Circle))
 {
     m_modes = { _u8L("Planar")//, _u8L("Grid")
@@ -219,7 +219,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
         m_connector_types.push_back(type_label);
     }
 
-    m_connector_styles = { _u8L("Prizm"), _u8L("Frustum")
+    m_connector_styles = { _u8L("Prism"), _u8L("Frustum")
 //              , _u8L("Claw")
     };
 
@@ -245,15 +245,17 @@ std::string GLGizmoCut3D::get_tooltip() const
         double koef = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
         std::string unit_str = " " + (m_imperial_units ? _u8L("inch") : _u8L("mm"));
         const BoundingBoxf3& tbb = m_transformed_bounding_box;
+
+        const std::string name = m_keep_as_parts ? _u8L("Part") : _u8L("Object");
         if (tbb.max.z() >= 0.0) {
             double top = (tbb.min.z() <= 0.0 ? tbb.max.z() : tbb.size().z()) * koef;
-            tooltip += format(top, 2) + " " + unit_str + " (" + _u8L("Top part") + ")";
+            tooltip += format(static_cast<float>(top), 2) + " " + unit_str + " (" + name + " A)";
             if (tbb.min.z() <= 0.0)
                 tooltip += "\n";
         }
         if (tbb.min.z() <= 0.0) {
             double bottom = (tbb.max.z() <= 0.0 ? tbb.size().z() : (tbb.min.z() * (-1))) * koef;
-            tooltip += format(bottom, 2) + " " + unit_str + " (" + _u8L("Bottom part") + ")";
+            tooltip += format(static_cast<float>(bottom), 2) + " " + unit_str + " (" + name + " B)";
         }
         return tooltip;
     }
@@ -362,11 +364,8 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
 
 void GLGizmoCut3D::shift_cut(double delta)
 {
-    Vec3d starting_vec = m_rotation_m * Vec3d::UnitZ();
-    if (starting_vec.norm() != 0.0)
-        starting_vec.normalize();
     Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Move cut plane"), UndoRedo::SnapshotType::GizmoAction);
-    set_center(m_plane_center + starting_vec * delta, true);
+    set_center(m_plane_center + m_cut_normal * delta, true);
     m_ar_plane_center = m_plane_center;
 }
 
@@ -405,18 +404,15 @@ bool GLGizmoCut3D::is_looking_forward() const
 void GLGizmoCut3D::update_clipper()
 {
     // update cut_normal
-    Vec3d beg, end = beg = m_bb_center;
-    beg[Z] -= m_radius;
-    end[Z] += m_radius;
-
-    rotate_vec3d_around_plane_center(beg);
-    rotate_vec3d_around_plane_center(end);
-
-    // calculate normal for cut plane
-    Vec3d normal = m_cut_normal = end - beg;
+    Vec3d normal = m_rotation_m * Vec3d::UnitZ();
+    normal.normalize();
+    m_cut_normal = normal;
 
     // calculate normal and offset for clipping plane
-    normal.normalize();
+    Vec3d beg = m_bb_center;
+    beg[Z] -= m_radius;
+    rotate_vec3d_around_plane_center(beg);
+
     m_clp_normal  = normal;
     double offset = normal.dot(m_plane_center);
     double dist   = normal.dot(beg);
@@ -425,17 +421,13 @@ void GLGizmoCut3D::update_clipper()
 
     if (!is_looking_forward()) {
         // recalculate normal and offset for clipping plane, if camera is looking downward to cut plane
-        end = beg = m_bb_center;
-        beg[Z] += m_radius;
-        end[Z] -= m_radius;
-
-        rotate_vec3d_around_plane_center(beg);
-        rotate_vec3d_around_plane_center(end);
-
-        normal = end - beg;
-        if (normal == Vec3d::Zero())
-            return;
+        normal = m_rotation_m * (-1. * Vec3d::UnitZ());
         normal.normalize();
+
+        beg = m_bb_center;
+        beg[Z] += m_radius;
+        rotate_vec3d_around_plane_center(beg);
+
         m_clp_normal = normal;
         offset       = normal.dot(m_plane_center);
         dist         = normal.dot(beg);
@@ -910,7 +902,7 @@ void GLGizmoCut3D::on_set_state()
 
         update_bb();
         m_connectors_editing = !m_selected.empty();
-        m_transformed_bounding_box = transformed_bounding_box(m_plane_center);
+        m_transformed_bounding_box = transformed_bounding_box(m_plane_center, m_rotation_m);
 
         // initiate archived values
         m_ar_plane_center   = m_plane_center;
@@ -1011,9 +1003,11 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             // recalculate connector position to world position
             Vec3d pos = connector.pos + instance_offset;
             if (connector.attribs.type == CutConnectorType::Dowel &&
-                connector.attribs.style == CutConnectorStyle::Prizm) {
-                pos -= height * m_clp_normal;
-                height *= 2;
+                connector.attribs.style == CutConnectorStyle::Prism) {
+                if (is_looking_forward())
+                    pos -= static_cast<double>(height - 0.05f) * m_clp_normal;
+                else
+                    pos += 0.05 * m_clp_normal;
             }
             pos[Z] += sla_shift;
 
@@ -1344,7 +1338,8 @@ void GLGizmoCut3D::update_bb()
         on_unregister_raycasters_for_picking();
 
         clear_selection();
-        if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info())
+        if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info();
+            selection && selection->model_object())
             m_selected.resize(selection->model_object()->cut_connectors.size(), false);
     }
 }
@@ -1559,7 +1554,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
 
     m_imgui->disabled_begin(m_connector_type == CutConnectorType::Dowel);
     if (type_changed && m_connector_type == CutConnectorType::Dowel) {
-        m_connector_style = size_t(CutConnectorStyle::Prizm);
+        m_connector_style = size_t(CutConnectorStyle::Prism);
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
     }
     if (render_combo(_u8L("Style"), m_connector_styles, m_connector_style))
@@ -1611,7 +1606,7 @@ void GLGizmoCut3D::render_build_size()
                      ",  Z: " + double_to_string(tbb_sz.z() * koef, 2) + unit_str;
 
     ImGui::AlignTextToFramePadding();
-    m_imgui->text(_L("Build size"));
+    m_imgui->text(_L("Build Volume"));
     ImGui::SameLine(m_label_width);
     m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, size);
 }
@@ -1860,7 +1855,7 @@ void GLGizmoCut3D::validate_connector_settings()
     if (m_connector_type == CutConnectorType::Undef)
         m_connector_type = CutConnectorType::Plug;
     if (m_connector_style == size_t(CutConnectorStyle::Undef))
-        m_connector_style = size_t(CutConnectorStyle::Prizm);
+        m_connector_style = size_t(CutConnectorStyle::Prism);
     if (m_connector_shape_id == size_t(CutConnectorShape::Undef))
         m_connector_shape_id = size_t(CutConnectorShape::Circle);
 }
@@ -2096,12 +2091,20 @@ void GLGizmoCut3D::render_connectors()
 
         const Camera& camera = wxGetApp().plater()->get_camera();
         if (connector.attribs.type  == CutConnectorType::Dowel &&
-            connector.attribs.style == CutConnectorStyle::Prizm) {
-            if (is_looking_forward())
-                pos -= height * m_clp_normal;
-            else
-                pos += height * m_clp_normal;
-            height *= 2;
+            connector.attribs.style == CutConnectorStyle::Prism) {
+            if (m_connectors_editing) {
+                if (is_looking_forward())
+                    pos -= static_cast<double>(height-0.05f) * m_clp_normal;
+                else 
+                    pos += 0.05 * m_clp_normal;
+            }
+            else {
+                if (is_looking_forward())
+                    pos -= static_cast<double>(height) * m_clp_normal;
+                else
+                    pos += static_cast<double>(height) * m_clp_normal;
+                height *= 2;
+            }
         }
         else if (!is_looking_forward())
             pos += 0.05 * m_clp_normal;
@@ -2136,16 +2139,13 @@ void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, bool &create_dowel
             connector.rotation_m = m_rotation_m;
 
             if (connector.attribs.type == CutConnectorType::Dowel) {
-                if (connector.attribs.style == CutConnectorStyle::Prizm)
+                if (connector.attribs.style == CutConnectorStyle::Prism)
                     connector.height *= 2;
                 create_dowels_as_separate_object = true;
             }
             else {
                 // calculate shift of the connector center regarding to the position on the cut plane
-                Vec3d shifted_center = m_plane_center + Vec3d::UnitZ();
-                rotate_vec3d_around_plane_center(shifted_center);
-                Vec3d norm = (shifted_center - m_plane_center).normalized();
-                connector.pos += norm * 0.5 * double(connector.height);
+                connector.pos += m_cut_normal * 0.5 * double(connector.height);
             }
         }
         mo->apply_cut_connectors(_u8L("Connector"));
@@ -2255,7 +2255,7 @@ void GLGizmoCut3D::reset_connectors()
 void GLGizmoCut3D::init_connector_shapes()
 {
     for (const CutConnectorType& type : {CutConnectorType::Dowel, CutConnectorType::Plug})
-        for (const CutConnectorStyle& style : {CutConnectorStyle::Frustum, CutConnectorStyle::Prizm})
+        for (const CutConnectorStyle& style : {CutConnectorStyle::Frustum, CutConnectorStyle::Prism})
             for (const CutConnectorShape& shape : {CutConnectorShape::Circle, CutConnectorShape::Hexagon, CutConnectorShape::Square, CutConnectorShape::Triangle}) {
                 const CutConnectorAttributes attribs = { type, style, shape };
                 const indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);

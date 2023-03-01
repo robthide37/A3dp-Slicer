@@ -2060,10 +2060,10 @@ bool ObjectList::del_from_cut_object(bool is_cut_connector, bool is_model_part/*
                                is_model_part      ? _L("Delete solid part from object which is a part of cut") :
                                is_negative_volume ? _L("Delete negative volume from object which is a part of cut") : "";
                              
-    const wxString msg_end   = is_cut_connector   ? ("\n" + _L("To save cut correspondence you can delete all connectors from all related objects.")) : "";
+    const wxString msg_end   = is_cut_connector   ? ("\n" + _L("To save cut information you can delete all connectors from all related objects.")) : "";
 
     InfoDialog dialog(wxGetApp().plater(), title,
-                      _L("This action will break a cut correspondence.\n"
+                      _L("This action will break a cut information.\n"
                          "After that PrusaSlicer can't guarantee model consistency.\n"
                          "\n"
                          "To manipulate with solid parts or negative volumes you have to invalidate cut infornation first." + msg_end ),

@@ -521,7 +521,7 @@ void GLGizmoFdmSupports::auto_generate()
 {
     std::string err = wxGetApp().plater()->fff_print().validate();
     if (!err.empty()) {
-        MessageDialog dlg(GUI::wxGetApp().plater(), _L("Automatic painting requires valid print setup. \n") + from_u8(err), _L("Warning"), wxOK);
+        MessageDialog dlg(GUI::wxGetApp().plater(), _L("Automatic painting requires valid print setup.") + " \n" + from_u8(err), _L("Warning"), wxOK);
         dlg.ShowModal();
         return;
     }

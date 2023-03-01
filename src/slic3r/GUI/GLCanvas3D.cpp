@@ -140,7 +140,7 @@ void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
     // Maximum height of an object changes when the object gets rotated or scaled.
     // Changing maximum height of an object will invalidate the layer heigth editing profile.
     // m_model_object->bounding_box() is cached, therefore it is cheap even if this method is called frequently.
-    const float new_max_z = (model_object_new == nullptr) ? 0.0f : static_cast<float>(model_object_new->bounding_box().max.z());
+    const float new_max_z = (model_object_new == nullptr) ? 0.0f : static_cast<float>(model_object_new->max_z());
     if (m_model_object != model_object_new || this->last_object_id != object_id || m_object_max_z != new_max_z ||
         (model_object_new != nullptr && m_model_object->id() != model_object_new->id())) {
         m_layer_height_profile.clear();
@@ -1977,7 +1977,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
         if (extruders_count > 1 && wt && !co) {
             // Height of a print (Show at least a slab)
-            const double height = std::max(m_model->bounding_box().max.z(), 10.0);
+            const double height = std::max(m_model->max_z(), 10.0);
 
             const float x = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_x"))->value;
             const float y = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_y"))->value;
@@ -7126,12 +7126,10 @@ const ModelVolume *get_model_volume(const GLVolume &v, const Model &model)
 {
     const ModelVolume * ret = nullptr;
 
-    if (model.objects.size() < v.object_idx()) {
-        if (v.object_idx() < model.objects.size()) {
-            const ModelObject *obj = model.objects[v.object_idx()];
-            if (v.volume_idx() < obj->volumes.size()) {
-                ret = obj->volumes[v.volume_idx()];
-            }
+    if (v.object_idx() < model.objects.size()) {
+        const ModelObject *obj = model.objects[v.object_idx()];
+        if (v.volume_idx() < obj->volumes.size()) {
+            ret = obj->volumes[v.volume_idx()];
         }
     }
 
