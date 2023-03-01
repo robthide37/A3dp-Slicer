@@ -499,6 +499,10 @@ public:
         NONE = 0,
         // Synchronize after rotation by an axis not parallel with Z.
         GENERAL = 1,
+#if ENABLE_WORLD_COORDINATE
+        // Synchronize after rotation reset.
+        RESET = 2
+#endif // ENABLE_WORLD_COORDINATE
     };
     void synchronize_unselected_instances(SyncRotationType sync_rotation_type);
     void synchronize_unselected_volumes();
@@ -512,7 +516,7 @@ private:
     void paste_objects_from_clipboard();
 
 #if ENABLE_WORLD_COORDINATE
-    void transform_instance_relative_world(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
+    void transform_instance_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
         const Transform3d& transform, const Vec3d& world_pivot);
     void transform_volume_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
         const Transform3d& transform, const Vec3d& world_pivot);
