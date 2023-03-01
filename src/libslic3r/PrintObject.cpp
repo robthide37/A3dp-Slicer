@@ -774,8 +774,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "wall_transition_angle"
             || opt_key == "wall_distribution_count"
             || opt_key == "min_feature_size"
-            || opt_key == "min_bead_width"
-            || opt_key == "ensure_vertical_shell_infill") {
+            || opt_key == "min_bead_width") {
             steps.emplace_back(posSlice);
         } else if (
                opt_key == "seam_position"
@@ -1774,6 +1773,20 @@ void PrintObject::bridge_over_infill()
                     return a.min.x() < b.min.x();
                 });
 
+                std::unordered_map<const LayerRegion *, std::pair<Polygons, Polygons>> infill_and_deep_infill_polygons_per_region;
+                for (const auto &surface_region : surface_to_region) {
+                    const LayerRegion *r = surface_region.second;
+                    if (infill_and_deep_infill_polygons_per_region.find(r) == infill_and_deep_infill_polygons_per_region.end()) {
+                        const Flow &flow                 = r->bridging_flow(frSolidInfill, true);
+                        Polygons    infill_region        = to_polygons(r->fill_expolygons());
+                        Polygons    deep_infill_area     = closing(infill_region, scale_(0.01), scale_(0.01) + 4.0 * flow.scaled_spacing());
+                        Polygons    solid_supported_area = expand(not_sparse_infill, 4.0 * flow.scaled_spacing());
+                        infill_and_deep_infill_polygons_per_region[r] = {closing(infill_region, scale_(0.1)),
+                                                                         intersection(lower_layers_sparse_infill,
+                                                                                      diff(deep_infill_area, solid_supported_area))};
+                    }
+                }
+
                 // Lower layers sparse infill sections gathered
                 // now we can intersected them with bridging surface candidates to get actual areas that need and can accumulate
                 // bridging. These areas we then expand (within the surrounding sparse infill only!)
@@ -1781,25 +1794,16 @@ void PrintObject::bridge_over_infill()
                 for (const Surface *candidate : candidates.second) {
                     const Flow &flow = surface_to_region[candidate]->bridging_flow(frSolidInfill, true);
                     assert(candidate->surface_type == stInternalSolid);
-                    Polygons bridged_area               = expand(to_polygons(candidate->expolygon), flow.scaled_spacing());
-                    Polygons infill_region              = to_polygons(surface_to_region[candidate]->fill_expolygons());
 
-                    bridged_area =
-                        intersection(bridged_area,
-                                     lower_layers_sparse_infill); // cut off parts which are not over sparse infill - material overflow
-
-                    {
-                        Polygons area_without_perimeter_boundary_sections     = intersection(bridged_area,
-                                                                                             closing(infill_region, flow.scaled_width(),
-                                                                                                     flow.scaled_width() +
-                                                                                                         4.0 * flow.scaled_spacing()));
-                        Polygons and_further_without_solid_supported_sections = diff(area_without_perimeter_boundary_sections,
-                                                                                     expand(not_sparse_infill, 4.0 * flow.scaled_spacing()));
-
-                        if (and_further_without_solid_supported_sections.empty()) {
-                            continue;
-                        }
+                    Polygons bridged_area = intersection(expand(to_polygons(candidate->expolygon), flow.scaled_spacing()),
+                                                         infill_and_deep_infill_polygons_per_region[surface_to_region[candidate]].first);
+                    // cut off parts which are not over sparse infill - material overflow
+                    Polygons worth_bridging = intersection(bridged_area,
+                                                           infill_and_deep_infill_polygons_per_region[surface_to_region[candidate]].second);
+                    if (worth_bridging.empty()) {
+                        continue;
                     }
+                    bridged_area = intersection(bridged_area, expand(worth_bridging, 5.0 * flow.scaled_spacing()));
 
                     Polygons max_area = expand_area;
                     max_area.insert(max_area.end(), bridged_area.begin(), bridged_area.end());
@@ -2133,7 +2137,9 @@ void PrintObject::bridge_over_infill()
                                     if (s.original_surface == &surface) {
                                         Surface tmp(surface, {});
                                         for (const ExPolygon &expoly : diff_ex(surface.expolygon, s.new_polys)) {
-                                            new_surfaces.emplace_back(tmp, expoly);
+                                            if (expoly.area() > region->flow(frSolidInfill).scaled_width() * scale_(4.0)) {
+                                                new_surfaces.emplace_back(tmp, expoly);
+                                            }
                                         }
                                         tmp.surface_type = stInternalBridge;
                                         tmp.bridge_angle = s.bridge_angle;
