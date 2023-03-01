@@ -5016,8 +5016,10 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
         // frequently enough, we call render() here directly when we can.
         render();
         assert(m_initialized);
-        if (requires_reload_scene)
-            reload_scene(true);
+        if (requires_reload_scene) {
+            if (wxGetApp().plater()->is_view3D_shown())
+                reload_scene(true);
+        }
     }
 }
 
