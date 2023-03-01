@@ -643,15 +643,7 @@ ModelObject& ModelObject::assign_copy(const ModelObject &rhs)
     this->printable                   = rhs.printable;
     this->origin_translation          = rhs.origin_translation;
     this->cut_id.copy(rhs.cut_id);
-    m_bounding_box_approx             = rhs.m_bounding_box_approx;
-    m_bounding_box_approx_valid       = rhs.m_bounding_box_approx_valid;
-    m_bounding_box_exact              = rhs.m_bounding_box_exact;
-    m_bounding_box_exact_valid        = rhs.m_bounding_box_exact_valid;
-    m_min_max_z_valid                 = rhs.m_min_max_z_valid;
-    m_raw_bounding_box                = rhs.m_raw_bounding_box;
-    m_raw_bounding_box_valid          = rhs.m_raw_bounding_box_valid;
-    m_raw_mesh_bounding_box           = rhs.m_raw_mesh_bounding_box;
-    m_raw_mesh_bounding_box_valid     = rhs.m_raw_mesh_bounding_box_valid;
+    this->copy_transformation_caches(rhs);
 
     this->clear_volumes();
     this->volumes.reserve(rhs.volumes.size());
@@ -687,15 +679,7 @@ ModelObject& ModelObject::assign_copy(ModelObject &&rhs)
     this->layer_height_profile        = std::move(rhs.layer_height_profile);
     this->printable                   = std::move(rhs.printable);
     this->origin_translation          = std::move(rhs.origin_translation);
-    m_bounding_box_approx             = std::move(rhs.m_bounding_box_approx);
-    m_bounding_box_approx_valid       = std::move(rhs.m_bounding_box_approx_valid);
-    m_bounding_box_exact              = std::move(rhs.m_bounding_box_exact);
-    m_bounding_box_exact_valid        = std::move(rhs.m_bounding_box_exact_valid);
-    m_min_max_z_valid                 = rhs.m_min_max_z_valid;
-    m_raw_bounding_box                = rhs.m_raw_bounding_box;
-    m_raw_bounding_box_valid          = rhs.m_raw_bounding_box_valid;
-    m_raw_mesh_bounding_box           = rhs.m_raw_mesh_bounding_box;
-    m_raw_mesh_bounding_box_valid     = rhs.m_raw_mesh_bounding_box_valid;
+    this->copy_transformation_caches(rhs);
 
     this->clear_volumes();
 	this->volumes = std::move(rhs.volumes);
