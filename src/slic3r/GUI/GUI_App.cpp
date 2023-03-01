@@ -480,6 +480,8 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_TEX */     { "Texture"sv,         { ".png"sv, ".svg"sv } },
 
     /* FT_SL1 */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv, ".pwmx"sv } },
+
+    /* FT_ZIP */     { "Zip files"sv, { ".zip"sv } },
 };
 
 #if ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
@@ -1975,6 +1977,17 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
 
     if (dialog.ShowModal() == wxID_OK)
         dialog.GetPaths(input_files);
+}
+
+void GUI_App::import_zip(wxWindow* parent, wxString& input_file) const
+{
+    wxFileDialog dialog(parent ? parent : GetTopWindow(),
+        _L("Choose ZIP file:"),
+        from_u8(app_config->get_last_dir()), "",
+        file_wildcards(FT_ZIP), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+    if (dialog.ShowModal() == wxID_OK)
+        input_file = dialog.GetPath();
 }
 
 void GUI_App::load_gcode(wxWindow* parent, wxString& input_file) const

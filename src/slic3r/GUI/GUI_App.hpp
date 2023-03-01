@@ -73,6 +73,8 @@ enum FileType
 
     FT_SL1,
 
+    FT_ZIP,
+
     FT_SIZE,
 };
 
@@ -252,6 +254,7 @@ public:
     void            keyboard_shortcuts();
     void            load_project(wxWindow *parent, wxString& input_file) const;
     void            import_model(wxWindow *parent, wxArrayString& input_files) const;
+    void            import_zip(wxWindow* parent, wxString& input_file) const;
     void            load_gcode(wxWindow* parent, wxString& input_file) const;
 
     static bool     catch_error(std::function<void()> cb, const std::string& err);
