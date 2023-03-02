@@ -193,6 +193,7 @@ namespace Emboss
     /// Z-rotation as angle to Y axis(FontProp::angle)</param>
     /// <param name="transformation">In / Out transformation to modify by property</param>
     void apply_transformation(const FontProp &font_prop, Transform3d &transformation);
+    void apply_transformation(const std::optional<float> &angle, const std::optional<float> &distance, Transform3d &transformation);
 
     /// <summary>
     /// Read information from naming table of font file

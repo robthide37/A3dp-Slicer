@@ -3366,9 +3366,11 @@ void Selection::transform_volume_relative(GLVolume& volume, const VolumeCache& v
 
 ModelVolume *get_selected_volume(const Selection &selection)
 {
-    const GLVolume *vol_gl = get_selected_gl_volume(selection);
+    const GLVolume *gl_volume = get_selected_gl_volume(selection);
+    if (gl_volume == nullptr)
+        return nullptr;
     const ModelObjectPtrs &objects = selection.get_model()->objects;
-    return get_model_volume(*vol_gl, objects);
+    return get_model_volume(*gl_volume, objects);
 }
 
 const GLVolume *get_selected_gl_volume(const Selection &selection)

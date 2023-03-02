@@ -325,9 +325,13 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
     if (!m_dragging) return used;
 
     if (mouse_event.Dragging()) {
-        auto &angle_opt = m_volume->text_configuration->style.prop.angle;
-        if (!m_rotate_start_angle.has_value())
-            m_rotate_start_angle = angle_opt.has_value() ? *angle_opt : 0.f;        
+        if (!m_rotate_start_angle.has_value()) {
+            // when m_rotate_start_angle is not set mean it is not Dragging
+            // when angle_opt is not set mean angle is Zero
+            const std::optional<float> &angle_opt = m_style_manager.get_font_prop().angle;
+            m_rotate_start_angle = angle_opt.has_value() ? *angle_opt : 0.f;
+        }
+
         double angle = m_rotate_gizmo.get_angle();
         angle -= PI / 2; // Grabber is upward
 
@@ -339,18 +343,15 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         angle += *m_rotate_start_angle;
         // move to range <-M_PI, M_PI>
         priv::to_range_pi_pi(angle);
-        // propagate angle into property
-        angle_opt = static_cast<float>(angle);
-
-        // do not store zero
-        if (is_approx(*angle_opt, 0.f))
-            angle_opt.reset();        
 
         // set into activ style
         assert(m_style_manager.is_active_font());
-        if (m_style_manager.is_active_font())
+        if (m_style_manager.is_active_font()) {
+            std::optional<float> angle_opt;
+            if (!is_approx(angle, 0.))
+                angle_opt = angle;
             m_style_manager.get_font_prop().angle = angle_opt;
-
+        }
     }
     return used;
 }
@@ -361,9 +362,11 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     if (m_volume == nullptr)
         return false;
     
+    std::optional<double> up_limit;
+    if (m_keep_up)        up_limit = priv::up_limit;
     const Camera &camera = wxGetApp().plater()->get_camera();
     bool was_dragging = m_surface_drag.has_value();
-    bool res = on_mouse_surface_drag(mouse_event, camera, m_surface_drag, m_parent, m_raycast_manager);
+    bool res = on_mouse_surface_drag(mouse_event, camera, m_surface_drag, m_parent, m_raycast_manager, up_limit);
     bool is_dragging = m_surface_drag.has_value();
 
     // End with surface dragging?
@@ -387,6 +390,17 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     else if (was_dragging && is_dragging) {
         // update scale of selected volume --> should be approx the same
         calculate_scale();
+
+        // Recalculate angle for GUI
+        if (!m_keep_up) { 
+            const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
+            assert(gl_volume != nullptr);
+            assert(m_style_manager.is_active_font());
+            if (gl_volume == nullptr || !m_style_manager.is_active_font())
+                return res;
+
+            m_style_manager.get_style().prop.angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
+        }
     }
     return res;
 }
@@ -693,6 +707,13 @@ void GLGizmoEmboss::on_stop_dragging()
     // apply rotation
     m_parent.do_rotate(L("Text-Rotate"));
 
+    // Re-Calculate current angle of up vector
+    const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
+    assert(m_style_manager.is_active_font());
+    assert(gl_volume != nullptr);
+    if (m_style_manager.is_active_font() && gl_volume != nullptr) 
+        m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
+
     m_rotate_start_angle.reset();
 
     // recalculate for surface cut
@@ -723,32 +744,37 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
     int count_letter_M_in_input = 12;
     cfg.input_width = letter_m_size.x * count_letter_M_in_input;
     GuiCfg::Translations &tr = cfg.translations;
-    tr.font  = _u8L("Font");
-    tr.size  = _u8L("Height");
-    tr.depth = _u8L("Depth");
+
+    tr.font   = _u8L("Font");
+    tr.height = _u8L("Height");
+    tr.depth  = _u8L("Depth");
+
     float max_text_width = std::max({
         ImGui::CalcTextSize(tr.font.c_str()).x,
-        ImGui::CalcTextSize(tr.size.c_str()).x,
+        ImGui::CalcTextSize(tr.height.c_str()).x,
         ImGui::CalcTextSize(tr.depth.c_str()).x});
     cfg.indent       = static_cast<float>(cfg.icon_width);
     cfg.input_offset = style.WindowPadding.x + cfg.indent + max_text_width + space;
 
-    tr.use_surface = _u8L("Use surface");
-    tr.char_gap = _u8L("Char gap");
-    tr.line_gap = _u8L("Line gap");
-    tr.boldness = _u8L("Boldness");
-    tr.italic = _u8L("Skew ratio");
-    tr.surface_distance = _u8L("Z-move");
-    tr.angle = _u8L("Z-rot");
-    tr.collection = _u8L("Collection");
+    tr.use_surface  = _u8L("Use surface");
+    tr.char_gap     = _u8L("Char gap");
+    tr.line_gap     = _u8L("Line gap");
+    tr.boldness     = _u8L("Boldness");
+    tr.skew_ration  = _u8L("Skew ratio");
+    tr.from_surface = _u8L("From surface");
+    tr.rotation     = _u8L("Rotation");
+    tr.keep_up      = _u8L("Keep Up");
+    tr.collection   = _u8L("Collection");
+
     float max_advanced_text_width = std::max({
         ImGui::CalcTextSize(tr.use_surface.c_str()).x,
         ImGui::CalcTextSize(tr.char_gap.c_str()).x,
         ImGui::CalcTextSize(tr.line_gap.c_str()).x,
         ImGui::CalcTextSize(tr.boldness.c_str()).x,
-        ImGui::CalcTextSize(tr.italic.c_str()).x,
-        ImGui::CalcTextSize(tr.surface_distance.c_str()).x,
-        ImGui::CalcTextSize(tr.angle.c_str()).x,
+        ImGui::CalcTextSize(tr.skew_ration.c_str()).x,
+        ImGui::CalcTextSize(tr.from_surface.c_str()).x,
+        ImGui::CalcTextSize(tr.rotation.c_str()).x,
+        ImGui::CalcTextSize(tr.keep_up.c_str()).x,
         ImGui::CalcTextSize(tr.collection.c_str()).x });
     cfg.advanced_input_offset = max_advanced_text_width
         + 3 * space + cfg.indent;
@@ -774,9 +800,9 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
         + 2 * (cfg.icon_width + space);
     cfg.minimal_window_size = ImVec2(window_width, window_height);
 
-    // 6 = charGap, LineGap, Bold, italic, surfDist, angle
+    // 9 = useSurface, charGap, lineGap, bold, italic, surfDist, rotation, keepUp, textFaceToCamera
     // 4 = 1px for fix each edit image of drag float 
-    float advance_height = input_height * 8 + 8;
+    float advance_height = input_height * 9 + 8;
     cfg.minimal_window_size_with_advance =
         ImVec2(cfg.minimal_window_size.x,
                cfg.minimal_window_size.y + advance_height);
@@ -867,9 +893,17 @@ void GLGizmoEmboss::set_default_text(){ m_text = _u8L("Embossed text"); }
 void GLGizmoEmboss::set_volume_by_selection()
 {
     const Selection &selection = m_parent.get_selection();
-    ModelVolume *vol = get_selected_volume(selection);
-    // is same volume selected?
-    if (vol != nullptr && vol->id() == m_volume_id) 
+    const GLVolume *gl_volume = get_selected_gl_volume(selection);
+    if (gl_volume == nullptr)
+        return reset_volume();
+
+    const ModelObjectPtrs &objects = selection.get_model()->objects;
+    ModelVolume *volume =get_model_volume(*gl_volume, objects);
+    if (volume == nullptr)
+        return reset_volume();
+
+    // is same volume as actual selected?
+    if (volume->id() == m_volume_id)
         return;
 
     // for changed volume notification is NOT valid
@@ -877,30 +911,14 @@ void GLGizmoEmboss::set_volume_by_selection()
 
     // Do not use focused input value when switch volume(it must swith value)
     if (m_volume != nullptr && 
-        m_volume != vol) // when update volume it changed id BUT not pointer
+        m_volume != volume) // when update volume it changed id BUT not pointer
         ImGuiWrapper::left_inputs();
 
-    if (vol == nullptr) {
-        reset_volume();
-        return;
-    }
+    // Is selected volume text volume?
+    const std::optional<TextConfiguration>& tc_opt = volume->text_configuration;
+    if (!tc_opt.has_value()) 
+        return reset_volume();
 
-    // is select embossed volume?
-    set_volume(vol);
-
-    // Check if user changed up vector by rotation or scale out of emboss gizmo
-    if (m_volume != nullptr) {
-        Transform3d world = selection.get_first_volume()->world_matrix();
-        std::optional<float> angle = calc_up(world, priv::up_limit);
-        m_volume->text_configuration->style.prop.angle = angle;
-    }
-}
-
-bool GLGizmoEmboss::set_volume(ModelVolume *volume)
-{
-    assert(volume != nullptr);
-    const std::optional<TextConfiguration> tc_opt = volume->text_configuration;
-    if (!tc_opt.has_value()) return false;
     const TextConfiguration &tc = *tc_opt;
     const EmbossStyle    &style = tc.style;
 
@@ -992,7 +1010,7 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
         
     // The change of volume could show or hide part with setter on volume type
     if (m_volume == nullptr || 
-        get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr ||
+        get_model_volume(m_volume_id, objects) == nullptr ||
         (m_volume->get_object()->volumes.size() == 1) != 
         (volume->get_object()->volumes.size() == 1)){
         m_should_set_minimal_windows_size = true;
@@ -1008,9 +1026,13 @@ bool GLGizmoEmboss::set_volume(ModelVolume *volume)
     m_volume = volume;
     m_volume_id = volume->id();
 
+    // Calculate current angle of up vector
+    assert(m_style_manager.is_active_font());
+    if (m_style_manager.is_active_font()) 
+        m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), priv::up_limit);    
+
     // calculate scale for height and depth inside of scaled object instance
-    calculate_scale();
-    return true;
+    calculate_scale();    
 }
 
 void GLGizmoEmboss::reset_volume()
@@ -1020,9 +1042,9 @@ void GLGizmoEmboss::reset_volume()
 
     m_volume = nullptr;
     m_volume_id.id = 0;
-    // TODO: check if it is neccessary to set default text
-    // Idea is to set default text when create object
-    set_default_text();
+
+    // No more need of current notification
+    remove_notification_not_valid_font();
 }
 
 void GLGizmoEmboss::calculate_scale() {
@@ -2677,7 +2699,7 @@ void GLGizmoEmboss::draw_height(bool use_inch)
     const float *stored = ((stored_style)? &stored_style->prop.size_in_mm : nullptr);
     const char *size_format = ((use_inch) ? "%.2f in" : "%.1f mm");
     const std::string revert_text_size = _u8L("Revert text size.");
-    const std::string& name = m_gui_cfg->translations.size;
+    const std::string& name = m_gui_cfg->translations.height;
     if (rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, m_scale_height))
         if (set_height())
             process();
@@ -2915,7 +2937,7 @@ void GLGizmoEmboss::draw_advanced()
     // input italic
     auto def_skew = stored_style ?
         &stored_style->prop.skew : nullptr;
-    if (rev_slider(tr.italic, font_prop.skew, def_skew, _u8L("Undo letter's skew"),
+    if (rev_slider(tr.skew_ration, font_prop.skew, def_skew, _u8L("Undo letter's skew"),
         priv::limits.skew.gui.min, priv::limits.skew.gui.max, "%.2f", _L("Italic strength ratio"))){
         if (!priv::Limits::apply(font_prop.skew, priv::limits.skew.values) ||
             !m_volume->text_configuration->style.prop.skew.has_value() ||
@@ -2949,7 +2971,7 @@ void GLGizmoEmboss::draw_advanced()
         }
         min_distance *= ObjectManipulation::mm_to_in;
         max_distance *= ObjectManipulation::mm_to_in;
-        if (rev_slider(tr.surface_distance, distance_inch, def_distance, undo_move_tooltip, min_distance, max_distance, "%.3f in", move_tooltip)) {
+        if (rev_slider(tr.from_surface, distance_inch, def_distance, undo_move_tooltip, min_distance, max_distance, "%.3f in", move_tooltip)) {
             if (distance_inch.has_value()) {
                 font_prop.distance = *distance_inch * ObjectManipulation::in_to_mm;
             } else {
@@ -2958,7 +2980,7 @@ void GLGizmoEmboss::draw_advanced()
             is_moved = true;
         }
     } else {
-        if (rev_slider(tr.surface_distance, distance, def_distance, undo_move_tooltip, 
+        if (rev_slider(tr.from_surface, distance, def_distance, undo_move_tooltip, 
         min_distance, max_distance, "%.2f mm", move_tooltip)) is_moved = true;
     }
 
@@ -2971,32 +2993,49 @@ void GLGizmoEmboss::draw_advanced()
 
     // slider for Clock-wise angle in degress
     // stored angle is optional CCW and in radians
-    std::optional<float> &angle = font_prop.angle;
-    float prev_angle = angle.has_value() ? *angle : .0f;
     // Convert stored value to degress
     // minus create clock-wise roation from CCW
-    float angle_deg = angle.has_value() ?
-        static_cast<float>(-(*angle) * 180 / M_PI) : .0f;
+    const std::optional<float> &angle_opt = m_style_manager.get_font_prop().angle;
+    float angle = angle_opt.has_value() ? *angle_opt: 0.f;
+    float angle_deg = static_cast<float>(-angle * 180 / M_PI);
     float def_angle_deg_val = 
         (!stored_style || !stored_style->prop.angle.has_value()) ?
         0.f : (*stored_style->prop.angle * -180 / M_PI);
     float* def_angle_deg = stored_style ?
         &def_angle_deg_val : nullptr;
-    if (rev_slider(tr.angle, angle_deg, def_angle_deg, _u8L("Undo rotation"), 
+    if (rev_slider(tr.rotation, angle_deg, def_angle_deg, _u8L("Undo rotation"), 
         priv::limits.angle.min, priv::limits.angle.max, u8"%.2f °",
                    _L("Rotate text Clock-wise."))) {
         // convert back to radians and CCW
-        angle = -angle_deg * M_PI / 180.0;
-        priv::to_range_pi_pi(*angle);
-        if (is_approx(*angle, 0.f))
-            angle.reset();
+        float angle_rad = static_cast<float>(-angle_deg * M_PI / 180.0);
+        priv::to_range_pi_pi(angle_rad);
+                
+
+        float diff_angle = angle_rad - angle;
+        do_rotate(diff_angle);
         
-        m_volume->text_configuration->style.prop.angle = angle;
-        float act_angle = angle.has_value() ? *angle : .0f;
-        do_rotate(act_angle - prev_angle);
+        // calc angle after rotation
+        const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
+        assert(gl_volume != nullptr);
+        assert(m_style_manager.is_active_font());
+        if (m_style_manager.is_active_font() && gl_volume != nullptr) 
+            m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
+        
         // recalculate for surface cut
-        if (font_prop.use_surface) process();
+        if (font_prop.use_surface) 
+            process();
     }
+
+    ImGui::Text("%s", tr.keep_up.c_str());
+    ImGui::SameLine(m_gui_cfg->advanced_input_offset);
+    if (ImGui::Checkbox("##keep_up", &m_keep_up)) {
+        if (m_keep_up) {
+            // copy angle to volume
+            m_volume->text_configuration->style.prop.angle = font_prop.angle;
+        }
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Keep text orientation during surface dragging.\nNot stable between horizontal and vertical alignment.").c_str());    
 
     // when more collection add selector
     if (ff.font_file->infos.size() > 1) {

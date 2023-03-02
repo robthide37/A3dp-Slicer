@@ -83,8 +83,6 @@ private:
     void set_default_text();
 
     void set_volume_by_selection();
-    // load text configuration from volume into gizmo
-    bool set_volume(ModelVolume *volume); 
     void reset_volume();
 
     // create volume from text - main functionality
@@ -198,7 +196,7 @@ private:
         struct Translations
         {
             std::string font;
-            std::string size;
+            std::string height;
             std::string depth;
             std::string use_surface;
 
@@ -206,9 +204,10 @@ private:
             std::string char_gap;
             std::string line_gap;
             std::string boldness;
-            std::string italic;
-            std::string surface_distance;
-            std::string angle;
+            std::string skew_ration;
+            std::string from_surface;
+            std::string rotation;
+            std::string keep_up;
             std::string collection;
         };
         Translations translations;
@@ -286,7 +285,10 @@ private:
     static void init_truncated_names(Facenames &face_names, float max_width);
 
     // Text to emboss
-    std::string m_text;
+    std::string m_text; // Sequence of Unicode UTF8 symbols
+
+    // When true keep up vector otherwise relative rotation
+    bool m_keep_up = true;
 
     // current selected volume 
     // NOTE: Be carefull could be uninitialized (removed from Model)

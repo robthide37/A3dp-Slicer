@@ -1264,15 +1264,17 @@ ExPolygons Emboss::text2shapes(FontFileWithCache    &font_with_cache,
     return result;
 }
 
-void Emboss::apply_transformation(const FontProp &font_prop,
-                                  Transform3d    &transformation)
-{
-    if (font_prop.angle.has_value()) {
-        double angle_z = *font_prop.angle;
+void Emboss::apply_transformation(const FontProp &font_prop, Transform3d &transformation){
+    apply_transformation(font_prop.angle, font_prop.distance, transformation);
+}
+
+void Emboss::apply_transformation(const std::optional<float>& angle, const std::optional<float>& distance, Transform3d &transformation) {
+    if (angle.has_value()) {
+        double angle_z = *angle;
         transformation *= Eigen::AngleAxisd(angle_z, Vec3d::UnitZ());
     }
-    if (font_prop.distance.has_value()) {
-        Vec3d translate = Vec3d::UnitZ() * (*font_prop.distance);
+    if (distance.has_value()) {
+        Vec3d translate = Vec3d::UnitZ() * (*distance);
         transformation.translate(translate);
     }
 }
@@ -1583,7 +1585,7 @@ std::optional<float> Emboss::calc_up(const Transform3d &tr, double up_limit)
     m.row(2) = normal;
     double det = m.determinant();
 
-    return atan2(det, dot);
+    return -atan2(det, dot);
 }
 
 Transform3d Emboss::create_transformation_onto_surface(const Vec3d &position,

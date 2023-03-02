@@ -69,7 +69,8 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
                            const Camera               &camera,
                            std::optional<SurfaceDrag> &surface_drag,
                            GLCanvas3D                 &canvas,
-                           RaycastManager             &raycast_manager)
+                           RaycastManager             &raycast_manager,
+                           std::optional<double>       up_limit)
 {
     // Fix when leave window during dragging
     // Fix when click right button
@@ -153,7 +154,10 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         Transform3d instance_tr     = instance->get_matrix();
         Transform3d instance_tr_inv = instance_tr.inverse();
         Transform3d world_tr        = instance_tr * volume_tr;
-        surface_drag                = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume, condition};
+        std::optional<float> start_angle;
+        if (up_limit.has_value())
+            start_angle = Emboss::calc_up(world_tr, *up_limit);        
+        surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume, condition, start_angle};
 
         // disable moving with object by mouse
         canvas.enable_moving(false);
@@ -195,11 +199,11 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         Transform3d world_new        = z_rotation * surface_drag->world;
         auto        world_new_linear = world_new.linear();
 
-        // Fix direction of up vector
-        {
+        // Fix direction of up vector to zero initial rotation
+        if(up_limit.has_value()){
             Vec3d z_world = world_new_linear.col(2);
             z_world.normalize();
-            Vec3d wanted_up = Emboss::suggest_up(z_world);
+            Vec3d wanted_up = Emboss::suggest_up(z_world, *up_limit);
 
             Vec3d y_world    = world_new_linear.col(1);
             auto  y_rotation = Eigen::Quaternion<double, Eigen::DontAlign>::FromTwoVectors(y_world, wanted_up);
@@ -229,7 +233,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
                 volume_new = volume_new * (*tc.fix_3mf_tr);
 
             // apply move in Z direction and rotation by up vector
-            Emboss::apply_transformation(tc.style.prop, volume_new);
+            Emboss::apply_transformation(surface_drag->start_angle, tc.style.prop.distance, volume_new);
         }
 
         // Update transformation for all instances

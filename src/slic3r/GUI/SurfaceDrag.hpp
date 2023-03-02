@@ -34,6 +34,9 @@ struct SurfaceDrag
     // condition for raycaster
     RaycastManager::AllowVolumes condition;
 
+    // initial rotation in Z axis of volume
+    std::optional<float> start_angle;
+
     // Flag whether coordinate hit some volume
     bool exist_hit = true;
 };
@@ -48,12 +51,14 @@ struct SurfaceDrag
 /// <param name="canvas">Contain gl_volumes and selection</param>
 /// <param name="raycast_manager">AABB trees for raycast in object
 /// Refresh state inside of function </param>
+/// <param name="up_limit">When set than use correction of up vector</param>
 /// <returns>True when event is processed otherwise false</returns>
 bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
                            const Camera               &camera,
                            std::optional<SurfaceDrag> &surface_drag,
                            GLCanvas3D                 &canvas,
-                           RaycastManager             &raycast_manager);
+                           RaycastManager             &raycast_manager,
+                           std::optional<double>       up_limit = {});
 
 /// <summary>
 /// Calculate translation of volume onto surface of model
