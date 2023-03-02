@@ -491,9 +491,8 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
         if (const std::vector<Polygons> &outlines = m_layer_outlines[outline_idx].second; ! outlines.empty()) {
             const TreeSupportMeshGroupSettings  &settings = m_layer_outlines[outline_idx].first;
             const coord_t       layer_height              = settings.layer_height;
-            const coord_t       z_distance_bottom         = settings.support_bottom_distance;
-            const int           z_distance_bottom_layers  = round_up_divide<int>(z_distance_bottom, layer_height);
-            const int           z_distance_top_layers     = round_up_divide<int>(settings.support_top_distance, layer_height);
+            const int           z_distance_bottom_layers  = int(round(double(settings.support_bottom_distance) / double(layer_height)));
+            const int           z_distance_top_layers     = int(round(double(settings.support_top_distance) / double(layer_height)));
             const LayerIndex    max_required_layer        = std::min<LayerIndex>(outlines.size(), max_layer_idx + std::max(coord_t(1), z_distance_top_layers));
             const LayerIndex    min_layer_bottom          = std::max<LayerIndex>(0, min_layer_last - int(z_distance_bottom_layers));
             const coord_t       xy_distance               = outline_idx == m_current_outline_idx ? m_current_min_xy_dist : 
