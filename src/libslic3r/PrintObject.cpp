@@ -26,6 +26,7 @@
 #include "Fill/FillAdaptive.hpp"
 #include "Fill/FillLightning.hpp"
 #include "Format/STL.hpp"
+#include "SupportMaterial.hpp"
 #include "SupportSpotsGenerator.hpp"
 #include "TriangleSelectorWrapper.hpp"
 #include "format.hpp"
@@ -784,8 +785,10 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_material_interface_speed"
             || opt_key == "bridge_speed"
             || opt_key == "enable_dynamic_overhang_speeds"
-            || opt_key == "overhang_overlap_levels"
-            || opt_key == "dynamic_overhang_speeds"
+            || opt_key == "overhang_speed_0"
+            || opt_key == "overhang_speed_1"
+            || opt_key == "overhang_speed_2"
+            || opt_key == "overhang_speed_3"
             || opt_key == "external_perimeter_speed"
             || opt_key == "infill_speed"
             || opt_key == "perimeter_speed"
@@ -1151,6 +1154,15 @@ void PrintObject::process_external_surfaces()
         );
         m_print->throw_if_canceled();
         BOOST_LOG_TRIVIAL(debug) << "Processing external surfaces for region " << region_id << " in parallel - end";
+    }
+
+    if (this->has_raft() && ! m_layers.empty()) {
+        // Adjust bridge direction of 1st object layer over raft to be perpendicular to the raft contact layer direction.
+        Layer &layer = *m_layers.front();
+        assert(layer.id() > 0);
+        for (LayerRegion *layerm : layer.regions())
+            for (Surface &fill : layerm->m_fill_surfaces)
+                fill.bridge_angle = -1;
     }
 } // void PrintObject::process_external_surfaces()
 

@@ -80,8 +80,8 @@ TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings& mes
       xy_min_distance(std::min(mesh_group_settings.support_xy_distance, mesh_group_settings.support_xy_distance_overhang)),
       bp_radius(mesh_group_settings.support_tree_bp_diameter / 2),
       diameter_scale_bp_radius(std::min(sin(0.7) * layer_height / branch_radius, 1.0 / (branch_radius / (support_line_width / 2.0)))), // Either 40? or as much as possible so that 2 lines will overlap by at least 50%, whichever is smaller.
-      z_distance_top_layers(round_up_divide(mesh_group_settings.support_top_distance, layer_height)),
-      z_distance_bottom_layers(round_up_divide(mesh_group_settings.support_bottom_distance, layer_height)),
+      z_distance_bottom_layers(size_t(round(double(mesh_group_settings.support_bottom_distance) / double(layer_height)))),
+      z_distance_top_layers(size_t(round(double(mesh_group_settings.support_top_distance) / double(layer_height)))),
       performance_interface_skip_layers(round_up_divide(mesh_group_settings.support_interface_skip_height, layer_height)),
 //              support_infill_angles(mesh_group_settings.support_infill_angles),
       support_roof_angles(mesh_group_settings.support_roof_angles),

@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <iterator>
 #include <limits>
 #include <numeric>
 #include <unordered_map>
@@ -238,6 +239,7 @@ struct ProcessedPoint
 {
     Point p;
     float speed = 1.0f;
+    int fan_speed = 0;
 };
 
 class ExtrusionQualityEstimator
@@ -257,34 +259,27 @@ public:
         next_layer_boundaries[object] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(layer->lslices)};
     }
 
-    std::vector<ProcessedPoint> estimate_extrusion_quality(const ExtrusionPath                &path,
-                                                           const ConfigOptionPercents         &overlaps,
-                                                           const ConfigOptionFloatsOrPercents &speeds,
-                                                           float                               ext_perimeter_speed,
-                                                           float                               original_speed)
+    std::vector<ProcessedPoint> estimate_extrusion_quality(const ExtrusionPath                                          &path,
+                                                           const std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_w_speeds,
+                                                           const std::vector<std::pair<int, ConfigOptionInts>> overhangs_w_fan_speeds,
+                                                           size_t                                              extruder_id,
+                                                           float                                               ext_perimeter_speed,
+                                                           float                                               original_speed)
     {
-        size_t                               speed_sections_count = std::min(overlaps.values.size(), speeds.values.size());
-        float speed_base = ext_perimeter_speed > 0 ? ext_perimeter_speed : original_speed;
-        std::vector<std::pair<float, float>> speed_sections;
-        for (size_t i = 0; i < speed_sections_count; i++) {
-            float distance = path.width * (1.0 - (overlaps.get_at(i) / 100.0));
-            float speed    = speeds.get_at(i).percent ? (speed_base * speeds.get_at(i).value / 100.0) : speeds.get_at(i).value;
-            speed_sections.push_back({distance, speed});
+        float                  speed_base = ext_perimeter_speed > 0 ? ext_perimeter_speed : original_speed;
+        std::map<float, float> speed_sections;
+        for (size_t i = 0; i < overhangs_w_speeds.size(); i++) {
+            float distance           = path.width * (1.0 - (overhangs_w_speeds[i].first / 100.0));
+            float speed              = overhangs_w_speeds[i].second.percent ? (speed_base * overhangs_w_speeds[i].second.value / 100.0) :
+                                                                              overhangs_w_speeds[i].second.value;
+            speed_sections[distance] = speed;
         }
-        std::sort(speed_sections.begin(), speed_sections.end(),
-                  [](const std::pair<float, float> &a, const std::pair<float, float> &b) { 
-                    if (a.first == b.first) {
-                        return a.second > b.second;
-                    }
-                    return a.first < b.first; });
 
-        std::pair<float, float> last_section{INFINITY, 0};
-        for (auto &section : speed_sections) {
-            if (section.first == last_section.first) {
-                section.second = last_section.second;
-            } else {
-                last_section = section;
-            }
+        std::map<float, float> fan_speed_sections;
+        for (size_t i = 0; i < overhangs_w_fan_speeds.size(); i++) {
+            float distance           = path.width * (1.0 - (overhangs_w_fan_speeds[i].first / 100.0));
+            float fan_speed            = overhangs_w_fan_speeds[i].second.get_at(extruder_id);
+            fan_speed_sections[distance] = fan_speed;
         }
 
         std::vector<ExtendedPoint> extended_points =
@@ -296,28 +291,26 @@ public:
             const ExtendedPoint &curr = extended_points[i];
             const ExtendedPoint &next = extended_points[i + 1 < extended_points.size() ? i + 1 : i];
 
-            auto calculate_speed = [&speed_sections, &original_speed](float distance) {
-                float final_speed;
-                if (distance <= speed_sections.front().first) {
-                    final_speed = original_speed;
-                } else if (distance >= speed_sections.back().first) {
-                    final_speed = speed_sections.back().second;
-                } else {
-                    size_t section_idx = 0;
-                    while (distance > speed_sections[section_idx + 1].first) {
-                        section_idx++;
-                    }
-                    float t = (distance - speed_sections[section_idx].first) /
-                              (speed_sections[section_idx + 1].first - speed_sections[section_idx].first);
-                    t           = std::clamp(t, 0.0f, 1.0f);
-                    final_speed = (1.0f - t) * speed_sections[section_idx].second + t * speed_sections[section_idx + 1].second;
+            auto interpolate_speed = [](const std::map<float, float> &values, float distance) {
+                auto upper_dist = values.lower_bound(distance);
+                if (upper_dist == values.end()) {
+                    return values.rbegin()->second;
                 }
-                return final_speed;
+                if (upper_dist == values.begin()) {
+                    return upper_dist->second;
+                }
+
+                auto  lower_dist = std::prev(upper_dist);
+                float t          = (distance - lower_dist->first) / (upper_dist->first - lower_dist->first);
+                return (1.0f - t) * lower_dist->second + t * upper_dist->second;
             };
 
-            float extrusion_speed = std::min(calculate_speed(curr.distance), calculate_speed(next.distance));
+            float extrusion_speed = std::min(interpolate_speed(speed_sections, curr.distance),
+                                             interpolate_speed(speed_sections, next.distance));
+            float fan_speed       = std::min(interpolate_speed(fan_speed_sections, curr.distance),
+                                             interpolate_speed(fan_speed_sections, next.distance));
 
-            processed_points.push_back({scaled(curr.position), extrusion_speed});
+            processed_points.push_back({scaled(curr.position), extrusion_speed, int(fan_speed)});
         }
         return processed_points;
     }

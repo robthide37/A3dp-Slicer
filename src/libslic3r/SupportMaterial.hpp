@@ -161,6 +161,14 @@ struct SupportParameters {
     InfillPattern 			contact_fill_pattern;
     // Shall the sparse (base) layers be printed with a single perimeter line (sheath) for robustness?
     bool                    with_sheath;
+
+    float 					raft_angle_1st_layer;
+    float 					raft_angle_base;
+    float 					raft_angle_interface;
+
+    // Produce a raft interface angle for a given SupportLayer::interface_id()
+    float 					raft_interface_angle(size_t interface_id) const 
+    	{ return this->raft_angle_interface + ((interface_id & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.)); }
 };
 
 // Remove bridges from support contact areas.
