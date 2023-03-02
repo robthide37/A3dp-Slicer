@@ -118,6 +118,20 @@ OptionsGroup::OptionsGroup(	wxWindow* _parent, const wxString& title,
 {
 }
 
+Option::Option(const ConfigOptionDef& _opt, t_config_option_key id) : opt(_opt), opt_id(id)
+{
+    if (!opt.tooltip.empty()) {
+        wxString tooltip;
+        if (opt.opt_key.rfind("branching", 0) == 0)
+            tooltip = _L("Unavailable for this method.") + "\n";
+        tooltip += _(opt.tooltip);
+
+        edit_tooltip(tooltip);
+
+        opt.tooltip = into_u8(tooltip);
+    }
+}
+
 void Line::clear()
 {
     if (near_label_widget_win)
@@ -517,9 +531,8 @@ void OptionsGroup::clear(bool destroy_custom_ctrl)
 
 Line OptionsGroup::create_single_option_line(const Option& option, const std::string& path/* = std::string()*/) const
 {
-    wxString tooltip = _(option.opt.tooltip);
-    edit_tooltip(tooltip);
-	Line retval{ _(option.opt.label), tooltip };
+    Line retval{ _(option.opt.label), from_u8(option.opt.tooltip) };
+
 	retval.label_path = path;
     retval.append_option(option);
     return retval;

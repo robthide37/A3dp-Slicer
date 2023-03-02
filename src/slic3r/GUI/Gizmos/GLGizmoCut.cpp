@@ -996,6 +996,8 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
         const Vec3d& instance_offset = mo->instances[inst_id]->get_offset();
         const double sla_shift = double(m_c->selection_info()->get_sla_shift());
 
+        const bool looking_forward = is_looking_forward();
+
         for (size_t i = 0; i < connectors.size(); ++i) {
             const CutConnector& connector = connectors[i];
 
@@ -1004,9 +1006,8 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             Vec3d pos = connector.pos + instance_offset;
             if (connector.attribs.type == CutConnectorType::Dowel &&
                 connector.attribs.style == CutConnectorStyle::Prism) {
-                if (is_looking_forward())
-                    pos -= static_cast<double>(height - 0.05f) * m_clp_normal;
-                else
+                height = 0.05f;
+                if (!looking_forward)
                     pos += 0.05 * m_clp_normal;
             }
             pos[Z] += sla_shift;
@@ -2065,6 +2066,8 @@ void GLGizmoCut3D::render_connectors()
     m_has_invalid_connector = false;
     m_info_stats.invalidate();
 
+    const bool looking_forward = is_looking_forward();
+
     for (size_t i = 0; i < connectors.size(); ++i) {
         const CutConnector& connector = connectors[i];
 
@@ -2093,20 +2096,19 @@ void GLGizmoCut3D::render_connectors()
         if (connector.attribs.type  == CutConnectorType::Dowel &&
             connector.attribs.style == CutConnectorStyle::Prism) {
             if (m_connectors_editing) {
-                if (is_looking_forward())
-                    pos -= static_cast<double>(height-0.05f) * m_clp_normal;
-                else 
+                height = 0.05f;
+                if (!looking_forward)
                     pos += 0.05 * m_clp_normal;
             }
             else {
-                if (is_looking_forward())
+                if (looking_forward)
                     pos -= static_cast<double>(height) * m_clp_normal;
                 else
                     pos += static_cast<double>(height) * m_clp_normal;
                 height *= 2;
             }
         }
-        else if (!is_looking_forward())
+        else if (!looking_forward)
             pos += 0.05 * m_clp_normal;
 
         const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(pos) * m_rotation_m * 

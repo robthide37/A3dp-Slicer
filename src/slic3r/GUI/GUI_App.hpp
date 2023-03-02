@@ -73,6 +73,8 @@ enum FileType
 
     FT_SL1,
 
+    FT_ZIP,
+
     FT_SIZE,
 };
 
@@ -125,9 +127,7 @@ private:
     bool            m_last_app_conf_lower_version{ false };
     EAppMode        m_app_mode{ EAppMode::Editor };
     bool            m_is_recreating_gui{ false };
-#ifdef __linux__
     bool            m_opengl_initialized{ false };
-#endif
 
     wxColour        m_color_label_modified;
     wxColour        m_color_label_sys;
@@ -252,6 +252,7 @@ public:
     void            keyboard_shortcuts();
     void            load_project(wxWindow *parent, wxString& input_file) const;
     void            import_model(wxWindow *parent, wxArrayString& input_files) const;
+    void            import_zip(wxWindow* parent, wxString& input_file) const;
     void            load_gcode(wxWindow* parent, wxString& input_file) const;
 
     static bool     catch_error(std::function<void()> cb, const std::string& err);

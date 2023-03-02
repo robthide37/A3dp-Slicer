@@ -38,13 +38,14 @@ static const char *CONFIG_KEY_PATH  = "printhost_path";
 static const char *CONFIG_KEY_GROUP = "printhost_group";
 static const char* CONFIG_KEY_STORAGE = "printhost_storage";
 
-PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUploadActions post_actions, const wxArrayString &groups, const wxArrayString& storage)
+PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUploadActions post_actions, const wxArrayString &groups, const wxArrayString& storage_paths, const wxArrayString& storage_names)
     : MsgDialog(static_cast<wxWindow*>(wxGetApp().mainframe), _L("Send G-Code to printer host"), _L("Upload to Printer Host with the following filename:"), 0) // Set style = 0 to avoid default creation of the "OK" button. 
                                                                                                                                                                // All buttons will be added later in this constructor 
     , txt_filename(new wxTextCtrl(this, wxID_ANY))
     , combo_groups(!groups.IsEmpty() ? new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, groups, wxCB_READONLY) : nullptr)
-    , combo_storage(storage.GetCount() > 1 ? new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, storage, wxCB_READONLY) : nullptr)
+    , combo_storage(storage_names.GetCount() > 1 ? new wxComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, storage_names, wxCB_READONLY) : nullptr)
     , post_upload_action(PrintHostPostUploadAction::None)
+    , m_paths(storage_paths)
 {
 #ifdef __APPLE__
     txt_filename->OSXDisableAllSmartSubstitutions();
@@ -73,15 +74,15 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
         auto* label_group = new wxStaticText(this, wxID_ANY, _L("Upload to storage:"));
         content_sizer->Add(label_group);
         content_sizer->Add(combo_storage, 0, wxBOTTOM, 2 * VERT_SPACING);
-        combo_storage->SetValue(storage.front());
+        combo_storage->SetValue(storage_names.front());
         wxString recent_storage = from_u8(app_config->get("recent", CONFIG_KEY_STORAGE));
         if (!recent_storage.empty())
             combo_storage->SetValue(recent_storage); 
-    } else if (storage.GetCount() == 1){
+    } else if (storage_names.GetCount() == 1){
         // PrusaLink specific: Show which storage has been detected.
-        auto* label_group = new wxStaticText(this, wxID_ANY, _L("Upload to storage: ") + storage.front());
+        auto* label_group = new wxStaticText(this, wxID_ANY, _L("Upload to storage: ") + storage_names.front());
         content_sizer->Add(label_group);
-        m_preselected_storage = storage.front();
+        m_preselected_storage = storage_paths.front();
     }
 
 
@@ -196,7 +197,9 @@ std::string PrintHostSendDialog::storage() const
 {
     if (!combo_storage)
         return GUI::format("%1%", m_preselected_storage);
-    return boost::nowide::narrow(combo_storage->GetValue());
+    if (combo_storage->GetSelection() < 0 || combo_storage->GetSelection() >= m_paths.size())
+        return {};
+    return boost::nowide::narrow(m_paths[combo_storage->GetSelection()]);
 }
 
 void PrintHostSendDialog::EndModal(int ret)
@@ -225,8 +228,6 @@ void PrintHostSendDialog::EndModal(int ret)
 
     MsgDialog::EndModal(ret);
 }
-
-
 
 wxDEFINE_EVENT(EVT_PRINTHOST_PROGRESS, PrintHostQueueDialog::Event);
 wxDEFINE_EVENT(EVT_PRINTHOST_ERROR,    PrintHostQueueDialog::Event);

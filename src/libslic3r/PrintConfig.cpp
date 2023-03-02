@@ -535,35 +535,96 @@ void PrintConfigDef::init_fff_params()
     def->label      = L("Enable dynamic overhang speeds");
     def->category   = L("Speed");
     def->tooltip    = L("This setting enables dynamic speed control on overhangs.");
-    def->mode       = comAdvanced;
+    def->mode       = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
-    def             = this->add("overhang_overlap_levels", coPercents);
-    def->full_label = L("Overhang overlap levels");
-    def->category   = L("Speed");
-    def->tooltip    = L("Controls overhang levels, expressed as a percentage of overlap of the extrusion with the previous layer - "
-                        "100% represents full overlap - no overhang is present, while 0% represents full overhang (floating extrusion). "
-                        "Each overhang level then corresponds with the overhang speed below. Speeds for overhang levels in between are "
-                        "calculated via linear interpolation."
-                        "If you set multiple different speeds for the same overhang level, only the largest speed is used. "
-                        );
-    def->sidetext   = L("%");
-    def->min        = 0;
-    def->max        = 100;
-    def->mode       = comAdvanced;
-    def->set_default_value(new ConfigOptionPercents({60, 40, 20, 0}));
+    auto overhang_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
+                        "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
+                        "Speeds for overhang sizes in between are calculated via linear interpolation. "
+                        "If set as percentage, the speed is calculated over the external perimeter speed.");
 
-    def             = this->add("dynamic_overhang_speeds", coFloatsOrPercents);
-    def->full_label = L("Dynamic speed on overhangs");
+    def             = this->add("overhang_speed_0", coFloatOrPercent);
+    def->label      = L("speed for 0\% overlap (bridge)");
     def->category   = L("Speed");
-    def->tooltip    = L("This setting controls the speed on the overhang with the overlap value set above. "
-                        "The speed of the extrusion is calculated as a linear interpolation of the speeds for higher and lower overlap. "
-                        "If set as percentage, the speed is calculated over the external perimeter speed."
-                        );
+    def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
     def->min        = 0;
-    def->mode       = comAdvanced;
-    def->set_default_value(new ConfigOptionFloatsOrPercents({{25, false}, {20, false}, {15, false}, {15, false}}));
+    def->mode       = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
+
+    def             = this->add("overhang_speed_1", coFloatOrPercent);
+    def->label      = L("speed for 25\% overlap");
+    def->category   = L("Speed");
+    def->tooltip    = overhang_speed_setting_description;
+    def->sidetext   = L("mm/s or %");
+    def->min        = 0;
+    def->mode       = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
+
+    def             = this->add("overhang_speed_2", coFloatOrPercent);
+    def->label      = L("speed for 50\% overlap");
+    def->category   = L("Speed");
+    def->tooltip    = overhang_speed_setting_description;
+    def->sidetext   = L("mm/s or %");
+    def->min        = 0;
+    def->mode       = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(20, false));
+
+    def             = this->add("overhang_speed_3", coFloatOrPercent);
+    def->label      = L("speed for 75\% overlap");
+    def->category   = L("Speed");
+    def->tooltip    = overhang_speed_setting_description;
+    def->sidetext   = L("mm/s or %");
+    def->min        = 0;
+    def->mode       = comExpert;
+    def->set_default_value(new ConfigOptionFloatOrPercent(25, false));
+
+    def          = this->add("enable_dynamic_fan_speeds", coBools);
+    def->label   = L("Enable dynamic fan speeds");
+    def->tooltip = L("This setting enables dynamic fan speed control on overhangs.");
+    def->mode    = comExpert;
+    def->set_default_value(new ConfigOptionBools{false});
+
+    auto fan_speed_setting_description = L(
+        "Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
+        "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
+        "Fan speeds for overhang sizes in between are calculated via linear interpolation. ");
+
+    def           = this->add("overhang_fan_speed_0", coInts);
+    def->label    = L("speed for 0\% overlap (bridge)");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{0});
+
+    def           = this->add("overhang_fan_speed_1", coInts);
+    def->label    = L("speed for 25\% overlap");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{0});
+
+    def           = this->add("overhang_fan_speed_2", coInts);
+    def->label    = L("speed for 50\% overlap");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{0});
+
+    def           = this->add("overhang_fan_speed_3", coInts);
+    def->label    = L("speed for 75\% overlap");
+    def->tooltip  = fan_speed_setting_description;
+    def->sidetext = L("%");
+    def->min      = 0;
+    def->max      = 100;
+    def->mode     = comExpert;
+    def->set_default_value(new ConfigOptionInts{0});
 
     def = this->add("brim_width", coFloat);
     def->label = L("Brim width");
@@ -3270,9 +3331,6 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 {
     ConfigOptionDef* def;
 
-    constexpr const char * pretext_unavailable = L("Unavailable for this method.\n");
-    std::string pretext;
-
     def = this->add(prefix + "support_head_front_diameter", coFloat);
     def->label = L("Pinhead front diameter");
     def->category = L("Supports");
@@ -3322,13 +3380,9 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionPercent(50));
 
-    pretext = "";
-    if (prefix == "branching")
-        pretext = pretext_unavailable;
-
     def = this->add(prefix + "support_max_bridges_on_pillar", coInt);
     def->label = L("Max bridges on a pillar");
-    def->tooltip = pretext + L(
+    def->tooltip = L(
         "Maximum number of bridges that can be placed on a pillar. Bridges "
         "hold support point pinheads and connect to pillars as small branches.");
     def->min = 0;
@@ -3336,14 +3390,10 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionInt(prefix == "branching" ? 2 : 3));
 
-    pretext = "";
-    if (prefix.empty())
-        pretext = pretext_unavailable;
-
     def = this->add(prefix + "support_max_weight_on_model", coFloat);
     def->label = L("Max weight on model");
     def->category = L("Supports");
-    def->tooltip  = pretext + L(
+    def->tooltip  = L(
         "Maximum weight of sub-trees that terminate on the model instead of the print bed. The weight is the sum of the lenghts of all "
         "branches emanating from the endpoint.");
     def->sidetext = L("mm");
@@ -3351,13 +3401,9 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(10.));
 
-    pretext = "";
-    if (prefix == "branching")
-        pretext = pretext_unavailable;
-
     def = this->add(prefix + "support_pillar_connection_mode", coEnum);
     def->label = L("Pillar connection mode");
-    def->tooltip = pretext + L("Controls the bridge type between two neighboring pillars."
+    def->tooltip = L("Controls the bridge type between two neighboring pillars."
                             " Can be zig-zag, cross (double zig-zag) or dynamic which"
                             " will automatically switch between the first two depending"
                             " on the distance of the two pillars.");
@@ -3378,11 +3424,7 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
     def->label = L("Pillar widening factor");
     def->category = L("Supports");
 
-    pretext = "";
-    if (prefix.empty())
-        pretext = pretext_unavailable;
-
-    def->tooltip  = pretext +
+    def->tooltip  = 
         L("Merging bridges or pillars into another pillars can "
         "increase the radius. Zero means no increase, one means "
         "full increase. The exact amount of increase is unspecified and can "
@@ -3449,14 +3491,10 @@ void PrintConfigDef::init_sla_support_params(const std::string &prefix)
 
     def->set_default_value(new ConfigOptionFloat(default_val));
 
-    pretext = "";
-    if (prefix == "branching")
-        pretext = pretext_unavailable;
-
     def = this->add(prefix + "support_max_pillar_link_distance", coFloat);
     def->label = L("Max pillar linking distance");
     def->category = L("Supports");
-    def->tooltip = pretext + L("The max distance of two pillars to get linked with each other."
+    def->tooltip = L("The max distance of two pillars to get linked with each other."
                                " A zero value will prohibit pillar cascading.");
     def->sidetext = L("mm");
     def->min = 0;   // 0 means no linking

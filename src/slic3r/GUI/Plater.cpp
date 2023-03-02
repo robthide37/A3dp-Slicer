@@ -5479,6 +5479,17 @@ void Plater::add_model(bool imperial_units/* = false*/)
         wxGetApp().mainframe->update_title();
 }
 
+void Plater::import_zip_archive()
+{
+   wxString input_file;
+   wxGetApp().import_zip(this, input_file);
+   if (input_file.empty())
+       return;
+
+   fs::path path = into_path(input_file);
+   preview_zip_archive(path);
+}
+
 void Plater::import_sl1_archive()
 {
     auto &w = get_ui_job_worker();
@@ -6937,18 +6948,19 @@ void Plater::send_gcode()
         upload_job.printhost->get_groups(groups);
     }
     // PrusaLink specific: Query the server for the list of file groups.
-    wxArrayString storage;
+    wxArrayString storage_paths;
+    wxArrayString storage_names;
     {
         wxBusyCursor wait;
         try {
-            upload_job.printhost->get_storage(storage);
+            upload_job.printhost->get_storage(storage_paths, storage_names);
         } catch (const Slic3r::IOError& ex) {
             show_error(this, ex.what(), false);
             return;
         }
     }
 
-    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups, storage);
+    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups, storage_paths, storage_names);
     if (dlg.ShowModal() == wxID_OK) {
         upload_job.upload_data.upload_path = dlg.filename();
         upload_job.upload_data.post_action = dlg.post_action();

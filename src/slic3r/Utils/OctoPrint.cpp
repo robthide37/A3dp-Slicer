@@ -273,7 +273,6 @@ bool OctoPrint::test(wxString& msg) const
     return res;
 }
 
-
 wxString OctoPrint::get_test_ok_msg () const
 {
     return _(L("Connection to OctoPrint works correctly."));
@@ -685,7 +684,7 @@ bool PrusaLink::test(wxString& msg) const
      return res;
 }
 
-bool PrusaLink::get_storage(wxArrayString& output) const
+bool PrusaLink::get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const
 {
     const char* name = get_name();
 
@@ -693,17 +692,22 @@ bool PrusaLink::get_storage(wxArrayString& output) const
     auto url = make_url("api/v1/storage");
     wxString error_msg;
 
-    struct StorageInfo{
+    struct StorageInfo {
+        wxString path;
         wxString name;
-        bool read_only;
-        long long free_space;
+        bool read_only = false;
+        long long free_space = -1;
     };
     std::vector<StorageInfo> storage;
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get storage at: %2%") % name % url;
 
+    wxString wlang = GUI::wxGetApp().current_language_code();
+    std::string lang = GUI::format(wlang.SubString(0, 1));
+
     auto http = Http::get(std::move(url));
     set_auth(http);
+    http.header("Accept-Language", lang);
     http.on_error([&](std::string body, std::string error, unsigned status) {
         BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error getting storage: %2%, HTTP %3%, body: `%4%`") % name % error % status % body;
         error_msg = L"\n\n" + boost::nowide::widen(error);
@@ -731,6 +735,7 @@ bool PrusaLink::get_storage(wxArrayString& output) const
             }
             // each storage has own subtree of storage_list
             for (const auto& section : ptree.front().second) {
+                const auto name = section.second.get_optional<std::string>("name");
                 const auto path = section.second.get_optional<std::string>("path");
                 const auto space = section.second.get_optional<std::string>("free_space");
                 const auto read_only = section.second.get_optional<bool>("read_only");
@@ -738,7 +743,8 @@ bool PrusaLink::get_storage(wxArrayString& output) const
                 const auto available = section.second.get_optional<bool>("available");
                 if (path && (!available || *available)) {
                     StorageInfo si;
-                    si.name = boost::nowide::widen(*path);
+                    si.path = boost::nowide::widen(*path);
+                    si.name = name ? boost::nowide::widen(*name) : wxString();
                     // If read_only is missing, assume it is NOT read only.
                     // si.read_only = read_only ? *read_only : false; // version without "ro"
                     si.read_only = (read_only ? *read_only : (ro ? *ro : false));
@@ -759,16 +765,17 @@ bool PrusaLink::get_storage(wxArrayString& output) const
     .perform_sync();
 
     for (const auto& si : storage) {
-        if (!si.read_only && si.free_space > 0)
-            output.push_back(si.name);
+        if (!si.read_only && si.free_space > 0) {
+            storage_path.push_back(si.path);
+            storage_name.push_back(si.name);
+        }
     }
 
-    if (res && output.empty())
-    {
+    if (res && storage_path.empty()) {
         if (!storage.empty()) { // otherwise error_msg is already filled 
             error_msg = L"\n\n" + _L("Storages found:") + L" \n";
             for (const auto& si : storage) {
-                error_msg += si.name + L" : " + (si.read_only ? _L("read only") : _L("no free space")) + L"\n";
+                error_msg += si.path + L" : " + (si.read_only ? _L("read only") : _L("no free space")) + L"\n";
             }
         }
         std::string message = GUI::format(_L("Upload has failed. There is no suitable storage found at %1%.%2%"), m_host, error_msg);

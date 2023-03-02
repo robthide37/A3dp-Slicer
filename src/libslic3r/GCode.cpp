@@ -1,3 +1,4 @@
+#include "Config.hpp"
 #include "libslic3r.h"
 #include "GCode/ExtrusionProcessor.hpp"
 #include "I18N.hpp"
@@ -24,6 +25,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <math.h>
+#include <string>
 #include <string_view>
 
 #include <boost/algorithm/string.hpp>
@@ -2867,16 +2869,36 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         );
     }
 
-    bool                        variable_speed = false;
+    bool                        variable_speed_or_fan_speed = false;
     std::vector<ProcessedPoint> new_points{};
-    if (this->m_config.enable_dynamic_overhang_speeds && !this->on_first_layer() && path.role().is_perimeter()) {
+    if ((this->m_config.enable_dynamic_overhang_speeds || this->config().enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())) &&
+        !this->on_first_layer() && path.role().is_perimeter()) {
+        std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_with_speeds = {{100, ConfigOptionFloatOrPercent{speed, false}}};
+        if (this->m_config.enable_dynamic_overhang_speeds) {
+            overhangs_with_speeds = {{0, m_config.overhang_speed_0},
+                                     {25, m_config.overhang_speed_1},
+                                     {50, m_config.overhang_speed_2},
+                                     {75, m_config.overhang_speed_3},
+                                     {100, ConfigOptionFloatOrPercent{speed, false}}};
+        }
+
+        std::vector<std::pair<int, ConfigOptionInts>> overhang_w_fan_speeds = {{100, ConfigOptionInts{0}}};
+        if (this->m_config.enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())) {
+            overhang_w_fan_speeds = {{0, m_config.overhang_fan_speed_0},
+                                     {25, m_config.overhang_fan_speed_1},
+                                     {50, m_config.overhang_fan_speed_2},
+                                     {75, m_config.overhang_fan_speed_3},
+                                     {100, ConfigOptionInts{0}}};
+        }
+
         double external_perim_reference_speed = std::min(m_config.get_abs_value("external_perimeter_speed"),
                                                          std::min(EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm,
                                                                   m_config.max_volumetric_speed.value / path.mm3_per_mm));
-        new_points     = m_extrusion_quality_estimator.estimate_extrusion_quality(path, m_config.overhang_overlap_levels,
-                                                                                  m_config.dynamic_overhang_speeds,
-                                                                                  external_perim_reference_speed, speed);
-        variable_speed = std::any_of(new_points.begin(), new_points.end(), [speed](const ProcessedPoint &p) { return p.speed != speed; });
+        new_points = m_extrusion_quality_estimator.estimate_extrusion_quality(path, overhangs_with_speeds, overhang_w_fan_speeds,
+                                                                              m_writer.extruder()->id(), external_perim_reference_speed,
+                                                                              speed);
+        variable_speed_or_fan_speed = std::any_of(new_points.begin(), new_points.end(),
+                                                  [speed](const ProcessedPoint &p) { return p.speed != speed || p.fan_speed != 0; });
     }
 
     double F = speed * 60;  // convert mm/sec to mm/min
@@ -2932,7 +2954,8 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
 
     std::string cooling_marker_setspeed_comments;
     if (m_enable_cooling_markers) {
-        if (path.role().is_bridge())
+        if (path.role().is_bridge() &&
+            (!path.role().is_perimeter() || !this->config().enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())))
             gcode += ";_BRIDGE_FAN_START\n";
         else
             cooling_marker_setspeed_comments = ";_EXTRUDE_SET_SPEED";
@@ -2940,7 +2963,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             cooling_marker_setspeed_comments += ";_EXTERNAL_PERIMETER";
     }
 
-    if (!variable_speed) {
+    if (!variable_speed_or_fan_speed) {
         // F is mm per minute.
         gcode += m_writer.set_speed(F, "", cooling_marker_setspeed_comments);
         double path_length = 0.;
@@ -2965,21 +2988,28 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             marked_comment = description;
             marked_comment += description_bridge;
         }
-        double last_set_speed = new_points[0].speed * 60.0;
+        double last_set_speed     = new_points[0].speed * 60.0;
+        double last_set_fan_speed = new_points[0].fan_speed;
         gcode += m_writer.set_speed(last_set_speed, "", cooling_marker_setspeed_comments);
+        gcode += ";_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
         Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
         for (size_t i = 1; i < new_points.size(); i++) {
-            const ProcessedPoint& processed_point = new_points[i];
-            Vec2d p = this->point_to_gcode_quantized(processed_point.p);
-            const double line_length = (p - prev).norm();
+            const ProcessedPoint &processed_point = new_points[i];
+            Vec2d                 p               = this->point_to_gcode_quantized(processed_point.p);
+            const double          line_length     = (p - prev).norm();
             gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, marked_comment);
-            prev = p;
+            prev             = p;
             double new_speed = processed_point.speed * 60.0;
             if (last_set_speed != new_speed) {
                 gcode += m_writer.set_speed(new_speed, "", cooling_marker_setspeed_comments);
                 last_set_speed = new_speed;
             }
+            if (last_set_fan_speed != processed_point.fan_speed) {
+                last_set_fan_speed = processed_point.fan_speed;
+                gcode += ";_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
+            }
         }
+        gcode += ";_RESET_FAN_SPEED\n";
     }
 
     if (m_enable_cooling_markers)
