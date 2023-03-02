@@ -597,7 +597,7 @@ void PrintConfigDef::init_fff_params()
     def->min      = 0;
     def->max      = 100;
     def->mode     = comExpert;
-    def->set_default_value(new ConfigOptionInts{100});
+    def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_1", coInts);
     def->label    = L("speed for 25\% overlap");
@@ -606,7 +606,7 @@ void PrintConfigDef::init_fff_params()
     def->min      = 0;
     def->max      = 100;
     def->mode     = comExpert;
-    def->set_default_value(new ConfigOptionInts{75});
+    def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_2", coInts);
     def->label    = L("speed for 50\% overlap");
@@ -615,7 +615,7 @@ void PrintConfigDef::init_fff_params()
     def->min      = 0;
     def->max      = 100;
     def->mode     = comExpert;
-    def->set_default_value(new ConfigOptionInts{50});
+    def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_3", coInts);
     def->label    = L("speed for 75\% overlap");
@@ -624,7 +624,7 @@ void PrintConfigDef::init_fff_params()
     def->min      = 0;
     def->max      = 100;
     def->mode     = comExpert;
-    def->set_default_value(new ConfigOptionInts{25});
+    def->set_default_value(new ConfigOptionInts{0});
 
     def = this->add("brim_width", coFloat);
     def->label = L("Brim width");
