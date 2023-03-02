@@ -1,5 +1,5 @@
 #include "IconManager.hpp"
-
+#include <cmath>
 #include <boost/log/trivial.hpp>
 
 using namespace Slic3r::GUI;
@@ -35,7 +35,7 @@ std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string>
     // only rectangle are supported
     assert(size.x == size.y);
     // no subpixel supported
-    unsigned int width = static_cast<unsigned int>(std::fabs(std::round(size.x)));
+    unsigned int width = static_cast<unsigned int>(std::abs(std::round(size.x)));
     assert(size.x == static_cast<float>(width));
 
     // state order has to match the enum IconState
@@ -171,7 +171,7 @@ void draw(const IconManager::Icon &icon, const ImVec2 &size, const ImVec4 &tint_
         return;
     }
 
-    ImTextureID   id = (void *) icon.tex_id;
+    ImTextureID id = (void *) icon.tex_id;
     const ImVec2 &s  = (size.x < 1 || size.y < 1) ? icon.size : size;
     ImGui::Image(id, s, icon.tl, icon.br, tint_col, border_col);
 }
