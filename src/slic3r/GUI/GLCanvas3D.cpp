@@ -988,16 +988,7 @@ PrinterTechnology GLCanvas3D::current_printer_technology() const
 
 bool GLCanvas3D::is_arrange_alignment_enabled() const
 {
-    static constexpr const char *ALIGN_ONLY_FOR = "XL";
-
-    bool ret = false;
-
-    auto *printer_model = m_config->opt<ConfigOptionString>("printer_model");
-
-    if (printer_model)
-        ret = boost::algorithm::contains(printer_model->value, ALIGN_ONLY_FOR);
-
-    return ret;
+    return m_config ? is_XL_printer(*m_config) : false;
 }
 
 GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)

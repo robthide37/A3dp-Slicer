@@ -185,7 +185,8 @@ void ArrangeJob::process()
     arrangement::ArrangeParams params = get_arrange_params(m_plater);
 
     auto count = unsigned(m_selected.size() + m_unprintable.size());
-    Points bedpts = get_bed_shape(*m_plater->config());
+    arrangement::ArrangeBed bed;
+    get_bed_shape(*m_plater->config(), bed);
     
     params.stopcondition = [this]() { return was_canceled(); };
     
@@ -194,13 +195,13 @@ void ArrangeJob::process()
         if (st > 0) update_status(int(count - st), arrangestr);
     };
 
-    arrangement::arrange(m_selected, m_unselected, bedpts, params);
+    arrangement::arrange(m_selected, m_unselected, bed, params);
 
     params.progressind = [this, count](unsigned st) {
         if (st > 0) update_status(int(count - st), arrangestr);
     };
 
-    arrangement::arrange(m_unprintable, {}, bedpts, params);
+    arrangement::arrange(m_unprintable, {}, bed, params);
 
     // finalize just here.
     update_status(int(count),
