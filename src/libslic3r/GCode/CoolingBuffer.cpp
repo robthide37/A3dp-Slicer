@@ -378,7 +378,8 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 size_t axis = (*c >= 'X' && *c <= 'Z') ? (*c - 'X') :
                               (*c == extrusion_axis) ? 3 : (*c == 'F') ? 4 : size_t(-1);
                 if (axis != size_t(-1)) {
-                    auto [pend, ec] = fast_float::from_chars(&*(++ c), sline.data() + sline.size(), new_pos[axis]);
+                    //auto [pend, ec] = 
+                        fast_float::from_chars(&*(++ c), sline.data() + sline.size(), new_pos[axis]);
                     if (axis == 4) {
                         // Convert mm/min to mm/sec.
                         new_pos[4] /= 60.f;
@@ -497,7 +498,8 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             bool   has_S = pos_S > 0;
             bool   has_P = pos_P > 0;
             if (has_S || has_P) {
-                auto [pend, ec] = fast_float::from_chars(sline.data() + (has_S ? pos_S : pos_P) + 1, sline.data() + sline.size(), line.time);
+                //auto [pend, ec] = 
+                    fast_float::from_chars(sline.data() + (has_S ? pos_S : pos_P) + 1, sline.data() + sline.size(), line.time);
                 if (has_P)
                     line.time *= 0.001f;
             } else
@@ -846,7 +848,8 @@ std::string CoolingBuffer::apply_layer_cooldown(
             if (line->slowdown)
                 new_feedrate = int(floor(60. * line->feedrate + 0.5));
             else
-                auto res = std::from_chars(fpos, line_end, new_feedrate);
+                //auto res = 
+                    std::from_chars(fpos, line_end, new_feedrate);
             if (new_feedrate == current_feedrate) {
                 // No need to change the F value.
                 if ((line->type & (CoolingLine::TYPE_ADJUSTABLE | CoolingLine::TYPE_ADJUSTABLE_EMPTY | CoolingLine::TYPE_EXTERNAL_PERIMETER | CoolingLine::TYPE_WIPE)) || line->length == 0.)

@@ -591,7 +591,7 @@ void PrintConfigDef::init_fff_params()
         "Fan speeds for overhang sizes in between are calculated via linear interpolation. ");
 
     def           = this->add("overhang_fan_speed_0", coInts);
-    def->label    = L("speed for 0\% overlap (bridge)");
+    def->label    = L("speed for 0% overlap (bridge)");
     def->tooltip  = fan_speed_setting_description;
     def->sidetext = L("%");
     def->min      = 0;
@@ -600,7 +600,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_1", coInts);
-    def->label    = L("speed for 25\% overlap");
+    def->label    = L("speed for 25% overlap");
     def->tooltip  = fan_speed_setting_description;
     def->sidetext = L("%");
     def->min      = 0;
@@ -609,7 +609,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_2", coInts);
-    def->label    = L("speed for 50\% overlap");
+    def->label    = L("speed for 50% overlap");
     def->tooltip  = fan_speed_setting_description;
     def->sidetext = L("%");
     def->min      = 0;
@@ -618,7 +618,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInts{0});
 
     def           = this->add("overhang_fan_speed_3", coInts);
-    def->label    = L("speed for 75\% overlap");
+    def->label    = L("speed for 75% overlap");
     def->tooltip  = fan_speed_setting_description;
     def->sidetext = L("%");
     def->min      = 0;

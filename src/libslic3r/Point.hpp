@@ -237,8 +237,20 @@ inline Point lerp(const Point &a, const Point &b, double t)
     return ((1. - t) * a.cast<double>() + t * b.cast<double>()).cast<coord_t>();
 }
 
+// if IncludeBoundary, then a bounding box is defined even for a single point.
+// otherwise a bounding box is only defined if it has a positive area.
+template<bool IncludeBoundary = false>
 BoundingBox get_extents(const Points &pts);
+extern template BoundingBox get_extents<false>(const Points &pts);
+extern template BoundingBox get_extents<true>(const Points &pts);
+
+// if IncludeBoundary, then a bounding box is defined even for a single point.
+// otherwise a bounding box is only defined if it has a positive area.
+template<bool IncludeBoundary = false>
 BoundingBox get_extents(const std::vector<Points> &pts);
+extern template BoundingBox get_extents<false>(const std::vector<Points> &pts);
+extern template BoundingBox get_extents<true>(const std::vector<Points> &pts);
+
 BoundingBoxf get_extents(const std::vector<Vec2d> &pts);
 
 int nearest_point_index(const Points &points, const Point &pt);

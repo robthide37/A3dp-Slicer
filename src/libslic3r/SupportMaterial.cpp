@@ -4755,4 +4755,3 @@ sub clip_with_shape {
 */
 
 } // namespace Slic3r
-

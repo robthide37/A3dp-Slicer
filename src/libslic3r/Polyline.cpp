@@ -292,6 +292,19 @@ void ThickPolyline::clip_end(double distance)
     assert(this->width.size() == (this->points.size() - 1) * 2);
 }
 
+void ThickPolyline::start_at_index(int index)
+{
+    assert(index >= 0 && index < this->points.size());
+    assert(this->points.front() == this->points.back() && this->width.front() == this->width.back());
+    if (index != 0 && index != (this->points.size() - 1) && this->points.front() == this->points.back() && this->width.front() == this->width.back()) {
+        this->points.pop_back();
+        assert(this->points.size() * 2 == this->width.size());
+        std::rotate(this->points.begin(), this->points.begin() + index, this->points.end());
+        std::rotate(this->width.begin(), this->width.begin() + 2 * index, this->width.end());
+        this->points.emplace_back(this->points.front());
+    }
+}
+
 double Polyline3::length() const
 {
     double l = 0;
