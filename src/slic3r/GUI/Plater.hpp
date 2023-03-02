@@ -459,6 +459,16 @@ private:
     bool m_was_scheduled;
 };
 
+class PlaterAfterLoadAutoArrange
+{
+    bool m_enabled{ false };
+
+public:
+    PlaterAfterLoadAutoArrange();
+    ~PlaterAfterLoadAutoArrange();
+    void disable() { m_enabled = false; }
+};
+
 } // namespace GUI
 } // namespace Slic3r
 

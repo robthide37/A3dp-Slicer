@@ -1736,6 +1736,7 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
 
 void ObjectList::load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center)
 {   
+    PlaterAfterLoadAutoArrange plater_after_load_auto_arrange;
     // Add mesh to model as a new object
     Model& model = wxGetApp().plater()->model();
 
