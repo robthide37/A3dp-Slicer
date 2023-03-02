@@ -1737,7 +1737,7 @@ void PrintObject::bridge_over_infill()
 
                     lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), special_infill.begin(), special_infill.end());
 
-                    if (shrink(lower_layers_sparse_infill, 3.0 * scaled(max_bridge_flow_height[candidates.first])).empty()) {
+                    if (shrink(lower_layers_sparse_infill, 3.0 * scale_(max_bridge_flow_height[candidates.first])).empty()) {
                         continue;
                     }
                 }
