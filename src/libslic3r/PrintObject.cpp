@@ -20,6 +20,7 @@
 #include "Fill/FillAdaptive.hpp"
 #include "Fill/FillLightning.hpp"
 #include "Format/STL.hpp"
+#include "SupportMaterial.hpp"
 #include "SupportSpotsGenerator.hpp"
 #include "TriangleSelectorWrapper.hpp"
 #include "format.hpp"
@@ -1128,6 +1129,15 @@ void PrintObject::process_external_surfaces()
         );
         m_print->throw_if_canceled();
         BOOST_LOG_TRIVIAL(debug) << "Processing external surfaces for region " << region_id << " in parallel - end";
+    }
+
+    if (this->has_raft() && ! m_layers.empty()) {
+        // Adjust bridge direction of 1st object layer over raft to be perpendicular to the raft contact layer direction.
+        Layer &layer = *m_layers.front();
+        assert(layer.id() > 0);
+        for (LayerRegion *layerm : layer.regions())
+            for (Surface &fill : layerm->m_fill_surfaces)
+                fill.bridge_angle = -1;
     }
 } // void PrintObject::process_external_surfaces()
 

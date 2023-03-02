@@ -441,11 +441,15 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 	}
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
+	size_t first_object_layer_id = this->object()->get_layer(0)->id();
     for (SurfaceFill &surface_fill : surface_fills) {
         // Create the filler object.
         std::unique_ptr<Fill> f = std::unique_ptr<Fill>(Fill::new_from_type(surface_fill.params.pattern));
         f->set_bounding_box(bbox);
-        f->layer_id = this->id();
+		// Layer ID is used for orienting the infill in alternating directions.
+		// Layer::id() returns layer ID including raft layers, subtract them to make the infill direction independent
+		// from raft.
+        f->layer_id = this->id() - first_object_layer_id;
         f->z 		= this->print_z;
         f->angle 	= surface_fill.params.angle;
         f->adapt_fill_octree = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
@@ -698,7 +702,11 @@ void Layer::make_ironing()
     FillRectilinear 	fill;
     FillParams 			fill_params;
 	fill.set_bounding_box(this->object()->bounding_box());
-	fill.layer_id 			 = this->id();
+	// Layer ID is used for orienting the infill in alternating directions.
+	// Layer::id() returns layer ID including raft layers, subtract them to make the infill direction independent
+	// from raft.
+	//FIXME ironing does not take fill angle into account. Shall it? Does it matter?
+	fill.layer_id 			 = this->id() - this->object()->get_layer(0)->id();
     fill.z 					 = this->print_z;
     fill.overlap 			 = 0;
     fill_params.density 	 = 1.;
