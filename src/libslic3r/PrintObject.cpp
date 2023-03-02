@@ -1474,51 +1474,36 @@ void PrintObject::discover_vertical_shells()
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
                     Polygons shell_before = shell;
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
-#if 1
+                    ExPolygons regularized_shell;
                     {
                         // Open to remove (filter out) regions narrower than a bit less than an infill extrusion line width.
                         // Such narrow regions are difficult to fill in with a gap fill algorithm (or Arachne), however they are most likely
                         // not needed for print stability / quality.
-                        const float narrow_ensure_vertical_wall_thickness_region_radius = 0.5f * 0.85f * min_perimeter_infill_spacing;
+                        const float narrow_ensure_vertical_wall_thickness_region_radius = 0.5f * 0.65f * min_perimeter_infill_spacing;
                         // Then close gaps narrower than 1.2 * line width, such gaps are difficult to fill in with sparse infill,
                         // thus they will be merged into the solid infill.
                         const float narrow_sparse_infill_region_radius                  = 0.5f * 1.2f * min_perimeter_infill_spacing;
                         // Finally expand the infill a bit to remove tiny gaps between solid infill and the other regions.
                         const float tiny_overlap_radius                                 = 0.2f        * min_perimeter_infill_spacing;
-                        shell = shrink(opening(union_(shell),
+                        regularized_shell = shrink_ex(offset2_ex(union_ex(shell),
                             // Open to remove (filter out) regions narrower than an infill extrusion line width.
-                            narrow_ensure_vertical_wall_thickness_region_radius,
+                            -narrow_ensure_vertical_wall_thickness_region_radius,
                             // Then close gaps narrower than 1.2 * line width, such gaps are difficult to fill in with sparse infill.
                             narrow_ensure_vertical_wall_thickness_region_radius + narrow_sparse_infill_region_radius, ClipperLib::jtSquare),
                             // Finally expand the infill a bit to remove tiny gaps between solid infill and the other regions.
                             narrow_sparse_infill_region_radius - tiny_overlap_radius, ClipperLib::jtSquare);
 
-                        // The opening operation may cause scattered tiny drops on the smooth parts of the model. 
-                        shell.erase(std::remove_if(shell.begin(), shell.end(), [&min_perimeter_infill_spacing](const Polygon& p){
-                            return p.area() < min_perimeter_infill_spacing * scaled(8.0);
-                        }), shell.end());
+                        // The opening operation may cause scattered tiny drops on the smooth parts of the model, filter them out
+                        regularized_shell.erase(std::remove_if(regularized_shell.begin(), regularized_shell.end(),
+                                                               [&min_perimeter_infill_spacing](const ExPolygon &p) {
+                                                                   return p.area() < min_perimeter_infill_spacing * scaled(8.0);
+                                                               }),
+                                                regularized_shell.end());
                     }
-                    if (shell.empty())
+                    if (regularized_shell.empty())
                         continue;
-#else
-                    // Ensure each region is at least 3x infill line width wide, so it could be filled in.
-        //            float margin = float(infill_line_spacing) * 3.f;
-                    float margin = float(infill_line_spacing) * 1.5f;
-                    // we use a higher miterLimit here to handle areas with acute angles
-                    // in those cases, the default miterLimit would cut the corner and we'd
-                    // get a triangle in $too_narrow; if we grow it below then the shell
-                    // would have a different shape from the external surface and we'd still
-                    // have the same angle, so the next shell would be grown even more and so on.
-                    Polygons too_narrow = diff(shell, opening(shell, margin, ClipperLib::jtMiter, 5.), true);
-                    if (! too_narrow.empty()) {
-                        // grow the collapsing parts and add the extra area to  the neighbor layer 
-                        // as well as to our original surfaces so that we support this 
-                        // additional area in the next shell too
-                        // make sure our grown surfaces don't exceed the fill area
-                        polygons_append(shell, intersection(offset(too_narrow, margin), polygonsInternal));
-                    }
-#endif
-                    ExPolygons new_internal_solid = intersection_ex(polygonsInternal, shell);
+
+                    ExPolygons new_internal_solid = intersection_ex(polygonsInternal, regularized_shell);
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
                     {
                         Slic3r::SVG svg(debug_out_path("discover_vertical_shells-regularized-%d.svg", debug_idx), get_extents(shell_before));
@@ -1533,8 +1518,8 @@ void PrintObject::discover_vertical_shells()
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 
                     // Trim the internal & internalvoid by the shell.
-                    Slic3r::ExPolygons new_internal = diff_ex(layerm->fill_surfaces().filter_by_type(stInternal), shell);
-                    Slic3r::ExPolygons new_internal_void = diff_ex(layerm->fill_surfaces().filter_by_type(stInternalVoid), shell);
+                    Slic3r::ExPolygons new_internal = diff_ex(layerm->fill_surfaces().filter_by_type(stInternal), regularized_shell);
+                    Slic3r::ExPolygons new_internal_void = diff_ex(layerm->fill_surfaces().filter_by_type(stInternalVoid), regularized_shell);
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
                     {
