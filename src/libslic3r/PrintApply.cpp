@@ -1250,7 +1250,6 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 	        						           l->get_transformation().get_matrix().isApprox(r->get_transformation().get_matrix()); })) {
 	        	// If some of the instances changed, the bounding box of the updated ModelObject is likely no more valid.
 	        	// This is safe as the ModelObject's bounding box is only accessed from this function, which is called from the main thread only.
-	 			model_object.invalidate_bounding_box();
 	        	// Synchronize the content of instances.
 	        	auto new_instance = model_object_new.instances.begin();
 				for (auto old_instance = model_object.instances.begin(); old_instance != model_object.instances.end(); ++ old_instance, ++ new_instance) {
@@ -1259,6 +1258,8 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                     (*old_instance)->printable 		    = (*new_instance)->printable;
   				}
 	        }
+            // Source / dest object share the same bounding boxes, just copy them.
+            model_object.copy_transformation_caches(model_object_new);
         }
     }
 

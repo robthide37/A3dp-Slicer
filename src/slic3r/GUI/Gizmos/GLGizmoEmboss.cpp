@@ -667,7 +667,7 @@ void GLGizmoEmboss::on_set_state()
             get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr ) { 
             // reopen gizmo when new object is created
             GLGizmoBase::m_state = GLGizmoBase::Off;
-            if (wxGetApp().get_mode() == comSimple)
+            if (wxGetApp().get_mode() == comSimple || wxGetApp().obj_list()->has_selected_cut_object())
                 // It's impossible to add a part in simple mode
                 return;
             // start creating new object 

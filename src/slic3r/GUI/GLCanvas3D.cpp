@@ -140,7 +140,7 @@ void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
     // Maximum height of an object changes when the object gets rotated or scaled.
     // Changing maximum height of an object will invalidate the layer heigth editing profile.
     // m_model_object->bounding_box() is cached, therefore it is cheap even if this method is called frequently.
-    const float new_max_z = (model_object_new == nullptr) ? 0.0f : static_cast<float>(model_object_new->bounding_box().max.z());
+    const float new_max_z = (model_object_new == nullptr) ? 0.0f : static_cast<float>(model_object_new->max_z());
     if (m_model_object != model_object_new || this->last_object_id != object_id || m_object_max_z != new_max_z ||
         (model_object_new != nullptr && m_model_object->id() != model_object_new->id())) {
         m_layer_height_profile.clear();
@@ -1977,7 +1977,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
         if (extruders_count > 1 && wt && !co) {
             // Height of a print (Show at least a slab)
-            const double height = std::max(m_model->bounding_box().max.z(), 10.0);
+            const double height = std::max(m_model->max_z(), 10.0);
 
             const float x = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_x"))->value;
             const float y = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_y"))->value;
@@ -3746,12 +3746,22 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
     if (!snapshot_type.empty())
         wxGetApp().plater()->take_snapshot(_(snapshot_type));
 
+    // stores current min_z of instances
+    std::map<std::pair<int, int>, double> min_zs;
+    if (!snapshot_type.empty()) {
+        for (int i = 0; i < static_cast<int>(m_model->objects.size()); ++i) {
+            const ModelObject* obj = m_model->objects[i];
+            for (int j = 0; j < static_cast<int>(obj->instances.size()); ++j) {
+                min_zs[{ i, j }] = obj->instance_bounding_box(j).min.z();
+            }
+        }
+    }
+
     std::set<std::pair<int, int>> done;  // keeps track of modified instances
 
-    const Selection::IndicesList& idxs = m_selection.get_volume_idxs();
+    Selection::EMode selection_mode = m_selection.get_mode();
 
-    for (unsigned int id : idxs) {
-        const GLVolume* v = m_volumes.volumes[id];
+    for (const GLVolume* v : m_volumes.volumes) {
         int object_idx = v->object_idx();
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
             continue;
@@ -3761,12 +3771,28 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
 
         done.insert(std::pair<int, int>(object_idx, instance_idx));
 
+        // Mirror instances/volumes
         ModelObject* model_object = m_model->objects[object_idx];
         if (model_object != nullptr) {
-            model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
-            model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
+            if (selection_mode == Selection::Instance)
+                model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+            else if (selection_mode == Selection::Volume)
+                model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
             model_object->invalidate_bounding_box();
         }
+    }
+
+    // Fixes sinking/flying instances
+    for (const std::pair<int, int>& i : done) {
+        ModelObject* m = m_model->objects[i.first];
+        double shift_z = m->get_instance_min_z(i.second);
+        // leave sinking instances as sinking
+        if (min_zs.empty() || min_zs.find({ i.first, i.second })->second >= SINKING_Z_THRESHOLD || shift_z > SINKING_Z_THRESHOLD) {
+            Vec3d shift(0.0, 0.0, -shift_z);
+            m_selection.translate(i.first, i.second, shift);
+            m->translate_instance(i.second, shift);
+        }
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
     }
 
     post_event(SimpleEvent(EVT_GLCANVAS_RESET_SKEW));
@@ -4990,8 +5016,10 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
         // frequently enough, we call render() here directly when we can.
         render();
         assert(m_initialized);
-        if (requires_reload_scene)
-            reload_scene(true);
+        if (requires_reload_scene) {
+            if (wxGetApp().plater()->is_view3D_shown())
+                reload_scene(true);
+        }
     }
 }
 

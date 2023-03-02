@@ -480,6 +480,8 @@ static const FileWildcards file_wildcards_by_type[FT_SIZE] = {
     /* FT_TEX */     { "Texture"sv,         { ".png"sv, ".svg"sv } },
 
     /* FT_SL1 */     { "Masked SLA files"sv, { ".sl1"sv, ".sl1s"sv, ".pwmx"sv } },
+
+    /* FT_ZIP */     { "Zip files"sv, { ".zip"sv } },
 };
 
 #if ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
@@ -885,13 +887,9 @@ wxGLContext* GUI_App::init_glcontext(wxGLCanvas& canvas)
 
 bool GUI_App::init_opengl()
 {
-#ifdef __linux__
     bool status = m_opengl_mgr.init_gl();
     m_opengl_initialized = true;
     return status;
-#else
-    return m_opengl_mgr.init_gl();
-#endif
 }
 
 // gets path to PrusaSlicer.ini, returns semver from first line comment
@@ -1368,12 +1366,15 @@ bool GUI_App::on_init_inner()
 
         // An ugly solution to GH #5537 in which GUI_App::init_opengl (normally called from events wxEVT_PAINT
         // and wxEVT_SET_FOCUS before GUI_App::post_init is called) wasn't called before GUI_App::post_init and OpenGL wasn't initialized.
-#ifdef __linux__
-        if (! m_post_initialized && m_opengl_initialized) {
+        // Since issue #9774 Where same problem occured on MacOS Ventura, we decided to have this check on MacOS as well.
+
+#if defined(__linux__) || defined(__APPLE__)
+        if (!m_post_initialized && m_opengl_initialized) {
 #else
-        if (! m_post_initialized) {
+        if (!m_post_initialized) {
 #endif
             m_post_initialized = true;
+
 #ifdef WIN32
             this->mainframe->register_win32_callbacks();
 #endif
@@ -1975,6 +1976,17 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
 
     if (dialog.ShowModal() == wxID_OK)
         dialog.GetPaths(input_files);
+}
+
+void GUI_App::import_zip(wxWindow* parent, wxString& input_file) const
+{
+    wxFileDialog dialog(parent ? parent : GetTopWindow(),
+        _L("Choose ZIP file:"),
+        from_u8(app_config->get_last_dir()), "",
+        file_wildcards(FT_ZIP), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+    if (dialog.ShowModal() == wxID_OK)
+        input_file = dialog.GetPath();
 }
 
 void GUI_App::load_gcode(wxWindow* parent, wxString& input_file) const

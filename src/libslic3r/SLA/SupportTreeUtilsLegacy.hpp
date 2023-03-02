@@ -141,6 +141,7 @@ std::pair<bool, long> create_ground_pillar(
             if (head_id >= 0) builder.head(head_id).bridge_id = br.id;
             endp = diffbr->endp;
             radius = diffbr->end_r;
+            end_radius = diffbr->end_r;
             builder.add_junction(endp, radius);
             non_head = true;
             dir = diffbr->get_dir();
