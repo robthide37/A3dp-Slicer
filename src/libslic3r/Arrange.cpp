@@ -682,7 +682,7 @@ void arrange(ArrangePolygons &items,
 
     auto it = std::max_element(items.begin(), items.end(),
                                [](auto &i1, auto &i2) {
-                                   return i1.bed_idx < i1.bed_idx;
+                                   return i1.bed_idx < i2.bed_idx;
                                });
 
     size_t beds = 0;
