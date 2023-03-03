@@ -4112,8 +4112,16 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     ImGui::Separator();
 
     if (imgui->button(_L("Reset"))) {
+        auto alignment = settings_out.alignment;
         settings_out = ArrangeSettings{};
         settings_out.distance = std::max(dist_min, settings_out.distance);
+
+        // Default alignment for XL printers set explicitly:
+        if (is_arrange_alignment_enabled())
+            settings_out.alignment = static_cast<int>(arrangement::Pivots::BottomLeft);
+        else
+            settings_out.alignment = alignment;
+
         appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
         appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation? "1" : "0");
         settings_changed = true;
