@@ -3,11 +3,24 @@
 
 #include "ExPolygon.hpp"
 
+#include <boost/variant.hpp>
+#include <libslic3r/BoundingBox.hpp>
+
 namespace Slic3r {
 
 class BoundingBox;
 
 namespace arrangement {
+
+/// Representing an unbounded bed.
+struct InfiniteBed {
+    Point center;
+    explicit InfiniteBed(const Point &p = {0, 0}): center{p} {}
+};
+
+struct RectangleBed {
+    BoundingBox bb;
+};
 
 /// A geometry abstraction for a circular print bed. Similarly to BoundingBox.
 class CircleBed {
@@ -22,11 +35,27 @@ public:
     inline const Point& center() const { return center_; }
 };
 
-/// Representing an unbounded bed.
-struct InfiniteBed {
-    Point center;
-    explicit InfiniteBed(const Point &p = {0, 0}): center{p} {}
+struct SegmentedRectangleBed {
+    Vec<2, size_t> segments;
+    BoundingBox bb;
+
+    SegmentedRectangleBed (const BoundingBox &bb,
+                           size_t segments_x,
+                           size_t segments_y)
+        : segments{segments_x, segments_y}
+        , bb{bb}
+    {}
 };
+
+struct IrregularBed {
+    ExPolygon poly;
+};
+
+//enum BedType { Infinite, Rectangle, Circle, SegmentedRectangle, Irregular };
+
+using ArrangeBed = boost::variant<InfiniteBed, RectangleBed, CircleBed, SegmentedRectangleBed, IrregularBed>;
+
+ArrangeBed to_arrange_bed(const Points &bedpts);
 
 /// A logical bed representing an object not being arranged. Either the arrange
 /// has not yet successfully run on this ArrangePolygon or it could not fit the
@@ -75,6 +104,10 @@ struct ArrangePolygon {
 
 using ArrangePolygons = std::vector<ArrangePolygon>;
 
+enum class Pivots {
+    Center, TopLeft, BottomLeft, BottomRight, TopRight
+};
+
 struct ArrangeParams {
 
     /// The minimum distance which is allowed for any 
@@ -92,6 +125,12 @@ struct ArrangeParams {
     bool parallel = true;
 
     bool allow_rotations = false;
+
+    /// Final alignment of the merged pile after arrangement
+    Pivots alignment = Pivots::Center;
+
+    /// Starting position hint for the arrangement
+    Pivots starting_point = Pivots::Center;
 
     /// Progress indicator callback called when an object gets packed. 
     /// The unsigned argument is the number of items remaining to pack.
@@ -127,11 +166,31 @@ extern template void arrange(ArrangePolygons &items, const ArrangePolygons &excl
 extern template void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const Polygon &bed, const ArrangeParams &params);
 extern template void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const InfiniteBed &bed, const ArrangeParams &params);
 
+inline void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const RectangleBed &bed, const ArrangeParams &params)
+{
+    arrange(items, excludes, bed.bb, params);
+}
+
+inline void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const IrregularBed &bed, const ArrangeParams &params)
+{
+    arrange(items, excludes, bed.poly.contour, params);
+}
+
+void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const SegmentedRectangleBed &bed, const ArrangeParams &params);
+
+inline void arrange(ArrangePolygons &items, const ArrangePolygons &excludes, const ArrangeBed &bed, const ArrangeParams &params)
+{
+    auto call_arrange = [&](const auto &realbed) { arrange(items, excludes, realbed, params); };
+    boost::apply_visitor(call_arrange, bed);
+}
+
 inline void arrange(ArrangePolygons &items, const Points &bed, const ArrangeParams &params = {}) { arrange(items, {}, bed, params); }
 inline void arrange(ArrangePolygons &items, const BoundingBox &bed, const ArrangeParams &params = {}) { arrange(items, {}, bed, params); }
 inline void arrange(ArrangePolygons &items, const CircleBed &bed, const ArrangeParams &params = {}) { arrange(items, {}, bed, params); }
 inline void arrange(ArrangePolygons &items, const Polygon &bed, const ArrangeParams &params = {}) { arrange(items, {}, bed, params); }
 inline void arrange(ArrangePolygons &items, const InfiniteBed &bed, const ArrangeParams &params = {}) { arrange(items, {}, bed, params); }
+
+bool is_box(const Points &bed);
 
 }} // namespace Slic3r::arrangement
 
