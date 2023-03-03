@@ -235,6 +235,15 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
         {"flip",    _L("Flip upside down")},
     };
 
+    m_labels_map = {
+        {"Connectors"   , _u8L("Connectors")},
+        {"Type"         , _u8L("Type")},
+        {"Style"        , _u8L("Style")},
+        {"Shape"        , _u8L("Shape")},
+        {"Depth ratio"  , _u8L("Depth ratio")},
+        {"Size"         , _u8L("Size")},
+    };
+
     update_connector_shape();
 }
 
@@ -576,9 +585,9 @@ void GLGizmoCut3D::render_move_center_input(int axis)
 
 bool GLGizmoCut3D::render_connect_type_radio_button(CutConnectorType type)
 {
-    ImGui::SameLine(type == CutConnectorType::Plug ? m_label_width : 2*m_label_width);
+    ImGui::SameLine(type == CutConnectorType::Plug ? m_label_width : 0);
     ImGui::PushItemWidth(m_control_width);
-    if (m_imgui->radio_button(m_connector_types[size_t(type)], m_connector_type == type)) {
+    if (ImGui::RadioButton(m_connector_types[size_t(type)].c_str(), m_connector_type == type)) {
         m_connector_type = type;
         update_connector_shape();
         return true;
@@ -588,9 +597,9 @@ bool GLGizmoCut3D::render_connect_type_radio_button(CutConnectorType type)
 
 void GLGizmoCut3D::render_connect_mode_radio_button(CutConnectorMode mode)
 {
-    ImGui::SameLine(mode == CutConnectorMode::Auto ? m_label_width : 2*m_label_width);
+    ImGui::SameLine(mode == CutConnectorMode::Auto ? m_label_width : 2 * m_label_width);
     ImGui::PushItemWidth(m_control_width);
-    if (m_imgui->radio_button(m_connector_modes[int(mode)], m_connector_mode == mode))
+    if (ImGui::RadioButton(m_connector_modes[int(mode)].c_str(), m_connector_mode == mode))
         m_connector_mode = mode;
 }
 
@@ -1534,7 +1543,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     // render_connect_mode_radio_button(CutConnectorMode::Manual);
 
     ImGui::AlignTextToFramePadding();
-    m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Connectors"));
+    m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, m_labels_map["Connectors"]);
 
     m_imgui->disabled_begin(connectors.empty());
     ImGui::SameLine(m_label_width);
@@ -1547,7 +1556,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
 
     render_flip_plane_button(m_connectors_editing && connectors.empty());
 
-    m_imgui->text(_L("Type"));
+    m_imgui->text(m_labels_map["Type"]);
     bool type_changed = render_connect_type_radio_button(CutConnectorType::Plug);
     type_changed     |= render_connect_type_radio_button(CutConnectorType::Dowel);
     if (type_changed)
@@ -1558,14 +1567,14 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
         m_connector_style = size_t(CutConnectorStyle::Prism);
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
     }
-    if (render_combo(_u8L("Style"), m_connector_styles, m_connector_style))
+    if (render_combo(m_labels_map["Style"], m_connector_styles, m_connector_style))
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
     m_imgui->disabled_end();
 
-    if (render_combo(_u8L("Shape"), m_connector_shapes, m_connector_shape_id))
+    if (render_combo(m_labels_map["Shape"], m_connector_shapes, m_connector_shape_id))
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id); });
 
-    if (render_slider_double_input(_u8L("Depth ratio"), m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
+    if (render_slider_double_input(m_labels_map["Depth ratio"], m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
         apply_selected_connectors([this, &connectors](size_t idx) {
             if (m_connector_depth_ratio > 0)
                 connectors[idx].height           = m_connector_depth_ratio;
@@ -1573,7 +1582,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
                 connectors[idx].height_tolerance = m_connector_depth_ratio_tolerance;
         });
 
-    if (render_slider_double_input(_u8L("Size"), m_connector_size, m_connector_size_tolerance))
+    if (render_slider_double_input(m_labels_map["Size"], m_connector_size, m_connector_size_tolerance))
         apply_selected_connectors([this, &connectors](size_t idx) {
             if (m_connector_size > 0)
                 connectors[idx].radius           = 0.5f * m_connector_size;
@@ -1588,7 +1597,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
         set_connectors_editing(false);
     }
 
-    ImGui::SameLine(2.75f * m_label_width);
+    ImGui::SameLine(m_label_width + 1.15f * m_control_width);
 
     if (m_imgui->button(_L("Cancel"))) {
         reset_connectors();
@@ -1608,7 +1617,7 @@ void GLGizmoCut3D::render_build_size()
 
     ImGui::AlignTextToFramePadding();
     m_imgui->text(_L("Build Volume"));
-    ImGui::SameLine(m_label_width);
+    ImGui::SameLine();
     m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, size);
 }
 
@@ -1657,7 +1666,7 @@ void GLGizmoCut3D::flip_cut_plane()
 
 void GLGizmoCut3D::render_flip_plane_button(bool disable_pred /*=false*/)
 {
-    ImGui::SameLine(2.5 * m_label_width);
+    ImGui::SameLine();
 
     if (m_hover_id == CutPlane)
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetColorU32(ImGuiCol_ButtonHovered));
@@ -1714,7 +1723,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
         ImGui::AlignTextToFramePadding();
         ImGuiWrapper::text(_L("Cut position: "));
-        ImGui::SameLine(m_label_width);
+        ImGui::SameLine();
         render_move_center_input(Z);
         ImGui::SameLine();
 
@@ -1738,7 +1747,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
                 set_connectors_editing(true);
         m_imgui->disabled_end();
 
-        ImGui::SameLine(2.5f * m_label_width);
+        ImGui::SameLine(1.5f * m_control_width);
 
         m_imgui->disabled_begin(is_cut_plane_init && !has_connectors);
             act_name = _L("Reset cut");
@@ -1864,7 +1873,6 @@ void GLGizmoCut3D::validate_connector_settings()
 void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
 {
     m_imperial_units = wxGetApp().app_config->get_bool("use_inches");
-    m_label_width    = m_imgui->get_font_size() * 6.f;
     m_control_width  = m_imgui->get_font_size() * 9.f;
 
     if (m_connectors_editing && m_selected_count > 0) {
@@ -1919,6 +1927,15 @@ void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
         m_connector_type                    = type;
         m_connector_style                   = size_t(style);
         m_connector_shape_id                = size_t(shape);
+    }
+
+    if (m_label_width == 0.f) {
+        for (const auto& item : m_labels_map) {
+            const float width = ImGuiWrapper::calc_text_size(item.second).x;
+            if (m_label_width < width)
+                m_label_width = width;
+        }
+        m_label_width += m_imgui->scaled(1.f);
     }
 }
 
