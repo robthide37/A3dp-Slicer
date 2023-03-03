@@ -5923,7 +5923,7 @@ msgstr "Avant"
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:4115
 msgid "Front left"
-msgstr "Front left"
+msgstr "Avant gauche"
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:4115
 msgid "Front right"
