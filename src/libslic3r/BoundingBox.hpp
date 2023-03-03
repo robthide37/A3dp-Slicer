@@ -221,7 +221,9 @@ inline bool empty(const BoundingBox3Base<VT> &bb)
     return ! bb.defined || bb.min(0) >= bb.max(0) || bb.min(1) >= bb.max(1) || bb.min(2) >= bb.max(2);
 }
 
-template<class T = coord_t>
+inline BoundingBox scaled(const BoundingBoxf &bb) { return {scaled(bb.min), scaled(bb.max)}; }
+
+template<class T>
 BoundingBoxBase<Vec<2, T>> scaled(const BoundingBoxf &bb) { return {scaled<T>(bb.min), scaled<T>(bb.max)}; }
 
 template<class T = coord_t>
