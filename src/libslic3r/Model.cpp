@@ -1522,6 +1522,11 @@ void ModelObject::process_modifier_cut(ModelVolume* volume, const Transform3d& i
     // to the modifier volume transformation to preserve their shape properly.
     volume->set_transformation(Geometry::Transformation(volume_matrix));
 
+    if (attributes.has(ModelObjectCutAttribute::KeepAsParts)) {
+        upper->add_volume(*volume);
+        return;
+    }
+
     // Some logic for the negative volumes/connectors. Add only needed modifiers
     auto bb = volume->mesh().transformed_bounding_box(inverse_cut_matrix * volume_matrix);
     bool is_crossed_by_cut = bb.min[Z] <= 0 && bb.max[Z] >= 0;
