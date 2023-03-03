@@ -1594,7 +1594,7 @@ void PrintObject::bridge_over_infill()
 
     std::unordered_map<const LayerSlice *, std::vector<ModifiedSurface>> bridging_surfaces;
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this,
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = static_cast<const PrintObject*>(this),
                                                                              &bridging_surfaces](tbb::blocked_range<size_t> r) {
         for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
             const Layer *layer = po->get_layer(lidx);
@@ -2100,6 +2100,7 @@ void PrintObject::bridge_over_infill()
                                                                                  &bridging_surfaces](tbb::blocked_range<size_t> r) {
             for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
                 Layer *layer = po->get_layer(lidx);
+                std::unordered_map<const LayerRegion*, Surfaces> new_surfaces;
 
                 for (const LayerSlice &slice : layer->lslices_ex) {
                     if (const auto &modified_surfaces = bridging_surfaces.find(&slice);
@@ -2122,40 +2123,38 @@ void PrintObject::bridge_over_infill()
                             cut_from_infill.insert(cut_from_infill.end(), surface.new_polys.begin(), surface.new_polys.end());
                         }
 
-                        for (LayerRegion *region : regions_to_check) {
-                            Surfaces new_surfaces;
-
+                        for (const LayerRegion *region : regions_to_check) {
                             for (const ModifiedSurface &s : modified_surfaces->second) {
-                                for (Surface &surface : region->m_fill_surfaces.surfaces) {
+                                for (const Surface &surface : region->m_fill_surfaces.surfaces) {
                                     if (s.original_surface == &surface) {
                                         Surface tmp(surface, {});
                                         for (const ExPolygon &expoly : diff_ex(surface.expolygon, s.new_polys)) {
                                             if (expoly.area() > region->flow(frSolidInfill).scaled_width() * scale_(4.0)) {
-                                                new_surfaces.emplace_back(tmp, expoly);
+                                                new_surfaces[region].emplace_back(tmp, expoly);
                                             }
                                         }
                                         tmp.surface_type = stInternalBridge;
                                         tmp.bridge_angle = s.bridge_angle;
                                         for (const ExPolygon &expoly : union_ex(s.new_polys)) {
-                                            new_surfaces.emplace_back(tmp, expoly);
+                                            new_surfaces[region].emplace_back(tmp, expoly);
                                         }
-                                        surface.clear();
                                     } else if (surface.surface_type == stInternal) {
                                         Surface tmp(surface, {});
                                         for (const ExPolygon &expoly : diff_ex(surface.expolygon, cut_from_infill)) {
-                                            new_surfaces.emplace_back(tmp, expoly);
+                                            new_surfaces[region].emplace_back(tmp, expoly);
                                         }
-                                        surface.clear();
+                                    } else {
+                                        new_surfaces[region].push_back(surface);
                                     }
                                 }
                             }
-                            region->m_fill_surfaces.surfaces.insert(region->m_fill_surfaces.surfaces.end(), new_surfaces.begin(),
-                                                                    new_surfaces.end());
-                            region->m_fill_surfaces.surfaces.erase(std::remove_if(region->m_fill_surfaces.surfaces.begin(),
-                                                                                  region->m_fill_surfaces.surfaces.end(),
-                                                                                  [](const Surface &s) { return s.empty(); }),
-                                                                   region->m_fill_surfaces.surfaces.end());
                         }
+                    }
+                }
+
+                for (LayerRegion *region : layer->regions()) {
+                    if (new_surfaces.find(region) != new_surfaces.end()) {
+                        region->m_fill_surfaces = new_surfaces[region];
                     }
                 }
             }
