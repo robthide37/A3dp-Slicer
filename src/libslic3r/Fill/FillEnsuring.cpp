@@ -25,7 +25,6 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
         Polygons polygons    = to_polygons(ex_poly);
         Arachne::WallToolPaths wall_tool_paths(polygons, scaled_spacing, scaled_spacing, loops_count, 0, params.layer_height, *this->print_object_config, *this->print_config);
         if (std::vector<Arachne::VariableWidthLines> loops = wall_tool_paths.getToolPaths(); !loops.empty()) {
-            assert(!is_bounded_rectilinear || loops.size() == 1);
             std::vector<const Arachne::ExtrusionLine *> all_extrusions;
             for (Arachne::VariableWidthLines &loop : loops) {
                 if (loop.empty())

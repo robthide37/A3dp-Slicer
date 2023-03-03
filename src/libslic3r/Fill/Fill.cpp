@@ -514,9 +514,9 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 		}
 
         if (surface_fill.params.pattern == ipEnsuring) {
-            auto *fill_bounded_rectilinear = dynamic_cast<FillEnsuring *>(f.get());
-            assert(fill_bounded_rectilinear != nullptr);
-            fill_bounded_rectilinear->print_region_config = &m_regions[surface_fill.region_id]->region().config();
+            auto *fill_ensuring = dynamic_cast<FillEnsuring *>(f.get());
+            assert(fill_ensuring != nullptr);
+            fill_ensuring->print_region_config = &m_regions[surface_fill.region_id]->region().config();
         }
 
         // calculate flow spacing for infill pattern generation
