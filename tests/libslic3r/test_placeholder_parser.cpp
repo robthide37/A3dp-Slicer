@@ -31,6 +31,7 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
 	parser.set("foo", 0);
 	parser.set("bar", 2);
 	parser.set("num_extruders", 4);
+    parser.set("gcode_flavor", "marlin");
 
     SECTION("nested config options (legacy syntax)") { REQUIRE(parser.process("[temperature_[foo]]") == "357"); }
     SECTION("array reference") { REQUIRE(parser.process("{temperature[foo]}") == "357"); }
@@ -115,4 +116,5 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
     SECTION("complex expression") { REQUIRE(boolean_expression("printer_notes=~/.*PRINTER_VENDOR_PRUSA3D.*/ and printer_notes=~/.*PRINTER_MODEL_MK2.*/ and nozzle_diameter[0]==0.6 and num_extruders>1")); }
     SECTION("complex expression2") { REQUIRE(boolean_expression("printer_notes=~/.*PRINTER_VEwerfNDOR_PRUSA3D.*/ or printer_notes=~/.*PRINTertER_MODEL_MK2.*/ or (nozzle_diameter[0]==0.6 and num_extruders>1)")); }
     SECTION("complex expression3") { REQUIRE(! boolean_expression("printer_notes=~/.*PRINTER_VEwerfNDOR_PRUSA3D.*/ or printer_notes=~/.*PRINTertER_MODEL_MK2.*/ or (nozzle_diameter[0]==0.3 and num_extruders>1)")); }
+    SECTION("enum expression") { REQUIRE(boolean_expression("gcode_flavor == \"marlin\"")); }
 }

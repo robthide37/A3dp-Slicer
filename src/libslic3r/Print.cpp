@@ -66,6 +66,11 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "between_objects_gcode",
         "bridge_acceleration",
         "bridge_fan_speed",
+        "enable_dynamic_fan_speeds",
+        "overhang_fan_speed_0",
+        "overhang_fan_speed_1",
+        "overhang_fan_speed_2",
+        "overhang_fan_speed_3",
         "colorprint_heights",
         "cooling",
         "default_acceleration",
@@ -514,7 +519,7 @@ std::string Print::validate(std::string* warning) const
         const PrintObject &print_object = *m_objects[print_object_idx];
         //FIXME It is quite expensive to generate object layers just to get the print height!
         if (auto layers = generate_object_layers(print_object.slicing_parameters(), layer_height_profile(print_object_idx));
-            ! layers.empty() && layers.back() > this->config().max_print_height) {
+            ! layers.empty() && layers.back() > this->config().max_print_height + EPSILON) {
             return L("The print is taller than the maximum allowed height. You might want to reduce the size of your model"
                      " or change current print settings and retry.");
         }

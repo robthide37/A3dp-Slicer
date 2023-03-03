@@ -5,6 +5,7 @@
 #include <map>
 #include <random>
 #include <string>
+#include <string_view>
 #include <vector>
 #include "PrintConfig.hpp"
 
@@ -38,6 +39,8 @@ public:
 
     // Add new ConfigOption values to m_config.
     void set(const std::string &key, const std::string &value)  { this->set(key, new ConfigOptionString(value)); }
+    void set(const std::string &key, std::string_view value)    { this->set(key, new ConfigOptionString(std::string(value))); }
+    void set(const std::string &key, const char *value)         { this->set(key, new ConfigOptionString(value)); }
     void set(const std::string &key, int value)                 { this->set(key, new ConfigOptionInt(value)); }
     void set(const std::string &key, unsigned int value)        { this->set(key, int(value)); }
     void set(const std::string &key, bool value)                { this->set(key, new ConfigOptionBool(value)); }

@@ -145,6 +145,7 @@ struct PartialObject
 
 using PartialObjects = std::vector<PartialObject>;
 
+// Both support points and partial objects are sorted from the lowest z to the highest
 std::tuple<SupportPoints, PartialObjects> full_search(const PrintObject *po, const PrintTryCancel& cancel_func, const Params &params);
 
 void estimate_supports_malformations(std::vector<SupportLayer *> &layers, float supports_flow_width, const Params &params);
