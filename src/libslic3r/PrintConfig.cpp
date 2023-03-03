@@ -4685,7 +4685,7 @@ bool is_XL_printer(const DynamicPrintConfig &cfg)
     auto *printer_model = cfg.opt<ConfigOptionString>("printer_model");
 
     if (printer_model)
-        ret = boost::algorithm::contains(printer_model->value, ALIGN_ONLY_FOR);
+        ret = boost::algorithm::starts_with(printer_model->value, ALIGN_ONLY_FOR);
 
     return ret;
 }
