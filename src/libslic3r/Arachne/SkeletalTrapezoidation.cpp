@@ -22,8 +22,6 @@
 
 #define SKELETAL_TRAPEZOIDATION_BEAD_SEARCH_MAX 1000 //A limit to how long it'll keep searching for adjacent beads. Increasing will re-use beadings more often (saving performance), but search longer for beading (costing performance).
 
-//#define ARACHNE_DEBUG
-
 namespace boost::polygon {
 
 template<> struct geometry_concept<Slic3r::Arachne::PolygonsSegmentIndex>
@@ -45,6 +43,71 @@ template<> struct segment_traits<Slic3r::Arachne::PolygonsSegmentIndex>
 
 namespace Slic3r::Arachne
 {
+
+#ifdef ARACHNE_DEBUG
+static void export_graph_to_svg(const std::string                                 &path,
+                                SkeletalTrapezoidationGraph                       &graph,
+                                const Polygons                                    &polys,
+                                const std::vector<std::shared_ptr<LineJunctions>> &edge_junctions     = {},
+                                const bool                                         beat_count         = true,
+                                const bool                                         transition_middles = true,
+                                const bool                                         transition_ends    = true)
+{
+    const std::vector<std::string> colors       = {"blue", "cyan", "red", "orange", "magenta", "pink", "purple", "green", "yellow"};
+    coordf_t                       stroke_width = scale_(0.03);
+    BoundingBox                    bbox         = get_extents(polys);
+    for (const auto &node : graph.nodes)
+        bbox.merge(node.p);
+
+    bbox.offset(scale_(1.));
+
+    ::Slic3r::SVG svg(path.c_str(), bbox);
+    for (const auto &line : to_lines(polys))
+        svg.draw(line, "gray", stroke_width);
+
+    for (const auto &edge : graph.edges)
+        svg.draw(Line(edge.from->p, edge.to->p), (edge.data.centralIsSet() && edge.data.isCentral()) ? "blue" : "cyan", stroke_width);
+
+    for (const auto &line_junction : edge_junctions)
+        for (const auto &extrusion_junction : *line_junction)
+            svg.draw(extrusion_junction.p, "orange", coord_t(stroke_width * 2.));
+
+    if (beat_count) {
+        for (const auto &node : graph.nodes) {
+            svg.draw(node.p, "red", coord_t(stroke_width * 1.6));
+            svg.draw_text(node.p, std::to_string(node.data.bead_count).c_str(), "black", 1);
+        }
+    }
+
+    if (transition_middles) {
+        for (auto &edge : graph.edges) {
+            if (std::shared_ptr<std::list<SkeletalTrapezoidationEdge::TransitionMiddle>> transitions = edge.data.getTransitions(); transitions) {
+                for (auto &transition : *transitions) {
+                    Line edge_line = Line(edge.to->p, edge.from->p);
+                    double edge_length = edge_line.length();
+                    Point   pt          = edge_line.a + (edge_line.vector().cast<double>() * (double(transition.pos) / edge_length)).cast<coord_t>();
+                    svg.draw(pt, "magenta", coord_t(stroke_width * 1.5));
+                    svg.draw_text(pt, std::to_string(transition.lower_bead_count).c_str(), "black", 1);
+                }
+            }
+        }
+    }
+
+    if (transition_ends) {
+        for (auto &edge : graph.edges) {
+            if (std::shared_ptr<std::list<SkeletalTrapezoidationEdge::TransitionEnd>> transitions = edge.data.getTransitionEnds(); transitions) {
+                for (auto &transition : *transitions) {
+                    Line edge_line = Line(edge.to->p, edge.from->p);
+                    double edge_length = edge_line.length();
+                    Point   pt          = edge_line.a + (edge_line.vector().cast<double>() * (double(transition.pos) / edge_length)).cast<coord_t>();
+                    svg.draw(pt, transition.is_lower_end ? "green" : "lime", coord_t(stroke_width * 1.5));
+                    svg.draw_text(pt, std::to_string(transition.lower_bead_count).c_str(), "black", 1);
+                }
+            }
+        }
+    }
+}
+#endif
 
 SkeletalTrapezoidation::node_t& SkeletalTrapezoidation::makeNode(vd_t::vertex_type& vd_node, Point p)
 {
@@ -388,8 +451,23 @@ SkeletalTrapezoidation::SkeletalTrapezoidation(const Polygons& polys, const Bead
     constructFromPolygons(polys);
 }
 
+static bool has_finite_edge_with_non_finite_vertex(const Geometry::VoronoiDiagram &voronoi_diagram)
+{
+    for (const VoronoiUtils::vd_t::edge_type &edge : voronoi_diagram.edges()) {
+        if (edge.is_finite()) {
+            assert(edge.vertex0() != nullptr && edge.vertex1() != nullptr);
+            if (edge.vertex0() == nullptr || edge.vertex1() == nullptr || !VoronoiUtils::is_finite(*edge.vertex0()) ||
+                !VoronoiUtils::is_finite(*edge.vertex1()))
+                return true;
+        }
+    }
+    return false;
+}
 
 static bool detect_missing_voronoi_vertex(const Geometry::VoronoiDiagram &voronoi_diagram, const std::vector<SkeletalTrapezoidation::Segment> &segments) {
+    if (has_finite_edge_with_non_finite_vertex(voronoi_diagram))
+        return true;
+
     for (VoronoiUtils::vd_t::cell_type cell : voronoi_diagram.cells()) {
         if (!cell.incident_edge())
             continue; // There is no spoon
@@ -408,7 +486,8 @@ static bool detect_missing_voronoi_vertex(const Geometry::VoronoiDiagram &vorono
             VoronoiUtils::vd_t::edge_type *ending_vd_edge                  = nullptr;
             VoronoiUtils::vd_t::edge_type *edge                            = cell.incident_edge();
             do {
-                if (edge->is_infinite()) continue;
+                if (edge->is_infinite() || edge->vertex0() == nullptr || edge->vertex1() == nullptr || !VoronoiUtils::is_finite(*edge->vertex0()) || !VoronoiUtils::is_finite(*edge->vertex1()))
+                    continue;
 
                 Vec2i64 v0 = VoronoiUtils::p(edge->vertex0());
                 Vec2i64 v1 = VoronoiUtils::p(edge->vertex1());
@@ -446,28 +525,35 @@ static bool has_missing_twin_edge(const SkeletalTrapezoidationGraph &graph)
 inline static std::unordered_map<Point, Point, PointHash> try_to_fix_degenerated_voronoi_diagram_by_rotation(
     Geometry::VoronoiDiagram                     &voronoi_diagram,
     const Polygons                               &polys,
-    Polygons                                     &polys_copy,
+    Polygons                                     &polys_rotated,
     std::vector<SkeletalTrapezoidation::Segment> &segments,
     const double                                  fix_angle)
 {
     std::unordered_map<Point, Point, PointHash> vertex_mapping;
-    for (Polygon &poly : polys_copy)
+    for (Polygon &poly : polys_rotated)
         poly.rotate(fix_angle);
 
-    assert(polys_copy.size() == polys.size());
+    assert(polys_rotated.size() == polys.size());
     for (size_t poly_idx = 0; poly_idx < polys.size(); ++poly_idx) {
-        assert(polys_copy[poly_idx].size() == polys[poly_idx].size());
+        assert(polys_rotated[poly_idx].size() == polys[poly_idx].size());
         for (size_t point_idx = 0; point_idx < polys[poly_idx].size(); ++point_idx)
-            vertex_mapping.insert({polys[poly_idx][point_idx], polys_copy[poly_idx][point_idx]});
+            vertex_mapping.insert({polys_rotated[poly_idx][point_idx], polys[poly_idx][point_idx]});
     }
 
     segments.clear();
-    for (size_t poly_idx = 0; poly_idx < polys_copy.size(); poly_idx++)
-        for (size_t point_idx = 0; point_idx < polys_copy[poly_idx].size(); point_idx++)
-            segments.emplace_back(&polys_copy, poly_idx, point_idx);
+    for (size_t poly_idx = 0; poly_idx < polys_rotated.size(); poly_idx++)
+        for (size_t point_idx = 0; point_idx < polys_rotated[poly_idx].size(); point_idx++)
+            segments.emplace_back(&polys_rotated, poly_idx, point_idx);
 
     voronoi_diagram.clear();
     construct_voronoi(segments.begin(), segments.end(), &voronoi_diagram);
+
+#ifdef ARACHNE_DEBUG_VORONOI
+    {
+        static int iRun = 0;
+        dump_voronoi_to_svg(debug_out_path("arachne_voronoi-diagram-rotated-%d.svg", iRun++).c_str(), voronoi_diagram, to_points(polys), to_lines(polys));
+    }
+#endif
 
     assert(Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(voronoi_diagram));
 
@@ -489,6 +575,10 @@ inline static void rotate_back_skeletal_trapezoidation_graph_after_fix(SkeletalT
 
 void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
 {
+#ifdef ARACHNE_DEBUG
+    this->outline = polys;
+#endif
+
     // Check self intersections.
     assert([&polys]() -> bool {
         EdgeGrid::Grid grid;
@@ -517,15 +607,11 @@ void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
     Geometry::VoronoiDiagram voronoi_diagram;
     construct_voronoi(segments.begin(), segments.end(), &voronoi_diagram);
 
-#ifdef ARACHNE_DEBUG
+#ifdef ARACHNE_DEBUG_VORONOI
     {
         static int iRun = 0;
         dump_voronoi_to_svg(debug_out_path("arachne_voronoi-diagram-%d.svg", iRun++).c_str(), voronoi_diagram, to_points(polys), to_lines(polys));
     }
-#endif
-
-#ifdef ARACHNE_DEBUG
-    assert(is_voronoi_diagram_planar_intersection(voronoi_diagram));
 #endif
 
     // Try to detect cases when some Voronoi vertex is missing and when
@@ -648,6 +734,10 @@ process_voronoi_diagram:
     if (degenerated_voronoi_diagram)
         rotate_back_skeletal_trapezoidation_graph_after_fix(this->graph, fix_angle, vertex_mapping);
 
+#ifdef ARACHNE_DEBUG
+    assert(Geometry::VoronoiUtilsCgal::is_voronoi_diagram_planar_intersection(voronoi_diagram));
+#endif
+
     separatePointyQuadEndNodes();
 
     graph.collapseSmallEdges();
@@ -694,45 +784,62 @@ void SkeletalTrapezoidation::separatePointyQuadEndNodes()
 // vvvvvvvvvvvvvvvvvvvvv
 //
 
-#if 0
-static void export_graph_to_svg(const std::string &path, const SkeletalTrapezoidationGraph &graph, const Polygons &polys)
-{
-    const std::vector<std::string> colors       = {"blue", "cyan", "red", "orange", "magenta", "pink", "purple", "green", "yellow"};
-    coordf_t                       stroke_width = scale_(0.05);
-    BoundingBox                    bbox;
-    for (const auto &node : graph.nodes)
-        bbox.merge(node.p);
-
-    bbox.offset(scale_(1.));
-    ::Slic3r::SVG svg(path.c_str(), bbox);
-    for (const auto &line : to_lines(polys))
-        svg.draw(line, "red", stroke_width);
-
-    for (const auto &edge : graph.edges)
-        svg.draw(Line(edge.from->p, edge.to->p), "cyan", scale_(0.01));
-}
-#endif
-
 void SkeletalTrapezoidation::generateToolpaths(std::vector<VariableWidthLines> &generated_toolpaths, bool filter_outermost_central_edges)
 {
+#ifdef ARACHNE_DEBUG
+    static int iRun = 0;
+#endif
+
     p_generated_toolpaths = &generated_toolpaths;
 
     updateIsCentral();
 
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-updateIsCentral-final-%d.svg", iRun), this->graph, this->outline);
+#endif
+
     filterCentral(central_filter_dist);
+
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-filterCentral-final-%d.svg", iRun), this->graph, this->outline);
+#endif
 
     if (filter_outermost_central_edges)
         filterOuterCentral();
 
     updateBeadCount();
 
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-updateBeadCount-final-%d.svg", iRun), this->graph, this->outline);
+#endif
+
     filterNoncentralRegions();
+
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-filterNoncentralRegions-final-%d.svg", iRun), this->graph, this->outline);
+#endif
 
     generateTransitioningRibs();
 
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-generateTransitioningRibs-final-%d.svg", iRun), this->graph, this->outline);
+#endif
+
     generateExtraRibs();
 
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-generateExtraRibs-final-%d.svg", iRun), this->graph, this->outline);
+#endif
+
     generateSegments();
+
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-generateSegments-final-%d.svg", iRun), this->graph, this->outline);
+#endif
+
+#ifdef ARACHNE_DEBUG
+    ++iRun;
+#endif
 }
 
 void SkeletalTrapezoidation::updateIsCentral()
@@ -944,11 +1051,24 @@ void SkeletalTrapezoidation::generateTransitioningRibs()
  
     filterTransitionMids();
 
+#ifdef ARACHNE_DEBUG
+    static int iRun = 0;
+    export_graph_to_svg(debug_out_path("ST-generateTransitioningRibs-mids-%d.svg", iRun++), this->graph, this->outline);
+#endif
+
     ptr_vector_t<std::list<TransitionEnd>> edge_transition_ends; // We only map the half edge in the upward direction. mapped items are not sorted
     generateAllTransitionEnds(edge_transition_ends);
 
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-generateTransitioningRibs-ends-%d.svg", iRun++), this->graph, this->outline);
+#endif
+
     applyTransitions(edge_transition_ends);
     // Note that the shared pointer lists will be out of scope and thus destroyed here, since the remaining refs are weak_ptr.
+
+#ifdef ARACHNE_DEBUG
+    ++iRun;
+#endif
 }
 
 
@@ -1526,9 +1646,7 @@ bool SkeletalTrapezoidation::isEndOfCentral(const edge_t& edge_to) const
 
 void SkeletalTrapezoidation::generateExtraRibs()
 {
-    if (graph.edges.empty()) return;
-    auto end_edge_it = --graph.edges.end(); // Don't check newly introduced edges
-    for (auto edge_it = graph.edges.begin(); edge_it == graph.edges.begin() || std::prev(edge_it) != end_edge_it; ++edge_it)
+    for (auto edge_it = graph.edges.begin(); edge_it != graph.edges.end(); ++edge_it)
     {
         edge_t& edge = *edge_it;
         
@@ -1670,17 +1788,38 @@ void SkeletalTrapezoidation::generateSegments()
             }
         }
     }
-    
+
+#ifdef ARACHNE_DEBUG
+    static int iRun = 0;
+    export_graph_to_svg(debug_out_path("ST-generateSegments-before-propagation-%d.svg", iRun), this->graph, this->outline);
+#endif
+
     propagateBeadingsUpward(upward_quad_mids, node_beadings);
 
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-generateSegments-upward-propagation-%d.svg", iRun), this->graph, this->outline);
+#endif
+
     propagateBeadingsDownward(upward_quad_mids, node_beadings);
+
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-generateSegments-downward-propagation-%d.svg", iRun), this->graph, this->outline);
+#endif
 
     ptr_vector_t<LineJunctions> edge_junctions; // junctions ordered high R to low R
     generateJunctions(node_beadings, edge_junctions);
 
+#ifdef ARACHNE_DEBUG
+    export_graph_to_svg(debug_out_path("ST-generateSegments-junctions-%d.svg", iRun), this->graph, this->outline, edge_junctions);
+#endif
+
     connectJunctions(edge_junctions);
-    
+
     generateLocalMaximaSingleBeads();
+
+#ifdef ARACHNE_DEBUG
+    ++iRun;
+#endif
 }
 
 SkeletalTrapezoidation::edge_t* SkeletalTrapezoidation::getQuadMaxRedgeTo(edge_t* quad_start_edge)
@@ -1913,7 +2052,10 @@ void SkeletalTrapezoidation::generateJunctions(ptr_vector_t<BeadingPropagation>&
         for (junction_idx = (std::max(size_t(1), beading->toolpath_locations.size()) - 1) / 2; junction_idx < num_junctions; junction_idx--)
         {
             coord_t bead_R = beading->toolpath_locations[junction_idx];
-            if (bead_R <= start_R)
+            // toolpath_locations computed inside DistributedBeadingStrategy could be off by 1 because of rounding errors.
+            // In GH issue #8472, these roundings errors caused missing the middle extrusion.
+            // Adding small epsilon should help resolve those cases.
+            if (bead_R <= start_R + 1)
             { // Junction coinciding with start node is used in this function call
                 break;
             }

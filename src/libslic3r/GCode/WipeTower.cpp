@@ -12,7 +12,8 @@
 #include "LocalesUtils.hpp"
 #include "Flow.hpp"
 
-#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+
 
 namespace Slic3r
 {
@@ -96,10 +97,7 @@ public:
                 && m_tool_name[this->m_current_tool][0] != static_cast<char>(('0' + this->m_current_tool))) {
                 m_gcode += "SET_PRESSURE_ADVANCE ADVANCE=0 EXTRUDER=" + m_tool_name[this->m_current_tool] + "\n";
             } else {
-                m_gcode += "SET_PRESSURE_ADVANCE ADVANCE=0 EXTRUDER=extruder";
-                if (this->m_current_tool > 0)
-                    m_gcode += std::to_string(this->m_current_tool);
-                m_gcode += "\n";
+                m_gcode += "SET_PRESSURE_ADVANCE ADVANCE=0\n";
             }
         } else {
             m_gcode += std::string("M900 K0\n");
@@ -1415,7 +1413,8 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         const Slic3r::Flow brim_flow = 
              Flow::new_from_config_width(
             frPerimeter,
-            *Flow::extrusion_option("brim_extrusion_width", brim_region_config),
+            *Flow::extrusion_width_option("brim", brim_region_config),
+            *Flow::extrusion_spacing_option("brim", brim_region_config),
             (float)m_nozzle_diameter,
             (float)m_layer_height,
             (m_current_tool < m_config->nozzle_diameter.values.size()) ? m_object_config->get_computed_value("filament_max_overlap", m_current_tool) : 1
@@ -1455,7 +1454,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
 
     // Ask our writer about how much material was consumed.
     // Skip this in case the layer is sparse and config option to not print sparse layers is enabled.
-    if (! m_no_sparse_layers || toolchanges_on_layer)
+    if (! m_no_sparse_layers || toolchanges_on_layer || first_layer)
         if (m_current_tool < m_used_filament_length.size())
             m_used_filament_length[m_current_tool] += writer.get_and_reset_used_filament_length();
 
@@ -1471,7 +1470,7 @@ void WipeTower::plan_toolchange(float z_par, float layer_height_par, uint16_t ol
 	if (m_plan.empty() || m_plan.back().z + WT_EPSILON < z_par) // if we moved to a new layer, we'll add it to m_plan first
 		m_plan.push_back(WipeTowerInfo(z_par, layer_height_par));
 
-    if (m_first_layer_idx == size_t(-1) && (! m_no_sparse_layers || old_tool != new_tool))
+    if (m_first_layer_idx == size_t(-1) && (! m_no_sparse_layers || old_tool != new_tool || m_plan.size() == 1))
         m_first_layer_idx = m_plan.size() - 1;
 
     if (old_tool == new_tool)	// new layer without toolchanges - we are done

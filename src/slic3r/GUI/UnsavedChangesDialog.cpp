@@ -1038,7 +1038,7 @@ bool UnsavedChangesDialog::save(PresetCollection* dependent_presets, bool show_s
 wxString get_string_from_enum(const std::string& opt_key, const DynamicPrintConfig& config)
 {
     const ConfigOptionDef& def = config.def()->options.at(opt_key);
-    const std::vector<std::string>& names = def.enum_labels;//ConfigOptionEnum<T>::get_enum_names();
+    const std::vector<std::string>& names = def.enum_labels.empty() ? def.enum_values : def.enum_labels;
     int val = config.option(opt_key)->getInt();
 
     // if it doesn't use all list declared in PrintConfig.hpp.
@@ -1309,7 +1309,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
 
         for (const std::string& opt_key : dirty_options) {
             const Search::Option& option = searcher.get_option(opt_key, type);
-            if (option.opt_key() != opt_key) {
+            if (option.opt_key_with_idx() != opt_key) {
                 // When founded option isn't the correct one.
                 // It can be for dirty_options: "default_print_profile", "printer_model", "printer_settings_id",
                 // because of they don't exist in searcher
@@ -1320,6 +1320,9 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
                 get_string_value(opt_key, old_config), get_string_value(opt_key, new_config), category_icon_map.find(option.category) != category_icon_map.end() ? category_icon_map.at(option.category) : "wrench");
         }
     }
+
+    // Revert sort of searcher back
+    searcher.sort_options_by_label();
 }
 
 void UnsavedChangesDialog::on_dpi_changed(const wxRect& suggested_rect)
@@ -1699,7 +1702,7 @@ void DiffPresetDialog::update_tree()
             wxString right_val = get_string_value(opt_key, right_congig);
 
             Search::Option option = searcher.get_option_names(opt_key/*, get_full_label(opt_key, left_config)*/, type);
-            if (option.opt_key() != opt_key) {
+            if (option.opt_key_with_idx() != opt_key) {
                 // temporary solution, just for testing
                 m_tree->Append(opt_key, type, _L("Undef category"), _L("Undef group"), opt_key, left_val, right_val, "question");
                 // When founded option isn't the correct one.
@@ -1729,6 +1732,9 @@ void DiffPresetDialog::update_tree()
         Fit();
         Refresh();
     }
+
+    // Revert sort of searcher back
+    searcher.sort_options_by_label();
 }
 
 void DiffPresetDialog::on_dpi_changed(const wxRect&)

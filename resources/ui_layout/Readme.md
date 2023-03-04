@@ -61,6 +61,7 @@ each parameter is separated by ':'
 	* `label_left`: Draw the label aligned to the left instead of the right.
 	* `full_label$STR`: to override the full_label by this new one (full_label is used on modifiers).
 	* `full_label`: to override the label by the "full one".
+	* `tooltip$STR`: to override the tooltip. Note that you can write '\t' for a tabulation, '\n' for a new line, '\.' for a ':' and '\£' for a '$'.
 	* `full_width`: to tell to create a field that span the full width.
 	* `sidetext$STR`: the suffix at the right of the widget (like 'mm').
 	* `sidetext_width$INT`: the suffix label length (override the group one). -1 for auto.
@@ -161,8 +162,8 @@ Here are all the functions you need to define for your custom widget to work (fo
  * float **OPTNAME_get**()
  * void **OPTNAME_set**(float set)
  ### type float_or_percent:
- * float **OPTNAME_get**(bool &out is_percent)
- * void **OPTNAME_set**(float set, bool is_percent)
+ * float **OPTNAME_get**(bool &out isPercent)
+ * void **OPTNAME_set**(float set, bool isPercent)
 ###  type string:
  * void **OPTNAME_get**(string &out get)
  * void **OPTNAME_set**(string &in set)

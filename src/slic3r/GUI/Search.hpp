@@ -48,14 +48,19 @@ struct Option {
 //    bool operator<(const Option& other) const { return other.label > this->label; }
     bool operator<(const Option& other) const {
         if (this->type == other.type)
-            return this->key < other.key;
-        return  this->type < other.type;
+            if (this->key == other.key)
+                return this->idx < other.idx;
+            else
+               return this->key < other.key;
+        else
+            return  this->type < other.type;
     }
 
     // Fuzzy matching works at a character level. Thus matching with wide characters is a safer bet than with short characters,
     // though for some languages (Chinese?) it may not work correctly.
     std::wstring    key;
     Preset::Type    type {Preset::TYPE_INVALID};
+    int16_t        idx;
     ConfigOptionMode tags;
     std::wstring    label;
     std::wstring    label_local;
@@ -67,7 +72,7 @@ struct Option {
     std::wstring    tooltip_local;
     std::wstring    tooltip_lowercase;
     std::wstring    tooltip_local_lowercase;
-    std::string     opt_key() const;
+    std::string     opt_key_with_idx() const;
 };
 
 struct FoundOption {
@@ -131,7 +136,7 @@ public:
     bool search();
     bool search(const std::string& search, bool force = false);
 
-    void add_key(const std::string& opt_key, Preset::Type type, const wxString& group, const wxString& category, const ConfigOptionDef& gui_opt);
+    void add_key(const std::string& opt_key, Preset::Type type, const wxString& group, const wxString& category, const ConfigOptionDef& gui_opt, bool reset = false);
 
     size_t size() const         { return found_size(); }
 

@@ -4729,7 +4729,7 @@ msgid "Minimum exposure time"
 msgstr "Minimale Belichtungszeit"
 
 msgid "Minimum feedrate when extruding"
-msgstr "Maximaler Vorschub bei Extrusion"
+msgstr "Minimaler Vorschub bei Extrusion"
 
 msgid "Minimum feedrate when extruding (M205 S)"
 msgstr "Minimaler Vorschub beim Extrudieren (M205 S)"

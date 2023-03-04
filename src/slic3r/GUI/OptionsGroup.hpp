@@ -143,8 +143,8 @@ public:
 	// delete all controls from the option group
 	void		clear(bool destroy_custom_ctrl = false);
 
-	// ask for each script option to recompute their value
-	void		update_script_presets();
+	// ask for each script option to recompute their value. If init is true, it will ask for get/set even if the Field isn't created.
+	void		update_script_presets(bool init = false);
 
     Line		create_single_option_line(const Option& option, const std::string& path = std::string()) const;
     void		append_single_option_line(const Option& option, const std::string& path = std::string()) { append_line(create_single_option_line(option, path)); }
@@ -268,11 +268,11 @@ public:
 	bool		has_option(const std::string& opt_key, int opt_index = -1);
 	// more like "create option from def"
 	Option		get_option(const std::string& opt_key, int opt_index = -1);
-	void		register_to_search(const std::string& opt_key, const ConfigOptionDef& option_def, int opt_index = -1);
+	void		register_to_search(const std::string& opt_key, const ConfigOptionDef& option_def, int opt_index, bool reset);
 	Option		get_option_and_register(const std::string& opt_key, int opt_index = -1) {
 		Option opt = get_option(opt_key, opt_index);
 		if(m_use_custom_ctrl) // fill group and category values just for options from Settings Tab
-			register_to_search(opt_key, opt.opt, opt_index);
+			register_to_search(opt_key, opt.opt, opt_index, true);
 		return opt;
 	}
 	Line		create_single_option_line(const std::string& title, const std::string& path = std::string(), int idx = -1) /*const*/{

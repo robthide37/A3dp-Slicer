@@ -131,12 +131,12 @@ public:
     double total_volume() const override { double volume=0.; for (const auto& ent : entities()) volume+=ent->total_volume(); return volume; }
 
     // Following methods shall never be called on an ExtrusionEntityCollection.
-    Polyline as_polyline() const override {
+    PolylineOrArc as_polyline() const override {
         throw Slic3r::RuntimeError("Calling as_polyline() on a ExtrusionEntityCollection");
-        return Polyline();
+        return PolylineOrArc();
     };
 
-    void collect_polylines(Polylines &dst) const override {
+    void collect_polylines(PolylinesOrArcs &dst) const override {
         for (const ExtrusionEntity* extrusion_entity : this->entities())
             extrusion_entity->collect_polylines(dst);
     }

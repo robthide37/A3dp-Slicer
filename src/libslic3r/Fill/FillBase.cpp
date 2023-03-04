@@ -58,9 +58,7 @@ Fill* Fill::new_from_type(const InfillPattern type)
     case ipAdaptiveCubic:       return new FillAdaptive::Filler();
     case ipSupportCubic:        return new FillAdaptive::Filler();
     case ipSupportBase:         return new FillSupportBase();
-#if HAS_LIGHTNING_INFILL
     case ipLightning:           return new FillLightning::Filler();
-#endif // HAS_LIGHTNING_INFILL
     default: throw Slic3r::InvalidArgument("unknown type");
     }
 }
@@ -217,8 +215,8 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                 for (const ExtrusionEntity* entity : entities) {
                     extruded_volume += entity->total_volume();
                 }
-                //append
-                all_new_paths->append(entities);
+                //append (move so the pointers are reused, and won't need to be deleted)
+                all_new_paths->append(std::move(entities));
             }
             thick_polylines.clear();
 

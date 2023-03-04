@@ -3043,8 +3043,11 @@ MedialAxis::build(ThickPolylines& polylines_out)
 
 }
 
+ExtrusionMultiPath variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance) {
+    return ExtrusionMultiPath(unsafe_variable_width(polyline, role, flow, resolution_internal, tolerance));
+}
 ExtrusionPaths
-variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance)
+unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance)
 {
 
     ExtrusionPaths paths;
@@ -3149,21 +3152,27 @@ variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Fl
 
         // default: extrude a thin wall that doesn't go outside of the specified width.
         double wanted_width = unscaled(line.a_width);
-        if (role == erGapFill) {
-            // Convert from spacing to extrusion width based on the extrusion model
-            // of a square extrusion ended with semi circles.
-            wanted_width = unscaled(line.a_width) + flow.height() * (1. - 0.25 * PI);
-        } else if (role == erOverhangPerimeter && flow.bridge()) {
-            // for Arachne overhangs: keep the bridge width.
-            wanted_width = flow.width();
-        } else if (unscale<coordf_t>(line.a_width) < 2 * flow.height() * (1. - 0.25 * PI)) {
+        //if gapfill or arachne, the width is in fact the spacing.
+        if (role != erThinWall) {
+            if (role == erOverhangPerimeter && flow.bridge()) {
+                // for Arachne overhangs: keep the bridge width.
+                wanted_width = flow.width();
+            } else {
+                // Convert from spacing to extrusion width based on the extrusion model
+                // of a square extrusion ended with semi circles.
+                wanted_width = Flow::rounded_rectangle_extrusion_width_from_spacing(unscaled(line.a_width), flow.height(), flow.spacing_ratio());
+            }
+        }
+        // check if the width isn't too small (negative spacing)
+        // 1.f spacing ratio, because it's to get the really minimum. 0 spacing ratio will makes that irrelevant.
+        if (unscale<coordf_t>(line.a_width) < 2 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), 1.f)) {
             //width (too) small, be sure to not extrude with negative spacing.
             //we began to fall back to spacing gradually even before the spacing go into the negative
             //  to make extrusion1 < extrusion2 if width1 < width2 even if width2 is too small. 
-            wanted_width = unscaled(line.a_width) * 0.35 + 1.3 * flow.height() * (1. - 0.25 * PI);
+            wanted_width = unscaled(line.a_width) * 0.35 + 1.3 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), 1.f);
         }
 
-        if (path.polyline.points.empty()) {
+        if (path.polyline.empty()) {
             if (wanted_width != current_flow.width()) {
                 current_flow = current_flow.with_width((float)wanted_width);
             }
@@ -3183,7 +3192,7 @@ variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Fl
                 path.polyline.append(line.b);
             } else {
                 // we need to initialize a new line
-                paths.emplace_back(std::move(path));
+                paths.push_back(path);
                 path = ExtrusionPath(role);
                 if (wanted_width != current_flow.width()) {
                     current_flow = current_flow.with_width(wanted_width);
@@ -3198,10 +3207,10 @@ variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Fl
                 path.height = current_flow.height();
             }
         }
-        assert(path.polyline.points.size() > 2 || path.first_point() != path.last_point());
+        assert(path.polyline.size() > 2 || path.first_point() != path.last_point());
     }
     if (path.polyline.is_valid())
-        paths.emplace_back(std::move(path));
+        paths.push_back(path);
 
     return paths;
 }
@@ -3217,36 +3226,34 @@ ExtrusionEntitiesPtr
     const coord_t tolerance = flow.scaled_width() / 10;//scale_(0.05);
     ExtrusionEntitiesPtr coll;
     for (const ThickPolyline& p : polylines) {
-
-        ExtrusionPaths paths = variable_width(p, role, flow, resolution_internal, tolerance);
+        ExtrusionMultiPath multi_paths = variable_width(p, role, flow, resolution_internal, tolerance);
         // Append paths to collection.
-        if (!paths.empty()) {
-            for (auto it = std::next(paths.begin()); it != paths.end(); ++it) {
-                assert(it->polyline.points.size() >= 2);
-                assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+        if (!multi_paths.empty()) {
+#if _DEBUG
+            for (auto it = std::next(multi_paths.paths.begin()); it != multi_paths.paths.end(); ++it) {
+                assert(it->polyline.size() >= 2);
+                assert(std::prev(it)->polyline.back() == it->polyline.front());
             }
-            if (paths.front().first_point().coincides_with_epsilon(paths.back().last_point())) {
-                coll.push_back(new ExtrusionLoop(std::move(paths)));
+#endif
+            if (multi_paths.paths.front().first_point().coincides_with_epsilon(multi_paths.paths.back().last_point())) {
+                coll.push_back(new ExtrusionLoop(std::move(multi_paths.paths)));
             } else {
                 if (role == erThinWall) {
                     //thin walls : avoid to cut them, please.
                     //also, keep the start, as the start should be already in a frontier where possible.
-                    ExtrusionEntityCollection* unsortable_coll = new ExtrusionEntityCollection(std::move(paths));
+                    ExtrusionEntityCollection* unsortable_coll = new ExtrusionEntityCollection(std::move(multi_paths.paths));
                     unsortable_coll->set_can_sort_reverse(false, false);
+                    //TODO un-reversable multipath ?
                     coll.push_back(unsortable_coll);
                 } else if (role == erGapFill) {
-                    if (paths.size() == 1) {
-                        coll.push_back(paths.front().clone_move());
+                    if (multi_paths.size() == 1) {
+                        coll.push_back(multi_paths.paths.front().clone_move());
                     } else {
-                        ExtrusionEntityCollection* unsortable_coll = new ExtrusionEntityCollection(std::move(paths));
-                        //gap fill : can reverse, but refrain from cutting them as it creates a mess.
-                        // I say that, but currently (false, true) does bad things.
-                        unsortable_coll->set_can_sort_reverse(false, true);
-                        coll.push_back(unsortable_coll);
+                        //can reverse but not sort/cut: it's a multipath!
+                        coll.push_back(multi_paths.clone_move());
                     }
                 } else {
-                    for (ExtrusionPath& path : paths)
-                        coll.push_back(new ExtrusionPath(std::move(path)));
+                    coll.push_back(multi_paths.clone_move());
                 }
             }
         }

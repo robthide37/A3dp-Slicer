@@ -461,6 +461,7 @@ namespace Slic3r {
 
         bool load_model_from_file(const std::string& filename, Model& model, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, bool check_version);
         unsigned int version() const { return m_version; }
+        boost::optional<Semver> prusaslicer_generator_version() const { return m_prusaslicer_generator_version; }
 
     private:
         void _destroy_xml_parser();
@@ -1123,7 +1124,7 @@ namespace Slic3r {
                             add_error("Error while reading '"+ opt_key +"': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
                             ConfigSubstitution config_substitution;
                             config_substitution.opt_def = config.get_option_def(opt_key);
-                            config_substitution.old_value = "Error while reading '" + opt_key + "': no value. If you are the one who created this project file, please open an issueand put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
+                            config_substitution.old_value = "Error while reading '" + opt_key + "': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
                             config_substitution.new_value = ConfigOptionUniquePtr(config_substitution.opt_def->default_value->clone());
                             config_substitutions.substitutions.emplace_back(std::move(config_substitution));
                         }else
@@ -2161,7 +2162,7 @@ namespace Slic3r {
                         add_error("Error while reading '" + metadata.key + "': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
                         ConfigSubstitution config_substitution;
                         config_substitution.opt_def = config_not_used_remove_plz.get_option_def(metadata.key);
-                        config_substitution.old_value = "Error while reading '" + metadata.key + "': no value. If you are the one who created this project file, please open an issueand put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
+                        config_substitution.old_value = "Error while reading '" + metadata.key + "': no value. If you are the one who created this project file, please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.";
                         config_substitution.new_value = ConfigOptionUniquePtr(config_substitution.opt_def->default_value->clone());
                         config_substitutions.substitutions.emplace_back(std::move(config_substitution));
                     } else
@@ -2954,7 +2955,7 @@ namespace Slic3r {
                                         if (def != nullptr) {
                                             log << "map : " << "\n";
                                             for (const auto& entry : *def->enum_keys_map) {
-                                                log << entry.first << " : " << entry.second << "\n";
+                                                log << "\t" << entry.first << " : " << entry.second << "\n";
                                             }
                                         }
                                     }
@@ -2964,6 +2965,7 @@ namespace Slic3r {
                                     }
                                     log.close();
                                     assert(false);
+                                    add_error("Error while writing '" + opt_key + "': no value. Please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
                                 }
                             }
                         }
@@ -3158,11 +3160,11 @@ namespace Slic3r {
                 } else {
                     for (const std::string& key : obj->config.keys()) {
                         std::string value = obj->config.opt_serialize(key);
-                        if (!value.empty()) {
+                        if (!value.empty() && key.find("pattern")==std::string::npos) {
                             stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
                         } else {
                             std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
-                            log << "error in ranges, can't serialize " << key << ": '" << value << "' " << (obj->config.option(key) != nullptr) << "\n";
+                            log << "error in model, can't serialize " << key << ": '" << value << "' " << (obj->config.option(key) != nullptr) << "\n";
                             if (obj->config.option(key) != nullptr) {
                                 log << "type : " << obj->config.option(key)->type();
                                 log << "\n";
@@ -3178,7 +3180,7 @@ namespace Slic3r {
                                 if (def != nullptr) {
                                     log << "map : " << "\n";
                                     for (const auto& entry : *def->enum_keys_map) {
-                                        log << entry.first << " : " << entry.second << "\n";
+                                        log << "\t" << entry.first << " : " << entry.second << "\n";
                                     }
                                 }
                             }
@@ -3188,6 +3190,7 @@ namespace Slic3r {
                             }
                             log.close();
                             assert(false);
+                            add_error("Error while writing '" + key + "': no value. Please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
                         }
                     }
                 }
@@ -3259,8 +3262,42 @@ namespace Slic3r {
                                         stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
                                 }
                             } else {
-                                for (const std::string& key : volume->config.keys())
-                                    stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << volume->config.opt_serialize(key) << "\"/>\n";
+                                for (const std::string& key : volume->config.keys()) {
+                                    //stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << volume->config.opt_serialize(key) << "\"/>\n";
+                                    std::string value = volume->config.opt_serialize(key);
+                                    if (!value.empty() && key.find("pattern") == std::string::npos) {
+                                        stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
+                                    } else {
+                                        std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
+                                        log << "error in model, can't serialize " << key << ": '" << value << "' " << ((volume->config.option(key) != nullptr)?"exist":"doesn't exist") << "\n";
+                                        if (volume->config.option(key) != nullptr) {
+                                            log << "type : " << volume->config.option(key)->type();
+                                            log << "\n";
+                                        }
+                                        if (volume->config.option(key) != nullptr && volume->config.option(key)->type() == ConfigOptionType::coEnum) {
+                                            log << "enum : " << volume->config.option(key)->getInt();
+                                            log << "\n";
+                                            const ConfigOptionDef* def = nullptr;
+                                            try {
+                                                def = print_config.get_option_def(key);
+                                            }
+                                            catch (Exception) {}
+                                            if (def != nullptr) {
+                                                log << "map : " << "\n";
+                                                for (const auto& entry : *def->enum_keys_map) {
+                                                    log << "\t" << entry.first << " : " << entry.second << "\n";
+                                                }
+                                            }
+                                        }
+                                        if (volume->config.option(key) != nullptr && volume->config.option(key)->type() == ConfigOptionType::coInt) {
+                                            log << "int : " << volume->config.option(key)->getInt();
+                                            log << "\n";
+                                        }
+                                        log.close();
+                                        assert(false);
+                                        add_error("Error while writing '" + key + "': no value. Please open an issue and put the ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt file created next to the executable for debugging.");
+                                    }
+                                }
                             }
                             
                             // stores mesh's statistics
@@ -3347,8 +3384,7 @@ bool _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive( mz_zip_archiv
 }
 
 // Perform conversions based on the config values available.
-//FIXME provide a version of PrusaSlicer that stored the project file (3MF).
-static void handle_legacy_project_loaded(unsigned int version_project_file, DynamicPrintConfig& config)
+static void handle_legacy_project_loaded(unsigned int version_project_file, DynamicPrintConfig& config, const boost::optional<Semver>& prusaslicer_generator_version)
 {
     // SuSi: don't do that. It's hidden behavior.
     //if (! config.has("brim_separation")) {
@@ -3356,6 +3392,22 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
     //        // Conversion from older PrusaSlicer which applied brim separation equal to elephant foot compensation.
     //        auto *opt_brim_separation = config.option<ConfigOptionFloat>("brim_separation", true);
     //        opt_brim_separation->value = -opt_elephant_foot->value;
+    //    }
+    //}
+    //// In PrusaSlicer 2.5.0-alpha2 and 2.5.0-alpha3, we introduce several parameters for Arachne that depend
+    //// on nozzle size . Later we decided to make default values for those parameters computed automatically
+    //// until the user changes them.
+    //if (prusaslicer_generator_version && *prusaslicer_generator_version >= *Semver::parse("2.5.0-alpha2") && *prusaslicer_generator_version <= *Semver::parse("2.5.0-alpha3")) {
+    //    if (auto *opt_wall_transition_length = config.option<ConfigOptionFloatOrPercent>("wall_transition_length", false);
+    //        opt_wall_transition_length && !opt_wall_transition_length->percent && opt_wall_transition_length->value == 0.4) {
+    //        opt_wall_transition_length->percent = true;
+    //        opt_wall_transition_length->value   = 100;
+    //    }
+
+    //    if (auto *opt_min_feature_size = config.option<ConfigOptionFloatOrPercent>("min_feature_size", false);
+    //        opt_min_feature_size && !opt_min_feature_size->percent && opt_min_feature_size->value == 0.1) {
+    //        opt_min_feature_size->percent = true;
+    //        opt_min_feature_size->value   = 25;
     //    }
     //}
 }
@@ -3402,7 +3454,7 @@ bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionCo
     _3MF_Importer         importer;
     bool res = importer.load_model_from_file(path, *model, config, config_substitutions, check_version);
     importer.log_errors();
-    handle_legacy_project_loaded(importer.version(), config);
+    handle_legacy_project_loaded(importer.version(), config, importer.prusaslicer_generator_version());
     return res;
 }
 
