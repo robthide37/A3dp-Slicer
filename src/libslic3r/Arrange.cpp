@@ -687,7 +687,9 @@ void arrange(ArrangePolygons &items,
              const SegmentedRectangleBed &bed,
              const ArrangeParams &params)
 {
-    arrange(items, excludes, bed.bb, params);
+    auto arrbed = bed.bb;
+    arrbed.offset(-bed.inset);
+    arrange(items, excludes, arrbed, params);
 
     if (! excludes.empty())
         return;
@@ -743,6 +745,19 @@ void arrange(ArrangePolygons &items,
         }
 
         Vec2crd d = bb.center() - pilebb[bedidx].center();
+
+        auto bedbb = bed.bb;
+        bedbb.offset(-bed.inset);
+        auto pilebbx = pilebb[bedidx];
+        pilebbx.translate(d);
+
+        Point corr{0, 0};
+        corr.x() = -std::min(0, pilebbx.min.x() - bedbb.min.x())
+                   -std::max(0, pilebbx.max.x() - bedbb.max.x());
+        corr.y() = -std::min(0, pilebbx.min.y() - bedbb.min.y())
+                   -std::max(0, pilebbx.max.y() - bedbb.max.y());
+
+        d += corr;
 
         for (auto &itm : items)
             if (itm.bed_idx == bedidx)

@@ -4663,7 +4663,9 @@ Points get_bed_shape(const DynamicPrintConfig &config)
 void get_bed_shape(const DynamicPrintConfig &cfg, arrangement::ArrangeBed &out)
 {
     if (is_XL_printer(cfg)) {
-        out = arrangement::SegmentedRectangleBed{get_extents(get_bed_shape(cfg)), 4, 4};
+        arrangement::SegmentedRectangleBed bed{get_extents(get_bed_shape(cfg)), 4, 4};
+        bed.inset = scaled(10.);
+        out = bed;
     } else {
         out = arrangement::to_arrange_bed(get_bed_shape(cfg));
     }

@@ -38,6 +38,7 @@ public:
 struct SegmentedRectangleBed {
     Vec<2, size_t> segments;
     BoundingBox bb;
+    coord_t inset = 0;
 
     SegmentedRectangleBed (const BoundingBox &bb,
                            size_t segments_x,
