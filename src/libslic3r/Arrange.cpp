@@ -705,24 +705,23 @@ void arrange(ArrangePolygons &items,
         auto pilesz = unscaled(pilebb[bedidx]).size();
         bb.max.x() = scaled(std::ceil(pilesz.x() / piecesz.x()) * piecesz.x());
         bb.max.y() = scaled(std::ceil(pilesz.y() / piecesz.y()) * piecesz.y());
-        coord_t offs = params.min_bed_distance;
         switch (params.alignment) {
         case Pivots::BottomLeft:
-            bb.translate((bed.bb.min - bb.min) + Point{offs, offs});
+            bb.translate(bed.bb.min - bb.min);
             break;
         case Pivots::TopRight:
-            bb.translate((bed.bb.max - bb.max) - Point{offs, offs});
+            bb.translate(bed.bb.max - bb.max);
             break;
         case Pivots::BottomRight: {
             Point bedref{bed.bb.max.x(), bed.bb.min.y()};
             Point bbref {bb.max.x(), bb.min.y()};
-            bb.translate((bedref - bbref) + Point{-offs, offs});
+            bb.translate(bedref - bbref);
             break;
         }
         case Pivots::TopLeft: {
             Point bedref{bed.bb.min.x(), bed.bb.max.y()};
             Point bbref {bb.min.x(), bb.max.y()};
-            bb.translate((bedref - bbref) + Point{offs, -offs});
+            bb.translate(bedref - bbref);
             break;
         }
         case Pivots::Center: {
@@ -732,6 +731,19 @@ void arrange(ArrangePolygons &items,
         }
 
         Vec2crd d = bb.center() - pilebb[bedidx].center();
+
+        auto bedbb = bed.bb;
+        bedbb.offset(-params.min_bed_distance);
+        auto pilebbx = pilebb[bedidx];
+        pilebbx.translate(d);
+
+        Point corr{0, 0};
+        corr.x() = -std::min(0, pilebbx.min.x() - bedbb.min.x())
+                   -std::max(0, pilebbx.max.x() - bedbb.max.x());
+        corr.y() = -std::min(0, pilebbx.min.y() - bedbb.min.y())
+                   -std::max(0, pilebbx.max.y() - bedbb.max.y());
+
+        d += corr;
 
         for (auto &itm : items)
             if (itm.bed_idx == bedidx)
