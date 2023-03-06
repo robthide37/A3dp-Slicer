@@ -2274,13 +2274,16 @@ void GLGizmoCut3D::reset_connectors()
 void GLGizmoCut3D::init_connector_shapes()
 {
     for (const CutConnectorType& type : {CutConnectorType::Dowel, CutConnectorType::Plug})
-        for (const CutConnectorStyle& style : {CutConnectorStyle::Frustum, CutConnectorStyle::Prism})
+        for (const CutConnectorStyle& style : {CutConnectorStyle::Frustum, CutConnectorStyle::Prism}) {
+            if (type == CutConnectorType::Dowel && style == CutConnectorStyle::Frustum)
+                continue;
             for (const CutConnectorShape& shape : {CutConnectorShape::Circle, CutConnectorShape::Hexagon, CutConnectorShape::Square, CutConnectorShape::Triangle}) {
                 const CutConnectorAttributes attribs = { type, style, shape };
                 const indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);
                 m_shapes[attribs].model.init_from(its);
                 m_shapes[attribs].mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
             }
+        }
 }
 
 void GLGizmoCut3D::update_connector_shape()
