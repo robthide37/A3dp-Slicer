@@ -1065,6 +1065,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              retract_lift_below))
     ((ConfigOptionBools,               retract_lift_first_layer))
     ((ConfigOptionStrings,             retract_lift_top))
+    ((ConfigOptionFloats,              retract_lift_before_travel))
     ((ConfigOptionFloats,              retract_restart_extra))
     ((ConfigOptionFloats,              retract_restart_extra_toolchange))
     ((ConfigOptionFloats,              retract_speed))
