@@ -5576,7 +5576,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
             for (mz_uint i = 0; i < num_entries; ++i) {
                 if (mz_zip_reader_file_stat(&archive, i, &stat)) {
                     wxString wname = boost::nowide::widen(stat.m_filename);
-                    std::string name = GUI::format(wname);
+                    std::string name = boost::nowide::narrow(wname);
                     fs::path archive_path(name);
 
                     std::string extra(1024, 0);
