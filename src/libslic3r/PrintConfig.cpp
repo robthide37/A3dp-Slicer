@@ -2705,7 +2705,7 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionInt(1));
 
-    auto support_material_interface_layers = def = this->add("support_material_interface_layers", coInt);
+    def = this->add("support_material_interface_layers", coInt);
     def->label = L("Top interface layers");
     def->category = L("Support material");
     def->tooltip = L("Number of interface layers to insert between the object(s) and support material.");

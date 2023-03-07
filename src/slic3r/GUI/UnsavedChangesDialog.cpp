@@ -1591,7 +1591,7 @@ void DiffPresetDialog::create_buttons()
         }
         evt.Enable(enable);
     });
-    m_transfer_btn->Bind(wxEVT_ENTER_WINDOW, [this, show_in_bottom_info](wxMouseEvent& e) {
+    m_transfer_btn->Bind(wxEVT_ENTER_WINDOW, [show_in_bottom_info](wxMouseEvent& e) {
         show_in_bottom_info(_L("Transfer the selected options from left preset to the right.\n"
                             "Note: New modified presets will be selected in settings tabs after close this dialog."), e); });
 
@@ -1599,7 +1599,7 @@ void DiffPresetDialog::create_buttons()
     m_save_btn = new ScalableButton(this, wxID_ANY, "save", _L("Save"), wxDefaultSize, wxDefaultPosition, wxBORDER_DEFAULT, 24);
     m_save_btn->Bind(wxEVT_BUTTON, [this](wxEvent&) { button_event(Action::Save); });
     m_save_btn->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { evt.Enable(m_tree->has_selection()); });
-    m_save_btn->Bind(wxEVT_ENTER_WINDOW, [this, show_in_bottom_info](wxMouseEvent& e) {
+    m_save_btn->Bind(wxEVT_ENTER_WINDOW, [show_in_bottom_info](wxMouseEvent& e) {
         show_in_bottom_info(_L("Save the selected options from left preset to the right."), e); });
 
     // Cancel

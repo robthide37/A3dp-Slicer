@@ -830,6 +830,7 @@ Sidebar::Sidebar(Plater *parent)
                 wxRIGHT, margin_5);
 #else
                 wxBOTTOM, 1);
+                (void)margin_5; // supress unused capture warning
 #endif // __WXGTK3__
         } else {
             sizer_filaments->Add(combo_and_btn_sizer, 0, wxEXPAND |
@@ -2251,7 +2252,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         this->q->load_files(input_files);
     });
   
-    this->q->Bind(EVT_START_DOWNLOAD_OTHER_INSTANCE, [this](StartDownloadOtherInstanceEvent& evt) {
+    this->q->Bind(EVT_START_DOWNLOAD_OTHER_INSTANCE, [](StartDownloadOtherInstanceEvent& evt) {
         BOOST_LOG_TRIVIAL(trace) << "Received url from other instance event.";
         wxGetApp().mainframe->Raise();
         for (size_t i = 0; i < evt.data.size(); ++i) {

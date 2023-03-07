@@ -1000,7 +1000,7 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
     std::string icon = "";
     append_menu_item(
         menu, wxID_ANY, name, description,
-        [can_edit_text](wxCommandEvent &) {
+        [](wxCommandEvent &) {
             plater()->canvas3D()->get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
         },
         icon, nullptr, can_edit_text, m_parent);

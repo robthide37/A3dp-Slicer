@@ -314,9 +314,9 @@ void MainFrame::bind_diff_dialog()
             process(diff_dlg_type);
     };
 
-    diff_dialog.Bind(EVT_DIFF_DIALOG_TRANSFER,      [this, process_options, transfer](SimpleEvent&)         { process_options(transfer); });
+    diff_dialog.Bind(EVT_DIFF_DIALOG_TRANSFER,      [process_options, transfer](SimpleEvent&)         { process_options(transfer); });
 
-    diff_dialog.Bind(EVT_DIFF_DIALOG_UPDATE_PRESETS,[this, process_options, update_presets](SimpleEvent&)   { process_options(update_presets); });
+    diff_dialog.Bind(EVT_DIFF_DIALOG_UPDATE_PRESETS,[process_options, update_presets](SimpleEvent&)   { process_options(update_presets); });
 }
 
 
