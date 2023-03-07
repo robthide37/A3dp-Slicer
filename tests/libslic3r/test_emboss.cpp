@@ -491,7 +491,7 @@ TEST_CASE("Cut surface", "[]")
 #include <sstream>
 #include <cereal/cereal.hpp>
 #include <cereal/archives/binary.hpp>
-TEST_CASE("UndoRedo serialization", "[Emboss]")
+TEST_CASE("UndoRedo TextConfiguration serialization", "[Emboss]")
 {
     TextConfiguration tc;
     tc.text = "Dovede-li se člověk zasmát sám sobě, nevyjde ze smíchu po celý život.";
@@ -521,6 +521,39 @@ TEST_CASE("UndoRedo serialization", "[Emboss]")
     CHECK(tc.style == tc_loaded.style);
     CHECK(tc.text == tc_loaded.text);
     CHECK(tc.fix_3mf_tr.has_value() == tc_loaded.fix_3mf_tr.has_value());
+}
+
+#include "libslic3r/EmbossShape.hpp"
+TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
+{
+    EmbossShape emboss;
+    emboss.shape       = {{{0, 0}, {10, 0}, {10, 10}, {0, 10}}, {{5, 5}, {6, 5}, {6, 6}, {5, 6}}};
+    emboss.shape_scale = 2.;
+    emboss.depth       = 5.;
+    emboss.use_surface = true;
+    emboss.distance = 3.f;
+    emboss.fix_3mf_tr  = Transform3d::Identity();
+    emboss.svg_file_path = "Everything starts somewhere, though many physicists disagree.\
+ But people have always been dimly aware of the problem with the start of things.\
+ They wonder how the snowplough driver gets to work,\
+ or how the makers of dictionaries look up the spelling of words.";
+    std::stringstream ss; // any stream can be used
+    {
+        cereal::BinaryOutputArchive oarchive(ss); // Create an output archive
+
+        oarchive(emboss);
+    } // archive goes out of scope, ensuring all contents are flushed
+
+    EmbossShape emboss_loaded;
+    {
+        cereal::BinaryInputArchive iarchive(ss); // Create an input archive
+        iarchive(emboss_loaded);
+    }
+    CHECK(emboss.shape == emboss_loaded.shape);
+    CHECK(emboss.shape_scale == emboss_loaded.shape_scale);
+    CHECK(emboss.depth == emboss_loaded.depth);
+    CHECK(emboss.use_surface == emboss_loaded.use_surface);
+    CHECK(emboss.distance == emboss_loaded.distance);
 }
 
 

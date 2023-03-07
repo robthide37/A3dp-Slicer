@@ -15,6 +15,7 @@
 #include "CustomGCode.hpp"
 #include "enum_bitmask.hpp"
 #include "TextConfiguration.hpp"
+#include "EmbossShape.hpp"
 
 #include <map>
 #include <memory>
@@ -824,6 +825,10 @@ public:
     // Contain information how to re-create volume
     std::optional<TextConfiguration> text_configuration;
 
+    // Is set only when volume is Embossed Shape
+    // Contain 2d information about embossed shape to be editabled
+    std::optional<EmbossShape> emboss_shape; 
+
     // A parent object owning this modifier volume.
     ModelObject*        get_object() const { return this->object; }
     ModelVolumeType     type() const { return m_type; }
@@ -1011,8 +1016,7 @@ private:
         name(other.name), source(other.source), m_mesh(other.m_mesh), m_convex_hull(other.m_convex_hull),
         config(other.config), m_type(other.m_type), object(object), m_transformation(other.m_transformation),
         supported_facets(other.supported_facets), seam_facets(other.seam_facets), mmu_segmentation_facets(other.mmu_segmentation_facets),
-        cut_info(other.cut_info),
-        text_configuration(other.text_configuration)
+        cut_info(other.cut_info), text_configuration(other.text_configuration), emboss_shape(other.emboss_shape)
     {
 		assert(this->id().valid()); 
         assert(this->config.id().valid()); 
@@ -1033,8 +1037,7 @@ private:
     // Providing a new mesh, therefore this volume will get a new unique ID assigned.
     ModelVolume(ModelObject *object, const ModelVolume &other, TriangleMesh &&mesh) :
         name(other.name), source(other.source), config(other.config), object(object), m_mesh(new TriangleMesh(std::move(mesh))), m_type(other.m_type), m_transformation(other.m_transformation),
-        cut_info(other.cut_info),
-        text_configuration(other.text_configuration)
+        cut_info(other.cut_info), text_configuration(other.text_configuration), emboss_shape(other.emboss_shape)
     {
 		assert(this->id().valid()); 
         assert(this->config.id().valid()); 
@@ -1082,6 +1085,7 @@ private:
         cereal::load_by_value(ar, mmu_segmentation_facets);
         cereal::load_by_value(ar, config);
         cereal::load(ar, text_configuration);
+        cereal::load(ar, emboss_shape);
 		assert(m_mesh);
 		if (has_convex_hull) {
 			cereal::load_optional(ar, m_convex_hull);
@@ -1099,6 +1103,7 @@ private:
         cereal::save_by_value(ar, mmu_segmentation_facets);
         cereal::save_by_value(ar, config);
         cereal::save(ar, text_configuration);
+        cereal::save(ar, emboss_shape);
 		if (has_convex_hull)
 			cereal::save_optional(ar, m_convex_hull);
 	}

@@ -65,3 +65,32 @@ SCENARIO("Basics", "[ExPolygon]") {
         }
     }
 }
+
+#include <sstream>
+#include <cereal/cereal.hpp>
+#include <cereal/archives/binary.hpp>
+#include "libslic3r/ExPolygonSerialize.hpp"
+TEST_CASE("Serialization of expolygons", "[ExPolygon, Cereal, serialization]")
+{
+    ExPolygons expolys{{
+        // expolygon 1 - without holes
+        {{0,0}, {10,0}, {10,10}, {0,10}}, // contour
+        // expolygon 2 - with rect 1px hole
+        {{{0,0}, {10,0}, {10,10}, {0,10}},
+        {{5, 5}, {6, 5}, {6, 6}, {5, 6}}}
+    }};
+
+    std::stringstream ss; // any stream can be used
+    {
+        cereal::BinaryOutputArchive oarchive(ss); // Create an output archive
+        oarchive(expolys);
+    } // archive goes out of scope, ensuring all contents are flushed
+
+    ExPolygons expolys_loaded;
+    {
+        cereal::BinaryInputArchive iarchive(ss); // Create an input archive
+        iarchive(expolys_loaded);
+    }
+
+    CHECK(expolys == expolys_loaded);
+}

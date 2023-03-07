@@ -56,9 +56,11 @@ set(SLIC3R_SOURCES
     ElephantFootCompensation.hpp
     Emboss.cpp
     Emboss.hpp
+    EmbossShape.hpp
     enum_bitmask.hpp
     ExPolygon.cpp
     ExPolygon.hpp
+    ExPolygonSerialize.hpp
     ExPolygonsIndex.cpp
     ExPolygonsIndex.hpp
     Extruder.cpp
