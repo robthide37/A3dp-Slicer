@@ -591,7 +591,7 @@ std::string Print::validate(std::string* warning) const
                     if (*(lh.end()-2) > *(lh_tallest.end()-2))
                         tallest_object_idx = i;
                 }
-            }
+           }
 
             if (has_custom_layering) {
                 for (size_t idx_object = 0; idx_object < m_objects.size(); ++ idx_object) {

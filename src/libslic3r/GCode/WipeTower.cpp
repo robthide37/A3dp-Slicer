@@ -4,13 +4,17 @@
 #include <iostream>
 #include <vector>
 #include <numeric>
+#include <memory>
 #include <sstream>
 #include <iomanip>
 
+#include "ClipperUtils.hpp"
 #include "GCodeProcessor.hpp"
 #include "BoundingBox.hpp"
 #include "LocalesUtils.hpp"
 #include "Geometry.hpp"
+#include "Surface.hpp"
+#include "Fill/FillRectilinear.hpp"
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -1171,9 +1175,11 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
                       ";------------------\n\n\n\n\n\n\n");
     }
 
+    const float spacing = m_perimeter_width - m_layer_height*float(1.-M_PI_4);
+
     // This block creates the stabilization cone.
     // First define a lambda to draw the rectangle with stabilization.
-    auto supported_rectangle = [this, &writer](const box_coordinates& wt_box, double feedrate) -> Polygon {
+    auto supported_rectangle = [this, &writer, spacing](const box_coordinates& wt_box, double feedrate, bool infill_cone) -> Polygon {
         const auto [R, support_scale] = get_wipe_tower_cone_base(m_wipe_tower_width, m_wipe_tower_height, m_wipe_tower_depth);
 
         double r = std::tan(Geometry::deg2rad(15.)) * (m_wipe_tower_height - m_layer_info->z);
@@ -1186,6 +1192,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
             ArcEnd
         };
 
+        // First generate vector of annotated point which form the boundary.
         std::vector<std::pair<Vec2f, Type>> pts = {{wt_box.ru, Corner}};        
         if (double alpha_start = std::asin((0.5*w)/r); ! std::isnan(alpha_start) && r > 0.5*w+0.01) {
             for (double alpha = alpha_start; alpha < M_PI-alpha_start+0.001; alpha+=(M_PI-2*alpha_start) / 20.)
@@ -1197,6 +1204,40 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         for (int i=int(pts.size())-3; i>0; --i)
             pts.emplace_back(Vec2f(pts[i].first.x(), 2*center.y()-pts[i].first.y()), i == int(pts.size())-3 ? ArcStart : i == 1 ? ArcEnd : Arc);
         pts.emplace_back(wt_box.rd, Corner);
+
+        // Create a Polygon from the points.
+        Polygon poly;
+        for (const auto& [pt, tag] : pts)
+            poly.points.push_back(Point::new_scale(pt));
+
+        // Prepare polygons to be filled by infill.
+        Polylines polylines;
+        if (infill_cone && m_wipe_tower_width > 2*spacing && m_wipe_tower_depth > 2*spacing) {
+            ExPolygons infill_areas;
+            ExPolygon wt_contour(poly);
+            Polygon wt_rectangle(Points{Point::new_scale(wt_box.ld), Point::new_scale(wt_box.rd), Point::new_scale(wt_box.ru), Point::new_scale(wt_box.lu)});
+            wt_rectangle = offset(wt_rectangle, scale_(-spacing/2.)).front();
+            wt_contour = offset_ex(wt_contour, scale_(-spacing/2.)).front();
+            infill_areas = diff_ex(wt_contour, wt_rectangle);
+            if (infill_areas.size() == 2) {
+                ExPolygon& bottom_expoly = infill_areas.front().contour.points.front().y() < infill_areas.back().contour.points.front().y() ? infill_areas[0] : infill_areas[1];
+                std::unique_ptr<Fill> filler(Fill::new_from_type(ipMonotonicLines));
+                filler->angle = Geometry::deg2rad(45.f);
+                filler->spacing = spacing;
+                FillParams params;
+                params.density = 1.f;
+                Surface surface(stBottom, bottom_expoly);
+                filler->bounding_box = get_extents(bottom_expoly);
+                polylines = filler->fill_surface(&surface, params);
+                if (! polylines.empty()) {
+                    if (polylines.front().points.front().x() > polylines.back().points.back().x()) {
+                        std::reverse(polylines.begin(), polylines.end());
+                        for (Polyline& p : polylines)
+                            p.reverse();
+                    }
+                }
+            }
+        }
 
         // Find the closest corner and travel to it.
         int start_i = 0;
@@ -1212,29 +1253,38 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         }
         writer.travel(pts[start_i].first);
 
-        // Now actually extrude the boundary:
+        // Now actually extrude the boundary (and possibly infill):
         int i = start_i+1 == int(pts.size()) ? 0 : start_i + 1;
         while (i != start_i) {
             writer.extrude(pts[i].first, feedrate);
+            if (pts[i].second == ArcEnd) {
+                // Extrude the infill.
+                if (! polylines.empty()) {
+                    // Extrude the infill and travel back to where we were.
+                    bool mirror = ((pts[i].first.y() - center.y()) * (unscale(polylines.front().points.front()).y() - center.y())) < 0.;
+                    for (const Polyline& line : polylines) {
+                        writer.travel(center - (mirror ? 1.f : -1.f) * (unscale(line.points.front()).cast<float>() - center));
+                        for (size_t i=0; i<line.points.size(); ++i)
+                            writer.extrude(center - (mirror ? 1.f : -1.f) * (unscale(line.points[i]).cast<float>() - center));
+                    }
+                    writer.travel(pts[i].first);
+                }
+            }
             if (++i == int(pts.size()))
                 i = 0;
         }
         writer.extrude(pts[start_i].first, feedrate);
-
-        // Return the polygon.
-        Polygon out;
-        for (const auto& [pt, tag] : pts)
-            out.points.push_back(Point::new_scale(pt));    
-        return out;
+        return poly;
     };
 
     // outer contour (always)
-    Polygon poly = supported_rectangle(wt_box, feedrate);
+    bool infill_cone = first_layer && m_wipe_tower_width > 2*spacing && m_wipe_tower_depth > 2*spacing;
+    Polygon poly = supported_rectangle(wt_box, feedrate, infill_cone);
+
 
     // brim (first layer only)
     if (first_layer) {
         box_coordinates box = wt_box;
-        float spacing = m_perimeter_width - m_layer_height*float(1.-M_PI_4);
         size_t loops_num = (m_wipe_tower_brim_width + spacing/2.f) / spacing;
         
         for (size_t i = 0; i < loops_num; ++ i) {
