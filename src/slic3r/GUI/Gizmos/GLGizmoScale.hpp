@@ -26,6 +26,7 @@ class GLGizmoScale3D : public GLGizmoBase
 #if ENABLE_WORLD_COORDINATE
         Vec3d center{ Vec3d::Zero() };
         Vec3d instance_center{ Vec3d::Zero() };
+        Vec3d constraint_position{ Vec3d::Zero() };
 #endif // ENABLE_WORLD_COORDINATE
         BoundingBoxf3 box;
 #if !ENABLE_WORLD_COORDINATE
@@ -44,7 +45,6 @@ class GLGizmoScale3D : public GLGizmoBase
     Transform3d m_offsets_transform;
 #endif // ENABLE_WORLD_COORDINATE
     Vec3d m_scale{ Vec3d::Ones() };
-    Vec3d m_offset{ Vec3d::Zero() };
     double m_snap_step{ 0.05 };
     StartingData m_starting;
 
@@ -68,7 +68,7 @@ public:
 
     const Vec3d& get_scale() const { return m_scale; }
 #if ENABLE_WORLD_COORDINATE
-    void set_scale(const Vec3d& scale) { m_starting.scale = scale; m_scale = scale; m_offset = Vec3d::Zero(); }
+    void set_scale(const Vec3d& scale) { m_starting.scale = scale; m_scale = scale; }
 #else
     void set_scale(const Vec3d& scale) { m_starting.scale = scale; m_scale = scale; }
 #endif // ENABLE_WORLD_COORDINATE
@@ -102,6 +102,7 @@ private:
     void do_scale_uniform(const UpdateData& data);
 
     double calc_ratio(const UpdateData& data) const;
+    void update_render_data();
 };
 
 

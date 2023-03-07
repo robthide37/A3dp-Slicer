@@ -1455,7 +1455,7 @@ void Selection::mirror(Axis axis)
 #endif // ENABLE_WORLD_COORDINATE
 
 #if ENABLE_WORLD_COORDINATE
-void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation, TransformationType transformation_type)
+void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& world_translation, TransformationType transformation_type)
 {
     if (!m_valid)
       return;
@@ -1489,32 +1489,28 @@ void Selection::scale_and_translate(const Vec3d& scale, const Vec3d& translation
                 const Vec3d local_inst_pivot = inst_trafo.get_matrix_no_offset().inverse() * world_inst_pivot;
                 Matrix3d inst_rotation, inst_scale;
                 inst_trafo.get_matrix().computeRotationScaling(&inst_rotation, &inst_scale);
-                const Transform3d offset_trafo = Geometry::translation_transform(inst_trafo.get_offset() + inst_rotation * translation);
+                const Transform3d offset_trafo = Geometry::translation_transform(inst_trafo.get_offset() + world_translation);
                 const Transform3d scale_trafo = Transform3d(inst_scale) * Geometry::scale_transform(relative_scale);
                 v.set_instance_transformation(Geometry::translation_transform(world_inst_pivot) * offset_trafo * Transform3d(inst_rotation) * scale_trafo * Geometry::translation_transform(-local_inst_pivot));
             }
             else
-                transform_instance_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
+                transform_instance_relative(v, volume_data, transformation_type, Geometry::translation_transform(world_translation) * Geometry::scale_transform(relative_scale), m_cache.dragging_center);
         }
         else {
             if (!is_single_volume_or_modifier()) {
                 assert(transformation_type.world());
-                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(scale), m_cache.dragging_center);
+                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(world_translation) * Geometry::scale_transform(scale), m_cache.dragging_center);
             }
             else {
-                if (transformation_type.local() && transformation_type.absolute()) {
-                    const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
-                    Matrix3d vol_rotation, vol_scale;
-                    vol_trafo.get_matrix().computeRotationScaling(&vol_rotation, &vol_scale);
-                    const Transform3d offset_trafo = Geometry::translation_transform(vol_trafo.get_offset() + vol_rotation * translation);
-                    const Transform3d scale_trafo = Transform3d(vol_scale) * Geometry::scale_transform(scale);
-                    v.set_volume_transformation(offset_trafo * Transform3d(vol_rotation) * scale_trafo);
-                }
-                else {
-                    transformation_type.set_independent();
-                    transformation_type.set_relative();
-                    transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(scale), m_cache.dragging_center);
-                }
+                transformation_type.set_independent();
+                Vec3d translation;
+                if (transformation_type.local())
+                    translation = volume_data.get_volume_transform().get_matrix_no_offset().inverse() * inst_trafo.get_matrix_no_offset().inverse() * world_translation;
+                else if (transformation_type.instance())
+                    translation = inst_trafo.get_matrix_no_offset().inverse() * world_translation;
+                else
+                    translation = world_translation;
+                transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(translation) * Geometry::scale_transform(scale), m_cache.dragging_center);
             }
         }
     }

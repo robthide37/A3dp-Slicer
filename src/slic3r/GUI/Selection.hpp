@@ -411,7 +411,7 @@ public:
     void scale(const Vec3d& scale, TransformationType transformation_type);
     void scale_to_fit_print_volume(const BuildVolume& volume);
 #if ENABLE_WORLD_COORDINATE
-    void scale_and_translate(const Vec3d& scale, const Vec3d& translation, TransformationType transformation_type);
+    void scale_and_translate(const Vec3d& scale, const Vec3d& world_translation, TransformationType transformation_type);
     void mirror(Axis axis, TransformationType transformation_type);
     void reset_skew();
 #else
