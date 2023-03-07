@@ -657,11 +657,7 @@ void AMFParserContext::endElement(const char * /* name */)
         if (bool has_transform = !m_volume_transform.isApprox(Transform3d::Identity(), 1e-10); has_transform)
             m_volume->source.transform = Slic3r::Geometry::Transformation(m_volume_transform);
 
-#if ENABLE_RELOAD_FROM_DISK_REWORK
         if (m_volume->source.input_file.empty()) {
-#else
-        if (m_volume->source.input_file.empty() && m_volume->type() == ModelVolumeType::MODEL_PART) {
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
             m_volume->source.object_idx = (int)m_model.objects.size() - 1;
             m_volume->source.volume_idx = (int)m_model.objects.back()->volumes.size() - 1;
             m_volume->center_geometry_after_creation();
@@ -818,10 +814,8 @@ void AMFParserContext::endElement(const char * /* name */)
                     m_volume->source.is_converted_from_inches = m_value[1] == "1";
                 else if (strcmp(opt_key, "source_in_meters") == 0)
                     m_volume->source.is_converted_from_meters = m_value[1] == "1";
-#if ENABLE_RELOAD_FROM_DISK_REWORK
                 else if (strcmp(opt_key, "source_is_builtin_volume") == 0)
                     m_volume->source.is_from_builtin_objects = m_value[1] == "1";
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
             }
         }
         else if (m_path.size() == 3) {
@@ -922,11 +916,7 @@ bool load_amf_file(const char *path, DynamicPrintConfig *config, ConfigSubstitut
         unsigned int counter = 0;
         for (ModelVolume* v : o->volumes) {
             ++counter;
-#if ENABLE_RELOAD_FROM_DISK_REWORK
             if (v->source.input_file.empty())
-#else
-            if (v->source.input_file.empty() && v->type() == ModelVolumeType::MODEL_PART)
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
                 v->source.input_file = path;
             if (v->name.empty()) {
                 v->name = o->name;
@@ -1075,11 +1065,7 @@ bool load_amf_archive(const char* path, DynamicPrintConfig* config, ConfigSubsti
 
     for (ModelObject *o : model->objects)
         for (ModelVolume *v : o->volumes)
-#if ENABLE_RELOAD_FROM_DISK_REWORK
             if (v->source.input_file.empty())
-#else
-            if (v->source.input_file.empty() && v->type() == ModelVolumeType::MODEL_PART)
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
                 v->source.input_file = path;
 
     return true;
@@ -1270,10 +1256,8 @@ bool store_amf(const char* path, Model* model, const DynamicPrintConfig* config,
                 stream << "        <metadata type=\"slic3r.source_in_inches\">1</metadata>\n";
             else if (volume->source.is_converted_from_meters)
                 stream << "        <metadata type=\"slic3r.source_in_meters\">1</metadata>\n";
-#if ENABLE_RELOAD_FROM_DISK_REWORK
             if (volume->source.is_from_builtin_objects)
                 stream << "        <metadata type=\"slic3r.source_is_builtin_volume\">1</metadata>\n";
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
             stream << std::setprecision(std::numeric_limits<float>::max_digits10);
             const indexed_triangle_set &its = volume->mesh().its;
             for (size_t i = 0; i < its.indices.size(); ++i) {

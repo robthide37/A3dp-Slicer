@@ -641,7 +641,7 @@ ExtrusionEntityCollection make_brim(const Print &print, PrintTryCancel try_cance
 			// perform operation
 			ClipperLib_Z::PolyTree loops_trimmed_tree;
 			clipper.Execute(ClipperLib_Z::ctDifference, loops_trimmed_tree, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
-			ClipperLib_Z::PolyTreeToPaths(loops_trimmed_tree, loops_trimmed);
+			ClipperLib_Z::PolyTreeToPaths(std::move(loops_trimmed_tree), loops_trimmed);
 		}
 
 		// Third, produce the extrusions, sorted by the source loop indices.

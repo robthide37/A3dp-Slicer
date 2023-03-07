@@ -137,9 +137,7 @@ static constexpr const char* SOURCE_OFFSET_Y_KEY          = "source_offset_y";
 static constexpr const char* SOURCE_OFFSET_Z_KEY          = "source_offset_z";
 static constexpr const char* SOURCE_IN_INCHES_KEY         = "source_in_inches";
 static constexpr const char* SOURCE_IN_METERS_KEY         = "source_in_meters";
-#if ENABLE_RELOAD_FROM_DISK_REWORK
 static constexpr const char* SOURCE_IS_BUILTIN_VOLUME_KEY = "source_is_builtin_volume";
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
 static constexpr const char* MESH_STAT_EDGES_FIXED          = "edges_fixed";
 static constexpr const char* MESH_STAT_DEGENERATED_FACETS   = "degenerate_facets";
@@ -906,36 +904,18 @@ namespace Slic3r {
             }
         }
 
-#if ENABLE_RELOAD_FROM_DISK_REWORK
         for (int obj_id = 0; obj_id < int(model.objects.size()); ++obj_id) {
             ModelObject* o = model.objects[obj_id];
             for (int vol_id = 0; vol_id < int(o->volumes.size()); ++vol_id) {
                 ModelVolume* v = o->volumes[vol_id];
                 if (v->source.input_file.empty())
-                    v->source.input_file = v->name.empty() ? filename : v->name;
+                    v->source.input_file = filename;
                 if (v->source.volume_idx == -1)
                     v->source.volume_idx = vol_id;
                 if (v->source.object_idx == -1)
                     v->source.object_idx = obj_id;
             }
         }
-#else
-        int object_idx = 0;
-        for (ModelObject* o : model.objects) {
-            int volume_idx = 0;
-            for (ModelVolume* v : o->volumes) {
-                if (v->source.input_file.empty() && v->type() == ModelVolumeType::MODEL_PART) {
-                    v->source.input_file = filename;
-                    if (v->source.volume_idx == -1)
-                        v->source.volume_idx = volume_idx;
-                    if (v->source.object_idx == -1)
-                        v->source.object_idx = object_idx;
-                }
-                ++volume_idx;
-            }
-            ++object_idx;
-        }
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
 //        // fixes the min z of the model if negative
 //        model.adjust_min_z();
@@ -2287,10 +2267,8 @@ namespace Slic3r {
                     volume->source.is_converted_from_inches = metadata.value == "1";
                 else if (metadata.key == SOURCE_IN_METERS_KEY)
                     volume->source.is_converted_from_meters = metadata.value == "1";
-#if ENABLE_RELOAD_FROM_DISK_REWORK
                 else if (metadata.key == SOURCE_IS_BUILTIN_VOLUME_KEY)
                     volume->source.is_from_builtin_objects = metadata.value == "1";
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
                 else
                     volume->config.set_deserialize(metadata.key, metadata.value, config_substitutions);
             }
@@ -3328,10 +3306,8 @@ namespace Slic3r {
                             stream << prefix << SOURCE_IN_INCHES_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
                         else if (volume->source.is_converted_from_meters)
                             stream << prefix << SOURCE_IN_METERS_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
-#if ENABLE_RELOAD_FROM_DISK_REWORK
                         if (volume->source.is_from_builtin_objects)
                             stream << prefix << SOURCE_IS_BUILTIN_VOLUME_KEY << "\" " << VALUE_ATTR << "=\"1\"/>\n";
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
                     }
 
                     // stores volume's config data

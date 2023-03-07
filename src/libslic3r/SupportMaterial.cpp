@@ -376,8 +376,6 @@ SupportParameters::SupportParameters(const PrintObject &object)
     }
 
 
-    this->base_angle         = Geometry::deg2rad(float(object_config.support_material_angle.value));
-    this->interface_angle    = Geometry::deg2rad(float(object_config.support_material_angle.value + 90.));
     double interface_spacing = object_config.support_material_interface_spacing.value + this->support_material_interface_flow.spacing();
     this->interface_density  = std::min(1., this->support_material_interface_flow.spacing() / interface_spacing);
     double raft_interface_spacing = object_config.support_material_interface_spacing.value + this->raft_interface_flow.spacing();
@@ -401,6 +399,39 @@ SupportParameters::SupportParameters(const PrintObject &object)
         object_config.support_material_interface_pattern == smipConcentric ?
         ipConcentric :
         (this->interface_density > 0.95 ? ipRectilinear : ipSupportBase);
+
+    this->base_angle            = Geometry::deg2rad(float(object_config.support_material_angle.value));
+    this->interface_angle       = Geometry::deg2rad(float(object_config.support_material_angle.value + 90.));
+    this->raft_angle_1st_layer  = 0.f;
+    this->raft_angle_base       = 0.f;
+    this->raft_angle_interface  = 0.f;
+    if (slicing_params.base_raft_layers > 1) {
+        assert(slicing_params.raft_layers() >= 4);
+        // There are all raft layer types (1st layer, base, interface & contact layers) available.
+        this->raft_angle_1st_layer  = this->interface_angle;
+        this->raft_angle_base       = this->base_angle;
+        this->raft_angle_interface  = this->interface_angle;
+        if ((slicing_params.interface_raft_layers & 1) == 0)
+            // Allign the 1st raft interface layer so that the object 1st layer is hatched perpendicularly to the raft contact interface.
+            this->raft_angle_interface += float(0.5 * M_PI);
+    } else if (slicing_params.base_raft_layers == 1 || slicing_params.interface_raft_layers > 1) {
+        assert(slicing_params.raft_layers() == 2 || slicing_params.raft_layers() == 3);
+        // 1st layer, interface & contact layers available.
+        this->raft_angle_1st_layer  = this->base_angle;
+        this->raft_angle_interface  = this->interface_angle + 0.5 * M_PI;
+    } else if (slicing_params.interface_raft_layers == 1) {
+        // Only the contact raft layer is non-empty, which will be printed as the 1st layer.
+        assert(slicing_params.base_raft_layers == 0);
+        assert(slicing_params.interface_raft_layers == 1);
+        assert(slicing_params.raft_layers() == 1);
+        this->raft_angle_1st_layer = float(0.5 * M_PI);
+        this->raft_angle_interface = this->raft_angle_1st_layer;
+    } else {
+        // No raft.
+        assert(slicing_params.base_raft_layers == 0);
+        assert(slicing_params.interface_raft_layers == 0);
+        assert(slicing_params.raft_layers() == 0);
+    }
 }
 
 PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object, const SlicingParameters &slicing_params) :
@@ -4207,38 +4238,12 @@ void generate_support_toolpaths(
 //    const coordf_t link_max_length_factor = 3.;
     const coordf_t link_max_length_factor = 0.;
 
-    float raft_angle_1st_layer  = 0.f;
-    float raft_angle_base       = 0.f;
-    float raft_angle_interface  = 0.f;
-    if (slicing_params.base_raft_layers > 1) {
-        // There are all raft layer types (1st layer, base, interface & contact layers) available.
-        raft_angle_1st_layer  = support_params.interface_angle;
-        raft_angle_base       = support_params.base_angle;
-        raft_angle_interface  = support_params.interface_angle;
-    } else if (slicing_params.base_raft_layers == 1 || slicing_params.interface_raft_layers > 1) {
-        // 1st layer, interface & contact layers available.
-        raft_angle_1st_layer  = support_params.base_angle;
-        if (config.support_material || config.support_material_enforce_layers > 0)
-            // Print 1st layer at 45 degrees from both the interface and base angles as both can land on the 1st layer.
-            raft_angle_1st_layer += 0.7854f;
-        raft_angle_interface  = support_params.interface_angle;
-    } else if (slicing_params.interface_raft_layers == 1) {
-        // Only the contact raft layer is non-empty, which will be printed as the 1st layer.
-        assert(slicing_params.base_raft_layers == 0);
-        assert(slicing_params.interface_raft_layers == 1);
-        assert(slicing_params.raft_layers() == 1 && raft_layers.size() == 0);
-    } else {
-        // No raft.
-        assert(slicing_params.base_raft_layers == 0);
-        assert(slicing_params.interface_raft_layers == 0);
-        assert(slicing_params.raft_layers() == 0 && raft_layers.size() == 0);
-    }
-
     // Insert the raft base layers.
     auto n_raft_layers = std::min<size_t>(support_layers.size(), std::max(0, int(slicing_params.raft_layers()) - 1));
+
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n_raft_layers),
         [&support_layers, &raft_layers, &intermediate_layers, &config, &support_params, &slicing_params,
-            &bbox_object, raft_angle_1st_layer, raft_angle_base, raft_angle_interface, link_max_length_factor]
+            &bbox_object, link_max_length_factor]
             (const tbb::blocked_range<size_t>& range) {
         for (size_t support_layer_id = range.begin(); support_layer_id < range.end(); ++ support_layer_id)
         {
@@ -4270,7 +4275,7 @@ void generate_support_toolpaths(
                 assert(!raft_layer.bridging);
                 if (! to_infill_polygons.empty()) {
                     Fill *filler = filler_support.get();
-                    filler->angle = raft_angle_base;
+                    filler->angle = support_params.raft_angle_base;
                     filler->spacing = support_params.support_material_flow.spacing();
                     filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / support_params.support_density));
                     fill_expolygons_with_sheath_generate_paths(
@@ -4293,11 +4298,11 @@ void generate_support_toolpaths(
             float density = 0.f;
             if (support_layer_id == 0) {
                 // Base flange.
-                filler->angle = raft_angle_1st_layer;
+                filler->angle = support_params.raft_angle_1st_layer;
                 filler->spacing = support_params.first_layer_flow.spacing();
                 density       = float(config.raft_first_layer_density.value * 0.01);
             } else if (support_layer_id >= slicing_params.base_raft_layers) {
-                filler->angle = raft_angle_interface;
+                filler->angle = support_params.raft_interface_angle(support_layer.interface_id());
                 // We don't use $base_flow->spacing because we need a constant spacing
                 // value that guarantees that all layers are correctly aligned.
                 filler->spacing = support_params.support_material_flow.spacing();
@@ -4345,7 +4350,7 @@ void generate_support_toolpaths(
     std::vector<LayerCache>             layer_caches(support_layers.size());
 
     tbb::parallel_for(tbb::blocked_range<size_t>(n_raft_layers, support_layers.size()),
-        [&config, &support_params, &support_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers, &layer_caches, &loop_interface_processor,
+        [&config, &slicing_params, &support_params, &support_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers, &layer_caches, &loop_interface_processor,
             &bbox_object, &angles, n_raft_layers, link_max_length_factor]
             (const tbb::blocked_range<size_t>& range) {
         // Indices of the 1st layer in their respective container at the support layer height.
@@ -4381,9 +4386,8 @@ void generate_support_toolpaths(
         {
             SupportLayer &support_layer = *support_layers[support_layer_id];
             LayerCache   &layer_cache   = layer_caches[support_layer_id];
-            float         interface_angle_delta = config.support_material_style.value != smsGrid ? 
-                (support_layer.interface_id() & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.) :
-                0;
+            const float   support_interface_angle = config.support_material_style.value == smsGrid ?
+                support_params.interface_angle : support_params.raft_interface_angle(support_layer.interface_id());
 
             // Find polygons with the same print_z.
             SupportGeneratorLayerExtruded &bottom_contact_layer = layer_cache.bottom_contact_layer;
@@ -4412,7 +4416,8 @@ void generate_support_toolpaths(
             if (idx_layer_intermediate < intermediate_layers.size() && intermediate_layers[idx_layer_intermediate]->print_z < support_layer.print_z + EPSILON)
                 base_layer.layer = intermediate_layers[idx_layer_intermediate];
 
-            bool raft_layer = support_layer_id == n_raft_layers;
+            // This layer is a raft contact layer. Any contact polygons at this layer are raft contacts.
+            bool raft_layer = slicing_params.interface_raft_layers && top_contact_layer.layer && is_approx(top_contact_layer.layer->print_z, slicing_params.raft_contact_top_z);
             if (config.support_material_interface_layers == 0) {
                 // If no top interface layers were requested, we treat the contact layer exactly as a generic base layer.
                 // Don't merge the raft contact layer though.
@@ -4470,7 +4475,9 @@ void generate_support_toolpaths(
                             // If zero interface layers are configured, use the same angle as for the base layers.
                             angles[support_layer_id % angles.size()] :
                             // Use interface angle for the interface layers.
-                            support_params.interface_angle + interface_angle_delta;
+                            raft_contact ? 
+                                support_params.raft_interface_angle(support_layer.interface_id()) :
+                                support_interface_angle;
                     double density = raft_contact ? support_params.raft_interface_density : interface_as_base ? support_params.support_density : support_params.interface_density;
                     filler->spacing = raft_contact ? support_params.raft_interface_flow.spacing() :
                         interface_as_base ? support_params.support_material_flow.spacing() : support_params.support_material_interface_flow.spacing();
@@ -4499,7 +4506,7 @@ void generate_support_toolpaths(
                 // the bridging flow does not quite apply. Reduce the flow to area of an ellipse? (A = pi * a * b)
                 assert(! base_interface_layer.layer->bridging);
                 Flow interface_flow = support_params.support_material_flow.with_height(float(base_interface_layer.layer->height));
-                filler->angle   = support_params.interface_angle + interface_angle_delta;
+                filler->angle   = support_interface_angle;
                 filler->spacing = support_params.support_material_interface_flow.spacing();
                 filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / support_params.interface_density));
                 fill_expolygons_generate_paths(
@@ -4748,4 +4755,3 @@ sub clip_with_shape {
 */
 
 } // namespace Slic3r
-

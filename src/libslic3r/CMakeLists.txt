@@ -22,6 +22,8 @@ set(SLIC3R_SOURCES
     AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
+    Algorithm/RegionExpansion.cpp
+    Algorithm/RegionExpansion.hpp
     AnyPtr.hpp
     BoundingBox.cpp
     BoundingBox.hpp
@@ -36,6 +38,7 @@ set(SLIC3R_SOURCES
     clipper.hpp
     ClipperUtils.cpp
     ClipperUtils.hpp
+    ClipperZUtils.hpp
     Color.cpp
     Color.hpp
     Config.cpp
@@ -79,6 +82,8 @@ set(SLIC3R_SOURCES
     Fill/FillBase.hpp
     Fill/FillConcentric.cpp
     Fill/FillConcentric.hpp
+    Fill/FillEnsuring.cpp
+    Fill/FillEnsuring.hpp
     Fill/FillHoneycomb.cpp
     Fill/FillHoneycomb.hpp
     Fill/FillGyroid.cpp

@@ -1796,10 +1796,8 @@ void ObjectList::load_shape_object(const std::string& type_name)
     BoundingBoxf3 bb;
     TriangleMesh mesh = create_mesh(type_name, bb);
     load_mesh_object(mesh, _u8L("Shape") + "-" + type_name);
-#if ENABLE_RELOAD_FROM_DISK_REWORK
     if (!m_objects->empty())
         m_objects->back()->volumes.front()->source.is_from_builtin_objects = true;
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
     wxGetApp().mainframe->update_title();
 }
 
@@ -1842,6 +1840,7 @@ void ObjectList::load_mesh_object(
     const TextConfiguration *text_config /* = nullptr*/,
     const Transform3d *      transformation /* = nullptr*/)
 {   
+    PlaterAfterLoadAutoArrange plater_after_load_auto_arrange;
     // Add mesh to model as a new object
     Model& model = wxGetApp().plater()->model();
 

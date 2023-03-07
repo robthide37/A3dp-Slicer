@@ -134,7 +134,7 @@ public:
     
     Flow    flow(FlowRole role) const;
     Flow    flow(FlowRole role, double layer_height) const;
-    Flow    bridging_flow(FlowRole role) const;
+    Flow    bridging_flow(FlowRole role, bool force_thick_bridges = false) const;
 
     void    slices_to_fill_surfaces_clipped();
     void    prepare_fill_surfaces();
@@ -369,6 +369,7 @@ public:
     // Phony version of make_fills() without parameters for Perl integration only.
     void                    make_fills() { this->make_fills(nullptr, nullptr, nullptr); }
     void                    make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree, FillLightning::Generator* lightning_generator);
+    Polylines               generate_sparse_infill_polylines_for_anchoring() const;
     void 					make_ironing();
 
     void                    export_region_slices_to_svg(const char *path) const;

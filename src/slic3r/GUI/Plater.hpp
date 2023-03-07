@@ -166,6 +166,7 @@ public:
     void load_project();
     void load_project(const wxString& filename);
     void add_model(bool imperial_units = false);
+    void import_zip_archive();
     void import_sl1_archive();
     void extract_config_from_project();
     void load_gcode();
@@ -504,6 +505,16 @@ public:
     ~SuppressBackgroundProcessingUpdate();
 private:
     bool m_was_scheduled;
+};
+
+class PlaterAfterLoadAutoArrange
+{
+    bool m_enabled{ false };
+
+public:
+    PlaterAfterLoadAutoArrange();
+    ~PlaterAfterLoadAutoArrange();
+    void disable() { m_enabled = false; }
 };
 
 } // namespace GUI
