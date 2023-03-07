@@ -1774,7 +1774,7 @@ void PrintObject::bridge_over_infill()
                         Polygons    infill_region        = to_polygons(r->fill_expolygons());
                         Polygons    deep_infill_area     = closing(infill_region, scale_(0.01), scale_(0.01) + 4.0 * flow.scaled_spacing());
                         Polygons    solid_supported_area = expand(not_sparse_infill, 4.0 * flow.scaled_spacing());
-                        infill_and_deep_infill_polygons_per_region[r] = {closing(infill_region, scale_(0.1)),
+                        infill_and_deep_infill_polygons_per_region[r] = {closing(infill_region, float(scale_(0.1))),
                                                                          intersection(lower_layers_sparse_infill,
                                                                                       diff(deep_infill_area, solid_supported_area))};
                     }

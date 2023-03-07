@@ -1077,7 +1077,7 @@ SLAPrintObject::get_parts_to_slice(SLAPrintObjectStep untilstep) const
 
     std::vector<csg::CSGPart> ret;
 
-    for (int step = 0; step < s; ++step) {
+    for (unsigned int step = 0; step < s; ++step) {
         auto r = m_mesh_to_slice.equal_range(SLAPrintObjectStep(step));
         csg::copy_csgrange_shallow(Range{r.first, r.second}, std::back_inserter(ret));
     }

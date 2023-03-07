@@ -64,26 +64,6 @@ static GLModel::Geometry its_make_line(Vec3f beg_pos, Vec3f end_pos)
     return init_data;
 }
 
-// Generates mesh for a square plane
-static GLModel::Geometry its_make_square_plane(float radius)
-{
-    GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
-    init_data.reserve_vertices(4);
-    init_data.reserve_indices(6);
-
-    // vertices
-    init_data.add_vertex(Vec3f(-radius, -radius, 0.0));
-    init_data.add_vertex(Vec3f(radius , -radius, 0.0));
-    init_data.add_vertex(Vec3f(radius , radius , 0.0));
-    init_data.add_vertex(Vec3f(-radius, radius , 0.0));
-
-    // indices
-    init_data.add_triangle(0, 1, 2);
-    init_data.add_triangle(2, 3, 0);
-    return init_data;
-}
-
 //! -- #ysFIXME those functions bodies are ported from GizmoRotation
 // Generates mesh for a circle 
 static void init_from_circle(GLModel& model, double radius)
@@ -625,36 +605,6 @@ bool GLGizmoCut3D::render_reset_button(const std::string& label_id, const std::s
     ImGui::PopStyleVar();
 
     return revert;
-}
-
-static Vec2d ndc_to_ss(const Vec3d& ndc, const std::array<int, 4>& viewport) {
-    const double half_w = 0.5 * double(viewport[2]);
-    const double half_h = 0.5 * double(viewport[3]);
-    return { half_w * ndc.x() + double(viewport[0]) + half_w, half_h * ndc.y() + double(viewport[1]) + half_h };
-};
-static Vec3d clip_to_ndc(const Vec4d& clip) {
-    return Vec3d(clip.x(), clip.y(), clip.z()) / clip.w();
-}
-static Vec4d world_to_clip(const Vec3d& world, const Matrix4d& projection_view_matrix) {
-    return projection_view_matrix * Vec4d(world.x(), world.y(), world.z(), 1.0);
-}
-static Vec2d world_to_ss(const Vec3d& world, const Matrix4d& projection_view_matrix, const std::array<int, 4>& viewport) {
-    return ndc_to_ss(clip_to_ndc(world_to_clip(world, projection_view_matrix)), viewport);
-}
-
-static wxString get_label(Vec3d vec)
-{
-    wxString str =  "x=" + double_to_string(vec.x(), 2) +
-                    ", y=" + double_to_string(vec.y(), 2) +
-                    ", z=" + double_to_string(vec.z(), 2);
-    return str;
-}
-
-static wxString get_label(Vec2d vec)
-{
-    wxString str =  "x=" + double_to_string(vec.x(), 2) +
-                    ", y=" + double_to_string(vec.y(), 2);
-    return str;
 }
 
 void GLGizmoCut3D::render_cut_plane()
