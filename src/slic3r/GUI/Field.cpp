@@ -988,7 +988,6 @@ void Choice::BUILD() {
 
 	choice_ctrl* temp;
     if (m_opt.gui_type != ConfigOptionDef::GUIType::undefined 
-        && m_opt.gui_type != ConfigOptionDef::GUIType::select_open 
         && m_opt.gui_type != ConfigOptionDef::GUIType::select_close) {
         m_is_editable = true;
         temp = new choice_ctrl(m_parent, wxID_ANY, wxString(""), wxDefaultPosition, size, 0, nullptr, wxTE_PROCESS_ENTER);
