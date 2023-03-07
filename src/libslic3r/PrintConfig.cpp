@@ -544,7 +544,7 @@ void PrintConfigDef::init_fff_params()
                         "If set as percentage, the speed is calculated over the external perimeter speed.");
 
     def             = this->add("overhang_speed_0", coFloatOrPercent);
-    def->label      = L("speed for 0\% overlap (bridge)");
+    def->label      = L("speed for 0% overlap (bridge)");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
@@ -553,7 +553,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def             = this->add("overhang_speed_1", coFloatOrPercent);
-    def->label      = L("speed for 25\% overlap");
+    def->label      = L("speed for 25% overlap");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
@@ -562,7 +562,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def             = this->add("overhang_speed_2", coFloatOrPercent);
-    def->label      = L("speed for 50\% overlap");
+    def->label      = L("speed for 50% overlap");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
@@ -571,7 +571,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(20, false));
 
     def             = this->add("overhang_speed_3", coFloatOrPercent);
-    def->label      = L("speed for 75\% overlap");
+    def->label      = L("speed for 75% overlap");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
