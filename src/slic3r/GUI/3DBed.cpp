@@ -172,10 +172,10 @@ void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, 
 {
     m_scale_factor = scale_factor;
 
+    glsafe(::glEnable(GL_DEPTH_TEST));
+
     if (show_axes)
         render_axes();
-
-    glsafe(::glEnable(GL_DEPTH_TEST));
 
     m_model.model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
 
