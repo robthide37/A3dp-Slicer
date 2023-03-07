@@ -1302,11 +1302,12 @@ void Selection::scale(const Vec3d& scale, TransformationType transformation_type
 
 void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
 {
-    auto fit = [this](double s, Vec3d offset) {
+    auto fit = [this](double s, Vec3d offset, bool undoredo_snapshot) {
         if (s <= 0.0 || s == 1.0)
-            return;
+            return false;
 
-        wxGetApp().plater()->take_snapshot(_L("Scale To Fit"));
+        if (undoredo_snapshot)
+            wxGetApp().plater()->take_snapshot(_L("Scale To Fit"));
 
         TransformationType type;
         type.set_world();
@@ -1331,29 +1332,32 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
         wxGetApp().plater()->canvas3D()->do_move(""); // avoid storing another snapshot
 
         wxGetApp().obj_manipul()->set_dirty();
+        return undoredo_snapshot;
     };
 
-    auto fit_rectangle = [this, fit](const BuildVolume& volume) {
+    auto fit_rectangle = [this, fit](const BuildVolume& volume, bool undoredo_snapshot, double* max_height = nullptr) {
         const BoundingBoxf3 print_volume = volume.bounding_volume();
-        const Vec3d print_volume_size = print_volume.size();
+        Vec3d print_volume_size = print_volume.size();
+        print_volume_size.z() = (max_height != nullptr) ? *max_height : volume.max_print_height();
 
-        // adds 1/100th of a mm on all sides to avoid false out of print volume detections due to floating-point roundings
-        const Vec3d box_size = get_bounding_box().size() + 0.02 * Vec3d::Ones();
+        // adds 1/100th of a mm on both xy sides to avoid false out of print volume detections due to floating-point roundings
+        Vec3d box_size = get_bounding_box().size();
+        box_size.x() += 0.02;
+        box_size.y() += 0.02;
 
-        const double sx = (box_size.x() != 0.0) ? print_volume_size.x() / box_size.x() : 0.0;
-        const double sy = (box_size.y() != 0.0) ? print_volume_size.y() / box_size.y() : 0.0;
-        const double sz = (box_size.z() != 0.0) ? print_volume_size.z() / box_size.z() : 0.0;
+        const double sx = print_volume_size.x() / box_size.x();
+        const double sy = print_volume_size.y() / box_size.y();
+        const double sz = print_volume_size.z() / box_size.z();
 
-        if (sx != 0.0 && sy != 0.0 && sz != 0.0)
-            fit(std::min(sx, std::min(sy, sz)), print_volume.center() - get_bounding_box().center());
+        return fit(std::min(sx, std::min(sy, sz)), print_volume.center() - get_bounding_box().center(), undoredo_snapshot);
     };
 
-    auto fit_circle = [this, fit](const BuildVolume& volume) {
+    auto fit_circle = [this, fit](const BuildVolume& volume, bool undoredo_snapshot, double* max_height = nullptr) {
         const Geometry::Circled& print_circle = volume.circle();
         double print_circle_radius = unscale<double>(print_circle.radius);
 
         if (print_circle_radius == 0.0)
-            return;
+            return false;
 
         Points points;
         double max_z = 0.0;
@@ -1367,30 +1371,55 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
         }
 
         if (points.empty())
-            return;
+            return false;
 
         const Geometry::Circled circle = Geometry::smallest_enclosing_circle_welzl(points);
         // adds 1/100th of a mm on all sides to avoid false out of print volume detections due to floating-point roundings
         const double circle_radius = unscale<double>(circle.radius) + 0.01;
 
         if (circle_radius == 0.0 || max_z == 0.0)
-            return;
+            return false;
 
-        const double s = std::min(print_circle_radius / circle_radius, volume.max_print_height() / max_z);
+        const double print_volume_max_z = (max_height != nullptr) ? *max_height : volume.max_print_height();
+        const double s = std::min(print_circle_radius / circle_radius, print_volume_max_z / max_z);
         const Vec3d sel_center = get_bounding_box().center();
         const Vec3d offset = s * (Vec3d(unscale<double>(circle.center.x()), unscale<double>(circle.center.y()), 0.5 * max_z) - sel_center);
         const Vec3d print_center = { unscale<double>(print_circle.center.x()), unscale<double>(print_circle.center.y()), 0.5 * volume.max_print_height() };
-        fit(s, print_center - (sel_center + offset));
+        return fit(s, print_center - (sel_center + offset), undoredo_snapshot);
     };
 
     if (is_empty() || m_mode == Volume)
         return;
 
+    assert(is_single_full_instance());
+
+    // used to keep track whether the undo/redo snapshot has already been taken 
+    bool undoredo_snapshot = false;
+
     switch (volume.type())
     {
-    case BuildVolume::Type::Rectangle: { fit_rectangle(volume); break; }
-    case BuildVolume::Type::Circle:    { fit_circle(volume); break; }
+    case BuildVolume::Type::Rectangle: { undoredo_snapshot = fit_rectangle(volume, !undoredo_snapshot); break; }
+    case BuildVolume::Type::Circle:    { undoredo_snapshot = fit_circle(volume, !undoredo_snapshot); break; }
     default: { break; }
+    }
+
+    if (wxGetApp().plater()->printer_technology() == ptFFF) {
+        // check whether the top layer exceeds the maximum height of the print volume
+        // and, in case, reduce the scale accordingly
+        const auto [slicing_parameters, profile] = wxGetApp().plater()->canvas3D()->get_layers_height_data(get_object_idx());
+        auto layers = generate_object_layers(slicing_parameters, profile);
+        auto layers_it = layers.rbegin();
+        while (layers_it != layers.rend() && *layers_it > volume.bounding_volume().max.z()) {
+            ++layers_it;
+        }
+        if (layers_it != layers.rbegin() && layers_it != layers.rend()) {
+            switch (volume.type())
+            {
+            case BuildVolume::Type::Rectangle: { fit_rectangle(volume, !undoredo_snapshot, &(*layers_it)); break; }
+            case BuildVolume::Type::Circle:    { fit_circle(volume, !undoredo_snapshot, &(*layers_it)); break; }
+            default: { break; }
+            }
+        }
     }
 }
 

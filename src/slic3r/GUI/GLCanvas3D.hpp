@@ -291,6 +291,8 @@ class GLCanvas3D
 
         std::string get_tooltip(const GLCanvas3D& canvas) const;
 
+        std::pair<SlicingParameters, const std::vector<double>> get_layers_height_data();
+
     private:
         bool is_initialized() const;
         void generate_layer_height_texture();
@@ -957,6 +959,8 @@ public:
     bool is_object_sinking(int object_idx) const;
 
     void apply_retina_scale(Vec2d &screen_coordinate) const;
+
+    std::pair<SlicingParameters, const std::vector<double>> get_layers_height_data(int object_id);
 
 private:
     bool _is_shown_on_screen() const;

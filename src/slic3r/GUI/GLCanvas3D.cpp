@@ -293,6 +293,20 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_screen(const GLCanvas3D& canvas)
     return { w - thickness_bar_width(canvas), 0.0f, w, h };
 }
 
+std::pair<SlicingParameters, const std::vector<double>> GLCanvas3D::LayersEditing::get_layers_height_data()
+{
+    if (m_slicing_parameters != nullptr)
+        return { *m_slicing_parameters, m_layer_height_profile };
+
+    assert(m_model_object != nullptr);
+    this->update_slicing_parameters();
+    PrintObject::update_layer_height_profile(*m_model_object, *m_slicing_parameters, m_layer_height_profile);
+    std::pair<SlicingParameters, const std::vector<double>> ret = { *m_slicing_parameters, m_layer_height_profile };
+    delete m_slicing_parameters;
+    m_slicing_parameters = nullptr;
+    return ret;
+}
+
 bool GLCanvas3D::LayersEditing::is_initialized() const
 {
     return wxGetApp().get_shader("variable_layer_height") != nullptr;
@@ -4080,6 +4094,14 @@ void GLCanvas3D::apply_retina_scale(Vec2d &screen_coordinate) const
     double scale = static_cast<double>(m_retina_helper->get_scale_factor());
     screen_coordinate *= scale;
 #endif // ENABLE_RETINA_GL
+}
+
+std::pair<SlicingParameters, const std::vector<double>> GLCanvas3D::get_layers_height_data(int object_id)
+{
+    m_layers_editing.select_object(*m_model, object_id);
+    std::pair<SlicingParameters, const std::vector<double>> ret = m_layers_editing.get_layers_height_data();
+    m_layers_editing.select_object(*m_model, -1);
+    return ret;
 }
 
 bool GLCanvas3D::_is_shown_on_screen() const
