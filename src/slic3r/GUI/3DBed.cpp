@@ -366,6 +366,9 @@ std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Point
 
 void Bed3D::render_axes()
 {
+    if (!m_show_axes)
+        return;
+
     if (m_build_volume.valid())
 #if ENABLE_WORLD_COORDINATE
         m_axes.render(Transform3d::Identity(), 0.25f);

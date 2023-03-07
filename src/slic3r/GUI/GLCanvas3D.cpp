@@ -2350,6 +2350,23 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
             post_event(SimpleEvent(EVT_GLTOOLBAR_COPY));
         break;
 #ifdef __APPLE__
+        case 'd':
+        case 'D':
+#else /* __APPLE__ */
+        case WXK_CONTROL_D:
+#endif /* __APPLE__ */
+            m_bed.toggle_show_axes();
+            m_dirty = true;
+            break;
+#ifdef __APPLE__
+        case 'f':
+        case 'F':
+#else /* __APPLE__ */
+        case WXK_CONTROL_F:
+#endif /* __APPLE__ */
+            _activate_search_toolbar_item();
+            break;
+#ifdef __APPLE__
         case 'm':
         case 'M':
 #else /* __APPLE__ */
@@ -2385,18 +2402,6 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
 #endif /* __APPLE__ */
             post_event(SimpleEvent(EVT_GLTOOLBAR_PASTE));
         break;
-
-
-#ifdef __APPLE__
-        case 'f':
-        case 'F':
-#else /* __APPLE__ */
-        case WXK_CONTROL_F:
-#endif /* __APPLE__ */
-            _activate_search_toolbar_item();
-            break;
-
-
 #ifdef __APPLE__
         case 'y':
         case 'Y':
