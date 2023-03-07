@@ -117,10 +117,6 @@ private:
     void draw_advanced();
 
     bool select_facename(const wxString& facename);
-
-    void do_translate(const Vec3d& relative_move);
-    void do_rotate(float relative_z_angle);
-
     bool rev_input_mm(const std::string &name, float &value, const float *default_value,
         const std::string &undo_tooltip, float step, float step_fast, const char *format,
         bool use_inch, const std::optional<float>& scale);

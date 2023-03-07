@@ -539,6 +539,27 @@ inline coord_t align_to_grid(coord_t coord, coord_t spacing, coord_t base)
 inline Point   align_to_grid(Point   coord, Point   spacing, Point   base)
     { return Point(align_to_grid(coord.x(), spacing.x(), base.x()), align_to_grid(coord.y(), spacing.y(), base.y())); }
 
+// MinMaxLimits
+template<typename T> struct MinMax { T min; T max;};
+template<typename T>
+static bool apply(std::optional<T> &val, const MinMax<T> &limit) {
+    if (!val.has_value()) return false;
+    return apply<T>(*val, limit);
+}
+template<typename T>
+static bool apply(T &val, const MinMax<T> &limit)
+{
+    if (val > limit.max) {
+        val = limit.max;
+        return true;
+    }
+    if (val < limit.min) {
+        val = limit.min;
+        return true;
+    }
+    return false;
+}
+
 } // namespace Slic3r
 
 // start Boost

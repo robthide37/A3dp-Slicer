@@ -41,6 +41,10 @@ struct SurfaceDrag
     bool exist_hit = true;
 };
 
+// Limit direction of up vector on model
+// Between side and top surface
+constexpr double up_limit = 0.9;
+
 /// <summary>
 /// Mouse event handler, when move(drag&drop) volume over model surface
 /// NOTE: Dragged volume has to be selected. And also has to be hovered on start of dragging.
@@ -85,6 +89,28 @@ Transform3d world_matrix_fixed(const GLVolume &gl_volume, const ModelObjectPtrs&
 /// <param name="selection">Selected volume</param>
 /// <returns>Fixed Transformation of selected volume in selection</returns>
 Transform3d world_matrix_fixed(const Selection &selection);
+
+/// <summary>
+/// Apply camera direction for emboss direction
+/// </summary>
+/// <param name="camera">Define view vector</param>
+/// <param name="canvas">Containe Selected ModelVolume to modify orientation</param>
+/// <returns>True when apply change otherwise false</returns>
+bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas);
+
+/// <summary>
+/// Rotation around z Axis(emboss direction)
+/// </summary>
+/// <param name="canvas">Selected volume for rotation</param>
+/// <param name="relative_angle">Relative angle to rotate around emboss direction</param>
+void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle);
+
+/// <summary>
+/// Translation along local z Axis (emboss direction)
+/// </summary>
+/// <param name="canvas">Selected volume for translate</param>
+/// <param name="relative_move">Relative move along emboss direction</param>
+void do_local_z_move(GLCanvas3D &canvas, double relative_move);
 
 } // namespace Slic3r::GUI
 #endif // slic3r_SurfaceDrag_hpp_

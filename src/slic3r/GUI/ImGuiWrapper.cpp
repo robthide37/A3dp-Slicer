@@ -1369,6 +1369,48 @@ bool ImGuiWrapper::slider_optional_int(const char         *label,
     } else return false;
 }
 
+std::optional<ImVec2> ImGuiWrapper::change_window_position(const char *window_name, bool try_to_fix) {
+    ImGuiWindow *window = ImGui::FindWindowByName(window_name);
+    // is window just created
+    if (window == NULL)
+        return {};
+
+    // position of window on screen
+    ImVec2 position = window->Pos;
+    ImVec2 size     = window->SizeFull;
+
+    // screen size
+    ImVec2 screen = ImGui::GetMainViewport()->Size;
+
+    std::optional<ImVec2> output_window_offset;
+    if (position.x < 0) {
+        if (position.y < 0)
+            // top left 
+            output_window_offset = ImVec2(0, 0); 
+        else
+            // only left
+            output_window_offset = ImVec2(0, position.y); 
+    } else if (position.y < 0) {
+        // only top
+        output_window_offset = ImVec2(position.x, 0); 
+    } else if (screen.x < (position.x + size.x)) {
+        if (screen.y < (position.y + size.y))
+            // right bottom
+            output_window_offset = ImVec2(screen.x - size.x, screen.y - size.y);
+        else
+            // only right
+            output_window_offset = ImVec2(screen.x - size.x, position.y);
+    } else if (screen.y < (position.y + size.y)) {
+        // only bottom
+        output_window_offset = ImVec2(position.x, screen.y - size.y);
+    }
+
+    if (!try_to_fix && output_window_offset.has_value())
+        output_window_offset = ImVec2(-1, -1); // Put on default position
+
+    return output_window_offset;
+}
+
 void ImGuiWrapper::left_inputs() { 
     ImGui::ClearActiveID(); 
 }

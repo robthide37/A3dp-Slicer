@@ -337,4 +337,83 @@ Transform3d world_matrix_fixed(const Selection &selection)
     return world_matrix_fixed(*gl_volume, selection.get_model()->objects);
 }
 
+bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas)
+{
+    const Vec3d &cam_dir = camera.get_dir_forward();
+    Selection   &sel     = canvas.get_selection();
+    if (sel.is_empty())
+        return false;
+
+    // camera direction transformed into volume coordinate system
+    Transform3d to_world   = world_matrix_fixed(sel);
+    Vec3d       cam_dir_tr = to_world.inverse().linear() * cam_dir;
+    cam_dir_tr.normalize();
+
+    Vec3d emboss_dir(0., 0., -1.);
+
+    // check wether cam_dir is already used
+    if (is_approx(cam_dir_tr, emboss_dir))
+        return false;
+
+    assert(sel.get_volume_idxs().size() == 1);
+    GLVolume *gl_volume = sel.get_volume(*sel.get_volume_idxs().begin());
+
+    Transform3d vol_rot;
+    Transform3d vol_tr = gl_volume->get_volume_transformation().get_matrix();
+    // check whether cam_dir is opposit to emboss dir
+    if (is_approx(cam_dir_tr, -emboss_dir)) {
+        // rotate 180 DEG by y
+        vol_rot = Eigen::AngleAxis(M_PI_2, Vec3d(0., 1., 0.));
+    } else {
+        // calc params for rotation
+        Vec3d axe = emboss_dir.cross(cam_dir_tr);
+        axe.normalize();
+        double angle = std::acos(emboss_dir.dot(cam_dir_tr));
+        vol_rot      = Eigen::AngleAxis(angle, axe);
+    }
+
+    Vec3d       offset     = vol_tr * Vec3d::Zero();
+    Vec3d       offset_inv = vol_rot.inverse() * offset;
+    Transform3d res        = vol_tr * Eigen::Translation<double, 3>(-offset) * vol_rot * Eigen::Translation<double, 3>(offset_inv);
+    // Transform3d res = vol_tr * vol_rot;
+    gl_volume->set_volume_transformation(Geometry::Transformation(res));
+    get_model_volume(*gl_volume, sel.get_model()->objects)->set_transformation(res);
+    return true;
+}
+
+void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
+{
+    Selection &selection = canvas.get_selection();
+
+    assert(!selection.is_empty());
+    if(selection.is_empty()) return;
+
+    selection.setup_cache();
+    TransformationType transformation_type = TransformationType::Local_Relative_Joint;
+    selection.rotate(Vec3d(0., 0., relative_angle), transformation_type);
+
+    std::string snapshot_name; // empty meand no store undo / redo
+    // NOTE: it use L instead of _L macro because prefix _ is appended
+    // inside function do_move
+    // snapshot_name = L("Set text rotation");
+    canvas.do_rotate(snapshot_name);
+}
+
+void do_local_z_move(GLCanvas3D &canvas, double relative_move) {
+    
+    Selection &selection = canvas.get_selection();
+    assert(!selection.is_empty());
+    if (selection.is_empty()) return;
+
+    selection.setup_cache();
+    Vec3d translate = Vec3d::UnitZ() * relative_move;
+    selection.translate(translate, TransformationType::Local);
+
+    std::string snapshot_name; // empty mean no store undo / redo
+    // NOTE: it use L instead of _L macro because prefix _ is appended inside
+    // function do_move
+    // snapshot_name = L("Set surface distance");
+    canvas.do_move(snapshot_name);
+}
+
 } // namespace Slic3r::GUI

@@ -67,7 +67,6 @@ using namespace Slic3r::GUI;
 using namespace Slic3r::GUI::Emboss;
 
 namespace priv {
-template<typename T> struct MinMax { T min; T max;};
 template<typename T> struct Limit {
     // Limitation for view slider range in GUI
     MinMax<T> gui;
@@ -86,40 +85,8 @@ static const struct Limits
     MinMax<int>  line_gap{-20000, 20000}; // in font points
     // distance text object from surface
     MinMax<float> angle{-180.f, 180.f}; // in degrees
-
-    template<typename T>
-    static bool apply(std::optional<T> &val, const MinMax<T> &limit) {
-        if (val.has_value())
-            return apply<T>(*val, limit);
-        return false;
-    }
-    template<typename T>
-    static bool apply(T &val, const MinMax<T> &limit)
-    {
-        if (val > limit.max) {
-            val = limit.max;
-            return true;
-        }
-        if (val < limit.min) {
-            val = limit.min;
-            return true;
-        }
-        return false;
-    }
-
 } limits;
 
-// Define where is up vector on model
-constexpr double up_limit = 0.9;
-
-// Normalize radian angle from -PI to PI
-template<typename T> void to_range_pi_pi(T& angle)
-{
-    if (angle > PI || angle < -PI) {
-        int count = static_cast<int>(std::round(angle / (2 * PI)));
-        angle -= static_cast<T>(count * 2 * PI);
-    }
-}
 } // namespace priv
 using namespace priv;
 
@@ -232,15 +199,6 @@ enum class IconState : unsigned { activable = 0, hovered /*1*/, disabled /*2*/ }
 const IconManager::Icon &get_icon(const IconManager::VIcons& icons, IconType type, IconState state);
 // short call of Slic3r::GUI::button
 static bool draw_button(const IconManager::VIcons& icons, IconType type, bool disable = false);
-
-/// <summary>
-/// Apply camera direction for emboss direction
-/// </summary>
-/// <param name="camera">Define view vector</param>
-/// <param name="canvas">Containe Selected Model to modify</param>
-/// <returns>True when apply change otherwise false</returns>
-static bool apply_camera_dir(const Camera &camera, GLCanvas3D &canvas);
-
 } // namespace priv
 
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
@@ -342,7 +300,7 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 
         angle += *m_rotate_start_angle;
         // move to range <-M_PI, M_PI>
-        priv::to_range_pi_pi(angle);
+        Geometry::to_range_pi_pi(angle);
 
         // set into activ style
         assert(m_style_manager.is_active_font());
@@ -363,7 +321,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         return false;
     
     std::optional<double> up_limit;
-    if (m_keep_up)        up_limit = priv::up_limit;
+    if (m_keep_up)        up_limit = Slic3r::GUI::up_limit;
     const Camera &camera = wxGetApp().plater()->get_camera();
     bool was_dragging = m_surface_drag.has_value();
     bool res = on_mouse_surface_drag(mouse_event, camera, m_surface_drag, m_parent, m_raycast_manager, up_limit);
@@ -399,7 +357,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             if (gl_volume == nullptr || !m_style_manager.is_active_font())
                 return res;
 
-            m_style_manager.get_style().prop.angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
+            m_style_manager.get_style().prop.angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
         }
     }
     return res;
@@ -622,12 +580,6 @@ namespace priv {
 /// </summary>
 static ImVec2 calc_fine_position(const Selection &selection, const ImVec2 &windows_size, const Size &canvas_size);
 
-/// <summary>
-/// Change position of emboss window
-/// </summary>
-/// <param name="output_window_offset"></param>
-/// <param name="try_to_fix">When True Only move to be full visible otherwise reset position</param>
-static void change_window_position(std::optional<ImVec2> &output_window_offset, bool try_to_fix);
 } // namespace priv
 
 void GLGizmoEmboss::on_set_state()
@@ -679,7 +631,7 @@ void GLGizmoEmboss::on_set_state()
             m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
         } else {
             if (m_gui_cfg.has_value())
-                priv::change_window_position(m_set_window_offset, false);
+                m_set_window_offset = ImGuiWrapper::change_window_position(on_get_name().c_str(), false);
             else
                 m_set_window_offset = ImVec2(-1, -1);
         }
@@ -712,7 +664,7 @@ void GLGizmoEmboss::on_stop_dragging()
     assert(m_style_manager.is_active_font());
     assert(gl_volume != nullptr);
     if (m_style_manager.is_active_font() && gl_volume != nullptr) 
-        m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
+        m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
 
     m_rotate_start_angle.reset();
 
@@ -1029,7 +981,7 @@ void GLGizmoEmboss::set_volume_by_selection()
     // Calculate current angle of up vector
     assert(m_style_manager.is_active_font());
     if (m_style_manager.is_active_font()) 
-        m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), priv::up_limit);    
+        m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);    
 
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();    
@@ -2228,7 +2180,7 @@ void GLGizmoEmboss::fix_transformation(const FontProp &from,
         // fix rotation
         float f_angle = f_angle_opt.has_value() ? *f_angle_opt : .0f;
         float t_angle = t_angle_opt.has_value() ? *t_angle_opt : .0f;
-        do_rotate(t_angle - f_angle);
+        do_local_z_rotate(m_parent, t_angle - f_angle);
     }
 
     // fix distance (Z move) when exists difference in styles
@@ -2237,7 +2189,7 @@ void GLGizmoEmboss::fix_transformation(const FontProp &from,
     if (!is_approx(f_move_opt, t_move_opt)) {
         float f_move = f_move_opt.has_value() ? *f_move_opt : .0f;
         float t_move = t_move_opt.has_value() ? *t_move_opt : .0f;
-        do_translate(Vec3d::UnitZ() * (t_move - f_move));
+        do_local_z_move(m_parent, t_move - f_move);
     }
 }
 
@@ -2669,7 +2621,7 @@ bool GLGizmoEmboss::set_height() {
     float &value = m_style_manager.get_style().prop.size_in_mm;
 
     // size can't be zero or negative
-    priv::Limits::apply(value, priv::limits.size_in_mm);
+    apply(value, priv::limits.size_in_mm);
 
     if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
         assert(false);
@@ -2710,7 +2662,7 @@ bool GLGizmoEmboss::set_depth()
     float &value = m_style_manager.get_style().prop.emboss;
 
     // size can't be zero or negative
-    priv::Limits::apply(value, priv::limits.emboss);
+    apply(value, priv::limits.emboss);
 
     // only different value need process
     return !is_approx(value, m_volume->text_configuration->style.prop.emboss);
@@ -2795,39 +2747,6 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
         undo_tooltip, undo_offset, draw_slider_float);
 }
 
-void GLGizmoEmboss::do_translate(const Vec3d &relative_move)
-{
-    assert(m_volume != nullptr);
-    assert(m_volume->text_configuration.has_value());
-    Selection &selection = m_parent.get_selection();
-    assert(!selection.is_empty());
-    selection.setup_cache();
-    selection.translate(relative_move, TransformationType::Local);
-
-    std::string snapshot_name; // empty mean no store undo / redo
-    // NOTE: it use L instead of _L macro because prefix _ is appended inside
-    // function do_move
-    // snapshot_name = L("Set surface distance");
-    m_parent.do_move(snapshot_name);
-}
-
-void GLGizmoEmboss::do_rotate(float relative_z_angle)
-{
-    assert(m_volume != nullptr);
-    assert(m_volume->text_configuration.has_value());
-    Selection &selection = m_parent.get_selection();
-    assert(!selection.is_empty());
-    selection.setup_cache();
-    TransformationType transformation_type = TransformationType::Local_Relative_Joint;
-    selection.rotate(Vec3d(0., 0., relative_z_angle), transformation_type);
-
-    std::string snapshot_name; // empty meand no store undo / redo
-    // NOTE: it use L instead of _L macro because prefix _ is appended
-    // inside function do_move
-    // snapshot_name = L("Set text rotation");
-    m_parent.do_rotate(snapshot_name);
-}
-
 void GLGizmoEmboss::draw_advanced()
 {
     const auto &ff = m_style_manager.get_font_file_with_cache();
@@ -2898,7 +2817,7 @@ void GLGizmoEmboss::draw_advanced()
     if (rev_slider(tr.char_gap, font_prop.char_gap, def_char_gap, _u8L("Revert gap between letters"), 
         min_char_gap, max_char_gap, units_fmt, _L("Distance between letters"))){
         // Condition prevent recalculation when insertint out of limits value by imgui input
-        if (!priv::Limits::apply(font_prop.char_gap, priv::limits.char_gap) ||
+        if (!apply(font_prop.char_gap, priv::limits.char_gap) ||
             !m_volume->text_configuration->style.prop.char_gap.has_value() ||
             m_volume->text_configuration->style.prop.char_gap != font_prop.char_gap) {        
             // char gap is stored inside of imgui font atlas
@@ -2914,7 +2833,7 @@ void GLGizmoEmboss::draw_advanced()
     if (rev_slider(tr.line_gap, font_prop.line_gap, def_line_gap, _u8L("Revert gap between lines"), 
         min_line_gap, max_line_gap, units_fmt, _L("Distance between lines"))){
         // Condition prevent recalculation when insertint out of limits value by imgui input
-        if (!priv::Limits::apply(font_prop.line_gap, priv::limits.line_gap) ||
+        if (!apply(font_prop.line_gap, priv::limits.line_gap) ||
             !m_volume->text_configuration->style.prop.line_gap.has_value() ||
             m_volume->text_configuration->style.prop.line_gap != font_prop.line_gap) {        
             // line gap is planed to be stored inside of imgui font atlas
@@ -2928,7 +2847,7 @@ void GLGizmoEmboss::draw_advanced()
         &stored_style->prop.boldness : nullptr;
     if (rev_slider(tr.boldness, font_prop.boldness, def_boldness, _u8L("Undo boldness"), 
         priv::limits.boldness.gui.min, priv::limits.boldness.gui.max, units_fmt, _L("Tiny / Wide glyphs"))){
-        if (!priv::Limits::apply(font_prop.boldness, priv::limits.boldness.values) ||
+        if (!apply(font_prop.boldness, priv::limits.boldness.values) ||
             !m_volume->text_configuration->style.prop.boldness.has_value() ||
             m_volume->text_configuration->style.prop.boldness != font_prop.boldness)
             exist_change = true;
@@ -2939,7 +2858,7 @@ void GLGizmoEmboss::draw_advanced()
         &stored_style->prop.skew : nullptr;
     if (rev_slider(tr.skew_ration, font_prop.skew, def_skew, _u8L("Undo letter's skew"),
         priv::limits.skew.gui.min, priv::limits.skew.gui.max, "%.2f", _L("Italic strength ratio"))){
-        if (!priv::Limits::apply(font_prop.skew, priv::limits.skew.values) ||
+        if (!apply(font_prop.skew, priv::limits.skew.values) ||
             !m_volume->text_configuration->style.prop.skew.has_value() ||
             m_volume->text_configuration->style.prop.skew != font_prop.skew)
             exist_change = true;
@@ -2987,7 +2906,7 @@ void GLGizmoEmboss::draw_advanced()
     if (is_moved){
         m_volume->text_configuration->style.prop.distance = font_prop.distance;        
         float act_distance = font_prop.distance.has_value() ? *font_prop.distance : .0f;
-        do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
+        do_local_z_move(m_parent, act_distance - prev_distance);
     }
     m_imgui->disabled_end();
 
@@ -3007,19 +2926,18 @@ void GLGizmoEmboss::draw_advanced()
         priv::limits.angle.min, priv::limits.angle.max, u8"%.2f °",
                    _L("Rotate text Clock-wise."))) {
         // convert back to radians and CCW
-        float angle_rad = static_cast<float>(-angle_deg * M_PI / 180.0);
-        priv::to_range_pi_pi(angle_rad);
-                
+        double angle_rad = -angle_deg * M_PI / 180.0;
+        Geometry::to_range_pi_pi(angle_rad);                
 
-        float diff_angle = angle_rad - angle;
-        do_rotate(diff_angle);
+        double diff_angle = angle_rad - angle;
+        do_local_z_rotate(m_parent, diff_angle);
         
         // calc angle after rotation
         const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
         assert(gl_volume != nullptr);
         assert(m_style_manager.is_active_font());
         if (m_style_manager.is_active_font() && gl_volume != nullptr) 
-            m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
+            m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
         
         // recalculate for surface cut
         if (font_prop.use_surface) 
@@ -3070,7 +2988,7 @@ void GLGizmoEmboss::draw_advanced()
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam         = wxGetApp().plater()->get_camera();
         bool          use_surface = m_style_manager.get_style().prop.use_surface;
-        if (priv::apply_camera_dir(cam, m_parent) && use_surface)
+        if (face_selected_volume_to_camera(cam, m_parent) && use_surface)
             process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Use camera direction for text orientation").c_str());
@@ -3103,9 +3021,9 @@ void GLGizmoEmboss::set_minimal_window_size(bool is_advance_edit_style)
     float diff_y = window_size.y - min_win_size_prev.y;
     m_is_advanced_edit_style = is_advance_edit_style;
     const ImVec2 &min_win_size = get_minimal_window_size();
-    ImGui::SetWindowSize(ImVec2(0.f, min_win_size.y + diff_y),
-                         ImGuiCond_Always);
-    priv::change_window_position(m_set_window_offset, true);
+    ImVec2 new_window_size(0.f, min_win_size.y + diff_y);
+    ImGui::SetWindowSize(new_window_size, ImGuiCond_Always);
+    m_set_window_offset = ImGuiWrapper::change_window_position(on_get_name().c_str(), true);
 }
 
 ImVec2 GLGizmoEmboss::get_minimal_window_size() const
@@ -3478,7 +3396,7 @@ bool priv::start_create_volume_on_surface_job(
     Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
 
     // Create result volume transformation
-    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal, priv::up_limit);
+    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal, Slic3r::GUI::up_limit);
     const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
     // new transformation in world coor is surface_trmat
@@ -3538,88 +3456,6 @@ ImVec2 priv::calc_fine_position(const Selection &selection, const ImVec2 &window
     ImVec2 c_size(canvas_size.get_width(), canvas_size.get_height());
     ImVec2 offset = ImGuiWrapper::suggest_location(windows_size, hull, c_size);
     return offset;
-}
-
-// Need internals to get window
-#include "imgui/imgui_internal.h"
-void priv::change_window_position(std::optional<ImVec2>& output_window_offset, bool try_to_fix) {
-    const char* name = "Emboss";
-    ImGuiWindow *window = ImGui::FindWindowByName(name);
-    // is window just created 
-    if (window == NULL)
-        return;
-
-    // position of window on screen
-    ImVec2 position = window->Pos;
-    ImVec2 size     = window->SizeFull;
-
-    // screen size
-    ImVec2 screen = ImGui::GetMainViewport()->Size;
-
-    if (position.x < 0) {
-        if (position.y < 0)
-            output_window_offset = ImVec2(0, 0);
-        else
-            output_window_offset = ImVec2(0, position.y);
-    } else if (position.y < 0) {
-        output_window_offset = ImVec2(position.x, 0);
-    } else if (screen.x < (position.x + size.x)) {
-        if (screen.y < (position.y + size.y))
-            output_window_offset = ImVec2(screen.x - size.x, screen.y - size.y);
-        else
-            output_window_offset = ImVec2(screen.x - size.x, position.y);
-    } else if (screen.y < (position.y + size.y)) {
-        output_window_offset = ImVec2(position.x, screen.y - size.y);
-    }
-
-    if (!try_to_fix && output_window_offset.has_value())
-        output_window_offset = ImVec2(-1, -1); // Cannot 
-}
-
-
-bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
-    const Vec3d &cam_dir = camera.get_dir_forward();
-
-    Selection &sel = canvas.get_selection();
-    if (sel.is_empty()) return false;
-    
-    // camera direction transformed into volume coordinate system    
-    Transform3d to_world = world_matrix_fixed(sel);
-    Vec3d cam_dir_tr = to_world.inverse().linear() * cam_dir;
-    cam_dir_tr.normalize();
-
-    Vec3d emboss_dir(0., 0., -1.);
-
-    // check wether cam_dir is already used
-    if (is_approx(cam_dir_tr, emboss_dir)) return false;
-
-    assert(sel.get_volume_idxs().size() == 1);
-    GLVolume *gl_volume = sel.get_volume(*sel.get_volume_idxs().begin());
-
-    Transform3d vol_rot;
-    Transform3d vol_tr = gl_volume->get_volume_transformation().get_matrix();
-    // check whether cam_dir is opposit to emboss dir
-    if (is_approx(cam_dir_tr, -emboss_dir)) {
-        // rotate 180 DEG by y
-        vol_rot = Eigen::AngleAxis(M_PI_2, Vec3d(0., 1., 0.));
-    } else {
-        // calc params for rotation
-        Vec3d axe = emboss_dir.cross(cam_dir_tr);
-        axe.normalize();
-        double angle = std::acos(emboss_dir.dot(cam_dir_tr));
-        vol_rot = Eigen::AngleAxis(angle, axe);
-    }
-
-    Vec3d offset = vol_tr * Vec3d::Zero();
-    Vec3d offset_inv = vol_rot.inverse() * offset;
-    Transform3d res = vol_tr * 
-        Eigen::Translation<double, 3>(-offset) * 
-        vol_rot * 
-        Eigen::Translation<double, 3>(offset_inv);
-    //Transform3d res = vol_tr * vol_rot;
-    gl_volume->set_volume_transformation(Geometry::Transformation(res));
-    get_model_volume(*gl_volume, sel.get_model()->objects)->set_transformation(res);
-    return true;
 }
 
 // any existing icon filename to not influence GUI
