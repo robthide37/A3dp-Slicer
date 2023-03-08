@@ -38,12 +38,14 @@ public:
     /// <param name="volume_type">Object part / Negative volume / Modifier</param>
     /// <param name="mouse_pos">Define position of new volume</param>
     void create_volume(const std::string& svg_file_path, ModelVolumeType volume_type, const Vec2d &mouse_pos);
+    void create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos); // first open file dialog
 
     /// <summary>
     /// Create new text without given position
     /// </summary>
     /// <param name="volume_type">Object part / Negative volume / Modifier</param>
     void create_volume(const std::string &svg_file_path, ModelVolumeType volume_type);
+    void create_volume(ModelVolumeType volume_type); // first open file dialog
 
     /// <summary>
     /// Check whether volume is object containing only emboss volume
@@ -101,8 +103,6 @@ private:
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
-
-    bool choose_svg_file();
 
     // This configs holds GUI layout size given by translated texts.
     // etc. When language changes, GUI is recreated and this class constructed again,

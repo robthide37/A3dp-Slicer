@@ -9,10 +9,9 @@
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
-#include "slic3r/GUI/Jobs/EmbossJob.hpp"
-#include "slic3r/GUI/Jobs/NotificationProgressIndicator.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 
+#include "libslic3r/Point.hpp"      
 #include "libslic3r/SVG.hpp"      // debug store
 #include "libslic3r/Geometry.hpp" // covex hull 2d
 #include "libslic3r/Timer.hpp" // covex hull 2d
@@ -33,7 +32,6 @@
 using namespace Slic3r;
 using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
-using namespace Slic3r::GUI::Emboss;
 
 namespace priv {
 // Variable keep limits for variables
@@ -43,6 +41,9 @@ static const struct Limits
     // distance text object from surface
     MinMax<float> angle{-180.f, 180.f}; // in degrees
 } limits;
+
+static std::string choose_svg_file();
+static std::string get_file_name(const std::string &file_path);
 } // namespace priv
 
 GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
@@ -55,10 +56,35 @@ GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
     m_rotate_gizmo.set_force_local_coordinate(true);
 }
 
+void GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos){
+    std::string path = priv::choose_svg_file();
+    if (path.empty()) return;
+    create_volume(path, volume_type, mouse_pos);
+}
+void GLGizmoSVG::create_volume(ModelVolumeType volume_type) {
+    std::string path = priv::choose_svg_file();
+    if (path.empty()) return;
+    create_volume(path, volume_type);
+}
+
 void GLGizmoSVG::create_volume(const std::string &svg_file_path, ModelVolumeType volume_type, const Vec2d &mouse_pos) {
+    std::string name  = priv::get_file_name(svg_file_path);
+    NSVGimage  *image = nsvgParseFromFile(svg_file_path.c_str(), "mm", 96.0f);
+    ExPolygons  polys = NSVGUtils::to_ExPolygons(image);
+    nsvgDelete(image);
+
+    BoundingBox bb;
+    for (const auto &p : polys)
+        bb.merge(p.contour.points);
+
+    double scale = 1e-4;
+    auto project = std::make_unique<ProjectScale>(std::make_unique<ProjectZ>(10 / scale), scale);
+    indexed_triangle_set its = polygons2model(polys, *project);
+    // add volume
 }
 
 void GLGizmoSVG::create_volume(const std::string &svg_file_path, ModelVolumeType volume_type) {
+
 }
 
 bool GLGizmoSVG::is_svg(const ModelVolume *volume) {
@@ -484,7 +510,10 @@ void GLGizmoSVG::draw_window()
 {
     ImGui::Text("Preview of svg image.");
 
-    if (ImGui::Button("choose svg file")) choose_svg_file();
+    if (ImGui::Button("choose svg file"))
+        return;
+        
+        //choose_svg_file();
  }
 
 void GLGizmoSVG::draw_model_type()
@@ -563,9 +592,9 @@ void GLGizmoSVG::draw_model_type()
         // TODO: select volume back - Ask @Sasa
     }
 }
-namespace priv {
-    
-std::string get_file_name(const std::string &file_path)
+
+
+std::string priv::get_file_name(const std::string &file_path)
 {
     size_t pos_last_delimiter = file_path.find_last_of("/\\");
     size_t pos_point          = file_path.find_last_of('.');
@@ -574,40 +603,25 @@ std::string get_file_name(const std::string &file_path)
     return file_path.substr(offset, count);
 }
 
-}
-
-bool GLGizmoSVG::choose_svg_file()
+std::string priv::choose_svg_file()
 {
     wxArrayString input_files;
-    wxString      fontDir      = wxEmptyString;
-    wxString      selectedFile = wxEmptyString;
-    wxFileDialog  dialog(nullptr, _L("Choose SVG file:"), fontDir,
+    wxString defaultDir   = wxEmptyString;
+    wxString selectedFile = wxEmptyString;
+
+    wxFileDialog  dialog(nullptr, _L("Choose SVG file:"), defaultDir,
                         selectedFile, file_wildcards(FT_SVG),
                         wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
     if (dialog.ShowModal() == wxID_OK) dialog.GetPaths(input_files);
-    if (input_files.IsEmpty()) return false;
-    if (input_files.size() != 1) return false;
-    auto &      input_file = input_files.front();
-    std::string path       = std::string(input_file.c_str());
-    std::string name       = priv::get_file_name(path);
+    if (input_files.IsEmpty())
+        return {};
+    if (input_files.size() != 1)
+        return {};
 
-    NSVGimage *image = nsvgParseFromFile(path.c_str(), "mm", 96.0f);
-    ExPolygons polys = NSVGUtils::to_ExPolygons(image);
-    nsvgDelete(image);
-
-    BoundingBox bb;
-    for (const auto &p : polys) bb.merge(p.contour.points);
-    
-    double scale = 1e-4;
-    auto project = std::make_unique<ProjectScale>(
-        std::make_unique<ProjectZ>(10 / scale), scale);
-    indexed_triangle_set its = polygons2model(polys, *project);
-    return false;
-    // test store:
-    // for (auto &poly : polys) poly.scale(1e5);
-    // SVG svg("converted.svg", BoundingBox(polys.front().contour.points));
-    // svg.draw(polys);
-    //return add_volume(name, its);
+    auto &input_file = input_files.front();
+    std::string path = std::string(input_file.c_str());
+    return path;
 }
 
 // any existing icon filename to not influence GUI

@@ -14,6 +14,7 @@
 #include "Selection.hpp"
 #include "format.hpp"
 #include "Gizmos/GLGizmoEmboss.hpp"
+#include "Gizmos/GLGizmoSVG.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include "slic3r/Utils/FixModelByWin10.hpp"
@@ -487,6 +488,7 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
         }
 
     append_menu_item_add_text(sub_menu, type);
+    append_menu_item_add_svg(sub_menu, type);
 
     if (mode >= comAdvanced) {
         sub_menu->AppendSeparator();
@@ -530,6 +532,42 @@ void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, 
         menu->AppendSeparator();
         const std::string icon_name = is_submenu_item ? "" : ADD_VOLUME_MENU_ITEMS[int(type)].second;
         append_menu_item(menu, wxID_ANY, item_name, "", add_text, icon_name, menu);
+    }
+}
+
+void MenuFactory::append_menu_item_add_svg(wxMenu *menu, ModelVolumeType type, bool is_submenu_item /* = true*/)
+{
+    auto open_svg = [type](wxCommandEvent &evt) {
+        GLCanvas3D* canvas = plater()->canvas3D();
+        GLGizmosManager& mng = canvas->get_gizmos_manager();
+        GLGizmoBase* gizmo = mng.get_gizmo(GLGizmosManager::Svg);
+        GLGizmoSVG* svg = dynamic_cast<GLGizmoSVG *>(gizmo);
+        assert(svg != nullptr);
+        if (svg == nullptr) return;
+        
+        ModelVolumeType volume_type = type;
+        // no selected object means create new object
+        if (volume_type == ModelVolumeType::INVALID)
+            volume_type = ModelVolumeType::MODEL_PART;
+
+        auto screen_position = canvas->get_popup_menu_position();
+        if (screen_position.has_value()) {
+            svg->create_volume(volume_type, *screen_position);
+        } else {
+            svg->create_volume(volume_type);
+        }
+    };
+
+    if (   type == ModelVolumeType::MODEL_PART
+        || type == ModelVolumeType::NEGATIVE_VOLUME
+        || type == ModelVolumeType::PARAMETER_MODIFIER
+        || type == ModelVolumeType::INVALID // cannot use gizmo without selected object
+        ) {
+        wxString item_name = is_submenu_item ? "" : _(ADD_VOLUME_MENU_ITEMS[int(type)].first) + ": ";
+        item_name += _L("SVG");
+        menu->AppendSeparator();
+        const std::string icon_name = is_submenu_item ? "" : ADD_VOLUME_MENU_ITEMS[int(type)].second;
+        append_menu_item(menu, wxID_ANY, item_name, "", open_svg, icon_name, menu);
     }
 }
 
