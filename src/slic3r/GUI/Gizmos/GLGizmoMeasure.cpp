@@ -1993,6 +1993,13 @@ void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit
                     radius = ObjectManipulation::mm_to_in * radius;
                 text += " (" + _u8L("Diameter") + ": " + format_double(2.0 * radius) + units + ")";
             }
+            else if (item.feature.has_value() && item.feature->get_type() == Measure::SurfaceFeatureType::Edge) {
+                auto [start, end] = item.feature->get_edge();
+                double length = (end - start).norm();
+                if (use_inches)
+                    length = ObjectManipulation::mm_to_in * length;
+                text += " (" + _u8L("Length") + ": " + format_double(length) + units + ")";
+            }
             return text;
         };
 

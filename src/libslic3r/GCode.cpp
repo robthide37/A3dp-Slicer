@@ -1005,18 +1005,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
             std::sort(zs.begin(), zs.end());
             m_layer_count += (unsigned int)(object->instances().size() * (std::unique(zs.begin(), zs.end()) - zs.begin()));
         }
-    } else {
-        // Print all objects with the same print_z together.
-        std::vector<coordf_t> zs;
-        for (auto object : print.objects()) {
-            zs.reserve(zs.size() + object->layers().size() + object->support_layers().size());
-            for (auto layer : object->layers())
-                zs.push_back(layer->print_z);
-            for (auto layer : object->support_layers())
-                zs.push_back(layer->print_z);
-        }
-        std::sort(zs.begin(), zs.end());
-        m_layer_count = (unsigned int)(std::unique(zs.begin(), zs.end()) - zs.begin());
     }
     print.throw_if_canceled();
 
@@ -1144,6 +1132,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         this->set_extruders(tool_ordering.all_extruders());
         // Order object instances using a nearest neighbor search.
         print_object_instances_ordering = chain_print_object_instances(print);
+        m_layer_count = tool_ordering.layer_tools().size();
     }
     if (initial_extruder_id == (unsigned int)-1) {
         // Nothing to print!

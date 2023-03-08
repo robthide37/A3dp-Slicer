@@ -889,7 +889,6 @@ const BoundingBoxf3& ModelObject::bounding_box_exact() const
     if (! m_bounding_box_exact_valid) {
         m_bounding_box_exact_valid = true;
         m_min_max_z_valid = true;
-        BoundingBoxf3 raw_bbox = this->raw_mesh_bounding_box();
         m_bounding_box_exact.reset();
         for (size_t i = 0; i < this->instances.size(); ++ i)
             m_bounding_box_exact.merge(this->instance_bounding_box(i));
@@ -1309,7 +1308,7 @@ indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes conn
     if (connector_attributes.style == CutConnectorStyle::Prism)
         connector_mesh = its_make_cylinder(1.0, 1.0, (2 * PI / sectorCount));
     else if (connector_attributes.type == CutConnectorType::Plug)
-        connector_mesh = its_make_cone(1.0, 1.0, (2 * PI / sectorCount));
+        connector_mesh = its_make_frustum(1.0, 1.0, (2 * PI / sectorCount));
     else
         connector_mesh = its_make_frustum_dowel(1.0, 1.0, sectorCount);
 
@@ -1521,6 +1520,11 @@ void ModelObject::process_modifier_cut(ModelVolume* volume, const Transform3d& i
     // Modifiers are not cut, but we still need to add the instance transformation
     // to the modifier volume transformation to preserve their shape properly.
     volume->set_transformation(Geometry::Transformation(volume_matrix));
+
+    if (attributes.has(ModelObjectCutAttribute::KeepAsParts)) {
+        upper->add_volume(*volume);
+        return;
+    }
 
     // Some logic for the negative volumes/connectors. Add only needed modifiers
     auto bb = volume->mesh().transformed_bounding_box(inverse_cut_matrix * volume_matrix);

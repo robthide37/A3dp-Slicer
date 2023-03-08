@@ -118,8 +118,8 @@ class GLGizmoCut3D : public GLGizmoBase
     float m_connector_depth_ratio_tolerance{ 0.1f };
     float m_connector_size_tolerance{ 0.f };
 
-    float m_label_width{ 150.0 };
-    float m_control_width{ 200.0 };
+    float m_label_width{ 0.f };
+    float m_control_width{ 200.f };
     bool  m_imperial_units{ false };
 
     float m_contour_width{ 0.4f };
@@ -168,6 +168,8 @@ class GLGizmoCut3D : public GLGizmoBase
     std::vector<std::string> m_axis_names;
 
     std::map<std::string, wxString> m_part_orientation_names;
+
+    std::map<std::string, std::string> m_labels_map;
 
 public:
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);

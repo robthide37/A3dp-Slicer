@@ -1840,6 +1840,7 @@ void ObjectList::load_mesh_object(
     const TextConfiguration *text_config /* = nullptr*/,
     const Transform3d *      transformation /* = nullptr*/)
 {   
+    PlaterAfterLoadAutoArrange plater_after_load_auto_arrange;
     // Add mesh to model as a new object
     Model& model = wxGetApp().plater()->model();
 

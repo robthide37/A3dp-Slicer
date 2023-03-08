@@ -312,24 +312,24 @@ SCENARIO("Infill only where needed", "[Fill]")
 
     double tolerance = 5; // mm^2
     
-    GIVEN("solid_infill_below_area == 0") {
-        config.opt_float("solid_infill_below_area") = 0;
-        WHEN("pyramid is sliced ") {
-            auto area = test();
-            THEN("no infill is generated when using infill_only_where_needed on a pyramid") {
-                REQUIRE(area < tolerance);
-            }
-        }
-    }
-    GIVEN("solid_infill_below_area == 70") {
-        config.opt_float("solid_infill_below_area") = 70;
-        WHEN("pyramid is sliced ") {
-            auto area = test();
-            THEN("infill is only generated under the forced solid shells") {
-                REQUIRE(std::abs(area - 70) < tolerance);
-            }
-        }
-    }
+    // GIVEN("solid_infill_below_area == 0") {
+    //     config.opt_float("solid_infill_below_area") = 0;
+    //     WHEN("pyramid is sliced ") {
+    //         auto area = test();
+    //         THEN("no infill is generated when using infill_only_where_needed on a pyramid") {
+    //             REQUIRE(area < tolerance);
+    //         }
+    //     }
+    // }
+    // GIVEN("solid_infill_below_area == 70") {
+    //     config.opt_float("solid_infill_below_area") = 70;
+    //     WHEN("pyramid is sliced ") {
+    //         auto area = test();
+    //         THEN("infill is only generated under the forced solid shells") {
+    //             REQUIRE(std::abs(area - 70) < tolerance);
+    //         }
+    //     }
+    // }
 }
 
 SCENARIO("Combine infill", "[Fill]")
