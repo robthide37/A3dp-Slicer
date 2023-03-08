@@ -798,6 +798,7 @@ std::string CoolingBuffer::apply_layer_cooldown(
             m_fan_speed = fan_speed_new;
             new_gcode  += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed);
         }
+        custom_fan_speed_limits.first = std::min(custom_fan_speed_limits.first, custom_fan_speed_limits.second);
         return custom_fan_speed_limits;
     };
 

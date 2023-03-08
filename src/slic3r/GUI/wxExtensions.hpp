@@ -54,11 +54,6 @@ wxBitmapBundle* get_bmp_bundle(const std::string& bmp_name, int px_cnt = 16, con
 wxBitmapBundle* get_empty_bmp_bundle(int width, int height);
 wxBitmapBundle* get_solid_bmp_bundle(int width, int height, const std::string& color);
 
-wxBitmap create_scaled_bitmap(const std::string& bmp_name, wxWindow *win = nullptr, 
-    const int px_cnt = 16, const bool grayscale = false,
-    const std::string& new_color = std::string(), // color witch will used instead of orange
-    const bool menu_bitmap = false);
-
 std::vector<wxBitmapBundle*> get_extruder_color_icons(bool thin_icon = false);
 
 namespace Slic3r {
@@ -172,7 +167,6 @@ private:
     wxBitmap        m_bitmap = wxBitmap();
     std::string     m_icon_name = "";
     int             m_px_cnt {16};
-    bool            m_grayscale {false};
 };
 
 
@@ -338,7 +332,6 @@ public:
 
 private:
     std::vector<ModeButton*> m_mode_btns;
-    wxWindow*                m_parent {nullptr};
     double                   m_hgap_unscaled;
 };
 

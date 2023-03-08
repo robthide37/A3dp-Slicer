@@ -197,7 +197,7 @@ std::string PrintHostSendDialog::storage() const
 {
     if (!combo_storage)
         return GUI::format("%1%", m_preselected_storage);
-    if (combo_storage->GetSelection() < 0 || combo_storage->GetSelection() >= m_paths.size())
+    if (combo_storage->GetSelection() < 0 || combo_storage->GetSelection() >= int(m_paths.size()))
         return {};
     return boost::nowide::narrow(m_paths[combo_storage->GetSelection()]);
 }

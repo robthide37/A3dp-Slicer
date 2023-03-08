@@ -62,7 +62,11 @@ public:
     // Inherits coord_t x, y
 };
 
-#define DEBUG_INTERSECTIONLINE (! defined(NDEBUG) || defined(SLIC3R_DEBUG_SLICE_PROCESSING))
+#if (! defined(NDEBUG) || defined(SLIC3R_DEBUG_SLICE_PROCESSING))
+    #define DEBUG_INTERSECTION_LINE 1
+#else
+    #define DEBUG_INTERSECTION_LINE 0
+#endif
 
 class IntersectionLine : public Line
 {

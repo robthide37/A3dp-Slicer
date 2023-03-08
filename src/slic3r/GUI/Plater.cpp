@@ -9,6 +9,7 @@
 #include <future>
 #include <boost/algorithm/string.hpp>
 #include <boost/optional.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/trivial.hpp>
@@ -2439,6 +2440,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     auto *nozzle_dmrs = config->opt<ConfigOptionFloats>("nozzle_diameter");
 
+    PlaterAfterLoadAutoArrange plater_after_load_auto_arrange;
+
     bool one_by_one = input_files.size() == 1 || printer_technology == ptSLA || nozzle_dmrs->values.size() <= 1;
     if (! one_by_one) {
         for (const auto &path : input_files) {
@@ -2698,6 +2701,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     new_model->add_object(*model_object);
                 }
             }
+
+            if (is_project_file)
+                plater_after_load_auto_arrange.disable();
         }
     }
 
@@ -7585,6 +7591,20 @@ SuppressBackgroundProcessingUpdate::SuppressBackgroundProcessingUpdate() :
 SuppressBackgroundProcessingUpdate::~SuppressBackgroundProcessingUpdate()
 {
     wxGetApp().plater()->schedule_background_process(m_was_scheduled);
+}
+
+PlaterAfterLoadAutoArrange::PlaterAfterLoadAutoArrange()
+{
+    Plater* plater = wxGetApp().plater();
+    m_enabled = plater->model().objects.empty() &&
+                plater->printer_technology() == ptFFF &&
+                plater->fff_print().config().printer_model.value == "XL";
+}
+
+PlaterAfterLoadAutoArrange::~PlaterAfterLoadAutoArrange()
+{
+    if (m_enabled)
+        wxGetApp().plater()->arrange();
 }
 
 }}    // namespace Slic3r::GUI

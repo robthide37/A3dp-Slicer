@@ -172,10 +172,10 @@ void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, 
 {
     m_scale_factor = scale_factor;
 
+    glsafe(::glEnable(GL_DEPTH_TEST));
+
     if (show_axes)
         render_axes();
-
-    glsafe(::glEnable(GL_DEPTH_TEST));
 
     m_model.model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
 
@@ -366,6 +366,9 @@ std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Point
 
 void Bed3D::render_axes()
 {
+    if (!m_show_axes)
+        return;
+
     if (m_build_volume.valid())
 #if ENABLE_WORLD_COORDINATE
         m_axes.render(Transform3d::Identity(), 0.25f);

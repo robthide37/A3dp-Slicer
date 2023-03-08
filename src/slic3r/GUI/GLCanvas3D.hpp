@@ -291,6 +291,8 @@ class GLCanvas3D
 
         std::string get_tooltip(const GLCanvas3D& canvas) const;
 
+        std::pair<SlicingParameters, const std::vector<double>> get_layers_height_data();
+
     private:
         bool is_initialized() const;
         void generate_layer_height_texture();
@@ -463,6 +465,7 @@ public:
 //        float distance_sla       = 6.;
         float accuracy           = 0.65f; // Unused currently
         bool  enable_rotation    = false;
+        int   alignment          = 0;
     };
 
 private:
@@ -549,8 +552,10 @@ private:
 
     PrinterTechnology current_printer_technology() const;
 
+    bool is_arrange_alignment_enabled() const;
+
     template<class Self>
-    static auto & get_arrange_settings(Self *self) {
+    static auto & get_arrange_settings_ref(Self *self) {
         PrinterTechnology ptech = self->current_printer_technology();
 
         auto *ptr = &self->m_arrange_settings_fff;
@@ -568,8 +573,22 @@ private:
         return *ptr;
     }
 
-    ArrangeSettings &get_arrange_settings() { return get_arrange_settings(this); }
+public:
+    ArrangeSettings get_arrange_settings() const {
+        const ArrangeSettings &settings = get_arrange_settings_ref(this);
+        ArrangeSettings ret = settings;
+        if (&settings == &m_arrange_settings_fff_seq_print) {
+            ret.distance = std::max(ret.distance,
+                                    float(min_object_distance(*m_config)));
+        }
 
+        if (!is_arrange_alignment_enabled())
+            ret.alignment = -1;
+
+        return ret;
+    }
+
+private:
     void load_arrange_settings();
 
     class SequentialPrintClearance
@@ -901,17 +920,6 @@ public:
     void highlight_toolbar_item(const std::string& item_name);
     void highlight_gizmo(const std::string& gizmo_name);
 
-    ArrangeSettings get_arrange_settings() const {
-        const ArrangeSettings &settings = get_arrange_settings(this);
-        ArrangeSettings ret = settings;
-        if (&settings == &m_arrange_settings_fff_seq_print) {
-            ret.distance = std::max(ret.distance,
-                                    float(min_object_distance(*m_config)));
-        }
-
-        return ret;
-    }
-
     // Timestamp for FPS calculation and notification fade-outs.
     static int64_t timestamp_now() {
 #ifdef _WIN32
@@ -951,6 +959,8 @@ public:
     bool is_object_sinking(int object_idx) const;
 
     void apply_retina_scale(Vec2d &screen_coordinate) const;
+
+    std::pair<SlicingParameters, const std::vector<double>> get_layers_height_data(int object_id);
 
 private:
     bool _is_shown_on_screen() const;

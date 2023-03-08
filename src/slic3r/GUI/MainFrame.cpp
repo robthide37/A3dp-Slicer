@@ -1293,7 +1293,7 @@ void MainFrame::init_menubar_as_editor()
             [this](wxCommandEvent&) { if (m_plater) m_plater->import_sl1_archive(); }, "import_plater", nullptr,
             [this](){return m_plater != nullptr && m_plater->get_ui_job_worker().is_idle(); }, this);
     
-        append_menu_item(import_menu, wxID_ANY, _L("Import ZIP Achive") + dots, _L("Load a zip achive"),
+        append_menu_item(import_menu, wxID_ANY, _L("Import ZIP Archive") + dots, _L("Load a ZIP archive"),
             [this](wxCommandEvent&) { if (m_plater) m_plater->import_zip_archive(); }, "import_plater", nullptr,
             [this]() {return m_plater != nullptr; }, this);
 

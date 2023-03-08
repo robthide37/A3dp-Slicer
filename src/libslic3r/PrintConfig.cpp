@@ -544,7 +544,7 @@ void PrintConfigDef::init_fff_params()
                         "If set as percentage, the speed is calculated over the external perimeter speed.");
 
     def             = this->add("overhang_speed_0", coFloatOrPercent);
-    def->label      = L("speed for 0\% overlap (bridge)");
+    def->label      = L("speed for 0% overlap (bridge)");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
@@ -553,7 +553,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def             = this->add("overhang_speed_1", coFloatOrPercent);
-    def->label      = L("speed for 25\% overlap");
+    def->label      = L("speed for 25% overlap");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
@@ -562,7 +562,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def             = this->add("overhang_speed_2", coFloatOrPercent);
-    def->label      = L("speed for 50\% overlap");
+    def->label      = L("speed for 50% overlap");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
@@ -571,7 +571,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(20, false));
 
     def             = this->add("overhang_speed_3", coFloatOrPercent);
-    def->label      = L("speed for 75\% overlap");
+    def->label      = L("speed for 75% overlap");
     def->category   = L("Speed");
     def->tooltip    = overhang_speed_setting_description;
     def->sidetext   = L("mm/s or %");
@@ -805,14 +805,6 @@ void PrintConfigDef::init_fff_params()
     def->height = 120;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionStrings { "; Filament-specific end gcode \n;END gcode for filament\n" });
-
-    def = this->add("ensure_vertical_shell_thickness", coBool);
-    def->label = L("Ensure vertical shell thickness");
-    def->category = L("Layers and Perimeters");
-    def->tooltip = L("Add solid infill near sloping surfaces to guarantee the vertical shell thickness "
-                   "(top+bottom solid layers).");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(false));
 
     auto def_top_fill_pattern = def = this->add("top_fill_pattern", coEnum);
     def->label = L("Top fill pattern");
@@ -4097,6 +4089,8 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "fuzzy_skin_perimeter_mode", "fuzzy_skin_shape",
     // Introduced in PrusaSlicer 2.3.0-alpha2, later replaced by automatic calculation based on extrusion width.
     "wall_add_middle_threshold", "wall_split_middle_threshold",
+    // Replaced by new concentric ensuring in 2.6.0-alpha5
+    "ensure_vertical_shell_thickness",
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
@@ -4828,6 +4822,15 @@ Points get_bed_shape(const DynamicPrintConfig &config)
     return to_points(bed_shape_opt->values);
 }
 
+void get_bed_shape(const DynamicPrintConfig &cfg, arrangement::ArrangeBed &out)
+{
+    if (is_XL_printer(cfg)) {
+        out = arrangement::SegmentedRectangleBed{get_extents(get_bed_shape(cfg)), 4, 4};
+    } else {
+        out = arrangement::to_arrange_bed(get_bed_shape(cfg));
+    }
+}
+
 Points get_bed_shape(const PrintConfig &cfg)
 {
     return to_points(cfg.bed_shape.values);
@@ -4850,6 +4853,20 @@ std::string get_sla_suptree_prefix(const DynamicPrintConfig &config)
     }
 
     return slatree;
+}
+
+bool is_XL_printer(const DynamicPrintConfig &cfg)
+{
+    static constexpr const char *ALIGN_ONLY_FOR = "XL";
+
+    bool ret = false;
+
+    auto *printer_model = cfg.opt<ConfigOptionString>("printer_model");
+
+    if (printer_model)
+        ret = boost::algorithm::contains(printer_model->value, ALIGN_ONLY_FOR);
+
+    return ret;
 }
 
 } // namespace Slic3r

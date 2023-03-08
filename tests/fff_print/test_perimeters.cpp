@@ -556,9 +556,9 @@ SCENARIO("Perimeters3", "[Perimeters]")
 
     GIVEN("V shape, unscaled") {
         int n = test(Vec3d(1., 1., 1.));
-        // except for the two internal solid layers above void
+        // One bridge layer under the V middle and one layer (two briding areas) under tops
         THEN("no overhangs printed with bridge speed") {
-            REQUIRE(n == 1);
+            REQUIRE(n == 2);
         }
     }
     GIVEN("V shape, scaled 3x in X") {
