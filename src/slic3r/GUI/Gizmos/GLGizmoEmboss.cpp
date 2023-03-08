@@ -190,6 +190,7 @@ enum class IconType : unsigned {
     unbold,
     system_selector,
     open_file,
+    exclamation,
     // automatic calc of icon's count
     _count
 };
@@ -1235,6 +1236,8 @@ void GLGizmoEmboss::draw_window()
 #endif // ALLOW_FLOAT_WINDOW
  }
 
+#include "imgui/imgui_internal.h" // scroll bar existence
+
 void GLGizmoEmboss::draw_text_input()
 {
     auto create_range_text_prep = [&mng = m_style_manager, &text = m_text, &exist_unknown = m_text_contain_unknown_glyph]() {
@@ -1264,75 +1267,69 @@ void GLGizmoEmboss::draw_text_input()
     if (exist_font) ImGui::PushFont(imgui_font);
 
     // show warning about incorrectness view of font
-    std::string warning;
-    std::string tool_tip;
+    std::string warning_tool_tip;
     if (!exist_font) {
-        warning  = _u8L("Can't write text by selected font.");
-        tool_tip = _u8L("Try to choose another font.");
+        warning_tool_tip = _u8L("Can't write text by selected font.Try to choose another font.");
     } else {
-        std::string who;
-        auto        append_warning = [&who, &tool_tip](std::string w, std::string t) {
-            if (!w.empty()) {
-                if (!who.empty()) who += " & ";
-                who += w;
-            }
-            if (!t.empty()) {
-                if (!tool_tip.empty()) tool_tip += "\n";
-                tool_tip += t;
-            }
+        auto append_warning = [&warning_tool_tip](std::string t) {
+            if (!warning_tool_tip.empty()) 
+                warning_tool_tip += "\n";
+            warning_tool_tip += t;
         };
-        if (priv::is_text_empty(m_text)) append_warning(_u8L("Empty"), _u8L("Embossed text can NOT contain only white spaces."));
+        if (priv::is_text_empty(m_text)) 
+            append_warning(_u8L("Embossed text can NOT contain only white spaces."));
         if (m_text_contain_unknown_glyph)
-            append_warning(_u8L("Bad symbol"), _u8L("Text contain character glyph (represented by '?') unknown by font."));
+            append_warning(_u8L("Text contain character glyph (represented by '?') unknown by font."));
 
         const FontProp &prop = m_style_manager.get_font_prop();
-        if (prop.skew.has_value()) append_warning(_u8L("Skew"), _u8L("Unsupported visualization of font skew for text input."));
-        if (prop.boldness.has_value()) append_warning(_u8L("Boldness"), _u8L("Unsupported visualization of font boldness for text input."));
+        if (prop.skew.has_value()) append_warning(_u8L("Text input do not show font skew."));
+        if (prop.boldness.has_value()) append_warning(_u8L("Text input do not show font boldness."));
         if (prop.line_gap.has_value())
-            append_warning(_u8L("Line gap"), _u8L("Unsupported visualization of gap between lines inside text input."));
+            append_warning(_u8L("Text input do not show gap between lines."));
         auto &ff         = m_style_manager.get_font_file_with_cache();
         float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file, scale);
         if (imgui_size > StyleManager::max_imgui_font_size)
-            append_warning(_u8L("Too tall"), _u8L("Diminished font height inside text input."));
+            append_warning(_u8L("Too tall, diminished font height inside text input."));
         if (imgui_size < StyleManager::min_imgui_font_size)
-            append_warning(_u8L("Too small"), _u8L("Enlarged font height inside text input."));
-        if (!who.empty()) warning = GUI::format(_L("%1% is NOT shown."), who);
+            append_warning(_u8L("Too small, enlarged font height inside text input."));
     }
-
-    // add border around input when warning appears
-    ScopeGuard input_border_sg;
-    if (!warning.empty()) { 
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
-        ImGui::PushStyleColor(ImGuiCol_Border, ImGuiWrapper::COL_ORANGE_LIGHT);
-        input_border_sg.closure = []() { ImGui::PopStyleColor(); ImGui::PopStyleVar(); };
-    }
-
+    
     // flag for extend font ranges if neccessary
     // ranges can't be extend during font is activ(pushed)
     std::string range_text;
     float  window_height  = ImGui::GetWindowHeight();
     float  minimal_height = get_minimal_window_size().y;
     float  extra_height   = window_height - minimal_height;
-    ImVec2 text_size(m_gui_cfg->text_size.x,
-                     m_gui_cfg->text_size.y + extra_height);
+    ImVec2 input_size(m_gui_cfg->text_size.x, m_gui_cfg->text_size.y + extra_height);
     const ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_AutoSelectAll;
-    if (ImGui::InputTextMultiline("##Text", &m_text, text_size, flags)) {
+    if (ImGui::InputTextMultiline("##Text", &m_text, input_size, flags)) {
         process();
         range_text = create_range_text_prep();
     }
 
     if (exist_font) ImGui::PopFont();
 
-    if (!warning.empty()) {
-        if (ImGui::IsItemHovered() && !tool_tip.empty())
-            ImGui::SetTooltip("%s", tool_tip.c_str());
+    // warning tooltip has to be with default font
+    if (!warning_tool_tip.empty()) {
+        // Multiline input has hidden window for scrolling
+        ImGuiWindow *input = ImGui::GetCurrentWindow()->DC.ChildWindows.front();
+
+        const ImGuiStyle &style = ImGui::GetStyle();
+        float scrollbar_width = (input->ScrollbarY) ? style.ScrollbarSize : 0.f;
+        float scrollbar_height = (input->ScrollbarX) ? style.ScrollbarSize : 0.f;
+
+        bool hovered = ImGui::IsItemHovered();
+        if (hovered)
+            ImGui::SetTooltip("%s", warning_tool_tip.c_str());
+
         ImVec2 cursor = ImGui::GetCursorPos();
         float width = ImGui::GetContentRegionAvailWidth();
-        ImVec2 size = ImGui::CalcTextSize(warning.c_str());
-        ImVec2 padding = ImGui::GetStyle().FramePadding;
-        ImGui::SetCursorPos(ImVec2(width - size.x + padding.x,
-                                   cursor.y - size.y - padding.y));
-        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, warning);
+        const ImVec2& padding = style.FramePadding;
+        ImVec2 icon_pos(width - m_gui_cfg->icon_width - scrollbar_width + padding.x, 
+                        cursor.y - m_gui_cfg->icon_width - scrollbar_height - 2*padding.y);
+        
+        ImGui::SetCursorPos(icon_pos);
+        draw(get_icon(m_icons, IconType::exclamation, IconState::hovered));
         ImGui::SetCursorPos(cursor);
     }
 
@@ -2328,7 +2325,7 @@ bool GLGizmoEmboss::draw_italic_button()
     const wxFont &wx_font = m_style_manager.get_wx_font(); 
     const auto& ff = m_style_manager.get_font_file_with_cache();
     if (!wx_font.IsOk() || !ff.has_value()) { 
-        draw(*m_icons[(int) IconType::italic][(int)IconState::disabled]);
+        draw(get_icon(m_icons, IconType::italic, IconState::disabled));
         return false;
     }
 
@@ -3234,7 +3231,8 @@ void GLGizmoEmboss::init_icons()
         "make_bold.svg",
         "make_unbold.svg",   
         "search.svg",
-        "open.svg"
+        "open.svg", 
+        "exclamation.svg"
     };
     assert(filenames.size() == static_cast<size_t>(IconType::_count));
     std::string path = resources_dir() + "/icons/";

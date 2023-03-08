@@ -188,25 +188,6 @@ static void append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
 	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
 }
 
-static void append_string_option(std::shared_ptr<ConfigOptionsGroup> optgroup,
-									const std::string& opt_key,
-									const std::string& label,
-									const std::string& tooltip,
-									const std::string& def_val,
-									ConfigOptionMode mode = comSimple)
-{
-	ConfigOptionDef def = { opt_key, coString };
-	def.label = label;
-	def.tooltip = tooltip;
-	def.mode = mode;
-	def.set_default_value(new ConfigOptionString{ def_val });
-	Option option(def, opt_key);
-	optgroup->append_single_option_line(option);
-
-	// fill data to the Search Dialog
-	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
-}
-
 static void append_preferences_option_to_searcher(std::shared_ptr<ConfigOptionsGroup> optgroup,
 												const std::string& opt_key,
 												const wxString& label)

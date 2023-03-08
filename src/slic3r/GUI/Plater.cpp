@@ -5646,6 +5646,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                                 close_zip_reader(&archive);
                                 throw Slic3r::FileIOError(e.what());
                             }
+                            break;
                         }
                     }
                 }
