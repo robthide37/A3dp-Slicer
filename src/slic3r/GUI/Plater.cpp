@@ -5568,11 +5568,22 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
         FileArchiveDialog dlg(static_cast<wxWindow*>(wxGetApp().mainframe), &archive, selected_paths);
         if (dlg.ShowModal() == wxID_OK)
         {
+            // selected_paths is already sorted
+            if (std::unique(selected_paths.begin(), selected_paths.end()) != selected_paths.end()) {
+                // notify about duplicities
+                wxString log = _L("Chosen paths to unzip contain duplicities. This will probably lead to fails during decompression.");
+                BOOST_LOG_TRIVIAL(warning) << log;
+                show_info(nullptr,log, _L("Warning"));
+            }
             std::string archive_path_string = archive_path.string();
             archive_path_string = archive_path_string.substr(0, archive_path_string.size() - 4);
-
             fs::path archive_dir(wxStandardPaths::Get().GetTempDir().utf8_str().data());
-
+            std::vector<std::pair<fs::path, bool>> selected_paths_with_flag; // flag true if already loaded
+            size_t used_paths = 0;
+            selected_paths_with_flag.reserve(selected_paths.size());
+            for (auto& path : selected_paths) {
+                selected_paths_with_flag.emplace_back(std::move(path), false);
+            }
             for (mz_uint i = 0; i < num_entries; ++i) {
                 if (mz_zip_reader_file_stat(&archive, i, &stat)) {
                     wxString wname = boost::nowide::widen(stat.m_filename);
@@ -5588,10 +5599,15 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
 
                     if (archive_path.empty())
                         continue;
-                    for (const auto& path : selected_paths) {
+                    for (auto& path_w_flag : selected_paths_with_flag) {
+                        if (path_w_flag.second)
+                            continue;
+                        const fs::path& path = path_w_flag.first;
                         if (path == archive_path) {
                             try
                             {
+                                path_w_flag.second = true;
+                                used_paths++;
                                 std::replace(name.begin(), name.end(), '\\', '/');
                                 // rename if file exists
                                 std::string filename = path.filename().string();
@@ -5614,7 +5630,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                                     wxString error_log = GUI::format_wxstr(_L("Failed to unzip file to %1%: %2% "), final_path.string(), mz_zip_get_error_string(mz_zip_get_last_error(&archive)));
                                     BOOST_LOG_TRIVIAL(error) << error_log;
                                     show_error(nullptr, error_log);
-                                    continue;
+                                    break;
                                 }
                                 fs::fstream file(final_path, std::ios::out | std::ios::binary | std::ios::trunc);
                                 file.write(buffer.c_str(), buffer.size());
@@ -5623,22 +5639,22 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                                     wxString error_log = GUI::format_wxstr(_L("Failed to find unzipped file at %1%. Unzipping of file has failed."), final_path.string());
                                     BOOST_LOG_TRIVIAL(error) << error_log;
                                     show_error(nullptr, error_log);
-                                    continue;
+                                    break;
                                 }
                                 BOOST_LOG_TRIVIAL(info) << "Unzipped " << final_path;
-
                                 if (!boost::algorithm::iends_with(filename, ".3mf") && !boost::algorithm::iends_with(filename, ".amf")) {
                                     non_project_paths.emplace_back(final_path);
-                                    continue;
+                                    break;
                                 }
                                 // if 3mf - read archive headers to find project file
                                 if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(final_path.string())) ||
                                     (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf"))) {
                                     non_project_paths.emplace_back(final_path);
-                                    continue;
+                                    break;
                                 }
 
                                 project_paths.emplace_back(final_path);
+                                break;
                             }
                             catch (const std::exception& e)
                             {
@@ -5646,9 +5662,11 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                                 close_zip_reader(&archive);
                                 throw Slic3r::FileIOError(e.what());
                             }
-                            break;
+                            
                         }
                     }
+                    if (used_paths == selected_paths_with_flag.size())
+                        break;
                 }
             }
             close_zip_reader(&archive);

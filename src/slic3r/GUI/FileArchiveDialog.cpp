@@ -236,7 +236,7 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
         }
     }
     // sorting files will help adjust_stack function to not create multiple same folders
-    std::sort(filtered_entries.begin(), filtered_entries.end(), [](const boost::filesystem::path& p1, const boost::filesystem::path& p2){ return p1.string() > p2.string(); });
+    std::sort(filtered_entries.begin(), filtered_entries.end(), [](const boost::filesystem::path& p1, const boost::filesystem::path& p2){ return p1.string() < p2.string(); });
     size_t entry_count = 0;
     size_t depth = 1;
     for (const boost::filesystem::path& path : filtered_entries)
