@@ -1114,7 +1114,7 @@ indexed_triangle_set its_make_sphere(double radius, double fa)
         std::vector<std::array<DividedEdge, 3>> divided_triangles(indices.size());
         std::vector<Vec3i> new_neighbors(4*indices.size());
 
-        size_t orig_indices_size = indices.size();
+        int orig_indices_size = int(indices.size());
         for (int i=0; i<orig_indices_size; ++i) { // iterate over all old triangles
 
             // We are going to split this triangle. Let's foresee what will be the indices

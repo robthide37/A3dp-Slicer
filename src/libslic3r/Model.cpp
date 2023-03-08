@@ -889,7 +889,6 @@ const BoundingBoxf3& ModelObject::bounding_box_exact() const
     if (! m_bounding_box_exact_valid) {
         m_bounding_box_exact_valid = true;
         m_min_max_z_valid = true;
-        BoundingBoxf3 raw_bbox = this->raw_mesh_bounding_box();
         m_bounding_box_exact.reset();
         for (size_t i = 0; i < this->instances.size(); ++ i)
             m_bounding_box_exact.merge(this->instance_bounding_box(i));

@@ -113,8 +113,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         }
     }
 
-    auto style = config->opt_enum<SupportMaterialStyle>("support_material_style");
-
     if (config->opt_bool("wipe_tower") && config->opt_bool("support_material") && 
         // Organic supports are always synchronized with object layers as of now.
         config->opt_enum<SupportMaterialStyle>("support_material_style") != smsOrganic) {

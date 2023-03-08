@@ -458,44 +458,6 @@ wxBitmapBundle* get_solid_bmp_bundle(int width, int height, const std::string& c
 #endif // __WXGTK2__
 }
 
-// win is used to get a correct em_unit value
-// It's important for bitmaps of dialogs.
-// if win == nullptr, em_unit value of MainFrame will be used
-wxBitmap create_scaled_bitmap(  const std::string& bmp_name_in, 
-                                wxWindow *win/* = nullptr*/,
-                                const int px_cnt/* = 16*/, 
-                                const bool grayscale/* = false*/,
-                                const std::string& new_color/* = std::string()*/, // color witch will used instead of orange
-                                const bool menu_bitmap/* = false*/)
-{
-    static Slic3r::GUI::BitmapCache cache;
-
-    unsigned int width = 0;
-    unsigned int height = (unsigned int)(em_unit(win) * px_cnt * 0.1f + 0.5f);
-
-    std::string bmp_name = bmp_name_in;
-    boost::replace_last(bmp_name, ".png", "");
-
-    bool dark_mode = 
-#ifdef _WIN32
-    menu_bitmap ? Slic3r::GUI::check_dark_mode() :
-#endif
-        Slic3r::GUI::wxGetApp().dark_mode();
-
-    // Try loading an SVG first, then PNG if SVG is not found:
-    wxBitmap *bmp = cache.load_svg(bmp_name, width, height, grayscale, dark_mode, new_color);
-    if (bmp == nullptr) {
-        bmp = cache.load_png(bmp_name, width, height, grayscale);
-    }
-
-    if (bmp == nullptr) {
-        // Neither SVG nor PNG has been found, raise error
-        throw Slic3r::RuntimeError("Could not load bitmap: " + bmp_name);
-    }
-
-    return *bmp;
-}
-
 std::vector<wxBitmapBundle*> get_extruder_color_icons(bool thin_icon/* = false*/)
 {
     // Create the bitmap with color bars.
@@ -736,7 +698,6 @@ void ModeButton::sys_color_changed()
 
 ModeSizer::ModeSizer(wxWindow *parent, int hgap/* = 0*/) :
     wxFlexGridSizer(3, 0, hgap),
-    m_parent(parent),
     m_hgap_unscaled((double)(hgap)/em_unit(parent))
 {
     SetFlexibleDirection(wxHORIZONTAL);

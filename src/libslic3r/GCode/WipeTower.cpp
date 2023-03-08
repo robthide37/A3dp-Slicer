@@ -929,7 +929,7 @@ void WipeTower::toolchange_Unload(
         writer.retract(-m_cooling_tube_length/2.f+m_parking_pos_retraction-m_cooling_tube_retraction, 2000);
     }
 
-	// this is to align ramming and future wiping extrusions, so the future y-steps can be uniform from the start:
+    // this is to align ramming and future wiping extrusions, so the future y-steps can be uniform from the start:
     // the perimeter_width will later be subtracted, it is there to not load while moving over just extruded material
     Vec2f pos = Vec2f(end_of_ramming.x(), end_of_ramming.y() + (y_step/m_extra_spacing-m_perimeter_width) / 2.f + m_perimeter_width);
     if (m_semm)
@@ -937,8 +937,8 @@ void WipeTower::toolchange_Unload(
     else
         writer.set_position(pos);
 
-	writer.resume_preview()
-		  .flush_planner_queue();
+    writer.resume_preview()
+          .flush_planner_queue();
 }
 
 // Change the tool, set a speed override for soluble and flex materials.

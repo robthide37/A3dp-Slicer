@@ -598,11 +598,11 @@ void TextCtrl::propagate_value()
     if (m_opt.nullable && val != na_value())
         m_last_meaningful_value = val;
 
-	if (!is_defined_input_value<wxTextCtrl>(window, m_opt.type) )
-		// on_kill_focus() cause a call of OptionsGroup::reload_config(),
-		// Thus, do it only when it's really needed (when undefined value was input)
+    if (!is_defined_input_value<wxTextCtrl>(window, m_opt.type) )
+        // on_kill_focus() cause a call of OptionsGroup::reload_config(),
+        // Thus, do it only when it's really needed (when undefined value was input)
         on_kill_focus();
-	else if (value_was_changed())
+    else if (value_was_changed())
         on_change_field();
 }
 
@@ -931,8 +931,8 @@ boost::any& SpinCtrl::get_value()
     if (spin->GetTextValue() == na_value(true))
         return m_value;
 
-	int value = spin->GetValue();
-	return m_value = value;
+    int value = spin->GetValue();
+    return m_value = value;
 }
 
 void SpinCtrl::propagate_value()
@@ -946,7 +946,7 @@ void SpinCtrl::propagate_value()
 
     if (tmp_value == UNDEF_VALUE) {
         on_kill_focus();
-	} else {
+    } else {
 #ifdef __WXOSX__
         // check input value for minimum
         if (m_opt.min > 0 && tmp_value < m_opt.min) {
@@ -988,7 +988,6 @@ void Choice::BUILD() {
 
 	choice_ctrl* temp;
     if (m_opt.gui_type != ConfigOptionDef::GUIType::undefined 
-        && m_opt.gui_type != ConfigOptionDef::GUIType::select_open 
         && m_opt.gui_type != ConfigOptionDef::GUIType::select_close) {
         m_is_editable = true;
         temp = new choice_ctrl(m_parent, wxID_ANY, wxString(""), wxDefaultPosition, size, 0, nullptr, wxTE_PROCESS_ENTER);
@@ -1152,7 +1151,7 @@ void Choice::set_value(const std::string& value, bool change_event)  //! Redunda
         field->SetSelection(*opt);
     else
         field->SetValue(value);
-	m_disable_change_event = false;
+    m_disable_change_event = false;
 }
 
 void Choice::set_value(const boost::any& value, bool change_event)
