@@ -1463,7 +1463,15 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
-    
+
+    def = this->add("travel_acceleration", coFloat);
+    def->label = L("Travel");
+    def->tooltip = L("This is the acceleration your printer will use for travel moves. Set zero to disable "
+                     "acceleration control for travel.");
+    def->sidetext = L("mm/s²");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("infill_every_layers", coInt);
     def->label = L("Combine infill every");

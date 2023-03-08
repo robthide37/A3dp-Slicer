@@ -815,6 +815,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionPoints,             thumbnails))
     ((ConfigOptionEnum<GCodeThumbnailsFormat>,  thumbnails_format))
     ((ConfigOptionFloat,              top_solid_infill_acceleration))
+    ((ConfigOptionFloat,              travel_acceleration))
     ((ConfigOptionBools,              wipe))
     ((ConfigOptionBool,               wipe_tower))
     ((ConfigOptionFloat,              wipe_tower_x))
