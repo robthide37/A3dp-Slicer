@@ -15,6 +15,11 @@
 
 namespace Slic3r {
 
+bool GCodeWriter::supports_PT() const
+{
+    return (FLAVOR_IS(gcfRepetier) || FLAVOR_IS(gcfMarlinFirmware) ||  FLAVOR_IS(gcfRepRapFirmware));
+}
+
 void GCodeWriter::apply_print_config(const PrintConfig &print_config)
 {
     this->config.apply(print_config, true);
@@ -154,36 +159,30 @@ std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait
     return gcode.str();
 }
 
-std::string GCodeWriter::set_acceleration(unsigned int acceleration)
+std::string GCodeWriter::set_acceleration_internal(Acceleration type, unsigned int acceleration)
 {
     // Clamp the acceleration to the allowed maximum.
+    // TODO: What about max travel acceleration ? Currently it is clamped by the extruding acceleration !!!
     if (m_max_acceleration > 0 && acceleration > m_max_acceleration)
         acceleration = m_max_acceleration;
 
-    if (acceleration == 0 || acceleration == m_last_acceleration)
+    // Are we setting travel acceleration for a flavour that supports separate travel and print acc?
+    bool separate_travel = (type == Acceleration::Travel && supports_PT());
+
+    auto& last_value = separate_travel ? m_last_travel_acceleration : m_last_acceleration ;
+    if (acceleration == 0 || acceleration == last_value)
         return std::string();
     
-    m_last_acceleration = acceleration;
+    last_value = acceleration;
     
     std::ostringstream gcode;
-    if (FLAVOR_IS(gcfRepetier)) {
-        // M201: Set max printing acceleration
-        gcode << "M201 X" << acceleration << " Y" << acceleration;
-        if (this->config.gcode_comments) gcode << " ; adjust acceleration";
-        gcode << "\n";
-        // M202: Set max travel acceleration
-        gcode << "M202 X" << acceleration << " Y" << acceleration;
-    } else if (FLAVOR_IS(gcfRepRapFirmware)) {
-        // M204: Set default acceleration
-        gcode << "M204 P" << acceleration;
-    } else if (FLAVOR_IS(gcfMarlinFirmware)) {
-        // This is new MarlinFirmware with separated print/retraction/travel acceleration.
-        // Use M204 P, we don't want to override travel acc by M204 S (which is deprecated anyway).
-        gcode << "M204 P" << acceleration;
-    } else {
-        // M204: Set default acceleration
+    if (FLAVOR_IS(gcfRepetier))
+        gcode << (separate_travel ? "M202 X" : "M201 X") << acceleration << " Y" << acceleration;
+    else if (FLAVOR_IS(gcfRepRapFirmware) || FLAVOR_IS(gcfMarlinFirmware))
+        gcode << (separate_travel ? "M204 T" : "M204 P") << acceleration;
+    else
         gcode << "M204 S" << acceleration;
-    }
+
     if (this->config.gcode_comments) gcode << " ; adjust acceleration";
     gcode << "\n";
     

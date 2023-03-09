@@ -2547,7 +2547,7 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view descr
     }
 
     // reset acceleration
-    gcode += m_writer.set_acceleration((unsigned int)(m_config.default_acceleration.value + 0.5));
+    gcode += m_writer.set_print_acceleration((unsigned int)(m_config.default_acceleration.value + 0.5));
 
     if (m_wipe.enable) {
         m_wipe.path = paths.front().polyline;
@@ -2633,7 +2633,7 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::s
         }
     }
     // reset acceleration
-    gcode += m_writer.set_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
+    gcode += m_writer.set_print_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
     return gcode;
 }
 
@@ -2659,7 +2659,7 @@ std::string GCode::extrude_path(ExtrusionPath path, std::string_view description
         m_wipe.path.reverse();
     }
     // reset acceleration
-    gcode += m_writer.set_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
+    gcode += m_writer.set_print_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
     return gcode;
 }
 
@@ -2802,7 +2802,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         } else {
             acceleration = m_config.default_acceleration.value;
         }
-        gcode += m_writer.set_acceleration((unsigned int)floor(acceleration + 0.5));
+        gcode += m_writer.set_print_acceleration((unsigned int)floor(acceleration + 0.5));
     }
 
     // calculate extrusion length per distance unit
@@ -3071,8 +3071,18 @@ std::string GCode::travel_to(const Point &point, ExtrusionRole role, std::string
 
     // use G1 because we rely on paths being straight (G0 may make round paths)
     if (travel.size() >= 2) {
+
+        gcode += m_writer.set_travel_acceleration((unsigned int)(m_config.travel_acceleration.value + 0.5));
+
         for (size_t i = 1; i < travel.size(); ++ i)
             gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[i]), comment);
+
+        if (! m_writer.supports_PT()) {
+            // In case that this flavor does not support separate print and travel acceleration,
+            // reset acceleration to default.
+            gcode += m_writer.set_travel_acceleration((unsigned int)(m_config.travel_acceleration.value + 0.5));
+        }
+
         this->set_last_pos(travel.points.back());
     }
     return gcode;
