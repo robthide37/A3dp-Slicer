@@ -77,7 +77,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
            fill_density == 0 &&
            ! config->opt_bool("support_material") &&
            config->opt_int("support_material_enforce_layers") == 0 &&
-           config->opt_bool("ensure_vertical_shell_thickness") &&
            ! config->opt_bool("thin_walls")))
     {
         wxString msg_text = _(L("The Spiral Vase mode requires:\n"
@@ -85,7 +84,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                                 "- no top solid layers\n"
                                 "- 0% fill density\n"
                                 "- no support material\n"
-                                "- Ensure vertical shell thickness enabled\n"
                					"- Detect thin walls disabled"));
         if (is_global_config)
             msg_text += "\n\n" + _(L("Shall I adjust those settings in order to enable Spiral Vase?"));
@@ -100,7 +98,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             new_conf.set_key_value("fill_density", new ConfigOptionPercent(0));
             new_conf.set_key_value("support_material", new ConfigOptionBool(false));
             new_conf.set_key_value("support_material_enforce_layers", new ConfigOptionInt(0));
-            new_conf.set_key_value("ensure_vertical_shell_thickness", new ConfigOptionBool(true));
             new_conf.set_key_value("thin_walls", new ConfigOptionBool(false));            
             fill_density = 0;
             support = false;
@@ -115,8 +112,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 cb_value_change("support_material", false);
         }
     }
-
-    auto style = config->opt_enum<SupportMaterialStyle>("support_material_style");
 
     if (config->opt_bool("wipe_tower") && config->opt_bool("support_material") && 
         // Organic supports are always synchronized with object layers as of now.
@@ -140,8 +135,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             }
         } else {
             if ((config->opt_int("support_material_extruder") != 0 || config->opt_int("support_material_interface_extruder") != 0)) {
-                wxString msg_text = _(L("The Wipe Tower currently supports the non-soluble supports only\n"
-                                        "if they are printed with the current extruder without triggering a tool change.\n"
+                wxString msg_text = _(L("The Wipe Tower currently supports the non-soluble supports only "
+                                        "if they are printed with the current extruder without triggering a tool change. "
                                         "(both support_material_extruder and support_material_interface_extruder need to be set to 0)."));
                 if (is_global_config)
                     msg_text += "\n\n" + _(L("Shall I adjust those settings in order to enable the Wipe Tower?"));
@@ -219,14 +214,13 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
 void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 {
     bool have_perimeters = config->opt_int("perimeters") > 0;
-    for (auto el : { "extra_perimeters","extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "thin_walls", "overhangs",
+    for (auto el : { "extra_perimeters","extra_perimeters_on_overhangs", "thin_walls", "overhangs",
                     "seam_position","staggered_inner_seams", "external_perimeters_first", "external_perimeter_extrusion_width",
-                    "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "enable_dynamic_overhang_speeds", "overhang_overlap_levels", "dynamic_overhang_speeds" })
+                    "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "enable_dynamic_overhang_speeds"})
         toggle_field(el, have_perimeters);
 
     for (size_t i = 0; i < 4; i++) {
-        toggle_field("overhang_overlap_levels#" + std::to_string(i), config->opt_bool("enable_dynamic_overhang_speeds"));
-        toggle_field("dynamic_overhang_speeds#" + std::to_string(i), config->opt_bool("enable_dynamic_overhang_speeds"));
+        toggle_field("overhang_speed_" + std::to_string(i), config->opt_bool("enable_dynamic_overhang_speeds"));
     }
 
     bool have_infill = config->option<ConfigOptionPercent>("fill_density")->value > 0;

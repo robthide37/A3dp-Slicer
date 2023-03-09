@@ -860,14 +860,26 @@ TransformationSVD::TransformationSVD(const Transform3d& trafo)
         rotation_90_degrees = true;
         for (int i = 0; i < 3; ++i) {
             const Vec3d row = v.row(i).cwiseAbs();
-            size_t num_zeros = is_approx(row[0], 0.) + is_approx(row[1], 0.) + is_approx(row[2], 0.);
-            size_t num_ones  = is_approx(row[0], 1.) + is_approx(row[1], 1.) + is_approx(row[2], 1.);
+            const size_t num_zeros = is_approx(row[0], 0.) + is_approx(row[1], 0.) + is_approx(row[2], 0.);
+            const size_t num_ones  = is_approx(row[0], 1.) + is_approx(row[1], 1.) + is_approx(row[2], 1.);
             if (num_zeros != 2 || num_ones != 1) {
                 rotation_90_degrees = false;
                 break;
             }
         }
-        skew = ! rotation_90_degrees;
+        // Detect skew by brute force: check if the axes are still orthogonal after transformation
+        const Matrix3d trafo_linear = trafo.linear();
+        const std::array<Vec3d, 3> axes = { Vec3d::UnitX(), Vec3d::UnitY(), Vec3d::UnitZ() };
+        std::array<Vec3d, 3> transformed_axes;
+        for (int i = 0; i < 3; ++i) {
+            transformed_axes[i] = trafo_linear * axes[i];
+        }
+        skew = std::abs(transformed_axes[0].dot(transformed_axes[1])) > EPSILON ||
+               std::abs(transformed_axes[1].dot(transformed_axes[2])) > EPSILON ||
+               std::abs(transformed_axes[2].dot(transformed_axes[0])) > EPSILON;
+
+        // This following old code does not work under all conditions. The v matrix can become non diagonal (see SPE-1492) 
+//        skew = ! rotation_90_degrees;
     } else
         skew = false;
 }
@@ -916,6 +928,32 @@ double rotation_diff_z(const Transform3d &trafo_from, const Transform3d &trafo_t
     assert(std::abs(std::hypot(vx.x(), vx.y()) - 1.) < 1e-5);
     assert(std::abs(vx.z()) < 1e-5);
     return atan2(vx.y(), vx.x());
+}
+
+bool trafos_differ_in_rotation_by_z_and_mirroring_by_xy_only(const Transform3d &t1, const Transform3d &t2)
+{
+    if (std::abs(t1.translation().z() - t2.translation().z()) > EPSILON)
+        // One of the object is higher than the other above the build plate (or below the build plate).
+        return false;
+    Matrix3d m1 = t1.matrix().block<3, 3>(0, 0);
+    Matrix3d m2 = t2.matrix().block<3, 3>(0, 0);
+    Matrix3d m = m2.inverse() * m1;
+    Vec3d    z = m.block<3, 1>(0, 2);
+    if (std::abs(z.x()) > EPSILON || std::abs(z.y()) > EPSILON || std::abs(z.z() - 1.) > EPSILON)
+        // Z direction or length changed.
+        return false;
+    // Z still points in the same direction and it has the same length.
+    Vec3d    x = m.block<3, 1>(0, 0);
+    Vec3d    y = m.block<3, 1>(0, 1);
+    if (std::abs(x.z()) > EPSILON || std::abs(y.z()) > EPSILON)
+        return false;
+    double   lx2 = x.squaredNorm();
+    double   ly2 = y.squaredNorm();
+    if (lx2 - 1. > EPSILON * EPSILON || ly2 - 1. > EPSILON * EPSILON)
+        return false;
+    // Verify whether the vectors x, y are still perpendicular.
+    double   d   = x.dot(y);
+    return std::abs(d * d) < EPSILON * lx2 * ly2;
 }
 
 }} // namespace Slic3r::Geometry

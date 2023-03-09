@@ -84,6 +84,7 @@ private:
 #endif // ENABLE_WORLD_COORDINATE
 
     float m_scale_factor{ 1.0f };
+    bool m_show_axes{ true };
 
 public:
     Bed3D() = default;
@@ -110,6 +111,8 @@ public:
     //FIXME shall one check against the real build volume?
     bool contains(const Point& point) const;
     Point point_projection(const Point& point) const;
+
+    void toggle_show_axes() { m_show_axes = !m_show_axes; }
 
     void render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture);
     void render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor);

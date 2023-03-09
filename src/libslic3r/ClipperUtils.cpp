@@ -8,8 +8,6 @@
 #include "SVG.hpp"
 #endif /* CLIPPER_UTILS_DEBUG */
 
-#define CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR (0.005f)
-
 namespace Slic3r {
 
 #ifdef CLIPPER_UTILS_DEBUG
@@ -267,7 +265,7 @@ static ClipperLib::Paths raw_offset(PathsProvider &&paths, float offset, Clipper
         co.ArcTolerance = miterLimit;
     else
         co.MiterLimit = miterLimit;
-    co.ShortestEdgeLength = double(std::abs(offset * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR));
+    co.ShortestEdgeLength = std::abs(offset * ClipperOffsetShortestEdgeFactor);
     for (const ClipperLib::Path &path : paths) {
         co.Clear();
         // Execute reorients the contours so that the outer most contour has a positive area. Thus the output
@@ -414,7 +412,7 @@ static int offset_expolygon_inner(const Slic3r::ExPolygon &expoly, const float d
             co.ArcTolerance = miterLimit;
         else
             co.MiterLimit = miterLimit;
-        co.ShortestEdgeLength = double(std::abs(delta * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR));
+        co.ShortestEdgeLength = std::abs(delta * ClipperOffsetShortestEdgeFactor);
         co.AddPath(expoly.contour.points, joinType, ClipperLib::etClosedPolygon);
         co.Execute(contours, delta);
     }
@@ -435,7 +433,7 @@ static int offset_expolygon_inner(const Slic3r::ExPolygon &expoly, const float d
                     co.ArcTolerance = miterLimit;
                 else
                     co.MiterLimit = miterLimit;
-                co.ShortestEdgeLength = double(std::abs(delta * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR));
+                co.ShortestEdgeLength = std::abs(delta * ClipperOffsetShortestEdgeFactor);
                 co.AddPath(hole.points, joinType, ClipperLib::etClosedPolygon);
                 ClipperLib::Paths out2;
                 // Execute reorients the contours so that the outer most contour has a positive area. Thus the output
@@ -680,6 +678,13 @@ Slic3r::Polygons union_(const Slic3r::ExPolygons &subject)
     { return _clipper(ClipperLib::ctUnion, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::EmptyPathsProvider(), ApplySafetyOffset::No); }
 Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::Polygons &subject2)
     { return _clipper(ClipperLib::ctUnion, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(subject2), ApplySafetyOffset::No); }
+Slic3r::Polygons union_(Slic3r::Polygons &&subject, const Slic3r::Polygons &subject2) { 
+    if (subject.empty())
+        return subject2;
+    if (subject2.empty())
+        return std::move(subject);
+    return union_(subject, subject2);
+}
 Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::ExPolygon &subject2)
     { return _clipper(ClipperLib::ctUnion, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonProvider(subject2), ApplySafetyOffset::No); }
 
@@ -713,6 +718,8 @@ Slic3r::ExPolygons diff_ex(const Slic3r::Surfaces &subject, const Slic3r::Surfac
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SurfacesProvider(subject), ClipperUtils::SurfacesProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SurfacesPtrProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons diff_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SurfacesPtrProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 
 Slic3r::ExPolygons intersection_ex(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
@@ -1055,7 +1062,7 @@ ClipperLib::Path mittered_offset_path_scaled(const Points &contour, const std::v
 		};
 
 		// Minimum edge length, squared.
-		double lmin  = *std::max_element(deltas.begin(), deltas.end()) * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR;
+		double lmin  = *std::max_element(deltas.begin(), deltas.end()) * ClipperOffsetShortestEdgeFactor;
 		double l2min = lmin * lmin;
 		// Minimum angle to consider two edges to be parallel.
 		// Vojtech's estimate.

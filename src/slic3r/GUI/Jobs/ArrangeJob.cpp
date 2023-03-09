@@ -14,6 +14,7 @@
 #include "libnest2d/common.hpp"
 
 #include <numeric>
+#include <random>
 
 namespace Slic3r { namespace GUI {
 
@@ -168,11 +169,11 @@ void ArrangeJob::process(Ctl &ctl)
     static const auto arrangestr = _u8L("Arranging");
 
     arrangement::ArrangeParams params;
-    Points bedpts;
-    ctl.call_on_main_thread([this, &params, &bedpts]{
+    arrangement::ArrangeBed bed;
+    ctl.call_on_main_thread([this, &params, &bed]{
            prepare();
            params = get_arrange_params(m_plater);
-           bedpts = get_bed_shape(*m_plater->config());
+           get_bed_shape(*m_plater->config(), bed);
     }).wait();
 
     auto count  = unsigned(m_selected.size() + m_unprintable.size());
@@ -191,13 +192,13 @@ void ArrangeJob::process(Ctl &ctl)
 
     ctl.update_status(0, arrangestr);
 
-    arrangement::arrange(m_selected, m_unselected, bedpts, params);
+    arrangement::arrange(m_selected, m_unselected, bed, params);
 
     params.progressind = [this, count, &ctl](unsigned st) {
         if (st > 0) ctl.update_status(int(count - st) * 100 / status_range(), arrangestr);
     };
 
-    arrangement::arrange(m_unprintable, {}, bedpts, params);
+    arrangement::arrange(m_unprintable, {}, bed, params);
 
     // finalize just here.
     ctl.update_status(int(count) * 100 / status_range(), ctl.was_canceled() ?
@@ -291,12 +292,29 @@ arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
 arrangement::ArrangeParams get_arrange_params(Plater *p)
 {
     const GLCanvas3D::ArrangeSettings &settings =
-        static_cast<const GLCanvas3D*>(p->canvas3D())->get_arrange_settings();
+        p->canvas3D()->get_arrange_settings();
 
     arrangement::ArrangeParams params;
     params.allow_rotations  = settings.enable_rotation;
     params.min_obj_distance = scaled(settings.distance);
     params.min_bed_distance = scaled(settings.distance_from_bed);
+
+    arrangement::Pivots pivot = arrangement::Pivots::Center;
+
+    int pivot_max = static_cast<int>(arrangement::Pivots::TopRight);
+    if (settings.alignment < 0) {
+        pivot = arrangement::Pivots::Center;
+    } else if (settings.alignment > pivot_max) {
+        // means it should be random
+        std::random_device rd{};
+        std::mt19937 rng(rd());
+        std::uniform_int_distribution<std::mt19937::result_type> dist(0, pivot_max);
+        pivot = static_cast<arrangement::Pivots>(dist(rng));
+    } else {
+        pivot = static_cast<arrangement::Pivots>(settings.alignment);
+    }
+
+    params.alignment = pivot;
 
     return params;
 }

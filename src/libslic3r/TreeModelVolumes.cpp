@@ -158,14 +158,24 @@ TreeModelVolumes::TreeModelVolumes(
     {
         m_anti_overhang = print_object.slice_support_blockers();
         TreeSupportMeshGroupSettings mesh_settings(print_object);
-        m_layer_outlines.emplace_back(mesh_settings, std::vector<Polygons>{});
+        const TreeSupportSettings config{ mesh_settings, print_object.slicing_parameters() };
+        m_current_min_xy_dist = config.xy_min_distance;
+        m_current_min_xy_dist_delta = config.xy_distance - m_current_min_xy_dist;
+        assert(m_current_min_xy_dist_delta >= 0);
+        m_increase_until_radius = config.increase_radius_until_radius;
+        m_radius_0 = config.getRadius(0);
+        m_raft_layers = config.raft_layers;
         m_current_outline_idx = 0;
+
+        m_layer_outlines.emplace_back(mesh_settings, std::vector<Polygons>{});
         std::vector<Polygons> &outlines = m_layer_outlines.front().second;
-        outlines.assign(print_object.layer_count(), Polygons{});
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, print_object.layer_count(), std::min<size_t>(1, std::max<size_t>(16, print_object.layer_count() / (8 * tbb::this_task_arena::max_concurrency())))),
+        size_t num_raft_layers = m_raft_layers.size();
+        size_t num_layers = print_object.layer_count() + num_raft_layers;
+        outlines.assign(num_layers, Polygons{});
+        tbb::parallel_for(tbb::blocked_range<size_t>(num_raft_layers, num_layers, std::min<size_t>(1, std::max<size_t>(16, num_layers / (8 * tbb::this_task_arena::max_concurrency())))),
             [&](const tbb::blocked_range<size_t> &range) {
             for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
-                outlines[layer_idx] = to_polygons(expolygons_simplify(print_object.get_layer(layer_idx)->lslices, mesh_settings.resolution));
+                outlines[layer_idx] = to_polygons(expolygons_simplify(print_object.get_layer(layer_idx - num_raft_layers)->lslices, mesh_settings.resolution));
         });
     }
 #endif
@@ -176,13 +186,6 @@ TreeModelVolumes::TreeModelVolumes(
         m_support_rests_on_model |= ! data_pair.first.support_material_buildplate_only;
         m_min_resolution = std::min(m_min_resolution, data_pair.first.resolution);
     }
-
-    const TreeSupportSettings config{ m_layer_outlines[m_current_outline_idx].first };
-    m_current_min_xy_dist = config.xy_min_distance;
-    m_current_min_xy_dist_delta = config.xy_distance - m_current_min_xy_dist;
-    assert(m_current_min_xy_dist_delta >= 0);
-    m_increase_until_radius = config.increase_radius_until_radius;
-    m_radius_0 = config.getRadius(0);
 
 #if 0
     for (size_t mesh_idx = 0; mesh_idx < storage.meshes.size(); mesh_idx++) {
@@ -214,7 +217,7 @@ TreeModelVolumes::TreeModelVolumes(
 #endif
 }
 
-void TreeModelVolumes::precalculate(const coord_t max_layer, std::function<void()> throw_on_cancel)
+void TreeModelVolumes::precalculate(const PrintObject& print_object, const coord_t max_layer, std::function<void()> throw_on_cancel)
 {
     auto t_start = std::chrono::high_resolution_clock::now();
     m_precalculated = true;
@@ -222,7 +225,7 @@ void TreeModelVolumes::precalculate(const coord_t max_layer, std::function<void(
     // Get the config corresponding to one mesh that is in the current group. Which one has to be irrelevant.
     // Not the prettiest way to do this, but it ensures some calculations that may be a bit more complex
     // like inital layer diameter are only done in once.
-    TreeSupportSettings config(m_layer_outlines[m_current_outline_idx].first);
+    TreeSupportSettings config(m_layer_outlines[m_current_outline_idx].first, print_object.slicing_parameters());
 
     {
         // calculate which radius each layer in the tip may have.
@@ -488,9 +491,8 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
         if (const std::vector<Polygons> &outlines = m_layer_outlines[outline_idx].second; ! outlines.empty()) {
             const TreeSupportMeshGroupSettings  &settings = m_layer_outlines[outline_idx].first;
             const coord_t       layer_height              = settings.layer_height;
-            const coord_t       z_distance_bottom         = settings.support_bottom_distance;
-            const int           z_distance_bottom_layers  = round_up_divide<int>(z_distance_bottom, layer_height);
-            const int           z_distance_top_layers     = round_up_divide<int>(settings.support_top_distance, layer_height);
+            const int           z_distance_bottom_layers  = int(round(double(settings.support_bottom_distance) / double(layer_height)));
+            const int           z_distance_top_layers     = int(round(double(settings.support_top_distance) / double(layer_height)));
             const LayerIndex    max_required_layer        = std::min<LayerIndex>(outlines.size(), max_layer_idx + std::max(coord_t(1), z_distance_top_layers));
             const LayerIndex    min_layer_bottom          = std::max<LayerIndex>(0, min_layer_last - int(z_distance_bottom_layers));
             const coord_t       xy_distance               = outline_idx == m_current_outline_idx ? m_current_min_xy_dist : 

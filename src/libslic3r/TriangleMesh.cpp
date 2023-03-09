@@ -965,6 +965,51 @@ indexed_triangle_set its_make_cylinder(double r, double h, double fa)
     return mesh;
 }
 
+indexed_triangle_set its_make_frustum(double r, double h, double fa)
+{
+    indexed_triangle_set mesh;
+    size_t n_steps    = (size_t)ceil(2. * PI / fa);
+    double angle_step = 2. * PI / n_steps;
+
+    auto &vertices = mesh.vertices;
+    auto &facets   = mesh.indices;
+    vertices.reserve(2 * n_steps + 2);
+    facets.reserve(4 * n_steps);
+
+    // 2 special vertices, top and bottom center, rest are relative to this
+    vertices.emplace_back(Vec3f(0.f, 0.f, 0.f));
+    vertices.emplace_back(Vec3f(0.f, 0.f, float(h)));
+
+    // for each line along the polygon approximating the top/bottom of the
+    // circle, generate four points and four facets (2 for the wall, 2 for the
+    // top and bottom.
+    // Special case: Last line shares 2 vertices with the first line.
+    Vec2f vec_top = Eigen::Rotation2Df(0.f) * Eigen::Vector2f(0, 0.5f*r);
+    Vec2f vec_botton = Eigen::Rotation2Df(0.f) * Eigen::Vector2f(0, r);
+
+    vertices.emplace_back(Vec3f(vec_botton(0), vec_botton(1), 0.f));
+    vertices.emplace_back(Vec3f(vec_top(0), vec_top(1), float(h)));
+    for (size_t i = 1; i < n_steps; ++i) {
+        vec_top = Eigen::Rotation2Df(angle_step * i) * Eigen::Vector2f(0, 0.5f*float(r));
+        vec_botton = Eigen::Rotation2Df(angle_step * i) * Eigen::Vector2f(0, float(r));
+        vertices.emplace_back(Vec3f(vec_botton(0), vec_botton(1), 0.f));
+        vertices.emplace_back(Vec3f(vec_top(0), vec_top(1), float(h)));
+        int id = (int)vertices.size() - 1;
+        facets.emplace_back( 0, id - 1, id - 3); // top
+        facets.emplace_back(id,      1, id - 2); // bottom
+        facets.emplace_back(id, id - 2, id - 3); // upper-right of side
+        facets.emplace_back(id, id - 3, id - 1); // bottom-left of side
+    }
+    // Connect the last set of vertices with the first.
+    int id = (int)vertices.size() - 1;
+    facets.emplace_back( 0, 2, id - 1);
+    facets.emplace_back( 3, 1,     id);
+    facets.emplace_back(id, 2,      3);
+    facets.emplace_back(id, id - 1, 2);
+
+    return mesh;
+}
+
 indexed_triangle_set its_make_cone(double r, double h, double fa)
 {
     indexed_triangle_set mesh;
@@ -1069,7 +1114,7 @@ indexed_triangle_set its_make_sphere(double radius, double fa)
         std::vector<std::array<DividedEdge, 3>> divided_triangles(indices.size());
         std::vector<Vec3i> new_neighbors(4*indices.size());
 
-        size_t orig_indices_size = indices.size();
+        int orig_indices_size = int(indices.size());
         for (int i=0; i<orig_indices_size; ++i) { // iterate over all old triangles
 
             // We are going to split this triangle. Let's foresee what will be the indices

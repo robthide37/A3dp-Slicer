@@ -431,7 +431,7 @@ void Preset::set_visible_from_appconfig(const AppConfig &app_config)
 static std::vector<std::string> s_Preset_print_options {
     "layer_height", "first_layer_height", "perimeters", "spiral_vase", "slice_closing_radius", "slicing_mode",
     "top_solid_layers", "top_solid_min_thickness", "bottom_solid_layers", "bottom_solid_min_thickness",
-    "extra_perimeters", "extra_perimeters_on_overhangs", "ensure_vertical_shell_thickness", "avoid_crossing_curled_overhangs", "avoid_crossing_perimeters", "thin_walls", "overhangs",
+    "extra_perimeters", "extra_perimeters_on_overhangs", "avoid_crossing_curled_overhangs", "avoid_crossing_perimeters", "thin_walls", "overhangs",
     "seam_position","staggered_inner_seams", "external_perimeters_first", "fill_density", "fill_pattern", "top_fill_pattern", "bottom_fill_pattern",
     "infill_every_layers", "infill_only_where_needed", "solid_infill_every_layers", "fill_angle", "bridge_angle",
     "solid_infill_below_area", "only_retract_when_crossing_perimeters", "infill_first",
@@ -440,7 +440,7 @@ static std::vector<std::string> s_Preset_print_options {
     "fuzzy_skin", "fuzzy_skin_thickness", "fuzzy_skin_point_dist",
     "max_volumetric_extrusion_rate_slope_positive", "max_volumetric_extrusion_rate_slope_negative",
     "perimeter_speed", "small_perimeter_speed", "external_perimeter_speed", "infill_speed", "solid_infill_speed",
-    "enable_dynamic_overhang_speeds", "dynamic_overhang_speeds", "overhang_overlap_levels",
+    "enable_dynamic_overhang_speeds", "overhang_speed_0", "overhang_speed_1", "overhang_speed_2", "overhang_speed_3",
     "top_solid_infill_speed", "support_material_speed", "support_material_xy_spacing", "support_material_interface_speed",
     "bridge_speed", "gap_fill_speed", "gap_fill_enabled", "travel_speed", "travel_speed_z", "first_layer_speed", "first_layer_speed_over_raft", "perimeter_acceleration", "infill_acceleration",
     "external_perimeter_acceleration", "top_solid_infill_acceleration", "solid_infill_acceleration",
@@ -473,7 +473,8 @@ static std::vector<std::string> s_Preset_filament_options {
     "filament_cooling_initial_speed", "filament_cooling_final_speed", "filament_ramming_parameters", "filament_minimal_purge_on_wipe_tower",
     "temperature", "idle_temperature", "first_layer_temperature", "bed_temperature", "first_layer_bed_temperature", "fan_always_on", "cooling", "min_fan_speed",
     "max_fan_speed", "bridge_fan_speed", "disable_fan_first_layers", "full_fan_speed_layer", "fan_below_layer_time", "slowdown_below_layer_time", "min_print_speed",
-    "start_filament_gcode", "end_filament_gcode",
+    "start_filament_gcode", "end_filament_gcode", "enable_dynamic_fan_speeds",
+    "overhang_fan_speed_0", "overhang_fan_speed_1", "overhang_fan_speed_2", "overhang_fan_speed_3",
     // Retract overrides
     "filament_retract_length", "filament_retract_lift", "filament_retract_lift_above", "filament_retract_lift_below", "filament_retract_speed", "filament_deretract_speed", "filament_retract_restart_extra", "filament_retract_before_travel",
     "filament_retract_layer_change", "filament_wipe", "filament_retract_before_wipe",
@@ -785,7 +786,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
 {
     // Load the preset over a default preset, so that the missing fields are filled in from the default preset.
     DynamicPrintConfig cfg(this->default_preset_for(combined_config).config);
-    t_config_option_keys keys = std::move(cfg.keys());
+    t_config_option_keys keys = cfg.keys();
     cfg.apply_only(combined_config, keys, true);
     std::string                 &inherits = Preset::inherits(cfg);
     if (select == LoadAndSelect::Never) {
@@ -879,7 +880,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
     // Insert a new profile.
     Preset &preset = this->load_preset(path, new_name, std::move(cfg), select == LoadAndSelect::Always);
     preset.is_external = true;
-    if (&this->get_selected_preset() == &preset)
+    if (this->m_idx_selected != size_t(-1) && &this->get_selected_preset() == &preset)
         this->get_edited_preset().is_external = true;
 
     return std::make_pair(&preset, false);

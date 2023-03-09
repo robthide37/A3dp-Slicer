@@ -1796,10 +1796,8 @@ void ObjectList::load_shape_object(const std::string& type_name)
     BoundingBoxf3 bb;
     TriangleMesh mesh = create_mesh(type_name, bb);
     load_mesh_object(mesh, _u8L("Shape") + "-" + type_name);
-#if ENABLE_RELOAD_FROM_DISK_REWORK
     if (!m_objects->empty())
         m_objects->back()->volumes.front()->source.is_from_builtin_objects = true;
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
     wxGetApp().mainframe->update_title();
 }
 
@@ -1842,6 +1840,7 @@ void ObjectList::load_mesh_object(
     const TextConfiguration *text_config /* = nullptr*/,
     const Transform3d *      transformation /* = nullptr*/)
 {   
+    PlaterAfterLoadAutoArrange plater_after_load_auto_arrange;
     // Add mesh to model as a new object
     Model& model = wxGetApp().plater()->model();
 
@@ -2060,10 +2059,10 @@ bool ObjectList::del_from_cut_object(bool is_cut_connector, bool is_model_part/*
                                is_model_part      ? _L("Delete solid part from object which is a part of cut") :
                                is_negative_volume ? _L("Delete negative volume from object which is a part of cut") : "";
                              
-    const wxString msg_end   = is_cut_connector   ? ("\n" + _L("To save cut correspondence you can delete all connectors from all related objects.")) : "";
+    const wxString msg_end   = is_cut_connector   ? ("\n" + _L("To save cut information you can delete all connectors from all related objects.")) : "";
 
     InfoDialog dialog(wxGetApp().plater(), title,
-                      _L("This action will break a cut correspondence.\n"
+                      _L("This action will break a cut information.\n"
                          "After that PrusaSlicer can't guarantee model consistency.\n"
                          "\n"
                          "To manipulate with solid parts or negative volumes you have to invalidate cut infornation first." + msg_end ),
@@ -2175,6 +2174,10 @@ void ObjectList::split()
 
     take_snapshot(_(L("Split to Parts")));
 
+    // Before splitting volume we have to remove all custom supports, seams, and multimaterial painting.
+    wxGetApp().plater()->clear_before_change_mesh(obj_idx, _u8L("Custom supports, seams and multimaterial painting were "
+                                                                "removed after splitting the object."));
+
     volume->split(nozzle_dmrs_cnt);
 
     (*m_objects)[obj_idx]->input_file.clear();
@@ -2186,6 +2189,10 @@ void ObjectList::split()
     changed_object(obj_idx);
     // update printable state for new volumes on canvas3D
     wxGetApp().plater()->canvas3D()->update_instance_printable_state_for_object(obj_idx);
+
+    // After removing custom supports, seams, and multimaterial painting, we have to update info about the object to remove information about
+    // custom supports, seams, and multimaterial painting in the right panel.
+    wxGetApp().obj_list()->update_info_items(obj_idx);
 }
 
 void ObjectList::merge(bool to_multipart_object)
@@ -4682,7 +4689,8 @@ void ObjectList::fix_through_netfabb()
             msg += "\n";
         }
 
-        plater->clear_before_change_mesh(obj_idx);
+        plater->clear_before_change_mesh(obj_idx, _u8L("Custom supports, seams and multimaterial painting were "
+                                                       "removed after repairing the mesh."));
         std::string res;
         if (!fix_model_by_win10_sdk_gui(*(object(obj_idx)), vol_idx, progress_dlg, msg, res))
             return false;

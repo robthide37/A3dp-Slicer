@@ -901,7 +901,7 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po,
                                                                   params)) {
                                 if (bridge.support_point_generated.has_value()) {
                                     reckon_new_support_point(*bridge.support_point_generated, create_support_point_position(bridge.b),
-                                                             -EPSILON, Vec2f::Zero());
+                                                             float(-EPSILON), Vec2f::Zero());
                                 }
                             }
                         }
@@ -916,7 +916,7 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po,
                                                                                          params);
                     for (const ExtrusionLine &perim : perims) {
                         if (perim.support_point_generated.has_value()) {
-                            reckon_new_support_point(*perim.support_point_generated, create_support_point_position(perim.b), -EPSILON,
+                            reckon_new_support_point(*perim.support_point_generated, create_support_point_position(perim.b), float(-EPSILON),
                                                      Vec2f::Zero());
                         }
                         if (perim.is_external_perimeter()) {
@@ -1043,6 +1043,7 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
     AABBTreeLines::LinesDistancer<ExtrusionLine> prev_layer_lines{};
 
     for (SupportLayer *l : layers) {
+        l->malformed_lines.clear();
         std::vector<ExtrusionLine> current_layer_lines;
 
         for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities) {
@@ -1114,6 +1115,7 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
     LD prev_layer_lines{};
 
     for (Layer *l : layers) {
+        l->malformed_lines.clear();
         std::vector<Linef> boundary_lines = l->lower_layer != nullptr ? to_unscaled_linesf(l->lower_layer->lslices) : std::vector<Linef>();
         AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary{std::move(boundary_lines)};
         std::vector<ExtrusionLine>           current_layer_lines;

@@ -1414,7 +1414,7 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
 
     append_spacer(VERTICAL_SPACING);
 
-    auto* box_allow_downloads = new wxCheckBox(this, wxID_ANY, _L("Allow build-in downloader"));
+    auto* box_allow_downloads = new wxCheckBox(this, wxID_ANY, _L("Allow built-in downloader"));
     // TODO: Do we want it like this? The downloader is allowed for very first time the wizard is run. 
     bool box_allow_value = (app_config->has("downloader_url_registered") ? app_config->get_bool("downloader_url_registered") : true);
     box_allow_downloads->SetValue(box_allow_value);
@@ -2785,7 +2785,7 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 {
 	// Walk over all installed Printer presets and verify whether there is a filament or SLA material profile installed at the same PresetBundle,
 	// which is compatible with it.
-    const auto printer_models_missing_materials = [this, only_for_model_id](PrinterTechnology technology, const std::string &section)
+    const auto printer_models_missing_materials = [this, only_for_model_id](PrinterTechnology technology, const std::string &section, bool no_templates)
     {
 		const std::map<std::string, std::string> &appconfig_presets = appconfig_new.has_section(section) ? appconfig_new.get_section(section) : std::map<std::string, std::string>();
     	std::set<const VendorProfile::PrinterModel*> printer_models_without_material;
@@ -2805,15 +2805,16 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 				                	has_material = true;
 				                    break;
 				                }
-                                
                                 // find if preset.first is part of the templates profile (up is searching if preset.first is part of printer vendor preset)
-                                for (const auto& bp : bundles) {
-                                    if (!bp.second.preset_bundle->vendors.empty() && bp.second.preset_bundle->vendors.begin()->second.templates_profile) {
-                                        const PresetCollection& template_materials = bp.second.preset_bundle->materials(technology);
-                                        const Preset* template_material = template_materials.find_preset(preset.first, false);
-                                        if (template_material && is_compatible_with_printer(PresetWithVendorProfile(*template_material, &bp.second.preset_bundle->vendors.begin()->second), PresetWithVendorProfile(printer, nullptr))) {
-                                            has_material = true;
-                                            break;
+                                if (!no_templates) {
+                                    for (const auto& bp : bundles) {
+                                        if (!bp.second.preset_bundle->vendors.empty() && bp.second.preset_bundle->vendors.begin()->second.templates_profile) {
+                                            const PresetCollection& template_materials = bp.second.preset_bundle->materials(technology);
+                                            const Preset* template_material = template_materials.find_preset(preset.first, false);
+                                            if (template_material && is_compatible_with_printer(PresetWithVendorProfile(*template_material, &bp.second.preset_bundle->vendors.begin()->second), PresetWithVendorProfile(printer, nullptr))) {
+                                                has_material = true;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
@@ -2872,15 +2873,17 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
     	return out;
     };
 
+    bool no_templates = wxGetApp().app_config->get("no_templates") == "1";
+
     if (any_fff_selected && (technology & T_FFF)) {
-    	std::set<const VendorProfile::PrinterModel*> printer_models_without_material = printer_models_missing_materials(ptFFF, AppConfig::SECTION_FILAMENTS);
+    	std::set<const VendorProfile::PrinterModel*> printer_models_without_material = printer_models_missing_materials(ptFFF, AppConfig::SECTION_FILAMENTS, no_templates);
     	if (! printer_models_without_material.empty()) {
 			if (only_for_model_id.empty())
 				ask_and_select_default_materials(
 					_L("The following FFF printer models have no filament selected:") +
-					"\n\n\t" +
+					"\n\n" +
 					printer_model_list(printer_models_without_material) +
-					"\n\n\t" +
+					"\n\n" +
 					_L("Do you want to select default filaments for these FFF printer models?"),
 					printer_models_without_material,
 					T_FFF);
@@ -2891,14 +2894,14 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
     }
 
     if (any_sla_selected && (technology & T_SLA)) {
-    	std::set<const VendorProfile::PrinterModel*> printer_models_without_material = printer_models_missing_materials(ptSLA, AppConfig::SECTION_MATERIALS);
+    	std::set<const VendorProfile::PrinterModel*> printer_models_without_material = printer_models_missing_materials(ptSLA, AppConfig::SECTION_MATERIALS, no_templates);
     	if (! printer_models_without_material.empty()) {
 	        if (only_for_model_id.empty())
 	            ask_and_select_default_materials(
 					_L("The following SLA printer models have no materials selected:") +
-	            	"\n\n\t" +
+	            	"\n\n" +
 				   	printer_model_list(printer_models_without_material) +
-					"\n\n\t" +
+					"\n\n" +
 					_L("Do you want to select default SLA materials for these printer models?"),
 					printer_models_without_material,
 	            	T_SLA);

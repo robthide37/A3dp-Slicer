@@ -446,7 +446,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
     m_reset_rotation_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
         GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
         Selection& selection = canvas->get_selection();
-
+        selection.setup_cache();
 #if ENABLE_WORLD_COORDINATE
         if (selection.is_single_volume_or_modifier()) {
             GLVolume* vol = const_cast<GLVolume*>(selection.get_first_volume());
@@ -468,9 +468,11 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         else
             return;
 
-        // Update rotation at the GLVolumes.
-        selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
+        // Synchronize instances/volumes.
+
+        selection.synchronize_unselected_instances(Selection::SyncRotationType::RESET);
         selection.synchronize_unselected_volumes();
+
         // Copy rotation values from GLVolumes into Model (ModelInstance / ModelVolume), trigger background processing.
         canvas->do_rotate(L("Reset Rotation"));
 
@@ -490,6 +492,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 #if ENABLE_WORLD_COORDINATE
         GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
         Selection& selection = canvas->get_selection();
+        selection.setup_cache();
         if (selection.is_single_volume_or_modifier()) {
             GLVolume* vol = const_cast<GLVolume*>(selection.get_first_volume());
             Geometry::Transformation trafo = vol->get_volume_transformation();
@@ -505,6 +508,10 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         }
         else
             return;
+
+        // Synchronize instances/volumes.
+        selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
+        selection.synchronize_unselected_volumes();
 
         canvas->do_scale(L("Reset scale"));
         UpdateAndShow(true);
@@ -750,7 +757,7 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
             m_new_rotation = volume->get_instance_rotation() * (180.0 / M_PI);
             m_new_size = volume->get_instance_scaling_factor().cwiseProduct(wxGetApp().model().objects[volume->object_idx()]->raw_mesh_bounding_box().size());
 #endif // ENABLE_WORLD_COORDINATE
-            m_new_scale = volume->get_instance_scaling_factor() * 100.0;
+            m_new_scale = m_new_size.cwiseQuotient(selection.get_full_unscaled_instance_local_bounding_box().size()) * 100.0;
         }
 
         m_new_enabled  = true;

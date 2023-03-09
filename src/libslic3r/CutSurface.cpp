@@ -1098,7 +1098,13 @@ namespace priv {
 /// Track source of intersection 
 /// Help for anotate inner and outer faces
 /// </summary>
-struct Visitor {
+struct Visitor : public CGAL::Polygon_mesh_processing::Corefinement::Default_visitor<CutMesh> {
+    Visitor(const CutMesh &object, const CutMesh &shape, EdgeShapeMap edge_shape_map,
+            FaceShapeMap face_shape_map, VertexShapeMap vert_shape_map, bool* is_valid) :
+        object(object), shape(shape), edge_shape_map(edge_shape_map), face_shape_map(face_shape_map),
+        vert_shape_map(vert_shape_map), is_valid(is_valid)
+    {}
+
     const CutMesh &object;
     const CutMesh &shape;
 
@@ -1160,16 +1166,6 @@ struct Visitor {
     /// <param name="v">New added vertex</param>
     /// <param name="tm">Affected mesh</param>
     void new_vertex_added(std::size_t i_id, VI v, const CutMesh &tm);
-
-    // Not used visitor functions
-    void before_subface_creations(FI /* f_old */, CutMesh &/* mesh */){}
-    void after_subface_created(FI /* f_new */, CutMesh &/* mesh */) {}
-    void after_subface_creations(CutMesh&) {}
-    void before_subface_created(CutMesh&) {}
-    void before_edge_split(HI /* h */, CutMesh& /* tm */) {}
-    void edge_split(HI /* hnew */, CutMesh& /* tm */) {}
-    void after_edge_split() {}
-    void add_retriangulation_edge(HI /* h */, CutMesh& /* tm */) {}
 };
 
 /// <summary>

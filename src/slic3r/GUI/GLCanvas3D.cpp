@@ -140,7 +140,7 @@ void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
     // Maximum height of an object changes when the object gets rotated or scaled.
     // Changing maximum height of an object will invalidate the layer heigth editing profile.
     // m_model_object->bounding_box() is cached, therefore it is cheap even if this method is called frequently.
-    const float new_max_z = (model_object_new == nullptr) ? 0.0f : static_cast<float>(model_object_new->bounding_box().max.z());
+    const float new_max_z = (model_object_new == nullptr) ? 0.0f : static_cast<float>(model_object_new->max_z());
     if (m_model_object != model_object_new || this->last_object_id != object_id || m_object_max_z != new_max_z ||
         (model_object_new != nullptr && m_model_object->id() != model_object_new->id())) {
         m_layer_height_profile.clear();
@@ -291,6 +291,20 @@ Rect GLCanvas3D::LayersEditing::get_bar_rect_screen(const GLCanvas3D& canvas)
     float h = (float)cnv_size.get_height();
 
     return { w - thickness_bar_width(canvas), 0.0f, w, h };
+}
+
+std::pair<SlicingParameters, const std::vector<double>> GLCanvas3D::LayersEditing::get_layers_height_data()
+{
+    if (m_slicing_parameters != nullptr)
+        return { *m_slicing_parameters, m_layer_height_profile };
+
+    assert(m_model_object != nullptr);
+    this->update_slicing_parameters();
+    PrintObject::update_layer_height_profile(*m_model_object, *m_slicing_parameters, m_layer_height_profile);
+    std::pair<SlicingParameters, const std::vector<double>> ret = { *m_slicing_parameters, m_layer_height_profile };
+    delete m_slicing_parameters;
+    m_slicing_parameters = nullptr;
+    return ret;
 }
 
 bool GLCanvas3D::LayersEditing::is_initialized() const
@@ -999,6 +1013,19 @@ void GLCanvas3D::load_arrange_settings()
     std::string en_rot_sla_str =
         wxGetApp().app_config->get("arrange", "enable_rotation_sla");
 
+//    std::string alignment_fff_str =
+//        wxGetApp().app_config->get("arrange", "alignment_fff");
+
+//    std::string alignment_fff_seqp_str =
+//        wxGetApp().app_config->get("arrange", "alignment_fff_seq_pring");
+
+//    std::string alignment_sla_str =
+//        wxGetApp().app_config->get("arrange", "alignment_sla");
+
+    // Override default alignment and save save/load it to a temporary slot "alignment_xl"
+    std::string alignment_xl_str =
+        wxGetApp().app_config->get("arrange", "alignment_xl");
+
     if (!dist_fff_str.empty())
         m_arrange_settings_fff.distance = string_to_float_decimal_point(dist_fff_str);
 
@@ -1025,11 +1052,34 @@ void GLCanvas3D::load_arrange_settings()
 
     if (!en_rot_sla_str.empty())
         m_arrange_settings_sla.enable_rotation = (en_rot_sla_str == "1" || en_rot_sla_str == "yes");
+
+//    if (!alignment_sla_str.empty())
+//        m_arrange_settings_sla.alignment = std::stoi(alignment_sla_str);
+
+//    if (!alignment_fff_str.empty())
+//        m_arrange_settings_fff.alignment = std::stoi(alignment_fff_str);
+
+//    if (!alignment_fff_seqp_str.empty())
+//        m_arrange_settings_fff_seq_print.alignment = std::stoi(alignment_fff_seqp_str);
+
+    // Override default alignment and save save/load it to a temporary slot "alignment_xl"
+    int arr_alignment = static_cast<int>(arrangement::Pivots::BottomLeft);
+    if (!alignment_xl_str.empty())
+        arr_alignment = std::stoi(alignment_xl_str);
+
+    m_arrange_settings_sla.alignment = arr_alignment ;
+    m_arrange_settings_fff.alignment = arr_alignment ;
+    m_arrange_settings_fff_seq_print.alignment = arr_alignment ;
 }
 
 PrinterTechnology GLCanvas3D::current_printer_technology() const
 {
     return m_process->current_printer_technology();
+}
+
+bool GLCanvas3D::is_arrange_alignment_enabled() const
+{
+    return m_config ? is_XL_printer(*m_config) : false;
 }
 
 GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)
@@ -1972,31 +2022,30 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         // Should the wipe tower be visualized ?
         unsigned int extruders_count = (unsigned int)dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"))->values.size();
 
-        bool wt = dynamic_cast<const ConfigOptionBool*>(m_config->option("wipe_tower"))->value;
-        bool co = dynamic_cast<const ConfigOptionBool*>(m_config->option("complete_objects"))->value;
+        const bool wt = dynamic_cast<const ConfigOptionBool*>(m_config->option("wipe_tower"))->value;
+        const bool co = dynamic_cast<const ConfigOptionBool*>(m_config->option("complete_objects"))->value;
 
         if (extruders_count > 1 && wt && !co) {
             // Height of a print (Show at least a slab)
-            double height = std::max(m_model->bounding_box().max(2), 10.0);
+            const double height = std::max(m_model->max_z(), 10.0);
 
-            float x = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_x"))->value;
-            float y = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_y"))->value;
-            float w = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_width"))->value;
-            float a = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_rotation_angle"))->value;
+            const float x = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_x"))->value;
+            const float y = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_y"))->value;
+            const float w = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_width"))->value;
+            const float a = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_rotation_angle"))->value;
+            const float bw = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_brim_width"))->value;
 
             const Print *print = m_process->fff_print();
-
-            float depth = print->wipe_tower_data(extruders_count).depth;
-            float brim_width = print->wipe_tower_data(extruders_count).brim_width;
+            const float depth = print->wipe_tower_data(extruders_count).depth;
 
 #if ENABLE_OPENGL_ES
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
-                brim_width, &m_wipe_tower_mesh);
+                bw, &m_wipe_tower_mesh);
 #else
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
                 x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
-                brim_width);
+                bw);
 #endif // ENABLE_OPENGL_ES
             if (volume_idx_wipe_tower_old != -1)
                 map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
@@ -2301,6 +2350,23 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
             post_event(SimpleEvent(EVT_GLTOOLBAR_COPY));
         break;
 #ifdef __APPLE__
+        case 'd':
+        case 'D':
+#else /* __APPLE__ */
+        case WXK_CONTROL_D:
+#endif /* __APPLE__ */
+            m_bed.toggle_show_axes();
+            m_dirty = true;
+            break;
+#ifdef __APPLE__
+        case 'f':
+        case 'F':
+#else /* __APPLE__ */
+        case WXK_CONTROL_F:
+#endif /* __APPLE__ */
+            _activate_search_toolbar_item();
+            break;
+#ifdef __APPLE__
         case 'm':
         case 'M':
 #else /* __APPLE__ */
@@ -2336,18 +2402,6 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
 #endif /* __APPLE__ */
             post_event(SimpleEvent(EVT_GLTOOLBAR_PASTE));
         break;
-
-
-#ifdef __APPLE__
-        case 'f':
-        case 'F':
-#else /* __APPLE__ */
-        case WXK_CONTROL_F:
-#endif /* __APPLE__ */
-            _activate_search_toolbar_item();
-            break;
-
-
 #ifdef __APPLE__
         case 'y':
         case 'Y':
@@ -3747,12 +3801,22 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
     if (!snapshot_type.empty())
         wxGetApp().plater()->take_snapshot(_(snapshot_type));
 
+    // stores current min_z of instances
+    std::map<std::pair<int, int>, double> min_zs;
+    if (!snapshot_type.empty()) {
+        for (int i = 0; i < static_cast<int>(m_model->objects.size()); ++i) {
+            const ModelObject* obj = m_model->objects[i];
+            for (int j = 0; j < static_cast<int>(obj->instances.size()); ++j) {
+                min_zs[{ i, j }] = obj->instance_bounding_box(j).min.z();
+            }
+        }
+    }
+
     std::set<std::pair<int, int>> done;  // keeps track of modified instances
 
-    const Selection::IndicesList& idxs = m_selection.get_volume_idxs();
+    Selection::EMode selection_mode = m_selection.get_mode();
 
-    for (unsigned int id : idxs) {
-        const GLVolume* v = m_volumes.volumes[id];
+    for (const GLVolume* v : m_volumes.volumes) {
         int object_idx = v->object_idx();
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
             continue;
@@ -3762,12 +3826,28 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
 
         done.insert(std::pair<int, int>(object_idx, instance_idx));
 
+        // Mirror instances/volumes
         ModelObject* model_object = m_model->objects[object_idx];
         if (model_object != nullptr) {
-            model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
-            model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
+            if (selection_mode == Selection::Instance)
+                model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
+            else if (selection_mode == Selection::Volume)
+                model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
             model_object->invalidate_bounding_box();
         }
+    }
+
+    // Fixes sinking/flying instances
+    for (const std::pair<int, int>& i : done) {
+        ModelObject* m = m_model->objects[i.first];
+        double shift_z = m->get_instance_min_z(i.second);
+        // leave sinking instances as sinking
+        if (min_zs.empty() || min_zs.find({ i.first, i.second })->second >= SINKING_Z_THRESHOLD || shift_z > SINKING_Z_THRESHOLD) {
+            Vec3d shift(0.0, 0.0, -shift_z);
+            m_selection.translate(i.first, i.second, shift);
+            m->translate_instance(i.second, shift);
+        }
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
     }
 
     post_event(SimpleEvent(EVT_GLCANVAS_RESET_SKEW));
@@ -3972,8 +4052,9 @@ void GLCanvas3D::update_sequential_clearance()
 
             Pointf3s& cache_hull_2d = m_sequential_print_clearance.m_hull_2d_cache.emplace_back(Pointf3s());
             cache_hull_2d.reserve(hull_2d.points.size());
+            const Transform3d inv_trafo = trafo.get_matrix().inverse();
             for (const Point& p : hull_2d.points) {
-                cache_hull_2d.emplace_back(unscale<double>(p.x()), unscale<double>(p.y()), 0.0);
+                cache_hull_2d.emplace_back(inv_trafo * Vec3d(unscale<double>(p.x()), unscale<double>(p.y()), 0.0));
             }
         }
         m_sequential_print_clearance_first_displacement = false;
@@ -4018,6 +4099,14 @@ void GLCanvas3D::apply_retina_scale(Vec2d &screen_coordinate) const
     double scale = static_cast<double>(m_retina_helper->get_scale_factor());
     screen_coordinate *= scale;
 #endif // ENABLE_RETINA_GL
+}
+
+std::pair<SlicingParameters, const std::vector<double>> GLCanvas3D::get_layers_height_data(int object_id)
+{
+    m_layers_editing.select_object(*m_model, object_id);
+    std::pair<SlicingParameters, const std::vector<double>> ret = m_layers_editing.get_layers_height_data();
+    m_layers_editing.select_object(*m_model, -1);
+    return ret;
 }
 
 bool GLCanvas3D::_is_shown_on_screen() const
@@ -4134,7 +4223,7 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     imgui->begin(_L("Arrange options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
     ArrangeSettings settings = get_arrange_settings();
-    ArrangeSettings &settings_out = get_arrange_settings();
+    ArrangeSettings &settings_out = get_arrange_settings_ref(this);
 
     auto &appcfg = wxGetApp().app_config;
     PrinterTechnology ptech = current_printer_technology();
@@ -4145,6 +4234,7 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     std::string dist_key = "min_object_distance";
     std::string dist_bed_key = "min_bed_distance";
     std::string rot_key = "enable_rotation";
+    std::string align_key = "alignment";
     std::string postfix;
 
     if (ptech == ptSLA) {
@@ -4163,6 +4253,7 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
     dist_key += postfix;
     dist_bed_key += postfix;
     rot_key += postfix;
+    align_key += postfix;
 
     imgui->text(GUI::format_wxstr(_L("Press %1%left mouse button to enter the exact value"), shortkey_ctrl_prefix()));
 
@@ -4186,11 +4277,28 @@ bool GLCanvas3D::_render_arrange_menu(float pos_x)
         settings_changed = true;
     }
 
+    Points bed = m_config ? get_bed_shape(*m_config) : Points{};
+
+    if (arrangement::is_box(bed) && settings.alignment >= 0 &&
+        imgui->combo(_L("Alignment"), {_u8L("Center"), _u8L("Rear left"), _u8L("Front left"), _u8L("Front right"), _u8L("Rear right"), _u8L("Random") }, settings.alignment)) {
+        settings_out.alignment = settings.alignment;
+        appcfg->set("arrange", align_key.c_str(), std::to_string(settings_out.alignment));
+        settings_changed = true;
+    }
+
     ImGui::Separator();
 
     if (imgui->button(_L("Reset"))) {
+        auto alignment = settings_out.alignment;
         settings_out = ArrangeSettings{};
         settings_out.distance = std::max(dist_min, settings_out.distance);
+
+        // Default alignment for XL printers set explicitly:
+        if (is_arrange_alignment_enabled())
+            settings_out.alignment = static_cast<int>(arrangement::Pivots::BottomLeft);
+        else
+            settings_out.alignment = alignment;
+
         appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
         appcfg->set("arrange", dist_bed_key.c_str(), float_to_string_decimal_point(settings_out.distance_from_bed));
         appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation? "1" : "0");
@@ -4990,8 +5098,10 @@ void GLCanvas3D::_refresh_if_shown_on_screen()
         // frequently enough, we call render() here directly when we can.
         render();
         assert(m_initialized);
-        if (requires_reload_scene)
-            reload_scene(true);
+        if (requires_reload_scene) {
+            if (wxGetApp().plater()->is_view3D_shown())
+                reload_scene(true);
+        }
     }
 }
 
@@ -7100,12 +7210,10 @@ const ModelVolume *get_model_volume(const GLVolume &v, const Model &model)
 {
     const ModelVolume * ret = nullptr;
 
-    if (model.objects.size() < v.object_idx()) {
-        if (v.object_idx() < model.objects.size()) {
-            const ModelObject *obj = model.objects[v.object_idx()];
-            if (v.volume_idx() < obj->volumes.size()) {
-                ret = obj->volumes[v.volume_idx()];
-            }
+    if (v.object_idx() < model.objects.size()) {
+        const ModelObject *obj = model.objects[v.object_idx()];
+        if (v.volume_idx() < obj->volumes.size()) {
+            ret = obj->volumes[v.volume_idx()];
         }
     }
 

@@ -179,6 +179,10 @@ struct TreeSupportMeshGroupSettings {
     // Tree Support Branch Density
     // Adjusts the density of the support structure used to generate the tips of the branches. A higher value results in better overhangs,
     // but the supports are harder to remove. Use Support Roof for very high values or ensure support density is similarly high at the top.
+    // ->
+    // Adjusts the density of the support structure used to generate the tips of the branches.
+    // A higher value results in better overhangs but the supports are harder to remove, thus it is recommended to enable top support interfaces
+    // instead of a high branch density value if dense interfaces are needed.
     // 5%-35%
     double                          support_tree_top_rate                   { 15. };
     // Tree Support Tip Diameter
@@ -240,7 +244,7 @@ public:
      * Knowledge about branch angle is used to only calculate avoidances and collisions that may actually be needed.
      * Not calling precalculate() will cause the class to lazily calculate avoidances and collisions as needed, which will be a lot slower on systems with more then one or two cores!
      */
-    void precalculate(const coord_t max_layer, std::function<void()> throw_on_cancel);
+    void precalculate(const PrintObject& print_object, const coord_t max_layer, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
@@ -613,6 +617,9 @@ private:
      * \brief Smallest radius a branch can have. This is the radius of a SupportElement with DTT=0.
      */
     coord_t m_radius_0;
+
+    // Z heights of the raft layers (additional layers below the object, last raft layer aligned with the bottom of the first object layer).
+    std::vector<double>         m_raft_layers;
 
     /*!
      * \brief Caches for the collision, avoidance and areas on the model where support can be placed safely

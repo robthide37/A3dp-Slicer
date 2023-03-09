@@ -848,7 +848,16 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
     using EcmType = CGAL::internal::Dynamic<MyMesh, ecm_it>;
     EcmType ecm = get(d_prop_bool(), cgal_object);
     
-    struct Visitor {
+    struct Visitor : public CGAL::Polygon_mesh_processing::Corefinement::Default_visitor<MyMesh> {
+        Visitor(const MyMesh &object, const MyMesh &shape,
+                MyMesh::Property_map<CGAL::SM_Edge_index, IntersectingElemnt> edge_shape_map,
+                MyMesh::Property_map<CGAL::SM_Face_index, IntersectingElemnt> face_shape_map,
+                MyMesh::Property_map<CGAL::SM_Face_index, int32_t> face_map,
+                MyMesh::Property_map<CGAL::SM_Vertex_index, IntersectingElemnt> vert_shape_map) :
+            object(object), shape(shape), edge_shape_map(edge_shape_map), face_shape_map(face_shape_map),
+            face_map(face_map), vert_shape_map(vert_shape_map)
+        {}
+
         const MyMesh &object;
         const MyMesh &shape;
         // Properties of the shape mesh:
@@ -946,13 +955,6 @@ TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
             assert(glyph->point_index != -1);
             vert_shape_map[vh] = glyph ? *glyph : IntersectingElemnt{};
         }
-
-        void after_subface_creations(MyMesh&) {}
-        void before_subface_created(MyMesh&) {}
-        void before_edge_split(halfedge_descriptor /* h */, MyMesh& /* tm */) {}
-        void edge_split(halfedge_descriptor /* hnew */, MyMesh& /* tm */) {}
-        void after_edge_split() {}
-        void add_retriangulation_edge(halfedge_descriptor /* h */, MyMesh& /* tm */) {}
     } visitor{cgal_object, cgal_shape, edge_shape_map, face_shape_map,
               face_map, vert_shape_map};
 

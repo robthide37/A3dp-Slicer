@@ -151,6 +151,7 @@ void KBShortcutsDialog::fill_shortcuts()
             { L("Arrow Right"), L("Move selection 10 mm in positive X direction") },
             { std::string("Shift+") + L("Any arrow"), L("Movement step set to 1 mm") },
             { ctrl + L("Any arrow"), L("Movement in camera space") },
+            { ctrl + "D", L("Show/hide reference axes") },
             { L("Page Up"), L("Rotate selection 45 degrees CCW") },
             { L("Page Down"), L("Rotate selection 45 degrees CW") },
             { "M", L("Gizmo move") },
@@ -231,6 +232,7 @@ void KBShortcutsDialog::fill_shortcuts()
         { "X", L("On/Off one layer mode of the vertical slider") },
         { "L", L("Show/Hide legend") },
         { "C", L("Show/Hide G-code window") },
+        { ctrl + "D", L("Show/hide reference axes") },
     };
 
     m_full_shortcuts.push_back({ { _L("Preview"), "" }, preview_shortcuts });

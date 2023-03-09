@@ -9,6 +9,7 @@
 #include <future>
 #include <boost/algorithm/string.hpp>
 #include <boost/optional.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/trivial.hpp>
@@ -2439,6 +2440,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     auto *nozzle_dmrs = config->opt<ConfigOptionFloats>("nozzle_diameter");
 
+    PlaterAfterLoadAutoArrange plater_after_load_auto_arrange;
+
     bool one_by_one = input_files.size() == 1 || printer_technology == ptSLA || nozzle_dmrs->values.size() <= 1;
     if (! one_by_one) {
         for (const auto &path : input_files) {
@@ -2683,7 +2686,8 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                         instance->set_offset(-model_object->origin_translation);
                     }
                 }
-                model_object->ensure_on_bed(is_project_file);
+                if (!model_object->instances.empty())
+                  model_object->ensure_on_bed(is_project_file);
             }
 
             if (one_by_one) {
@@ -2697,6 +2701,9 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     new_model->add_object(*model_object);
                 }
             }
+
+            if (is_project_file)
+                plater_after_load_auto_arrange.disable();
         }
     }
 
@@ -3116,38 +3123,6 @@ void Plater::priv::mirror(Axis axis)
     view3D->mirror_selection(axis);
 }
 
-void Plater::find_new_position(const ModelInstancePtrs &instances)
-{
-    arrangement::ArrangePolygons movable, fixed;
-    arrangement::ArrangeParams arr_params = get_arrange_params(this);
-    
-    for (const ModelObject *mo : p->model.objects)
-        for (ModelInstance *inst : mo->instances) {
-            auto it = std::find(instances.begin(), instances.end(), inst);
-            auto arrpoly = get_arrange_poly(inst, this);
-
-            if (it == instances.end())
-                fixed.emplace_back(std::move(arrpoly));
-            else {
-                arrpoly.setter = [it](const arrangement::ArrangePolygon &p) {
-                    if (p.is_arranged() && p.bed_idx == 0) {
-                        Vec2d t = p.translation.cast<double>();
-                        (*it)->apply_arrange_result(t, p.rotation);
-                    }
-                };
-                movable.emplace_back(std::move(arrpoly));
-            }
-        }
-    
-    if (auto wt = get_wipe_tower_arrangepoly(*this))
-        fixed.emplace_back(*wt);
-    
-    arrangement::arrange(movable, fixed, this->build_volume().polygon(), arr_params);
-
-    for (auto & m : movable)
-        m.apply();
-}
-
 void Plater::priv::split_object()
 {
     int obj_idx = get_selected_object_idx();
@@ -3158,6 +3133,10 @@ void Plater::priv::split_object()
     // into the same model object, thus causing duplicates when we call load_model_objects()
     Model new_model = model;
     ModelObject* current_model_object = new_model.objects[obj_idx];
+
+    // Before splitting object we have to remove all custom supports, seams, and multimaterial painting.
+    wxGetApp().plater()->clear_before_change_mesh(obj_idx, _u8L("Custom supports, seams and multimaterial painting were "
+                                                                "removed after splitting the object."));
 
     wxBusyCursor wait;
     ModelObjectPtrs new_objects;
@@ -3546,7 +3525,7 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
     ModelObject* old_model_object = model.objects[object_idx];
     ModelVolume* old_volume = old_model_object->volumes[volume_idx];
 
-    bool sinking = old_model_object->bounding_box().min.z() < SINKING_Z_THRESHOLD;
+    bool sinking = old_model_object->min_z() < SINKING_Z_THRESHOLD;
 
     ModelObject* new_model_object = new_model.objects.front();
     old_model_object->add_volume(*new_model_object->volumes.front());
@@ -3635,7 +3614,6 @@ void Plater::priv::replace_with_stl()
     }
 }
 
-#if ENABLE_RELOAD_FROM_DISK_REWORK
 static std::vector<std::pair<int, int>> reloadable_volumes(const Model& model, const Selection& selection)
 {
     std::vector<std::pair<int, int>> ret;
@@ -3656,11 +3634,9 @@ static std::vector<std::pair<int, int>> reloadable_volumes(const Model& model, c
     }
     return ret;
 }
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
 void Plater::priv::reload_from_disk()
 {
-#if ENABLE_RELOAD_FROM_DISK_REWORK
     // collect selected reloadable ModelVolumes
     std::vector<std::pair<int, int>> selected_volumes = reloadable_volumes(model, get_selection());
 
@@ -3671,47 +3647,13 @@ void Plater::priv::reload_from_disk()
     std::sort(selected_volumes.begin(), selected_volumes.end(), [](const std::pair<int, int>& v1, const std::pair<int, int>& v2) {
         return (v1.first < v2.first) || (v1.first == v2.first && v1.second < v2.second);
         });
+
     selected_volumes.erase(std::unique(selected_volumes.begin(), selected_volumes.end(), [](const std::pair<int, int>& v1, const std::pair<int, int>& v2) {
         return (v1.first == v2.first) && (v1.second == v2.second); }), selected_volumes.end());
-#else
-    Plater::TakeSnapshot snapshot(q, _L("Reload from disk"));
-
-    const Selection& selection = get_selection();
-
-    if (selection.is_wipe_tower())
-        return;
-
-    // struct to hold selected ModelVolumes by their indices
-    struct SelectedVolume
-    {
-        int object_idx;
-        int volume_idx;
-
-        // operators needed by std::algorithms
-        bool operator < (const SelectedVolume& other) const { return object_idx < other.object_idx || (object_idx == other.object_idx && volume_idx < other.volume_idx); }
-        bool operator == (const SelectedVolume& other) const { return object_idx == other.object_idx && volume_idx == other.volume_idx; }
-    };
-    std::vector<SelectedVolume> selected_volumes;
-
-    // collects selected ModelVolumes
-    const std::set<unsigned int>& selected_volumes_idxs = selection.get_volume_idxs();
-    for (unsigned int idx : selected_volumes_idxs) {
-        const GLVolume* v = selection.get_volume(idx);
-        int v_idx = v->volume_idx();
-        if (v_idx >= 0) {
-            int o_idx = v->object_idx();
-            if (0 <= o_idx && o_idx < (int)model.objects.size())
-                selected_volumes.push_back({ o_idx, v_idx });
-        }
-    }
-    std::sort(selected_volumes.begin(), selected_volumes.end());
-    selected_volumes.erase(std::unique(selected_volumes.begin(), selected_volumes.end()), selected_volumes.end());
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     // collects paths of files to load
     std::vector<fs::path> input_paths;
     std::vector<fs::path> missing_input_paths;
-#if ENABLE_RELOAD_FROM_DISK_REWORK
     std::vector<std::pair<fs::path, fs::path>> replace_paths;
     for (auto [obj_idx, vol_idx] : selected_volumes) {
         const ModelObject* object = model.objects[obj_idx];
@@ -3735,37 +3677,6 @@ void Plater::priv::reload_from_disk()
                 missing_input_paths.push_back(volume->source.input_file);
         }
     }
-#else
-    std::vector<fs::path> replace_paths;
-    for (const SelectedVolume& v : selected_volumes) {
-        const ModelObject* object = model.objects[v.object_idx];
-        const ModelVolume* volume = object->volumes[v.volume_idx];
-
-        if (!volume->source.input_file.empty()) {
-            if (fs::exists(volume->source.input_file))
-                input_paths.push_back(volume->source.input_file);
-            else {
-                // searches the source in the same folder containing the object
-                bool found = false;
-                if (!object->input_file.empty()) {
-                    fs::path object_path = fs::path(object->input_file).remove_filename();
-                    if (!object_path.empty()) {
-                        object_path /= fs::path(volume->source.input_file).filename();
-                        const std::string source_input_file = object_path.string();
-                        if (fs::exists(source_input_file)) {
-                            input_paths.push_back(source_input_file);
-                            found = true;
-                        }
-                    }
-                }
-                if (!found)
-                    missing_input_paths.push_back(volume->source.input_file);
-            }
-        }
-        else if (!object->input_file.empty() && volume->is_model_part() && !volume->name.empty() && !volume->source.is_from_builtin_objects)
-            missing_input_paths.push_back(volume->name);
-    }
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     std::sort(missing_input_paths.begin(), missing_input_paths.end());
     missing_input_paths.erase(std::unique(missing_input_paths.begin(), missing_input_paths.end()), missing_input_paths.end());
@@ -3809,11 +3720,8 @@ void Plater::priv::reload_from_disk()
             //wxMessageDialog dlg(q, message, wxMessageBoxCaptionStr, wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
             MessageDialog dlg(q, message, wxMessageBoxCaptionStr, wxYES_NO | wxYES_DEFAULT | wxICON_QUESTION);
             if (dlg.ShowModal() == wxID_YES)
-#if ENABLE_RELOAD_FROM_DISK_REWORK
                 replace_paths.emplace_back(search, sel_filename_path);
-#else
-                replace_paths.emplace_back(sel_filename_path);
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
+
             missing_input_paths.pop_back();
         }
     }
@@ -3824,9 +3732,7 @@ void Plater::priv::reload_from_disk()
     std::sort(replace_paths.begin(), replace_paths.end());
     replace_paths.erase(std::unique(replace_paths.begin(), replace_paths.end()), replace_paths.end());
 
-#if ENABLE_RELOAD_FROM_DISK_REWORK
     Plater::TakeSnapshot snapshot(q, _L("Reload from disk"));
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     std::vector<wxString> fail_list;
 
@@ -3856,12 +3762,11 @@ void Plater::priv::reload_from_disk()
         }
 
         // update the selected volumes whose source is the current file
-#if ENABLE_RELOAD_FROM_DISK_REWORK
         for (auto [obj_idx, vol_idx] : selected_volumes) {
             ModelObject* old_model_object = model.objects[obj_idx];
             ModelVolume* old_volume = old_model_object->volumes[vol_idx];
 
-            bool sinking = old_model_object->bounding_box().min.z() < SINKING_Z_THRESHOLD;
+            bool sinking = old_model_object->min_z() < SINKING_Z_THRESHOLD;
 
             bool has_source = !old_volume->source.input_file.empty() && boost::algorithm::iequals(fs::path(old_volume->source.input_file).filename().string(), fs::path(path).filename().string());
             bool has_name = !old_volume->name.empty() && boost::algorithm::iequals(old_volume->name, fs::path(path).filename().string());
@@ -3947,106 +3852,16 @@ void Plater::priv::reload_from_disk()
                 wxGetApp().obj_list()->update_item_error_icon(obj_idx, vol_idx);
             }
         }
-#else
-        for (const SelectedVolume& sel_v : selected_volumes) {
-            ModelObject* old_model_object = model.objects[sel_v.object_idx];
-            ModelVolume* old_volume = old_model_object->volumes[sel_v.volume_idx];
-
-            bool sinking = old_model_object->bounding_box().min.z() < SINKING_Z_THRESHOLD;
-
-            bool has_source = !old_volume->source.input_file.empty() && boost::algorithm::iequals(fs::path(old_volume->source.input_file).filename().string(), fs::path(path).filename().string());
-            bool has_name = !old_volume->name.empty() && boost::algorithm::iequals(old_volume->name, fs::path(path).filename().string());
-            if (has_source || has_name) {
-                int new_volume_idx = -1;
-                int new_object_idx = -1;
-                bool match_found = false;
-                // take idxs from the matching volume
-                if (has_source && old_volume->source.object_idx < int(new_model.objects.size())) {
-                    const ModelObject* obj = new_model.objects[old_volume->source.object_idx];
-                    if (old_volume->source.volume_idx < int(obj->volumes.size())) {
-                        if (obj->volumes[old_volume->source.volume_idx]->name == old_volume->name) {
-                            new_volume_idx = old_volume->source.volume_idx;
-                            new_object_idx = old_volume->source.object_idx;
-                            match_found = true;
-                        }
-                    }
-                }
-
-                if (!match_found && has_name) {
-                    // take idxs from the 1st matching volume
-                    for (size_t o = 0; o < new_model.objects.size(); ++o) {
-                        ModelObject* obj = new_model.objects[o];
-                        bool found = false;
-                        for (size_t v = 0; v < obj->volumes.size(); ++v) {
-                            if (obj->volumes[v]->name == old_volume->name) {
-                                new_volume_idx = (int)v;
-                                new_object_idx = (int)o;
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (found)
-                            break;
-                    }
-                }
-
-                if (new_object_idx < 0 || int(new_model.objects.size()) <= new_object_idx) {
-                    fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
-                    continue;
-                }
-                ModelObject* new_model_object = new_model.objects[new_object_idx];
-                if (new_volume_idx < 0 || int(new_model_object->volumes.size()) <= new_volume_idx) {
-                    fail_list.push_back(from_u8(has_source ? old_volume->source.input_file : old_volume->name));
-                    continue;
-                }
-
-                old_model_object->add_volume(*new_model_object->volumes[new_volume_idx]);
-                ModelVolume* new_volume = old_model_object->volumes.back();
-                new_volume->set_new_unique_id();
-                new_volume->config.apply(old_volume->config);
-                new_volume->set_type(old_volume->type());
-                new_volume->set_material_id(old_volume->material_id());
-                new_volume->set_transformation(old_volume->get_transformation());
-                new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
-                new_volume->source.object_idx = old_volume->source.object_idx;
-                new_volume->source.volume_idx = old_volume->source.volume_idx;
-                assert(! old_volume->source.is_converted_from_inches || ! old_volume->source.is_converted_from_meters);
-                if (old_volume->source.is_converted_from_inches)
-                    new_volume->convert_from_imperial_units();
-                else if (old_volume->source.is_converted_from_meters)
-                    new_volume->convert_from_meters();
-                std::swap(old_model_object->volumes[sel_v.volume_idx], old_model_object->volumes.back());
-                old_model_object->delete_volume(old_model_object->volumes.size() - 1);
-                if (!sinking)
-                    old_model_object->ensure_on_bed();
-                old_model_object->sort_volumes(get_config_bool("order_volumes"));
-
-                sla::reproject_points_and_holes(old_model_object);
-            }
-        }
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
     }
 
     busy.reset();
 
-#if ENABLE_RELOAD_FROM_DISK_REWORK
     for (auto [src, dest] : replace_paths) {
         for (auto [obj_idx, vol_idx] : selected_volumes) {
             if (boost::algorithm::iequals(model.objects[obj_idx]->volumes[vol_idx]->source.input_file, src.string()))
                 replace_volume_with_stl(obj_idx, vol_idx, dest, "");
         }
     }
-#else
-    for (size_t i = 0; i < replace_paths.size(); ++i) {
-        const auto& path = replace_paths[i].string();
-        for (const SelectedVolume& sel_v : selected_volumes) {
-//            ModelObject* old_model_object = model.objects[sel_v.object_idx];
-//            ModelVolume* old_volume = old_model_object->volumes[sel_v.volume_idx];
-//            bool has_source = !old_volume->source.input_file.empty() && boost::algorithm::iequals(fs::path(old_volume->source.input_file).filename().string(), fs::path(path).filename().string());
-            replace_volume_with_stl(sel_v.object_idx, sel_v.volume_idx, path, "");
-        }
-    }
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
 
     if (!fail_list.empty()) {
         wxString message = _L("Unable to reload:") + "\n";
@@ -4842,7 +4657,7 @@ bool Plater::priv::layers_height_allowed() const
         return false;
 
     int obj_idx = get_selected_object_idx();
-    return 0 <= obj_idx && obj_idx < (int)model.objects.size() && model.objects[obj_idx]->bounding_box().max.z() > SINKING_Z_THRESHOLD &&
+    return 0 <= obj_idx && obj_idx < (int)model.objects.size() && model.objects[obj_idx]->max_z() > SINKING_Z_THRESHOLD &&
         config->opt_bool("variable_layer_height") && view3D->is_layers_editing_allowed();
 }
 
@@ -4866,41 +4681,12 @@ bool Plater::priv::can_reload_from_disk() const
     if (sidebar->obj_list()->has_selected_cut_object())
         return false;
 
-#if ENABLE_RELOAD_FROM_DISK_REWORK
     // collect selected reloadable ModelVolumes
     std::vector<std::pair<int, int>> selected_volumes = reloadable_volumes(model, get_selection());
     // nothing to reload, return
     if (selected_volumes.empty())
         return false;
-#else
-    // struct to hold selected ModelVolumes by their indices
-    struct SelectedVolume
-    {
-        int object_idx;
-        int volume_idx;
 
-        // operators needed by std::algorithms
-        bool operator < (const SelectedVolume& other) const { return (object_idx < other.object_idx) || ((object_idx == other.object_idx) && (volume_idx < other.volume_idx)); }
-        bool operator == (const SelectedVolume& other) const { return (object_idx == other.object_idx) && (volume_idx == other.volume_idx); }
-    };
-    std::vector<SelectedVolume> selected_volumes;
-
-    const Selection& selection = get_selection();
-
-    // collects selected ModelVolumes
-    const std::set<unsigned int>& selected_volumes_idxs = selection.get_volume_idxs();
-    for (unsigned int idx : selected_volumes_idxs) {
-        const GLVolume* v = selection.get_volume(idx);
-        int v_idx = v->volume_idx();
-        if (v_idx >= 0) {
-            int o_idx = v->object_idx();
-            if (0 <= o_idx && o_idx < (int)model.objects.size())
-                selected_volumes.push_back({ o_idx, v_idx });
-        }
-    }
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
-
-#if ENABLE_RELOAD_FROM_DISK_REWORK
     std::sort(selected_volumes.begin(), selected_volumes.end(), [](const std::pair<int, int>& v1, const std::pair<int, int>& v2) {
         return (v1.first < v2.first) || (v1.first == v2.first && v1.second < v2.second);
         });
@@ -4912,21 +4698,7 @@ bool Plater::priv::can_reload_from_disk() const
     for (auto [obj_idx, vol_idx] : selected_volumes) {
         paths.push_back(model.objects[obj_idx]->volumes[vol_idx]->source.input_file);
     }
-#else
-    std::sort(selected_volumes.begin(), selected_volumes.end());
-    selected_volumes.erase(std::unique(selected_volumes.begin(), selected_volumes.end()), selected_volumes.end());
 
-    // collects paths of files to load
-    std::vector<fs::path> paths;
-    for (const SelectedVolume& v : selected_volumes) {
-        const ModelObject* object = model.objects[v.object_idx];
-        const ModelVolume* volume = object->volumes[v.volume_idx];
-        if (!volume->source.input_file.empty())
-            paths.push_back(volume->source.input_file);
-        else if (!object->input_file.empty() && !volume->name.empty() && !volume->source.is_from_builtin_objects)
-            paths.push_back(volume->name);
-    }
-#endif // ENABLE_RELOAD_FROM_DISK_REWORK
     std::sort(paths.begin(), paths.end());
     paths.erase(std::unique(paths.begin(), paths.end()), paths.end());
 
@@ -5014,7 +4786,16 @@ bool Plater::priv::can_decrease_instances(int obj_idx /*= -1*/) const
 
     if (obj_idx < 0)
         obj_idx = get_selected_object_idx();
-    return (0 <= obj_idx) && (obj_idx < (int)model.objects.size()) && 
+
+    if (obj_idx < 0) {
+        if (const auto obj_ids = get_selection().get_object_idxs(); !obj_ids.empty())
+            for (const size_t obj_id : obj_ids)
+                if (can_decrease_instances(obj_id))
+                    return true;
+        return false;
+    }
+
+    return  obj_idx < (int)model.objects.size() && 
             (model.objects[obj_idx]->instances.size() > 1) &&
             !sidebar->obj_list()->has_selected_cut_object();
 }
@@ -5495,6 +5276,17 @@ void Plater::add_model(bool imperial_units/* = false*/)
         wxGetApp().mainframe->update_title();
 }
 
+void Plater::import_zip_archive()
+{
+   wxString input_file;
+   wxGetApp().import_zip(this, input_file);
+   if (input_file.empty())
+       return;
+
+   fs::path path = into_path(input_file);
+   preview_zip_archive(path);
+}
+
 void Plater::import_sl1_archive()
 {
     auto &w = get_ui_job_worker();
@@ -5852,6 +5644,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                                 close_zip_reader(&archive);
                                 throw Slic3r::FileIOError(e.what());
                             }
+                            break;
                         }
                     }
                 }
@@ -6280,6 +6073,13 @@ void Plater::increase_instances(size_t num, int obj_idx/* = -1*/)
     if (obj_idx < 0)
         obj_idx = p->get_selected_object_idx();
 
+    if (obj_idx < 0) {
+        if (const auto obj_idxs = get_selection().get_object_idxs(); !obj_idxs.empty())
+            for (const size_t obj_id : obj_idxs)
+                increase_instances(1, int(obj_id));
+        return;
+    }
+
     ModelObject* model_object = p->model.objects[obj_idx];
     ModelInstance* model_instance = model_object->instances.back();
 
@@ -6314,6 +6114,13 @@ void Plater::decrease_instances(size_t num, int obj_idx/* = -1*/)
 
     if (obj_idx < 0)
         obj_idx = p->get_selected_object_idx();
+
+    if (obj_idx < 0) {
+        if (const auto obj_ids = get_selection().get_object_idxs(); !obj_ids.empty())
+            for (const size_t obj_id : obj_ids)
+                decrease_instances(1, int(obj_id));
+        return;
+    }
 
     ModelObject* model_object = p->model.objects[obj_idx];
     if (model_object->instances.size() > num) {
@@ -6939,18 +6746,19 @@ void Plater::send_gcode()
         upload_job.printhost->get_groups(groups);
     }
     // PrusaLink specific: Query the server for the list of file groups.
-    wxArrayString storage;
+    wxArrayString storage_paths;
+    wxArrayString storage_names;
     {
         wxBusyCursor wait;
         try {
-            upload_job.printhost->get_storage(storage);
+            upload_job.printhost->get_storage(storage_paths, storage_names);
         } catch (const Slic3r::IOError& ex) {
             show_error(this, ex.what(), false);
             return;
         }
     }
 
-    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups, storage);
+    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups, storage_paths, storage_names);
     if (dlg.ShowModal() == wxID_OK) {
         upload_job.upload_data.upload_path = dlg.filename();
         upload_job.upload_data.post_action = dlg.post_action();
@@ -7368,7 +7176,7 @@ bool Plater::set_printer_technology(PrinterTechnology printer_technology)
     return ret;
 }
 
-void Plater::clear_before_change_mesh(int obj_idx)
+void Plater::clear_before_change_mesh(int obj_idx, const std::string &notification_msg)
 {
     ModelObject* mo = model().objects[obj_idx];
 
@@ -7386,8 +7194,7 @@ void Plater::clear_before_change_mesh(int obj_idx)
         get_notification_manager()->push_notification(
                     NotificationType::CustomSupportsAndSeamRemovedAfterRepair,
                     NotificationManager::NotificationLevel::PrintInfoNotificationLevel,
-                    _u8L("Custom supports, seams and multimaterial painting were "
-                         "removed after repairing the mesh."));
+                    notification_msg);
 //                    _u8L("Undo the repair"),
 //                    [this, snapshot_time](wxEvtHandler*){
 //                        // Make sure the snapshot is still available and that
@@ -7439,7 +7246,7 @@ void Plater::changed_objects(const std::vector<size_t>& object_idxs)
 
     for (size_t obj_idx : object_idxs) {
         if (obj_idx < p->model.objects.size()) {
-            if (p->model.objects[obj_idx]->bounding_box().min.z() >= SINKING_Z_THRESHOLD)
+            if (p->model.objects[obj_idx]->min_z() >= SINKING_Z_THRESHOLD)
                 // re - align to Z = 0
                 p->model.objects[obj_idx]->ensure_on_bed();
         }
@@ -7783,6 +7590,20 @@ SuppressBackgroundProcessingUpdate::SuppressBackgroundProcessingUpdate() :
 SuppressBackgroundProcessingUpdate::~SuppressBackgroundProcessingUpdate()
 {
     wxGetApp().plater()->schedule_background_process(m_was_scheduled);
+}
+
+PlaterAfterLoadAutoArrange::PlaterAfterLoadAutoArrange()
+{
+    Plater* plater = wxGetApp().plater();
+    m_enabled = plater->model().objects.empty() &&
+                plater->printer_technology() == ptFFF &&
+                plater->fff_print().config().printer_model.value == "XL";
+}
+
+PlaterAfterLoadAutoArrange::~PlaterAfterLoadAutoArrange()
+{
+    if (m_enabled)
+        wxGetApp().plater()->arrange();
 }
 
 }}    // namespace Slic3r::GUI
