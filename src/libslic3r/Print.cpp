@@ -562,8 +562,9 @@ std::string Print::validate(std::string* warning) const
         }
 
         if (m_config.gcode_flavor != gcfRepRapSprinter && m_config.gcode_flavor != gcfRepRapFirmware &&
-            m_config.gcode_flavor != gcfRepetier && m_config.gcode_flavor != gcfMarlinLegacy && m_config.gcode_flavor != gcfMarlinFirmware)
-            return _u8L("The Wipe Tower is currently only supported for the Marlin, RepRap/Sprinter, RepRapFirmware and Repetier G-code flavors.");
+            m_config.gcode_flavor != gcfRepetier && m_config.gcode_flavor != gcfMarlinLegacy &&
+            m_config.gcode_flavor != gcfMarlinFirmware && m_config.gcode_flavor != gcfKlipper)
+            return _u8L("The Wipe Tower is currently only supported for the Marlin, Klipper, RepRap/Sprinter, RepRapFirmware and Repetier G-code flavors.");
         if (! m_config.use_relative_e_distances)
             return _u8L("The Wipe Tower is currently only supported with the relative extruder addressing (use_relative_e_distances=1).");
         if (m_config.ooze_prevention && m_config.single_extruder_multi_material)

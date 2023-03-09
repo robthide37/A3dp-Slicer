@@ -568,10 +568,11 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_result.filament_cost[i]       = static_cast<float>(config.filament_cost.get_at(i));
     }
 
-    if ((m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware) && config.machine_limits_usage.value != MachineLimitsUsage::Ignore) {
+    if ((m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware || m_flavor == gcfKlipper)
+         && config.machine_limits_usage.value != MachineLimitsUsage::Ignore) {
         m_time_processor.machine_limits = reinterpret_cast<const MachineEnvelopeConfig&>(config);
-        if (m_flavor == gcfMarlinLegacy) {
-            // Legacy Marlin does not have separate travel acceleration, it uses the 'extruding' value instead.
+        if (m_flavor == gcfMarlinLegacy || m_flavor == gcfKlipper) {
+            // Legacy Marlin and Klipper don't have separate travel acceleration, they use the 'extruding' value instead.
             m_time_processor.machine_limits.machine_max_acceleration_travel = m_time_processor.machine_limits.machine_max_acceleration_extruding;
         }
         if (m_flavor == gcfRepRapFirmware) {
@@ -788,7 +789,7 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
     if (machine_limits_usage != nullptr)
         use_machine_limits = machine_limits_usage->value != MachineLimitsUsage::Ignore;
 
-    if (use_machine_limits && (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware)) {
+    if (use_machine_limits && (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware || m_flavor == gcfRepRapFirmware || m_flavor == gcfKlipper)) {
         const ConfigOptionFloats* machine_max_acceleration_x = config.option<ConfigOptionFloats>("machine_max_acceleration_x");
         if (machine_max_acceleration_x != nullptr)
             m_time_processor.machine_limits.machine_max_acceleration_x.values = machine_max_acceleration_x->values;
@@ -846,8 +847,8 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
             m_time_processor.machine_limits.machine_max_acceleration_retracting.values = machine_max_acceleration_retracting->values;
 
 
-        // Legacy Marlin does not have separate travel acceleration, it uses the 'extruding' value instead.
-        const ConfigOptionFloats* machine_max_acceleration_travel = config.option<ConfigOptionFloats>(m_flavor == gcfMarlinLegacy
+        // Legacy Marlin and Klipper don't have separate travel acceleration, they use the 'extruding' value instead.
+        const ConfigOptionFloats* machine_max_acceleration_travel = config.option<ConfigOptionFloats>((m_flavor == gcfMarlinLegacy || m_flavor == gcfKlipper)
                                                                                                     ? "machine_max_acceleration_extruding"
                                                                                                     : "machine_max_acceleration_travel");
         if (machine_max_acceleration_travel != nullptr)
@@ -885,7 +886,7 @@ void GCodeProcessor::apply_config(const DynamicPrintConfig& config)
         m_time_processor.machines[i].travel_acceleration = (max_travel_acceleration > 0.0f) ? max_travel_acceleration : DEFAULT_TRAVEL_ACCELERATION;
     }
 
-    if (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) {
+    if (m_flavor == gcfMarlinLegacy || m_flavor == gcfMarlinFirmware) { // No Klipper here, it does not support silent mode.
         const ConfigOptionBool* silent_mode = config.option<ConfigOptionBool>("silent_mode");
         if (silent_mode != nullptr) {
             if (silent_mode->value && m_time_processor.machine_limits.machine_max_acceleration_x.values.size() > 1)
@@ -3244,7 +3245,7 @@ void GCodeProcessor::process_M205(const GCodeReader::GCodeLine& line)
 
 void GCodeProcessor::process_M220(const GCodeReader::GCodeLine& line)
 {
-    if (m_flavor != gcfMarlinLegacy && m_flavor != gcfMarlinFirmware)
+    if (m_flavor != gcfMarlinLegacy && m_flavor != gcfMarlinFirmware && m_flavor != gcfKlipper)
         return;
 
     if (line.has('B'))

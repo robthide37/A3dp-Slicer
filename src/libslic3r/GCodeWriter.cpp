@@ -58,6 +58,7 @@ std::string GCodeWriter::preamble()
         FLAVOR_IS(gcfRepRapFirmware) ||
         FLAVOR_IS(gcfMarlinLegacy) ||
         FLAVOR_IS(gcfMarlinFirmware) ||
+        FLAVOR_IS(gcfKlipper) ||
         FLAVOR_IS(gcfTeacup) ||
         FLAVOR_IS(gcfRepetier) ||
         FLAVOR_IS(gcfSmoothie))
