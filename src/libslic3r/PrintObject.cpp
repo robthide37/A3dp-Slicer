@@ -1604,26 +1604,28 @@ void PrintObject::bridge_over_infill()
                 continue;
             }
             auto spacing = layer->regions().front()->flow(frSolidInfill, true).scaled_spacing();
-            Polygons internal_area = shrink(to_polygons(layer->lower_layer->lslices), 4 * spacing);
+            ExPolygons internal_area;
             Polygons lower_layer_solids;
             for (const LayerRegion *region : layer->lower_layer->regions()) {
-                bool has_low_density = region->region().config().fill_density.value < 100;
+                internal_area.insert(internal_area.end(), region->fill_expolygons().begin(), region->fill_expolygons().end());
                 for (const Surface &surface : region->fill_surfaces()) {
-                    if (surface.surface_type == stInternal && has_low_density) {
+                    if (surface.surface_type != stInternal || region->region().config().fill_density.value == 100) {
                         Polygons p = to_polygons(surface.expolygon);
                         lower_layer_solids.insert(lower_layer_solids.end(), p.begin(), p.end());
                     }
                 }
             }
-            lower_layer_solids = expand(lower_layer_solids, 4 * spacing);
-            internal_area = diff(internal_area, lower_layer_solids);
+            lower_layer_solids        = expand(lower_layer_solids, 4 * spacing);
+            Polygons unsupported_area = to_polygons(internal_area);
+            unsupported_area          = shrink(unsupported_area, 4 * spacing);
+            unsupported_area          = diff(unsupported_area, lower_layer_solids);
 
             for (const LayerRegion *region : layer->regions()) {
                 SurfacesPtr region_internal_solids = region->fill_surfaces().filter_by_type(stInternalSolid);
                 for (const Surface *s : region_internal_solids) {
-                    Polygons away_from_perimeter = intersection(to_polygons(s->expolygon), internal_area);
-                    if (!away_from_perimeter.empty()) {
-                        Polygons worth_bridging = intersection(to_polygons(s->expolygon), expand(away_from_perimeter, 5 * spacing));
+                    Polygons unsupported = intersection(to_polygons(s->expolygon), unsupported_area);
+                    if (!unsupported.empty()) {
+                        Polygons worth_bridging = intersection(to_polygons(s->expolygon), expand(unsupported, 5 * spacing));
                         candidate_surfaces.push_back(CandidateSurface(s, worth_bridging, region, 0));
                     }
                 }
@@ -1956,11 +1958,10 @@ void PrintObject::bridge_over_infill()
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, clustered_layers_for_threads.size()), [po = this, &surfaces_by_layer,
                                                                                            &clustered_layers_for_threads,
-                                                                                           &gather_areas_w_depth,
-                                                                                           &infill_lines,
+                                                                                           &gather_areas_w_depth, &infill_lines,
                                                                                            &determine_bridging_angle,
-                                                                                           &construct_anchored_polygon]
-                                                                                           (tbb::blocked_range<size_t> r) {
+                                                                                           &construct_anchored_polygon](
+                                                                                              tbb::blocked_range<size_t> r) {
         for (size_t cluster_idx = r.begin(); cluster_idx < r.end(); cluster_idx++) {
             for (size_t job_idx = 0; job_idx < clustered_layers_for_threads[cluster_idx].size(); job_idx++) {
                 size_t       lidx  = clustered_layers_for_threads[cluster_idx][job_idx];
@@ -2000,6 +2001,7 @@ void PrintObject::bridge_over_infill()
                             break;
                         }
                     }
+                }
 
                 // Now gather expansion polygons - internal infill on current layer, from which we can cut off anchors
                 Polygons expansion_area;
@@ -2046,11 +2048,12 @@ void PrintObject::bridge_over_infill()
 
                     boundary_lines.insert(boundary_lines.end(), anchors.begin(), anchors.end());
                     Polygons bridged_area = construct_anchored_polygon(area_to_be_bridged, boundary_lines, flow, bridging_angle);
-                    bridged_area = intersection(bridged_area, boundary_area);
-                    bridged_area = opening(bridged_area, flow.scaled_spacing());
-                    expansion_area = diff(expansion_area, bridged_area);
+                    bridged_area          = intersection(bridged_area, boundary_area);
+                    bridged_area          = opening(bridged_area, flow.scaled_spacing());
+                    expansion_area        = diff(expansion_area, bridged_area);
 
-                    expanded_surfaces.push_back(CandidateSurface(candidate.original_surface, bridged_area, candidate.region, bridging_angle));
+                    expanded_surfaces.push_back(
+                        CandidateSurface(candidate.original_surface, bridged_area, candidate.region, bridging_angle));
                 }
                 surfaces_by_layer[lidx].swap(expanded_surfaces);
                 expanded_surfaces.clear();
@@ -2058,58 +2061,56 @@ void PrintObject::bridge_over_infill()
         }
     });
 
-        BOOST_LOG_TRIVIAL(info) << "Bridge over infill - Directions and expanded surfaces computed" << log_memory_info();
+    BOOST_LOG_TRIVIAL(info) << "Bridge over infill - Directions and expanded surfaces computed" << log_memory_info();
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this,
-                                                                                 &surfaces_by_layer](tbb::blocked_range<size_t> r) {
-            for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
-                if (surfaces_by_layer.find(lidx) == surfaces_by_layer.end()) 
-                    continue;
-                Layer *layer = po->get_layer(lidx);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this, &surfaces_by_layer](tbb::blocked_range<size_t> r) {
+        for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
+            if (surfaces_by_layer.find(lidx) == surfaces_by_layer.end())
+                continue;
+            Layer *layer = po->get_layer(lidx);
 
-                Polygons cut_from_infill{};
-                for (const auto &surface : surfaces_by_layer.at(lidx)) {
-                    cut_from_infill.insert(cut_from_infill.end(), surface.new_polys.begin(), surface.new_polys.end());
-                }
+            Polygons cut_from_infill{};
+            for (const auto &surface : surfaces_by_layer.at(lidx)) {
+                cut_from_infill.insert(cut_from_infill.end(), surface.new_polys.begin(), surface.new_polys.end());
+            }
 
-                for (LayerRegion *region : layer->regions()) {
-                    Surfaces new_surfaces;
+            for (LayerRegion *region : layer->regions()) {
+                Surfaces new_surfaces;
 
-                    for (const CandidateSurface &cs : surfaces_by_layer.at(lidx)) {
-                        for (Surface &surface : region->m_fill_surfaces.surfaces) {
-                            if (cs.original_surface == &surface) {
-                                Surface tmp(surface, {});
-                                for (const ExPolygon &expoly : diff_ex(surface.expolygon, cs.new_polys)) {
-                                    if (expoly.area() > region->flow(frSolidInfill).scaled_width() * scale_(4.0)) {
-                                        new_surfaces.emplace_back(tmp, expoly);
-                                    }
-                                }
-                                tmp.surface_type = stInternalBridge;
-                                tmp.bridge_angle = cs.bridge_angle;
-                                for (const ExPolygon &expoly : union_ex(cs.new_polys)) {
+                for (const CandidateSurface &cs : surfaces_by_layer.at(lidx)) {
+                    for (Surface &surface : region->m_fill_surfaces.surfaces) {
+                        if (cs.original_surface == &surface) {
+                            Surface tmp(surface, {});
+                            for (const ExPolygon &expoly : diff_ex(surface.expolygon, cs.new_polys)) {
+                                if (expoly.area() > region->flow(frSolidInfill).scaled_width() * scale_(4.0)) {
                                     new_surfaces.emplace_back(tmp, expoly);
                                 }
-                                surface.clear();
-                            } else if (surface.surface_type == stInternal) {
-                                Surface tmp(surface, {});
-                                for (const ExPolygon &expoly : diff_ex(surface.expolygon, cut_from_infill)) {
-                                    new_surfaces.emplace_back(tmp, expoly);
-                                }
-                                surface.clear();
                             }
+                            tmp.surface_type = stInternalBridge;
+                            tmp.bridge_angle = cs.bridge_angle;
+                            for (const ExPolygon &expoly : union_ex(cs.new_polys)) {
+                                new_surfaces.emplace_back(tmp, expoly);
+                            }
+                            surface.clear();
+                        } else if (surface.surface_type == stInternal) {
+                            Surface tmp(surface, {});
+                            for (const ExPolygon &expoly : diff_ex(surface.expolygon, cut_from_infill)) {
+                                new_surfaces.emplace_back(tmp, expoly);
+                            }
+                            surface.clear();
                         }
                     }
-                    region->m_fill_surfaces.surfaces.insert(region->m_fill_surfaces.surfaces.end(), new_surfaces.begin(),
-                                                            new_surfaces.end());
-                    region->m_fill_surfaces.surfaces.erase(std::remove_if(region->m_fill_surfaces.surfaces.begin(),
-                                                                          region->m_fill_surfaces.surfaces.end(),
-                                                                          [](const Surface &s) { return s.empty(); }),
-                                                           region->m_fill_surfaces.surfaces.end());
                 }
+                region->m_fill_surfaces.surfaces.insert(region->m_fill_surfaces.surfaces.end(), new_surfaces.begin(), new_surfaces.end());
+                region->m_fill_surfaces.surfaces.erase(std::remove_if(region->m_fill_surfaces.surfaces.begin(),
+                                                                      region->m_fill_surfaces.surfaces.end(),
+                                                                      [](const Surface &s) { return s.empty(); }),
+                                                       region->m_fill_surfaces.surfaces.end());
             }
-        });
+        }
+    });
 
-        BOOST_LOG_TRIVIAL(info) << "Bridge over infill - End" << log_memory_info();
+    BOOST_LOG_TRIVIAL(info) << "Bridge over infill - End" << log_memory_info();
 
 } // void PrintObject::bridge_over_infill()
 
