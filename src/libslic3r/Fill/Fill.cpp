@@ -16,6 +16,7 @@
 #include "FillLightning.hpp"
 #include "FillConcentric.hpp"
 #include "FillEnsuring.hpp"
+#include "Polygon.hpp"
 
 namespace Slic3r {
 
@@ -649,7 +650,10 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
 
     for (SurfaceFill &surface_fill : surface_fills) {
         switch (surface_fill.params.pattern) {
-        case ipLightning: continue; break;
+        case ipLightning: {
+            auto polylines = to_polylines(shrink_ex(surface_fill.expolygons, 5.0 * surface_fill.params.flow.scaled_spacing()));
+            sparse_infill_polylines.insert(sparse_infill_polylines.end(), polylines.begin(), polylines.end());
+        }; break;
         case ipCount: continue; break;
         case ipSupportBase: continue; break;
         case ipEnsuring: continue; break;
