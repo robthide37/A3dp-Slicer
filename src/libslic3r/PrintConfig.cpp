@@ -48,6 +48,7 @@ static const t_config_enum_values s_keys_map_GCodeFlavor {
     { "makerware",      gcfMakerWare },
     { "marlin",         gcfMarlinLegacy },
     { "marlin2",        gcfMarlinFirmware },
+    { "klipper",        gcfKlipper },
     { "sailfish",       gcfSailfish },
     { "smoothie",       gcfSmoothie },
     { "mach3",          gcfMach3 },
@@ -1406,6 +1407,7 @@ void PrintConfigDef::init_fff_params()
         { "makerware",      "MakerWare (MakerBot)" },
         { "marlin",         "Marlin (legacy)" },
         { "marlin2",        "Marlin 2" },
+        { "klipper",        "Klipper" },
         { "sailfish",       "Sailfish (MakerBot)" },
         { "mach3",          "Mach3/LinuxCNC" },
         { "machinekit",     "Machinekit" },
@@ -4421,8 +4423,9 @@ std::string validate(const FullPrintConfig &cfg)
         cfg.gcode_flavor.value != gcfMarlinLegacy &&
         cfg.gcode_flavor.value != gcfMarlinFirmware &&
         cfg.gcode_flavor.value != gcfMachinekit &&
-        cfg.gcode_flavor.value != gcfRepetier)
-        return "--use-firmware-retraction is only supported by Marlin, Smoothie, RepRapFirmware, Repetier and Machinekit firmware";
+        cfg.gcode_flavor.value != gcfRepetier &&
+        cfg.gcode_flavor.value != gcfKlipper)
+        return "--use-firmware-retraction is only supported by Marlin, Klipper, Smoothie, RepRapFirmware, Repetier and Machinekit firmware";
 
     if (cfg.use_firmware_retraction.value)
         for (unsigned char wipe : cfg.wipe.values)

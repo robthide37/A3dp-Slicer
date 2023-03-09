@@ -502,6 +502,10 @@ std::string Print::validate(std::string* warning) const
             return _u8L("The Spiral Vase option can only be used when printing single material objects.");
     }
 
+    if (m_config.machine_limits_usage == MachineLimitsUsage::EmitToGCode && m_config.gcode_flavor == gcfKlipper)
+        return L("Machine limits cannot be emitted to G-Code when Klipper firmware flavor is used. "
+                 "Change the value of machine_limits_usage.");
+
     // Cache of layer height profiles for checking:
     // 1) Whether all layers are synchronized if printing with wipe tower and / or unsynchronized supports.
     // 2) Whether layer height is constant for Organic supports.
