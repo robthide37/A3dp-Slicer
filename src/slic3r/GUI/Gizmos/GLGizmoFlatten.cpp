@@ -179,11 +179,7 @@ void GLGizmoFlatten::update_planes()
     ch = ch.convex_hull_3d();
     m_planes.clear();
     on_unregister_raycasters_for_picking();
-#if ENABLE_WORLD_COORDINATE
     const Transform3d inst_matrix = mo->instances.front()->get_matrix_no_offset();
-#else
-    const Transform3d& inst_matrix = mo->instances.front()->get_matrix(true);
-#endif // ENABLE_WORLD_COORDINATE
 
     // Following constants are used for discarding too small polygons.
     const float minimal_area = 5.f; // in square mm (world coordinates)

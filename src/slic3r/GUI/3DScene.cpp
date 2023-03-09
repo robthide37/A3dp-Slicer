@@ -494,7 +494,7 @@ int GLVolumeCollection::load_wipe_tower_preview(
         height = 0.1f;
 
     static const float brim_height = 0.2f;
-    const float scaled_brim_height = brim_height / height;
+//    const float scaled_brim_height = brim_height / height;
 
     TriangleMesh mesh;
     ColorRGBA color = ColorRGBA::DARK_YELLOW();
