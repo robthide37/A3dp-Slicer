@@ -482,6 +482,8 @@ void ObjectManipulation::Show(const bool show)
     }
 
     if (show) {
+        ECoordinatesType coordinates_type = m_coordinates_type;
+
         // Show the "World Coordinates" / "Local Coordintes" Combo in Advanced / Expert mode only.
         const Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
         bool show_world_local_combo = wxGetApp().get_mode() != comSimple && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier());
@@ -491,15 +493,12 @@ void ObjectManipulation::Show(const bool show)
 #else
             m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Local), wxNullBitmap, 2);
 #endif // __linux__
-            m_word_local_combo->Select((int)ECoordinatesType::World);
-            this->set_coordinates_type(m_word_local_combo->GetString(m_word_local_combo->GetSelection()));
         }
         else if (selection.is_single_full_instance() && m_word_local_combo->GetCount() > 2) {
             m_word_local_combo->Delete(2);
-            m_word_local_combo->Select((int)ECoordinatesType::World);
-            this->set_coordinates_type(m_word_local_combo->GetString(m_word_local_combo->GetSelection()));
+            if (coordinates_type > ECoordinatesType::Instance)
+                coordinates_type = ECoordinatesType::World;
         }
-
         m_word_local_combo->Show(show_world_local_combo);
         m_empty_str->Show(!show_world_local_combo);
     }
@@ -742,9 +741,6 @@ void ObjectManipulation::update_if_dirty()
     m_lock_bnt->SetToolTip(wxEmptyString);
     m_lock_bnt->enable();
 
-    if (m_word_local_combo->GetSelection() != (int)m_coordinates_type)
-        m_word_local_combo->SetSelection((int)m_coordinates_type);
-
     if (m_new_enabled)
         m_og->enable();
     else
@@ -857,6 +853,19 @@ wxString ObjectManipulation::coordinate_type_str(ECoordinatesType type)
     default:                         { assert(false); return _L("Unknown"); }
     }
 }
+
+#if ENABLE_OBJECT_MANIPULATION_DEBUG
+void ObjectManipulation::render_debug_window()
+{
+  ImGuiWrapper& imgui = *wxGetApp().imgui();
+//  ImGui::SetNextWindowCollapsed(true, ImGuiCond_Once);
+  imgui.begin(std::string("ObjectManipulation"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+  imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Coordinates type");
+  ImGui::SameLine();
+  imgui.text(coordinate_type_str(m_coordinates_type));
+  imgui.end();
+}
+#endif // ENABLE_OBJECT_MANIPULATION_DEBUG
 
 void ObjectManipulation::reset_settings_value()
 {
@@ -1084,6 +1093,7 @@ void ObjectManipulation::set_coordinates_type(ECoordinatesType type)
         return;
 
     m_coordinates_type = type;
+    m_word_local_combo->SetSelection((int)m_coordinates_type);
     this->UpdateAndShow(true);
     GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
     canvas->get_gizmos_manager().update_data();
@@ -1093,10 +1103,6 @@ void ObjectManipulation::set_coordinates_type(ECoordinatesType type)
 
 ECoordinatesType ObjectManipulation::get_coordinates_type() const
 {
-    const wxString og_name = get_og()->get_name();
-    if (og_name.Contains(_L("Group manipulation")))
-        return ECoordinatesType::World;
-
     return m_coordinates_type;
 }
 
@@ -1151,13 +1157,12 @@ void ObjectManipulation::sys_color_changed()
 
 void ObjectManipulation::set_coordinates_type(const wxString& type_string)
 {
-    ECoordinatesType type = ECoordinatesType::World;
-    if (type_string == coordinate_type_str(ECoordinatesType::Instance))
-        type = ECoordinatesType::Instance;
-    else if (type_string == coordinate_type_str(ECoordinatesType::Local))
-        type = ECoordinatesType::Local;
-
-    this->set_coordinates_type(type);
+  if (type_string == coordinate_type_str(ECoordinatesType::Instance))
+      this->set_coordinates_type(ECoordinatesType::Instance);
+  else if (type_string == coordinate_type_str(ECoordinatesType::Local))
+      this->set_coordinates_type(ECoordinatesType::Local);
+  else
+      this->set_coordinates_type(ECoordinatesType::World);
 }
 
 static const char axes[] = { 'x', 'y', 'z' };

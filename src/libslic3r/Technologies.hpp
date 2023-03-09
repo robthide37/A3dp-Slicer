@@ -34,6 +34,8 @@
 #define ENABLE_GLMODEL_STATISTICS 0
 // Shows an imgui dialog containing the matrices of the selected volumes
 #define ENABLE_MATRICES_DEBUG 0
+// Shows an imgui dialog containing data from class ObjectManipulation
+#define ENABLE_OBJECT_MANIPULATION_DEBUG 0
 
 
 // Enable rendering of objects using environment map
@@ -41,18 +43,19 @@
 // Enable smoothing of objects normals
 #define ENABLE_SMOOTH_NORMALS 0
 
-
-//====================
-// 2.6.0.alpha1 techs
-//====================
-#define ENABLE_2_6_0_ALPHA1 1
-
 // Enable OpenGL ES
 #define ENABLE_OPENGL_ES 0
 // Enable OpenGL core profile context (tested against Mesa 20.1.8 on Windows)
 #define ENABLE_GL_CORE_PROFILE (1 && !ENABLE_OPENGL_ES)
 // Enable OpenGL debug messages using debug context
 #define ENABLE_OPENGL_DEBUG_OPTION (1 && ENABLE_GL_CORE_PROFILE)
+
+
+//====================
+// 2.6.0.alpha1 techs
+//====================
+#define ENABLE_2_6_0_ALPHA1 1
+
 // Enable alternative version of file_wildcards()
 #define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_6_0_ALPHA1)
 

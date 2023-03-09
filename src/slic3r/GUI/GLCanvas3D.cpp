@@ -1639,6 +1639,9 @@ void GLCanvas3D::render()
 #if ENABLE_GLMODEL_STATISTICS
     GLModel::render_statistics();
 #endif // ENABLE_GLMODEL_STATISTICS
+#if ENABLE_OBJECT_MANIPULATION_DEBUG
+    wxGetApp().obj_manipul()->render_debug_window();
+#endif // ENABLE_OBJECT_MANIPULATION_DEBUG
 
     std::string tooltip;
 

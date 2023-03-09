@@ -213,6 +213,10 @@ public:
 
     static wxString coordinate_type_str(ECoordinatesType type);
 
+#if ENABLE_OBJECT_MANIPULATION_DEBUG
+    void render_debug_window();
+#endif // ENABLE_OBJECT_MANIPULATION_DEBUG
+
 private:
     void reset_settings_value();
     void update_settings_value(const Selection& selection);

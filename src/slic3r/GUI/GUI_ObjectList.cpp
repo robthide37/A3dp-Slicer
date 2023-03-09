@@ -2668,6 +2668,8 @@ void ObjectList::part_selection_changed()
     bool disable_ss_manipulation {false};
     bool disable_ununiform_scale {false};
 
+    ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
+
     const auto item = GetSelection();
 
     GLGizmosManager& gizmos_mgr = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
@@ -2684,6 +2686,7 @@ void ObjectList::part_selection_changed()
 
         if (selection.is_single_full_object()) {
             og_name = _L("Object manipulation");
+            coordinates_type = ECoordinatesType::World;
             update_and_show_manipulations = true;
 
             obj_idx             = selection.get_object_idx();
@@ -2693,6 +2696,7 @@ void ObjectList::part_selection_changed()
         }
         else {
             og_name = _L("Group manipulation");
+            coordinates_type = ECoordinatesType::World;
 
             // don't show manipulation panel for case of all Object's parts selection 
             update_and_show_manipulations = !selection.is_single_full_instance();
@@ -2748,6 +2752,8 @@ void ObjectList::part_selection_changed()
              || type == itInfo) {
                 og_name = _L("Object manipulation");
                 m_config = &object->config;
+                if (!scene_selection().is_single_full_instance() || coordinates_type > ECoordinatesType::Instance)
+                    coordinates_type = ECoordinatesType::World;
                 update_and_show_manipulations = true;
 
                 if (type == itInfo) {
@@ -2825,6 +2831,8 @@ void ObjectList::part_selection_changed()
 
     if (update_and_show_manipulations) {
         wxGetApp().obj_manipul()->get_og()->set_name(" " + og_name + " ");
+        if (wxGetApp().obj_manipul()->get_coordinates_type() != coordinates_type)
+            wxGetApp().obj_manipul()->set_coordinates_type(coordinates_type);
 
         if (item) {
             wxGetApp().obj_manipul()->update_item_name(m_objects_model->GetName(item));
