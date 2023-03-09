@@ -58,7 +58,7 @@ std::string GLGizmoScale3D::get_tooltip() const
 static int constraint_id(int grabber_id)
 {
   static const std::vector<int> id_map = { 1, 0, 3, 2, 5, 4, 8, 9, 6, 7 };
-  return (0 <= grabber_id && grabber_id < id_map.size()) ? id_map[grabber_id] : -1;
+  return (0 <= grabber_id && grabber_id < (int)id_map.size()) ? id_map[grabber_id] : -1;
 }
 
 bool GLGizmoScale3D::on_mouse(const wxMouseEvent &mouse_event)
@@ -157,8 +157,6 @@ void GLGizmoScale3D::on_dragging(const UpdateData& data)
 
 void GLGizmoScale3D::on_render()
 {
-    const Selection& selection = m_parent.get_selection();
-
     glsafe(::glClear(GL_DEPTH_BUFFER_BIT));
     glsafe(::glEnable(GL_DEPTH_TEST));
 

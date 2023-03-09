@@ -7137,11 +7137,10 @@ const ModelVolume *get_model_volume(const GLVolume &v, const Model &model)
 {
     const ModelVolume * ret = nullptr;
 
-    if (v.object_idx() < model.objects.size()) {
+    if (v.object_idx() < (int)model.objects.size()) {
         const ModelObject *obj = model.objects[v.object_idx()];
-        if (v.volume_idx() < obj->volumes.size()) {
+        if (v.volume_idx() < (int)obj->volumes.size())
             ret = obj->volumes[v.volume_idx()];
-        }
     }
 
     return ret;
