@@ -1560,7 +1560,7 @@ void PrintObject::discover_vertical_shells()
     } // for each region
 } // void PrintObject::discover_vertical_shells()
 
-// #define DEBUG_BRIDGE_OVER_INFILL
+#define DEBUG_BRIDGE_OVER_INFILL
 #ifdef DEBUG_BRIDGE_OVER_INFILL
 template<typename T> void debug_draw(std::string name, const T& a, const T& b, const T& c, const T& d)
 {
@@ -1608,10 +1608,11 @@ void PrintObject::bridge_over_infill()
                     continue;
                 }
                 auto       spacing = layer->regions().front()->flow(frSolidInfill, true).scaled_spacing();
-                ExPolygons internal_area;
+                Polygons   unsupported_area;
                 Polygons   lower_layer_solids;
                 for (const LayerRegion *region : layer->lower_layer->regions()) {
-                    internal_area.insert(internal_area.end(), region->fill_expolygons().begin(), region->fill_expolygons().end());
+                    Polygons fill_polys = to_polygons(region->fill_expolygons());
+                    unsupported_area = union_(unsupported_area, fill_polys);
                     for (const Surface &surface : region->fill_surfaces()) {
                         if (surface.surface_type != stInternal || region->region().config().fill_density.value == 100) {
                             Polygons p = to_polygons(surface.expolygon);
@@ -1619,30 +1620,31 @@ void PrintObject::bridge_over_infill()
                         }
                     }
                 }
-                lower_layer_solids        = expand(lower_layer_solids, 4 * spacing);
-                Polygons unsupported_area = to_polygons(internal_area);
-                unsupported_area          = shrink(unsupported_area, 4 * spacing);
-                unsupported_area          = diff(unsupported_area, lower_layer_solids);
+
+                //TODO if region touches the extremes, then check for its area and filter. otherwise, keep even the smallest one
+
+                lower_layer_solids = expand(lower_layer_solids, 4 * spacing);
+                unsupported_area   = shrink(unsupported_area, 4 * spacing);
+                unsupported_area   = diff(unsupported_area, lower_layer_solids);
 
                 for (const LayerRegion *region : layer->regions()) {
                     SurfacesPtr region_internal_solids = region->fill_surfaces().filter_by_type(stInternalSolid);
                     for (const Surface *s : region_internal_solids) {
                         Polygons unsupported = intersection(to_polygons(s->expolygon), unsupported_area);
-                        if (!unsupported.empty()) {
+                        if (area(unsupported) > spacing * spacing) {
                             Polygons worth_bridging = intersection(to_polygons(s->expolygon), expand(unsupported, 5 * spacing));
                             candidate_surfaces.push_back(CandidateSurface(s, worth_bridging, region, 0));
+
+#ifdef DEBUG_BRIDGE_OVER_INFILL
+                            debug_draw(std::to_string(region->layer()->id()) + "_candidate_surface_" + std::to_string(area(s->expolygon)),
+                                       to_lines(region->layer()->lslices), to_lines(s->expolygon), to_lines(worth_bridging),
+                                       to_lines(unsupported_area));
+#endif
                         }
                     }
                 }
             }
         });
-
-#ifdef DEBUG_BRIDGE_OVER_INFILL
-        for (const auto &c : candidate_surfaces) {
-            debug_draw(std::to_string(c.region->layer()->id()) + "_candidate_surface_" + std::to_string(area(c.original_surface->expolygon)),
-                       to_lines(c.region->layer()->lslices), to_lines(c.original_surface->expolygon), to_lines(c.new_polys), {});
-        }
-#endif
 
         for (const CandidateSurface &c : candidate_surfaces) {
             surfaces_by_layer[c.region->layer()->id()].push_back(c);

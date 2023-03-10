@@ -657,6 +657,7 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
         case ipLightning: {
             auto polylines = to_polylines(shrink_ex(surface_fill.expolygons, 5.0 * surface_fill.params.flow.scaled_spacing()));
             sparse_infill_polylines.insert(sparse_infill_polylines.end(), polylines.begin(), polylines.end());
+            continue;
         }; break;
         case ipCount: continue; break;
         case ipSupportBase: continue; break;
