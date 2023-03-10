@@ -1660,7 +1660,7 @@ void PrintObject::bridge_over_infill()
 
             // generate sparse infill polylines from lower layers to get anchorable polylines
             Polylines lower_layer_polylines = po->get_layer(lidx)->lower_layer
-                ? po->get_layer(lidx)->lower_layer->generate_sparse_infill_polylines_for_anchoring();
+                ? po->get_layer(lidx)->lower_layer->generate_sparse_infill_polylines_for_anchoring()
                 : Polylines();
 
             for (std::pair<const LayerSlice *, SurfacesPtr> candidates : bridging_surface_candidates) {
