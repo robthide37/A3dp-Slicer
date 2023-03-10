@@ -1531,6 +1531,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("support_tree_branch_diameter", category_path + "tree_branch_diameter");
         optgroup->append_single_option_line("support_tree_branch_diameter_angle", category_path + "tree_branch_diameter_angle");
         optgroup->append_single_option_line("support_tree_tip_diameter", category_path + "tree_tip_diameter");
+        optgroup->append_single_option_line("support_tree_branch_distance", category_path + "tree_branch_distance");
         optgroup->append_single_option_line("support_tree_top_rate", category_path + "tree_top_rate");
 
     page = add_options_page(L("Speed"), "time");

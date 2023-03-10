@@ -328,6 +328,26 @@ public:
     }
 
 private:
+    // Caching polygons for a range of layers.
+    struct LayerPolygonCache {
+        std::vector<Polygons> polygons;
+        LayerIndex            idx_begin;
+        LayerIndex            idx_end;
+
+        void allocate(LayerIndex aidx_begin, LayerIndex aidx_end) {
+            this->idx_begin = aidx_begin;
+            this->idx_end = aidx_end;
+            this->polygons.assign(aidx_end - aidx_begin, {});
+        }
+
+        LayerIndex begin() const { return idx_begin; }
+        LayerIndex end()   const { return idx_end; }
+        size_t     size()  const { return polygons.size(); }
+
+        bool      has(LayerIndex idx) const { return idx >= idx_begin && idx < idx_end; }
+        Polygons& operator[](LayerIndex idx) { return polygons[idx + idx_begin]; }
+    };
+
     /*!
      * \brief Convenience typedef for the keys to the caches
      */
@@ -362,6 +382,13 @@ private:
             allocate_layers(first_layer_idx + in.size());
             for (auto &d : in)
                 m_data[first_layer_idx ++].emplace(radius, std::move(d));
+        }
+        void insert(LayerPolygonCache &&in, coord_t radius) {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            LayerIndex i = in.idx_begin;
+            allocate_layers(i + LayerIndex(in.size()));
+            for (auto &d : in.polygons)
+                m_data[i ++].emplace(radius, std::move(d));
         }
         /*!
          * \brief Checks a cache for a given RadiusLayerPair and returns it if it is found

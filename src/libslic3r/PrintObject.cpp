@@ -693,6 +693,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_tree_branch_diameter"
             || opt_key == "support_tree_branch_diameter_angle"
             || opt_key == "support_tree_top_rate"
+            || opt_key == "support_tree_branch_distance"
             || opt_key == "support_tree_tip_diameter"
             || opt_key == "raft_expansion"
             || opt_key == "raft_first_layer_density"
