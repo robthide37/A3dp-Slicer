@@ -649,6 +649,10 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
     Polylines sparse_infill_polylines{};
 
     for (SurfaceFill &surface_fill : surface_fills) {
+		if (surface_fill.surface.surface_type != stInternal) {
+			continue;
+		}
+
         switch (surface_fill.params.pattern) {
         case ipLightning: {
             auto polylines = to_polylines(shrink_ex(surface_fill.expolygons, 5.0 * surface_fill.params.flow.scaled_spacing()));
