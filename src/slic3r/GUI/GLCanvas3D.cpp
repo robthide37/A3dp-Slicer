@@ -1573,8 +1573,10 @@ void GLCanvas3D::render()
     _render_objects(GLVolumeCollection::ERenderType::Opaque);
     _render_sla_slices();
     _render_selection();
+    if (m_show_bed_axes)
+        _render_bed_axes();
     if (is_looking_downward)
-        _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false, true);
+        _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false);
     if (!m_main_toolbar.is_enabled())
         _render_gcode();
     _render_objects(GLVolumeCollection::ERenderType::Transparent);
@@ -1597,7 +1599,7 @@ void GLCanvas3D::render()
     _render_selection_sidebar_hints();
     _render_current_gizmo();
     if (!is_looking_downward)
-        _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), true, true);
+        _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), true);
 
 #if ENABLE_RAYCAST_PICKING_DEBUG
     if (m_picking_enabled && !m_mouse.dragging && !m_gizmos.is_dragging() && !m_rectangle_selection.is_dragging())
@@ -2355,7 +2357,7 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
 #else /* __APPLE__ */
         case WXK_CONTROL_D:
 #endif /* __APPLE__ */
-            m_bed.toggle_show_axes();
+            m_show_bed_axes = !m_show_bed_axes;
             m_dirty = true;
             break;
 #ifdef __APPLE__
@@ -4423,7 +4425,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     glsafe(::glDisable(GL_DEPTH_TEST));
 
     if (thumbnail_params.show_bed)
-        _render_bed(view_matrix, projection_matrix, !camera.is_looking_downward(), false);
+        _render_bed(view_matrix, projection_matrix, !camera.is_looking_downward());
 
     // restore background color
     if (thumbnail_params.transparent_background)
@@ -5477,7 +5479,7 @@ void GLCanvas3D::_render_background()
     glsafe(::glEnable(GL_DEPTH_TEST));
 }
 
-void GLCanvas3D::_render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, bool show_axes)
+void GLCanvas3D::_render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom)
 {
     float scale_factor = 1.0;
 #if ENABLE_RETINA_GL
@@ -5491,7 +5493,12 @@ void GLCanvas3D::_render_bed(const Transform3d& view_matrix, const Transform3d& 
           && m_gizmos.get_current_type() != GLGizmosManager::Seam
           && m_gizmos.get_current_type() != GLGizmosManager::MmuSegmentation);
 
-    m_bed.render(*this, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture);
+    m_bed.render(*this, view_matrix, projection_matrix, bottom, scale_factor, show_texture);
+}
+
+void GLCanvas3D::_render_bed_axes()
+{
+  m_bed.render_axes();
 }
 
 void GLCanvas3D::_render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom)
