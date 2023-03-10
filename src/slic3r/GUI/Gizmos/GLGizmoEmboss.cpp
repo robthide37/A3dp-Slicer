@@ -107,6 +107,67 @@ GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
 
 // Private namespace with helper function for create volume
 namespace priv {
+/// <summary>
+/// Data for emboss job to create shape
+/// </summary>
+struct TextDataBase : public DataBase
+{
+    TextDataBase(DataBase &&parent, const FontFileWithCache& font_file, TextConfiguration &&text_configuration)
+        : DataBase(std::move(parent)), font_file(font_file) /* copy */, text_configuration(std::move(text_configuration))
+    {
+        assert(this->font_file.has_value());
+
+        // partialy fill shape from text configuration
+        const FontProp &fp = this->text_configuration.style.prop;
+        shape.depth       = fp.emboss;
+        shape.use_surface = fp.use_surface;
+        shape.distance    = fp.distance;
+                
+        const FontFile &ff = *this->font_file.font_file;
+        shape.scale = get_text_shape_scale(fp, ff);
+    }
+    /// <summary>
+    /// Create shape from text and font
+    /// </summary>
+    /// <returns>Text shape defined by configuration and font file</returns>
+    EmbossShape &create_shape() override {
+        if (!shape.shapes.empty())
+            return shape;
+
+        // create shape by configuration
+        const char *text = text_configuration.text.c_str();
+        const FontProp &fp = text_configuration.style.prop;        
+        auto was_canceled = [&c = cancel]() -> bool { return c->load(); };
+        shape.shapes = text2shapes(font_file, text, fp, was_canceled);
+
+        // TEST
+        const FontProp                    &prop       = text_configuration.style.prop;
+        const std::optional<unsigned int> &cn         = prop.collection_number;
+        unsigned int                       font_index = (cn.has_value()) ? *cn : 0;
+        const FontFileWithCache           &font       = font_file;
+        assert(font_index < font.font_file->infos.size());
+        int   unit_per_em = font.font_file->infos[font_index].unit_per_em;
+        float scale       = prop.size_in_mm / unit_per_em;
+        float depth       = prop.emboss / scale;
+
+        return shape;
+    }
+
+    void write(ModelVolume &volume) const override
+    {
+        volume.text_configuration = text_configuration; // copy
+
+        // discard information about rotation, should not be stored in volume
+        volume.text_configuration->style.prop.angle.reset();
+
+        DataBase::write(volume);
+    }
+
+    // Keep pointer on Data of font (glyph shapes)
+    FontFileWithCache font_file;
+    // font item is not used for create object
+    TextConfiguration text_configuration;
+};
 
 /// <summary>
 /// Check if volume type is possible use for new text volume
@@ -122,7 +183,8 @@ static bool is_valid(ModelVolumeType volume_type);
 /// <param name="style_manager">Keep actual selected style</param>
 /// <param name="cancel">Cancel for previous job</param>
 /// <returns>Base data for emboss text</returns>
-static DataBase create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>> &cancel);
+static std::unique_ptr<DataBase> create_emboss_data_base(
+    const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>> &cancel);
 
 /// <summary>
 /// Start job for add new volume to object with given transformation
@@ -133,7 +195,7 @@ static DataBase create_emboss_data_base(const std::string &text, StyleManager &s
 /// <param name="volume_type">Type of volume</param>
 static void start_create_volume_job(const ModelObject *object,
                                     const Transform3d  volume_trmat,
-                                    DataBase          &emboss_data,
+                                    std::unique_ptr<DataBase> emboss_data,
                                     ModelVolumeType    volume_type);
 
 /// <summary>
@@ -146,7 +208,7 @@ static void start_create_volume_job(const ModelObject *object,
 /// <param name="raycaster">Ability to ray cast to model</param>
 /// <param name="canvas">Contain already used scene RayCasters</param>
 /// <returns>True when start creation, False when there is no hit surface by screen coor</returns>
-static bool start_create_volume_on_surface_job(DataBase         &emboss_data,
+static bool start_create_volume_on_surface_job(std::unique_ptr<DataBase> emboss_data,
                                                ModelVolumeType   volume_type,
                                                const Vec2d      &screen_coor,
                                                const GLVolume   *gl_volume,
@@ -174,7 +236,7 @@ static void find_closest_volume(const Selection       &selection,
 /// </summary>
 /// <param name="emboss_data">Define params of text</param>
 /// <param name="coor">Screen coordinat, where to create new object laying on bed</param>
-static void start_create_object_job(DataBase &emboss_data, const Vec2d &coor);
+static void start_create_object_job(std::unique_ptr<DataBase> emboss_data, const Vec2d &coor);
 
 // Loaded icons enum
 // Have to match order of files in function GLGizmoEmboss::init_icons()
@@ -209,17 +271,17 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     set_default_text();
     
     GLVolume *gl_volume = get_first_hovered_gl_volume(m_parent);
-    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
+    std::unique_ptr<DataBase> emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
     if (gl_volume != nullptr) {
         // Try to cast ray into scene and find object for add volume
-        if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager, m_parent)) {
+        if (!priv::start_create_volume_on_surface_job(std::move(emboss_data), volume_type, mouse_pos, gl_volume, m_raycast_manager, m_parent)) {
             // When model is broken. It could appear that hit miss the object.
             // So add part near by in simmilar manner as right panel do
             create_volume(volume_type);
         }
     } else {
         // object is not under mouse position soo create object on plater
-        priv::start_create_object_job(emboss_data, mouse_pos);    
+        priv::start_create_object_job(std::move(emboss_data), mouse_pos);    
     }
 }
 
@@ -236,13 +298,13 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 
     Size s = m_parent.get_canvas_size();
     Vec2d screen_center(s.get_width() / 2., s.get_height() / 2.);
-    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
+    std::unique_ptr<DataBase> emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
     const ModelObjectPtrs &objects = selection.get_model()->objects;
     // No selected object so create new object
     if (selection.is_empty() || object_idx < 0 || static_cast<size_t>(object_idx) >= objects.size()) {
         // create Object on center of screen
         // when ray throw center of screen not hit bed it create object on center of bed
-        priv::start_create_object_job(emboss_data, screen_center);
+        priv::start_create_object_job(std::move(emboss_data), screen_center);
         return;
     }
 
@@ -252,15 +314,18 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
     const Camera &camera = wxGetApp().plater()->get_camera();
     priv::find_closest_volume(selection, screen_center, camera, objects, &coor, &vol);
     if (vol == nullptr) {
-        priv::start_create_object_job(emboss_data, screen_center);
-    } else if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager, m_parent)) {
+        priv::start_create_object_job(std::move(emboss_data), screen_center);
+    } else if (!priv::start_create_volume_on_surface_job(std::move(emboss_data), volume_type, coor, vol, m_raycast_manager, m_parent)) {
         // in centroid of convex hull is not hit with object
         // soo create transfomation on border of object
         
+        // unique pointer is already destoyed need to create again
+        std::unique_ptr<DataBase> emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
+        // TODO: do it better way
+        FontProp &fp   = static_cast<TextDataBase *>(emboss_data.get())->text_configuration.style.prop;
         // there is no point on surface so no use of surface will be applied
-        FontProp &prop = emboss_data.text_configuration.style.prop;
-        if (prop.use_surface)
-            prop.use_surface = false;
+        if (fp.use_surface)
+            fp.use_surface = false;
         
         // Transformation is inspired add generic volumes in ObjectList::load_generic_subobject
         const ModelObject *obj = objects[vol->object_idx()];
@@ -268,11 +333,11 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
         // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
         Transform3d tr = vol->get_instance_transformation().get_matrix_no_offset().inverse();
         Vec3d offset_tr(0, // center of instance - Can't suggest width of text before it will be created
-            - instance_bb.size().y() / 2 - prop.size_in_mm / 2, // under
-            prop.emboss / 2 - instance_bb.size().z() / 2 // lay on bed
+            - instance_bb.size().y() / 2 - fp.size_in_mm / 2, // under
+            fp.emboss / 2 - instance_bb.size().z() / 2 // lay on bed
         );
         Transform3d volume_trmat = tr * Eigen::Translation3d(offset_tr);
-        priv::start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
+        priv::start_create_volume_job(obj, volume_trmat, std::move(emboss_data), volume_type);
     }
 }
 
@@ -1064,8 +1129,10 @@ bool GLGizmoEmboss::process()
 
     std::unique_ptr<Job> job = nullptr;
 
-    // check cutting from source mesh
-    bool &use_surface = data.text_configuration.style.prop.use_surface;
+    // check cutting from source mesh    
+    // TODO: do it better way    
+    FontProp &fp = static_cast<TextDataBase *>(data.base.get())->text_configuration.style.prop;
+    bool &use_surface = fp.use_surface;
     bool  is_object   = m_volume->get_object()->volumes.size() == 1;
     if (use_surface && is_object) 
         use_surface = false;
@@ -3271,15 +3338,16 @@ bool GLGizmoEmboss::is_text_object(const ModelVolume *text) {
 
 bool priv::is_valid(ModelVolumeType volume_type)
 {
-    if (volume_type == ModelVolumeType::MODEL_PART || volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
+    if (volume_type == ModelVolumeType::MODEL_PART || 
+        volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
         volume_type == ModelVolumeType::PARAMETER_MODIFIER)
         return true;
 
-    BOOST_LOG_TRIVIAL(error) << "Can't create embossed volume with this type: " << (int) volume_type;
+    BOOST_LOG_TRIVIAL(error) << "Can't create embossed text with this type: " << (int) volume_type;
     return false;
 }
 
-DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>>& cancel)
+std::unique_ptr<DataBase> priv::create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>>& cancel)
 {
     // create volume_name
     std::string volume_name = text; // copy
@@ -3297,7 +3365,6 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &st
     // volume must store valid path
     assert(style_manager.get_wx_font().IsOk());
     assert(es.path.compare(WxFontUtils::store_wxFont(style_manager.get_wx_font())) == 0);
-    TextConfiguration tc{es, text};
 
     // Cancel previous Job, when it is in process
     // worker.cancel(); --> Use less in this case I want cancel only previous EmbossJob no other jobs
@@ -3306,10 +3373,14 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &st
         cancel->store(true);
     // create new shared ptr to cancel new job
     cancel = std::make_shared<std::atomic<bool>>(false);
-    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), tc, volume_name, cancel};
+
+    DataBase base(volume_name, cancel);
+    FontFileWithCache &font = style_manager.get_font_file_with_cache();
+    TextConfiguration  tc{es, text};
+    return std::make_unique<TextDataBase>(std::move(base), font, std::move(tc));
 }
 
-void priv::start_create_object_job(DataBase &emboss_data, const Vec2d &coor)
+void priv::start_create_object_job(std::unique_ptr<DataBase> emboss_data, const Vec2d &coor)
 {
     // start creation of new object
     Plater        *plater    = wxGetApp().plater();
@@ -3317,12 +3388,13 @@ void priv::start_create_object_job(DataBase &emboss_data, const Vec2d &coor)
     const Pointfs &bed_shape = plater->build_volume().bed_shape();
 
     // can't create new object with distance from surface
-    FontProp &prop = emboss_data.text_configuration.style.prop;
-    if (prop.distance.has_value()) prop.distance.reset();
+    // TODO: do it better way
+    FontProp &fp = static_cast<TextDataBase *>(emboss_data.get())->text_configuration.style.prop;
+    if (fp.distance.has_value()) fp.distance.reset();
 
     // can't create new object with using surface
-    if (prop.use_surface)
-        prop.use_surface = false;
+    if (fp.use_surface)
+        fp.use_surface = false;
 
     //    Transform3d volume_tr = priv::create_transformation_on_bed(mouse_pos, camera, bed_shape, prop.emboss / 2);
     DataCreateObject data{std::move(emboss_data), coor, camera, bed_shape};
@@ -3333,10 +3405,13 @@ void priv::start_create_object_job(DataBase &emboss_data, const Vec2d &coor)
 
 void priv::start_create_volume_job(const ModelObject *object,
                                    const Transform3d  volume_trmat,
-                                   DataBase          &emboss_data,
+                                   std::unique_ptr<DataBase> emboss_data,
                                    ModelVolumeType    volume_type)
 {
-    bool &use_surface = emboss_data.text_configuration.style.prop.use_surface;
+    // TODO: do it better way    
+    FontProp &fp = static_cast<TextDataBase *>(emboss_data.get())->text_configuration.style.prop;
+    bool &use_surface = fp.use_surface;
+
     std::unique_ptr<GUI::Job> job;
     if (use_surface) {
         // Model to cut surface from.
@@ -3348,7 +3423,7 @@ void priv::start_create_volume_job(const ModelObject *object,
             // check that there is not unexpected volume type
             assert(is_outside || volume_type == ModelVolumeType::NEGATIVE_VOLUME || volume_type == ModelVolumeType::PARAMETER_MODIFIER);
             SurfaceVolumeData sfvd{volume_trmat, is_outside, std::move(sources)};
-            CreateSurfaceVolumeData surface_data{std::move(emboss_data), std::move(sfvd), volume_type, object->id()};
+            CreateSurfaceVolumeData surface_data{std::move(sfvd), std::move(emboss_data), volume_type, object->id()};
             job = std::make_unique<CreateSurfaceVolumeJob>(std::move(surface_data));
         }
     }
@@ -3363,8 +3438,12 @@ void priv::start_create_volume_job(const ModelObject *object,
     queue_job(worker, std::move(job));
 }
 
-bool priv::start_create_volume_on_surface_job(
-    DataBase &emboss_data, ModelVolumeType volume_type, const Vec2d &screen_coor, const GLVolume *gl_volume, RaycastManager &raycaster, GLCanvas3D& canvas)
+bool priv::start_create_volume_on_surface_job(std::unique_ptr<DataBase> emboss_data,
+                                              ModelVolumeType            volume_type,
+                                              const Vec2d               &screen_coor,
+                                              const GLVolume            *gl_volume,
+                                              RaycastManager            &raycaster,
+                                              GLCanvas3D                &canvas)
 {
     assert(gl_volume != nullptr);
     if (gl_volume == nullptr) return false;
@@ -3395,11 +3474,14 @@ bool priv::start_create_volume_on_surface_job(
 
     // Create result volume transformation
     Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal, Slic3r::GUI::up_limit);
-    const FontProp &font_prop = emboss_data.text_configuration.style.prop;
-    apply_transformation(font_prop, surface_trmat);
+
+    // TODO: find better way !!!
+    const FontProp &fp = static_cast<TextDataBase *>(emboss_data.get())->text_configuration.style.prop;
+
+    apply_transformation(fp, surface_trmat);
     // new transformation in world coor is surface_trmat
     Transform3d volume_trmat = instance.inverse() * surface_trmat;    
-    start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
+    start_create_volume_job(obj, volume_trmat, std::move(emboss_data), volume_type);
     return true;
 }
 

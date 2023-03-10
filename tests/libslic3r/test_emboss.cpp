@@ -258,7 +258,9 @@ TEST_CASE("Heal of 'i' in ALIENATO.TTF", "[Emboss]")
     auto a = heal_and_check(polygons);
 
     Polygons scaled_shape = polygons; // copy
-    scale(scaled_shape, 1 / Emboss::SHAPE_SCALE);
+
+    double text_shape_scale = 0.001; // Emboss.cpp --> SHAPE_SCALE
+    scale(scaled_shape, 1 / text_shape_scale);
     auto b = heal_and_check(scaled_shape);
 
     // different scale
@@ -468,7 +470,8 @@ TEST_CASE("Cut surface", "[]")
 
     Transform3d tr = Transform3d::Identity();
     tr.translate(Vec3d(0., 0., -z_depth));
-    tr.scale(Emboss::SHAPE_SCALE);
+    double text_shape_scale = 0.001; // Emboss.cpp --> SHAPE_SCALE
+    tr.scale(text_shape_scale);
     Emboss::OrthoProject cut_projection(tr, Vec3d(0., 0., z_depth));
 
     auto object = its_make_cube(782 - 49 + 50, 724 + 10 + 50, 5);
@@ -527,8 +530,8 @@ TEST_CASE("UndoRedo TextConfiguration serialization", "[Emboss]")
 TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
 {
     EmbossShape emboss;
-    emboss.shape       = {{{0, 0}, {10, 0}, {10, 10}, {0, 10}}, {{5, 5}, {6, 5}, {6, 6}, {5, 6}}};
-    emboss.shape_scale = 2.;
+    emboss.shapes       = {{{0, 0}, {10, 0}, {10, 10}, {0, 10}}, {{5, 5}, {6, 5}, {6, 6}, {5, 6}}};
+    emboss.scale = 2.;
     emboss.depth       = 5.;
     emboss.use_surface = true;
     emboss.distance = 3.f;
@@ -549,8 +552,8 @@ TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
         cereal::BinaryInputArchive iarchive(ss); // Create an input archive
         iarchive(emboss_loaded);
     }
-    CHECK(emboss.shape == emboss_loaded.shape);
-    CHECK(emboss.shape_scale == emboss_loaded.shape_scale);
+    CHECK(emboss.shapes == emboss_loaded.shapes);
+    CHECK(emboss.scale == emboss_loaded.scale);
     CHECK(emboss.depth == emboss_loaded.depth);
     CHECK(emboss.use_surface == emboss_loaded.use_surface);
     CHECK(emboss.distance == emboss_loaded.distance);

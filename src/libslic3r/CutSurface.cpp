@@ -449,16 +449,21 @@ ProjectionDistances choose_best_distance(
 /// </summary>
 /// <param name="best_distances">For each point selected closest distance</param>
 /// <param name="patches">All patches</param>
-/// <param name="shapes">All patches</param>
+/// <param name="shapes">Shape to cut</param>
+/// <param name="shapes_bb">Bound of shapes</param>
+/// <param name="s2i"></param>
+/// <param name="cutAOIs"></param>
+/// <param name="meshes"></param>
+/// <param name="projection"></param>
 /// <returns>Mask of used patch</returns>
 std::vector<bool> select_patches(const ProjectionDistances &best_distances,
                                  const SurfacePatches      &patches,
-
-                                 const ExPolygons       &shapes,
-                                 const ExPolygonsIndices &s2i,
-                                 const VCutAOIs         &cutAOIs,
-                                 const CutMeshes        &meshes,
-                                 const Project &projection);
+                                 const ExPolygons          &shapes,
+                                 const BoundingBox         &shapes_bb,
+                                 const ExPolygonsIndices   &s2i,
+                                 const VCutAOIs            &cutAOIs,
+                                 const CutMeshes           &meshes,
+                                 const Project             &projection);
 
 /// <summary>
 /// Merge two surface cuts together
@@ -601,8 +606,7 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons &shapes,
     // Use only outline points
     // for each point select best projection
     priv::ProjectionDistances best_projection = priv::choose_best_distance(distances, shapes, start, s2i, patches);
-    std::vector<bool> use_patch = priv::select_patches(best_projection, patches,
-        shapes, s2i,model_cuts, cgal_models, projection);
+    std::vector<bool> use_patch = priv::select_patches(best_projection, patches, shapes, shapes_bb, s2i, model_cuts, cgal_models, projection);
     SurfaceCut result = merge_patches(patches, use_patch);
     //*/
 
@@ -3194,15 +3198,17 @@ bool priv::is_over_whole_expoly(const CutAOI    &cutAOI,
 
 std::vector<bool> priv::select_patches(const ProjectionDistances &best_distances,
                                        const SurfacePatches      &patches,
-
-                                       const ExPolygons       &shapes,
-                                       const ExPolygonsIndices &s2i,
-                                       const VCutAOIs         &cutAOIs,
-                                       const CutMeshes        &meshes,
-                                       const Project          &projection)
+                                       const ExPolygons          &shapes,
+                                       const BoundingBox         &shapes_bb,
+                                       const ExPolygonsIndices   &s2i,
+                                       const VCutAOIs            &cutAOIs,
+                                       const CutMeshes           &meshes,
+                                       const Project             &projection)
 {
     // extension to cover numerical mistake made by back projection patch from 3d to 2d
-    const float extend_delta = 5.f / Emboss::SHAPE_SCALE; // [Font points scaled by Emboss::SHAPE_SCALE]
+    // Calculated as one percent of average size(width and height)
+    Point s = shapes_bb.size();
+    const float extend_delta = (s.x() + s.y())/ float(2 * 100);
         
     // vector of patches for shape
     std::vector<std::vector<uint32_t>> used_shapes_patches(shapes.size());    

@@ -19,6 +19,10 @@
 #include "libslic3r/Line.hpp"
 #include "libslic3r/BoundingBox.hpp"
 
+// every glyph's shape point is divided by SHAPE_SCALE - increase precission of fixed point value
+// stored in fonts (to be able represents curve by sequence of lines)
+static constexpr double SHAPE_SCALE = 0.001; // SCALING_FACTOR promile is fine enough
+
 using namespace Slic3r;
 using namespace Emboss;
 using fontinfo_opt = std::optional<stbtt_fontinfo>;
@@ -1358,12 +1362,12 @@ std::string Emboss::create_range_text(const std::string &text,
     return boost::nowide::narrow(ws);
 }
 
-double Emboss::get_shape_scale(const FontProp &fp, const FontFile &ff)
+double Emboss::get_text_shape_scale(const FontProp &fp, const FontFile &ff)
 {
-    const auto  &cn          = fp.collection_number;
+    const std::optional<unsigned int> &cn = fp.collection_number;
     unsigned int font_index  = (cn.has_value()) ? *cn : 0;
-    int          unit_per_em = ff.infos[font_index].unit_per_em;
-    double       scale       = fp.size_in_mm / unit_per_em;
+    int unit_per_em = ff.infos[font_index].unit_per_em;
+    double scale = fp.size_in_mm / unit_per_em;
     // Shape is scaled for store point coordinate as integer
     return scale * SHAPE_SCALE;
 }
@@ -1523,10 +1527,7 @@ indexed_triangle_set Emboss::polygons2model(const ExPolygons &shape2d,
 
 std::pair<Vec3d, Vec3d> Emboss::ProjectZ::create_front_back(const Point &p) const
 {
-    Vec3d front(
-        p.x() * SHAPE_SCALE,
-        p.y() * SHAPE_SCALE,
-        0.);
+    Vec3d front(p.x(), p.y(), 0.);
     return std::make_pair(front, project(front));
 }
 
@@ -1538,8 +1539,7 @@ Vec3d Emboss::ProjectZ::project(const Vec3d &point) const
 }
 
 std::optional<Vec2d> Emboss::ProjectZ::unproject(const Vec3d &p, double *depth) const {
-    if (depth != nullptr) *depth /= SHAPE_SCALE;
-    return Vec2d(p.x() / SHAPE_SCALE, p.y() / SHAPE_SCALE);
+    return Vec2d(p.x(), p.y());
 }
 
 

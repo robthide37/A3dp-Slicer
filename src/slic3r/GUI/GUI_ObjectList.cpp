@@ -1833,12 +1833,7 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
         wxGetApp().mainframe->update_title();
 }
 
-void ObjectList::load_mesh_object(
-    const TriangleMesh &     mesh,
-    const std::string &      name,
-    bool                     center,
-    const TextConfiguration *text_config /* = nullptr*/,
-    const Transform3d *      transformation /* = nullptr*/)
+void ObjectList::load_mesh_object(const TriangleMesh &mesh, const std::string &name, bool center)
 {   
     PlaterAfterLoadAutoArrange plater_after_load_auto_arrange;
     // Add mesh to model as a new object
@@ -1848,7 +1843,6 @@ void ObjectList::load_mesh_object(
     check_model_ids_validity(model);
 #endif /* _DEBUG */
     
-    std::vector<size_t> object_idxs;
     ModelObject* new_object = model.add_object();
     new_object->name = name;
     new_object->add_instance(); // each object should have at list one instance
@@ -1856,31 +1850,24 @@ void ObjectList::load_mesh_object(
     ModelVolume* new_volume = new_object->add_volume(mesh);
     new_object->sort_volumes(wxGetApp().app_config->get_bool("order_volumes"));
     new_volume->name = name;
-    if (text_config)
-        new_volume->text_configuration = *text_config;
+
     // set a default extruder value, since user can't add it manually
     new_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
     new_object->invalidate_bounding_box();
-    if (transformation) {
-        assert(!center);
-        Slic3r::Geometry::Transformation tr(*transformation);
-        new_object->instances[0]->set_transformation(tr);
-    } else {
-        auto bb = mesh.bounding_box();
-        new_object->translate(-bb.center());
-        new_object->instances[0]->set_offset(
-            center ? to_3d(wxGetApp().plater()->build_volume().bounding_volume2d().center(), -new_object->origin_translation.z()) :
-        bb.center());
-    }
+    
+    auto bb = mesh.bounding_box();
+    new_object->translate(-bb.center());
+    new_object->instances[0]->set_offset(
+        center ? to_3d(wxGetApp().plater()->build_volume().bounding_volume2d().center(), -new_object->origin_translation.z()) :
+    bb.center());
 
     new_object->ensure_on_bed();
 
-    object_idxs.push_back(model.objects.size() - 1);
 #ifdef _DEBUG
     check_model_ids_validity(model);
 #endif /* _DEBUG */
-    
-    paste_objects_into_list(object_idxs);
+
+    paste_objects_into_list({model.objects.size() - 1});
 
 #ifdef _DEBUG
     check_model_ids_validity(model);

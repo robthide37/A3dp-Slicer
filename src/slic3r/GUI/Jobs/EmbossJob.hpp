@@ -4,7 +4,8 @@
 #include <atomic>
 #include <memory>
 #include <string>
-#include <libslic3r/Emboss.hpp>
+#include "libslic3r/Emboss.hpp"
+#include "libslic3r/EmbossShape.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "Job.hpp"
@@ -17,20 +18,43 @@ class TriangleMesh;
 namespace Slic3r::GUI::Emboss {
 
 /// <summary>
-/// Base data holder for embossing
+/// Base data hold data for create emboss shape
 /// </summary>
-struct DataBase
+class DataBase
 {
-    // Keep pointer on Data of font (glyph shapes)
-    Slic3r::Emboss::FontFileWithCache font_file;
-    // font item is not used for create object
-    TextConfiguration text_configuration;
-    // new volume name created from text
+public:
+    DataBase(std::string volume_name, std::shared_ptr<std::atomic<bool>> cancel) : volume_name(volume_name), cancel(std::move(cancel)) {}
+    DataBase(std::string volume_name, std::shared_ptr<std::atomic<bool>> cancel, EmbossShape shape)
+        : volume_name(volume_name), cancel(std::move(cancel)), shape(std::move(shape))
+    {}
+    virtual ~DataBase() {}
+
+    /// <summary>
+    /// Create shape
+    /// e.g. Text extract glyphs from font
+    /// Not 'const' function because it could modify shape
+    /// </summary>
+    virtual EmbossShape &create_shape() { return shape; };
+
+    /// <summary>
+    /// Write data how to reconstruct shape to volume
+    /// </summary>
+    /// <param name="volume">Data object for store emboss params</param>
+    virtual void write(ModelVolume &volume) const
+    {
+        volume.name         = volume_name;
+        volume.emboss_shape = shape;
+    };
+        
+    // new volume name
     std::string volume_name;
 
     // flag that job is canceled
     // for time after process.
     std::shared_ptr<std::atomic<bool>> cancel;
+
+    // shape to emboss
+    EmbossShape shape;
 };
 
 /// <summary>
@@ -38,8 +62,11 @@ struct DataBase
 /// Volume is created on the surface of existing volume in object.
 /// NOTE: EmbossDataBase::font_file doesn't have to be valid !!!
 /// </summary>
-struct DataCreateVolume : public DataBase
+struct DataCreateVolume
 {
+    // Hold data about shape
+    std::unique_ptr<DataBase> base;
+
     // define embossed volume type
     ModelVolumeType volume_type;
 
@@ -71,8 +98,11 @@ public:
 /// Object is placed on bed under screen coor
 /// OR to center of scene when it is out of bed shape
 /// </summary>
-struct DataCreateObject : public DataBase
+struct DataCreateObject
 {
+    // Hold data about shape
+    std::unique_ptr<DataBase> base;
+
     // define position on screen where to create object
     Vec2d screen_coor;
 
@@ -101,8 +131,11 @@ public:
 /// <summary>
 /// Hold neccessary data to update embossed text object in job
 /// </summary>
-struct DataUpdate : public DataBase
+struct DataUpdate
 {
+    // Hold data about shape
+    std::unique_ptr<DataBase> base;
+
     // unique identifier of volume to change
     ObjectID volume_id;
 };
@@ -140,18 +173,14 @@ public:
     /// </summary>
     /// <param name="volume">Volume to be updated</param>
     /// <param name="mesh">New Triangle mesh for volume</param>
-    /// <param name="text_configuration">Parametric description of volume</param>
-    /// <param name="volume_name">Name of volume</param>
-    static void update_volume(ModelVolume             *volume,
-                              TriangleMesh           &&mesh,
-                              const TextConfiguration &text_configuration,
-                              const std::string       &volume_name);
+    /// <param name="base">Data to write into volume</param>
+    static void update_volume(ModelVolume *volume, TriangleMesh &&mesh, const DataBase &base);
 };
 
 struct SurfaceVolumeData
 {
-    // Transformation of text volume inside of object
-    Transform3d text_tr;
+    // Transformation of volume inside of object
+    Transform3d transform;
 
     // Define projection move
     // True (raised) .. move outside from surface
@@ -172,7 +201,10 @@ struct SurfaceVolumeData
 /// <summary>
 /// Hold neccessary data to create(cut) volume from surface object in job
 /// </summary>
-struct CreateSurfaceVolumeData : public DataBase, public SurfaceVolumeData{    
+struct CreateSurfaceVolumeData : public SurfaceVolumeData{     
+    // Hold data about shape
+    std::unique_ptr<DataBase> base;
+
     // define embossed volume type
     ModelVolumeType volume_type;
 

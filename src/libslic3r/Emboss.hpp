@@ -18,10 +18,6 @@ namespace Slic3r {
 /// </summary>
 namespace Emboss
 {    
-    // every glyph's shape point is divided by SHAPE_SCALE - increase precission of fixed point value
-    // stored in fonts (to be able represents curve by sequence of lines)
-    static constexpr double SHAPE_SCALE = 0.001; // SCALING_FACTOR promile is fine enough
-
     /// <summary>
     /// Collect fonts registred inside OS
     /// </summary>
@@ -220,7 +216,7 @@ namespace Emboss
     /// <param name="fp">Property of font</param>
     /// <param name="ff">Font data</param>
     /// <returns>Conversion to mm</returns>
-    double get_shape_scale(const FontProp &fp, const FontFile &ff);
+    double get_text_shape_scale(const FontProp &fp, const FontFile &ff);
 
     /// <summary>
     /// Project spatial point

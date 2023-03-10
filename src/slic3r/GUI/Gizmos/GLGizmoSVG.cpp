@@ -41,9 +41,6 @@ static const struct Limits
     // distance text object from surface
     MinMax<float> angle{-180.f, 180.f}; // in degrees
 } limits;
-
-static std::string choose_svg_file();
-static std::string get_file_name(const std::string &file_path);
 } // namespace priv
 
 GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
@@ -55,6 +52,34 @@ GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
     m_rotate_gizmo.set_group_id(0);
     m_rotate_gizmo.set_force_local_coordinate(true);
 }
+
+// Private functions to create emboss volume
+namespace priv {
+
+/// <summary>
+/// Check if volume type is possible use for new text volume
+/// </summary>
+/// <param name="volume_type">Type</param>
+/// <returns>True when allowed otherwise false</returns>
+static bool is_valid(ModelVolumeType volume_type);
+
+/// <summary>
+/// Open file dialog with svg files
+/// </summary>
+/// <returns>File path to svg</returns>
+static std::string choose_svg_file();
+
+/// <summary>
+/// Separate file name from file path.
+/// String after last delimiter and before last point 
+/// </summary>
+/// <param name="file_path">path return by file dialog</param>
+/// <returns>File name without directory path</returns>
+static std::string get_file_name(const std::string &file_path);
+
+
+} // namespace priv
+
 
 void GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos){
     std::string path = priv::choose_svg_file();
@@ -594,30 +619,70 @@ void GLGizmoSVG::draw_model_type()
 }
 
 
+/////////////
+// priv namespace implementation
+///////////////
+
+bool priv::is_valid(ModelVolumeType volume_type)
+{
+    if (volume_type == ModelVolumeType::MODEL_PART || 
+        volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
+        volume_type == ModelVolumeType::PARAMETER_MODIFIER )
+        return true;
+
+    BOOST_LOG_TRIVIAL(error) << "Can't create embossed SVG with this type: " << (int) volume_type;
+    return false;
+}
+
 std::string priv::get_file_name(const std::string &file_path)
 {
+    if (file_path.empty())
+        return file_path;
+
     size_t pos_last_delimiter = file_path.find_last_of("/\\");
-    size_t pos_point          = file_path.find_last_of('.');
-    size_t offset             = pos_last_delimiter + 1;
-    size_t count              = pos_point - pos_last_delimiter - 1;
+    if (pos_last_delimiter == std::string::npos) {
+        // should not happend that in path is not delimiter
+        assert(false);
+        pos_last_delimiter = 0;
+    }
+
+    size_t pos_point = file_path.find_last_of('.');
+    if (pos_point == std::string::npos || 
+        pos_point < pos_last_delimiter // last point is inside of directory path
+        ) {
+        // there is no extension
+        assert(false);
+        pos_point = file_path.size();
+    }
+
+    size_t offset = pos_last_delimiter + 1; // result should not contain last delimiter ( +1 )
+    size_t count  = pos_point - pos_last_delimiter - 1; // result should not contain extension point ( -1 )
     return file_path.substr(offset, count);
 }
 
 std::string priv::choose_svg_file()
 {
-    wxArrayString input_files;
+    wxWindow* parent = nullptr;
+    wxString message = _L("Choose SVG file for emboss:");
     wxString defaultDir   = wxEmptyString;
     wxString selectedFile = wxEmptyString;
-
-    wxFileDialog  dialog(nullptr, _L("Choose SVG file:"), defaultDir,
-                        selectedFile, file_wildcards(FT_SVG),
-                        wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-
-    if (dialog.ShowModal() == wxID_OK) dialog.GetPaths(input_files);
-    if (input_files.IsEmpty())
+    wxString wildcard = file_wildcards(FT_SVG);
+    long style = wxFD_OPEN | wxFD_FILE_MUST_EXIST;
+    wxFileDialog dialog(parent, message, defaultDir, selectedFile, wildcard, style);
+    if (dialog.ShowModal() != wxID_OK) {
+        BOOST_LOG_TRIVIAL(warning) << "SVG file for emboss was NOT selected.";
         return {};
+    }
+
+    wxArrayString input_files;
+    dialog.GetPaths(input_files);    
+    if (input_files.IsEmpty()) {
+        BOOST_LOG_TRIVIAL(warning) << "SVG file dialog result is empty.";
+        return {};
+    }
+
     if (input_files.size() != 1)
-        return {};
+        BOOST_LOG_TRIVIAL(warning) << "SVG file dialog result contain multiple files but only first is used.";
 
     auto &input_file = input_files.front();
     std::string path = std::string(input_file.c_str());

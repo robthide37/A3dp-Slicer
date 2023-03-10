@@ -3435,5 +3435,30 @@ const GLVolume *get_selected_gl_volume(const Selection &selection)
     return selection.get_volume(volume_idx);
 }
 
+ModelVolume *get_selected_volume(const ObjectID &volume_id, const Selection &selection) {
+    const Selection::IndicesList &volume_ids = selection.get_volume_idxs();
+    const ModelObjectPtrs &model_objects     = selection.get_model()->objects;
+    for (auto id : volume_ids) {
+        const GLVolume *selected_volume = selection.get_volume(id);
+        const GLVolume::CompositeID &cid = selected_volume->composite_id;
+        ModelObject *obj    = model_objects[cid.object_id];
+        ModelVolume *volume = obj->volumes[cid.volume_id];
+        if (volume_id == volume->id())
+            return volume;
+    }
+    return nullptr;
+}
+
+ModelVolume *get_volume(const ObjectID &volume_id, const Selection &selection) {
+    const ModelObjectPtrs &objects = selection.get_model()->objects;
+    for (const ModelObject *object : objects) {
+        for (ModelVolume *volume : object->volumes) {
+            if (volume->id() == volume_id)
+                return volume;
+        }        
+    }
+    return nullptr;
+}
+
 } // namespace GUI
 } // namespace Slic3r
