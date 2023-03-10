@@ -693,6 +693,7 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "support_tree_branch_diameter"
             || opt_key == "support_tree_branch_diameter_angle"
             || opt_key == "support_tree_top_rate"
+            || opt_key == "support_tree_branch_distance"
             || opt_key == "support_tree_tip_diameter"
             || opt_key == "raft_expansion"
             || opt_key == "raft_first_layer_density"
@@ -1658,7 +1659,9 @@ void PrintObject::bridge_over_infill()
             }
 
             // generate sparse infill polylines from lower layers to get anchorable polylines
-            Polylines lower_layer_polylines = po->get_layer(lidx)->lower_layer->generate_sparse_infill_polylines_for_anchoring();
+            Polylines lower_layer_polylines = po->get_layer(lidx)->lower_layer
+                ? po->get_layer(lidx)->lower_layer->generate_sparse_infill_polylines_for_anchoring()
+                : Polylines();
 
             for (std::pair<const LayerSlice *, SurfacesPtr> candidates : bridging_surface_candidates) {
                 if (candidates.second.empty()) {

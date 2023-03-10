@@ -555,6 +555,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,               support_tree_branch_diameter))
     ((ConfigOptionFloat,               support_tree_branch_diameter_angle))
     ((ConfigOptionPercent,             support_tree_top_rate))
+    ((ConfigOptionFloat,               support_tree_branch_distance))
     ((ConfigOptionFloat,               support_tree_tip_diameter))
     // The rest
     ((ConfigOptionBool,                thick_bridges))
