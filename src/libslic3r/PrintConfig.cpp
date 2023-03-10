@@ -2910,6 +2910,18 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(5));
 
+    // Tree Support Branch Distance
+    // How far apart the branches need to be when they touch the model. Making this distance small will cause 
+    // the tree support to touch the model at more points, causing better overhang but making support harder to remove.
+    def = this->add("support_tree_branch_distance", coFloat);
+    def->label = L("Branch Distance");
+    def->category = L("Support material");
+    def->tooltip = L("How far apart the branches need to be when they touch the model. "
+                     "Making this distance small will cause the tree support to touch the model at more points, "
+                     "causing better overhang but making support harder to remove.");
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(1.));
+
     def = this->add("support_tree_top_rate", coPercent);
     def->label = L("Branch Density");
     def->category = L("Support material");
@@ -2921,7 +2933,7 @@ void PrintConfigDef::init_fff_params()
     def->min = 5;
     def->max_literal = 35;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionPercent(30));
+    def->set_default_value(new ConfigOptionPercent(15));
 
     def = this->add("temperature", coInts);
     def->label = L("Other layers");
