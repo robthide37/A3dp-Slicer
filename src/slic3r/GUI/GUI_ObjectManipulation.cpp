@@ -1395,8 +1395,9 @@ void ObjectManipulation::on_change(const std::string& opt_key, int axis, double 
         if (new_value > 0.0)
             change_size_value(axis, new_value);
         else {
-            new_value = m_cache.size(axis);
-            m_cache.size(axis) = 0.0;
+            Vec3d& size = m_imperial_units ? m_cache.size_inches : m_cache.size;
+            new_value = size(axis);
+            size(axis) = 0.0;
             m_cache.size_rounded(axis) = DBL_MAX;
             change_size_value(axis, new_value);
         }
