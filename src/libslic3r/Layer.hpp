@@ -372,7 +372,8 @@ public:
                                        FillAdaptive::Octree     *support_fill_octree,
                                        FillLightning::Generator *lightning_generator);
     Polylines               generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Octree *adaptive_fill_octree,
-                                                                           FillAdaptive::Octree *support_fill_octree) const;
+                                                                           FillAdaptive::Octree *support_fill_octree,
+                                                                           FillLightning::Generator* lightning_generator) const;
     void 					make_ironing();
 
     void                    export_region_slices_to_svg(const char *path) const;

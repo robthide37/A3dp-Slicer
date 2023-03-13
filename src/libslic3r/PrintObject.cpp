@@ -404,17 +404,16 @@ void PrintObject::infill()
 
     if (this->set_started(posInfill)) {
         m_print->set_status(45, L("making infill"));
-        const auto& adaptive_fill_octree = this->adaptive_fill_octrees.first;
-        const auto& support_fill_octree = this->adaptive_fill_octrees.second;
-        auto lightning_generator                         = this->prepare_lightning_infill_data();
+        const auto& adaptive_fill_octree = this->m_adaptive_fill_octrees.first;
+        const auto& support_fill_octree = this->m_adaptive_fill_octrees.second;
 
         BOOST_LOG_TRIVIAL(debug) << "Filling layers in parallel - start";
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size()),
-            [this, &adaptive_fill_octree = adaptive_fill_octree, &support_fill_octree = support_fill_octree, &lightning_generator](const tbb::blocked_range<size_t>& range) {
+            [this, &adaptive_fill_octree = adaptive_fill_octree, &support_fill_octree = support_fill_octree](const tbb::blocked_range<size_t>& range) {
                 for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                     m_print->throw_if_canceled();
-                    m_layers[layer_idx]->make_fills(adaptive_fill_octree.get(), support_fill_octree.get(), lightning_generator.get());
+                    m_layers[layer_idx]->make_fills(adaptive_fill_octree.get(), support_fill_octree.get(), this->m_lightning_generator.get());
                 }
             }
         );
@@ -1560,7 +1559,7 @@ void PrintObject::discover_vertical_shells()
     } // for each region
 } // void PrintObject::discover_vertical_shells()
 
-#define DEBUG_BRIDGE_OVER_INFILL
+// #define DEBUG_BRIDGE_OVER_INFILL
 #ifdef DEBUG_BRIDGE_OVER_INFILL
 template<typename T> void debug_draw(std::string name, const T& a, const T& b, const T& c, const T& d)
 {
@@ -1586,13 +1585,22 @@ void PrintObject::bridge_over_infill()
 
     struct CandidateSurface
     {
-        CandidateSurface(const Surface *original_surface, Polygons new_polys, const LayerRegion *region, double bridge_angle)
-            : original_surface(original_surface), new_polys(new_polys), region(region), bridge_angle(bridge_angle)
+        CandidateSurface(const Surface     *original_surface,
+                         Polygons           new_polys,
+                         const LayerRegion *region,
+                         double             bridge_angle,
+                         bool               supported_by_lightning)
+            : original_surface(original_surface)
+            , new_polys(new_polys)
+            , region(region)
+            , bridge_angle(bridge_angle)
+            , supported_by_lightning(supported_by_lightning)
         {}
         const Surface     *original_surface;
         Polygons           new_polys;
         const LayerRegion *region;
         double             bridge_angle;
+        bool               supported_by_lightning;
     };
 
     std::map<size_t, std::vector<CandidateSurface>> surfaces_by_layer;
@@ -1610,7 +1618,11 @@ void PrintObject::bridge_over_infill()
                 auto       spacing = layer->regions().front()->flow(frSolidInfill).scaled_spacing();
                 Polygons   unsupported_area;
                 Polygons   lower_layer_solids;
+                bool contains_only_lightning = true;
                 for (const LayerRegion *region : layer->lower_layer->regions()) {
+                    if (region->region().config().fill_pattern.value != ipLightning) {
+                        contains_only_lightning = false;
+                    }
                     Polygons fill_polys = to_polygons(region->fill_expolygons());
                     unsupported_area = union_(unsupported_area, expand(fill_polys, spacing));
                     for (const Surface &surface : region->fill_surfaces()) {
@@ -1632,7 +1644,7 @@ void PrintObject::bridge_over_infill()
                         bool     partially_supported = area(unsupported) < area(to_polygons(s->expolygon)) - EPSILON;
                         if (!unsupported.empty() && (!partially_supported || area(unsupported) > 5 * 5 * spacing * spacing)) {
                             Polygons worth_bridging = intersection(to_polygons(s->expolygon), expand(unsupported, 5 * spacing));
-                            candidate_surfaces.push_back(CandidateSurface(s, worth_bridging, region, 0));
+                            candidate_surfaces.push_back(CandidateSurface(s, worth_bridging, region, 0, contains_only_lightning));
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                             debug_draw(std::to_string(region->layer()->id()) + "_candidate_surface_" + std::to_string(area(s->expolygon)),
@@ -1660,7 +1672,9 @@ void PrintObject::bridge_over_infill()
             }
         }
 
-        this->adaptive_fill_octrees = this->prepare_adaptive_infill_data(surfaces_w_bottom_z);
+        this->m_adaptive_fill_octrees = this->prepare_adaptive_infill_data(surfaces_w_bottom_z);
+        this->m_lightning_generator = this->prepare_lightning_infill_data();
+
         std::vector<size_t> layers_to_generate_infill;
         for (const auto &pair : surfaces_by_layer) {
             assert(pair.first > 0);
@@ -1674,8 +1688,9 @@ void PrintObject::bridge_over_infill()
             for (size_t job_idx = r.begin(); job_idx < r.end(); job_idx++) {
                 size_t lidx = layers_to_generate_infill[job_idx];
                 infill_lines.at(
-                    lidx) = po->get_layer(lidx)->generate_sparse_infill_polylines_for_anchoring(po->adaptive_fill_octrees.first.get(),
-                                                                                                po->adaptive_fill_octrees.second.get());
+                    lidx) = po->get_layer(lidx)->generate_sparse_infill_polylines_for_anchoring(po->m_adaptive_fill_octrees.first.get(),
+                                                                                                po->m_adaptive_fill_octrees.second.get(),
+                                                                                                po->m_lightning_generator.get());
             }
         });
 #ifdef DEBUG_BRIDGE_OVER_INFILL
@@ -2061,21 +2076,21 @@ void PrintObject::bridge_over_infill()
                 }
                 expansion_area = closing(expansion_area, SCALED_EPSILON);
                 expansion_area = intersection(expansion_area, deep_infill_area);
-                Lines anchors  = to_lines(intersection_pl(infill_lines[lidx - 1], expansion_area));
+                Polylines anchors  = intersection_pl(infill_lines[lidx - 1], expansion_area);
 
                 std::vector<CandidateSurface> expanded_surfaces;
                 expanded_surfaces.reserve(surfaces_by_layer[lidx].size());
                 for (const CandidateSurface &candidate : surfaces_by_layer[lidx]) {
                     const Flow &flow               = candidate.region->bridging_flow(frSolidInfill, true);
-                    Polygons    area_to_be_bridged = intersection(candidate.new_polys, deep_infill_area);
+                    Polygons    area_to_be_bridge = intersection(candidate.new_polys, deep_infill_area);
 
-                    if (area_to_be_bridged.empty())
+                    if (area_to_be_bridge.empty())
                         continue;
 
-                    Polygons boundary_area  = union_(expansion_area, expand(area_to_be_bridged, flow.scaled_spacing()));
-                    Lines    boundary_lines = to_lines(boundary_area);
+                    Polygons boundary_area  = union_(expansion_area, expand(area_to_be_bridge, flow.scaled_spacing()));
+                    Polylines    boundary_plines = to_polylines(boundary_area);
                     double   bridging_angle    = 0;
-                    Polygons tmp_expanded_area = expand(area_to_be_bridged, 3.0 * flow.scaled_spacing());
+                    Polygons tmp_expanded_area = expand(area_to_be_bridge, 3.0 * flow.scaled_spacing());
                     for (const CandidateSurface &s : expanded_surfaces) {
                         if (!intersection(s.new_polys, tmp_expanded_area).empty()) {
                             bridging_angle = s.bridge_angle;
@@ -2084,30 +2099,33 @@ void PrintObject::bridge_over_infill()
                     }
                     if (bridging_angle == 0) {
                         if (!anchors.empty()) {
-                            bridging_angle = determine_bridging_angle(area_to_be_bridged, anchors,
+                            bridging_angle = determine_bridging_angle(area_to_be_bridge, to_lines(anchors),
                                                                       candidate.region->region().config().fill_pattern.value);
                         } else {
                             // use expansion boundaries as anchors.
                             // Also, use Infill pattern that is neutral for angle determination, since there are no infill lines.
-                            bridging_angle = determine_bridging_angle(area_to_be_bridged, boundary_lines, InfillPattern::ipLine);
+                            bridging_angle = determine_bridging_angle(area_to_be_bridge, to_lines(boundary_plines), InfillPattern::ipLine);
                         }
                     }
 
-                    boundary_lines.insert(boundary_lines.end(), anchors.begin(), anchors.end());
-                    Polygons bridged_area = construct_anchored_polygon(area_to_be_bridged, boundary_lines, flow, bridging_angle);
-                    bridged_area          = intersection(bridged_area, boundary_area);
-                    bridged_area          = opening(bridged_area, flow.scaled_spacing());
-                    expansion_area        = diff(expansion_area, bridged_area);
+                    boundary_plines.insert(boundary_plines.end(), anchors.begin(), anchors.end());
+                    if (candidate.supported_by_lightning) {
+                        boundary_plines = intersection_pl(boundary_plines, expand(area_to_be_bridge, scale_(10)));
+                    }
+                    Polygons bridging_area = construct_anchored_polygon(area_to_be_bridge, to_lines(boundary_plines), flow, bridging_angle);
+                    bridging_area          = intersection(bridging_area, boundary_area);
+                    bridging_area          = opening(bridging_area, flow.scaled_spacing());
+                    expansion_area        = diff(expansion_area, bridging_area);
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                     debug_draw(std::to_string(lidx) + "_" + std::to_string(cluster_idx) + "_" + std::to_string(job_idx) +
                                    "_expanded_bridging",
                                to_lines(layer->lslices), to_lines(candidate.original_surface->expolygon), to_lines(candidate.new_polys),
-                               to_lines(bridged_area));
+                               to_lines(bridging_area));
 #endif
 
                     expanded_surfaces.push_back(
-                        CandidateSurface(candidate.original_surface, bridged_area, candidate.region, bridging_angle));
+                        CandidateSurface(candidate.original_surface, bridging_area, candidate.region, bridging_angle, candidate.supported_by_lightning));
                 }
                 surfaces_by_layer[lidx].swap(expanded_surfaces);
                 expanded_surfaces.clear();

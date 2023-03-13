@@ -2,6 +2,7 @@
 #define slic3r_Print_hpp_
 
 #include "Fill/FillAdaptive.hpp"
+#include "Fill/FillLightning.hpp"
 #include "PrintBase.hpp"
 
 #include "BoundingBox.hpp"
@@ -413,7 +414,8 @@ private:
     // so that next call to make_perimeters() performs a union() before computing loops
     bool                    				m_typed_slices = false;
 
-    std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> adaptive_fill_octrees;
+    std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> m_adaptive_fill_octrees;
+    FillLightning::GeneratorPtr m_lightning_generator;
 };
 
 struct WipeTowerData

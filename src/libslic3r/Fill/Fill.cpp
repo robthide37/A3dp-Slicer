@@ -640,7 +640,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 #endif
 }
 
-Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree) const
+Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree,  FillLightning::Generator* lightning_generator) const
 {
     std::vector<SurfaceFill>  surface_fills = group_fills(*this);
     const Slic3r::BoundingBox bbox          = this->object()->bounding_box();
@@ -654,14 +654,10 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
 		}
 
         switch (surface_fill.params.pattern) {
-        case ipLightning: {
-            auto polylines = to_polylines(shrink_ex(surface_fill.expolygons, 5.0 * surface_fill.params.flow.scaled_spacing()));
-            sparse_infill_polylines.insert(sparse_infill_polylines.end(), polylines.begin(), polylines.end());
-            continue;
-        }; break;
         case ipCount: continue; break;
         case ipSupportBase: continue; break;
         case ipEnsuring: continue; break;
+        case ipLightning:
 		case ipAdaptiveCubic:
         case ipSupportCubic:
         case ipRectilinear:
@@ -691,6 +687,12 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
         f->adapt_fill_octree   = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
         f->print_config        = &this->object()->print()->config();
         f->print_object_config = &this->object()->config();
+
+        if (surface_fill.params.pattern == ipLightning) {
+            auto *lf            = dynamic_cast<FillLightning::Filler *>(f.get());
+            lf->generator       = lightning_generator;
+            lf->num_raft_layers = this->object()->slicing_parameters().raft_layers();
+        }
 
         // calculate flow spacing for infill pattern generation
         double link_max_length = 0.;
