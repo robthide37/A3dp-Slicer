@@ -1607,12 +1607,12 @@ void PrintObject::bridge_over_infill()
                 if (layer->lower_layer == nullptr) {
                     continue;
                 }
-                auto       spacing = layer->regions().front()->flow(frSolidInfill, true).scaled_spacing();
+                auto       spacing = layer->regions().front()->flow(frSolidInfill).scaled_spacing();
                 Polygons   unsupported_area;
                 Polygons   lower_layer_solids;
                 for (const LayerRegion *region : layer->lower_layer->regions()) {
                     Polygons fill_polys = to_polygons(region->fill_expolygons());
-                    unsupported_area = union_(unsupported_area, fill_polys);
+                    unsupported_area = union_(unsupported_area, expand(fill_polys, spacing));
                     for (const Surface &surface : region->fill_surfaces()) {
                         if (surface.surface_type != stInternal || region->region().config().fill_density.value == 100) {
                             Polygons p = to_polygons(surface.expolygon);
@@ -1621,17 +1621,16 @@ void PrintObject::bridge_over_infill()
                     }
                 }
 
-                //TODO if region touches the extremes, then check for its area and filter. otherwise, keep even the smallest one
-
                 lower_layer_solids = expand(lower_layer_solids, 4 * spacing);
-                unsupported_area   = shrink(unsupported_area, 4 * spacing);
+                unsupported_area   = shrink(unsupported_area, 5 * spacing);
                 unsupported_area   = diff(unsupported_area, lower_layer_solids);
 
                 for (const LayerRegion *region : layer->regions()) {
                     SurfacesPtr region_internal_solids = region->fill_surfaces().filter_by_type(stInternalSolid);
                     for (const Surface *s : region_internal_solids) {
-                        Polygons unsupported = intersection(to_polygons(s->expolygon), unsupported_area);
-                        if (area(unsupported) > spacing * spacing) {
+                        Polygons unsupported         = intersection(to_polygons(s->expolygon), unsupported_area);
+                        bool     partially_supported = area(unsupported) < area(to_polygons(s->expolygon)) - EPSILON;
+                        if (!unsupported.empty() && (!partially_supported || area(unsupported) > 5 * 5 * spacing * spacing)) {
                             Polygons worth_bridging = intersection(to_polygons(s->expolygon), expand(unsupported, 5 * spacing));
                             candidate_surfaces.push_back(CandidateSurface(s, worth_bridging, region, 0));
 
