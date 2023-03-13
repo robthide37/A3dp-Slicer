@@ -623,7 +623,7 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
         else if (m_current == Cut) {
             auto do_move = [this, &processed](double delta_z) {
                 GLGizmoCut3D* cut = dynamic_cast<GLGizmoCut3D*>(get_current());
-                cut->shift_cut_z(delta_z);
+                cut->shift_cut(delta_z);
                 processed = true;
             };
 
@@ -740,6 +740,7 @@ void GLGizmosManager::render_arrow(const GLCanvas3D& parent, EType highlighted_t
     const float icons_size_x = 2.0f * m_layout.scaled_icons_size() * inv_cnv_w;
     const float icons_size_y = 2.0f * m_layout.scaled_icons_size() * inv_cnv_h;
     const float stride_y = 2.0f * m_layout.scaled_stride_y() * inv_cnv_h;
+    top_y -= stride_y;
 
     for (size_t idx : selectable_idxs) {
         if (idx == highlighted_type) {

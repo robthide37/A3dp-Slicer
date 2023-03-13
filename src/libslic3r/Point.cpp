@@ -84,18 +84,28 @@ Points collect_duplicates(Points pts /* Copy */)
     return duplicits;
 }
 
+template<bool IncludeBoundary>
 BoundingBox get_extents(const Points &pts)
 { 
-    return BoundingBox(pts);
+    BoundingBox out;
+    BoundingBox::construct<IncludeBoundary>(out, pts.begin(), pts.end());
+    return out;
 }
+template BoundingBox get_extents<false>(const Points &pts);
+template BoundingBox get_extents<true>(const Points &pts);
 
+// if IncludeBoundary, then a bounding box is defined even for a single point.
+// otherwise a bounding box is only defined if it has a positive area.
+template<bool IncludeBoundary>
 BoundingBox get_extents(const std::vector<Points> &pts)
 {
     BoundingBox bbox;
     for (const Points &p : pts)
-        bbox.merge(get_extents(p));
+        bbox.merge(get_extents<IncludeBoundary>(p));
     return bbox;
 }
+template BoundingBox get_extents<false>(const std::vector<Points> &pts);
+template BoundingBox get_extents<true>(const std::vector<Points> &pts);
 
 BoundingBoxf get_extents(const std::vector<Vec2d> &pts)
 {

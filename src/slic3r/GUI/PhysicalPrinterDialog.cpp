@@ -547,18 +547,19 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
     } link, connect;
     // allowed models are: all MINI, all MK3 and newer, MK2.5 and MK2.5S  
     auto model_supports_prusalink = [](const std::string& model) {
-        return model.size() >= 3 &&
+        return model.size() >= 2 &&
                 (( boost::starts_with(model, "MK") && model[2] > '2' && model[2] <= '9')
                 || boost::starts_with(model, "MINI")
                 || boost::starts_with(model, "MK2.5")
-                //|| boost::starts_with(model, "MK2.5S")
+                || boost::starts_with(model, "XL")
                 );
     };
     // allowed models are: all MK3/S and MK2.5/S
     auto model_supports_prusaconnect = [](const std::string& model) {
-        return model.size() >= 3 &&
-                (boost::starts_with(model, "MK3")
+        return model.size() >= 2 &&
+                ((boost::starts_with(model, "MK") && model[2] > '2' && model[2] <= '9')
                 || boost::starts_with(model, "MK2.5")
+                || boost::starts_with(model, "XL")
                 );
     };
 
@@ -632,7 +633,6 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
 
     Choice* choice = dynamic_cast<Choice*>(ht);
     choice->set_values(types);
-    int dif = (int)ht->m_opt.enum_def->values().size() - (int)types.size();
     int index_in_choice = (printer_change ? std::clamp(last_in_conf - ((int)ht->m_opt.enum_def->values().size() - (int)types.size()), 0, (int)ht->m_opt.enum_def->values().size() - 1) : last_in_conf);
     choice->set_value(index_in_choice);
     if (link.supported && link.label == _(ht->m_opt.enum_def->label(index_in_choice)))

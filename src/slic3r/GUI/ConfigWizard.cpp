@@ -1315,10 +1315,12 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     box_presets->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent &event) { this->preset_update = event.IsChecked(); });
 }
 
+
+
 namespace DownloaderUtils
 {
+namespace {
 #ifdef _WIN32
-
     wxString get_downloads_path()
     {
         wxString ret;
@@ -1330,7 +1332,6 @@ namespace DownloaderUtils
         CoTaskMemFree(path);
         return ret;
     }
-
 #elif  __APPLE__
     wxString get_downloads_path()
     {
@@ -1348,9 +1349,8 @@ namespace DownloaderUtils
         }
         return wxString();
     }
-
 #endif
-
+ }
 Worker::Worker(wxWindow* parent)
 : wxBoxSizer(wxHORIZONTAL)
 , m_parent(parent)
@@ -1414,7 +1414,7 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
 
     append_spacer(VERTICAL_SPACING);
 
-    auto* box_allow_downloads = new wxCheckBox(this, wxID_ANY, _L("Allow build-in downloader"));
+    auto* box_allow_downloads = new wxCheckBox(this, wxID_ANY, _L("Allow built-in downloader"));
     // TODO: Do we want it like this? The downloader is allowed for very first time the wizard is run. 
     bool box_allow_value = (app_config->has("downloader_url_registered") ? app_config->get_bool("downloader_url_registered") : true);
     box_allow_downloads->SetValue(box_allow_value);
@@ -1432,16 +1432,16 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
     )));
 #endif
 
-    box_allow_downloads->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) { this->downloader->allow(event.IsChecked()); });
+    box_allow_downloads->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) { this->m_downloader->allow(event.IsChecked()); });
 
-    downloader = new DownloaderUtils::Worker(this);
-    append(downloader);
-    downloader->allow(box_allow_value);
+    m_downloader = new DownloaderUtils::Worker(this);
+    append(m_downloader);
+    m_downloader->allow(box_allow_value);
 }
 
 bool PageDownloader::on_finish_downloader() const
 {
-    return downloader->on_finish();
+    return m_downloader->on_finish();
 }
 
 bool DownloaderUtils::Worker::perform_register(const std::string& path_override/* = {}*/)
@@ -2785,7 +2785,7 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 {
 	// Walk over all installed Printer presets and verify whether there is a filament or SLA material profile installed at the same PresetBundle,
 	// which is compatible with it.
-    const auto printer_models_missing_materials = [this, only_for_model_id](PrinterTechnology technology, const std::string &section)
+    const auto printer_models_missing_materials = [this, only_for_model_id](PrinterTechnology technology, const std::string &section, bool no_templates)
     {
 		const std::map<std::string, std::string> &appconfig_presets = appconfig_new.has_section(section) ? appconfig_new.get_section(section) : std::map<std::string, std::string>();
     	std::set<const VendorProfile::PrinterModel*> printer_models_without_material;
@@ -2805,15 +2805,16 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 				                	has_material = true;
 				                    break;
 				                }
-                                
                                 // find if preset.first is part of the templates profile (up is searching if preset.first is part of printer vendor preset)
-                                for (const auto& bp : bundles) {
-                                    if (!bp.second.preset_bundle->vendors.empty() && bp.second.preset_bundle->vendors.begin()->second.templates_profile) {
-                                        const PresetCollection& template_materials = bp.second.preset_bundle->materials(technology);
-                                        const Preset* template_material = template_materials.find_preset(preset.first, false);
-                                        if (template_material && is_compatible_with_printer(PresetWithVendorProfile(*template_material, &bp.second.preset_bundle->vendors.begin()->second), PresetWithVendorProfile(printer, nullptr))) {
-                                            has_material = true;
-                                            break;
+                                if (!no_templates) {
+                                    for (const auto& bp : bundles) {
+                                        if (!bp.second.preset_bundle->vendors.empty() && bp.second.preset_bundle->vendors.begin()->second.templates_profile) {
+                                            const PresetCollection& template_materials = bp.second.preset_bundle->materials(technology);
+                                            const Preset* template_material = template_materials.find_preset(preset.first, false);
+                                            if (template_material && is_compatible_with_printer(PresetWithVendorProfile(*template_material, &bp.second.preset_bundle->vendors.begin()->second), PresetWithVendorProfile(printer, nullptr))) {
+                                                has_material = true;
+                                                break;
+                                            }
                                         }
                                     }
                                 }
@@ -2872,15 +2873,17 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
     	return out;
     };
 
+    bool no_templates = wxGetApp().app_config->get("no_templates") == "1";
+
     if (any_fff_selected && (technology & T_FFF)) {
-    	std::set<const VendorProfile::PrinterModel*> printer_models_without_material = printer_models_missing_materials(ptFFF, AppConfig::SECTION_FILAMENTS);
+    	std::set<const VendorProfile::PrinterModel*> printer_models_without_material = printer_models_missing_materials(ptFFF, AppConfig::SECTION_FILAMENTS, no_templates);
     	if (! printer_models_without_material.empty()) {
 			if (only_for_model_id.empty())
 				ask_and_select_default_materials(
 					_L("The following FFF printer models have no filament selected:") +
-					"\n\n\t" +
+					"\n\n" +
 					printer_model_list(printer_models_without_material) +
-					"\n\n\t" +
+					"\n\n" +
 					_L("Do you want to select default filaments for these FFF printer models?"),
 					printer_models_without_material,
 					T_FFF);
@@ -2891,14 +2894,14 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
     }
 
     if (any_sla_selected && (technology & T_SLA)) {
-    	std::set<const VendorProfile::PrinterModel*> printer_models_without_material = printer_models_missing_materials(ptSLA, AppConfig::SECTION_MATERIALS);
+    	std::set<const VendorProfile::PrinterModel*> printer_models_without_material = printer_models_missing_materials(ptSLA, AppConfig::SECTION_MATERIALS, no_templates);
     	if (! printer_models_without_material.empty()) {
 	        if (only_for_model_id.empty())
 	            ask_and_select_default_materials(
 					_L("The following SLA printer models have no materials selected:") +
-	            	"\n\n\t" +
+	            	"\n\n" +
 				   	printer_model_list(printer_models_without_material) +
-					"\n\n\t" +
+					"\n\n" +
 					_L("Do you want to select default SLA materials for these printer models?"),
 					printer_models_without_material,
 	            	T_SLA);
@@ -3035,9 +3038,11 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
 #ifdef __linux__
     // Desktop integration on Linux
-    BOOST_LOG_TRIVIAL(debug) << "ConfigWizard::priv::apply_config integrate_desktop" << page_welcome->integrate_desktop()  << " perform_registration_linux " << page_downloader->downloader->get_perform_registration_linux();
-    if (page_welcome->integrate_desktop() || page_downloader->downloader->get_perform_registration_linux())
-        DesktopIntegrationDialog::perform_desktop_integration(page_downloader->downloader->get_perform_registration_linux());
+    BOOST_LOG_TRIVIAL(debug) << "ConfigWizard::priv::apply_config integrate_desktop" << page_welcome->integrate_desktop()  << " perform_registration_linux " << page_downloader->m_downloader->get_perform_registration_linux();
+    if (page_welcome->integrate_desktop())
+        DesktopIntegrationDialog::perform_desktop_integration();
+    if (page_downloader->m_downloader->get_perform_registration_linux())
+        DesktopIntegrationDialog::perform_downloader_desktop_integration();
 #endif
 
     // Decide whether to create snapshot based on run_reason and the reset profile checkbox
@@ -3175,7 +3180,8 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
     // apply materials in app_config
     for (const std::string& section_name : {AppConfig::SECTION_FILAMENTS, AppConfig::SECTION_MATERIALS})
-        app_config->set_section(section_name, appconfig_new.get_section(section_name));
+        if (appconfig_new.has_section(section_name))
+            app_config->set_section(section_name, appconfig_new.get_section(section_name));
 
     app_config->set_vendors(appconfig_new);
 

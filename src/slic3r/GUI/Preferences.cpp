@@ -10,7 +10,7 @@
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
 #include "GLCanvas3D.hpp"
-#include "ConfigWizard_private.hpp"
+#include "ConfigWizard.hpp"
 
 #include <boost/dll/runtime_symbol_info.hpp>
 
@@ -181,25 +181,6 @@ static void append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
 	def.set_enum<EnumType>(enum_values);
 
 	def.set_default_value(def_val);
-	Option option(def, opt_key);
-	optgroup->append_single_option_line(option);
-
-	// fill data to the Search Dialog
-	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
-}
-
-static void append_string_option(std::shared_ptr<ConfigOptionsGroup> optgroup,
-									const std::string& opt_key,
-									const std::string& label,
-									const std::string& tooltip,
-									const std::string& def_val,
-									ConfigOptionMode mode = comSimple)
-{
-	ConfigOptionDef def = { opt_key, coString };
-	def.label = label;
-	def.tooltip = tooltip;
-	def.mode = mode;
-	def.set_default_value(new ConfigOptionString{ def_val });
 	Option option(def, opt_key);
 	optgroup->append_single_option_line(option);
 
@@ -598,7 +579,7 @@ void PreferencesDialog::build()
 		
 		append_bool_option(m_optgroup_other, "downloader_url_registered",
 			L("Allow downloads from Printables.com"),
-			L("If enabled, PrusaSlicer will allow to download from Printables.com"),
+			L("If enabled, PrusaSlicer will be allowed to download from Printables.com"),
 			app_config->get_bool("downloader_url_registered"));
 
 		activate_options_tab(m_optgroup_other);
@@ -645,7 +626,7 @@ void PreferencesDialog::build()
 		{
 		append_bool_option(m_optgroup_dark_mode, "sys_menu_enabled",
 			L("Use system menu for application"),
-			L("If enabled, application will use the standart Windows system menu,\n"
+			L("If enabled, application will use the standard Windows system menu,\n"
 			"but on some combination od display scales it can look ugly. If disabled, old UI will be used."),
 			app_config->get_bool("sys_menu_enabled"));
 		}
@@ -712,7 +693,7 @@ void PreferencesDialog::accept(wxEvent&)
 			return;
 #ifdef __linux__
 		if( downloader->get_perform_registration_linux()) 
-			DesktopIntegrationDialog::perform_desktop_integration(true);
+			DesktopIntegrationDialog::perform_downloader_desktop_integration();
 #endif // __linux__
 	}
 

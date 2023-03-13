@@ -492,8 +492,8 @@ public:
     void reset();
 #if ENABLE_WORLD_COORDINATE
     void reset_offset() { set_offset(Vec3d::Zero()); }
-    void reset_rotation() { set_rotation(Vec3d::Zero()); }
-    void reset_scaling_factor() { set_scaling_factor(Vec3d::Ones()); }
+    void reset_rotation();
+    void reset_scaling_factor();
     void reset_mirror() { set_mirror(Vec3d::Ones()); }
     void reset_skew();
 
@@ -538,6 +538,27 @@ private:
 #endif // ENABLE_WORLD_COORDINATE
 };
 
+#if ENABLE_WORLD_COORDINATE
+struct TransformationSVD
+{
+    Matrix3d u = Matrix3d::Identity();
+    Matrix3d s = Matrix3d::Identity();
+    Matrix3d v = Matrix3d::Identity();
+
+    bool mirror{ false };
+    bool scale{ false };
+    bool anisotropic_scale{ false };
+    bool rotation{ false };
+    bool rotation_90_degrees{ false };
+    bool skew{ false };
+
+    explicit TransformationSVD(const Transformation& trafo) : TransformationSVD(trafo.get_matrix()) {}
+    explicit TransformationSVD(const Transform3d& trafo);
+
+    Eigen::DiagonalMatrix<double, 3, 3> mirror_matrix() const { return Eigen::DiagonalMatrix<double, 3, 3>(this->mirror ? -1. : 1., 1., 1.); }
+};
+#endif // ENABLE_WORLD_COORDINATE
+
 // For parsing a transformation matrix from 3MF / AMF.
 extern Transform3d transform3d_from_string(const std::string& transform_str);
 
@@ -562,6 +583,13 @@ inline bool is_rotation_ninety_degrees(const Vec3d &rotation)
 {
     return is_rotation_ninety_degrees(rotation.x()) && is_rotation_ninety_degrees(rotation.y()) && is_rotation_ninety_degrees(rotation.z());
 }
+
+// Returns true if one transformation may be converted into another transformation by
+// rotation around Z and by mirroring in X / Y only. Two objects sharing such transformation
+// may share support structures and they share Z height.
+bool trafos_differ_in_rotation_by_z_and_mirroring_by_xy_only(const Transform3d &t1, const Transform3d &t2);
+inline bool trafos_differ_in_rotation_by_z_and_mirroring_by_xy_only(const Transformation &t1, const Transformation &t2)
+    { return trafos_differ_in_rotation_by_z_and_mirroring_by_xy_only(t1.get_matrix(), t2.get_matrix()); }
 
 template <class Tout = double, class Tin>
 std::pair<Tout, Tout> dir_to_spheric(const Vec<3, Tin> &n, Tout norm = 1.)

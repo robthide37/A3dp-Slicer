@@ -1,5 +1,5 @@
 #include "Layer.hpp"
-#include <clipper/clipper_z.hpp>
+#include "ClipperZUtils.hpp"
 #include "ClipperUtils.hpp"
 #include "Print.hpp"
 #include "Fill/Fill.hpp"
@@ -53,22 +53,7 @@ void Layer::make_slices()
         this->lslices = slices;
     }
 
-    // prepare lslices ordered by print order
-    this->lslice_indices_sorted_by_print_order.clear();
-    this->lslice_indices_sorted_by_print_order.reserve(lslices.size());
-    // prepare ordering points
-    Points ordering_points;
-    ordering_points.reserve( this->lslices.size());
-    for (const ExPolygon &ex :  this->lslices)
-        ordering_points.push_back(ex.contour.first_point());
-    
-    // sort slices
-    std::vector<Points::size_type> order = chain_points(ordering_points);
-
-    // populate slices vector
-    for (size_t i : order) {
-        this->lslice_indices_sorted_by_print_order.emplace_back(i);
-    }
+    this->lslice_indices_sorted_by_print_order = chain_expolygons(this->lslices);
 }
 
 // used by Layer::build_up_down_graph()
@@ -105,7 +90,7 @@ static void connect_layer_slices(
     const coord_t                                    offset_below,
     const coord_t                                    offset_above
 #ifndef NDEBUG
-    , const coord_t                                    offset_end
+    , const coord_t                                  offset_end
 #endif // NDEBUG
     )
 {
@@ -127,9 +112,7 @@ static void connect_layer_slices(
         {
 #ifndef NDEBUG
             auto assert_intersection_valid = [this](int i, int j) {
-                assert(i != j);
-                if (i > j)
-                    std::swap(i, j);
+                assert(i < j);
                 assert(i >= m_offset_below);
                 assert(i < m_offset_above);
                 assert(j >= m_offset_above);
@@ -140,35 +123,47 @@ static void connect_layer_slices(
             if (polynode.Contour.size() >= 3) {
                 // If there is an intersection point, it should indicate which contours (one from layer below, the other from layer above) intersect.
                 // Otherwise the contour is fully inside another contour.
-                int32_t i = 0, j = 0;
+                int32_t i = -1, j = -1;
                 for (int icontour = 0; icontour <= polynode.ChildCount(); ++ icontour) {
-                    const bool                first   = icontour == 0;
-                    const ClipperLib_Z::Path &contour = first ? polynode.Contour : polynode.Childs[icontour - 1]->Contour;
+                    const ClipperLib_Z::Path &contour = icontour == 0 ? polynode.Contour : polynode.Childs[icontour - 1]->Contour;
                     if (contour.size() >= 3) {
-                        if (first) {
-                            i = contour.front().z();
-                            j = i;
-                            if (i < 0) {
-                                std::tie(i, j) = m_intersections[-i - 1];
-                                assert(assert_intersection_valid(i, j));
-                                goto end;
-                            }
-                        }
-                        for (const ClipperLib_Z::IntPoint& pt : contour) {
+                        for (const ClipperLib_Z::IntPoint &pt : contour) {
                             j = pt.z();
                             if (j < 0) {
-                                std::tie(i, j) = m_intersections[-j - 1];
+                                const auto &intersection = m_intersections[-j - 1];
+                                assert(intersection.first <= intersection.second);
+                                if (intersection.second < m_offset_above) {
+                                    // Ignore intersection of polygons on the 1st layer.
+                                    assert(intersection.first >= m_offset_below);
+                                    j = i;
+                                } else if (intersection.first >= m_offset_above) {
+                                    // Ignore intersection of polygons on the 2nd layer
+                                    assert(intersection.second < m_offset_end);
+                                    j = i;
+                                } else {
+                                    std::tie(i, j) = m_intersections[-j - 1];
+                                    assert(assert_intersection_valid(i, j));
+                                    goto end;
+                                }
+                            } else if (i == -1) {
+                                // First source contour of this expolygon was found.
+                                i = j;
+                            } else if (i != j) {
+                                // Second source contour of this expolygon was found.
+                                if (i > j)
+                                    std::swap(i, j);
                                 assert(assert_intersection_valid(i, j));
                                 goto end;
                             }
-                            else if (i != j)
-                                goto end;
                         }
                     }
                 }
             end:
                 bool found = false;
-                if (i == j) {
+                if (i == -1) {
+                    // This should not happen. It may only happen if the source contours had just self intersections or intersections with contours at the same layer.
+                    assert(false);
+                } else if (i == j) {
                     // The contour is completely inside another contour.
                     Point pt(polynode.Contour.front().x(), polynode.Contour.front().y());
                     if (i < m_offset_above) {
@@ -202,8 +197,6 @@ static void connect_layer_slices(
                     }
                 } else {
                     assert(assert_intersection_valid(i, j));
-                    if (i > j)
-                        std::swap(i, j);
                     i -= m_offset_below;
                     j -= m_offset_above;
                     assert(i >= 0 && i < m_below.lslices_ex.size());
@@ -309,48 +302,16 @@ void Layer::build_up_down_graph(Layer& below, Layer& above)
     coord_t             paths_end = paths_above_offset + coord_t(above.lslices.size());
 #endif // NDEBUG
 
-    class ZFill {
-    public:
-        ZFill() = default;
-        void reset() { m_intersections.clear(); }
-        void operator()(
-            const ClipperLib_Z::IntPoint& e1bot, const ClipperLib_Z::IntPoint& e1top,
-            const ClipperLib_Z::IntPoint& e2bot, const ClipperLib_Z::IntPoint& e2top,
-            ClipperLib_Z::IntPoint& pt) {
-            coord_t srcs[4]{ e1bot.z(), e1top.z(), e2bot.z(), e2top.z() };
-            coord_t* begin = srcs;
-            coord_t* end = srcs + 4;
-            std::sort(begin, end);
-            end = std::unique(begin, end);
-            if (begin + 1 == end) {
-                // Self intersection may happen on source contour. Just copy the Z value.
-                pt.z() = *begin;
-            } else {
-                assert(begin + 2 == end);
-                if (begin + 2 <= end) {
-                    // store a -1 based negative index into the "intersections" vector here.
-                    m_intersections.emplace_back(srcs[0], srcs[1]);
-                    pt.z() = -coord_t(m_intersections.size());
-                }
-            }
-        }
-        const std::vector<std::pair<coord_t, coord_t>>& intersections() const { return m_intersections; }
-
-    private:
-        std::vector<std::pair<coord_t, coord_t>> m_intersections;
-    } zfill;
-
     ClipperLib_Z::Clipper  clipper;
     ClipperLib_Z::PolyTree result;
-    clipper.ZFillFunction(
-        [&zfill](const ClipperLib_Z::IntPoint &e1bot, const ClipperLib_Z::IntPoint &e1top, 
-                 const ClipperLib_Z::IntPoint &e2bot, const ClipperLib_Z::IntPoint &e2top, ClipperLib_Z::IntPoint &pt)
-        { return zfill(e1bot, e1top, e2bot, e2top, pt); });
+    ClipperZUtils::ClipperZIntersectionVisitor::Intersections intersections;
+    ClipperZUtils::ClipperZIntersectionVisitor visitor(intersections);
+    clipper.ZFillFunction(visitor.clipper_callback());
     clipper.AddPaths(paths_below, ClipperLib_Z::ptSubject, true);
     clipper.AddPaths(paths_above, ClipperLib_Z::ptClip, true);
     clipper.Execute(ClipperLib_Z::ctIntersection, result, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
 
-    connect_layer_slices(below, above, result, zfill.intersections(), paths_below_offset, paths_above_offset
+    connect_layer_slices(below, above, result, intersections, paths_below_offset, paths_above_offset
 #ifndef NDEBUG
         , paths_end
 #endif // NDEBUG

@@ -179,6 +179,10 @@ struct TreeSupportMeshGroupSettings {
     // Tree Support Branch Density
     // Adjusts the density of the support structure used to generate the tips of the branches. A higher value results in better overhangs,
     // but the supports are harder to remove. Use Support Roof for very high values or ensure support density is similarly high at the top.
+    // ->
+    // Adjusts the density of the support structure used to generate the tips of the branches.
+    // A higher value results in better overhangs but the supports are harder to remove, thus it is recommended to enable top support interfaces
+    // instead of a high branch density value if dense interfaces are needed.
     // 5%-35%
     double                          support_tree_top_rate                   { 15. };
     // Tree Support Tip Diameter
@@ -240,7 +244,7 @@ public:
      * Knowledge about branch angle is used to only calculate avoidances and collisions that may actually be needed.
      * Not calling precalculate() will cause the class to lazily calculate avoidances and collisions as needed, which will be a lot slower on systems with more then one or two cores!
      */
-    void precalculate(const coord_t max_layer, std::function<void()> throw_on_cancel);
+    void precalculate(const PrintObject& print_object, const coord_t max_layer, std::function<void()> throw_on_cancel);
 
     /*!
      * \brief Provides the areas that have to be avoided by the tree's branches to prevent collision with the model on this layer.
@@ -324,6 +328,26 @@ public:
     }
 
 private:
+    // Caching polygons for a range of layers.
+    struct LayerPolygonCache {
+        std::vector<Polygons> polygons;
+        LayerIndex            idx_begin;
+        LayerIndex            idx_end;
+
+        void allocate(LayerIndex aidx_begin, LayerIndex aidx_end) {
+            this->idx_begin = aidx_begin;
+            this->idx_end = aidx_end;
+            this->polygons.assign(aidx_end - aidx_begin, {});
+        }
+
+        LayerIndex begin() const { return idx_begin; }
+        LayerIndex end()   const { return idx_end; }
+        size_t     size()  const { return polygons.size(); }
+
+        bool      has(LayerIndex idx) const { return idx >= idx_begin && idx < idx_end; }
+        Polygons& operator[](LayerIndex idx) { return polygons[idx + idx_begin]; }
+    };
+
     /*!
      * \brief Convenience typedef for the keys to the caches
      */
@@ -358,6 +382,13 @@ private:
             allocate_layers(first_layer_idx + in.size());
             for (auto &d : in)
                 m_data[first_layer_idx ++].emplace(radius, std::move(d));
+        }
+        void insert(LayerPolygonCache &&in, coord_t radius) {
+            std::lock_guard<std::mutex> guard(m_mutex);
+            LayerIndex i = in.idx_begin;
+            allocate_layers(i + LayerIndex(in.size()));
+            for (auto &d : in.polygons)
+                m_data[i ++].emplace(radius, std::move(d));
         }
         /*!
          * \brief Checks a cache for a given RadiusLayerPair and returns it if it is found
@@ -613,6 +644,9 @@ private:
      * \brief Smallest radius a branch can have. This is the radius of a SupportElement with DTT=0.
      */
     coord_t m_radius_0;
+
+    // Z heights of the raft layers (additional layers below the object, last raft layer aligned with the bottom of the first object layer).
+    std::vector<double>         m_raft_layers;
 
     /*!
      * \brief Caches for the collision, avoidance and areas on the model where support can be placed safely

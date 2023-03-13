@@ -444,7 +444,9 @@ private:
 
 MedialAxis::MedialAxis(double min_width, double max_width, const ExPolygon &expolygon) :
     m_expolygon(expolygon), m_lines(expolygon.lines()), m_min_width(min_width), m_max_width(max_width)
-{}
+{
+    (void)m_expolygon; // supress unused variable warning
+}
 
 void MedialAxis::build(ThickPolylines* polylines)
 {
@@ -467,9 +469,6 @@ void MedialAxis::build(ThickPolylines* polylines)
         return;
     }
     */
-    
-    //typedef const VD::vertex_type vert_t;
-    using edge_t = const VD::edge_type;
     
     // collect valid edges (i.e. prune those not belonging to MAT)
     // note: this keeps twins, so it inserts twice the number of the valid edges

@@ -335,6 +335,7 @@ SupportParameters::SupportParameters(const PrintObject &object)
     this->first_layer_flow                   = Slic3r::support_material_1st_layer_flow(&object, float(slicing_params.first_print_layer_height));
     this->support_material_flow              = Slic3r::support_material_flow(&object, float(slicing_params.layer_height));
     this->support_material_interface_flow    = Slic3r::support_material_interface_flow(&object, float(slicing_params.layer_height));
+    this->raft_interface_flow                = support_material_interface_flow;
 
     // Calculate a minimum support layer height as a minimum over all extruders, but not smaller than 10um.
     this->support_layer_height_min = scaled<coord_t>(0.01);
@@ -375,15 +376,14 @@ SupportParameters::SupportParameters(const PrintObject &object)
     }
 
 
-    this->base_angle         = Geometry::deg2rad(float(object_config.support_material_angle.value));
-    this->interface_angle    = Geometry::deg2rad(float(object_config.support_material_angle.value + 90.));
-    this->interface_spacing  = object_config.support_material_interface_spacing.value + this->support_material_interface_flow.spacing();
-    this->interface_density  = std::min(1., this->support_material_interface_flow.spacing() / this->interface_spacing);
-    this->support_spacing    = object_config.support_material_spacing.value + this->support_material_flow.spacing();
-    this->support_density    = std::min(1., this->support_material_flow.spacing() / this->support_spacing);
+    double interface_spacing = object_config.support_material_interface_spacing.value + this->support_material_interface_flow.spacing();
+    this->interface_density  = std::min(1., this->support_material_interface_flow.spacing() / interface_spacing);
+    double raft_interface_spacing = object_config.support_material_interface_spacing.value + this->raft_interface_flow.spacing();
+    this->raft_interface_density = std::min(1., this->raft_interface_flow.spacing() / raft_interface_spacing);
+    double support_spacing   = object_config.support_material_spacing.value + this->support_material_flow.spacing();
+    this->support_density    = std::min(1., this->support_material_flow.spacing() / support_spacing);
     if (object_config.support_material_interface_layers.value == 0) {
         // No interface layers allowed, print everything with the base support pattern.
-        this->interface_spacing = this->support_spacing;
         this->interface_density = this->support_density;
     }
 
@@ -393,11 +393,45 @@ SupportParameters::SupportParameters(const PrintObject &object)
         support_pattern == smpHoneycomb ? ipHoneycomb :
         this->support_density > 0.95 || this->with_sheath ? ipRectilinear : ipSupportBase;
     this->interface_fill_pattern = (this->interface_density > 0.95 ? ipRectilinear : ipSupportBase);
+    this->raft_interface_fill_pattern = this->raft_interface_density > 0.95 ? ipRectilinear : ipSupportBase;
     this->contact_fill_pattern   =
         (object_config.support_material_interface_pattern == smipAuto && slicing_params.soluble_interface) ||
         object_config.support_material_interface_pattern == smipConcentric ?
         ipConcentric :
         (this->interface_density > 0.95 ? ipRectilinear : ipSupportBase);
+
+    this->base_angle            = Geometry::deg2rad(float(object_config.support_material_angle.value));
+    this->interface_angle       = Geometry::deg2rad(float(object_config.support_material_angle.value + 90.));
+    this->raft_angle_1st_layer  = 0.f;
+    this->raft_angle_base       = 0.f;
+    this->raft_angle_interface  = 0.f;
+    if (slicing_params.base_raft_layers > 1) {
+        assert(slicing_params.raft_layers() >= 4);
+        // There are all raft layer types (1st layer, base, interface & contact layers) available.
+        this->raft_angle_1st_layer  = this->interface_angle;
+        this->raft_angle_base       = this->base_angle;
+        this->raft_angle_interface  = this->interface_angle;
+        if ((slicing_params.interface_raft_layers & 1) == 0)
+            // Allign the 1st raft interface layer so that the object 1st layer is hatched perpendicularly to the raft contact interface.
+            this->raft_angle_interface += float(0.5 * M_PI);
+    } else if (slicing_params.base_raft_layers == 1 || slicing_params.interface_raft_layers > 1) {
+        assert(slicing_params.raft_layers() == 2 || slicing_params.raft_layers() == 3);
+        // 1st layer, interface & contact layers available.
+        this->raft_angle_1st_layer  = this->base_angle;
+        this->raft_angle_interface  = this->interface_angle + 0.5 * M_PI;
+    } else if (slicing_params.interface_raft_layers == 1) {
+        // Only the contact raft layer is non-empty, which will be printed as the 1st layer.
+        assert(slicing_params.base_raft_layers == 0);
+        assert(slicing_params.interface_raft_layers == 1);
+        assert(slicing_params.raft_layers() == 1);
+        this->raft_angle_1st_layer = float(0.5 * M_PI);
+        this->raft_angle_interface = this->raft_angle_1st_layer;
+    } else {
+        // No raft.
+        assert(slicing_params.base_raft_layers == 0);
+        assert(slicing_params.interface_raft_layers == 0);
+        assert(slicing_params.raft_layers() == 0);
+    }
 }
 
 PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object, const SlicingParameters &slicing_params) :
@@ -799,10 +833,6 @@ public:
         )
     {
         switch (m_style) {
-        case smsTree:
-        case smsOrganic:
-            assert(false);
-            [[fallthrough]];
         case smsGrid:
         {
     #ifdef SUPPORT_USE_AGG_RASTERIZER
@@ -893,6 +923,10 @@ public:
                 polygons_rotate(out, m_support_angle);
             return out;
         }
+        case smsTree:
+        case smsOrganic:
+//            assert(false);
+            [[fallthrough]];
         case smsSnug:
             // Merge the support polygons by applying morphological closing and inwards smoothing.
             auto closing_distance   = scaled<float>(m_support_material_closing_radius);
@@ -1763,7 +1797,7 @@ static inline void fill_contact_layer(
 #endif // SLIC3R_DEBUG
         ));
     // 2) infill polygons, expand them by half the extrusion width + a tiny bit of extra.
-    bool reduce_interfaces = object_config.support_material_style.value != smsSnug && layer_id > 0 && !slicing_params.soluble_interface;
+    bool reduce_interfaces = object_config.support_material_style.value == smsGrid && layer_id > 0 && !slicing_params.soluble_interface;
     if (reduce_interfaces) {
         // Reduce the amount of dense interfaces: Do not generate dense interfaces below overhangs with 60% overhang of the extrusions.
         Polygons dense_interface_polygons = diff(overhang_polygons, lower_layer_polygons_for_dense_interface());
@@ -2011,11 +2045,11 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::top_contact_layers(
 // Find the bottom contact layers above the top surfaces of this layer.
 static inline SupportGeneratorLayer* detect_bottom_contacts(
     const SlicingParameters                          &slicing_params,
-    const SupportParameters  &support_params,
+    const SupportParameters                          &support_params,
     const PrintObject                                &object,
     const Layer                                      &layer,
     // Existing top contact layers, to which this newly created bottom contact layer will be snapped to guarantee a minimum layer height.
-    const SupportGeneratorLayersPtr    &top_contacts,
+    const SupportGeneratorLayersPtr                  &top_contacts,
     // First top contact layer index overlapping with this new bottom interface layer.
     size_t                                            contact_idx,
     // To allocate a new layer from.
@@ -2888,6 +2922,7 @@ SupportGeneratorLayersPtr generate_raft_base(
     // If there is brim to be generated, calculate the trimming regions.
     Polygons brim;
     if (object.has_brim()) {
+        // The object does not have a raft.
         // Calculate the area covered by the brim.
         const BrimType brim_type       = object.config().brim_type;
         const bool     brim_outer      = brim_type == btOuterOnly || brim_type == btOuterAndInner;
@@ -2948,12 +2983,20 @@ SupportGeneratorLayersPtr generate_raft_base(
     if (slicing_params.raft_layers() > 1) {
         Polygons base;
         Polygons columns;
+        Polygons first_layer;
         if (columns_base != nullptr) {
-            base = columns_base->polygons;
-            columns = base;
-            if (! interface_polygons.empty())
-                // Trim the 1st layer columns with the inflated interface polygons.
-                columns = diff(columns, interface_polygons);
+            if (columns_base->bottom_print_z() > slicing_params.raft_interface_top_z - EPSILON) {
+                // Classic supports with colums above the raft interface.
+                base = columns_base->polygons;
+                columns = base;
+                if (! interface_polygons.empty())
+                    // Trim the 1st layer columns with the inflated interface polygons.
+                    columns = diff(columns, interface_polygons);
+            } else {
+                // Organic supports with raft on print bed.
+                assert(is_approx(columns_base->print_z, slicing_params.first_print_layer_height));
+                first_layer = columns_base->polygons;
+            }
         }
         if (! interface_polygons.empty()) {
             // Merge the untrimmed columns base with the expanded raft interface, to be used for the support base and interface.
@@ -2967,7 +3010,8 @@ SupportGeneratorLayersPtr generate_raft_base(
             new_layer.print_z = slicing_params.first_print_layer_height;
             new_layer.height  = slicing_params.first_print_layer_height;
             new_layer.bottom_z = 0.;
-            new_layer.polygons = inflate_factor_1st_layer > 0 ? expand(base, inflate_factor_1st_layer) : base;
+            first_layer = union_(std::move(first_layer), base);
+            new_layer.polygons = inflate_factor_1st_layer > 0 ? expand(first_layer, inflate_factor_1st_layer) : first_layer;
         }
         // Insert the base layers.
         for (size_t i = 1; i < slicing_params.base_raft_layers; ++ i) {
@@ -3045,7 +3089,7 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> PrintObjectSuppo
         m_object_config->support_material_interface_extruder.value > 0 && m_print_config->filament_soluble.get_at(m_object_config->support_material_interface_extruder.value - 1) && 
         // Base extruder: Either "print with active extruder" not soluble.
         (m_object_config->support_material_extruder.value == 0 || ! m_print_config->filament_soluble.get_at(m_object_config->support_material_extruder.value - 1));
-    bool   snug_supports                 = m_object_config->support_material_style.value == smsSnug;
+    bool   snug_supports                 = m_object_config->support_material_style.value != smsGrid;
     int num_interface_layers_top         = m_object_config->support_material_interface_layers;
     int num_interface_layers_bottom      = m_object_config->support_material_bottom_interface_layers;
     if (num_interface_layers_bottom < 0)
@@ -3492,12 +3536,7 @@ static inline void fill_expolygons_with_sheath_generate_paths(
     if (polygons.empty())
         return;
 
-    if (with_sheath) {
-        if (density == 0) {
-            tree_supports_generate_paths(dst, polygons, flow);
-            return;
-        }
-    } else {
+    if (! with_sheath) {
         fill_expolygons_generate_paths(dst, closing_ex(polygons, float(SCALED_EPSILON)), filler, density, role, flow);
         return;
     }
@@ -4199,50 +4238,31 @@ void generate_support_toolpaths(
 //    const coordf_t link_max_length_factor = 3.;
     const coordf_t link_max_length_factor = 0.;
 
-    float raft_angle_1st_layer  = 0.f;
-    float raft_angle_base       = 0.f;
-    float raft_angle_interface  = 0.f;
-    if (slicing_params.base_raft_layers > 1) {
-        // There are all raft layer types (1st layer, base, interface & contact layers) available.
-        raft_angle_1st_layer  = support_params.interface_angle;
-        raft_angle_base       = support_params.base_angle;
-        raft_angle_interface  = support_params.interface_angle;
-    } else if (slicing_params.base_raft_layers == 1 || slicing_params.interface_raft_layers > 1) {
-        // 1st layer, interface & contact layers available.
-        raft_angle_1st_layer  = support_params.base_angle;
-        if (config.support_material || config.support_material_enforce_layers > 0)
-            // Print 1st layer at 45 degrees from both the interface and base angles as both can land on the 1st layer.
-            raft_angle_1st_layer += 0.7854f;
-        raft_angle_interface  = support_params.interface_angle;
-    } else if (slicing_params.interface_raft_layers == 1) {
-        // Only the contact raft layer is non-empty, which will be printed as the 1st layer.
-        assert(slicing_params.base_raft_layers == 0);
-        assert(slicing_params.interface_raft_layers == 1);
-        assert(slicing_params.raft_layers() == 1 && raft_layers.size() == 0);
-    } else {
-        // No raft.
-        assert(slicing_params.base_raft_layers == 0);
-        assert(slicing_params.interface_raft_layers == 0);
-        assert(slicing_params.raft_layers() == 0 && raft_layers.size() == 0);
-    }
-
     // Insert the raft base layers.
-    size_t n_raft_layers = size_t(std::max(0, int(slicing_params.raft_layers()) - 1));
+    auto n_raft_layers = std::min<size_t>(support_layers.size(), std::max(0, int(slicing_params.raft_layers()) - 1));
+
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n_raft_layers),
-        [&support_layers, &raft_layers, &config, &support_params, &slicing_params,
-            &bbox_object, raft_angle_1st_layer, raft_angle_base, raft_angle_interface, link_max_length_factor]
+        [&support_layers, &raft_layers, &intermediate_layers, &config, &support_params, &slicing_params,
+            &bbox_object, link_max_length_factor]
             (const tbb::blocked_range<size_t>& range) {
         for (size_t support_layer_id = range.begin(); support_layer_id < range.end(); ++ support_layer_id)
         {
             assert(support_layer_id < raft_layers.size());
-            SupportLayer &support_layer = *support_layers[support_layer_id];
+            SupportLayer               &support_layer = *support_layers[support_layer_id];
             assert(support_layer.support_fills.entities.empty());
             SupportGeneratorLayer      &raft_layer    = *raft_layers[support_layer_id];
 
-            std::unique_ptr<Fill> filler_interface = std::unique_ptr<Fill>(Fill::new_from_type(support_params.interface_fill_pattern));
+            std::unique_ptr<Fill> filler_interface = std::unique_ptr<Fill>(Fill::new_from_type(support_params.raft_interface_fill_pattern));
             std::unique_ptr<Fill> filler_support   = std::unique_ptr<Fill>(Fill::new_from_type(support_params.base_fill_pattern));
             filler_interface->set_bounding_box(bbox_object);
             filler_support->set_bounding_box(bbox_object);
+
+            // Print the tree supports cutting through the raft with the exception of the 1st layer, where a full support layer will be printed below
+            // both the raft and the trees.
+            // Trim the raft layers with the tree polygons.
+            const Polygons &tree_polygons =
+                support_layer_id > 0 && support_layer_id < intermediate_layers.size() && is_approx(intermediate_layers[support_layer_id]->print_z, support_layer.print_z) ?
+                intermediate_layers[support_layer_id]->polygons : Polygons();
 
             // Print the support base below the support columns, or the support base for the support columns plus the contacts.
             if (support_layer_id > 0) {
@@ -4250,24 +4270,27 @@ void generate_support_toolpaths(
                     raft_layer.polygons :
                     //FIXME misusing contact_polygons for support columns.
                     ((raft_layer.contact_polygons == nullptr) ? Polygons() : *raft_layer.contact_polygons);
+                // Trees may cut through the raft layers down to a print bed.
+                Flow flow(float(support_params.support_material_flow.width()), float(raft_layer.height), support_params.support_material_flow.nozzle_diameter());
+                assert(!raft_layer.bridging);
                 if (! to_infill_polygons.empty()) {
-                    assert(! raft_layer.bridging);
-                    Flow flow(float(support_params.support_material_flow.width()), float(raft_layer.height), support_params.support_material_flow.nozzle_diameter());
-                    Fill * filler = filler_support.get();
-                    filler->angle = raft_angle_base;
+                    Fill *filler = filler_support.get();
+                    filler->angle = support_params.raft_angle_base;
                     filler->spacing = support_params.support_material_flow.spacing();
                     filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / support_params.support_density));
                     fill_expolygons_with_sheath_generate_paths(
                         // Destination
                         support_layer.support_fills.entities,
                         // Regions to fill
-                        to_infill_polygons,
+                        tree_polygons.empty() ? to_infill_polygons : diff(to_infill_polygons, tree_polygons),
                         // Filler and its parameters
                         filler, float(support_params.support_density),
                         // Extrusion parameters
                         ExtrusionRole::SupportMaterial, flow,
                         support_params.with_sheath, false);
                 }
+                if (! tree_polygons.empty())
+                    tree_supports_generate_paths(support_layer.support_fills.entities, tree_polygons, flow);
             }
 
             Fill *filler = filler_interface.get();
@@ -4275,17 +4298,17 @@ void generate_support_toolpaths(
             float density = 0.f;
             if (support_layer_id == 0) {
                 // Base flange.
-                filler->angle = raft_angle_1st_layer;
+                filler->angle = support_params.raft_angle_1st_layer;
                 filler->spacing = support_params.first_layer_flow.spacing();
                 density       = float(config.raft_first_layer_density.value * 0.01);
             } else if (support_layer_id >= slicing_params.base_raft_layers) {
-                filler->angle = raft_angle_interface;
+                filler->angle = support_params.raft_interface_angle(support_layer.interface_id());
                 // We don't use $base_flow->spacing because we need a constant spacing
                 // value that guarantees that all layers are correctly aligned.
                 filler->spacing = support_params.support_material_flow.spacing();
                 assert(! raft_layer.bridging);
-                flow          = Flow(float(support_params.support_material_interface_flow.width()), float(raft_layer.height), support_params.support_material_flow.nozzle_diameter());
-                density       = float(support_params.interface_density);
+                flow          = Flow(float(support_params.raft_interface_flow.width()), float(raft_layer.height), support_params.raft_interface_flow.nozzle_diameter());
+                density       = float(support_params.raft_interface_density);
             } else
                 continue;
             filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / density));
@@ -4293,7 +4316,7 @@ void generate_support_toolpaths(
                 // Destination
                 support_layer.support_fills.entities, 
                 // Regions to fill
-                raft_layer.polygons,
+                tree_polygons.empty() ? raft_layer.polygons : diff(raft_layer.polygons, tree_polygons),
                 // Filler and its parameters
                 filler, density,
                 // Extrusion parameters
@@ -4327,8 +4350,8 @@ void generate_support_toolpaths(
     std::vector<LayerCache>             layer_caches(support_layers.size());
 
     tbb::parallel_for(tbb::blocked_range<size_t>(n_raft_layers, support_layers.size()),
-        [&config, &support_params, &support_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers, &layer_caches, &loop_interface_processor,
-            &bbox_object, &angles, link_max_length_factor]
+        [&config, &slicing_params, &support_params, &support_layers, &bottom_contacts, &top_contacts, &intermediate_layers, &interface_layers, &base_interface_layers, &layer_caches, &loop_interface_processor,
+            &bbox_object, &angles, n_raft_layers, link_max_length_factor]
             (const tbb::blocked_range<size_t>& range) {
         // Indices of the 1st layer in their respective container at the support layer height.
         size_t idx_layer_bottom_contact   = size_t(-1);
@@ -4342,6 +4365,11 @@ void generate_support_toolpaths(
         auto filler_first_layer_ptr = std::unique_ptr<Fill>(range.begin() == 0 && support_params.contact_fill_pattern != fill_type_first_layer ? Fill::new_from_type(fill_type_first_layer) : nullptr);
         // Pointer to the 1st layer interface filler.
         auto filler_first_layer     = filler_first_layer_ptr ? filler_first_layer_ptr.get() : filler_interface.get();
+        // Filler for the 1st layer interface, if different from filler_interface.
+        auto filler_raft_contact_ptr = std::unique_ptr<Fill>(range.begin() == n_raft_layers && config.support_material_interface_layers.value == 0 ? 
+            Fill::new_from_type(support_params.raft_interface_fill_pattern) : nullptr);
+        // Pointer to the 1st layer interface filler.
+        auto filler_raft_contact     = filler_raft_contact_ptr ? filler_raft_contact_ptr.get() : filler_interface.get();
         // Filler for the base interface (to be used for soluble interface / non soluble base, to produce non soluble interface layer below soluble interface layer).
         auto filler_base_interface  = std::unique_ptr<Fill>(base_interface_layers.empty() ? nullptr : 
             Fill::new_from_type(support_params.interface_density > 0.95 || support_params.with_sheath ? ipRectilinear : ipSupportBase));
@@ -4349,6 +4377,8 @@ void generate_support_toolpaths(
         filler_interface->set_bounding_box(bbox_object);
         if (filler_first_layer_ptr)
             filler_first_layer_ptr->set_bounding_box(bbox_object);
+        if (filler_raft_contact_ptr)
+            filler_raft_contact_ptr->set_bounding_box(bbox_object);
         if (filler_base_interface)
             filler_base_interface->set_bounding_box(bbox_object);
         filler_support->set_bounding_box(bbox_object);
@@ -4356,9 +4386,8 @@ void generate_support_toolpaths(
         {
             SupportLayer &support_layer = *support_layers[support_layer_id];
             LayerCache   &layer_cache   = layer_caches[support_layer_id];
-            float         interface_angle_delta = config.support_material_style.value == smsSnug || config.support_material_style.value == smsTree || config.support_material_style.value == smsOrganic ? 
-                (support_layer.interface_id() & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.) :
-                0;
+            const float   support_interface_angle = config.support_material_style.value == smsGrid ?
+                support_params.interface_angle : support_params.raft_interface_angle(support_layer.interface_id());
 
             // Find polygons with the same print_z.
             SupportGeneratorLayerExtruded &bottom_contact_layer = layer_cache.bottom_contact_layer;
@@ -4387,10 +4416,13 @@ void generate_support_toolpaths(
             if (idx_layer_intermediate < intermediate_layers.size() && intermediate_layers[idx_layer_intermediate]->print_z < support_layer.print_z + EPSILON)
                 base_layer.layer = intermediate_layers[idx_layer_intermediate];
 
+            // This layer is a raft contact layer. Any contact polygons at this layer are raft contacts.
+            bool raft_layer = slicing_params.interface_raft_layers && top_contact_layer.layer && is_approx(top_contact_layer.layer->print_z, slicing_params.raft_contact_top_z);
             if (config.support_material_interface_layers == 0) {
                 // If no top interface layers were requested, we treat the contact layer exactly as a generic base layer.
-                if (support_params.can_merge_support_regions) {
-                    if (base_layer.could_merge(top_contact_layer)) 
+                // Don't merge the raft contact layer though.
+                if (support_params.can_merge_support_regions && ! raft_layer) {
+                    if (base_layer.could_merge(top_contact_layer))
                         base_layer.merge(std::move(top_contact_layer));
                     else if (base_layer.empty())
                         base_layer = std::move(top_contact_layer);
@@ -4400,7 +4432,7 @@ void generate_support_toolpaths(
                 // If no loops are allowed, we treat the contact layer exactly as a generic interface layer.
                 // Merge interface_layer into top_contact_layer, as the top_contact_layer is not synchronized and therefore it will be used
                 // to trim other layers.
-                if (top_contact_layer.could_merge(interface_layer))
+                if (top_contact_layer.could_merge(interface_layer) && ! raft_layer)
                     top_contact_layer.merge(std::move(interface_layer));
             } 
             if ((config.support_material_interface_layers == 0 || config.support_material_bottom_interface_layers == 0) && support_params.can_merge_support_regions) {
@@ -4408,7 +4440,7 @@ void generate_support_toolpaths(
                     base_layer.merge(std::move(bottom_contact_layer));
                 else if (base_layer.empty() && ! bottom_contact_layer.empty() && ! bottom_contact_layer.layer->bridging)
                     base_layer = std::move(bottom_contact_layer);
-            } else if (bottom_contact_layer.could_merge(top_contact_layer))
+            } else if (bottom_contact_layer.could_merge(top_contact_layer) && ! raft_layer)
                 top_contact_layer.merge(std::move(bottom_contact_layer));
             else if (bottom_contact_layer.could_merge(interface_layer))
                 bottom_contact_layer.merge(std::move(interface_layer));
@@ -4426,35 +4458,46 @@ void generate_support_toolpaths(
 #endif
 
             // Top and bottom contacts, interface layers.
-            for (size_t i = 0; i < 3; ++ i) {
-                SupportGeneratorLayerExtruded &layer_ex = (i == 0) ? top_contact_layer : (i == 1 ? bottom_contact_layer : interface_layer);
-                if (layer_ex.empty() || layer_ex.polygons_to_extrude().empty())
-                    continue;
-                bool interface_as_base = config.support_material_interface_layers.value == 0 || 
-                    (config.support_material_bottom_interface_layers == 0 && &layer_ex == &bottom_contact_layer);
-                //FIXME Bottom interfaces are extruded with the briding flow. Some bridging layers have its height slightly reduced, therefore
-                // the bridging flow does not quite apply. Reduce the flow to area of an ellipse? (A = pi * a * b)
-                auto interface_flow = layer_ex.layer->bridging ?
-                    Flow::bridging_flow(layer_ex.layer->height, support_params.support_material_bottom_interface_flow.nozzle_diameter()) :
-                    (interface_as_base ? &support_params.support_material_flow : &support_params.support_material_interface_flow)->with_height(float(layer_ex.layer->height));
-                filler_interface->angle = interface_as_base ?
-                        // If zero interface layers are configured, use the same angle as for the base layers.
-                        angles[support_layer_id % angles.size()] :
-                        // Use interface angle for the interface layers.
-                        support_params.interface_angle + interface_angle_delta;
-                double density = interface_as_base ? support_params.support_density : support_params.interface_density;
-                filler_interface->spacing = interface_as_base ? support_params.support_material_flow.spacing() : support_params.support_material_interface_flow.spacing();
-                filler_interface->link_max_length = coord_t(scale_(filler_interface->spacing * link_max_length_factor / density));
-                fill_expolygons_generate_paths(
-                    // Destination
-                    layer_ex.extrusions, 
-                    // Regions to fill
-                    union_safety_offset_ex(layer_ex.polygons_to_extrude()),
-                    // Filler and its parameters
-                    filler_interface.get(), float(density),
-                    // Extrusion parameters
-                    ExtrusionRole::SupportMaterialInterface, interface_flow);
-            }
+            enum class InterfaceLayerType { TopContact, BottomContact, RaftContact, Interface, InterfaceAsBase };
+            auto extrude_interface = [&](SupportGeneratorLayerExtruded &layer_ex, InterfaceLayerType interface_layer_type) {
+                if (! layer_ex.empty() && ! layer_ex.polygons_to_extrude().empty()) {
+                    bool interface_as_base = interface_layer_type == InterfaceLayerType::InterfaceAsBase;
+                    bool raft_contact      = interface_layer_type == InterfaceLayerType::RaftContact;
+                    //FIXME Bottom interfaces are extruded with the briding flow. Some bridging layers have its height slightly reduced, therefore
+                    // the bridging flow does not quite apply. Reduce the flow to area of an ellipse? (A = pi * a * b)
+                    auto *filler = raft_contact ? filler_raft_contact : filler_interface.get();
+                    auto interface_flow = layer_ex.layer->bridging ?
+                        Flow::bridging_flow(layer_ex.layer->height, support_params.support_material_bottom_interface_flow.nozzle_diameter()) :
+                        (raft_contact ? &support_params.raft_interface_flow : 
+                         interface_as_base ? &support_params.support_material_flow : &support_params.support_material_interface_flow)
+                            ->with_height(float(layer_ex.layer->height));
+                    filler->angle = interface_as_base ?
+                            // If zero interface layers are configured, use the same angle as for the base layers.
+                            angles[support_layer_id % angles.size()] :
+                            // Use interface angle for the interface layers.
+                            raft_contact ? 
+                                support_params.raft_interface_angle(support_layer.interface_id()) :
+                                support_interface_angle;
+                    double density = raft_contact ? support_params.raft_interface_density : interface_as_base ? support_params.support_density : support_params.interface_density;
+                    filler->spacing = raft_contact ? support_params.raft_interface_flow.spacing() :
+                        interface_as_base ? support_params.support_material_flow.spacing() : support_params.support_material_interface_flow.spacing();
+                    filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / density));
+                    fill_expolygons_generate_paths(
+                        // Destination
+                        layer_ex.extrusions, 
+                        // Regions to fill
+                        union_safety_offset_ex(layer_ex.polygons_to_extrude()),
+                        // Filler and its parameters
+                        filler, float(density),
+                        // Extrusion parameters
+                        ExtrusionRole::SupportMaterialInterface, interface_flow);
+                }
+            };
+            const bool top_interfaces = config.support_material_interface_layers.value != 0;
+            const bool bottom_interfaces = top_interfaces && config.support_material_bottom_interface_layers != 0;
+            extrude_interface(top_contact_layer,    raft_layer ? InterfaceLayerType::RaftContact : top_interfaces ? InterfaceLayerType::TopContact : InterfaceLayerType::InterfaceAsBase);
+            extrude_interface(bottom_contact_layer, bottom_interfaces ? InterfaceLayerType::BottomContact : InterfaceLayerType::InterfaceAsBase);
+            extrude_interface(interface_layer,      top_interfaces ? InterfaceLayerType::Interface : InterfaceLayerType::InterfaceAsBase);
 
             // Base interface layers under soluble interfaces
             if ( ! base_interface_layer.empty() && ! base_interface_layer.polygons_to_extrude().empty()) {
@@ -4463,7 +4506,7 @@ void generate_support_toolpaths(
                 // the bridging flow does not quite apply. Reduce the flow to area of an ellipse? (A = pi * a * b)
                 assert(! base_interface_layer.layer->bridging);
                 Flow interface_flow = support_params.support_material_flow.with_height(float(base_interface_layer.layer->height));
-                filler->angle   = support_params.interface_angle + interface_angle_delta;
+                filler->angle   = support_interface_angle;
                 filler->spacing = support_params.support_material_interface_flow.spacing();
                 filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / support_params.interface_density));
                 fill_expolygons_generate_paths(
@@ -4491,6 +4534,7 @@ void generate_support_toolpaths(
                 float density = float(support_params.support_density);
                 bool  sheath  = support_params.with_sheath;
                 bool  no_sort = false;
+                bool  done    = false;
                 if (base_layer.layer->bottom_z < EPSILON) {
                     // Base flange (the 1st layer).
                     filler = filler_first_layer;
@@ -4504,18 +4548,21 @@ void generate_support_toolpaths(
                     filler->link_max_length = coord_t(scale_(filler->spacing * link_max_length_factor / density));
                     sheath  = true;
                     no_sort = true;
+                } else if (config.support_material_style == SupportMaterialStyle::smsOrganic) {
+                    tree_supports_generate_paths(base_layer.extrusions, base_layer.polygons_to_extrude(), flow);
+                    done = true;
                 }
-                fill_expolygons_with_sheath_generate_paths(
-                    // Destination
-                    base_layer.extrusions,
-                    // Regions to fill
-                    base_layer.polygons_to_extrude(),
-                    // Filler and its parameters
-                    filler, density,
-                    // Extrusion parameters
-                    ExtrusionRole::SupportMaterial, flow,
-                    sheath, no_sort);
-
+                if (! done)
+                    fill_expolygons_with_sheath_generate_paths(
+                        // Destination
+                        base_layer.extrusions,
+                        // Regions to fill
+                        base_layer.polygons_to_extrude(),
+                        // Filler and its parameters
+                        filler, density,
+                        // Extrusion parameters
+                        ExtrusionRole::SupportMaterial, flow,
+                        sheath, no_sort);
             }
 
             // Merge base_interface_layers to base_layers to avoid unneccessary retractions

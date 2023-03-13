@@ -180,7 +180,7 @@ indexed_triangle_set SLAPrint::Steps::generate_preview_vdb(
     auto r = range(po.m_mesh_to_slice);
     auto grid = csg::voxelize_csgmesh(r, voxparams);
     auto m = grid ? grid_to_mesh(*grid, 0., 0.01) : indexed_triangle_set{};
-    float loss_less_max_error = 1e-6;
+    float loss_less_max_error = float(1e-6);
     its_quadric_edge_collapse(m, 0U, &loss_less_max_error);
 
     return m;

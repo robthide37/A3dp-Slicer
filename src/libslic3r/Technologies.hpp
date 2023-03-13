@@ -51,8 +51,6 @@
 #define ENABLE_GL_CORE_PROFILE (1 && !ENABLE_OPENGL_ES)
 // Enable OpenGL debug messages using debug context
 #define ENABLE_OPENGL_DEBUG_OPTION (1 && ENABLE_GL_CORE_PROFILE)
-// Enable rework of Reload from disk command
-#define ENABLE_RELOAD_FROM_DISK_REWORK (1 && ENABLE_2_6_0_ALPHA1)
 // Enable editing volumes transformation in world coordinates and instances in local coordinates
 #define ENABLE_WORLD_COORDINATE (1 && ENABLE_2_6_0_ALPHA1)
 // Shows an imgui dialog containing the matrices of the selected volumes

@@ -885,7 +885,7 @@ void GLGizmoEmboss::on_set_state()
             priv::get_volume(m_parent.get_selection().get_model()->objects, m_volume_id) == nullptr ) { 
             // reopen gizmo when new object is created
             GLGizmoBase::m_state = GLGizmoBase::Off;
-            if (wxGetApp().get_mode() == comSimple)
+            if (wxGetApp().get_mode() == comSimple || wxGetApp().obj_list()->has_selected_cut_object())
                 // It's impossible to add a part in simple mode
                 return;
             // start creating new object
@@ -1528,7 +1528,7 @@ void GLGizmoEmboss::draw_window()
     if (m_is_unknown_font && m_is_advanced_edit_style) 
         ImGui::SetNextTreeNodeOpen(false);
 
-    if (ImGui::TreeNode(_u8L("advanced").c_str())) {
+    if (ImGui::TreeNode(_u8L("Advanced").c_str())) {
         if (!m_is_advanced_edit_style) {
             set_minimal_window_size(true);
         } else {
@@ -1592,8 +1592,8 @@ void GLGizmoEmboss::draw_window()
             m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", ((m_allow_open_near_volume) ? 
-            _u8L("Fix settings possition"):
-            _u8L("Allow floating window near text")).c_str());
+            "Fix settings position":
+            "Allow floating window near text").c_str());
     }
 #endif // ALLOW_FLOAT_WINDOW
  }
@@ -1654,9 +1654,9 @@ void GLGizmoEmboss::draw_text_input()
         auto &ff         = m_style_manager.get_font_file_with_cache();
         float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file, scale);
         if (imgui_size > StyleManager::max_imgui_font_size)
-            append_warning(_u8L("To tall"), _u8L("Diminished font height inside text input."));
+            append_warning(_u8L("Too tall"), _u8L("Diminished font height inside text input."));
         if (imgui_size < StyleManager::min_imgui_font_size)
-            append_warning(_u8L("To small"), _u8L("Enlarged font height inside text input."));
+            append_warning(_u8L("Too small"), _u8L("Enlarged font height inside text input."));
         if (!who.empty()) warning = GUI::format(_L("%1% is NOT shown."), who);
     }
 
@@ -3175,7 +3175,8 @@ void GLGizmoEmboss::draw_advanced()
 {
     const auto &ff = m_style_manager.get_font_file_with_cache();
     if (!ff.has_value()) { 
-        ImGui::Text("%s", _u8L("Advanced font options could be change only for corect font.\nStart with select correct font.").c_str());
+        ImGui::Text("%s", _u8L("Advanced font options could be changed only for correct font.\n"
+                                   "Start with select correct font.").c_str());
         return;
     }
 
@@ -3301,7 +3302,7 @@ void GLGizmoEmboss::draw_advanced()
     
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
     const std::string undo_move_tooltip = _u8L("Undo translation");
-    const wxString move_tooltip = _L("Distance center of text from model surface");
+    const wxString move_tooltip = _L("Distance of the center of text from model surface");
     bool is_moved = false;
     if (use_inch) {
         std::optional<float> distance_inch;
@@ -3597,7 +3598,7 @@ void GLGizmoEmboss::create_notification_not_valid_font(
 
     std::string text =
         GUI::format(_L("Can't load exactly same font(\"%1%\"), "
-                       "Aplication select similar one(\"%2%\"). "
+                       "Aplication selected a similar one(\"%2%\"). "
                        "You have to specify font for enable edit text."),
                     face_name_3mf, face_name);
     auto notification_manager = wxGetApp().plater()->get_notification_manager();

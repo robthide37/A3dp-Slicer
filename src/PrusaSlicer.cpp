@@ -382,7 +382,7 @@ int CLI::run(int argc, char **argv)
         } else if (opt_key == "align_xy") {
             const Vec2d &p = m_config.option<ConfigOptionPoint>("align_xy")->value;
             for (auto &model : m_models) {
-                BoundingBoxf3 bb = model.bounding_box();
+                BoundingBoxf3 bb = model.bounding_box_exact();
                 // this affects volumes:
                 model.translate(-(bb.min.x() - p.x()), -(bb.min.y() - p.y()), -bb.min.z());
             }
@@ -423,7 +423,7 @@ int CLI::run(int argc, char **argv)
         } else if (opt_key == "cut" || opt_key == "cut_x" || opt_key == "cut_y") {
             std::vector<Model> new_models;
             for (auto &model : m_models) {
-                model.translate(0, 0, -model.bounding_box().min.z());  // align to z = 0
+                model.translate(0, 0, -model.bounding_box_exact().min.z());  // align to z = 0
                 size_t num_objects = model.objects.size();
                 for (size_t i = 0; i < num_objects; ++ i) {
 
