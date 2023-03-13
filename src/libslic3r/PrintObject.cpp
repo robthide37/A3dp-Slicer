@@ -2021,11 +2021,11 @@ void PrintObject::bridge_over_infill()
         return expanded_bridged_area;
     };
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, clustered_layers_for_threads.size()), [po = this, &surfaces_by_layer,
-                                                                                           &clustered_layers_for_threads,
-                                                                                           &gather_areas_w_depth, &infill_lines,
-                                                                                           &determine_bridging_angle,
-                                                                                           &construct_anchored_polygon](
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, clustered_layers_for_threads.size()), [po = static_cast<const PrintObject *>(this),
+                                                                                           &surfaces_by_layer, &clustered_layers_for_threads,
+                                                                                           gather_areas_w_depth, &infill_lines,
+                                                                                           determine_bridging_angle,
+                                                                                           construct_anchored_polygon](
                                                                                               tbb::blocked_range<size_t> r) {
         for (size_t cluster_idx = r.begin(); cluster_idx < r.end(); cluster_idx++) {
             for (size_t job_idx = 0; job_idx < clustered_layers_for_threads[cluster_idx].size(); job_idx++) {
