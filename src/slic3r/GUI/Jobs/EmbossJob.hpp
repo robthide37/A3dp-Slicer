@@ -6,14 +6,28 @@
 #include <string>
 #include "libslic3r/Emboss.hpp"
 #include "libslic3r/EmbossShape.hpp"
+#include "libslic3r/Point.hpp" // Transform3d
+
 #include "slic3r/Utils/RaycastManager.hpp"
+
+#include "slic3r/GUI/Jobs/EmbossJob.hpp" // Emboss::DataBase
 #include "slic3r/GUI/Camera.hpp"
+
 #include "Job.hpp"
 
+// forward declarations
 namespace Slic3r {
+class GLVolume;
 class ModelVolume;
+class ModelObject;
 class TriangleMesh;
-}
+typedef std::vector<ModelObject *> ModelObjectPtrs;
+typedef std::vector<ModelVolume *> ModelVolumePtrs;
+namespace GUI {
+class Selection;
+class RaycastManager;
+class Worker;
+}}
 
 namespace Slic3r::GUI::Emboss {
 
@@ -233,6 +247,21 @@ public:
 struct UpdateSurfaceVolumeData : public DataUpdate, public SurfaceVolumeData{};
 
 /// <summary>
+/// Update text volume to use surface from object
+/// </summary>
+class UpdateSurfaceVolumeJob : public Job
+{
+    UpdateSurfaceVolumeData m_input;
+    TriangleMesh            m_result;
+
+public:
+    // move params to private variable
+    UpdateSurfaceVolumeJob(UpdateSurfaceVolumeData &&input);
+    void process(Ctl &ctl) override;
+    void finalize(bool canceled, std::exception_ptr &eptr) override;
+};
+
+/// <summary>
 /// Copied triangles from object to be able create mesh for cut surface from
 /// </summary>
 /// <param name="volumes">Source object volumes for cut surface from</param>
@@ -247,21 +276,59 @@ SurfaceVolumeData::ModelSources create_sources(const ModelVolumePtrs &volumes, s
 /// <returns>Source data for cut surface from</returns>
 SurfaceVolumeData::ModelSources create_volume_sources(const ModelVolume *text_volume);
 
+using DataBasePtr = std::unique_ptr<DataBase>;
 
 /// <summary>
-/// Update text volume to use surface from object
+/// Start job for add new volume to object with given transformation
 /// </summary>
-class UpdateSurfaceVolumeJob : public Job
-{
-    UpdateSurfaceVolumeData m_input;
-    TriangleMesh   m_result;
+/// <param name="worker">Define where to queue the job. e.g. wxGetApp().plater()->get_ui_job_worker()</param>
+/// <param name="object">Define where to add</param>
+/// <param name="volume_tr">Wanted volume transformation</param>
+/// <param name="data">Define what to emboss - shape</param>
+/// <param name="volume_type">Type of volume: Part, negative, modifier</param>
+/// <return>True on success otherwise false</return>
+bool start_create_volume_job(Worker &worker, const ModelObject &object, const Transform3d volume_tr, DataBasePtr data, ModelVolumeType volume_type);
 
-public:
-    // move params to private variable
-    UpdateSurfaceVolumeJob(UpdateSurfaceVolumeData &&input);
-    void process(Ctl &ctl) override;
-    void finalize(bool canceled, std::exception_ptr &eptr) override;
-};
+/// <summary>
+/// Start job for add new volume on surface of object defined by screen coor
+/// </summary>
+/// <param name="screen_coor">Mouse position which define position</param>
+/// <param name="volume">Volume to find surface for create</param>
+/// <param name="instance">Instance to find surface for create</param>
+/// <param name="raycaster">Ability to ray cast to model</param>
+/// <param name="canvas">Contain already used scene RayCasters</param>
+/// <param name="angle">Initial z move</param>
+/// <param name="angle">Initial z rotation</param>
+/// <returns>Volume transformation otherwise there is no hit surface by screen coor</returns>
+std::optional<Transform3d> create_volume_transformation_on_surface(const Vec2d                &screen_coor,
+                                                                   const Camera               &camera,
+                                                                   const ModelVolume          &volume,
+                                                                   const ModelInstance        &instance,
+                                                                   RaycastManager             &raycaster,
+                                                                   GLCanvas3D                 &canvas,
+                                                                   const std::optional<float> &distance = {},
+                                                                   const std::optional<float> &angle    = {});
+
+/// <summary>
+/// Create transformation for volume near from object(defined by glVolume)
+/// </summary>
+/// <param name="gl_volume">Define object</param>
+/// <param name="objects">All objects</param>
+/// <param name="volume_height">Y Size of embossed volume [mm in instance]</param>
+/// <param name="volume_depth">Z size of embossed volume - emboss depth[mm in instance]</param>
+/// <returns>Transformation for new created volume</returns>
+Transform3d create_volume_transformation(const GLVolume& gl_volume, const ModelObjectPtrs &objects, float volume_height, float volume_depth);
+
+/// <summary>
+/// Find volume in selected objects with closest convex hull to screen center.
+/// </summary>
+/// <param name="selection">Define where to search for closest</param>
+/// <param name="screen_center">Canvas center(dependent on camera settings)</param>
+/// <param name="objects">Actual objects</param>
+/// <param name="closest_center">OUT: coordinate of controid of closest volume</param>
+/// <returns>closest volume when exists otherwise nullptr</returns>
+const GLVolume *find_closest(
+    const Selection &selection, const Vec2d &screen_center, const Camera &camera, const ModelObjectPtrs &objects, Vec2d *closest_center);
 
 } // namespace Slic3r::GUI
 

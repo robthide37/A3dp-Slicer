@@ -21,10 +21,10 @@ struct EmbossShape
     ExPolygons shapes;
 
     // scale of shape, multiplier to get 3d point in mm from integer shape
-    double scale;
+    double scale = 1.;
         
     // Emboss depth, Size in local Z direction
-    double depth; // [in loacal mm] 
+    double depth = 1.; // [in loacal mm] 
     // NOTE: User should see and modify mainly world size not local
 
     // Flag that result volume use surface cutted from source objects

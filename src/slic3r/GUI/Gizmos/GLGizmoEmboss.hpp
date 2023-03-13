@@ -16,7 +16,6 @@
 
 #include "libslic3r/Emboss.hpp"
 #include "libslic3r/Point.hpp"
-#include "libslic3r/Model.hpp"
 #include "libslic3r/TextConfiguration.hpp"
 
 #include <imgui/imgui.h>
