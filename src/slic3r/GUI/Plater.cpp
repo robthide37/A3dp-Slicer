@@ -3293,10 +3293,12 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             return_state |= UPDATE_BACKGROUND_PROCESS_INVALID;
             if (printer_technology == ptFFF) {
                 const Print* print = background_process.fff_print();
-                const Polygons polygons = print->get_sequential_print_clearance_polygons();
-                view3D->get_canvas3d()->set_sequential_print_clearance_visible(!polygons.empty());
-                view3D->get_canvas3d()->set_sequential_print_clearance_render_fill(!polygons.empty());
-                view3D->get_canvas3d()->set_sequential_print_clearance_polygons(polygons);
+                GLCanvas3D::ContoursList contours;
+                contours.contours = print->get_sequential_print_clearance_contours();
+                view3D->get_canvas3d()->set_sequential_print_clearance_visible(!contours.empty());
+                view3D->get_canvas3d()->set_sequential_print_clearance_render_fill(!contours.empty());
+                view3D->get_canvas3d()->set_sequential_print_clearance_contours(contours);
+                view3D->get_canvas3d()->set_sequential_print_clearance_evaluating(false);
             }
         }
     }

@@ -587,22 +587,38 @@ public:
         return ret;
     }
 
+    struct ContoursList
+    {
+        // list of unique contours
+        std::vector<Polygon> contours;
+        // if defined: list of transforms to apply to contours
+        std::optional<std::vector<std::pair<size_t, Transform3d>>> trafos;
+
+        bool empty() const { return contours.empty(); }
+    };
+
 private:
     void load_arrange_settings();
 
     class SequentialPrintClearance
     {
         GLModel m_fill;
-        GLModel m_perimeter;
+        // list of unique contours
+        std::vector<GLModel> m_contours;
+        // list of transforms used to render the contours
+        std::vector<std::pair<size_t, Transform3d>> m_instances;
         bool m_render_fill{ true };
         bool m_visible{ false };
+        bool m_evaluating{ false };
 
-        std::vector<Pointf3s> m_hull_2d_cache;
+        std::vector<std::pair<Pointf3s, Transform3d>> m_hulls_2d_cache;
 
     public:
-        void set_polygons(const Polygons& polygons);
+        void set_contours(const ContoursList& contours);
+        void update_instances_trafos(const std::vector<Transform3d>& trafos);
         void set_render_fill(bool render_fill) { m_render_fill = render_fill; }
         void set_visible(bool visible) { m_visible = visible; }
+        void set_evaluating(bool evaluating) { m_evaluating = evaluating; }
         void render();
 
         friend class GLCanvas3D;
@@ -927,7 +943,7 @@ public:
     void reset_sequential_print_clearance() {
         m_sequential_print_clearance.set_visible(false);
         m_sequential_print_clearance.set_render_fill(false);
-        m_sequential_print_clearance.set_polygons(Polygons());
+        m_sequential_print_clearance.set_contours(ContoursList());
     }
 
     void set_sequential_print_clearance_visible(bool visible) {
@@ -938,8 +954,12 @@ public:
         m_sequential_print_clearance.set_render_fill(render_fill);
     }
 
-    void set_sequential_print_clearance_polygons(const Polygons& polygons) {
-        m_sequential_print_clearance.set_polygons(polygons);
+    void set_sequential_print_clearance_contours(const ContoursList& contours) {
+        m_sequential_print_clearance.set_contours(contours);
+    }
+
+    void set_sequential_print_clearance_evaluating(bool evaluating) {
+        m_sequential_print_clearance.set_evaluating(evaluating);
     }
 
     void update_sequential_clearance();

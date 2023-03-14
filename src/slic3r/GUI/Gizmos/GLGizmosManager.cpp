@@ -971,6 +971,8 @@ bool GLGizmosManager::activate_gizmo(EType type)
 
     new_gizmo.register_raycasters_for_picking();
 
+    m_parent.reset_sequential_print_clearance();  
+
     // sucessful activation of gizmo
     return true;
 }
