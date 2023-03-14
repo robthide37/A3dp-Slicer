@@ -880,20 +880,22 @@ void GLCanvas3D::Tooltip::render(const Vec2d& mouse_position, GLCanvas3D& canvas
     ImGui::PopStyleVar(2);
 }
 
-void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons)
+void GLCanvas3D::SequentialPrintClearance::set_contours(const ContoursList& contours)
 {
-    m_perimeter.reset();
+    m_contours.clear();
+    m_instances.clear();
     m_fill.reset();
-    if (polygons.empty())
+
+    if (contours.empty())
         return;
 
     if (m_render_fill) {
         GLModel::Geometry fill_data;
         fill_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
-        fill_data.color  = { 0.3333f, 0.0f, 0.0f, 0.5f };
+        fill_data.color = { 0.3333f, 0.0f, 0.0f, 0.5f };
 
         // vertices + indices
-        const ExPolygons polygons_union = union_ex(polygons);
+        const ExPolygons polygons_union = union_ex(contours.contours);
         unsigned int vertices_counter = 0;
         for (const ExPolygon& poly : polygons_union) {
             const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(poly);
@@ -906,17 +908,42 @@ void GLCanvas3D::SequentialPrintClearance::set_polygons(const Polygons& polygons
                     fill_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
             }
         }
-
         m_fill.init_from(std::move(fill_data));
     }
 
-    m_perimeter.init_from(polygons, 0.025f); // add a small positive z to avoid z-fighting
+    for (size_t i = 0; i < contours.contours.size(); ++i) {
+        GLModel& model = m_contours.emplace_back(GLModel());
+        model.init_from(contours.contours[i], 0.025f); // add a small positive z to avoid z-fighting
+    }
+
+    if (contours.trafos.has_value()) {
+        // create the requested instances
+        for (const auto& instance : contours.trafos.value()) {
+            m_instances.emplace_back(instance.first, instance.second);
+        }
+    }
+    else {
+        // no instances have been specified
+        // create one instance for every polygon
+        for (size_t i = 0; i < contours.contours.size(); ++i) {
+            m_instances.emplace_back(i, Transform3f::Identity());
+        }
+    }
+}
+
+void GLCanvas3D::SequentialPrintClearance::update_instances_trafos(const std::vector<Transform3d>& trafos)
+{
+    assert(trafos.size() == m_instances.size());
+    for (size_t i = 0; i < trafos.size(); ++i) {
+        m_instances[i].second = trafos[i];
+    }
 }
 
 void GLCanvas3D::SequentialPrintClearance::render()
 {
-    const ColorRGBA FILL_COLOR    = { 1.0f, 0.0f, 0.0f, 0.5f };
-    const ColorRGBA NO_FILL_COLOR = { 1.0f, 1.0f, 1.0f, 0.75f };
+    const ColorRGBA FILL_COLOR               = { 1.0f, 0.0f, 0.0f, 0.5f };
+    const ColorRGBA NO_FILL_COLOR            = { 1.0f, 1.0f, 1.0f, 0.75f };
+    const ColorRGBA NO_FILL_EVALUATING_COLOR = { 1.0f, 1.0f, 0.0f, 1.0f };
 
     GLShaderProgram* shader = wxGetApp().get_shader("flat");
     if (shader == nullptr)
@@ -933,9 +960,34 @@ void GLCanvas3D::SequentialPrintClearance::render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-    m_perimeter.set_color(m_render_fill ? FILL_COLOR : NO_FILL_COLOR);
-    m_perimeter.render();
-    m_fill.render();
+    if (m_render_fill)
+        m_fill.render();
+
+#if ENABLE_GL_CORE_PROFILE
+    if (OpenGLManager::get_gl_info().is_core_profile()) {
+        shader->stop_using();
+
+        shader = wxGetApp().get_shader("dashed_thick_lines");
+        if (shader == nullptr)
+            return;
+
+        shader->start_using();
+        shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        const std::array<int, 4>& viewport = camera.get_viewport();
+        shader->set_uniform("viewport_size", Vec2d(double(viewport[2]), double(viewport[3])));
+        shader->set_uniform("width", 1.0f);
+        shader->set_uniform("gap_size", 0.0f);
+    }
+    else
+#endif // ENABLE_GL_CORE_PROFILE
+        glsafe(::glLineWidth(2.0f));
+
+    for (const auto& [id, trafo] : m_instances) {
+        shader->set_uniform("view_model_matrix", camera.get_view_matrix() * trafo);
+        assert(id < m_contours.size());
+        m_contours[id].set_color(m_render_fill ? FILL_COLOR : m_evaluating ? NO_FILL_EVALUATING_COLOR : NO_FILL_COLOR);
+        m_contours[id].render();
+    }
 
     glsafe(::glDisable(GL_BLEND));
     glsafe(::glEnable(GL_CULL_FACE));
@@ -3945,7 +3997,11 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
     if (wipe_tower_origin != Vec3d::Zero())
         post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_MOVED, std::move(wipe_tower_origin)));
 
-    reset_sequential_print_clearance();
+    if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects) {
+        m_sequential_print_clearance_first_displacement = true;
+        update_sequential_clearance();
+        m_sequential_print_clearance.set_evaluating(true);
+    }
 
     m_dirty = true;
 }
@@ -4030,6 +4086,12 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     if (!done.empty())
         post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_ROTATED));
 
+    if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects) {
+        m_sequential_print_clearance_first_displacement = true;
+        update_sequential_clearance();
+        m_sequential_print_clearance.set_evaluating(true);
+    }
+
     m_dirty = true;
 }
 
@@ -4101,6 +4163,12 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
 
     if (!done.empty())
         post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_SCALED));
+
+    if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects) {
+        m_sequential_print_clearance_first_displacement = true;
+        update_sequential_clearance();
+        m_sequential_print_clearance.set_evaluating(true);
+    }
 
     m_dirty = true;
 }
@@ -4378,7 +4446,7 @@ void GLCanvas3D::update_sequential_clearance()
         return;
 
     // collects instance transformations from volumes
-    // first define temporary cache
+    // first: define temporary cache
     unsigned int instances_count = 0;
     std::vector<std::vector<std::optional<Geometry::Transformation>>> instance_transforms;
     for (size_t obj = 0; obj < m_model->objects.size(); ++obj) {
@@ -4393,7 +4461,7 @@ void GLCanvas3D::update_sequential_clearance()
     if (instances_count == 1)
         return;
 
-    // second fill temporary cache with data from volumes
+    // second: fill temporary cache with data from volumes
     for (const GLVolume* v : m_volumes.volumes) {
         if (v->is_modifier || v->is_wipe_tower)
             continue;
@@ -4403,14 +4471,24 @@ void GLCanvas3D::update_sequential_clearance()
             transform = v->get_instance_transformation();
     }
 
+    // helper function to calculate the transformation to be applied to the sequential print clearance contours
+    auto instance_trafo = [](const Transform3d& hull_trafo, const Geometry::Transformation& inst_trafo) {
+        Vec3d offset = inst_trafo.get_offset() - hull_trafo.translation();
+        offset.z() = 0.0;
+        return Geometry::translation_transform(offset) *
+            Geometry::rotation_transform(Geometry::rotation_diff_z(hull_trafo, inst_trafo.get_matrix()) * Vec3d::UnitZ());
+    };
+
+    set_sequential_print_clearance_render_fill(false);
+
     // calculates objects 2d hulls (see also: Print::sequential_print_horizontal_clearance_valid())
     // this is done only the first time this method is called while moving the mouse,
     // the results are then cached for following displacements
     if (m_sequential_print_clearance_first_displacement) {
-        m_sequential_print_clearance.m_hull_2d_cache.clear();
+        m_sequential_print_clearance.m_hulls_2d_cache.clear();
         const float shrink_factor = static_cast<float>(scale_(0.5 * fff_print()->config().extruder_clearance_radius.value - EPSILON));
         const double mitter_limit = scale_(0.1);
-        m_sequential_print_clearance.m_hull_2d_cache.reserve(m_model->objects.size());
+        m_sequential_print_clearance.m_hulls_2d_cache.reserve(m_model->objects.size());
         for (size_t i = 0; i < m_model->objects.size(); ++i) {
             ModelObject* model_object = m_model->objects[i];
             ModelInstance* model_instance0 = model_object->instances.front();
@@ -4422,38 +4500,51 @@ void GLCanvas3D::update_sequential_clearance()
                 shrink_factor,
                 jtRound, mitter_limit).front();
 
-            Pointf3s& cache_hull_2d = m_sequential_print_clearance.m_hull_2d_cache.emplace_back(Pointf3s());
-            cache_hull_2d.reserve(hull_2d.points.size());
+            Pointf3s& new_hull_2d = m_sequential_print_clearance.m_hulls_2d_cache.emplace_back(std::make_pair(Pointf3s(), trafo.get_matrix())).first;
+            new_hull_2d.reserve(hull_2d.points.size());
             const Transform3d inv_trafo = trafo.get_matrix().inverse();
             for (const Point& p : hull_2d.points) {
-                cache_hull_2d.emplace_back(inv_trafo * Vec3d(unscale<double>(p.x()), unscale<double>(p.y()), 0.0));
+                new_hull_2d.emplace_back(Vec3d(unscale<double>(p.x()), unscale<double>(p.y()), 0.0));
             }
         }
+
+        ContoursList contours;
+        contours.contours.reserve(instance_transforms.size());
+        contours.trafos = std::vector<std::pair<size_t, Transform3d>>();
+        contours.trafos.value().reserve(instances_count);
+        for (size_t i = 0; i < instance_transforms.size(); ++i) {
+            const auto& [hull, hull_trafo] = m_sequential_print_clearance.m_hulls_2d_cache[i];
+            Points hull_pts;
+            hull_pts.reserve(hull.size());
+            for (size_t j = 0; j < hull.size(); ++j) {
+                hull_pts.emplace_back(scaled<double>(hull[j].x()), scaled<double>(hull[j].y()));
+            }
+            contours.contours.emplace_back(Geometry::convex_hull(std::move(hull_pts)));
+
+            const auto& instances = instance_transforms[i];
+            for (const auto& instance : instances) {
+                contours.trafos.value().emplace_back(i, instance_trafo(hull_trafo, instance.value()));
+            }
+        }
+
+        set_sequential_print_clearance_contours(contours);
         m_sequential_print_clearance_first_displacement = false;
     }
-
-    // calculates instances 2d hulls (see also: Print::sequential_print_horizontal_clearance_valid())
-    Polygons polygons;
-    polygons.reserve(instances_count);
-    for (size_t i = 0; i < instance_transforms.size(); ++i) {
-        const auto& instances = instance_transforms[i];
-        for (const auto& instance : instances) {
-            const Transform3d& trafo = instance->get_matrix();
-            const Pointf3s& hull_2d = m_sequential_print_clearance.m_hull_2d_cache[i];
-            Points inst_pts;
-            inst_pts.reserve(hull_2d.size());
-            for (size_t j = 0; j < hull_2d.size(); ++j) {
-                const Vec3d p = trafo * hull_2d[j];
-                inst_pts.emplace_back(scaled<double>(p.x()), scaled<double>(p.y()));
+    else {
+        std::vector<Transform3d> trafos;
+        trafos.reserve(instances_count);
+        for (size_t i = 0; i < instance_transforms.size(); ++i) {
+            const auto& [hull, hull_trafo] = m_sequential_print_clearance.m_hulls_2d_cache[i];
+            const auto& instances = instance_transforms[i];
+            for (const auto& instance : instances) {
+                trafos.emplace_back(instance_trafo(hull_trafo, instance.value()));
             }
-            polygons.emplace_back(Geometry::convex_hull(std::move(inst_pts)));
         }
+        m_sequential_print_clearance.update_instances_trafos(trafos);
     }
 
     // sends instances 2d hulls to be rendered
     set_sequential_print_clearance_visible(true);
-    set_sequential_print_clearance_render_fill(false);
-    set_sequential_print_clearance_polygons(polygons);
 }
 
 bool GLCanvas3D::is_object_sinking(int object_idx) const
