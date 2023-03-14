@@ -2090,10 +2090,11 @@ void PrintObject::bridge_over_infill()
                     if (area_to_be_bridge.empty())
                         continue;
 
-                    Polygons boundary_area  = union_(expansion_area, area_to_be_bridge);
-                    Polylines    boundary_plines = to_polylines(boundary_area);
-                    double   bridging_angle    = 0;
-                    Polygons tmp_expanded_area = expand(area_to_be_bridge, 3.0 * flow.scaled_spacing());
+                    Polygons boundary_area      = union_(expansion_area, area_to_be_bridge);
+                    boundary_area               = closing(boundary_area, 0.3 * flow.scaled_spacing());
+                    Polylines boundary_plines   = to_polylines(boundary_area);
+                    double    bridging_angle    = 0;
+                    Polygons  tmp_expanded_area = expand(area_to_be_bridge, 3.0 * flow.scaled_spacing());
                     for (const CandidateSurface &s : expanded_surfaces) {
                         if (!intersection(s.new_polys, tmp_expanded_area).empty()) {
                             bridging_angle = s.bridge_angle;
