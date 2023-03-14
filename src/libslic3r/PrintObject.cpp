@@ -1647,6 +1647,12 @@ void PrintObject::bridge_over_infill()
                         bool     partially_supported = area(unsupported) < area(to_polygons(s->expolygon)) - EPSILON;
                         if (!unsupported.empty() && (!partially_supported || area(unsupported) > 5 * 5 * spacing * spacing)) {
                             Polygons worth_bridging = intersection(to_polygons(s->expolygon), expand(unsupported, 5 * spacing));
+                            for (Polygon p : diff(to_polygons(s->expolygon), worth_bridging)) {
+                                if (p.area() < region->flow(frSolidInfill, true).scaled_spacing() * scale_(12.0)) {
+                                    worth_bridging.push_back(p);
+                                }
+                            }
+                            worth_bridging = intersection(closing(worth_bridging, 3 * region->flow(frSolidInfill, true).scaled_spacing()), s->expolygon);
                             candidate_surfaces.push_back(CandidateSurface(s, lidx, worth_bridging, region, 0, contains_only_lightning));
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
@@ -1705,6 +1711,7 @@ void PrintObject::bridge_over_infill()
 
     // cluster layers by depth needed for thick bridges. Each cluster is to be processed by single thread sequentially, so that bridges cannot appear one on another
     std::vector<std::vector<size_t>> clustered_layers_for_threads;
+    float target_flow_height_factor = 0.5;
     {
         std::vector<size_t> layers_with_candidates;
         std::map<size_t, Polygons> layer_area_covered_by_candidates;
@@ -1732,7 +1739,8 @@ void PrintObject::bridge_over_infill()
         for (auto pair : surfaces_by_layer) {
             if (clustered_layers_for_threads.empty() ||
                 this->get_layer(clustered_layers_for_threads.back().back())->print_z <
-                    this->get_layer(pair.first)->print_z - this->get_layer(pair.first)->regions()[0]->flow(frSolidInfill, true).height() -
+                    this->get_layer(pair.first)->print_z -
+                        this->get_layer(pair.first)->regions()[0]->flow(frSolidInfill, true).height() * target_flow_height_factor -
                         EPSILON ||
                 intersection(layer_area_covered_by_candidates[clustered_layers_for_threads.back().back()],
                              layer_area_covered_by_candidates[pair.first])
@@ -1756,35 +1764,34 @@ void PrintObject::bridge_over_infill()
     }
 
     // LAMBDA to gather areas with sparse infill deep enough that we can fit thick bridges there.
-    auto gather_areas_w_depth =
-        [](const PrintObject *po, int lidx, float target_flow_height) {
-            // Gather lower layers sparse infill areas, to depth defined by used bridge flow
-            Polygons lower_layers_sparse_infill{};
-            Polygons not_sparse_infill{};
-            double   bottom_z = po->get_layer(lidx)->print_z - target_flow_height - EPSILON;
-            for (int i = int(lidx) - 1; i >= 0; --i) {
-                // Stop iterating if layer is lower than bottom_z.
-                const Layer *layer = po->get_layer(i);
-                if (layer->print_z < bottom_z)
-                    break;
+    auto gather_areas_w_depth = [target_flow_height_factor](const PrintObject *po, int lidx, float target_flow_height) {
+        // Gather lower layers sparse infill areas, to depth defined by used bridge flow
+        Polygons lower_layers_sparse_infill{};
+        Polygons not_sparse_infill{};
+        double   bottom_z = po->get_layer(lidx)->print_z - target_flow_height * target_flow_height_factor - EPSILON;
+        for (int i = int(lidx) - 1; i >= 0; --i) {
+            // Stop iterating if layer is lower than bottom_z.
+            const Layer *layer = po->get_layer(i);
+            if (layer->print_z < bottom_z)
+                break;
 
-                for (const LayerRegion *region : layer->regions()) {
-                    bool has_low_density = region->region().config().fill_density.value < 100;
-                    for (const Surface &surface : region->fill_surfaces()) {
-                        if (surface.surface_type == stInternal && has_low_density) {
-                            Polygons p = to_polygons(surface.expolygon);
-                            lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), p.begin(), p.end());
-                        } else {
-                            Polygons p = to_polygons(surface.expolygon);
-                            not_sparse_infill.insert(not_sparse_infill.end(), p.begin(), p.end());
-                        }
+            for (const LayerRegion *region : layer->regions()) {
+                bool has_low_density = region->region().config().fill_density.value < 100;
+                for (const Surface &surface : region->fill_surfaces()) {
+                    if (surface.surface_type == stInternal && has_low_density) {
+                        Polygons p = to_polygons(surface.expolygon);
+                        lower_layers_sparse_infill.insert(lower_layers_sparse_infill.end(), p.begin(), p.end());
+                    } else {
+                        Polygons p = to_polygons(surface.expolygon);
+                        not_sparse_infill.insert(not_sparse_infill.end(), p.begin(), p.end());
                     }
                 }
-                lower_layers_sparse_infill = union_(lower_layers_sparse_infill);
             }
+            lower_layers_sparse_infill = union_(lower_layers_sparse_infill);
+        }
 
-            return diff(lower_layers_sparse_infill, not_sparse_infill);
-        };
+        return diff(lower_layers_sparse_infill, not_sparse_infill);
+    };
 
     // LAMBDA do determine optimal bridging angle
     auto determine_bridging_angle = [](const Polygons &bridged_area, const Lines &anchors, InfillPattern dominant_pattern) {
@@ -2052,7 +2059,7 @@ void PrintObject::bridge_over_infill()
 
                 // Gather deep infill areas, where thick bridges fit
                 coordf_t thick_bridges_depth = surfaces_by_layer[lidx].front().region->flow(frSolidInfill, true).height();
-                Polygons deep_infill_area    = gather_areas_w_depth(po, lidx, thick_bridges_depth);
+                Polygons deep_infill_area    = gather_areas_w_depth(po, lidx, thick_bridges_depth * 0.5);
 
                 // Now also remove area that has been already filled on lower layers by bridging expansion - For this
                 // reason we did the clustering of layers per thread.
@@ -2090,26 +2097,18 @@ void PrintObject::bridge_over_infill()
                     if (area_to_be_bridge.empty())
                         continue;
 
-                    Polygons boundary_area      = union_(expansion_area, area_to_be_bridge);
-                    boundary_area               = closing(boundary_area, 0.3 * flow.scaled_spacing());
-                    Polylines boundary_plines   = to_polylines(boundary_area);
-                    double    bridging_angle    = 0;
-                    Polygons  tmp_expanded_area = expand(area_to_be_bridge, 3.0 * flow.scaled_spacing());
-                    for (const CandidateSurface &s : expanded_surfaces) {
-                        if (!intersection(s.new_polys, tmp_expanded_area).empty()) {
-                            bridging_angle = s.bridge_angle;
-                            break;
-                        }
-                    }
-                    if (bridging_angle == 0) {
-                        if (!anchors.empty()) {
-                            bridging_angle = determine_bridging_angle(area_to_be_bridge, to_lines(anchors),
-                                                                      candidate.region->region().config().fill_pattern.value);
-                        } else {
-                            // use expansion boundaries as anchors.
-                            // Also, use Infill pattern that is neutral for angle determination, since there are no infill lines.
-                            bridging_angle = determine_bridging_angle(area_to_be_bridge, to_lines(boundary_plines), InfillPattern::ipLine);
-                        }
+                    area_to_be_bridge          = expand(area_to_be_bridge, flow.scaled_spacing());
+                    Polygons boundary_area    = union_(expansion_area, area_to_be_bridge);
+                    Polylines boundary_plines = to_polylines(boundary_area);
+                    
+                    double    bridging_angle  = 0;
+                    if (!anchors.empty()) {
+                        bridging_angle = determine_bridging_angle(area_to_be_bridge, to_lines(anchors),
+                                                                  candidate.region->region().config().fill_pattern.value);
+                    } else {
+                        // use expansion boundaries as anchors.
+                        // Also, use Infill pattern that is neutral for angle determination, since there are no infill lines.
+                        bridging_angle = determine_bridging_angle(area_to_be_bridge, to_lines(boundary_plines), InfillPattern::ipLine);
                     }
 
                     boundary_plines.insert(boundary_plines.end(), anchors.begin(), anchors.end());
@@ -2117,6 +2116,23 @@ void PrintObject::bridge_over_infill()
                         boundary_plines = intersection_pl(boundary_plines, expand(area_to_be_bridge, scale_(10)));
                     }
                     Polygons bridging_area = construct_anchored_polygon(area_to_be_bridge, to_lines(boundary_plines), flow, bridging_angle);
+
+                    // Check collision with other expanded surfaces
+                    {
+                        bool     reconstruct       = false;
+                        Polygons tmp_expanded_area = expand(bridging_area, 3.0 * flow.scaled_spacing());
+                        for (const CandidateSurface &s : expanded_surfaces) {
+                            if (!intersection(s.new_polys, tmp_expanded_area).empty()) {
+                                bridging_angle = s.bridge_angle;
+                                reconstruct    = true;
+                                break;
+                            }
+                        }
+                        if (reconstruct) {
+                            bridging_area = construct_anchored_polygon(area_to_be_bridge, to_lines(boundary_plines), flow, bridging_angle);
+                        }
+                    }
+
                     bridging_area          = intersection(bridging_area, boundary_area);
                     bridging_area          = opening(bridging_area, flow.scaled_spacing());
                     expansion_area         = diff(expansion_area, bridging_area);
@@ -2124,7 +2140,7 @@ void PrintObject::bridge_over_infill()
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                     debug_draw(std::to_string(lidx) + "_" + std::to_string(cluster_idx) + "_" + std::to_string(job_idx) +
                                    "_expanded_bridging",
-                               to_lines(layer->lslices), to_lines(candidate.original_surface->expolygon), to_lines(candidate.new_polys),
+                               to_lines(layer->lslices), to_lines(boundary_plines), to_lines(candidate.new_polys),
                                to_lines(bridging_area));
 #endif
 
