@@ -255,7 +255,7 @@ protected:
     std::string get_gizmo_leaving_text() const override     { return _u8L("Leaving Cut gizmo"); }
     std::string get_action_snapshot_name() override         { return _u8L("Cut gizmo editing"); }
 
-    void data_changed() override;
+    void data_changed(bool is_serializing) override;
 
 private:
     void set_center(const Vec3d& center, bool update_tbb = false);

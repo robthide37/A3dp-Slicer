@@ -903,7 +903,7 @@ void GLGizmoEmboss::on_set_state()
     }
 }
 
-void GLGizmoEmboss::data_changed() { 
+void GLGizmoEmboss::data_changed(bool is_serializing) { 
     set_volume_by_selection();
 }
 

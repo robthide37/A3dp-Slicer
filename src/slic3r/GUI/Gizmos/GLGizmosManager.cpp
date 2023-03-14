@@ -223,7 +223,7 @@ void GLGizmosManager::update_data()
         m_common_gizmos_data->update(get_current()
                                    ? get_current()->get_requirements()
                                    : CommonGizmosDataID(0));
-    if (m_current != Undefined) m_gizmos[m_current]->data_changed();
+    if (m_current != Undefined) m_gizmos[m_current]->data_changed(m_serializing);
 }
 
 bool GLGizmosManager::is_running() const

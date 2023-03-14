@@ -601,7 +601,7 @@ bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
     return use_grabbers(mouse_event);
 }
 
-void GLGizmoRotate3D::data_changed() {
+void GLGizmoRotate3D::data_changed(bool is_serializing) {
     if (m_parent.get_selection().is_wipe_tower()) {
 #if !ENABLE_WORLD_COORDINATE
         const DynamicPrintConfig& config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
