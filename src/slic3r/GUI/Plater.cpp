@@ -6402,7 +6402,7 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
         }
 
         if (mesh.empty()) {
-            get_notification_manager()->push_plater_warning_notification(
+            get_notification_manager()->push_plater_error_notification(
                 _u8L("Unable to perform boolean operation on model meshes. "
                      "Only positive parts will be exported."));
 
