@@ -5,6 +5,7 @@
 #include <libslic3r/Model.hpp>
 #include <libslic3r/Format/OBJ.hpp> // load_obj for default mesh
 #include <libslic3r/CutSurface.hpp> // use surface cuts
+#include <libslic3r/BuildVolume.hpp> // create object
 
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
@@ -27,6 +28,120 @@ using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
 using namespace Slic3r::GUI::Emboss;
 
+// Private implementation for create volume and objects jobs
+namespace Slic3r::GUI::Emboss {
+/// <summary>
+/// Hold neccessary data to create ModelVolume in job
+/// Volume is created on the surface of existing volume in object.
+/// NOTE: EmbossDataBase::font_file doesn't have to be valid !!!
+/// </summary>
+struct DataCreateVolume
+{
+    // Hold data about shape
+    DataBasePtr base;
+
+    // define embossed volume type
+    ModelVolumeType volume_type;
+
+    // parent ModelObject index where to create volume
+    ObjectID object_id;
+
+    // new created volume transformation
+    std::optional<Transform3d> trmat;
+
+    // Define which gizmo open on the success
+    GLGizmosManager::EType gizmo;
+};
+
+/// <summary>
+/// Create new TextVolume on the surface of ModelObject
+/// Should not be stopped
+/// NOTE: EmbossDataBase::font_file doesn't have to be valid !!!
+/// </summary>
+class CreateVolumeJob : public Job
+{
+    DataCreateVolume m_input;
+    TriangleMesh     m_result;
+
+public:
+    CreateVolumeJob(DataCreateVolume &&input);
+    void process(Ctl &ctl) override;
+    void finalize(bool canceled, std::exception_ptr &eptr) override;
+};
+
+/// <summary>
+/// Hold neccessary data to create ModelObject in job
+/// Object is placed on bed under screen coor
+/// OR to center of scene when it is out of bed shape
+/// </summary>
+struct DataCreateObject
+{
+    // Hold data about shape
+    DataBasePtr base;
+
+    // define position on screen where to create object
+    Vec2d screen_coor;
+
+    // projection property
+    Camera camera;
+
+    // shape of bed in case of create volume on bed
+    std::vector<Vec2d> bed_shape;
+
+    // Define which gizmo open on the success
+    GLGizmosManager::EType gizmo;
+};
+
+/// <summary>
+/// Create new TextObject on the platter
+/// Should not be stopped
+/// </summary>
+class CreateObjectJob : public Job
+{
+    DataCreateObject m_input;
+    TriangleMesh     m_result;
+    Transform3d      m_transformation;
+
+public:
+    CreateObjectJob(DataCreateObject &&input);
+    void process(Ctl &ctl) override;
+    void finalize(bool canceled, std::exception_ptr &eptr) override;
+};
+
+/// <summary>
+/// Hold neccessary data to create(cut) volume from surface object in job
+/// </summary>
+struct CreateSurfaceVolumeData : public SurfaceVolumeData
+{
+    // Hold data about shape
+    DataBasePtr base;
+
+    // define embossed volume type
+    ModelVolumeType volume_type;
+
+    // parent ModelObject index where to create volume
+    ObjectID object_id;
+
+    // Define which gizmo open on the success
+    GLGizmosManager::EType gizmo;
+};
+
+/// <summary>
+/// Cut surface from object and create cutted volume
+/// Should not be stopped
+/// </summary>
+class CreateSurfaceVolumeJob : public Job
+{
+    CreateSurfaceVolumeData m_input;
+    TriangleMesh            m_result;
+
+public:
+    CreateSurfaceVolumeJob(CreateSurfaceVolumeData &&input);
+    void process(Ctl &ctl) override;
+    void finalize(bool canceled, std::exception_ptr &eptr) override;
+};
+} // namespace Slic3r::GUI::Emboss
+
 // private namespace
 namespace priv{
 // create sure that emboss object is bigger than source object [in mm]
@@ -37,12 +152,13 @@ constexpr float safe_extension = 1.0f;
 /// </summary>
 /// <param name="input"></param>
 /// <returns></returns>
-bool check(const DataBase &input, bool check_fontfile = true, bool use_surface = false);
-bool check(const DataCreateVolume &input, bool is_main_thread = false);
-bool check(const DataCreateObject &input);
-bool check(const DataUpdate &input, bool is_main_thread = false, bool use_surface = false);
-bool check(const CreateSurfaceVolumeData &input, bool is_main_thread = false);
-bool check(const UpdateSurfaceVolumeData &input, bool is_main_thread = false);
+static bool check(const DataBase &input, bool check_fontfile = true, bool use_surface = false);
+static bool check(GLGizmosManager::EType gizmo);
+static bool check(const DataCreateVolume &input, bool is_main_thread = false);
+static bool check(const DataCreateObject &input);
+static bool check(const DataUpdate &input, bool is_main_thread = false, bool use_surface = false);
+static bool check(const CreateSurfaceVolumeData &input, bool is_main_thread = false);
+static bool check(const UpdateSurfaceVolumeData &input, bool is_main_thread = false);
 
 // <summary>
 /// Try to create mesh from text
@@ -85,8 +201,9 @@ static void update_name_in_list(const ObjectList &object_list, const ModelVolume
 /// <param name="type">Type of new volume</param>
 /// <param name="trmat">Transformation of volume inside of object</param>
 /// <param name="data">Text configuration and New VolumeName</param>
-static void create_volume(TriangleMesh &&mesh, const ObjectID& object_id, 
-    const ModelVolumeType type, const Transform3d trmat, const DataBase &data);
+/// <param name="gizmo">Gizmo to open</param>
+static void create_volume(TriangleMesh &&mesh, const ObjectID& object_id, const ModelVolumeType type, 
+    const std::optional<Transform3d>& trmat, const DataBase &data, GLGizmosManager::EType gizmo);
 
 /// <summary>
 /// Select Volume from objects
@@ -124,6 +241,14 @@ static OrthoProject3d create_emboss_projection(bool is_outside, float emboss, Tr
 /// <returns>Extruded object from cuted surace</returns>
 static TriangleMesh cut_surface(/*const*/ DataBase &input1, const SurfaceVolumeData &input2, std::function<bool()> was_canceled);
 
+/// <summary>
+/// Copied triangles from object to be able create mesh for cut surface from
+/// </summary>
+/// <param name="volumes">Source object volumes for cut surface from</param>
+/// <param name="text_volume_id">Source volume id</param>
+/// <returns>Source data for cut surface from</returns>
+static SurfaceVolumeData::ModelSources create_sources(const ModelVolumePtrs &volumes, std::optional<size_t> text_volume_id = {});
+
 static void create_message(const std::string &message); // only in finalize
 static bool process(std::exception_ptr &eptr);
 static bool finalize(bool canceled, std::exception_ptr &eptr, const DataBase &input);
@@ -140,6 +265,11 @@ auto was_canceled(Job::Ctl &ctl, DataBase &base){
 }
 
 }// namespace priv
+
+void Slic3r::GUI::Emboss::DataBase::write(ModelVolume &volume) const{
+    volume.name         = volume_name;
+    volume.emboss_shape = shape;
+}
 
 /////////////////
 /// Create Volume
@@ -159,7 +289,7 @@ void CreateVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
         return;
     if (m_result.its.empty()) 
         return priv::create_message(_u8L("Can't create empty volume."));
-    priv::create_volume(std::move(m_result), m_input.object_id, m_input.volume_type, m_input.trmat, *m_input.base);
+    priv::create_volume(std::move(m_result), m_input.object_id, m_input.volume_type, m_input.trmat, *m_input.base, m_input.gizmo);
 }
 
 
@@ -194,7 +324,7 @@ void CreateObjectJob::process(Ctl &ctl)
     bed_shape_.reserve(m_input.bed_shape.size());
     for (const Vec2d &p : m_input.bed_shape)
         bed_shape_.emplace_back(p.cast<int>());
-    Polygon bed(bed_shape_);
+    Slic3r::Polygon bed(bed_shape_);
     if (!bed.contains(bed_coor.cast<int>()))
         // mouse pose is out of build plate so create object in center of plate
         bed_coor = bed.centroid().cast<double>();
@@ -254,8 +384,8 @@ void CreateObjectJob::finalize(bool canceled, std::exception_ptr &eptr)
     // Manager::reset_all() So Gizmo could be closed before end of creation object
     GLCanvas3D      *canvas  = plater->canvas3D();
     GLGizmosManager &manager = canvas->get_gizmos_manager();
-    if (manager.get_current_type() != GLGizmosManager::Emboss)
-        manager.open_gizmo(GLGizmosManager::Emboss);   
+    if (manager.get_current_type() != m_input.gizmo)
+        manager.open_gizmo(m_input.gizmo);
 
     // redraw scene
     canvas->reload_scene(true);
@@ -306,7 +436,7 @@ void CreateSurfaceVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
     if (!priv::finalize(canceled, eptr, *m_input.base))
         return; 
     priv::create_volume(std::move(m_result), m_input.object_id,
-        m_input.volume_type, m_input.transform, *m_input.base);
+        m_input.volume_type, m_input.transform, *m_input.base, m_input.gizmo);
 }
 
 /////////////////
@@ -335,143 +465,203 @@ void UpdateSurfaceVolumeJob::finalize(bool canceled, std::exception_ptr &eptr)
     priv::update_volume(std::move(m_result), m_input, tr);
 }
 
-namespace Slic3r::GUI::Emboss {
+namespace priv {
+/// <summary>
+/// Check if volume type is possible use for new text volume
+/// </summary>
+/// <param name="volume_type">Type</param>
+/// <returns>True when allowed otherwise false</returns>
+static bool is_valid(ModelVolumeType volume_type);
 
-SurfaceVolumeData::ModelSources create_sources(const ModelVolumePtrs &volumes, std::optional<size_t> text_volume_id)
-{
-    SurfaceVolumeData::ModelSources result;
-    result.reserve(volumes.size() - 1);
-    for (const ModelVolume *v : volumes) {
-        if (text_volume_id.has_value() && v->id().id == *text_volume_id)
-            continue;
-        // skip modifiers and negative volumes, ...
-        if (!v->is_model_part())
-            continue;
-        const TriangleMesh &tm = v->mesh();
-        if (tm.empty())
-            continue;
-        if (tm.its.empty())
-            continue;
-        result.push_back({v->get_mesh_shared_ptr(), v->get_matrix()});
-    }
-    return result;
+/// <summary>
+/// Start job for add new volume to object with given transformation
+/// </summary>
+/// <param name="worker">Define where to queue the job. e.g. wxGetApp().plater()->get_ui_job_worker()</param>
+/// <param name="object">Define where to add</param>
+/// <param name="volume_tr">Wanted volume transformation, when not set will be calculated after creation to be near the object</param>
+/// <param name="data">Define what to emboss - shape</param>
+/// <param name="volume_type">Type of volume: Part, negative, modifier</param>
+/// <param name="gizmo">Define which gizmo open on the success</param>
+/// <returns>Nullptr when job is sucessfully add to worker otherwise return data to be processed different way</returns>
+static bool start_create_volume_job(Worker &worker, const ModelObject &object, const std::optional<Transform3d>& volume_tr, DataBasePtr data, ModelVolumeType volume_type, GLGizmosManager::EType gizmo);
+
+/// <summary>
+/// Find volume in selected objects with closest convex hull to screen center.
+/// </summary>
+/// <param name="selection">Define where to search for closest</param>
+/// <param name="screen_center">Canvas center(dependent on camera settings)</param>
+/// <param name="objects">Actual objects</param>
+/// <param name="closest_center">OUT: coordinate of controid of closest volume</param>
+/// <returns>closest volume when exists otherwise nullptr</returns>
+static const GLVolume *find_closest(
+    const Selection &selection, const Vec2d &screen_center, 
+    const Camera &camera, const ModelObjectPtrs &objects, Vec2d *closest_center);
+
+/// <summary>
+/// Start job for add object with text into scene
+/// </summary>
+/// <param name="plater">Contain worker and build shape</param>
+/// <param name="emboss_data">Define params of text</param>
+/// <param name="coor">Screen coordinat, where to create new object laying on bed</param>
+/// <param name="gizmo">Define which gizmo open on the success</param>
+/// <returns>True when can add job to worker otherwise FALSE</returns>
+static bool start_create_object_job(Plater &plater, DataBasePtr emboss_data, const Vec2d &coor, GLGizmosManager::EType gizmo);
+
+/// <summary>
+/// Start job to create volume on the surface of object
+/// </summary>
+/// <param name="plater">scene RayCasters + Objects + Camera + worker</param>
+/// <param name="data">Describe what to emboss</param>
+/// <param name="volume_type">Type of new volume</param>
+/// <param name="screen_coor">Where to add</param>
+/// <param name="gl_volume">Surface point is belonge to</param>
+/// <param name="raycaster">For project on surface</param>
+/// <param name="gizmo">Define which gizmo open on the success</param>
+/// <param name="distance">Distance from surface</param>
+/// <param name="angle">Angle around emboss direction</param>
+/// <param name="success">True on add job to worker otherwise false</param>
+/// <returns>Nullptr when job is sucessfully add to worker otherwise return data to be processed different way</returns>
+static DataBasePtr start_create_volume_on_surface_job(Plater                     &plater,
+                                                      DataBasePtr                 data,
+                                                      ModelVolumeType             volume_type,
+                                                      const Vec2d                &screen_coor,
+                                                      const GLVolume             &gl_volume,
+                                                      RaycastManager           &raycaster,
+                                                      GLGizmosManager::EType      gizmo,
+                                                      const std::optional<float> &distance,
+                                                      const std::optional<float> &angle,
+                                                      bool                       &success);
+
 }
 
-SurfaceVolumeData::ModelSources create_volume_sources(const ModelVolume *text_volume)
+namespace Slic3r::GUI::Emboss {
+
+SurfaceVolumeData::ModelSources create_volume_sources(const ModelVolume &text_volume)
 {
-    if (text_volume == nullptr)
-        return {};
-    if (!text_volume->text_configuration.has_value())
-        return {};
-    const ModelVolumePtrs &volumes = text_volume->get_object()->volumes;
+    const ModelVolumePtrs &volumes = text_volume.get_object()->volumes;
     // no other volume in object
     if (volumes.size() <= 1)
         return {};
-    return create_sources(volumes, text_volume->id().id);
+    return priv::create_sources(volumes, text_volume.id().id);
 }
 
-bool start_create_volume_job(
-    Worker &worker, const ModelObject &object, const Transform3d volume_tr, DataBasePtr data, ModelVolumeType volume_type)
+bool start_create_volume(Plater                     *plater_ptr,
+                         DataBasePtr                 data,
+                         ModelVolumeType             volume_type,
+                         RaycastManager             &raycaster,
+                         unsigned char               gizmo,
+                         const Vec2d                &mouse_pos,
+                         const std::optional<float> &distance,
+                         const std::optional<float> &angle)
 {
-    bool &use_surface = data->shape.use_surface;
-    std::unique_ptr<GUI::Job> job;
-    if (use_surface) {
-        // Model to cut surface from.
-        SurfaceVolumeData::ModelSources sources = create_sources(object.volumes);
-        if (sources.empty()) {
-            use_surface = false;
-        } else {
-            bool is_outside = volume_type == ModelVolumeType::MODEL_PART;
-            // check that there is not unexpected volume type
-            assert(is_outside || volume_type == ModelVolumeType::NEGATIVE_VOLUME || volume_type == ModelVolumeType::PARAMETER_MODIFIER);
-            SurfaceVolumeData       sfvd{volume_tr, is_outside, std::move(sources)};
-            CreateSurfaceVolumeData surface_data{std::move(sfvd), std::move(data), volume_type, object.id()};
-            job = std::make_unique<CreateSurfaceVolumeJob>(std::move(surface_data));
-        }
-    }
-    if (!use_surface) {
-        // create volume
-        DataCreateVolume create_volume_data{std::move(data), volume_type, object.id(), volume_tr};
-        job = std::make_unique<CreateVolumeJob>(std::move(create_volume_data));
-    }
-    return queue_job(worker, std::move(job));
+    if (!priv::is_valid(volume_type))
+        return false;
+
+    assert(plater_ptr);
+    if (plater_ptr == nullptr)
+        return false;
+    Plater &plater = *plater_ptr;
+
+    GLCanvas3D *canvas_ptr = plater.get_current_canvas3D();
+    assert(canvas_ptr);
+    if (canvas_ptr == nullptr)
+        return false;
+
+    GLGizmosManager::EType gizmo_type = static_cast<GLGizmosManager::EType>(gizmo);
+
+    GLVolume *gl_volume = get_first_hovered_gl_volume(*canvas_ptr);
+    if (gl_volume == nullptr)
+        // object is not under mouse position soo create object on plater
+        return priv::start_create_object_job(plater, std::move(data), mouse_pos, gizmo_type);
+
+    bool success = true;
+    DataBasePtr data2 = priv::start_create_volume_on_surface_job(plater, std::move(data), 
+        volume_type, mouse_pos, *gl_volume, raycaster, gizmo_type, distance, angle, success);
+
+    // Is successfull created job for add volume on surface?
+    if (success)
+        return true;
+
+    // not success and consume data
+    if (data2 == nullptr)
+        return false;
+    
+    // Can't create on coordinate try to create somewhere
+    return start_create_volume_without_position(plater_ptr, std::move(data2), volume_type, raycaster, gizmo, distance, angle);
 }
 
-std::optional<Transform3d> create_volume_transformation_on_surface(const Vec2d                &screen_coor,
-                                                                   const Camera               &camera,
-                                                                   const ModelVolume          &volume,
-                                                                   const ModelInstance        &instance,
-                                                                   RaycastManager             &raycaster,
-                                                                   GLCanvas3D                 &canvas,
-                                                                   const std::optional<float> &distance,
-                                                                   const std::optional<float> &angle)
+bool start_create_volume_without_position(Plater                     *plater_ptr,
+                                          DataBasePtr                 data,
+                                          ModelVolumeType             volume_type,
+                                          RaycastManager             &raycaster,
+                                          unsigned char               gizmo,
+                                          const std::optional<float> &distance,
+                                          const std::optional<float> &angle)
 {
-    auto cond = RaycastManager::AllowVolumes({volume.id().id});
-    RaycastManager::Meshes meshes = create_meshes(canvas, cond);
-    raycaster.actualize(instance, &cond, &meshes);
+    if (!priv::is_valid(volume_type))
+        return false;
 
-    std::optional<RaycastManager::Hit> hit = ray_from_camera(raycaster, screen_coor, camera, &cond);
+    assert(plater_ptr);
+    if (plater_ptr == nullptr)
+        return false;
+    Plater &plater = *plater_ptr;
 
-    // context menu for add text could be open only by right click on an
-    // object. After right click, object is selected and object_idx is set
-    // also hit must exist. But there is options to add text by object list
-    if (!hit.has_value())
-        return {};
+    GLCanvas3D *canvas_ptr = plater.get_current_canvas3D();
+    assert(canvas_ptr);
+    if (canvas_ptr == nullptr)
+        return false;
+    const GLCanvas3D &canvas = *canvas_ptr;
 
-    // Create result volume transformation
-    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal, Slic3r::GUI::up_limit);
+    // select position by camera position and view direction
+    const Selection &selection = canvas.get_selection();
+    int object_idx = selection.get_object_idx();
 
-    apply_transformation(angle, distance, surface_trmat);
+    Size s = canvas.get_canvas_size();
+    Vec2d screen_center(s.get_width() / 2., s.get_height() / 2.);
+    const ModelObjectPtrs &objects = selection.get_model()->objects;
 
-    return instance.get_matrix().inverse() * surface_trmat;
-}
+    GLGizmosManager::EType gizmo_type = static_cast<GLGizmosManager::EType>(gizmo);
 
-Transform3d create_volume_transformation(const GLVolume &gl_volume, const ModelObjectPtrs &objects, float volume_height, float volume_depth)
-{
-    // Transformation is inspired add generic volumes in ObjectList::load_generic_subobject
-    const ModelObject *obj = objects[gl_volume.object_idx()];
-    BoundingBoxf3 instance_bb = obj->instance_bounding_box(gl_volume.instance_idx());
-    // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
-    Transform3d tr = gl_volume.get_instance_transformation().get_matrix_no_offset().inverse();
-    Vec3d offset_tr(0, // center of instance - Can't suggest width of text before it will be created
-        - instance_bb.size().y() / 2 - volume_height / 2, // under
-        volume_depth / 2 - instance_bb.size().z() / 2 // lay on bed
-    );
-    return tr * Eigen::Translation3d(offset_tr);
-}
+    // No selected object so create new object
+    if (selection.is_empty() || object_idx < 0 || 
+        static_cast<size_t>(object_idx) >= objects.size()) 
+        // create Object on center of screen
+        // when ray throw center of screen not hit bed it create object on center of bed
+        return priv::start_create_object_job(plater, std::move(data), screen_center, gizmo_type);
 
-const GLVolume *find_closest(
-    const Selection &selection, const Vec2d &screen_center, const Camera &camera, const ModelObjectPtrs &objects, Vec2d *closest_center)
-{
-    assert(closest_center != nullptr);
-    const GLVolume * closest = nullptr;
-    const Selection::IndicesList &indices = selection.get_volume_idxs();
-    assert(!indices.empty()); // no selected volume
-    if (indices.empty())
-        return closest;
+    // create volume inside of selected object
+    Vec2d coor;
+    const Camera &camera = wxGetApp().plater()->get_camera();
+    const GLVolume *gl_volume = priv::find_closest(selection, screen_center, camera, objects, &coor);
 
-    double center_sq_distance = std::numeric_limits<double>::max();
-    for (unsigned int id : indices) {
-        const GLVolume    *gl_volume = selection.get_volume(id);
-        const ModelVolume *volume    = get_model_volume(*gl_volume, objects);
-        if (!volume->is_model_part())
-            continue;
-        Slic3r::Polygon hull        = CameraUtils::create_hull2d(camera, *gl_volume);
-        Vec2d           c           = hull.centroid().cast<double>();
-        Vec2d           d           = c - screen_center;
-        bool            is_bigger_x = std::fabs(d.x()) > std::fabs(d.y());
-        if ((is_bigger_x && d.x() * d.x() > center_sq_distance) || (!is_bigger_x && d.y() * d.y() > center_sq_distance))
-            continue;
+    if (gl_volume == nullptr)
+        return priv::start_create_object_job(plater, std::move(data), screen_center, gizmo_type);
+    
+    bool success = true;
+    DataBasePtr data2 = priv::start_create_volume_on_surface_job(plater, std::move(data), 
+        volume_type, coor, *gl_volume, raycaster, gizmo_type, distance, angle, success);
 
-        double distance = d.squaredNorm();
-        if (center_sq_distance < distance)
-            continue;
-        center_sq_distance = distance;
+    // Is successfull created job for add volume on surface?
+    if (success)
+        return true;
 
-        *closest_center    = c;
-        closest = gl_volume;
-    }
-    return closest;
+    // not success and consume data
+    if (data2 == nullptr)
+        return false;
+
+    // In centroid of convex hull is not hit with object. e.g. torid
+    // soo create transfomation on border of object
+
+    // there is no point on surface so no use of surface will be applied
+    if (data2->shape.use_surface)
+        data2->shape.use_surface = false;
+        
+    Worker &worker = plater.get_ui_job_worker();
+    const ModelObject *object = get_model_object(*gl_volume, objects);
+    if (object == nullptr)
+        return false;
+
+    return priv::start_create_volume_job(worker, *object, {}, std::move(data2), volume_type, gizmo_type);
 }
 
 } // namespace Slic3r::GUI::Emboss
@@ -495,6 +685,13 @@ bool priv::check(const DataBase &input, bool check_fontfile, bool use_surface)
     //res &= input.text_configuration.style.prop.use_surface == use_surface;
     return res; 
 }
+
+bool priv::check(GLGizmosManager::EType gizmo)
+{
+    assert(gizmo == GLGizmosManager::Emboss || gizmo == GLGizmosManager::Svg);
+    return gizmo == GLGizmosManager::Emboss || gizmo == GLGizmosManager::Svg;
+}
+
 bool priv::check(const DataCreateVolume &input, bool is_main_thread) {
     bool check_fontfile = false;
     assert(input.base != nullptr);
@@ -504,6 +701,7 @@ bool priv::check(const DataCreateVolume &input, bool is_main_thread) {
     res &= input.volume_type != ModelVolumeType::INVALID;
     assert(input.object_id.id >= 0);
     res &= input.object_id.id >= 0;
+    res &= check(input.gizmo);
     return res; 
 }
 bool priv::check(const DataCreateObject &input) {
@@ -517,6 +715,7 @@ bool priv::check(const DataCreateObject &input) {
     res &= input.screen_coor.y() >= 0.;
     assert(input.bed_shape.size() >= 3); // at least triangle
     res &= input.bed_shape.size() >= 3;
+    res &= check(input.gizmo);
     return res;
 }
 bool priv::check(const DataUpdate &input, bool is_main_thread, bool use_surface){
@@ -542,6 +741,7 @@ bool priv::check(const CreateSurfaceVolumeData &input, bool is_main_thread)
     res &= check(*input.base, is_main_thread, use_surface);
     assert(!input.sources.empty());
     res &= !input.sources.empty();
+    res &= check(input.gizmo);
     return res;
 }
 bool priv::check(const UpdateSurfaceVolumeData &input, bool is_main_thread){
@@ -711,9 +911,12 @@ void priv::update_volume(TriangleMesh &&mesh, const DataUpdate &data, Transform3
     UpdateJob::update_volume(volume, std::move(mesh), *data.base);
 }
 
-void priv::create_volume(
-    TriangleMesh &&mesh, const ObjectID& object_id, 
-    const ModelVolumeType type, const Transform3d trmat, const DataBase &data)
+void priv::create_volume(TriangleMesh                    &&mesh,
+                         const ObjectID                   &object_id,
+                         const ModelVolumeType             type,
+                         const std::optional<Transform3d> &trmat,
+                         const DataBase                   &data,
+                         GLGizmosManager::EType            gizmo)
 {
     GUI_App         &app      = wxGetApp();
     Plater          *plater   = app.plater();
@@ -741,6 +944,13 @@ void priv::create_volume(
 
     plater->take_snapshot(_L("Add Emboss text Volume"));
 
+    BoundingBoxf3 instance_bb;
+    if (!trmat.has_value()) {
+        // used for align to instance
+        size_t instance_index = 0; // must exist
+        instance_bb = obj->instance_bounding_box(instance_index);
+    }
+
     // NOTE: be carefull add volume also center mesh !!!
     // So first add simple shape(convex hull is also calculated)
     ModelVolume *volume = obj->add_volume(make_cube(1., 1., 1.), type);
@@ -757,7 +967,24 @@ void priv::create_volume(
     volume->source.is_from_builtin_objects = true;
 
     volume->name = data.volume_name; // copy
-    volume->set_transformation(trmat);
+
+    if (trmat.has_value()) {
+        volume->set_transformation(*trmat);    
+    } else {
+        assert(!data.shape.use_surface);
+        // Create transformation for volume near from object(defined by glVolume)
+        // Transformation is inspired add generic volumes in ObjectList::load_generic_subobject
+        Vec3d volume_size = volume->mesh().bounding_box().size();
+        // Translate the new modifier to be pickable: move to the left front corner of the instance's bounding box, lift to print bed.
+        Vec3d offset_tr(0, // center of instance - Can't suggest width of text before it will be created
+                        -instance_bb.size().y() / 2 - volume_size.y() / 2, // under
+                        volume_size.z() / 2 - instance_bb.size().z() / 2); // lay on bed        
+        // use same instance as for calculation of instance_bounding_box
+        Transform3d tr = obj->instances.front()->get_transformation().get_matrix_no_offset().inverse();
+        Transform3d volume_trmat = tr * Eigen::Translation3d(offset_tr);
+        volume->set_transformation(volume_trmat);
+    }
+
     data.write(*volume);
 
     // update printable state on canvas
@@ -935,6 +1162,26 @@ TriangleMesh priv::cut_surface(DataBase& base, const SurfaceVolumeData& input2, 
     return TriangleMesh(std::move(new_its));
 }
 
+SurfaceVolumeData::ModelSources priv::create_sources(const ModelVolumePtrs &volumes, std::optional<size_t> text_volume_id)
+{
+    SurfaceVolumeData::ModelSources result;
+    result.reserve(volumes.size() - 1);
+    for (const ModelVolume *v : volumes) {
+        if (text_volume_id.has_value() && v->id().id == *text_volume_id)
+            continue;
+        // skip modifiers and negative volumes, ...
+        if (!v->is_model_part())
+            continue;
+        const TriangleMesh &tm = v->mesh();
+        if (tm.empty())
+            continue;
+        if (tm.its.empty())
+            continue;
+        result.push_back({v->get_mesh_shared_ptr(), v->get_matrix()});
+    }
+    return result;
+}
+
 bool priv::process(std::exception_ptr &eptr) { 
     if (!eptr) return false;
     try {
@@ -956,6 +1203,141 @@ bool priv::finalize(bool canceled, std::exception_ptr &eptr, const DataBase &inp
     return !process(eptr);
 }
 
+bool priv::is_valid(ModelVolumeType volume_type)
+{
+    if (volume_type == ModelVolumeType::MODEL_PART || 
+        volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
+        volume_type == ModelVolumeType::PARAMETER_MODIFIER )
+        return true;
+
+    BOOST_LOG_TRIVIAL(error) << "Can't create embossed volume with this type: " << (int) volume_type;
+    return false;
+}
+
+bool priv::start_create_volume_job(
+    Worker &worker, const ModelObject &object, const std::optional<Transform3d>& volume_tr, DataBasePtr data, ModelVolumeType volume_type, GLGizmosManager::EType gizmo)
+{
+    bool &use_surface = data->shape.use_surface;
+    std::unique_ptr<GUI::Job> job;
+    if (use_surface) {
+        // Model to cut surface from.
+        SurfaceVolumeData::ModelSources sources = create_sources(object.volumes);
+        if (sources.empty() || !volume_tr.has_value()) {
+            use_surface = false;
+        } else {
+            bool is_outside = volume_type == ModelVolumeType::MODEL_PART;
+            // check that there is not unexpected volume type
+            assert(is_outside || volume_type == ModelVolumeType::NEGATIVE_VOLUME || volume_type == ModelVolumeType::PARAMETER_MODIFIER);
+            SurfaceVolumeData       sfvd{*volume_tr, is_outside, std::move(sources)};
+            CreateSurfaceVolumeData surface_data{std::move(sfvd), std::move(data), volume_type, object.id(), gizmo};
+            job = std::make_unique<CreateSurfaceVolumeJob>(std::move(surface_data));
+        }
+    }
+    if (!use_surface) {
+        // create volume
+        DataCreateVolume create_volume_data{std::move(data), volume_type, object.id(), volume_tr, gizmo};
+        job = std::make_unique<CreateVolumeJob>(std::move(create_volume_data));
+    }
+    return queue_job(worker, std::move(job));
+}
+
+const GLVolume * priv::find_closest(
+    const Selection &selection, const Vec2d &screen_center, const Camera &camera, const ModelObjectPtrs &objects, Vec2d *closest_center)
+{
+    assert(closest_center != nullptr);
+    const GLVolume               *closest = nullptr;
+    const Selection::IndicesList &indices = selection.get_volume_idxs();
+    assert(!indices.empty()); // no selected volume
+    if (indices.empty())
+        return closest;
+
+    double center_sq_distance = std::numeric_limits<double>::max();
+    for (unsigned int id : indices) {
+        const GLVolume    *gl_volume = selection.get_volume(id);
+        const ModelVolume *volume    = get_model_volume(*gl_volume, objects);
+        if (!volume->is_model_part())
+            continue;
+        Slic3r::Polygon hull        = CameraUtils::create_hull2d(camera, *gl_volume);
+        Vec2d           c           = hull.centroid().cast<double>();
+        Vec2d           d           = c - screen_center;
+        bool            is_bigger_x = std::fabs(d.x()) > std::fabs(d.y());
+        if ((is_bigger_x && d.x() * d.x() > center_sq_distance) || (!is_bigger_x && d.y() * d.y() > center_sq_distance))
+            continue;
+
+        double distance = d.squaredNorm();
+        if (center_sq_distance < distance)
+            continue;
+        center_sq_distance = distance;
+
+        *closest_center = c;
+        closest         = gl_volume;
+    }
+    return closest;
+}
+
+bool priv::start_create_object_job(Plater &plater, DataBasePtr emboss_data, const Vec2d &coor, GLGizmosManager::EType gizmo)
+{
+    const Camera  &camera    = plater.get_camera();
+    const Pointfs &bed_shape = plater.build_volume().bed_shape();
+
+    DataCreateObject data{std::move(emboss_data), coor, camera, bed_shape, gizmo};
+    auto job = std::make_unique<CreateObjectJob>(std::move(data));
+
+    Worker &worker = plater.get_ui_job_worker();
+    return queue_job(worker, std::move(job));
+}
+
+DataBasePtr priv::start_create_volume_on_surface_job(Plater                     &plater,
+                                                     DataBasePtr                 data,
+                                                     ModelVolumeType             volume_type,
+                                                     const Vec2d                &screen_coor,
+                                                     const GLVolume             &gl_volume,
+                                                     RaycastManager             &raycaster,
+                                                     GLGizmosManager::EType      gizmo,
+                                                     const std::optional<float> &distance,
+                                                     const std::optional<float> &angle,
+                                                     bool                       &success)
+{
+    success = false;
+    const ModelObjectPtrs &objects  = plater.model().objects;
+    const ModelVolume* volume = get_model_volume(gl_volume, objects);
+    const ModelInstance *instance = get_model_instance(gl_volume, objects);
+    if (volume == nullptr || instance == nullptr ||
+        volume->get_object() == nullptr) {
+        // weird situation
+        assert(false);
+        return data;
+    }
+    
+    const Camera &camera = plater.get_camera();
+    GLCanvas3D &canvas = *plater.get_current_canvas3D();
+
+    auto cond = RaycastManager::AllowVolumes({volume->id().id});
+    RaycastManager::Meshes meshes = create_meshes(canvas, cond);
+    raycaster.actualize(*instance, &cond, &meshes);
+    std::optional<RaycastManager::Hit> hit = ray_from_camera(raycaster, screen_coor, camera, &cond);
+
+    // context menu for add text could be open only by right click on an
+    // object. After right click, object is selected and object_idx is set
+    // also hit must exist. But there is options to add text by object list
+    if (!hit.has_value())
+        // When model is broken. It could appear that hit miss the object.
+        // So add part near by in simmilar manner as right panel do
+        return data;
+
+    // Create result volume transformation
+    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal, Slic3r::GUI::up_limit);
+
+    apply_transformation(angle, distance, surface_trmat);
+
+    Transform3d transform = instance->get_matrix().inverse() * surface_trmat;
+
+    // Try to cast ray into scene and find object for add volume
+    Worker &worker = plater.get_ui_job_worker();
+
+    success = priv::start_create_volume_job(worker, *volume->get_object(), transform, std::move(data), volume_type, gizmo);
+    return nullptr;
+}
 
 #include <wx/msgdlg.h>
 

@@ -37,29 +37,29 @@ public:
     /// </summary>
     /// <param name="volume_type">Object part / Negative volume / Modifier</param>
     /// <param name="mouse_pos">Define position of new volume</param>
-    void create_volume(const std::string& svg_file_path, ModelVolumeType volume_type, const Vec2d &mouse_pos);
-    void create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos); // first open file dialog
+    /// <returns>True on succesfull start creation otherwise False</returns>
+    bool create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos); // first open file dialog
 
     /// <summary>
     /// Create new text without given position
     /// </summary>
     /// <param name="volume_type">Object part / Negative volume / Modifier</param>
-    void create_volume(const std::string &svg_file_path, ModelVolumeType volume_type);
-    void create_volume(ModelVolumeType volume_type); // first open file dialog
+    /// <returns>True on succesfull start creation otherwise False</returns>
+    bool create_volume(ModelVolumeType volume_type); // first open file dialog
 
     /// <summary>
     /// Check whether volume is object containing only emboss volume
     /// </summary>
     /// <param name="volume">Pointer to volume</param>
     /// <returns>True when object otherwise False</returns>
-    static bool is_svg_object(const ModelVolume *volume);
+    static bool is_svg_object(const ModelVolume &volume);
 
     /// <summary>
     /// Check whether volume has emboss data
     /// </summary>
     /// <param name="volume">Pointer to volume</param>
     /// <returns>True when constain emboss data otherwise False</returns>
-    static bool is_svg(const ModelVolume *volume);
+    static bool is_svg(const ModelVolume &volume);
 
 protected:
     bool on_init() override;

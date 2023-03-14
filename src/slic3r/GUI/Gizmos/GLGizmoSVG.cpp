@@ -9,6 +9,7 @@
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "slic3r/GUI/format.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
+#include "slic3r/GUI/Jobs/EmbossJob.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 
 #include "libslic3r/Point.hpp"      
@@ -32,11 +33,11 @@
 using namespace Slic3r;
 using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
+using namespace Slic3r::GUI::Emboss;
 
 namespace priv {
 // Variable keep limits for variables
-static const struct Limits
-{
+static const struct Limits{
     MinMax<float> emboss{0.01f, 1e4f}; // in mm
     // distance text object from surface
     MinMax<float> angle{-180.f, 180.f}; // in degrees
@@ -55,19 +56,33 @@ GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
 
 // Private functions to create emboss volume
 namespace priv {
-
-/// <summary>
-/// Check if volume type is possible use for new text volume
-/// </summary>
-/// <param name="volume_type">Type</param>
-/// <returns>True when allowed otherwise false</returns>
-static bool is_valid(ModelVolumeType volume_type);
-
 /// <summary>
 /// Open file dialog with svg files
 /// </summary>
 /// <returns>File path to svg</returns>
 static std::string choose_svg_file();
+
+/// <summary>
+/// Let user to choose file with (S)calable (V)ector (G)raphics - SVG.
+/// Than let select contour
+/// </summary>
+/// <returns>EmbossShape to create</returns>
+static EmbossShape select_shape();
+
+/// <summary>
+/// Create new embos data
+/// </summary>
+/// <param name="cancel">Cancel for previous job</param>
+/// <returns>Base data for emboss SVG</returns>
+static DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel);
+
+/// <summary>
+/// Create symbol '?' as default shape
+/// without source file
+/// with size 2cm
+/// </summary>
+/// <returns>Default shape to emboss</returns>
+static ExPolygons default_shape();
 
 /// <summary>
 /// Separate file name from file path.
@@ -77,53 +92,39 @@ static std::string choose_svg_file();
 /// <returns>File name without directory path</returns>
 static std::string get_file_name(const std::string &file_path);
 
+/// <summary>
+/// Create volume name from shape information
+/// </summary>
+/// <param name="shape">File path</param>
+/// <returns>Name for volume</returns>
+static std::string volume_name(const EmbossShape& shape);
 
 } // namespace priv
 
 
-void GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos){
-    std::string path = priv::choose_svg_file();
-    if (path.empty()) return;
-    create_volume(path, volume_type, mouse_pos);
-}
-void GLGizmoSVG::create_volume(ModelVolumeType volume_type) {
-    std::string path = priv::choose_svg_file();
-    if (path.empty()) return;
-    create_volume(path, volume_type);
+bool GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos)
+{
+    DataBasePtr base = priv::create_emboss_data_base(m_job_cancel);
+    Plater *plater_ptr = wxGetApp().plater();
+    return start_create_volume(plater_ptr, std::move(base), volume_type, m_raycast_manager, GLGizmosManager::Svg, mouse_pos);
 }
 
-void GLGizmoSVG::create_volume(const std::string &svg_file_path, ModelVolumeType volume_type, const Vec2d &mouse_pos) {
-    std::string name  = priv::get_file_name(svg_file_path);
-    NSVGimage  *image = nsvgParseFromFile(svg_file_path.c_str(), "mm", 96.0f);
-    ExPolygons  polys = NSVGUtils::to_ExPolygons(image);
-    nsvgDelete(image);
-
-    BoundingBox bb;
-    for (const auto &p : polys)
-        bb.merge(p.contour.points);
-
-    double scale = 1e-4;
-    auto project = std::make_unique<ProjectScale>(std::make_unique<ProjectZ>(10 / scale), scale);
-    indexed_triangle_set its = polygons2model(polys, *project);
-    // add volume
+bool GLGizmoSVG::create_volume(ModelVolumeType volume_type) 
+{
+    DataBasePtr base = priv::create_emboss_data_base(m_job_cancel);
+    Plater *plater_ptr = wxGetApp().plater();
+    return start_create_volume_without_position(plater_ptr, std::move(base), volume_type, m_raycast_manager, GLGizmosManager::Svg);
 }
 
-void GLGizmoSVG::create_volume(const std::string &svg_file_path, ModelVolumeType volume_type) {
-
+bool GLGizmoSVG::is_svg(const ModelVolume &volume) {
+    return volume.emboss_shape.has_value();
 }
 
-bool GLGizmoSVG::is_svg(const ModelVolume *volume) {
-    if (volume == nullptr)
-        return false;
-    return volume->emboss_shape.has_value();
-}
-
-bool GLGizmoSVG::is_svg_object(const ModelVolume *volume) {
-    if (volume == nullptr) return false;
-    if (!volume->emboss_shape.has_value()) return false;
-    if (volume->type() != ModelVolumeType::MODEL_PART) return false;
-    for (const ModelVolume *v : volume->get_object()->volumes) {
-        if (v == volume) continue;
+bool GLGizmoSVG::is_svg_object(const ModelVolume &volume) {
+    if (!volume.emboss_shape.has_value()) return false;
+    if (volume.type() != ModelVolumeType::MODEL_PART) return false;
+    for (const ModelVolume *v : volume.get_object()->volumes) {
+        if (v->id() == volume.id()) continue;
         if (v->type() == ModelVolumeType::MODEL_PART) return false;
     }
     return true;
@@ -423,7 +424,7 @@ void GLGizmoSVG::set_volume_by_selection()
         ImGuiWrapper::left_inputs();
 
     // is valid svg volume?
-    if (!is_svg(volume)) 
+    if (!is_svg(*volume)) 
         return reset_volume();
 
     // cancel previous job
@@ -527,8 +528,8 @@ void GLGizmoSVG::close()
 {
     // close gizmo == open it again
     auto& mng = m_parent.get_gizmos_manager();
-    if (mng.get_current_type() == GLGizmosManager::Emboss)
-        mng.open_gizmo(GLGizmosManager::Emboss);
+    if (mng.get_current_type() == GLGizmosManager::Svg)
+        mng.open_gizmo(GLGizmosManager::Svg);
 }
 
 void GLGizmoSVG::draw_window()
@@ -543,7 +544,8 @@ void GLGizmoSVG::draw_window()
 
 void GLGizmoSVG::draw_model_type()
 {
-    bool is_last_solid_part = is_svg_object(m_volume);
+    assert(m_volume != nullptr);
+    bool is_last_solid_part = is_svg_object(*m_volume);
     std::string title = _u8L("SVG is to object");
     if (is_last_solid_part) {
         ImVec4 color{.5f, .5f, .5f, 1.f};
@@ -561,7 +563,7 @@ void GLGizmoSVG::draw_model_type()
     if (ImGui::RadioButton(_u8L("Added").c_str(), type == part))
         new_type = part;
     else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Click to change text into object part.").c_str());
+        ImGui::SetTooltip("%s", _u8L("Change to object's part.").c_str());
     ImGui::SameLine();
 
     std::string last_solid_part_hint = _u8L("You can't change a type of the last solid part of the object.");
@@ -571,11 +573,16 @@ void GLGizmoSVG::draw_model_type()
         if (is_last_solid_part)
             ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
         else if (type != negative)
-            ImGui::SetTooltip("%s", _u8L("Click to change part type into negative volume.").c_str());
+            ImGui::SetTooltip("%s", _u8L("Change to negative volume.").c_str());
     }
 
-    // In simple mode are not modifiers
-    if (wxGetApp().plater()->printer_technology() != ptSLA && wxGetApp().get_mode() != ConfigOptionMode::comSimple) {
+    GUI_App &app = wxGetApp();
+    Plater  *plater = app.plater();
+    // SLA printers do not use modifiers
+    bool is_sla = plater->printer_technology() == ptSLA;
+    // In simple mode are not modifiers ?!?
+    bool is_simple = app.get_mode() == ConfigOptionMode::comSimple;
+    if (!is_sla && !is_simple) {
         ImGui::SameLine();
         if (ImGui::RadioButton(_u8L("Modifier").c_str(), type == modifier))
             new_type = modifier;
@@ -583,13 +590,11 @@ void GLGizmoSVG::draw_model_type()
             if (is_last_solid_part)
                 ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
             else if (type != modifier)
-                ImGui::SetTooltip("%s", _u8L("Click to change part type into modifier.").c_str());
+                ImGui::SetTooltip("%s", _u8L("Change to modifier.").c_str());
         }
     }
 
     if (m_volume != nullptr && new_type.has_value() && !is_last_solid_part) {
-        GUI_App &app    = wxGetApp();
-        Plater * plater = app.plater();
         Plater::TakeSnapshot snapshot(plater, _L("Change Text Type"), UndoRedo::SnapshotType::GizmoAction);
         m_volume->set_type(*new_type);
 
@@ -612,8 +617,8 @@ void GLGizmoSVG::draw_model_type()
         // NOTE: on linux, function reorder_volumes_and_get_selection call GLCanvas3D::reload_scene(refresh_immediately = false)
         // which discard m_volume pointer and set it to nullptr also selection is cleared so gizmo is automaticaly closed
         auto &mng = m_parent.get_gizmos_manager();
-        if (mng.get_current_type() != GLGizmosManager::Emboss)
-            mng.open_gizmo(GLGizmosManager::Emboss);
+        if (mng.get_current_type() != GLGizmosManager::Svg)
+            mng.open_gizmo(GLGizmosManager::Svg);
         // TODO: select volume back - Ask @Sasa
     }
 }
@@ -622,17 +627,6 @@ void GLGizmoSVG::draw_model_type()
 /////////////
 // priv namespace implementation
 ///////////////
-
-bool priv::is_valid(ModelVolumeType volume_type)
-{
-    if (volume_type == ModelVolumeType::MODEL_PART || 
-        volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
-        volume_type == ModelVolumeType::PARAMETER_MODIFIER )
-        return true;
-
-    BOOST_LOG_TRIVIAL(error) << "Can't create embossed SVG with this type: " << (int) volume_type;
-    return false;
-}
 
 std::string priv::get_file_name(const std::string &file_path)
 {
@@ -658,6 +652,14 @@ std::string priv::get_file_name(const std::string &file_path)
     size_t offset = pos_last_delimiter + 1; // result should not contain last delimiter ( +1 )
     size_t count  = pos_point - pos_last_delimiter - 1; // result should not contain extension point ( -1 )
     return file_path.substr(offset, count);
+}
+
+std::string priv::volume_name(const EmbossShape &shape)
+{
+    std::string file_name = get_file_name(shape.svg_file_path);
+    if (!file_name.empty())
+        return file_name;
+    return "SVG shape";
 }
 
 std::string priv::choose_svg_file()
@@ -687,6 +689,58 @@ std::string priv::choose_svg_file()
     auto &input_file = input_files.front();
     std::string path = std::string(input_file.c_str());
     return path;
+}
+
+ExPolygons priv::default_shape() {
+    std::string file = Slic3r::resources_dir() + "/icons/question.svg";
+    NSVGimage *image = nsvgParseFromFile(file.c_str(), "px", 96.0f);
+    ExPolygons shape = NSVGUtils::to_ExPolygons(image);
+    nsvgDelete(image);
+    return shape;
+}
+
+EmbossShape priv::select_shape() {
+    EmbossShape shape;
+    shape.depth = 10.;
+    shape.distance = 0;
+    shape.use_surface = false;
+
+    shape.svg_file_path = choose_svg_file();
+    if (shape.svg_file_path.empty())
+        return {};
+
+    NSVGimage *image = nsvgParseFromFile(shape.svg_file_path.c_str(), "mm", 96.0f);
+    ScopeGuard sg([image]() { nsvgDelete(image); });
+    shape.shapes = NSVGUtils::to_ExPolygons(image);
+
+    // TODO: get scale from file
+    shape.scale = 1.;
+
+    // Must contain some shapes !!!
+    if (shape.shapes.empty())
+        shape.shapes = default_shape();
+
+    return shape;
+}
+
+DataBasePtr priv::create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel) {
+    EmbossShape shape = priv::select_shape();
+
+    if (shape.shapes.empty())
+        // canceled selection of SVG file
+        return nullptr;
+
+    // Cancel previous Job, when it is in process
+    // worker.cancel(); --> Use less in this case I want cancel only previous EmbossJob no other jobs
+    // Cancel only EmbossUpdateJob no others
+    if (cancel != nullptr)
+        cancel->store(true);
+    // create new shared ptr to cancel new job
+    cancel = std::make_shared<std::atomic<bool>>(false);
+
+    std::string name = priv::volume_name(shape);
+
+    return std::make_unique<DataBase>(name, cancel /*copy*/, std::move(shape));
 }
 
 // any existing icon filename to not influence GUI

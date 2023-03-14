@@ -39,13 +39,13 @@ public:
     /// </summary>
     /// <param name="volume_type">Object part / Negative volume / Modifier</param>
     /// <param name="mouse_pos">Define position of new volume</param>
-    void create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos);
+    bool create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos);
 
     /// <summary>
     /// Create new text without given position
     /// </summary>
     /// <param name="volume_type">Object part / Negative volume / Modifier</param>
-    void create_volume(ModelVolumeType volume_type);
+    bool create_volume(ModelVolumeType volume_type);
 
 protected:
     bool on_init() override;
