@@ -3293,10 +3293,12 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             return_state |= UPDATE_BACKGROUND_PROCESS_INVALID;
             if (printer_technology == ptFFF) {
                 const Print* print = background_process.fff_print();
-                const Polygons polygons = print->get_sequential_print_clearance_polygons();
-                view3D->get_canvas3d()->set_sequential_print_clearance_visible(!polygons.empty());
-                view3D->get_canvas3d()->set_sequential_print_clearance_render_fill(!polygons.empty());
-                view3D->get_canvas3d()->set_sequential_print_clearance_polygons(polygons);
+                GLCanvas3D::ContoursList contours;
+                contours.contours = print->get_sequential_print_clearance_contours();
+                view3D->get_canvas3d()->set_sequential_print_clearance_visible(!contours.empty());
+                view3D->get_canvas3d()->set_sequential_print_clearance_render_fill(!contours.empty());
+                view3D->get_canvas3d()->set_sequential_print_clearance_contours(contours);
+                view3D->get_canvas3d()->set_sequential_print_clearance_evaluating(false);
             }
         }
     }
@@ -5549,7 +5551,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
             for (mz_uint i = 0; i < num_entries; ++i) {
                 if (mz_zip_reader_file_stat(&archive, i, &stat)) {
                     wxString wname = boost::nowide::widen(stat.m_filename);
-                    std::string name = GUI::format(wname);
+                    std::string name = boost::nowide::narrow(wname);
                     fs::path archive_path(name);
 
                     std::string extra(1024, 0);
@@ -6476,9 +6478,9 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
         }
     }
 
-    if (path.EndsWith(".stl"))
+    if (path.Lower().EndsWith(".stl"))
         Slic3r::store_stl(path_u8.c_str(), &mesh, true);
-    else if (path.EndsWith(".obj"))
+    else if (path.Lower().EndsWith(".obj"))
         Slic3r::store_obj(path_u8.c_str(), &mesh);
 //    p->statusbar()->set_status_text(format_wxstr(_L("STL file exported to %s"), path));
 }

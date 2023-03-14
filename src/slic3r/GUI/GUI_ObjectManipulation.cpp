@@ -596,6 +596,12 @@ void ObjectManipulation::update_ui_from_settings()
 
 void ObjectManipulation::update_settings_value(const Selection& selection)
 {
+    if (selection.is_empty()) {
+        // No selection, reset the cache.
+        reset_settings_value();
+        return;
+    }
+
     m_new_move_label_string   = L("Position");
     m_new_rotate_label_string = L("Rotation");
     m_new_scale_label_string  = L("Scale factors");
@@ -673,11 +679,6 @@ void ObjectManipulation::update_settings_value(const Selection& selection)
         m_new_scale_label_string  = L("Scale");
         m_new_size = selection.get_bounding_box_in_current_reference_system().first.size();
         m_new_enabled  = true;
-    }
-    else {
-        // No selection, reset the cache.
-//		assert(selection.is_empty());
-        reset_settings_value();
     }
 }
 
@@ -1066,8 +1067,9 @@ void ObjectManipulation::on_change(const std::string& opt_key, int axis, double 
         if (new_value > 0.0)
             change_size_value(axis, new_value);
         else {
-            new_value = m_cache.size(axis);
-            m_cache.size(axis) = 0.0;
+            Vec3d& size = m_imperial_units ? m_cache.size_inches : m_cache.size;
+            new_value = size(axis);
+            size(axis) = 0.0;
             m_cache.size_rounded(axis) = DBL_MAX;
             change_size_value(axis, new_value);
         }
