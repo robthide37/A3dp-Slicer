@@ -1586,17 +1586,20 @@ void PrintObject::bridge_over_infill()
     struct CandidateSurface
     {
         CandidateSurface(const Surface     *original_surface,
+                         int                layer_index,
                          Polygons           new_polys,
                          const LayerRegion *region,
                          double             bridge_angle,
                          bool               supported_by_lightning)
             : original_surface(original_surface)
+            , layer_index(layer_index)
             , new_polys(new_polys)
             , region(region)
             , bridge_angle(bridge_angle)
             , supported_by_lightning(supported_by_lightning)
         {}
         const Surface     *original_surface;
+        int                layer_index;
         Polygons           new_polys;
         const LayerRegion *region;
         double             bridge_angle;
@@ -1644,10 +1647,10 @@ void PrintObject::bridge_over_infill()
                         bool     partially_supported = area(unsupported) < area(to_polygons(s->expolygon)) - EPSILON;
                         if (!unsupported.empty() && (!partially_supported || area(unsupported) > 5 * 5 * spacing * spacing)) {
                             Polygons worth_bridging = intersection(to_polygons(s->expolygon), expand(unsupported, 5 * spacing));
-                            candidate_surfaces.push_back(CandidateSurface(s, worth_bridging, region, 0, contains_only_lightning));
+                            candidate_surfaces.push_back(CandidateSurface(s, lidx, worth_bridging, region, 0, contains_only_lightning));
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
-                            debug_draw(std::to_string(region->layer()->id()) + "_candidate_surface_" + std::to_string(area(s->expolygon)),
+                            debug_draw(std::to_string(lidx) + "_candidate_surface_" + std::to_string(area(s->expolygon)),
                                        to_lines(region->layer()->lslices), to_lines(s->expolygon), to_lines(worth_bridging),
                                        to_lines(unsupported_area));
 #endif
@@ -1658,7 +1661,7 @@ void PrintObject::bridge_over_infill()
         });
 
         for (const CandidateSurface &c : candidate_surfaces) {
-            surfaces_by_layer[c.region->layer()->id()].push_back(c);
+            surfaces_by_layer[c.layer_index].push_back(c);
         }
     }
 
@@ -2053,7 +2056,7 @@ void PrintObject::bridge_over_infill()
 
                 // Now also remove area that has been already filled on lower layers by bridging expansion - For this
                 // reason we did the clustering of layers per thread.
-                double bottom_z = po->get_layer(lidx)->print_z - thick_bridges_depth - EPSILON;
+                double bottom_z = layer->print_z - thick_bridges_depth - EPSILON;
                 if (job_idx > 0) {
                     for (int lower_job_idx = job_idx - 1; lower_job_idx >= 0; lower_job_idx--) {
                         size_t       lower_layer_idx = clustered_layers_for_threads[cluster_idx][lower_job_idx];
@@ -2124,8 +2127,8 @@ void PrintObject::bridge_over_infill()
                                to_lines(bridging_area));
 #endif
 
-                    expanded_surfaces.push_back(
-                        CandidateSurface(candidate.original_surface, bridging_area, candidate.region, bridging_angle, candidate.supported_by_lightning));
+                    expanded_surfaces.push_back(CandidateSurface(candidate.original_surface, candidate.layer_index, bridging_area,
+                                                                 candidate.region, bridging_angle, candidate.supported_by_lightning));
                 }
                 surfaces_by_layer[lidx].swap(expanded_surfaces);
                 expanded_surfaces.clear();
