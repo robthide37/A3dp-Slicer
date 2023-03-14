@@ -2090,7 +2090,7 @@ void PrintObject::bridge_over_infill()
                     if (area_to_be_bridge.empty())
                         continue;
 
-                    Polygons boundary_area  = union_(expansion_area, expand(area_to_be_bridge, flow.scaled_spacing()));
+                    Polygons boundary_area  = union_(expansion_area, area_to_be_bridge);
                     Polylines    boundary_plines = to_polylines(boundary_area);
                     double   bridging_angle    = 0;
                     Polygons tmp_expanded_area = expand(area_to_be_bridge, 3.0 * flow.scaled_spacing());
@@ -2118,7 +2118,7 @@ void PrintObject::bridge_over_infill()
                     Polygons bridging_area = construct_anchored_polygon(area_to_be_bridge, to_lines(boundary_plines), flow, bridging_angle);
                     bridging_area          = intersection(bridging_area, boundary_area);
                     bridging_area          = opening(bridging_area, flow.scaled_spacing());
-                    expansion_area        = diff(expansion_area, bridging_area);
+                    expansion_area         = diff(expansion_area, bridging_area);
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                     debug_draw(std::to_string(lidx) + "_" + std::to_string(cluster_idx) + "_" + std::to_string(job_idx) +
