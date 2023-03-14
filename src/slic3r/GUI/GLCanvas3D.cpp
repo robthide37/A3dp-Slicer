@@ -4445,6 +4445,15 @@ void GLCanvas3D::update_sequential_clearance()
     if (m_layers_editing.is_enabled() || m_gizmos.is_dragging())
         return;
 
+    auto instance_transform_from_volumes = [this](int object_idx, int instance_idx) {
+        for (const GLVolume* v : m_volumes.volumes) {
+            if (v->object_idx() == object_idx && v->instance_idx() == instance_idx)
+                return v->get_instance_transformation();
+        }
+        assert(false);
+        return Geometry::Transformation();
+    };
+
     // collects instance transformations from volumes
     // first: define temporary cache
     unsigned int instances_count = 0;
@@ -4463,12 +4472,11 @@ void GLCanvas3D::update_sequential_clearance()
 
     // second: fill temporary cache with data from volumes
     for (const GLVolume* v : m_volumes.volumes) {
-        if (v->is_modifier || v->is_wipe_tower)
-            continue;
-
-        auto& transform = instance_transforms[v->object_idx()][v->instance_idx()];
+        const int object_idx = v->object_idx();
+        const int instance_idx = v->instance_idx();
+        auto& transform = instance_transforms[object_idx][instance_idx];
         if (!transform.has_value())
-            transform = v->get_instance_transformation();
+            transform = instance_transform_from_volumes(object_idx, instance_idx);
     }
 
     // helper function to calculate the transformation to be applied to the sequential print clearance contours
@@ -4491,9 +4499,8 @@ void GLCanvas3D::update_sequential_clearance()
         m_sequential_print_clearance.m_hulls_2d_cache.reserve(m_model->objects.size());
         for (size_t i = 0; i < m_model->objects.size(); ++i) {
             ModelObject* model_object = m_model->objects[i];
-            ModelInstance* model_instance0 = model_object->instances.front();
-            Geometry::Transformation trafo = model_instance0->get_transformation();
-            trafo.set_offset({ 0.0, 0.0, model_instance0->get_offset().z() });
+            Geometry::Transformation trafo = instance_transform_from_volumes((int)i, 0);
+            trafo.set_offset({ 0.0, 0.0, trafo.get_offset().z() });
             const Polygon hull_2d = offset(model_object->convex_hull_2d(trafo.get_matrix()),
                 // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
                 // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
