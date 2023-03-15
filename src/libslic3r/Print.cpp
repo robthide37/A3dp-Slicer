@@ -1173,25 +1173,33 @@ void Print::alert_when_supports_needed()
         auto issue_to_alert_message = [](SupportSpotsGenerator::SupportPointCause cause, bool critical) {
             std::string message;
             switch (cause) {
-            case SupportSpotsGenerator::SupportPointCause::LongBridge: message = L("long bridging extrusions"); break;
-            case SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor: message = L("floating bridge anchors"); break;
+            //TRN Alert when support is needed. Describes that the model has long bridging extrusions which may print badly 
+            case SupportSpotsGenerator::SupportPointCause::LongBridge: message = L("Long bridging extrusions"); break;
+            //TRN Alert when support is needed. Describes bridge anchors/turns in the air, which will definitely print badly
+            case SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor: message = L("Floating bridge anchors"); break;
             case SupportSpotsGenerator::SupportPointCause::FloatingExtrusion:
                 if (critical) {
-                    message = L("collapsing overhang");
+                     //TRN Alert when support is needed. Describes that the print has large overhang area which will print badly or not print at all.
+                    message = L("Collapsing overhang");
                 } else {
-                    message = L("loose extrusions");
+                    //TRN Alert when support is needed. Describes extrusions that are not supported enough and come out curled or loose.
+                    message = L("Loose extrusions");
                 }
                 break;
-            case SupportSpotsGenerator::SupportPointCause::SeparationFromBed: message = L("low bed adhesion"); break;
-            case SupportSpotsGenerator::SupportPointCause::UnstableFloatingPart: message = L("floating object part"); break;
-            case SupportSpotsGenerator::SupportPointCause::WeakObjectPart: message = L("thin fragile part"); break;
+            //TRN Alert when support is needed. Describes that the print has low bed adhesion and may became loose.
+            case SupportSpotsGenerator::SupportPointCause::SeparationFromBed: message = L("Low bed adhesion"); break;
+            //TRN Alert when support is needed. Describes that the object has part that is not connected to the bed and will not print at all without supports.
+            case SupportSpotsGenerator::SupportPointCause::UnstableFloatingPart: message = L("Floating object part"); break;
+            //TRN Alert when support is needed. Describes that the object has thin part that may brake during printing 
+            case SupportSpotsGenerator::SupportPointCause::WeakObjectPart: message = L("Thin fragile part"); break;
             }
 
             return message;
         };
 
         // TRN this translation rule is used to translate lists of uknown size on single line. The first argument is element of the list,
-        // the second argument may be element or rest of the list.
+        // the second argument may be element or rest of the list. For most languages, this does not need translation, but some use different 
+        // separator than comma and some use blank space in front of the separator.
         auto single_line_list_rule = L("%1%, %2%");
         auto multiline_list_rule   = "%1%\n%2%";
 
@@ -1257,9 +1265,6 @@ void Print::alert_when_supports_needed()
             }
         }
 
-        // TRN first argument is a list of detected issues
-        auto top_level_message = L("Detected print stability issues:\n%1%");
-
         std::vector<std::pair<std::string, std::vector<std::string>>> message_elements;
         if (objects_isssues.size() > po_by_support_issues.size()) {
             // there are more objects than causes, group by issues
@@ -1299,7 +1304,8 @@ void Print::alert_when_supports_needed()
             lines.push_back(L("Also consider enabling brim."));
         }
 
-        auto message = Slic3r::format(top_level_message, elements_to_translated_list(lines, multiline_list_rule));
+        // TRN Alert message for detected print issues. first argument is a list of detected issues.
+        auto message = Slic3r::format(L("Detected print stability issues:\n%1%"), elements_to_translated_list(lines, multiline_list_rule));
 
         if (objects_isssues.size() > 0) {
             this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL, message);
