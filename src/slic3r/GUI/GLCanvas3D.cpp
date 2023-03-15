@@ -880,7 +880,7 @@ void GLCanvas3D::Tooltip::render(const Vec2d& mouse_position, GLCanvas3D& canvas
     ImGui::PopStyleVar(2);
 }
 
-void GLCanvas3D::SequentialPrintClearance::set_contours(const ContoursList& contours)
+void GLCanvas3D::SequentialPrintClearance::set_contours(const ContoursList& contours, bool generate_fill)
 {
     m_contours.clear();
     m_instances.clear();
@@ -889,7 +889,7 @@ void GLCanvas3D::SequentialPrintClearance::set_contours(const ContoursList& cont
     if (contours.empty())
         return;
 
-    if (m_render_fill) {
+    if (generate_fill) {
         GLModel::Geometry fill_data;
         fill_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
         fill_data.color = { 0.3333f, 0.0f, 0.0f, 0.5f };
@@ -966,8 +966,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-    if (m_render_fill)
-        m_fill.render();
+    m_fill.render();
 
 #if ENABLE_GL_CORE_PROFILE
     if (OpenGLManager::get_gl_info().is_core_profile()) {
@@ -991,7 +990,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
     for (const auto& [id, trafo] : m_instances) {
         shader->set_uniform("view_model_matrix", camera.get_view_matrix() * trafo);
         assert(id < m_contours.size());
-        m_contours[id].set_color(m_render_fill ? FILL_COLOR : m_evaluating ? NO_FILL_EVALUATING_COLOR : NO_FILL_COLOR);
+        m_contours[id].set_color(m_fill.is_initialized() ? FILL_COLOR : m_evaluating ? NO_FILL_EVALUATING_COLOR : NO_FILL_COLOR);
         m_contours[id].render();
     }
 
@@ -3090,17 +3089,12 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         // Not only detection of some modifiers !!!
         if (evt.Dragging()) {
             GLGizmosManager::EType c = m_gizmos.get_current_type();
-            if (current_printer_technology() == ptFFF &&
-                fff_print()->config().complete_objects){
-                if (c == GLGizmosManager::EType::Move ||
-                    c == GLGizmosManager::EType::Scale ||
-                    c == GLGizmosManager::EType::Rotate)
+            if (c == GLGizmosManager::EType::Move ||
+                c == GLGizmosManager::EType::Scale ||
+                c == GLGizmosManager::EType::Rotate) {
+                show_sinking_contours();
+                if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects)
                     update_sequential_clearance(true);
-            } else {
-                if (c == GLGizmosManager::EType::Move ||
-                    c == GLGizmosManager::EType::Scale ||
-                    c == GLGizmosManager::EType::Rotate)
-                    show_sinking_contours();
             }
         }
         else if (evt.LeftUp() &&
@@ -3591,7 +3585,7 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
 
     if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects) {
         update_sequential_clearance(true);
-        m_sequential_print_clearance.set_evaluating(true);
+        m_sequential_print_clearance.m_evaluating = true;
     }
 
     m_dirty = true;
@@ -3672,7 +3666,7 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
 
     if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects) {
         update_sequential_clearance(true);
-        m_sequential_print_clearance.set_evaluating(true);
+        m_sequential_print_clearance.m_evaluating = true;
     }
 
     m_dirty = true;
@@ -3742,7 +3736,7 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
 
     if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects) {
         update_sequential_clearance(true);
-        m_sequential_print_clearance.set_evaluating(true);
+        m_sequential_print_clearance.m_evaluating = true;
     }
 
     m_dirty = true;
@@ -4039,6 +4033,9 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
 
     // second: fill temporary cache with data from volumes
     for (const GLVolume* v : m_volumes.volumes) {
+        if (v->is_wipe_tower)
+            continue;
+
         const int object_idx = v->object_idx();
         const int instance_idx = v->instance_idx();
         auto& transform = instance_transforms[object_idx][instance_idx];
@@ -4054,12 +4051,11 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
             Geometry::rotation_transform(Geometry::rotation_diff_z(hull_trafo, inst_trafo.get_matrix()) * Vec3d::UnitZ());
     };
 
-    set_sequential_print_clearance_render_fill(false);
-
     // calculates objects 2d hulls (see also: Print::sequential_print_horizontal_clearance_valid())
     // this is done only the first time this method is called while moving the mouse,
     // the results are then cached for following displacements
     if (force_contours_generation || m_sequential_print_clearance_first_displacement) {
+        m_sequential_print_clearance.m_evaluating = false;
         m_sequential_print_clearance.m_hulls_2d_cache.clear();
         const float shrink_factor = static_cast<float>(scale_(0.5 * fff_print()->config().extruder_clearance_radius.value - EPSILON));
         const double mitter_limit = scale_(0.1);
@@ -4101,7 +4097,7 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
             }
         }
 
-        set_sequential_print_clearance_contours(contours);
+        set_sequential_print_clearance_contours(contours, false);
         m_sequential_print_clearance_first_displacement = false;
     }
     else {
@@ -4118,9 +4114,6 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
             m_sequential_print_clearance.update_instances_trafos(trafos);
         }
     }
-
-    // sends instances 2d hulls to be rendered
-    set_sequential_print_clearance_visible(true);
 }
 
 bool GLCanvas3D::is_object_sinking(int object_idx) const

@@ -607,18 +607,13 @@ private:
         std::vector<GLModel> m_contours;
         // list of transforms used to render the contours
         std::vector<std::pair<size_t, Transform3d>> m_instances;
-        bool m_render_fill{ true };
-        bool m_visible{ false };
         bool m_evaluating{ false };
 
         std::vector<std::pair<Pointf3s, Transform3d>> m_hulls_2d_cache;
 
     public:
-        void set_contours(const ContoursList& contours);
+        void set_contours(const ContoursList& contours, bool generate_fill);
         void update_instances_trafos(const std::vector<Transform3d>& trafos);
-        void set_render_fill(bool render_fill) { m_render_fill = render_fill; }
-        void set_visible(bool visible) { m_visible = visible; }
-        void set_evaluating(bool evaluating) { m_evaluating = evaluating; }
         void render();
         bool empty() const { return m_contours.empty(); }
 
@@ -942,25 +937,20 @@ public:
     }
 
     void reset_sequential_print_clearance() {
-        m_sequential_print_clearance.set_visible(false);
-        m_sequential_print_clearance.set_render_fill(false);
-        m_sequential_print_clearance.set_contours(ContoursList());
+        m_sequential_print_clearance.m_evaluating = false;
+        m_sequential_print_clearance.set_contours(ContoursList(), false);
     }
 
-    void set_sequential_print_clearance_visible(bool visible) {
-        m_sequential_print_clearance.set_visible(visible);
+    void set_sequential_print_clearance_contours(const ContoursList& contours, bool generate_fill) {
+        m_sequential_print_clearance.set_contours(contours, generate_fill);
     }
 
-    void set_sequential_print_clearance_render_fill(bool render_fill) {
-        m_sequential_print_clearance.set_render_fill(render_fill);
+    bool is_sequential_print_clearance_empty() const {
+        return m_sequential_print_clearance.empty();
     }
 
-    void set_sequential_print_clearance_contours(const ContoursList& contours) {
-        m_sequential_print_clearance.set_contours(contours);
-    }
-
-    void set_sequential_print_clearance_evaluating(bool evaluating) {
-        m_sequential_print_clearance.set_evaluating(evaluating);
+    bool is_sequential_print_clearance_evaluating() const {
+        return m_sequential_print_clearance.m_evaluating;
     }
 
     void update_sequential_clearance(bool force_contours_generation);
