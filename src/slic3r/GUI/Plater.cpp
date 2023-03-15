@@ -4397,7 +4397,6 @@ void Plater::priv::on_update_geometry(Vec3dsEvent<2>&)
 
 void Plater::priv::on_3dcanvas_mouse_dragging_started(SimpleEvent&)
 {
-    view3D->get_canvas3d()->reset_sequential_print_clearance();
 }
 
 // Update the scene from the background processing,

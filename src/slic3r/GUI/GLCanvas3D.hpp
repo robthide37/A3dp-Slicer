@@ -620,6 +620,7 @@ private:
         void set_visible(bool visible) { m_visible = visible; }
         void set_evaluating(bool evaluating) { m_evaluating = evaluating; }
         void render();
+        bool empty() const { return m_contours.empty(); }
 
         friend class GLCanvas3D;
     };
@@ -962,7 +963,7 @@ public:
         m_sequential_print_clearance.set_evaluating(evaluating);
     }
 
-    void update_sequential_clearance();
+    void update_sequential_clearance(bool force_contours_generation);
 
     const Print* fff_print() const;
     const SLAPrint* sla_print() const;
