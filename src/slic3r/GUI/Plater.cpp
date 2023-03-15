@@ -3294,24 +3294,26 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             // or hide the old one.
             process_validation_warning(warning);
             if (printer_technology == ptFFF) {
-                view3D->get_canvas3d()->reset_sequential_print_clearance();
-                view3D->get_canvas3d()->set_as_dirty();
-                view3D->get_canvas3d()->request_extra_frame();
+                GLCanvas3D* canvas = view3D->get_canvas3d();
+                if (canvas->is_sequential_print_clearance_evaluating()) {
+                    canvas->reset_sequential_print_clearance();
+                    canvas->set_as_dirty();
+                    canvas->request_extra_frame();
+                }
             }
         }
         else {
-			// The print is not valid.
-			// Show error as notification.
+            // The print is not valid.
+            // Show error as notification.
             notification_manager->push_validate_error_notification(err);
             return_state |= UPDATE_BACKGROUND_PROCESS_INVALID;
             if (printer_technology == ptFFF) {
-                const Print* print = background_process.fff_print();
-                GLCanvas3D::ContoursList contours;
-                contours.contours = print->get_sequential_print_clearance_contours();
-                view3D->get_canvas3d()->set_sequential_print_clearance_visible(!contours.empty());
-                view3D->get_canvas3d()->set_sequential_print_clearance_render_fill(!contours.empty());
-                view3D->get_canvas3d()->set_sequential_print_clearance_contours(contours);
-                view3D->get_canvas3d()->set_sequential_print_clearance_evaluating(false);
+                GLCanvas3D* canvas = view3D->get_canvas3d();
+                if (canvas->is_sequential_print_clearance_empty() || canvas->is_sequential_print_clearance_evaluating()) {
+                    GLCanvas3D::ContoursList contours;
+                    contours.contours = background_process.fff_print()->get_sequential_print_clearance_contours();
+                    canvas->set_sequential_print_clearance_contours(contours, true);
+                }
             }
         }
     }
