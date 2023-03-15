@@ -1169,7 +1169,8 @@ void GLGizmoEmboss::close()
         m_volume->text_configuration.has_value() &&
         priv::is_text_empty(m_text)) {
         Plater &p = *wxGetApp().plater();
-        if (is_text_object(m_volume)) {
+        // is the text object?
+        if (m_volume->is_the_only_one_part()) {
             // delete whole object
             p.remove(m_parent.get_selection().get_object_idx());
         } else {
@@ -1912,7 +1913,7 @@ void GLGizmoEmboss::draw_font_list()
 
 void GLGizmoEmboss::draw_model_type()
 {
-    bool is_last_solid_part = is_text_object(m_volume);
+    bool is_last_solid_part = m_volume->is_the_only_one_part();
     std::string title = _u8L("Text is to object");
     if (is_last_solid_part) {
         ImVec4 color{.5f, .5f, .5f, 1.f};
@@ -2945,7 +2946,7 @@ void GLGizmoEmboss::draw_advanced()
     // input surface distance
     bool allowe_surface_distance = 
         !m_volume->text_configuration->style.prop.use_surface &&
-        !is_text_object(m_volume);    
+        !m_volume->is_the_only_one_part();
     std::optional<float> &distance = font_prop.distance;
     float prev_distance = distance.has_value() ? *distance : .0f,
           min_distance = -2 * font_prop.emboss,
@@ -3334,17 +3335,6 @@ bool priv::draw_button(const IconManager::VIcons &icons, IconType type, bool dis
         get_icon(icons, type, IconState::disabled),
         disable
     );
-}
-
-bool GLGizmoEmboss::is_text_object(const ModelVolume *text) {
-    if (text == nullptr) return false;
-    if (!text->text_configuration.has_value()) return false;
-    if (text->type() != ModelVolumeType::MODEL_PART) return false;
-    for (const ModelVolume *v : text->get_object()->volumes) {
-        if (v == text) continue;
-        if (v->type() == ModelVolumeType::MODEL_PART) return false;
-    }
-    return true;
 }
 
 /////////////
