@@ -2411,6 +2411,9 @@ void TabPrinter::build_fff()
         option.opt.height = 3 * gcode_field_height;//150;
         optgroup->append_single_option_line(option);
 
+        optgroup = page->new_optgroup(L("Start G-Code options"));
+        optgroup->append_single_option_line("autoemit_temperature_commands");
+
         optgroup = page->new_optgroup(L("End G-code"), 0);
         optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
             validate_custom_gcode_cb(this, optgroup_title, opt_key, value);

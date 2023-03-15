@@ -1706,17 +1706,18 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
 // M190 - Set Extruder Temperature and Wait
 void GCode::_print_first_layer_bed_temperature(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
 {
+    bool autoemit = print.config().autoemit_temperature_commands;
     // Initial bed temperature based on the first extruder.
     int  temp = print.config().first_layer_bed_temperature.get_at(first_printing_extruder_id);
     // Is the bed temperature set by the provided custom G-code?
     int  temp_by_gcode     = -1;
     bool temp_set_by_gcode = custom_gcode_sets_temperature(gcode, 140, 190, false, temp_by_gcode);
-    if (temp_set_by_gcode && temp_by_gcode >= 0 && temp_by_gcode < 1000)
+    if (autoemit && temp_set_by_gcode && temp_by_gcode >= 0 && temp_by_gcode < 1000)
         temp = temp_by_gcode;
     // Always call m_writer.set_bed_temperature() so it will set the internal "current" state of the bed temp as if
     // the custom start G-code emited these.
     std::string set_temp_gcode = m_writer.set_bed_temperature(temp, wait);
-    if (! temp_set_by_gcode)
+    if (autoemit && ! temp_set_by_gcode)
         file.write(set_temp_gcode);
 }
 
@@ -1727,13 +1728,14 @@ void GCode::_print_first_layer_bed_temperature(GCodeOutputStream &file, Print &p
 // RepRapFirmware: G10 Sxx
 void GCode::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
 {
+    bool autoemit = print.config().autoemit_temperature_commands;
     // Is the bed temperature set by the provided custom G-code?
     int  temp_by_gcode = -1;
     bool include_g10   = print.config().gcode_flavor == gcfRepRapFirmware;
-    if (custom_gcode_sets_temperature(gcode, 104, 109, include_g10, temp_by_gcode)) {
+    if (! autoemit  || custom_gcode_sets_temperature(gcode, 104, 109, include_g10, temp_by_gcode)) {
         // Set the extruder temperature at m_writer, but throw away the generated G-code as it will be written with the custom G-code.
         int temp = print.config().first_layer_temperature.get_at(first_printing_extruder_id);
-        if (temp_by_gcode >= 0 && temp_by_gcode < 1000)
+        if (autoemit && temp_by_gcode >= 0 && temp_by_gcode < 1000)
             temp = temp_by_gcode;
         m_writer.set_temperature(temp, wait, first_printing_extruder_id);
     } else {

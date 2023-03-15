@@ -661,6 +661,7 @@ PRINT_CONFIG_CLASS_DEFINE(
 PRINT_CONFIG_CLASS_DEFINE(
     GCodeConfig,
 
+    ((ConfigOptionBool,                autoemit_temperature_commands))
     ((ConfigOptionString,              before_layer_gcode))
     ((ConfigOptionString,              between_objects_gcode))
     ((ConfigOptionFloats,              deretract_speed))
