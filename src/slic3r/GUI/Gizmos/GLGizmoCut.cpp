@@ -799,7 +799,7 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
 
 void GLGizmoCut3D::render_cut_line()
 {
-    if (!cut_line_processing() || m_line_end == Vec3d::Zero())
+    if (!cut_line_processing() || m_line_end.isApprox(Vec3d::Zero()))
         return;
 
     glsafe(::glEnable(GL_DEPTH_TEST));
@@ -1130,7 +1130,7 @@ void GLGizmoCut3D::dragging_grabber_xy(const GLGizmoBase::UpdateData &data)
     rotation[m_hover_id] = theta;
 
     const Transform3d rotation_tmp = m_start_dragging_m * rotation_transform(rotation);
-    const bool update_tbb = m_rotation_m.rotation() != rotation_tmp.rotation();
+    const bool update_tbb = !m_rotation_m.rotation().isApprox(rotation_tmp.rotation());
     m_rotation_m = rotation_tmp;
     if (update_tbb)
         m_transformed_bounding_box = transformed_bounding_box(m_plane_center, m_rotation_m);
@@ -1262,7 +1262,7 @@ void GLGizmoCut3D::update_bb()
     const BoundingBoxf3 box = bounding_box();
     if (!box.defined)
         return;
-    if (m_max_pos != box.max || m_min_pos != box.min) {
+    if (!m_max_pos.isApprox(box.max) || !m_min_pos.isApprox(box.min)) {
 
         m_bounding_box = box;
 
@@ -1679,7 +1679,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
         const bool has_connectors = !connectors.empty();
 
-        const bool is_cut_plane_init = m_rotation_m.isApprox(Transform3d::Identity()) && m_bb_center == m_plane_center;
+        const bool is_cut_plane_init = m_rotation_m.isApprox(Transform3d::Identity()) && m_bb_center.isApprox(m_plane_center);
         m_imgui->disabled_begin(is_cut_plane_init);
             wxString act_name = _L("Reset cutting plane");
             if (render_reset_button("cut_plane", into_u8(act_name))) {
@@ -2247,7 +2247,7 @@ void GLGizmoCut3D::update_connector_shape()
 
 bool GLGizmoCut3D::cut_line_processing() const
 {
-    return m_line_beg != Vec3d::Zero();
+    return !m_line_beg.isApprox(Vec3d::Zero());
 }
 
 void GLGizmoCut3D::discard_cut_line_processing()

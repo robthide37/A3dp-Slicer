@@ -157,25 +157,22 @@ Point Bed3D::point_projection(const Point& point) const
     return m_polygon.point_projection(point);
 }
 
-void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes, bool show_texture)
+void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_texture)
 {
-    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_axes, show_texture, false);
+    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_texture, false);
 }
 
 void Bed3D::render_for_picking(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor)
 {
-    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, false, false, true);
+    render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, false, true);
 }
 
 void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
-    bool show_axes, bool show_texture, bool picking)
+    bool show_texture, bool picking)
 {
     m_scale_factor = scale_factor;
 
     glsafe(::glEnable(GL_DEPTH_TEST));
-
-    if (show_axes)
-        render_axes();
 
     m_model.model.set_color(picking ? PICKING_MODEL_COLOR : DEFAULT_MODEL_COLOR);
 
@@ -366,9 +363,6 @@ std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Point
 
 void Bed3D::render_axes()
 {
-    if (!m_show_axes)
-        return;
-
     if (m_build_volume.valid())
 #if ENABLE_WORLD_COORDINATE
         m_axes.render(Transform3d::Identity(), 0.25f);
