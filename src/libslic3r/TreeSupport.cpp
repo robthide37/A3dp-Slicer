@@ -1451,7 +1451,7 @@ static void generate_initial_areas(
     // As a circle is round this length is identical for every axis as long as the 90 degrees angle between both remains.
     const coord_t circle_length_to_half_linewidth_change = config.min_radius < config.support_line_width ? 
         config.min_radius / 2 : 
-        sqrt(sqr(config.min_radius) - sqr(config.min_radius - config.support_line_width / 2));
+        scale_(sqrt(sqr(unscale<double>(config.min_radius)) - sqr(unscale<double>(config.min_radius - config.support_line_width / 2))));
     // Extra support offset to compensate for larger tip radiis. Also outset a bit more when z overwrites xy, because supporting something with a part of a support line is better than not supporting it at all.
     //FIXME Vojtech: This is not sufficient for support enforcers to work.
     //FIXME There is no account for the support overhang angle.

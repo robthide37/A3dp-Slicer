@@ -1177,7 +1177,7 @@ void Print::alert_when_supports_needed()
             case SupportSpotsGenerator::SupportPointCause::WeakObjectPart: message = L("thin fragile section"); break;
             }
 
-            return  (critical ? "!" : "") + message;
+            return message;
         };
 
         // vector of pairs of object and its issues, where each issue is a pair of type and critical flag
