@@ -4515,6 +4515,8 @@ bool Tab::validate_custom_gcodes()
         if (!opt_group->is_activated())
             break;
         std::string key = opt_group->opt_map().begin()->first;
+        if (key == "autoemit_temperature_commands")
+            continue;
         valid &= validate_custom_gcode(opt_group->title, boost::any_cast<std::string>(opt_group->get_value(key)));
         if (!valid)
             break;
