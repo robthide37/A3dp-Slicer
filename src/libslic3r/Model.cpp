@@ -1397,6 +1397,25 @@ void ModelObject::clone_for_cut(ModelObject** obj)
     (*obj)->input_file.clear();
 }
 
+bool ModelVolume::is_the_only_one_part() const 
+{
+    if (m_type != ModelVolumeType::MODEL_PART)
+        return false;
+    if (object == nullptr)
+        return false;
+    for (const ModelVolume *v : object->volumes) {
+        if (v == nullptr)
+            continue;
+        // is this volume?
+        if (v->id() == this->id())
+            continue;
+        // exist another model part in object?
+        if (v->type() == ModelVolumeType::MODEL_PART)
+            return false;
+    }
+    return true;
+}
+
 void ModelVolume::reset_extra_facets()
 {
     this->supported_facets.reset();
@@ -1500,7 +1519,7 @@ void ModelObject::process_connector_cut(ModelVolume* volume, const Transform3d& 
 
         // Perform cut
         TriangleMesh upper_mesh, lower_mesh;
-        process_volume_cut(volume, instance_matrix, cut_matrix, attributes, upper_mesh, lower_mesh);
+        process_volume_cut(volume, Transform3d::Identity(), cut_matrix, attributes, upper_mesh, lower_mesh);
 
         // add small Z offset to better preview
         upper_mesh.translate((-0.05 * Vec3d::UnitZ()).cast<float>());

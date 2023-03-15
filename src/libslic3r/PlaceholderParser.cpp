@@ -234,6 +234,7 @@ namespace client
                 delete m_data.s;
             m_type = TYPE_EMPTY;
         }
+        ~expr() { reset(); }
 
         enum Type {
             TYPE_EMPTY = 0,

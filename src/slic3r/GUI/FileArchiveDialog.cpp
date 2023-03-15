@@ -206,7 +206,7 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
             reduce_stack(stack, struct_size);
         }
         if (!file.has_extension() && stack.size() == struct_size)
-            stack.push_back(avc->get_model()->AddFile((stack.empty() ? std::shared_ptr<ArchiveViewNode>(nullptr) : stack.back()), GUI::format_wxstr(file.filename().string()), true)); // filename string to wstring?
+            stack.push_back(avc->get_model()->AddFile((stack.empty() ? std::shared_ptr<ArchiveViewNode>(nullptr) : stack.back()), boost::nowide::widen(file.filename().string()), true)); // filename string to wstring?
         return struct_size + 1;
     };
 
@@ -223,7 +223,7 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
                 path = boost::filesystem::path(extra.substr(0, extra_size));
             } else {
                 wxString wname = boost::nowide::widen(stat.m_filename);
-                std::string name = GUI::format(wname);
+                std::string name = boost::nowide::narrow(wname);
                 path = boost::filesystem::path(name);
             }
             assert(!path.empty());
@@ -247,7 +247,7 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
         if (!stack.empty())
             parent = stack.back();
         if (std::regex_match(path.extension().string(), pattern_drop)) { // this leaves out non-compatible files 
-            m_avc->get_model()->AddFile(parent, GUI::format_wxstr(path.filename().string()), false)->set_fullpath(/*std::move(path)*/path); // filename string to wstring?
+            m_avc->get_model()->AddFile(parent, boost::nowide::widen(path.filename().string()), false)->set_fullpath(/*std::move(path)*/path); // filename string to wstring?
             entry_count++;
         }
     }

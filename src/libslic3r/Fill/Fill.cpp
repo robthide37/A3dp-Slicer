@@ -16,6 +16,7 @@
 #include "FillLightning.hpp"
 #include "FillConcentric.hpp"
 #include "FillEnsuring.hpp"
+#include "Polygon.hpp"
 
 namespace Slic3r {
 
@@ -486,14 +487,6 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
 	size_t first_object_layer_id = this->object()->get_layer(0)->id();
     for (SurfaceFill &surface_fill : surface_fills) {
-		//skip patterns for which additional input is nullptr
-		switch (surface_fill.params.pattern) {
-			case ipLightning: if (lightning_generator == nullptr) continue; break;
-			case ipAdaptiveCubic: if (adaptive_fill_octree == nullptr) continue; break;
-			case ipSupportCubic: if (support_fill_octree == nullptr) continue; break;
-			default: break;
-		}
-
         // Create the filler object.
         std::unique_ptr<Fill> f = std::unique_ptr<Fill>(Fill::new_from_type(surface_fill.params.pattern));
         f->set_bounding_box(bbox);
@@ -647,7 +640,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 #endif
 }
 
-Polylines Layer::generate_sparse_infill_polylines_for_anchoring() const
+Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree,  FillLightning::Generator* lightning_generator) const
 {
     std::vector<SurfaceFill>  surface_fills = group_fills(*this);
     const Slic3r::BoundingBox bbox          = this->object()->bounding_box();
@@ -656,14 +649,17 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring() const
     Polylines sparse_infill_polylines{};
 
     for (SurfaceFill &surface_fill : surface_fills) {
-        // skip patterns for which additional input is nullptr
+		if (surface_fill.surface.surface_type != stInternal) {
+			continue;
+		}
+
         switch (surface_fill.params.pattern) {
-        case ipLightning: continue; break;
-        case ipAdaptiveCubic: continue; break;
-        case ipSupportCubic: continue; break;
         case ipCount: continue; break;
         case ipSupportBase: continue; break;
         case ipEnsuring: continue; break;
+        case ipLightning:
+		case ipAdaptiveCubic:
+        case ipSupportCubic:
         case ipRectilinear:
         case ipMonotonic:
         case ipMonotonicLines:
@@ -688,9 +684,15 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring() const
         f->layer_id = this->id();
         f->z        = this->print_z;
         f->angle    = surface_fill.params.angle;
-        // f->adapt_fill_octree   = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
+        f->adapt_fill_octree   = (surface_fill.params.pattern == ipSupportCubic) ? support_fill_octree : adaptive_fill_octree;
         f->print_config        = &this->object()->print()->config();
         f->print_object_config = &this->object()->config();
+
+        if (surface_fill.params.pattern == ipLightning) {
+            auto *lf            = dynamic_cast<FillLightning::Filler *>(f.get());
+            lf->generator       = lightning_generator;
+            lf->num_raft_layers = this->object()->slicing_parameters().raft_layers();
+        }
 
         // calculate flow spacing for infill pattern generation
         double link_max_length = 0.;

@@ -122,7 +122,7 @@ struct SupportElementStateBits {
     bool use_min_xy_dist : 1;
 
     /*!
-     * \brief True if this Element or any parent provides support to a support roof.
+     * \brief True if this Element or any parent (element above) provides support to a support roof.
      */
     bool supports_roof : 1;
 
@@ -193,7 +193,7 @@ struct SupportElementState : public SupportElementStateBits
     double      elephant_foot_increases;
 
     /*!
-     * \brief The element trys not to move until this dtt is reached, is set to 0 if the element had to move.
+     * \brief The element tries to not move until this dtt is reached, is set to 0 if the element had to move.
      */
     uint32_t    dont_move_until;
 
@@ -218,6 +218,8 @@ struct SupportElementState : public SupportElementStateBits
         dst.skip_ovalisation = false;
         return dst;
     }
+
+    [[nodiscard]] bool locked() const { return this->distance_to_top < this->dont_move_until; }
 };
 
 struct SupportElement

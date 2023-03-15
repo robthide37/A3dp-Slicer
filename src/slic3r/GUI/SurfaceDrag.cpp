@@ -116,6 +116,10 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         if (object == nullptr || instance == nullptr || volume == nullptr)
             return false;
 
+        // allowed drag&drop by canvas for object
+        if (volume->is_the_only_one_part())
+            return false;
+
         const ModelVolumePtrs &volumes = object->volumes;
         std::vector<size_t>    allowed_volumes_id;
         if (volumes.size() > 1) {

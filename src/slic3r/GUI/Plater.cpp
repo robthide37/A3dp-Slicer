@@ -5576,7 +5576,7 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
             for (mz_uint i = 0; i < num_entries; ++i) {
                 if (mz_zip_reader_file_stat(&archive, i, &stat)) {
                     wxString wname = boost::nowide::widen(stat.m_filename);
-                    std::string name = GUI::format(wname);
+                    std::string name = boost::nowide::narrow(wname);
                     fs::path archive_path(name);
 
                     std::string extra(1024, 0);
@@ -6503,9 +6503,9 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
         }
     }
 
-    if (path.EndsWith(".stl"))
+    if (path.Lower().EndsWith(".stl"))
         Slic3r::store_stl(path_u8.c_str(), &mesh, true);
-    else if (path.EndsWith(".obj"))
+    else if (path.Lower().EndsWith(".obj"))
         Slic3r::store_obj(path_u8.c_str(), &mesh);
 //    p->statusbar()->set_status_text(format_wxstr(_L("STL file exported to %s"), path));
 }
