@@ -32,11 +32,11 @@ namespace Slic3r::GUI::Emboss {
 class DataBase
 {
 public:
-    DataBase(std::string volume_name, std::shared_ptr<std::atomic<bool>> cancel) : volume_name(volume_name), cancel(std::move(cancel)) {}
-    DataBase(std::string volume_name, std::shared_ptr<std::atomic<bool>> cancel, EmbossShape&& shape)
+    DataBase(const std::string& volume_name, std::shared_ptr<std::atomic<bool>> cancel) : volume_name(volume_name), cancel(std::move(cancel)) {}
+    DataBase(const std::string& volume_name, std::shared_ptr<std::atomic<bool>> cancel, EmbossShape&& shape)
         : volume_name(volume_name), cancel(std::move(cancel)), shape(std::move(shape))
     {}
-    virtual ~DataBase() {}
+    virtual ~DataBase() = default;
 
     /// <summary>
     /// Create shape
@@ -86,7 +86,7 @@ class UpdateJob : public Job
 
 public:
     // move params to private variable
-    UpdateJob(DataUpdate &&input);
+    explicit UpdateJob(DataUpdate &&input);
 
     /// <summary>
     /// Create new embossed volume by m_input data and store to m_result
@@ -148,7 +148,7 @@ class UpdateSurfaceVolumeJob : public Job
 
 public:
     // move params to private variable
-    UpdateSurfaceVolumeJob(UpdateSurfaceVolumeData &&input);
+    explicit UpdateSurfaceVolumeJob(UpdateSurfaceVolumeData &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &eptr) override;
 };

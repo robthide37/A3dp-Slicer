@@ -64,7 +64,7 @@ class CreateVolumeJob : public Job
     TriangleMesh     m_result;
 
 public:
-    CreateVolumeJob(DataCreateVolume &&input);
+    explicit CreateVolumeJob(DataCreateVolume &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &eptr) override;
 };
@@ -103,7 +103,7 @@ class CreateObjectJob : public Job
     Transform3d      m_transformation;
 
 public:
-    CreateObjectJob(DataCreateObject &&input);
+    explicit CreateObjectJob(DataCreateObject &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &eptr) override;
 };
@@ -136,7 +136,7 @@ class CreateSurfaceVolumeJob : public Job
     TriangleMesh            m_result;
 
 public:
-    CreateSurfaceVolumeJob(CreateSurfaceVolumeData &&input);
+    explicit CreateSurfaceVolumeJob(CreateSurfaceVolumeData &&input);
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &eptr) override;
 };
@@ -169,8 +169,8 @@ static bool check(const UpdateSurfaceVolumeData &input, bool is_main_thread = fa
 /// NOTE: Cache glyphs is changed</param>
 /// <param name="was_canceled">To check if process was canceled</param>
 /// <returns>Triangle mesh model</returns>
-template<typename Fnc> static TriangleMesh try_create_mesh(DataBase &input, Fnc was_canceled);
-template<typename Fnc> static TriangleMesh create_mesh(DataBase &input, Fnc was_canceled, Job::Ctl &ctl);
+template<typename Fnc> static TriangleMesh try_create_mesh(DataBase &input, const Fnc& was_canceled);
+template<typename Fnc> static TriangleMesh create_mesh(DataBase &input, const Fnc& was_canceled, Job::Ctl &ctl);
 
 /// <summary>
 /// Create default mesh for embossed text
@@ -239,7 +239,7 @@ static OrthoProject3d create_emboss_projection(bool is_outside, float emboss, Tr
 /// <param name="input2">SurfaceVolume data</param>
 /// <param name="was_canceled">Check to interupt execution</param>
 /// <returns>Extruded object from cuted surace</returns>
-static TriangleMesh cut_surface(/*const*/ DataBase &input1, const SurfaceVolumeData &input2, std::function<bool()> was_canceled);
+static TriangleMesh cut_surface(/*const*/ DataBase &input1, const SurfaceVolumeData &input2, const std::function<bool()>& was_canceled);
 
 /// <summary>
 /// Copied triangles from object to be able create mesh for cut surface from
@@ -254,9 +254,8 @@ static bool process(std::exception_ptr &eptr);
 static bool finalize(bool canceled, std::exception_ptr &eptr, const DataBase &input);
 
 class JobException : public std::runtime_error { 
-public: JobException(const char* message):runtime_error(message){}}; 
-
-auto was_canceled(Job::Ctl &ctl, DataBase &base){
+public: JobException(const char* message):runtime_error(message){}};
+static auto was_canceled(Job::Ctl &ctl, DataBase &base){
     return [&ctl, &cancel = base.cancel]() -> bool {
         if (cancel->load())
             return true;
@@ -554,6 +553,8 @@ bool start_create_volume(Plater                     *plater_ptr,
                          const std::optional<float> &distance,
                          const std::optional<float> &angle)
 {
+    if (data == nullptr)
+        return false;
     if (!priv::is_valid(volume_type))
         return false;
 
@@ -562,14 +563,13 @@ bool start_create_volume(Plater                     *plater_ptr,
         return false;
     Plater &plater = *plater_ptr;
 
-    GLCanvas3D *canvas_ptr = plater.get_current_canvas3D();
+    const GLCanvas3D *canvas_ptr = plater.get_current_canvas3D();
     assert(canvas_ptr);
     if (canvas_ptr == nullptr)
         return false;
 
-    GLGizmosManager::EType gizmo_type = static_cast<GLGizmosManager::EType>(gizmo);
-
-    GLVolume *gl_volume = get_first_hovered_gl_volume(*canvas_ptr);
+    auto gizmo_type = static_cast<GLGizmosManager::EType>(gizmo);
+    const GLVolume *gl_volume = get_first_hovered_gl_volume(*canvas_ptr);
     if (gl_volume == nullptr)
         // object is not under mouse position soo create object on plater
         return priv::start_create_object_job(plater, std::move(data), mouse_pos, gizmo_type);
@@ -755,11 +755,11 @@ bool priv::check(const UpdateSurfaceVolumeData &input, bool is_main_thread){
 }
 
 template<typename Fnc>
-TriangleMesh priv::try_create_mesh(DataBase &base, Fnc was_canceled)
+TriangleMesh priv::try_create_mesh(DataBase &base, const Fnc& was_canceled)
 {
     const EmbossShape& shape = base.create_shape();
     if (shape.shapes.empty()) return {};  
-    float depth = shape.depth / shape.scale;
+    double depth = shape.depth / shape.scale;
     auto  projectZ = std::make_unique<ProjectZ>(depth);
     ProjectScale project(std::move(projectZ), shape.scale);
     if (was_canceled()) return {};
@@ -767,7 +767,7 @@ TriangleMesh priv::try_create_mesh(DataBase &base, Fnc was_canceled)
 }
 
 template<typename Fnc>
-TriangleMesh priv::create_mesh(DataBase &input, Fnc was_canceled, Job::Ctl& ctl)
+TriangleMesh priv::create_mesh(DataBase &input, const Fnc& was_canceled, Job::Ctl& ctl)
 {
     // It is neccessary to create some shape
     // Emboss text window is opened by creation new emboss text object
@@ -1061,7 +1061,7 @@ OrthoProject3d priv::create_emboss_projection(
 }
 
 // input can't be const - cache of font
-TriangleMesh priv::cut_surface(DataBase& base, const SurfaceVolumeData& input2, std::function<bool()> was_canceled)
+TriangleMesh priv::cut_surface(DataBase& base, const SurfaceVolumeData& input2, const std::function<bool()>& was_canceled)
 {
     EmbossShape& emboss_shape = base.create_shape();
     ExPolygons& shapes = emboss_shape.shapes; 
@@ -1077,7 +1077,7 @@ TriangleMesh priv::cut_surface(DataBase& base, const SurfaceVolumeData& input2, 
     bb.translate(-projection_center);
 
     const SurfaceVolumeData::ModelSources &sources = input2.sources;
-    const SurfaceVolumeData::ModelSource  *biggest = nullptr;
+    const SurfaceVolumeData::ModelSource  *biggest = &sources.front();
 
     size_t biggest_count = 0;
     // convert index from (s)ources to (i)ndexed (t)riangle (s)ets
@@ -1119,8 +1119,8 @@ TriangleMesh priv::cut_surface(DataBase& base, const SurfaceVolumeData& input2, 
         bool fix_reflected = true;
         indexed_triangle_set &its = itss[itss_index];
         its_transform(its, tr, fix_reflected);
-        BoundingBoxf3 bb = bounding_box(its);
-        mesh_bb.merge(bb);
+        BoundingBoxf3 its_bb = bounding_box(its);
+        mesh_bb.merge(its_bb);
     }
 
     // tr_inv = transformation of mesh inverted
@@ -1253,9 +1253,9 @@ const GLVolume * priv::find_closest(
 
     double center_sq_distance = std::numeric_limits<double>::max();
     for (unsigned int id : indices) {
-        const GLVolume    *gl_volume = selection.get_volume(id);
-        const ModelVolume *volume    = get_model_volume(*gl_volume, objects);
-        if (!volume->is_model_part())
+        const GLVolume *gl_volume = selection.get_volume(id);
+        const ModelVolume *volume = get_model_volume(*gl_volume, objects); 
+        if (volume == nullptr || !volume->is_model_part())
             continue;
         Slic3r::Polygon hull        = CameraUtils::create_hull2d(camera, *gl_volume);
         Vec2d           c           = hull.centroid().cast<double>();
