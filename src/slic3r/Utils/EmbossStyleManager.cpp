@@ -59,8 +59,7 @@ void StyleManager::init(AppConfig *app_config)
     load_valid_style();
 }
 
-bool StyleManager::store_styles_to_app_config(bool use_modification,
-                                                    bool store_active_index)
+bool StyleManager::store_styles_to_app_config(bool use_modification, bool store_active_index)
 {
     assert(m_app_config != nullptr);
     if (m_app_config == nullptr) return false;
