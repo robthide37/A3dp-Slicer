@@ -1711,7 +1711,7 @@ void PrintObject::bridge_over_infill()
 
     // cluster layers by depth needed for thick bridges. Each cluster is to be processed by single thread sequentially, so that bridges cannot appear one on another
     std::vector<std::vector<size_t>> clustered_layers_for_threads;
-    float target_flow_height_factor = 0.5;
+    float target_flow_height_factor = 0.75;
     {
         std::vector<size_t> layers_with_candidates;
         std::map<size_t, Polygons> layer_area_covered_by_candidates;
@@ -1789,7 +1789,7 @@ void PrintObject::bridge_over_infill()
             }
             lower_layers_sparse_infill = union_(lower_layers_sparse_infill);
         }
-
+        lower_layers_sparse_infill = closing(lower_layers_sparse_infill, SCALED_EPSILON);
         return diff(lower_layers_sparse_infill, not_sparse_infill);
     };
 
@@ -2032,7 +2032,8 @@ void PrintObject::bridge_over_infill()
     };
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, clustered_layers_for_threads.size()), [po = static_cast<const PrintObject *>(this),
-                                                                                           &surfaces_by_layer, &clustered_layers_for_threads,
+                                                                                           target_flow_height_factor, &surfaces_by_layer,
+                                                                                           &clustered_layers_for_threads,
                                                                                            gather_areas_w_depth, &infill_lines,
                                                                                            determine_bridging_angle,
                                                                                            construct_anchored_polygon](
@@ -2058,12 +2059,12 @@ void PrintObject::bridge_over_infill()
                           });
 
                 // Gather deep infill areas, where thick bridges fit
-                coordf_t thick_bridges_depth = surfaces_by_layer[lidx].front().region->flow(frSolidInfill, true).height();
-                Polygons deep_infill_area    = gather_areas_w_depth(po, lidx, thick_bridges_depth * 0.5);
+                coordf_t target_flow_height = surfaces_by_layer[lidx].front().region->flow(frSolidInfill, true).height() * target_flow_height_factor;
+                Polygons deep_infill_area    = gather_areas_w_depth(po, lidx, target_flow_height);
 
                 // Now also remove area that has been already filled on lower layers by bridging expansion - For this
                 // reason we did the clustering of layers per thread.
-                double bottom_z = layer->print_z - thick_bridges_depth - EPSILON;
+                double bottom_z = layer->print_z - target_flow_height - EPSILON;
                 if (job_idx > 0) {
                     for (int lower_job_idx = job_idx - 1; lower_job_idx >= 0; lower_job_idx--) {
                         size_t       lower_layer_idx = clustered_layers_for_threads[cluster_idx][lower_job_idx];
@@ -2080,10 +2081,14 @@ void PrintObject::bridge_over_infill()
 
                 // Now gather expansion polygons - internal infill on current layer, from which we can cut off anchors
                 Polygons expansion_area;
+                Polygons total_fill_area;
                 for (const LayerRegion *region : layer->regions()) {
-                    auto polys = to_polygons(region->fill_surfaces().filter_by_type(stInternal));
-                    expansion_area.insert(expansion_area.end(), polys.begin(), polys.end());
+                    Polygons internal_polys = to_polygons(region->fill_surfaces().filter_by_type(stInternal));
+                    expansion_area.insert(expansion_area.end(), internal_polys.begin(), internal_polys.end());
+                    Polygons fill_polys = to_polygons(region->fill_expolygons());
+                    total_fill_area.insert(total_fill_area.end(), fill_polys.begin(), fill_polys.end());
                 }
+                total_fill_area = closing(total_fill_area, SCALED_EPSILON);
                 expansion_area = closing(expansion_area, SCALED_EPSILON);
                 expansion_area = intersection(expansion_area, deep_infill_area);
                 Polylines anchors  = intersection_pl(infill_lines[lidx - 1], expansion_area);
@@ -2098,10 +2103,16 @@ void PrintObject::bridge_over_infill()
                         continue;
 
                     area_to_be_bridge          = expand(area_to_be_bridge, flow.scaled_spacing());
-                    Polygons boundary_area    = union_(expansion_area, area_to_be_bridge);
-                    Polylines boundary_plines = to_polylines(boundary_area);
-                    
-                    double    bridging_angle  = 0;
+
+                    Polylines boundary_plines = to_polylines(expand(total_fill_area, 1.3 * flow.scaled_spacing()));
+                    {
+                        Polylines expansion_plines          = to_polylines(expansion_area);
+                        boundary_plines.insert(boundary_plines.end(), expansion_plines.begin(), expansion_plines.end());
+                        Polylines expanded_expansion_plines = to_polylines(expand(expansion_area, 1.3 * flow.scaled_spacing()));
+                        boundary_plines.insert(boundary_plines.end(), expanded_expansion_plines.begin(), expanded_expansion_plines.end());
+                    }
+
+                    double bridging_angle = 0;
                     if (!anchors.empty()) {
                         bridging_angle = determine_bridging_angle(area_to_be_bridge, to_lines(anchors),
                                                                   candidate.region->region().config().fill_pattern.value);
@@ -2133,8 +2144,8 @@ void PrintObject::bridge_over_infill()
                         }
                     }
 
-                    bridging_area          = intersection(bridging_area, boundary_area);
                     bridging_area          = opening(bridging_area, flow.scaled_spacing());
+                    bridging_area          = intersection(bridging_area, total_fill_area);
                     expansion_area         = diff(expansion_area, bridging_area);
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
