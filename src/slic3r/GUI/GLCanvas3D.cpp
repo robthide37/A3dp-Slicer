@@ -2035,17 +2035,18 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             const float w = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_width"))->value;
             const float a = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_rotation_angle"))->value;
             const float bw = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_brim_width"))->value;
+            const float ca = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_cone_angle"))->value;
 
             const Print *print = m_process->fff_print();
             const float depth = print->wipe_tower_data(extruders_count).depth;
 
 #if ENABLE_OPENGL_ES
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
-                x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
+                x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
                 bw, &m_wipe_tower_mesh);
 #else
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
-                x, y, w, depth, (float)height, a, !print->is_step_done(psWipeTower),
+                x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
                 bw);
 #endif // ENABLE_OPENGL_ES
             if (volume_idx_wipe_tower_old != -1)

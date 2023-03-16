@@ -517,6 +517,7 @@ WipeTower::WipeTower(const PrintConfig& config, const std::vector<std::vector<fl
     m_wipe_tower_width(float(config.wipe_tower_width)),
     m_wipe_tower_rotation_angle(float(config.wipe_tower_rotation_angle)),
     m_wipe_tower_brim_width(float(config.wipe_tower_brim_width)),
+    m_wipe_tower_cone_angle(float(config.wipe_tower_cone_angle)),
     m_extra_spacing(float(config.wipe_tower_extra_spacing/100.)),
     m_y_shift(0.f),
     m_z_pos(0.f),
@@ -1180,9 +1181,9 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
     // This block creates the stabilization cone.
     // First define a lambda to draw the rectangle with stabilization.
     auto supported_rectangle = [this, &writer, spacing](const box_coordinates& wt_box, double feedrate, bool infill_cone) -> Polygon {
-        const auto [R, support_scale] = get_wipe_tower_cone_base(m_wipe_tower_width, m_wipe_tower_height, m_wipe_tower_depth);
+        const auto [R, support_scale] = get_wipe_tower_cone_base(m_wipe_tower_width, m_wipe_tower_height, m_wipe_tower_depth, m_wipe_tower_cone_angle);
 
-        double r = std::tan(Geometry::deg2rad(15.)) * (m_wipe_tower_height - m_layer_info->z);
+        double r = std::tan(Geometry::deg2rad(m_wipe_tower_cone_angle/2.f)) * (m_wipe_tower_height - m_layer_info->z);
         Vec2f center = (wt_box.lu + wt_box.rd) / 2.;
         double w = wt_box.lu.y() - wt_box.ld.y();
         enum Type {
@@ -1320,10 +1321,9 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
 }
 
 // Static method to get the radius and x-scaling of the stabilizing cone base.
-std::pair<double, double> WipeTower::get_wipe_tower_cone_base(double width, double height, double depth)
+std::pair<double, double> WipeTower::get_wipe_tower_cone_base(double width, double height, double depth, double angle_deg)
 {
-    const double angle_deg = 15.;
-    double R = std::tan(Geometry::deg2rad(angle_deg)) * height;
+    double R = std::tan(Geometry::deg2rad(angle_deg/2.)) * height;
     double fake_width = 0.66 * width;
     double diag = std::hypot(fake_width / 2., depth / 2.);
     double support_scale = 1.;

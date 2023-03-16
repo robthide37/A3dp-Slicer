@@ -23,7 +23,7 @@ class WipeTower
 public:
     static const std::string never_skip_tag() { return "_GCODE_WIPE_TOWER_NEVER_SKIP_TAG"; }
 
-	static std::pair<double, double> get_wipe_tower_cone_base(double width, double height, double depth);
+	static std::pair<double, double> get_wipe_tower_cone_base(double width, double height, double depth, double angle_deg);
 
     struct Extrusion
     {
@@ -257,6 +257,7 @@ private:
 	float  m_wipe_tower_width; 			// Width of the wipe tower.
 	float  m_wipe_tower_depth 	= 0.f; 	// Depth of the wipe tower
 	float  m_wipe_tower_height  = 0.f;
+	float  m_wipe_tower_cone_angle = 0.f;
     float  m_wipe_tower_brim_width      = 0.f; 	// Width of brim (mm) from config
     float  m_wipe_tower_brim_width_real = 0.f; 	// Width of brim (mm) after generation
 	float  m_wipe_tower_rotation_angle = 0.f; // Wipe tower rotation angle in degrees (with respect to x axis)

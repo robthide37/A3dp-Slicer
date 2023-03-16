@@ -3150,6 +3150,16 @@ void PrintConfigDef::init_fff_params()
     def->min = 0.;
     def->set_default_value(new ConfigOptionFloat(2.));
 
+    def = this->add("wipe_tower_cone_angle", coFloat);
+    def->label = L("Stabilization cone apex angle");
+    def->tooltip = L("Angle at the apex of the cone that is used to stabilize the wipe tower. "
+                     "Larger angle means wider base.");
+    def->sidetext = L("°");
+    def->mode = comAdvanced;
+    def->min = 0.;
+    def->max = 90.;
+    def->set_default_value(new ConfigOptionFloat(0.));
+
     def = this->add("wipe_tower_extra_spacing", coPercent);
     def->label = L("Wipe tower purge lines spacing");
     def->tooltip = L("Spacing of purge lines on the wipe tower.");

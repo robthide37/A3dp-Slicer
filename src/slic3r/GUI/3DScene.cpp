@@ -480,11 +480,11 @@ int GLVolumeCollection::load_object_volume(
 
 #if ENABLE_OPENGL_ES
 int GLVolumeCollection::load_wipe_tower_preview(
-    float pos_x, float pos_y, float width, float depth, float height,
+    float pos_x, float pos_y, float width, float depth, float height, float cone_angle,
     float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh)
 #else
 int GLVolumeCollection::load_wipe_tower_preview(
-    float pos_x, float pos_y, float width, float depth, float height,
+    float pos_x, float pos_y, float width, float depth, float height, float cone_angle,
     float rotation_angle, bool size_unknown, float brim_width)
 #endif // ENABLE_OPENGL_ES
 {
@@ -545,16 +545,18 @@ int GLVolumeCollection::load_wipe_tower_preview(
     mesh.merge(brim_mesh);
 
     // Now the stabilization cone and its base.
-    const auto [R, scale_x] = WipeTower::get_wipe_tower_cone_base(width, height, depth);
-    TriangleMesh cone_mesh(its_make_cone(R, height)); 
-    cone_mesh.scale(Vec3f(1.f/scale_x, 1.f, 1.f));
+    const auto [R, scale_x] = WipeTower::get_wipe_tower_cone_base(width, height, depth, cone_angle);
+    if (R > 0.) {
+        TriangleMesh cone_mesh(its_make_cone(R, height));
+        cone_mesh.scale(Vec3f(1.f/scale_x, 1.f, 1.f));
 
-    TriangleMesh disk_mesh(its_make_cylinder(R, brim_height));
-    disk_mesh.scale(Vec3f(1. / scale_x, 1., 1.)); // Now it matches the base, which may be elliptic.
-    disk_mesh.scale(Vec3f(1.f + scale_x*brim_width/R, 1.f + brim_width/R, 1.f)); // Scale so the brim is not deformed.
-    cone_mesh.merge(disk_mesh);
-    cone_mesh.translate(width / 2., depth / 2., 0.);
-    mesh.merge(cone_mesh);
+        TriangleMesh disk_mesh(its_make_cylinder(R, brim_height));
+        disk_mesh.scale(Vec3f(1. / scale_x, 1., 1.)); // Now it matches the base, which may be elliptic.
+        disk_mesh.scale(Vec3f(1.f + scale_x*brim_width/R, 1.f + brim_width/R, 1.f)); // Scale so the brim is not deformed.
+        cone_mesh.merge(disk_mesh);
+        cone_mesh.translate(width / 2., depth / 2., 0.);
+        mesh.merge(cone_mesh);
+    }
 
 
     volumes.emplace_back(new GLVolume(color));
