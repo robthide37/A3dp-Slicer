@@ -15,9 +15,7 @@
 #include "slic3r/Utils/WxFontUtils.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 
-// TODO: remove include
-#include "libslic3r/SVG.hpp"      // debug store
-#include "libslic3r/Geometry.hpp" // covex hull 2d
+#include "libslic3r/Geometry.hpp" // to range pi pi
 #include "libslic3r/Timer.hpp" 
 
 #include "libslic3r/NSVGUtils.hpp"
@@ -92,16 +90,12 @@ using namespace priv;
 
 GLGizmoEmboss::GLGizmoEmboss(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -2)
-    , m_volume(nullptr)
-    , m_is_unknown_font(false)
-    , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
     , m_style_manager(m_imgui->get_glyph_ranges(), create_default_styles)
-    , m_job_cancel(nullptr)
+    , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
 {
     m_rotate_gizmo.set_group_id(0);
     m_rotate_gizmo.set_force_local_coordinate(true);
-    // TODO: add suggestion to use https://fontawesome.com/
-    // (copy & paste) unicode symbols from web    
+    // to use https://fontawesome.com/ (copy & paste) unicode symbols from web
     // paste HEX unicode into notepad move cursor after unicode press [alt] + [x]
 }
 
@@ -160,14 +154,25 @@ const IconManager::Icon &get_icon(const IconManager::VIcons& icons, IconType typ
 static bool draw_button(const IconManager::VIcons& icons, IconType type, bool disable = false);
 } // namespace priv
 
+CreateVolumeParams create_input(GLCanvas3D &canvas, StyleManager &styler, RaycastManager& raycaster, ModelVolumeType volume_type)
+{
+    auto gizmo = static_cast<unsigned char>(GLGizmosManager::Emboss);
+    const GLVolume *gl_volume = get_first_hovered_gl_volume(canvas);
+    const FontProp &fp = styler.get_style().prop;
+    Plater *plater = wxGetApp().plater();
+    return CreateVolumeParams{canvas, plater->get_camera(), plater->build_volume(),
+        plater->get_ui_job_worker(), volume_type, raycaster, gizmo, gl_volume, fp.distance, fp.angle};
+}
+
 bool GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
     m_style_manager.discard_style_changes();
     set_default_text();    
+
+    // NOTE: change style manager - be carefull with order changes
     DataBasePtr base = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
-    Plater *plater_ptr = wxGetApp().plater();
-    const FontProp &fp = m_style_manager.get_style().prop;
-    return start_create_volume(plater_ptr, std::move(base), volume_type, m_raycast_manager, GLGizmosManager::Emboss, mouse_pos, fp.distance, fp.angle);
+    CreateVolumeParams input = create_input(m_parent, m_style_manager, m_raycast_manager, volume_type);
+    return start_create_volume(input, std::move(base), mouse_pos);
 }
 
 // Designed for create volume without information of mouse in scene
@@ -175,11 +180,11 @@ bool GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 {
     m_style_manager.discard_style_changes();
     set_default_text();
-    std::unique_ptr<DataBase> emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
-    Plater *plater_ptr = wxGetApp().plater();    
-    const FontProp &fp = m_style_manager.get_style().prop;
-    return start_create_volume_without_position(plater_ptr, std::move(emboss_data), 
-        volume_type, m_raycast_manager, GLGizmosManager::Emboss, fp.distance, fp.angle);
+
+    // NOTE: change style manager - be carefull with order changes
+    DataBasePtr base = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
+    CreateVolumeParams input = create_input(m_parent, m_style_manager, m_raycast_manager, volume_type);
+    return start_create_volume_without_position(input, std::move(base));
 }
 
 bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)

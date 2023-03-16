@@ -147,7 +147,7 @@ private:
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
 
     // When open text loaded from .3mf it could be written with unknown font
-    bool m_is_unknown_font;
+    bool m_is_unknown_font = false;
     void create_notification_not_valid_font(const TextConfiguration& tc);
     void remove_notification_not_valid_font();
     
@@ -272,7 +272,8 @@ private:
         // filtration pattern
         std::string search = "";
         std::vector<bool> hide; // result of filtration
-    } m_face_names;
+    };
+    Facenames m_face_names;
     static bool store(const Facenames &facenames);
     static bool load(Facenames &facenames);
 
@@ -287,7 +288,7 @@ private:
 
     // current selected volume 
     // NOTE: Be carefull could be uninitialized (removed from Model)
-    ModelVolume *m_volume;
+    ModelVolume *m_volume = nullptr;
 
     // When work with undo redo stack there could be situation that 
     // m_volume point to unexisting volume so One need also objectID
@@ -297,7 +298,7 @@ private:
     bool m_text_contain_unknown_glyph = false;
 
     // cancel for previous update of volume to cancel finalize part
-    std::shared_ptr<std::atomic<bool>> m_job_cancel;
+    std::shared_ptr<std::atomic<bool>> m_job_cancel = nullptr;
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;

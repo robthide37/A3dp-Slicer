@@ -19,9 +19,12 @@ namespace Slic3r {
 class TriangleMesh;
 class ModelVolume;
 enum class ModelVolumeType : int;
+class BuildVolume;
 namespace GUI {
 class RaycastManager;
 class Plater;
+class GLCanvas3D;
+class Worker;
 }}
 
 namespace Slic3r::GUI::Emboss {
@@ -161,6 +164,42 @@ public:
 SurfaceVolumeData::ModelSources create_volume_sources(const ModelVolume &volume);
 
 /// <summary>
+/// shorten params for start_crate_volume functions
+/// </summary>
+struct CreateVolumeParams
+{
+
+    GLCanvas3D &canvas;
+
+    // Direction of ray into scene
+    const Camera &camera;
+
+    // To put new object on the build volume
+    const BuildVolume &build_volume;
+
+    // used to emplace job for execution
+    Worker &worker;
+
+    // New created volume type
+    ModelVolumeType volume_type;
+
+    // Contain AABB trees from scene
+    RaycastManager &raycaster;
+
+    // Define which gizmo open on the success
+    unsigned char gizmo; // GLGizmosManager::EType
+
+    // Volume define object to add new volume
+    const GLVolume *gl_volume;
+
+    // Wanted additionl move in Z(emboss) direction of new created volume
+    std::optional<float> distance = {};
+
+    // Wanted additionl rotation around Z of new created volume
+    std::optional<float> angle = {};
+};
+
+/// <summary>
 /// Create new volume on position of mouse cursor
 /// </summary>
 /// <param name="plater_ptr">canvas + camera + bed shape + </param>
@@ -172,27 +211,13 @@ SurfaceVolumeData::ModelSources create_volume_sources(const ModelVolume &volume)
 /// <param name="distance">Wanted additionl move in Z(emboss) direction of new created volume</param>
 /// <param name="angle">Wanted additionl rotation around Z of new created volume</param>
 /// <returns>True on success otherwise False</returns>
-bool start_create_volume(Plater                     *plater_ptr,
-                         DataBasePtr                 data,
-                         ModelVolumeType             volume_type,
-                         RaycastManager             &raycaster,
-                         unsigned char               gizmo,
-                         const Vec2d                &mouse_pos,
-                         const std::optional<float> &distance = {},
-                         const std::optional<float> &angle    = {});
-
+bool start_create_volume(CreateVolumeParams &input, DataBasePtr data, const Vec2d &mouse_pos);
 
 /// <summary>
 /// Same as previous function but without mouse position
 /// Need to suggest position or put near the selection
 /// </summary>
-bool start_create_volume_without_position(Plater                     *plater_ptr,
-                                          DataBasePtr                 data,
-                                          ModelVolumeType             volume_type,
-                                          RaycastManager             &raycaster,
-                                          unsigned char               gizmo,
-                                          const std::optional<float> &distance = {},
-                                          const std::optional<float> &angle    = {});
+bool start_create_volume_without_position(CreateVolumeParams &input, DataBasePtr data);
 } // namespace Slic3r::GUI
 
 #endif // slic3r_EmbossJob_hpp_

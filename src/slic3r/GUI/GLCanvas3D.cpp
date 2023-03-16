@@ -7235,10 +7235,10 @@ const ModelVolume *get_model_volume(const GLVolume &v, const Model &model)
     return ret;
 }
 
-const ModelVolume *get_model_volume(const ObjectID &volume_id, const ModelObjectPtrs &objects)
+ModelVolume *get_model_volume(const ObjectID &volume_id, const ModelObjectPtrs &objects)
 {
     for (const ModelObject *obj : objects)
-        for (const ModelVolume *vol : obj->volumes)
+        for (ModelVolume *vol : obj->volumes)
             if (vol->id() == volume_id)
                 return vol;
     return nullptr;

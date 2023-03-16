@@ -1069,7 +1069,7 @@ private:
 };
 
 const ModelVolume *get_model_volume(const GLVolume &v, const Model &model);
-const ModelVolume *get_model_volume(const ObjectID &volume_id, const ModelObjectPtrs &objects);
+ModelVolume *get_model_volume(const ObjectID &volume_id, const ModelObjectPtrs &objects);
 ModelVolume *get_model_volume(const GLVolume &v, const ModelObjectPtrs &objects);
 ModelVolume *get_model_volume(const GLVolume &v, const ModelObject &object);
 
