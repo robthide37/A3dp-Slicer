@@ -168,7 +168,6 @@ SurfaceVolumeData::ModelSources create_volume_sources(const ModelVolume &volume)
 /// </summary>
 struct CreateVolumeParams
 {
-
     GLCanvas3D &canvas;
 
     // Direction of ray into scene

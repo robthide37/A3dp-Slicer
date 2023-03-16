@@ -291,12 +291,9 @@ void CreateObjectJob::process(Ctl &ctl)
     if (!check(m_input))
         throw JobException("Bad input data for EmbossCreateObjectJob.");
 
-    if (m_input.base->shape.distance.has_value())
-        m_input.base->shape.distance.reset();
-
     // can't create new object with using surface
-    if (m_input.base->shape.use_surface)
-        m_input.base->shape.use_surface = false;
+    if (m_input.base->shape.projection.use_surface)
+        m_input.base->shape.projection.use_surface = false;
 
     auto was_canceled = ::was_canceled(ctl, *m_input.base);
     m_result = create_mesh(*m_input.base, was_canceled, ctl);
@@ -319,7 +316,7 @@ void CreateObjectJob::process(Ctl &ctl)
         bed_coor = bed.centroid().cast<double>();
 
     // TODO: need TextConfiguration refactor to work !!!
-    double z = m_input.base->shape.depth / 2;
+    double z = m_input.base->shape.projection.depth / 2;
 
     Vec3d  offset(bed_coor.x(), bed_coor.y(), z);
     offset -= m_result.center();
@@ -658,6 +655,8 @@ bool check(const DataCreateVolume &input, bool is_main_thread)
     assert(input.volume_type != ModelVolumeType::INVALID);
     res &= input.volume_type != ModelVolumeType::INVALID;
     res &= check(input.gizmo);
+    assert(!input.base->shape.projection.use_surface);
+    res &= !input.base->shape.projection.use_surface;
     return res;
 }
 bool check(const DataCreateObject &input)
@@ -673,6 +672,8 @@ bool check(const DataCreateObject &input)
     assert(input.bed_shape.size() >= 3); // at least triangle
     res &= input.bed_shape.size() >= 3;
     res &= check(input.gizmo);
+    assert(!input.base->shape.projection.use_surface);
+    res &= !input.base->shape.projection.use_surface;
     return res;
 }
 bool check(const DataUpdate &input, bool is_main_thread, bool use_surface)
@@ -687,6 +688,8 @@ bool check(const DataUpdate &input, bool is_main_thread, bool use_surface)
     res &= input.base->cancel != nullptr;
     if (is_main_thread)
         assert(!input.base->cancel->load());
+    assert(!input.base->shape.projection.use_surface);
+    res &= !input.base->shape.projection.use_surface;
     return res;
 }
 bool check(const CreateSurfaceVolumeData &input, bool is_main_thread)
@@ -698,6 +701,8 @@ bool check(const CreateSurfaceVolumeData &input, bool is_main_thread)
     assert(!input.sources.empty());
     res &= !input.sources.empty();
     res &= check(input.gizmo);
+    assert(input.base->shape.projection.use_surface);
+    res &= input.base->shape.projection.use_surface;
     return res;
 }
 bool check(const UpdateSurfaceVolumeData &input, bool is_main_thread)
@@ -708,6 +713,8 @@ bool check(const UpdateSurfaceVolumeData &input, bool is_main_thread)
     res &= check(*input.base, is_main_thread, use_surface);
     assert(!input.sources.empty());
     res &= !input.sources.empty();
+    assert(input.base->shape.projection.use_surface);
+    res &= input.base->shape.projection.use_surface;
     return res;
 }
 
@@ -716,7 +723,7 @@ template<typename Fnc> TriangleMesh try_create_mesh(DataBase &base, const Fnc &w
     const EmbossShape &shape = base.create_shape();
     if (shape.shapes.empty())
         return {};
-    double       depth    = shape.depth / shape.scale;
+    double       depth    = shape.projection.depth / shape.scale;
     auto         projectZ = std::make_unique<ProjectZ>(depth);
     ProjectScale project(std::move(projectZ), shape.scale);
     if (was_canceled())
@@ -887,7 +894,7 @@ void create_volume(TriangleMesh                    &&mesh,
     if (trmat.has_value()) {
         volume->set_transformation(*trmat);
     } else {
-        assert(!data.shape.use_surface);
+        assert(!data.shape.projection.use_surface);
         // Create transformation for volume near from object(defined by glVolume)
         // Transformation is inspired add generic volumes in ObjectList::load_generic_subobject
         Vec3d volume_size = volume->mesh().bounding_box().size();
@@ -1064,7 +1071,7 @@ template<typename Fnc> TriangleMesh cut_surface(DataBase &base, const SurfaceVol
         return {};
 
     // !! Projection needs to transform cut
-    OrthoProject3d projection = create_emboss_projection(input2.is_outside, static_cast<float>(emboss_shape.depth), emboss_tr, cut);
+    OrthoProject3d projection = create_emboss_projection(input2.is_outside, static_cast<float>(emboss_shape.projection.depth), emboss_tr, cut);
     indexed_triangle_set new_its    = cut2model(cut, projection);
     assert(!new_its.empty());
     if (was_canceled())
@@ -1132,7 +1139,7 @@ bool start_create_volume_job(Worker                           &worker,
                              ModelVolumeType                   volume_type,
                              GLGizmosManager::EType            gizmo)
 {
-    bool                     &use_surface = data->shape.use_surface;
+    bool &use_surface = data->shape.projection.use_surface;
     std::unique_ptr<GUI::Job> job;
     if (use_surface) {
         // Model to cut surface from.
@@ -1211,8 +1218,8 @@ bool start_create_volume_on_surface_job(CreateVolumeParams &input, DataBasePtr d
             // soo create transfomation on border of object
 
             // there is no point on surface so no use of surface will be applied
-            if (data_->shape.use_surface)
-                data_->shape.use_surface = false;
+            if (data_->shape.projection.use_surface)
+                data_->shape.projection.use_surface = false;
 
             if (object == nullptr)
                 return false;

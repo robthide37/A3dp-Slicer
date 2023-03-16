@@ -511,8 +511,7 @@ TEST_CASE("UndoRedo TextConfiguration serialization", "[Emboss]")
 
     std::stringstream ss; // any stream can be used
     {
-        cereal::BinaryOutputArchive oarchive(ss); // Create an output archive  
-
+        cereal::BinaryOutputArchive oarchive(ss); // Create an output archive
         oarchive(tc);
     } // archive goes out of scope, ensuring all contents are flushed
 
@@ -532,9 +531,8 @@ TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
     EmbossShape emboss;
     emboss.shapes       = {{{0, 0}, {10, 0}, {10, 10}, {0, 10}}, {{5, 5}, {6, 5}, {6, 6}, {5, 6}}};
     emboss.scale = 2.;
-    emboss.depth       = 5.;
-    emboss.use_surface = true;
-    emboss.distance = 3.f;
+    emboss.projection.depth       = 5.;
+    emboss.projection.use_surface = true;
     emboss.fix_3mf_tr  = Transform3d::Identity();
     emboss.svg_file_path = "Everything starts somewhere, though many physicists disagree.\
  But people have always been dimly aware of the problem with the start of things.\
@@ -543,7 +541,6 @@ TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
     std::stringstream ss; // any stream can be used
     {
         cereal::BinaryOutputArchive oarchive(ss); // Create an output archive
-
         oarchive(emboss);
     } // archive goes out of scope, ensuring all contents are flushed
 
@@ -554,9 +551,8 @@ TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
     }
     CHECK(emboss.shapes == emboss_loaded.shapes);
     CHECK(emboss.scale == emboss_loaded.scale);
-    CHECK(emboss.depth == emboss_loaded.depth);
-    CHECK(emboss.use_surface == emboss_loaded.use_surface);
-    CHECK(emboss.distance == emboss_loaded.distance);
+    CHECK(emboss.projection.depth == emboss_loaded.projection.depth);
+    CHECK(emboss.projection.use_surface == emboss_loaded.projection.use_surface);
 }
 
 

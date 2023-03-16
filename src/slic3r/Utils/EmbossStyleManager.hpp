@@ -10,6 +10,8 @@
 #include <GL/glew.h>
 #include <libslic3r/BoundingBox.hpp>
 #include <libslic3r/Emboss.hpp>
+#include <libslic3r/TextConfiguration.hpp>
+#include <libslic3r/EmbossShape.hpp>
 #include <libslic3r/AppConfig.hpp>
 
 namespace Slic3r::GUI::Emboss {
@@ -176,7 +178,9 @@ public:
     {
         void* texture_id = 0; // GLuint
         BoundingBox bounding_box;
-        ImVec2 tex_size, uv0, uv1;
+        ImVec2 tex_size;
+        ImVec2 uv0;
+        ImVec2 uv1;
         Point  offset     = Point(0, 0);
         StyleImage()      = default;
     };
@@ -187,8 +191,27 @@ public:
     /// </summary>
     struct Item
     {
-        // define font, style and other property of text
+        // parent Text style
         EmbossStyle style;
+
+        // Define how to emboss shape
+        EmbossProjection projection;
+
+        // distance from surface point
+        // used for move over model surface
+        // When not set value is zero and is not stored
+        std::optional<float> distance; // [in mm]
+
+        // Angle of rotation around emboss direction (Z axis)
+        // It is calculate on the fly from volume world transformation
+        // only StyleManager keep actual value for comparision with style
+        // When not set value is zero and is not stored
+        std::optional<float> angle; // [in radians] form -Pi to Pi
+
+        bool operator==(const Item &other) const
+        {
+            return style == other.style && projection == other.projection && distance == other.distance && angle == other.angle;
+        }
 
         // cache for view font name with maximal width in imgui
         std::string truncated_name; 

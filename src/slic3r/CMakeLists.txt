@@ -258,8 +258,6 @@ set(SLIC3R_GUI_SOURCES
     Utils/Duet.hpp
     Utils/EmbossStyleManager.cpp
     Utils/EmbossStyleManager.hpp
-    Utils/EmbossStylesSerializable.cpp
-    Utils/EmbossStylesSerializable.hpp
     Utils/FlashAir.cpp
     Utils/FlashAir.hpp
     Utils/FontConfigHelp.cpp
