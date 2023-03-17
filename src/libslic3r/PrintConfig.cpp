@@ -3166,7 +3166,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->mode = comExpert;
     def->min = 100.;
-    def->max = 200.;
+    def->max = 300.;
     def->set_default_value(new ConfigOptionPercent(100.));
 
     def = this->add("wipe_into_infill", coBool);
