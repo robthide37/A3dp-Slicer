@@ -918,7 +918,7 @@ void GLCanvas3D::SequentialPrintClearance::set_contours(const ContoursList& cont
 
     if (contours.trafos.has_value()) {
         // create the requested instances
-        for (const auto& instance : contours.trafos.value()) {
+        for (const auto& instance : *contours.trafos) {
             m_instances.emplace_back(instance.first, instance.second);
         }
     }
@@ -4081,7 +4081,7 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
         ContoursList contours;
         contours.contours.reserve(instance_transforms.size());
         contours.trafos = std::vector<std::pair<size_t, Transform3d>>();
-        contours.trafos.value().reserve(instances_count);
+        (*contours.trafos).reserve(instances_count);
         for (size_t i = 0; i < instance_transforms.size(); ++i) {
             const auto& [hull, hull_trafo] = m_sequential_print_clearance.m_hulls_2d_cache[i];
             Points hull_pts;
@@ -4093,7 +4093,7 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
 
             const auto& instances = instance_transforms[i];
             for (const auto& instance : instances) {
-                contours.trafos.value().emplace_back(i, instance_trafo(hull_trafo, instance.value()));
+                (*contours.trafos).emplace_back(i, instance_trafo(hull_trafo, *instance));
             }
         }
 
@@ -4108,7 +4108,7 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
                 const auto& [hull, hull_trafo] = m_sequential_print_clearance.m_hulls_2d_cache[i];
                 const auto& instances = instance_transforms[i];
                 for (const auto& instance : instances) {
-                    trafos.emplace_back(instance_trafo(hull_trafo, instance.value()));
+                    trafos.emplace_back(instance_trafo(hull_trafo, *instance));
                 }
             }
             m_sequential_print_clearance.update_instances_trafos(trafos);
