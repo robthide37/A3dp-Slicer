@@ -53,8 +53,8 @@ static Vec2d calc_screen_offset_to_volume_center(const Vec2d &screen_coor, const
     return nearest_offset;
 }
 
- // Calculate scale in world
-static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
+ // Calculate scale in world for check in debug
+[[maybe_unused]] static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
 {
     Vec3d  from_dir      = from * dir;
     Vec3d  to_dir        = to * dir;
@@ -98,11 +98,13 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
             return false;
 
         // is selected volume closest hovered?
-        const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;
-        int hovered_idx = canvas.get_first_hover_volume_idx();
-        if (hovered_idx < 0 || 
-            hovered_idx >= gl_volumes.size() || 
-            gl_volumes[hovered_idx] != gl_volume)
+        const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;        
+        if (int hovered_idx = canvas.get_first_hover_volume_idx();
+            hovered_idx < 0)
+            return false;        
+        else if (auto hovered_idx_ = static_cast<size_t>(hovered_idx);
+            hovered_idx_ >= gl_volumes.size() || 
+            gl_volumes[hovered_idx_] != gl_volume)
             return false;
 
         const ModelObject *object = get_model_object(*gl_volume, canvas.get_model()->objects);

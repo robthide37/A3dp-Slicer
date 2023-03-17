@@ -171,7 +171,7 @@ void draw(const IconManager::Icon &icon, const ImVec2 &size, const ImVec4 &tint_
         return;
     }
 
-    ImTextureID id = (void *) icon.tex_id;
+    ImTextureID id = (void *)static_cast<intptr_t>(icon.tex_id);
     const ImVec2 &s  = (size.x < 1 || size.y < 1) ? icon.size : size;
     ImGui::Image(id, s, icon.tl, icon.br, tint_col, border_col);
 }

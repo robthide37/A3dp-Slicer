@@ -11,7 +11,7 @@ static RaycastManager::TrKey create_key(const ModelVolume& volume, const ModelIn
     return std::make_pair(instance.id().id, volume.id().id); }
 static RaycastManager::TrItems::iterator find(RaycastManager::TrItems &items, const RaycastManager::TrKey &key);
 static bool is_lower_key(const RaycastManager::TrKey &k1, const RaycastManager::TrKey &k2) {
-    return k1.first < k2.first || k1.first == k2.first && k1.second < k2.second; }
+    return k1.first < k2.first || (k1.first == k2.first && k1.second < k2.second); }
 static bool is_lower(const RaycastManager::TrItem &i1, const RaycastManager::TrItem &i2) {
     return is_lower_key(i1.first, i2.first); };
 }
@@ -313,9 +313,12 @@ RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::A
     RaycastManager::Meshes meshes;
     for (const std::shared_ptr<SceneRaycasterItem> &caster : casters) {
         int index = SceneRaycaster::decode_id(type, caster->get_id());
-        if (index < 0 || index >= gl_volumes.size())
+        if (index < 0)
             continue;
-        const GLVolume    *gl_volume = gl_volumes[index];
+        auto index_ = static_cast<size_t>(index);
+        if(index_ >= gl_volumes.size())
+            continue;
+        const GLVolume    *gl_volume = gl_volumes[index_];
         const ModelVolume *volume    = get_model_volume(*gl_volume, objects);
         size_t             id        = volume->id().id;
         if (condition.skip(id))
