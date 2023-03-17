@@ -14,11 +14,13 @@
 #include "GCode/WipeTower.hpp"
 #include "Utils.hpp"
 #include "BuildVolume.hpp"
+#include "format.hpp"
 
 #include <float.h>
 
 #include <algorithm>
 #include <limits>
+#include <string>
 #include <unordered_set>
 #include <boost/filesystem/path.hpp>
 #include <boost/format.hpp>
@@ -1171,21 +1173,66 @@ void Print::alert_when_supports_needed()
         auto issue_to_alert_message = [](SupportSpotsGenerator::SupportPointCause cause, bool critical) {
             std::string message;
             switch (cause) {
-            case SupportSpotsGenerator::SupportPointCause::LongBridge: message = L("long bridging extrusions"); break;
-            case SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor: message = L("floating bridge anchors"); break;
+            //TRN Alert when support is needed. Describes that the model has long bridging extrusions which may print badly 
+            case SupportSpotsGenerator::SupportPointCause::LongBridge: message = L("Long bridging extrusions"); break;
+            //TRN Alert when support is needed. Describes bridge anchors/turns in the air, which will definitely print badly
+            case SupportSpotsGenerator::SupportPointCause::FloatingBridgeAnchor: message = L("Floating bridge anchors"); break;
             case SupportSpotsGenerator::SupportPointCause::FloatingExtrusion:
                 if (critical) {
-                    message = L("collapsing overhang");
+                     //TRN Alert when support is needed. Describes that the print has large overhang area which will print badly or not print at all.
+                    message = L("Collapsing overhang");
                 } else {
-                    message = L("loose extrusions");
+                    //TRN Alert when support is needed. Describes extrusions that are not supported enough and come out curled or loose.
+                    message = L("Loose extrusions");
                 }
                 break;
-            case SupportSpotsGenerator::SupportPointCause::SeparationFromBed: message = L("low bed adhesion"); break;
-            case SupportSpotsGenerator::SupportPointCause::UnstableFloatingPart: message = L("floating object part"); break;
-            case SupportSpotsGenerator::SupportPointCause::WeakObjectPart: message = L("thin fragile section"); break;
+            //TRN Alert when support is needed. Describes that the print has low bed adhesion and may became loose.
+            case SupportSpotsGenerator::SupportPointCause::SeparationFromBed: message = L("Low bed adhesion"); break;
+            //TRN Alert when support is needed. Describes that the object has part that is not connected to the bed and will not print at all without supports.
+            case SupportSpotsGenerator::SupportPointCause::UnstableFloatingPart: message = L("Floating object part"); break;
+            //TRN Alert when support is needed. Describes that the object has thin part that may brake during printing 
+            case SupportSpotsGenerator::SupportPointCause::WeakObjectPart: message = L("Thin fragile part"); break;
             }
 
             return message;
+        };
+
+        // TRN this translation rule is used to translate lists of uknown size on single line. The first argument is element of the list,
+        // the second argument may be element or rest of the list. For most languages, this does not need translation, but some use different 
+        // separator than comma and some use blank space in front of the separator.
+        auto single_line_list_rule = L("%1%, %2%");
+        auto multiline_list_rule   = "%1%\n%2%";
+
+        auto elements_to_translated_list = [](const std::vector<std::string> &translated_elements, std::string expansion_rule) {
+            if (expansion_rule.find("%1%") == expansion_rule.npos || expansion_rule.find("%2%") == expansion_rule.npos) {
+                BOOST_LOG_TRIVIAL(error) << "INCORRECT EXPANSION RULE FOR LIST TRANSLATION: " << expansion_rule
+                                         << " - IT SHOULD CONTAIN %1% and %2%!";
+                expansion_rule = "%1% %2%";
+            }
+            if (translated_elements.size() == 0) {
+                return std::string{};
+            }
+            if (translated_elements.size() == 1) {
+                return translated_elements.front();
+            }
+
+            std::string translated_list = expansion_rule;
+            for (int i = 0; i < translated_elements.size() - 1; i++) {
+                auto first_elem = translated_list.find("%1%");
+                assert(first_elem != translated_list.npos);
+                translated_list.replace(first_elem, 3, translated_elements[i]);
+
+                // expand the translated list by another application of the same rule
+                auto second_elem = translated_list.find("%2%");
+                assert(second_elem != translated_list.npos);
+                if (i < translated_elements.size() - 2) {
+                    translated_list.replace(second_elem, 3, expansion_rule);
+                } else {
+                    translated_list.replace(second_elem, 3, translated_elements[i + 1]);
+                }
+            }
+
+            return translated_list;
         };
 
         // vector of pairs of object and its issues, where each issue is a pair of type and critical flag
@@ -1207,45 +1254,58 @@ void Print::alert_when_supports_needed()
             }
         }
 
-        bool recommend_brim = false;
+        bool                                                                                                  recommend_brim = false;
         std::map<std::pair<SupportSpotsGenerator::SupportPointCause, bool>, std::vector<const PrintObject *>> po_by_support_issues;
         for (const auto &obj : objects_isssues) {
             for (const auto &issue : obj.second) {
                 po_by_support_issues[issue].push_back(obj.first);
-                if (issue.first == SupportSpotsGenerator::SupportPointCause::SeparationFromBed && !obj.first->has_brim()){
+                if (issue.first == SupportSpotsGenerator::SupportPointCause::SeparationFromBed && !obj.first->has_brim()) {
                     recommend_brim = true;
                 }
             }
         }
 
-        auto message = L("Detected print stability issues") + ": \n";
+        std::vector<std::pair<std::string, std::vector<std::string>>> message_elements;
         if (objects_isssues.size() > po_by_support_issues.size()) {
             // there are more objects than causes, group by issues
             for (const auto &issue : po_by_support_issues) {
-                message += "\n" + issue_to_alert_message(issue.first.first, issue.first.second) + "  >>  ";
+                auto &pair = message_elements.emplace_back(issue_to_alert_message(issue.first.first, issue.first.second),
+                                                           std::vector<std::string>{});
                 for (const auto &obj : issue.second) {
-                    message += obj->m_model_object->name + ", ";
+                    pair.second.push_back(obj->m_model_object->name);
                 }
-                message.pop_back();
-                message.pop_back(); // remove ,
-                message += ".\n";
             }
         } else {
             // more causes than objects, group by objects
             for (const auto &obj : objects_isssues) {
-                message += "\n" + L("Object") + " " + obj.first->model_object()->name + "  <<  ";
+                auto &pair = message_elements.emplace_back(obj.first->model_object()->name,  std::vector<std::string>{});
                 for (const auto &issue : obj.second) {
-                    message += issue_to_alert_message(issue.first, issue.second) + ", ";
+                    pair.second.push_back(issue_to_alert_message(issue.first, issue.second));
                 }
-                message.pop_back();
-                message.pop_back(); // remove ,
-                message += ".\n";
             }
         }
 
-        bool brim_or_supp = recommend_brim && po_by_support_issues.size() < 2;
-        auto brim_part = " " + (brim_or_supp ? L("or") : L("and")) + " " + L("brim");
-        message += "\n" + L("Consider enabling supports") + (recommend_brim ? brim_part : "") + ".";
+        // first, gather sublements into single line list, store in first subelement
+        for (auto &pair : message_elements) {
+            pair.second.front() = elements_to_translated_list(pair.second, single_line_list_rule);
+        }
+
+        // then gather elements to create multiline list
+        std::vector<std::string> lines = {};
+        for (auto &pair : message_elements) {
+            lines.push_back(""); // empty line for readability
+            lines.push_back(pair.first);
+            lines.push_back(pair.second.front());
+        }
+
+        lines.push_back("");
+        lines.push_back(L("Consider enabling supports."));
+        if (recommend_brim) {
+            lines.push_back(L("Also consider enabling brim."));
+        }
+
+        // TRN Alert message for detected print issues. first argument is a list of detected issues.
+        auto message = Slic3r::format(L("Detected print stability issues:\n%1%"), elements_to_translated_list(lines, multiline_list_rule));
 
         if (objects_isssues.size() > 0) {
             this->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL, message);
