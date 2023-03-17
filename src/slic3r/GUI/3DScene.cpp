@@ -488,8 +488,6 @@ int GLVolumeCollection::load_wipe_tower_preview(
     float rotation_angle, bool size_unknown, float brim_width)
 #endif // ENABLE_OPENGL_ES
 {
-    if (depth < 0.01f)
-        return int(this->volumes.size() - 1);
     if (height == 0.0f)
         height = 0.1f;
 
