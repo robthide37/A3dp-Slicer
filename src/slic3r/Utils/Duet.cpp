@@ -49,9 +49,7 @@ wxString Duet::get_test_ok_msg () const
 
 wxString Duet::get_test_failed_msg (wxString &msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s")
-                    % _utf8(L("Could not connect to Duet"))
-                    % std::string(msg.ToUTF8())).str());
+    return GUI::format_wxstr("%s: %s", _L("Could not connect to Duet"), msg);
 }
 
 bool Duet::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const

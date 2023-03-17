@@ -30,8 +30,6 @@ namespace I18N {
 	namespace {
 		const char* L(const char* s)            { return s; }
 		std::string _u8L(const char* s)         { return Slic3r::I18N::translate(s); }
-		std::string _utf8(const char* s)        { return Slic3r::I18N::translate(s); }
-		std::string _utf8(const std::string& s) { return Slic3r::I18N::translate(s); }
 	}
 #endif
 

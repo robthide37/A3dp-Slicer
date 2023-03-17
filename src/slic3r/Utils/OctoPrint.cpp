@@ -203,7 +203,7 @@ bool OctoPrint::test_with_resolved_ip(wxString &msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                 }
             }
             catch (const std::exception&) {
@@ -252,7 +252,7 @@ bool OctoPrint::test(wxString& msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (! res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                 }
             }
             catch (const std::exception &) {
@@ -280,10 +280,10 @@ wxString OctoPrint::get_test_ok_msg () const
 
 wxString OctoPrint::get_test_failed_msg (wxString &msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s\n\n%s")
-        % _utf8(L("Could not connect to OctoPrint"))
-        % std::string(msg.ToUTF8())
-        % _utf8(L("Note: OctoPrint version at least 1.1.0 is required."))).str());
+    return GUI::format_wxstr("%s: %s\n\n%s"
+        , _L("Could not connect to OctoPrint")
+        , msg
+        , _L("Note: OctoPrint version at least 1.1.0 is required."));
 }
 
 bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
@@ -530,9 +530,7 @@ wxString SL1Host::get_test_ok_msg () const
 
 wxString SL1Host::get_test_failed_msg (wxString &msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s")
-                    % _utf8(L("Could not connect to Prusa SLA"))
-                    % std::string(msg.ToUTF8())).str());
+    return GUI::format_wxstr("%s: %s", _L("Could not connect to Prusa SLA"), msg);
 }
 
 bool SL1Host::validate_version_text(const boost::optional<std::string> &version_text) const
@@ -575,9 +573,7 @@ wxString PrusaLink::get_test_ok_msg() const
 
 wxString PrusaLink::get_test_failed_msg(wxString& msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s")
-        % _utf8(L("Could not connect to PrusaLink"))
-        % std::string(msg.ToUTF8())).str());
+    return GUI::format_wxstr("%s: %s", _L("Could not connect to PrusaLink"), msg);
 }
 
 bool PrusaLink::validate_version_text(const boost::optional<std::string>& version_text) const
@@ -663,7 +659,7 @@ bool PrusaLink::test(wxString& msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                 }
             }
             catch (const std::exception&) {
@@ -821,7 +817,7 @@ bool PrusaLink::test_with_method_check(wxString& msg, bool& use_put) const
             const auto text = ptree.get_optional<std::string>("text");
             res = validate_version_text(text);
             if (!res) {
-                msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                 use_put = false;
                 return;
             }
@@ -894,7 +890,7 @@ bool PrusaLink::test_with_resolved_ip_and_method_check(wxString& msg, bool& use_
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                     use_put = false;
                     return;
                 }
