@@ -3462,15 +3462,12 @@ bool priv::start_create_volume_on_surface_job(
     if (!hit.has_value())
         return false;
 
-    // priv::reset_skew(hit_to_world);
-    Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
-
     // Create result volume transformation
     Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal, priv::up_limit);
     const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
-    // new transformation in world coor is surface_trmat
-    Transform3d volume_trmat = instance.inverse() * surface_trmat;    
+    Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
+    Transform3d volume_trmat = instance.inverse() * surface_trmat;  
     start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     return true;
 }

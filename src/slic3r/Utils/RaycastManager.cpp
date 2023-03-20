@@ -153,6 +153,8 @@ std::optional<RaycastManager::Hit> RaycastManager::first_hit(const Vec3d& point,
     for (int i = 0; i < 3; ++i)
         pts[i] = tr * hit_mesh->vertices(tri[i]).cast<double>();
     Vec3d normal_world = (pts[1] - pts[0]).cross(pts[2] - pts[1]);
+    if (has_reflection(*hit_tramsformation))
+        normal_world *= -1;
     normal_world.normalize();
 
     SurfacePoint<double> point_world{hit_world, normal_world};
@@ -298,8 +300,8 @@ RaycastManager::TrItems::const_iterator find(const RaycastManager::TrItems &item
 
 template<typename VecType> inline void erase(std::vector<VecType> &vec, const std::vector<bool> &flags)
 {
-    assert(vec.size() == flags.size());
-    if (flags.empty()) return;
+    if (vec.size() < flags.size() || flags.empty())
+        return;
 
     // reverse iteration over flags to erase indices from back to front.
     for (int i = static_cast<int>(flags.size()) - 1; i >= 0; --i)
