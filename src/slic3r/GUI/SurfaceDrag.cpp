@@ -80,6 +80,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
 
         // allow moving with object again
         canvas.enable_moving(true);
+        canvas.enable_picking(true);
         surface_drag.reset();
 
         // only left up is correct
@@ -167,6 +168,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
 
         // disable moving with object by mouse
         canvas.enable_moving(false);
+        canvas.enable_picking(false);
         return true;
     }
 
