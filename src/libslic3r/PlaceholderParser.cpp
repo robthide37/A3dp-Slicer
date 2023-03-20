@@ -587,7 +587,7 @@ namespace client
             param1.set_s(buf);
         }
 
-        static void regex_op(expr &lhs, boost::iterator_range<Iterator> &rhs, char op)
+        static void regex_op(const expr &lhs, boost::iterator_range<Iterator> &rhs, char op, expr &out)
         {
             const std::string *subject  = nullptr;
             if (lhs.type() == TYPE_STRING) {
@@ -601,7 +601,7 @@ namespace client
                 bool result = SLIC3R_REGEX_NAMESPACE::regex_match(*subject, SLIC3R_REGEX_NAMESPACE::regex(pattern));
                 if (op == '!')
                     result = ! result;
-                lhs.set_b(result);
+                out.set_b(result);
             } catch (SLIC3R_REGEX_NAMESPACE::regex_error &ex) {
                 // Syntax error in the regular expression
                 boost::throw_exception(qi::expectation_failure<Iterator>(
@@ -609,8 +609,37 @@ namespace client
             }
         }
 
-        static void regex_matches     (expr &lhs, boost::iterator_range<Iterator> &rhs) { return regex_op(lhs, rhs, '='); }
-        static void regex_doesnt_match(expr &lhs, boost::iterator_range<Iterator> &rhs) { return regex_op(lhs, rhs, '!'); }
+        static void regex_matches     (expr &lhs, boost::iterator_range<Iterator> &rhs) { return regex_op(lhs, rhs, '=', lhs); }
+        static void regex_doesnt_match(expr &lhs, boost::iterator_range<Iterator> &rhs) { return regex_op(lhs, rhs, '!', lhs); }
+
+        static void one_of_test_init(expr &out) {
+            out.set_b(false);
+        }
+        template<bool RegEx>
+        static void one_of_test(const expr &match, const expr &pattern, expr &out) { 
+            if (! out.b()) {
+                if (match.type() != TYPE_STRING)
+                    match.throw_exception("one_of(): First parameter (the string to match against) has to be a string value");
+                if (pattern.type() != TYPE_STRING)
+                    match.throw_exception("one_of(): Pattern has to be a string value");
+                if (RegEx) {
+                    try {
+                        out.set_b(SLIC3R_REGEX_NAMESPACE::regex_match(match.s(), SLIC3R_REGEX_NAMESPACE::regex(pattern.s())));
+                    } catch (SLIC3R_REGEX_NAMESPACE::regex_error &) {
+                        // Syntax error in the regular expression
+                        pattern.throw_exception("Regular expression compilation failed");
+                    }
+                } else
+                    out.set_b(match.s() == pattern.s());
+            }
+        }
+        static void one_of_test_regex(const expr &match, boost::iterator_range<Iterator> &pattern, expr &out) {
+            if (! out.b()) {
+                if (match.type() != TYPE_STRING)
+                    match.throw_exception("one_of(): First parameter (the string to match against) has to be a string value");
+                regex_op(match, pattern, '=', out);
+            }
+        }
 
         static void logical_op(expr &lhs, expr &rhs, char op)
         {
@@ -1101,6 +1130,7 @@ namespace client
         { "multiplicative_expression",  "Expecting an expression." },
         { "unary_expression",           "Expecting an expression." },
         { "optional_parameter",         "Expecting a closing brace or an optional parameter." },
+        { "one_of_list",                "Expecting a list of string patterns (simple text or rexep)" },
         { "variable_reference",         "Expecting a variable reference."},
         { "is_nil_test",                "Expecting a scalar variable reference."},
         { "variable",                   "Expecting a variable name."},
@@ -1221,6 +1251,7 @@ namespace client
             qi::_a_type                 _a;
             qi::_b_type                 _b;
             qi::_r1_type                _r1;
+            qi::_r2_type                _r2;
 
             // Starting symbol of the grammer.
             // The leading eps is required by the "expectation point" operator ">".
@@ -1395,7 +1426,8 @@ namespace client
                                                                     [ px::bind(&expr<Iterator>::template digits<true>, _val, _2, _3) ]
                 |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1, _val) ]
                 |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
-                |   (kw["is_nil"] > '(' > is_nil_test(_r1) > ')')   [_val = _1]
+                |   (kw["is_nil"] > '(' > is_nil_test(_r1) > ')')   [ _val = _1 ]
+                |   (kw["one_of"] > '(' > one_of(_r1) > ')')        [ _val = _1 ]
                 |   (strict_double > iter_pos)                      [ px::bind(&FactorActions::double_, _1, _2, _val) ]
                 |   (int_      > iter_pos)                          [ px::bind(&FactorActions::int_,    _1, _2, _val) ]
                 |   (kw[bool_] > iter_pos)                          [ px::bind(&FactorActions::bool_,   _1, _2, _val) ]
@@ -1403,6 +1435,20 @@ namespace client
                                                                     [ px::bind(&FactorActions::string_, _1,     _val) ]
                 );
             unary_expression.name("unary_expression");
+
+            one_of = (unary_expression(_r1)[_a = _1] > one_of_list(_r1, _a))[_val = _2];
+            one_of.name("one_of");
+            one_of_list = 
+                eps[px::bind(&expr<Iterator>::one_of_test_init, _val)] >
+                (   ',' > *(
+                        (
+                                unary_expression(_r1)[px::bind(&expr<Iterator>::template one_of_test<false>, _r2, _1, _val)]
+                            |   (lit('~') > unary_expression(_r1))[px::bind(&expr<Iterator>::template one_of_test<true>, _r2, _1, _val)]
+                            |   regular_expression[px::bind(&expr<Iterator>::one_of_test_regex, _r2, _1, _val)]
+                        ) >> -lit(','))
+                    | eps
+                );
+            one_of_list.name("one_of_list");
 
             optional_parameter = iter_pos[px::bind(&FactorActions::set_start_pos, _1, _val)] >> (
                     lit(')')                                       [ px::bind(&FactorActions::noexpr, _val) ]
@@ -1445,6 +1491,7 @@ namespace client
                 ("random")
                 ("round")
                 ("not")
+                ("one_of")
                 ("or")
                 ("true");
 
@@ -1466,6 +1513,8 @@ namespace client
                 debug(additive_expression);
                 debug(multiplicative_expression);
                 debug(unary_expression);
+                debug(one_of);
+                debug(one_of_list);
                 debug(optional_parameter);
                 debug(variable_reference);
                 debug(variable);
@@ -1517,6 +1566,9 @@ namespace client
         qi::rule<Iterator, OptWithPos<Iterator>(const MyContext*), spirit_encoding::space_type> variable;
         // Evaluating whether a nullable variable is nil.
         qi::rule<Iterator, expr<Iterator>(const MyContext*), spirit_encoding::space_type> is_nil_test;
+        // Evaluating "one of" list of patterns.
+        qi::rule<Iterator, expr<Iterator>(const MyContext*), qi::locals<expr<Iterator>>, spirit_encoding::space_type> one_of;
+        qi::rule<Iterator, expr<Iterator>(const MyContext*, const expr<Iterator> &param), spirit_encoding::space_type> one_of_list;
 
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, bool>, spirit_encoding::space_type> if_else_output;
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<OptWithPos<Iterator>, int>, spirit_encoding::space_type> assignment_statement;
