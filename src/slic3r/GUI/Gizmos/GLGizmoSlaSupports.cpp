@@ -25,8 +25,10 @@ namespace Slic3r {
 namespace GUI {
 
 GLGizmoSlaSupports::GLGizmoSlaSupports(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
-    : GLGizmoSlaBase(parent, icon_filename, sprite_id, slaposDrillHoles)
-{}
+: GLGizmoSlaBase(parent, icon_filename, sprite_id, slaposDrillHoles)
+{
+    show_sla_supports(true);
+}
 
 bool GLGizmoSlaSupports::on_init()
 {
@@ -127,6 +129,7 @@ void GLGizmoSlaSupports::on_render()
 
     m_selection_rectangle.render(m_parent);
     m_c->object_clipper()->render_cut();
+    m_c->supports_clipper()->render_cut();
 
     glsafe(::glDisable(GL_BLEND));
 }

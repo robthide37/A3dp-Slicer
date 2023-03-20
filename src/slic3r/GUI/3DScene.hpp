@@ -430,6 +430,16 @@ public:
         float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width);
 #endif // ENABLE_OPENGL_ES
 
+    // Load SLA auxiliary GLVolumes (for support trees or pad).
+    void load_object_auxiliary(
+        const SLAPrintObject* print_object,
+        int                             obj_idx,
+        // pairs of <instance_idx, print_instance_idx>
+        const std::vector<std::pair<size_t, size_t>>& instances,
+        SLAPrintObjectStep              milestone,
+        // Timestamp of the last change of the milestone
+        size_t                          timestamp);
+
     GLVolume* new_toolpath_volume(const ColorRGBA& rgba);
     GLVolume* new_nontoolpath_volume(const ColorRGBA& rgba);
     // Render the volumes by OpenGL.
