@@ -313,11 +313,14 @@ namespace Slic3r::GUI{
 
 RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::AllowVolumes &condition)
 {
-    SceneRaycaster::EType                                   type          = SceneRaycaster::EType::Volume;
-    auto                                                    scene_casters = canvas.get_raycasters_for_picking(type);
-    const std::vector<std::shared_ptr<SceneRaycasterItem>> &casters       = *scene_casters;
-    const GLVolumePtrs                                     &gl_volumes    = canvas.get_volumes().volumes;
-    const ModelObjectPtrs                                  &objects       = canvas.get_model()->objects;
+    SceneRaycaster::EType type = SceneRaycaster::EType::Volume;
+    auto scene_casters = canvas.get_raycasters_for_picking(type);
+    if (scene_casters == nullptr)
+        return {};
+    const std::vector<std::shared_ptr<SceneRaycasterItem>> &casters = *scene_casters;
+
+    const GLVolumePtrs    &gl_volumes = canvas.get_volumes().volumes;
+    const ModelObjectPtrs &objects    = canvas.get_model()->objects;
 
     RaycastManager::Meshes meshes;
     for (const std::shared_ptr<SceneRaycasterItem> &caster : casters) {
@@ -327,9 +330,13 @@ RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::A
         auto index_ = static_cast<size_t>(index);
         if(index_ >= gl_volumes.size())
             continue;
-        const GLVolume    *gl_volume = gl_volumes[index_];
-        const ModelVolume *volume    = get_model_volume(*gl_volume, objects);
-        size_t             id        = volume->id().id;
+        const GLVolume *gl_volume = gl_volumes[index_];
+        if (gl_volume == nullptr)
+            continue;
+        const ModelVolume *volume = get_model_volume(*gl_volume, objects);
+        if (volume == nullptr)
+            continue;
+        size_t id = volume->id().id;
         if (condition.skip(id))
             continue;
         auto mesh = std::make_unique<AABBMesh>(caster->get_raycaster()->get_aabb_mesh());
