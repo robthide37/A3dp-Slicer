@@ -4,7 +4,6 @@
 #include <string_view>
 #include <cassert>
 
-#define L(s) (s)
 
 namespace Slic3r {
 

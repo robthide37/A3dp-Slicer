@@ -296,11 +296,6 @@ bool is_valid_object_type(const std::string& type)
 
 namespace Slic3r {
 
-//! macro used to mark string used at localization,
-//! return same string
-#define L(s) (s)
-#define _(s) Slic3r::I18N::translate(s)
-
     // Base class with error messages management
     class _3MF_Base
     {
@@ -1875,9 +1870,9 @@ namespace Slic3r {
         if (m_curr_metadata_name == SLIC3RPE_3MF_VERSION) {
             m_version = (unsigned int)atoi(m_curr_characters.c_str());
             if (m_check_version && (m_version > VERSION_3MF_COMPATIBLE)) {
-                // std::string msg = _(L("The selected 3mf file has been saved with a newer version of " + std::string(SLIC3R_APP_NAME) + " and is not compatible."));
+                // std::string msg = _u8L("The selected 3mf file has been saved with a newer version of " + std::string(SLIC3R_APP_NAME) + " and is not compatible.");
                 // throw version_error(msg.c_str());
-                const std::string msg = (boost::format(_(L("The selected 3mf file has been saved with a newer version of %1% and is not compatible."))) % std::string(SLIC3R_APP_NAME)).str();
+                const std::string msg = (boost::format(_u8L("The selected 3mf file has been saved with a newer version of %1% and is not compatible.")) % std::string(SLIC3R_APP_NAME)).str();
                 throw version_error(msg);
             }
         } else if (m_curr_metadata_name == "Application") {
@@ -1888,15 +1883,15 @@ namespace Slic3r {
         } else if (m_curr_metadata_name == SLIC3RPE_FDM_SUPPORTS_PAINTING_VERSION) {
             m_fdm_supports_painting_version = (unsigned int) atoi(m_curr_characters.c_str());
             check_painting_version(m_fdm_supports_painting_version, FDM_SUPPORTS_PAINTING_VERSION,
-                _(L("The selected 3MF contains FDM supports painted object using a newer version of PrusaSlicer and is not compatible.")));
+                _u8L("The selected 3MF contains FDM supports painted object using a newer version of PrusaSlicer and is not compatible."));
         } else if (m_curr_metadata_name == SLIC3RPE_SEAM_PAINTING_VERSION) {
             m_seam_painting_version = (unsigned int) atoi(m_curr_characters.c_str());
             check_painting_version(m_seam_painting_version, SEAM_PAINTING_VERSION,
-                _(L("The selected 3MF contains seam painted object using a newer version of PrusaSlicer and is not compatible.")));
+                _u8L("The selected 3MF contains seam painted object using a newer version of PrusaSlicer and is not compatible."));
         } else if (m_curr_metadata_name == SLIC3RPE_MM_PAINTING_VERSION) {
             m_mm_painting_version = (unsigned int) atoi(m_curr_characters.c_str());
             check_painting_version(m_mm_painting_version, MM_PAINTING_VERSION,
-                _(L("The selected 3MF contains multi-material painted object using a newer version of PrusaSlicer and is not compatible.")));
+                _u8L("The selected 3MF contains multi-material painted object using a newer version of PrusaSlicer and is not compatible."));
         }
 
         return true;

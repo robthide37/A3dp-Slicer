@@ -4,6 +4,7 @@
 #include "GLGizmoBase.hpp"
 #include "slic3r/GUI/GLSelectionRectangle.hpp"
 #include "slic3r/GUI/GLModel.hpp"
+#include "slic3r/GUI/I18N.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Model.hpp"
 #include "imgui/imgui.h"
@@ -253,7 +254,7 @@ protected:
     bool wants_enter_leave_snapshots() const override       { return true; }
     std::string get_gizmo_entering_text() const override    { return _u8L("Entering Cut gizmo"); }
     std::string get_gizmo_leaving_text() const override     { return _u8L("Leaving Cut gizmo"); }
-    std::string get_action_snapshot_name() override         { return _u8L("Cut gizmo editing"); }
+    std::string get_action_snapshot_name() const override   { return _u8L("Cut gizmo editing"); }
 
     void data_changed() override;
 

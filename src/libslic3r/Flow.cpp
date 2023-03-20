@@ -6,9 +6,6 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-// Mark string for localization and translate.
-#define L(s) Slic3r::I18N::translate(s)
-
 namespace Slic3r {
 
 FlowErrorNegativeSpacing::FlowErrorNegativeSpacing() : 
@@ -58,7 +55,7 @@ static inline FlowRole opt_key_to_flow_role(const std::string &opt_key)
 
 static inline void throw_on_missing_variable(const std::string &opt_key, const char *dependent_opt_key) 
 {
-	throw FlowErrorMissingVariable((boost::format(L("Cannot calculate extrusion width for %1%: Variable \"%2%\" not accessible.")) % opt_key % dependent_opt_key).str());
+	throw FlowErrorMissingVariable((boost::format(_u8L("Cannot calculate extrusion width for %1%: Variable \"%2%\" not accessible.")) % opt_key % dependent_opt_key).str());
 }
 
 // Used to provide hints to the user on default extrusion width values, and to provide reasonable values to the PlaceholderParser.

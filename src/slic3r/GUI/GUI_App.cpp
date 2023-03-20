@@ -5,7 +5,11 @@
 #include "GUI_ObjectManipulation.hpp"
 #include "GUI_Factories.hpp"
 #include "format.hpp"
-#include "I18N.hpp"
+
+// Localization headers: include libslic3r version first so everything in this file
+// uses the slic3r/GUI version (the macros will take precedence over the functions).
+#include "libslic3r/I18N.hpp"
+#include "slic3r/GUI/I18N.hpp"
 
 #include <algorithm>
 #include <iterator>
@@ -44,7 +48,6 @@
 
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Model.hpp"
-#include "libslic3r/I18N.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Color.hpp"
 
@@ -2381,8 +2384,8 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
     auto local_menu = new wxMenu();
     wxWindowID config_id_base = wxWindow::NewControlId(int(ConfigMenuCnt));
 
-    const auto config_wizard_name = _(ConfigWizard::name(true));
-    const auto config_wizard_tooltip = from_u8((boost::format(_utf8(L("Run %s"))) % config_wizard_name).str());
+    const wxString config_wizard_name = _(ConfigWizard::name(true));
+    const wxString config_wizard_tooltip = from_u8((boost::format(_u8L("Run %s")) % config_wizard_name).str());
     // Cmd+, is standard on OS X - what about other operating systems?
     if (is_editor()) {
         local_menu->Append(config_id_base + ConfigMenuWizard, config_wizard_name + dots, config_wizard_tooltip);
@@ -3461,7 +3464,7 @@ void GUI_App::start_download(std::string url)
     //lets always init so if the download dest folder was changed, new dest is used 
         boost::filesystem::path dest_folder(app_config->get("url_downloader_dest"));
         if (dest_folder.empty() || !boost::filesystem::is_directory(dest_folder)) {
-            std::string msg = _utf8("Could not start URL download. Destination folder is not set. Please choose destination folder in Configuration Wizard.");
+            std::string msg = _u8L("Could not start URL download. Destination folder is not set. Please choose destination folder in Configuration Wizard.");
             BOOST_LOG_TRIVIAL(error) << msg;
             show_error(nullptr, msg);
             return;

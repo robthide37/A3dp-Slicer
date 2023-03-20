@@ -56,6 +56,7 @@
 #include "MsgDialog.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "slic3r/Utils/AppUpdater.hpp"
+#include "slic3r/GUI/I18N.hpp"
 
 #if defined(__linux__) && defined(__WXGTK3__)
 #define wxLinux_gtk3 true

@@ -71,11 +71,6 @@ using namespace std::literals::string_view_literals;
 
 namespace Slic3r {
 
-    //! macro used to mark string used at localization,
-    //! return same string
-#define L(s) (s)
-#define _(s) Slic3r::I18N::translate(s)
-
 // Only add a newline in case the current G-code does not end with a newline.
     static inline void check_add_eol(std::string& gcode)
     {
@@ -487,8 +482,8 @@ GCode::ObjectsLayerToPrint GCode::collect_layers_to_print(const PrintObject& obj
         // first layer may result in skirt/brim in the air and maybe other issues.
         if (layers_to_print.size() == 1u) {
             if (!has_extrusions)
-                throw Slic3r::SlicingError(_(L("There is an object with no extrusions in the first layer.")) + "\n" +
-                                           _(L("Object name")) + ": " + object.model_object()->name);
+                throw Slic3r::SlicingError(_u8L("There is an object with no extrusions in the first layer.") + "\n" +
+                                           _u8L("Object name") + ": " + object.model_object()->name);
         }
 
         // In case there are extrusions on this layer, check there is a layer to lay it on.
@@ -518,14 +513,14 @@ GCode::ObjectsLayerToPrint GCode::collect_layers_to_print(const PrintObject& obj
         std::string warning;
         size_t i = 0;
         for (i = 0; i < std::min(warning_ranges.size(), size_t(3)); ++i)
-            warning += Slic3r::format(_(L("Empty layer between %1% and %2%.")),
+            warning += Slic3r::format(_u8L("Empty layer between %1% and %2%."),
                                       warning_ranges[i].first, warning_ranges[i].second) + "\n";
         if (i < warning_ranges.size())
-            warning += _(L("(Some lines not shown)")) + "\n";
+            warning += _u8L("(Some lines not shown)") + "\n";
         warning += "\n";
-        warning += Slic3r::format(_(L("Object name: %1%")), object.model_object()->name) + "\n\n"
-            + _(L("Make sure the object is printable. This is usually caused by negligibly small extrusions or by a faulty model. "
-                "Try to repair the model or change its orientation on the bed."));
+        warning += Slic3r::format(_u8L("Object name: %1%"), object.model_object()->name) + "\n\n"
+            + _u8L("Make sure the object is printable. This is usually caused by negligibly small extrusions or by a faulty model. "
+                "Try to repair the model or change its orientation on the bed.");
 
         const_cast<Print*>(object.print())->active_step_add_warning(
             PrintStateBase::WarningLevel::CRITICAL, warning);
@@ -655,25 +650,25 @@ namespace DoExport {
         };
 
         const GCodeConfig& config = print.config();
-        check(_(L("Start G-code")), config.start_gcode.value);
-        if (ret.size() < MAX_TAGS_COUNT) check(_(L("End G-code")), config.end_gcode.value);
-        if (ret.size() < MAX_TAGS_COUNT) check(_(L("Before layer change G-code")), config.before_layer_gcode.value);
-        if (ret.size() < MAX_TAGS_COUNT) check(_(L("After layer change G-code")), config.layer_gcode.value);
-        if (ret.size() < MAX_TAGS_COUNT) check(_(L("Tool change G-code")), config.toolchange_gcode.value);
-        if (ret.size() < MAX_TAGS_COUNT) check(_(L("Between objects G-code (for sequential printing)")), config.between_objects_gcode.value);
-        if (ret.size() < MAX_TAGS_COUNT) check(_(L("Color Change G-code")), config.color_change_gcode.value);
-        if (ret.size() < MAX_TAGS_COUNT) check(_(L("Pause Print G-code")), config.pause_print_gcode.value);
-        if (ret.size() < MAX_TAGS_COUNT) check(_(L("Template Custom G-code")), config.template_custom_gcode.value);
+        check(_u8L("Start G-code"), config.start_gcode.value);
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("End G-code"), config.end_gcode.value);
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Before layer change G-code"), config.before_layer_gcode.value);
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("After layer change G-code"), config.layer_gcode.value);
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Tool change G-code"), config.toolchange_gcode.value);
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Between objects G-code (for sequential printing)"), config.between_objects_gcode.value);
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Color Change G-code"), config.color_change_gcode.value);
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Pause Print G-code"), config.pause_print_gcode.value);
+        if (ret.size() < MAX_TAGS_COUNT) check(_u8L("Template Custom G-code"), config.template_custom_gcode.value);
         if (ret.size() < MAX_TAGS_COUNT) {
             for (const std::string& value : config.start_filament_gcode.values) {
-                check(_(L("Filament Start G-code")), value);
+                check(_u8L("Filament Start G-code"), value);
                 if (ret.size() == MAX_TAGS_COUNT)
                     break;
             }
         }
         if (ret.size() < MAX_TAGS_COUNT) {
             for (const std::string& value : config.end_filament_gcode.values) {
-                check(_(L("Filament End G-code")), value);
+                check(_u8L("Filament End G-code"), value);
                 if (ret.size() == MAX_TAGS_COUNT)
                     break;
             }
@@ -681,7 +676,7 @@ namespace DoExport {
         if (ret.size() < MAX_TAGS_COUNT) {
             const CustomGCode::Info& custom_gcode_per_print_z = print.model().custom_gcode_per_print_z;
             for (const auto& gcode : custom_gcode_per_print_z.gcodes) {
-                check(_(L("Custom G-code")), gcode.extra);
+                check(_u8L("Custom G-code"), gcode.extra);
                 if (ret.size() == MAX_TAGS_COUNT)
                     break;
             }
@@ -714,9 +709,9 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
             reports += source + ": \"" + keyword + "\"\n";
         }
         print->active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
-            _(L("In the custom G-code were found reserved keywords:")) + "\n" +
+            _u8L("In the custom G-code were found reserved keywords:") + "\n" +
             reports +
-            _(L("This may cause problems in g-code visualization and printing time estimation.")));
+            _u8L("This may cause problems in g-code visualization and printing time estimation."));
     }
 
     BOOST_LOG_TRIVIAL(info) << "Exporting G-code..." << log_memory_info();
@@ -1111,7 +1106,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         }
         if (initial_extruder_id == static_cast<unsigned int>(-1))
             // No object to print was found, cancel the G-code export.
-            throw Slic3r::SlicingError(_(L("No extrusions were generated for objects.")));
+            throw Slic3r::SlicingError(_u8L("No extrusions were generated for objects."));
         // We don't allow switching of extruders per layer by Model::custom_gcode_per_print_z in sequential mode.
         // Use the extruder IDs collected from Regions.
         this->set_extruders(print.extruders());
@@ -1122,7 +1117,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         tool_ordering.assign_custom_gcodes(print);
         if (tool_ordering.all_extruders().empty())
             // No object to print was found, cancel the G-code export.
-            throw Slic3r::SlicingError(_(L("No extrusions were generated for objects.")));
+            throw Slic3r::SlicingError(_u8L("No extrusions were generated for objects."));
         has_wipe_tower = print.has_wipe_tower() && tool_ordering.has_wipe_tower();
         initial_extruder_id = (has_wipe_tower && ! print.config().single_extruder_multi_material_priming) ?
             // The priming towers will be skipped.
@@ -1316,8 +1311,8 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
                     // (See https://github.com/prusa3d/PrusaSlicer/issues/5441.)
                     if (overlap) {
                         print.active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                            _(L("Your print is very close to the priming regions. "
-                              "Make sure there is no collision.")));
+                            _u8L("Your print is very close to the priming regions. "
+                              "Make sure there is no collision."));
                     } else {
                         // Just continue printing, no action necessary.
                     }

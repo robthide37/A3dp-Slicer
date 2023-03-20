@@ -1,4 +1,3 @@
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoCut.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 
