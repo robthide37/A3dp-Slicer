@@ -769,12 +769,17 @@ bool PrusaLink::get_storage(wxArrayString& storage_path, wxArrayString& storage_
 
     if (res && storage_path.empty()) {
         if (!storage.empty()) { // otherwise error_msg is already filled 
-            error_msg = L"\n\n" + _L("Storages found:") + L" \n";
+            error_msg = L"\n\n" + _L("Storages found") + L": \n";
             for (const auto& si : storage) {
-                error_msg += si.path + L" : " + (si.read_only ? _L("read only") : _L("no free space")) + L"\n";
+                error_msg += GUI::format_wxstr(si.read_only ?
+                                                                // TRN %1% = storage path
+                                                                _L("%1% : read only") : 
+                                                                // TRN %1% = storage path
+                                                                _L("%1% : no free space"), si.path) + L"\n";
             }
         }
-        std::string message = GUI::format(_L("Upload has failed. There is no suitable storage found at %1%.%2%"), m_host, error_msg);
+        // TRN %1% = host
+        std::string message = GUI::format(_L("Upload has failed. There is no suitable storage found at %1%."), m_host) + GUI::into_u8(error_msg);
         BOOST_LOG_TRIVIAL(error) << message;
         throw Slic3r::IOError(message);
     }
@@ -1138,9 +1143,7 @@ wxString PrusaConnect::get_test_ok_msg() const
 
 wxString PrusaConnect::get_test_failed_msg(wxString& msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s")
-        % _utf8(L("Could not connect to PrusaConnect"))
-        % std::string(msg.ToUTF8())).str());
+    return GUI::format_wxstr("%s: %s", _L("Could not connect to PrusaConnect"), msg);
 }
 
 }

@@ -51,6 +51,7 @@ const std::array<unsigned, slaposCount> OBJ_STEP_LEVELS = {
 std::string OBJ_STEP_LABELS(size_t idx)
 {
     switch (idx) {
+                                            // TRN Status of the SLA print calculation
     case slaposAssembly:             return _u8L("Assembling model from parts");
     case slaposHollowing:            return _u8L("Hollowing model");
     case slaposDrillHoles:           return _u8L("Drilling holes into model.");

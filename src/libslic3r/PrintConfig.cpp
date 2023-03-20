@@ -399,6 +399,7 @@ void PrintConfigDef::init_fff_params()
     const int max_temp = 1500;
     def = this->add("avoid_crossing_curled_overhangs", coBool);
     def->label = L("Avoid crossing curled overhangs (Experimental)");
+    // TRN PrintSettings: "Avoid crossing curled overhangs (Experimental)"
     def->tooltip = L("Plan travel moves such that the extruder avoids areas where the filament may be curled up. "
                    "This is mostly happening on steeper rounded overhangs and may cause a crash with the nozzle. "
                    "This feature slows down both the print and the G-code generation.");
@@ -456,8 +457,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("bottom_solid_layers", coInt);
-    //TRN To be shown in Print Settings "Bottom solid layers"
-    def->label = L("Bottom");
+    //TRN Print Settings: "Bottom solid layers"
+    def->label = L_CONTEXT("Bottom", "Layers");
     def->category = L("Layers and Perimeters");
     def->tooltip = L("Number of solid layers to generate on bottom surfaces.");
     def->full_label = L("Bottom solid layers");
@@ -465,8 +466,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInt(3));
 
     def = this->add("bottom_solid_min_thickness", coFloat);
-    //TRN To be shown in Print Settings "Top solid layers"
-    def->label = L("Bottom");
+    def->label = L_CONTEXT("Bottom", "Layers");
     def->category = L("Layers and Perimeters");
     def->tooltip = L("The number of bottom solid layers is increased above bottom_solid_layers if necessary to satisfy "
     				 "minimum thickness of bottom shell.");
@@ -533,6 +533,7 @@ void PrintConfigDef::init_fff_params()
     def->mode       = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
+    // TRN PrintSettings : "Dynamic overhang speed"
     auto overhang_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
                         "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
                         "Speeds for overhang sizes in between are calculated via linear interpolation. "
@@ -580,10 +581,11 @@ void PrintConfigDef::init_fff_params()
     def->mode    = comExpert;
     def->set_default_value(new ConfigOptionBools{false});
 
+    // TRN FilamentSettings : "Dynamic fan speeds"
     auto fan_speed_setting_description = L(
         "Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
         "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
-        "Fan speeds for overhang sizes in between are calculated via linear interpolation. ");
+        "Fan speeds for overhang sizes in between are calculated via linear interpolation.");
 
     def           = this->add("overhang_fan_speed_0", coInts);
     def->label    = L("speed for 0% overlap (bridge)");
@@ -1961,7 +1963,8 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("ooze_prevention", coBool);
     def->label = L("Enable");
-    def->tooltip = L("This option will drop the temperature of the inactive extruders to prevent oozing. ");
+    // TRN PrintSettings: Enable ooze prevention
+    def->tooltip = L("This option will drop the temperature of the inactive extruders to prevent oozing.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
@@ -2299,6 +2302,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("staggered_inner_seams", coBool);
     def->label = L("Staggered inner seams");
+    // TRN PrintSettings: "Staggered inner seams"
     def->tooltip = L("This option causes the inner seams to be shifted backwards based on their depth, forming a zigzag pattern.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(false));
@@ -2464,6 +2468,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("standby_temperature_delta", coInt);
     def->label = L("Temperature variation");
+    // TRN PrintSettings : "Ooze prevention" > "Temperature variation"
     def->tooltip = L("Temperature difference to be applied when an extruder is not active. "
                      "The value is not used when 'idle_temperature' in filament settings "
                      "is defined.");
@@ -2641,8 +2646,8 @@ void PrintConfigDef::init_fff_params()
                    "If set to zero, support_material_contact_distance will be used for both top and bottom contact Z distances.");
     def->sidetext = L("mm");
 //    def->min = 0;
-    //TRN To be shown in Print Settings "Bottom contact Z distance". Have to be as short as possible
     def->set_enum_values(ConfigOptionDef::GUIType::f_enum_open, {
+    //TRN Print Settings: "Bottom contact Z distance". Have to be as short as possible
         { "0",      L("Same as top") },
         { "0.1",    "0.1" },
         { "0.2",    "0.2" }
@@ -2722,8 +2727,8 @@ void PrintConfigDef::init_fff_params()
                      "Set to -1 to use support_material_interface_layers");
     def->sidetext = L("layers");
     def->min = -1;
-    //TRN To be shown in Print Settings "Bottom interface layers". Have to be as short as possible
     def->set_enum_values(ConfigOptionDef::GUIType::i_enum_open, {
+    //TRN Print Settings: "Bottom interface layers". Have to be as short as possible
         { "-1", L("Same as top") },
         { "0", L("0 (off)") },
         { "1", L("1 (light)") },
@@ -2824,6 +2829,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("support_material_synchronize_layers", coBool);
     def->label = L("Synchronize with object layers");
     def->category = L("Support material");
+    // TRN PrintSettings : "Synchronize with object layers"
     def->tooltip = L("Synchronize support layers with the object print layers. This is useful "
                    "with multi-material printers, where the extruder switch is expensive. "
                    "This option is only available when top contact Z distance is set to zero.");
@@ -2855,6 +2861,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("support_tree_angle", coFloat);
     def->label = L("Maximum Branch Angle");
     def->category = L("Support material");
+    // TRN PrintSettings: "Organic supports" > "Maximum Branch Angle"
     def->tooltip = L("The maximum angle of the branches, when the branches have to avoid the model. "
                      "Use a lower angle to make them more vertical and more stable. Use a higher angle to be able to have more reach.");
     def->sidetext = L("°");
@@ -2866,6 +2873,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("support_tree_angle_slow", coFloat);
     def->label = L("Preferred Branch Angle");
     def->category = L("Support material");
+    // TRN PrintSettings: "Organic supports" > "Preferred Branch Angle"
     def->tooltip = L("The preferred angle of the branches, when they do not have to avoid the model. "
                      "Use a lower angle to make them more vertical and more stable. Use a higher angle for branches to merge faster.");
     def->sidetext = L("°");
@@ -2877,6 +2885,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("support_tree_tip_diameter", coFloat);
     def->label = L("Tip Diameter");
     def->category = L("Support material");
+    // TRN PrintSettings: "Organic supports" > "Tip Diameter"
     def->tooltip = L("The diameter of the top of the tip of the branches of organic support.");
     def->sidetext = L("mm");
     def->min = 0;
@@ -2886,6 +2895,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("support_tree_branch_diameter", coFloat);
     def->label = L("Branch Diameter");
     def->category = L("Support material");
+    // TRN PrintSettings: "Organic supports" > "Branch Diameter"
     def->tooltip = L("The diameter of the thinnest branches of organic support. Thicker branches are more sturdy. "
                      "Branches towards the base will be thicker than this.");
     def->sidetext = L("mm");
@@ -2894,8 +2904,10 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(2));
 
     def = this->add("support_tree_branch_diameter_angle", coFloat);
+    // TRN PrintSettings: #lmFIXME 
     def->label = L("Branch Diameter Angle");
     def->category = L("Support material");
+    // TRN PrintSettings: "Organic supports" > "Branch Diameter Angle"
     def->tooltip = L("The angle of the branches' diameter as they gradually become thicker towards the bottom. "
                      "An angle of 0 will cause the branches to have uniform thickness over their length. "
                      "A bit of an angle can increase stability of the organic support.");
@@ -2909,8 +2921,10 @@ void PrintConfigDef::init_fff_params()
     // How far apart the branches need to be when they touch the model. Making this distance small will cause 
     // the tree support to touch the model at more points, causing better overhang but making support harder to remove.
     def = this->add("support_tree_branch_distance", coFloat);
+    // TRN PrintSettings: #lmFIXME 
     def->label = L("Branch Distance");
     def->category = L("Support material");
+    // TRN PrintSettings: "Organic supports" > "Branch Distance"
     def->tooltip = L("How far apart the branches need to be when they touch the model. "
                      "Making this distance small will cause the tree support to touch the model at more points, "
                      "causing better overhang but making support harder to remove.");
@@ -2920,6 +2934,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("support_tree_top_rate", coPercent);
     def->label = L("Branch Density");
     def->category = L("Support material");
+    // TRN PrintSettings: "Organic supports" > "Branch Density"
     def->tooltip = L("Adjusts the density of the support structure used to generate the tips of the branches. "
                      "A higher value results in better overhangs but the supports are harder to remove, "
                      "thus it is recommended to enable top support interfaces instead of a high branch density value "
@@ -3008,8 +3023,8 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(15, false));
 
     def = this->add("top_solid_layers", coInt);
-    //TRN To be shown in Print Settings "Top solid layers"
-    def->label = L("Top");
+    //TRN Print Settings: "Top solid layers"
+    def->label = L_CONTEXT("Top", "Layers");
     def->category = L("Layers and Perimeters");
     def->tooltip = L("Number of solid layers to generate on top surfaces.");
     def->full_label = L("Top solid layers");
@@ -3017,8 +3032,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionInt(3));
 
     def = this->add("top_solid_min_thickness", coFloat);
-    //TRN To be shown in Print Settings "Top solid layers"
-    def->label = L("Top");
+    def->label = L_CONTEXT("Top", "Layers");
     def->category = L("Layers and Perimeters");
     def->tooltip = L("The number of top solid layers is increased above top_solid_layers if necessary to satisfy "
     				 "minimum thickness of top shell."
@@ -3874,7 +3888,9 @@ void PrintConfigDef::init_sla_params()
     def->tooltip = L("Support tree building strategy");
     def->set_enum<sla::SupportTreeType>(
         ConfigOptionEnum<sla::SupportTreeType>::get_enum_names(),
-        { L("Default"), L("Branching (experimental)") });
+        { L("Default"),
+    // TRN One of the "Support tree type"s on SLAPrintSettings : Supports
+            L("Branching (experimental)") });
     // TODO: def->enum_def->labels[2] = L("Organic");
     def->mode = comSimple;
     def->set_default_value(new ConfigOptionEnum(sla::SupportTreeType::Default));

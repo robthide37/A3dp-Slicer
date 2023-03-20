@@ -272,11 +272,10 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         // We will add a button to toggle mirroring to each axis:
         auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_off", wxEmptyString, wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER | wxTRANSPARENT_WINDOW);
 #if ENABLE_WORLD_COORDINATE
-        btn->SetToolTip(_L("Mirror along") + wxString::Format(_L(" %c "), (int)label) + _L("axis"));
-
+        btn->SetToolTip(format_wxstr(_L("Mirror along %1% axis"), label));
         m_mirror_buttons[axis_idx] = btn;
 #else
-        btn->SetToolTip(wxString::Format(_L("Toggle %c axis mirroring"), (int)label));
+        btn->SetToolTip(format_wxstr(_L("Toggle %1% axis mirroring"), label));
         btn->SetBitmapDisabled_(m_mirror_bitmap_hidden);
 
         m_mirror_buttons[axis_idx].first = btn;

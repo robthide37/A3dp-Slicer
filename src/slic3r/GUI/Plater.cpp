@@ -3033,8 +3033,8 @@ bool Plater::priv::delete_object_from_model(size_t obj_idx)
     ModelObject* obj = model.objects[obj_idx];
     if (obj->is_cut()) {
         InfoDialog dialog(q, _L("Delete object which is a part of cut object"), 
-                             _L("You try to delete an object which is a part of a cut object.\n"
-                                "This action will break a cut correspondence.\n"
+                             _L("You try to delete an object which is a part of a cut object.") + "\n" + 
+                                _L("This action will break a cut information.\n"
                                 "After that PrusaSlicer can't guarantee model consistency"), 
                                 false, wxYES | wxCANCEL | wxCANCEL_DEFAULT | wxICON_WARNING);
         dialog.SetButtonLabel(wxID_YES, _L("Delete object"));
@@ -5437,7 +5437,7 @@ protected:
 
 LoadProjectsDialog::LoadProjectsDialog(const std::vector<fs::path>& paths)
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY,
-        format_wxstr(_L("%s - Multiple projects file"), SLIC3R_APP_NAME), wxDefaultPosition,
+        format_wxstr(_L("%1% - Multiple projects file"), SLIC3R_APP_NAME), wxDefaultPosition,
         wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
 {
     SetFont(wxGetApp().normal_font());
@@ -5826,7 +5826,7 @@ protected:
 
 ProjectDropDialog::ProjectDropDialog(const std::string& filename)
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY,
-        format_wxstr(_L("%s - Load project file"), SLIC3R_APP_NAME), wxDefaultPosition,
+        format_wxstr("%1% - %2%", SLIC3R_APP_NAME, _L("Load project file")), wxDefaultPosition,
         wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
 {
     SetFont(wxGetApp().normal_font());
@@ -5934,7 +5934,7 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
         std::string filename = (*it).filename().string();
         if (boost::algorithm::iends_with(filename, ".3mf") || boost::algorithm::iends_with(filename, ".amf")) {
             ProjectDropDialog::LoadType load_type = ProjectDropDialog::LoadType::Unknown;
-//            if (!model().objects.empty()) { // #ysFIXME_delete_after_test_of_6377
+            {
                 if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(it->string())) ||
                     (boost::algorithm::iends_with(filename, ".amf") && !boost::algorithm::iends_with(filename, ".zip.amf")))
                     load_type = ProjectDropDialog::LoadType::LoadGeometry;
@@ -5951,11 +5951,7 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
                         load_type = static_cast<ProjectDropDialog::LoadType>(std::clamp(std::stoi(wxGetApp().app_config->get("drop_project_action")),
                             static_cast<int>(ProjectDropDialog::LoadType::OpenProject), static_cast<int>(ProjectDropDialog::LoadType::LoadConfig)));
                 }
-/* // #ysFIXME_delete_after_test_of_6377
             }
-            else
-                load_type = ProjectDropDialog::LoadType::OpenProject;
-*/
 
             if (load_type == ProjectDropDialog::LoadType::Unknown)
                 return false;

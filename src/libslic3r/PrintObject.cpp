@@ -399,7 +399,8 @@ void PrintObject::infill()
     this->prepare_infill();
 
     if (this->set_started(posInfill)) {
-        m_print->set_status(45, _u8L("making infill"));
+        // TRN Status for the Print calculation 
+        m_print->set_status(45, _u8L("Making infill"));
         const auto& adaptive_fill_octree = this->m_adaptive_fill_octrees.first;
         const auto& support_fill_octree = this->m_adaptive_fill_octrees.second;
 

@@ -141,7 +141,6 @@ wxString CopyrightsDialog::get_html_text()
     const auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
 
     const wxString copyright_str = _L("Copyright") + "&copy; ";
-    // TRN "Slic3r _is licensed under the_ License"
     const wxString header_str = _L("License agreements of all following programs (libraries) are part of application license agreement");
 
     wxString text = wxString::Format(
@@ -268,7 +267,7 @@ AboutDialog::AboutDialog()
         m_html->SetFonts(font.GetFaceName(), font.GetFaceName(), size);
         m_html->SetBorders(2);
         const wxString copyright_str    = _L("Copyright");
-        // TRN "Slic3r _is licensed under the_ License"
+        // TRN AboutDialog: "Slic3r %1% GNU Affero General Public License"
         const wxString is_lecensed_str  = _L("is licensed under the");
         const wxString license_str      = _L("GNU Affero General Public License, version 3");
         const wxString based_on_str     = _L("PrusaSlicer is based on Slic3r by Alessandro Ranellucci and the RepRap community.");

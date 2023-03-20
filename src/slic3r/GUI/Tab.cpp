@@ -163,9 +163,10 @@ void Tab::create_preset_tab()
     add_scaled_button(panel, &m_btn_hide_incompatible_presets, "flag_green");
 
     m_btn_compare_preset->SetToolTip(_L("Compare this preset with some another"));
-    // TRN "Save current Settings"
+    // TRN Settings Tabs: Tooltip for save button: "Settings"
     m_btn_save_preset->SetToolTip(format_wxstr(_L("Save current %s"), m_title));
-    m_btn_rename_preset->SetToolTip(format_wxstr(_L("Rename current %s"), m_title));
+    // TRN Settings Tabs: Tooltip for rename button: "Settings"
+    m_btn_rename_preset->SetToolTip(format_wxstr(_L("Rename current %1%"), m_title));
     m_btn_rename_preset->Hide();
     m_btn_delete_preset->SetToolTip(_(L("Delete this preset")));
     m_btn_delete_preset->Hide();
@@ -3925,7 +3926,6 @@ void Tab::delete_preset()
     auto current_preset = m_presets->get_selected_preset();
     // Don't let the user delete the ' - default - ' configuration.
     wxString action = current_preset.is_external ? _L("remove") : _L("delete");
-    // TRN  remove/delete
 
     PhysicalPrinterCollection& physical_printers = m_preset_bundle->physical_printers;
     wxString msg;
@@ -3969,12 +3969,13 @@ void Tab::delete_preset()
                                         "Note, that these printers will be deleted after deleting the selected preset.", ph_printers_only.size()) + "\n\n";
             }
         }
-    
+
+        // TRN "remove/delete"
         msg += from_u8((boost::format(_u8L("Are you sure you want to %1% the selected preset?")) % action).str());
     }
 
     action = current_preset.is_external ? _L("Remove") : _L("Delete");
-    // TRN  Remove/Delete
+    // TRN Settings Tabs: Button in toolbar: "Remove/Delete"
     wxString title = format_wxstr(_L("%1% Preset"), action);
     if (current_preset.is_default ||
         //wxID_YES != wxMessageDialog(parent(), msg, title, wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION).ShowModal())

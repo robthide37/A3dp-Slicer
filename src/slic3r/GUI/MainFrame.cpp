@@ -1198,10 +1198,10 @@ static void add_common_view_menu_items(wxMenu* view_menu, MainFrame* mainFrame, 
     append_menu_item(view_menu, wxID_ANY, _L("Iso") + sep + "&0", _L("Iso View"), [mainFrame](wxCommandEvent&) { mainFrame->select_view("iso"); },
         "", nullptr, [can_change_view]() { return can_change_view(); }, mainFrame);
     view_menu->AppendSeparator();
-    //TRN To be shown in the main menu View->Top 
+    //TRN Main menu: View->Top 
     append_menu_item(view_menu, wxID_ANY, _L("Top") + sep + "&1", _L("Top View"), [mainFrame](wxCommandEvent&) { mainFrame->select_view("top"); },
         "", nullptr, [can_change_view]() { return can_change_view(); }, mainFrame);
-    //TRN To be shown in the main menu View->Bottom 
+    //TRN Main menu: View->Bottom 
     append_menu_item(view_menu, wxID_ANY, _L("Bottom") + sep + "&2", _L("Bottom View"), [mainFrame](wxCommandEvent&) { mainFrame->select_view("bottom"); },
         "", nullptr, [can_change_view]() { return can_change_view(); }, mainFrame);
     append_menu_item(view_menu, wxID_ANY, _L("Front") + sep + "&3", _L("Front View"), [mainFrame](wxCommandEvent&) { mainFrame->select_view("front"); },
@@ -1638,7 +1638,7 @@ void MainFrame::init_menubar_as_gcodeviewer()
         viewMenu = new wxMenu();
         add_common_view_menu_items(viewMenu, this, std::bind(&MainFrame::can_change_view, this));
         viewMenu->AppendSeparator();
-        append_menu_check_item(viewMenu, wxID_ANY, _L("Show legen&d") + sep + "L", _L("Show legend"),
+        append_menu_check_item(viewMenu, wxID_ANY, _L("Show Legen&d") + sep + "L", _L("Show legend"),
             [this](wxCommandEvent&) { m_plater->show_legend(!m_plater->is_legend_shown()); }, this,
             [this]() { return m_plater->is_preview_shown(); }, [this]() { return m_plater->is_legend_shown(); }, this);
     }
@@ -1777,7 +1777,7 @@ void MainFrame::quick_slice(const int qs)
 
     // show processbar dialog
     m_progress_dialog = new wxProgressDialog(_L("Slicing") + dots,
-        // TRN "Processing input_file_basename"
+        // TRN ProgressDialog on reslicing: "input file basename"
         format_wxstr(_L("Processing %s"), (input_file_basename + dots)),
         100, nullptr, wxPD_AUTO_HIDE);
     m_progress_dialog->Pulse();

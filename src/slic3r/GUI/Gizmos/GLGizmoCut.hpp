@@ -151,7 +151,7 @@ class GLGizmoCut3D : public GLGizmoBase
         , Manual
     };
 
-    std::vector<std::string> m_modes;
+//    std::vector<std::string> m_modes;
     size_t m_mode{ size_t(CutMode::cutPlanar) };
 
     std::vector<std::string> m_connector_modes;

@@ -87,9 +87,13 @@ void SavePresetDialog::Item::init_input_name_ctrl(wxBoxSizer *input_name_sizer, 
 
 wxString SavePresetDialog::Item::get_top_label_text() const 
 {
-    const std::string label_str = m_use_text_ctrl ?_u8L("Rename %s to:") : _u8L("Save %s as:");
+    const std::string label_str = m_use_text_ctrl ?
+        // TRN %1% = "Preset"
+        L("Rename %1% to") :
+        // TRN %1% = "Preset"
+        L("Save %1% as");
     Tab* tab = wxGetApp().get_tab(m_type);
-    return from_u8((boost::format(label_str) % into_u8(tab->title())).str());
+    return format_wxstr(_(label_str) + ":", tab->title());
 }
 
 SavePresetDialog::Item::Item(Preset::Type type, const std::string& suffix, wxBoxSizer* sizer, SavePresetDialog* parent):
@@ -324,6 +328,7 @@ void SavePresetDialog::build(std::vector<Preset::Type> types, std::string suffix
 #endif // __WXMSW__
 
     if (suffix.empty())
+        // TRN Suffix for the preset name. Have to be a noun.
         suffix = _CTX_utf8(L_CONTEXT("Copy", "PresetName"), "PresetName");
 
     wxBoxSizer* topSizer = new wxBoxSizer(wxVERTICAL);

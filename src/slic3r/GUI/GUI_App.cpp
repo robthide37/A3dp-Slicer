@@ -1988,7 +1988,7 @@ void GUI_App::import_model(wxWindow *parent, wxArrayString& input_files) const
 void GUI_App::import_zip(wxWindow* parent, wxString& input_file) const
 {
     wxFileDialog dialog(parent ? parent : GetTopWindow(),
-        _L("Choose ZIP file:"),
+        _L("Choose ZIP file") + ":",
         from_u8(app_config->get_last_dir()), "",
         file_wildcards(FT_ZIP), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
@@ -2416,7 +2416,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
         mode_menu = new wxMenu();
         mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeSimple, _L("Simple"), _L("Simple View Mode"));
 //    mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeAdvanced, _L("Advanced"), _L("Advanced View Mode"));
-        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeAdvanced, _CTX(L_CONTEXT("Advanced", "Mode"), "Mode"), _L("Advanced View Mode"));
+        mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeAdvanced, _CTX("Advanced", "Mode"), _L("Advanced View Mode"));
         mode_menu->AppendRadioItem(config_id_base + ConfigMenuModeExpert, _L("Expert"), _L("Expert View Mode"));
         Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if (get_mode() == comSimple) evt.Check(true); }, config_id_base + ConfigMenuModeSimple);
         Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { if (get_mode() == comAdvanced) evt.Check(true); }, config_id_base + ConfigMenuModeAdvanced);

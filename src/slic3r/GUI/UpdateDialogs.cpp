@@ -135,10 +135,10 @@ bool AppUpdateAvailableDialog::disable_version_check() const
 
 // AppUpdateDownloadDialog
 AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boost::filesystem::path& path)
-	: MsgDialog(nullptr, _(L("App Update download")), wxString::Format(_(L("New version of %s is available.")), SLIC3R_APP_NAME))
+	: MsgDialog(nullptr, _L("App Update download"), format_wxstr(_L("New version of %1% is available."), SLIC3R_APP_NAME))
 {
 	auto* versions = new wxFlexGridSizer(2, 0, VERT_SPACING);
-	versions->Add(new wxStaticText(this, wxID_ANY, _(L("New version:"))));
+	versions->Add(new wxStaticText(this, wxID_ANY, _L("New version") + ":"));
 	versions->Add(new wxStaticText(this, wxID_ANY, ver_online.to_string()));
 	content_sizer->Add(versions);
 	content_sizer->AddSpacer(VERT_SPACING);
@@ -148,7 +148,7 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boos
 #endif
 	content_sizer->AddSpacer(VERT_SPACING);
 	content_sizer->AddSpacer(VERT_SPACING);
-	content_sizer->Add(new wxStaticText(this, wxID_ANY, _(L("Target directory:"))));
+	content_sizer->Add(new wxStaticText(this, wxID_ANY, _L("Target directory") + ":"));
 	content_sizer->AddSpacer(VERT_SPACING);
 	txtctrl_path = new wxTextCtrl(this, wxID_ANY, GUI::format_wxstr(path.parent_path().string()));
 	filename = GUI::format_wxstr(path.filename().string());
@@ -173,7 +173,7 @@ AppUpdateDownloadDialog::AppUpdateDownloadDialog( const Semver& ver_online, boos
 			dir = GUI::format(txtctrl_path->GetValue());
 		wxDirDialog save_dlg(
 			this
-			, _L("Select directory:")
+			, _L("Select directory") + ":"
 			, GUI::format_wxstr(dir.string())
 			/*
 			, filename //boost::nowide::widen(AppUpdater::get_filename_from_url(txtctrl_path->GetValue().ToUTF8().data()))
