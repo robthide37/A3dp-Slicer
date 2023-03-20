@@ -171,7 +171,8 @@ namespace client
     struct OptWithPos {
         OptWithPos() {}
         OptWithPos(ConfigOptionConstPtr opt, boost::iterator_range<Iterator> it_range) : opt(opt), it_range(it_range) {}
-        ConfigOptionConstPtr             opt = nullptr;
+        ConfigOptionConstPtr             opt { nullptr };
+        bool                             writable { false };
         boost::iterator_range<Iterator>  it_range;
     };
 
@@ -688,6 +689,7 @@ namespace client
     	const DynamicConfig     *external_config        = nullptr;
         const DynamicConfig     *config                 = nullptr;
         const DynamicConfig     *config_override        = nullptr;
+        mutable DynamicConfig   *config_outputs         = nullptr;
         size_t                   current_extruder_id    = 0;
         PlaceholderParser::ContextData *context_data    = nullptr;
         // If false, the macro_processor will evaluate a full macro.
@@ -713,6 +715,7 @@ namespace client
         }
 
         const ConfigOption*     resolve_symbol(const std::string &opt_key) const { return this->optptr(opt_key); }
+        ConfigOption*           resolve_output_symbol(const std::string &opt_key) const { return this->config_outputs ? this->config_outputs->optptr(opt_key, false) : nullptr; }
 
         template <typename Iterator>
         static void legacy_variable_expansion(
@@ -788,8 +791,12 @@ namespace client
             OptWithPos<Iterator>            &output)
         {
             const ConfigOption *opt = ctx->resolve_symbol(std::string(opt_key.begin(), opt_key.end()));
-            if (opt == nullptr)
-                ctx->throw_exception("Not a variable name", opt_key);
+            if (opt == nullptr) {
+                opt = ctx->resolve_output_symbol(std::string(opt_key.begin(), opt_key.end()));
+                if (opt == nullptr)
+                    ctx->throw_exception("Not a variable name", opt_key);
+                output.writable = true;
+            }
             output.opt = opt;
             output.it_range = opt_key;
         }
@@ -912,6 +919,98 @@ namespace client
             size_t idx = (index < 0) ? 0 : (index >= int(vec->size())) ? 0 : size_t(index);
             output.set_b(static_cast<const ConfigOptionVectorBase*>(opt.opt)->is_nil(idx));
             output.it_range = boost::iterator_range<Iterator>(opt.it_range.begin(), it_end);
+        }
+
+        // Decoding a scalar variable symbol "opt", assigning it a value of "param".
+        template <typename Iterator>
+        static void scalar_variable_assign(
+            const MyContext                 *ctx,
+            OptWithPos<Iterator>            &opt,
+            expr<Iterator>                  &param,
+            // Not used, just clear it.
+            std::string                     &out)
+        {
+            if (! opt.writable)
+                ctx->throw_exception("Cannot modify a read-only variable", opt.it_range);
+            if (opt.opt->is_vector())
+                ctx->throw_exception("Referencing an output vector variable when scalar is expected", opt.it_range);
+            ConfigOption *wropt = const_cast<ConfigOption*>(opt.opt);
+            switch (wropt->type()) {
+            case coFloat:
+                if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
+                    ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                static_cast<ConfigOptionFloat*>(wropt)->value = param.as_d();
+                break;
+            case coInt:
+                if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
+                    ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                static_cast<ConfigOptionInt*>(wropt)->value = param.as_i();
+                break;
+            case coString:
+                static_cast<ConfigOptionString*>(wropt)->value = param.to_string();
+                break;
+            case coPercent:
+                if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
+                    ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                static_cast<ConfigOptionPercent*>(wropt)->value = param.as_d();
+                break;
+            case coBool:
+                if (param.type() != expr<Iterator>::TYPE_BOOL)
+                    ctx->throw_exception("Right side is not a boolean expression", param.it_range);
+                static_cast<ConfigOptionBool*>(wropt)->value = param.b();
+                break;
+            default:
+                ctx->throw_exception("Unsupported output scalar variable type", opt.it_range);
+            }
+            out.clear();
+        }
+
+        template <typename Iterator>
+        static void vector_variable_assign(
+            const MyContext                 *ctx,
+            OptWithPos<Iterator>            &opt,
+            int                             &index,
+            expr<Iterator>                  &param,
+            // Not used, just clear it.
+            std::string                     &out)
+        {
+            if (! opt.writable)
+                ctx->throw_exception("Cannot modify a read-only variable", opt.it_range);
+            if (opt.opt->is_scalar())
+                ctx->throw_exception("Referencing an output scalar variable when vector is expected", opt.it_range);
+            ConfigOptionVectorBase *vec = const_cast<ConfigOptionVectorBase*>(static_cast<const ConfigOptionVectorBase*>(opt.opt));
+            if (vec->empty())
+                ctx->throw_exception("Indexing an empty vector variable", opt.it_range);
+            if (index < 0 || index >= int(vec->size()))
+                ctx->throw_exception("Index out of range", opt.it_range);
+            switch (opt.opt->type()) {
+            case coFloats:
+                if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
+                    ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                static_cast<ConfigOptionFloats*>(vec)->values[index] = param.as_d();
+                break;
+            case coInts:
+                if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
+                    ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                static_cast<ConfigOptionInts*>(vec)->values[index] = param.as_i();
+                break;
+            case coStrings:
+                static_cast<ConfigOptionStrings*>(vec)->values[index] = param.to_string();
+                break;
+            case coPercents:
+                if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
+                    ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                static_cast<ConfigOptionPercents*>(vec)->values[index] = param.as_d();
+                break;
+            case coBools:
+                if (param.type() != expr<Iterator>::TYPE_BOOL)
+                    ctx->throw_exception("Right side is not a boolean expression", param.it_range);
+                static_cast<ConfigOptionBools*>(vec)->values[index] = param.b();
+                break;
+            default:
+                ctx->throw_exception("Unsupported output vector variable type", opt.it_range);
+            }
+            out.clear();
         }
 
         // Verify that the expression returns an integer, which may be used
@@ -1165,7 +1264,9 @@ namespace client
             macro =
                     (kw["if"]     > if_else_output(_r1) [_val = _1])
 //                |   (kw["switch"] > switch_output(_r1)  [_val = _1])
-                |   additive_expression(_r1) [ px::bind(&expr<Iterator>::to_string2, _1, _val) ];
+                  |   (assignment_statement(_r1) [_val = _1])
+                  |   (additive_expression(_r1) [ px::bind(&expr<Iterator>::to_string2, _1, _val) ])
+                ;
             macro.name("macro");
 
             // An if expression enclosed in {} (the outmost {} are already parsed by the caller).
@@ -1256,6 +1357,15 @@ namespace client
                     |   (lit('%') > unary_expression(_r1) ) [_val %= _1]
                     );
             multiplicative_expression.name("multiplicative_expression");
+
+            assignment_statement =
+                variable_reference(_r1)[_a = _1] >>
+                (
+                      ('[' >> additive_expression(_r1)[px::bind(&MyContext::evaluate_index<Iterator>, _1, _b)] >> ']' >> '=' >> additive_expression(_r1))
+                            [px::bind(&MyContext::vector_variable_assign<Iterator>, _r1, _a, _b, _2, _val)]
+                    | ('=' >> additive_expression(_r1))
+                            [px::bind(&MyContext::scalar_variable_assign<Iterator>, _r1, _a, _1, _val)]
+                );
 
             struct FactorActions {
                 static void set_start_pos(Iterator &start_pos, expr<Iterator> &out)
@@ -1430,6 +1540,7 @@ namespace client
         qi::rule<Iterator, expr<Iterator>(const MyContext*), qi::locals<OptWithPos<Iterator>, int>, spirit_encoding::space_type> is_nil_test;
 
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, bool>, spirit_encoding::space_type> if_else_output;
+        qi::rule<Iterator, std::string(const MyContext*), qi::locals<OptWithPos<Iterator>, int>, spirit_encoding::space_type> assignment_statement;
 //        qi::rule<Iterator, std::string(const MyContext*), qi::locals<expr<Iterator>, bool, std::string>, spirit_encoding::space_type> switch_output;
 
         qi::symbols<char> keywords;
@@ -1461,12 +1572,13 @@ static std::string process_macro(const std::string &templ, client::MyContext &co
     return output;
 }
 
-std::string PlaceholderParser::process(const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override, ContextData *context_data) const
+std::string PlaceholderParser::process(const std::string &templ, unsigned int current_extruder_id, const DynamicConfig *config_override, DynamicConfig *config_outputs, ContextData *context_data) const
 {
     client::MyContext context;
     context.external_config 	= this->external_config();
     context.config              = &this->config();
     context.config_override     = config_override;
+    context.config_outputs      = config_outputs;
     context.current_extruder_id = current_extruder_id;
     context.context_data        = context_data;
     return process_macro(templ, context);
