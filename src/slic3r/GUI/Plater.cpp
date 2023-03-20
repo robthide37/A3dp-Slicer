@@ -3160,6 +3160,8 @@ void Plater::priv::split_object()
         // causing original positions not to be kept
         std::vector<size_t> idxs = load_model_objects(new_objects);
 
+        // clear previosli selection
+        get_selection().clear();
         // select newly added objects
         for (size_t idx : idxs)
         {

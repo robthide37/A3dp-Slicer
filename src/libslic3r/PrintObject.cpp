@@ -1618,7 +1618,8 @@ void PrintObject::bridge_over_infill()
                 if (layer->lower_layer == nullptr) {
                     continue;
                 }
-                auto       spacing = layer->regions().front()->flow(frSolidInfill).scaled_spacing();
+                double spacing = layer->regions().front()->flow(frSolidInfill).scaled_spacing();
+                // unsupported area will serve as a filter for polygons worth bridging.
                 Polygons   unsupported_area;
                 Polygons   lower_layer_solids;
                 bool contains_only_lightning = true;
@@ -1627,6 +1628,7 @@ void PrintObject::bridge_over_infill()
                         contains_only_lightning = false;
                     }
                     Polygons fill_polys = to_polygons(region->fill_expolygons());
+                    // initially consider the whole layer unsupported, but also gather solid layers to later cut off supported parts
                     unsupported_area.insert(unsupported_area.end(), fill_polys.begin(), fill_polys.end());
                     for (const Surface &surface : region->fill_surfaces()) {
                         if (surface.surface_type != stInternal || region->region().config().fill_density.value == 100) {
@@ -1636,25 +1638,30 @@ void PrintObject::bridge_over_infill()
                     }
                 }
                 unsupported_area = closing(unsupported_area, SCALED_EPSILON);
-
-                lower_layer_solids = expand(lower_layer_solids, 4 * spacing);
-                unsupported_area   = shrink(unsupported_area, 4 * spacing);
+                // By expanding the lower layer solids, we avoid making bridges from the tiny internal overhangs that are (very likely) supported by previous layer solids
+                // NOTE that we cannot filter out polygons worth bridging by their area, because sometimes there is a very small internal island that will grow into large hole
+                lower_layer_solids = expand(lower_layer_solids, 3 * spacing);
+                // By shrinking the unsupported area, we avoid making bridges from narrow ensuring region along perimeters.
+                unsupported_area   = shrink(unsupported_area, 3 * spacing);
                 unsupported_area   = diff(unsupported_area, lower_layer_solids);
 
                 for (const LayerRegion *region : layer->regions()) {
                     SurfacesPtr region_internal_solids = region->fill_surfaces().filter_by_type(stInternalSolid);
                     for (const Surface *s : region_internal_solids) {
                         Polygons unsupported         = intersection(to_polygons(s->expolygon), unsupported_area);
+                        // The following flag marks those surfaces, which overlap with unuspported area, but at least part of them is supported. 
+                        // These regions can be filtered by area, because they for sure are touching solids on lower layers, and it does not make sense to bridge their tiny overhangs 
                         bool     partially_supported = area(unsupported) < area(to_polygons(s->expolygon)) - EPSILON;
-                        if (!unsupported.empty() && (!partially_supported || area(unsupported) > 5 * 5 * spacing * spacing)) {
-                            Polygons worth_bridging = intersection(to_polygons(s->expolygon), expand(unsupported, 5 * spacing));
+                        if (!unsupported.empty() && (!partially_supported || area(unsupported) > 3 * 3 * spacing * spacing)) {
+                            Polygons worth_bridging = intersection(to_polygons(s->expolygon), expand(unsupported, 4 * spacing));
+                            // after we extracted the part worth briding, we go over the leftovers and merge the tiny ones back, to not brake the surface too much
                             for (const Polygon& p : diff(to_polygons(s->expolygon), expand(worth_bridging, spacing))) {
-                                auto area = p.area();
+                                double area = p.area();
                                 if (area < spacing * scale_(12.0) && area > spacing * spacing) {
                                     worth_bridging.push_back(p);
                                 }
                             }
-                            worth_bridging = intersection(closing(worth_bridging, 2 * spacing), s->expolygon);
+                            worth_bridging = intersection(closing(worth_bridging, SCALED_EPSILON), s->expolygon);
                             candidate_surfaces.push_back(CandidateSurface(s, lidx, worth_bridging, region, 0, contains_only_lightning));
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
@@ -1663,7 +1670,7 @@ void PrintObject::bridge_over_infill()
                                        to_lines(unsupported_area));
 #endif
 #ifdef DEBUG_BRIDGE_OVER_INFILL
-                            debug_draw(std::to_string(lidx) + "_candidate_processing_" + std::to_string(area(s->expolygon)),
+                            debug_draw(std::to_string(lidx) + "_candidate_processing_" + std::to_string(area(unsupported)),
                                        to_lines(unsupported), to_lines(intersection(to_polygons(s->expolygon), expand(unsupported, 5 * spacing))), 
                                        to_lines(diff(to_polygons(s->expolygon), expand(worth_bridging, spacing))),
                                        to_lines(unsupported_area));
@@ -1728,15 +1735,15 @@ void PrintObject::bridge_over_infill()
             layer_area_covered_by_candidates[pair.first] = {};
         }
 
+        // prepare inflated filter for each candidate on each layer. layers will be put into single thread cluster if they are close to each other (z-axis-wise)
+        // and if the inflated AABB polygons overlap somewhere
         tbb::parallel_for(tbb::blocked_range<size_t>(0, layers_with_candidates.size()), [&layers_with_candidates, &surfaces_by_layer,
                                                                                          &layer_area_covered_by_candidates](
                                                                                             tbb::blocked_range<size_t> r) {
             for (size_t job_idx = r.begin(); job_idx < r.end(); job_idx++) {
                 size_t lidx = layers_with_candidates[job_idx];
                 for (const auto &candidate : surfaces_by_layer.at(lidx)) {
-                    Polygon candiate_inflated_aabb = get_extents(candidate.new_polys)
-                                                         .inflated(candidate.region->flow(frSolidInfill, true).scaled_spacing() * 5)
-                                                         .polygon();
+                    Polygon candiate_inflated_aabb = get_extents(candidate.new_polys).inflated(scale_(7)).polygon();
                     layer_area_covered_by_candidates.at(lidx) = union_(layer_area_covered_by_candidates.at(lidx),
                                                                        Polygons{candiate_inflated_aabb});
                 }
@@ -2088,13 +2095,13 @@ void PrintObject::bridge_over_infill()
                     }
                 }
 
-                deep_infill_area = expand(deep_infill_area, spacing);
+                deep_infill_area = expand(deep_infill_area, spacing * 1.5);
 
                 // Now gather expansion polygons - internal infill on current layer, from which we can cut off anchors
                 Polygons expansion_area;
                 Polygons total_fill_area;
                 for (const LayerRegion *region : layer->regions()) {
-                    Polygons internal_polys = to_polygons(region->fill_surfaces().filter_by_type(stInternal));
+                    Polygons internal_polys = to_polygons(region->fill_surfaces().filter_by_types({stInternal, stInternalSolid}));
                     expansion_area.insert(expansion_area.end(), internal_polys.begin(), internal_polys.end());
                     Polygons fill_polys = to_polygons(region->fill_expolygons());
                     total_fill_area.insert(total_fill_area.end(), fill_polys.begin(), fill_polys.end());

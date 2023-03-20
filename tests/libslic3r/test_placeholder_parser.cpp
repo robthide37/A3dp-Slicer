@@ -117,4 +117,17 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
     SECTION("complex expression2") { REQUIRE(boolean_expression("printer_notes=~/.*PRINTER_VEwerfNDOR_PRUSA3D.*/ or printer_notes=~/.*PRINTertER_MODEL_MK2.*/ or (nozzle_diameter[0]==0.6 and num_extruders>1)")); }
     SECTION("complex expression3") { REQUIRE(! boolean_expression("printer_notes=~/.*PRINTER_VEwerfNDOR_PRUSA3D.*/ or printer_notes=~/.*PRINTertER_MODEL_MK2.*/ or (nozzle_diameter[0]==0.3 and num_extruders>1)")); }
     SECTION("enum expression") { REQUIRE(boolean_expression("gcode_flavor == \"marlin\"")); }
+
+    SECTION("write to a scalar variable") {
+        DynamicConfig config_outputs;
+        config_outputs.set_key_value("writable_string", new ConfigOptionString());
+        parser.process("{writable_string = \"Written\"}", 0, nullptr, &config_outputs, nullptr);
+        REQUIRE(parser.process("{writable_string}", 0, nullptr, &config_outputs, nullptr) == "Written");
+    }
+    SECTION("write to a vector variable") {
+        DynamicConfig config_outputs;
+        config_outputs.set_key_value("writable_floats", new ConfigOptionFloats({ 0., 0., 0. }));
+        parser.process("{writable_floats[1] = 33}", 0, nullptr, &config_outputs, nullptr);
+        REQUIRE(config_outputs.opt_float("writable_floats", 1) == Approx(33.));
+    }
 }

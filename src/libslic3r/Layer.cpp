@@ -1,11 +1,14 @@
 #include "Layer.hpp"
 #include "ClipperZUtils.hpp"
 #include "ClipperUtils.hpp"
+#include "Point.hpp"
+#include "Polygon.hpp"
 #include "Print.hpp"
 #include "Fill/Fill.hpp"
 #include "ShortestPath.hpp"
 #include "SVG.hpp"
 #include "BoundingBox.hpp"
+#include "clipper/clipper.hpp"
 
 #include <boost/log/trivial.hpp>
 
@@ -180,6 +183,31 @@ static void connect_layer_slices(
                                 break;
                             }
                         }
+                        if (!found) {
+                            // The check above might sometimes fail when the polygons overlap only on points, which causes the clipper to detect no intersection.
+                            // The problem happens rarely, mostly on simple polygons (in terms of number of points), but regardless of size!
+                            // example of failing link on two layers, each with single polygon without holes.
+                            // layer A = Polygon{(-24931238,-11153865),(-22504249,-8726874),(-22504249,11477151),(-23261469,12235585),(-23752371,12727276),(-25002495,12727276),(-27502745,10227026),(-27502745,-12727274),(-26504645,-12727274)}
+                            // layer B = Polygon{(-24877897,-11100524),(-22504249,-8726874),(-22504249,11477151),(-23244827,12218916),(-23752371,12727276),(-25002495,12727276),(-27502745,10227026),(-27502745,-12727274),(-26504645,-12727274)}
+                            // note that first point is not identical, and the check above picks (-24877897,-11100524) as the first contour point (polynode.Contour.front()).
+                            // that point is sadly slightly outisde of the layer A, so no link is detected, eventhough they are overlaping "completely"
+                            Polygon contour_poly;
+                            for (const auto& p : polynode.Contour) {
+                                contour_poly.points.emplace_back(p.x(), p.y());
+                            }
+                            BoundingBox contour_aabb{contour_poly.points};
+                            for (int l = int(m_above.lslices_ex.size()) - 1; l >= 0; --l) {
+                                LayerSlice &lslice = m_above.lslices_ex[l];
+                                // it is potentially slow, but should be executed rarely
+                                if (contour_aabb.overlap(lslice.bbox) && !intersection(Polygons{contour_poly}, m_above.lslices[l]).empty()) {
+                                    found = true;
+                                    j     = l;
+                                    assert(i >= 0 && i < m_below.lslices_ex.size());
+                                    assert(j >= 0 && j < m_above.lslices_ex.size());
+                                    break;
+                                }
+                            }
+                        }
                     } else {
                         // Index of an island above. Look-it up in the island below.
                         assert(j < m_offset_end);
@@ -192,6 +220,23 @@ static void connect_layer_slices(
                                 assert(i >= 0 && i < m_below.lslices_ex.size());
                                 assert(j >= 0 && j < m_above.lslices_ex.size());
                                 break;
+                            }
+                        }
+                        if (!found) { // Explanation for aditional check is above.
+                            Polygon contour_poly;
+                            for (const auto &p : polynode.Contour) {
+                                contour_poly.points.emplace_back(p.x(), p.y());
+                            }
+                            BoundingBox contour_aabb{contour_poly.points};
+                            for (int l = int(m_below.lslices_ex.size()) - 1; l >= 0; --l) {
+                                LayerSlice &lslice = m_below.lslices_ex[l];
+                                if (contour_aabb.overlap(lslice.bbox) && !intersection(Polygons{contour_poly}, m_below.lslices[l]).empty()) {
+                                    found = true;
+                                    i     = l;
+                                    assert(i >= 0 && i < m_below.lslices_ex.size());
+                                    assert(j >= 0 && j < m_above.lslices_ex.size());
+                                    break;
+                                }
                             }
                         }
                     }
