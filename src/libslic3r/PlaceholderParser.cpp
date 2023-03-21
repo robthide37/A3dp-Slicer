@@ -249,6 +249,7 @@ namespace client
             TYPE_STRING,
         };
         Type                type() const { return m_type; }
+        bool                numeric_type() const { return m_type == TYPE_INT || m_type == TYPE_DOUBLE; }
 
         bool&               b()       { return m_data.b; }
         bool                b() const { return m_data.b; }
@@ -472,8 +473,7 @@ namespace client
         static void compare_op(expr &lhs, expr &rhs, char op, bool invert)
         {
             bool value = false;
-            if ((lhs.type() == TYPE_INT || lhs.type() == TYPE_DOUBLE) &&
-                (rhs.type() == TYPE_INT || rhs.type() == TYPE_DOUBLE)) {
+            if (lhs.numeric_type() && rhs.numeric_type()) {
                 // Both types are numeric.
                 switch (op) {
                     case '=':
@@ -681,7 +681,7 @@ namespace client
 
         void throw_if_not_numeric(const char *message) const 
         {
-            if (this->type() != TYPE_INT && this->type() != TYPE_DOUBLE)
+            if (! this->numeric_type())
                 this->throw_exception(message);
         }
 
@@ -964,6 +964,10 @@ namespace client
         {
             if (! opt.writable)
                 ctx->throw_exception("Cannot modify a read-only variable", opt.it_range);
+            auto check_numeric = [](const expr<Iterator> &param) {
+                if (! param.numeric_type())
+                    param.throw_exception("Right side is not a numeric expression");
+            };
             if (opt.opt->is_vector()) {
                 if (! opt.has_index())
                     ctx->throw_exception("Referencing an output vector variable when scalar is expected", opt.it_range);
@@ -974,21 +978,18 @@ namespace client
                     ctx->throw_exception("Index out of range", opt.it_range);
                 switch (opt.opt->type()) {
                 case coFloats:
-                    if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
-                        ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                    check_numeric(param);
                     static_cast<ConfigOptionFloats*>(vec)->values[opt.index] = param.as_d();
                     break;
                 case coInts:
-                    if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
-                        ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                    check_numeric(param);
                     static_cast<ConfigOptionInts*>(vec)->values[opt.index] = param.as_i();
                     break;
                 case coStrings:
                     static_cast<ConfigOptionStrings*>(vec)->values[opt.index] = param.to_string();
                     break;
                 case coPercents:
-                    if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
-                        ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                    check_numeric(param);
                     static_cast<ConfigOptionPercents*>(vec)->values[opt.index] = param.as_d();
                     break;
                 case coBools:
@@ -1004,21 +1005,18 @@ namespace client
                 ConfigOption *wropt = const_cast<ConfigOption*>(opt.opt);
                 switch (wropt->type()) {
                 case coFloat:
-                    if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
-                        ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                    check_numeric(param);
                     static_cast<ConfigOptionFloat*>(wropt)->value = param.as_d();
                     break;
                 case coInt:
-                    if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
-                        ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                    check_numeric(param);
                     static_cast<ConfigOptionInt*>(wropt)->value = param.as_i();
                     break;
                 case coString:
                     static_cast<ConfigOptionString*>(wropt)->value = param.to_string();
                     break;
                 case coPercent:
-                    if (param.type() != expr<Iterator>::TYPE_INT && param.type() != expr<Iterator>::TYPE_DOUBLE)
-                        ctx->throw_exception("Right side is not a numeric expression", param.it_range);
+                    check_numeric(param);
                     static_cast<ConfigOptionPercent*>(wropt)->value = param.as_d();
                     break;
                 case coBool:
@@ -1108,6 +1106,72 @@ namespace client
             msg += "^\n";
         }
     };
+
+    template<typename Iterator>
+    struct InterpolateTableContext {
+        template<typename Iterator>
+        struct Item {
+            double                           x;
+            boost::iterator_range<Iterator>  it_range_x;
+            double                           y;
+        };
+        std::vector<Item<Iterator>> table;
+
+        static void init(const expr<Iterator> &x) {
+            if (!x.numeric_type())
+                x.throw_exception("Interpolation value must be a number.");
+        }
+        static void add_pair(const expr<Iterator> &x, const expr<Iterator> &y, InterpolateTableContext &table) {
+            if (! x.numeric_type())
+                x.throw_exception("X value of a table point must be a number.");
+            if (! y.numeric_type())
+                y.throw_exception("Y value of a table point must be a number.");
+            table.table.push_back({ x.as_d(), x.it_range, y.as_d() });
+        }
+        static void evaluate(const expr<Iterator> &expr_x, const InterpolateTableContext &table, expr<Iterator> &out) {
+            // Check whether the table X values are sorted.
+            double x = expr_x.as_d();
+            bool   evaluated = false;
+            for (size_t i = 1; i < table.table.size(); ++i) {
+                double x0 = table.table[i - 1].x;
+                double x1 = table.table[i].x;
+                if (x0 > x1)
+                    boost::throw_exception(qi::expectation_failure<Iterator>(
+                        table.table[i - 1].it_range_x.begin(), table.table[i].it_range_x.end(), spirit::info("X coordinates of the table must be increasing")));
+                if (! evaluated && x >= x0 && x <= x1) {
+                    double y0 = table.table[i - 1].y;
+                    double y1 = table.table[i].y;
+                    if (x == x0)
+                        out.set_d(y0);
+                    else if (x == x1)
+                        out.set_d(y1);
+                    else if (is_approx(x0, x1))
+                        out.set_d(0.5 * (y0 + y1));
+                    else
+                        out.set_d(Slic3r::lerp(y0, y1, (x - x0) / (x1 - x0)));
+                    evaluated = true;
+                }
+            }
+            if (! evaluated) {
+                // Clamp x into the table range with EPSILON.
+                if (x > table.table.front().x - EPSILON)
+                    out.set_d(table.table.front().y);
+                else if (x < table.table.back().x + EPSILON)
+                    out.set_d(table.table.back().y);
+                else
+                    // The value is really outside the table range.
+                    expr_x.throw_exception("Interpolation value is outside the table range");
+            }
+        }
+    };
+
+    template<typename Iterator>
+    std::ostream& operator<<(std::ostream &os, const InterpolateTableContext<Iterator> &table_context)
+    {
+        for (const auto &item : table_context.table)
+            os << "(" << item.x << "," << item.y << ")";
+        return os;
+    }
 
     // Table to translate symbol tag to a human readable error message.
     std::map<std::string, std::string> MyContext::tag_to_error_message = {
@@ -1428,6 +1492,7 @@ namespace client
                 |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
                 |   (kw["is_nil"] > '(' > is_nil_test(_r1) > ')')   [ _val = _1 ]
                 |   (kw["one_of"] > '(' > one_of(_r1) > ')')        [ _val = _1 ]
+                |   (kw["interpolate_table"] > '(' > interpolate_table(_r1) > ')') [ _val = _1 ]
                 |   (strict_double > iter_pos)                      [ px::bind(&FactorActions::double_, _1, _2, _val) ]
                 |   (int_      > iter_pos)                          [ px::bind(&FactorActions::int_,    _1, _2, _val) ]
                 |   (kw[bool_] > iter_pos)                          [ px::bind(&FactorActions::bool_,   _1, _2, _val) ]
@@ -1440,15 +1505,25 @@ namespace client
             one_of.name("one_of");
             one_of_list = 
                 eps[px::bind(&expr<Iterator>::one_of_test_init, _val)] >
-                (   ',' > *(
+                (   ( ',' > *(
                         (
                                 unary_expression(_r1)[px::bind(&expr<Iterator>::template one_of_test<false>, _r2, _1, _val)]
                             |   (lit('~') > unary_expression(_r1))[px::bind(&expr<Iterator>::template one_of_test<true>, _r2, _1, _val)]
                             |   regular_expression[px::bind(&expr<Iterator>::one_of_test_regex, _r2, _1, _val)]
                         ) >> -lit(','))
-                    | eps
+                    )
+                  | eps
                 );
             one_of_list.name("one_of_list");
+
+            interpolate_table = (unary_expression(_r1)[_a = _1] > ',' > interpolate_table_list(_r1, _a))
+                [px::bind(&InterpolateTableContext<Iterator>::evaluate, _a, _2, _val)];
+            interpolate_table.name("interpolate_table");
+            interpolate_table_list =
+                eps[px::bind(&InterpolateTableContext<Iterator>::init, _r2)] >
+                ( *(( lit('(') > unary_expression(_r1) > ',' > unary_expression(_r1) > ')' ) 
+                    [px::bind(&InterpolateTableContext<Iterator>::add_pair, _1, _2, _val)] >> -lit(',')) );
+            interpolate_table.name("interpolate_table_list");
 
             optional_parameter = iter_pos[px::bind(&FactorActions::set_start_pos, _1, _val)] >> (
                     lit(')')                                       [ px::bind(&FactorActions::noexpr, _val) ]
@@ -1486,6 +1561,7 @@ namespace client
                 ("elsif")
                 ("endif")
                 ("false")
+                ("interpolate_table")
                 ("min")
                 ("max")
                 ("random")
@@ -1501,9 +1577,12 @@ namespace client
                 debug(text_block);
                 debug(macro);
                 debug(if_else_output);
+                debug(interpolate_table);
 //                debug(switch_output);
                 debug(legacy_variable_expansion);
                 debug(identifier);
+                debug(interpolate_table);
+                debug(interpolate_table_list);
                 debug(conditional_expression);
                 debug(logical_or_expression);
                 debug(logical_and_expression);
@@ -1569,6 +1648,9 @@ namespace client
         // Evaluating "one of" list of patterns.
         qi::rule<Iterator, expr<Iterator>(const MyContext*), qi::locals<expr<Iterator>>, spirit_encoding::space_type> one_of;
         qi::rule<Iterator, expr<Iterator>(const MyContext*, const expr<Iterator> &param), spirit_encoding::space_type> one_of_list;
+        // Evaluating the "interpolate_table" expression.
+        qi::rule<Iterator, expr<Iterator>(const MyContext*), qi::locals<expr<Iterator>>, spirit_encoding::space_type> interpolate_table;
+        qi::rule<Iterator, InterpolateTableContext<Iterator>(const MyContext*, const expr<Iterator> &param), spirit_encoding::space_type> interpolate_table_list;
 
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, bool>, spirit_encoding::space_type> if_else_output;
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<OptWithPos<Iterator>, int>, spirit_encoding::space_type> assignment_statement;
