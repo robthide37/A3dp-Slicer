@@ -144,7 +144,6 @@ void GLGizmoSlaBase::render_volumes()
 
     m_volumes.render(GLVolumeCollection::ERenderType::Opaque, true, camera.get_view_matrix(), camera.get_projection_matrix());
     shader->stop_using();
-
 }
 
 void GLGizmoSlaBase::register_volume_raycasters_for_picking()
