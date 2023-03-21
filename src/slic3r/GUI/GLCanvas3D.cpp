@@ -3766,7 +3766,7 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
                 model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
 #endif // ENABLE_WORLD_COORDINATE
             }
-            else if (selection_mode == Selection::Volume) {
+            else if (selection_mode == Selection::Volume && volume_idx >= 0) {
 #if ENABLE_WORLD_COORDINATE
                 model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
 #else
