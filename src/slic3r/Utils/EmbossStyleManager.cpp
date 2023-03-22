@@ -38,6 +38,7 @@ void make_unique_name(const StyleManager::Styles &styles, std::string &name);
 
 void StyleManager::init(AppConfig *app_config)
 {
+    assert(app_config != nullptr);
     m_app_config = app_config;
     m_styles = ::load_styles(*app_config);
 

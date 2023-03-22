@@ -222,58 +222,10 @@ private:
     // Keep information about stored styles and loaded actual style to compare with
     Emboss::StyleManager m_style_manager;
 
-    struct FaceName{
-        wxString wx_name;
-        std::string name_truncated = "";
-        size_t texture_index = 0;
-        // State for generation of texture
-        // when start generate create share pointers
-        std::shared_ptr<std::atomic<bool>> cancel = nullptr;
-        // R/W only on main thread - finalize of job
-        std::shared_ptr<bool> is_created = nullptr;
-    };
+    // pImpl to hide implementation of FaceNames to .cpp file
+    struct Facenames; // forward declaration
+    std::unique_ptr<Facenames> m_face_names;
 
-    // Keep sorted list of loadable face names
-    struct Facenames
-    {
-        // flag to keep need of enumeration fonts from OS
-        // false .. wants new enumeration check by Hash
-        // true  .. already enumerated(During opened combo box)
-        bool is_init = false;
-
-        bool has_truncated_names = false;
-
-        // data of can_load() faces
-        std::vector<FaceName> faces = {};
-        // Sorter set of Non valid face names in OS
-        std::vector<wxString> bad   = {};
-
-        // Configuration of font encoding
-        static const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
-
-        // Identify if preview texture exists
-        GLuint texture_id = 0;
-                
-        // protection for open too much font files together
-        // Gtk:ERROR:../../../../gtk/gtkiconhelper.c:494:ensure_surface_for_gicon: assertion failed (error == NULL): Failed to load /usr/share/icons/Yaru/48x48/status/image-missing.png: Error opening file /usr/share/icons/Yaru/48x48/status/image-missing.png: Too many open files (g-io-error-quark, 31)
-        // This variable must exist until no CreateFontImageJob is running
-        unsigned int count_opened_font_files = 0; 
-
-        // Configuration for texture height
-        const int count_cached_textures = 32;
-
-        // index for new generated texture index(must be lower than count_cached_textures)
-        size_t texture_index = 0;
-
-        // hash created from enumerated font from OS
-        // check when new font was installed
-        size_t hash = 0;
-
-        // filtration pattern
-        std::string search = "";
-        std::vector<bool> hide; // result of filtration
-    };
-    Facenames m_face_names;
     static bool store(const Facenames &facenames);
     static bool load(Facenames &facenames);
 
