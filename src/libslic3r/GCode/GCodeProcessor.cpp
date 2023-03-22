@@ -558,8 +558,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     m_flavor = config.gcode_flavor;
 
 #if ENABLE_GCODE_POSTPROCESS_BACKTRACE
-    m_result.backtrace_enabled = true; /*config.printer_model.value == "MK3MMU2" || config.printer_model.value == "MK3SMMU2S" ||
-        config.printer_model.value == "MK2.5MMU2" || config.printer_model.value == "MK2.5SMMU2S" || config.printer_model.value == "MK2SMM";*/
+    m_result.backtrace_enabled = is_XL_printer(config);
 #endif // ENABLE_GCODE_POSTPROCESS_BACKTRACE
 
     size_t extruders_count = config.nozzle_diameter.values.size();
@@ -572,11 +571,14 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     m_result.filament_cost.resize(extruders_count);
     m_extruder_temps.resize(extruders_count);
     m_extruder_temps_config.resize(extruders_count);
+    m_extruder_temps_first_layer_config.resize(extruders_count);
+    m_is_XL_printer = is_XL_printer(config);
 
     for (size_t i = 0; i < extruders_count; ++ i) {
         m_extruder_offsets[i]           = to_3d(config.extruder_offset.get_at(i).cast<float>().eval(), 0.f);
         m_extruder_colors[i]            = static_cast<unsigned char>(i);
         m_extruder_temps_config[i]      = static_cast<int>(config.temperature.get_at(i));
+        m_extruder_temps_first_layer_config[i] = static_cast<int>(config.first_layer_temperature.get_at(i));
         m_result.filament_diameters[i]  = static_cast<float>(config.filament_diameter.get_at(i));
         m_result.filament_densities[i]  = static_cast<float>(config.filament_density.get_at(i));
         m_result.filament_cost[i]       = static_cast<float>(config.filament_cost.get_at(i));
@@ -3992,19 +3994,19 @@ void GCodeProcessor::post_process()
                 export_lines.insert_lines(backtrace, cmd,
                     // line inserter
                     [tool_number, this](unsigned int id, float time, float time_diff) {
-                        //const std::string out = "XYYY ; id:" + std::to_string(id) + " time:" + std::to_string(time) + " time diff:" + std::to_string(time_diff) + "\n";
-                        const std::string out = "M104 T" + std::to_string(tool_number) + " P" + std::to_string(int(std::round(time_diff))) + " S" + std::to_string(int(m_extruder_temps_config[tool_number])) + "\n";
+                        int temperature = int( m_layer_id != 1 ? m_extruder_temps_config[tool_number] : m_extruder_temps_first_layer_config[tool_number]);
+                        const std::string out = "M104 T" + std::to_string(tool_number) + " P" + std::to_string(int(std::round(time_diff))) + " S" + std::to_string(temperature) + "\n";
                         return out;
                     },
                     // line replacer
-                    [tool_number](const std::string& line) {
+                    [this, tool_number](const std::string& line) {
                         if (GCodeReader::GCodeLine::cmd_is(line, "M104")) {
                             GCodeReader::GCodeLine gline;
                             GCodeReader reader;
                             reader.parse_line(line, [&gline](GCodeReader& reader, const GCodeReader::GCodeLine& l) { gline = l; });
 
                             float val;
-                            if (gline.has_value('T', val) && gline.raw().find("cooldown") != std::string::npos) {
+                            if (gline.has_value('T', val) && gline.raw().find("cooldown") != std::string::npos && m_is_XL_printer) {
                                 if (static_cast<int>(val) == tool_number)
                                     return std::string("; removed M104\n");
                             }
@@ -4299,6 +4301,8 @@ void GCodeProcessor::set_travel_acceleration(PrintEstimatedStatistics::ETimeMode
 
 float GCodeProcessor::get_filament_load_time(size_t extruder_id)
 {
+    if (m_is_XL_printer)
+        return 4.5f; // FIXME
     return (m_time_processor.filament_load_times.empty() || m_time_processor.extruder_unloaded) ?
         0.0f :
         ((extruder_id < m_time_processor.filament_load_times.size()) ?
@@ -4307,6 +4311,8 @@ float GCodeProcessor::get_filament_load_time(size_t extruder_id)
 
 float GCodeProcessor::get_filament_unload_time(size_t extruder_id)
 {
+    if (m_is_XL_printer)
+        return 0.f; // FIXME
     return (m_time_processor.filament_unload_times.empty() || m_time_processor.extruder_unloaded) ?
         0.0f :
         ((extruder_id < m_time_processor.filament_unload_times.size()) ?
