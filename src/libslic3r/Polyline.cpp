@@ -660,9 +660,13 @@ void PolylineOrArc::append(const PolylineOrArc& src)
         this->points = src.points;
         this->m_fitting_result = src.m_fitting_result;
     } else {
-        //BBS: append the first point to create connection first, update the fitting date as well
+        //BBS: append the first point to create connection first, update the fitting data as well
         if (src.front() != back()) {
             this->append(src.front());
+            if (!this->m_fitting_result.empty()) {
+                assert(size() >= 2);
+                this->m_fitting_result.emplace_back(Slic3r::Geometry::PathFittingData{ this->points.size() - 2, this->points.size() - 1, Slic3r::Geometry::EMovePathType::Linear_move, Slic3r::Geometry::ArcSegment() });
+            }
         }
         //BBS: append a polyline which has fitting data to a polyline without fitting data.
         //Then create a fake fitting data first, so that we can keep the fitting data in last polyline

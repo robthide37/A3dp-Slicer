@@ -1857,7 +1857,6 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
             if (doforeach(paths[paths.size() - 2], paths.back(), paths.front())) {
                 paths.erase(paths.end() - 1);
                 if (paths.back().height == paths.front().height) {
-                    //paths.front().polyline.points.insert(paths.front().polyline.points.begin(), paths.back().polyline.points.begin(), paths.back().polyline.points.end() - 1);
                     paths.back().polyline.append(paths.front().polyline);
                     paths.front().polyline.swap(paths.back().polyline);
                     paths.erase(paths.end() - 1);
@@ -1867,7 +1866,6 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
             if (doforeach(paths.back(), paths.front(), paths[1])) {
                 paths.erase(paths.begin());
                 if (paths.back().height == paths.front().height) {
-                    //paths.front().polyline.points.insert(paths.front().polyline.points.begin(), paths.back().polyline.points.begin(), paths.back().polyline.points.end() - 1);
                     paths.back().polyline.append(paths.front().polyline);
                     paths.front().polyline.swap(paths.back().polyline);
                     paths.erase(paths.end() - 1);
@@ -1888,13 +1886,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
                     //merge to previous
                     assert(prev.last_point() == curr.first_point());
                     assert(curr.polyline.size() > 1);
-                    //prev.polyline.points.insert(prev.polyline.points.end(), curr.polyline.points.begin() + 1, curr.polyline.points.end());
                     prev.polyline.append(curr.polyline);
                 } else {
                     //merge to next
                     assert(curr.last_point() == next.first_point());
                     assert(curr.polyline.size() > 1);
-                    //next.polyline.points.insert(next.polyline.points.begin(), curr.polyline.points.begin(), curr.polyline.points.end() - 1);
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
                 }
@@ -1902,16 +1898,18 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
             } else if(((int)curr.height) % 2 == 1 && curr.length() > ok_length){
                 curr.height++;
                 if (prev.height == curr.height) {
-                    //prev.polyline.points.insert(prev.polyline.points.end(), curr.polyline.points.begin() + 1, curr.polyline.points.end());
                     prev.polyline.append(curr.polyline);
+                    return true;
                 } else if (next.height == curr.height) {
-                    //next.polyline.points.insert(next.polyline.points.begin(), curr.polyline.points.begin(), curr.polyline.points.end() - 1);
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
+                    return true;
+                } else {
+                    return false;
                 }
-                return true;
+            } else {
+                return false;
             }
-            return false;
         });
 
         foreach(paths, [](ExtrusionPath& prev, ExtrusionPath& curr, ExtrusionPath& next) {
@@ -1921,13 +1919,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
                     //merge to previous
                     assert(prev.last_point() == curr.first_point());
                     assert(curr.polyline.size() > 1);
-                    //prev.polyline.points.insert(prev.polyline.points.end(), curr.polyline.points.begin() + 1, curr.polyline.points.end());
                     prev.polyline.append(curr.polyline);
                 } else {
                     //merge to next
                     assert(curr.last_point() == next.first_point());
                     assert(curr.polyline.size() > 1);
-                    //next.polyline.points.insert(next.polyline.points.begin(), curr.polyline.points.begin(), curr.polyline.points.end() - 1);
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
                 }
@@ -1942,13 +1938,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
                     //merge to previous
                     assert(prev.last_point() == curr.first_point());
                     assert(curr.polyline.size() > 1);
-                    //prev.polyline.points.insert(prev.polyline.points.end(), curr.polyline.points.begin() + 1, curr.polyline.points.end());
                     prev.polyline.append(curr.polyline);
                 } else {
                     //merge to next
                     assert(curr.last_point() == next.first_point());
                     assert(curr.polyline.size() > 1);
-                    //next.polyline.points.insert(next.polyline.points.begin(), curr.polyline.points.begin(), curr.polyline.points.end() - 1);
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
                 }
@@ -1960,12 +1954,10 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
     if(paths.size() == 2){
         double min_length = this->perimeter_flow.scaled_width() * 2;
         if (paths.front().length() < min_length) {
-            //paths.back().polyline.points.insert(paths.back().polyline.points.begin(), paths.front().polyline.points.begin(), paths.front().polyline.points.end() - 1);
             paths.front().polyline.append(paths.back().polyline);
             paths.back().polyline.swap(paths.front().polyline);
             paths.erase(paths.begin());
         }else if (paths.back().length() < min_length) {
-            //paths.front().polyline.points.insert(paths.front().polyline.points.end(), paths.back().polyline.points.begin() + 1, paths.back().polyline.points.end());
             paths.front().polyline.append(paths.back().polyline);
             paths.erase(paths.begin() + 1);
         }
@@ -2175,7 +2167,6 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                     paths.erase(paths.begin() + i);
                     i--;
                     if (paths[i].height == paths[i + 1].height) {
-                        //paths[i].polyline.points.insert(paths[i].polyline.points.end(), paths[i + 1].polyline.points.begin() + 1, paths[i + 1].polyline.points.end());
                         paths[i].polyline.append(paths[i + 1].polyline);
                         paths.erase(paths.begin() + i + 1);
                     }
@@ -2186,7 +2177,6 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                 if (doforeach(paths[paths.size() - 2], paths.back(), paths.front())) {
                     paths.erase(paths.end() - 1);
                     if (paths.back().height == paths.front().height) {
-                        //paths.front().polyline.points.insert(paths.front().polyline.points.begin(), paths.back().polyline.points.begin(), paths.back().polyline.points.end() - 1);
                         paths.back().polyline.append(paths.front().polyline);
                         paths.front().polyline.swap(paths.back().polyline);
                         paths.erase(paths.end() - 1);
@@ -2197,7 +2187,6 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                 if (doforeach(paths.back(), paths.front(), paths[1])) {
                     paths.erase(paths.begin());
                     if (paths.back().height == paths.front().height) {
-                        //paths.front().polyline.points.insert(paths.front().polyline.points.begin(), paths.back().polyline.points.begin(), paths.back().polyline.points.end() - 1);
                         paths.back().polyline.append(paths.front().polyline);
                         paths.front().polyline.swap(paths.back().polyline);
                         paths.erase(paths.end() - 1);
@@ -2219,13 +2208,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                     //merge to previous
                     assert(prev.last_point() == curr.first_point());
                     assert(curr.polyline.size() > 1);
-                    //prev.polyline.points.insert(prev.polyline.points.end(), curr.polyline.points.begin() + 1, curr.polyline.points.end());
                     prev.polyline.append(curr.polyline);
                 } else {
                     //merge to next
                     assert(curr.last_point() == next.first_point());
                     assert(curr.polyline.size() > 1);
-                    //next.polyline.points.insert(next.polyline.points.begin(), curr.polyline.points.begin(), curr.polyline.points.end() - 1);
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
                 }
@@ -2233,10 +2220,8 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
             } else if (((int)curr.height) % 2 == 1 && curr.length() > ok_length) {
                 curr.height++;
                 if (prev.height == curr.height) {
-                    //prev.polyline.points.insert(prev.polyline.points.end(), curr.polyline.points.begin() + 1, curr.polyline.points.end());
                     prev.polyline.append(curr.polyline);
                 } else if (next.height == curr.height) {
-                    //next.polyline.points.insert(next.polyline.points.begin(), curr.polyline.points.begin(), curr.polyline.points.end() - 1);
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
                 }
@@ -2252,13 +2237,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                     //merge to previous
                     assert(prev.last_point() == curr.first_point());
                     assert(curr.polyline.size() > 1);
-                    //prev.polyline.points.insert(prev.polyline.points.end(), curr.polyline.points.begin() + 1, curr.polyline.points.end());
                     prev.polyline.append(curr.polyline);
                 } else {
                     //merge to next
                     assert(curr.last_point() == next.first_point());
                     assert(curr.polyline.size() > 1);
-                    //next.polyline.points.insert(next.polyline.points.begin(), curr.polyline.points.begin(), curr.polyline.points.end() - 1);
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
                 }
@@ -2273,13 +2256,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                     //merge to previous
                     assert(prev.last_point() == curr.first_point());
                     assert(curr.polyline.size() > 1);
-                    //prev.polyline.points.insert(prev.polyline.points.end(), curr.polyline.points.begin() + 1, curr.polyline.points.end());
                     prev.polyline.append(curr.polyline);
                 } else {
                     //merge to next
                     assert(curr.last_point() == next.first_point());
                     assert(curr.polyline.size() > 1);
-                    //next.polyline.points.insert(next.polyline.points.begin(), curr.polyline.points.begin(), curr.polyline.points.end() - 1);
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
                 }
@@ -2291,12 +2272,10 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
     if (paths.size() == 2) {
         double min_length = this->perimeter_flow.scaled_width() * 2;
         if (paths.front().length() < min_length) {
-            //paths.back().polyline.points.insert(paths.back().polyline.points.begin(), paths.front().polyline.points.begin(), paths.front().polyline.points.end() - 1);
             paths.front().polyline.append(paths.back().polyline);
             paths.back().polyline.swap(paths.front().polyline);
             paths.erase(paths.begin());
         } else if (paths.back().length() < min_length) {
-            //paths.front().polyline.points.insert(paths.front().polyline.points.end(), paths.back().polyline.points.begin() + 1, paths.back().polyline.points.end());
             paths.front().polyline.append(paths.back().polyline);
             paths.erase(paths.begin() + 1);
         }
