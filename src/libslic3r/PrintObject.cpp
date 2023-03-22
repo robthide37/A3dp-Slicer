@@ -528,7 +528,8 @@ std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> PrintObject::prepare
     its_transform(mesh, to_octree * this->trafo_centered(), true);
 
     // Triangulate internal bridging surfaces.
-    std::vector<std::vector<Vec3d>> overhangs(surfaces_w_bottom_z.size());
+    std::vector<std::vector<Vec3d>> overhangs(std::max(surfaces_w_bottom_z.size(), size_t(1)));
+    // ^ make sure vector is not empty, even with no briding surfaces we still want to build the adaptive trees later, some continue normally
     tbb::parallel_for(tbb::blocked_range<int>(0, surfaces_w_bottom_z.size()),
                       [this, &to_octree, &overhangs, &surfaces_w_bottom_z](const tbb::blocked_range<int> &range) {
                           for (int surface_idx = range.begin(); surface_idx < range.end(); ++surface_idx) {
