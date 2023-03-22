@@ -502,6 +502,9 @@ void UpdateJob::update_volume(ModelVolume             *volume,
     volume->calculate_convex_hull();
     volume->get_object()->invalidate_bounding_box();
     volume->text_configuration = text_configuration;
+
+    // discard information about rotation, should not be stored in volume
+    volume->text_configuration->style.prop.angle.reset();
         
     GUI_App         &app        = wxGetApp(); // may be move to input
     GLCanvas3D      *canvas     = app.plater()->canvas3D();
@@ -615,6 +618,10 @@ void priv::create_volume(
 
     volume->name               = data.volume_name; // copy
     volume->text_configuration = data.text_configuration; // copy
+
+    // discard information about rotation, should not be stored in volume
+    volume->text_configuration->style.prop.angle.reset();
+
     volume->set_transformation(trmat);
 
     // update printable state on canvas

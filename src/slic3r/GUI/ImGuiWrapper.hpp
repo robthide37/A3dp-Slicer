@@ -147,6 +147,12 @@ public:
     bool slider_optional_int(const char* label, std::optional<int> &v, int v_min, int v_max, const char* format = "%.3f", float power = 1.0f, bool clamp = true, const wxString& tooltip = {}, bool show_edit_btn = true, int def_val = 0);
 
     /// <summary>
+    /// Use ImGui internals to unactivate (lose focus) in input.
+    /// When input is activ it can't change value by application.
+    /// </summary>
+    static void left_inputs();
+
+    /// <summary>
     /// Truncate text by ImGui draw function to specific width
     /// NOTE 1: ImGui must be initialized
     /// NOTE 2: Calculation for actual acive imgui font
@@ -192,6 +198,20 @@ public:
                      ImDrawList *   draw_list = ImGui::GetOverlayDrawList(),
                      ImU32 color     = ImGui::GetColorU32(COL_ORANGE_LIGHT),
                      float thickness = 3.f);
+
+    /// <summary>
+    /// Draw symbol of cross hair
+    /// </summary>
+    /// <param name="position">Center of cross hair</param>
+    /// <param name="radius">Circle radius</param>
+    /// <param name="color">Color of symbol</param>
+    /// <param name="num_segments">Precission of circle</param>
+    /// <param name="thickness">Thickness of Line in symbol</param>
+    static void draw_cross_hair(const ImVec2 &position,
+                                float         radius       = 16.f,
+                                ImU32         color        = ImGui::GetColorU32(ImVec4(1.f, 1.f, 1.f, .75f)),
+                                int           num_segments = 0,
+                                float         thickness    = 4.f);
 
     /// <summary>
     /// Check that font ranges contain all chars in string
