@@ -4656,15 +4656,29 @@ void GCode::add_wipe_points(const std::vector<THING>& paths) {
 
 std::string GCode::extrude_multi_path(const ExtrusionMultiPath &multipath, const std::string &description, double speed) {
 #if _DEBUG
+    assert(!multipath.empty());
+    assert(!multipath.paths.front().polyline.empty());
     for (auto it = std::next(multipath.paths.begin()); it != multipath.paths.end(); ++it) {
         assert(it->polyline.size() >= 2);
         assert(std::prev(it)->polyline.back() == it->polyline.front());
     }
 #endif
-    // extrude along the path
     std::string gcode;
-    for (const ExtrusionPath &path : multipath.paths) {
-        gcode += extrude_path(path, description, speed);
+    //test if we reverse
+    if (m_last_pos_defined && multipath.can_reverse() 
+        && multipath.first_point().distance_to_square(m_last_pos) > multipath.last_point().distance_to_square(m_last_pos)) {
+        //reverse to get a shorter point (hopefully there is still no feature that choose a point that need no perimeter crossing before).
+        // extrude along the  reversedpath
+        for (size_t idx_path = multipath.paths.size() - 1; idx_path < multipath.paths.size(); --idx_path) {
+            assert(multipath.paths[idx_path].can_reverse());
+            //extrude_path will reverse the path by itself, no need to copy it do to it here.
+            gcode += extrude_path(multipath.paths[idx_path], description, speed);
+        }
+    } else {
+        // extrude along the path
+        for (const ExtrusionPath& path : multipath.paths) {
+            gcode += extrude_path(path, description, speed);
+        }
     }
     add_wipe_points(multipath.paths);
     // reset acceleration
@@ -4716,7 +4730,7 @@ std::string GCode::extrude_entity(const ExtrusionEntity &entity, const std::stri
 }
 
 void GCode::use(const ExtrusionEntityCollection &collection) {
-    if (!collection.can_sort() || collection.role() == erMixed) {
+    if (!collection.can_sort() || collection.role() == erMixed || collection.entities().size() <= 1) {
         for (const ExtrusionEntity* next_entity : collection.entities()) {
             next_entity->visit(*this);
         }
@@ -4731,6 +4745,13 @@ void GCode::use(const ExtrusionEntityCollection &collection) {
 std::string GCode::extrude_path(const ExtrusionPath &path, const std::string &description, double speed_mm_per_sec) {
     std::string gcode;
     ExtrusionPath simplifed_path = path;
+
+    //check if we should reverse it
+    if (m_last_pos_defined && path.can_reverse()
+        && simplifed_path.first_point().distance_to_square(m_last_pos) > simplifed_path.last_point().distance_to_square(m_last_pos)) {
+        simplifed_path.reverse();
+    }
+
     // simplify with gcode_resolution (not used yet). Simplify by jusntion deviation before the g1/sec count, to be able to use that decimation to reduce max_gcode_per_second triggers.
     // But as it can be visible on cylinders, should only be called if a max_gcode_per_second trigger may come.
     //simplifed_path.simplify(m_scaled_gcode_resolution);
