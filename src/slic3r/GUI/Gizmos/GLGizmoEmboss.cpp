@@ -51,7 +51,6 @@
 #define SHOW_IMGUI_ATLAS
 #define SHOW_ICONS_TEXTURE
 #define SHOW_FINE_POSITION // draw convex hull around volume
-#define SHOW_WX_WEIGHT_INPUT
 #define DRAW_PLACE_TO_ADD_TEXT // Interactive draw of window position 
 #define ALLOW_OPEN_NEAR_VOLUME
 #define EXECUTE_PROCESS_ON_MAIN_THREAD // debug execution on main thread
@@ -398,6 +397,12 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         close();
         return;
     }
+
+    // Not known situation when could happend this is only for sure
+    if (!m_is_unknown_font && !m_style_manager.is_active_font())
+        create_notification_not_valid_font("No active font in style. Select correct one.");
+    else if (!m_is_unknown_font && !m_style_manager.get_wx_font().IsOk())
+        create_notification_not_valid_font("WxFont is not loaded properly.");
 
     // Configuration creation
     double screen_scale = wxDisplay(wxGetApp().plater()).GetScaleFactor();
@@ -1108,21 +1113,24 @@ void GLGizmoEmboss::draw_window()
     if (ImGui::Button("add svg")) choose_svg_file();
 #endif //  ALLOW_DEBUG_MODE
 
-    bool is_active_font = m_style_manager.is_active_font();
-    if (!is_active_font)
-        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Warning: No font is selected. Select correct one."));
-    
+    // Setter of indent must be befor disable !!!
+    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, m_gui_cfg->indent);
+    ScopeGuard indent_sc([](){ ImGui::PopStyleVar(/*ImGuiStyleVar_IndentSpacing*/); });
+
     // Disable all except selection of font, when open text from 3mf with unknown font
     m_imgui->disabled_begin(m_is_unknown_font);
-    ScopeGuard unknown_font_sc([&]() { 
-        m_imgui->disabled_end(); 
-    });
-    draw_text_input();
-    m_imgui->disabled_begin(!is_active_font);
+    ScopeGuard unknown_font_sc([imgui = m_imgui]() { imgui->disabled_end(/*m_is_unknown_font*/); });
 
-    ImGui::PushStyleVar(ImGuiStyleVar_IndentSpacing, m_gui_cfg->indent);
+    draw_text_input();
+
     ImGui::Indent();
-    draw_style_edit();
+        // When unknown font is inside .3mf only font selection is allowed
+        m_imgui->disabled_end(/*m_is_unknown_font*/);
+        draw_font_list_line();
+        m_imgui->disabled_begin(m_is_unknown_font);
+        bool use_inch = wxGetApp().app_config->get_bool("use_inches");
+        draw_height(use_inch);
+        draw_depth(use_inch);
     ImGui::Unindent();
 
     // close advanced style property when unknown font is selected
@@ -1139,8 +1147,6 @@ void GLGizmoEmboss::draw_window()
     } else if (m_is_advanced_edit_style) 
         set_minimal_window_size(false);
 
-    ImGui::PopStyleVar(); // ImGuiStyleVar_IndentSpacing
-
     ImGui::Separator();
 
     draw_style_list();
@@ -1150,8 +1156,6 @@ void GLGizmoEmboss::draw_window()
         ImGui::Separator();
         draw_model_type();
     }
-
-    m_imgui->disabled_end(); // !is_active_font
        
 #ifdef SHOW_WX_FONT_DESCRIPTOR
     if (is_selected_style)
@@ -1644,6 +1648,59 @@ bool GLGizmoEmboss::select_facename(const wxString &facename)
     return true;
 }
 
+void GLGizmoEmboss::draw_font_list_line()
+{    
+    bool exist_stored_style   = m_style_manager.exist_stored_style();
+    bool exist_change_in_font = m_style_manager.is_font_changed();
+    const std::string& font_text = m_gui_cfg->translations.font;
+    if (exist_change_in_font || !exist_stored_style)
+        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, font_text);
+    else
+        ImGuiWrapper::text(font_text);
+
+    ImGui::SameLine(m_gui_cfg->input_offset);
+
+    draw_font_list();
+
+    bool exist_change = false;
+    if (!m_is_unknown_font) {
+        ImGui::SameLine();
+        if (draw_italic_button())
+            exist_change = true;
+        ImGui::SameLine();
+        if (draw_bold_button())
+            exist_change = true;
+    } else {
+        // when exist unknown font add confirmation button
+        ImGui::SameLine();
+        // Apply for actual selected font
+        if (ImGui::Button(_u8L("Apply").c_str()))
+            exist_change = true;
+    }
+
+    EmbossStyle &style = m_style_manager.get_style();
+    if (exist_change_in_font) {
+        ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
+        if (draw_button(m_icons, IconType::undo)) {
+            const EmbossStyle *stored_style = m_style_manager.get_stored_style();
+
+            style.path          = stored_style->path;
+            style.prop.boldness = stored_style->prop.boldness;
+            style.prop.skew     = stored_style->prop.skew;
+
+            wxFont new_wx_font = WxFontUtils::load_wxFont(style.path);
+            if (new_wx_font.IsOk() && m_style_manager.set_wx_font(new_wx_font))
+                exist_change = true;
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Revert font changes.").c_str());
+    }
+
+    if (exist_change) {
+        m_style_manager.clear_glyphs_cache();
+        process();
+    }
+}
+
 void GLGizmoEmboss::draw_font_list()
 {
     // Set partial
@@ -1660,16 +1717,6 @@ void GLGizmoEmboss::draw_font_list()
     // Do not remove font face during enumeration
     // When deletation of font appear this variable is set
     std::optional<size_t> del_index;
-
-    // When is unknown font is inside .3mf only font selection is allowed
-    // Stop Imgui disable + Guard again start disabling
-    ScopeGuard unknown_font_sc;
-    if (m_is_unknown_font) {
-        m_imgui->disabled_end(); 
-        unknown_font_sc.closure = [&]() { 
-            m_imgui->disabled_begin(true); 
-        };
-    }
 
     // Code
     const char *popup_id = "##font_list_popup";
@@ -1795,13 +1842,6 @@ void GLGizmoEmboss::draw_font_list()
         m_face_names.faces.erase(face);
         // update cached file
         store(m_face_names);
-    }
-
-    if (m_is_unknown_font) {
-        ImGui::SameLine();
-        // Apply for actual selected font
-        if (ImGui::Button(_u8L("Apply").c_str()))
-            process();
     }
 
 #ifdef ALLOW_ADD_FONT_BY_FILE
@@ -2488,89 +2528,6 @@ bool GLGizmoEmboss::rev_checkbox(const std::string &name,
                       undo_offset, draw_offseted_input);
 }
 
-void GLGizmoEmboss::draw_style_edit()
-{
-    {
-        // Check correct WxFont
-        const wxFont &wx_font = m_style_manager.get_wx_font();
-        assert(wx_font.IsOk());
-        if (!wx_font.IsOk()) {
-            ImGui::TextColored(ImGuiWrapper::COL_ORANGE_DARK, "%s", _u8L("WxFont is not loaded properly.").c_str());
-            return;
-        }
-    }
-
-    bool exist_stored_style = m_style_manager.exist_stored_style();
-    bool exist_change_in_font = m_style_manager.is_font_changed();
-    const GuiCfg::Translations &tr = m_gui_cfg->translations;
-    if (exist_change_in_font || !exist_stored_style)
-        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, tr.font);
-    else
-        ImGuiWrapper::text(tr.font);
-    ImGui::SameLine(m_gui_cfg->input_offset);
-    draw_font_list();
-    bool exist_change = false;
-    if (!m_is_unknown_font) {
-        ImGui::SameLine();
-        if (draw_italic_button())
-            exist_change = true;
-        ImGui::SameLine();
-        if (draw_bold_button())
-            exist_change = true;
-    }
-    EmbossStyle &style = m_style_manager.get_style();
-    if (exist_change_in_font) {
-        ImGui::SameLine(ImGui::GetStyle().FramePadding.x);
-        if (draw_button(m_icons, IconType::undo)) {
-            const EmbossStyle *stored_style = m_style_manager.get_stored_style();
-            style.path = stored_style->path;
-            style.prop.boldness = stored_style->prop.boldness;
-            style.prop.skew = stored_style->prop.skew;
-
-            wxFont new_wx_font = WxFontUtils::load_wxFont(style.path);
-            if (new_wx_font.IsOk() && 
-                m_style_manager.set_wx_font(new_wx_font))
-                exist_change = true;
-        } else if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Revert font changes.").c_str());
-    }
-
-    if (exist_change) {
-        m_style_manager.clear_glyphs_cache();
-        process();
-    }
-
-    bool use_inch = wxGetApp().app_config->get_bool("use_inches");
-    draw_height(use_inch);
-    draw_depth(use_inch);
-
-#ifdef SHOW_WX_WEIGHT_INPUT
-    if (wx_font.has_value()) {
-        ImGui::Text("%s", "weight");
-        ImGui::SameLine(m_gui_cfg->input_offset);
-        ImGui::SetNextItemWidth(m_gui_cfg->input_width);
-        int weight     = wx_font->GetNumericWeight();
-        int min_weight = 1, max_weight = 1000;
-        if (ImGui::SliderInt("##weight", &weight, min_weight, max_weight)) {
-            wx_font->SetNumericWeight(weight);
-            m_style_manager.wx_font_changed();
-            process();
-        }
-
-        wxFont f       = wx_font->Bold();
-        bool   disable = f == *wx_font;
-        ImGui::SameLine();
-        if (draw_button(IconType::bold, disable)) {
-            *wx_font = f;
-            m_style_manager.wx_font_changed();
-            process();
-        }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("wx Make bold").c_str());
-    }
-#endif // SHOW_WX_WEIGHT_INPUT 
-}
-
 bool GLGizmoEmboss::set_height() {
     float &value = m_style_manager.get_style().prop.size_in_mm;
 
@@ -3112,39 +3069,36 @@ bool GLGizmoEmboss::choose_svg_file()
 void GLGizmoEmboss::create_notification_not_valid_font(
     const TextConfiguration &tc)
 {
-    // not neccessary, but for sure that old notification doesnt exist
-    if (m_is_unknown_font) remove_notification_not_valid_font();
-    m_is_unknown_font = true;
-
-    auto type = NotificationType::UnknownFont;
-    auto level =
-        NotificationManager::NotificationLevel::WarningNotificationLevel;
-
     const EmbossStyle &es = m_style_manager.get_style();
     const auto &face_name_opt = es.prop.face_name;
-    const auto &face_name_3mf_opt = tc.style.prop.face_name;
+    const std::string &face_name_3mf = tc.style.prop.face_name.value_or(tc.style.path);
 
-    const std::string &face_name_3mf = face_name_3mf_opt.has_value() ?
-                                              *face_name_3mf_opt :
-                                              tc.style.path;
-
-    std::string face_name_by_wx;
+    std::optional<std::string> face_name_by_wx;
     if (!face_name_opt.has_value()) {
         const wxFont& wx_font = m_style_manager.get_wx_font();
         if (wx_font.IsOk()) {
             wxString wx_face_name = wx_font.GetFaceName();
-            face_name_by_wx = std::string((const char *) wx_face_name.ToUTF8());
+            if (!wx_face_name.empty())
+                face_name_by_wx = std::string(wx_face_name.ToUTF8().data());
         }
     }
-
-    const std::string &face_name = face_name_opt.has_value() ? *face_name_opt : 
-            (!face_name_by_wx.empty() ? face_name_by_wx : es.path);
-
+    const std::string &face_name = face_name_opt.value_or(face_name_by_wx.value_or(es.path));
     std::string text =
         GUI::format(_L("Can't load exactly same font(\"%1%\"), "
                        "Aplication selected a similar one(\"%2%\"). "
                        "You have to specify font for enable edit text."),
                     face_name_3mf, face_name);
+    create_notification_not_valid_font(text);
+}
+
+void GLGizmoEmboss::create_notification_not_valid_font(const std::string &text) {
+    // not neccessary, but for sure that old notification doesnt exist
+    if (m_is_unknown_font)
+        remove_notification_not_valid_font();
+    m_is_unknown_font = true;
+
+    auto type  = NotificationType::UnknownFont;
+    auto level = NotificationManager::NotificationLevel::WarningNotificationLevel;
     auto notification_manager = wxGetApp().plater()->get_notification_manager();
     notification_manager->push_notification(type, level, text);
 }
@@ -3278,7 +3232,6 @@ std::unique_ptr<DataBase> priv::create_emboss_data_base(const std::string &text,
         cancel->store(true);
     // create new shared ptr to cancel new job
     cancel = std::make_shared<std::atomic<bool>>(false);
-
     DataBase base(volume_name, cancel);
     FontFileWithCache &font = style_manager.get_font_file_with_cache();
     TextConfiguration  tc{es, text};

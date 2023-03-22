@@ -100,8 +100,8 @@ private:
     void init_font_name_texture();
     struct FaceName;
     void draw_font_preview(FaceName &face, bool is_visible);
+    void draw_font_list_line();
     void draw_font_list();
-    void draw_style_edit();
     void draw_height(bool use_inch);
     void draw_depth(bool use_inch);
 
@@ -148,6 +148,7 @@ private:
     // When open text loaded from .3mf it could be written with unknown font
     bool m_is_unknown_font = false;
     void create_notification_not_valid_font(const TextConfiguration& tc);
+    void create_notification_not_valid_font(const std::string& text);
     void remove_notification_not_valid_font();
     
     // This configs holds GUI layout size given by translated texts.

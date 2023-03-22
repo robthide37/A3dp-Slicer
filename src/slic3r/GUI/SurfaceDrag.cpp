@@ -53,8 +53,8 @@ static Vec2d calc_screen_offset_to_volume_center(const Vec2d &screen_coor, const
     return nearest_offset;
 }
 
- // Calculate scale in world
-static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
+ // Calculate scale in world for check in debug
+[[maybe_unused]] static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
 {
     Vec3d  from_dir      = from * dir;
     Vec3d  to_dir        = to * dir;
@@ -80,6 +80,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
 
         // allow moving with object again
         canvas.enable_moving(true);
+        canvas.enable_picking(true);
         surface_drag.reset();
 
         // only left up is correct
@@ -168,6 +169,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
 
         // disable moving with object by mouse
         canvas.enable_moving(false);
+        canvas.enable_picking(false);
         return true;
     }
 
