@@ -24,11 +24,10 @@ namespace Slic3r::GUI::Emboss {
 class StyleManager
 {
     friend class CreateFontStyleImagesJob; // access to StyleImagesData
-
 public:
     /// <param name="language_glyph_range">Character to load for imgui when initialize imgui font</param>
     /// <param name="create_default_styles">Function to create default styles</param>
-    StyleManager(const ImWchar *language_glyph_range, std::function<EmbossStyles()> create_default_styles);
+    StyleManager(const ImWchar *language_glyph_range, const std::function<EmbossStyles()>& create_default_styles);
         
     /// <summary>
     /// Release imgui font and style images from GPU
@@ -59,11 +58,11 @@ public:
     void add_style(const std::string& name);
 
     /// <summary>
-    /// Change order of style item in m_style_items.
+    /// Change order of style item in m_styles.
     /// Fix selected font index when (i1 || i2) == m_font_selected 
     /// </summary>
-    /// <param name="i1">First index to m_style_items</param>
-    /// <param name="i2">Second index to m_style_items</param>
+    /// <param name="i1">First index to m_styles</param>
+    /// <param name="i2">Second index to m_styles</param>
     void swap(size_t i1, size_t i2);
 
     /// <summary>
@@ -73,7 +72,7 @@ public:
     void discard_style_changes();
 
     /// <summary>
-    /// Remove style from m_style_items.
+    /// Remove style from m_styles.
     /// Fix selected font index when index is under m_font_selected
     /// </summary>
     /// <param name="index">Index of style to be removed</param>
@@ -94,13 +93,14 @@ public:
     /// Change active font
     /// When font not loaded roll back activ font
     /// </summary>
-    /// <param name="font_index">New font index(from m_style_items range)</param>
+    /// <param name="font_index">New font index(from m_styles range)</param>
     /// <returns>True on succes. False on fail load font</returns>
     bool load_style(size_t font_index);
     // load font style not stored in list
-    bool load_style(const EmbossStyle &style);
+    struct Style;
+    bool load_style(const Style &style);
     // fastering load font on index by wxFont, ignore type and descriptor
-    bool load_style(const EmbossStyle &style, const wxFont &font);
+    bool load_style(const Style &style, const wxFont &font);
     
     // clear actual selected glyphs cache
     void clear_glyphs_cache();
@@ -109,10 +109,10 @@ public:
     void clear_imgui_font();
 
     // getters for private data
-    const EmbossStyle *get_stored_style() const;
+    const Style *get_stored_style() const;
 
-    const EmbossStyle &get_style() const     { return m_style_cache.style; }
-          EmbossStyle &get_style()           { return m_style_cache.style; }
+    const Style &get_style() const     { return m_style_cache.style; }
+          Style &get_style()           { return m_style_cache.style; }
           size_t get_style_index() const     { return m_style_cache.style_index; }
     std::string &get_truncated_name()        { return m_style_cache.truncated_name; }
     const ImFontAtlas &get_atlas() const     { return m_style_cache.atlas; } 
@@ -132,6 +132,8 @@ public:
     /// </summary>
     /// <returns></returns>
     bool is_font_changed() const;
+
+    bool is_unique_style_name(const std::string &name) const;
 
     /// <summary>
     /// Setter on wx_font when changed
@@ -167,33 +169,28 @@ public:
     void init_style_images(const Vec2i& max_size, const std::string &text);
     void free_style_images();
     
-    struct Item;
     // access to all managed font styles
-    const std::vector<Item> &get_styles() const;
+    const std::vector<Style> &get_styles() const;
 
     /// <summary>
     /// Describe image in GPU to show settings of style
     /// </summary>
     struct StyleImage
     {
-        void* texture_id = 0; // GLuint
+        void* texture_id = nullptr; // GLuint
         BoundingBox bounding_box;
         ImVec2 tex_size;
         ImVec2 uv0;
         ImVec2 uv1;
-        Point  offset     = Point(0, 0);
-        StyleImage()      = default;
+        Point  offset = Point(0, 0);
     };
 
     /// <summary>
     /// All connected with one style 
     /// keep temporary data and caches for style
     /// </summary>
-    struct Item
+    struct Style : public EmbossStyle
     {
-        // parent Text style
-        EmbossStyle style;
-
         // Define how to emboss shape
         EmbossProjection projection;
 
@@ -208,9 +205,12 @@ public:
         // When not set value is zero and is not stored
         std::optional<float> angle; // [in radians] form -Pi to Pi
 
-        bool operator==(const Item &other) const
+        bool operator==(const Style &other) const
         {
-            return style == other.style && projection == other.projection && distance == other.distance && angle == other.angle;
+            return EmbossStyle::operator==(other) && 
+                projection == other.projection &&
+                distance == other.distance && 
+                angle == other.angle;
         }
 
         // cache for view font name with maximal width in imgui
@@ -219,6 +219,7 @@ public:
         // visualization of style
         std::optional<StyleImage> image;
     };
+    using Styles = std::vector<Style>;
 
     // check if exist selected font style in manager
     bool is_active_font();
@@ -230,7 +231,10 @@ public:
     static float get_imgui_font_size(const FontProp &prop, const Slic3r::Emboss::FontFile &file, double scale);
 
 private:
+    // function to create default style list
     std::function<EmbossStyles()> m_create_default_styles;
+    // keep language dependent glyph range
+    const ImWchar *m_imgui_init_glyph_range;
 
     /// <summary>
     /// Cache data from style to reduce amount of:
@@ -256,22 +260,20 @@ private:
         std::string truncated_name; 
 
         // actual used font item
-        EmbossStyle style = {};
+        Style style = {};
 
         // cache for stored wx font to not create every frame
         wxFont stored_wx_font = {};
 
-        // index into m_style_items
+        // index into m_styles
         size_t style_index = std::numeric_limits<size_t>::max();
 
     } m_style_cache;
 
-    void make_unique_name(std::string &name);
-
     // Privat member
-    std::vector<Item> m_style_items;
-    AppConfig        *m_app_config;
-    size_t            m_last_style_index;
+    Styles m_styles;
+    AppConfig *m_app_config = nullptr;
+    size_t m_last_style_index = std::numeric_limits<size_t>::max();
 
     /// <summary>
     /// Keep data needed to create Font Style Images in Job
@@ -310,12 +312,8 @@ private:
         // pixel per milimeter (scaled DPI)
         double ppm;
     };
-    std::shared_ptr<StyleImagesData::StyleImages> m_temp_style_images;
-    bool m_exist_style_images;
-
-    // store all font GLImages
-    //ImFontAtlas    m_imgui_font_atlas;
-    const ImWchar *m_imgui_init_glyph_range;
+    std::shared_ptr<StyleImagesData::StyleImages> m_temp_style_images = nullptr;
+    bool m_exist_style_images = false;
 };
 
 } // namespace Slic3r

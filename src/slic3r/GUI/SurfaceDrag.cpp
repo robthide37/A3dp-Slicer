@@ -93,25 +93,28 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
     // detect start text dragging
     if (mouse_event.LeftDown()) {
         // selected volume
-        GLVolume *gl_volume = get_selected_gl_volume(canvas);
-        if (gl_volume == nullptr)
+        GLVolume *gl_volume_ptr = get_selected_gl_volume(canvas);
+        if (gl_volume_ptr == nullptr)
             return false;
+        const GLVolume &gl_volume = *gl_volume_ptr;
 
         // is selected volume closest hovered?
-        const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;
-        int hovered_idx = canvas.get_first_hover_volume_idx();
-        if (hovered_idx < 0 || 
-            hovered_idx >= gl_volumes.size() || 
-            gl_volumes[hovered_idx] != gl_volume)
+        const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;        
+        if (int hovered_idx = canvas.get_first_hover_volume_idx();
+            hovered_idx < 0)
+            return false;        
+        else if (auto hovered_idx_ = static_cast<size_t>(hovered_idx);
+            hovered_idx_ >= gl_volumes.size() || 
+            gl_volumes[hovered_idx_] != gl_volume_ptr)
             return false;
 
-        const ModelObject *object = get_model_object(*gl_volume, canvas.get_model()->objects);
+        const ModelObject *object = get_model_object(gl_volume, canvas.get_model()->objects);
         assert(object != nullptr);
         if (object == nullptr)
             return false;
 
-        const ModelInstance *instance = get_model_instance(*gl_volume, *object);
-        const ModelVolume   *volume   = get_model_volume(*gl_volume, *object);
+        const ModelInstance *instance = get_model_instance(gl_volume, *object);
+        const ModelVolume   *volume   = get_model_volume(gl_volume, *object);
         assert(instance != nullptr && volume != nullptr);
         if (object == nullptr || instance == nullptr || volume == nullptr)
             return false;
@@ -124,7 +127,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         std::vector<size_t>    allowed_volumes_id;
         if (volumes.size() > 1) {
             allowed_volumes_id.reserve(volumes.size() - 1);
-            for (auto &v : volumes) {
+            for (const ModelVolume *v : volumes) {
                 // skip actual selected object
                 if (v->id() == volume->id())
                     continue;
@@ -146,7 +149,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         Vec2d mouse_pos    = mouse_coord.cast<double>();
         Vec2d mouse_offset = calc_screen_offset_to_volume_center(mouse_pos, *volume, camera);
 
-        Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
+        Transform3d volume_tr = gl_volume.get_volume_transformation().get_matrix();
 
         if (volume->text_configuration.has_value()) {
             const TextConfiguration &tc = *volume->text_configuration;
@@ -161,7 +164,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         std::optional<float> start_angle;
         if (up_limit.has_value())
             start_angle = Emboss::calc_up(world_tr, *up_limit);        
-        surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume, condition, start_angle};
+        surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume_ptr, condition, start_angle};
 
         // disable moving with object by mouse
         canvas.enable_moving(false);

@@ -398,7 +398,7 @@ void GLGizmoSVG::on_stop_dragging()
     // recalculate for surface cut
     if (m_volume != nullptr && 
         m_volume->emboss_shape.has_value() &&
-        m_volume->emboss_shape->use_surface)
+        m_volume->emboss_shape->projection.use_surface)
         process();
 }
 void GLGizmoSVG::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
@@ -710,9 +710,8 @@ ExPolygons priv::default_shape() {
 
 EmbossShape priv::select_shape() {
     EmbossShape shape;
-    shape.depth = 10.;
-    shape.distance = 0;
-    shape.use_surface = false;
+    shape.projection.depth = 10.;
+    shape.projection.use_surface = false;
 
     shape.svg_file_path = choose_svg_file();
     if (shape.svg_file_path.empty())

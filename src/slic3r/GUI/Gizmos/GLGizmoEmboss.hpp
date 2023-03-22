@@ -32,7 +32,7 @@ namespace Slic3r::GUI {
 class GLGizmoEmboss : public GLGizmoBase
 {
 public:
-    GLGizmoEmboss(GLCanvas3D& parent);
+    explicit GLGizmoEmboss(GLCanvas3D& parent);
 
     /// <summary>
     /// Create new embossed text volume by type on position of mouse
@@ -51,8 +51,8 @@ protected:
     bool on_init() override;
     std::string on_get_name() const override;
     void on_render() override;
-    virtual void on_register_raycasters_for_picking() override;
-    virtual void on_unregister_raycasters_for_picking() override;
+    void on_register_raycasters_for_picking() override;
+    void on_unregister_raycasters_for_picking() override;
     void on_render_input_window(float x, float y, float bottom_limit) override;
     bool on_is_activable() const override { return true; }
     bool on_is_selectable() const override { return false; }
@@ -90,7 +90,6 @@ private:
     void draw_window();
     void draw_text_input();
     void draw_model_type();
-    void fix_transformation(const FontProp &from, const FontProp &to);
     void draw_style_list();
     void draw_delete_style_button();
     void draw_style_rename_popup();
@@ -308,8 +307,8 @@ private:
     // Keep data about dragging only during drag&drop
     std::optional<SurfaceDrag> m_surface_drag;
 
-    // TODO: it should be accessible by other gizmo too.
-    // May be move to plater?
+    // Keep old scene triangle data in AABB trees, 
+    // all the time it need actualize before use.
     RaycastManager m_raycast_manager;
 
     // For text on scaled objects

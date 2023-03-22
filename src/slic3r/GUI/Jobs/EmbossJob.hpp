@@ -37,8 +37,8 @@ class DataBase
 public:
     DataBase(const std::string& volume_name, std::shared_ptr<std::atomic<bool>> cancel) : volume_name(volume_name), cancel(std::move(cancel)) {}
     DataBase(const std::string& volume_name, std::shared_ptr<std::atomic<bool>> cancel, EmbossShape&& shape)
-        : volume_name(volume_name), cancel(std::move(cancel)), shape(std::move(shape))
-    {}
+        : volume_name(volume_name), cancel(std::move(cancel)), shape(std::move(shape)){}
+    DataBase(DataBase &&) = default;
     virtual ~DataBase() = default;
 
     /// <summary>

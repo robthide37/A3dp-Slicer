@@ -825,10 +825,10 @@ void update_volume(TriangleMesh &&mesh, const DataUpdate &data, const Transform3
         volume->set_transformation(*tr);
     } else {
         // apply fix matrix made by store to .3mf
-        const auto &tc = volume->text_configuration;
-        assert(tc.has_value());
-        if (tc.has_value() && tc->fix_3mf_tr.has_value())
-            volume->set_transformation(volume->get_matrix() * tc->fix_3mf_tr->inverse());
+        const std::optional<EmbossShape> &emboss_shape = volume->emboss_shape;
+        assert(emboss_shape.has_value());
+        if (emboss_shape.has_value() && emboss_shape->fix_3mf_tr.has_value())
+            volume->set_transformation(volume->get_matrix() * emboss_shape->fix_3mf_tr->inverse());
     }
 
     UpdateJob::update_volume(volume, std::move(mesh), *data.base);
