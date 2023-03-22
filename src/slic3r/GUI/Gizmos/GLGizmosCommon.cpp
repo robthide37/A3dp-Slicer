@@ -453,18 +453,18 @@ void SupportsClipper::on_update()
     if (! mo || ! is_sla)
         return;
 
-    const SLAPrintObject* print_object = get_pool()->selection_info()->print_object();
-    if (print_object == nullptr)
+    const SLAPrintObject* po = get_pool()->selection_info()->print_object();
+    if (po == nullptr)
         return;
 
-    if (print_object->get_mesh_to_print() == nullptr) {
+    if (po->get_mesh_to_print() == nullptr) {
         // The object has been not sliced yet. We better dump the cached data.
         m_supports_clipper.reset();
         m_pad_clipper.reset();
         return;
     }
 
-    const TriangleMesh& support_mesh = print_object->support_mesh();
+    const TriangleMesh& support_mesh = po->support_mesh();
     if (support_mesh.empty()) {
         // The supports are not available yet. We better dump the cached data.
         m_supports_clipper.reset();
@@ -474,7 +474,7 @@ void SupportsClipper::on_update()
         m_supports_clipper->set_mesh(support_mesh.its);
     }
 
-    const TriangleMesh& pad_mesh = print_object->pad_mesh();
+    const TriangleMesh& pad_mesh = po->pad_mesh();
     if (pad_mesh.empty()) {
         // The supports are not available yet. We better dump the cached data.
         m_pad_clipper.reset();
@@ -499,8 +499,16 @@ void SupportsClipper::render_cut() const
     if (ocl->get_position() == 0.)
         return;
 
+    const SLAPrintObject* po = get_pool()->selection_info()->print_object();
+    if (po == nullptr)
+        return;
+
+    Geometry::Transformation po_trafo(po->trafo());
+
     const SelectionInfo* sel_info = get_pool()->selection_info();
-    const Geometry::Transformation inst_trafo = sel_info->model_object()->instances[sel_info->get_active_instance()]->get_transformation();
+    Geometry::Transformation inst_trafo = sel_info->model_object()->instances[sel_info->get_active_instance()]->get_transformation();
+    inst_trafo = Geometry::Transformation(inst_trafo.get_matrix() * po_trafo.get_matrix().inverse());
+    inst_trafo.set_offset(inst_trafo.get_offset() + Vec3d(0.0, 0.0, sel_info->get_sla_shift()));
 
     if (m_supports_clipper != nullptr) {
         m_supports_clipper->set_plane(*ocl->get_clipping_plane());
