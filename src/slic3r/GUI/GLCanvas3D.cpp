@@ -2090,51 +2090,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 assert(it != model_object->instances.end());
                 int instance_idx = it - model_object->instances.begin();
                 for (size_t istep = 0; istep < sla_steps.size(); ++istep) {
-                    if (sla_steps[istep] == slaposDrillHoles) {
-                        // Hollowing is a special case, where the mesh from the backend is being loaded into the 1st volume of an instance,
-                        // not into its own GLVolume.
-                        // There shall always be such a GLVolume allocated.
-                        ModelVolumeState key(model_object->volumes.front()->id(), instance.instance_id);
-                        auto it = std::lower_bound(model_volume_state.begin(), model_volume_state.end(), key, model_volume_state_lower);
-                        assert(it != model_volume_state.end() && it->geometry_id == key.geometry_id);
-                        assert(!it->new_geometry());
-                        GLVolume& volume = *m_volumes.volumes[it->volume_idx];
-                        if (!volume.offsets.empty() && state.step[istep].timestamp != volume.offsets.front()) {
-                            // The backend either produced a new hollowed mesh, or it invalidated the one that the front end has seen.
-                            volume.model.reset();
-                            if (state.step[istep].state == PrintStateBase::State::Done) {
-                                std::shared_ptr<const indexed_triangle_set> m = print_object->get_mesh_to_print();
-                                assert(m != nullptr && !m->empty());
-                                TriangleMesh mesh(*m);
-                                // sla_trafo does not contain volume trafo. To get a mesh to create
-                                // a new volume from, we have to apply vol trafo inverse separately.
-                                const ModelObject& mo = *m_model->objects[volume.object_idx()];
-                                Transform3d trafo = sla_print->sla_trafo(mo) * mo.volumes.front()->get_transformation().get_matrix();
-                                mesh.transform(trafo.inverse());
-#if ENABLE_SMOOTH_NORMALS
-                                volume.model.init_from(mesh, true);
-#else
-                                volume.model.init_from(mesh);
-                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(mesh));
-#endif // ENABLE_SMOOTH_NORMALS
-                            }
-                            else {
-                                // Reload the original volume.
-#if ENABLE_SMOOTH_NORMALS
-                                volume.model.init_from(m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh(), true);
-#else
-                                const TriangleMesh& new_mesh = m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh();
-                                volume.model.init_from(new_mesh);
-                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(new_mesh));
-#endif // ENABLE_SMOOTH_NORMALS
-                            }
-                        }
-                        //FIXME it is an ugly hack to write the timestamp into the "offsets" field to not have to add another member variable
-                        // to the GLVolume. We should refactor GLVolume significantly, so that the GLVolume will not contain member variables
-                        // of various concenrs (model vs. 3D print path).
-                        volume.offsets = { state.step[istep].timestamp };
-                    }
-                    else if (state.step[istep].state == PrintStateBase::State::Done) {
+                    if (state.step[istep].state == PrintStateBase::State::Done) {
                         // Check whether there is an existing auxiliary volume to be updated, or a new auxiliary volume to be created.
                         ModelVolumeState key(state.step[istep].timestamp, instance.instance_id.id);
                         auto it = std::lower_bound(aux_volume_state.begin(), aux_volume_state.end(), key, model_volume_state_lower);
