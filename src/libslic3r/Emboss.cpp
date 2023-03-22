@@ -1264,15 +1264,17 @@ ExPolygons Emboss::text2shapes(FontFileWithCache    &font_with_cache,
     return result;
 }
 
-void Emboss::apply_transformation(const FontProp &font_prop,
-                                  Transform3d    &transformation)
-{
-    if (font_prop.angle.has_value()) {
-        double angle_z = *font_prop.angle;
+void Emboss::apply_transformation(const FontProp &font_prop, Transform3d &transformation){
+    apply_transformation(font_prop.angle, font_prop.distance, transformation);
+}
+
+void Emboss::apply_transformation(const std::optional<float>& angle, const std::optional<float>& distance, Transform3d &transformation) {
+    if (angle.has_value()) {
+        double angle_z = *angle;
         transformation *= Eigen::AngleAxisd(angle_z, Vec3d::UnitZ());
     }
-    if (font_prop.distance.has_value()) {
-        Vec3d translate = Vec3d::UnitZ() * (*font_prop.distance);
+    if (distance.has_value()) {
+        Vec3d translate = Vec3d::UnitZ() * (*distance);
         transformation.translate(translate);
     }
 }
@@ -1540,60 +1542,95 @@ std::optional<Vec2d> Emboss::ProjectZ::unproject(const Vec3d &p, double *depth) 
     return Vec2d(p.x() / SHAPE_SCALE, p.y() / SHAPE_SCALE);
 }
 
-Transform3d Emboss::create_transformation_onto_surface(const Vec3f &position,
-                                                       const Vec3f &normal,
-                                                       float        up_limit)
+
+Vec3d Emboss::suggest_up(const Vec3d normal, double up_limit) 
 {
-    // up and emboss direction for generated model
-    Vec3d text_up_dir     = Vec3d::UnitY();
-    Vec3d text_emboss_dir = Vec3d::UnitZ();
+    // Normal must be 1
+    assert(is_approx(normal.squaredNorm(), 1.));
 
     // wanted up direction of result
-    Vec3d wanted_up_side = Vec3d::UnitZ();
-    if (std::fabs(normal.z()) > up_limit) wanted_up_side = Vec3d::UnitY();
-
-    Vec3d wanted_emboss_dir = normal.cast<double>();
-    // after cast from float it needs to be normalized again
-    wanted_emboss_dir.normalize(); 
+    Vec3d wanted_up_side = 
+        (std::fabs(normal.z()) > up_limit)?
+        Vec3d::UnitY() : Vec3d::UnitZ();
 
     // create perpendicular unit vector to surface triangle normal vector
     // lay on surface of triangle and define up vector for text
-    Vec3d wanted_up_dir = wanted_emboss_dir
-        .cross(wanted_up_side)
-        .cross(wanted_emboss_dir);
+    Vec3d wanted_up_dir = normal.cross(wanted_up_side).cross(normal);
     // normal3d is NOT perpendicular to normal_up_dir
-    wanted_up_dir.normalize(); 
+    wanted_up_dir.normalize();
+
+    return wanted_up_dir;
+}
+
+std::optional<float> Emboss::calc_up(const Transform3d &tr, double up_limit)
+{
+    auto tr_linear = tr.linear();
+    // z base of transformation ( tr * UnitZ )
+    Vec3d normal = tr_linear.col(2);
+    // scaled matrix has base with different size
+    normal.normalize();
+    Vec3d suggested = suggest_up(normal);
+    assert(is_approx(suggested.squaredNorm(), 1.));
+
+    Vec3d up = tr_linear.col(1); // tr * UnitY()
+    up.normalize();
+    
+    double dot = suggested.dot(up);
+    if (dot >= 1. || dot <= -1.)
+        return {}; // zero angle
+
+    Matrix3d m;
+    m.row(0) = up;
+    m.row(1) = suggested;
+    m.row(2) = normal;
+    double det = m.determinant();
+
+    return -atan2(det, dot);
+}
+
+Transform3d Emboss::create_transformation_onto_surface(const Vec3d &position,
+                                                       const Vec3d &normal,
+                                                       double       up_limit)
+{
+    // is normalized ?
+    assert(is_approx(normal.squaredNorm(), 1.));
+
+    // up and emboss direction for generated model
+    Vec3d up_dir     = Vec3d::UnitY();
+    Vec3d emboss_dir = Vec3d::UnitZ();
+
+    // after cast from float it needs to be normalized again
+    Vec3d wanted_up_dir = suggest_up(normal, up_limit);
 
     // perpendicular to emboss vector of text and normal
     Vec3d axis_view;
     double angle_view;
-    if (wanted_emboss_dir == -Vec3d::UnitZ()) {
+    if (normal == -Vec3d::UnitZ()) {
         // text_emboss_dir has opposit direction to wanted_emboss_dir
         axis_view = Vec3d::UnitY();
         angle_view = M_PI;
     } else {
-        axis_view = text_emboss_dir.cross(wanted_emboss_dir);
-        angle_view = std::acos(text_emboss_dir.dot(wanted_emboss_dir)); // in rad
+        axis_view = emboss_dir.cross(normal);
+        angle_view = std::acos(emboss_dir.dot(normal)); // in rad
         axis_view.normalize();
     }
 
     Eigen::AngleAxis view_rot(angle_view, axis_view);
     Vec3d wanterd_up_rotated = view_rot.matrix().inverse() * wanted_up_dir;
     wanterd_up_rotated.normalize();
-    double angle_up = std::acos(text_up_dir.dot(wanterd_up_rotated));
+    double angle_up = std::acos(up_dir.dot(wanterd_up_rotated));
 
-    // text_view and text_view2 should have same direction
-    Vec3d text_view2 = text_up_dir.cross(wanterd_up_rotated);
-    Vec3d diff_view  = text_emboss_dir - text_view2;
+    Vec3d text_view = up_dir.cross(wanterd_up_rotated);
+    Vec3d diff_view  = emboss_dir - text_view;
     if (std::fabs(diff_view.x()) > 1. ||
         std::fabs(diff_view.y()) > 1. ||
         std::fabs(diff_view.z()) > 1.) // oposit direction
         angle_up *= -1.;
 
-    Eigen::AngleAxis up_rot(angle_up, text_emboss_dir);
+    Eigen::AngleAxis up_rot(angle_up, emboss_dir);
 
     Transform3d transform = Transform3d::Identity();
-    transform.translate(position.cast<double>());
+    transform.translate(position);
     transform.rotate(view_rot);
     transform.rotate(up_rot);
     return transform;

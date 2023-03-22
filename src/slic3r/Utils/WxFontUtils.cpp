@@ -55,13 +55,11 @@ static std::string get_file_path(const wxFont& font) {
     if (url == NULL) return {};
     wxString file_uri;
     wxCFTypeRef(url).GetValue(file_uri);
-    std::string file_path(wxURI::Unescape(file_uri).c_str());
-    size_t start = std::string("file://").size();
-    if (file_path.empty() || file_path.size() <= start)
-        return {};
-    // remove prefix file://
-    file_path = file_path.substr(start, file_path.size() - start);
-    return file_path;
+    wxURI uri(file_uri);
+    const wxString &path = uri.GetPath();
+    std::string path_str(wxURI::Unescape(path).c_str());
+    BOOST_LOG_TRIVIAL(trace) << "input uri(" << file_uri.c_str() << ") convert to path(" << path.c_str() << ") string(" << path_str << ").";
+    return path_str;
 }    
 #endif // __APPLE__
 } // namespace
@@ -171,13 +169,23 @@ std::string WxFontUtils::store_wxFont(const wxFont &font)
 {
     // wxString os = wxPlatformInfo::Get().GetOperatingSystemIdName();
     wxString font_descriptor = font.GetNativeFontInfoDesc();
+    BOOST_LOG_TRIVIAL(trace) << "'" << font_descriptor << "' wx string get from GetNativeFontInfoDesc. wxFont " << 
+        "IsOk(" << font.IsOk() << "), " <<
+        "isNull(" << font.IsNull() << ")" <<
+        // "IsFree(" << font.IsFree() << "), " << // on MacOs is no function is free
+        "IsFixedWidth(" << font.IsFixedWidth() << "), " <<
+        "IsUsingSizeInPixels(" << font.IsUsingSizeInPixels() << "), " <<
+        "Encoding(" << (int)font.GetEncoding() << "), " ;
     return std::string(font_descriptor.c_str());
 }
 
 wxFont WxFontUtils::load_wxFont(const std::string &font_descriptor)
 {
+    BOOST_LOG_TRIVIAL(trace) << "'" << font_descriptor << "'font descriptor string param of load_wxFont()";
     wxString font_descriptor_wx(font_descriptor);
+    BOOST_LOG_TRIVIAL(trace) << "'" << font_descriptor_wx.c_str() << "' wx string descriptor";
     wxFont wx_font(font_descriptor_wx);
+    BOOST_LOG_TRIVIAL(trace) << "loaded font is '" << get_human_readable_name(wx_font) << "'.";
     return wx_font;
 }
 
