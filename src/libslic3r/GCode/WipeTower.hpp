@@ -364,6 +364,10 @@ private:
 	std::vector<WipeTowerInfo> m_plan; 	// Stores information about all layers and toolchanges for the future wipe tower (filled by plan_toolchange(...))
 	std::vector<WipeTowerInfo>::iterator m_layer_info = m_plan.end();
 
+	// This sums height of all extruded layers, not counting the layers which
+	// will be later removed when the "no_sparse_layers" is used.
+	float m_current_height = 0.f;
+
     // Stores information about used filament length per extruder:
     std::vector<float> m_used_filament_length;
 
