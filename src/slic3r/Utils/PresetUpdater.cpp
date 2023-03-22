@@ -399,7 +399,7 @@ void PresetUpdater::priv::sync_config(const VendorMap vendors, const std::string
 				std::string name(stat.m_filename);
 				if (stat.m_uncomp_size > 0) {
 					std::string buffer((size_t)stat.m_uncomp_size, 0);
-					mz_bool res = mz_zip_reader_extract_file_to_mem(&archive, stat.m_filename, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
+					mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
 					if (res == 0) {
 						BOOST_LOG_TRIVIAL(error) << "Failed to unzip " << stat.m_filename;
 						continue;
