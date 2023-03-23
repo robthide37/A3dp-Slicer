@@ -737,7 +737,7 @@ namespace client
         // Table to translate symbol tag to a human readable error message.
         static std::map<std::string, std::string> tag_to_error_message;
 
-        static void             evaluate_full_macro(const MyContext *ctx, bool &result) { result = ! ctx->just_boolean_expression; }
+        static bool             evaluate_full_macro(const MyContext *ctx) { return ! ctx->just_boolean_expression; }
 
         const ConfigOption* 	optptr(const t_config_option_key &opt_key) const override
         {
@@ -1570,13 +1570,12 @@ namespace client
 
     template<typename Iterator>
     struct InterpolateTableContext {
-        template<typename Iterator>
         struct Item {
             double                           x;
             boost::iterator_range<Iterator>  it_range_x;
             double                           y;
         };
-        std::vector<Item<Iterator>> table;
+        std::vector<Item> table;
 
         static void init(const expr<Iterator> &x) {
             if (!x.numeric_type())
@@ -1785,8 +1784,8 @@ namespace client
             // Also the start symbol switches between the "full macro syntax" and a "boolean expression only",
             // depending on the context->just_boolean_expression flag. This way a single static expression parser
             // could serve both purposes.
-            start = eps[px::bind(&MyContext::evaluate_full_macro, _r1, _a)] >
-                (       (eps(_a==true) > text_block(_r1) [_val=_1])
+            start =
+                (       (eps(px::bind(&MyContext::evaluate_full_macro, _r1)) > text_block(_r1) [_val=_1])
                     |   conditional_expression(_r1) [ px::bind(&expr<Iterator>::evaluate_boolean_to_string, _1, _val) ]
 				) > eoi;
             start.name("start");
