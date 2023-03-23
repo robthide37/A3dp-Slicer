@@ -1427,6 +1427,30 @@ namespace client
             list.emplace_back(std::move(expr));
         }
 
+        template <typename Iterator>
+        static void is_vector_empty(
+            const MyContext         *ctx,
+            OptWithPos<Iterator>    &opt,
+            expr<Iterator>          &out)
+        {
+            if (opt.has_index() || ! opt.opt->is_vector())
+                ctx->throw_exception("parameter of empty() is not a vector variable", opt.it_range);
+            out.set_b(static_cast<const ConfigOptionVectorBase*>(opt.opt)->size() == 0);
+            out.it_range = opt.it_range;
+        }
+
+        template <typename Iterator>
+        static void vector_size(
+            const MyContext         *ctx,
+            OptWithPos<Iterator>    &opt,
+            expr<Iterator>          &out)
+        {
+            if (opt.has_index() || ! opt.opt->is_vector())
+                ctx->throw_exception("parameter of size() is not a vector variable", opt.it_range);
+            out.set_i(int(static_cast<const ConfigOptionVectorBase*>(opt.opt)->size()));
+            out.it_range = opt.it_range;
+        }
+
         // Verify that the expression returns an integer, which may be used
         // to address a vector.
         template <typename Iterator>
@@ -1843,8 +1867,7 @@ namespace client
             assignment_statement =
                 variable_reference(_r1)[_a = _1] >> '=' > 
                 (       // Consumes also '(' conditional_expression ')', that means enclosing an expression into braces makes it a single value vector initializer.
-                        (lit('(') > initializer_list(_r1) > ')') 
-                            [px::bind(&MyContext::vector_variable_assign_initializer_list<Iterator>, _r1, _a, _1)]
+                         initializer_list(_r1)[px::bind(&MyContext::vector_variable_assign_initializer_list<Iterator>, _r1, _a, _1)]
                         // Process it before conditional_expression, as conditional_expression requires a vector reference to be augmented with an index.
                         // Only process such variable references, which return a naked vector variable.
                     |  eps(px::bind(&MyContext::is_vector_variable_reference<Iterator>, _a)) >> 
@@ -1859,8 +1882,7 @@ namespace client
             new_variable_statement =
                 (kw["local"][_a = false] | kw["global"][_a = true]) > identifier[px::bind(&MyContext::new_old_variable<Iterator>, _r1, _a, _1, _b)] > lit('=') >
                 (       // Consumes also '(' conditional_expression ')', that means enclosing an expression into braces makes it a single value vector initializer.
-                        (lit('(') > initializer_list(_r1) > ')') 
-                            [px::bind(&MyContext::vector_variable_new_from_initializer_list<Iterator>, _r1, _a, _b, _1)]
+                        initializer_list(_r1)[px::bind(&MyContext::vector_variable_new_from_initializer_list<Iterator>, _r1, _a, _b, _1)]
                         // Process it before conditional_expression, as conditional_expression requires a vector reference to be augmented with an index.
                         // Only process such variable references, which return a naked vector variable.
                     |  eps(px::bind(&MyContext::could_be_vector_variable_reference<Iterator>, _b)) >>
@@ -1871,7 +1893,13 @@ namespace client
                     |  (kw["repeat"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
                             [px::bind(&MyContext::vector_variable_new_from_array<Iterator>, _r1, _a, _b, _1, _2)]
                 );
-            initializer_list = *(lit(',') > conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)]);
+            initializer_list = lit('(') >
+                (   lit(')') |
+                    (   conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)] >
+                        *(lit(',') > conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)]) >
+                        lit(')')
+                    )
+                );
 
             struct FactorActions {
                 static void set_start_pos(Iterator &start_pos, expr<Iterator> &out)
@@ -1917,6 +1945,8 @@ namespace client
                 |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
                 |   (kw["is_nil"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_nil_test<Iterator>, _r1, _1, _val)]
                 |   (kw["one_of"] > '(' > one_of(_r1) > ')')        [ _val = _1 ]
+                |   (kw["empty"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_vector_empty<Iterator>, _r1, _1, _val)]
+                |   (kw["size"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::vector_size<Iterator>, _r1, _1, _val)]
                 |   (kw["interpolate_table"] > '(' > interpolate_table(_r1) > ')') [ _val = _1 ]
                 |   (strict_double > iter_pos)                      [ px::bind(&FactorActions::double_, _1, _2, _val) ]
                 |   (int_      > iter_pos)                          [ px::bind(&FactorActions::int_,    _1, _2, _val) ]
@@ -1975,6 +2005,7 @@ namespace client
                 ("and")
                 ("digits")
                 ("zdigits")
+                ("empty")
                 ("if")
                 ("int")
                 ("is_nil")
@@ -1994,6 +2025,7 @@ namespace client
                 ("not")
                 ("one_of")
                 ("or")
+                ("size")
                 ("true");
 
             if (0) {

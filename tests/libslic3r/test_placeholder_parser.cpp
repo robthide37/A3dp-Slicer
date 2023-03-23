@@ -222,4 +222,9 @@ SCENARIO("Placeholder parser variables", "[PlaceholderParser]") {
         REQUIRE(parser.process("{local mybool = enable_dynamic_fan_speeds}{mybool = (false, true)}{mybool[1]}", 0, &config, nullptr, nullptr) == "true");
         REQUIRE(parser.process("{local mybool = enable_dynamic_fan_speeds}{mybool = (false, false)}{mybool = enable_dynamic_fan_speeds}{mybool[0]}", 0, &config, nullptr, nullptr) == "true");
     }
+
+    SECTION("size() of a non-empty vector returns the right size") { REQUIRE(parser.process("{local myint = (0, 1, 2, 3)}{size(myint)}", 0, nullptr, nullptr, nullptr) == "4"); }
+    SECTION("size() of a an empty vector returns the right size") { REQUIRE(parser.process("{local myint = (0);myint=();size(myint)}", 0, nullptr, nullptr, nullptr) == "0"); }
+    SECTION("empty() of a non-empty vector returns false") { REQUIRE(parser.process("{local myint = (0, 1, 2, 3)}{empty(myint)}", 0, nullptr, nullptr, nullptr) == "false"); }
+    SECTION("empty() of a an empty vector returns true") { REQUIRE(parser.process("{local myint = (0);myint=();empty(myint)}", 0, nullptr, nullptr, nullptr) == "true"); }
 }
