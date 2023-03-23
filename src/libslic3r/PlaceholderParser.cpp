@@ -1263,14 +1263,23 @@ namespace client
             const std::vector<expr<Iterator>>           &il)
         {
             check_writable(ctx, lhs);
+
+            if (lhs.opt->is_scalar()) {
+                if (il.size() == 1)
+                    // scalar_var = ( scalar )
+                    scalar_variable_assign_scalar_expression(ctx, lhs, il.front());
+                else
+                    // scalar_var = () 
+                    // or
+                    // scalar_var = ( scalar, scalar, ... )
+                    ctx->throw_exception("Cannot assign a vector value to a scalar variable.", lhs.it_range);
+            }
+
             auto check_numeric_vector = [](const std::vector<expr<Iterator>> &il) {
                 for (auto &i : il)
                     if (! i.numeric_type())
                         i.throw_exception("Right side is not a numeric expression");
             };
-
-            if (lhs.opt->is_scalar())
-                ctx->throw_exception("Cannot assign a vector value to a scalar variable.", lhs.it_range);
 
             ConfigOption *opt = const_cast<ConfigOption*>(lhs.opt);
             switch (lhs.opt->type()) {
@@ -1304,11 +1313,11 @@ namespace client
         {
             if (lhs.opt) {
                 // Assign to an existing vector variable.
-                if (lhs.opt->is_scalar())
-                    ctx->throw_exception("Cannot assign a vector value to a scalar variable.", lhs.it_range);
                 OptWithPos lhs_opt{ lhs.opt, lhs.it_range, true };
                 vector_variable_assign_initializer_list(ctx, lhs_opt, il);
             } else {
+                if (il.empty())
+                    ctx->throw_exception("Cannot create vector variable from an empty initializer list, because its type cannot be deduced.", lhs.it_range);
                 // Allocate a new vector variable.
                 // First guesstimate type of the output vector.
                 size_t num_bool = 0;
@@ -1345,15 +1354,26 @@ namespace client
         }
 
         template <typename Iterator>
+        static bool is_vector_variable_reference(const OptWithPos<Iterator> &var) {
+            return ! var.has_index() && var.opt->is_vector();
+        }
+
+        // Called when checking whether the NewOldVariable could be assigned a vectir right hand side.
+        template <typename Iterator>
+        static bool could_be_vector_variable_reference(const NewOldVariable<Iterator> &var) {
+            return var.opt == nullptr || var.opt->is_vector();
+        }
+
+        template <typename Iterator>
         static void copy_vector_variable_to_vector_variable(
             const MyContext             *ctx,
             OptWithPos<Iterator>        &lhs,
             const OptWithPos<Iterator>  &rhs)
         {
             check_writable(ctx, lhs);
-            assert(rhs.opt->is_vector());
-            if (! lhs.opt->is_vector())
-                ctx->throw_exception("Cannot assign vector to a scalar", lhs.it_range);
+            assert(lhs.opt->is_vector());
+            if (rhs.has_index() || ! rhs.opt->is_vector())
+                ctx->throw_exception("Cannot assign scalar to a vector", lhs.it_range);
             if (lhs.opt->type() != rhs.opt->type()) {
                 // Vector types are not compatible.
                 switch (lhs.opt->type()) {
@@ -1373,54 +1393,32 @@ namespace client
         }
 
         template <typename Iterator>
-        static bool is_vector_variable_reference(const OptWithPos<Iterator> &var) {
-            return ! var.has_index() && var.opt->is_vector();
-        }
-
-        template <typename Iterator>
         static bool vector_variable_new_from_copy(
             const MyContext                             *ctx,
             bool                                         global_variable,
             NewOldVariable<Iterator>                    &lhs,
             const OptWithPos<Iterator>                  &rhs)
         {
-            if (is_vector_variable_reference(rhs)) {
-                if (lhs.opt) {
-                    OptWithPos lhs_opt{ lhs.opt, lhs.it_range, true };
-                    copy_vector_variable_to_vector_variable(ctx, lhs_opt, rhs);
-                } else {
-                    // Clone the vector variable.
-                    std::unique_ptr<ConfigOption> opt_new;
-                    if (one_of(rhs.opt->type(), { coFloats, coInts, coStrings, coBools }))
-                        opt_new = std::unique_ptr<ConfigOption>(rhs.opt->clone());
-                    else if (rhs.opt->type() == coPercents)
-                        opt_new = std::make_unique<ConfigOptionFloats>(static_cast<const ConfigOptionPercents*>(rhs.opt)->values);
-                    else
-                        ctx->throw_exception("Duplicating this type of vector variable is not supported", rhs.it_range);
-                    const_cast<MyContext*>(ctx)->store_new_variable(lhs.name, std::move(opt_new), global_variable);
-                }
-                // Continue parsing.
-                return true;
+            if (lhs.opt) {
+                assert(lhs.opt->is_vector());
+                OptWithPos lhs_opt{ lhs.opt, lhs.it_range, true };
+                copy_vector_variable_to_vector_variable(ctx, lhs_opt, rhs);
             } else {
-                // Skip parsing this branch, bactrack.
-                return false;
+                if (rhs.has_index() || ! rhs.opt->is_vector())
+                    // Stop parsing, let the other rules resolve this case.
+                    return false;
+                // Clone the vector variable.
+                std::unique_ptr<ConfigOption> opt_new;
+                if (one_of(rhs.opt->type(), { coFloats, coInts, coStrings, coBools }))
+                    opt_new = std::unique_ptr<ConfigOption>(rhs.opt->clone());
+                else if (rhs.opt->type() == coPercents)
+                    opt_new = std::make_unique<ConfigOptionFloats>(static_cast<const ConfigOptionPercents*>(rhs.opt)->values);
+                else
+                    ctx->throw_exception("Duplicating this type of vector variable is not supported", rhs.it_range);
+                const_cast<MyContext*>(ctx)->store_new_variable(lhs.name, std::move(opt_new), global_variable);
             }
-        }
-
-        template <typename Iterator>
-        static bool vector_variable_assign_copy(
-            const MyContext                             *ctx,
-            OptWithPos<Iterator>                        &lhs,
-            const OptWithPos<Iterator>                  &rhs)
-        {
-            if (is_vector_variable_reference(rhs)) {
-                copy_vector_variable_to_vector_variable(ctx, lhs, rhs);
-                // Continue parsing.
-                return true;
-            } else {
-                // Skip parsing this branch, bactrack.
-                return false;
-            }
+            // Continue parsing.
+            return true;
         }
 
         template <typename Iterator>
@@ -1572,12 +1570,12 @@ namespace client
 
     // Table to translate symbol tag to a human readable error message.
     std::map<std::string, std::string> MyContext::tag_to_error_message = {
-        { "array",                      "Unknown syntax error" },
         { "eoi",                        "Unknown syntax error" },
         { "start",                      "Unknown syntax error" },
         { "text",                       "Invalid text." },
         { "text_block",                 "Invalid text block." },
         { "macro",                      "Invalid macro." },
+        { "repeat",                     "Unknown syntax error" },
         { "if_else_output",             "Not an {if}{else}{endif} macro." },
         { "switch_output",              "Not a {switch} macro." },
         { "legacy_variable_expansion",  "Expecting a legacy variable expansion format" },
@@ -1594,7 +1592,6 @@ namespace client
         { "optional_parameter",         "Expecting a closing brace or an optional parameter." },
         { "one_of_list",                "Expecting a list of string patterns (simple text or rexep)" },
         { "variable_reference",         "Expecting a variable reference."},
-        { "is_nil_test",                "Expecting a scalar variable reference."},
         { "variable",                   "Expecting a variable name."},
         { "regular_expression",         "Expecting a regular expression."}
     };
@@ -1846,37 +1843,35 @@ namespace client
             assignment_statement =
                 variable_reference(_r1)[_a = _1] >> '=' > 
                 (       // Consumes also '(' conditional_expression ')', that means enclosing an expression into braces makes it a single value vector initializer.
-                        (lit('(') > new_variable_initializer_list(_r1) > ')') 
+                        (lit('(') > initializer_list(_r1) > ')') 
                             [px::bind(&MyContext::vector_variable_assign_initializer_list<Iterator>, _r1, _a, _1)]
                         // Process it before conditional_expression, as conditional_expression requires a vector reference to be augmented with an index.
                         // Only process such variable references, which return a naked vector variable.
-                    |  variable_reference(_r1)
-                            [px::ref(qi::_pass) = px::bind(&MyContext::vector_variable_assign_copy<Iterator>, _r1, _a, _1)]
+                    |  eps(px::bind(&MyContext::is_vector_variable_reference<Iterator>, _a)) >> 
+                            variable_reference(_r1)[px::bind(&MyContext::copy_vector_variable_to_vector_variable<Iterator>, _r1, _a, _1)]
                        // Would NOT consume '(' conditional_expression ')' because such value was consumed with the expression above.
                     |  conditional_expression(_r1)
                             [px::bind(&MyContext::scalar_variable_assign_scalar_expression<Iterator>, _r1, _a, _1)]
-                    |  (kw["array"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
+                    |  (kw["repeat"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
                             [px::bind(&MyContext::vector_variable_assign_array<Iterator>, _r1, _a, _1, _2)]
                 );
   
             new_variable_statement =
                 (kw["local"][_a = false] | kw["global"][_a = true]) > identifier[px::bind(&MyContext::new_old_variable<Iterator>, _r1, _a, _1, _b)] > lit('=') >
                 (       // Consumes also '(' conditional_expression ')', that means enclosing an expression into braces makes it a single value vector initializer.
-                        (lit('(') > new_variable_initializer_list(_r1) > ')') 
+                        (lit('(') > initializer_list(_r1) > ')') 
                             [px::bind(&MyContext::vector_variable_new_from_initializer_list<Iterator>, _r1, _a, _b, _1)]
                         // Process it before conditional_expression, as conditional_expression requires a vector reference to be augmented with an index.
                         // Only process such variable references, which return a naked vector variable.
-                    |  variable_reference(_r1)
-                            [px::ref(qi::_pass) = px::bind(&MyContext::vector_variable_new_from_copy<Iterator>, _r1, _a, _b, _1)]
+                    |  eps(px::bind(&MyContext::could_be_vector_variable_reference<Iterator>, _b)) >>
+                            variable_reference(_r1)[px::ref(qi::_pass) = px::bind(&MyContext::vector_variable_new_from_copy<Iterator>, _r1, _a, _b, _1)]
                        // Would NOT consume '(' conditional_expression ')' because such value was consumed with the expression above.
                     |  conditional_expression(_r1)
                             [px::bind(&MyContext::scalar_variable_new_from_scalar_expression<Iterator>, _r1, _a, _b, _1)]
-                    |  (kw["array"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
+                    |  (kw["repeat"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
                             [px::bind(&MyContext::vector_variable_new_from_array<Iterator>, _r1, _a, _b, _1, _2)]
                 );
-            new_variable_initializer_list = 
-                             conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)] >>
-                *(lit(',') > conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)]);
+            initializer_list = *(lit(',') > conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)]);
 
             struct FactorActions {
                 static void set_start_pos(Iterator &start_pos, expr<Iterator> &out)
@@ -1920,7 +1915,7 @@ namespace client
                                                                     [ px::bind(&expr<Iterator>::template digits<true>, _val, _2, _3) ]
                 |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1, _val) ]
                 |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
-                |   (kw["is_nil"] > '(' > is_nil_test(_r1) > ')')   [ _val = _1 ]
+                |   (kw["is_nil"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_nil_test<Iterator>, _r1, _1, _val)]
                 |   (kw["one_of"] > '(' > one_of(_r1) > ')')        [ _val = _1 ]
                 |   (kw["interpolate_table"] > '(' > interpolate_table(_r1) > ')') [ _val = _1 ]
                 |   (strict_double > iter_pos)                      [ px::bind(&FactorActions::double_, _1, _2, _val) ]
@@ -1961,9 +1956,6 @@ namespace client
                 );
             optional_parameter.name("optional_parameter");
 
-            is_nil_test = variable_reference(_r1)[px::bind(&MyContext::is_nil_test<Iterator>, _r1, _1, _val)];
-            is_nil_test.name("is_nil test");
-
             variable_reference =
                 variable(_r1)[_a=_1] >>
                 (
@@ -1981,7 +1973,6 @@ namespace client
 
             keywords.add
                 ("and")
-                ("array")
                 ("digits")
                 ("zdigits")
                 ("if")
@@ -1998,6 +1989,7 @@ namespace client
                 ("min")
                 ("max")
                 ("random")
+                ("repeat")
                 ("round")
                 ("not")
                 ("one_of")
@@ -2030,7 +2022,6 @@ namespace client
                 debug(optional_parameter);
                 debug(variable_reference);
                 debug(variable);
-                debug(is_nil_test);
                 debug(regular_expression);
             }
         }
@@ -2089,7 +2080,7 @@ namespace client
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<OptWithPos<Iterator>>, spirit_encoding::space_type> assignment_statement;
         // Allocating new local or global variables.
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, MyContext::NewOldVariable<Iterator>>, spirit_encoding::space_type> new_variable_statement;
-        qi::rule<Iterator, std::vector<expr<Iterator>>(const MyContext*), spirit_encoding::space_type> new_variable_initializer_list;
+        qi::rule<Iterator, std::vector<expr<Iterator>>(const MyContext*), spirit_encoding::space_type> initializer_list;
 
 //        qi::rule<Iterator, std::string(const MyContext*), qi::locals<expr<Iterator>, bool, std::string>, spirit_encoding::space_type> switch_output;
         qi::symbols<char> keywords;
