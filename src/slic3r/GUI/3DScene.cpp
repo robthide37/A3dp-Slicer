@@ -603,24 +603,28 @@ void GLVolumeCollection::load_object_auxiliary(
     };
  
     // Get the support mesh.
-    TriangleMesh supports_mesh = print_object->support_mesh();
-    if (!supports_mesh.empty()) {
-        supports_mesh.transform(mesh_trafo_inv);
-        TriangleMesh convex_hull = supports_mesh.convex_hull_3d();
-        for (const std::pair<size_t, size_t>& instance_idx : instances) {
-            const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
-            add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposSupportTree, supports_mesh, GLVolume::SLA_SUPPORT_COLOR, convex_hull);
+    if (milestone == SLAPrintObjectStep::slaposSupportTree) {
+        TriangleMesh supports_mesh = print_object->support_mesh();
+        if (!supports_mesh.empty()) {
+            supports_mesh.transform(mesh_trafo_inv);
+            TriangleMesh convex_hull = supports_mesh.convex_hull_3d();
+            for (const std::pair<size_t, size_t>& instance_idx : instances) {
+              const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
+              add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposSupportTree, supports_mesh, GLVolume::SLA_SUPPORT_COLOR, convex_hull);
+            }
         }
     }
 
     // Get the pad mesh.
-    TriangleMesh pad_mesh = print_object->pad_mesh();
-    if (!pad_mesh.empty()) {
-        pad_mesh.transform(mesh_trafo_inv);
-        TriangleMesh convex_hull = pad_mesh.convex_hull_3d();
-        for (const std::pair<size_t, size_t>& instance_idx : instances) {
-            const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
-            add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposPad, pad_mesh, GLVolume::SLA_PAD_COLOR, convex_hull);
+    if (milestone == SLAPrintObjectStep::slaposPad) {
+        TriangleMesh pad_mesh = print_object->pad_mesh();
+        if (!pad_mesh.empty()) {
+            pad_mesh.transform(mesh_trafo_inv);
+            TriangleMesh convex_hull = pad_mesh.convex_hull_3d();
+            for (const std::pair<size_t, size_t>& instance_idx : instances) {
+                const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
+                add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposPad, pad_mesh, GLVolume::SLA_PAD_COLOR, convex_hull);
+            }
         }
     }
 }
