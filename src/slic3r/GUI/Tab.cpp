@@ -2260,6 +2260,12 @@ void TabPrinter::build_print_host_upload_group(Page* page)
     optgroup->append_line(line);
 }
 
+static wxString get_info_klipper_string()
+{
+    return _L("Emitting machine limits to G-code is not supported with Klipper G-code flavor.\n"
+              "The option was switched to \"Use for time estimate\".");
+}
+
 void TabPrinter::build_fff()
 {
     if (!m_pages.empty())
@@ -2386,22 +2392,20 @@ void TabPrinter::build_fff()
                         m_supports_min_feedrates = supports_min_feedrates;
                     }
 
-                    const bool is_silent_mode = m_config->option("silent_mode")->getBool();
                     const bool is_emit_to_gcode = m_config->option("machine_limits_usage")->getInt() == static_cast<int>(MachineLimitsUsage::EmitToGCode);
-                    if ((flavor == gcfKlipper && is_emit_to_gcode) || (!m_supports_min_feedrates && is_silent_mode)) {
+                    if ((flavor == gcfKlipper && is_emit_to_gcode) || (!m_supports_min_feedrates && m_use_silent_mode)) {
                         DynamicPrintConfig new_conf = *m_config;
                         wxString msg;
 
                         if (flavor == gcfKlipper && is_emit_to_gcode) {
-                            msg = _L("Emitting machine limits to G-code is not supported with Klipper G-code flavor.\n"
-                                     "The option was switched to \"Use for time estimate\".");
+                            msg = get_info_klipper_string();
 
                             auto machine_limits_usage = static_cast<ConfigOptionEnum<MachineLimitsUsage>*>(m_config->option("machine_limits_usage")->clone());
                             machine_limits_usage->value = MachineLimitsUsage::TimeEstimateOnly;
                             new_conf.set_key_value("machine_limits_usage", machine_limits_usage);
                         }
 
-                        if (!m_supports_min_feedrates && is_silent_mode) {
+                        if (!m_supports_min_feedrates && m_use_silent_mode) {
                             if (!msg.IsEmpty())
                                 msg += "\n\n";
                             msg += _L("Stealth mode for machine limits to G-code is not supported with selected G-code flavor.\n"
@@ -2662,6 +2666,27 @@ PageShp TabPrinter::build_kinematics_page()
         };
         optgroup->append_line(line);
     }
+
+    optgroup->m_on_change = [this](const t_config_option_key& opt_key, boost::any value)
+    {
+        if (opt_key == "machine_limits_usage" &&
+            static_cast<MachineLimitsUsage>(boost::any_cast<int>(value)) == MachineLimitsUsage::EmitToGCode &&
+            static_cast<GCodeFlavor>(m_config->option("gcode_flavor")->getInt()) == gcfKlipper)
+        {
+            DynamicPrintConfig new_conf = *m_config;
+
+            auto machine_limits_usage = static_cast<ConfigOptionEnum<MachineLimitsUsage>*>(m_config->option("machine_limits_usage")->clone());
+            machine_limits_usage->value = MachineLimitsUsage::TimeEstimateOnly;
+
+            new_conf.set_key_value("machine_limits_usage", machine_limits_usage);
+
+            InfoDialog(parent(), wxEmptyString, get_info_klipper_string()).ShowModal();
+            load_config(new_conf);
+        }
+
+        update_dirty();
+        update();
+    };
 
     if (m_use_silent_mode) {
         // Legend for OptionsGroups
