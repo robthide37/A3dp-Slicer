@@ -434,6 +434,7 @@ struct WipeTowerData
     // Depth of the wipe tower to pass to GLCanvas3D for exact bounding box:
     float                                                 depth;
     float                                                 brim_width;
+    float                                                 height;
 
     void clear() {
         priming.reset(nullptr);
