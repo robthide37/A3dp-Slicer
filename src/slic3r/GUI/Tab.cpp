@@ -7,6 +7,7 @@
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "libslic3r/GCodeWriter.hpp"
 
 #include "slic3r/Utils/Http.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
@@ -2384,7 +2385,7 @@ void TabPrinter::build_fff()
                 }
                 if (opt_key == "gcode_flavor") {
                     const GCodeFlavor flavor = static_cast<GCodeFlavor>(boost::any_cast<int>(value));
-                    bool supports_travel_acceleration = (flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware);
+                    bool supports_travel_acceleration = GCodeWriter::supports_separate_travel_acceleration(flavor);
                     bool supports_min_feedrates       = (flavor == gcfMarlinFirmware || flavor == gcfMarlinLegacy);
                     if (supports_travel_acceleration != m_supports_travel_acceleration || supports_min_feedrates != m_supports_min_feedrates) {
                         m_rebuild_kinematics_page = true;

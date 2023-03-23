@@ -3,6 +3,7 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/format.hpp"
+#include "libslic3r/GCodeWriter.hpp"
 #include "GCodeProcessor.hpp"
 
 #include <boost/algorithm/string/case_conv.hpp>
@@ -610,7 +611,12 @@ for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::
         float max_retract_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_retracting, i);
         m_time_processor.machines[i].max_retract_acceleration = max_retract_acceleration;
         m_time_processor.machines[i].retract_acceleration = (max_retract_acceleration > 0.0f) ? max_retract_acceleration : DEFAULT_RETRACT_ACCELERATION;
+
         float max_travel_acceleration = get_option_value(m_time_processor.machine_limits.machine_max_acceleration_travel, i);
+        if ( ! GCodeWriter::supports_separate_travel_acceleration(config.gcode_flavor.value) || config.machine_limits_usage.value != MachineLimitsUsage::EmitToGCode) {
+            // Only clamp travel acceleration when it is accessible in machine limits.
+            max_travel_acceleration = 0;
+        }
         m_time_processor.machines[i].max_travel_acceleration = max_travel_acceleration;
         m_time_processor.machines[i].travel_acceleration = (max_travel_acceleration > 0.0f) ? max_travel_acceleration : DEFAULT_TRAVEL_ACCELERATION;
     }

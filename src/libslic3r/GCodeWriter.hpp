@@ -71,7 +71,7 @@ public:
     Vec3d       get_position() const { return m_pos; }
 
     // Returns whether this flavor supports separate print and travel acceleration.
-    bool supports_PT() const;
+    static bool supports_separate_travel_acceleration(GCodeFlavor flavor);
 
     // To be called by the CoolingBuffer from another thread.
     static std::string set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, unsigned int speed);
@@ -90,6 +90,8 @@ private:
     // Limit for setting the acceleration, to respect the machine limits set for the Marlin firmware.
     // If set to zero, the limit is not in action.
     unsigned int    m_max_acceleration;
+    unsigned int    m_max_travel_acceleration;
+
     unsigned int    m_last_bed_temperature;
     bool            m_last_bed_temperature_reached;
     double          m_lifted;

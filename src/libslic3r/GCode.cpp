@@ -3075,7 +3075,7 @@ std::string GCode::travel_to(const Point &point, ExtrusionRole role, std::string
         for (size_t i = 1; i < travel.size(); ++ i)
             gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[i]), comment);
 
-        if (! m_writer.supports_PT()) {
+        if (! GCodeWriter::supports_separate_travel_acceleration(config().gcode_flavor)) {
             // In case that this flavor does not support separate print and travel acceleration,
             // reset acceleration to default.
             gcode += m_writer.set_travel_acceleration((unsigned int)(m_config.travel_acceleration.value + 0.5));

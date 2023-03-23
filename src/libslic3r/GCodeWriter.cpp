@@ -15,9 +15,10 @@
 
 namespace Slic3r {
 
-bool GCodeWriter::supports_PT() const
+// static
+bool GCodeWriter::supports_separate_travel_acceleration(GCodeFlavor flavor)
 {
-    return (FLAVOR_IS(gcfRepetier) || FLAVOR_IS(gcfMarlinFirmware) ||  FLAVOR_IS(gcfRepRapFirmware));
+    return (flavor == gcfRepetier || flavor == gcfMarlinFirmware ||  flavor == gcfRepRapFirmware);
 }
 
 void GCodeWriter::apply_print_config(const PrintConfig &print_config)
@@ -30,6 +31,8 @@ void GCodeWriter::apply_print_config(const PrintConfig &print_config)
                         || print_config.gcode_flavor.value == gcfRepRapFirmware;
     m_max_acceleration = static_cast<unsigned int>(std::round((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) ?
         print_config.machine_max_acceleration_extruding.values.front() : 0));
+    m_max_travel_acceleration = static_cast<unsigned int>(std::round((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode && supports_separate_travel_acceleration(print_config.gcode_flavor.value)) ?
+        print_config.machine_max_acceleration_travel.values.front() : 0));
 }
 
 void GCodeWriter::set_extruders(std::vector<unsigned int> extruder_ids)
@@ -163,12 +166,13 @@ std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait
 std::string GCodeWriter::set_acceleration_internal(Acceleration type, unsigned int acceleration)
 {
     // Clamp the acceleration to the allowed maximum.
-    // TODO: What about max travel acceleration ? Currently it is clamped by the extruding acceleration !!!
-    if (m_max_acceleration > 0 && acceleration > m_max_acceleration)
+    if (type == Acceleration::Print && m_max_acceleration > 0 && acceleration > m_max_acceleration)
         acceleration = m_max_acceleration;
+    if (type == Acceleration::Travel && m_max_travel_acceleration > 0 && acceleration > m_max_travel_acceleration)
+        acceleration = m_max_travel_acceleration;
 
     // Are we setting travel acceleration for a flavour that supports separate travel and print acc?
-    bool separate_travel = (type == Acceleration::Travel && supports_PT());
+    bool separate_travel = (type == Acceleration::Travel && supports_separate_travel_acceleration(this->config.gcode_flavor));
 
     auto& last_value = separate_travel ? m_last_travel_acceleration : m_last_acceleration ;
     if (acceleration == 0 || acceleration == last_value)
