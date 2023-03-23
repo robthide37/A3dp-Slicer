@@ -1,6 +1,7 @@
 #include "WxFontUtils.hpp"
 #include <boost/assign.hpp>
 #include <boost/log/trivial.hpp>
+#include "libslic3r/Utils.hpp"
 
 #if defined(__APPLE__)
 #include <CoreText/CTFont.h>
@@ -14,10 +15,9 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-namespace {
-
 #ifdef __APPLE__
-static bool is_valid_ttf(std::string_view file_path)
+namespace {
+bool is_valid_ttf(std::string_view file_path)
 {
     if (file_path.empty()) return false;
     auto const pos_point = file_path.find_last_of('.');
@@ -34,8 +34,7 @@ static bool is_valid_ttf(std::string_view file_path)
     if (extension_size >= 5) return false; // a lot of symbols for extension
     if (extension_size <= 1) return false; // few letters for extension
 
-    std::string_view extension = file_path.substr(pos_point + 1,
-                                                  extension_size);
+    std::string_view extension = file_path.substr(pos_point + 1, extension_size);
 
     // Because of MacOs - Courier, Geneva, Monaco
     if (extension == std::string_view("dfont")) return false;
@@ -44,28 +43,29 @@ static bool is_valid_ttf(std::string_view file_path)
 }
 
 // get filepath from wxFont on Mac OsX
-static std::string get_file_path(const wxFont& font) {
+std::string get_file_path(const wxFont& font) {
     const wxNativeFontInfo *info = font.GetNativeFontInfo();
     if (info == nullptr) return {};
     CTFontDescriptorRef descriptor = info->GetCTFontDescriptor();
-    CFURLRef            typeref    = (CFURLRef)
-        CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
+    CFURLRef typeref = (CFURLRef)CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute);
     if (typeref == NULL) return {};
+    ScopeGuard sg([&typeref]() { CFRelease(typeref); });
     CFStringRef url = CFURLGetString(typeref);
     if (url == NULL) return {};
-    wxString file_uri;
-    wxCFTypeRef(url).GetValue(file_uri);
+    wxString file_uri(wxCFStringRef::AsString(url));
     wxURI uri(file_uri);
     const wxString &path = uri.GetPath();
-    std::string path_str(wxURI::Unescape(path).c_str());
+    wxString path_unescaped = wxURI::Unescape(path);
+    std::string path_str = path_unescaped.ToUTF8().data();
     BOOST_LOG_TRIVIAL(trace) << "input uri(" << file_uri.c_str() << ") convert to path(" << path.c_str() << ") string(" << path_str << ").";
     return path_str;
 }    
-#endif // __APPLE__
 } // namespace
+#endif // __APPLE__
 
 bool WxFontUtils::can_load(const wxFont &font)
 {
+    
     if (!font.IsOk()) return false;    
 #ifdef _WIN32
     return Emboss::can_load(font.GetHFONT()) != nullptr;
