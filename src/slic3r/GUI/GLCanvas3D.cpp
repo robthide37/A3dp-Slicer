@@ -2119,10 +2119,11 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
         // Shift-up all volumes of the object so that it has the right elevation with respect to the print bed
         for (GLVolume* volume : m_volumes.volumes) {
-            if (volume->object_idx() < (int)m_model->objects.size() && m_model->objects[volume->object_idx()]->instances[volume->instance_idx()]->is_printable()) {
-                const SLAPrintObject* po = sla_print->objects()[volume->object_idx()];
-                float zoffs = po->get_current_elevation() / sla_print->relative_correction().z();
-                volume->set_sla_shift_z(zoffs);
+            const ModelObject* model_object = (volume->object_idx() < (int)m_model->objects.size()) ? m_model->objects[volume->object_idx()] : nullptr;
+            if (model_object != nullptr && model_object->instances[volume->instance_idx()]->is_printable()) {
+                const SLAPrintObject* po = sla_print->get_print_object_by_model_object_id(model_object->id());
+                if (po != nullptr)
+                    volume->set_sla_shift_z(po->get_current_elevation() / sla_print->relative_correction().z());
             }
         }
     }
