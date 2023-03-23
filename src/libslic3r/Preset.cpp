@@ -10,15 +10,6 @@
     #include <Windows.h>
 #endif /* _MSC_VER */
 
-// instead of #include "slic3r/GUI/I18N.hpp" :
-#ifndef L
-// !!! If you needed to translate some string,
-// !!! please use _L(string)
-// !!! _() - is a standard wxWidgets macro to translate
-// !!! L() is used only for marking localizable string
-// !!! It will be used in "xgettext" to create a Locating Message Catalog.
-#define L(s) s
-#endif /* L */
 
 #include <algorithm>
 #include <fstream>

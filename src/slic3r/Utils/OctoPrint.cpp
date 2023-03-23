@@ -203,7 +203,7 @@ bool OctoPrint::test_with_resolved_ip(wxString &msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                 }
             }
             catch (const std::exception&) {
@@ -252,7 +252,7 @@ bool OctoPrint::test(wxString& msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (! res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                 }
             }
             catch (const std::exception &) {
@@ -280,10 +280,10 @@ wxString OctoPrint::get_test_ok_msg () const
 
 wxString OctoPrint::get_test_failed_msg (wxString &msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s\n\n%s")
-        % _utf8(L("Could not connect to OctoPrint"))
-        % std::string(msg.ToUTF8())
-        % _utf8(L("Note: OctoPrint version at least 1.1.0 is required."))).str());
+    return GUI::format_wxstr("%s: %s\n\n%s"
+        , _L("Could not connect to OctoPrint")
+        , msg
+        , _L("Note: OctoPrint version at least 1.1.0 is required."));
 }
 
 bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
@@ -530,9 +530,7 @@ wxString SL1Host::get_test_ok_msg () const
 
 wxString SL1Host::get_test_failed_msg (wxString &msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s")
-                    % _utf8(L("Could not connect to Prusa SLA"))
-                    % std::string(msg.ToUTF8())).str());
+    return GUI::format_wxstr("%s: %s", _L("Could not connect to Prusa SLA"), msg);
 }
 
 bool SL1Host::validate_version_text(const boost::optional<std::string> &version_text) const
@@ -575,9 +573,7 @@ wxString PrusaLink::get_test_ok_msg() const
 
 wxString PrusaLink::get_test_failed_msg(wxString& msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s")
-        % _utf8(L("Could not connect to PrusaLink"))
-        % std::string(msg.ToUTF8())).str());
+    return GUI::format_wxstr("%s: %s", _L("Could not connect to PrusaLink"), msg);
 }
 
 bool PrusaLink::validate_version_text(const boost::optional<std::string>& version_text) const
@@ -663,7 +659,7 @@ bool PrusaLink::test(wxString& msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                 }
             }
             catch (const std::exception&) {
@@ -773,12 +769,17 @@ bool PrusaLink::get_storage(wxArrayString& storage_path, wxArrayString& storage_
 
     if (res && storage_path.empty()) {
         if (!storage.empty()) { // otherwise error_msg is already filled 
-            error_msg = L"\n\n" + _L("Storages found:") + L" \n";
+            error_msg = L"\n\n" + _L("Storages found") + L": \n";
             for (const auto& si : storage) {
-                error_msg += si.path + L" : " + (si.read_only ? _L("read only") : _L("no free space")) + L"\n";
+                error_msg += GUI::format_wxstr(si.read_only ?
+                                                                // TRN %1% = storage path
+                                                                _L("%1% : read only") : 
+                                                                // TRN %1% = storage path
+                                                                _L("%1% : no free space"), si.path) + L"\n";
             }
         }
-        std::string message = GUI::format(_L("Upload has failed. There is no suitable storage found at %1%.%2%"), m_host, error_msg);
+        // TRN %1% = host
+        std::string message = GUI::format(_L("Upload has failed. There is no suitable storage found at %1%."), m_host) + GUI::into_u8(error_msg);
         BOOST_LOG_TRIVIAL(error) << message;
         throw Slic3r::IOError(message);
     }
@@ -821,7 +822,7 @@ bool PrusaLink::test_with_method_check(wxString& msg, bool& use_put) const
             const auto text = ptree.get_optional<std::string>("text");
             res = validate_version_text(text);
             if (!res) {
-                msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                 use_put = false;
                 return;
             }
@@ -894,7 +895,7 @@ bool PrusaLink::test_with_resolved_ip_and_method_check(wxString& msg, bool& use_
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "OctoPrint")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
                     use_put = false;
                     return;
                 }
@@ -1142,9 +1143,7 @@ wxString PrusaConnect::get_test_ok_msg() const
 
 wxString PrusaConnect::get_test_failed_msg(wxString& msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s")
-        % _utf8(L("Could not connect to PrusaConnect"))
-        % std::string(msg.ToUTF8())).str());
+    return GUI::format_wxstr("%s: %s", _L("Could not connect to PrusaConnect"), msg);
 }
 
 }

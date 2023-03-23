@@ -158,6 +158,12 @@ GLGizmoBase::GLGizmoBase(GLCanvas3D& parent, const std::string& icon_filename, u
 {
 }
 
+
+std::string GLGizmoBase::get_action_snapshot_name() const
+{
+    return _u8L("Gizmo action");
+}
+
 void GLGizmoBase::set_hover_id(int id)
 {
     // do not change hover id during dragging
