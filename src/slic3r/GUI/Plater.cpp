@@ -4779,7 +4779,7 @@ bool Plater::priv::can_increase_instances() const
     if (q->canvas3D()->get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss) return false;
 
     const auto obj_idxs = get_selection().get_object_idxs();
-    return !obj_idxs.empty() && !sidebar->obj_list()->has_selected_cut_object();
+    return !obj_idxs.empty() && !get_selection().is_wipe_tower() && !sidebar->obj_list()->has_selected_cut_object();
 }
 
 bool Plater::priv::can_decrease_instances(int obj_idx /*= -1*/) const
