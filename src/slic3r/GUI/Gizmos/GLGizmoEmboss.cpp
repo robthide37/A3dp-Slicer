@@ -521,6 +521,7 @@ static void draw_mouse_offset(const std::optional<Vec2d> &offset)
 
 void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 {
+    m_is_just_opened = false;
     assert(m_volume != nullptr);
     // Do not render window for not selected text volume
     if (m_volume == nullptr ||
@@ -668,6 +669,7 @@ void GLGizmoEmboss::on_set_state()
         // Immediately after set state On is called function data_changed(), 
         // where one could distiguish undo/redo serialization from opening by letter 'T'
         //set_volume_by_selection();
+        m_is_just_opened = true;
 
         // change position of just opened emboss window
         if (m_allow_open_near_volume) {
@@ -692,7 +694,7 @@ void GLGizmoEmboss::data_changed(bool is_serializing) {
     set_volume_by_selection();
 
     // when open window by "T" and no valid volume is selected, so Create new one
-    if (!is_serializing && m_volume == nullptr) {
+    if (!is_serializing && m_is_just_opened && m_volume == nullptr) {
         // reopen gizmo when new object is created
         close();
         if (wxGetApp().get_mode() == comSimple || wxGetApp().obj_list()->has_selected_cut_object())

@@ -302,6 +302,10 @@ private:
     // True when m_text contain character unknown by selected font
     bool m_text_contain_unknown_glyph = false;
 
+    // True from on_set_state(State::On) to first call of on_render_input_window()
+    // To know that on data_change when no volume is selected create new one
+    bool m_is_just_opened = false;
+
     // cancel for previous update of volume to cancel finalize part
     std::shared_ptr<std::atomic<bool>> m_job_cancel;
 
