@@ -4472,13 +4472,26 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Seam gap");
     def->category = OptionCategory::extruders;
     def->tooltip = L("To avoid visible seam, the extrusion can be stoppped a bit before the end of the loop."
-                    "\nCan be a mm or a % of the current extruder diameter.");
+        "\nCan be a mm or a % of the current extruder diameter.");
     def->sidetext = L("mm or %");
     def->min = 0;
     def->max_literal = { 5, false };
     def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{15,true} });
+
+    def = this->add("seam_gap_external", coFloatsOrPercents);
+    def->label = L("Seam gap for external perimeters");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("To avoid visible seam, the extrusion can be stoppped a bit before the end of the loop."
+        "\n this setting is enforced only for external perimeter. It overrides 'seam_gap' if different than 0"
+        "\nCan be a mm or a % of the current seam gap.");
+    def->sidetext = L("mm or %");
+    def->min = 0;
+    def->max_literal = { 5, false };
+    def->mode = comExpert | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{0,false} });
 
     def = this->add("seam_notch_all", coFloatOrPercent);
     def->label = L("for everything");
@@ -6240,6 +6253,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_restart_extra_toolchange",
         "retract_speed",
         "seam_gap",
+        "seam_gap_external",
         "tool_name",
         "wipe",
         "wipe_extra_perimeter",
@@ -7652,6 +7666,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "retract_lift_top",
 "seam_angle_cost",
 "seam_gap",
+"seam_gap_external",
 "seam_notch_all",
 "seam_notch_angle",
 "seam_notch_inner",

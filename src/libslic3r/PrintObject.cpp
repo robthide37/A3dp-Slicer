@@ -965,6 +965,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "infill_connection_solid"
                 || opt_key == "infill_connection_top"
                 || opt_key == "seam_gap"
+                || opt_key == "seam_gap_external"
                 || opt_key == "top_infill_extrusion_spacing"
                 || opt_key == "top_infill_extrusion_width" ) {
                 steps.emplace_back(posInfill);

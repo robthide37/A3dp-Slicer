@@ -1201,6 +1201,7 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionInt,                  skirt_height))
     ((ConfigOptionFloatOrPercent,       skirt_extrusion_width))
     ((ConfigOptionFloatsOrPercents,     seam_gap))
+    ((ConfigOptionFloatsOrPercents,     seam_gap_external))
     ((ConfigOptionInt,                  skirts))
     ((ConfigOptionFloats,               slowdown_below_layer_time))
     ((ConfigOptionBool,                 spiral_vase))

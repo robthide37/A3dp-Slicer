@@ -3556,6 +3556,12 @@ std::string GCode::extrude_loop_vase(const ExtrusionLoop &original_loop, const s
     ExtrusionPaths &paths = loop_to_seam.paths;
     if (false && m_enable_loop_clipping && m_writer.tool_is_extruder()) {
         coordf_t clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)));
+        if (original_loop.role() == erExternalPerimeter) {
+            coordf_t clip_length_external = scale_(m_config.seam_gap_external.get_abs_value(m_writer.tool()->id(), unscaled(clip_length)));
+            if (clip_length_external > 0) {
+                clip_length = clip_length_external;
+            }
+        }
         coordf_t min_clip_length = scale_(EXTRUDER_CONFIG_WITH_DEFAULT(nozzle_diameter, 0)) * 0.15;
 
         // get paths
@@ -4270,6 +4276,12 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     ExtrusionPaths& building_paths = loop_to_seam.paths;
     if (m_enable_loop_clipping && m_writer.tool_is_extruder()) {
         coordf_t clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), nozzle_diam));
+        if (original_loop.role() == erExternalPerimeter) {
+            coordf_t clip_length_external = scale_(m_config.seam_gap_external.get_abs_value(m_writer.tool()->id(), unscaled(clip_length)));
+            if (clip_length_external > 0) {
+                clip_length = clip_length_external;
+            }
+        }
         coordf_t min_clip_length = scale_(nozzle_diam) * 0.15;
 
         if (clip_length > full_loop_length / 4) {
