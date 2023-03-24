@@ -3394,6 +3394,7 @@ bool priv::start_create_volume_on_surface_job(
 {
     assert(gl_volume != nullptr);
     if (gl_volume == nullptr) return false;
+    if (gl_volume->volume_idx() < 0) return false;
 
     Plater *plater = wxGetApp().plater();
     const ModelObjectPtrs &objects = plater->model().objects;
