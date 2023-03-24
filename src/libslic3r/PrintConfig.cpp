@@ -1803,9 +1803,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("machine_max_acceleration_extruding", coFloats);
     def->full_label = L("Maximum acceleration when extruding");
     def->category = L("Machine limits");
-    def->tooltip = L("Maximum acceleration when extruding (M204 P)\n\n"
-                     "Marlin (legacy) firmware flavor will use this also "
-                     "as travel acceleration (M204 T).");
+    def->tooltip = L("Maximum acceleration when extruding");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comAdvanced;
@@ -1816,7 +1814,8 @@ void PrintConfigDef::init_fff_params()
     def = this->add("machine_max_acceleration_retracting", coFloats);
     def->full_label = L("Maximum acceleration when retracting");
     def->category = L("Machine limits");
-    def->tooltip = L("Maximum acceleration when retracting (M204 R)");
+    def->tooltip = L("Maximum acceleration when retracting.\n\n"
+                     "Not used for RepRapFirmware, which does not support it.");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comAdvanced;
@@ -1826,7 +1825,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("machine_max_acceleration_travel", coFloats);
     def->full_label = L("Maximum acceleration for travel moves");
     def->category = L("Machine limits");
-    def->tooltip = L("Maximum acceleration for travel moves (M204 T)");
+    def->tooltip = L("Maximum acceleration for travel moves.");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comAdvanced;

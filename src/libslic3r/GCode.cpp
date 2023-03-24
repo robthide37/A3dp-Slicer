@@ -1663,23 +1663,25 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
             int(print.config().machine_max_feedrate_e.values.front() * factor + 0.5),
             factor == 60 ? "mm / min" : "mm / sec");
 
-        // Now M204 - acceleration. This one is quite hairy thanks to how Marlin guys care about
-        // backwards compatibility: https://github.com/prusa3d/PrusaSlicer/issues/1089
-        // Legacy Marlin should export travel acceleration the same as printing acceleration.
-        // MarlinFirmware has the two separated.
-        int travel_acc = flavor == gcfMarlinLegacy
-                       ? int(print.config().machine_max_acceleration_extruding.values.front() + 0.5)
-                       : int(print.config().machine_max_acceleration_travel.values.front() + 0.5);
-        // Retract acceleration not accepted in M204 in RRF
+        // Now M204 - acceleration. This one is quite hairy...
         if (flavor == gcfRepRapFirmware)
+            // Uses M204 P[print] T[travel]
             file.write_format("M204 P%d T%d ; sets acceleration (P, T), mm/sec^2\n",
                 int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
-                travel_acc);
-        else
-            file.write_format("M204 P%d R%d T%d ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2\n",
+                int(print.config().machine_max_acceleration_travel.values.front() + 0.5));
+        else if (flavor == gcfMarlinLegacy)
+            // Legacy Marlin uses M204 S[print] T[retract]
+            file.write_format("M204 " + "S%d T%d ; sets acceleration (S) and retract acceleration (R), mm/sec^2\n",
+                int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
+                int(print.config().machine_max_acceleration_retracting.values.front() + 0.5));
+        else if (flavor == gcfMarlinFirmware)
+            // New Marlin uses M204 P[print] R[retract] T[travel]
+            file.write_format("M204 " + "P%d R%d T%d ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2\n",
                 int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_retracting.values.front() + 0.5),
-                travel_acc);
+                int(print.config().machine_max_acceleration_travel.values.front() + 0.5));
+        else
+            assert(false);
 
         assert(is_decimal_separator_point());
         file.write_format(flavor == gcfRepRapFirmware
