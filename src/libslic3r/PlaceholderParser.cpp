@@ -170,7 +170,7 @@ namespace client
     template<typename Iterator>
     struct OptWithPos {
         OptWithPos() {}
-        OptWithPos(ConfigOptionConstPtr opt, boost::iterator_range<Iterator> it_range) : opt(opt), it_range(it_range) {}
+        OptWithPos(ConfigOptionConstPtr opt, boost::iterator_range<Iterator> it_range, bool writable = false) : opt(opt), it_range(it_range), writable(writable) {}
         ConfigOptionConstPtr             opt { nullptr };
         bool                             writable { false };
         // -1 means it is a scalar variable, or it is a vector variable and index was not assigned yet or the whole vector is considered.
@@ -720,9 +720,14 @@ namespace client
     }
 
     struct MyContext : public ConfigOptionResolver {
+        // Config provided as a parameter to PlaceholderParser invocation, overriding PlaceholderParser stored config.
     	const DynamicConfig     *external_config        = nullptr;
+        // Config stored inside PlaceholderParser.
         const DynamicConfig     *config                 = nullptr;
+        // Config provided as a parameter to PlaceholderParser invocation, evaluated after the two configs above.
         const DynamicConfig     *config_override        = nullptr;
+        // Config provided as a parameter to PlaceholderParser invocation, containing variables that will be read out 
+        // and processed by the PlaceholderParser callee.
         mutable DynamicConfig   *config_outputs         = nullptr;
         // Local variables, read / write
         mutable DynamicConfig    config_local;
@@ -737,6 +742,7 @@ namespace client
         // Table to translate symbol tag to a human readable error message.
         static std::map<std::string, std::string> tag_to_error_message;
 
+        // Should the parser consider the parsed string to be a macro or a boolean expression?
         static bool             evaluate_full_macro(const MyContext *ctx) { return ! ctx->just_boolean_expression; }
 
         const ConfigOption* 	optptr(const t_config_option_key &opt_key) const override
@@ -762,13 +768,13 @@ namespace client
                 out = this->config_local.optptr(opt_key);
             return out;
         }
-        void                    store_new_variable(const std::string &opt_key, ConfigOption *opt, bool global_variable) {
-            assert(opt != nullptr);
+        void                    store_new_variable(const std::string &opt_key, std::unique_ptr<ConfigOption> &&opt, bool global_variable) {
+            assert(opt);
             if (global_variable) {
                 assert(this->context_data != nullptr && this->context_data->global_config);
-                this->context_data->global_config->set_key_value(opt_key, opt);
+                this->context_data->global_config->set_key_value(opt_key, opt.release());
             } else
-                this->config_local.set_key_value(opt_key ,opt);
+                this->config_local.set_key_value(opt_key, opt.release());
         }
 
         template <typename Iterator>
@@ -844,9 +850,10 @@ namespace client
             boost::iterator_range<Iterator> &opt_key,
             OptWithPos<Iterator>            &output)
         {
-            const ConfigOption *opt = ctx->resolve_symbol(std::string(opt_key.begin(), opt_key.end()));
+            const std::string key{ opt_key.begin(), opt_key.end() };
+            const ConfigOption *opt = ctx->resolve_symbol(key);
             if (opt == nullptr) {
-                opt = ctx->resolve_output_symbol(std::string(opt_key.begin(), opt_key.end()));
+                opt = ctx->resolve_output_symbol(key);
                 if (opt == nullptr)
                     ctx->throw_exception("Not a variable name", opt_key);
                 output.writable = true;
@@ -872,83 +879,233 @@ namespace client
             output.it_range.end()   = it_end;
         }
 
+        // Evaluating a scalar variable into expr,
+        // all possible ConfigOption types are supported.
+        template <typename Iterator>
+        static void scalar_variable_to_expr(
+            const MyContext         *ctx,
+            OptWithPos<Iterator>    &opt,
+            expr<Iterator>          &output)
+        {
+            assert(opt.opt->is_scalar());
+
+            switch (opt.opt->type()) {
+            case coFloat:   output.set_d(opt.opt->getFloat());   break;
+            case coInt:     output.set_i(opt.opt->getInt());     break;
+            case coString:  output.set_s(static_cast<const ConfigOptionString*>(opt.opt)->value); break;
+            case coPercent: output.set_d(opt.opt->getFloat());   break;
+            case coEnum:
+            case coPoint:   output.set_s(opt.opt->serialize());  break;
+            case coBool:    output.set_b(opt.opt->getBool());    break;
+            case coFloatOrPercent:
+            {
+                std::string opt_key(opt.it_range.begin(), opt.it_range.end());
+                if (boost::ends_with(opt_key, "extrusion_width")) {
+                    // Extrusion width supports defaults and a complex graph of dependencies.
+                    output.set_d(Flow::extrusion_width(opt_key, *ctx, static_cast<unsigned int>(ctx->current_extruder_id)));
+                } else if (! static_cast<const ConfigOptionFloatOrPercent*>(opt.opt)->percent) {
+                    // Not a percent, just return the value.
+                    output.set_d(opt.opt->getFloat());
+                } else {
+                    // Resolve dependencies using the "ratio_over" link to a parent value.
+    			    const ConfigOptionDef  *opt_def = print_config_def.get(opt_key);
+    			    assert(opt_def != nullptr);
+    			    double v = opt.opt->getFloat() * 0.01; // percent to ratio
+    			    for (;;) {
+    			        const ConfigOption *opt_parent = opt_def->ratio_over.empty() ? nullptr : ctx->resolve_symbol(opt_def->ratio_over);
+    			        if (opt_parent == nullptr)
+    			            ctx->throw_exception("FloatOrPercent variable failed to resolve the \"ratio_over\" dependencies", opt.it_range);
+    			        if (boost::ends_with(opt_def->ratio_over, "extrusion_width")) {
+                    		// Extrusion width supports defaults and a complex graph of dependencies.
+                            assert(opt_parent->type() == coFloatOrPercent);
+                        	v *= Flow::extrusion_width(opt_def->ratio_over, static_cast<const ConfigOptionFloatOrPercent*>(opt_parent), *ctx, static_cast<unsigned int>(ctx->current_extruder_id));
+                        	break;
+                        }
+                        if (opt_parent->type() == coFloat || opt_parent->type() == coFloatOrPercent) {
+    			        	v *= opt_parent->getFloat();
+    			        	if (opt_parent->type() == coFloat || ! static_cast<const ConfigOptionFloatOrPercent*>(opt_parent)->percent)
+    			        		break;
+    			        	v *= 0.01; // percent to ratio
+    			        }
+    		        	// Continue one level up in the "ratio_over" hierarchy.
+    				    opt_def = print_config_def.get(opt_def->ratio_over);
+    				    assert(opt_def != nullptr);
+    			    }
+                    output.set_d(v);
+    	        }
+    		    break;
+    		}
+            default:
+                ctx->throw_exception("Unsupported scalar variable type", opt.it_range);
+            }
+        }
+
+        // Evaluating one element of a vector variable.
+        // all possible ConfigOption types are supported.
+        template <typename Iterator>
+        static void vector_element_to_expr(
+            const MyContext         *ctx,
+            OptWithPos<Iterator>    &opt,
+            expr<Iterator>          &output)
+        {
+            assert(opt.opt->is_vector());
+            if (! opt.has_index())
+                ctx->throw_exception("Referencing a vector variable when scalar is expected", opt.it_range);
+            const ConfigOptionVectorBase* vec = static_cast<const ConfigOptionVectorBase*>(opt.opt);
+            if (vec->empty())
+                ctx->throw_exception("Indexing an empty vector variable", opt.it_range);
+            size_t idx = (opt.index < 0) ? 0 : (opt.index >= int(vec->size())) ? 0 : size_t(opt.index);
+            switch (opt.opt->type()) {
+            case coFloats:   output.set_d(static_cast<const ConfigOptionFloats*>(opt.opt)->values[idx]); break;
+            case coInts:     output.set_i(static_cast<const ConfigOptionInts*>(opt.opt)->values[idx]); break;
+            case coStrings:  output.set_s(static_cast<const ConfigOptionStrings*>(opt.opt)->values[idx]); break;
+            case coPercents: output.set_d(static_cast<const ConfigOptionPercents*>(opt.opt)->values[idx]); break;
+            case coPoints:   output.set_s(to_string(static_cast<const ConfigOptionPoints*>(opt.opt)->values[idx])); break;
+            case coBools:    output.set_b(static_cast<const ConfigOptionBools*>(opt.opt)->values[idx] != 0); break;
+                //case coEnums:    output.set_s(opt.opt->vserialize()[idx]); break;
+            default:
+                ctx->throw_exception("Unsupported vector variable type", opt.it_range);
+            }
+        }
+
+        template <typename Iterator>
+        static void check_writable(const MyContext *ctx, OptWithPos<Iterator> &opt) {
+            if (! opt.writable)
+                ctx->throw_exception("Cannot modify a read-only variable", opt.it_range);
+        }
+
+        template <typename Iterator>
+        static void check_numeric(const expr<Iterator> &param) {
+            if (! param.numeric_type())
+                param.throw_exception("Right side is not a numeric expression");
+        };
+
+        template <typename Iterator>
+        static size_t evaluate_count(const expr<Iterator> &expr_count) {
+            if (expr_count.type() != expr<Iterator>::TYPE_INT)
+                expr_count.throw_exception("Expected number of elements to fill a vector with.");
+            int count = expr_count.i();
+            if (count < 0)
+                expr_count.throw_exception("Negative number of elements specified.");
+            return size_t(count);
+        };
+
+        template <typename Iterator>
+        static void scalar_variable_assign_scalar(
+            const MyContext                 *ctx,
+            OptWithPos<Iterator>            &lhs,
+            const expr<Iterator>            &rhs)
+        {
+            assert(lhs.opt->is_scalar());
+            check_writable(ctx, lhs);
+            ConfigOption *wropt = const_cast<ConfigOption*>(lhs.opt);
+            switch (wropt->type()) {
+            case coFloat:
+                check_numeric(rhs);
+                static_cast<ConfigOptionFloat*>(wropt)->value = rhs.as_d();
+                break;
+            case coInt:
+                check_numeric(rhs);
+                static_cast<ConfigOptionInt*>(wropt)->value = rhs.as_i();
+                break;
+            case coString:
+                static_cast<ConfigOptionString*>(wropt)->value = rhs.to_string();
+                break;
+            case coPercent:
+                check_numeric(rhs);
+                static_cast<ConfigOptionPercent*>(wropt)->value = rhs.as_d();
+                break;
+            case coBool:
+                if (rhs.type() != expr<Iterator>::TYPE_BOOL)
+                    ctx->throw_exception("Right side is not a boolean expression", rhs.it_range);
+                static_cast<ConfigOptionBool*>(wropt)->value = rhs.b();
+                break;
+            default:
+                ctx->throw_exception("Unsupported output scalar variable type", lhs.it_range);
+            }
+        }
+
+        template <typename Iterator>
+        static void vector_variable_element_assign_scalar(
+            const MyContext                 *ctx,
+            OptWithPos<Iterator>            &lhs,
+            const expr<Iterator>            &rhs)
+        {
+            assert(lhs.opt->is_vector());
+            check_writable(ctx, lhs);
+            if (! lhs.has_index())
+                ctx->throw_exception("Referencing an output vector variable when scalar is expected", lhs.it_range);
+            ConfigOptionVectorBase *vec = const_cast<ConfigOptionVectorBase*>(static_cast<const ConfigOptionVectorBase*>(lhs.opt));
+            if (vec->empty())
+                ctx->throw_exception("Indexing an empty vector variable", lhs.it_range);
+            if (lhs.index >= int(vec->size()))
+                ctx->throw_exception("Index out of range", lhs.it_range);
+            switch (lhs.opt->type()) {
+            case coFloats:
+                check_numeric(rhs);
+                static_cast<ConfigOptionFloats*>(vec)->values[lhs.index] = rhs.as_d();
+                break;
+            case coInts:
+                check_numeric(rhs);
+                static_cast<ConfigOptionInts*>(vec)->values[lhs.index] = rhs.as_i();
+                break;
+            case coStrings:
+                static_cast<ConfigOptionStrings*>(vec)->values[lhs.index] = rhs.to_string();
+                break;
+            case coPercents:
+                check_numeric(rhs);
+                static_cast<ConfigOptionPercents*>(vec)->values[lhs.index] = rhs.as_d();
+                break;
+            case coBools:
+                if (rhs.type() != expr<Iterator>::TYPE_BOOL)
+                    ctx->throw_exception("Right side is not a boolean expression", rhs.it_range);
+                static_cast<ConfigOptionBools*>(vec)->values[lhs.index] = rhs.b();
+                break;
+            default:
+                ctx->throw_exception("Unsupported output vector variable type", lhs.it_range);
+            }
+        }
+
+        template <typename Iterator>
+        static void vector_variable_assign_expr_with_count(
+            const MyContext         *ctx,
+            OptWithPos<Iterator>    &lhs,
+            const expr<Iterator>    &rhs_count,
+            const expr<Iterator>    &rhs_value)
+        {
+            size_t count = evaluate_count(rhs_count);
+            auto *opt = const_cast<ConfigOption*>(lhs.opt);
+            switch (lhs.opt->type()) {
+            case coFloats:
+                check_numeric(rhs_value);
+                static_cast<ConfigOptionFloats*>(opt)->values.assign(count, rhs_value.as_d());
+                break;
+            case coInts:
+                check_numeric(rhs_value);
+                static_cast<ConfigOptionInts*>(opt)->values.assign(count, rhs_value.as_i());
+                break;
+            case coStrings:
+                static_cast<ConfigOptionStrings*>(opt)->values.assign(count, rhs_value.to_string());
+                break;
+            case coBools:
+                if (rhs_value.type() != expr<Iterator>::TYPE_BOOL)
+                    rhs_value.throw_exception("Right side is not a boolean expression");
+                static_cast<ConfigOptionBools*>(opt)->values.assign(count, rhs_value.b());
+                break;
+            default: assert(false);
+            }
+        }
+
         template <typename Iterator>
         static void variable_value(
             const MyContext                 *ctx,
             OptWithPos<Iterator>            &opt,
             expr<Iterator>                  &output)
         {
-            if (opt.opt->is_vector()) {
-                if (! opt.has_index())
-                    ctx->throw_exception("Referencing a vector variable when scalar is expected", opt.it_range);
-                const ConfigOptionVectorBase *vec = static_cast<const ConfigOptionVectorBase*>(opt.opt);
-                if (vec->empty())
-                    ctx->throw_exception("Indexing an empty vector variable", opt.it_range);
-                size_t idx = (opt.index < 0) ? 0 : (opt.index >= int(vec->size())) ? 0 : size_t(opt.index);
-                switch (opt.opt->type()) {
-                case coFloats:   output.set_d(static_cast<const ConfigOptionFloats  *>(opt.opt)->values[idx]); break;
-                case coInts:     output.set_i(static_cast<const ConfigOptionInts    *>(opt.opt)->values[idx]); break;
-                case coStrings:  output.set_s(static_cast<const ConfigOptionStrings *>(opt.opt)->values[idx]); break;
-                case coPercents: output.set_d(static_cast<const ConfigOptionPercents*>(opt.opt)->values[idx]); break;
-                case coPoints:   output.set_s(to_string(static_cast<const ConfigOptionPoints  *>(opt.opt)->values[idx])); break;
-                case coBools:    output.set_b(static_cast<const ConfigOptionBools   *>(opt.opt)->values[idx] != 0); break;
-                //case coEnums:    output.set_s(opt.opt->vserialize()[idx]); break;
-                default:
-                    ctx->throw_exception("Unknown vector variable type", opt.it_range);
-                }
-            } else {
-                assert(opt.opt->is_scalar());
-                switch (opt.opt->type()) {
-                case coFloat:   output.set_d(opt.opt->getFloat());   break;
-                case coInt:     output.set_i(opt.opt->getInt());     break;
-                case coString:  output.set_s(static_cast<const ConfigOptionString*>(opt.opt)->value); break;
-                case coPercent: output.set_d(opt.opt->getFloat());   break;
-                case coEnum:
-                case coPoint:   output.set_s(opt.opt->serialize());  break;
-                case coBool:    output.set_b(opt.opt->getBool());    break;
-                case coFloatOrPercent:
-                {
-                    std::string opt_key(opt.it_range.begin(), opt.it_range.end());
-                    if (boost::ends_with(opt_key, "extrusion_width")) {
-                    	// Extrusion width supports defaults and a complex graph of dependencies.
-                        output.set_d(Flow::extrusion_width(opt_key, *ctx, static_cast<unsigned int>(ctx->current_extruder_id)));
-                    } else if (! static_cast<const ConfigOptionFloatOrPercent*>(opt.opt)->percent) {
-                    	// Not a percent, just return the value.
-                        output.set_d(opt.opt->getFloat());
-                    } else {
-                    	// Resolve dependencies using the "ratio_over" link to a parent value.
-    			        const ConfigOptionDef  *opt_def = print_config_def.get(opt_key);
-    			        assert(opt_def != nullptr);
-    			        double v = opt.opt->getFloat() * 0.01; // percent to ratio
-    			        for (;;) {
-    			        	const ConfigOption *opt_parent = opt_def->ratio_over.empty() ? nullptr : ctx->resolve_symbol(opt_def->ratio_over);
-    			        	if (opt_parent == nullptr)
-    			                ctx->throw_exception("FloatOrPercent variable failed to resolve the \"ratio_over\" dependencies", opt.it_range);
-    			            if (boost::ends_with(opt_def->ratio_over, "extrusion_width")) {
-                    			// Extrusion width supports defaults and a complex graph of dependencies.
-                                assert(opt_parent->type() == coFloatOrPercent);
-                        		v *= Flow::extrusion_width(opt_def->ratio_over, static_cast<const ConfigOptionFloatOrPercent*>(opt_parent), *ctx, static_cast<unsigned int>(ctx->current_extruder_id));
-                        		break;
-                        	}
-                        	if (opt_parent->type() == coFloat || opt_parent->type() == coFloatOrPercent) {
-    			        		v *= opt_parent->getFloat();
-    			        		if (opt_parent->type() == coFloat || ! static_cast<const ConfigOptionFloatOrPercent*>(opt_parent)->percent)
-    			        			break;
-    			        		v *= 0.01; // percent to ratio
-    			        	}
-    		        		// Continue one level up in the "ratio_over" hierarchy.
-    				        opt_def = print_config_def.get(opt_def->ratio_over);
-    				        assert(opt_def != nullptr);
-    			        }
-                        output.set_d(v);
-    	            }
-    		        break;
-    		    }
-                default:
-                    ctx->throw_exception("Unknown scalar variable type", opt.it_range);
-                }
-            }
-
+            if (opt.opt->is_vector())
+                vector_element_to_expr(ctx, opt, output);
+            else
+                scalar_variable_to_expr(ctx, opt, output);
             output.it_range = opt.it_range;
         }
 
@@ -974,6 +1131,7 @@ namespace client
             output.it_range = opt.it_range;
         }
 
+        // Reference to an existing symbol, or a name of a new symbol.
         template<typename Iterator>
         struct NewOldVariable {
             std::string                      name;
@@ -1010,240 +1168,157 @@ namespace client
             out.it_range = it_range;
         }
 
-        template <typename Iterator>
-        static void new_scalar_variable(
-            const MyContext                         *ctx,
-            bool                                     global_variable,
-            NewOldVariable<Iterator>                &output_variable,
-            const expr<Iterator>                    &param)
-        {
-            auto check_numeric = [](const expr<Iterator> &param) {
-                if (! param.numeric_type())
-                    param.throw_exception("Right side is not a numeric expression");
-            };
-            if (output_variable.opt) {
-                if (output_variable.opt->is_vector())
-                    param.throw_exception("Cannot assign a scalar value to a vector variable.");
-                switch (output_variable.opt->type()) {
-                case coFloat:
-                    check_numeric(param);
-                    static_cast<ConfigOptionFloat*>(output_variable.opt)->value = param.as_d();
-                    break;
-                case coInt:
-                    check_numeric(param);
-                    static_cast<ConfigOptionInt*>(output_variable.opt)->value = param.as_i();
-                    break;
-                case coString:
-                    static_cast<ConfigOptionString*>(output_variable.opt)->value = param.to_string();
-                    break;
-                case coBool:
-                    if (param.type() != expr<Iterator>::TYPE_BOOL)
-                        param.throw_exception("Right side is not a boolean expression");
-                    static_cast<ConfigOptionBool*>(output_variable.opt)->value = param.b();
-                    break;
-                default: assert(false);
-                }
-            } else {
-                switch (param.type()) {
-                    case expr<Iterator>::TYPE_BOOL:     output_variable.opt = new ConfigOptionBool(param.b());   break;
-                    case expr<Iterator>::TYPE_INT:      output_variable.opt = new ConfigOptionInt(param.i());    break;
-                    case expr<Iterator>::TYPE_DOUBLE:   output_variable.opt = new ConfigOptionFloat(param.d());  break;
-                    case expr<Iterator>::TYPE_STRING:   output_variable.opt = new ConfigOptionString(param.s()); break;
-                    default: assert(false);
-                }
-                const_cast<MyContext*>(ctx)->store_new_variable(output_variable.name, output_variable.opt, global_variable);
-            }
-        }
-
-        template <typename Iterator>
-        static void check_writable(const MyContext *ctx, OptWithPos<Iterator> &opt) {
-            if (! opt.writable)
-                ctx->throw_exception("Cannot modify a read-only variable", opt.it_range);
-        }
-
         // Decoding a scalar variable symbol "opt", assigning it a value of "param".
         template <typename Iterator>
-        static void assign_scalar_variable(
+        static void scalar_variable_assign_scalar_expression(
             const MyContext                 *ctx,
             OptWithPos<Iterator>            &opt,
-            expr<Iterator>                  &param)
+            const expr<Iterator>            &param)
         {
             check_writable(ctx, opt);
-            auto check_numeric = [](const expr<Iterator> &param) {
-                if (! param.numeric_type())
-                    param.throw_exception("Right side is not a numeric expression");
-            };
-            if (opt.opt->is_vector()) {
-                if (! opt.has_index())
-                    ctx->throw_exception("Referencing an output vector variable when scalar is expected", opt.it_range);
-                ConfigOptionVectorBase *vec = const_cast<ConfigOptionVectorBase*>(static_cast<const ConfigOptionVectorBase*>(opt.opt));
-                if (vec->empty())
-                    ctx->throw_exception("Indexing an empty vector variable", opt.it_range);
-                if (opt.index >= int(vec->size()))
-                    ctx->throw_exception("Index out of range", opt.it_range);
-                switch (opt.opt->type()) {
-                case coFloats:
-                    check_numeric(param);
-                    static_cast<ConfigOptionFloats*>(vec)->values[opt.index] = param.as_d();
-                    break;
-                case coInts:
-                    check_numeric(param);
-                    static_cast<ConfigOptionInts*>(vec)->values[opt.index] = param.as_i();
-                    break;
-                case coStrings:
-                    static_cast<ConfigOptionStrings*>(vec)->values[opt.index] = param.to_string();
-                    break;
-                case coPercents:
-                    check_numeric(param);
-                    static_cast<ConfigOptionPercents*>(vec)->values[opt.index] = param.as_d();
-                    break;
-                case coBools:
-                    if (param.type() != expr<Iterator>::TYPE_BOOL)
-                        ctx->throw_exception("Right side is not a boolean expression", param.it_range);
-                    static_cast<ConfigOptionBools*>(vec)->values[opt.index] = param.b();
-                    break;
-                default:
-                    ctx->throw_exception("Unsupported output vector variable type", opt.it_range);
-                }
-            } else {
-                assert(opt.opt->is_scalar());
-                ConfigOption *wropt = const_cast<ConfigOption*>(opt.opt);
-                switch (wropt->type()) {
-                case coFloat:
-                    check_numeric(param);
-                    static_cast<ConfigOptionFloat*>(wropt)->value = param.as_d();
-                    break;
-                case coInt:
-                    check_numeric(param);
-                    static_cast<ConfigOptionInt*>(wropt)->value = param.as_i();
-                    break;
-                case coString:
-                    static_cast<ConfigOptionString*>(wropt)->value = param.to_string();
-                    break;
-                case coPercent:
-                    check_numeric(param);
-                    static_cast<ConfigOptionPercent*>(wropt)->value = param.as_d();
-                    break;
-                case coBool:
-                    if (param.type() != expr<Iterator>::TYPE_BOOL)
-                        ctx->throw_exception("Right side is not a boolean expression", param.it_range);
-                    static_cast<ConfigOptionBool*>(wropt)->value = param.b();
-                    break;
-                default:
-                    ctx->throw_exception("Unsupported output scalar variable type", opt.it_range);
-                }
-            }
+            if (opt.opt->is_vector())
+                vector_variable_element_assign_scalar(ctx, opt, param);
+            else
+                scalar_variable_assign_scalar(ctx, opt, param);
         }
 
         template <typename Iterator>
-        static void new_vector_variable_array(
+        static void scalar_variable_new_from_scalar_expression(
             const MyContext                         *ctx,
             bool                                     global_variable,
-            NewOldVariable<Iterator>                &output_variable,
-            const expr<Iterator>                    &expr_count,
-            const expr<Iterator>                    &expr_value)
+            NewOldVariable<Iterator>                &lhs,
+            const expr<Iterator>                    &rhs)
         {
-            auto check_numeric = [](const expr<Iterator> &param) {
-                if (! param.numeric_type())
-                    param.throw_exception("Right side is not a numeric expression");
-            };
-            auto evaluate_count = [](const expr<Iterator> &expr_count) -> size_t {
-                if (expr_count.type() != expr<Iterator>::TYPE_INT)
-                    expr_count.throw_exception("Expected number of elements to fill a vector with.");
-                int count = expr_count.i();
-                if (count < 0)
-                    expr_count.throw_exception("Negative number of elements specified.");
-                return size_t(count);
-            };
-            if (output_variable.opt) {
-                if (output_variable.opt->is_scalar())
-                    expr_value.throw_exception("Cannot assign a vector value to a scalar variable.");
-                size_t count = evaluate_count(expr_count);
-                switch (output_variable.opt->type()) {
-                case coFloats:
-                    check_numeric(expr_value);
-                    static_cast<ConfigOptionFloats*>(output_variable.opt)->values.assign(count, expr_value.as_d());
-                    break;
-                case coInts:
-                    check_numeric(expr_value);
-                    static_cast<ConfigOptionInts*>(output_variable.opt)->values.assign(count, expr_value.as_i());
-                    break;
-                case coStrings:
-                    static_cast<ConfigOptionStrings*>(output_variable.opt)->values.assign(count, expr_value.to_string());
-                    break;
-                case coBools:
-                    if (expr_value.type() != expr<Iterator>::TYPE_BOOL)
-                        expr_value.throw_exception("Right side is not a boolean expression");
-                    static_cast<ConfigOptionBools*>(output_variable.opt)->values.assign(count, expr_value.b());
-                    break;
-                default: assert(false);
-                }
+            if (lhs.opt) {
+                if (lhs.opt->is_vector())
+                    rhs.throw_exception("Cannot assign a scalar value to a vector variable.");
+                OptWithPos lhs_opt{ lhs.opt, lhs.it_range, true };
+                scalar_variable_assign_scalar(ctx, lhs_opt, rhs);
             } else {
-                size_t count = evaluate_count(expr_count);
-                switch (expr_value.type()) {
-                    case expr<Iterator>::TYPE_BOOL:     output_variable.opt = new ConfigOptionBools(count, expr_value.b());   break;
-                    case expr<Iterator>::TYPE_INT:      output_variable.opt = new ConfigOptionInts(count, expr_value.i());    break;
-                    case expr<Iterator>::TYPE_DOUBLE:   output_variable.opt = new ConfigOptionFloats(count, expr_value.d()); break;
-                    case expr<Iterator>::TYPE_STRING:   output_variable.opt = new ConfigOptionStrings(count, expr_value.s()); break;
+                std::unique_ptr<ConfigOption> opt_new;
+                switch (rhs.type()) {
+                    case expr<Iterator>::TYPE_BOOL:     opt_new = std::make_unique<ConfigOptionBool>(rhs.b());   break;
+                    case expr<Iterator>::TYPE_INT:      opt_new = std::make_unique<ConfigOptionInt>(rhs.i());    break;
+                    case expr<Iterator>::TYPE_DOUBLE:   opt_new = std::make_unique<ConfigOptionFloat>(rhs.d());  break;
+                    case expr<Iterator>::TYPE_STRING:   opt_new = std::make_unique<ConfigOptionString>(rhs.s()); break;
                     default: assert(false);
                 }
-                const_cast<MyContext*>(ctx)->store_new_variable(output_variable.name, output_variable.opt, global_variable);
+                const_cast<MyContext*>(ctx)->store_new_variable(lhs.name, std::move(opt_new), global_variable);
             }
         }
 
         template <typename Iterator>
-        static void assign_vector_variable_array(
+        static void vector_variable_new_from_array(
+            const MyContext                         *ctx,
+            bool                                     global_variable,
+            NewOldVariable<Iterator>                &lhs,
+            const expr<Iterator>                    &rhs_count,
+            const expr<Iterator>                    &rhs_value)
+        {
+            if (lhs.opt) {
+                if (lhs.opt->is_scalar())
+                    rhs_value.throw_exception("Cannot assign a vector value to a scalar variable.");
+                OptWithPos lhs_opt{ lhs.opt, lhs.it_range, true };
+                vector_variable_assign_expr_with_count(ctx, lhs_opt, rhs_count, rhs_value);
+            } else {
+                size_t count = evaluate_count(rhs_count);
+                std::unique_ptr<ConfigOption> opt_new;
+                switch (rhs_value.type()) {
+                    case expr<Iterator>::TYPE_BOOL:     opt_new = std::make_unique<ConfigOptionBools>(count, rhs_value.b());   break;
+                    case expr<Iterator>::TYPE_INT:      opt_new = std::make_unique<ConfigOptionInts>(count, rhs_value.i());    break;
+                    case expr<Iterator>::TYPE_DOUBLE:   opt_new = std::make_unique<ConfigOptionFloats>(count, rhs_value.d()); break;
+                    case expr<Iterator>::TYPE_STRING:   opt_new = std::make_unique<ConfigOptionStrings>(count, rhs_value.s()); break;
+                    default: assert(false);
+                }
+                const_cast<MyContext*>(ctx)->store_new_variable(lhs.name, std::move(opt_new), global_variable);
+            }
+        }
+
+        template <typename Iterator>
+        static void vector_variable_assign_array(
             const MyContext                         *ctx,
             OptWithPos<Iterator>                    &lhs,
-            const expr<Iterator>                    &expr_count,
-            const expr<Iterator>                    &expr_value)
+            const expr<Iterator>                    &rhs_count,
+            const expr<Iterator>                    &rhs_value)
         {
             check_writable(ctx, lhs);
-            auto check_numeric = [](const expr<Iterator> &param) {
-                if (! param.numeric_type())
-                    param.throw_exception("Right side is not a numeric expression");
-            };
-            auto evaluate_count = [](const expr<Iterator> &expr_count) -> size_t {
-                if (expr_count.type() != expr<Iterator>::TYPE_INT)
-                    expr_count.throw_exception("Expected number of elements to fill a vector with.");
-                int count = expr_count.i();
-                if (count < 0)
-                    expr_count.throw_exception("Negative number of elements specified.");
-                return size_t(count);
-            };
             if (lhs.opt->is_scalar())
-                expr_value.throw_exception("Cannot assign a vector value to a scalar variable.");
-            auto *opt = const_cast<ConfigOption*>(lhs.opt);
-            size_t count = evaluate_count(expr_count);
+                rhs_value.throw_exception("Cannot assign a vector value to a scalar variable.");
+            vector_variable_assign_expr_with_count(ctx, lhs, rhs_count, rhs_value);
+        }
+
+        template<typename ConfigOptionType, typename Iterator, typename RightValueEvaluate>
+        static void fill_vector_from_initializer_list(ConfigOption *opt, const std::vector<expr<Iterator>> &il, RightValueEvaluate rv_eval) {
+            auto& out = static_cast<ConfigOptionType*>(opt)->values;
+            out.clear();
+            out.reserve(il.size());
+            for (const expr<Iterator>& i : il)
+                out.emplace_back(rv_eval(i));
+        }
+
+        template <typename Iterator>
+        static void vector_variable_assign_initializer_list(
+            const MyContext                             *ctx,
+            OptWithPos<Iterator>                        &lhs,
+            const std::vector<expr<Iterator>>           &il)
+        {
+            check_writable(ctx, lhs);
+
+            if (lhs.opt->is_scalar()) {
+                if (il.size() == 1)
+                    // scalar_var = ( scalar )
+                    scalar_variable_assign_scalar_expression(ctx, lhs, il.front());
+                else
+                    // scalar_var = () 
+                    // or
+                    // scalar_var = ( scalar, scalar, ... )
+                    ctx->throw_exception("Cannot assign a vector value to a scalar variable.", lhs.it_range);
+            }
+
+            auto check_numeric_vector = [](const std::vector<expr<Iterator>> &il) {
+                for (auto &i : il)
+                    if (! i.numeric_type())
+                        i.throw_exception("Right side is not a numeric expression");
+            };
+
+            ConfigOption *opt = const_cast<ConfigOption*>(lhs.opt);
             switch (lhs.opt->type()) {
             case coFloats:
-                check_numeric(expr_value);
-                static_cast<ConfigOptionFloats*>(opt)->values.assign(count, expr_value.as_d());
+                check_numeric_vector(il);
+                fill_vector_from_initializer_list<ConfigOptionFloats>(opt, il, [](auto &v){ return v.as_d(); });
                 break;
             case coInts:
-                check_numeric(expr_value);
-                static_cast<ConfigOptionInts*>(opt)->values.assign(count, expr_value.as_i());
+                check_numeric_vector(il);
+                fill_vector_from_initializer_list<ConfigOptionInts>(opt, il, [](auto &v){ return v.as_i(); });
                 break;
             case coStrings:
-                static_cast<ConfigOptionStrings*>(opt)->values.assign(count, expr_value.to_string());
+                fill_vector_from_initializer_list<ConfigOptionStrings>(opt, il, [](auto &v){ return v.to_string(); });
                 break;
             case coBools:
-                if (expr_value.type() != expr<Iterator>::TYPE_BOOL)
-                    expr_value.throw_exception("Right side is not a boolean expression");
-                static_cast<ConfigOptionBools*>(opt)->values.assign(count, expr_value.b());
+                for (auto &i : il)
+                    if (i.type() != expr<Iterator>::TYPE_BOOL)
+                        i.throw_exception("Right side is not a boolean expression");
+                fill_vector_from_initializer_list<ConfigOptionBools>(opt, il, [](auto &v){ return v.b(); });
                 break;
             default: assert(false);
             }
         }
 
         template <typename Iterator>
-        static void new_vector_variable_initializer_list(
+        static void vector_variable_new_from_initializer_list(
             const MyContext                             *ctx,
             bool                                         global_variable,
-            NewOldVariable<Iterator>                    &output_variable,
+            NewOldVariable<Iterator>                    &lhs,
             const std::vector<expr<Iterator>>           &il)
         {
-            if (! output_variable.opt) {
+            if (lhs.opt) {
+                // Assign to an existing vector variable.
+                OptWithPos lhs_opt{ lhs.opt, lhs.it_range, true };
+                vector_variable_assign_initializer_list(ctx, lhs_opt, il);
+            } else {
+                if (il.empty())
+                    ctx->throw_exception("Cannot create vector variable from an empty initializer list, because its type cannot be deduced.", lhs.it_range);
+                // Allocate a new vector variable.
                 // First guesstimate type of the output vector.
                 size_t num_bool = 0;
                 size_t num_int = 0;
@@ -1257,186 +1332,25 @@ namespace client
                     case expr<Iterator>::TYPE_STRING:   ++ num_string;  break;
                     default: assert(false);
                     }
+                std::unique_ptr<ConfigOption> opt_new;
                 if (num_string > 0)
                     // Convert everything to strings.
-                    output_variable.opt = new ConfigOptionStrings();
+                    opt_new = std::make_unique<ConfigOptionStrings>();
                 else if (num_bool > 0) {
                     if (num_double + num_int > 0)
                         ctx->throw_exception("Right side is not valid: Mixing numeric and boolean types.", boost::iterator_range<Iterator>{ il.front().it_range.begin(), il.back().it_range.end() });
-                    output_variable.opt = new ConfigOptionBools();
-                } else
+                    opt_new = std::make_unique<ConfigOptionBools>();
+                } else {
                     // Output is numeric.
-                    output_variable.opt = num_double == 0 ? static_cast<ConfigOption*>(new ConfigOptionInts()) : static_cast<ConfigOption*>(new ConfigOptionFloats());
-                const_cast<MyContext*>(ctx)->store_new_variable(output_variable.name, output_variable.opt, global_variable);
+                    if (num_double == 0)
+                        opt_new = std::make_unique<ConfigOptionInts>();
+                    else 
+                        opt_new = std::make_unique<ConfigOptionFloats>();
+                }
+                OptWithPos lhs_opt{ opt_new.get(), lhs.it_range, true };
+                vector_variable_assign_initializer_list(ctx, lhs_opt, il);
+                const_cast<MyContext*>(ctx)->store_new_variable(lhs.name, std::move(opt_new), global_variable);
             }
-
-            auto check_numeric = [](const std::vector<expr<Iterator>> &il) {
-                for (auto& i : il)
-                    if (!i.numeric_type())
-                        i.throw_exception("Right side is not a numeric expression");
-            };
-
-            if (output_variable.opt->is_scalar())
-                ctx->throw_exception("Cannot assign a vector value to a scalar variable.", output_variable.it_range);
-
-            switch (output_variable.opt->type()) {
-            case coFloats:
-            {
-                check_numeric(il);
-                auto &out = static_cast<ConfigOptionFloats*>(output_variable.opt)->values;
-                out.clear();
-                out.reserve(il.size());
-                for (auto &i : il)
-                    out.emplace_back(i.as_d());
-                break;
-            }
-            case coInts:
-            {
-                check_numeric(il);
-                auto &out = static_cast<ConfigOptionInts*>(output_variable.opt)->values;
-                out.clear();
-                out.reserve(il.size());
-                for (auto& i : il)
-                    out.emplace_back(i.as_i());
-                break;
-            }
-            case coStrings:
-            {
-                auto &out = static_cast<ConfigOptionStrings*>(output_variable.opt)->values;
-                out.clear();
-                out.reserve(il.size());
-                for (auto &i : il)
-                    out.emplace_back(i.to_string());
-                break;
-            }
-            case coBools:
-            {
-                auto &out = static_cast<ConfigOptionBools*>(output_variable.opt)->values;
-                out.clear();
-                out.reserve(il.size());
-                for (auto &i : il)
-                    if (i.type() == expr<Iterator>::TYPE_BOOL)
-                        out.emplace_back(i.b());
-                    else
-                        i.throw_exception("Right side is not a boolean expression");
-                break;
-            }
-            default:
-                assert(false);
-            }
-        }
-
-        template <typename Iterator>
-        static void assign_vector_variable_initializer_list(
-            const MyContext                             *ctx,
-            OptWithPos<Iterator>                        &lhs,
-            const std::vector<expr<Iterator>>           &il)
-        {
-            check_writable(ctx, lhs);
-            auto check_numeric = [](const std::vector<expr<Iterator>> &il) {
-                for (auto &i : il)
-                    if (! i.numeric_type())
-                        i.throw_exception("Right side is not a numeric expression");
-            };
-
-            if (lhs.opt->is_scalar())
-                ctx->throw_exception("Cannot assign a vector value to a scalar variable.", lhs.it_range);
-
-            ConfigOption *opt = const_cast<ConfigOption*>(lhs.opt);
-            switch (lhs.opt->type()) {
-            case coFloats:
-            {
-                check_numeric(il);
-                auto &out = static_cast<ConfigOptionFloats*>(opt)->values;
-                out.clear();
-                out.reserve(il.size());
-                for (auto &i : il)
-                    out.emplace_back(i.as_d());
-                break;
-            }
-            case coInts:
-            {
-                check_numeric(il);
-                auto &out = static_cast<ConfigOptionInts*>(opt)->values;
-                out.clear();
-                out.reserve(il.size());
-                for (auto& i : il)
-                    out.emplace_back(i.as_i());
-                break;
-            }
-            case coStrings:
-            {
-                auto &out = static_cast<ConfigOptionStrings*>(opt)->values;
-                out.clear();
-                out.reserve(il.size());
-                for (auto &i : il)
-                    out.emplace_back(i.to_string());
-                break;
-            }
-            case coBools:
-            {
-                auto &out = static_cast<ConfigOptionBools*>(opt)->values;
-                out.clear();
-                out.reserve(il.size());
-                for (auto &i : il)
-                    if (i.type() == expr<Iterator>::TYPE_BOOL)
-                        out.emplace_back(i.b());
-                    else
-                        i.throw_exception("Right side is not a boolean expression");
-                break;
-            }
-            default:
-                assert(false);
-            }
-        }
-
-        template <typename Iterator>
-        static bool new_vector_variable_copy(
-            const MyContext                             *ctx,
-            bool                                         global_variable,
-            NewOldVariable<Iterator>                    &output_variable,
-            const OptWithPos<Iterator>                  &src_variable)
-        {
-            if (! is_vector_variable_reference(src_variable))
-                // Skip parsing this branch, bactrack.
-                return false;
-
-            if (! output_variable.opt) {
-                if (one_of(src_variable.opt->type(), { coFloats, coInts, coStrings, coBools }))
-                    output_variable.opt = src_variable.opt->clone();
-                else if (src_variable.opt->type() == coPercents)
-                    output_variable.opt = new ConfigOptionFloats(static_cast<const ConfigOptionPercents*>(src_variable.opt)->values);
-                else
-                    ctx->throw_exception("Duplicating this vector variable is not supported", src_variable.it_range);
-                const_cast<MyContext*>(ctx)->store_new_variable(output_variable.name, output_variable.opt, global_variable);
-            }
-
-            switch (output_variable.opt->type()) {
-            case coFloats:
-                if (output_variable.opt->type() != coFloats)
-                    ctx->throw_exception("Left hand side is a float vector, while the right hand side is not.", boost::iterator_range<Iterator>{ output_variable.it_range.begin(), src_variable.it_range.end() });
-                static_cast<ConfigOptionFloats*>(output_variable.opt)->values = static_cast<const ConfigOptionFloats*>(src_variable.opt)->values;
-                break;
-            case coInts:
-                if (output_variable.opt->type() != coInts)
-                    ctx->throw_exception("Left hand side is an int vector, while the right hand side is not.", boost::iterator_range<Iterator>{ output_variable.it_range.begin(), src_variable.it_range.end() });
-                static_cast<ConfigOptionInts*>(output_variable.opt)->values = static_cast<const ConfigOptionInts*>(src_variable.opt)->values;
-                break;
-            case coStrings:
-                if (output_variable.opt->type() != coStrings)
-                    ctx->throw_exception("Left hand side is a string vector, while the right hand side is not.", boost::iterator_range<Iterator>{ output_variable.it_range.begin(), src_variable.it_range.end() });
-                static_cast<ConfigOptionStrings*>(output_variable.opt)->values = static_cast<const ConfigOptionStrings*>(src_variable.opt)->values;
-                break;
-            case coBools:
-                if (output_variable.opt->type() != coBools)
-                    ctx->throw_exception("Left hand side is a bool vector, while the right hand side is not.", boost::iterator_range<Iterator>{ output_variable.it_range.begin(), src_variable.it_range.end() });
-                static_cast<ConfigOptionBools*>(output_variable.opt)->values = static_cast<const ConfigOptionBools*>(src_variable.opt)->values;
-                break;
-            default:
-                assert(false);
-            }
-            // Continue parsing.
-            return true;
         }
 
         template <typename Iterator>
@@ -1444,52 +1358,97 @@ namespace client
             return ! var.has_index() && var.opt->is_vector();
         }
 
+        // Called when checking whether the NewOldVariable could be assigned a vectir right hand side.
         template <typename Iterator>
-        static bool assign_vector_variable_copy(
-            const MyContext                             *ctx,
-            OptWithPos<Iterator>                        &lhs,
-            const OptWithPos<Iterator>                  &src_variable)
+        static bool could_be_vector_variable_reference(const NewOldVariable<Iterator> &var) {
+            return var.opt == nullptr || var.opt->is_vector();
+        }
+
+        template <typename Iterator>
+        static void copy_vector_variable_to_vector_variable(
+            const MyContext             *ctx,
+            OptWithPos<Iterator>        &lhs,
+            const OptWithPos<Iterator>  &rhs)
         {
-            if (! is_vector_variable_reference(src_variable))
-                // Skip parsing this branch, bactrack.
-                return false;
-
             check_writable(ctx, lhs);
-
-            auto *opt = const_cast<ConfigOption*>(lhs.opt);
-            switch (lhs.opt->type()) {
-            case coFloats:
-                if (lhs.opt->type() != coFloats)
+            assert(lhs.opt->is_vector());
+            if (rhs.has_index() || ! rhs.opt->is_vector())
+                ctx->throw_exception("Cannot assign scalar to a vector", lhs.it_range);
+            if (lhs.opt->type() != rhs.opt->type()) {
+                // Vector types are not compatible.
+                switch (lhs.opt->type()) {
+                case coFloats:
                     ctx->throw_exception("Left hand side is a float vector, while the right hand side is not.", lhs.it_range);
-                static_cast<ConfigOptionFloats*>(opt)->values = static_cast<const ConfigOptionFloats*>(src_variable.opt)->values;
-                break;
-            case coInts:
-                if (lhs.opt->type() != coInts)
+                case coInts:
                     ctx->throw_exception("Left hand side is an int vector, while the right hand side is not.", lhs.it_range);
-                static_cast<ConfigOptionInts*>(opt)->values = static_cast<const ConfigOptionInts*>(src_variable.opt)->values;
-                break;
-            case coStrings:
-                if (lhs.opt->type() != coStrings)
+                case coStrings:
                     ctx->throw_exception("Left hand side is a string vector, while the right hand side is not.", lhs.it_range);
-                static_cast<ConfigOptionStrings*>(opt)->values = static_cast<const ConfigOptionStrings*>(src_variable.opt)->values;
-                break;
-            case coBools:
-                if (lhs.opt->type() != coBools)
+                case coBools:
                     ctx->throw_exception("Left hand side is a bool vector, while the right hand side is not.", lhs.it_range);
-                static_cast<ConfigOptionBools*>(opt)->values = static_cast<const ConfigOptionBools*>(src_variable.opt)->values;
-                break;
-            default:
-                assert(false);
+                default:
+                    ctx->throw_exception("Left hand side / right hand side vectors are not compatible.", lhs.it_range);
+                }
             }
+            const_cast<ConfigOption*>(lhs.opt)->set(rhs.opt);
+        }
 
+        template <typename Iterator>
+        static bool vector_variable_new_from_copy(
+            const MyContext                             *ctx,
+            bool                                         global_variable,
+            NewOldVariable<Iterator>                    &lhs,
+            const OptWithPos<Iterator>                  &rhs)
+        {
+            if (lhs.opt) {
+                assert(lhs.opt->is_vector());
+                OptWithPos lhs_opt{ lhs.opt, lhs.it_range, true };
+                copy_vector_variable_to_vector_variable(ctx, lhs_opt, rhs);
+            } else {
+                if (rhs.has_index() || ! rhs.opt->is_vector())
+                    // Stop parsing, let the other rules resolve this case.
+                    return false;
+                // Clone the vector variable.
+                std::unique_ptr<ConfigOption> opt_new;
+                if (one_of(rhs.opt->type(), { coFloats, coInts, coStrings, coBools }))
+                    opt_new = std::unique_ptr<ConfigOption>(rhs.opt->clone());
+                else if (rhs.opt->type() == coPercents)
+                    opt_new = std::make_unique<ConfigOptionFloats>(static_cast<const ConfigOptionPercents*>(rhs.opt)->values);
+                else
+                    ctx->throw_exception("Duplicating this type of vector variable is not supported", rhs.it_range);
+                const_cast<MyContext*>(ctx)->store_new_variable(lhs.name, std::move(opt_new), global_variable);
+            }
             // Continue parsing.
             return true;
         }
 
         template <typename Iterator>
-        static void new_vector_variable_initializer_list_append(std::vector<expr<Iterator>> &list, expr<Iterator> &expr)
+        static void initializer_list_append(std::vector<expr<Iterator>> &list, expr<Iterator> &expr)
         {
             list.emplace_back(std::move(expr));
+        }
+
+        template <typename Iterator>
+        static void is_vector_empty(
+            const MyContext         *ctx,
+            OptWithPos<Iterator>    &opt,
+            expr<Iterator>          &out)
+        {
+            if (opt.has_index() || ! opt.opt->is_vector())
+                ctx->throw_exception("parameter of empty() is not a vector variable", opt.it_range);
+            out.set_b(static_cast<const ConfigOptionVectorBase*>(opt.opt)->size() == 0);
+            out.it_range = opt.it_range;
+        }
+
+        template <typename Iterator>
+        static void vector_size(
+            const MyContext         *ctx,
+            OptWithPos<Iterator>    &opt,
+            expr<Iterator>          &out)
+        {
+            if (opt.has_index() || ! opt.opt->is_vector())
+                ctx->throw_exception("parameter of size() is not a vector variable", opt.it_range);
+            out.set_i(int(static_cast<const ConfigOptionVectorBase*>(opt.opt)->size()));
+            out.it_range = opt.it_range;
         }
 
         // Verify that the expression returns an integer, which may be used
@@ -1635,12 +1594,12 @@ namespace client
 
     // Table to translate symbol tag to a human readable error message.
     std::map<std::string, std::string> MyContext::tag_to_error_message = {
-        { "array",                      "Unknown syntax error" },
         { "eoi",                        "Unknown syntax error" },
         { "start",                      "Unknown syntax error" },
         { "text",                       "Invalid text." },
         { "text_block",                 "Invalid text block." },
         { "macro",                      "Invalid macro." },
+        { "repeat",                     "Unknown syntax error" },
         { "if_else_output",             "Not an {if}{else}{endif} macro." },
         { "switch_output",              "Not a {switch} macro." },
         { "legacy_variable_expansion",  "Expecting a legacy variable expansion format" },
@@ -1657,7 +1616,6 @@ namespace client
         { "optional_parameter",         "Expecting a closing brace or an optional parameter." },
         { "one_of_list",                "Expecting a list of string patterns (simple text or rexep)" },
         { "variable_reference",         "Expecting a variable reference."},
-        { "is_nil_test",                "Expecting a scalar variable reference."},
         { "variable",                   "Expecting a variable name."},
         { "regular_expression",         "Expecting a regular expression."}
     };
@@ -1909,37 +1867,39 @@ namespace client
             assignment_statement =
                 variable_reference(_r1)[_a = _1] >> '=' > 
                 (       // Consumes also '(' conditional_expression ')', that means enclosing an expression into braces makes it a single value vector initializer.
-                        (lit('(') > new_variable_initializer_list(_r1) > ')') 
-                            [px::bind(&MyContext::assign_vector_variable_initializer_list<Iterator>, _r1, _a, _1)]
+                         initializer_list(_r1)[px::bind(&MyContext::vector_variable_assign_initializer_list<Iterator>, _r1, _a, _1)]
                         // Process it before conditional_expression, as conditional_expression requires a vector reference to be augmented with an index.
                         // Only process such variable references, which return a naked vector variable.
-                    |  variable_reference(_r1)
-                            [px::ref(qi::_pass) = px::bind(&MyContext::assign_vector_variable_copy<Iterator>, _r1, _a, _1)]
+                    |  eps(px::bind(&MyContext::is_vector_variable_reference<Iterator>, _a)) >> 
+                            variable_reference(_r1)[px::bind(&MyContext::copy_vector_variable_to_vector_variable<Iterator>, _r1, _a, _1)]
                        // Would NOT consume '(' conditional_expression ')' because such value was consumed with the expression above.
                     |  conditional_expression(_r1)
-                            [px::bind(&MyContext::assign_scalar_variable<Iterator>, _r1, _a, _1)]
-                    |  (kw["array"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
-                            [px::bind(&MyContext::assign_vector_variable_array<Iterator>, _r1, _a, _1, _2)]
+                            [px::bind(&MyContext::scalar_variable_assign_scalar_expression<Iterator>, _r1, _a, _1)]
+                    |  (kw["repeat"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
+                            [px::bind(&MyContext::vector_variable_assign_array<Iterator>, _r1, _a, _1, _2)]
                 );
   
             new_variable_statement =
                 (kw["local"][_a = false] | kw["global"][_a = true]) > identifier[px::bind(&MyContext::new_old_variable<Iterator>, _r1, _a, _1, _b)] > lit('=') >
                 (       // Consumes also '(' conditional_expression ')', that means enclosing an expression into braces makes it a single value vector initializer.
-                        (lit('(') > new_variable_initializer_list(_r1) > ')') 
-                            [px::bind(&MyContext::new_vector_variable_initializer_list<Iterator>, _r1, _a, _b, _1)]
+                        initializer_list(_r1)[px::bind(&MyContext::vector_variable_new_from_initializer_list<Iterator>, _r1, _a, _b, _1)]
                         // Process it before conditional_expression, as conditional_expression requires a vector reference to be augmented with an index.
                         // Only process such variable references, which return a naked vector variable.
-                    |  variable_reference(_r1)
-                            [px::ref(qi::_pass) = px::bind(&MyContext::new_vector_variable_copy<Iterator>, _r1, _a, _b, _1)]
+                    |  eps(px::bind(&MyContext::could_be_vector_variable_reference<Iterator>, _b)) >>
+                            variable_reference(_r1)[px::ref(qi::_pass) = px::bind(&MyContext::vector_variable_new_from_copy<Iterator>, _r1, _a, _b, _1)]
                        // Would NOT consume '(' conditional_expression ')' because such value was consumed with the expression above.
                     |  conditional_expression(_r1)
-                            [px::bind(&MyContext::new_scalar_variable<Iterator>, _r1, _a, _b, _1)]
-                    |  (kw["array"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
-                            [px::bind(&MyContext::new_vector_variable_array<Iterator>, _r1, _a, _b, _1, _2)]
+                            [px::bind(&MyContext::scalar_variable_new_from_scalar_expression<Iterator>, _r1, _a, _b, _1)]
+                    |  (kw["repeat"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
+                            [px::bind(&MyContext::vector_variable_new_from_array<Iterator>, _r1, _a, _b, _1, _2)]
                 );
-            new_variable_initializer_list = 
-                             conditional_expression(_r1)[px::bind(&MyContext::new_vector_variable_initializer_list_append<Iterator>, _val, _1)] >>
-                *(lit(',') > conditional_expression(_r1)[px::bind(&MyContext::new_vector_variable_initializer_list_append<Iterator>, _val, _1)]);
+            initializer_list = lit('(') >
+                (   lit(')') |
+                    (   conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)] >
+                        *(lit(',') > conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)]) >
+                        lit(')')
+                    )
+                );
 
             struct FactorActions {
                 static void set_start_pos(Iterator &start_pos, expr<Iterator> &out)
@@ -1983,8 +1943,10 @@ namespace client
                                                                     [ px::bind(&expr<Iterator>::template digits<true>, _val, _2, _3) ]
                 |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1, _val) ]
                 |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
-                |   (kw["is_nil"] > '(' > is_nil_test(_r1) > ')')   [ _val = _1 ]
+                |   (kw["is_nil"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_nil_test<Iterator>, _r1, _1, _val)]
                 |   (kw["one_of"] > '(' > one_of(_r1) > ')')        [ _val = _1 ]
+                |   (kw["empty"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_vector_empty<Iterator>, _r1, _1, _val)]
+                |   (kw["size"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::vector_size<Iterator>, _r1, _1, _val)]
                 |   (kw["interpolate_table"] > '(' > interpolate_table(_r1) > ')') [ _val = _1 ]
                 |   (strict_double > iter_pos)                      [ px::bind(&FactorActions::double_, _1, _2, _val) ]
                 |   (int_      > iter_pos)                          [ px::bind(&FactorActions::int_,    _1, _2, _val) ]
@@ -2024,9 +1986,6 @@ namespace client
                 );
             optional_parameter.name("optional_parameter");
 
-            is_nil_test = variable_reference(_r1)[px::bind(&MyContext::is_nil_test<Iterator>, _r1, _1, _val)];
-            is_nil_test.name("is_nil test");
-
             variable_reference =
                 variable(_r1)[_a=_1] >>
                 (
@@ -2044,9 +2003,9 @@ namespace client
 
             keywords.add
                 ("and")
-                ("array")
                 ("digits")
                 ("zdigits")
+                ("empty")
                 ("if")
                 ("int")
                 ("is_nil")
@@ -2061,10 +2020,12 @@ namespace client
                 ("min")
                 ("max")
                 ("random")
+                ("repeat")
                 ("round")
                 ("not")
                 ("one_of")
                 ("or")
+                ("size")
                 ("true");
 
             if (0) {
@@ -2093,7 +2054,6 @@ namespace client
                 debug(optional_parameter);
                 debug(variable_reference);
                 debug(variable);
-                debug(is_nil_test);
                 debug(regular_expression);
             }
         }
@@ -2152,7 +2112,7 @@ namespace client
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<OptWithPos<Iterator>>, spirit_encoding::space_type> assignment_statement;
         // Allocating new local or global variables.
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, MyContext::NewOldVariable<Iterator>>, spirit_encoding::space_type> new_variable_statement;
-        qi::rule<Iterator, std::vector<expr<Iterator>>(const MyContext*), spirit_encoding::space_type> new_variable_initializer_list;
+        qi::rule<Iterator, std::vector<expr<Iterator>>(const MyContext*), spirit_encoding::space_type> initializer_list;
 
 //        qi::rule<Iterator, std::string(const MyContext*), qi::locals<expr<Iterator>, bool, std::string>, spirit_encoding::space_type> switch_output;
         qi::symbols<char> keywords;

@@ -1,4 +1,3 @@
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoCut.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 
@@ -183,9 +182,9 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     , m_connector_style (size_t(CutConnectorStyle::Prism))
     , m_connector_shape_id (size_t(CutConnectorShape::Circle))
 {
-    m_modes = { _u8L("Planar")//, _u8L("Grid")
+//    m_modes = { _u8L("Planar"), _u8L("Grid")
 //              , _u8L("Radial"), _u8L("Modular")
-    };
+//    };
 
     m_connector_modes = { _u8L("Auto"), _u8L("Manual") };
 
@@ -232,7 +231,7 @@ std::string GLGizmoCut3D::get_tooltip() const
     std::string tooltip;
     if (m_hover_id == Z || (m_dragging && m_hover_id == CutPlane)) {
         double koef = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
-        std::string unit_str = " " + (m_imperial_units ? _u8L("inch") : _u8L("mm"));
+        std::string unit_str = " " + (m_imperial_units ? _u8L("in") : _u8L("mm"));
         const BoundingBoxf3& tbb = m_transformed_bounding_box;
 
         const std::string name = m_keep_as_parts ? _u8L("Part") : _u8L("Object");
@@ -1682,7 +1681,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         render_build_size();
 
         ImGui::AlignTextToFramePadding();
-        ImGuiWrapper::text(_L("Cut position: "));
+        ImGuiWrapper::text(_L("Cut position") + ": ");
         ImGui::SameLine();
         render_move_center_input(Z);
         ImGui::SameLine();
@@ -1789,9 +1788,11 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
             ImGuiWrapper::text(_L("Cut to") + ":");
 
             add_horizontal_scaled_interval(1.2f);
+            // TRN CutGizmo: RadioButton Cut to ...
             if (m_imgui->radio_button(_L("Objects"), !m_keep_as_parts))
                 m_keep_as_parts = false;
             ImGui::SameLine();
+            // TRN CutGizmo: RadioButton Cut to ...
             if (m_imgui->radio_button(_L("Parts"), m_keep_as_parts))
                 m_keep_as_parts = true;
 

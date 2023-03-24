@@ -71,7 +71,7 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
 
     if (combo_storage != nullptr) {
         // PrusaLink specific: User needs to choose a storage
-        auto* label_group = new wxStaticText(this, wxID_ANY, _L("Upload to storage:"));
+        auto* label_group = new wxStaticText(this, wxID_ANY, _L("Upload to storage") + ":");
         content_sizer->Add(label_group);
         content_sizer->Add(combo_storage, 0, wxBOTTOM, 2 * VERT_SPACING);
         combo_storage->SetValue(storage_names.front());
@@ -80,7 +80,7 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
             combo_storage->SetValue(recent_storage); 
     } else if (storage_names.GetCount() == 1){
         // PrusaLink specific: Show which storage has been detected.
-        auto* label_group = new wxStaticText(this, wxID_ANY, _L("Upload to storage: ") + storage_names.front());
+        auto* label_group = new wxStaticText(this, wxID_ANY, _L("Upload to storage") + ": " + storage_names.front());
         content_sizer->Add(label_group);
         m_preselected_storage = storage_paths.front();
     }
@@ -473,7 +473,7 @@ void PrintHostQueueDialog::on_error(Event &evt)
 
     set_state(evt.job_id, ST_ERROR);
 
-    auto errormsg = from_u8((boost::format("%1%\n%2%") % _utf8(L("Error uploading to print host:")) % std::string(evt.status.ToUTF8())).str());
+    auto errormsg = format_wxstr("%1%\n%2%", _L("Error uploading to print host") + ":", evt.status);
     job_list->SetValue(wxVariant(0), evt.job_id, COL_PROGRESS);
     job_list->SetValue(wxVariant(errormsg), evt.job_id, COL_ERRORMSG);    // Stashes the error message into a hidden column for later
 

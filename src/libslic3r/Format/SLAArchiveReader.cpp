@@ -7,7 +7,6 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/algorithm/string.hpp>
 
-constexpr const char * L(const char * str) { return str; }
 
 #include <array>
 #include <map>

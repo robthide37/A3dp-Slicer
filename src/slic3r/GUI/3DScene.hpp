@@ -424,10 +424,10 @@ public:
 
 #if ENABLE_OPENGL_ES
     int load_wipe_tower_preview(
-        float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh = nullptr);
+        float pos_x, float pos_y, float width, float depth, float height, float cone_angle, float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh = nullptr);
 #else
     int load_wipe_tower_preview(
-        float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width);
+        float pos_x, float pos_y, float width, float depth, float height, float cone_angle, float rotation_angle, bool size_unknown, float brim_width);
 #endif // ENABLE_OPENGL_ES
 
     // Load SLA auxiliary GLVolumes (for support trees or pad).
