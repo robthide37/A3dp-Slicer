@@ -1671,12 +1671,12 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
                 int(print.config().machine_max_acceleration_travel.values.front() + 0.5));
         else if (flavor == gcfMarlinLegacy)
             // Legacy Marlin uses M204 S[print] T[retract]
-            file.write_format("M204 " + "S%d T%d ; sets acceleration (S) and retract acceleration (R), mm/sec^2\n",
+            file.write_format("M204 S%d T%d ; sets acceleration (S) and retract acceleration (R), mm/sec^2\n",
                 int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_retracting.values.front() + 0.5));
         else if (flavor == gcfMarlinFirmware)
             // New Marlin uses M204 P[print] R[retract] T[travel]
-            file.write_format("M204 " + "P%d R%d T%d ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2\n",
+            file.write_format("M204 P%d R%d T%d ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2\n",
                 int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_retracting.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_travel.values.front() + 0.5));
