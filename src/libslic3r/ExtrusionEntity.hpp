@@ -338,8 +338,8 @@ public:
 
     bool is_loop() const override { return false; }
     ExtrusionRole role() const override { return this->paths.empty() ? erNone : this->paths.front().role(); }
-    virtual const Point& first_point() const override { return this->paths.front().as_polyline().front(); }
-    virtual const Point& last_point() const override { return this->paths.back().as_polyline().back(); }
+    virtual const Point& first_point() const override { return this->paths.front().polyline.as_polyline().front(); }
+    virtual const Point& last_point() const override { return this->paths.back().polyline.as_polyline().back(); }
 
     virtual void reverse() override {
         for (THING &entity : this->paths)
