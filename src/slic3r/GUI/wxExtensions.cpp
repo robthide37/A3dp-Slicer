@@ -18,6 +18,7 @@
 #include "BitmapComboBox.hpp"
 #include "libslic3r/Utils.hpp"
 #include "OG_CustomCtrl.hpp"
+#include "format.hpp"
 
 #include "libslic3r/Color.hpp"
 

@@ -9,6 +9,7 @@
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 #include "wxExtensions.hpp"
+#include "format.hpp"
 
 namespace Slic3r { 
 namespace GUI {
