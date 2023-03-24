@@ -7,6 +7,12 @@
 #include "slic3r/GUI/CameraUtils.hpp"
 #include "libslic3r/Emboss.hpp"
 
+namespace{
+// Distance of embossed volume from surface to be represented as distance surface
+// Maximal distance is also enlarge by size of emboss depth
+constexpr Slic3r::MinMax<double> surface_distance_sq{1e-4, 10.}; // [in mm]
+}
+
 namespace Slic3r::GUI {
     
 /// <summary>
@@ -19,14 +25,15 @@ namespace Slic3r::GUI {
 static Vec2d calc_screen_offset_to_volume_center(const Vec2d &screen_coor, const ModelVolume &volume, const Camera &camera)
 {
     const Transform3d &volume_tr = volume.get_matrix();
-    assert(volume.text_configuration.has_value());
+    assert(volume.emboss_shape.has_value());
 
     auto calc_offset = [&screen_coor, &volume_tr, &camera, &volume](const Transform3d &instrance_tr) -> Vec2d {
         Transform3d to_world = instrance_tr * volume_tr;
 
-        // Use fix of .3mf loaded tranformation when exist
-        if (volume.text_configuration->fix_3mf_tr.has_value())
-            to_world = to_world * (*volume.text_configuration->fix_3mf_tr);
+        // Use fix of .3mf loaded tranformation when exist        
+        if (std::optional<Transform3d> fix = volume.emboss_shape->fix_3mf_tr;
+            fix.has_value())
+            to_world = to_world * (*fix);
         // zero point of volume in world coordinate system
         Vec3d volume_center = to_world.translation();
         // screen coordinate of volume center
@@ -151,12 +158,13 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         Vec2d mouse_offset = calc_screen_offset_to_volume_center(mouse_pos, *volume, camera);
 
         Transform3d volume_tr = gl_volume.get_volume_transformation().get_matrix();
-
-        if (volume->text_configuration.has_value()) {
-            const TextConfiguration &tc = *volume->text_configuration;
-            // fix baked transformation from .3mf store process
-            if (tc.fix_3mf_tr.has_value())
-                volume_tr = volume_tr * tc.fix_3mf_tr->inverse();
+        
+        // fix baked transformation from .3mf store process
+        if (const std::optional<EmbossShape> &es_opt = volume->emboss_shape; 
+            es_opt.has_value()) {
+            const std::optional<Slic3r::Transform3d> &fix = es_opt->fix_3mf_tr;
+            if (fix.has_value())
+                volume_tr = volume_tr * fix->inverse();
         }
 
         Transform3d instance_tr     = instance->get_matrix();
@@ -164,8 +172,12 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         Transform3d world_tr        = instance_tr * volume_tr;
         std::optional<float> start_angle;
         if (up_limit.has_value())
-            start_angle = Emboss::calc_up(world_tr, *up_limit);        
-        surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume_ptr, condition, start_angle};
+            start_angle = Emboss::calc_up(world_tr, *up_limit);
+
+        std::optional<float> start_distance;        
+        if (!volume->emboss_shape->projection.use_surface)
+            start_distance = calc_distance(gl_volume, raycast_manager, &condition);
+        surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume_ptr, condition, start_angle, start_distance};
 
         // disable moving with object by mouse
         canvas.enable_moving(false);
@@ -235,14 +247,14 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         assert(!calc_scale(world_linear, world_new_linear, Vec3d::UnitZ()).has_value());
 
         const ModelVolume *volume = get_model_volume(*surface_drag->gl_volume, canvas.get_model()->objects);
-        if (volume != nullptr && volume->text_configuration.has_value()) {
-            const TextConfiguration &tc = *volume->text_configuration;
-            // fix baked transformation from .3mf store process
-            if (tc.fix_3mf_tr.has_value())
-                volume_new = volume_new * (*tc.fix_3mf_tr);
+        // fix baked transformation from .3mf store process
+        if (volume != nullptr && volume->emboss_shape.has_value()) {
+            const std::optional<Slic3r::Transform3d> &fix = volume->emboss_shape->fix_3mf_tr;
+            if (fix.has_value())
+                volume_new = volume_new * (*fix);
 
             // apply move in Z direction and rotation by up vector
-            Emboss::apply_transformation(surface_drag->start_angle, tc.style.prop.distance, volume_new);
+            Emboss::apply_transformation(surface_drag->start_angle, surface_drag->start_distance, volume_new);
         }
 
         // Update transformation for all instances
@@ -317,6 +329,67 @@ std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastMana
     return offset_volume;
 }
 
+std::optional<float> calc_distance(const GLVolume &gl_volume, RaycastManager &raycaster, GLCanvas3D &canvas)
+{
+    const ModelObject *object = get_model_object(gl_volume, canvas.get_model()->objects);
+    assert(object != nullptr);
+    if (object == nullptr)
+        return {};
+
+    const ModelInstance *instance = get_model_instance(gl_volume, *object);
+    const ModelVolume   *volume   = get_model_volume(gl_volume, *object);
+    assert(instance != nullptr && volume != nullptr);
+    if (object == nullptr || instance == nullptr || volume == nullptr)
+        return {};
+
+    if (volume->is_the_only_one_part())
+        return {};
+
+    const ModelVolumePtrs &volumes = object->volumes;
+    std::vector<size_t> allowed_volumes_id;
+    allowed_volumes_id.reserve(volumes.size() - 1);
+    for (const ModelVolume *v : volumes) {
+        // skip actual selected object
+        if (v->id() == volume->id())
+            continue;
+        // collect hit only from object parts not modifiers neither negative
+        if (!v->is_model_part())
+            continue;
+        allowed_volumes_id.emplace_back(v->id().id);
+    }
+    RaycastManager::AllowVolumes condition(std::move(allowed_volumes_id));
+    RaycastManager::Meshes meshes = create_meshes(canvas, condition);
+    raycaster.actualize(*instance, &condition, &meshes);
+    return calc_distance(gl_volume, raycaster, &condition);
+}
+
+std::optional<float> calc_distance(const GLVolume &gl_volume, const RaycastManager &raycaster, const RaycastManager::ISkip *condition)
+{
+    Transform3d w = gl_volume.world_matrix();
+    Vec3d p = w.translation();
+    const Vec3d& dir = get_z_base(w);
+    auto hit_opt = raycaster.closest_hit(p, dir, condition);
+    if (!hit_opt.has_value())
+        return {};
+    const RaycastManager::Hit &hit = *hit_opt;
+
+    // too small distance is calculated as zero distance
+    if (hit.squared_distance < ::surface_distance_sq.min)
+        return {};
+
+    // check maximal distance
+    const BoundingBoxf3& bb = gl_volume.bounding_box();
+    double max_squared_distance = std::max(std::pow(2 * bb.size().z(), 2), ::surface_distance_sq.max);
+    if (hit.squared_distance > max_squared_distance)
+        return {};
+
+    // calculate sign
+    float sign = ((hit.position - p).dot(dir) > 0)? 1.f : -1.f;
+
+    // distiguish sign
+    return sign * static_cast<float>(sqrt(hit.squared_distance));
+}
+
 Transform3d world_matrix_fixed(const GLVolume &gl_volume, const ModelObjectPtrs &objects)
 {
     Transform3d res = gl_volume.world_matrix();
@@ -325,11 +398,11 @@ Transform3d world_matrix_fixed(const GLVolume &gl_volume, const ModelObjectPtrs 
     if (!mv)
         return res;
 
-    const std::optional<TextConfiguration> &tc = mv->text_configuration;
-    if (!tc.has_value())
+    const std::optional<EmbossShape> &es = mv->emboss_shape;
+    if (!es.has_value())
         return res;
 
-    const std::optional<Transform3d> &fix = tc->fix_3mf_tr;
+    const std::optional<Transform3d> &fix = es->fix_3mf_tr;
     if (!fix.has_value())
         return res;
 

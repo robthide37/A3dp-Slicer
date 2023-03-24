@@ -37,6 +37,9 @@ struct SurfaceDrag
     // initial rotation in Z axis of volume
     std::optional<float> start_angle;
 
+    // initial Z distance from surface
+    std::optional<float> start_distance;
+
     // Flag whether coordinate hit some volume
     bool exist_hit = true;
 };
@@ -71,6 +74,16 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
 /// <param name="raycast_manager">AABB trees of object. Actualize object</param>
 /// <returns>Offset of volume in volume coordinate</returns>
 std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastManager &raycast_manager);
+
+/// <summary>
+/// Calculate distance by ray to surface of object in emboss direction
+/// </summary>
+/// <param name="gl_volume">Define embossed volume</param>
+/// <param name="raycaster">Way to cast rays to object</param>
+/// <param name="canvas">Contain model</param>
+/// <returns>Calculated distance from surface</returns>
+std::optional<float> calc_distance(const GLVolume &gl_volume, RaycastManager &raycaster, GLCanvas3D &canvas);
+std::optional<float> calc_distance(const GLVolume &gl_volume, const RaycastManager &raycaster, const RaycastManager::ISkip *condition);
 
 /// <summary>
 /// Get transformation to world

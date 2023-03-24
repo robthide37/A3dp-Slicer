@@ -105,35 +105,32 @@ private:
 
     // call after set m_style_manager.get_style().prop.size_in_mm
     bool set_height();
-    // call after set m_style_manager.get_style().prop.emboss
-    bool set_depth();
 
     bool draw_italic_button();
     bool draw_bold_button();
     void draw_advanced();
 
     bool select_facename(const wxString& facename);
-    bool rev_input_mm(const std::string &name, float &value, const float *default_value,
-        const std::string &undo_tooltip, float step, float step_fast, const char *format,
-        bool use_inch, const std::optional<float>& scale);
+
+    template<typename T> bool rev_input_mm(const std::string &name, T &value, const T *default_value,
+        const std::string &undo_tooltip, T step, T step_fast, const char *format, bool use_inch, const std::optional<float>& scale) const;
 
     /// <summary>
     /// Reversible input float with option to restor default value
     /// TODO: make more general, static and move to ImGuiWrapper 
     /// </summary>
     /// <returns>True when value changed otherwise FALSE.</returns>
-    bool rev_input(const std::string &name, float &value, const float *default_value, 
-        const std::string &undo_tooltip, float step, float step_fast, const char *format, 
-        ImGuiInputTextFlags flags = 0);
-    bool rev_checkbox(const std::string &name, bool &value, const bool* default_value, const std::string  &undo_tooltip);
+    template<typename T> bool rev_input(const std::string &name, T &value, const T *default_value, 
+        const std::string &undo_tooltip, T step, T step_fast, const char *format, ImGuiInputTextFlags flags = 0) const;
+    bool rev_checkbox(const std::string &name, bool &value, const bool* default_value, const std::string  &undo_tooltip) const;
     bool rev_slider(const std::string &name, std::optional<int>& value, const std::optional<int> *default_value,
-        const std::string &undo_tooltip, int v_min, int v_max, const std::string &format, const wxString &tooltip);
+        const std::string &undo_tooltip, int v_min, int v_max, const std::string &format, const wxString &tooltip) const;
     bool rev_slider(const std::string &name, std::optional<float>& value, const std::optional<float> *default_value,
-        const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip);
+        const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip) const;
     bool rev_slider(const std::string &name, float &value, const float *default_value, 
-        const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip);
-    template<typename T, typename Draw>
-    bool revertible(const std::string &name, T &value, const T *default_value, const std::string &undo_tooltip, float undo_offset, Draw draw);
+        const std::string &undo_tooltip, float v_min, float v_max, const std::string &format, const wxString &tooltip) const;
+    template<typename T, typename Draw> bool revertible(const std::string &name, T &value, const T *default_value,
+        const std::string &undo_tooltip, float undo_offset, Draw draw) const;
 
     bool m_should_set_minimal_windows_size = false;
     void set_minimal_window_size(bool is_advance_edit_style);
@@ -150,8 +147,7 @@ private:
     void remove_notification_not_valid_font();
 
     struct GuiCfg;
-    std::unique_ptr<const GuiCfg> m_gui_cfg = nullptr; 
-    static GuiCfg create_gui_configuration();
+    std::unique_ptr<const GuiCfg> m_gui_cfg = nullptr;
 
     // Is open tree with advanced options
     bool m_is_advanced_edit_style = false;

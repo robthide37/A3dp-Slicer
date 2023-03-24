@@ -83,7 +83,7 @@ template<typename T> struct Limit {
 // Variable keep limits for variables
 static const struct Limits
 {
-    MinMax<float> emboss{0.01f, 1e4f}; // in mm
+    MinMax<double> emboss{0.01, 1e4}; // in mm
     MinMax<float> size_in_mm{0.1f, 1000.f}; // in mm
     Limit<float> boldness{{-200.f, 200.f}, {-2e4f, 2e4f}}; // in font points
     Limit<float> skew{{-1.f, 1.f}, {-100.f, 100.f}}; // ration without unit
@@ -91,9 +91,6 @@ static const struct Limits
     MinMax<int>  line_gap{-20000, 20000}; // in font points
     // distance text object from surface
     MinMax<float> angle{-180.f, 180.f}; // in degrees
-
-    // Distance of text volume from surface to be represented as distance surface
-    MinMax<double> calc_distance_sq{1e-4, 10.}; // in mm
 } limits;
 
 /// <summary>
@@ -117,16 +114,17 @@ ImVec2 calc_fine_position(const Selection &selection, const ImVec2 &windows_size
 /// </summary>
 struct TextDataBase : public DataBase
 {
-    TextDataBase(DataBase &&parent, const FontFileWithCache &font_file, TextConfiguration &&text_configuration);
+    TextDataBase(DataBase &&parent, const FontFileWithCache &font_file, 
+        TextConfiguration &&text_configuration, const EmbossProjection& projection);
     // Create shape from text + font configuration
     EmbossShape &create_shape() override;
     void write(ModelVolume &volume) const override;
 
-// private:
+private:
     //  Keep pointer on Data of font (glyph shapes)
-    FontFileWithCache font_file;
+    FontFileWithCache m_font_file;
     // font item is not used for create object
-    TextConfiguration text_configuration;
+    TextConfiguration m_text_configuration;
 };
 
 // Loaded icons enum
@@ -270,6 +268,7 @@ struct GuiCfg
     };
     Translations translations;
 };
+GuiCfg create_gui_configuration();
 
 void draw_font_preview(FaceName &face, const std::string &text, Facenames &faces, const GuiCfg &cfg, bool is_visible);
 } // namespace priv
@@ -542,11 +541,12 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
         m_gui_cfg->main_toolbar_height != main_toolbar_height // change size of view port
         ) {
         // Create cache for gui offsets
-        GuiCfg cfg = create_gui_configuration();
+        ::GuiCfg cfg = create_gui_configuration();
         cfg.screen_scale = screen_scale;
         cfg.main_toolbar_height = main_toolbar_height;
 
-        m_gui_cfg = std::make_unique<const GuiCfg>(std::move(cfg));
+        GuiCfg gui_cfg{std::move(cfg)};
+        m_gui_cfg = std::make_unique<const GuiCfg>(std::move(gui_cfg));
         // set position near toolbar
         m_set_window_offset = ImVec2(-1.f, -1.f);
 
@@ -711,102 +711,6 @@ void GLGizmoEmboss::on_stop_dragging()
 }
 void GLGizmoEmboss::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
 
-GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
-{
-    GuiCfg cfg; // initialize by default values;
-
-    float line_height = ImGui::GetTextLineHeight();
-    float line_height_with_spacing = ImGui::GetTextLineHeightWithSpacing();
-    float space = line_height_with_spacing - line_height;
-    const ImGuiStyle &style  = ImGui::GetStyle();
-
-    cfg.max_style_name_width = ImGui::CalcTextSize("Maximal font name, extended").x;
-
-    cfg.icon_width = static_cast<unsigned int>(std::ceil(line_height));
-    // make size pair number
-    if (cfg.icon_width % 2 != 0) ++cfg.icon_width;
-
-    cfg.delete_pos_x = cfg.max_style_name_width + space;
-    const float count_line_of_text = 3.f;
-    cfg.text_size = ImVec2(-FLT_MIN, line_height_with_spacing * count_line_of_text);
-    ImVec2 letter_m_size = ImGui::CalcTextSize("M");
-    const float count_letter_M_in_input = 12.f;
-    cfg.input_width = letter_m_size.x * count_letter_M_in_input;
-    GuiCfg::Translations &tr = cfg.translations;
-
-    tr.font   = _u8L("Font");
-    tr.height = _u8L("Height");
-    tr.depth  = _u8L("Depth");
-
-    float max_text_width = std::max({
-        ImGui::CalcTextSize(tr.font.c_str()).x,
-        ImGui::CalcTextSize(tr.height.c_str()).x,
-        ImGui::CalcTextSize(tr.depth.c_str()).x});
-    cfg.indent       = static_cast<float>(cfg.icon_width);
-    cfg.input_offset = style.WindowPadding.x + cfg.indent + max_text_width + space;
-
-    tr.use_surface  = _u8L("Use surface");
-    tr.char_gap     = _u8L("Char gap");
-    tr.line_gap     = _u8L("Line gap");
-    tr.boldness     = _u8L("Boldness");
-    tr.skew_ration  = _u8L("Skew ratio");
-    tr.from_surface = _u8L("From surface");
-    tr.rotation     = _u8L("Rotation");
-    tr.keep_up      = _u8L("Keep Up");
-    tr.collection   = _u8L("Collection");
-
-    float max_advanced_text_width = std::max({
-        ImGui::CalcTextSize(tr.use_surface.c_str()).x,
-        ImGui::CalcTextSize(tr.char_gap.c_str()).x,
-        ImGui::CalcTextSize(tr.line_gap.c_str()).x,
-        ImGui::CalcTextSize(tr.boldness.c_str()).x,
-        ImGui::CalcTextSize(tr.skew_ration.c_str()).x,
-        ImGui::CalcTextSize(tr.from_surface.c_str()).x,
-        ImGui::CalcTextSize(tr.rotation.c_str()).x,
-        ImGui::CalcTextSize(tr.keep_up.c_str()).x,
-        ImGui::CalcTextSize(tr.collection.c_str()).x });
-    cfg.advanced_input_offset = max_advanced_text_width
-        + 3 * space + cfg.indent;
-
-    // calculate window size
-    float window_title = line_height + 2*style.FramePadding.y + 2 * style.WindowTitleAlign.y;
-    float input_height = line_height_with_spacing + 2*style.FramePadding.y;
-    float tree_header  = line_height_with_spacing;
-    float separator_height = 1 + style.FramePadding.y;
-
-    // "Text is to object" + radio buttons
-    cfg.height_of_volume_type_selector = separator_height + line_height_with_spacing + input_height;
-
-    float window_height = 
-        window_title + // window title
-        cfg.text_size.y +  // text field
-        input_height * 4 + // font name + height + depth + style selector 
-        tree_header +      // advance tree
-        separator_height + // presets separator line
-        line_height_with_spacing + // "Presets"
-        2 * style.WindowPadding.y;
-    float window_width = cfg.input_offset + cfg.input_width + 2*style.WindowPadding.x 
-        + 2 * (cfg.icon_width + space);
-    cfg.minimal_window_size = ImVec2(window_width, window_height);
-
-    // 9 = useSurface, charGap, lineGap, bold, italic, surfDist, rotation, keepUp, textFaceToCamera
-    // 4 = 1px for fix each edit image of drag float 
-    float advance_height = input_height * 9 + 8;
-    cfg.minimal_window_size_with_advance =
-        ImVec2(cfg.minimal_window_size.x,
-               cfg.minimal_window_size.y + advance_height);
-
-    cfg.minimal_window_size_with_collections = 
-        ImVec2(cfg.minimal_window_size_with_advance.x,
-            cfg.minimal_window_size_with_advance.y + input_height);
-
-    int max_style_image_width = static_cast<int>(std::round(cfg.max_style_name_width/2 - 2 * style.FramePadding.x));
-    int max_style_image_height = static_cast<int>(std::round(1.5 * input_height));
-    cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
-    cfg.face_name_size.y() = line_height_with_spacing;
-    return cfg;
-}
-
 EmbossStyles GLGizmoEmboss::create_default_styles()
 {
     wxFontEnumerator::InvalidateCache();
@@ -881,66 +785,48 @@ void GLGizmoEmboss::set_default_text(){ m_text = _u8L("Embossed text"); }
 namespace {
 
 /// <summary>
-/// Throow ray by embossing params to object and find surface point
+/// Check installed fonts whether optional face name exist in installed fonts
 /// </summary>
-/// <param name="gl_volume">Define embossed volume</param>
-/// <param name="raycaster">Way to cast rays to object</param>
-/// <param name="canvas">Contain model</param>
-/// <returns>Calculated distance from surface</returns>
-std::optional<float> calc_distance(const GLVolume &gl_volume, RaycastManager &raycaster, GLCanvas3D& canvas) 
+/// <param name="face_name_opt">Name from style - style.prop.face_name</param>
+/// <param name="face_names">All installed good and bad fonts - not const must be possible to initialize it</param>
+/// <returns>When it could be installed it contain value(potentionaly empty string)</returns>
+std::optional<wxString> get_installed_face_name(const std::optional<std::string> &face_name_opt, ::Facenames& face_names)
 {
-    const ModelObject *object = get_model_object(gl_volume, canvas.get_model()->objects);
-    assert(object != nullptr);
-    if (object == nullptr)
-        return {};
+    // Could exist OS without getter on face_name,
+    // but it is able to restore font from descriptor
+    // Soo default value must be TRUE
+    if (face_name_opt.has_value())
+        return wxString();
 
-    const ModelInstance *instance = get_model_instance(gl_volume, *object);
-    const ModelVolume   *volume   = get_model_volume(gl_volume, *object);
-    assert(instance != nullptr && volume != nullptr);
-    if (object == nullptr || instance == nullptr || volume == nullptr)
-        return {};
+    wxString face_name(face_name_opt->c_str());
 
-    if (volume->is_the_only_one_part())
-        return {};
+    // search in enumerated fonts
+    // refresh list of installed font in the OS.
+    init_face_names(face_names);
+    face_names.is_init = false;
 
-    const ModelVolumePtrs &volumes = object->volumes;
-    std::vector<size_t> allowed_volumes_id;
-    allowed_volumes_id.reserve(volumes.size() - 1);
-    for (const ModelVolume *v : volumes) {
-        // skip actual selected object
-        if (v->id() == volume->id())
-            continue;
-        // collect hit only from object parts not modifiers neither negative
-        if (!v->is_model_part())
-            continue;
-        allowed_volumes_id.emplace_back(v->id().id);
+    auto cmp = [](const FaceName &fn, const wxString &wx_name) { return fn.wx_name < wx_name; };
+    const std::vector<FaceName> &faces = face_names.faces;    
+    // is font installed?
+    if (auto it = std::lower_bound(faces.begin(), faces.end(), face_name, cmp);
+        it != faces.end() && it->wx_name == face_name)
+        return face_name;
+
+    const std::vector<wxString> &bad = face_names.bad;
+    auto it_bad = std::lower_bound(bad.begin(), bad.end(), face_name);
+    if (it_bad == bad.end() || *it_bad != face_name) {
+        // check if wx allowed to set it up - another encoding of name
+        wxFontEnumerator::InvalidateCache();
+        wxFont wx_font_;                                                                          // temporary structure
+        if (wx_font_.SetFaceName(face_name) && WxFontUtils::create_font_file(wx_font_) != nullptr // can load TTF file?
+        ) {
+            return wxString();
+            // QUESTION: add this name to allowed faces?
+            // Could create twin of font face name
+            // When not add it will be hard to select it again when change font
+        }
     }
-    RaycastManager::AllowVolumes condition(std::move(allowed_volumes_id));
-    RaycastManager::Meshes meshes = create_meshes(canvas, condition);
-    raycaster.actualize(*instance, &condition, &meshes);
-
-    Transform3d w = gl_volume.world_matrix();
-    Vec3d p = w.translation();
-    const Vec3d& dir = get_z_base(w);
-    auto hit_opt = raycaster.closest_hit(p, dir, &condition);
-    if (!hit_opt.has_value())
-        return {};
-    const RaycastManager::Hit &hit = *hit_opt;
-
-    // too small distance is calculated as zero distance
-    if (hit.squared_distance < limits.calc_distance_sq.min)
-        return {};
-
-    // check macimal distance
-    double max_squared_distance = std::max(std::pow(2 * volume->emboss_shape->projection.depth, 2), limits.calc_distance_sq.max);
-    if (hit.squared_distance > max_squared_distance)
-        return {};
-
-    // calculate sign
-    float sign = ((hit.position - p).dot(dir) > 0)? 1.f : -1.f;
-
-    // distiguish sign
-    return sign * static_cast<float>(sqrt(hit.squared_distance));
+    return {}; // not installed    
 }
 
 } // namespace
@@ -981,46 +867,11 @@ void GLGizmoEmboss::set_volume_by_selection()
     const TextConfiguration &tc = *tc_opt;
     const EmbossStyle    &style = tc.style;
 
-    // Could exist OS without getter on face_name,
-    // but it is able to restore font from descriptor
-    // Soo default value must be TRUE
-    bool     is_font_installed = true;
-    wxString face_name;    
-    if (const std::optional<std::string> &face_name_opt = style.prop.face_name;
-        face_name_opt.has_value()) {
-        face_name = wxString(face_name_opt->c_str());
-
-        // search in enumerated fonts
-        // refresh list of installed font in the OS.
-        init_face_names(*m_face_names);
-        m_face_names->is_init = false;
-
-        auto cmp = [](const ::FaceName &fn, const wxString &wx_name) { return fn.wx_name < wx_name; };
-        const std::vector<::FaceName> &faces = m_face_names->faces;
-        auto it = std::lower_bound(faces.begin(), faces.end(), face_name, cmp);
-        is_font_installed = it != faces.end() && it->wx_name == face_name;
-
-        if (!is_font_installed) {
-            const std::vector<wxString> &bad = m_face_names->bad;
-            auto it_bad = std::lower_bound(bad.begin(), bad.end(), face_name);
-            if (it_bad == bad.end() || *it_bad != face_name) {
-                // check if wx allowed to set it up - another encoding of name
-                wxFontEnumerator::InvalidateCache();
-                wxFont wx_font_;                                                                          // temporary structure
-                if (wx_font_.SetFaceName(face_name) && WxFontUtils::create_font_file(wx_font_) != nullptr // can load TTF file?
-                ) {
-                    is_font_installed = true;
-                    // QUESTION: add this name to allowed faces?
-                    // Could create twin of font face name
-                    // When not add it will be hard to select it again when change font
-                }
-            }
-        }
-    }
+    std::optional<wxString> installed_name = get_installed_face_name(style.prop.face_name, *m_face_names);
 
     wxFont wx_font;
     // load wxFont from same OS when font name is installed
-    if (style.type == WxFontUtils::get_current_type() && is_font_installed)
+    if (style.type == WxFontUtils::get_current_type() && installed_name.has_value())
         wx_font = WxFontUtils::load_wxFont(style.path);
 
     // Flag that is selected same font
@@ -1030,8 +881,8 @@ void GLGizmoEmboss::set_volume_by_selection()
         is_exact_font = false;
         // Try create similar wx font by FontFamily
         wx_font = WxFontUtils::create_wxFont(style);
-        if (is_font_installed && !face_name.empty())
-            is_exact_font = wx_font.SetFaceName(face_name);
+        if (installed_name.has_value() && !installed_name->empty())
+            is_exact_font = wx_font.SetFaceName(*installed_name);
 
         // Have to use some wxFont
         if (!wx_font.IsOk())
@@ -1162,31 +1013,32 @@ bool GLGizmoEmboss::process()
 
     // exist loaded font file?
     if (!m_style_manager.is_active_font()) return false;
+
+    assert(m_volume->text_configuration.has_value());
+    if (!m_volume->text_configuration.has_value()) return false;
+    assert(m_volume->emboss_shape.has_value());
+    if (!m_volume->emboss_shape.has_value()) return false;
     
     DataUpdate data{create_emboss_data_base(m_text, m_style_manager, m_job_cancel), m_volume->id()};
-
     std::unique_ptr<Job> job = nullptr;
 
-    // check cutting from source mesh    
-    // TODO: do it better way    
-    FontProp &fp = static_cast<TextDataBase *>(data.base.get())->text_configuration.style.prop;
-    bool &use_surface = fp.use_surface;
-    bool  is_object   = m_volume->get_object()->volumes.size() == 1;
-    if (use_surface && is_object) 
+    // check cutting from source mesh
+    bool &use_surface = data.base->shape.projection.use_surface;
+    if (use_surface && m_volume->is_the_only_one_part()) 
         use_surface = false;
-    
+
     if (use_surface) {
         // Model to cut surface from.
         SurfaceVolumeData::ModelSources sources = create_volume_sources(*m_volume);
         if (sources.empty()) return false;
 
         Transform3d text_tr = m_volume->get_matrix();
-        auto& fix_3mf = m_volume->text_configuration->fix_3mf_tr;
+        auto& fix_3mf = m_volume->emboss_shape->fix_3mf_tr;
         if (fix_3mf.has_value())
             text_tr = text_tr * fix_3mf->inverse();
 
         // when it is new applying of use surface than move origin onto surfaca
-        if (!m_volume->text_configuration->style.prop.use_surface) {
+        if (!m_volume->emboss_shape->projection.use_surface) {
             auto offset = calc_surface_offset(m_parent.get_selection(), m_raycast_manager);
             if (offset.has_value())
                 text_tr *= Eigen::Translation<double, 3>(*offset);
@@ -1194,8 +1046,7 @@ bool GLGizmoEmboss::process()
 
         bool is_outside = m_volume->is_model_part();
         // check that there is not unexpected volume type
-        assert(is_outside || m_volume->is_negative_volume() ||
-               m_volume->is_modifier());
+        assert(is_outside || m_volume->is_negative_volume() || m_volume->is_modifier());
         UpdateSurfaceVolumeData surface_data{std::move(data), {text_tr, is_outside, std::move(sources)}};
         job = std::make_unique<UpdateSurfaceVolumeJob>(std::move(surface_data));                  
     } else {
@@ -1215,8 +1066,8 @@ bool GLGizmoEmboss::process()
     return true;
 }
 
-namespace priv {
-static bool is_text_empty(const std::string &text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
+namespace {
+bool is_text_empty(std::string_view text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
 }
 
 void GLGizmoEmboss::close()
@@ -1224,7 +1075,7 @@ void GLGizmoEmboss::close()
     // remove volume when text is empty
     if (m_volume != nullptr && 
         m_volume->text_configuration.has_value() &&
-        priv::is_text_empty(m_text)) {
+        is_text_empty(m_text)) {
         Plater &p = *wxGetApp().plater();
         // is the text object?
         if (m_volume->is_the_only_one_part()) {
@@ -1381,7 +1232,7 @@ void GLGizmoEmboss::draw_text_input()
                 warning_tool_tip += "\n";
             warning_tool_tip += t;
         };
-        if (priv::is_text_empty(m_text)) 
+        if (is_text_empty(m_text)) 
             append_warning(_u8L("Embossed text can NOT contain only white spaces."));
         if (m_text_contain_unknown_glyph)
             append_warning(_u8L("Text contain character glyph (represented by '?') unknown by font."));
@@ -1417,14 +1268,12 @@ void GLGizmoEmboss::draw_text_input()
     // warning tooltip has to be with default font
     if (!warning_tool_tip.empty()) {
         // Multiline input has hidden window for scrolling
-        ImGuiWindow *input = ImGui::GetCurrentWindow()->DC.ChildWindows.front();
-
+        const ImGuiWindow *input = ImGui::GetCurrentWindow()->DC.ChildWindows.front();
         const ImGuiStyle &style = ImGui::GetStyle();
         float scrollbar_width = (input->ScrollbarY) ? style.ScrollbarSize : 0.f;
         float scrollbar_height = (input->ScrollbarX) ? style.ScrollbarSize : 0.f;
 
-        bool hovered = ImGui::IsItemHovered();
-        if (hovered)
+        if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", warning_tool_tip.c_str());
 
         ImVec2 cursor = ImGui::GetCursorPos();
@@ -1443,7 +1292,7 @@ void GLGizmoEmboss::draw_text_input()
     // IMPROVE: only extend not clear
     // Extend font ranges
     if (!range_text.empty() &&
-        !m_imgui->contain_all_glyphs(imgui_font, range_text) )
+        !ImGuiWrapper::contain_all_glyphs(imgui_font, range_text) )
         m_style_manager.clear_imgui_font();    
 }
 
@@ -1471,7 +1320,7 @@ void GLGizmoEmboss::init_font_name_texture() {
     glsafe(::glBindTexture(target, no_texture_id));
 
     // clear info about creation of texture - no one is initialized yet
-    for (::FaceName &face : m_face_names->faces) { 
+    for (FaceName &face : m_face_names->faces) { 
         face.cancel = nullptr;
         face.is_created = nullptr;
     }
@@ -1484,8 +1333,7 @@ bool GLGizmoEmboss::select_facename(const wxString &facename)
 {
     if (!wxFontEnumerator::IsValidFacename(facename)) return false;
     // Select font
-    const wxFontEncoding &encoding = m_face_names->encoding;
-    wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(encoding));
+    wxFont wx_font(wxFontInfo().FaceName(facename).Encoding(Facenames::encoding));
     if (!wx_font.IsOk()) return false;
 #ifdef USE_PIXEL_SIZE_IN_WX_FONT
     // wx font could change source file by size of font
@@ -1590,7 +1438,7 @@ void GLGizmoEmboss::draw_font_list()
         std::string search = m_face_names->search; // copy
         std::transform(search.begin(), search.end(), search.begin(), ::toupper);
 
-        for (::FaceName &face : m_face_names->faces) {
+        for (const FaceName &face : m_face_names->faces) {
             size_t index = &face - &m_face_names->faces.front();
 
             // font name to uppercase
@@ -1629,7 +1477,7 @@ void GLGizmoEmboss::draw_font_list()
         if (m_face_names->texture_id == 0) 
             init_font_name_texture();
 
-        for (::FaceName &face : m_face_names->faces) {
+        for (FaceName &face : m_face_names->faces) {
             const wxString &wx_face_name = face.wx_name;
             size_t index = &face - &m_face_names->faces.front();
 
@@ -1670,7 +1518,7 @@ void GLGizmoEmboss::draw_font_list()
         m_face_names->is_init = false;
         m_face_names->hide.clear();
         // cancel all process for generation of texture
-        for (::FaceName &face : m_face_names->faces)
+        for (FaceName &face : m_face_names->faces)
             if (face.cancel != nullptr)
                 face.cancel->store(true);
         glsafe(::glDeleteTextures(1, &m_face_names->texture_id));
@@ -1769,7 +1617,7 @@ void GLGizmoEmboss::draw_model_type()
         m_volume->set_type(*new_type);
 
          // Update volume position when switch from part or into part
-        if (m_volume->text_configuration->style.prop.use_surface) {
+        if (m_volume->emboss_shape->projection.use_surface) {
             // move inside
             bool is_volume_move_inside  = (type == part);
             bool is_volume_move_outside = (*new_type == part);
@@ -1804,9 +1652,9 @@ void GLGizmoEmboss::draw_style_rename_popup() {
 
     bool allow_change = false;
     if (new_name.empty()) {
-        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
+        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
     }else if (!is_unique) { 
-        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
+        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
     } else {
         ImGui::NewLine();
         allow_change = true;
@@ -1824,7 +1672,7 @@ void GLGizmoEmboss::draw_style_rename_popup() {
 
     if (store) {
         // rename style in all objects and volumes
-        for (ModelObject *mo :wxGetApp().plater()->model().objects) {
+        for (const ModelObject *mo :wxGetApp().plater()->model().objects) {
             for (ModelVolume *mv : mo->volumes) { 
                 if (!mv->text_configuration.has_value()) continue;
                 std::string& name = mv->text_configuration->style.name;
@@ -1885,9 +1733,9 @@ void GLGizmoEmboss::draw_style_save_as_popup() {
     bool is_unique = m_style_manager.is_unique_style_name(new_name);        
     bool allow_change = false;
     if (new_name.empty()) {
-        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
+        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name can't be empty."));
     }else if (!is_unique) { 
-        m_imgui->text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
+        ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_DARK, _u8L("Name has to be unique."));
     } else {
         ImGui::NewLine();
         allow_change = true;
@@ -1943,7 +1791,7 @@ void GLGizmoEmboss::draw_style_add_button()
         }
     }
 
-    if (ImGui::BeginPopupModal(popup_id, 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(popup_id, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         m_imgui->disable_background_fadeout_animation();
         draw_style_save_as_popup();
         ImGui::EndPopup();
@@ -2056,11 +1904,11 @@ void GLGizmoEmboss::draw_style_list() {
         trunc_name = ImGuiWrapper::trunc(current_name, max_style_name_width);
     }
 
-    std::string title = _u8L("Presets");
+    std::string presets = _u8L("Presets");
     if (m_style_manager.exist_stored_style())
-        ImGui::Text("%s", title.c_str());
+        ImGui::Text("%s", presets.c_str());
     else
-        ImGui::TextColored(ImGuiWrapper::COL_ORANGE_LIGHT, "%s", title.c_str());
+        ImGui::TextColored(ImGuiWrapper::COL_ORANGE_LIGHT, "%s", presets.c_str());
         
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     auto add_text_modify = [&is_modified](const std::string& name) {
@@ -2281,7 +2129,7 @@ bool GLGizmoEmboss::revertible(const std::string &name,
                                const T           *default_value,
                                const std::string &undo_tooltip,
                                float              undo_offset,
-                               Draw               draw)
+                               Draw               draw) const
 {
     bool changed = exist_change(value, default_value);
     if (changed || default_value == nullptr)
@@ -2301,43 +2149,43 @@ bool GLGizmoEmboss::revertible(const std::string &name,
     }
     return result;
 }
+// May be move to ImGuiWrapper
+template<typename T> bool imgui_input(const char *label, T *v, T step, T step_fast, const char *format, ImGuiInputTextFlags flags);
+template<> bool imgui_input(const char *label, float *v, float step, float step_fast, const char *format, ImGuiInputTextFlags flags)
+{ return ImGui::InputFloat(label, v, step, step_fast, format, flags); }
+template<> bool imgui_input(const char *label, double *v, double step, double step_fast, const char *format, ImGuiInputTextFlags flags)
+{ return ImGui::InputDouble(label, v, step, step_fast, format, flags); }
 
-
-bool GLGizmoEmboss::rev_input(const std::string  &name,
-                              float              &value,
-                              const float       *default_value,
-                              const std::string  &undo_tooltip,
-                              float               step,
-                              float               step_fast,
-                              const char         *format,
-                              ImGuiInputTextFlags flags)
+template<typename T> 
+bool GLGizmoEmboss::rev_input(const std::string &name, T &value, const T *default_value,
+    const std::string &undo_tooltip, T step, T step_fast, const char *format, ImGuiInputTextFlags flags) const
 {
     // draw offseted input
-    auto draw_offseted_input = [&]()->bool{
-        float input_offset = m_gui_cfg->input_offset;
-        float input_width  = m_gui_cfg->input_width;
-        ImGui::SameLine(input_offset);
-        ImGui::SetNextItemWidth(input_width);
-        return ImGui::InputFloat(("##" + name).c_str(),
+    auto draw_offseted_input = [&offset = m_gui_cfg->input_offset, &width = m_gui_cfg->input_width,
+                                &name, &value, &step, &step_fast, format, flags](){
+        ImGui::SameLine(offset);
+        ImGui::SetNextItemWidth(width);
+        return imgui_input(("##" + name).c_str(),
             &value, step, step_fast, format, flags);
     };
     float undo_offset = ImGui::GetStyle().FramePadding.x;
     return revertible(name, value, default_value, undo_tooltip, undo_offset, draw_offseted_input);
 }
 
-bool GLGizmoEmboss::rev_input_mm(const std::string   &name,
-                                 float               &value,
-                                 const float         *default_value_ptr,
-                                 const std::string   &undo_tooltip,
-                                 float                step,
-                                 float                step_fast,
-                                 const char          *format,
-                                 bool                 use_inch,
-                                 const std::optional<float>& scale)
+template<typename T>
+bool GLGizmoEmboss::rev_input_mm(const std::string          &name,
+                                 T                          &value,
+                                 const T                    *default_value_ptr,
+                                 const std::string          &undo_tooltip,
+                                 T                           step,
+                                 T                           step_fast,
+                                 const char                 *format,
+                                 bool                        use_inch,
+                                 const std::optional<float> &scale) const
 {
     // _variable which temporary keep value
-    float  value_ = value;
-    float  default_value_;
+    T value_ = value;
+    T default_value_;
     if (use_inch) {
         // calc value in inch
         value_ *= ObjectManipulation::mm_to_in;
@@ -2365,11 +2213,11 @@ bool GLGizmoEmboss::rev_input_mm(const std::string   &name,
 bool GLGizmoEmboss::rev_checkbox(const std::string &name,
                                  bool              &value,
                                  const bool        *default_value,
-                                 const std::string &undo_tooltip)
+                                 const std::string &undo_tooltip) const
 {
     // draw offseted input
-    auto draw_offseted_input = [&]() -> bool {
-        ImGui::SameLine(m_gui_cfg->advanced_input_offset);
+    auto draw_offseted_input = [&offset = m_gui_cfg->advanced_input_offset, &name, &value](){
+        ImGui::SameLine(offset);
         return ImGui::Checkbox(("##" + name).c_str(), &value);
     };
     float undo_offset  = ImGui::GetStyle().FramePadding.x;
@@ -2417,28 +2265,22 @@ void GLGizmoEmboss::draw_height(bool use_inch)
             process();
 }
 
-bool GLGizmoEmboss::set_depth()
-{
-    float &value = m_style_manager.get_style().prop.emboss;
-
-    // size can't be zero or negative
-    apply(value, limits.emboss);
-
-    // only different value need process
-    return !is_approx(value, m_volume->text_configuration->style.prop.emboss);
-}
-
 void GLGizmoEmboss::draw_depth(bool use_inch)
 {
-    float &value = m_style_manager.get_style().prop.emboss;
-    const EmbossStyle* stored_style = m_style_manager.get_stored_style();
-    const float *stored = ((stored_style)? &stored_style->prop.emboss : nullptr);
+    double &value = m_style_manager.get_style().projection.depth;
+    const StyleManager::Style * stored_style = m_style_manager.get_stored_style();
+    const double *stored = ((stored_style!=nullptr)? &stored_style->projection.depth : nullptr);
     const std::string  revert_emboss_depth = _u8L("Revert embossed depth.");
     const char *size_format = ((use_inch) ? "%.3f in" : "%.2f mm");
     const std::string  name = m_gui_cfg->translations.depth;
-    if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1f, 1.f, size_format, use_inch, m_scale_depth))
-        if (set_depth())
-            process();    
+    if (rev_input_mm(name, value, stored, revert_emboss_depth, 0.1, 1., size_format, use_inch, m_scale_depth)){
+        // size can't be zero or negative
+        apply(value, limits.emboss);
+
+        // only different value need process
+        if(!is_approx(value, m_volume->emboss_shape->projection.depth))
+            process();
+    }
 }
 
 bool GLGizmoEmboss::rev_slider(const std::string &name,
@@ -2448,7 +2290,7 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
                                int                v_min,
                                int                v_max,
                                const std::string& format,
-                               const wxString    &tooltip)
+                               const wxString    &tooltip) const
 {    
     auto draw_slider_optional_int = [&]() -> bool {
         float slider_offset = m_gui_cfg->advanced_input_offset;
@@ -2470,7 +2312,7 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
                                float                v_min,
                                float                v_max,
                                const std::string& format,
-                               const wxString    &tooltip)
+                               const wxString    &tooltip) const
 {    
     auto draw_slider_optional_float = [&]() -> bool {
         float slider_offset = m_gui_cfg->advanced_input_offset;
@@ -2492,7 +2334,7 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
                                float              v_min,
                                float              v_max,
                                const std::string &format,
-                               const wxString    &tooltip)
+                               const wxString    &tooltip) const
 {    
     auto draw_slider_float = [&]() -> bool {
         float slider_offset = m_gui_cfg->advanced_input_offset;
@@ -2780,9 +2622,10 @@ ImVec2 GLGizmoEmboss::get_minimal_window_size() const
     else
         res = m_gui_cfg->minimal_window_size_with_collections;
 
-    bool is_object = m_volume->get_object()->volumes.size() == 1;
-    if (!is_object)
+    // Can change type of volume
+    if (!m_volume->is_the_only_one_part())
         res.y += m_gui_cfg->height_of_volume_type_selector;
+
     return res;
 }
 
@@ -3033,19 +2876,18 @@ bool draw_button(const IconManager::VIcons &icons, IconType type, bool disable){
         get_icon(icons, type, IconState::disabled),
         disable);}
 
-TextDataBase::TextDataBase(DataBase &&parent, const FontFileWithCache &font_file, TextConfiguration &&text_configuration)
-        : DataBase(std::move(parent)), font_file(font_file) /* copy */, text_configuration(std::move(text_configuration))
+TextDataBase::TextDataBase(DataBase               &&parent,
+                           const FontFileWithCache &font_file,
+                           TextConfiguration      &&text_configuration,
+                           const EmbossProjection  &projection)
+    : DataBase(std::move(parent)), m_font_file(font_file) /* copy */, m_text_configuration(std::move(text_configuration))
 {
-    assert(this->font_file.has_value());
+    assert(m_font_file.has_value());
+    shape.projection = projection; // copy
 
-    // partialy fill shape from text configuration
-    const FontProp &fp = this->text_configuration.style.prop;
-    EmbossProjection &p = shape.projection;
-    p.depth        = fp.emboss;
-    p.use_surface  = fp.use_surface;
-
-    const FontFile &ff = *this->font_file.font_file;
-    shape.scale        = get_text_shape_scale(fp, ff);
+    const FontProp &fp = m_text_configuration.style.prop;
+    const FontFile &ff = *m_font_file.font_file;
+    shape.scale = get_text_shape_scale(fp, ff);
 }
 
 EmbossShape &TextDataBase::create_shape()
@@ -3054,36 +2896,37 @@ EmbossShape &TextDataBase::create_shape()
         return shape;
 
     // create shape by configuration
-    const char     *text         = text_configuration.text.c_str();
-    const FontProp &fp           = text_configuration.style.prop;
-    auto            was_canceled = [&c = cancel]() -> bool { return c->load(); };
-    shape.shapes                 = text2shapes(font_file, text, fp, was_canceled);
-
-    // TEST
-    const FontProp                    &prop       = text_configuration.style.prop;
-    const std::optional<unsigned int> &cn         = prop.collection_number;
-    unsigned int                       font_index = (cn.has_value()) ? *cn : 0;
-    const FontFileWithCache           &font       = font_file;
-    assert(font_index < font.font_file->infos.size());
-    int   unit_per_em = font.font_file->infos[font_index].unit_per_em;
-    float scale       = prop.size_in_mm / unit_per_em;
-    float depth       = prop.emboss / scale;
-
+    const char *text = m_text_configuration.text.c_str();
+    const FontProp &fp = m_text_configuration.style.prop;
+    auto was_canceled = [&c = cancel](){ return c->load(); };
+    shape.shapes = text2shapes(m_font_file, text, fp, was_canceled);
     return shape;
 }
 
 void TextDataBase::write(ModelVolume &volume) const
 {
-    volume.text_configuration = text_configuration; // copy
-
-    // discard information about rotation, should not be stored in volume
-    volume.text_configuration->style.prop.angle.reset();
-
-    // only temporary solution
-    volume.text_configuration->style.prop.use_surface = shape.projection.use_surface; // copy
-    volume.text_configuration->style.prop.emboss = static_cast<float>(shape.projection.depth); // copy
-
     DataBase::write(volume);
+    volume.text_configuration = m_text_configuration; // copy
+
+    // TEMPORARY check until depricated variable will be deleted
+    FontProp &fp = volume.text_configuration->style.prop;
+    // Distance and angle are calculated on the fly it should not be stored in volume
+    assert(!fp.angle.has_value());
+    if (fp.angle.has_value())
+        fp.angle.reset();
+    assert(!fp.distance.has_value());
+    if (fp.distance.has_value())
+        fp.distance.reset();
+
+    // use_surface and emboss are stored in projection
+    assert(volume.emboss_shape.has_value());
+    if (!volume.emboss_shape.has_value())
+        return;
+    const EmbossProjection &ep = volume.emboss_shape->projection;
+    if (fp.use_surface != ep.use_surface)
+        fp.use_surface = ep.use_surface;
+    if (!is_approx(fp.emboss, static_cast<float>(ep.depth)))
+        fp.emboss = static_cast<float>(ep.depth);
 }
 
 std::unique_ptr<DataBase> create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>>& cancel)
@@ -3099,11 +2942,11 @@ std::unique_ptr<DataBase> create_emboss_data_base(const std::string &text, Style
         style_manager.load_valid_style();
     assert(style_manager.is_active_font());
 
-    const EmbossStyle &es = style_manager.get_style();
+    const StyleManager::Style &style = style_manager.get_style();
     // actualize font path - during changes in gui it could be corrupted
     // volume must store valid path
     assert(style_manager.get_wx_font().IsOk());
-    assert(es.path.compare(WxFontUtils::store_wxFont(style_manager.get_wx_font())) == 0);
+    assert(style.path.compare(WxFontUtils::store_wxFont(style_manager.get_wx_font())) == 0);
 
     // Cancel previous Job, when it is in process
     // worker.cancel(); --> Use less in this case I want cancel only previous EmbossJob no other jobs
@@ -3114,8 +2957,8 @@ std::unique_ptr<DataBase> create_emboss_data_base(const std::string &text, Style
     cancel = std::make_shared<std::atomic<bool>>(false);
     DataBase base(volume_name, cancel);
     FontFileWithCache &font = style_manager.get_font_file_with_cache();
-    TextConfiguration  tc{es, text};
-    return std::make_unique<TextDataBase>(std::move(base), font, std::move(tc));
+    TextConfiguration tc{static_cast<EmbossStyle>(style), text};
+    return std::make_unique<TextDataBase>(std::move(base), font, std::move(tc), style.projection);
 }
 
 CreateVolumeParams create_input(GLCanvas3D &canvas, const StyleManager::Style &style, RaycastManager& raycaster, ModelVolumeType volume_type)
@@ -3163,7 +3006,7 @@ bool store(const Facenames &facenames) {
     ::cereal::BinaryOutputArchive archive(file);
     std::vector<wxString> good;
     good.reserve(facenames.faces.size());
-    for (const ::FaceName &face : facenames.faces) good.push_back(face.wx_name);
+    for (const FaceName &face : facenames.faces) good.push_back(face.wx_name);
     FacenamesSerializer data = {facenames.hash, good, facenames.bad};
 
     assert(std::is_sorted(data.bad.begin(), data.bad.end()));
@@ -3209,7 +3052,7 @@ bool load(Facenames &facenames) {
 
 void init_truncated_names(Facenames &face_names, float max_width)
 {
-    for (::FaceName &face : face_names.faces) {
+    for (FaceName &face : face_names.faces) {
         std::string name_str(face.wx_name.ToUTF8().data());
         face.name_truncated = ImGuiWrapper::trunc(name_str, max_width);
     }
@@ -3345,7 +3188,7 @@ void draw_font_preview(FaceName &face, const std::string& text, Facenames &faces
         size_t texture_index = (faces.texture_index + 1) % faces.count_cached_textures;
 
         // set previous cach as deleted
-        for (::FaceName &f : faces.faces)
+        for (FaceName &f : faces.faces)
             if (f.texture_index == texture_index) {
                 if (f.cancel != nullptr) f.cancel->store(true);
                 f.is_created = nullptr;
@@ -3386,6 +3229,102 @@ void draw_font_preview(FaceName &face, const std::string& text, Facenames &faces
     ImGui::SameLine(cfg.face_name_texture_offset_x);
     ImTextureID tex_id = (void *) (intptr_t) faces.texture_id;
     ImGui::Image(tex_id, size, uv0, uv1);
+}
+
+GuiCfg create_gui_configuration()
+{
+    GuiCfg cfg; // initialize by default values;
+
+    float line_height = ImGui::GetTextLineHeight();
+    float line_height_with_spacing = ImGui::GetTextLineHeightWithSpacing();
+    float space = line_height_with_spacing - line_height;
+    const ImGuiStyle &style  = ImGui::GetStyle();
+
+    cfg.max_style_name_width = ImGui::CalcTextSize("Maximal font name, extended").x;
+
+    cfg.icon_width = static_cast<unsigned int>(std::ceil(line_height));
+    // make size pair number
+    if (cfg.icon_width % 2 != 0) ++cfg.icon_width;
+
+    cfg.delete_pos_x = cfg.max_style_name_width + space;
+    const float count_line_of_text = 3.f;
+    cfg.text_size = ImVec2(-FLT_MIN, line_height_with_spacing * count_line_of_text);
+    ImVec2 letter_m_size = ImGui::CalcTextSize("M");
+    const float count_letter_M_in_input = 12.f;
+    cfg.input_width = letter_m_size.x * count_letter_M_in_input;
+    GuiCfg::Translations &tr = cfg.translations;
+
+    tr.font   = _u8L("Font");
+    tr.height = _u8L("Height");
+    tr.depth  = _u8L("Depth");
+
+    float max_text_width = std::max({
+        ImGui::CalcTextSize(tr.font.c_str()).x,
+        ImGui::CalcTextSize(tr.height.c_str()).x,
+        ImGui::CalcTextSize(tr.depth.c_str()).x});
+    cfg.indent       = static_cast<float>(cfg.icon_width);
+    cfg.input_offset = style.WindowPadding.x + cfg.indent + max_text_width + space;
+
+    tr.use_surface  = _u8L("Use surface");
+    tr.char_gap     = _u8L("Char gap");
+    tr.line_gap     = _u8L("Line gap");
+    tr.boldness     = _u8L("Boldness");
+    tr.skew_ration  = _u8L("Skew ratio");
+    tr.from_surface = _u8L("From surface");
+    tr.rotation     = _u8L("Rotation");
+    tr.keep_up      = _u8L("Keep Up");
+    tr.collection   = _u8L("Collection");
+
+    float max_advanced_text_width = std::max({
+        ImGui::CalcTextSize(tr.use_surface.c_str()).x,
+        ImGui::CalcTextSize(tr.char_gap.c_str()).x,
+        ImGui::CalcTextSize(tr.line_gap.c_str()).x,
+        ImGui::CalcTextSize(tr.boldness.c_str()).x,
+        ImGui::CalcTextSize(tr.skew_ration.c_str()).x,
+        ImGui::CalcTextSize(tr.from_surface.c_str()).x,
+        ImGui::CalcTextSize(tr.rotation.c_str()).x,
+        ImGui::CalcTextSize(tr.keep_up.c_str()).x,
+        ImGui::CalcTextSize(tr.collection.c_str()).x });
+    cfg.advanced_input_offset = max_advanced_text_width
+        + 3 * space + cfg.indent;
+
+    // calculate window size
+    float window_title = line_height + 2*style.FramePadding.y + 2 * style.WindowTitleAlign.y;
+    float input_height = line_height_with_spacing + 2*style.FramePadding.y;
+    float tree_header  = line_height_with_spacing;
+    float separator_height = 1 + style.FramePadding.y;
+
+    // "Text is to object" + radio buttons
+    cfg.height_of_volume_type_selector = separator_height + line_height_with_spacing + input_height;
+
+    float window_height = 
+        window_title + // window title
+        cfg.text_size.y +  // text field
+        input_height * 4 + // font name + height + depth + style selector 
+        tree_header +      // advance tree
+        separator_height + // presets separator line
+        line_height_with_spacing + // "Presets"
+        2 * style.WindowPadding.y;
+    float window_width = cfg.input_offset + cfg.input_width + 2*style.WindowPadding.x 
+        + 2 * (cfg.icon_width + space);
+    cfg.minimal_window_size = ImVec2(window_width, window_height);
+
+    // 9 = useSurface, charGap, lineGap, bold, italic, surfDist, rotation, keepUp, textFaceToCamera
+    // 4 = 1px for fix each edit image of drag float 
+    float advance_height = input_height * 9 + 8;
+    cfg.minimal_window_size_with_advance =
+        ImVec2(cfg.minimal_window_size.x,
+               cfg.minimal_window_size.y + advance_height);
+
+    cfg.minimal_window_size_with_collections = 
+        ImVec2(cfg.minimal_window_size_with_advance.x,
+            cfg.minimal_window_size_with_advance.y + input_height);
+
+    int max_style_image_width = static_cast<int>(std::round(cfg.max_style_name_width/2 - 2 * style.FramePadding.x));
+    int max_style_image_height = static_cast<int>(std::round(1.5 * input_height));
+    cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
+    cfg.face_name_size.y() = line_height_with_spacing;
+    return cfg;
 }
 
 } // namespace

@@ -315,9 +315,7 @@ void CreateObjectJob::process(Ctl &ctl)
         // mouse pose is out of build plate so create object in center of plate
         bed_coor = bed.centroid().cast<double>();
 
-    // TODO: need TextConfiguration refactor to work !!!
     double z = m_input.base->shape.projection.depth / 2;
-
     Vec3d  offset(bed_coor.x(), bed_coor.y(), z);
     offset -= m_result.center();
     Transform3d::TranslationType tt(offset.x(), offset.y(), offset.z());

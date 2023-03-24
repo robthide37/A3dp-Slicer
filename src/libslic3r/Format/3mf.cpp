@@ -36,6 +36,7 @@ namespace pt = boost::property_tree;
 #include "miniz_extension.hpp"
 
 #include "TextConfiguration.hpp"
+#include "EmbossShape.hpp"
 
 #include <fast_float/fast_float.h>
 

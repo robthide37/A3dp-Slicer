@@ -44,7 +44,7 @@ std::optional<Glyph> get_glyph(const stbtt_fontinfo &font_info, int unicode_lett
 const Glyph* get_glyph(int unicode, const FontFile &font, const FontProp &font_prop, 
         Glyphs &cache, fontinfo_opt &font_info_opt);
 
-EmbossStyle create_style(std::wstring name, std::wstring path);
+EmbossStyle create_style(const std::wstring &name, const std::wstring &path);
 
 // scale and convert float to int coordinate
 Point to_point(const stbtt__point &point);
@@ -797,8 +797,7 @@ const Glyph* priv::get_glyph(
     auto glyph_item = cache.find(unicode);
     if (glyph_item != cache.end()) return &glyph_item->second;
 
-    unsigned int font_index = font_prop.collection_number.has_value()?
-            *font_prop.collection_number : 0;
+    unsigned int font_index = font_prop.collection_number.value_or(0);
     if (!is_valid(font, font_index)) return nullptr;
 
     if (!font_info_opt.has_value()) {
@@ -813,47 +812,43 @@ const Glyph* priv::get_glyph(
     // Fix for very small flatness because it create huge amount of points from curve
     if (flatness < RESOLUTION) flatness = RESOLUTION;
 
-    std::optional<Glyph> glyph_opt =
-        priv::get_glyph(*font_info_opt, unicode, flatness);
+    std::optional<Glyph> glyph_opt = priv::get_glyph(*font_info_opt, unicode, flatness);
 
     // IMPROVE: multiple loadig glyph without data
     // has definition inside of font?
     if (!glyph_opt.has_value()) return nullptr;
 
+    Glyph &glyph = *glyph_opt;
     if (font_prop.char_gap.has_value()) 
-        glyph_opt->advance_width += *font_prop.char_gap;
+        glyph.advance_width += *font_prop.char_gap;
 
     // scale glyph size
-    glyph_opt->advance_width = 
-        static_cast<int>(glyph_opt->advance_width / SHAPE_SCALE);
-    glyph_opt->left_side_bearing = 
-        static_cast<int>(glyph_opt->left_side_bearing / SHAPE_SCALE);
+    glyph.advance_width = static_cast<int>(glyph.advance_width / SHAPE_SCALE);
+    glyph.left_side_bearing = static_cast<int>(glyph.left_side_bearing / SHAPE_SCALE);
 
-    if (!glyph_opt->shape.empty()) {
+    if (!glyph.shape.empty()) {
         if (font_prop.boldness.has_value()) {
-            float delta = *font_prop.boldness / SHAPE_SCALE /
-                          font_prop.size_in_mm;
-            glyph_opt->shape = Slic3r::union_ex(offset_ex(glyph_opt->shape, delta));
+            float delta = static_cast<float>(*font_prop.boldness / SHAPE_SCALE / font_prop.size_in_mm);
+            glyph.shape = Slic3r::union_ex(offset_ex(glyph.shape, delta));
         }
         if (font_prop.skew.has_value()) {
             const float &ratio = *font_prop.skew;
-            auto         skew  = [&ratio](Polygon &polygon) {
-                for (Slic3r::Point &p : polygon.points) {
-                    p.x() += p.y() * ratio;
-                }
+            auto skew = [&ratio](Polygon &polygon) {
+                for (Slic3r::Point &p : polygon.points)
+                    p.x() += static_cast<int>(std::round(p.y() * ratio));
             };
-            for (ExPolygon &expolygon : glyph_opt->shape) {
+            for (ExPolygon &expolygon : glyph.shape) {
                 skew(expolygon.contour);
                 for (Polygon &hole : expolygon.holes) skew(hole);
             }
         }
     }
-    auto it = cache.insert({unicode, std::move(*glyph_opt)});
-    assert(it.second);
-    return &it.first->second;
+    auto [it, success] = cache.try_emplace(unicode, std::move(glyph));
+    assert(success);
+    return &it->second;
 }
 
-EmbossStyle priv::create_style(std::wstring name, std::wstring path) {
+EmbossStyle priv::create_style(const std::wstring& name, const std::wstring& path) {
     return { boost::nowide::narrow(name.c_str()),
              boost::nowide::narrow(path.c_str()),
              EmbossStyle::Type::file_path, FontProp() };
@@ -1220,8 +1215,7 @@ ExPolygons Emboss::text2shapes(FontFileWithCache    &font_with_cache,
     Point    cursor(0, 0);
     ExPolygons result;
     const FontFile& font = *font_with_cache.font_file;
-    unsigned int font_index = font_prop.collection_number.has_value()?
-        *font_prop.collection_number : 0;
+    unsigned int font_index = font_prop.collection_number.value_or(0);
     if (!priv::is_valid(font, font_index)) return {};
     const FontFile::Info& info = font.infos[font_index];
     Glyphs& cache = *font_with_cache.cache;
