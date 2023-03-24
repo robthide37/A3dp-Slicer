@@ -167,28 +167,28 @@ namespace px = boost::phoenix;
 
 namespace client
 {
-    template<typename Iterator>
+    using Iterator      = std::string::const_iterator;
+    using IteratorRange = boost::iterator_range<Iterator>;
+
     struct OptWithPos {
         OptWithPos() {}
-        OptWithPos(ConfigOptionConstPtr opt, boost::iterator_range<Iterator> it_range, bool writable = false) : opt(opt), it_range(it_range), writable(writable) {}
+        OptWithPos(ConfigOptionConstPtr opt, IteratorRange it_range, bool writable = false) : opt(opt), it_range(it_range), writable(writable) {}
         ConfigOptionConstPtr             opt { nullptr };
         bool                             writable { false };
         // -1 means it is a scalar variable, or it is a vector variable and index was not assigned yet or the whole vector is considered.
         int                              index { -1 };
-        boost::iterator_range<Iterator>  it_range;
+        IteratorRange  it_range;
 
         bool                             empty() const { return opt == nullptr; }
         bool                             has_index() const { return index != -1; }
     };
 
-    template<typename ITERATOR>
-    std::ostream& operator<<(std::ostream& os, OptWithPos<ITERATOR> const& opt)
+    std::ostream& operator<<(std::ostream& os, OptWithPos const& opt)
     {
         os << std::string(opt.it_range.begin(), opt.it_range.end());
         return os;
     }
 
-    template<typename Iterator>
     struct expr
     {
                  expr() {}
@@ -320,7 +320,7 @@ namespace client
 
         // Range of input iterators covering this expression.
         // Used for throwing parse exceptions.
-        boost::iterator_range<Iterator>  it_range;
+        IteratorRange  it_range;
 
         expr unary_minus(const Iterator start_pos) const
         { 
@@ -329,9 +329,9 @@ namespace client
                 // Inside an if / else block to be skipped.
                 return expr();
             case TYPE_INT :
-                return expr<Iterator>(- this->i(), start_pos, this->it_range.end());
+                return expr(- this->i(), start_pos, this->it_range.end());
             case TYPE_DOUBLE:
-                return expr<Iterator>(- this->d(), start_pos, this->it_range.end()); 
+                return expr(- this->d(), start_pos, this->it_range.end()); 
             default:
                 this->throw_exception("Cannot apply unary minus operator.");
             }
@@ -347,9 +347,9 @@ namespace client
                 // Inside an if / else block to be skipped.
                 return expr();
             case TYPE_INT:
-                return expr<Iterator>(this->i(), start_pos, this->it_range.end());
+                return expr(this->i(), start_pos, this->it_range.end());
             case TYPE_DOUBLE:
-                return expr<Iterator>(static_cast<int>(this->d()), start_pos, this->it_range.end()); 
+                return expr(static_cast<int>(this->d()), start_pos, this->it_range.end()); 
             default:
                 this->throw_exception("Cannot convert to integer.");
             }
@@ -365,9 +365,9 @@ namespace client
                 // Inside an if / else block to be skipped.
                 return expr();
             case TYPE_INT:
-                return expr<Iterator>(this->i(), start_pos, this->it_range.end());
+                return expr(this->i(), start_pos, this->it_range.end());
             case TYPE_DOUBLE:
-                return expr<Iterator>(static_cast<int>(std::round(this->d())), start_pos, this->it_range.end());
+                return expr(static_cast<int>(std::round(this->d())), start_pos, this->it_range.end());
             default:
                 this->throw_exception("Cannot round a non-numeric value.");
             }
@@ -383,7 +383,7 @@ namespace client
                 // Inside an if / else block to be skipped.
                 return expr();
             case TYPE_BOOL:
-                return expr<Iterator>(! this->b(), start_pos, this->it_range.end());
+                return expr(! this->b(), start_pos, this->it_range.end());
             default:
                 this->throw_exception("Cannot apply a not operator.");
             }
@@ -411,7 +411,7 @@ namespace client
                 else
                     m_data.i += rhs.i();
             }
-            this->it_range = boost::iterator_range<Iterator>(this->it_range.begin(), rhs.it_range.end());
+            this->it_range = IteratorRange(this->it_range.begin(), rhs.it_range.end());
             return *this;
         }
 
@@ -428,7 +428,7 @@ namespace client
                     this->set_d_lite(this->as_d() - rhs.as_d());
                 else
                     m_data.i -= rhs.i();
-                this->it_range = boost::iterator_range<Iterator>(this->it_range.begin(), rhs.it_range.end());
+                this->it_range = IteratorRange(this->it_range.begin(), rhs.it_range.end());
             }
             return *this;
         }
@@ -446,7 +446,7 @@ namespace client
                     this->set_d_lite(this->as_d() * rhs.as_d());
                 else
                     m_data.i *= rhs.i();
-                this->it_range = boost::iterator_range<Iterator>(this->it_range.begin(), rhs.it_range.end());
+                this->it_range = IteratorRange(this->it_range.begin(), rhs.it_range.end());
             }
             return *this;
         }
@@ -465,7 +465,7 @@ namespace client
                     this->set_d_lite(this->as_d() / rhs.as_d());
                 else
                     m_data.i /= rhs.i();
-                this->it_range = boost::iterator_range<Iterator>(this->it_range.begin(), rhs.it_range.end());
+                this->it_range = IteratorRange(this->it_range.begin(), rhs.it_range.end());
             }
             return *this;
         }
@@ -484,7 +484,7 @@ namespace client
                     this->set_d_lite(std::fmod(this->as_d(), rhs.as_d()));
                 else
                     m_data.i %= rhs.i();
-                this->it_range = boost::iterator_range<Iterator>(this->it_range.begin(), rhs.it_range.end());
+                this->it_range = IteratorRange(this->it_range.begin(), rhs.it_range.end());
             }
             return *this;
         }
@@ -644,7 +644,7 @@ namespace client
             param1.set_s(buf);
         }
 
-        static void regex_op(const expr &lhs, boost::iterator_range<Iterator> &rhs, char op, expr &out)
+        static void regex_op(const expr &lhs, IteratorRange &rhs, char op, expr &out)
         {
             if (lhs.type() == TYPE_EMPTY)
                 // Inside an if / else block to be skipped
@@ -669,8 +669,8 @@ namespace client
             }
         }
 
-        static void regex_matches     (expr &lhs, boost::iterator_range<Iterator> &rhs) { return regex_op(lhs, rhs, '=', lhs); }
-        static void regex_doesnt_match(expr &lhs, boost::iterator_range<Iterator> &rhs) { return regex_op(lhs, rhs, '!', lhs); }
+        static void regex_matches     (expr &lhs, IteratorRange &rhs) { return regex_op(lhs, rhs, '=', lhs); }
+        static void regex_doesnt_match(expr &lhs, IteratorRange &rhs) { return regex_op(lhs, rhs, '!', lhs); }
 
         static void one_of_test_init(expr &out) {
             out.set_b(false);
@@ -698,7 +698,7 @@ namespace client
                     out.set_b(match.s() == pattern.s());
             }
         }
-        static void one_of_test_regex(const expr &match, boost::iterator_range<Iterator> &pattern, expr &out) {
+        static void one_of_test_regex(const expr &match, IteratorRange &pattern, expr &out) {
             if (match.type() == TYPE_EMPTY) {
                 // Inside an if / else block to be skipped
                 out.reset();
@@ -757,10 +757,9 @@ namespace client
         } m_data;
     };
 
-    template<typename ITERATOR>
-    std::ostream& operator<<(std::ostream &os, const expr<ITERATOR> &expression)
+    std::ostream& operator<<(std::ostream &os, const expr &expression)
     {
-        typedef expr<ITERATOR> Expr;
+        typedef expr Expr;
         os << std::string(expression.it_range.begin(), expression.it_range.end()) << " - ";
         switch (expression.type()) {
         case Expr::TYPE_EMPTY:    os << "empty"; break;
@@ -815,8 +814,7 @@ namespace client
                 not_yet_consumed = false;
             }
         }
-        template<typename DataType>
-        static void block_exit_ternary(const MyContext* ctx, const bool condition, DataType &data_in, DataType &data_out)
+        static void block_exit_ternary(const MyContext* ctx, const bool condition, expr &data_in, expr &data_out)
         {
             if (ctx->skipping())
                 -- ctx->m_depth_suppressed;
@@ -858,11 +856,7 @@ namespace client
                 this->config_local.set_key_value(opt_key, opt.release());
         }
 
-        template <typename Iterator>
-        static void legacy_variable_expansion(
-            const MyContext                 *ctx, 
-            boost::iterator_range<Iterator> &opt_key,
-            std::string                     &output)
+        static void legacy_variable_expansion(const MyContext *ctx, IteratorRange &opt_key, std::string &output)
         {
             if (ctx->skipping())
                 return;
@@ -881,12 +875,12 @@ namespace client
                         char *endptr = nullptr;
                         idx = strtol(opt_key_str.c_str() + idx + 1, &endptr, 10);
                         if (endptr == nullptr || *endptr != 0)
-                            ctx->throw_exception("Invalid vector index", boost::iterator_range<Iterator>(opt_key.begin() + idx + 1, opt_key.end()));
+                            ctx->throw_exception("Invalid vector index", IteratorRange(opt_key.begin() + idx + 1, opt_key.end()));
                     }
                 }
             }
             if (opt == nullptr)
-                ctx->throw_exception("Variable does not exist", boost::iterator_range<Iterator>(opt_key.begin(), opt_key.end()));
+                ctx->throw_exception("Variable does not exist", IteratorRange(opt_key.begin(), opt_key.end()));
             if (opt->is_scalar())
                 output = opt->serialize();
             else {
@@ -897,12 +891,11 @@ namespace client
             }
         }
 
-        template <typename Iterator>
         static void legacy_variable_expansion2(
-            const MyContext                 *ctx, 
-            boost::iterator_range<Iterator> &opt_key,
-            boost::iterator_range<Iterator> &opt_vector_index,
-            std::string                     &output)
+            const MyContext *ctx, 
+            IteratorRange   &opt_key,
+            IteratorRange   &opt_vector_index,
+            std::string     &output)
         {
             if (ctx->skipping())
                 return;
@@ -919,7 +912,7 @@ namespace client
                 ctx->throw_exception("Trying to index a scalar variable", opt_key);
             const ConfigOptionVectorBase *vec = static_cast<const ConfigOptionVectorBase*>(opt);
             if (vec->empty())
-                ctx->throw_exception("Indexing an empty vector variable", boost::iterator_range<Iterator>(opt_key.begin(), opt_key.end()));
+                ctx->throw_exception("Indexing an empty vector variable", IteratorRange(opt_key.begin(), opt_key.end()));
             const ConfigOption *opt_index = ctx->resolve_symbol(std::string(opt_vector_index.begin(), opt_vector_index.end()));
             if (opt_index == nullptr)
                 ctx->throw_exception("Variable does not exist", opt_key);
@@ -931,11 +924,10 @@ namespace client
 			output = vec->vserialize()[(idx >= (int)vec->size()) ? 0 : idx];
         }
 
-        template <typename Iterator>
         static void resolve_variable(
-            const MyContext                 *ctx,
-            boost::iterator_range<Iterator> &opt_key,
-            OptWithPos<Iterator>            &output)
+            const MyContext     *ctx,
+            IteratorRange       &opt_key,
+            OptWithPos          &output)
         {
             if (! ctx->skipping()) {
                 const std::string key{ opt_key.begin(), opt_key.end() };
@@ -951,13 +943,12 @@ namespace client
             output.it_range = opt_key;
         }
 
-        template <typename Iterator>
         static void store_variable_index(
-            const MyContext                 *ctx,
-           OptWithPos<Iterator>             &opt,
-           int                               index,
-           Iterator                          it_end,
-           OptWithPos<Iterator>             &output)
+            const MyContext *ctx,
+           OptWithPos       &opt,
+           int               index,
+           Iterator          it_end,
+           OptWithPos       &output)
         {
             if (! ctx->skipping()) {
                 if (! opt.opt->is_vector())
@@ -973,11 +964,7 @@ namespace client
 
         // Evaluating a scalar variable into expr,
         // all possible ConfigOption types are supported.
-        template <typename Iterator>
-        static void scalar_variable_to_expr(
-            const MyContext         *ctx,
-            OptWithPos<Iterator>    &opt,
-            expr<Iterator>          &output)
+        static void scalar_variable_to_expr(const MyContext *ctx, OptWithPos &opt, expr &output)
         {
             if (ctx->skipping())
                 return;
@@ -1037,11 +1024,7 @@ namespace client
 
         // Evaluating one element of a vector variable.
         // all possible ConfigOption types are supported.
-        template <typename Iterator>
-        static void vector_element_to_expr(
-            const MyContext         *ctx,
-            OptWithPos<Iterator>    &opt,
-            expr<Iterator>          &output)
+        static void vector_element_to_expr(const MyContext *ctx, OptWithPos &opt, expr &output)
         {
             if (ctx->skipping())
                 return;
@@ -1066,21 +1049,18 @@ namespace client
             }
         }
 
-        template <typename Iterator>
-        static void check_writable(const MyContext *ctx, OptWithPos<Iterator> &opt) {
+        static void check_writable(const MyContext *ctx, OptWithPos &opt) {
             if (! opt.writable)
                 ctx->throw_exception("Cannot modify a read-only variable", opt.it_range);
         }
 
-        template <typename Iterator>
-        static void check_numeric(const expr<Iterator> &param) {
+        static void check_numeric(const expr &param) {
             if (! param.numeric_type())
                 param.throw_exception("Right side is not a numeric expression");
         };
 
-        template <typename Iterator>
-        static size_t evaluate_count(const expr<Iterator> &expr_count) {
-            if (expr_count.type() != expr<Iterator>::TYPE_INT)
+        static size_t evaluate_count(const expr &expr_count) {
+            if (expr_count.type() != expr::TYPE_INT)
                 expr_count.throw_exception("Expected number of elements to fill a vector with.");
             int count = expr_count.i();
             if (count < 0)
@@ -1088,11 +1068,7 @@ namespace client
             return size_t(count);
         };
 
-        template <typename Iterator>
-        static void scalar_variable_assign_scalar(
-            const MyContext                 *ctx,
-            OptWithPos<Iterator>            &lhs,
-            const expr<Iterator>            &rhs)
+        static void scalar_variable_assign_scalar(const MyContext *ctx, OptWithPos &lhs, const expr &rhs)
         {
             assert(lhs.opt->is_scalar());
             check_writable(ctx, lhs);
@@ -1114,7 +1090,7 @@ namespace client
                 static_cast<ConfigOptionPercent*>(wropt)->value = rhs.as_d();
                 break;
             case coBool:
-                if (rhs.type() != expr<Iterator>::TYPE_BOOL)
+                if (rhs.type() != expr::TYPE_BOOL)
                     ctx->throw_exception("Right side is not a boolean expression", rhs.it_range);
                 static_cast<ConfigOptionBool*>(wropt)->value = rhs.b();
                 break;
@@ -1123,11 +1099,7 @@ namespace client
             }
         }
 
-        template <typename Iterator>
-        static void vector_variable_element_assign_scalar(
-            const MyContext                 *ctx,
-            OptWithPos<Iterator>            &lhs,
-            const expr<Iterator>            &rhs)
+        static void vector_variable_element_assign_scalar(const MyContext *ctx, OptWithPos &lhs, const expr &rhs)
         {
             assert(lhs.opt->is_vector());
             check_writable(ctx, lhs);
@@ -1155,7 +1127,7 @@ namespace client
                 static_cast<ConfigOptionPercents*>(vec)->values[lhs.index] = rhs.as_d();
                 break;
             case coBools:
-                if (rhs.type() != expr<Iterator>::TYPE_BOOL)
+                if (rhs.type() != expr::TYPE_BOOL)
                     ctx->throw_exception("Right side is not a boolean expression", rhs.it_range);
                 static_cast<ConfigOptionBools*>(vec)->values[lhs.index] = rhs.b();
                 break;
@@ -1164,12 +1136,7 @@ namespace client
             }
         }
 
-        template <typename Iterator>
-        static void vector_variable_assign_expr_with_count(
-            const MyContext         *ctx,
-            OptWithPos<Iterator>    &lhs,
-            const expr<Iterator>    &rhs_count,
-            const expr<Iterator>    &rhs_value)
+        static void vector_variable_assign_expr_with_count(const MyContext *ctx, OptWithPos &lhs, const expr &rhs_count, const expr &rhs_value)
         {
             size_t count = evaluate_count(rhs_count);
             auto *opt = const_cast<ConfigOption*>(lhs.opt);
@@ -1186,7 +1153,7 @@ namespace client
                 static_cast<ConfigOptionStrings*>(opt)->values.assign(count, rhs_value.to_string());
                 break;
             case coBools:
-                if (rhs_value.type() != expr<Iterator>::TYPE_BOOL)
+                if (rhs_value.type() != expr::TYPE_BOOL)
                     rhs_value.throw_exception("Right side is not a boolean expression");
                 static_cast<ConfigOptionBools*>(opt)->values.assign(count, rhs_value.b());
                 break;
@@ -1194,11 +1161,7 @@ namespace client
             }
         }
 
-        template <typename Iterator>
-        static void variable_value(
-            const MyContext                 *ctx,
-            OptWithPos<Iterator>            &opt,
-            expr<Iterator>                  &output)
+        static void variable_value(const MyContext *ctx, OptWithPos &opt, expr &output)
         {
             if (! ctx->skipping()) {
                 if (opt.opt->is_vector())
@@ -1211,11 +1174,7 @@ namespace client
 
         // Return a boolean value, true if the scalar variable referenced by "opt" is nullable and it has a nil value.
         // Return a boolean value, true if an element of a vector variable referenced by "opt[index]" is nullable and it has a nil value.
-        template <typename Iterator>
-        static void is_nil_test(
-            const MyContext                 *ctx,
-            OptWithPos<Iterator>            &opt,
-            expr<Iterator>                  &output)
+        static void is_nil_test(const MyContext *ctx, OptWithPos &opt, expr &output)
         {
             if (ctx->skipping()) {
             } else if (opt.opt->is_vector()) {
@@ -1233,18 +1192,16 @@ namespace client
         }
 
         // Reference to an existing symbol, or a name of a new symbol.
-        template<typename Iterator>
         struct NewOldVariable {
-            std::string                      name;
-            boost::iterator_range<Iterator>  it_range;
-            ConfigOption                    *opt{ nullptr };
+            std::string    name;
+            IteratorRange  it_range;
+            ConfigOption  *opt{ nullptr };
         };
-        template <typename Iterator>
         static void new_old_variable(
-            const MyContext                         *ctx,
-            bool                                     global_variable,
-            const boost::iterator_range<Iterator>   &it_range,
-            NewOldVariable<Iterator>                &out)
+            const MyContext       *ctx,
+            bool                   global_variable,
+            const IteratorRange   &it_range,
+            NewOldVariable        &out)
         {
             if (! ctx->skipping()) {
                 t_config_option_key key(std::string(it_range.begin(), it_range.end()));
@@ -1270,11 +1227,7 @@ namespace client
         }
 
         // Decoding a scalar variable symbol "opt", assigning it a value of "param".
-        template <typename Iterator>
-        static void scalar_variable_assign_scalar_expression(
-            const MyContext                 *ctx,
-            OptWithPos<Iterator>            &opt,
-            const expr<Iterator>            &param)
+        static void scalar_variable_assign_scalar_expression(const MyContext *ctx, OptWithPos &opt, const expr &param)
         {
             if (! ctx->skipping()) {
                 check_writable(ctx, opt);
@@ -1285,12 +1238,11 @@ namespace client
             }
         }
 
-        template <typename Iterator>
         static void scalar_variable_new_from_scalar_expression(
-            const MyContext                         *ctx,
-            bool                                     global_variable,
-            NewOldVariable<Iterator>                &lhs,
-            const expr<Iterator>                    &rhs)
+            const MyContext *ctx,
+            bool             global_variable,
+            NewOldVariable  &lhs,
+            const expr      &rhs)
         {
             if (ctx->skipping()) {
             } else if (lhs.opt) {
@@ -1301,23 +1253,22 @@ namespace client
             } else {
                 std::unique_ptr<ConfigOption> opt_new;
                 switch (rhs.type()) {
-                    case expr<Iterator>::TYPE_BOOL:     opt_new = std::make_unique<ConfigOptionBool>(rhs.b());   break;
-                    case expr<Iterator>::TYPE_INT:      opt_new = std::make_unique<ConfigOptionInt>(rhs.i());    break;
-                    case expr<Iterator>::TYPE_DOUBLE:   opt_new = std::make_unique<ConfigOptionFloat>(rhs.d());  break;
-                    case expr<Iterator>::TYPE_STRING:   opt_new = std::make_unique<ConfigOptionString>(rhs.s()); break;
+                    case expr::TYPE_BOOL:     opt_new = std::make_unique<ConfigOptionBool>(rhs.b());   break;
+                    case expr::TYPE_INT:      opt_new = std::make_unique<ConfigOptionInt>(rhs.i());    break;
+                    case expr::TYPE_DOUBLE:   opt_new = std::make_unique<ConfigOptionFloat>(rhs.d());  break;
+                    case expr::TYPE_STRING:   opt_new = std::make_unique<ConfigOptionString>(rhs.s()); break;
                     default: assert(false);
                 }
                 const_cast<MyContext*>(ctx)->store_new_variable(lhs.name, std::move(opt_new), global_variable);
             }
         }
 
-        template <typename Iterator>
         static void vector_variable_new_from_array(
-            const MyContext                         *ctx,
-            bool                                     global_variable,
-            NewOldVariable<Iterator>                &lhs,
-            const expr<Iterator>                    &rhs_count,
-            const expr<Iterator>                    &rhs_value)
+            const MyContext     *ctx,
+            bool                 global_variable,
+            NewOldVariable      &lhs,
+            const expr          &rhs_count,
+            const expr          &rhs_value)
         {
             if (ctx->skipping()) {
             } else if (lhs.opt) {
@@ -1329,22 +1280,21 @@ namespace client
                 size_t count = evaluate_count(rhs_count);
                 std::unique_ptr<ConfigOption> opt_new;
                 switch (rhs_value.type()) {
-                    case expr<Iterator>::TYPE_BOOL:     opt_new = std::make_unique<ConfigOptionBools>(count, rhs_value.b());   break;
-                    case expr<Iterator>::TYPE_INT:      opt_new = std::make_unique<ConfigOptionInts>(count, rhs_value.i());    break;
-                    case expr<Iterator>::TYPE_DOUBLE:   opt_new = std::make_unique<ConfigOptionFloats>(count, rhs_value.d()); break;
-                    case expr<Iterator>::TYPE_STRING:   opt_new = std::make_unique<ConfigOptionStrings>(count, rhs_value.s()); break;
+                    case expr::TYPE_BOOL:     opt_new = std::make_unique<ConfigOptionBools>(count, rhs_value.b());   break;
+                    case expr::TYPE_INT:      opt_new = std::make_unique<ConfigOptionInts>(count, rhs_value.i());    break;
+                    case expr::TYPE_DOUBLE:   opt_new = std::make_unique<ConfigOptionFloats>(count, rhs_value.d()); break;
+                    case expr::TYPE_STRING:   opt_new = std::make_unique<ConfigOptionStrings>(count, rhs_value.s()); break;
                     default: assert(false);
                 }
                 const_cast<MyContext*>(ctx)->store_new_variable(lhs.name, std::move(opt_new), global_variable);
             }
         }
 
-        template <typename Iterator>
         static void vector_variable_assign_array(
-            const MyContext                         *ctx,
-            OptWithPos<Iterator>                    &lhs,
-            const expr<Iterator>                    &rhs_count,
-            const expr<Iterator>                    &rhs_value)
+            const MyContext *ctx,
+            OptWithPos      &lhs,
+            const expr      &rhs_count,
+            const expr      &rhs_value)
         {
             if (! ctx->skipping()) {
                 check_writable(ctx, lhs);
@@ -1354,20 +1304,16 @@ namespace client
             }
         }
 
-        template<typename ConfigOptionType, typename Iterator, typename RightValueEvaluate>
-        static void fill_vector_from_initializer_list(ConfigOption *opt, const std::vector<expr<Iterator>> &il, RightValueEvaluate rv_eval) {
+        template<typename ConfigOptionType, typename RightValueEvaluate>
+        static void fill_vector_from_initializer_list(ConfigOption *opt, const std::vector<expr> &il, RightValueEvaluate rv_eval) {
             auto& out = static_cast<ConfigOptionType*>(opt)->values;
             out.clear();
             out.reserve(il.size());
-            for (const expr<Iterator>& i : il)
+            for (const expr& i : il)
                 out.emplace_back(rv_eval(i));
         }
 
-        template <typename Iterator>
-        static void vector_variable_assign_initializer_list(
-            const MyContext                             *ctx,
-            OptWithPos<Iterator>                        &lhs,
-            const std::vector<expr<Iterator>>           &il)
+        static void vector_variable_assign_initializer_list(const MyContext *ctx, OptWithPos &lhs, const std::vector<expr> &il)
         {
             if (ctx->skipping())
                 return;
@@ -1385,7 +1331,7 @@ namespace client
                     ctx->throw_exception("Cannot assign a vector value to a scalar variable.", lhs.it_range);
             }
 
-            auto check_numeric_vector = [](const std::vector<expr<Iterator>> &il) {
+            auto check_numeric_vector = [](const std::vector<expr> &il) {
                 for (auto &i : il)
                     if (! i.numeric_type())
                         i.throw_exception("Right side is not a numeric expression");
@@ -1406,7 +1352,7 @@ namespace client
                 break;
             case coBools:
                 for (auto &i : il)
-                    if (i.type() != expr<Iterator>::TYPE_BOOL)
+                    if (i.type() != expr::TYPE_BOOL)
                         i.throw_exception("Right side is not a boolean expression");
                 fill_vector_from_initializer_list<ConfigOptionBools>(opt, il, [](auto &v){ return v.b(); });
                 break;
@@ -1414,12 +1360,11 @@ namespace client
             }
         }
 
-        template <typename Iterator>
         static void vector_variable_new_from_initializer_list(
-            const MyContext                             *ctx,
-            bool                                         global_variable,
-            NewOldVariable<Iterator>                    &lhs,
-            const std::vector<expr<Iterator>>           &il)
+            const MyContext         *ctx,
+            bool                     global_variable,
+            NewOldVariable          &lhs,
+            const std::vector<expr> &il)
         {
             if (ctx->skipping())
                 return;
@@ -1439,10 +1384,10 @@ namespace client
                 size_t num_string = 0;
                 for (auto &i : il)
                     switch (i.type()) {
-                    case expr<Iterator>::TYPE_BOOL:     ++ num_bool;    break;
-                    case expr<Iterator>::TYPE_INT:      ++ num_int;     break;
-                    case expr<Iterator>::TYPE_DOUBLE:   ++ num_double;  break;
-                    case expr<Iterator>::TYPE_STRING:   ++ num_string;  break;
+                    case expr::TYPE_BOOL:     ++ num_bool;    break;
+                    case expr::TYPE_INT:      ++ num_int;     break;
+                    case expr::TYPE_DOUBLE:   ++ num_double;  break;
+                    case expr::TYPE_STRING:   ++ num_string;  break;
                     default: assert(false);
                     }
                 std::unique_ptr<ConfigOption> opt_new;
@@ -1451,7 +1396,7 @@ namespace client
                     opt_new = std::make_unique<ConfigOptionStrings>();
                 else if (num_bool > 0) {
                     if (num_double + num_int > 0)
-                        ctx->throw_exception("Right side is not valid: Mixing numeric and boolean types.", boost::iterator_range<Iterator>{ il.front().it_range.begin(), il.back().it_range.end() });
+                        ctx->throw_exception("Right side is not valid: Mixing numeric and boolean types.", IteratorRange{ il.front().it_range.begin(), il.back().it_range.end() });
                     opt_new = std::make_unique<ConfigOptionBools>();
                 } else {
                     // Output is numeric.
@@ -1466,22 +1411,16 @@ namespace client
             }
         }
 
-        template <typename Iterator>
-        static bool is_vector_variable_reference(const OptWithPos<Iterator> &var) {
+        static bool is_vector_variable_reference(const OptWithPos &var) {
             return ! var.empty() && ! var.has_index() && var.opt->is_vector();
         }
 
         // Called when checking whether the NewOldVariable could be assigned a vectir right hand side.
-        template <typename Iterator>
-        static bool could_be_vector_variable_reference(const NewOldVariable<Iterator> &var) {
+        static bool could_be_vector_variable_reference(const NewOldVariable &var) {
             return var.opt == nullptr || var.opt->is_vector();
         }
 
-        template <typename Iterator>
-        static void copy_vector_variable_to_vector_variable(
-            const MyContext             *ctx,
-            OptWithPos<Iterator>        &lhs,
-            const OptWithPos<Iterator>  &rhs)
+        static void copy_vector_variable_to_vector_variable(const MyContext *ctx, OptWithPos &lhs, const OptWithPos &rhs)
         {
             if (ctx->skipping())
                 return;
@@ -1508,12 +1447,11 @@ namespace client
             const_cast<ConfigOption*>(lhs.opt)->set(rhs.opt);
         }
 
-        template <typename Iterator>
         static bool vector_variable_new_from_copy(
-            const MyContext                             *ctx,
-            bool                                         global_variable,
-            NewOldVariable<Iterator>                    &lhs,
-            const OptWithPos<Iterator>                  &rhs)
+            const MyContext   *ctx,
+            bool               global_variable,
+            NewOldVariable    &lhs,
+            const OptWithPos  &rhs)
         {
             if (ctx->skipping())
                 // Skipping, continue parsing.
@@ -1541,19 +1479,14 @@ namespace client
             return true;
         }
 
-        template <typename Iterator>
-        static void initializer_list_append(std::vector<expr<Iterator>> &list, expr<Iterator> &param)
+        static void initializer_list_append(std::vector<expr> &list, expr &param)
         {
-            if (param.type() != expr<Iterator>::TYPE_EMPTY)
+            if (param.type() != expr::TYPE_EMPTY)
                 // not skipping
                 list.emplace_back(std::move(param));
         }
 
-        template <typename Iterator>
-        static void is_vector_empty(
-            const MyContext         *ctx,
-            OptWithPos<Iterator>    &opt,
-            expr<Iterator>          &out)
+        static void is_vector_empty(const MyContext *ctx, OptWithPos &opt, expr &out)
         {
             if (! ctx->skipping()) {
                 if (opt.has_index() || ! opt.opt->is_vector())
@@ -1563,11 +1496,7 @@ namespace client
             out.it_range = opt.it_range;
         }
 
-        template <typename Iterator>
-        static void vector_size(
-            const MyContext         *ctx,
-            OptWithPos<Iterator>    &opt,
-            expr<Iterator>          &out)
+        static void vector_size(const MyContext *ctx, OptWithPos &opt, expr &out)
         {
             if (! ctx->skipping()) {
                 if (opt.has_index() || ! opt.opt->is_vector())
@@ -1579,37 +1508,33 @@ namespace client
 
         // Verify that the expression returns an integer, which may be used
         // to address a vector.
-        template <typename Iterator>
-        static void evaluate_index(expr<Iterator> &expr_index, int &output)
+        static void evaluate_index(expr &expr_index, int &output)
         {
-            if (expr_index.type() != expr<Iterator>::TYPE_EMPTY) {
-                if (expr_index.type() != expr<Iterator>::TYPE_INT)                
+            if (expr_index.type() != expr::TYPE_EMPTY) {
+                if (expr_index.type() != expr::TYPE_INT)                
                     expr_index.throw_exception("Non-integer index is not allowed to address a vector variable.");
                 output = expr_index.i();
             }
         }
 
-        template <typename Iterator>
-        static void random(const MyContext *ctx, expr<Iterator> &param1, expr<Iterator> &param2)
+        static void random(const MyContext *ctx, expr &param1, expr &param2)
         {
             if (ctx->skipping())
                 return;
 
             if (ctx->context_data == nullptr)
                 ctx->throw_exception("Random number generator not available in this context.",
-                    boost::iterator_range<Iterator>(param1.it_range.begin(), param2.it_range.end()));
-            expr<Iterator>::random(param1, param2, ctx->context_data->rng);
+                    IteratorRange(param1.it_range.begin(), param2.it_range.end()));
+            expr::random(param1, param2, ctx->context_data->rng);
         }
 
-        template <typename Iterator>
-        static void throw_exception(const std::string &msg, const boost::iterator_range<Iterator> &it_range)
+        static void throw_exception(const std::string &msg, const IteratorRange &it_range)
         {
             // An asterix is added to the start of the string to differentiate the boost::spirit::info::tag content
             // between the grammer terminal / non-terminal symbol name and a free-form error message.
-            boost::throw_exception(qi::expectation_failure<Iterator>(it_range.begin(), it_range.end(), spirit::info(std::string("*") + msg)));
+            boost::throw_exception(qi::expectation_failure(it_range.begin(), it_range.end(), spirit::info(std::string("*") + msg)));
         }
 
-        template <typename Iterator>
         static void process_error_message(const MyContext *context, const boost::spirit::info &info, const Iterator &it_begin, const Iterator &it_end, const Iterator &it_error)
         {
             std::string &msg = const_cast<MyContext*>(context)->error_message;
@@ -1662,23 +1587,22 @@ namespace client
         mutable int m_depth_suppressed{ 0 };
     };
 
-    template<typename Iterator>
     struct InterpolateTableContext {
         struct Item {
-            double                           x;
-            boost::iterator_range<Iterator>  it_range_x;
-            double                           y;
+            double         x;
+            IteratorRange  it_range_x;
+            double         y;
         };
         std::vector<Item> table;
 
-        static void init(const expr<Iterator> &x) {
-            if (x.type() != expr<Iterator>::TYPE_EMPTY) {
+        static void init(const expr &x) {
+            if (x.type() != expr::TYPE_EMPTY) {
                 if (!x.numeric_type())
                     x.throw_exception("Interpolation value must be a number.");
             }
         }
-        static void add_pair(const expr<Iterator> &x, const expr<Iterator> &y, InterpolateTableContext &table) {
-            if (x.type() != expr<Iterator>::TYPE_EMPTY) {
+        static void add_pair(const expr &x, const expr &y, InterpolateTableContext &table) {
+            if (x.type() != expr::TYPE_EMPTY) {
                 if (! x.numeric_type())
                     x.throw_exception("X value of a table point must be a number.");
                 if (! y.numeric_type())
@@ -1686,8 +1610,8 @@ namespace client
                 table.table.push_back({ x.as_d(), x.it_range, y.as_d() });
             }
         }
-        static void evaluate(const expr<Iterator> &expr_x, const InterpolateTableContext &table, expr<Iterator> &out) {
-            if (expr_x.type() == expr<Iterator>::TYPE_EMPTY)
+        static void evaluate(const expr &expr_x, const InterpolateTableContext &table, expr &out) {
+            if (expr_x.type() == expr::TYPE_EMPTY)
                 return;
 
             // Check whether the table X values are sorted.
@@ -1697,7 +1621,7 @@ namespace client
                 double x0 = table.table[i - 1].x;
                 double x1 = table.table[i].x;
                 if (x0 > x1)
-                    boost::throw_exception(qi::expectation_failure<Iterator>(
+                    boost::throw_exception(qi::expectation_failure(
                         table.table[i - 1].it_range_x.begin(), table.table[i].it_range_x.end(), spirit::info("X coordinates of the table must be increasing")));
                 if (! evaluated && x >= x0 && x <= x1) {
                     double y0 = table.table[i - 1].y;
@@ -1726,8 +1650,7 @@ namespace client
         }
     };
 
-    template<typename Iterator>
-    std::ostream& operator<<(std::ostream &os, const InterpolateTableContext<Iterator> &table_context)
+    std::ostream& operator<<(std::ostream &os, const InterpolateTableContext &table_context)
     {
         for (const auto &item : table_context.table)
             os << "(" << item.x << "," << item.y << ")";
@@ -1763,8 +1686,7 @@ namespace client
     };
 
     // For debugging the boost::spirit parsers. Print out the string enclosed in it_range.
-    template<typename Iterator>
-    std::ostream& operator<<(std::ostream& os, const boost::iterator_range<Iterator> &it_range)
+    std::ostream& operator<<(std::ostream& os, const IteratorRange &it_range)
     {
         os << std::string(it_range.begin(), it_range.end());
         return os;
@@ -1828,7 +1750,7 @@ namespace client
             first = it;
             return true;
         err:
-            MyContext::throw_exception("Invalid utf8 sequence", boost::iterator_range<Iterator>(first, last));
+            MyContext::throw_exception("Invalid utf8 sequence", IteratorRange(first, last));
             return false;
         }
 
@@ -1840,57 +1762,55 @@ namespace client
         }
     };
 
-    template<typename Iterator>
     struct FactorActions {
-        static void set_start_pos(Iterator &start_pos, expr<Iterator> &out)
-                { out.it_range = boost::iterator_range<Iterator>(start_pos, start_pos); }
-        static void int_(const MyContext *ctx, int &value, Iterator &end_pos, expr<Iterator> &out) { 
+        static void set_start_pos(Iterator &start_pos, expr &out)
+                { out.it_range = IteratorRange(start_pos, start_pos); }
+        static void int_(const MyContext *ctx, int &value, Iterator &end_pos, expr &out) { 
             if (ctx->skipping()) {
                 out.reset();
                 out.it_range.end() = end_pos;
             } else
-                out = expr<Iterator>(value, out.it_range.begin(), end_pos);
+                out = expr(value, out.it_range.begin(), end_pos);
         }
-        static void double_(const MyContext *ctx, double &value, Iterator &end_pos, expr<Iterator> &out) { 
+        static void double_(const MyContext *ctx, double &value, Iterator &end_pos, expr &out) { 
             if (ctx->skipping()) {
                 out.reset();
                 out.it_range.end() = end_pos;
             } else
-                out = expr<Iterator>(value, out.it_range.begin(), end_pos);
+                out = expr(value, out.it_range.begin(), end_pos);
         }
-        static void bool_(const MyContext *ctx, bool &value, Iterator &end_pos, expr<Iterator> &out) { 
+        static void bool_(const MyContext *ctx, bool &value, Iterator &end_pos, expr &out) { 
             if (ctx->skipping()) {
                 out.reset();
                 out.it_range.end() = end_pos;
             } else
-                out = expr<Iterator>(value, out.it_range.begin(), end_pos);
+                out = expr(value, out.it_range.begin(), end_pos);
         }
-        static void string_(const MyContext *ctx, boost::iterator_range<Iterator> &it_range, expr<Iterator> &out) { 
+        static void string_(const MyContext *ctx, IteratorRange &it_range, expr &out) { 
             if (ctx->skipping()) {
                 out.reset();
                 out.it_range = it_range;
             } else
-                out = expr<Iterator>(std::string(it_range.begin() + 1, it_range.end() - 1), it_range.begin(), it_range.end());
+                out = expr(std::string(it_range.begin() + 1, it_range.end() - 1), it_range.begin(), it_range.end());
         }
-        static void expr_(expr<Iterator> &value, Iterator &end_pos, expr<Iterator> &out)
-                { auto begin_pos = out.it_range.begin(); out = expr<Iterator>(std::move(value), begin_pos, end_pos); }
-        static void minus_(expr<Iterator> &value, expr<Iterator> &out)
+        static void expr_(expr &value, Iterator &end_pos, expr &out)
+                { auto begin_pos = out.it_range.begin(); out = expr(std::move(value), begin_pos, end_pos); }
+        static void minus_(expr &value, expr &out)
                 { out = value.unary_minus(out.it_range.begin()); }
-        static void not_(expr<Iterator> &value, expr<Iterator> &out)
+        static void not_(expr &value, expr &out)
                 { out = value.unary_not(out.it_range.begin()); }
-        static void to_int(expr<Iterator> &value, expr<Iterator> &out)
+        static void to_int(expr &value, expr &out)
                 { out = value.unary_integer(out.it_range.begin()); }
-        static void round(expr<Iterator> &value, expr<Iterator> &out)
+        static void round(expr &value, expr &out)
                 { out = value.round(out.it_range.begin()); }
         // For indicating "no optional parameter".
-        static void noexpr(expr<Iterator> &out) { out.reset(); }
+        static void noexpr(expr &out) { out.reset(); }
     };
 
     ///////////////////////////////////////////////////////////////////////////
     //  Our macro_processor grammar
     ///////////////////////////////////////////////////////////////////////////
     // Inspired by the C grammar rules https://www.lysator.liu.se/c/ANSI-C-grammar-y.html
-    template <typename Iterator>
     struct macro_processor : qi::grammar<Iterator, std::string(const MyContext*), qi::locals<bool>, spirit_encoding::space_type>
     {
         macro_processor() : macro_processor::base_type(start)
@@ -1932,10 +1852,10 @@ namespace client
             // could serve both purposes.
             start =
                 (       (eps(px::bind(&MyContext::evaluate_full_macro, _r1)) > text_block(_r1) [_val=_1])
-                    |   conditional_expression(_r1) [ px::bind(&expr<Iterator>::evaluate_boolean_to_string, _1, _val) ]
+                    |   conditional_expression(_r1) [ px::bind(&expr::evaluate_boolean_to_string, _1, _val) ]
 				) > eoi;
             start.name("start");
-            qi::on_error<qi::fail>(start, px::bind(&MyContext::process_error_message<Iterator>, _r1, _4, _1, _2, _3));
+            qi::on_error<qi::fail>(start, px::bind(&MyContext::process_error_message, _r1, _4, _1, _2, _3));
 
             text_block = *(
                         text [_val+=_1]
@@ -1959,7 +1879,7 @@ namespace client
 //                |   (kw["switch"] > switch_output(_r1)  [_val = _1])
                   |   (assignment_statement(_r1) [_val = _1])
                   |   (new_variable_statement(_r1) [_val = _1])
-                  |   (conditional_expression(_r1) [ px::bind(&expr<Iterator>::to_string2, _1, _val) ])
+                  |   (conditional_expression(_r1) [ px::bind(&expr::to_string2, _1, _val) ])
                 ;
             macro.name("macro");
 
@@ -1978,18 +1898,18 @@ namespace client
 /*
             switch_output =
                 eps[_b=true] >
-                omit[expr(_r1)[_a=_1]] > '}' > text_block(_r1)[px::bind(&expr<Iterator>::set_if_equal, _a, _b, _1, _val)] > '{' >
-                *("elsif" > omit[bool_expr_eval(_r1)[_a=_1]] > '}' > text_block(_r1)[px::bind(&expr<Iterator>::set_if, _a, _b, _1, _val)]) >>
-                -("else" > '}' >> text_block(_r1)[px::bind(&expr<Iterator>::set_if, _b, _b, _1, _val)]) >
+                omit[expr(_r1)[_a=_1]] > '}' > text_block(_r1)[px::bind(&expr::set_if_equal, _a, _b, _1, _val)] > '{' >
+                *("elsif" > omit[bool_expr_eval(_r1)[_a=_1]] > '}' > text_block(_r1)[px::bind(&expr::set_if, _a, _b, _1, _val)]) >>
+                -("else" > '}' >> text_block(_r1)[px::bind(&expr::set_if, _b, _b, _1, _val)]) >
                 "endif";
 */
 
             // Legacy variable expansion of the original Slic3r, in the form of [scalar_variable] or [vector_variable_index].
             legacy_variable_expansion =
                     (identifier >> &lit(']'))
-                        [ px::bind(&MyContext::legacy_variable_expansion<Iterator>, _r1, _1, _val) ]
+                        [ px::bind(&MyContext::legacy_variable_expansion, _r1, _1, _val) ]
                 |   (identifier > lit('[') > identifier > ']') 
-                        [ px::bind(&MyContext::legacy_variable_expansion2<Iterator>, _r1, _1, _2, _val) ]
+                        [ px::bind(&MyContext::legacy_variable_expansion2, _r1, _1, _2, _val) ]
                 ;
             legacy_variable_expansion.name("legacy_variable_expansion");
 
@@ -2000,43 +1920,43 @@ namespace client
 
             conditional_expression =
                 logical_or_expression(_r1) [_val = _1]
-                >> -('?' > eps[px::bind(&expr<Iterator>::evaluate_boolean, _val, _a)] >
-                      eps[px::bind(&MyContext::block_enter, _r1, _a)] > conditional_expression(_r1)[px::bind(&MyContext::block_exit_ternary<expr<Iterator>>, _r1, _a, _1, _val)]
+                >> -('?' > eps[px::bind(&expr::evaluate_boolean, _val, _a)] >
+                      eps[px::bind(&MyContext::block_enter, _r1, _a)] > conditional_expression(_r1)[px::bind(&MyContext::block_exit_ternary, _r1, _a, _1, _val)]
                       > ':' >
-                    eps[px::bind(&MyContext::block_enter, _r1, ! _a)] > conditional_expression(_r1)[px::bind(&MyContext::block_exit_ternary<expr<Iterator>>, _r1, ! _a, _1, _val)]);
+                    eps[px::bind(&MyContext::block_enter, _r1, ! _a)] > conditional_expression(_r1)[px::bind(&MyContext::block_exit_ternary, _r1, ! _a, _1, _val)]);
             conditional_expression.name("conditional_expression");
 
             logical_or_expression = 
                 logical_and_expression(_r1)                [_val = _1]
-                >> *(   ((kw["or"] | "||") > logical_and_expression(_r1) ) [px::bind(&expr<Iterator>::logical_or, _val, _1)] );
+                >> *(   ((kw["or"] | "||") > logical_and_expression(_r1) ) [px::bind(&expr::logical_or, _val, _1)] );
             logical_or_expression.name("logical_or_expression");
 
             logical_and_expression = 
                 equality_expression(_r1)                   [_val = _1]
-                >> *(   ((kw["and"] | "&&") > equality_expression(_r1) ) [px::bind(&expr<Iterator>::logical_and, _val, _1)] );
+                >> *(   ((kw["and"] | "&&") > equality_expression(_r1) ) [px::bind(&expr::logical_and, _val, _1)] );
             logical_and_expression.name("logical_and_expression");
 
             equality_expression =
                 relational_expression(_r1)                   [_val = _1]
-                >> *(   ("==" > relational_expression(_r1) ) [px::bind(&expr<Iterator>::equal,     _val, _1)]
-                    |   ("!=" > relational_expression(_r1) ) [px::bind(&expr<Iterator>::not_equal, _val, _1)]
-                    |   ("<>" > relational_expression(_r1) ) [px::bind(&expr<Iterator>::not_equal, _val, _1)]
-                    |   ("=~" > regular_expression         ) [px::bind(&expr<Iterator>::regex_matches, _val, _1)]
-                    |   ("!~" > regular_expression         ) [px::bind(&expr<Iterator>::regex_doesnt_match, _val, _1)]
+                >> *(   ("==" > relational_expression(_r1) ) [px::bind(&expr::equal,     _val, _1)]
+                    |   ("!=" > relational_expression(_r1) ) [px::bind(&expr::not_equal, _val, _1)]
+                    |   ("<>" > relational_expression(_r1) ) [px::bind(&expr::not_equal, _val, _1)]
+                    |   ("=~" > regular_expression         ) [px::bind(&expr::regex_matches, _val, _1)]
+                    |   ("!~" > regular_expression         ) [px::bind(&expr::regex_doesnt_match, _val, _1)]
                     );
             equality_expression.name("bool expression");
 
             // Evaluate a boolean expression stored as expr into a boolean value.
             // Throw if the equality_expression does not produce a expr of boolean type.
-            bool_expr_eval = conditional_expression(_r1) [ px::bind(&expr<Iterator>::evaluate_boolean, _1, _val) ];
+            bool_expr_eval = conditional_expression(_r1) [ px::bind(&expr::evaluate_boolean, _1, _val) ];
             bool_expr_eval.name("bool_expr_eval");
 
             relational_expression = 
                     additive_expression(_r1)                [_val  = _1]
-                >> *(   ("<="     > additive_expression(_r1) ) [px::bind(&expr<Iterator>::leq,     _val, _1)]
-                    |   (">="     > additive_expression(_r1) ) [px::bind(&expr<Iterator>::geq,     _val, _1)]
-                    |   (lit('<') > additive_expression(_r1) ) [px::bind(&expr<Iterator>::lower,   _val, _1)]
-                    |   (lit('>') > additive_expression(_r1) ) [px::bind(&expr<Iterator>::greater, _val, _1)]
+                >> *(   ("<="     > additive_expression(_r1) ) [px::bind(&expr::leq,     _val, _1)]
+                    |   (">="     > additive_expression(_r1) ) [px::bind(&expr::geq,     _val, _1)]
+                    |   (lit('<') > additive_expression(_r1) ) [px::bind(&expr::lower,   _val, _1)]
+                    |   (lit('>') > additive_expression(_r1) ) [px::bind(&expr::greater, _val, _1)]
                     );
             relational_expression.name("relational_expression");
 
@@ -2058,80 +1978,80 @@ namespace client
             assignment_statement =
                 variable_reference(_r1)[_a = _1] >> '=' > 
                 (       // Consumes also '(' conditional_expression ')', that means enclosing an expression into braces makes it a single value vector initializer.
-                         initializer_list(_r1)[px::bind(&MyContext::vector_variable_assign_initializer_list<Iterator>, _r1, _a, _1)]
+                         initializer_list(_r1)[px::bind(&MyContext::vector_variable_assign_initializer_list, _r1, _a, _1)]
                         // Process it before conditional_expression, as conditional_expression requires a vector reference to be augmented with an index.
                         // Only process such variable references, which return a naked vector variable.
-                    |  eps(px::bind(&MyContext::is_vector_variable_reference<Iterator>, _a)) >> 
-                            variable_reference(_r1)[px::bind(&MyContext::copy_vector_variable_to_vector_variable<Iterator>, _r1, _a, _1)]
+                    |  eps(px::bind(&MyContext::is_vector_variable_reference, _a)) >> 
+                            variable_reference(_r1)[px::bind(&MyContext::copy_vector_variable_to_vector_variable, _r1, _a, _1)]
                        // Would NOT consume '(' conditional_expression ')' because such value was consumed with the expression above.
                     |  conditional_expression(_r1)
-                            [px::bind(&MyContext::scalar_variable_assign_scalar_expression<Iterator>, _r1, _a, _1)]
+                            [px::bind(&MyContext::scalar_variable_assign_scalar_expression, _r1, _a, _1)]
                     |  (kw["repeat"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
-                            [px::bind(&MyContext::vector_variable_assign_array<Iterator>, _r1, _a, _1, _2)]
+                            [px::bind(&MyContext::vector_variable_assign_array, _r1, _a, _1, _2)]
                 );
   
             new_variable_statement =
-                (kw["local"][_a = false] | kw["global"][_a = true]) > identifier[px::bind(&MyContext::new_old_variable<Iterator>, _r1, _a, _1, _b)] > lit('=') >
+                (kw["local"][_a = false] | kw["global"][_a = true]) > identifier[px::bind(&MyContext::new_old_variable, _r1, _a, _1, _b)] > lit('=') >
                 (       // Consumes also '(' conditional_expression ')', that means enclosing an expression into braces makes it a single value vector initializer.
-                        initializer_list(_r1)[px::bind(&MyContext::vector_variable_new_from_initializer_list<Iterator>, _r1, _a, _b, _1)]
+                        initializer_list(_r1)[px::bind(&MyContext::vector_variable_new_from_initializer_list, _r1, _a, _b, _1)]
                         // Process it before conditional_expression, as conditional_expression requires a vector reference to be augmented with an index.
                         // Only process such variable references, which return a naked vector variable.
-                    |  eps(px::bind(&MyContext::could_be_vector_variable_reference<Iterator>, _b)) >>
-                            variable_reference(_r1)[px::ref(qi::_pass) = px::bind(&MyContext::vector_variable_new_from_copy<Iterator>, _r1, _a, _b, _1)]
+                    |  eps(px::bind(&MyContext::could_be_vector_variable_reference, _b)) >>
+                            variable_reference(_r1)[px::ref(qi::_pass) = px::bind(&MyContext::vector_variable_new_from_copy, _r1, _a, _b, _1)]
                        // Would NOT consume '(' conditional_expression ')' because such value was consumed with the expression above.
                     |  conditional_expression(_r1)
-                            [px::bind(&MyContext::scalar_variable_new_from_scalar_expression<Iterator>, _r1, _a, _b, _1)]
+                            [px::bind(&MyContext::scalar_variable_new_from_scalar_expression, _r1, _a, _b, _1)]
                     |  (kw["repeat"] > "(" > additive_expression(_r1) > "," > conditional_expression(_r1) > ")")
-                            [px::bind(&MyContext::vector_variable_new_from_array<Iterator>, _r1, _a, _b, _1, _2)]
+                            [px::bind(&MyContext::vector_variable_new_from_array, _r1, _a, _b, _1, _2)]
                 );
             initializer_list = lit('(') >
                 (   lit(')') |
-                    (   conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)] >
-                        *(lit(',') > conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append<Iterator>, _val, _1)]) >
+                    (   conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append, _val, _1)] >
+                        *(lit(',') > conditional_expression(_r1)[px::bind(&MyContext::initializer_list_append, _val, _1)]) >
                         lit(')')
                     )
                 );
 
-            unary_expression = iter_pos[px::bind(&FactorActions<Iterator>::set_start_pos, _1, _val)] >> (
-                    variable_reference(_r1) [px::bind(&MyContext::variable_value<Iterator>, _r1, _1, _val)]
-                |   (lit('(')  > conditional_expression(_r1) > ')' > iter_pos) [ px::bind(&FactorActions<Iterator>::expr_, _1, _2, _val) ]
-                |   (lit('-')  > unary_expression(_r1)           )  [ px::bind(&FactorActions<Iterator>::minus_,  _1,     _val) ]
-                |   (lit('+')  > unary_expression(_r1) > iter_pos)  [ px::bind(&FactorActions<Iterator>::expr_,   _1, _2, _val) ]
-                |   ((kw["not"] | '!') > unary_expression(_r1) > iter_pos) [ px::bind(&FactorActions<Iterator>::not_, _1, _val) ]
+            unary_expression = iter_pos[px::bind(&FactorActions::set_start_pos, _1, _val)] >> (
+                    variable_reference(_r1) [px::bind(&MyContext::variable_value, _r1, _1, _val)]
+                |   (lit('(')  > conditional_expression(_r1) > ')' > iter_pos) [ px::bind(&FactorActions::expr_, _1, _2, _val) ]
+                |   (lit('-')  > unary_expression(_r1)           )  [ px::bind(&FactorActions::minus_,  _1,     _val) ]
+                |   (lit('+')  > unary_expression(_r1) > iter_pos)  [ px::bind(&FactorActions::expr_,   _1, _2, _val) ]
+                |   ((kw["not"] | '!') > unary_expression(_r1) > iter_pos) [ px::bind(&FactorActions::not_, _1, _val) ]
                 |   (kw["min"] > '(' > conditional_expression(_r1) [_val = _1] > ',' > conditional_expression(_r1) > ')') 
-                                                                    [ px::bind(&expr<Iterator>::min, _val, _2) ]
+                                                                    [ px::bind(&expr::min, _val, _2) ]
                 |   (kw["max"] > '(' > conditional_expression(_r1) [_val = _1] > ',' > conditional_expression(_r1) > ')') 
-                                                                    [ px::bind(&expr<Iterator>::max, _val, _2) ]
+                                                                    [ px::bind(&expr::max, _val, _2) ]
                 |   (kw["random"] > '(' > conditional_expression(_r1) [_val = _1] > ',' > conditional_expression(_r1) > ')') 
-                                                                    [ px::bind(&MyContext::random<Iterator>, _r1, _val, _2) ]
+                                                                    [ px::bind(&MyContext::random, _r1, _val, _2) ]
                 |   (kw["digits"] > '(' > conditional_expression(_r1) [_val = _1] > ',' > conditional_expression(_r1) > optional_parameter(_r1))
-                                                                    [ px::bind(&expr<Iterator>::template digits<false>, _val, _2, _3) ]
+                                                                    [ px::bind(&expr::digits<false>, _val, _2, _3) ]
                 |   (kw["zdigits"] > '(' > conditional_expression(_r1) [_val = _1] > ',' > conditional_expression(_r1) > optional_parameter(_r1))
-                                                                    [ px::bind(&expr<Iterator>::template digits<true>, _val, _2, _3) ]
-                |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions<Iterator>::to_int,  _1, _val) ]
-                |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions<Iterator>::round,   _1, _val) ]
-                |   (kw["is_nil"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_nil_test<Iterator>, _r1, _1, _val)]
+                                                                    [ px::bind(&expr::digits<true>, _val, _2, _3) ]
+                |   (kw["int"]   > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::to_int,  _1, _val) ]
+                |   (kw["round"] > '(' > conditional_expression(_r1) > ')') [ px::bind(&FactorActions::round,   _1, _val) ]
+                |   (kw["is_nil"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_nil_test, _r1, _1, _val)]
                 |   (kw["one_of"] > '(' > one_of(_r1) > ')')        [ _val = _1 ]
-                |   (kw["empty"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_vector_empty<Iterator>, _r1, _1, _val)]
-                |   (kw["size"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::vector_size<Iterator>, _r1, _1, _val)]
+                |   (kw["empty"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::is_vector_empty, _r1, _1, _val)]
+                |   (kw["size"] > '(' > variable_reference(_r1) > ')') [px::bind(&MyContext::vector_size, _r1, _1, _val)]
                 |   (kw["interpolate_table"] > '(' > interpolate_table(_r1) > ')') [ _val = _1 ]
-                |   (strict_double > iter_pos)                      [ px::bind(&FactorActions<Iterator>::double_, _r1, _1, _2, _val) ]
-                |   (int_      > iter_pos)                          [ px::bind(&FactorActions<Iterator>::int_,    _r1, _1, _2, _val) ]
-                |   (kw[bool_] > iter_pos)                          [ px::bind(&FactorActions<Iterator>::bool_,   _r1, _1, _2, _val) ]
+                |   (strict_double > iter_pos)                      [ px::bind(&FactorActions::double_, _r1, _1, _2, _val) ]
+                |   (int_      > iter_pos)                          [ px::bind(&FactorActions::int_,    _r1, _1, _2, _val) ]
+                |   (kw[bool_] > iter_pos)                          [ px::bind(&FactorActions::bool_,   _r1, _1, _2, _val) ]
                 |   raw[lexeme['"' > *((utf8char - char_('\\') - char_('"')) | ('\\' > char_)) > '"']]
-                                                                    [ px::bind(&FactorActions<Iterator>::string_, _r1, _1,     _val) ]
+                                                                    [ px::bind(&FactorActions::string_, _r1, _1,     _val) ]
                 );
             unary_expression.name("unary_expression");
 
             one_of = (unary_expression(_r1)[_a = _1] > one_of_list(_r1, _a))[_val = _2];
             one_of.name("one_of");
             one_of_list = 
-                eps[px::bind(&expr<Iterator>::one_of_test_init, _val)] >
+                eps[px::bind(&expr::one_of_test_init, _val)] >
                 (   ( ',' > *(
                         (
-                                unary_expression(_r1)[px::bind(&expr<Iterator>::template one_of_test<false>, _r2, _1, _val)]
-                            |   (lit('~') > unary_expression(_r1))[px::bind(&expr<Iterator>::template one_of_test<true>, _r2, _1, _val)]
-                            |   regular_expression[px::bind(&expr<Iterator>::one_of_test_regex, _r2, _1, _val)]
+                                unary_expression(_r1)[px::bind(&expr::one_of_test<false>, _r2, _1, _val)]
+                            |   (lit('~') > unary_expression(_r1))[px::bind(&expr::one_of_test<true>, _r2, _1, _val)]
+                            |   regular_expression[px::bind(&expr::one_of_test_regex, _r2, _1, _val)]
                         ) >> -lit(','))
                     )
                   | eps
@@ -2139,16 +2059,16 @@ namespace client
             one_of_list.name("one_of_list");
 
             interpolate_table = (unary_expression(_r1)[_a = _1] > ',' > interpolate_table_list(_r1, _a))
-                [px::bind(&InterpolateTableContext<Iterator>::evaluate, _a, _2, _val)];
+                [px::bind(&InterpolateTableContext::evaluate, _a, _2, _val)];
             interpolate_table.name("interpolate_table");
             interpolate_table_list =
-                eps[px::bind(&InterpolateTableContext<Iterator>::init, _r2)] >
+                eps[px::bind(&InterpolateTableContext::init, _r2)] >
                 ( *(( lit('(') > unary_expression(_r1) > ',' > unary_expression(_r1) > ')' ) 
-                    [px::bind(&InterpolateTableContext<Iterator>::add_pair, _1, _2, _val)] >> -lit(',')) );
+                    [px::bind(&InterpolateTableContext::add_pair, _1, _2, _val)] >> -lit(',')) );
             interpolate_table.name("interpolate_table_list");
 
-            optional_parameter = iter_pos[px::bind(&FactorActions<Iterator>::set_start_pos, _1, _val)] >> (
-                    lit(')')                                       [ px::bind(&FactorActions<Iterator>::noexpr, _val) ]
+            optional_parameter = iter_pos[px::bind(&FactorActions::set_start_pos, _1, _val)] >> (
+                    lit(')')                                       [ px::bind(&FactorActions::noexpr, _val) ]
                 |   (lit(',') > conditional_expression(_r1) > ')') [ _val = _1 ]
                 );
             optional_parameter.name("optional_parameter");
@@ -2156,13 +2076,13 @@ namespace client
             variable_reference =
                 variable(_r1)[_a=_1] >>
                 (
-                        ('[' > additive_expression(_r1)[px::bind(&MyContext::evaluate_index<Iterator>, _1, _b)] > ']' > iter_pos)
-                            [px::bind(&MyContext::store_variable_index<Iterator>, _r1, _a, _b, _2, _val)]
+                        ('[' > additive_expression(_r1)[px::bind(&MyContext::evaluate_index, _1, _b)] > ']' > iter_pos)
+                            [px::bind(&MyContext::store_variable_index, _r1, _a, _b, _2, _val)]
                     |   eps[_val=_a]
                 );
             variable_reference.name("variable reference");
 
-            variable = identifier[ px::bind(&MyContext::resolve_variable<Iterator>, _r1, _1, _val) ];
+            variable = identifier[ px::bind(&MyContext::resolve_variable, _r1, _1, _val) ];
             variable.name("variable name");
 
             regular_expression = raw[lexeme['/' > *((utf8char - char_('\\') - char_('/')) | ('\\' > char_)) > '/']];
@@ -2225,8 +2145,8 @@ namespace client
             }
         }
 
-        // Generic expression over expr<Iterator>.
-        typedef qi::rule<Iterator, expr<Iterator>(const MyContext*), spirit_encoding::space_type> RuleExpression;
+        // Generic expression over expr.
+        typedef qi::rule<Iterator, expr(const MyContext*), spirit_encoding::space_type> RuleExpression;
 
         // The start of the grammar.
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool>, spirit_encoding::space_type> start;
@@ -2239,9 +2159,9 @@ namespace client
         // Legacy variable expansion of the original Slic3r, in the form of [scalar_variable] or [vector_variable_index].
         qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> legacy_variable_expansion;
         // Parsed identifier name.
-        qi::rule<Iterator, boost::iterator_range<Iterator>(), spirit_encoding::space_type> identifier;
+        qi::rule<Iterator, IteratorRange(), spirit_encoding::space_type> identifier;
         // Ternary operator (?:) over logical_or_expression.
-        qi::rule<Iterator, expr<Iterator>(const MyContext*), qi::locals<bool>, spirit_encoding::space_type> conditional_expression;
+        qi::rule<Iterator, expr(const MyContext*), qi::locals<bool>, spirit_encoding::space_type> conditional_expression;
         // Logical or over logical_and_expressions.
         RuleExpression logical_or_expression;
         // Logical and over relational_expressions.
@@ -2259,51 +2179,39 @@ namespace client
         // Accepting an optional parameter.
         RuleExpression optional_parameter;
         // Rule to capture a regular expression enclosed in //.
-        qi::rule<Iterator, boost::iterator_range<Iterator>(), spirit_encoding::space_type> regular_expression;
+        qi::rule<Iterator, IteratorRange(), spirit_encoding::space_type> regular_expression;
         // Evaluate boolean expression into bool.
         qi::rule<Iterator, bool(const MyContext*), spirit_encoding::space_type> bool_expr_eval;
         // Reference of a scalar variable, or reference to a field of a vector variable.
-        qi::rule<Iterator, OptWithPos<Iterator>(const MyContext*), qi::locals<OptWithPos<Iterator>, int>, spirit_encoding::space_type> variable_reference;
+        qi::rule<Iterator, OptWithPos(const MyContext*), qi::locals<OptWithPos, int>, spirit_encoding::space_type> variable_reference;
         // Rule to translate an identifier to a ConfigOption, or to fail.
-        qi::rule<Iterator, OptWithPos<Iterator>(const MyContext*), spirit_encoding::space_type> variable;
+        qi::rule<Iterator, OptWithPos(const MyContext*), spirit_encoding::space_type> variable;
         // Evaluating whether a nullable variable is nil.
-        qi::rule<Iterator, expr<Iterator>(const MyContext*), spirit_encoding::space_type> is_nil_test;
+        qi::rule<Iterator, expr(const MyContext*), spirit_encoding::space_type> is_nil_test;
         // Evaluating "one of" list of patterns.
-        qi::rule<Iterator, expr<Iterator>(const MyContext*), qi::locals<expr<Iterator>>, spirit_encoding::space_type> one_of;
-        qi::rule<Iterator, expr<Iterator>(const MyContext*, const expr<Iterator> &param), spirit_encoding::space_type> one_of_list;
+        qi::rule<Iterator, expr(const MyContext*), qi::locals<expr>, spirit_encoding::space_type> one_of;
+        qi::rule<Iterator, expr(const MyContext*, const expr &param), spirit_encoding::space_type> one_of_list;
         // Evaluating the "interpolate_table" expression.
-        qi::rule<Iterator, expr<Iterator>(const MyContext*), qi::locals<expr<Iterator>>, spirit_encoding::space_type> interpolate_table;
-        qi::rule<Iterator, InterpolateTableContext<Iterator>(const MyContext*, const expr<Iterator> &param), spirit_encoding::space_type> interpolate_table_list;
+        qi::rule<Iterator, expr(const MyContext*), qi::locals<expr>, spirit_encoding::space_type> interpolate_table;
+        qi::rule<Iterator, InterpolateTableContext(const MyContext*, const expr &param), spirit_encoding::space_type> interpolate_table_list;
 
         qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool>, spirit_encoding::space_type> if_else_output;
-        qi::rule<Iterator, std::string(const MyContext*), qi::locals<OptWithPos<Iterator>>, spirit_encoding::space_type> assignment_statement;
+        qi::rule<Iterator, std::string(const MyContext*), qi::locals<OptWithPos>, spirit_encoding::space_type> assignment_statement;
         // Allocating new local or global variables.
-        qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, MyContext::NewOldVariable<Iterator>>, spirit_encoding::space_type> new_variable_statement;
-        qi::rule<Iterator, std::vector<expr<Iterator>>(const MyContext*), spirit_encoding::space_type> initializer_list;
+        qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, MyContext::NewOldVariable>, spirit_encoding::space_type> new_variable_statement;
+        qi::rule<Iterator, std::vector<expr>(const MyContext*), spirit_encoding::space_type> initializer_list;
 
-//        qi::rule<Iterator, std::string(const MyContext*), qi::locals<expr<Iterator>, bool, std::string>, spirit_encoding::space_type> switch_output;
         qi::symbols<char> keywords;
     };
 }
 
+static const client::macro_processor g_macro_processor_instance;
+
 static std::string process_macro(const std::string &templ, client::MyContext &context)
 {
-    typedef std::string::const_iterator iterator_type;
-    typedef client::macro_processor<iterator_type> macro_processor;
-
-    // Our whitespace skipper.
-    spirit_encoding::space_type space;
-    // Our grammar, statically allocated inside the method, meaning it will be allocated the first time
-    // PlaceholderParser::process() runs.
-    //FIXME this kind of initialization is not thread safe!
-    static macro_processor      macro_processor_instance;
-    // Iterators over the source template.
-    std::string::const_iterator iter = templ.begin();
-    std::string::const_iterator end  = templ.end();
-    // Accumulator for the processed template.
-    std::string                 output;
-    phrase_parse(iter, end, macro_processor_instance(&context), space, output);
-	if (!context.error_message.empty()) {
+    std::string output;
+    phrase_parse(templ.begin(), templ.end(), g_macro_processor_instance(&context), spirit_encoding::space_type{}, output);
+	if (! context.error_message.empty()) {
         if (context.error_message.back() != '\n' && context.error_message.back() != '\r')
             context.error_message += '\n';
         throw Slic3r::PlaceholderParserError(context.error_message);
