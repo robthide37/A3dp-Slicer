@@ -1862,7 +1862,7 @@ namespace client
                         // Allow back tracking after '{' in case of a text_block embedded inside a condition.
                         // In that case the inner-most {else} wins and the {if}/{elsif}/{else} shall be paired.
                         // {elsif}/{else} without an {if} will be allowed to back track from the embedded text_block.
-                    |   (lit('{') >> macro(_r1)[_val+=_1] > *(+lit(';') >> macro(_r1)[_val+=_1]) > *lit(';') > '}')
+                    |   (lit('{') >> macro(_r1)[_val += _1] % (+lit(';')) > *lit(';') > '}')
                     |   (lit('[') > legacy_variable_expansion(_r1) [_val+=_1] > ']')
                 );
             text_block.name("text_block");
@@ -1884,16 +1884,24 @@ namespace client
             macro.name("macro");
 
             // An if expression enclosed in {} (the outmost {} are already parsed by the caller).
+            // Also }{ could be replaced with ; to simplify writing of pure code.
             if_else_output =
                 eps[_a=true] >
-                (bool_expr_eval(_r1)[px::bind(&MyContext::block_enter, _r1, _1)] > '}' >
-                    text_block(_r1))[px::bind(&MyContext::block_exit, _r1, _1, _a, _2, _val)] > '{' >
-                *((kw["elsif"] > bool_expr_eval(_r1)[px::bind(&MyContext::block_enter, _r1, _1 && _a)] > '}' >
-                    text_block(_r1))[px::bind(&MyContext::block_exit, _r1, _1, _a, _2, _val)] > '{') >
-                -(kw["else"] > eps[px::bind(&MyContext::block_enter, _r1, _a)] > lit('}') >
-                    text_block(_r1)[px::bind(&MyContext::block_exit, _r1, _a, _a, _1, _val)] > '{') >
+                (bool_expr_eval(_r1)[px::bind(&MyContext::block_enter, _r1, _1)] > (if_text_block(_r1) | if_macros(_r1)))
+                    [px::bind(&MyContext::block_exit, _r1, _1, _a, _2, _val)] >
+                *((kw["elsif"] > bool_expr_eval(_r1)[px::bind(&MyContext::block_enter, _r1, _1 && _a)] > (if_text_block(_r1) | if_macros(_r1)))
+                    [px::bind(&MyContext::block_exit, _r1, _1, _a, _2, _val)]) >
+                -(kw["else"] > eps[px::bind(&MyContext::block_enter, _r1, _a)] > (if_text_block(_r1) | else_macros(_r1)))
+                    [px::bind(&MyContext::block_exit, _r1, _a, _a, _1, _val)] >
                 kw["endif"];
             if_else_output.name("if_else_output");
+            if_text_block = (lit('}') > text_block(_r1) > '{');
+            if_text_block.name("if_text_block");
+            if_macros = +lit(';') > (macro(_r1)[_val += _1] % (+lit(';')) | eps) > (+lit(';') | &(kw["elsif"] | kw["else"] | kw["endif"]));
+            if_macros.name("if_macros");
+            else_macros = *lit(';') > (macro(_r1)[_val += _1] % (+lit(';')) | eps) > (+lit(';') | &kw["endif"]);
+            else_macros.name("else_macros");
+
             // A switch expression enclosed in {} (the outmost {} are already parsed by the caller).
 /*
             switch_output =
@@ -2155,7 +2163,7 @@ namespace client
         // A free-form text, possibly empty, possibly containing macro expansions.
         qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> text_block;
         // Statements enclosed in curely braces {}
-        qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> macro;
+        qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> macro, if_text_block, if_macros, else_macros;
         // Legacy variable expansion of the original Slic3r, in the form of [scalar_variable] or [vector_variable_index].
         qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> legacy_variable_expansion;
         // Parsed identifier name.
