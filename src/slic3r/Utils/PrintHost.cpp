@@ -54,6 +54,7 @@ PrintHost* PrintHost::get_print_host(DynamicPrintConfig *config)
             case htPrusaLink: return new PrusaLink(config);
             case htPrusaConnect: return new PrusaConnect(config);
             case htMKS:       return new MKS(config);
+            case htMainSail:  return new Mainsail(config);
             default:          return nullptr;
         }
     } else {

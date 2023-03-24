@@ -1334,6 +1334,7 @@ void GLGizmoEmboss::draw_text_input()
                 warning_tool_tip += "\n";
             warning_tool_tip += t;
         };
+
         if (priv::is_text_empty(m_text)) 
             append_warning(_u8L("Embossed text can NOT contain only white spaces."));
         if (m_text_contain_unknown_glyph)
@@ -1655,9 +1656,9 @@ void GLGizmoEmboss::draw_font_preview(FaceName& face, bool is_visible)
             // Not finished preview
             if (is_visible) {
                 // when not canceled still loading
-                state_text = (face.cancel->load())? 
-                    _u8L(" No symbol"):
-                    _u8L(" ... Loading");                
+                state_text = std::string(" ") + (face.cancel->load() ?
+                    _u8L("No symbol") :
+                    (dots.ToStdString() + _u8L("Loading")));
             } else {
                 // not finished and not visible cancel job
                 face.is_created = nullptr;
@@ -1707,7 +1708,7 @@ void GLGizmoEmboss::draw_font_preview(FaceName& face, bool is_visible)
         queue_job(worker, std::move(job));
     } else {
         // cant start new thread at this moment so wait in queue
-        state_text = _u8L(" ... In queue");
+        state_text = " " + dots.ToStdString() +  " " + _u8L("Queue");
     }
 
     if (!state_text.empty()) {
@@ -1941,7 +1942,7 @@ void GLGizmoEmboss::draw_font_list()
             process();
         }
     } else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("add file with font(.ttf, .ttc)").c_str());
+        ImGui::SetTooltip("Add file with font(.ttf, .ttc)");
 #endif //  ALLOW_ADD_FONT_BY_FILE
 
 #ifdef ALLOW_ADD_FONT_BY_OS_SELECTOR
@@ -1951,7 +1952,7 @@ void GLGizmoEmboss::draw_font_list()
             process();
         }
     } else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Open dialog for choose from fonts.").c_str());
+        ImGui::SetTooltip("Open dialog for choose from fonts.");
 #endif //  ALLOW_ADD_FONT_BY_OS_SELECTOR
 
 }
@@ -2036,7 +2037,7 @@ void GLGizmoEmboss::draw_model_type()
 void GLGizmoEmboss::draw_style_rename_popup() {
     std::string& new_name = m_style_manager.get_style().name;
     const std::string &old_name = m_style_manager.get_stored_style()->name;
-    std::string text_in_popup = GUI::format(_L("Rename style(%1%) for embossing text: "), old_name);
+    std::string text_in_popup = GUI::format(_L("Rename style(%1%) for embossing text"), old_name) + ": ";
     ImGui::Text("%s", text_in_popup.c_str());
     
     bool is_unique = true;
@@ -2059,9 +2060,9 @@ void GLGizmoEmboss::draw_style_rename_popup() {
     bool store = false;
     ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
     if (ImGui::InputText("##rename style", &new_name, flags) && allow_change) store = true;
-    if (m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change)) store = true;
+    if (m_imgui->button(_L("OK"), ImVec2(0.f, 0.f), allow_change)) store = true;
     ImGui::SameLine();
-    if (ImGui::Button(_u8L("cancel").c_str())) {
+    if (ImGui::Button(_u8L("Cancel").c_str())) {
         new_name = old_name;
         ImGui::CloseCurrentPopup();
     }
@@ -2122,7 +2123,7 @@ void GLGizmoEmboss::draw_style_save_button(bool is_modified)
 }
 
 void GLGizmoEmboss::draw_style_save_as_popup() {
-    ImGui::Text("%s", _u8L("New name of style: ").c_str());
+    ImGui::Text("%s", (_u8L("New name of style") +": ").c_str());
 
     // use name inside of volume configuration as temporary new name
     std::string &new_name = m_volume->text_configuration->style.name;
@@ -2146,11 +2147,11 @@ void GLGizmoEmboss::draw_style_save_as_popup() {
     if (ImGui::InputText("##save as style", &new_name, flags))
         save_style = true;
         
-    if (m_imgui->button(_L("ok"), ImVec2(0.f, 0.f), allow_change))
+    if (m_imgui->button(_L("OK"), ImVec2(0.f, 0.f), allow_change))
         save_style = true;
 
     ImGui::SameLine();
-    if (ImGui::Button(_u8L("cancel").c_str())){
+    if (ImGui::Button(_u8L("Cancel").c_str())){
         // write original name to volume TextConfiguration
         new_name = m_style_manager.get_style().name;
         ImGui::CloseCurrentPopup();
@@ -2393,7 +2394,7 @@ void GLGizmoEmboss::draw_style_list() {
             process();
         } else {
             wxString title   = _L("Not valid style.");
-            wxString message = GUI::format_wxstr(_L("Style '%1%' can't be used and will be removed from list."), style.name);
+            wxString message = GUI::format_wxstr(_L("Style '%1%' can't be used and will be removed from a list."), style.name);
             MessageDialog not_loaded_style_message(nullptr, message, title, wxOK);
             not_loaded_style_message.ShowModal();
             m_style_manager.erase(*selected_style_index);
@@ -2845,7 +2846,7 @@ void GLGizmoEmboss::draw_advanced()
         process();
     }
     m_imgui->disabled_end(); // !can_use_surface
-
+    // TRN EmbossGizmo: font units
     std::string units = _u8L("font points");
     std::string units_fmt = "%.0f " + units;
     
@@ -3116,9 +3117,9 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
         (!use_deserialized_font && !m_style_manager.load_style(emboss_style, wx_font))) {
         m_style_manager.erase(font_index);
         wxString message = GUI::format_wxstr(
-            _L("Font '%1%' can't be used. Please select another."),
+            "Font '%1%' can't be used. Please select another.",
             emboss_style.name);
-        wxString      title = _L("Selected font is NOT True-type.");
+        wxString      title = "Selected font is NOT True-type.";
         MessageDialog not_loaded_font_message(nullptr, message, title, wxOK);
         not_loaded_font_message.ShowModal();
         return choose_font_by_wxdialog();
@@ -3155,7 +3156,7 @@ bool GLGizmoEmboss::choose_true_type_file()
     wxArrayString input_files;
     wxString      fontDir      = wxEmptyString;
     wxString      selectedFile = wxEmptyString;
-    wxFileDialog  dialog(nullptr, _L("Choose one or more files (TTF, TTC):"),
+    wxFileDialog  dialog(nullptr, "Choose one or more files (TTF, TTC):",
                         fontDir, selectedFile, file_wildcards(FT_FONTS),
                         wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dialog.ShowModal() == wxID_OK) dialog.GetPaths(input_files);
@@ -3183,7 +3184,7 @@ bool GLGizmoEmboss::choose_svg_file()
     wxArrayString input_files;
     wxString      fontDir      = wxEmptyString;
     wxString      selectedFile = wxEmptyString;
-    wxFileDialog  dialog(nullptr, _L("Choose SVG file:"), fontDir,
+    wxFileDialog  dialog(nullptr, _L("Choose SVG file")+":", fontDir,
                         selectedFile, file_wildcards(FT_SVG),
                         wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dialog.ShowModal() == wxID_OK) dialog.GetPaths(input_files);
@@ -3231,7 +3232,7 @@ void GLGizmoEmboss::create_notification_not_valid_font(
     }
     const std::string &face_name = face_name_opt.value_or(face_name_by_wx.value_or(es.path));
     std::string text =
-        GUI::format(_L("Can't load exactly same font(\"%1%\"), "
+        GUI::format(_L("Can't load exactly same font(\"%1%\"). "
                        "Aplication selected a similar one(\"%2%\"). "
                        "You have to specify font for enable edit text."),
                     face_name_3mf, face_name);

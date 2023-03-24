@@ -308,14 +308,9 @@ void PreferencesDialog::build()
 		m_optgroup_general->append_separator();
 
 		append_bool_option(m_optgroup_general, "show_drop_project_dialog",
-#if 1 // #ysFIXME_delete_after_test_of_6377
 			L("Show load project dialog"),
 			L("When checked, whenever dragging and dropping a project file on the application or open it from a browser, "
 			  "shows a dialog asking to select the action to take on the file to load."),
-#else
-			L("Show drop project dialog"),
-			L("When checked, whenever dragging and dropping a project file on the application, shows a dialog asking to select the action to take on the file to load."),
-#endif
 			app_config->get_bool("show_drop_project_dialog"));
 
 		append_bool_option(m_optgroup_general, "single_instance",
@@ -471,7 +466,7 @@ void PreferencesDialog::build()
 
 	append_bool_option(m_optgroup_gui, "seq_top_layer_only",
 		L("Sequential slider applied only to top layer"),
-		L("If enabled, changes made using the sequential slider, in preview, apply only to gcode top layer."
+		L("If enabled, changes made using the sequential slider, in preview, apply only to gcode top layer. "
 		  "If disabled, changes made using the sequential slider, in preview, apply to the whole gcode."),
 		app_config->get_bool("seq_top_layer_only"));
 
@@ -627,7 +622,7 @@ void PreferencesDialog::build()
 		append_bool_option(m_optgroup_dark_mode, "sys_menu_enabled",
 			L("Use system menu for application"),
 			L("If enabled, application will use the standard Windows system menu,\n"
-			"but on some combination od display scales it can look ugly. If disabled, old UI will be used."),
+			"but on some combination of display scales it can look ugly. If disabled, old UI will be used."),
 			app_config->get_bool("sys_menu_enabled"));
 		}
 

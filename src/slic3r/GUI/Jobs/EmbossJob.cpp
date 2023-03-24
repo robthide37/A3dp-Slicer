@@ -145,7 +145,7 @@ void CreateVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
     if (!priv::finalize(canceled, eptr, m_input))
         return;
     if (m_result.its.empty()) 
-        return priv::create_message(_u8L("Can't create empty volume."));
+        return priv::create_message("Can't create empty volume.");
 
     priv::create_volume(std::move(m_result), m_input.object_id, m_input.volume_type, m_input.trmat, m_input);
 }
@@ -198,7 +198,7 @@ void CreateObjectJob::finalize(bool canceled, std::exception_ptr &eptr)
 
     // only for sure
     if (m_result.empty()) 
-        return priv::create_message(_u8L("Can't create empty object."));
+        return priv::create_message("Can't create empty object.");
 
     GUI_App    &app      = wxGetApp();
     Plater     *plater   = app.plater();
@@ -462,8 +462,8 @@ TriangleMesh priv::create_mesh(DataBase &input, Fnc was_canceled, Job::Ctl& ctl)
         if (was_canceled()) return {};
         // only info
         ctl.call_on_main_thread([]() {
-            create_message(_u8L("It is used default volume for embossed "
-                                "text, try to change text or font to fix it."));
+            create_message("It is used default volume for embossed "
+                                "text, try to change text or font to fix it.");
         });
     }
 
@@ -593,10 +593,10 @@ void priv::create_volume(
     // Parent object for text volume was propably removed.
     // Assumption: User know what he does, so text volume is no more needed.
     if (obj == nullptr) 
-        return priv::create_message(_u8L("Bad object to create volume."));
+        return priv::create_message("Bad object to create volume.");
 
     if (mesh.its.empty()) 
-        return priv::create_message(_u8L("Can't create empty volume."));
+        return priv::create_message("Can't create empty volume.");
 
     plater->take_snapshot(_L("Add Emboss text Volume"));
 
@@ -823,10 +823,6 @@ bool priv::finalize(bool canceled, std::exception_ptr &eptr, const DataBase &inp
     return !process(eptr);
 }
 
-
-#include <wx/msgdlg.h>
-
 void priv::create_message(const std::string &message) {
-    wxMessageBox(wxString(message), _L("Issue during embossing the text."),
-                 wxOK | wxICON_WARNING);
+    show_error(nullptr, message.c_str());
 }

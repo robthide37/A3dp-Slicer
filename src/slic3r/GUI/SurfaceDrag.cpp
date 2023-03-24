@@ -5,6 +5,7 @@
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
+#include "slic3r/GUI/I18N.hpp"
 #include "libslic3r/Emboss.hpp"
 
 namespace Slic3r::GUI {

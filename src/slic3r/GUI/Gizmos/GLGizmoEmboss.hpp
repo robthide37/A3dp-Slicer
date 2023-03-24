@@ -1,12 +1,11 @@
 #ifndef slic3r_GLGizmoEmboss_hpp_
 #define slic3r_GLGizmoEmboss_hpp_
 
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code,
-// which overrides our localization "L" macro.
 #include "GLGizmoBase.hpp"
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/IconManager.hpp"
 #include "slic3r/GUI/SurfaceDrag.hpp"
+#include "slic3r/GUI/I18N.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/Utils/EmbossStyleManager.hpp"
 
@@ -76,7 +75,7 @@ protected:
     bool wants_enter_leave_snapshots() const override { return true; }
     std::string get_gizmo_entering_text() const override { return _u8L("Enter emboss gizmo"); }
     std::string get_gizmo_leaving_text() const override { return _u8L("Leave emboss gizmo"); }
-    std::string get_action_snapshot_name() override { return _u8L("Embossing actions"); }
+    std::string get_action_snapshot_name() const override { return _u8L("Embossing actions"); }
 private:
     static EmbossStyles create_default_styles();
     // localized default text

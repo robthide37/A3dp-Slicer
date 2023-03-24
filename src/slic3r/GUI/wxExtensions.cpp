@@ -18,6 +18,7 @@
 #include "BitmapComboBox.hpp"
 #include "libslic3r/Utils.hpp"
 #include "OG_CustomCtrl.hpp"
+#include "format.hpp"
 
 #include "libslic3r/Color.hpp"
 
@@ -630,9 +631,8 @@ ModeButton::ModeButton( wxWindow*           parent,
 
 void ModeButton::Init(const wxString &mode)
 {
-    std::string mode_str = std::string(mode.ToUTF8());
-    m_tt_focused  = Slic3r::GUI::from_u8((boost::format(_utf8(L("Switch to the %s mode"))) % mode_str).str());
-    m_tt_selected = Slic3r::GUI::from_u8((boost::format(_utf8(L("Current mode is %s"))) % mode_str).str());
+    m_tt_focused  = Slic3r::GUI::format_wxstr(_L("Switch to the %s mode"), mode);
+    m_tt_selected = Slic3r::GUI::format_wxstr(_L("Current mode is %s"),    mode);
 
     SetBitmapMargins(3, 0);
 
