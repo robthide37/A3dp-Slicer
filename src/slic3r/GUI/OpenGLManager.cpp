@@ -7,6 +7,7 @@
 #endif // ENABLE_GL_CORE_PROFILE
 #include "I18N.hpp"
 #include "3DScene.hpp"
+#include "format.hpp"
 
 #include "libslic3r/Platform.hpp"
 

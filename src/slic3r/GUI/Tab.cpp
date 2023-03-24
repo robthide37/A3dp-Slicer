@@ -7,6 +7,7 @@
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Model.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
+#include "libslic3r/GCodeWriter.hpp"
 
 #include "slic3r/Utils/Http.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
@@ -1573,6 +1574,7 @@ void TabPrint::build()
         optgroup->append_single_option_line("bridge_acceleration");
         optgroup->append_single_option_line("first_layer_acceleration");
         optgroup->append_single_option_line("first_layer_acceleration_over_raft");
+        optgroup->append_single_option_line("travel_acceleration");
         optgroup->append_single_option_line("default_acceleration");
 
         optgroup = page->new_optgroup(L("Autospeed (advanced)"));
@@ -2259,6 +2261,12 @@ void TabPrinter::build_print_host_upload_group(Page* page)
     optgroup->append_line(line);
 }
 
+static wxString get_info_klipper_string()
+{
+    return _L("Emitting machine limits to G-code is not supported with Klipper G-code flavor.\n"
+              "The option was switched to \"Use for time estimate\".");
+}
+
 void TabPrinter::build_fff()
 {
     if (!m_pages.empty())
@@ -2376,13 +2384,41 @@ void TabPrinter::build_fff()
                     }
                 }
                 if (opt_key == "gcode_flavor") {
-                    const int flavor = boost::any_cast<int>(value);
-                    bool supports_travel_acceleration = (flavor == int(gcfMarlinFirmware) || flavor == int(gcfRepRapFirmware));
-                    bool supports_min_feedrates       = (flavor == int(gcfMarlinFirmware) || flavor == int(gcfMarlinLegacy));
+                    const GCodeFlavor flavor = static_cast<GCodeFlavor>(boost::any_cast<int>(value));
+                    bool supports_travel_acceleration = GCodeWriter::supports_separate_travel_acceleration(flavor);
+                    bool supports_min_feedrates       = (flavor == gcfMarlinFirmware || flavor == gcfMarlinLegacy);
                     if (supports_travel_acceleration != m_supports_travel_acceleration || supports_min_feedrates != m_supports_min_feedrates) {
                         m_rebuild_kinematics_page = true;
                         m_supports_travel_acceleration = supports_travel_acceleration;
                         m_supports_min_feedrates = supports_min_feedrates;
+                    }
+
+                    const bool is_emit_to_gcode = m_config->option("machine_limits_usage")->getInt() == static_cast<int>(MachineLimitsUsage::EmitToGCode);
+                    if ((flavor == gcfKlipper && is_emit_to_gcode) || (!m_supports_min_feedrates && m_use_silent_mode)) {
+                        DynamicPrintConfig new_conf = *m_config;
+                        wxString msg;
+
+                        if (flavor == gcfKlipper && is_emit_to_gcode) {
+                            msg = get_info_klipper_string();
+
+                            auto machine_limits_usage = static_cast<ConfigOptionEnum<MachineLimitsUsage>*>(m_config->option("machine_limits_usage")->clone());
+                            machine_limits_usage->value = MachineLimitsUsage::TimeEstimateOnly;
+                            new_conf.set_key_value("machine_limits_usage", machine_limits_usage);
+                        }
+
+                        if (!m_supports_min_feedrates && m_use_silent_mode) {
+                            if (!msg.IsEmpty())
+                                msg += "\n\n";
+                            msg += _L("Stealth mode for machine limits to G-code is not supported with selected G-code flavor.\n"
+                                      "The Stealth mode was suppressed.");
+
+                            auto silent_mode = static_cast<ConfigOptionBool*>(m_config->option("silent_mode")->clone());
+                            silent_mode->value = false;
+                            new_conf.set_key_value("silent_mode", silent_mode);
+                        }
+
+                        InfoDialog(parent(), _L("G-code flavor is switched"), msg).ShowModal();
+                        load_config(new_conf);
                     }
                 }
                 build_unregular_pages();
@@ -2409,6 +2445,9 @@ void TabPrinter::build_fff()
         option.opt.is_code = true;
         option.opt.height = 3 * gcode_field_height;//150;
         optgroup->append_single_option_line(option);
+
+        optgroup = page->new_optgroup(L("Start G-Code options"));
+        optgroup->append_single_option_line("autoemit_temperature_commands");
 
         optgroup = page->new_optgroup(L("End G-code"), 0);
         optgroup->m_on_change = [this, &optgroup_title = optgroup->title](const t_config_option_key& opt_key, const boost::any& value) {
@@ -2628,6 +2667,27 @@ PageShp TabPrinter::build_kinematics_page()
         };
         optgroup->append_line(line);
     }
+
+    optgroup->m_on_change = [this](const t_config_option_key& opt_key, boost::any value)
+    {
+        if (opt_key == "machine_limits_usage" &&
+            static_cast<MachineLimitsUsage>(boost::any_cast<int>(value)) == MachineLimitsUsage::EmitToGCode &&
+            static_cast<GCodeFlavor>(m_config->option("gcode_flavor")->getInt()) == gcfKlipper)
+        {
+            DynamicPrintConfig new_conf = *m_config;
+
+            auto machine_limits_usage = static_cast<ConfigOptionEnum<MachineLimitsUsage>*>(m_config->option("machine_limits_usage")->clone());
+            machine_limits_usage->value = MachineLimitsUsage::TimeEstimateOnly;
+
+            new_conf.set_key_value("machine_limits_usage", machine_limits_usage);
+
+            InfoDialog(parent(), wxEmptyString, get_info_klipper_string()).ShowModal();
+            load_config(new_conf);
+        }
+
+        update_dirty();
+        update();
+    };
 
     if (m_use_silent_mode) {
         // Legend for OptionsGroups
@@ -2865,7 +2925,7 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
 {
     size_t		n_before_extruders = 2;			//	Count of pages before Extruder pages
     auto        flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
-    bool		show_mach_limits = (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware);
+    bool		show_mach_limits = (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfRepRapFirmware || flavor == gcfKlipper);
 
     /* ! Freeze/Thaw in this function is needed to avoid call OnPaint() for erased pages
      * and be cause of application crash, when try to change Preset in moment,
@@ -3101,7 +3161,8 @@ void TabPrinter::toggle_options()
     if (m_active_page->title() == "Machine limits" && m_machine_limits_description_line) {
         assert(flavor == gcfMarlinLegacy
             || flavor == gcfMarlinFirmware
-            || flavor == gcfRepRapFirmware);
+            || flavor == gcfRepRapFirmware
+            || flavor == gcfKlipper);
 		const auto *machine_limits_usage = m_config->option<ConfigOptionEnum<MachineLimitsUsage>>("machine_limits_usage");
 		bool enabled = machine_limits_usage->value != MachineLimitsUsage::Ignore;
         bool silent_mode = m_config->opt_bool("silent_mode");
@@ -4510,6 +4571,8 @@ bool Tab::validate_custom_gcodes()
         if (!opt_group->is_activated())
             break;
         std::string key = opt_group->opt_map().begin()->first;
+        if (key == "autoemit_temperature_commands")
+            continue;
         valid &= validate_custom_gcode(opt_group->title, boost::any_cast<std::string>(opt_group->get_value(key)));
         if (!valid)
             break;

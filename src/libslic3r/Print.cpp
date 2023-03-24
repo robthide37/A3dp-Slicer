@@ -58,6 +58,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
     // Cache the plenty of parameters, which influence the G-code generator only,
     // or they are only notes not influencing the generated G-code.
     static std::unordered_set<std::string> steps_gcode = {
+        "autoemit_temperature_commands",
         "avoid_crossing_perimeters",
         "avoid_crossing_perimeters_max_detour",
         "bed_shape",
@@ -137,6 +138,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "start_filament_gcode",
         "toolchange_gcode",
         "top_solid_infill_acceleration",
+        "travel_acceleration",
         "thumbnails",
         "thumbnails_format",
         "use_firmware_retraction",
@@ -501,6 +503,10 @@ std::string Print::validate(std::string* warning) const
             return _u8L("The Spiral Vase option can only be used when printing single material objects.");
     }
 
+    if (m_config.machine_limits_usage == MachineLimitsUsage::EmitToGCode && m_config.gcode_flavor == gcfKlipper)
+        return L("Machine limits cannot be emitted to G-Code when Klipper firmware flavor is used. "
+                 "Change the value of machine_limits_usage.");
+
     // Cache of layer height profiles for checking:
     // 1) Whether all layers are synchronized if printing with wipe tower and / or unsynchronized supports.
     // 2) Whether layer height is constant for Organic supports.
@@ -557,8 +563,9 @@ std::string Print::validate(std::string* warning) const
         }
 
         if (m_config.gcode_flavor != gcfRepRapSprinter && m_config.gcode_flavor != gcfRepRapFirmware &&
-            m_config.gcode_flavor != gcfRepetier && m_config.gcode_flavor != gcfMarlinLegacy && m_config.gcode_flavor != gcfMarlinFirmware)
-            return _u8L("The Wipe Tower is currently only supported for the Marlin, RepRap/Sprinter, RepRapFirmware and Repetier G-code flavors.");
+            m_config.gcode_flavor != gcfRepetier && m_config.gcode_flavor != gcfMarlinLegacy &&
+            m_config.gcode_flavor != gcfMarlinFirmware && m_config.gcode_flavor != gcfKlipper)
+            return _u8L("The Wipe Tower is currently only supported for the Marlin, Klipper, RepRap/Sprinter, RepRapFirmware and Repetier G-code flavors.");
         if (! m_config.use_relative_e_distances)
             return _u8L("The Wipe Tower is currently only supported with the relative extruder addressing (use_relative_e_distances=1).");
         if (m_config.ooze_prevention && m_config.single_extruder_multi_material)

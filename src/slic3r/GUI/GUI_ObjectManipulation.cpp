@@ -1,5 +1,6 @@
 #include "GUI_ObjectManipulation.hpp"
 #include "I18N.hpp"
+#include "format.hpp"
 #include "BitmapComboBox.hpp"
 
 #include "GLCanvas3D.hpp"

@@ -28,9 +28,9 @@ namespace I18N {
 	    #error L macro is defined where it shouldn't be. Didn't you include slic3r/GUI/I18N.hpp in libslic3r by mistake?
 	#endif
 	namespace {
-		const char* L(const char* s)            { return s; }
-		const char* L_CONTEXT(const char* s, const char* context) { return s; }
-		std::string _u8L(const char* s)         { return Slic3r::I18N::translate(s); }
+		[[maybe_unused]] const char* L(const char* s)    { return s; }
+		[[maybe_unused]] const char* L_CONTEXT(const char* s, const char* context) { return s; }
+		[[maybe_unused]] std::string _u8L(const char* s) { return Slic3r::I18N::translate(s); }
 	}
 #endif
 

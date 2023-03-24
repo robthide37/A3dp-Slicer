@@ -1147,10 +1147,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // Emit machine envelope limits for the Marlin firmware.
     this->print_machine_envelope(file, print);
 
-    // Disable fan.
-    if (! print.config().cooling.get_at(initial_extruder_id) || print.config().disable_fan_first_layers.get_at(initial_extruder_id))
-        file.write(m_writer.set_fan(0));
-
     // Let the start-up script prime the 1st printing tool.
     m_placeholder_parser.set("initial_tool", initial_extruder_id);
     m_placeholder_parser.set("initial_extruder", initial_extruder_id);
@@ -1667,23 +1663,25 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
             int(print.config().machine_max_feedrate_e.values.front() * factor + 0.5),
             factor == 60 ? "mm / min" : "mm / sec");
 
-        // Now M204 - acceleration. This one is quite hairy thanks to how Marlin guys care about
-        // backwards compatibility: https://github.com/prusa3d/PrusaSlicer/issues/1089
-        // Legacy Marlin should export travel acceleration the same as printing acceleration.
-        // MarlinFirmware has the two separated.
-        int travel_acc = flavor == gcfMarlinLegacy
-                       ? int(print.config().machine_max_acceleration_extruding.values.front() + 0.5)
-                       : int(print.config().machine_max_acceleration_travel.values.front() + 0.5);
-        // Retract acceleration not accepted in M204 in RRF
+        // Now M204 - acceleration. This one is quite hairy...
         if (flavor == gcfRepRapFirmware)
+            // Uses M204 P[print] T[travel]
             file.write_format("M204 P%d T%d ; sets acceleration (P, T), mm/sec^2\n",
                 int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
-                travel_acc);
-        else
+                int(print.config().machine_max_acceleration_travel.values.front() + 0.5));
+        else if (flavor == gcfMarlinLegacy)
+            // Legacy Marlin uses M204 S[print] T[retract]
+            file.write_format("M204 S%d T%d ; sets acceleration (S) and retract acceleration (R), mm/sec^2\n",
+                int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
+                int(print.config().machine_max_acceleration_retracting.values.front() + 0.5));
+        else if (flavor == gcfMarlinFirmware)
+            // New Marlin uses M204 P[print] R[retract] T[travel]
             file.write_format("M204 P%d R%d T%d ; sets acceleration (P, T) and retract acceleration (R), mm/sec^2\n",
                 int(print.config().machine_max_acceleration_extruding.values.front() + 0.5),
                 int(print.config().machine_max_acceleration_retracting.values.front() + 0.5),
-                travel_acc);
+                int(print.config().machine_max_acceleration_travel.values.front() + 0.5));
+        else
+            assert(false);
 
         assert(is_decimal_separator_point());
         file.write_format(flavor == gcfRepRapFirmware
@@ -1710,17 +1708,18 @@ void GCode::print_machine_envelope(GCodeOutputStream &file, Print &print)
 // M190 - Set Extruder Temperature and Wait
 void GCode::_print_first_layer_bed_temperature(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
 {
+    bool autoemit = print.config().autoemit_temperature_commands;
     // Initial bed temperature based on the first extruder.
     int  temp = print.config().first_layer_bed_temperature.get_at(first_printing_extruder_id);
     // Is the bed temperature set by the provided custom G-code?
     int  temp_by_gcode     = -1;
     bool temp_set_by_gcode = custom_gcode_sets_temperature(gcode, 140, 190, false, temp_by_gcode);
-    if (temp_set_by_gcode && temp_by_gcode >= 0 && temp_by_gcode < 1000)
+    if (autoemit && temp_set_by_gcode && temp_by_gcode >= 0 && temp_by_gcode < 1000)
         temp = temp_by_gcode;
     // Always call m_writer.set_bed_temperature() so it will set the internal "current" state of the bed temp as if
     // the custom start G-code emited these.
     std::string set_temp_gcode = m_writer.set_bed_temperature(temp, wait);
-    if (! temp_set_by_gcode)
+    if (autoemit && ! temp_set_by_gcode)
         file.write(set_temp_gcode);
 }
 
@@ -1731,13 +1730,14 @@ void GCode::_print_first_layer_bed_temperature(GCodeOutputStream &file, Print &p
 // RepRapFirmware: G10 Sxx
 void GCode::_print_first_layer_extruder_temperatures(GCodeOutputStream &file, Print &print, const std::string &gcode, unsigned int first_printing_extruder_id, bool wait)
 {
+    bool autoemit = print.config().autoemit_temperature_commands;
     // Is the bed temperature set by the provided custom G-code?
     int  temp_by_gcode = -1;
     bool include_g10   = print.config().gcode_flavor == gcfRepRapFirmware;
-    if (custom_gcode_sets_temperature(gcode, 104, 109, include_g10, temp_by_gcode)) {
+    if (! autoemit  || custom_gcode_sets_temperature(gcode, 104, 109, include_g10, temp_by_gcode)) {
         // Set the extruder temperature at m_writer, but throw away the generated G-code as it will be written with the custom G-code.
         int temp = print.config().first_layer_temperature.get_at(first_printing_extruder_id);
-        if (temp_by_gcode >= 0 && temp_by_gcode < 1000)
+        if (autoemit && temp_by_gcode >= 0 && temp_by_gcode < 1000)
             temp = temp_by_gcode;
         m_writer.set_temperature(temp, wait, first_printing_extruder_id);
     } else {
@@ -2547,7 +2547,7 @@ std::string GCode::extrude_loop(ExtrusionLoop loop, const std::string_view descr
     }
 
     // reset acceleration
-    gcode += m_writer.set_acceleration((unsigned int)(m_config.default_acceleration.value + 0.5));
+    gcode += m_writer.set_print_acceleration((unsigned int)(m_config.default_acceleration.value + 0.5));
 
     if (m_wipe.enable) {
         m_wipe.path = paths.front().polyline;
@@ -2633,7 +2633,7 @@ std::string GCode::extrude_multi_path(ExtrusionMultiPath multipath, const std::s
         }
     }
     // reset acceleration
-    gcode += m_writer.set_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
+    gcode += m_writer.set_print_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
     return gcode;
 }
 
@@ -2659,7 +2659,7 @@ std::string GCode::extrude_path(ExtrusionPath path, std::string_view description
         m_wipe.path.reverse();
     }
     // reset acceleration
-    gcode += m_writer.set_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
+    gcode += m_writer.set_print_acceleration((unsigned int)floor(m_config.default_acceleration.value + 0.5));
     return gcode;
 }
 
@@ -2802,7 +2802,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         } else {
             acceleration = m_config.default_acceleration.value;
         }
-        gcode += m_writer.set_acceleration((unsigned int)floor(acceleration + 0.5));
+        gcode += m_writer.set_print_acceleration((unsigned int)floor(acceleration + 0.5));
     }
 
     // calculate extrusion length per distance unit
@@ -3071,8 +3071,18 @@ std::string GCode::travel_to(const Point &point, ExtrusionRole role, std::string
 
     // use G1 because we rely on paths being straight (G0 may make round paths)
     if (travel.size() >= 2) {
+
+        gcode += m_writer.set_travel_acceleration((unsigned int)(m_config.travel_acceleration.value + 0.5));
+
         for (size_t i = 1; i < travel.size(); ++ i)
             gcode += m_writer.travel_to_xy(this->point_to_gcode(travel.points[i]), comment);
+
+        if (! GCodeWriter::supports_separate_travel_acceleration(config().gcode_flavor)) {
+            // In case that this flavor does not support separate print and travel acceleration,
+            // reset acceleration to default.
+            gcode += m_writer.set_travel_acceleration((unsigned int)(m_config.travel_acceleration.value + 0.5));
+        }
+
         this->set_last_pos(travel.points.back());
     }
     return gcode;
