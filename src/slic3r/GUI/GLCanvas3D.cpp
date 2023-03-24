@@ -3605,6 +3605,9 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
         int instance_idx = v->instance_idx();
         int volume_idx = v->volume_idx();
 
+        if (volume_idx < 0)
+            continue;
+
         std::pair<int, int> done_id(object_idx, instance_idx);
 
         if (0 <= object_idx && object_idx < (int)m_model->objects.size()) {
@@ -3619,7 +3622,7 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
 #else
                     model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
 #endif // ENABLE_WORLD_COORDINATE
-                else if (volume_idx >= 0 && selection_mode == Selection::Volume)
+                else if (selection_mode == Selection::Volume)
 #if ENABLE_WORLD_COORDINATE
                     model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
 #else
@@ -3710,6 +3713,9 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
         const int instance_idx = v->instance_idx();
         const int volume_idx = v->volume_idx();
 
+        if (volume_idx < 0)
+            continue;
+
         done.insert(std::pair<int, int>(object_idx, instance_idx));
 
         // Rotate instances/volumes.
@@ -3723,7 +3729,7 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
                 model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
 #endif // ENABLE_WORLD_COORDINATE
             }
-            else if (selection_mode == Selection::Volume && volume_idx >= 0) {
+            else if (selection_mode == Selection::Volume) {
 #if ENABLE_WORLD_COORDINATE
                 model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
 #else
@@ -3786,6 +3792,9 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
         const int instance_idx = v->instance_idx();
         const int volume_idx = v->volume_idx();
 
+        if (volume_idx < 0)
+            continue;
+
         done.insert(std::pair<int, int>(object_idx, instance_idx));
 
         // Rotate instances/volumes
@@ -3799,7 +3808,7 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
                 model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
 #endif // ENABLE_WORLD_COORDINATE
             }
-            else if (selection_mode == Selection::Volume && volume_idx >= 0) {
+            else if (selection_mode == Selection::Volume) {
 #if ENABLE_WORLD_COORDINATE
                 model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
                 model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
