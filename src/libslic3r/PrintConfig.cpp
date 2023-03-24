@@ -48,6 +48,7 @@ static const t_config_enum_values s_keys_map_GCodeFlavor {
     { "makerware",      gcfMakerWare },
     { "marlin",         gcfMarlinLegacy },
     { "marlin2",        gcfMarlinFirmware },
+    { "klipper",        gcfKlipper },
     { "sailfish",       gcfSailfish },
     { "smoothie",       gcfSmoothie },
     { "mach3",          gcfMach3 },
@@ -67,6 +68,7 @@ static const t_config_enum_values s_keys_map_PrintHostType {
     { "prusalink",      htPrusaLink },
     { "prusaconnect",   htPrusaConnect },
     { "octoprint",      htOctoPrint },
+    { "mainsail",       htMainSail },
     { "duet",           htDuet },
     { "flashair",       htFlashAir },
     { "astrobox",       htAstroBox },
@@ -1406,6 +1408,7 @@ void PrintConfigDef::init_fff_params()
         { "makerware",      "MakerWare (MakerBot)" },
         { "marlin",         "Marlin (legacy)" },
         { "marlin2",        "Marlin 2" },
+        { "klipper",        "Klipper" },
         { "sailfish",       "Sailfish (MakerBot)" },
         { "mach3",          "Mach3/LinuxCNC" },
         { "machinekit",     "Machinekit" },
@@ -1463,7 +1466,15 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0));
-    
+
+    def = this->add("travel_acceleration", coFloat);
+    def->label = L("Travel");
+    def->tooltip = L("This is the acceleration your printer will use for travel moves. Set zero to disable "
+                     "acceleration control for travel.");
+    def->sidetext = L("mm/s²");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0));
 
     def = this->add("infill_every_layers", coInt);
     def->label = L("Combine infill every");
@@ -1792,9 +1803,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("machine_max_acceleration_extruding", coFloats);
     def->full_label = L("Maximum acceleration when extruding");
     def->category = L("Machine limits");
-    def->tooltip = L("Maximum acceleration when extruding (M204 P)\n\n"
-                     "Marlin (legacy) firmware flavor will use this also "
-                     "as travel acceleration (M204 T).");
+    def->tooltip = L("Maximum acceleration when extruding");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comAdvanced;
@@ -1805,7 +1814,8 @@ void PrintConfigDef::init_fff_params()
     def = this->add("machine_max_acceleration_retracting", coFloats);
     def->full_label = L("Maximum acceleration when retracting");
     def->category = L("Machine limits");
-    def->tooltip = L("Maximum acceleration when retracting (M204 R)");
+    def->tooltip = L("Maximum acceleration when retracting.\n\n"
+                     "Not used for RepRapFirmware, which does not support it.");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comAdvanced;
@@ -1815,7 +1825,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("machine_max_acceleration_travel", coFloats);
     def->full_label = L("Maximum acceleration for travel moves");
     def->category = L("Machine limits");
-    def->tooltip = L("Maximum acceleration for travel moves (M204 T)");
+    def->tooltip = L("Maximum acceleration for travel moves.");
     def->sidetext = L("mm/s²");
     def->min = 0;
     def->mode = comAdvanced;
@@ -1944,6 +1954,7 @@ void PrintConfigDef::init_fff_params()
         { "prusalink",      "PrusaLink" },
         { "prusaconnect",   "PrusaConnect" },
         { "octoprint",      "OctoPrint" },
+        { "mainsail",       "Mainsail/Fluidd" },
         { "duet",           "Duet" },
         { "flashair",       "FlashAir" },
         { "astrobox",       "AstroBox" },
@@ -2478,15 +2489,25 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionInt(-5));
 
+    def = this->add("autoemit_temperature_commands", coBool);
+    def->label = L("Emit temperature commands automatically");
+    def->tooltip = L("When enabled, PrusaSlicer will check whether your Custom Start G-Code contains M104 or M190. "
+                     "If so, the temperatures will not be emitted automatically so you're free to customize "
+                     "the order of heating commands and other custom actions. Note that you can use "
+                     "placeholder variables for all PrusaSlicer settings, so you can put "
+                     "a \"M109 S[first_layer_temperature]\" command wherever you want.\n"
+                     "If your Custom Start G-Code does NOT contain M104 or M190, "
+                     "PrusaSlicer will execute the Start G-Code after bed reached its target temperature "
+                     "and extruder just started heating.\n\n"
+                     "When disabled, PrusaSlicer will NOT emit commands to heat up extruder and bed, "
+                     "leaving both to Custom Start G-Code.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(true));
+
     def = this->add("start_gcode", coString);
     def->label = L("Start G-code");
-    def->tooltip = L("This start procedure is inserted at the beginning, after bed has reached "
-                   "the target temperature and extruder just started heating, and before extruder "
-                   "has finished heating. If PrusaSlicer detects M104 or M190 in your custom codes, "
-                   "such commands will not be prepended automatically so you're free to customize "
-                   "the order of heating commands and other custom actions. Note that you can use "
-                   "placeholder variables for all PrusaSlicer settings, so you can put "
-                   "a \"M109 S[first_layer_temperature]\" command wherever you want.");
+    def->tooltip = L("This start procedure is inserted at the beginning, possibly prepended by "
+                     "temperature-changing commands. See 'autoemit_temperature_commands'.");
     def->multiline = true;
     def->full_width = true;
     def->height = 12;
@@ -4413,8 +4434,9 @@ std::string validate(const FullPrintConfig &cfg)
         cfg.gcode_flavor.value != gcfMarlinLegacy &&
         cfg.gcode_flavor.value != gcfMarlinFirmware &&
         cfg.gcode_flavor.value != gcfMachinekit &&
-        cfg.gcode_flavor.value != gcfRepetier)
-        return "--use-firmware-retraction is only supported by Marlin, Smoothie, RepRapFirmware, Repetier and Machinekit firmware";
+        cfg.gcode_flavor.value != gcfRepetier &&
+        cfg.gcode_flavor.value != gcfKlipper)
+        return "--use-firmware-retraction is only supported by Marlin, Klipper, Smoothie, RepRapFirmware, Repetier and Machinekit firmware";
 
     if (cfg.use_firmware_retraction.value)
         for (unsigned char wipe : cfg.wipe.values)
