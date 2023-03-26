@@ -1436,7 +1436,8 @@ void Print::_make_skirt(const PrintObjectPtrs &objects, ExtrusionEntityCollectio
                 erSkirt,
                 (float)mm3_per_mm,         // this will be overridden at G-code export time
                 flow.width(),
-				(float)get_first_layer_height()  // this will be overridden at G-code export time
+				(float)get_first_layer_height(),  // this will be overridden at G-code export time
+                false
             )));
         eloop.paths.back().polyline = loop.split_at_first_point();
         //we make it clowkwise, but as it will be reversed, it will be ccw

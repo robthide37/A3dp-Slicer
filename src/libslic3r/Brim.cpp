@@ -820,11 +820,11 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
             for (Polyline& pline : to_cut.lines) {
                 assert(pline.size() > 0);
                 if (pline.back() == pline.front()) {
-                    ExtrusionPath path(erSkirt, mm3_per_mm, width, height);
+                    ExtrusionPath path(erSkirt, mm3_per_mm, width, height, false);
                     path.polyline = pline;
                     to_add.push_back(new ExtrusionLoop(std::move(path), elrSkirt));
                 } else {
-                    ExtrusionPath* extrusion_path = new ExtrusionPath(erSkirt, mm3_per_mm, width, height);
+                    ExtrusionPath* extrusion_path = new ExtrusionPath(erSkirt, mm3_per_mm, width, height, false);
                     to_add.push_back(extrusion_path);
                     extrusion_path->polyline = pline;
                 }
@@ -851,16 +851,16 @@ void extrude_brim_from_tree(const Print& print, std::vector<std::vector<BrimLoop
         } else {
             ExtrusionEntityCollection* print_me_first = new ExtrusionEntityCollection();
             print_me_first->set_can_sort_reverse(false, false);
-            parent->append({ print_me_first });
+            parent->append(ExtrusionEntitiesPtr{ print_me_first });
             ExtrusionEntitiesPtr to_add;
             for (Polyline& pline : to_cut.lines) {
                 assert(pline.size() > 0);
                 if (pline.back() == pline.front()) {
-                    ExtrusionPath path(erSkirt, mm3_per_mm, width, height);
+                    ExtrusionPath path(erSkirt, mm3_per_mm, width, height, false);
                     path.polyline = pline;
                     to_add.push_back(new ExtrusionLoop(std::move(path), elrSkirt));
                 } else {
-                    ExtrusionPath* extrusion_path = new ExtrusionPath(erSkirt, mm3_per_mm, width, height);
+                    ExtrusionPath* extrusion_path = new ExtrusionPath(erSkirt, mm3_per_mm, width, height, false);
                     to_add.push_back(extrusion_path);
                     extrusion_path->polyline = pline;
                 }

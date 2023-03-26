@@ -27,8 +27,6 @@ class ExtrusionEntityCollection : public ExtrusionEntity
 private:
     // set to tru to forbit to reorder and reverse all entities indie us.
     bool m_no_sort;
-    // even if no_sort, allow to reverse() us (and our entities if they allow it, but they should) 
-    bool m_no_reverse;
     ExtrusionEntitiesPtr m_entities;     // we own these entities
 public:
     virtual ExtrusionEntityCollection* clone() const override { return new ExtrusionEntityCollection(*this); }
@@ -40,17 +38,17 @@ public:
     /// Iterating over this needs to check each child to see if it, too is a collection.
     const ExtrusionEntitiesPtr& entities() const { return m_entities; }
     ExtrusionEntitiesPtr& set_entities() { return m_entities; }
-    ExtrusionEntityCollection() : m_no_sort(false), m_no_reverse(false) {}
-    ExtrusionEntityCollection(bool no_sort, bool no_reverse) : m_no_sort(no_sort), m_no_reverse(no_reverse) {}
-    ExtrusionEntityCollection(const ExtrusionEntityCollection &other) : m_no_sort(other.m_no_sort), m_no_reverse(other.m_no_reverse) { this->append(other.entities()); }
-    ExtrusionEntityCollection(ExtrusionEntityCollection &&other) : m_entities(std::move(other.m_entities)), m_no_sort(other.m_no_sort), m_no_reverse(other.m_no_reverse) {}
+    ExtrusionEntityCollection() : m_no_sort(false), ExtrusionEntity(true) {}
+    ExtrusionEntityCollection(bool can_sort, bool can_reverse) : m_no_sort(!can_sort), ExtrusionEntity(can_reverse) {}
+    ExtrusionEntityCollection(const ExtrusionEntityCollection &other) : m_no_sort(other.m_no_sort), ExtrusionEntity(other.m_can_reverse) { this->append(other.entities()); }
+    ExtrusionEntityCollection(ExtrusionEntityCollection &&other) : m_entities(std::move(other.m_entities)), m_no_sort(other.m_no_sort), ExtrusionEntity(other.m_can_reverse) {}
     explicit ExtrusionEntityCollection(const ExtrusionPaths &paths);
     ExtrusionEntityCollection& operator=(const ExtrusionEntityCollection &other);
     ExtrusionEntityCollection& operator=(ExtrusionEntityCollection &&other) {
         this->clear();
         this->m_entities = std::move(other.m_entities);
         this->m_no_sort  = other.m_no_sort;
-        this->m_no_reverse = other.m_no_reverse;
+        this->m_can_reverse = other.m_can_reverse;
         return *this;
     }
     ~ExtrusionEntityCollection() override { clear(); }
@@ -67,9 +65,9 @@ public:
         }
         return out;
     }
-    void set_can_sort_reverse(bool sort, bool reverse) { this->m_no_sort = !sort; this->m_no_reverse = !reverse; }
+    void set_can_sort_reverse(bool can_sort, bool can_reverse) { this->m_no_sort = !can_sort; this->m_can_reverse = can_reverse; }
     bool can_sort() const { return !this->m_no_sort; }
-    bool can_reverse() const override { return can_sort() || !this->m_no_reverse; }
+    bool can_reverse() const override { return can_sort() || this->m_can_reverse; }
     bool empty() const { return this->m_entities.empty(); }
     void clear();
     void swap (ExtrusionEntityCollection &c);

@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <numeric>
 #include <utility>
-#include <boost/unordered_map.hpp>
 #include <stdexcept>
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
@@ -61,7 +60,7 @@ using Config::Snapshot;
 using Config::SnapshotDB;
 
 
-static const boost::unordered_map<PrinterTechnology, std::string> tech_to_string{ {
+static const std::unordered_map<PrinterTechnology, std::string> tech_to_string{ {
     { PrinterTechnology::ptFFF, "FFF" },
     { PrinterTechnology::ptSLA, "SLA" },
     { PrinterTechnology::ptSLS, "SLS" },

@@ -4274,6 +4274,11 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
     // we discard it in that case
     ExtrusionPaths& building_paths = loop_to_seam.paths;
+    //direction is now set, make the path unreversable
+    for (ExtrusionPath& path : building_paths) {
+        assert(!path.can_reverse() || path.role() == erGapFill);
+        path.set_can_reverse(false);
+    }
     if (m_enable_loop_clipping && m_writer.tool_is_extruder()) {
         coordf_t clip_length = scale_(m_config.seam_gap.get_abs_value(m_writer.tool()->id(), nozzle_diam));
         if (original_loop.role() == erExternalPerimeter) {
@@ -4396,21 +4401,25 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
         // use extrude instead of travel_to_xy to trigger the unretract
         ExtrusionPath fake_path_wipe(Polyline{ pt , current_point }, wipe_paths.front());
         fake_path_wipe.mm3_per_mm = 0;
+        assert(!fake_path_wipe.can_reverse());
         gcode += extrude_path(fake_path_wipe, "move inwards before retraction/seam", speed);
     }
     
     //extrusion notch start if any
     for (const ExtrusionPath& path : notch_extrusion_start) {
+        assert(!path.can_reverse());
         gcode += extrude_path(path, description, speed);
     }
     // extrude along the path
     //FIXME: we can have one-point paths in the loop that don't move : it's useless! and can create problems!
-    for (auto path = paths.begin(); path != paths.end(); ++path) {
-        if(path->polyline.size() > 1)
-            gcode += extrude_path(*path, description, speed);
+    for (const ExtrusionPath& path : paths) {
+        assert(!path.can_reverse());
+        if(path.polyline.size() > 1)
+            gcode += extrude_path(path, description, speed);
     }
     //extrusion notch end if any
     for (const ExtrusionPath& path : notch_extrusion_end) {
+        assert(!path.can_reverse());
         gcode += extrude_path(path, description, speed);
     }
 

@@ -3338,7 +3338,7 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
             if (!poly.is_valid()) continue;
 
             ExtrusionMultiPath3D *extrusions = new ExtrusionMultiPath3D();
-            extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.mm3_per_mm() * params.flow_mult, params.flow.width() * params.flow_mult, params.flow.height()));
+            extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.mm3_per_mm() * params.flow_mult, params.flow.width() * params.flow_mult, params.flow.height(), false));
             ExtrusionPath3D *current_extrusion = &(extrusions->paths.back());
             const Points &pts = poly.points;
             coord_t next_zhop = tooth_spacing_min + (coord_t)abs((rand() / (float)RAND_MAX) * (tooth_spacing_max - tooth_spacing_min));
@@ -3380,13 +3380,13 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
                     }
 
                     //add new extrusion that go up with nozzle_flow
-                    extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.nozzle_diameter() * params.flow.nozzle_diameter() * PI / 4, params.flow.nozzle_diameter(), params.flow.nozzle_diameter()));
+                    extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.nozzle_diameter() * params.flow.nozzle_diameter() * PI / 4, params.flow.nozzle_diameter(), params.flow.nozzle_diameter(), false));
                     current_extrusion = &(extrusions->paths.back());
                     current_extrusion->push_back(last, 0);
                     current_extrusion->push_back(last, tooth_zhop);
 
                     //add new extrusion that move a bit to let the place for the nozzle tip
-                    extrusions->paths.push_back(ExtrusionPath3D(good_role, 0, params.flow.nozzle_diameter() / 10, params.flow.nozzle_diameter() / 10));
+                    extrusions->paths.push_back(ExtrusionPath3D(good_role, 0, params.flow.nozzle_diameter() / 10, params.flow.nozzle_diameter() / 10, false));
                     current_extrusion = &(extrusions->paths.back());
                     //add first point
                     current_extrusion->push_back(last, tooth_zhop);
@@ -3396,7 +3396,7 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
                     current_extrusion->push_back(last, tooth_zhop);
 
                     // add new extrusion that go down with no nozzle_flow / sqrt(2)
-                    extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.mm3_per_mm() / std::sqrt(2), float(params.flow.width() / std::sqrt(2)), params.flow.height()));
+                    extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.mm3_per_mm() / std::sqrt(2), float(params.flow.width() / std::sqrt(2)), params.flow.height(), false));
                     current_extrusion = &(extrusions->paths.back());
                     current_extrusion->push_back(last, tooth_zhop);
                     //add next point at scaled_nozzle_diam distance
@@ -3405,7 +3405,7 @@ FillRectilinearSawtooth::fill_surface_extrusion(const Surface *surface, const Fi
                     current_extrusion->push_back(last, 0);
 
                     // now go back to normal flow
-                    extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.mm3_per_mm() * params.flow_mult, params.flow.width() * params.flow_mult, params.flow.height()));
+                    extrusions->paths.push_back(ExtrusionPath3D(good_role, params.flow.mm3_per_mm() * params.flow_mult, params.flow.width() * params.flow_mult, params.flow.height(), false));
                     current_extrusion = &(extrusions->paths.back());
                     //add first point
                     current_extrusion->push_back(last, 0);

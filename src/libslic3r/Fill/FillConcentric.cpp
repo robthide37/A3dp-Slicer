@@ -80,7 +80,7 @@ void append_loop_into_collection(ExtrusionEntityCollection& storage, ExtrusionRo
     if (polygon.is_valid()) {
         //default to ccw
         polygon.make_counter_clockwise();
-        ExtrusionPath path(good_role, flow, width, height);
+        ExtrusionPath path(good_role, flow, width, height, false);
         path.polyline.append(std::move(polygon.points));
         path.polyline.append(path.polyline.front());
         storage.append(ExtrusionLoop{ std::move(path) });
@@ -134,6 +134,9 @@ FillConcentricWGapFill::fill_surface_extrusion(
             if (!new_gaps.empty()) {
                 append(gaps, new_gaps);
                 bunch_2_gaps.push_back(std::move(new_gaps));
+                if (!bunch_2_shell_2_loops.back().empty() && bunch_2_shell_2_loops.back().back().empty()) {
+                    bunch_2_shell_2_loops.back().pop_back();
+                }
                 //create a new collection for next bunch.
                 bunch_2_shell_2_loops.emplace_back();
             }
@@ -143,9 +146,15 @@ FillConcentricWGapFill::fill_surface_extrusion(
             }
             first = false;
         }
+        if (!bunch_2_shell_2_loops.back().empty() && bunch_2_shell_2_loops.back().back().empty()) {
+            bunch_2_shell_2_loops.back().pop_back();
+        }
         if (bunch_2_shell_2_loops.back().empty()) {
             assert(bunch_2_shell_2_loops.size() > bunch_2_gaps.size());
             bunch_2_shell_2_loops.pop_back();
+            if (!bunch_2_shell_2_loops.empty() && !bunch_2_shell_2_loops.back().empty() && bunch_2_shell_2_loops.back().back().empty()) {
+                bunch_2_shell_2_loops.back().pop_back();
+            }
         }
 
         // generate paths from the outermost to the innermost, to avoid
@@ -157,10 +166,10 @@ FillConcentricWGapFill::fill_surface_extrusion(
         //get the role
         ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
 
-        ExtrusionEntityCollection* root_collection_nosort = new ExtrusionEntityCollection(true, true);
+        ExtrusionEntityCollection* root_collection_nosort = new ExtrusionEntityCollection(false, false);
 
         //pattern (don't modify/move it)
-        const ExtrusionEntityCollection eec_pattern_no_sort{ true, true };
+        const ExtrusionEntityCollection eec_pattern_no_sort{ false, false };
 
         assert(bunch_2_shell_2_loops.size() == bunch_2_gaps.size() || bunch_2_shell_2_loops.size() == bunch_2_gaps.size() + 1);
         //for each "shell" (loop to print before a gap)
@@ -225,15 +234,15 @@ FillConcentricWGapFill::fill_surface_extrusion(
                             ExtrusionEntity* elt = leaf_coll->set_entities().back();
                             leaf_coll->set_entities().pop_back();
                             //add sortbale collection inside
-                            leaf_coll->append(ExtrusionEntityCollection{});;
+                            leaf_coll->append(ExtrusionEntityCollection{});
                             leaf_count.sortable = static_cast<ExtrusionEntityCollection*>(leaf_coll->set_entities().back());
-                            ExtrusionEntityCollection new_coll_nosort{ true, true };
+                            ExtrusionEntityCollection new_coll_nosort{ false, false };
                             new_coll_nosort.set_entities().push_back(elt);
                             leaf_count.sortable->append(std::move(new_coll_nosort));
                         }
                         if (leaf_count.sortable) {
                             //add new collection
-                            ExtrusionEntityCollection new_coll_nosort{ true, true };
+                            ExtrusionEntityCollection new_coll_nosort{ false, false };
                             append_loop_into_collection(new_coll_nosort, good_role, params, islands[idx_island]);
                             leaf_count.sortable->append(std::move(new_coll_nosort));
                         }
@@ -296,43 +305,43 @@ FillConcentricWGapFill::fill_surface_extrusion(
                         md.build(polylines);
                     }
                 }
-                //search if we can add some at the end of a leaf
-                for (size_t idx_polyline = 0; idx_polyline < polylines.size(); ++idx_polyline) {
-                    ThickPolyline& poly = polylines[idx_polyline];
-                    assert(!poly.empty());
-                    for (size_t idx_leaf = 0; idx_leaf < leafs.size(); ++idx_leaf) {
-                        assert(!leafs[idx_leaf]->entities().empty());
-                        const ExtrusionEntitiesPtr& leaf_entities = leafs[idx_leaf]->entities();
-                        //get last loop
-                        size_t idx_last_loop = leaf_entities.size() - 1;
-                        while (!leaf_entities[idx_last_loop]->is_loop()) {
-                            if (idx_last_loop == 0) {
-                                assert(false);
-                                //goto goto_next_polyline;
-                            }
-                            --idx_last_loop;
-                        }
-                        //test
-                        assert(leafs[idx_leaf]->entities()[idx_last_loop]->is_loop());
-                        if (leafs[idx_leaf]->entities()[idx_last_loop]->is_loop() &&
-                            static_cast<ExtrusionLoop*>(leafs[idx_leaf]->entities()[idx_last_loop])->polygon().contains(poly.points[poly.size() / 2])) {
-                            //do gapfill locally
-                            leafs[idx_leaf]->append(
-                                Geometry::variable_width(
-                                    poly, erGapFill, 
-                                    params.flow, 
-                                    scale_t(params.config->get_computed_value("resolution_internal")), 
-                                    params.flow.scaled_width() / 10)
-                            );
-                            polylines.erase(polylines.begin() + idx_polyline);
-                            --idx_polyline;
-                            break;
-                        }
-                    }
-                    //goto_next_polyline:
-                }
+                ////search if we can add some at the end of a leaf
+                //for (size_t idx_polyline = 0; idx_polyline < polylines.size(); ++idx_polyline) {
+                //    ThickPolyline& poly = polylines[idx_polyline];
+                //    assert(!poly.empty());
+                //    for (size_t idx_leaf = 0; idx_leaf < leafs.size(); ++idx_leaf) {
+                //        assert(!leafs[idx_leaf]->entities().empty());
+                //        const ExtrusionEntitiesPtr& leaf_entities = leafs[idx_leaf]->entities();
+                //        //get last loop
+                //        size_t idx_last_loop = leaf_entities.size() - 1;
+                //        while (!leaf_entities[idx_last_loop]->is_loop()) {
+                //            if (idx_last_loop == 0) {
+                //                assert(false);
+                //                //goto goto_next_polyline;
+                //            }
+                //            --idx_last_loop;
+                //        }
+                //        //test
+                //        assert(leafs[idx_leaf]->entities()[idx_last_loop]->is_loop());
+                //        if (leafs[idx_leaf]->entities()[idx_last_loop]->is_loop() &&
+                //            static_cast<ExtrusionLoop*>(leafs[idx_leaf]->entities()[idx_last_loop])->polygon().contains(poly.points[poly.size() / 2])) {
+                //            //do gapfill locally
+                //            leafs[idx_leaf]->append(
+                //                Geometry::variable_width(
+                //                    poly, erGapFill, 
+                //                    params.flow, 
+                //                    scale_t(params.config->get_computed_value("resolution_internal")), 
+                //                    params.flow.scaled_width() / 10)
+                //            );
+                //            polylines.erase(polylines.begin() + idx_polyline);
+                //            --idx_polyline;
+                //            break;
+                //        }
+                //    }
+                //    //goto_next_polyline:
+                //}
                 if (!polylines.empty() && !is_bridge(good_role)) {
-                    ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")));
+                    ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
                     if (!gap_fill_entities.empty()) {
                         //set role if needed
                         if (good_role != erSolidInfill) {
