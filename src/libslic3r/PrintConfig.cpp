@@ -4552,12 +4552,19 @@ std::string validate(const FullPrintConfig &cfg)
         }
         case coFloats:
         case coPercents:
-            for (double v : static_cast<const ConfigOptionVector<double>*>(opt)->values)
+        {
+            const auto* vec = static_cast<const ConfigOptionVector<double>*>(opt);
+            for (size_t i = 0; i < vec->size(); ++i) {
+                if (vec->is_nil(i))
+                    continue;
+                double v = vec->values[i];
                 if (v < optdef->min || v > optdef->max) {
                     out_of_range = true;
                     break;
                 }
+            }
             break;
+        }
         case coInt:
         {
             auto *iopt = static_cast<const ConfigOptionInt*>(opt);
@@ -4565,12 +4572,19 @@ std::string validate(const FullPrintConfig &cfg)
             break;
         }
         case coInts:
-            for (int v : static_cast<const ConfigOptionVector<int>*>(opt)->values)
+        {
+            const auto* vec = static_cast<const ConfigOptionVector<int>*>(opt);
+            for (size_t i = 0; i < vec->size(); ++i) {
+                if (vec->is_nil(i))
+                    continue;
+                int v = vec->values[i];
                 if (v < optdef->min || v > optdef->max) {
                     out_of_range = true;
                     break;
                 }
+            }
             break;
+        }
         default:;
         }
         if (out_of_range)
