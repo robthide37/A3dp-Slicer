@@ -2298,7 +2298,10 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
             const Vec3d new_plane_center = m_bb_center + cross_dir * cross_dir.dot(pt - m_bb_center);
             // update transformed bb
             const auto new_tbb = transformed_bounding_box(new_plane_center, m);
-            const Vec3d& instance_offset = m_parent.get_selection().get_first_volume()->get_instance_offset();
+            const GLVolume* first_volume = m_parent.get_selection().get_first_volume();
+            Vec3d instance_offset = first_volume->get_instance_offset();
+            instance_offset[Z] += first_volume->get_sla_shift_z();
+
             const Vec3d trans_center_pos = m.inverse() * (new_plane_center - instance_offset) + new_tbb.center();
             if (new_tbb.contains(trans_center_pos)) {
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by line"), UndoRedo::SnapshotType::GizmoAction);
