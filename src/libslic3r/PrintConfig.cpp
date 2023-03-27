@@ -1560,14 +1560,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
-    def = this->add("infill_only_where_needed", coBool);
-    def->label = L("Only infill where needed");
-    def->category = L("Infill");
-    def->tooltip = L("This option will limit infill to the areas actually needed for supporting ceilings "
-                   "(it will act as internal support material). If enabled, slows down the G-code generation "
-                   "due to the multiple checks involved.");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(false));
+    // def = this->add("infill_only_where_needed", coBool);
+    // def->label = L("Only infill where needed");
+    // def->category = L("Infill");
+    // def->tooltip = L("This option will limit infill to the areas actually needed for supporting ceilings "
+    //                "(it will act as internal support material). If enabled, slows down the G-code generation "
+    //                "due to the multiple checks involved.");
+    // def->mode = comAdvanced;
+    // def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("infill_overlap", coFloatOrPercent);
     def->label = L("Infill/perimeters overlap");
@@ -4154,6 +4154,8 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "wall_add_middle_threshold", "wall_split_middle_threshold",
     // Replaced by new concentric ensuring in 2.6.0-alpha5
     "ensure_vertical_shell_thickness",
+    // Disabled in 2.6.0-alpha6, this option is problematic
+    "infill_only_where_needed",
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
