@@ -3820,7 +3820,7 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     }
 
     if (name.empty()) {
-        SavePresetDialog dlg(m_parent, m_type, detach ? _u8L("Detached") : "", from_template);
+        SavePresetDialog dlg(m_parent, { m_type }, detach ? _u8L("Detached") : "", from_template);
         if (dlg.ShowModal() != wxID_OK)
             return;
         name = dlg.get_name();
@@ -3931,7 +3931,7 @@ void Tab::rename_preset()
 
     // get new name
 
-    SavePresetDialog dlg(m_parent, m_type, true, msg);
+    SavePresetDialog dlg(m_parent, m_type, msg);
     if (dlg.ShowModal() != wxID_OK)
         return;
 

@@ -1012,7 +1012,7 @@ bool UnsavedChangesDialog::save(PresetCollection* dependent_presets, bool show_s
 
         // for system/default/external presets we should take an edited name
         if (preset.is_system || preset.is_default || preset.is_external) {
-            SavePresetDialog save_dlg(this, preset.type);
+            SavePresetDialog save_dlg(this, { preset.type });
             if (save_dlg.ShowModal() != wxID_OK) {
                 m_exit_action = Action::Discard;
                 return false;
