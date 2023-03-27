@@ -1371,7 +1371,7 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                         else
                             expoly = to_add.front();
                         for (size_t j = 1; j < to_add.size(); j++)
-                            gaps.emplace_back(to_add[j]);
+                            gaps.push_back(to_add[j]);
                     }
                 }
             }
@@ -1452,7 +1452,8 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                         thin_walls_thickpolys, 
                         erThinWall, 
                         this->ext_perimeter_flow, 
-                        std::max(ext_perimeter_width / 4, scale_t(this->print_config->resolution))));
+                        std::max(ext_perimeter_width / 4, scale_t(this->print_config->resolution)),
+                        false));
                 }
                 thin_walls_thickpolys.clear();
             }
@@ -1649,7 +1650,8 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
                 polylines,
                 erGapFill, 
                 this->solid_infill_flow, 
-                scale_t(this->print_config->resolution_internal)));
+                scale_t(this->print_config->resolution_internal),
+                true));
             /*  Make sure we don't infill narrow parts that are already gap-filled
                 (we only consider this surface's gaps to reduce the diff() complexity).
                 Growing actual extrusions ensures that gaps not filled by medial axis
@@ -1676,7 +1678,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
     const double overhangs_width_speed = this->config->overhangs_width_speed.get_abs_value(this->overhang_flow.nozzle_diameter());
     if ( 0 == overhangs_width && 0 == overhangs_width_speed) {
         //error
-        ExtrusionPath path(role);
+        ExtrusionPath path(role, false);
         path.polyline = loop_polygons;
         path.mm3_per_mm = is_external ? this->ext_mm3_per_mm()           : this->mm3_per_mm();
         path.width = is_external ?      this->ext_perimeter_flow.width() : this->perimeter_flow.width();
@@ -1780,7 +1782,7 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const Polyline& loop_polygon
     if (!ok_polylines.empty()) {
         //fast track
         if (small_speed.empty() && big_speed.empty() && small_flow.empty() && big_flow.empty()) {
-            ExtrusionPath path(role);
+            ExtrusionPath path(role, false);
             path.polyline = loop_polygons;
             path.mm3_per_mm = is_external ? this->ext_mm3_per_mm() : this->mm3_per_mm();
             path.width = is_external ? this->ext_perimeter_flow.width() : this->perimeter_flow.width();
@@ -1987,6 +1989,10 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
             std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
             (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10));
         //(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance)
+        for (ExtrusionPath& path : paths) {
+            //these variable_width paths aren't gapfill, they are proper perimeters
+            path.set_can_reverse(false);
+        }
         return paths;
 
     }
@@ -2083,18 +2089,23 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
     if (!ok_polylines.empty()) {
         //fast track
         if (small_speed.empty() && big_speed.empty() && small_flow.empty() && big_flow.empty()) {
-            return Geometry::unsafe_variable_width(Arachne::to_thick_polyline(arachne_path),
-                role,
-                is_external ? this->ext_perimeter_flow : this->perimeter_flow,
-                std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
-                (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10);
+            for (auto&& path : Geometry::unsafe_variable_width(Arachne::to_thick_polyline(arachne_path),
+                    role,
+                    is_external ? this->ext_perimeter_flow : this->perimeter_flow,
+                    std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
+                    (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                path.set_can_reverse(!is_loop);
+                paths.push_back(std::move(path));
+            }
+            return paths;
         }
         for (const ClipperLib_Z::Path& extrusion_path : ok_polylines) {
             for (auto&& path : Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                role,
-                is_external ? this->ext_perimeter_flow : this->perimeter_flow,
-                std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
-                (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                    role,
+                    is_external ? this->ext_perimeter_flow : this->perimeter_flow,
+                    std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
+                    (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                path.set_can_reverse(!is_loop);
                 path.height = 0;
                 paths.push_back(std::move(path));
             }
@@ -2103,10 +2114,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
     if (!small_speed.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : small_speed) {
             for (auto&& path : Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                erOverhangPerimeter,
-                is_external ? this->ext_perimeter_flow : this->perimeter_flow,
-                std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
-                (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                    erOverhangPerimeter,
+                    is_external ? this->ext_perimeter_flow : this->perimeter_flow,
+                    std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
+                    (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                path.set_can_reverse(!is_loop);
                 path.height = no_small_flow ? 2 : 1;
                 paths.push_back(std::move(path));
             }
@@ -2115,10 +2127,11 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
     if (!big_speed.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : big_speed) {
             for (auto&& path : Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                erOverhangPerimeter,
-                is_external ? this->ext_perimeter_flow : this->perimeter_flow,
-                std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
-                (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                    erOverhangPerimeter,
+                    is_external ? this->ext_perimeter_flow : this->perimeter_flow,
+                    std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
+                    (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                path.set_can_reverse(!is_loop);
                 path.height = no_small_flow ? 3 : 2;
                 paths.push_back(std::move(path));
             }
@@ -2127,10 +2140,17 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
     if (!small_flow.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : small_flow) {
             for (auto&& path : Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                erOverhangPerimeter,
-                this->overhang_flow,
-                std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
-                (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                    erOverhangPerimeter,
+                    is_external ? this->ext_perimeter_flow : this->perimeter_flow,
+                    std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
+                    (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                // change flow to overhang one if too much.
+                if (path.mm3_per_mm > this->overhang_flow.mm3_per_mm() ){
+                    path.mm3_per_mm = this->overhang_flow.mm3_per_mm();
+                    path.height = this->overhang_flow.height();
+                    path.width = this->overhang_flow.width();
+                }
+                path.set_can_reverse(!is_loop);
                 path.height = 3;
                 paths.push_back(std::move(path));
             }
@@ -2139,10 +2159,17 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
     if (!big_flow.empty()) {
         for (const ClipperLib_Z::Path& extrusion_path : big_flow) {
             for (auto&& path : Geometry::unsafe_variable_width(Arachne::to_thick_polyline(extrusion_path),
-                erOverhangPerimeter,
-                this->overhang_flow,
-                std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
-                (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                    erOverhangPerimeter,
+                    is_external ? this->ext_perimeter_flow : this->perimeter_flow,
+                    std::max(this->ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)),
+                    (is_external ? this->ext_perimeter_flow : this->perimeter_flow).scaled_width() / 10)) {
+                // change flow to overhang one if too much.
+                if (path.mm3_per_mm > this->overhang_flow.mm3_per_mm()) {
+                    path.mm3_per_mm = this->overhang_flow.mm3_per_mm();
+                    path.height = this->overhang_flow.height();
+                    path.width = this->overhang_flow.width();
+                }
+                path.set_can_reverse(!is_loop);
                 path.height = 4;
                 paths.push_back(std::move(path));
             }
@@ -2427,7 +2454,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
         if (can_overhang) {
             paths = this->create_overhangs(loop.polygon.split_at_first_point(), role, is_external);
         } else {
-            ExtrusionPath path(role);
+            ExtrusionPath path(role, false);
             path.polyline   = loop.polygon.split_at_first_point();
             path.mm3_per_mm = is_external ? this->ext_mm3_per_mm()           : this->mm3_per_mm();
             path.width      = is_external ? this->ext_perimeter_flow.width() : this->perimeter_flow.width();
@@ -2449,7 +2476,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
     
     // append thin walls to the nearest-neighbor search (only for first iteration)
     if (!thin_walls.empty()) {
-        ExtrusionEntitiesPtr tw = Geometry::thin_variable_width(thin_walls, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)));
+        ExtrusionEntitiesPtr tw = Geometry::thin_variable_width(thin_walls, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)), false);
         coll.insert(coll.end(), tw.begin(), tw.end());
         //don't add again
         thin_walls.clear();
@@ -2657,8 +2684,13 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
                     assert(it->polyline.size() >= 2);
                     assert(std::prev(it)->last_point() == it->first_point());
                 }
-                assert(extrusion_loop.paths.front().first_point() == extrusion_loop.paths.back().last_point());
+                // first & last points can be very near each other but sometimes not exactly.
+                assert(extrusion_loop.paths.front().first_point().coincides_with_epsilon(extrusion_loop.paths.back().last_point()));
 #endif
+                //ensure the start & end points are the same.
+                extrusion_loop.paths.front().polyline.set_points().front() = extrusion_loop.paths.back().last_point();
+                assert(extrusion_loop.paths.front().first_point() == (extrusion_loop.paths.back().last_point()));
+
                 extrusion_coll.append(std::move(extrusion_loop));
             } else {
 
@@ -2671,13 +2703,16 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
                     return true;
                 }());
                 ExtrusionMultiPath multi_path;
-                multi_path.paths.emplace_back(std::move(paths.front()));
+                multi_path.paths.push_back(std::move(paths.front()));
+                multi_path.set_can_reverse(true);
 
                 for (auto it_path = std::next(paths.begin()); it_path != paths.end(); ++it_path) {
-                    if (multi_path.paths.back().last_point() != it_path->first_point()) {
+                    if (!multi_path.paths.back().last_point().coincides_with_epsilon(it_path->first_point())) {
                         extrusion_coll.append(std::move(multi_path));
                         multi_path = ExtrusionMultiPath();
+                        multi_path.set_can_reverse(true);
                     }
+                    it_path->set_can_reverse(false);
                     multi_path.paths.push_back(std::move(*it_path));
                 }
 
@@ -2705,7 +2740,7 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
                         path.polyline.set_points()[0] = *first_point;
                     } else {
                         //add travel
-                        ExtrusionPath travel(path.role());
+                        ExtrusionPath travel(path.role(), false);
                         travel.width = path.width;
                         travel.height = path.height;
                         travel.mm3_per_mm = 0;
@@ -2838,7 +2873,7 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
                 ExtrusionPath(poly_after, *searcher.search_result.path));
             //create thin wall path exttrusion
             ExtrusionEntityCollection tws;
-            tws.append(Geometry::thin_variable_width({ tw }, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution))));
+            tws.append(Geometry::thin_variable_width({ tw }, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)), false));
             assert(!tws.entities().empty());
             ChangeFlow change_flow;
             if (tws.entities().size() == 1 && tws.entities()[0]->is_loop()) {
@@ -2884,7 +2919,7 @@ void PerimeterGenerator::_merge_thin_walls(ExtrusionEntityCollection &extrusions
     }
 
     //now add thinwalls that have no anchor (make them reversable)
-    extrusions.append(Geometry::thin_variable_width(not_added, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution))));
+    extrusions.append(Geometry::thin_variable_width(not_added, erThinWall, this->ext_perimeter_flow, std::max(ext_perimeter_flow.scaled_width() / 4, scale_t(this->print_config->resolution)), true));
 }
 
 PerimeterIntersectionPoint
@@ -3033,7 +3068,8 @@ PerimeterGenerator::_extrude_and_cut_loop(const PerimeterGeneratorLoop &loop, co
                 loop.is_external() ? erExternalPerimeter : erPerimeter,
                 (double)(loop.is_external() ? this->ext_mm3_per_mm() : this->mm3_per_mm()),
                 (float)(loop.is_external() ? this->ext_perimeter_flow.width() : this->perimeter_flow.width()),
-                (float)(this->layer->height));
+                (float)(this->layer->height),
+                false/*can't reverse*/);
             single_point.paths.back().polyline = poly_point;
             return single_point;
         }
@@ -3123,12 +3159,12 @@ PerimeterGenerator::_extrude_and_cut_loop(const PerimeterGeneratorLoop &loop, co
             for (size_t idx_path = good_idx; idx_path < paths.size(); idx_path++) {
                 ExtrusionPath &path = paths[idx_path];
                 if (need_to_reverse) path.reverse();
-                my_loop.paths.emplace_back(path);
+                my_loop.paths.push_back(path);
             }
             for (size_t idx_path = 0; idx_path < good_idx; idx_path++) {
                 ExtrusionPath &path = paths[idx_path];
                 if (need_to_reverse) path.reverse();
-                my_loop.paths.emplace_back(path);
+                my_loop.paths.push_back(path);
             }
         } else {
 
@@ -3140,13 +3176,13 @@ PerimeterGenerator::_extrude_and_cut_loop(const PerimeterGeneratorLoop &loop, co
                 need_to_reverse = dot>0;
             }
 
-            ExtrusionPath path(role);
+            ExtrusionPath path(role, false);
             path.polyline = initial_polyline;
             if (need_to_reverse) path.polyline.reverse();
             path.mm3_per_mm = is_external ? this->ext_mm3_per_mm() : this->mm3_per_mm();
             path.width = is_external ? this->ext_perimeter_flow.width() : this->perimeter_flow.width();
             path.height = (float)(this->layer->height);
-            my_loop.paths.emplace_back(path);
+            my_loop.paths.push_back(path);
         }
 
     }
@@ -3348,9 +3384,9 @@ PerimeterGenerator::_traverse_and_join_loops(const PerimeterGeneratorLoop &loop,
             //travel_path_end.extruder_id = -1;
             double dist_travel = outer_start->polyline.back().distance_to(inner_start->polyline.front());
             if (dist_travel > max_width_extrusion*1.5 && this->config->fill_density.value > 0) {
-                travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height);
-                travel_path_begin.emplace_back(ExtrusionRole::erNone, 0, outer_start->width, outer_start->height);
-                travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height);
+                travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height, false);
+                travel_path_begin.emplace_back(ExtrusionRole::erNone, 0, outer_start->width, outer_start->height, false);
+                travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height, false);
                 //travel_path_begin[0].extruder_id = -1;
                 //travel_path_begin[1].extruder_id = -1;
                 //travel_path_begin[2].extruder_id = -1;
@@ -3378,16 +3414,16 @@ PerimeterGenerator::_traverse_and_join_loops(const PerimeterGeneratorLoop &loop,
                     // the path is a bit too long, reduce the extrusion flow.
                     flow_mult = max_width_extrusion / dist_travel;
                 }
-                travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm * flow_mult, (float)(outer_start->width * flow_mult), outer_start->height);
+                travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm * flow_mult, (float)(outer_start->width * flow_mult), outer_start->height, false);
                 //travel_path_begin[0].extruder_id = -1;
                 travel_path_begin[0].polyline.append(outer_start->polyline.back());
                 travel_path_begin[0].polyline.append(inner_start->polyline.front());
             }
             dist_travel = inner_end->polyline.back().distance_to(outer_end->polyline.front());
             if (dist_travel > max_width_extrusion*1.5 && this->config->fill_density.value > 0) {
-                travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height);
-                travel_path_end.emplace_back(ExtrusionRole::erNone, 0, outer_end->width, outer_end->height);
-                travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height);
+                travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height, false);
+                travel_path_end.emplace_back(ExtrusionRole::erNone, 0, outer_end->width, outer_end->height, false);
+                travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height, false);
                 //travel_path_end[0].extruder_id = -1;
                 //travel_path_end[1].extruder_id = -1;
                 //travel_path_end[2].extruder_id = -1;
@@ -3415,7 +3451,7 @@ PerimeterGenerator::_traverse_and_join_loops(const PerimeterGeneratorLoop &loop,
                     // the path is a bit too long, reduce the extrusion flow.
                     flow_mult = max_width_extrusion / dist_travel;
                 }
-                travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm * flow_mult, (float)(outer_end->width * flow_mult), outer_end->height);
+                travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm * flow_mult, (float)(outer_end->width * flow_mult), outer_end->height, false);
                 //travel_path_end[0].extruder_id = -1;
                 travel_path_end[0].polyline.append(inner_end->polyline.back());
                 travel_path_end[0].polyline.append(outer_end->polyline.front());
