@@ -550,7 +550,6 @@ void PreferencesDialog::build()
 		create_settings_mode_widget();
 		create_settings_text_color_widget();
 		create_settings_mode_color_widget();
-//		create_settings_font_widget();
 
 		m_optgroup_other = create_options_tab(_L("Other"), tabs);
 		m_optgroup_other->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
@@ -1112,7 +1111,7 @@ void PreferencesDialog::create_settings_font_widget()
 
 	m_optgroup_other->sizer->Add(sizer, 1, wxEXPAND | wxTOP, em_unit());
 
-	append_preferences_option_to_searcer(m_optgroup_other, opt_key, title);
+	append_preferences_option_to_searcher(m_optgroup_other, opt_key, title);
 }
 
 void PreferencesDialog::create_downloader_path_sizer()
