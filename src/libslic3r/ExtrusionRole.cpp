@@ -1,4 +1,5 @@
 #include "ExtrusionRole.hpp"
+#include "I18N.hpp"
 
 #include <string>
 #include <string_view>
