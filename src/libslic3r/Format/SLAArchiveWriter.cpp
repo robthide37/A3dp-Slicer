@@ -30,6 +30,10 @@ static const std::map<std::string, ArchiveEntry> REGISTERED_ARCHIVES {
         { "sl1_svg",  [] (const auto &cfg) { return std::make_unique<SL1_SVGArchive>(cfg); } }
     },
     {
+        "SL2",
+        { "sl1_svg",  [] (const auto &cfg) { return std::make_unique<SL1_SVGArchive>(cfg); } }
+    },
+    {
         "pwmx",
         { "pwmx", [] (const auto &cfg) { return std::make_unique<PwmxArchive>(cfg); } }
     }
