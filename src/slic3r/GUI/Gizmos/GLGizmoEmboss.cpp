@@ -405,6 +405,33 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     return res;
 }
 
+void GLGizmoEmboss::on_mouse_change_selection(const wxMouseEvent &mouse_event)
+{
+    if (mouse_event.LeftDown()) {
+        // is hovered volume closest hovered?
+        int hovered_idx = m_parent.get_first_hover_volume_idx();
+        if (hovered_idx < 0) 
+            // unselect object
+            return close();
+
+        const GLVolumePtrs &gl_volumes = m_parent.get_volumes().volumes;
+        auto hovered_idx_ = static_cast<size_t>(hovered_idx);
+        if (hovered_idx_ >= gl_volumes.size())
+            return close();
+        
+        const GLVolume *gl_volume = gl_volumes[hovered_idx_];
+        if (gl_volume == nullptr)
+            return close();
+
+        const ModelVolume *volume = get_model_volume(*gl_volume, m_parent.get_model()->objects);
+        if (volume == nullptr || !volume->text_configuration.has_value())
+            // select volume without text configuration
+            return close();
+
+        // Reselection of text to another text
+    }
+}
+
 bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
 {
     // not selected volume
@@ -414,7 +441,7 @@ bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
 
     if (on_mouse_for_rotation(mouse_event)) return true;
     if (on_mouse_for_translate(mouse_event)) return true;
-
+    on_mouse_change_selection(mouse_event);
     return false;
 }
 
@@ -527,6 +554,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
     if (m_volume == nullptr ||
         get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr ||
         !m_volume->text_configuration.has_value()) {
+        // This closing could lead to bad behavior of undo/redo stack when unselection create snapshot before close
         close();
         return;
     }

@@ -1711,6 +1711,11 @@ void GLCanvas3D::deselect_all()
     if (m_selection.is_empty())
         return;
 
+    // close actual opened gizmo before deselection(m_selection.remove_all()) write to undo/redo snapshot
+    if (GLGizmosManager::EType current_type = m_gizmos.get_current_type();
+        current_type != GLGizmosManager::Undefined)
+        m_gizmos.open_gizmo(current_type);            
+
     m_selection.remove_all();
     wxGetApp().obj_manipul()->set_dirty();
     m_gizmos.reset_all_states();

@@ -149,6 +149,7 @@ private:
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
+    void on_mouse_change_selection(const wxMouseEvent &mouse_event);
 
     // When open text loaded from .3mf it could be written with unknown font
     bool m_is_unknown_font;
