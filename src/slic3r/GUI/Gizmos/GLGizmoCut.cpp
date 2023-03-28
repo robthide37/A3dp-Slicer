@@ -2418,6 +2418,26 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                     for (size_t id = 2; id < cut_connectors_obj.size(); id++)
                         cut_object_ptrs.push_back(cut_connectors_obj[id]);
             }
+
+            // Now merge all model parts together:
+            {
+                for (ModelObject* mo : cut_object_ptrs) {
+                    TriangleMesh mesh;
+                    for (const ModelVolume* mv : mo->volumes) {
+                        if (mv->is_model_part()) {
+                            TriangleMesh m = mv->mesh();
+                            m.transform(mv->get_matrix());
+                            mesh.merge(m);
+                        }
+                    }
+                    if (! mesh.empty()) {
+                        ModelVolume* new_volume = mo->add_volume(mesh);
+                        for (int i=int(mo->volumes.size())-2; i>=0; --i)
+                            if (mo->volumes[i]->type() == ModelVolumeType::MODEL_PART)
+                                mo->delete_volume(i);
+                    }
+                }
+            }
         }
         else
             cut_object_ptrs = mo->cut(instance_idx, cut_matrix, attributes);
