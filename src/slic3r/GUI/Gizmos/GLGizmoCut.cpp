@@ -1402,6 +1402,7 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal)
 
         shader->start_using();
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+        shader->set_uniform("emission_factor", 0.f);
 
         // FIXME: Cache the transforms.
 
@@ -1416,7 +1417,6 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal)
                 continue;
             const Vec3d volume_offset = model_object->volumes[id]->get_offset();
             shader->set_uniform("view_model_matrix", view_inst_matrix * translation_transform(volume_offset));
-            //parts[id].glmodel.set_color(parts[id].selected ? ColorRGBA(1.f, 0.f, 0.f, 1.f) : ColorRGBA(0.f, 1.f, 0.f, 1.f));
             parts[id].glmodel.set_color(parts[id].selected ? UPPER_PART_COLOR : LOWER_PART_COLOR);
             parts[id].glmodel.render();
         }
@@ -1779,14 +1779,13 @@ void GLGizmoCut3D::process_contours()
     const int instance_idx = selection.get_instance_idx();
     const int object_idx = selection.get_object_idx();
 
-    m_cut_part_ptrs.clear();
-    m_cut_part_ptrs = model_objects[object_idx]->cut(instance_idx, get_cut_matrix(selection),
+    ModelObjectPtrs cut_part_ptrs = model_objects[object_idx]->cut(instance_idx, get_cut_matrix(selection),
         ModelObjectCutAttribute::KeepUpper |
         ModelObjectCutAttribute::KeepLower |
         ModelObjectCutAttribute::KeepAsParts);
-    assert(m_cut_part_ptrs.size() == 1);
+    assert(cut_part_ptrs.size() == 1);
 
-    m_part_selection = PartSelection(m_cut_part_ptrs.front(), instance_idx, m_plane_center, m_cut_normal);
+    m_part_selection = PartSelection(cut_part_ptrs.front(), instance_idx, m_plane_center, m_cut_normal);
     m_parent.toggle_model_objects_visibility(false);
 }
 
@@ -2144,7 +2143,7 @@ bool GLGizmoCut3D::is_outside_of_cut_contour(size_t idx, const CutConnectors& co
     }
     its_transform(mesh, translation_transform(cur_pos) * m_rotation_m);
 
-    for (auto vertex : vertices) {
+    for (const Vec3f& vertex : vertices) {
         if (m_c->object_clipper() && m_c->object_clipper()->is_projection_inside_cut(vertex.cast<double>()) == -1) {
             m_info_stats.outside_cut_contour++;
             return true;
@@ -2341,8 +2340,8 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
     {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
 
-        const bool cut_by_contour = m_part_selection.valid && !m_cut_part_ptrs.empty();
-        ModelObject* cut_mo = cut_by_contour ? m_cut_part_ptrs.front() : nullptr;
+        const bool cut_by_contour = m_part_selection.valid;
+        ModelObject* cut_mo = cut_by_contour ? m_part_selection.model_object : nullptr;
         if (cut_mo)
             cut_mo->cut_connectors = mo->cut_connectors;
 
@@ -2404,7 +2403,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                     delete *(volumes.begin() + id);
                 volumes.erase(volumes.begin(), volumes.begin() + cut_parts_cnt);
 
-                const auto cut_connectors_obj = cut_mo->cut(instance_idx, get_cut_matrix(selection), attributes);
+                const ModelObjectPtrs cut_connectors_obj = cut_mo->cut(instance_idx, get_cut_matrix(selection), attributes);
                 assert(create_dowels_as_separate_object ? cut_connectors_obj.size() >= 3 : cut_connectors_obj.size() == 2);
 
                 for (const ModelVolume* volume : cut_connectors_obj[0]->volumes)

@@ -149,7 +149,6 @@ class GLGizmoCut3D : public GLGizmoBase
             GLModel glmodel;
             MeshRaycaster raycaster;
             bool selected;
-            bool upper;
         };
         ModelObject* model_object; // FIXME: Ownership !
         int instance_idx;
@@ -158,7 +157,6 @@ class GLGizmoCut3D : public GLGizmoBase
     };
 
     PartSelection m_part_selection;
-    ModelObjectPtrs m_cut_part_ptrs;
 
     bool                                        m_show_shortcuts{ false };
     std::vector<std::pair<wxString, wxString>>  m_shortcuts;
