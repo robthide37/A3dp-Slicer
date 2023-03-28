@@ -512,11 +512,8 @@ std::string OctoPrint::make_url(const std::string &path) const
     }
 }
 
-SL1Host::SL1Host(DynamicPrintConfig *config) : 
-    OctoPrint(config),
-    m_authorization_type(dynamic_cast<const ConfigOptionEnum<AuthorizationType>*>(config->option("printhost_authorization_type"))->value),
-    m_username(config->opt_string("printhost_user")),
-    m_password(config->opt_string("printhost_password"))
+SL1Host::SL1Host(DynamicPrintConfig *config)
+    : PrusaLink(config)
 {
 }
 
@@ -536,22 +533,6 @@ wxString SL1Host::get_test_failed_msg (wxString &msg) const
 bool SL1Host::validate_version_text(const boost::optional<std::string> &version_text) const
 {
     return version_text ? boost::starts_with(*version_text, "Prusa SLA") : false;
-}
-
-void SL1Host::set_auth(Http &http) const
-{
-    switch (m_authorization_type) {
-    case atKeyPassword:
-        http.header("X-Api-Key", get_apikey());
-        break;
-    case atUserPassword:
-        http.auth_digest(m_username, m_password);
-        break;
-    }
-
-    if (! get_cafile().empty()) {
-        http.ca_file(get_cafile());
-    }
 }
 
 // PrusaLink
