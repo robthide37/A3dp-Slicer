@@ -56,7 +56,7 @@ void TextInput::Create(wxWindow *     parent,
     state_handler.attach({&label_color, &text_color});
     state_handler.update_binds();
 
-    text_ctrl = new wxTextCtrl(this, wxID_ANY, text, {4, 4}, wxDefaultSize, style | wxBORDER_NONE);
+    text_ctrl = new wxTextCtrl(this, wxID_ANY, text, {4, 4}, size, style | wxBORDER_NONE);
 #ifdef __WXOSX__
     text_ctrl->OSXDisableAllSmartSubstitutions();
 #endif // __WXOSX__
