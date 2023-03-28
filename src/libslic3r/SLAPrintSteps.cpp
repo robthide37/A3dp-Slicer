@@ -199,7 +199,13 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         m = csgmesh_merge_positive_parts(r);
         handled = true;
     } else if (csg::check_csgmesh_booleans(r) == r.end()) {
-        auto cgalmeshptr = csg::perform_csgmesh_booleans(r);
+        MeshBoolean::cgal::CGALMeshPtr cgalmeshptr;
+        try {
+            cgalmeshptr = csg::perform_csgmesh_booleans(r);
+        } catch (...) {
+            // leaves cgalmeshptr as nullptr
+        }
+
         if (cgalmeshptr) {
             m = MeshBoolean::cgal::cgal_to_indexed_triangle_set(*cgalmeshptr);
             handled = true;
