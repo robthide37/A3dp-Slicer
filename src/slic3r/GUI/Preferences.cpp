@@ -4,6 +4,7 @@
 #include "Plater.hpp"
 #include "MsgDialog.hpp"
 #include "I18N.hpp"
+#include "format.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include <wx/notebook.h>
 #include "Notebook.hpp"
@@ -580,6 +581,7 @@ void PreferencesDialog::build()
 		activate_options_tab(m_optgroup_other);
 
 		create_downloader_path_sizer();
+//		create_settings_font_widget();
 
 #if ENABLE_ENVIRONMENT_MAP
 		// Add "Render" tab
@@ -694,7 +696,7 @@ void PreferencesDialog::accept(wxEvent&)
 
 	bool update_filament_sidebar = (m_values.find("no_templates") != m_values.end());
 
-	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled" };
+	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled", "font_size" };
 
 	for (const std::string& option : options_to_recreate_GUI) {
 		if (m_values.find(option) != m_values.end()) {
@@ -943,7 +945,6 @@ void PreferencesDialog::create_icon_size_slider()
 void PreferencesDialog::create_settings_mode_widget()
 {
 	wxWindow* parent = m_optgroup_gui->parent();
-	wxGetApp().UpdateDarkUI(parent);
 
 	wxString title = L("Layout Options");
     wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
@@ -1043,6 +1044,74 @@ void PreferencesDialog::create_settings_mode_color_widget()
 	m_optgroup_gui->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
 
 	append_preferences_option_to_searcher(m_optgroup_gui, opt_key, title);
+}
+
+void PreferencesDialog::create_settings_font_widget()
+{
+	wxWindow* parent = m_optgroup_other->parent();
+	wxGetApp().UpdateDarkUI(parent);
+
+	const wxString title = L("Application font size");
+	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
+	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
+
+	const std::string opt_key = "font_size";
+	m_blinkers[opt_key] = new BlinkingBitmap(parent);
+
+	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxHORIZONTAL);
+
+	wxStaticText* font_example = new wxStaticText(parent, wxID_ANY, "Application text");
+    int val = wxGetApp().normal_font().GetPointSize();
+	wxSpinCtrl* size_sc = new wxSpinCtrl(parent, wxID_ANY, format_wxstr("%1%", val), wxDefaultPosition, wxSize(15*em_unit(), -1), wxTE_PROCESS_ENTER | wxSP_ARROW_KEYS
+#ifdef _WIN32
+		| wxBORDER_SIMPLE
+#endif 
+	, 8, 20);
+	wxGetApp().UpdateDarkUI(size_sc);
+
+	auto apply_font = [this, font_example, opt_key](const int val, const wxFont& font) {
+		font_example->SetFont(font);
+		m_values[opt_key] = format("%1%", val);
+		refresh_og(m_optgroup_other);
+	};
+
+	auto change_value = [size_sc, apply_font](wxCommandEvent& evt) {
+		const int val = size_sc->GetValue();
+		wxFont font = wxGetApp().normal_font();
+		font.SetPointSize(val);
+
+		apply_font(val, font);
+	};
+    size_sc->Bind(wxEVT_SPINCTRL, change_value);
+	size_sc->Bind(wxEVT_TEXT_ENTER, change_value);
+
+	auto revert_btn = new ScalableButton(parent, wxID_ANY, "undo");
+	revert_btn->SetToolTip(_L("Revert font to default"));
+	revert_btn->Bind(wxEVT_BUTTON, [size_sc, apply_font](wxEvent& event) {
+		wxFont font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
+		const int val = font.GetPointSize();
+	    size_sc->SetValue(val);
+		apply_font(val, font);
+	});
+	parent->Bind(wxEVT_UPDATE_UI, [size_sc](wxUpdateUIEvent& evt) {
+		const int def_size = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).GetPointSize();
+		evt.Enable(def_size != size_sc->GetValue());
+	}, revert_btn->GetId());
+
+    stb_sizer->Add(new wxStaticText(parent, wxID_ANY, _L("Font size") + ":"), 0, wxALIGN_CENTER_VERTICAL | wxLEFT, em_unit());
+    stb_sizer->Add(size_sc, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit());
+    stb_sizer->Add(revert_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, em_unit());
+	wxBoxSizer* font_sizer = new wxBoxSizer(wxVERTICAL);
+	font_sizer->Add(font_example, 1, wxALIGN_CENTER_HORIZONTAL);
+    stb_sizer->Add(font_sizer, 1, wxALIGN_CENTER_VERTICAL);
+
+	auto sizer = new wxBoxSizer(wxHORIZONTAL);
+	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
+	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
+
+	m_optgroup_other->sizer->Add(sizer, 1, wxEXPAND | wxTOP, em_unit());
+
+	append_preferences_option_to_searcher(m_optgroup_other, opt_key, title);
 }
 
 void PreferencesDialog::create_downloader_path_sizer()

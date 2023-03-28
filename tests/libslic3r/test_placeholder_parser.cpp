@@ -245,10 +245,41 @@ SCENARIO("Placeholder parser variables", "[PlaceholderParser]") {
             "{size(myfloats)}";
         REQUIRE(parser.process(script, 0, nullptr, nullptr, nullptr) == "7");
     }
+    SECTION("nested if with new variables 2, mixing }{ with ;") {
+        std::string script =
+            "{if 1 == 0 then local myints = (5, 4, 3, 2, 1);else;local myfloats = (1., 2., 3., 4., 5., 6., 7.);endif}"
+            "{size(myfloats)}";
+        REQUIRE(parser.process(script, 0, nullptr, nullptr, nullptr) == "7");
+    }
     SECTION("nested if with new variables, two level") {
         std::string script =
             "{if 1 == 1}{if 2 == 3}{nejaka / haluz}{else}{local myints = (6, 5, 4, 3, 2, 1)}{endif}{else}{if zase * haluz}{else}{local myfloats = (1., 2., 3., 4., 5., 6., 7.)}{endif}{endif}"
             "{size(myints)}";
         REQUIRE(parser.process(script, 0, nullptr, nullptr, nullptr) == "6");
     }
+    SECTION("if with empty block and ;") {
+        std::string script =
+            "{if false then else;local myfloats = (1., 2., 3., 4., 5., 6., 7.);endif}"
+            "{size(myfloats)}";
+        REQUIRE(parser.process(script, 0, nullptr, nullptr, nullptr) == "7");
+    }
+    SECTION("nested if with new variables, two level, mixing }{ with ;") {
+        std::string script =
+            "{if 1 == 1 then if 2 == 3}nejaka / haluz{else local myints = (6, 5, 4, 3, 2, 1) endif else if zase * haluz then else local myfloats = (1., 2., 3., 4., 5., 6., 7.) endif endif}"
+            "{size(myints)}";
+        REQUIRE(parser.process(script, 0, nullptr, nullptr, nullptr) == "6");
+    }
+    SECTION("nested if with new variables, two level, mixing }{ with ; 2") {
+        std::string script =
+            "{if 1 == 1 then if 2 == 3 then nejaka / haluz else}{local myints = (6, 5, 4, 3, 2, 1)}{endif else if zase * haluz then else local myfloats = (1., 2., 3., 4., 5., 6., 7.) endif endif}"
+            "{size(myints)}";
+        REQUIRE(parser.process(script, 0, nullptr, nullptr, nullptr) == "6");
+    }
+    SECTION("nested if with new variables, two level, mixing }{ with ; 3") {
+        std::string script =
+            "{if 1 == 1 then if 2 == 3 then nejaka / haluz else}{local myints = (6, 5, 4, 3, 2, 1)}{endif else}{if zase * haluz}{else local myfloats = (1., 2., 3., 4., 5., 6., 7.) endif}{endif}"
+            "{size(myints)}";
+        REQUIRE(parser.process(script, 0, nullptr, nullptr, nullptr) == "6");
+    }
+    SECTION("if else completely empty") { REQUIRE(parser.process("{if false then elsif false then else endif}", 0, nullptr, nullptr, nullptr) == ""); }
 }

@@ -348,8 +348,8 @@ void PrintObject::prepare_infill()
     //FIXME The surfaces are supported by a sparse infill, but the sparse infill is only as large as the area to support.
     // Likely the sparse infill will not be anchored correctly, so it will not work as intended.
     // Also one wishes the perimeters to be supported by a full infill.
-    this->clip_fill_surfaces();
-    m_print->throw_if_canceled();
+    // this->clip_fill_surfaces();
+    // m_print->throw_if_canceled();
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
@@ -2107,7 +2107,7 @@ void PrintObject::bridge_over_infill()
                 total_fill_area   = closing(total_fill_area, SCALED_EPSILON);
                 expansion_area    = closing(expansion_area, SCALED_EPSILON);
                 expansion_area    = intersection(expansion_area, deep_infill_area);
-                Polylines anchors = intersection_pl(infill_lines[lidx - 1], expansion_area);
+                Polylines anchors = intersection_pl(infill_lines[lidx - 1], shrink(expansion_area, spacing));
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                     debug_draw(std::to_string(lidx) + "_" + std::to_string(cluster_idx) + "_" + std::to_string(job_idx) + "_" +
@@ -2419,98 +2419,98 @@ bool PrintObject::update_layer_height_profile(const ModelObject &model_object, c
 // Also one wishes the perimeters to be supported by a full infill.
 // Idempotence of this method is guaranteed by the fact that we don't remove things from
 // fill_surfaces but we only turn them into VOID surfaces, thus preserving the boundaries.
-void PrintObject::clip_fill_surfaces()
-{
-    bool has_lightning_infill = false;
-    for (size_t region_id = 0; region_id < this->num_printing_regions(); ++region_id)
-        if (const PrintRegionConfig &config = this->printing_region(region_id).config(); config.fill_density > 0 && config.fill_pattern == ipLightning)
-            has_lightning_infill = true;
+// void PrintObject::clip_fill_surfaces()
+// {
+//     bool has_lightning_infill = false;
+//     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++region_id)
+//         if (const PrintRegionConfig &config = this->printing_region(region_id).config(); config.fill_density > 0 && config.fill_pattern == ipLightning)
+//             has_lightning_infill = true;
 
-    // For Lightning infill, infill_only_where_needed is ignored because both
-    // do a similar thing, and their combination doesn't make much sense.
-    if (! m_config.infill_only_where_needed.value || has_lightning_infill)
-        return;
-    bool has_infill = false;
-    for (size_t i = 0; i < this->num_printing_regions(); ++ i)
-        if (this->printing_region(i).config().fill_density > 0) {
-            has_infill = true;
-            break;
-        }
-    if (! has_infill)
-        return;
+//     // For Lightning infill, infill_only_where_needed is ignored because both
+//     // do a similar thing, and their combination doesn't make much sense.
+//     if (! m_config.infill_only_where_needed.value || has_lightning_infill)
+//         return;
+//     bool has_infill = false;
+//     for (size_t i = 0; i < this->num_printing_regions(); ++ i)
+//         if (this->printing_region(i).config().fill_density > 0) {
+//             has_infill = true;
+//             break;
+//         }
+//     if (! has_infill)
+//         return;
 
-    // We only want infill under ceilings; this is almost like an
-    // internal support material.
-    // Proceed top-down, skipping the bottom layer.
-    Polygons upper_internal;
-    for (int layer_id = int(m_layers.size()) - 1; layer_id > 0; -- layer_id) {
-        Layer *layer       = m_layers[layer_id];
-        Layer *lower_layer = m_layers[layer_id - 1];
-        // Detect things that we need to support.
-        // Cummulative fill surfaces.
-        Polygons fill_surfaces;
-        // Solid surfaces to be supported.
-        Polygons overhangs;
-        for (const LayerRegion *layerm : layer->m_regions)
-            for (const Surface &surface : layerm->fill_surfaces()) {
-                Polygons polygons = to_polygons(surface.expolygon);
-                if (surface.is_solid())
-                    polygons_append(overhangs, polygons);
-                polygons_append(fill_surfaces, std::move(polygons));
-            }
-        Polygons lower_layer_fill_surfaces;
-        Polygons lower_layer_internal_surfaces;
-        for (const LayerRegion *layerm : lower_layer->m_regions)
-            for (const Surface &surface : layerm->fill_surfaces()) {
-                Polygons polygons = to_polygons(surface.expolygon);
-                if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
-                    polygons_append(lower_layer_internal_surfaces, polygons);
-                polygons_append(lower_layer_fill_surfaces, std::move(polygons));
-            }
-        // We also need to support perimeters when there's at least one full unsupported loop
-        {
-            // Get perimeters area as the difference between slices and fill_surfaces
-            // Only consider the area that is not supported by lower perimeters
-            Polygons perimeters = intersection(diff(layer->lslices, fill_surfaces), lower_layer_fill_surfaces);
-            // Only consider perimeter areas that are at least one extrusion width thick.
-            //FIXME Offset2 eats out from both sides, while the perimeters are create outside in.
-            //Should the pw not be half of the current value?
-            float pw = FLT_MAX;
-            for (const LayerRegion *layerm : layer->m_regions)
-                pw = std::min(pw, (float)layerm->flow(frPerimeter).scaled_width());
-            // Append such thick perimeters to the areas that need support
-            polygons_append(overhangs, opening(perimeters, pw));
-        }
-        // Merge the new overhangs, find new internal infill.
-        polygons_append(upper_internal, std::move(overhangs));
-        static constexpr const auto closing_radius = scaled<float>(2.f);
-        upper_internal = intersection(
-            // Regularize the overhang regions, so that the infill areas will not become excessively jagged.
-            smooth_outward(
-                closing(upper_internal, closing_radius, ClipperLib::jtSquare, 0.),
-                scaled<coord_t>(0.1)), 
-            lower_layer_internal_surfaces);
-        // Apply new internal infill to regions.
-        for (LayerRegion *layerm : lower_layer->m_regions) {
-            if (layerm->region().config().fill_density.value == 0)
-                continue;
-            Polygons internal;
-            for (Surface &surface : layerm->m_fill_surfaces.surfaces)
-                if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
-                    polygons_append(internal, std::move(surface.expolygon));
-            layerm->m_fill_surfaces.remove_types({ stInternal, stInternalVoid });
-            layerm->m_fill_surfaces.append(intersection_ex(internal, upper_internal, ApplySafetyOffset::Yes), stInternal);
-            layerm->m_fill_surfaces.append(diff_ex        (internal, upper_internal, ApplySafetyOffset::Yes), stInternalVoid);
-            // If there are voids it means that our internal infill is not adjacent to
-            // perimeters. In this case it would be nice to add a loop around infill to
-            // make it more robust and nicer. TODO.
-#ifdef SLIC3R_DEBUG_SLICE_PROCESSING
-            layerm->export_region_fill_surfaces_to_svg_debug("6_clip_fill_surfaces");
-#endif
-        }
-        m_print->throw_if_canceled();
-    }
-} // void PrintObject::clip_fill_surfaces()
+//     // We only want infill under ceilings; this is almost like an
+//     // internal support material.
+//     // Proceed top-down, skipping the bottom layer.
+//     Polygons upper_internal;
+//     for (int layer_id = int(m_layers.size()) - 1; layer_id > 0; -- layer_id) {
+//         Layer *layer       = m_layers[layer_id];
+//         Layer *lower_layer = m_layers[layer_id - 1];
+//         // Detect things that we need to support.
+//         // Cummulative fill surfaces.
+//         Polygons fill_surfaces;
+//         // Solid surfaces to be supported.
+//         Polygons overhangs;
+//         for (const LayerRegion *layerm : layer->m_regions)
+//             for (const Surface &surface : layerm->fill_surfaces()) {
+//                 Polygons polygons = to_polygons(surface.expolygon);
+//                 if (surface.is_solid())
+//                     polygons_append(overhangs, polygons);
+//                 polygons_append(fill_surfaces, std::move(polygons));
+//             }
+//         Polygons lower_layer_fill_surfaces;
+//         Polygons lower_layer_internal_surfaces;
+//         for (const LayerRegion *layerm : lower_layer->m_regions)
+//             for (const Surface &surface : layerm->fill_surfaces()) {
+//                 Polygons polygons = to_polygons(surface.expolygon);
+//                 if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
+//                     polygons_append(lower_layer_internal_surfaces, polygons);
+//                 polygons_append(lower_layer_fill_surfaces, std::move(polygons));
+//             }
+//         // We also need to support perimeters when there's at least one full unsupported loop
+//         {
+//             // Get perimeters area as the difference between slices and fill_surfaces
+//             // Only consider the area that is not supported by lower perimeters
+//             Polygons perimeters = intersection(diff(layer->lslices, fill_surfaces), lower_layer_fill_surfaces);
+//             // Only consider perimeter areas that are at least one extrusion width thick.
+//             //FIXME Offset2 eats out from both sides, while the perimeters are create outside in.
+//             //Should the pw not be half of the current value?
+//             float pw = FLT_MAX;
+//             for (const LayerRegion *layerm : layer->m_regions)
+//                 pw = std::min(pw, (float)layerm->flow(frPerimeter).scaled_width());
+//             // Append such thick perimeters to the areas that need support
+//             polygons_append(overhangs, opening(perimeters, pw));
+//         }
+//         // Merge the new overhangs, find new internal infill.
+//         polygons_append(upper_internal, std::move(overhangs));
+//         static constexpr const auto closing_radius = scaled<float>(2.f);
+//         upper_internal = intersection(
+//             // Regularize the overhang regions, so that the infill areas will not become excessively jagged.
+//             smooth_outward(
+//                 closing(upper_internal, closing_radius, ClipperLib::jtSquare, 0.),
+//                 scaled<coord_t>(0.1)), 
+//             lower_layer_internal_surfaces);
+//         // Apply new internal infill to regions.
+//         for (LayerRegion *layerm : lower_layer->m_regions) {
+//             if (layerm->region().config().fill_density.value == 0)
+//                 continue;
+//             Polygons internal;
+//             for (Surface &surface : layerm->m_fill_surfaces.surfaces)
+//                 if (surface.surface_type == stInternal || surface.surface_type == stInternalVoid)
+//                     polygons_append(internal, std::move(surface.expolygon));
+//             layerm->m_fill_surfaces.remove_types({ stInternal, stInternalVoid });
+//             layerm->m_fill_surfaces.append(intersection_ex(internal, upper_internal, ApplySafetyOffset::Yes), stInternal);
+//             layerm->m_fill_surfaces.append(diff_ex        (internal, upper_internal, ApplySafetyOffset::Yes), stInternalVoid);
+//             // If there are voids it means that our internal infill is not adjacent to
+//             // perimeters. In this case it would be nice to add a loop around infill to
+//             // make it more robust and nicer. TODO.
+// #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
+//             layerm->export_region_fill_surfaces_to_svg_debug("6_clip_fill_surfaces");
+// #endif
+//         }
+//         m_print->throw_if_canceled();
+//     }
+// } // void PrintObject::clip_fill_surfaces()
 
 void PrintObject::discover_horizontal_shells()
 {

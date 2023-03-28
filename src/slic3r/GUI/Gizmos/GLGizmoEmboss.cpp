@@ -774,7 +774,7 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
     tr.skew_ration  = _u8L("Skew ratio");
     tr.from_surface = _u8L("From surface");
     tr.rotation     = _u8L("Rotation");
-    tr.keep_up      = _u8L("Keep Up");
+    tr.keep_up      = "Keep Rotation";
     tr.collection   = _u8L("Collection");
 
     float max_advanced_text_width = std::max({
@@ -2996,7 +2996,7 @@ void GLGizmoEmboss::draw_advanced()
         }
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Keep text orientation during surface dragging.\nNot stable between horizontal and vertical alignment.").c_str());    
+        ImGui::SetTooltip("%s", _u8L("Lock the text's rotation when moving text along the object's surface.").c_str());
 
     // when more collection add selector
     if (ff.font_file->infos.size() > 1) {

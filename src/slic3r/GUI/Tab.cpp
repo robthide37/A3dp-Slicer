@@ -265,6 +265,7 @@ void Tab::create_preset_tab()
     // tree
     m_treectrl = new wxTreeCtrl(panel, wxID_ANY, wxDefaultPosition, wxSize(20 * m_em_unit, -1),
         wxTR_NO_BUTTONS | wxTR_HIDE_ROOT | wxTR_SINGLE | wxTR_NO_LINES | wxBORDER_SUNKEN | wxWANTS_CHARS);
+    m_treectrl->SetFont(wxGetApp().normal_font());
     m_left_sizer->Add(m_treectrl, 1, wxEXPAND);
     // Index of the last icon inserted into m_treectrl
     m_icon_count = -1;
@@ -1469,7 +1470,7 @@ void TabPrint::build()
         optgroup = page->new_optgroup(L("Reducing printing time"));
         category_path = "infill_42#";
         optgroup->append_single_option_line("infill_every_layers", category_path + "combine-infill-every-x-layers");
-        optgroup->append_single_option_line("infill_only_where_needed", category_path + "only-infill-where-needed");
+        // optgroup->append_single_option_line("infill_only_where_needed", category_path + "only-infill-where-needed");
 
         optgroup = page->new_optgroup(L("Advanced"));
         optgroup->append_single_option_line("solid_infill_every_layers", category_path + "solid-infill-every-x-layers");
@@ -3820,7 +3821,7 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     }
 
     if (name.empty()) {
-        SavePresetDialog dlg(m_parent, m_type, detach ? _u8L("Detached") : "", from_template);
+        SavePresetDialog dlg(m_parent, { m_type }, detach ? _u8L("Detached") : "", from_template);
         if (dlg.ShowModal() != wxID_OK)
             return;
         name = dlg.get_name();
@@ -3931,7 +3932,7 @@ void Tab::rename_preset()
 
     // get new name
 
-    SavePresetDialog dlg(m_parent, m_type, true, msg);
+    SavePresetDialog dlg(m_parent, m_type, msg);
     if (dlg.ShowModal() != wxID_OK)
         return;
 

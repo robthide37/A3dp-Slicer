@@ -177,7 +177,7 @@ namespace client
         bool                             writable { false };
         // -1 means it is a scalar variable, or it is a vector variable and index was not assigned yet or the whole vector is considered.
         int                              index { -1 };
-        IteratorRange  it_range;
+        IteratorRange                    it_range;
 
         bool                             empty() const { return opt == nullptr; }
         bool                             has_index() const { return index != -1; }
@@ -1862,7 +1862,7 @@ namespace client
                         // Allow back tracking after '{' in case of a text_block embedded inside a condition.
                         // In that case the inner-most {else} wins and the {if}/{elsif}/{else} shall be paired.
                         // {elsif}/{else} without an {if} will be allowed to back track from the embedded text_block.
-                    |   (lit('{') >> macro(_r1)[_val+=_1] > *(+lit(';') >> macro(_r1)[_val+=_1]) > *lit(';') > '}')
+                    |   (lit('{') >> (macros(_r1)[_val += _1] > '}') | '}')
                     |   (lit('[') > legacy_variable_expansion(_r1) [_val+=_1] > ']')
                 );
             text_block.name("text_block");
@@ -1874,26 +1874,45 @@ namespace client
 
             // New style of macro expansion.
             // The macro expansion may contain numeric or string expressions, ifs and cases.
-            macro =
-                    (kw["if"]     > if_else_output(_r1) [_val = _1])
-//                |   (kw["switch"] > switch_output(_r1)  [_val = _1])
-                  |   (assignment_statement(_r1) [_val = _1])
-                  |   (new_variable_statement(_r1) [_val = _1])
-                  |   (conditional_expression(_r1) [ px::bind(&expr::to_string2, _1, _val) ])
+            macros =
+                +(block(_r1)[_val += _1] | (statement(_r1) > (+lit(';') | &lit('}')))[_val += _1] | +lit(';'));
+            macros.name("macro");
+            // if_macros and else_macros only differ by the look-ahead ending condition, which is to not have to repeat the last semicolon
+            // at the end of the block.
+            if_macros = kw["then"] > *(block(_r1)[_val += _1] | (statement(_r1) > (+lit(';') | &(kw["elsif"] | kw["else"] | kw["endif"])))[_val += _1] | +lit(';'));
+            if_macros.name("if_macros");
+            else_macros = *(block(_r1)[_val += _1] | (statement(_r1) > (+lit(';') | &kw["endif"]))[_val += _1] | +lit(';'));
+            else_macros.name("else_macros");
+
+            // Blocks do not require a separating semicolon.
+            block = 
+                    (kw["if"] > if_else_output(_r1)[_val = _1])
+                // (kw["switch"] ...
                 ;
-            macro.name("macro");
+            block.name("block");
+
+            // Statements require a separating semicolon.
+            statement =
+                  (assignment_statement(_r1)  [_val = _1])
+                | (new_variable_statement(_r1)[_val = _1])
+                | (conditional_expression(_r1)[px::bind(&expr::to_string2, _1, _val)])
+                ;
 
             // An if expression enclosed in {} (the outmost {} are already parsed by the caller).
+            // Also }{ could be replaced with ; to simplify writing of pure code.
             if_else_output =
                 eps[_a=true] >
-                (bool_expr_eval(_r1)[px::bind(&MyContext::block_enter, _r1, _1)] > '}' >
-                    text_block(_r1))[px::bind(&MyContext::block_exit, _r1, _1, _a, _2, _val)] > '{' >
-                *((kw["elsif"] > bool_expr_eval(_r1)[px::bind(&MyContext::block_enter, _r1, _1 && _a)] > '}' >
-                    text_block(_r1))[px::bind(&MyContext::block_exit, _r1, _1, _a, _2, _val)] > '{') >
-                -(kw["else"] > eps[px::bind(&MyContext::block_enter, _r1, _a)] > lit('}') >
-                    text_block(_r1)[px::bind(&MyContext::block_exit, _r1, _a, _a, _1, _val)] > '{') >
+                (bool_expr_eval(_r1)[px::bind(&MyContext::block_enter, _r1, _1)] > (if_text_block(_r1) | if_macros(_r1)))
+                    [px::bind(&MyContext::block_exit, _r1, _1, _a, _2, _val)] >
+                *((kw["elsif"] > bool_expr_eval(_r1)[px::bind(&MyContext::block_enter, _r1, _1 && _a)] > (if_text_block(_r1) | if_macros(_r1)))
+                    [px::bind(&MyContext::block_exit, _r1, _1, _a, _2, _val)]) >
+                -(kw["else"] > eps[px::bind(&MyContext::block_enter, _r1, _a)] > (if_text_block(_r1) | else_macros(_r1)))
+                    [px::bind(&MyContext::block_exit, _r1, _a, _a, _1, _val)] >
                 kw["endif"];
             if_else_output.name("if_else_output");
+            if_text_block = (lit('}') > text_block(_r1) > '{');
+            if_text_block.name("if_text_block");
+
             // A switch expression enclosed in {} (the outmost {} are already parsed by the caller).
 /*
             switch_output =
@@ -2119,7 +2138,7 @@ namespace client
                 debug(start);
                 debug(text);
                 debug(text_block);
-                debug(macro);
+                debug(macros);
                 debug(if_else_output);
                 debug(interpolate_table);
 //                debug(switch_output);
@@ -2155,7 +2174,7 @@ namespace client
         // A free-form text, possibly empty, possibly containing macro expansions.
         qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> text_block;
         // Statements enclosed in curely braces {}
-        qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> macro;
+        qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> block, statement, macros, if_text_block, if_macros, else_macros;
         // Legacy variable expansion of the original Slic3r, in the form of [scalar_variable] or [vector_variable_index].
         qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> legacy_variable_expansion;
         // Parsed identifier name.

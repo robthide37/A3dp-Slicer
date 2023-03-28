@@ -727,7 +727,7 @@ void LayerRegion::prepare_fill_surfaces()
     if (! spiral_vase && this->region().config().top_solid_layers == 0) {
         for (Surface &surface : m_fill_surfaces)
             if (surface.is_top())
-                surface.surface_type = this->layer()->object()->config().infill_only_where_needed && this->region().config().fill_pattern != ipLightning ? stInternalVoid : stInternal;
+                surface.surface_type = /*this->layer()->object()->config().infill_only_where_needed && this->region().config().fill_pattern != ipLightning ? stInternalVoid :*/ stInternal;
     }
     if (this->region().config().bottom_solid_layers == 0) {
         for (Surface &surface : m_fill_surfaces)

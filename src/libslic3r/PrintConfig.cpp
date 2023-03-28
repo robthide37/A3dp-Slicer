@@ -1560,14 +1560,14 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
-    def = this->add("infill_only_where_needed", coBool);
-    def->label = L("Only infill where needed");
-    def->category = L("Infill");
-    def->tooltip = L("This option will limit infill to the areas actually needed for supporting ceilings "
-                   "(it will act as internal support material). If enabled, slows down the G-code generation "
-                   "due to the multiple checks involved.");
-    def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(false));
+    // def = this->add("infill_only_where_needed", coBool);
+    // def->label = L("Only infill where needed");
+    // def->category = L("Infill");
+    // def->tooltip = L("This option will limit infill to the areas actually needed for supporting ceilings "
+    //                "(it will act as internal support material). If enabled, slows down the G-code generation "
+    //                "due to the multiple checks involved.");
+    // def->mode = comAdvanced;
+    // def->set_default_value(new ConfigOptionBool(false));
 
     def = this->add("infill_overlap", coFloatOrPercent);
     def->label = L("Infill/perimeters overlap");
@@ -4154,6 +4154,8 @@ static std::set<std::string> PrintConfigDef_ignore = {
     "wall_add_middle_threshold", "wall_split_middle_threshold",
     // Replaced by new concentric ensuring in 2.6.0-alpha5
     "ensure_vertical_shell_thickness",
+    // Disabled in 2.6.0-alpha6, this option is problematic
+    "infill_only_where_needed",
 };
 
 void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &value)
@@ -4552,12 +4554,19 @@ std::string validate(const FullPrintConfig &cfg)
         }
         case coFloats:
         case coPercents:
-            for (double v : static_cast<const ConfigOptionVector<double>*>(opt)->values)
+        {
+            const auto* vec = static_cast<const ConfigOptionVector<double>*>(opt);
+            for (size_t i = 0; i < vec->size(); ++i) {
+                if (vec->is_nil(i))
+                    continue;
+                double v = vec->values[i];
                 if (v < optdef->min || v > optdef->max) {
                     out_of_range = true;
                     break;
                 }
+            }
             break;
+        }
         case coInt:
         {
             auto *iopt = static_cast<const ConfigOptionInt*>(opt);
@@ -4565,12 +4574,19 @@ std::string validate(const FullPrintConfig &cfg)
             break;
         }
         case coInts:
-            for (int v : static_cast<const ConfigOptionVector<int>*>(opt)->values)
+        {
+            const auto* vec = static_cast<const ConfigOptionVector<int>*>(opt);
+            for (size_t i = 0; i < vec->size(); ++i) {
+                if (vec->is_nil(i))
+                    continue;
+                int v = vec->values[i];
                 if (v < optdef->min || v > optdef->max) {
                     out_of_range = true;
                     break;
                 }
+            }
             break;
+        }
         default:;
         }
         if (out_of_range)

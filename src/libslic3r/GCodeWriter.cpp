@@ -486,6 +486,20 @@ std::string GCodeWriter::unlift()
     return gcode;
 }
 
+void GCodeWriter::update_position(const Vec3d &new_pos)
+{
+    assert(this->m_lifted >= 0);
+    const double nominal_z = m_pos.z() - m_lifted;
+    m_lifted = new_pos.z() - nominal_z;
+    if (m_lifted < - EPSILON)
+        throw Slic3r::RuntimeError("Custom G-code reports negative Z-hop. Final Z position is below the print_z height.");
+    // In case that retract_lift == layer_height we could end up with almost zero in_m_lifted
+    // and a retract could be skipped (https://github.com/prusa3d/PrusaSlicer/issues/2154
+    if (m_lifted < EPSILON)
+        m_lifted = 0.;
+    m_pos = new_pos;
+}
+
 std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, unsigned int speed)
 {
     std::ostringstream gcode;

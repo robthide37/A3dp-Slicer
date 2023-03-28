@@ -1572,8 +1572,7 @@ void GLCanvas3D::render()
     _render_objects(GLVolumeCollection::ERenderType::Opaque);
     _render_sla_slices();
     _render_selection();
-    if (m_show_bed_axes)
-        _render_bed_axes();
+    _render_bed_axes();
     if (is_looking_downward)
         _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false);
     if (!m_main_toolbar.is_enabled())
@@ -2351,15 +2350,6 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
 #endif /* __APPLE__ */
             post_event(SimpleEvent(EVT_GLTOOLBAR_COPY));
         break;
-#ifdef __APPLE__
-        case 'd':
-        case 'D':
-#else /* __APPLE__ */
-        case WXK_CONTROL_D:
-#endif /* __APPLE__ */
-            m_show_bed_axes = !m_show_bed_axes;
-            m_dirty = true;
-            break;
 #ifdef __APPLE__
         case 'f':
         case 'F':
