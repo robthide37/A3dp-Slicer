@@ -1406,7 +1406,7 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal)
 
         // FIXME: Cache the transforms.
 
-        const Vec3d         inst_offset     = model_object->instances[instance_idx]->get_offset();
+        const Vec3d         inst_offset     = model_object()->instances[instance_idx]->get_offset();
         const Transform3d   view_inst_matrix= camera.get_view_matrix() * translation_transform(inst_offset);
 
         const bool is_looking_forward = normal && camera.get_dir_forward().dot(*normal) < 0.05;
@@ -1415,7 +1415,7 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal)
             if (normal && (( is_looking_forward &&  parts[id].selected) ||
                            (!is_looking_forward && !parts[id].selected)   ) )
                 continue;
-            const Vec3d volume_offset = model_object->volumes[id]->get_offset();
+            const Vec3d volume_offset = model_object()->volumes[id]->get_offset();
             shader->set_uniform("view_model_matrix", view_inst_matrix * translation_transform(volume_offset));
             parts[id].glmodel.set_color(parts[id].selected ? UPPER_PART_COLOR : LOWER_PART_COLOR);
             parts[id].glmodel.render();
@@ -1437,8 +1437,8 @@ void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
     std::vector<std::pair<size_t, double>> hits_id_and_sqdist;
 
     for (size_t id=0; id<parts.size(); ++id) {
-        const Vec3d volume_offset = model_object->volumes[id]->get_offset();
-        Transform3d tr = model_object->instances[instance_idx]->get_matrix() * model_object->volumes[id]->get_matrix();
+        const Vec3d volume_offset = model_object()->volumes[id]->get_offset();
+        Transform3d tr = model_object()->instances[instance_idx]->get_matrix() * model_object()->volumes[id]->get_matrix();
         if (parts[id].raycaster.unproject_on_mesh(mouse_pos, tr, camera, pos, normal)) {
             hits_id_and_sqdist.emplace_back(id, (camera_pos - tr*(pos.cast<double>())).squaredNorm());
         }
@@ -1730,12 +1730,21 @@ void GLGizmoCut3D::flip_cut_plane()
 }
 
 
-GLGizmoCut3D::PartSelection::PartSelection(ModelObject* mo, int instance_idx_in, const Vec3d& center, const Vec3d& normal)
+GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx_in, const Vec3d& center, const Vec3d& normal)
 {
-    model_object = mo; // FIXME: Ownership.
+    model = Model();
+    model.add_object(*mo);
+    ModelObjectPtrs cut_part_ptrs = model.objects.front()->cut(instance_idx_in, cut_matrix,
+        ModelObjectCutAttribute::KeepUpper |
+        ModelObjectCutAttribute::KeepLower |
+        ModelObjectCutAttribute::KeepAsParts);
+    assert(cut_part_ptrs.size() == 1);
+    model = Model();
+    model.add_object(*cut_part_ptrs.front());
+
     instance_idx = instance_idx_in;
 
-    const ModelVolumePtrs& volumes = mo->volumes;
+    const ModelVolumePtrs& volumes = model_object()->volumes;
 
     // split to parts
     for (int id = int(volumes.size())-1; id >= 0; id--)
@@ -1750,7 +1759,7 @@ GLGizmoCut3D::PartSelection::PartSelection(ModelObject* mo, int instance_idx_in,
         parts.back().glmodel.init_from(volume->mesh());
 
         // Now check whether this part is below or above the plane.
-        Transform3d tr = (model_object->instances[instance_idx]->get_matrix() * volume->get_matrix()).inverse();
+        Transform3d tr = (model_object()->instances[instance_idx]->get_matrix() * volume->get_matrix()).inverse();
         Vec3f pos = (tr * center).cast<float>();
         Vec3f norm = (tr.linear().inverse().transpose() * normal).cast<float>();
         for (const Vec3f& v : volume->mesh().its.vertices) {
@@ -1786,13 +1795,7 @@ void GLGizmoCut3D::process_contours()
     const int instance_idx = selection.get_instance_idx();
     const int object_idx = selection.get_object_idx();
 
-    ModelObjectPtrs cut_part_ptrs = model_objects[object_idx]->cut(instance_idx, get_cut_matrix(selection),
-        ModelObjectCutAttribute::KeepUpper |
-        ModelObjectCutAttribute::KeepLower |
-        ModelObjectCutAttribute::KeepAsParts);
-    assert(cut_part_ptrs.size() == 1);
-
-    m_part_selection = PartSelection(cut_part_ptrs.front(), instance_idx, m_plane_center, m_cut_normal);
+    m_part_selection = PartSelection(model_objects[object_idx], get_cut_matrix(selection), instance_idx, m_plane_center, m_cut_normal);
     m_parent.toggle_model_objects_visibility(false);
 }
 
@@ -2348,7 +2351,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by Plane"));
 
         const bool cut_by_contour = m_part_selection.valid;
-        ModelObject* cut_mo = cut_by_contour ? m_part_selection.model_object : nullptr;
+        ModelObject* cut_mo = cut_by_contour ? m_part_selection.model_object() : nullptr;
         if (cut_mo)
             cut_mo->cut_connectors = mo->cut_connectors;
 
