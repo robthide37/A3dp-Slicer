@@ -2,6 +2,7 @@
 #include "SLAPrintSteps.hpp"
 #include "CSGMesh/CSGMeshCopy.hpp"
 #include "CSGMesh/PerformCSGMeshBooleans.hpp"
+#include "format.hpp"
 
 #include "Geometry.hpp"
 #include "Thread.hpp"
