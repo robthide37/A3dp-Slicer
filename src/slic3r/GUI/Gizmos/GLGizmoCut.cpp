@@ -1428,18 +1428,25 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal)
 void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
 {
     // FIXME: Cache the transforms.
-    const Camera&       camera          = wxGetApp().plater()->get_camera();
+    const Camera& camera     = wxGetApp().plater()->get_camera();
+    const Vec3d&  camera_pos = camera.get_position();
 
     Vec3f pos;
     Vec3f normal;
-    
+
+    std::vector<std::pair<size_t, double>> hits_id_and_sqdist;
+
     for (size_t id=0; id<parts.size(); ++id) {
         const Vec3d volume_offset = model_object->volumes[id]->get_offset();
         Transform3d tr = model_object->instances[instance_idx]->get_matrix() * model_object->volumes[id]->get_matrix();
         if (parts[id].raycaster.unproject_on_mesh(mouse_pos, tr, camera, pos, normal)) {
-            parts[id].selected = ! parts[id].selected;
-            return;
-        }            
+            hits_id_and_sqdist.emplace_back(id, (camera_pos - tr*(pos.cast<double>())).squaredNorm());
+        }
+    }
+    if (! hits_id_and_sqdist.empty()) {
+        size_t id = std::min_element(hits_id_and_sqdist.begin(), hits_id_and_sqdist.end(),
+            [](const std::pair<size_t, double>& a, const std::pair<size_t, double>& b) { return a.second < b.second; })->first;
+        parts[id].selected = ! parts[id].selected;
     }
 }
 
@@ -2470,7 +2477,22 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& po
         hit = (point + t * direction);
     } else
         return false;
-    
+
+    // Now check if the hit is not obscured by a selected part on this side of the plane.
+    // FIXME: This would be better solved by remembering which contours are active. We will
+    // probably need that anyway because there is not other way to find out which contours
+    // to render. If you want to uncomment it, fix it first. It does not work yet.
+    /*for (size_t id = 0; id < m_part_selection.parts.size(); ++id) {
+        if (! m_part_selection.parts[id].selected) {
+            Vec3f pos, normal;
+            const ModelObject* model_object = m_part_selection.model_object;
+            const Vec3d volume_offset = m_part_selection.model_object->volumes[id]->get_offset();
+            Transform3d tr = model_object->instances[m_part_selection.instance_idx]->get_matrix() * model_object->volumes[id]->get_matrix();
+            if (m_part_selection.parts[id].raycaster.unproject_on_mesh(mouse_position, tr, camera, pos, normal))
+                return false;
+        }
+    }*/
+
     if (m_c->object_clipper()->is_projection_inside_cut(hit) == -1)
         return false;
 
