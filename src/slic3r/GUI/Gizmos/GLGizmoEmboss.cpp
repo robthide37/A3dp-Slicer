@@ -369,6 +369,10 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     bool res = on_mouse_surface_drag(mouse_event, camera, m_surface_drag, m_parent, m_raycast_manager, up_limit);
     bool is_dragging = m_surface_drag.has_value();
 
+    // Check if selection is still active
+    if (m_volume == nullptr)
+        return false;
+
     // End with surface dragging?
     if (was_dragging && !is_dragging) {
         // Update surface by new position
