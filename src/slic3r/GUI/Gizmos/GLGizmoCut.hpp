@@ -137,14 +137,10 @@ class GLGizmoCut3D : public GLGizmoBase
     bool m_was_cut_plane_dragged { false };
     bool m_was_contour_selected { false };
 
-    struct PartSelection {
+    class PartSelection {
+    public:
         PartSelection() = default;
         PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx, const Vec3d& center, const Vec3d& normal);
-
-        void render(const Vec3d* normal = nullptr);
-        void toggle_selection(const Vec2d& mouse_pos);
-        void turn_over_selection();
-        ModelObject* model_object() { return model.objects.front(); }
 
         struct Part {
             GLModel glmodel;
@@ -152,10 +148,19 @@ class GLGizmoCut3D : public GLGizmoBase
             bool selected;
         };
 
-        Model model;
-        int instance_idx;
-        std::vector<Part> parts;
-        bool valid = false;
+        void render(const Vec3d* normal = nullptr);
+        void toggle_selection(const Vec2d& mouse_pos);
+        void turn_over_selection();
+        ModelObject* model_object() { return m_model.objects.front(); }
+        bool valid() const { return m_valid; }
+        const std::vector<Part>& parts() const { return m_parts; }
+
+
+    private:
+        Model m_model;
+        int m_instance_idx;
+        std::vector<Part> m_parts;
+        bool m_valid = false;
     };
 
     PartSelection m_part_selection;
