@@ -581,7 +581,7 @@ void PreferencesDialog::build()
 		activate_options_tab(m_optgroup_other);
 
 		create_downloader_path_sizer();
-		create_settings_font_widget();
+//		create_settings_font_widget();
 
 #if ENABLE_ENVIRONMENT_MAP
 		// Add "Render" tab
