@@ -299,12 +299,11 @@ public:
         
         for (ExtendedPoint& ep : extended_points) {
             // We are going to enforce slowdown by increasing the point distance. The overhang speed is based on signed distance from
-            // the prev layer, where 0 means fully overlapping extrusions and thus no slowdown, while extrusion_width and more means full overhang, thus full slowdown.
-            // However, for curling, we take unsinged distance from the curled lines and artifically modifiy the distance
+            // the prev layer, where 0 means fully overlapping extrusions and thus no slowdown, while extrusion_width and more means full overhang,
+            // thus full slowdown. However, for curling, we take unsinged distance from the curled lines and artifically modifiy the distance
             float distance_from_curled = prev_curled_extrusions[current_object].distance_from_lines<false>(ep.position);
-            ep.distance = std::max(ep.distance, path.width - distance_from_curled);
+            ep.distance                = std::max(ep.distance, (path.width - distance_from_curled));
         }
-
 
         std::vector<ProcessedPoint> processed_points;
         processed_points.reserve(extended_points.size());
