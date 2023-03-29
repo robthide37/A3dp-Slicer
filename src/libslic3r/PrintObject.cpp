@@ -1373,43 +1373,56 @@ void PrintObject::discover_vertical_shells()
                     }
 #endif /* SLIC3R_DEBUG_SLICE_PROCESSING */
 			        polygons_append(holes, cache_top_botom_regions[idx_layer].holes);
+                    auto combine_holes = [&holes](const Polygons &holes2) {
+                        if (holes.empty() || holes2.empty())
+                            holes.clear();
+                        else
+                            holes = intersection(holes, holes2);
+                    };
+                    auto combine_shells = [&shell](const Polygons &shells2) {
+                        if (shell.empty())
+                            shell = std::move(shells2);
+                        else if (! shells2.empty()) {
+                            polygons_append(shell, shells2);
+                            // Running the union_ using the Clipper library piece by piece is cheaper 
+                            // than running the union_ all at once.
+                            shell = union_(shell);
+                        }
+                    };
+                    static constexpr const bool one_more_layer_below_top_bottom_surfaces = false;
 			        if (int n_top_layers = region_config.top_solid_layers.value; n_top_layers > 0) {
                         // Gather top regions projected to this layer.
                         coordf_t print_z = layer->print_z;
-	                    for (int i = int(idx_layer) + 1; 
-	                        i < int(cache_top_botom_regions.size()) && 
-	                        	(i < int(idx_layer) + n_top_layers ||
-	                        		m_layers[i]->print_z - print_z < region_config.top_solid_min_thickness - EPSILON);
+                        int i = int(idx_layer) + 1;
+                        int itop = int(idx_layer) + n_top_layers;
+	                    for (; i < int(cache_top_botom_regions.size()) &&
+	                         (i < itop || m_layers[i]->print_z - print_z < region_config.top_solid_min_thickness - EPSILON);
 	                        ++ i) {
 	                        const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
-							if (! holes.empty())
-								holes = intersection(holes, cache.holes);
-							if (! cache.top_surfaces.empty()) {
-		                        polygons_append(shell, cache.top_surfaces);
-		                        // Running the union_ using the Clipper library piece by piece is cheaper 
-		                        // than running the union_ all at once.
-	                            shell = union_(shell);
-	                        }
+                            combine_holes(cache.holes);
+                            combine_shells(cache.top_surfaces);
 	                    }
+                        if (one_more_layer_below_top_bottom_surfaces)
+                            if (i < int(cache_top_botom_regions.size()) &&
+                                (i <= itop || m_layers[i]->bottom_z() - print_z < region_config.top_solid_min_thickness - EPSILON))
+                                combine_holes(cache_top_botom_regions[i].holes);
 	                }
 	                if (int n_bottom_layers = region_config.bottom_solid_layers.value; n_bottom_layers > 0) {
                         // Gather bottom regions projected to this layer.
                         coordf_t bottom_z = layer->bottom_z();
-	                    for (int i = int(idx_layer) - 1;
-	                        i >= 0 &&
-	                        	(i > int(idx_layer) - n_bottom_layers ||
-	                        		bottom_z - m_layers[i]->bottom_z() < region_config.bottom_solid_min_thickness - EPSILON);
+                        int i = int(idx_layer) - 1;
+                        int ibottom = int(idx_layer) - n_bottom_layers;
+	                    for (; i >= 0 &&
+	                         (i > ibottom || bottom_z - m_layers[i]->bottom_z() < region_config.bottom_solid_min_thickness - EPSILON);
 	                        -- i) {
 	                        const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
-							if (! holes.empty())
-								holes = intersection(holes, cache.holes);
-							if (! cache.bottom_surfaces.empty()) {
-		                        polygons_append(shell, cache.bottom_surfaces);
-		                        // Running the union_ using the Clipper library piece by piece is cheaper 
-		                        // than running the union_ all at once.
-		                        shell = union_(shell);
-		                    }
+							combine_holes(cache.holes);
+                            combine_shells(cache.bottom_surfaces);
 	                    }
+                        if (one_more_layer_below_top_bottom_surfaces)
+                            if (i >= 0 &&
+                                (i > ibottom || bottom_z - m_layers[i]->print_z < region_config.bottom_solid_min_thickness - EPSILON))
+                                combine_holes(cache_top_botom_regions[i].holes);
 	                }
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
                     {
