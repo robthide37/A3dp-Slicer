@@ -24,6 +24,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <functional>
+#include <math.h>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -38,7 +39,7 @@
 #include "Geometry/ConvexHull.hpp"
 
 // #define DETAILED_DEBUG_LOGS
-// #define DEBUG_FILES
+#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -208,16 +209,44 @@ std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length
 float estimate_curled_up_height(
     const ExtendedPoint &point, float layer_height, float flow_width, float prev_line_curled_height, Params params)
 {
-    float curled_up_height = 0.0f;
+    float curled_up_height = 0;
     if (fabs(point.distance) < 1.5 * flow_width) {
-        curled_up_height = 0.85 * prev_line_curled_height;
+        curled_up_height = 0.9 * prev_line_curled_height;
     }
-    if (point.distance > params.malformation_distance_factors.first * flow_width &&
-        point.distance < params.malformation_distance_factors.second * flow_width && point.curvature > -0.1f) {
-        float dist_factor = std::max(point.distance - params.malformation_distance_factors.first * flow_width, 0.01f) /
-                            ((params.malformation_distance_factors.second - params.malformation_distance_factors.first) * flow_width);
 
-        curled_up_height = layer_height * sqrt(sqrt(dist_factor)) * std::clamp(3.0f * point.curvature, 1.0f, 3.0f);
+    if (point.distance > params.malformation_distance_factors.first * flow_width &&
+        point.distance < params.malformation_distance_factors.second * flow_width) {
+        // imagine the extrusion profile. The part that has been glued (melted) with the previous layer will be called anchored section
+        // and the rest will be called curling section
+        float anchored_section = flow_width - point.distance;
+        float curling_section = point.distance;
+
+        // after extruding, the curling (floating) part of the extrusion starts to shrink back to the rounded shape of the nozzle
+        // The anchored part not, because the melted material holds to the previous layer well.
+        // We can assume for simplicity perfect equalization of layer height and raising part width, from which:
+        float swelling_radius = (layer_height + curling_section) / 2.0f;
+        curled_up_height += std::max(0.f, (swelling_radius - layer_height) / 2.0f);
+
+        // There is one more effect. On convex turns, there is larger tension on the floating edge of the extrusion then on the middle section.
+        // The tension is caused by the shrinking tendency of the filament, and on outer edge of convex trun, the expansion is greater and thus shrinking force is greater.
+        // This tension will cause the curling section to curle up (Why not down? maybe the previous layer works as a heat block, releasing the heat
+        // faster or slower than thin air, thus the extrusion always curles up)
+        
+        if (point.curvature > 0.01){
+            float radius = 1.0 / point.curvature;
+            // compute radius at the point where the extrusion stops touch previous layer and starts curling
+            float radius_anchored_section_end = radius - flow_width / 2.0 + anchored_section;
+            // target radius represents the radius of the extrusion curling end, after curling
+            // the layer_height term aproximates that the extrusion curling part, when raising to vertical position, will stop before reaching 
+            // perpendicular position, due to various forces.
+            float target_radius = std::max(radius, radius_anchored_section_end) + layer_height;
+            
+            float b = target_radius - radius_anchored_section_end;
+            float a = (curling_section + swelling_radius) / 2.0;
+            float c = sqrt(a*a - b*b);
+
+            curled_up_height += c;
+        }
         curled_up_height = std::min(curled_up_height, params.max_curled_height_factor * layer_height);
     }
 

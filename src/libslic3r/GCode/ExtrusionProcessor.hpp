@@ -246,6 +246,8 @@ class ExtrusionQualityEstimator
 {
     std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>> prev_layer_boundaries;
     std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>> next_layer_boundaries;
+    std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>> prev_curled_extrusions;
+    std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>> next_curled_extrusions;
     const PrintObject                                                            *current_object;
 
 public:
@@ -253,18 +255,27 @@ public:
 
     void prepare_for_new_layer(const Layer *layer)
     {
-        if (layer == nullptr) return;
-        const PrintObject *object     = layer->object();
-        prev_layer_boundaries[object] = next_layer_boundaries[object];
-        next_layer_boundaries[object] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(layer->lslices)};
+        if (layer == nullptr)
+            return;
+        const PrintObject *object      = layer->object();
+        prev_layer_boundaries[object]  = next_layer_boundaries[object];
+        next_layer_boundaries[object]  = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(layer->lslices)};
+        prev_curled_extrusions[object] = next_curled_extrusions[object];
+        Linesf curled_lines;
+        curled_lines.reserve(layer->malformed_lines.size());
+        for (const Line &l : layer->malformed_lines) {
+            curled_lines.push_back(Linef(unscaled(l.a), unscaled(l.b)));
+        }
+        next_curled_extrusions[object] = AABBTreeLines::LinesDistancer<Linef>{curled_lines};
     }
 
-    std::vector<ProcessedPoint> estimate_extrusion_quality(const ExtrusionPath                                          &path,
-                                                           const std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_w_speeds,
-                                                           const std::vector<std::pair<int, ConfigOptionInts>> overhangs_w_fan_speeds,
-                                                           size_t                                              extruder_id,
-                                                           float                                               ext_perimeter_speed,
-                                                           float                                               original_speed)
+    std::vector<ProcessedPoint> estimate_speed_from_extrusion_quality(
+        const ExtrusionPath                                          &path,
+        const std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_w_speeds,
+        const std::vector<std::pair<int, ConfigOptionInts>>           overhangs_w_fan_speeds,
+        size_t                                                        extruder_id,
+        float                                                         ext_perimeter_speed,
+        float                                                         original_speed)
     {
         float                  speed_base = ext_perimeter_speed > 0 ? ext_perimeter_speed : original_speed;
         std::map<float, float> speed_sections;
@@ -285,6 +296,15 @@ public:
 
         std::vector<ExtendedPoint> extended_points =
             estimate_points_properties<true, true, true, true>(path.polyline.points, prev_layer_boundaries[current_object], path.width);
+        
+        for (ExtendedPoint& ep : extended_points) {
+            // We are going to enforce slowdown by increasing the point distance. The overhang speed is based on signed distance from
+            // the prev layer, where 0 means fully overlapping extrusions and thus no slowdown, while extrusion_width and more means full overhang, thus full slowdown.
+            // However, for curling, we take unsinged distance from the curled lines and artifically modifiy the distance
+            float distance_from_curled = prev_curled_extrusions[current_object].distance_from_lines<false>(ep.position);
+            ep.distance = std::max(ep.distance, path.width - distance_from_curled);
+        }
+
 
         std::vector<ProcessedPoint> processed_points;
         processed_points.reserve(extended_points.size());
