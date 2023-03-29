@@ -257,7 +257,7 @@ private:
         std::vector<wxString> bad   = {};
 
         // Configuration of font encoding
-        static const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
+        static constexpr wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
 
         // Identify if preview texture exists
         GLuint texture_id = 0;
