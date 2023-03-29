@@ -901,6 +901,7 @@ public:
 
         if(can_pack) {
             ret = PackResult(item);
+            item.onPacked();
             merged_pile_ = nfp::merge(merged_pile_, item.transformedShape());
         } else {
             ret = PackResult(best_overfit);
