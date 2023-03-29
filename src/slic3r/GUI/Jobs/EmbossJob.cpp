@@ -483,10 +483,46 @@ TriangleMesh priv::create_default_mesh()
     return triangle_mesh;
 }
 
+namespace{
+void update_volume_name(const ModelVolume &volume, const ObjectList *obj_list)
+{
+    if (obj_list == nullptr)
+        return;
+
+    const std::vector<ModelObject *>* objects = obj_list->objects();
+    if (objects == nullptr)
+        return;
+
+    int object_idx = -1;
+    int volume_idx = -1;
+    for (size_t oi = 0; oi < objects->size(); ++oi) {
+        const ModelObject *mo = objects->at(oi);
+        if (mo == nullptr)
+            continue;
+        if (volume.get_object()->id() != mo->id())
+            continue;
+        const ModelVolumePtrs& volumes = mo->volumes;
+        for (size_t vi = 0; vi < volumes.size(); ++vi) {
+            const ModelVolume *mv = volumes[vi];
+            if (mv == nullptr)
+                continue;
+            if (mv->id() == volume.id()){
+                object_idx = static_cast<int>(oi);
+                volume_idx = static_cast<int>(vi);
+                break;
+            }
+        }
+        if (volume_idx > 0)
+            break;
+    }
+    obj_list->update_name_in_list(object_idx, volume_idx);
+}
+}
+
 void UpdateJob::update_volume(ModelVolume             *volume,
                               TriangleMesh           &&mesh,
                               const TextConfiguration &text_configuration,
-                              const std::string       &volume_name)
+                              std::string_view       volume_name)
 {
     // check inputs
     bool is_valid_input = 
@@ -506,19 +542,12 @@ void UpdateJob::update_volume(ModelVolume             *volume,
     // discard information about rotation, should not be stored in volume
     volume->text_configuration->style.prop.angle.reset();
         
-    GUI_App         &app        = wxGetApp(); // may be move to input
-    GLCanvas3D      *canvas     = app.plater()->canvas3D();
-    const Selection &selection  = canvas->get_selection();
-    const GLVolume  *gl_volume  = selection.get_volume(*selection.get_volume_idxs().begin());
-    int              object_idx = gl_volume->object_idx();
+    GUI_App &app = wxGetApp(); // may be move ObjectList and Plater to input?
 
+    // update volume name in right panel( volume / object name)
     if (volume->name != volume_name) {
         volume->name = volume_name;
-
-        // update volume name in right panel( volume / object name)
-        int         volume_idx = gl_volume->volume_idx();
-        ObjectList *obj_list   = app.obj_list();
-        obj_list->update_name_in_list(object_idx, volume_idx);
+        update_volume_name(*volume, app.obj_list());
     }
 
     // When text is object.
@@ -528,11 +557,12 @@ void UpdateJob::update_volume(ModelVolume             *volume,
         volume->get_object()->ensure_on_bed();
 
     // redraw scene
-    bool refresh_immediately = false;
-    canvas->reload_scene(refresh_immediately);
+    Plater *plater = app.plater();
+    if (plater == nullptr)
+        return;
 
-    // Change buttons "Export G-code" into "Slice now"
-    canvas->post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
+    // Update Model and redraw scene
+    plater->update();
 }
 
 void priv::update_volume(TriangleMesh &&mesh, const DataUpdate &data, Transform3d* tr)
@@ -646,8 +676,9 @@ void priv::create_volume(
     if (manager.get_current_type() != GLGizmosManager::Emboss) 
         manager.open_gizmo(GLGizmosManager::Emboss);
 
-    // redraw scene
-    canvas->reload_scene(true);
+    // update model and redraw scene
+    //canvas->reload_scene(true);
+    plater->update();
 }
 
 ModelVolume *priv::get_volume(ModelObjectPtrs &objects,
