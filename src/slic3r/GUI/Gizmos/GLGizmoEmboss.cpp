@@ -407,7 +407,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
 void GLGizmoEmboss::on_mouse_change_selection(const wxMouseEvent &mouse_event)
 {
-    if (mouse_event.LeftDown()) {
+    static bool was_dragging = true;    
+    if ((mouse_event.LeftUp() || mouse_event.RightUp()) && !was_dragging) {
         // is hovered volume closest hovered?
         int hovered_idx = m_parent.get_first_hover_volume_idx();
         if (hovered_idx < 0) 
@@ -430,6 +431,7 @@ void GLGizmoEmboss::on_mouse_change_selection(const wxMouseEvent &mouse_event)
 
         // Reselection of text to another text
     }
+    was_dragging = mouse_event.Dragging();
 }
 
 bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
