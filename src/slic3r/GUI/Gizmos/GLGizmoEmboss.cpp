@@ -223,6 +223,10 @@ enum class IconType : unsigned {
     system_selector,
     open_file,
     exclamation,
+    lock,
+    lock_bold,
+    unlock,
+    unlock_bold,
     // automatic calc of icon's count
     _count
 };
@@ -814,12 +818,12 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
         ImGui::CalcTextSize(tr.boldness.c_str()).x,
         ImGui::CalcTextSize(tr.skew_ration.c_str()).x,
         ImGui::CalcTextSize(tr.from_surface.c_str()).x,
-        ImGui::CalcTextSize(tr.rotation.c_str()).x,
+        ImGui::CalcTextSize(tr.rotation.c_str()).x + cfg.icon_width + 2*space,
         ImGui::CalcTextSize(tr.keep_up.c_str()).x,
         ImGui::CalcTextSize(tr.collection.c_str()).x });
     cfg.advanced_input_offset = max_advanced_text_width
         + 3 * space + cfg.indent;
-
+    cfg.lock_offset = cfg.advanced_input_offset - (cfg.icon_width + space);
     // calculate window size
     float window_title = line_height + 2*style.FramePadding.y + 2 * style.WindowTitleAlign.y;
     float input_height = line_height_with_spacing + 2*style.FramePadding.y;
@@ -841,9 +845,9 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
         + 2 * (cfg.icon_width + space);
     cfg.minimal_window_size = ImVec2(window_width, window_height);
 
-    // 9 = useSurface, charGap, lineGap, bold, italic, surfDist, rotation, keepUp, textFaceToCamera
+    // 8 = useSurface, charGap, lineGap, bold, italic, surfDist, rotation, textFaceToCamera
     // 4 = 1px for fix each edit image of drag float 
-    float advance_height = input_height * 9 + 8;
+    float advance_height = input_height * 8 + 8;
     cfg.minimal_window_size_with_advance =
         ImVec2(cfg.minimal_window_size.x,
                cfg.minimal_window_size.y + advance_height);
@@ -2687,8 +2691,8 @@ void GLGizmoEmboss::draw_height(bool use_inch)
 {
     float &value = m_style_manager.get_style().prop.size_in_mm;
     const EmbossStyle* stored_style = m_style_manager.get_stored_style();
-    const float *stored = ((stored_style)? &stored_style->prop.size_in_mm : nullptr);
-    const char *size_format = ((use_inch) ? "%.2f in" : "%.1f mm");
+    const float *stored = (stored_style != nullptr)? &stored_style->prop.size_in_mm : nullptr;
+    const char *size_format = use_inch ? "%.2f in" : "%.1f mm";
     const std::string revert_text_size = _u8L("Revert text size.");
     const std::string& name = m_gui_cfg->translations.height;
     if (rev_input_mm(name, value, stored, revert_text_size, 0.1f, 1.f, size_format, use_inch, m_scale_height))
@@ -2948,10 +2952,10 @@ void GLGizmoEmboss::draw_advanced()
         &stored_style->prop.distance : nullptr;    
     m_imgui->disabled_begin(!allowe_surface_distance);
     
-    bool use_inch = wxGetApp().app_config->get_bool("use_inches");
     const std::string undo_move_tooltip = _u8L("Undo translation");
     const wxString move_tooltip = _L("Distance of the center of text from model surface");
     bool is_moved = false;
+    bool use_inch = wxGetApp().app_config->get_bool("use_inches");
     if (use_inch) {
         std::optional<float> distance_inch;
         if (distance.has_value()) distance_inch = (*distance * ObjectManipulation::mm_to_in);
@@ -3017,16 +3021,23 @@ void GLGizmoEmboss::draw_advanced()
             process();
     }
 
-    ImGui::Text("%s", tr.keep_up.c_str());
-    ImGui::SameLine(m_gui_cfg->advanced_input_offset);
-    if (ImGui::Checkbox("##keep_up", &m_keep_up)) {
+    // Keep up - lock button icon
+    ImGui::SameLine(m_gui_cfg->lock_offset);
+    const IconManager::Icon &icon = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::activable);
+    const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_up ? IconType::lock_bold : IconType::unlock_bold, IconState::activable);
+    const IconManager::Icon &icon_disable = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::disabled);
+    if (button(icon, icon_hover, icon_disable)) {
+        m_keep_up = !m_keep_up;
         if (m_keep_up) {
             // copy angle to volume
             m_volume->text_configuration->style.prop.angle = font_prop.angle;
         }
     }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Lock the text's rotation when moving text along the object's surface.").c_str());
+        ImGui::SetTooltip("%s", (m_keep_up?
+            _u8L("Unlock the text's up orientation when moving text along the object's surface."):
+            _u8L("Lock the text's up orientation when moving text along the object's surface.")
+        ).c_str());
 
     // when more collection add selector
     if (ff.font_file->infos.size() > 1) {
@@ -3305,7 +3316,11 @@ void GLGizmoEmboss::init_icons()
         "make_unbold.svg",   
         "search.svg",
         "open.svg", 
-        "exclamation.svg"
+        "exclamation.svg",   
+        "lock_closed.svg",  // lock,
+        "lock_closed_f.svg",// lock_bold,
+        "lock_open.svg",    // unlock,
+        "lock_open_f.svg"   // unlock_bold,
     };
     assert(filenames.size() == static_cast<size_t>(IconType::_count));
     std::string path = resources_dir() + "/icons/";

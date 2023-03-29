@@ -183,6 +183,8 @@ private:
         float input_offset          = 0.f;
         float advanced_input_offset = 0.f;
 
+        float lock_offset = 0.f;
+
         ImVec2 text_size;
 
         // maximal size of face name image
