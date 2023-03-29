@@ -467,6 +467,7 @@ void GCode::PlaceholderParserIntegration::init(const GCodeWriter &writer)
     // Reserve buffer for current position.
     this->position.assign(3, 0);
     this->opt_position = new ConfigOptionFloats(this->position);
+    this->output_config.set_key_value("position", this->opt_position);
     // Store zhop variable into the parser itself, it is a read-only variable to the script.
     this->opt_zhop = new ConfigOptionFloat(writer.get_zhop());
     this->parser.set("zhop", this->opt_zhop);
