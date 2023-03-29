@@ -3000,8 +3000,8 @@ void GLGizmoEmboss::draw_advanced()
     }
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", (m_keep_up?
-            _u8L("Unlock the text's up orientation when moving text along the object's surface."):
-            _u8L("Lock the text's up orientation when moving text along the object's surface.")
+            _u8L("Unlock the text's rotation when moving text along the object's surface."):
+            _u8L("Lock the text's rotation when moving text along the object's surface.")
         ).c_str());
 
     // when more collection add selector
