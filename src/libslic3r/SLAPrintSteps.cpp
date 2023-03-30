@@ -31,7 +31,7 @@
 #include "I18N.hpp"
 
 #include <libnest2d/tools/benchmark.h>
-
+#include "format.hpp"
 
 namespace Slic3r {
 
@@ -511,8 +511,7 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
     if(slindex_it == po.m_slice_index.end())
         //TRN To be shown at the status bar on SLA slicing error.
         throw Slic3r::RuntimeError(
-            _u8L("Slicing had to be stopped due to an internal error: "
-              "Inconsistent slice index."));
+            format(_u8L("Model named: %s can not be sliced. Please check if the model is sane."), po.model_object()->name));
 
     po.m_model_height_levels.clear();
     po.m_model_height_levels.reserve(po.m_slice_index.size());
