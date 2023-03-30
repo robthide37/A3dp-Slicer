@@ -1352,6 +1352,11 @@ std::vector<std::vector<float>> WipeTower::extract_wipe_volumes(const PrintConfi
     // Get wiping matrix to get number of extruders and convert vector<double> to vector<float>:
     std::vector<float> wiping_matrix(cast<float>(config.wiping_volumes_matrix.values));
 
+    // The values shall only be used when SEMM is enabled. The purging for other printers
+    // is determined by filament_minimal_purge_on_wipe_tower.
+    if (! config.single_extruder_multi_material.value)
+        std::fill(wiping_matrix.begin(), wiping_matrix.end(), 0.f);
+
     // Extract purging volumes for each extruder pair:
     std::vector<std::vector<float>> wipe_volumes;
     const unsigned int number_of_extruders = (unsigned int)(sqrt(wiping_matrix.size())+EPSILON);
