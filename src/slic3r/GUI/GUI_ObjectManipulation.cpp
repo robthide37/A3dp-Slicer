@@ -433,7 +433,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 
     m_main_grid_sizer->Add(editors_grid_sizer, 1, wxEXPAND);
 
-    m_skew_label = new wxStaticText(parent, wxID_ANY, _L("Skew"));
+    m_skew_label = new wxStaticText(parent, wxID_ANY, _L("Skew [World]"));
     m_main_grid_sizer->Add(m_skew_label, 1, wxEXPAND);
 
     m_reset_skew_button = new ScalableButton(parent, wxID_ANY, ScalableBitmap(parent, "undo"));
@@ -780,7 +780,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
         show_rotation = trafo_svd.rotation;
         show_scale    = trafo_svd.scale;
         show_mirror   = trafo_svd.mirror;
-        show_skew     = trafo_svd.skew;
+        show_skew     = Geometry::TransformationSVD(volume->world_matrix()).skew;
     }
 
     wxGetApp().CallAfter([this, show_drop_to_bed, show_rotation, show_scale, show_mirror, show_skew] {
