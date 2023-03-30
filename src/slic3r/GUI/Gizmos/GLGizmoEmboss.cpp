@@ -487,9 +487,6 @@ void GLGizmoEmboss::on_mouse_change_selection(const wxMouseEvent &mouse_event)
         if (m_volume->id() == volume->id())
             return;
 
-        if (volume->is_the_only_one_part())
-            return; // reselect to another text
-
         // select volume without text configuration
         return close();
     }
