@@ -90,7 +90,7 @@ public:
 
     void render_painter_gizmo() override;
 
-    void data_changed(bool is_serializing) override;
+    void data_changed() override;
 
     void render_triangles(const Selection& selection) const override;
 

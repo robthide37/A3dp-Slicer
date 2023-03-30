@@ -2510,7 +2510,7 @@ CommonGizmosDataID GLGizmoCut3D::on_get_requirements() const {
               | int(CommonGizmosDataID::ObjectClipper));
 }
 
-void GLGizmoCut3D::data_changed(bool is_serializing)
+void GLGizmoCut3D::data_changed()
 {
     update_bb();
     if (auto oc = m_c->object_clipper())

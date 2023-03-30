@@ -387,9 +387,9 @@ void GLGizmoFdmSupports::select_facets_by_angle(float threshold_deg, bool block)
     m_parent.set_as_dirty();
 }
 
-void GLGizmoFdmSupports::data_changed(bool is_serializing)
+void GLGizmoFdmSupports::data_changed()
 {
-    GLGizmoPainterBase::data_changed(is_serializing);
+    GLGizmoPainterBase::data_changed();
     if (! m_c->selection_info())
         return;
 

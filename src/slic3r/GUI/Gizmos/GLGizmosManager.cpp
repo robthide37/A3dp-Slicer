@@ -223,7 +223,7 @@ void GLGizmosManager::update_data()
         m_common_gizmos_data->update(get_current()
                                    ? get_current()->get_requirements()
                                    : CommonGizmosDataID(0));
-    if (m_current != Undefined) m_gizmos[m_current]->data_changed(m_serializing);
+    if (m_current != Undefined) m_gizmos[m_current]->data_changed();
 }
 
 bool GLGizmosManager::is_running() const
@@ -245,7 +245,7 @@ bool GLGizmosManager::handle_shortcut(int key)
     // allowe open shortcut even when selection is empty    
     if (GLGizmoBase* gizmo_emboss = m_gizmos[Emboss].get();
         is_key(gizmo_emboss->get_shortcut_key())) {
-        dynamic_cast<GLGizmoEmboss *>(gizmo_emboss)->create_volume(ModelVolumeType::MODEL_PART);
+        dynamic_cast<GLGizmoEmboss *>(gizmo_emboss)->on_shortcut_key();
         return true;
     }
 

@@ -454,7 +454,7 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
     return false;
 }
 
-void GLGizmoMeasure::data_changed(bool is_serializing)
+void GLGizmoMeasure::data_changed()
 {
     m_parent.toggle_sla_auxiliaries_visibility(false, nullptr, -1);
 

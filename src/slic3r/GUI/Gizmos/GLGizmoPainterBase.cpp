@@ -31,7 +31,7 @@ GLGizmoPainterBase::~GLGizmoPainterBase()
         s_sphere.reset();
 }
 
-void GLGizmoPainterBase::data_changed(bool is_serializing)
+void GLGizmoPainterBase::data_changed()
 {
     if (m_state != On)
         return;

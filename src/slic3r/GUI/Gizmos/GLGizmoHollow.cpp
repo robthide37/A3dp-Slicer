@@ -42,7 +42,7 @@ bool GLGizmoHollow::on_init()
     return true;
 }
 
-void GLGizmoHollow::data_changed(bool is_serializing)
+void GLGizmoHollow::data_changed()
 {
     if (! m_c->selection_info())
         return;

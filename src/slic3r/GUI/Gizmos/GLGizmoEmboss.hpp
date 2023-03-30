@@ -47,6 +47,10 @@ public:
     /// <param name="volume_type">Object part / Negative volume / Modifier</param>
     void create_volume(ModelVolumeType volume_type);
 
+    /// <summary>
+    /// Handle pressing of shortcut
+    /// </summary>
+    void on_shortcut_key();
 protected:
     bool on_init() override;
     bool on_is_activable() const override;
@@ -57,7 +61,7 @@ protected:
     void on_render_input_window(float x, float y, float bottom_limit) override;
     bool on_is_selectable() const override { return false; }
     void on_set_state() override;    
-    void data_changed(bool is_serializing) override; // selection changed
+    void data_changed() override; // selection changed
     void on_set_hover_id() override{ m_rotate_gizmo.set_hover_id(m_hover_id); }
     void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(); }
     void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(); }
@@ -303,10 +307,6 @@ private:
 
     // True when m_text contain character unknown by selected font
     bool m_text_contain_unknown_glyph = false;
-
-    // True from on_set_state(State::On) to first call of on_render_input_window()
-    // To know that on data_change when no volume is selected create new one
-    bool m_is_just_opened = false;
 
     // cancel for previous update of volume to cancel finalize part
     std::shared_ptr<std::atomic<bool>> m_job_cancel;

@@ -147,9 +147,9 @@ void GLGizmoMmuSegmentation::render_painter_gizmo()
     glsafe(::glDisable(GL_BLEND));
 }
 
-void GLGizmoMmuSegmentation::data_changed(bool is_serializing)
+void GLGizmoMmuSegmentation::data_changed()
 {
-    GLGizmoPainterBase::data_changed(is_serializing);
+    GLGizmoPainterBase::data_changed();
     if (m_state != On || wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() != ptFFF || wxGetApp().extruders_edited_cnt() <= 1)
         return;
 

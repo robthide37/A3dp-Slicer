@@ -105,7 +105,7 @@ void GLGizmoScale3D::enable_ununiversal_scale(bool enable)
         m_grabbers[i].enabled = enable;
 }
 
-void GLGizmoScale3D::data_changed(bool is_serializing)
+void GLGizmoScale3D::data_changed()
 {
 #if ENABLE_WORLD_COORDINATE
     set_scale(Vec3d::Ones());
