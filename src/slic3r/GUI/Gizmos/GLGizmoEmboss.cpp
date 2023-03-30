@@ -782,12 +782,14 @@ void GLGizmoEmboss::data_changed(bool is_serializing) {
     set_volume_by_selection();
 
     // when open window by "T" and no valid volume is selected, so Create new one
+    // this is only place where One could distiguish between serializing and open by shortcut T
     if (!is_serializing && m_is_just_opened && m_volume == nullptr) {
         // reopen gizmo when new object is created
         close();
         if (wxGetApp().get_mode() == comSimple || wxGetApp().obj_list()->has_selected_cut_object())
-            // It's impossible to add a part in simple mode
+            // It's unwanted to add a part in simple mode
             return;
+
         // start creating new object
         create_volume(ModelVolumeType::MODEL_PART);
     }
