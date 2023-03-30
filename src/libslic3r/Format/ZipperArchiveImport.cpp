@@ -18,7 +18,7 @@ boost::property_tree::ptree read_ini(const mz_zip_archive_file_stat &entry,
 {
     std::string buf(size_t(entry.m_uncomp_size), '\0');
 
-    if (!mz_zip_reader_extract_file_to_mem(&zip.arch, entry.m_filename,
+    if (!mz_zip_reader_extract_to_mem(&zip.arch, entry.m_file_index,
                                            buf.data(), buf.size(), 0))
         throw Slic3r::FileIOError(zip.get_errorstr());
 
@@ -35,7 +35,7 @@ EntryBuffer read_entry(const mz_zip_archive_file_stat &entry,
 {
     std::vector<uint8_t> buf(entry.m_uncomp_size);
 
-    if (!mz_zip_reader_extract_file_to_mem(&zip.arch, entry.m_filename,
+    if (!mz_zip_reader_extract_to_mem(&zip.arch, entry.m_file_index,
                                            buf.data(), buf.size(), 0))
         throw Slic3r::FileIOError(zip.get_errorstr());
 

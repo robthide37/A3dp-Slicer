@@ -34,6 +34,10 @@
 
 // #define SLIC3R_DEBUG_SLICE_PROCESSING
 
+#ifdef SLIC3R_DEBUG_SLICE_PROCESSING
+    #define DEBUG_INTERSECTIONLINE
+#endif
+
 #if defined(SLIC3R_DEBUG) || defined(SLIC3R_DEBUG_SLICE_PROCESSING)
 #include "SVG.hpp"
 #endif
@@ -125,7 +129,7 @@ public:
     };
     uint32_t        flags { 0 };
 
-#if DEBUG_INTERSECTIONLINE
+#ifdef DEBUG_INTERSECTIONLINE
     enum class Source {
         BottomPlane,
         TopPlane,
@@ -1446,19 +1450,19 @@ static std::vector<Polygons> make_slab_loops(
                         for (const IntersectionLine &l : lines.at_slice[slice_below])
                             if (l.edge_type != IntersectionLine::FacetEdgeType::Top) {
                                 in.emplace_back(l);
-#if DEBUG_INTERSECTIONLINE
+#ifdef DEBUG_INTERSECTIONLINE
                                 in.back().source = IntersectionLine::Source::BottomPlane;
 #endif // DEBUG_INTERSECTIONLINE
                             }
                     }
                     {
                         // Edges in between slice_below and slice_above.
-#if DEBUG_INTERSECTIONLINE
+#ifdef DEBUG_INTERSECTIONLINE
                         size_t old_size = in.size();
 #endif // DEBUG_INTERSECTIONLINE
                         // Edge IDs of end points on in-between lines that touch the layer above are already increased with num_edges.
                         append(in, lines.between_slices[line_idx]);
-#if DEBUG_INTERSECTIONLINE
+#ifdef DEBUG_INTERSECTIONLINE
                         for (auto it = in.begin() + old_size; it != in.end(); ++ it) {
                             assert(it->edge_type == IntersectionLine::FacetEdgeType::Slab);
                             it->source = IntersectionLine::Source::Slab;
@@ -1476,7 +1480,7 @@ static std::vector<Polygons> make_slab_loops(
                                     l.edge_a_id += num_edges;
                                 if (l.edge_b_id >= 0)
                                     l.edge_b_id += num_edges;
-#if DEBUG_INTERSECTIONLINE
+#ifdef DEBUG_INTERSECTIONLINE
                                 l.source = IntersectionLine::Source::TopPlane;
 #endif // DEBUG_INTERSECTIONLINE
                             }

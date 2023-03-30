@@ -2253,7 +2253,7 @@ void GCodeViewer::load_shells(const Print& print)
             const WipeTowerData& wipe_tower_data = print.wipe_tower_data(extruders_count);
             const float depth = wipe_tower_data.depth;
             const float brim_width = wipe_tower_data.brim_width;
-            m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_rotation_angle,
+            m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_cone_angle, config.wipe_tower_rotation_angle,
                 !print.is_step_done(psWipeTower), brim_width);
         }
     }

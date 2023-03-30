@@ -1125,6 +1125,18 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
     // used to keep track whether the undo/redo snapshot has already been taken 
     bool undoredo_snapshot = false;
 
+    if (wxGetApp().plater()->printer_technology() == ptSLA) {
+        // remove SLA auxiliary volumes from the selection to ensure that the proper bounding box is calculated
+        std::vector<unsigned int> to_remove;
+        for (unsigned int i : m_list) {
+            if ((*m_volumes)[i]->volume_idx() < 0)
+                to_remove.push_back(i);
+        }
+
+        if (!to_remove.empty())
+            remove_volumes(m_mode, to_remove);
+    }
+
     switch (volume.type())
     {
     case BuildVolume::Type::Rectangle: { undoredo_snapshot = fit_rectangle(volume, !undoredo_snapshot); break; }
@@ -2589,7 +2601,7 @@ static void verify_instances_rotation_synchronized(const Model &model, const GLV
             continue;
         const Transform3d::ConstLinearPart& rotation0 = volumes[idx_volume_first]->get_instance_transformation().get_matrix().linear();
         for (int i = idx_volume_first + 1; i < (int)volumes.size(); ++i)
-            if (volumes[i]->object_idx() == idx_object) {
+            if (volumes[i]->object_idx() == idx_object && volumes[i]->volume_idx() >= 0) {
                 const Transform3d::ConstLinearPart& rotation = volumes[i]->get_instance_transformation().get_matrix().linear();
                 assert(is_rotation_xy_synchronized(rotation, rotation0));
             }
@@ -2906,6 +2918,31 @@ void Selection::transform_volume_relative(GLVolume& volume, const VolumeCache& v
         volume.set_volume_transformation(vol_trafo.get_matrix() * transform);
     else
         assert(false);
+}
+
+ModelVolume *get_selected_volume(const Selection &selection)
+{
+    const GLVolume *gl_volume = get_selected_gl_volume(selection);
+    if (gl_volume == nullptr)
+        return nullptr;
+    const ModelObjectPtrs &objects = selection.get_model()->objects;
+    return get_model_volume(*gl_volume, objects);
+}
+
+const GLVolume *get_selected_gl_volume(const Selection &selection)
+{
+    int object_idx = selection.get_object_idx();
+    // is more object selected?
+    if (object_idx == -1)
+        return nullptr;
+
+    const auto &list = selection.get_volume_idxs();
+    // is more volumes selected?
+    if (list.size() != 1)
+        return nullptr;
+
+    unsigned int volume_idx = *list.begin();
+    return selection.get_volume(volume_idx);
 }
 
 } // namespace GUI

@@ -1019,13 +1019,23 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
                                   overhang_region.end());
 
             if (!overhang_region.empty()) {
+                // there is a special case, where the first (or last) generated overhang perimeter eats all anchor space.
+                // When this happens, the first overhang perimeter is also a closed loop, and needs special check
+                // instead of the following simple is_anchored lambda, which checks only the first and last point (not very useful on closed
+                // polyline)
+                bool first_overhang_is_closed_and_anchored =
+                    (overhang_region.front().first_point() == overhang_region.front().last_point() &&
+                     !intersection_pl(overhang_region.front().polyline, optimized_lower_slices).empty());
+                     
                 auto is_anchored = [&lower_layer_aabb_tree](const ExtrusionPath &path) {
                     return lower_layer_aabb_tree.distance_from_lines<true>(path.first_point()) <= 0 ||
                            lower_layer_aabb_tree.distance_from_lines<true>(path.last_point()) <= 0;
                 };
-                std::reverse(overhang_region.begin(), overhang_region.end());
-                auto first_unanchored = std::stable_partition(overhang_region.begin(), overhang_region.end(), is_anchored);
-                int index_of_first_unanchored = first_unanchored - overhang_region.begin();
+                if (!first_overhang_is_closed_and_anchored) {
+                    std::reverse(overhang_region.begin(), overhang_region.end());
+                }
+                auto first_unanchored          = std::stable_partition(overhang_region.begin(), overhang_region.end(), is_anchored);
+                int  index_of_first_unanchored = first_unanchored - overhang_region.begin();
                 overhang_region = sort_extra_perimeters(overhang_region, index_of_first_unanchored, overhang_flow.scaled_spacing());
             }
         }

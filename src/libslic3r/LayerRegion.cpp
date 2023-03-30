@@ -291,22 +291,24 @@ Surfaces expand_bridges_detect_orientations(
             uint32_t src_id = it->src_id;
             for (++ it; it != bridge_expansions.end() && it->src_id == src_id; ++ it) ;
         }
-        for (uint32_t bridge_id = 0; bridge_id < uint32_t(bridges.size()); ++ bridge_id) {
-            acc.clear();
-            for (uint32_t bridge_id2 = bridge_id; bridge_id2 < uint32_t(bridges.size()); ++ bridge_id2)
-                if (group_id(bridge_id) == bridge_id) {
-                    append(acc, to_polygons(std::move(bridges[bridge_id2].expolygon)));
-                    auto it_bridge_expansion = bridges[bridge_id2].bridge_expansion_begin;
-                    assert(it_bridge_expansion == bridge_expansions.end() || it_bridge_expansion->src_id == bridge_id2);
-                    for (; it_bridge_expansion != bridge_expansions.end() && it_bridge_expansion->src_id == bridge_id2; ++ it_bridge_expansion)
-                        append(acc, to_polygons(std::move(it_bridge_expansion->expolygon)));
-                }
-            //FIXME try to be smart and pick the best bridging angle for all?
-            templ.bridge_angle = bridges[bridge_id].angle;
-            // without safety offset, artifacts are generated (GH #2494)
-            for (ExPolygon &ex : union_safety_offset_ex(acc))
-                out.emplace_back(templ, std::move(ex));
-        }
+        for (uint32_t bridge_id = 0; bridge_id < uint32_t(bridges.size()); ++ bridge_id)
+            if (group_id(bridge_id) == bridge_id) {
+                // Head of the group.
+                acc.clear();
+                for (uint32_t bridge_id2 = bridge_id; bridge_id2 < uint32_t(bridges.size()); ++ bridge_id2)
+                    if (group_id(bridge_id2) == bridge_id) {
+                        append(acc, to_polygons(std::move(bridges[bridge_id2].expolygon)));
+                        auto it_bridge_expansion = bridges[bridge_id2].bridge_expansion_begin;
+                        assert(it_bridge_expansion == bridge_expansions.end() || it_bridge_expansion->src_id == bridge_id2);
+                        for (; it_bridge_expansion != bridge_expansions.end() && it_bridge_expansion->src_id == bridge_id2; ++ it_bridge_expansion)
+                            append(acc, to_polygons(std::move(it_bridge_expansion->expolygon)));
+                    }
+                //FIXME try to be smart and pick the best bridging angle for all?
+                templ.bridge_angle = bridges[bridge_id].angle;
+                // without safety offset, artifacts are generated (GH #2494)
+                for (ExPolygon &ex : union_safety_offset_ex(acc))
+                    out.emplace_back(templ, std::move(ex));
+            }
     }
 
     // Clip the shells by the expanded bridges.
@@ -378,7 +380,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
         const double custom_angle = this->region().config().bridge_angle.value;
         const auto   params = Algorithm::RegionExpansionParameters::build(expansion_bottom_bridge, expansion_step, max_nr_expansion_steps);
         bridges.surfaces = custom_angle > 0 ?
-            expand_merge_surfaces(m_fill_surfaces.surfaces, stBottomBridge, shells, params, custom_angle) :
+            expand_merge_surfaces(m_fill_surfaces.surfaces, stBottomBridge, shells, params, Geometry::deg2rad(custom_angle)) :
             expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, params);
         BOOST_LOG_TRIVIAL(trace) << "Processing external surface, detecting bridges - done";
 #if 0
@@ -725,7 +727,7 @@ void LayerRegion::prepare_fill_surfaces()
     if (! spiral_vase && this->region().config().top_solid_layers == 0) {
         for (Surface &surface : m_fill_surfaces)
             if (surface.is_top())
-                surface.surface_type = this->layer()->object()->config().infill_only_where_needed && this->region().config().fill_pattern != ipLightning ? stInternalVoid : stInternal;
+                surface.surface_type = /*this->layer()->object()->config().infill_only_where_needed && this->region().config().fill_pattern != ipLightning ? stInternalVoid :*/ stInternal;
     }
     if (this->region().config().bottom_solid_layers == 0) {
         for (Surface &surface : m_fill_surfaces)

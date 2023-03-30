@@ -13,6 +13,7 @@ namespace Slic3r {
 class Shader;
 class Model;
 class ModelObject;
+class ModelVolume;
 class GLVolume;
 class GLArrow;
 class GLCurvedArrow;
@@ -418,6 +419,9 @@ private:
     void transform_volume_relative(GLVolume& volume, const VolumeCache& volume_data, TransformationType transformation_type,
         const Transform3d& transform, const Vec3d& world_pivot);
 };
+
+ModelVolume *get_selected_volume(const Selection &selection);
+const GLVolume *get_selected_gl_volume(const Selection &selection);
 
 } // namespace GUI
 } // namespace Slic3r

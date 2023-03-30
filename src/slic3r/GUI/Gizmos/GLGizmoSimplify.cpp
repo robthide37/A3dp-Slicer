@@ -318,6 +318,7 @@ void GLGizmoSimplify::on_render_input_window(float x, float y, float bottom_limi
         m_configuration.use_count = !m_configuration.use_count;
         start_process = true;
     } else if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && is_multipart)
+        // TRN %1% = "Detail level", %2% = "Decimate ratio"
         ImGui::SetTooltip("%s", GUI::format(_L(
              "Multipart object can be simplified only by %1%. "
              "If you want specify %2% process it separately."),
@@ -539,7 +540,8 @@ void GLGizmoSimplify::apply_simplify() {
 
     const Selection& selection = m_parent.get_selection();
     auto plater = wxGetApp().plater();
-    plater->take_snapshot(_u8L("Simplify ") + create_volumes_name(m_volume_ids, selection));
+    // TRN %1% = volumes name
+    plater->take_snapshot(Slic3r::format(_u8L("Simplify %1%"), create_volumes_name(m_volume_ids, selection)));
     plater->clear_before_change_mesh(selection.get_object_idx(), _u8L("Custom supports, seams and multimaterial painting were "
                                                                       "removed after simplifying the mesh."));
     // After removing custom supports, seams, and multimaterial painting, we have to update info about the object to remove information about

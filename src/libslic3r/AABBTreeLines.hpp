@@ -165,9 +165,9 @@ inline std::vector<std::pair<VectorType, size_t>> get_intersections_with_line(si
 // Epsilon is applied to the bounding boxes of the AABB Tree to cope with numeric inaccuracies
 // during tree traversal.
 template<typename LineType>
-inline AABBTreeIndirect::Tree<2, typename LineType::Scalar> build_aabb_tree_over_indexed_lines(const std::vector<LineType> &lines)
+inline AABBTreeIndirect::Tree<LineType::Dim, typename LineType::Scalar> build_aabb_tree_over_indexed_lines(const std::vector<LineType> &lines)
 {
-    using TreeType = AABBTreeIndirect::Tree<2, typename LineType::Scalar>;
+    using TreeType = AABBTreeIndirect::Tree<LineType::Dim, typename LineType::Scalar>;
     //    using              CoordType      = typename TreeType::CoordType;
     using VectorType  = typename TreeType::VectorType;
     using BoundingBox = typename TreeType::BoundingBox;

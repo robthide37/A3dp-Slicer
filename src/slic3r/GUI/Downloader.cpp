@@ -178,7 +178,7 @@ void Downloader::on_error(wxCommandEvent& event)
     BOOST_LOG_TRIVIAL(error) << "Download error: " << event.GetString();
 	NotificationManager* ntf_mngr = wxGetApp().notification_manager();
 	ntf_mngr->set_download_URL_error(id, boost::nowide::narrow(event.GetString()));
-	show_error(nullptr, format_wxstr(L"%1%\n%2%", _L("The download has failed:"), event.GetString()));
+	show_error(nullptr, format_wxstr(L"%1%\n%2%", _L("The download has failed") + ":", event.GetString()));
 }
 void Downloader::on_complete(wxCommandEvent& event)
 {

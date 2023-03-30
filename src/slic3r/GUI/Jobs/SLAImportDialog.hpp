@@ -30,7 +30,7 @@ std::string get_readers_wildcard()
     std::string ret;
 
     for (const char *archtype : SLAArchiveReader::registered_archives()) {
-        ret += _utf8(SLAArchiveReader::get_description(archtype));
+        ret += into_u8(_(SLAArchiveReader::get_description(archtype)));
         ret += " (";
         auto extensions = SLAArchiveReader::get_extensions(archtype);
         for (const char * ext : extensions) {
