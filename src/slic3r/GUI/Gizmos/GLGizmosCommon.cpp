@@ -453,83 +453,74 @@ void SupportsClipper::on_update()
     if (! mo || ! is_sla)
         return;
 
-    const GLCanvas3D* canvas = get_pool()->get_canvas();
-    const PrintObjects& print_objects = canvas->sla_print()->objects();
-    const SLAPrintObject* print_object = (m_print_object_idx >= 0 && m_print_object_idx < int(print_objects.size()))
-            ? print_objects[m_print_object_idx]
-            : nullptr;
+    const SLAPrintObject* po = get_pool()->selection_info()->print_object();
+    if (po == nullptr)
+        return;
 
-    // Find the respective SLAPrintObject.
-    if (m_print_object_idx < 0 || m_print_objects_count != int(print_objects.size())) {
-        m_print_objects_count = print_objects.size();
-        m_print_object_idx = -1;
-        for (const SLAPrintObject* po : print_objects) {
-            ++m_print_object_idx;
-            if (po->model_object()->id() == mo->id()) {
-                print_object = po;
-                break;
-            }
-        }
+    if (po->get_mesh_to_print() == nullptr) {
+        // The object has been not sliced yet. We better dump the cached data.
+        m_supports_clipper.reset();
+        m_pad_clipper.reset();
+        return;
     }
 
-    if (print_object
-     && print_object->is_step_done(slaposSupportTree)
-     && ! print_object->support_mesh().empty())
-    {
-        // If the supports are already calculated, save the timestamp of the respective step
-        // so we can later tell they were recalculated.
-        size_t timestamp = print_object->step_state_with_timestamp(slaposSupportTree).timestamp;
-        if (! m_clipper || timestamp != m_old_timestamp) {
-            // The timestamp has changed.
-            m_clipper.reset(new MeshClipper);
-            // The mesh should already have the shared vertices calculated.
-            m_clipper->set_mesh(print_object->support_mesh().its);
-            m_old_timestamp = timestamp;
-        }
+    const TriangleMesh& support_mesh = po->support_mesh();
+    if (support_mesh.empty()) {
+        // The supports are not available yet. We better dump the cached data.
+        m_supports_clipper.reset();
     }
-    else
-        // The supports are not valid. We better dump the cached data.
-        m_clipper.reset();
+    else {
+        m_supports_clipper.reset(new MeshClipper);
+        m_supports_clipper->set_mesh(support_mesh.its);
+    }
+
+    const TriangleMesh& pad_mesh = po->pad_mesh();
+    if (pad_mesh.empty()) {
+        // The supports are not available yet. We better dump the cached data.
+        m_pad_clipper.reset();
+    }
+    else {
+        m_pad_clipper.reset(new MeshClipper);
+        m_pad_clipper->set_mesh(pad_mesh.its);
+    }
 }
 
 
 void SupportsClipper::on_release()
 {
-    m_clipper.reset();
-    m_old_timestamp = 0;
+    m_supports_clipper.reset();
+    m_pad_clipper.reset();
     m_print_object_idx = -1;
 }
 
 void SupportsClipper::render_cut() const
 {
     const CommonGizmosDataObjects::ObjectClipper* ocl = get_pool()->object_clipper();
-    if (ocl->get_position() == 0.
-     || ! m_clipper)
+    if (ocl->get_position() == 0.)
         return;
 
+    const SLAPrintObject* po = get_pool()->selection_info()->print_object();
+    if (po == nullptr)
+        return;
+
+    Geometry::Transformation po_trafo(po->trafo());
+
     const SelectionInfo* sel_info = get_pool()->selection_info();
-    const ModelObject* mo = sel_info->model_object();
-    const Geometry::Transformation inst_trafo = mo->instances[sel_info->get_active_instance()]->get_transformation();
-    //Geometry::Transformation vol_trafo  = mo->volumes.front()->get_transformation();
-    Geometry::Transformation trafo = inst_trafo;// * vol_trafo;
-    trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
+    Geometry::Transformation inst_trafo = sel_info->model_object()->instances[sel_info->get_active_instance()]->get_transformation();
+    inst_trafo = Geometry::Transformation(inst_trafo.get_matrix() * po_trafo.get_matrix().inverse());
+    inst_trafo.set_offset(inst_trafo.get_offset() + Vec3d(0.0, 0.0, sel_info->get_sla_shift()));
 
+    if (m_supports_clipper != nullptr) {
+        m_supports_clipper->set_plane(*ocl->get_clipping_plane());
+        m_supports_clipper->set_transformation(inst_trafo);
+        m_supports_clipper->render_cut({ 1.0f, 0.f, 0.37f, 1.0f });
+    }
 
-    // Get transformation of supports
-    Geometry::Transformation supports_trafo = trafo;
-    supports_trafo.set_scaling_factor(Vec3d::Ones());
-    supports_trafo.set_offset(Vec3d(trafo.get_offset()(0), trafo.get_offset()(1), sel_info->get_sla_shift()));
-    supports_trafo.set_rotation(Vec3d(0., 0., trafo.get_rotation()(2)));
-    // I don't know why, but following seems to be correct.
-    supports_trafo.set_mirror(Vec3d(trafo.get_mirror()(0) * trafo.get_mirror()(1) * trafo.get_mirror()(2),
-                                    1,
-                                    1.));
-
-    m_clipper->set_plane(*ocl->get_clipping_plane());
-    m_clipper->set_transformation(supports_trafo);
-
-    m_clipper->render_cut({ 1.0f, 0.f, 0.37f, 1.0f });
-    m_clipper->render_contour({ 1.f, 1.f, 1.f, 1.f });
+    if (m_pad_clipper != nullptr) {
+        m_pad_clipper->set_plane(*ocl->get_clipping_plane());
+        m_pad_clipper->set_transformation(inst_trafo);
+        m_pad_clipper->render_cut({ 0.6f, 0.f, 0.222f, 1.0f });
+    }
 }
 
 

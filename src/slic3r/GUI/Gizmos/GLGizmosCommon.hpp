@@ -293,10 +293,10 @@ protected:
     void on_release() override;
 
 private:
-    size_t m_old_timestamp = 0;
     int m_print_object_idx = -1;
     int m_print_objects_count = 0;
-    std::unique_ptr<MeshClipper> m_clipper;
+    std::unique_ptr<MeshClipper> m_supports_clipper;
+    std::unique_ptr<MeshClipper> m_pad_clipper;
 };
 
 } // namespace CommonGizmosDataObjects

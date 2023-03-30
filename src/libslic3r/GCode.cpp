@@ -438,6 +438,10 @@ void GCode::PlaceholderParserIntegration::reset()
     this->opt_e_position = nullptr;
     this->opt_e_retracted = nullptr;
     this->opt_e_restart_extra = nullptr;
+    this->opt_extruded_volume = nullptr;
+    this->opt_extruded_weight = nullptr;
+    this->opt_extruded_volume_total = nullptr;
+    this->opt_extruded_weight_total = nullptr;
     this->num_extruders = 0;
     this->position.clear();
     this->e_position.clear();
@@ -463,10 +467,19 @@ void GCode::PlaceholderParserIntegration::init(const GCodeWriter &writer)
             this->output_config.set_key_value("e_position", opt_e_position);
         }
     }
+    this->opt_extruded_volume = new ConfigOptionFloats(this->num_extruders, 0.f);
+    this->opt_extruded_weight = new ConfigOptionFloats(this->num_extruders, 0.f);
+    this->opt_extruded_volume_total = new ConfigOptionFloat(0.f);
+    this->opt_extruded_weight_total = new ConfigOptionFloat(0.f);
+    this->parser.set("extruded_volume", this->opt_extruded_volume);
+    this->parser.set("extruded_weight", this->opt_extruded_weight);
+    this->parser.set("extruded_volume_total", this->opt_extruded_volume_total);
+    this->parser.set("extruded_weight_total", this->opt_extruded_weight_total);
 
     // Reserve buffer for current position.
     this->position.assign(3, 0);
     this->opt_position = new ConfigOptionFloats(this->position);
+    this->output_config.set_key_value("position", this->opt_position);
     // Store zhop variable into the parser itself, it is a read-only variable to the script.
     this->opt_zhop = new ConfigOptionFloat(writer.get_zhop());
     this->parser.set("zhop", this->opt_zhop);
@@ -483,10 +496,22 @@ void GCode::PlaceholderParserIntegration::update_from_gcodewriter(const GCodeWri
         assert(! extruders.empty() && num_extruders == extruders.back().id() + 1);
         this->e_retracted.assign(num_extruders, 0);
         this->e_restart_extra.assign(num_extruders, 0);
+        this->opt_extruded_volume->values.assign(num_extruders, 0);
+        this->opt_extruded_weight->values.assign(num_extruders, 0);
+        double total_volume = 0.;
+        double total_weight = 0.;
         for (const Extruder &e : extruders) {
             this->e_retracted[e.id()]     = e.retracted();
             this->e_restart_extra[e.id()] = e.restart_extra();
+            double v = e.extruded_volume();
+            double w = v * e.filament_density() * 0.001;
+            this->opt_extruded_volume->values[e.id()] = v;
+            this->opt_extruded_weight->values[e.id()] = w;
+            total_volume += v;
+            total_weight += w;
         }
+        opt_extruded_volume_total->value = total_volume;
+        opt_extruded_weight_total->value = total_weight;
         opt_e_retracted->values = this->e_retracted;
         opt_e_restart_extra->values = this->e_restart_extra;
         if (! writer.config.use_relative_e_distances) {
@@ -3384,10 +3409,12 @@ Vec2d GCode::point_to_gcode_quantized(const Point &point) const
 // convert a model-space scaled point into G-code coordinates
 Point GCode::gcode_to_point(const Vec2d &point) const
 {
-    Vec2d extruder_offset = EXTRUDER_CONFIG(extruder_offset);
-    return Point(
-        scale_(point(0) - m_origin(0) + extruder_offset(0)),
-        scale_(point(1) - m_origin(1) + extruder_offset(1)));
+    Vec2d pt = point - m_origin;
+    if (const Extruder *extruder = m_writer.extruder(); extruder)
+        // This function may be called at the very start from toolchange G-code when the extruder is not assigned yet.
+        pt += m_config.extruder_offset.get_at(extruder->id());
+    return scaled<coord_t>(pt);
+        
 }
 
 }   // namespace Slic3r

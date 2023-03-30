@@ -362,6 +362,10 @@ private:
         ConfigOptionFloats                 *opt_e_position { nullptr };
         ConfigOptionFloats                 *opt_e_retracted { nullptr };
         ConfigOptionFloats                 *opt_e_restart_extra { nullptr };
+        ConfigOptionFloats                 *opt_extruded_volume { nullptr };
+        ConfigOptionFloats                 *opt_extruded_weight { nullptr };
+        ConfigOptionFloat                  *opt_extruded_volume_total { nullptr };
+        ConfigOptionFloat                  *opt_extruded_weight_total { nullptr };
         // Caches of the data passed to the script.
         size_t                              num_extruders;
         std::vector<double>                 position;

@@ -182,6 +182,8 @@ private:
         float input_offset          = 0.f;
         float advanced_input_offset = 0.f;
 
+        float lock_offset = 0.f;
+
         ImVec2 text_size;
 
         // maximal size of face name image
@@ -254,7 +256,7 @@ private:
         std::vector<wxString> bad   = {};
 
         // Configuration of font encoding
-        static const wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
+        static constexpr wxFontEncoding encoding = wxFontEncoding::wxFONTENCODING_SYSTEM;
 
         // Identify if preview texture exists
         GLuint texture_id = 0;

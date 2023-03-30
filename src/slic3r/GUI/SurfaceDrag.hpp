@@ -39,6 +39,9 @@ struct SurfaceDrag
 
     // Flag whether coordinate hit some volume
     bool exist_hit = true;
+
+    //  hold screen coor offset of cursor from object center without SLA shift
+    Vec2d mouse_offset_without_sla_shift;
 };
 
 /// <summary>
