@@ -411,7 +411,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
 void GLGizmoEmboss::on_mouse_change_selection(const wxMouseEvent &mouse_event)
 {
-    static bool was_dragging = true;    
+    static bool was_dragging = true;  
     if ((mouse_event.LeftUp() || mouse_event.RightUp()) && !was_dragging) {
         // is hovered volume closest hovered?
         int hovered_idx = m_parent.get_first_hover_volume_idx();
@@ -436,6 +436,63 @@ void GLGizmoEmboss::on_mouse_change_selection(const wxMouseEvent &mouse_event)
         // Reselection of text to another text
     }
     was_dragging = mouse_event.Dragging();
+
+    // Hook When click on object for reselection must be on event left down not up
+    if (mouse_event.LeftDown()) {
+        // is hovered volume closest hovered?
+        int hovered_idx = m_parent.get_first_hover_volume_idx();
+        if (hovered_idx < 0)
+            // Potentionaly move with camera (drag)
+            return;
+
+        const GLVolumePtrs &gl_volumes = m_parent.get_volumes().volumes;
+        auto hovered_idx_ = static_cast<size_t>(hovered_idx);
+        if (hovered_idx_ >= gl_volumes.size())
+            return;
+        const GLVolume *gl_volume = gl_volumes[hovered_idx_];
+        if (gl_volume == nullptr)
+            return;
+        const ModelVolume *volume = get_model_volume(*gl_volume, m_parent.get_model()->objects);
+        if (volume == nullptr)
+            return;
+
+        if (volume->text_configuration.has_value())        
+            return; // Reselection of text to another text
+
+        // select volume without text configuration
+        return close();
+    }
+
+    // Hook When drag with scene by right mouse button
+    // object it is selected after drag scene !!
+    if (mouse_event.RightDown()) {
+        // is hovered volume closest hovered?
+        int hovered_idx = m_parent.get_first_hover_volume_idx();
+        if (hovered_idx < 0)
+            // Potentionaly move with camera (drag)
+            return;
+
+        const GLVolumePtrs &gl_volumes = m_parent.get_volumes().volumes;
+        auto hovered_idx_ = static_cast<size_t>(hovered_idx);
+        if (hovered_idx_ >= gl_volumes.size())
+            return;
+        const GLVolume *gl_volume = gl_volumes[hovered_idx_];
+        if (gl_volume == nullptr)
+            return;
+        const ModelVolume *volume = get_model_volume(*gl_volume, m_parent.get_model()->objects);
+        if (volume == nullptr)
+            return;
+
+        // is actual selected?
+        if (m_volume->id() == volume->id())
+            return;
+
+        if (volume->is_the_only_one_part())
+            return; // reselect to another text
+
+        // select volume without text configuration
+        return close();
+    }
 }
 
 bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
