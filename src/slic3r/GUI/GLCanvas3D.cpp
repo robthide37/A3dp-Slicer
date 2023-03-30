@@ -2133,8 +2133,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         const bool co = dynamic_cast<const ConfigOptionBool*>(m_config->option("complete_objects"))->value;
 
         if (extruders_count > 1 && wt && !co) {
-            // Height of a print (Show at least a slab)
-            const double height = std::max(m_model->max_z(), 10.0);
 
             const float x = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_x"))->value;
             const float y = dynamic_cast<const ConfigOptionFloat*>(m_config->option("wipe_tower_y"))->value;
@@ -2145,6 +2143,10 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
             const Print *print = m_process->fff_print();
             const float depth = print->wipe_tower_data(extruders_count).depth;
+            const float height_real = print->wipe_tower_data(extruders_count).height; // -1.f = unknown
+
+            // Height of a print (Show at least a slab).
+            const double height = height_real < 0.f ? std::max(m_model->max_z(), 10.0) : height_real;
 
 #if ENABLE_OPENGL_ES
             int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(

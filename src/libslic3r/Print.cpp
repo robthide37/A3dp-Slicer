@@ -1353,6 +1353,7 @@ const WipeTowerData& Print::wipe_tower_data(size_t extruders_cnt) const
         float layer_height = 0.2f; // just assume fixed value, it will still be better than before.
 
         const_cast<Print*>(this)->m_wipe_tower_data.depth = (maximum/layer_height)/width;
+        const_cast<Print*>(this)->m_wipe_tower_data.height = -1.f; // unknown yet
     }
 
     return m_wipe_tower_data;
