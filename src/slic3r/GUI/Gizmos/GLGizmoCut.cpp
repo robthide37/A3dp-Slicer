@@ -875,6 +875,7 @@ void GLGizmoCut3D::on_set_state()
         }
         m_selected.clear();
         m_parent.set_use_color_clip_plane(false);
+        m_c->selection_info()->set_use_shift(false);
     }
 }
 
@@ -1238,7 +1239,10 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(const Vec3d& plane_center, 
 {
     const Selection& selection = m_parent.get_selection();
 
-    const Vec3d& instance_offset = selection.get_first_volume()->get_instance_offset();
+    const auto first_volume = selection.get_first_volume();
+    Vec3d instance_offset   = first_volume->get_instance_offset();
+    instance_offset[Z]     += first_volume->get_sla_shift_z();
+
     const auto cut_matrix = Transform3d::Identity() * rotation_m.inverse() * translation_transform(instance_offset - plane_center);
 
     const Selection::IndicesList& idxs = selection.get_volume_idxs();
@@ -1356,6 +1360,12 @@ void GLGizmoCut3D::render_clipper_cut()
 
 void GLGizmoCut3D::on_render()
 {
+    if (m_state == On) {
+        // This gizmo is showing the object elevated. Tell the common
+        // SelectionInfo object to lie about the actual shift.
+        m_c->selection_info()->set_use_shift(true);
+    }
+
     update_clipper();
 
     init_picking_models();
@@ -2288,7 +2298,10 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
             const Vec3d new_plane_center = m_bb_center + cross_dir * cross_dir.dot(pt - m_bb_center);
             // update transformed bb
             const auto new_tbb = transformed_bounding_box(new_plane_center, m);
-            const Vec3d& instance_offset = m_parent.get_selection().get_first_volume()->get_instance_offset();
+            const GLVolume* first_volume = m_parent.get_selection().get_first_volume();
+            Vec3d instance_offset = first_volume->get_instance_offset();
+            instance_offset[Z] += first_volume->get_sla_shift_z();
+
             const Vec3d trans_center_pos = m.inverse() * (new_plane_center - instance_offset) + new_tbb.center();
             if (new_tbb.contains(trans_center_pos)) {
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by line"), UndoRedo::SnapshotType::GizmoAction);

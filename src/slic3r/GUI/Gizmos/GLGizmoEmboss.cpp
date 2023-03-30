@@ -3089,8 +3089,8 @@ void GLGizmoEmboss::draw_advanced()
     }
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", (m_keep_up?
-            _u8L("Unlock the text's up orientation when moving text along the object's surface."):
-            _u8L("Lock the text's up orientation when moving text along the object's surface.")
+            _u8L("Unlock the text's rotation when moving text along the object's surface."):
+            _u8L("Lock the text's rotation when moving text along the object's surface.")
         ).c_str());
 
     // when more collection add selector
@@ -3499,6 +3499,7 @@ bool priv::start_create_volume_on_surface_job(
 {
     assert(gl_volume != nullptr);
     if (gl_volume == nullptr) return false;
+    if (gl_volume->volume_idx() < 0) return false;
 
     Plater *plater = wxGetApp().plater();
     const ModelObjectPtrs &objects = plater->model().objects;
@@ -3549,7 +3550,7 @@ void priv::find_closest_volume(const Selection       &selection,
     for (unsigned int id : indices) {
         const GLVolume *gl_volume = selection.get_volume(id);
         const ModelVolume *volume = get_model_volume(*gl_volume, objects);
-        if (!volume->is_model_part()) continue;        
+        if (volume == nullptr || !volume->is_model_part()) continue;
         Slic3r::Polygon hull = CameraUtils::create_hull2d(camera, *gl_volume);
         Vec2d c = hull.centroid().cast<double>();
         Vec2d d = c - screen_center;

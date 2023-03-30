@@ -2958,6 +2958,8 @@ namespace Slic3r {
 
         unsigned int object_cnt = 0;
         for (const ModelObject* object : model.objects) {
+            if (!object->is_cut())
+                continue;
             object_cnt++;
             pt::ptree& obj_tree = tree.add("objects.object", "");
 
