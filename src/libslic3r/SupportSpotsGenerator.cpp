@@ -210,8 +210,8 @@ float estimate_curled_up_height(
     const ExtendedPoint &point, float layer_height, float flow_width, float prev_line_curled_height, Params params)
 {
     float curled_up_height = 0;
-    if (fabs(point.distance) < 1.5 * flow_width) {
-        curled_up_height = 0.9 * prev_line_curled_height;
+    if (fabs(point.distance) < 1.1 * flow_width) {
+        curled_up_height = std::max(prev_line_curled_height - layer_height * 0.5, 0.0);
     }
 
     if (point.distance > params.malformation_distance_factors.first * flow_width &&
@@ -233,17 +233,17 @@ float estimate_curled_up_height(
         // faster or slower than thin air, thus the extrusion always curles up)
         
         if (point.curvature > 0.01){
-            float radius = 1.0 / point.curvature;
-            // compute radius at the point where the extrusion stops touch previous layer and starts curling
-            float radius_anchored_section_end = radius - flow_width / 2.0 + anchored_section;
+            float radius = std::max(1.0 / point.curvature - flow_width / 2.0, 0.001);
+            // compute radius at the point where the extrusion stops touching the previous layer and starts curling
+            float radius_anchored_section_end = radius + anchored_section;
             // target radius represents the radius of the extrusion curling end, after curling
             // the layer_height term aproximates that the extrusion curling part, when raising to vertical position, will stop before reaching 
             // perpendicular position, due to various forces.
-            float target_radius = std::max(radius, radius_anchored_section_end) + layer_height;
+            float target_radius = radius_anchored_section_end + radius * flow_width / 100.0;
             
             float b = target_radius - radius_anchored_section_end;
-            float a = (curling_section + swelling_radius) / 2.0;
-            float c = sqrt(a*a - b*b);
+            float a = curling_section;
+            float c = sqrt(std::max(0.0f,a*a - b*b));
 
             curled_up_height += c;
         }
