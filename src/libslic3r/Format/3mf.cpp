@@ -975,7 +975,7 @@ namespace Slic3r {
         }
 
         if (res == 0) {
-            add_error("Error while extracting model data from zip archive");
+            add_error("Error while extracting model data from ZIP archive");
             return false;
         }
 

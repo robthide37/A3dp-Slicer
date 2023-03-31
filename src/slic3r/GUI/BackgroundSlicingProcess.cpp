@@ -719,7 +719,7 @@ void BackgroundSlicingProcess::prepare_upload()
 		m_print->set_status(95, _u8L("Running post-processing scripts"));
 		std::string error_message;
 		if (copy_file(m_temp_output_path, source_path.string(), error_message) != SUCCESS)
-			throw Slic3r::RuntimeError(_u8L("Copying of the temporary G-code to the output G-code failed"));
+			throw Slic3r::RuntimeError("Copying of the temporary G-code to the output G-code failed");
         m_upload_job.upload_data.upload_path = m_fff_print->print_statistics().finalize_output_path(m_upload_job.upload_data.upload_path.string());
         // Make a copy of the source path, as run_post_process_scripts() is allowed to change it when making a copy of the source file
         // (not here, but when the final target is a file). 
