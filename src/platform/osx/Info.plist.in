@@ -5,7 +5,7 @@
   <key>CFBundleExecutable</key>
   <string>@SLIC3R_APP_KEY@</string>
   <key>CFBundleGetInfoString</key>
-  <string>@SLIC3R_APP_NAME@ Copyright (C) 2011-2019 Alessandro Ranellucci, (C) 2016-2022 Prusa Reseach</string>
+  <string>@SLIC3R_APP_NAME@ Copyright (C) 2011-2019 Alessandro Ranellucci, (C) 2016-2023 Prusa Reseach</string>
   <key>CFBundleIconFile</key>
   <string>PrusaSlicer.icns</string>
   <key>CFBundleName</key>
@@ -110,8 +110,19 @@
       <string>Alternate</string>
     </dict>
   </array>
+  <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLName</key>
+        <string>PrusaSlicer Downloads</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>prusaslicer</string>
+        </array>
+      </dict>
+    </array>
   <key>LSMinimumSystemVersion</key>
-  <string>10.10</string>
+  <string>10.12</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>NSHighResolutionCapable</key>

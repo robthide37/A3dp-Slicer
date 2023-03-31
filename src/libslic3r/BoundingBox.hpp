@@ -18,28 +18,13 @@ public:
     
     BoundingBoxBase() : min(PointClass::Zero()), max(PointClass::Zero()), defined(false) {}
     BoundingBoxBase(const PointClass &pmin, const PointClass &pmax) : 
-        min(pmin), max(pmax), defined(pmin(0) < pmax(0) && pmin(1) < pmax(1)) {}
+        min(pmin), max(pmax), defined(pmin.x() < pmax.x() && pmin.y() < pmax.y()) {}
     BoundingBoxBase(const PointClass &p1, const PointClass &p2, const PointClass &p3) :
         min(p1), max(p1), defined(false) { merge(p2); merge(p3); }
 
-    template<class It, class = IteratorOnly<It> >
-    BoundingBoxBase(It from, It to) : min(PointClass::Zero()), max(PointClass::Zero())
-    {
-        if (from == to) {
-            this->defined = false;
-            // throw Slic3r::InvalidArgument("Empty point set supplied to BoundingBoxBase constructor");
-        } else {
-            auto it = from;
-            this->min = it->template cast<typename PointClass::Scalar>();
-            this->max = this->min;
-            for (++ it; it != to; ++ it) {
-                auto vec = it->template cast<typename PointClass::Scalar>();
-                this->min = this->min.cwiseMin(vec);
-                this->max = this->max.cwiseMax(vec);
-            }
-            this->defined = (this->min(0) < this->max(0)) && (this->min(1) < this->max(1));
-        }
-    }
+    template<class It, class = IteratorOnly<It>>
+    BoundingBoxBase(It from, It to)
+        { construct(*this, from, to); }
 
     BoundingBoxBase(const std::vector<PointClass> &points)
         : BoundingBoxBase(points.begin(), points.end())
@@ -58,18 +43,42 @@ public:
     BoundingBoxBase<PointClass> inflated(coordf_t delta) const throw() { BoundingBoxBase<PointClass> out(*this); out.offset(delta); return out; }
     PointClass center() const;
     bool contains(const PointClass &point) const {
-        return point(0) >= this->min(0) && point(0) <= this->max(0)
-            && point(1) >= this->min(1) && point(1) <= this->max(1);
+        return point.x() >= this->min.x() && point.x() <= this->max.x()
+            && point.y() >= this->min.y() && point.y() <= this->max.y();
     }
     bool contains(const BoundingBoxBase<PointClass> &other) const {
         return contains(other.min) && contains(other.max);
     }
     bool overlap(const BoundingBoxBase<PointClass> &other) const {
-        return ! (this->max(0) < other.min(0) || this->min(0) > other.max(0) ||
-                  this->max(1) < other.min(1) || this->min(1) > other.max(1));
+        return ! (this->max.x() < other.min.x() || this->min.x() > other.max.x() ||
+                  this->max.y() < other.min.y() || this->min.y() > other.max.y());
     }
     bool operator==(const BoundingBoxBase<PointClass> &rhs) { return this->min == rhs.min && this->max == rhs.max; }
     bool operator!=(const BoundingBoxBase<PointClass> &rhs) { return ! (*this == rhs); }
+
+private:
+    // to access construct()
+    friend BoundingBox get_extents<false>(const Points &pts);
+    friend BoundingBox get_extents<true>(const Points &pts);
+
+    // if IncludeBoundary, then a bounding box is defined even for a single point.
+    // otherwise a bounding box is only defined if it has a positive area.
+    // The output bounding box is expected to be set to "undefined" initially.
+    template<bool IncludeBoundary = false, class BoundingBoxType, class It, class = IteratorOnly<It>>
+    static void construct(BoundingBoxType &out, It from, It to)
+    {
+        if (from != to) {
+            auto it = from;
+            out.min = it->template cast<typename PointClass::Scalar>();
+            out.max = out.min;
+            for (++ it; it != to; ++ it) {
+                auto vec = it->template cast<typename PointClass::Scalar>();
+                out.min = out.min.cwiseMin(vec);
+                out.max = out.max.cwiseMax(vec);
+            }
+            out.defined = IncludeBoundary || (out.min.x() < out.max.x() && out.min.y() < out.max.y());
+        }
+    }
 };
 
 template <class PointClass>
@@ -79,7 +88,7 @@ public:
     BoundingBox3Base() : BoundingBoxBase<PointClass>() {}
     BoundingBox3Base(const PointClass &pmin, const PointClass &pmax) : 
         BoundingBoxBase<PointClass>(pmin, pmax) 
-        { if (pmin(2) >= pmax(2)) BoundingBoxBase<PointClass>::defined = false; }
+        { if (pmin.z() >= pmax.z()) BoundingBoxBase<PointClass>::defined = false; }
     BoundingBox3Base(const PointClass &p1, const PointClass &p2, const PointClass &p3) :
         BoundingBoxBase<PointClass>(p1, p1) { merge(p2); merge(p3); }
 
@@ -96,7 +105,7 @@ public:
             this->min = this->min.cwiseMin(vec);
             this->max = this->max.cwiseMax(vec);
         }
-        this->defined = (this->min(0) < this->max(0)) && (this->min(1) < this->max(1)) && (this->min(2) < this->max(2));
+        this->defined = (this->min.x() < this->max.x()) && (this->min.y() < this->max.y()) && (this->min.z() < this->max.z());
     }
 
     BoundingBox3Base(const std::vector<PointClass> &points)
@@ -116,15 +125,17 @@ public:
     coordf_t max_size() const;
 
     bool contains(const PointClass &point) const {
-        return BoundingBoxBase<PointClass>::contains(point) && point(2) >= this->min(2) && point(2) <= this->max(2);
+        return BoundingBoxBase<PointClass>::contains(point) && point.z() >= this->min.z() && point.z() <= this->max.z();
     }
 
     bool contains(const BoundingBox3Base<PointClass>& other) const {
         return contains(other.min) && contains(other.max);
     }
 
+    // Intersects without boundaries.
     bool intersects(const BoundingBox3Base<PointClass>& other) const {
-        return (this->min(0) < other.max(0)) && (this->max(0) > other.min(0)) && (this->min(1) < other.max(1)) && (this->max(1) > other.min(1)) && (this->min(2) < other.max(2)) && (this->max(2) > other.min(2));
+        return this->min.x() < other.max.x() && this->max.x() > other.min.x() && this->min.y() < other.max.y() && this->max.y() > other.min.y() && 
+            this->min.z() < other.max.z() && this->max.z() > other.min.z();
     }
 };
 
@@ -185,6 +196,8 @@ public:
     friend BoundingBox get_extents_rotated(const Points &points, double angle);
 };
 
+using BoundingBoxes = std::vector<BoundingBox>;
+
 class BoundingBox3  : public BoundingBox3Base<Vec3crd> 
 {
 public:
@@ -212,18 +225,18 @@ public:
 template<typename VT>
 inline bool empty(const BoundingBoxBase<VT> &bb)
 {
-    return ! bb.defined || bb.min(0) >= bb.max(0) || bb.min(1) >= bb.max(1);
+    return ! bb.defined || bb.min.x() >= bb.max.x() || bb.min.y() >= bb.max.y();
 }
 
 template<typename VT>
 inline bool empty(const BoundingBox3Base<VT> &bb)
 {
-    return ! bb.defined || bb.min(0) >= bb.max(0) || bb.min(1) >= bb.max(1) || bb.min(2) >= bb.max(2);
+    return ! bb.defined || bb.min.x() >= bb.max.x() || bb.min.y() >= bb.max.y() || bb.min.z() >= bb.max.z();
 }
 
 inline BoundingBox scaled(const BoundingBoxf &bb) { return {scaled(bb.min), scaled(bb.max)}; }
 
-template<class T>
+template<class T = coord_t>
 BoundingBoxBase<Vec<2, T>> scaled(const BoundingBoxf &bb) { return {scaled<T>(bb.min), scaled<T>(bb.max)}; }
 
 template<class T = coord_t>
@@ -247,6 +260,39 @@ auto cast(const BoundingBox3Base<Tin> &b)
 {
     return BoundingBox3Base<Vec<3, Tout>>{b.min.template cast<Tout>(),
                                           b.max.template cast<Tout>()};
+}
+
+// Distance of a point to a bounding box. Zero inside and on the boundary, positive outside.
+inline double bbox_point_distance(const BoundingBox &bbox, const Point &pt)
+{
+    if (pt.x() < bbox.min.x())
+        return pt.y() < bbox.min.y() ? (bbox.min - pt).cast<double>().norm() :
+               pt.y() > bbox.max.y() ? (Point(bbox.min.x(), bbox.max.y()) - pt).cast<double>().norm() :
+               double(bbox.min.x() - pt.x());
+    else if (pt.x() > bbox.max.x())
+        return pt.y() < bbox.min.y() ? (Point(bbox.max.x(), bbox.min.y()) - pt).cast<double>().norm() :
+               pt.y() > bbox.max.y() ? (bbox.max - pt).cast<double>().norm() :
+               double(pt.x() - bbox.max.x());
+    else
+        return pt.y() < bbox.min.y() ? bbox.min.y() - pt.y() :
+               pt.y() > bbox.max.y() ? pt.y() - bbox.max.y() :
+               coord_t(0);
+}
+
+inline double bbox_point_distance_squared(const BoundingBox &bbox, const Point &pt)
+{
+    if (pt.x() < bbox.min.x())
+        return pt.y() < bbox.min.y() ? (bbox.min - pt).cast<double>().squaredNorm() :
+               pt.y() > bbox.max.y() ? (Point(bbox.min.x(), bbox.max.y()) - pt).cast<double>().squaredNorm() :
+               Slic3r::sqr(double(bbox.min.x() - pt.x()));
+    else if (pt.x() > bbox.max.x())
+        return pt.y() < bbox.min.y() ? (Point(bbox.max.x(), bbox.min.y()) - pt).cast<double>().squaredNorm() :
+               pt.y() > bbox.max.y() ? (bbox.max - pt).cast<double>().squaredNorm() :
+               Slic3r::sqr<double>(pt.x() - bbox.max.x());
+    else
+        return Slic3r::sqr<double>(pt.y() < bbox.min.y() ? bbox.min.y() - pt.y() :
+                                   pt.y() > bbox.max.y() ? pt.y() - bbox.max.y() :
+                                   coord_t(0));
 }
 
 } // namespace Slic3r

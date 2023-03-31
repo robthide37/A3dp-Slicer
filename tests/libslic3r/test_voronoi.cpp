@@ -1918,7 +1918,6 @@ TEST_CASE("Voronoi skeleton", "[VoronoiSkeleton]")
     Lines lines = to_lines(poly);
     construct_voronoi(lines.begin(), lines.end(), &vd);
     Slic3r::Voronoi::annotate_inside_outside(vd, lines);
-    Slic3r::Voronoi::annotate_inside_outside(vd, lines);
     static constexpr double threshold_alpha = M_PI / 12.; // 30 degrees
     std::vector<Vec2d> skeleton_edges = Slic3r::Voronoi::skeleton_edges_rough(vd, lines, threshold_alpha);
 
@@ -2054,6 +2053,50 @@ TEST_CASE("Voronoi missing vertex 3", "[VoronoiMissingVertex3]")
 #endif
 
 //    REQUIRE(!has_missing_voronoi_vertices(poly, vd));
+}
+
+TEST_CASE("Voronoi missing vertex 4", "[VoronoiMissingVertex4]")
+{
+    // Probably the reason why Voronoi vertex is missing is that 19299999 and 19300000 are very close.
+    Polygon polygon_1 = {
+        Point(27000000, -18900000),
+        Point(27000000, 20000000),
+        Point(19000000, 20000000),
+        Point(19000000, 19299999),
+        Point(26000000, -18000000),
+        Point(-19000000, -18000000),
+        Point(-27000000, 19300000),
+        Point(-19000000, 19300000),
+        Point(-19000000, 20000000),
+        Point(-28000000, 20000000),
+        Point(-20000000, -18900000),
+    };
+
+    // Maybe this is the same case as the previous, but the missing Voronoi vertex is different.
+    Polygon polygon_2 = {
+        Point(27000000, -18900000),
+        Point(27000000, 20000000),
+        Point(19000000, 20000000),
+        Point(19000000, 19299999),
+        Point(19000000, -18000000), // Just this point is different other points are the same as previous.
+        Point(-19000000, -18000000),
+        Point(-27000000, 19300000),
+        Point(-19000000, 19300000),
+        Point(-19000000, 20000000),
+        Point(-28000000, 20000000),
+        Point(-20000000, -18900000),
+    };
+
+    Geometry::VoronoiDiagram vd_1;
+    Geometry::VoronoiDiagram vd_2;
+    Lines                    lines_1 = to_lines(polygon_1);
+    Lines                    lines_2 = to_lines(polygon_2);
+    construct_voronoi(lines_1.begin(), lines_1.end(), &vd_1);
+    construct_voronoi(lines_2.begin(), lines_2.end(), &vd_2);
+#ifdef VORONOI_DEBUG_OUT
+    dump_voronoi_to_svg(debug_out_path("voronoi-missing-vertex4-1-out.svg").c_str(), vd_1, Points(), lines_1);
+    dump_voronoi_to_svg(debug_out_path("voronoi-missing-vertex4-2-out.svg").c_str(), vd_2, Points(), lines_2);
+#endif
 }
 
 // In this case, the Voronoi vertex (146873, -146873) is included twice.

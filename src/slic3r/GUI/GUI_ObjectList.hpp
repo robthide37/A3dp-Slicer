@@ -27,6 +27,7 @@ class ModelConfig;
 class ModelObject;
 class ModelVolume;
 class TriangleMesh;
+struct TextConfiguration;
 enum class ModelVolumeType : int;
 
 // FIXME: broken build on mac os because of this is missing:
@@ -175,6 +176,7 @@ private:
     // Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.
     int 	    m_last_selected_column = -1;
 #endif /* __MSW__ */
+    bool        m_is_editing_started{ false };
 
 #if 0
     SettingsFactory::Bundle m_freq_settings_fff;
@@ -191,7 +193,7 @@ private:
 
 public:
     ObjectList(wxWindow* parent);
-    ~ObjectList();
+    ~ObjectList() override;
 
     void set_min_height();
     void update_min_height();
@@ -247,7 +249,7 @@ public:
     void                add_category_to_settings_from_frequent(const std::vector<std::string>& category_options, wxDataViewItem item);
     void                show_settings(const wxDataViewItem settings_item);
     bool                is_instance_or_object_selected();
-
+    bool                is_selected_object_cut();
     void                load_subobject(ModelVolumeType type, bool from_galery = false);
     // ! ysFIXME - delete commented code after testing and rename "load_modifier" to something common
     //void                load_part(ModelObject& model_object, std::vector<ModelVolume*>& added_volumes, ModelVolumeType type, bool from_galery = false);
@@ -256,13 +258,15 @@ public:
     void                load_shape_object(const std::string &type_name);
     void                load_shape_object_from_gallery();
     void                load_shape_object_from_gallery(const wxArrayString& input_files);
-    void                load_mesh_object(const TriangleMesh &mesh, const wxString &name, bool center = true);
-    void                del_object(const int obj_idx);
-    void                del_subobject_item(wxDataViewItem& item);
+    void                load_mesh_object(const TriangleMesh &mesh, const std::string &name, bool center = true, 
+                                         const TextConfiguration* text_config = nullptr, const Transform3d* transformation = nullptr);
+    bool                del_object(const int obj_idx);
+    bool                del_subobject_item(wxDataViewItem& item);
     void                del_settings_from_config(const wxDataViewItem& parent_item);
     void                del_instances_from_object(const int obj_idx);
     void                del_layer_from_object(const int obj_idx, const t_layer_height_range& layer_range);
     void                del_layers_from_object(const int obj_idx);
+    bool                del_from_cut_object(bool is_connector, bool is_model_part = false, bool is_negative_volume = false);
     bool                del_subobject_from_object(const int obj_idx, const int idx, const int type);
     void                del_info_item(const int obj_idx, InfoItemType type);
     void                split();
@@ -277,10 +281,15 @@ public:
     bool                is_splittable(bool to_objects);
     bool                selected_instances_of_same_object();
     bool                can_split_instances();
+    bool                has_selected_cut_object() const;
+    void                invalidate_cut_info_for_selection();
+    void                invalidate_cut_info_for_object(int obj_idx);
+    void                delete_all_connectors_for_selection();
+    void                delete_all_connectors_for_object(int obj_idx);
     bool                can_merge_to_multipart_object() const;
     bool                can_merge_to_single_object() const;
 
-    wxPoint             get_mouse_position_in_control() const { return wxGetMousePosition() - this->GetScreenPosition(); }
+    wxPoint             get_mouse_position_in_control() const;
     wxBoxSizer*         get_sizer() {return  m_sizer;}
     int                 get_selected_obj_idx() const;
     ModelConfig&        get_item_config(const wxDataViewItem& item) const;
@@ -288,6 +297,9 @@ public:
     void                changed_object(const int obj_idx = -1) const;
     void                part_selection_changed();
 
+    // Add object's volumes to the list
+    // Return selected items, if add_to_selection is defined 
+    wxDataViewItemArray add_volumes_to_object_in_list(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
     // Add object to the list
     void add_object_to_list(size_t obj_idx, bool call_selection_changed = true);
     // Delete object from the list
@@ -295,8 +307,9 @@ public:
     void delete_object_from_list(const size_t obj_idx);
     void delete_volume_from_list(const size_t obj_idx, const size_t vol_idx);
     void delete_instance_from_list(const size_t obj_idx, const size_t inst_idx);
-    void delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx);
-    void delete_from_model_and_list(const std::vector<ItemForDelete>& items_for_delete);
+    void update_lock_icons_for_model();
+    bool delete_from_model_and_list(const ItemType type, const int obj_idx, const int sub_obj_idx);
+    bool delete_from_model_and_list(const std::vector<ItemForDelete>& items_for_delete);
     // Delete all objects from the list
     void delete_all_objects_from_list();
     // Increase instances count
@@ -339,6 +352,8 @@ public:
     void init_objects();
     bool multiple_selection() const ;
     bool is_selected(const ItemType type) const;
+    bool is_connectors_item_selected() const;
+    bool is_connectors_item_selected(const wxDataViewItemArray& sels) const;
     int  get_selected_layers_range_idx() const;
     void set_selected_layers_range_idx(const int range_idx) { m_selected_layers_range_idx = range_idx; }
     void set_selection_mode(SELECTION_MODE mode) { m_selection_mode = mode; }
@@ -353,6 +368,9 @@ public:
     bool check_last_selection(wxString& msg_str);
     // correct current selections to avoid of the possible conflicts
     void fix_multiselection_conflicts();
+    // correct selection in respect to the cut_id if any exists
+    void fix_cut_selection();
+    bool fix_cut_selection(wxDataViewItemArray& sels);
 
     ModelVolume* get_selected_model_volume();
     void change_part_type();
@@ -388,9 +406,11 @@ public:
     void toggle_printable_state();
 
     void set_extruder_for_selected_items(const int extruder) const ;
-    wxDataViewItemArray reorder_volumes_and_get_selection(int obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
+    wxDataViewItemArray reorder_volumes_and_get_selection(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
     void apply_volumes_order();
     bool has_paint_on_segmentation();
+
+    bool is_editing() const { return m_is_editing_started; }
 
 private:
 #ifdef __WXOSX__
@@ -405,10 +425,8 @@ private:
     bool can_drop(const wxDataViewItem& item) const ;
 
     void ItemValueChanged(wxDataViewEvent &event);
-#ifdef __WXMSW__
     // Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.
 	void OnEditingStarted(wxDataViewEvent &event);
-#endif /* __WXMSW__ */
     void OnEditingDone(wxDataViewEvent &event);
 };
 

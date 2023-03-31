@@ -43,34 +43,15 @@ set(XS_MAIN_XS ${CMAKE_CURRENT_BINARY_DIR}/main.xs)
 set(XSP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/xsp)
 #FIXME list the dependecies explicitely, add dependency on the typemap.
 set(XS_XSP_FILES
-    ${XSP_DIR}/BoundingBox.xsp
-    ${XSP_DIR}/BridgeDetector.xsp
-    ${XSP_DIR}/Clipper.xsp
     ${XSP_DIR}/Config.xsp
     ${XSP_DIR}/ExPolygon.xsp
-    ${XSP_DIR}/ExPolygonCollection.xsp
-    ${XSP_DIR}/ExtrusionEntityCollection.xsp
-    ${XSP_DIR}/ExtrusionLoop.xsp
-    ${XSP_DIR}/ExtrusionMultiPath.xsp
-    ${XSP_DIR}/ExtrusionPath.xsp
-    ${XSP_DIR}/ExtrusionSimulator.xsp
-    ${XSP_DIR}/Filler.xsp
-    ${XSP_DIR}/Flow.xsp
-    ${XSP_DIR}/GCode.xsp
-    # ${XSP_DIR}/GCodeSender.xsp
     ${XSP_DIR}/Geometry.xsp
-    ${XSP_DIR}/Layer.xsp
     ${XSP_DIR}/Line.xsp
     ${XSP_DIR}/Model.xsp
-    ${XSP_DIR}/PerimeterGenerator.xsp
-    ${XSP_DIR}/PlaceholderParser.xsp
     ${XSP_DIR}/Point.xsp
     ${XSP_DIR}/Polygon.xsp
     ${XSP_DIR}/Polyline.xsp
-    ${XSP_DIR}/PolylineCollection.xsp
     ${XSP_DIR}/Print.xsp
-    ${XSP_DIR}/Surface.xsp
-    ${XSP_DIR}/SurfaceCollection.xsp
     ${XSP_DIR}/TriangleMesh.xsp
     ${XSP_DIR}/XS.xsp
 )
@@ -213,5 +194,45 @@ if (MSVC)
 else ()
     set(PERL_PROVE "${PERL_BIN_PATH}/prove")
 endif ()
-add_test (NAME xs COMMAND "${PERL_EXECUTABLE}" ${PERL_PROVE} -I ${PERL_LOCAL_LIB_DIR}/lib/perl5 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-add_test (NAME integration COMMAND "${PERL_EXECUTABLE}" ${PERL_PROVE} WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/..)
+
+set(PERL_ENV_VARS "")
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_CROSSCOMPILING AND ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang"))
+    if (SLIC3R_ASAN OR SLIC3R_UBSAN)
+        set(PERL_ENV_VARS env)
+    endif ()
+
+    if (SLIC3R_ASAN)
+        # Find the location of libasan.so for passing it into LD_PRELOAD. It works with GCC and Clang on Linux.
+        # On Centos 7 calling "gcc -print-file-name=libasan.so" returns path to "ld script" instead of path to shared library.
+        set(_asan_compiled_bin ${CMAKE_CURRENT_BINARY_DIR}/detect_libasan)
+        set(_asan_source_file ${_asan_compiled_bin}.c)
+        # Compile and link simple C application with enabled address sanitizer.
+        file(WRITE ${_asan_source_file} "int main(){}")
+        include(GetPrerequisites)
+        execute_process(COMMAND ${CMAKE_C_COMPILER} ${_asan_source_file} -fsanitize=address -lasan -o ${_asan_compiled_bin})
+        # Extract from the compiled application absolute path of libasan.
+        get_prerequisites(${_asan_compiled_bin} _asan_shared_libraries_list 0 0 "" "")
+        list(FILTER _asan_shared_libraries_list INCLUDE REGEX libasan)
+        set(PERL_ENV_VARS ${PERL_ENV_VARS} "LD_PRELOAD=${_asan_shared_libraries_list}")
+
+        # Suppressed memory leak reports that come from Perl.
+        set(PERL_LEAK_SUPPRESSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/leak_suppression.txt)
+        file(WRITE ${PERL_LEAK_SUPPRESSION_FILE}
+                "leak:Perl_safesysmalloc\n"
+                "leak:Perl_safesyscalloc\n"
+                "leak:Perl_safesysrealloc\n"
+                "leak:__newlocale\n")
+
+        # Suppress a few memory leak reports and disable informing about suppressions.
+        # Print reports about memory leaks but exit with zero exit code when any memory leaks is found to make unit tests pass.
+        set(PERL_ENV_VARS ${PERL_ENV_VARS} "LSAN_OPTIONS=suppressions=${PERL_LEAK_SUPPRESSION_FILE}:print_suppressions=0:exitcode=0")
+    endif ()
+
+    if (SLIC3R_UBSAN)
+        # Do not show full stacktrace for reports from UndefinedBehaviorSanitizer in Perl tests.
+        set(PERL_ENV_VARS ${PERL_ENV_VARS} "UBSAN_OPTIONS=print_stacktrace=0")
+    endif ()
+endif ()
+
+add_test (NAME xs COMMAND ${PERL_ENV_VARS} "${PERL_EXECUTABLE}" ${PERL_PROVE} -I ${PERL_LOCAL_LIB_DIR}/lib/perl5 WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+add_test (NAME integration COMMAND ${PERL_ENV_VARS} "${PERL_EXECUTABLE}" ${PERL_PROVE} WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/..)

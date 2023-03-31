@@ -14,6 +14,7 @@
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Color.hpp"
 #include "GUI.hpp"
 #include "format.hpp"
 #include "I18N.hpp"
@@ -98,9 +99,10 @@ void MsgDialog::apply_style(long style)
     if (style & wxNO)       add_button(wxID_NO,     (style & wxNO_DEFAULT));
     if (style & wxCANCEL)   add_button(wxID_CANCEL, (style & wxCANCEL_DEFAULT));
 
-    logo->SetBitmap( create_scaled_bitmap(style & wxICON_WARNING        ? "exclamation" :
-                                          style & wxICON_INFORMATION    ? "info"        :
-                                          style & wxICON_QUESTION       ? "question"    : "PrusaSlicer", this, 64, style & wxICON_ERROR));
+    std::string icon_name = style & wxICON_WARNING        ? "exclamation" :
+                            style & wxICON_INFORMATION    ? "info"        :
+                            style & wxICON_QUESTION       ? "question"    : "PrusaSlicer";
+    logo->SetBitmap(*get_bmp_bundle(icon_name, 64));
 }
 
 void MsgDialog::finalize()
@@ -134,7 +136,7 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
         msg_lines++;
     }
 
-    wxFont      font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
+    wxFont      font = wxGetApp().normal_font();//wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
     wxFont      monospace = wxGetApp().code_font();
     wxColour    text_clr = wxGetApp().get_label_clr_default();
     wxColour    bgr_clr = parent->GetBackgroundColour();
@@ -151,10 +153,8 @@ static void add_msg_content(wxWindow* parent, wxBoxSizer* content_sizer, wxStrin
         bgr_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 #endif
 
-    
-    
-    auto        text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-    auto        bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
+    auto        text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+    auto        bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
     const int   font_size = font.GetPointSize();
     int         size[] = { font_size, font_size, font_size, font_size, font_size, font_size, font_size };
     html->SetFonts(font.GetFaceName(), monospace.GetFaceName(), size);
@@ -231,7 +231,7 @@ ErrorDialog::ErrorDialog(wxWindow *parent, const wxString &msg, bool monospaced_
     add_msg_content(this, content_sizer, msg, monospaced_font);
 
 	// Use a small bitmap with monospaced font, as the error text will not be wrapped.
-	logo->SetBitmap(create_scaled_bitmap("PrusaSlicer_192px_grayscale.png", this, monospaced_font ? 48 : /*1*/84));
+	logo->SetBitmap(*get_bmp_bundle("PrusaSlicer_192px_grayscale.png", monospaced_font ? 48 : /*1*/84));
 
     SetMaxSize(wxSize(-1, CONTENT_MAX_HEIGHT*wxGetApp().em_unit()));
 

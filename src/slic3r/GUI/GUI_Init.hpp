@@ -8,6 +8,15 @@ namespace Slic3r {
 
 namespace GUI {
 
+struct OpenGLVersions
+{
+	static const std::vector<std::string> core_str;
+	static const std::vector<std::string> precore_str;
+
+	static const std::vector<std::pair<int, int>> core;
+	static const std::vector<std::pair<int, int>> precore;
+};
+
 struct GUI_InitParams
 {
 	int		                    argc;
@@ -21,6 +30,15 @@ struct GUI_InitParams
     std::vector<std::string>    input_files;
 
 	bool	                    start_as_gcodeviewer;
+	bool						start_downloader;
+	bool					    delete_after_load;
+    std::string                 download_url;
+#if ENABLE_GL_CORE_PROFILE
+	std::pair<int, int>         opengl_version;
+#if ENABLE_OPENGL_DEBUG_OPTION
+	bool                        opengl_debug;
+#endif // ENABLE_OPENGL_DEBUG_OPTION
+#endif // ENABLE_GL_CORE_PROFILE
 };
 
 int GUI_Run(GUI_InitParams &params);

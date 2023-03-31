@@ -6,6 +6,8 @@
 #include <vector>
 #include <wx/hyperlink.h>
 
+#include <boost/filesystem.hpp>
+
 #include "libslic3r/Semver.hpp"
 #include "MsgDialog.hpp"
 
@@ -36,6 +38,43 @@ private:
 	wxCheckBox *cbox;
 };
 
+
+class AppUpdateAvailableDialog : public MsgDialog
+{
+public:
+	AppUpdateAvailableDialog(const Semver& ver_current, const Semver& ver_online, bool from_user);
+	AppUpdateAvailableDialog(AppUpdateAvailableDialog&&) = delete;
+	AppUpdateAvailableDialog(const AppUpdateAvailableDialog&) = delete;
+	AppUpdateAvailableDialog& operator=(AppUpdateAvailableDialog&&) = delete;
+	AppUpdateAvailableDialog& operator=(const AppUpdateAvailableDialog&) = delete;
+	virtual ~AppUpdateAvailableDialog();
+
+	// Tells whether the user checked the "don't bother me again" checkbox
+	bool disable_version_check() const;
+	static wxSize AUAD_size;
+private:
+	wxCheckBox* cbox {nullptr};
+};
+
+class AppUpdateDownloadDialog : public MsgDialog
+{
+public:
+	AppUpdateDownloadDialog(const Semver& ver_online, boost::filesystem::path& path);
+	AppUpdateDownloadDialog(AppUpdateDownloadDialog&&) = delete;
+	AppUpdateDownloadDialog(const AppUpdateDownloadDialog&) = delete;
+	AppUpdateDownloadDialog& operator=(AppUpdateDownloadDialog&&) = delete;
+	AppUpdateDownloadDialog& operator=(const AppUpdateDownloadDialog&) = delete;
+	virtual ~AppUpdateDownloadDialog();
+
+	// Tells whether the user checked the "don't bother me again" checkbox
+	bool		run_after_download() const;
+	boost::filesystem::path	get_download_path() const;
+
+private:
+	wxCheckBox* cbox_run;
+	wxTextCtrl* txtctrl_path;
+	wxString filename;
+};
 
 // Confirmation dialog informing about configuration update. Lists updated bundles & their versions.
 class MsgUpdateConfig : public MsgDialog
@@ -127,6 +166,18 @@ public:
 	MsgNoUpdates& operator=(MsgNoUpdates&&) = delete;
 	MsgNoUpdates& operator=(const MsgNoUpdates&) = delete;
 	~MsgNoUpdates();
+};
+
+// Informs about absence of new version online.
+class MsgNoAppUpdates : public MsgDialog
+{
+public:
+	MsgNoAppUpdates();
+	MsgNoAppUpdates(MsgNoAppUpdates&&) = delete;
+	MsgNoAppUpdates(const MsgNoAppUpdates&) = delete;
+	MsgNoAppUpdates& operator=(MsgNoUpdates&&) = delete;
+	MsgNoAppUpdates& operator=(const MsgNoAppUpdates&) = delete;
+	~MsgNoAppUpdates();
 };
 
 }

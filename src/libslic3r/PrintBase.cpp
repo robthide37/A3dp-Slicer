@@ -6,14 +6,10 @@
 
 #include "I18N.hpp"
 
-//! macro used to mark string used at localization, 
-//! return same string
-#define L(s) Slic3r::I18N::translate(s)
-
 namespace Slic3r
 {
 
-void PrintTryCancel::operator()()
+void PrintTryCancel::operator()() const
 {
     m_print->throw_if_canceled();
 }
@@ -81,7 +77,7 @@ std::string PrintBase::output_filename(const std::string &format, const std::str
             filename = boost::filesystem::change_extension(filename, default_ext);
         return filename.string();
     } catch (std::runtime_error &err) {
-        throw Slic3r::PlaceholderParserError(L("Failed processing of the output_filename_format template.") + "\n" + err.what());
+        throw Slic3r::PlaceholderParserError(_u8L("Failed processing of the output_filename_format template.") + "\n" + err.what());
     }
 }
 
@@ -103,7 +99,7 @@ std::string PrintBase::output_filepath(const std::string &path, const std::strin
 
 void PrintBase::status_update_warnings(int step, PrintStateBase::WarningLevel /* warning_level */, const std::string &message, const PrintObjectBase* print_object)
 {
-    if (this->m_status_callback) {
+    if (m_status_callback) {
         auto status = print_object ? SlicingStatus(*print_object, step) : SlicingStatus(*this, step);
         m_status_callback(status);
     }

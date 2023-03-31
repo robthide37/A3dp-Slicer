@@ -15,6 +15,12 @@
 
 namespace Slic3r {
 
+// static
+bool GCodeWriter::supports_separate_travel_acceleration(GCodeFlavor flavor)
+{
+    return (flavor == gcfRepetier || flavor == gcfMarlinFirmware ||  flavor == gcfRepRapFirmware);
+}
+
 void GCodeWriter::apply_print_config(const PrintConfig &print_config)
 {
     this->config.apply(print_config, true);
@@ -23,8 +29,10 @@ void GCodeWriter::apply_print_config(const PrintConfig &print_config)
     bool use_mach_limits = print_config.gcode_flavor.value == gcfMarlinLegacy
                         || print_config.gcode_flavor.value == gcfMarlinFirmware
                         || print_config.gcode_flavor.value == gcfRepRapFirmware;
-    m_max_acceleration = std::lrint((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) ?
-        print_config.machine_max_acceleration_extruding.values.front() : 0);
+    m_max_acceleration = static_cast<unsigned int>(std::round((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode) ?
+        print_config.machine_max_acceleration_extruding.values.front() : 0));
+    m_max_travel_acceleration = static_cast<unsigned int>(std::round((use_mach_limits && print_config.machine_limits_usage.value == MachineLimitsUsage::EmitToGCode && supports_separate_travel_acceleration(print_config.gcode_flavor.value)) ?
+        print_config.machine_max_acceleration_travel.values.front() : 0));
 }
 
 void GCodeWriter::set_extruders(std::vector<unsigned int> extruder_ids)
@@ -53,6 +61,7 @@ std::string GCodeWriter::preamble()
         FLAVOR_IS(gcfRepRapFirmware) ||
         FLAVOR_IS(gcfMarlinLegacy) ||
         FLAVOR_IS(gcfMarlinFirmware) ||
+        FLAVOR_IS(gcfKlipper) ||
         FLAVOR_IS(gcfTeacup) ||
         FLAVOR_IS(gcfRepetier) ||
         FLAVOR_IS(gcfSmoothie))
@@ -79,7 +88,7 @@ std::string GCodeWriter::postamble() const
 std::string GCodeWriter::set_temperature(unsigned int temperature, bool wait, int tool) const
 {
     if (wait && (FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish)))
-        return "";
+        return {};
     
     std::string code, comment;
     if (wait && FLAVOR_IS_NOT(gcfTeacup) && FLAVOR_IS_NOT(gcfRepRapFirmware)) {
@@ -154,36 +163,31 @@ std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait
     return gcode.str();
 }
 
-std::string GCodeWriter::set_acceleration(unsigned int acceleration)
+std::string GCodeWriter::set_acceleration_internal(Acceleration type, unsigned int acceleration)
 {
     // Clamp the acceleration to the allowed maximum.
-    if (m_max_acceleration > 0 && acceleration > m_max_acceleration)
+    if (type == Acceleration::Print && m_max_acceleration > 0 && acceleration > m_max_acceleration)
         acceleration = m_max_acceleration;
+    if (type == Acceleration::Travel && m_max_travel_acceleration > 0 && acceleration > m_max_travel_acceleration)
+        acceleration = m_max_travel_acceleration;
 
-    if (acceleration == 0 || acceleration == m_last_acceleration)
+    // Are we setting travel acceleration for a flavour that supports separate travel and print acc?
+    bool separate_travel = (type == Acceleration::Travel && supports_separate_travel_acceleration(this->config.gcode_flavor));
+
+    auto& last_value = separate_travel ? m_last_travel_acceleration : m_last_acceleration ;
+    if (acceleration == 0 || acceleration == last_value)
         return std::string();
     
-    m_last_acceleration = acceleration;
+    last_value = acceleration;
     
     std::ostringstream gcode;
-    if (FLAVOR_IS(gcfRepetier)) {
-        // M201: Set max printing acceleration
-        gcode << "M201 X" << acceleration << " Y" << acceleration;
-        if (this->config.gcode_comments) gcode << " ; adjust acceleration";
-        gcode << "\n";
-        // M202: Set max travel acceleration
-        gcode << "M202 X" << acceleration << " Y" << acceleration;
-    } else if (FLAVOR_IS(gcfRepRapFirmware)) {
-        // M204: Set default acceleration
-        gcode << "M204 P" << acceleration;
-    } else if (FLAVOR_IS(gcfMarlinFirmware)) {
-        // This is new MarlinFirmware with separated print/retraction/travel acceleration.
-        // Use M204 P, we don't want to override travel acc by M204 S (which is deprecated anyway).
-        gcode << "M204 P" << acceleration;
-    } else {
-        // M204: Set default acceleration
+    if (FLAVOR_IS(gcfRepetier))
+        gcode << (separate_travel ? "M202 X" : "M201 X") << acceleration << " Y" << acceleration;
+    else if (FLAVOR_IS(gcfRepRapFirmware) || FLAVOR_IS(gcfMarlinFirmware))
+        gcode << (separate_travel ? "M204 T" : "M204 P") << acceleration;
+    else
         gcode << "M204 S" << acceleration;
-    }
+
     if (this->config.gcode_comments) gcode << " ; adjust acceleration";
     gcode << "\n";
     
@@ -192,32 +196,18 @@ std::string GCodeWriter::set_acceleration(unsigned int acceleration)
 
 std::string GCodeWriter::reset_e(bool force)
 {
-    if (FLAVOR_IS(gcfMach3)
-        || FLAVOR_IS(gcfMakerWare)
-        || FLAVOR_IS(gcfSailfish))
-        return "";
-    
-    if (m_extruder != nullptr) {
-        if (m_extruder->E() == 0. && ! force)
-            return "";
-        m_extruder->reset_E();
-    }
-
-    if (! m_extrusion_axis.empty() && ! this->config.use_relative_e_distances) {
-        std::ostringstream gcode;
-        gcode << "G92 " << m_extrusion_axis << "0";
-        if (this->config.gcode_comments) gcode << " ; reset extrusion distance";
-        gcode << "\n";
-        return gcode.str();
-    } else {
-        return "";
-    }
+    return
+        FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish) || this->config.use_relative_e_distances ||
+        (m_extruder != nullptr && ! m_extruder->reset_E() && ! force) || 
+        m_extrusion_axis.empty() ?
+        std::string{} :
+        std::string("G92 ") + m_extrusion_axis + (this->config.gcode_comments ? "0 ; reset extrusion distance\n" : "0\n");
 }
 
 std::string GCodeWriter::update_progress(unsigned int num, unsigned int tot, bool allow_100) const
 {
     if (FLAVOR_IS_NOT(gcfMakerWare) && FLAVOR_IS_NOT(gcfSailfish))
-        return "";
+        return {};
     
     unsigned int percent = (unsigned int)floor(100.0 * num / tot + 0.5);
     if (!allow_100) percent = std::min(percent, (unsigned int)99);
@@ -269,8 +259,8 @@ std::string GCodeWriter::set_speed(double F, const std::string &comment, const s
 
 std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string &comment)
 {
-    m_pos(0) = point(0);
-    m_pos(1) = point(1);
+    m_pos.x() = point.x();
+    m_pos.y() = point.y();
     
     GCodeG1Formatter w;
     w.emit_xy(point);
@@ -290,9 +280,9 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const std::string &co
         don't perform the Z move but we only move in the XY plane and
         adjust the nominal Z by reducing the lift amount that will be 
         used for unlift. */
-    if (!this->will_move_z(point(2))) {
-        double nominal_z = m_pos(2) - m_lifted;
-        m_lifted -= (point(2) - nominal_z);
+    if (!this->will_move_z(point.z())) {
+        double nominal_z = m_pos.z() - m_lifted;
+        m_lifted -= (point.z() - nominal_z);
         // In case that retract_lift == layer_height we could end up with almost zero in_m_lifted
         // and a retract could be skipped (https://github.com/prusa3d/PrusaSlicer/issues/2154
         if (std::abs(m_lifted) < EPSILON)
@@ -318,11 +308,11 @@ std::string GCodeWriter::travel_to_z(double z, const std::string &comment)
         we don't perform the move but we only adjust the nominal Z by
         reducing the lift amount that will be used for unlift. */
     if (!this->will_move_z(z)) {
-        double nominal_z = m_pos(2) - m_lifted;
+        double nominal_z = m_pos.z() - m_lifted;
         m_lifted -= (z - nominal_z);
         if (std::abs(m_lifted) < EPSILON)
             m_lifted = 0.;
-        return "";
+        return {};
     }
     
     /*  In all the other cases, we perform an actual Z move and cancel
@@ -333,7 +323,7 @@ std::string GCodeWriter::travel_to_z(double z, const std::string &comment)
 
 std::string GCodeWriter::_travel_to_z(double z, const std::string &comment)
 {
-    m_pos(2) = z;
+    m_pos.z() = z;
 
     double speed = this->config.travel_speed_z.value;
     if (speed == 0.)
@@ -351,8 +341,8 @@ bool GCodeWriter::will_move_z(double z) const
     /* If target Z is lower than current Z but higher than nominal Z
         we don't perform an actual Z move. */
     if (m_lifted > 0) {
-        double nominal_z = m_pos(2) - m_lifted;
-        if (z >= nominal_z && z <= m_pos(2))
+        double nominal_z = m_pos.z() - m_lifted;
+        if (z >= nominal_z && z <= m_pos.z())
             return false;
     }
     return true;
@@ -360,17 +350,17 @@ bool GCodeWriter::will_move_z(double z) const
 
 std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std::string &comment)
 {
-    m_pos(0) = point(0);
-    m_pos(1) = point(1);
-    m_extruder->extrude(dE);
+    m_pos.x() = point.x();
+    m_pos.y() = point.y();
 
     GCodeG1Formatter w;
     w.emit_xy(point);
-    w.emit_e(m_extrusion_axis, m_extruder->E());
+    w.emit_e(m_extrusion_axis, m_extruder->extrude(dE).second);
     w.emit_comment(this->config.gcode_comments, comment);
     return w.string();
 }
 
+#if 0
 std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std::string &comment)
 {
     m_pos = point;
@@ -383,6 +373,7 @@ std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std
     w.emit_comment(this->config.gcode_comments, comment);
     return w.string();
 }
+#endif
 
 std::string GCodeWriter::retract(bool before_wipe)
 {
@@ -422,14 +413,13 @@ std::string GCodeWriter::_retract(double length, double restart_extra, const std
         restart_extra = restart_extra * area;
     }
     
-
     std::string gcode;
-    if (double dE = m_extruder->retract(length, restart_extra);  dE != 0) {
+    if (auto [dE, emitE] = m_extruder->retract(length, restart_extra);  dE != 0) {
         if (this->config.use_firmware_retraction) {
             gcode = FLAVOR_IS(gcfMachinekit) ? "G22 ; retract\n" : "G10 ; retract\n";
         } else if (! m_extrusion_axis.empty()) {
             GCodeG1Formatter w;
-            w.emit_e(m_extrusion_axis, m_extruder->E());
+            w.emit_e(m_extrusion_axis, emitE);
             w.emit_f(m_extruder->retract_speed() * 60.);
             w.emit_comment(this->config.gcode_comments, comment);
             gcode = w.string();
@@ -449,14 +439,14 @@ std::string GCodeWriter::unretract()
     if (FLAVOR_IS(gcfMakerWare))
         gcode = "M101 ; extruder on\n";
     
-    if (double dE = m_extruder->unretract(); dE != 0) {
+    if (auto [dE, emitE] = m_extruder->unretract(); dE != 0) {
         if (this->config.use_firmware_retraction) {
             gcode += FLAVOR_IS(gcfMachinekit) ? "G23 ; unretract\n" : "G11 ; unretract\n";
             gcode += this->reset_e();
         } else if (! m_extrusion_axis.empty()) {
             // use G1 instead of G0 because G0 will blend the restart with the previous travel move
             GCodeG1Formatter w;
-            w.emit_e(m_extrusion_axis, m_extruder->E());
+            w.emit_e(m_extrusion_axis, emitE);
             w.emit_f(m_extruder->deretract_speed() * 60.);
             w.emit_comment(this->config.gcode_comments, " ; unretract");
             gcode += w.string();
@@ -476,24 +466,38 @@ std::string GCodeWriter::lift()
     {
         double above = this->config.retract_lift_above.get_at(m_extruder->id());
         double below = this->config.retract_lift_below.get_at(m_extruder->id());
-        if (m_pos(2) >= above && (below == 0 || m_pos(2) <= below))
+        if (m_pos.z() >= above && (below == 0 || m_pos.z() <= below))
             target_lift = this->config.retract_lift.get_at(m_extruder->id());
     }
     if (m_lifted == 0 && target_lift > 0) {
         m_lifted = target_lift;
-        return this->_travel_to_z(m_pos(2) + target_lift, "lift Z");
+        return this->_travel_to_z(m_pos.z() + target_lift, "lift Z");
     }
-    return "";
+    return {};
 }
 
 std::string GCodeWriter::unlift()
 {
     std::string gcode;
     if (m_lifted > 0) {
-        gcode += this->_travel_to_z(m_pos(2) - m_lifted, "restore layer Z");
+        gcode += this->_travel_to_z(m_pos.z() - m_lifted, "restore layer Z");
         m_lifted = 0;
     }
     return gcode;
+}
+
+void GCodeWriter::update_position(const Vec3d &new_pos)
+{
+    assert(this->m_lifted >= 0);
+    const double nominal_z = m_pos.z() - m_lifted;
+    m_lifted = new_pos.z() - nominal_z;
+    if (m_lifted < - EPSILON)
+        throw Slic3r::RuntimeError("Custom G-code reports negative Z-hop. Final Z position is below the print_z height.");
+    // In case that retract_lift == layer_height we could end up with almost zero in_m_lifted
+    // and a retract could be skipped (https://github.com/prusa3d/PrusaSlicer/issues/2154
+    if (m_lifted < EPSILON)
+        m_lifted = 0.;
+    m_pos = new_pos;
 }
 
 std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, unsigned int speed)

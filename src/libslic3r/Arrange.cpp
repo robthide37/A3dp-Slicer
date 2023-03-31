@@ -431,24 +431,11 @@ template<> std::function<double(const Item&)> AutoArranger<Circle>::get_objfn()
 {
     auto bincenter = m_bin.center();
     return [this, bincenter](const Item &item) {
-        
+
         auto result = objfunc(item, bincenter);
-        
+
         double score = std::get<0>(result);
-        
-        auto isBig = [this](const Item& itm) {
-            return itm.area() / m_bin_area > BIG_ITEM_TRESHOLD ;
-        };
-        
-        if(isBig(item)) {
-            auto mp = m_merged_pile;
-            mp.push_back(item.transformedShape());
-            auto chull = sl::convexHull(mp);
-            double miss = Placer::overfit(chull, m_bin);
-            if(miss < 0) miss = 0;
-            score += miss*miss;
-        }
-        
+
         return score;
     };
 }
@@ -495,7 +482,7 @@ void _arrange(
 {
     // Integer ceiling the min distance from the bed perimeters
     coord_t md = params.min_obj_distance;
-    md = md / 2;
+    md = md / 2 - params.min_bed_distance;
     
     auto corrected_bin = bin;
     sl::offset(corrected_bin, md);
@@ -503,11 +490,11 @@ void _arrange(
     mod_params.min_obj_distance = 0;
 
     AutoArranger<BinT> arranger{corrected_bin, mod_params, progressfn, stopfn};
-    
+
     auto infl = coord_t(std::ceil(params.min_obj_distance / 2.0));
     for (Item& itm : shapes) itm.inflate(infl);
     for (Item& itm : excludes) itm.inflate(infl);
-    
+
     remove_large_items(excludes, corrected_bin);
 
     // If there is something on the plate
@@ -517,7 +504,7 @@ void _arrange(
     inp.reserve(shapes.size() + excludes.size());
     for (auto &itm : shapes  ) inp.emplace_back(itm);
     for (auto &itm : excludes) inp.emplace_back(itm);
-    
+
     // Use the minimum bounding box rotation as a starting point.
     // TODO: This only works for convex hull. If we ever switch to concave
     // polygon nesting, a convex hull needs to be calculated.
@@ -534,7 +521,13 @@ void _arrange(
         }
     }
 
-    arranger(inp.begin(), inp.end());
+    if (sl::area(corrected_bin) > 0)
+        arranger(inp.begin(), inp.end());
+    else {
+        for (Item &itm : inp)
+            itm.binId(BIN_ID_UNSET);
+    }
+
     for (Item &itm : inp) itm.inflate(-infl);
 }
 
@@ -558,7 +551,7 @@ static CircleBed to_circle(const Point &center, const Points& points) {
     std::vector<double> vertex_distances;
     double avg_dist = 0;
     
-    for (auto pt : points)
+    for (const Point& pt : points)
     {
         double distance = distance_to(center, pt);
         vertex_distances.push_back(distance);
@@ -587,16 +580,15 @@ static void process_arrangeable(const ArrangePolygon &arrpoly,
     const Vec2crd &offs     = arrpoly.translation;
     double         rotation = arrpoly.rotation;
 
-    // This fixes:
-    // https://github.com/prusa3d/PrusaSlicer/issues/2209
-    if (p.points.size() < 3)
-        return;
-
     outp.emplace_back(std::move(p));
     outp.back().rotation(rotation);
     outp.back().translation({offs.x(), offs.y()});
+    outp.back().inflate(arrpoly.inflation);
     outp.back().binId(arrpoly.bed_idx);
     outp.back().priority(arrpoly.priority);
+    outp.back().setOnPackedFn([&arrpoly](Item &itm){
+        itm.inflate(-arrpoly.inflation);
+    });
 }
 
 template<class Fn> auto call_with_bed(const Points &bed, Fn &&fn)
@@ -687,9 +679,7 @@ void arrange(ArrangePolygons &items,
              const SegmentedRectangleBed &bed,
              const ArrangeParams &params)
 {
-    auto arrbed = bed.bb;
-    arrbed.offset(-bed.inset);
-    arrange(items, excludes, arrbed, params);
+    arrange(items, excludes, bed.bb, params);
 
     if (! excludes.empty())
         return;
@@ -721,21 +711,21 @@ void arrange(ArrangePolygons &items,
         bb.max.y() = scaled(std::ceil(pilesz.y() / piecesz.y()) * piecesz.y());
         switch (params.alignment) {
         case Pivots::BottomLeft:
-            bb.translate((bed.bb.min - bb.min));
+            bb.translate(bed.bb.min - bb.min);
             break;
         case Pivots::TopRight:
-            bb.translate((bed.bb.max - bb.max));
+            bb.translate(bed.bb.max - bb.max);
             break;
         case Pivots::BottomRight: {
             Point bedref{bed.bb.max.x(), bed.bb.min.y()};
             Point bbref {bb.max.x(), bb.min.y()};
-            bb.translate((bedref - bbref));
+            bb.translate(bedref - bbref);
             break;
         }
         case Pivots::TopLeft: {
             Point bedref{bed.bb.min.x(), bed.bb.max.y()};
             Point bbref {bb.min.x(), bb.max.y()};
-            bb.translate((bedref - bbref));
+            bb.translate(bedref - bbref);
             break;
         }
         case Pivots::Center: {
@@ -747,7 +737,7 @@ void arrange(ArrangePolygons &items,
         Vec2crd d = bb.center() - pilebb[bedidx].center();
 
         auto bedbb = bed.bb;
-        bedbb.offset(-bed.inset);
+        bedbb.offset(-params.min_bed_distance);
         auto pilebbx = pilebb[bedidx];
         pilebbx.translate(d);
 

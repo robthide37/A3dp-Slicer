@@ -162,13 +162,33 @@ TEST_CASE("Splitting a Polygon generates a polyline correctly", "[Geometry]"){
 }
 
 
-TEST_CASE("Bounding boxes are scaled appropriately", "[Geometry]"){
-    BoundingBox bb(std::vector<Point>({Point(0, 1), Point(10, 2), Point(20, 2)}));
-    bb.scale(2);
-    REQUIRE(bb.min == Point(0,2));
-    REQUIRE(bb.max == Point(40,4));
+SCENARIO("BoundingBox", "[Geometry]") {
+    WHEN("Bounding boxes are scaled") {
+        BoundingBox bb(std::vector<Point>({Point(0, 1), Point(10, 2), Point(20, 2)}));
+        bb.scale(2);
+        REQUIRE(bb.min == Point(0,2));
+        REQUIRE(bb.max == Point(40,4));
+    }
+    WHEN("BoundingBox constructed from points") {
+        BoundingBox bb(Points{ {100,200}, {100, 200}, {500, -600} });
+        THEN("minimum is correct") {
+            REQUIRE(bb.min == Point{100,-600});
+        }
+        THEN("maximum is correct") {
+            REQUIRE(bb.max == Point{500,200});
+        }
+    }
+    WHEN("BoundingBox constructed from a single point") {
+        BoundingBox bb;
+        bb.merge({10, 10});
+        THEN("minimum equals to the only defined point") {
+            REQUIRE(bb.min == Point{10,10});
+        }
+        THEN("maximum equals to the only defined point") {
+            REQUIRE(bb.max == Point{10,10});
+        }
+    }
 }
-
 
 TEST_CASE("Offseting a line generates a polygon correctly", "[Geometry]"){
 	Slic3r::Polyline tmp = { Point(10,10), Point(20,10) };
@@ -373,7 +393,43 @@ SCENARIO("Line distances", "[Geometry]"){
     }
 }
 
+SCENARIO("Calculating angles", "[Geometry]")
+{
+    GIVEN(("Vectors 30 degrees apart"))
+    {
+        std::vector<std::pair<Point, Point>> pts {
+            { {1000, 0}, { 866, 500 } },
+            { { 866, 500 }, { 500, 866 } },
+            { { 500, 866 }, { 0, 1000 } },
+            { { -500, 866 }, { -866, 500 } }
+        };
+
+        THEN("Angle detected is 30 degrees")
+        {
+            for (auto &p : pts)
+                REQUIRE(is_approx(angle(p.first, p.second), M_PI / 6.));
+        }
+    }
+
+    GIVEN(("Vectors 30 degrees apart"))
+    {
+        std::vector<std::pair<Point, Point>> pts {
+            { { 866, 500 }, {1000, 0} },
+            { { 500, 866 }, { 866, 500 } },
+            { { 0, 1000 }, { 500, 866 } },
+            { { -866, 500 }, { -500, 866 } }
+        };
+
+        THEN("Angle detected is -30 degrees")
+        {
+            for (auto &p : pts)
+                REQUIRE(is_approx(angle(p.first, p.second), - M_PI / 6.));
+        }
+    }
+}
+
 SCENARIO("Polygon convex/concave detection", "[Geometry]"){
+    static constexpr const double angle_threshold = M_PI / 3.;
     GIVEN(("A Square with dimension 100")){
         auto square = Slic3r::Polygon /*new_scale*/(std::vector<Point>({
             Point(100,100),
@@ -381,13 +437,13 @@ SCENARIO("Polygon convex/concave detection", "[Geometry]"){
             Point(200,200),
             Point(100,200)}));
         THEN("It has 4 convex points counterclockwise"){
-            REQUIRE(square.concave_points(PI*4/3).size() == 0);
-            REQUIRE(square.convex_points(PI*2/3).size() == 4);
+            REQUIRE(square.concave_points(angle_threshold).size() == 0);
+            REQUIRE(square.convex_points(angle_threshold).size() == 4);
         }
         THEN("It has 4 concave points clockwise"){
             square.make_clockwise();
-            REQUIRE(square.concave_points(PI*4/3).size() == 4);
-            REQUIRE(square.convex_points(PI*2/3).size() == 0);
+            REQUIRE(square.concave_points(angle_threshold).size() == 4);
+            REQUIRE(square.convex_points(angle_threshold).size() == 0);
         }
     }
     GIVEN("A Square with an extra colinearvertex"){
@@ -398,8 +454,8 @@ SCENARIO("Polygon convex/concave detection", "[Geometry]"){
             Point(100,200),
             Point(100,100)}));
         THEN("It has 4 convex points counterclockwise"){
-            REQUIRE(square.concave_points(PI*4/3).size() == 0);
-            REQUIRE(square.convex_points(PI*2/3).size() == 4);
+            REQUIRE(square.concave_points(angle_threshold).size() == 0);
+            REQUIRE(square.convex_points(angle_threshold).size() == 4);
         }
     }
     GIVEN("A Square with an extra collinear vertex in different order"){
@@ -410,8 +466,8 @@ SCENARIO("Polygon convex/concave detection", "[Geometry]"){
             Point(150,100),
             Point(200,100)}));
         THEN("It has 4 convex points counterclockwise"){
-            REQUIRE(square.concave_points(PI*4/3).size() == 0);
-            REQUIRE(square.convex_points(PI*2/3).size() == 4);
+            REQUIRE(square.concave_points(angle_threshold).size() == 0);
+            REQUIRE(square.convex_points(angle_threshold).size() == 4);
         }
     }
 
@@ -422,8 +478,8 @@ SCENARIO("Polygon convex/concave detection", "[Geometry]"){
             Point(31286371,461008)
         }));
         THEN("it has three convex vertices"){
-            REQUIRE(triangle.concave_points(PI*4/3).size() == 0);
-            REQUIRE(triangle.convex_points(PI*2/3).size() == 3);
+            REQUIRE(triangle.concave_points(angle_threshold).size() == 0);
+            REQUIRE(triangle.convex_points(angle_threshold).size() == 3);
         }
     }
 
@@ -435,8 +491,8 @@ SCENARIO("Polygon convex/concave detection", "[Geometry]"){
             Point(31286371,461012)
         }));
         THEN("it has three convex vertices"){
-            REQUIRE(triangle.concave_points(PI*4/3).size() == 0);
-            REQUIRE(triangle.convex_points(PI*2/3).size() == 3);
+            REQUIRE(triangle.concave_points(angle_threshold).size() == 0);
+            REQUIRE(triangle.convex_points(angle_threshold).size() == 3);
         }
     }
     GIVEN("A polygon with concave vertices with angles of specifically 4/3pi"){
@@ -453,8 +509,8 @@ SCENARIO("Polygon convex/concave detection", "[Geometry]"){
             Point(38092663,692699),Point(52100125,692699)
         }));
         THEN("the correct number of points are detected"){
-            REQUIRE(polygon.concave_points(PI*4/3).size() == 6);
-            REQUIRE(polygon.convex_points(PI*2/3).size() == 10);
+            REQUIRE(polygon.concave_points(angle_threshold).size() == 6);
+            REQUIRE(polygon.convex_points(angle_threshold).size() == 10);
         }
     }
 }
@@ -706,5 +762,29 @@ TEST_CASE("Convex polygon intersection test prusa polygons", "[Geometry][Rotcali
         }
 
         REQUIRE(res == ref);
+    }
+}
+
+
+TEST_CASE("Euler angles roundtrip", "[Geometry]") {
+    std::vector<Vec3d> euler_angles_vec = {{M_PI/2.,  -M_PI,    0.},
+                                           {M_PI,     -M_PI,    0.},
+                                           {M_PI,     -M_PI,    2*M_PI},
+                                           {0.,       0.,       M_PI},
+                                           {M_PI,     M_PI/2.,  0.},
+                                           {0.2,      0.3,      -0.5}};
+
+    // Also include all combinations of zero and +-pi/2:
+    for (double x : {0., M_PI/2., -M_PI/2.})
+       for (double y : {0., M_PI/2., -M_PI/2.})
+          for (double z : {0., M_PI/2., -M_PI/2.})
+              euler_angles_vec.emplace_back(x, y, z);
+
+    for (Vec3d& euler_angles : euler_angles_vec) {
+        Transform3d trafo1 = Geometry::rotation_transform(euler_angles);
+        euler_angles = Geometry::extract_rotation(trafo1);
+        Transform3d trafo2 = Geometry::rotation_transform(euler_angles);
+
+        REQUIRE(trafo1.isApprox(trafo2));
     }
 }

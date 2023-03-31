@@ -27,12 +27,12 @@ option(SLIC3R_STATIC 			"Compile PrusaSlicer with static libraries (Boost, TBB, 
 option(SLIC3R_GUI    			"Compile PrusaSlicer with GUI components (OpenGL, wxWidgets)" 1)
 option(SLIC3R_FHS               "Assume PrusaSlicer is to be installed in a FHS directory structure" 0)
 option(SLIC3R_WX_STABLE         "Build against wxWidgets stable (3.0) as oppsed to dev (3.1) on Linux" 0)
-option(SLIC3R_PROFILE 			"Compile PrusaSlicer with an invasive Shiny profiler" 0)
 option(SLIC3R_PCH               "Use precompiled headers" 1)
 option(SLIC3R_MSVC_COMPILE_PARALLEL "Compile on Visual Studio in parallel" 1)
 option(SLIC3R_MSVC_PDB          "Generate PDB files on MSVC in Release mode" 1)
 option(SLIC3R_PERL_XS           "Compile XS Perl module and enable Perl unit and integration tests" 0)
 option(SLIC3R_ASAN              "Enable ASan on Clang and GCC" 0)
+option(SLIC3R_UBSAN             "Enable UBSan on Clang and GCC" 0)
 option(SLIC3R_ENABLE_FORMAT_STEP "Enable compilation of STEP file support" 1)
 # If SLIC3R_FHS is 1 -> SLIC3R_DESKTOP_INTEGRATION is always 0, othrewise variable.
 CMAKE_DEPENDENT_OPTION(SLIC3R_DESKTOP_INTEGRATION "Allow perfoming desktop integration during runtime" 1 "NOT SLIC3R_FHS" 0)
@@ -42,6 +42,14 @@ set(OPENVDB_FIND_MODULE_PATH "" CACHE PATH "Path to OpenVDB installation's find 
 set(SLIC3R_GTK "2" CACHE STRING "GTK version to use with wxWidgets on Linux")
 
 set(IS_CROSS_COMPILE FALSE)
+
+if (SLIC3R_STATIC)
+    # Prefer config scripts over find modules. This is helpful when building with
+    # the static dependencies. Many libraries have their own export scripts
+    # while having a Find<PkgName> module in standard cmake installation.
+    # (e.g. CURL)
+    set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+endif ()
 
 if (APPLE)
     set(CMAKE_FIND_FRAMEWORK LAST)
@@ -106,6 +114,8 @@ if (MSVC)
     # C4244: 'conversion' conversion from 'type1' to 'type2', possible loss of data. An integer type is converted to a smaller integer type.
     # C4267: The compiler detected a conversion from size_t to a smaller type.
     add_compile_options(/wd4244 /wd4267)
+    # Enforce strict C++ conformance, so our code that compiles on MSVC also compiles on GCC and clang.
+    add_compile_options(/permissive-)
 endif ()
 
 if (MINGW)
@@ -240,6 +250,11 @@ if (NOT MSVC AND ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR "${CMAKE_CXX_COMP
         add_compile_options(-Wno-deprecated-declarations)
     endif()
 
+    # Clang reports misleading indentation for some IF blocks because of mixing tabs with spaces.
+    if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+        add_compile_options(-Wno-misleading-indentation)
+    endif()
+
     #GCC generates loads of -Wunknown-pragmas when compiling igl. The fix is not easy due to a bug in gcc, see
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66943 or
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53431
@@ -264,6 +279,32 @@ if (SLIC3R_ASAN)
 
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lasan")
+    endif ()
+endif ()
+
+if (SLIC3R_UBSAN)
+    # Stacktrace for every report is enabled by default. It can be disabled by running PrusaSlicer with "UBSAN_OPTIONS=print_stacktrace=0".
+
+    # Define macro SLIC3R_UBSAN to allow detection in the source code if this sanitizer is enabled.
+    add_compile_definitions(SLIC3R_UBSAN)
+
+    # Clang supports much more useful checks than GCC, so when Clang is detected, another checks will be enabled.
+    # List of what GCC is checking: https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
+    # List of what Clang is checking: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+        set(_ubsan_flags "-fsanitize=undefined,integer")
+    else ()
+        set(_ubsan_flags "-fsanitize=undefined")
+    endif ()
+
+    add_compile_options(${_ubsan_flags} -fno-omit-frame-pointer)
+
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${_ubsan_flags}")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_ubsan_flags}")
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${_ubsan_flags}")
+
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lubsan")
     endif ()
 endif ()
 
@@ -295,25 +336,6 @@ add_definitions(-DwxUSE_UNICODE -D_UNICODE -DUNICODE -DWXINTL_NO_GETTEXT_MACRO)
 
 # Disable unsafe implicit wxString to const char* / std::string and vice versa. This implicit conversion breaks the UTF-8 encoding quite often.
 add_definitions(-DwxNO_UNSAFE_WXSTRING_CONV)
-
-if (SLIC3R_PROFILE)
-    message("PrusaSlicer will be built with a Shiny invasive profiler")
-    add_definitions(-DSLIC3R_PROFILE)
-endif ()
-
-# Disable optimization even with debugging on.
-if (0)
-    message(STATUS "Perl compiled without optimization. Disabling optimization for the PrusaSlicer build.")
-    message("Old CMAKE_CXX_FLAGS_RELEASE: ${CMAKE_CXX_FLAGS_RELEASE}")
-    message("Old CMAKE_CXX_FLAGS_RELWITHDEBINFO: ${CMAKE_CXX_FLAGS_RELEASE}")
-    message("Old CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS_RELEASE}")
-    set(CMAKE_CXX_FLAGS_RELEASE "/MD /Od /Zi /EHsc /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_C_FLAGS_RELEASE "/MD /Od /Zi /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/MD /Od /Zi /EHsc /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_C_FLAGS_RELWITHDEBINFO "/MD /Od /Zi /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_CXX_FLAGS "/MD /Od /Zi /EHsc /DWIN32 /DTBB_USE_ASSERT")
-    set(CMAKE_C_FLAGS "/MD /Od /Zi /DWIN32 /DTBB_USE_ASSERT")
-endif()
 
 # Find and configure boost
 if(SLIC3R_STATIC)
@@ -383,6 +405,7 @@ if(SLIC3R_STATIC)
 endif()
 set(TBB_DEBUG 1)
 find_package(TBB REQUIRED)
+slic3r_remap_configs(TBB::tbb RelWithDebInfo Release)
 # include_directories(${TBB_INCLUDE_DIRS})
 # add_definitions(${TBB_DEFINITIONS})
 # if(MSVC)
@@ -422,6 +445,14 @@ include_directories(BEFORE SYSTEM ${EIGEN3_INCLUDE_DIR})
 # no matter what.
 find_package(EXPAT REQUIRED)
 
+add_library(libexpat INTERFACE)
+
+if (TARGET EXPAT::EXPAT )
+    target_link_libraries(libexpat INTERFACE EXPAT::EXPAT)
+elseif(TARGET expat::expat)
+    target_link_libraries(libexpat INTERFACE expat::expat)
+endif ()
+
 find_package(PNG REQUIRED)
 
 set(OpenGL_GL_PREFERENCE "LEGACY")
@@ -433,19 +464,16 @@ if (SLIC3R_STATIC AND NOT SLIC3R_STATIC_EXCLUDE_GLEW)
     set(GLEW_VERBOSE ON)
 endif()
 
-find_package(GLEW)
-if (NOT TARGET GLEW::GLEW)
-    message(STATUS "GLEW not found, using bundled version.")
-    add_library(glew STATIC ${LIBDIR}/glew/src/glew.c)
-    set(GLEW_FOUND TRUE)
-    set(GLEW_INCLUDE_DIRS ${LIBDIR}/glew/include/)
-    target_compile_definitions(glew PUBLIC GLEW_STATIC)
-    target_include_directories(glew PUBLIC ${GLEW_INCLUDE_DIRS})
-    add_library(GLEW::GLEW ALIAS glew)
-endif ()
+find_package(GLEW REQUIRED)
 
 # Find the Cereal serialization library
 find_package(cereal REQUIRED)
+add_library(libcereal INTERFACE)
+if (NOT TARGET cereal::cereal)
+    target_link_libraries(libcereal INTERFACE cereal)
+else()
+    target_link_libraries(libcereal INTERFACE cereal::cereal)
+endif()
 
 # l10n
 set(L10N_DIR "${SLIC3R_RESOURCES_DIR}/localization")

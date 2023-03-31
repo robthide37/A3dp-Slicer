@@ -24,7 +24,6 @@
 * miniz: No packages, author suggests using in the source tree
 * qhull: libqhull-dev does not contain libqhullcpp => link errors. Until it is fixed, we will use the builtin version. https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=925540
 * semver: One module C library, author expects to use clib for installation. No packages.
-* Shiny: no packages
 
 ## Header only
 * igl

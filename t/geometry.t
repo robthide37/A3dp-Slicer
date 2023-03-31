@@ -2,7 +2,7 @@ use Test::More;
 use strict;
 use warnings;
 
-plan tests => 42;
+plan tests => 10;
 
 BEGIN {
     use FindBin;
@@ -11,7 +11,7 @@ BEGIN {
 }
 
 use Slic3r;
-use Slic3r::Geometry qw(PI polygon_is_convex
+use Slic3r::Geometry qw(PI
     chained_path_from epsilon scale);
 
 {
@@ -23,56 +23,6 @@ use Slic3r::Geometry qw(PI polygon_is_convex
     );
     my $point = Slic3r::Point->new(95706562, -57294774);
     ok $polygon->contains_point($point), 'contains_point';
-}
-
-#==========================================================
-
-my $line1 = [ [5, 15], [30, 15] ];
-my $line2 = [ [10, 20], [10, 10] ];
-is_deeply Slic3r::Geometry::line_intersection($line1, $line2, 1)->arrayref, [10, 15], 'line_intersection';
-
-#==========================================================
-
-$line1 = [ [73.6310778185108/0.0000001, 371.74239268924/0.0000001], [73.6310778185108/0.0000001, 501.74239268924/0.0000001] ];
-$line2 = [ [75/0.0000001, 437.9853/0.0000001], [62.7484/0.0000001, 440.4223/0.0000001] ];
-isnt Slic3r::Geometry::line_intersection($line1, $line2, 1), undef, 'line_intersection';
-
-#==========================================================
-
-{
-    my $polygon = Slic3r::Polygon->new(
-        [45919000, 515273900], [14726100, 461246400], [14726100, 348753500], [33988700, 315389800], 
-        [43749700, 343843000], [45422300, 352251500], [52362100, 362637800], [62748400, 369577600], 
-        [75000000, 372014700], [87251500, 369577600], [97637800, 362637800], [104577600, 352251500], 
-        [107014700, 340000000], [104577600, 327748400], [97637800, 317362100], [87251500, 310422300], 
-        [82789200, 309534700], [69846100, 294726100], [254081000, 294726100], [285273900, 348753500], 
-        [285273900, 461246400], [254081000, 515273900],
-    );
-    
-    # this points belongs to $polyline
-    # note: it's actually a vertex, while we should better check an intermediate point
-    my $point = Slic3r::Point->new(104577600, 327748400);
-    
-    local $Slic3r::Geometry::epsilon = 1E-5;
-    is_deeply Slic3r::Geometry::polygon_segment_having_point($polygon, $point)->pp, 
-        [ [107014700, 340000000], [104577600, 327748400] ],
-        'polygon_segment_having_point';
-}
-
-#==========================================================
-
-{
-    my $point = Slic3r::Point->new(736310778.185108, 5017423926.8924);
-    my $line = Slic3r::Line->new([627484000, 3695776000], [750000000, 3720147000]);
-    is Slic3r::Geometry::point_in_segment($point, $line), 0, 'point_in_segment';
-}
-
-#==========================================================
-
-{
-    my $point = Slic3r::Point->new(736310778.185108, 5017423926.8924);
-    my $line = Slic3r::Line->new([627484000, 3695776000], [750000000, 3720147000]);
-    is Slic3r::Geometry::point_in_segment($point, $line), 0, 'point_in_segment';
 }
 
 #==========================================================
@@ -95,54 +45,6 @@ my $polygons = [
     ),
 ];
 
-#==========================================================
-
-{
-    my $p1 = [10, 10];
-    my $p2 = [10, 20];
-    my $p3 = [10, 30];
-    my $p4 = [20, 20];
-    my $p5 = [0,  20];
-    
-    is Slic3r::Geometry::angle3points($p2, $p3, $p1),  PI(),   'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p3),  PI(),   'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p3, $p4),  PI()/2*3, 'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p4, $p3),  PI()/2, 'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p4),  PI()/2, 'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p5),  PI()/2*3, 'angle3points';
-}
-
-{
-    my $p1 = [30, 30];
-    my $p2 = [20, 20];
-    my $p3 = [10, 10];
-    my $p4 = [30, 10];
-    
-    is Slic3r::Geometry::angle3points($p2, $p1, $p3), PI(),       'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p4), PI()/2*3,   'angle3points';
-    is Slic3r::Geometry::angle3points($p2, $p1, $p1), 2*PI(),     'angle3points';
-}
-
-#==========================================================
-
-{
-    my $cw_square = [ [0,0], [0,10], [10,10], [10,0] ];
-    is polygon_is_convex($cw_square), 0, 'cw square is not convex';
-    is polygon_is_convex([ reverse @$cw_square ]), 1, 'ccw square is convex';
-    
-    my $convex1 = [ [0,0], [10,0], [10,10], [0,10], [0,6], [4,6], [4,4], [0,4] ];
-    is polygon_is_convex($convex1), 0, 'concave polygon';
-}
-
-#==========================================================
-
-{
-    my $polyline = Slic3r::Polyline->new([0, 0], [10, 0], [20, 0]);
-    is_deeply [ map $_->pp, @{$polyline->lines} ], [
-        [ [0, 0], [10, 0] ],
-        [ [10, 0], [20, 0] ],
-    ], 'polyline_lines';
-}
 
 #==========================================================
 
@@ -155,18 +57,11 @@ my $polygons = [
 
 #==========================================================
 
-{
-    my $bb = Slic3r::Geometry::BoundingBox->new_from_points([ map Slic3r::Point->new(@$_), [0, 1], [10, 2], [20, 2] ]);
-    $bb->scale(2);
-    is_deeply [ $bb->min_point->pp, $bb->max_point->pp ], [ [0,2], [40,4] ], 'bounding box is scaled correctly';
-}
-
-#==========================================================
-
-{
-    my $line = Slic3r::Line->new([10,10], [20,10]);
-    is $line->grow(5)->[0]->area, Slic3r::Polygon->new([10,5], [20,5], [20,15], [10,15])->area, 'grow line';
-}
+#{
+#    my $bb = Slic3r::Geometry::BoundingBox->new_from_points([ map Slic3r::Point->new(@$_), [0, 1], [10, 2], [20, 2] ]);
+#    $bb->scale(2);
+#    is_deeply [ $bb->min_point->pp, $bb->max_point->pp ], [ [0,2], [40,4] ], 'bounding box is scaled correctly';
+#}
 
 #==========================================================
 
@@ -187,63 +82,6 @@ my $polygons = [
     is +Slic3r::Point->new(0, 0)->distance_to_line($line), 0, 'distance_to';
     is +Slic3r::Point->new(20, 0)->distance_to_line($line), 0, 'distance_to';
     is +Slic3r::Point->new(10, 0)->distance_to_line($line), 0, 'distance_to';
-}
-
-#==========================================================
-
-{
-    my $square = Slic3r::Polygon->new_scale(
-        [100,100],
-        [200,100],
-        [200,200],
-        [100,200],
-    );
-    is scalar(@{$square->concave_points(PI*4/3)}), 0, 'no concave vertices detected in ccw square';
-    is scalar(@{$square->convex_points(PI*2/3)}), 4, 'four convex vertices detected in ccw square';
-    
-    $square->make_clockwise;
-    is scalar(@{$square->concave_points(PI*4/3)}), 4, 'fuor concave vertices detected in cw square';
-    is scalar(@{$square->convex_points(PI*2/3)}), 0, 'no convex vertices detected in cw square';
-}
-
-{
-    my $square = Slic3r::Polygon->new_scale(
-        [150,100],
-        [200,100],
-        [200,200],
-        [100,200],
-        [100,100],
-    );
-    is scalar(@{$square->concave_points(PI*4/3)}), 0, 'no concave vertices detected in convex polygon';
-    is scalar(@{$square->convex_points(PI*2/3)}), 4, 'four convex vertices detected in square';
-}
-
-{
-    my $square = Slic3r::Polygon->new_scale(
-        [200,200],
-        [100,200],
-        [100,100],
-        [150,100],
-        [200,100],
-    );
-    is scalar(@{$square->concave_points(PI*4/3)}), 0, 'no concave vertices detected in convex polygon';
-    is scalar(@{$square->convex_points(PI*2/3)}), 4, 'four convex vertices detected in square';
-}
-
-{
-    my $triangle = Slic3r::Polygon->new(
-        [16000170,26257364], [714223,461012], [31286371,461008],
-    );
-    is scalar(@{$triangle->concave_points(PI*4/3)}), 0, 'no concave vertices detected in triangle';
-    is scalar(@{$triangle->convex_points(PI*2/3)}), 3, 'three convex vertices detected in triangle';
-}
-
-{
-    my $triangle = Slic3r::Polygon->new(
-        [16000170,26257364], [714223,461012], [20000000,461012], [31286371,461012],
-    );
-    is scalar(@{$triangle->concave_points(PI*4/3)}), 0, 'no concave vertices detected in triangle having collinear point';
-    is scalar(@{$triangle->convex_points(PI*2/3)}), 3, 'three convex vertices detected in triangle having collinear point';
 }
 
 {

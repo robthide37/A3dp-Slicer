@@ -2,6 +2,7 @@
 #include "I18N.hpp"
 
 #include "libslic3r/Utils.hpp"
+#include "libslic3r/Color.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
@@ -40,9 +41,9 @@ void AboutDialogLogo::onRepaint(wxEvent &event)
 // CopyrightsDialog
 // -----------------------------------------
 CopyrightsDialog::CopyrightsDialog()
-    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, from_u8((boost::format("%1% - %2%")
-        % (wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME)
-        % _utf8(L("Portions copyright"))).str()),
+    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, format_wxstr("%1% - %2%"
+        , wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME
+        , _L("Portions copyright")),
         wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
     this->SetFont(wxGetApp().normal_font());
@@ -113,7 +114,6 @@ void CopyrightsDialog::fill_entries()
         { "Expat"           , "1998-2000 Thai Open Source Software Center Ltd and Clark Cooper"
                               "2001-2016 Expat maintainers"                 , "http://www.libexpat.org/" },
         { "AVRDUDE"         , "2018  Free Software Foundation, Inc."        , "http://savannah.nongnu.org/projects/avrdude" },
-        { "Shinyprofiler"   , "2007-2010 Aidin Abedi"                       , "http://code.google.com/p/shinyprofiler/" },
         { "Real-Time DXT1/DXT5 C compression library"   
                                     , "Based on original by fabian \"ryg\" giesen v1.04. "
                               "Custom version, modified by Yann Collet"     , "https://github.com/Cyan4973/RygsDXTc" },
@@ -126,7 +126,9 @@ void CopyrightsDialog::fill_entries()
         { "fast_float"
                             , "Daniel Lemire, João Paulo Magalhaes and contributors", "https://github.com/fastfloat/fast_float" },
         { "CuraEngine (Arachne, etc.)"
-                            , "Ultimaker", "https://github.com/Ultimaker/CuraEngine" }
+                            , "Ultimaker", "https://github.com/Ultimaker/CuraEngine" },
+        { "Open CASCADE Technology"
+                            , "Open Cascade SAS", "https://github.com/Open-Cascade-SAS/OCCT" }
     };
 }
 
@@ -135,12 +137,11 @@ wxString CopyrightsDialog::get_html_text()
     wxColour bgr_clr = wxGetApp().get_window_default_clr();//wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
 
     const auto text_clr = wxGetApp().get_label_clr_default();
-    const auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-    const auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
+    const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+    const auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
 
-    const wxString copyright_str = _(L("Copyright")) + "&copy; ";
-    // TRN "Slic3r _is licensed under the_ License"
-    const wxString header_str = _(L("License agreements of all following programs (libraries) are part of application license agreement"));
+    const wxString copyright_str = _L("Copyright") + "&copy; ";
+    const wxString header_str = _L("License agreements of all following programs (libraries) are part of application license agreement");
 
     wxString text = wxString::Format(
         "<html>"
@@ -209,7 +210,7 @@ void CopyrightsDialog::onCloseDialog(wxEvent &)
 }
 
 AboutDialog::AboutDialog()
-    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, from_u8((boost::format(_utf8(L("About %s"))) % (wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME)).str()), wxDefaultPosition,
+    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, format_wxstr(_L("About %s"), wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME), wxDefaultPosition,
         wxDefaultSize, /*wxCAPTION*/wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
     SetFont(wxGetApp().normal_font());
@@ -222,8 +223,7 @@ AboutDialog::AboutDialog()
 	main_sizer->Add(hsizer, 0, wxEXPAND | wxALL, 20);
 
     // logo
-    m_logo_bitmap = ScalableBitmap(this, wxGetApp().logo_name(), 192);
-    m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bitmap.bmp());
+    m_logo = new wxStaticBitmap(this, wxID_ANY, *get_bmp_bundle(wxGetApp().logo_name(), 192));
 	hsizer->Add(m_logo, 1, wxALIGN_CENTER_VERTICAL);
     
     wxBoxSizer* vsizer = new wxBoxSizer(wxVERTICAL); 	
@@ -259,25 +259,24 @@ AboutDialog::AboutDialog()
         m_html->SetMinSize(wxSize(-1, 16 * wxGetApp().em_unit()));
         wxFont font = get_default_font(this);
         const auto text_clr = wxGetApp().get_label_clr_default();
-		auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-		auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
+        const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+        const auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
 
 		const int fs = font.GetPointSize()-1;
         int size[] = {fs,fs,fs,fs,fs,fs,fs};
         m_html->SetFonts(font.GetFaceName(), font.GetFaceName(), size);
         m_html->SetBorders(2);
-        const std::string copyright_str = _utf8(L("Copyright"));
-        // TRN "Slic3r _is licensed under the_ License"
-        const std::string is_lecensed_str = _utf8(L("is licensed under the"));
-        const std::string license_str = _utf8(L("GNU Affero General Public License, version 3"));
-        const std::string based_on_str = _utf8(L("PrusaSlicer is based on Slic3r by Alessandro Ranellucci and the RepRap community."));
-        const std::string contributors_str = _utf8(L("Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik and numerous others."));
-        const auto text = from_u8(
-            (boost::format(
+        const wxString copyright_str    = _L("Copyright");
+        // TRN AboutDialog: "Slic3r %1% GNU Affero General Public License"
+        const wxString is_lecensed_str  = _L("is licensed under the");
+        const wxString license_str      = _L("GNU Affero General Public License, version 3");
+        const wxString based_on_str     = _L("PrusaSlicer is based on Slic3r by Alessandro Ranellucci and the RepRap community.");
+        const wxString contributors_str = _L("Contributions by Henrik Brix Andersen, Nicolas Dandrimont, Mark Hindess, Petr Ledvina, Joseph Lenox, Y. Sapir, Mike Sheldrake, Vojtech Bubnik and numerous others.");
+        const auto text = format_wxstr(
             "<html>"
             "<body bgcolor= %1% link= %2%>"
             "<font color=%3%>"
-            "%4% &copy; 2016-2022 Prusa Research. <br />"
+            "%4% &copy; 2016-2023 Prusa Research. <br />"
             "%5% &copy; 2011-2018 Alessandro Ranellucci. <br />"
             "<a href=\"http://slic3r.org/\">Slic3r</a> %6% "
             "<a href=\"http://www.gnu.org/licenses/agpl-3.0.html\">%7%</a>."
@@ -287,12 +286,12 @@ AboutDialog::AboutDialog()
             "%9%"
             "</font>"
             "</body>"
-            "</html>") % bgr_clr_str % text_clr_str % text_clr_str
-            % copyright_str % copyright_str
-            % is_lecensed_str
-            % license_str
-            % based_on_str
-            % contributors_str).str());
+            "</html>", bgr_clr_str, text_clr_str, text_clr_str
+            , copyright_str, copyright_str
+            , is_lecensed_str
+            , license_str
+            , based_on_str
+            , contributors_str);
         m_html->SetPage(text);
         vsizer->Add(m_html, 1, wxEXPAND | wxBOTTOM, 10);
         m_html->Bind(wxEVT_HTML_LINK_CLICKED, &AboutDialog::onLinkClicked, this);
@@ -323,8 +322,8 @@ AboutDialog::AboutDialog()
 
 void AboutDialog::on_dpi_changed(const wxRect &suggested_rect)
 {
-    m_logo_bitmap.msw_rescale();
-    m_logo->SetBitmap(m_logo_bitmap.bmp());
+//    m_logo_bitmap.msw_rescale();
+//    m_logo->SetBitmap(m_logo_bitmap.bmp());
 
     const wxFont& font = GetFont();
     const int fs = font.GetPointSize() - 1;

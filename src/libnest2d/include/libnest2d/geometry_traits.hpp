@@ -198,9 +198,11 @@ public:
 
     inline P center() const BP2D_NOEXCEPT;
 
-    template<class Unit = TCompute<P>> 
+    template<class Unit = TCompute<P>>
     inline Unit area() const BP2D_NOEXCEPT {
-        return Unit(width())*height();
+        constexpr TCoord<P> Zero{0};
+        Unit s = width() < Zero || height() < Zero ? Unit(-1) : Unit(1);
+        return s * libnest2d::abs(Unit(width()) * height());
     }
     
     static inline _Box infinite(const P &center = {TCoord<P>(0), TCoord<P>(0)});
@@ -869,7 +871,7 @@ template<class P> auto rcend(const P& p) -> decltype(_backward(cbegin(p)))
 
 template<class P> TPoint<P> front(const P& p) { return *shapelike::cbegin(p); }
 template<class P> TPoint<P> back (const P& p) {
-    return *backward(shapelike::cend(p));
+    return *std::prev(shapelike::cend(p));
 }
 
 // Optional, does nothing by default

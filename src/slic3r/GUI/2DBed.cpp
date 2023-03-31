@@ -39,8 +39,8 @@ void Bed_2D::repaint(const std::vector<Vec2d>& shape)
 #else
 		auto color = wxSystemSettings::GetColour(wxSYS_COLOUR_3DLIGHT); //GetSystemColour
 #endif
-		dc.SetPen(*new wxPen(color, 1, wxPENSTYLE_SOLID));
-		dc.SetBrush(*new wxBrush(color, wxBRUSHSTYLE_SOLID));
+		dc.SetPen(wxPen(color, 1, wxPENSTYLE_SOLID));
+		dc.SetBrush(wxBrush(color, wxBRUSHSTYLE_SOLID));
 		auto rect = GetUpdateRegion().GetBox();
 		dc.DrawRectangle(rect.GetLeft(), rect.GetTop(), rect.GetWidth(), rect.GetHeight());
 	}
@@ -75,11 +75,15 @@ void Bed_2D::repaint(const std::vector<Vec2d>& shape)
 
 	// draw bed fill
 	dc.SetBrush(wxBrush(wxColour(255, 255, 255), wxBRUSHSTYLE_SOLID));
+
 	wxPointList pt_list;
-    for (auto pt : shape)
-    {
-        Point pt_pix = to_pixels(pt, ch);
-        pt_list.push_back(new wxPoint(pt_pix(0), pt_pix(1)));
+	const size_t pt_cnt = shape.size();
+	std::vector<wxPoint> points;
+    points.reserve(pt_cnt);
+    for (const auto& shape_pt : shape) {
+        Point pt_pix = to_pixels(shape_pt, ch);
+		points.emplace_back(wxPoint(pt_pix(0), pt_pix(1)));
+        pt_list.Append(&points.back());
 	}
 	dc.DrawPolygon(&pt_list, 0, 0);
 

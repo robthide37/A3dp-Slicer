@@ -423,7 +423,7 @@ bool fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx, wxPro
 		}
 	});
     while (! finished) {
-        std::unique_lock<std::mutex> lock(mtx);
+		std::unique_lock<std::mutex> lock(mtx);
 		condition.wait_for(lock, std::chrono::milliseconds(250), [&progress]{ return progress.updated; });
 		// decrease progress.percent value to avoid closing of the progress dialog
 		if (!progress_dialog.Update(progress.percent-1, msg_header + _(progress.message)))

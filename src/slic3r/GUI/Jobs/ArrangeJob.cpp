@@ -1,8 +1,10 @@
 #include "ArrangeJob.hpp"
 
 #include "libslic3r/BuildVolume.hpp"
-#include "libslic3r/MTUtils.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Print.hpp"
+#include "libslic3r/SLAPrint.hpp"
+#include "libslic3r/Geometry/ConvexHull.hpp"
 
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -11,6 +13,7 @@
 #include "slic3r/GUI/GUI_ObjectManipulation.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
 #include "slic3r/GUI/format.hpp"
+
 
 #include "libnest2d/common.hpp"
 
@@ -94,28 +97,28 @@ void ArrangeJob::prepare_all() {
 
 void ArrangeJob::prepare_selected() {
     clear_input();
-    
+
     Model &model = m_plater->model();
     double stride = bed_stride(m_plater);
-    
+
     std::vector<const Selection::InstanceIdxsList *>
             obj_sel(model.objects.size(), nullptr);
     
     for (auto &s : m_plater->get_selection().get_content())
         if (s.first < int(obj_sel.size()))
             obj_sel[size_t(s.first)] = &s.second;
-    
+
     // Go through the objects and check if inside the selection
     for (size_t oidx = 0; oidx < model.objects.size(); ++oidx) {
         const Selection::InstanceIdxsList * instlist = obj_sel[oidx];
         ModelObject *mo = model.objects[oidx];
-        
+
         std::vector<bool> inst_sel(mo->instances.size(), false);
-        
+
         if (instlist)
             for (auto inst_id : *instlist)
                 inst_sel[size_t(inst_id)] = true;
-        
+
         for (size_t i = 0; i < inst_sel.size(); ++i) {
             ModelInstance * mi = mo->instances[i];
             ArrangePolygon &&ap = get_arrange_poly_(mi);
@@ -124,11 +127,11 @@ void ArrangeJob::prepare_selected() {
                         (inst_sel[i] ? m_selected :
                                        m_unselected) :
                         m_unprintable;
-            
+
             cont.emplace_back(std::move(ap));
         }
     }
-    
+
     if (auto wti = get_wipe_tower(*m_plater)) {
         ArrangePolygon &&ap = get_arrange_poly(wti, m_plater);
 
@@ -136,14 +139,77 @@ void ArrangeJob::prepare_selected() {
                                                                  m_unselected;
         cont.emplace_back(std::move(ap));
     }
-    
+
     // If the selection was empty arrange everything
-    if (m_selected.empty()) m_selected.swap(m_unselected);
-    
+    if (m_selected.empty())
+        m_selected.swap(m_unselected);
+
     // The strides have to be removed from the fixed items. For the
     // arrangeable (selected) items bed_idx is ignored and the
     // translation is irrelevant.
-    for (auto &p : m_unselected) p.translation(X) -= p.bed_idx * stride;
+    for (auto &p : m_unselected)
+        p.translation(X) -= p.bed_idx * stride;
+}
+
+static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
+                                        const SLAPrintObject &po,
+                                        const ModelInstance &inst)
+{
+    // The 1.1 multiplier is a safety gap, as the offset might be bigger
+    // in sharp edges of a polygon, depending on clipper's offset algorithm
+    coord_t pad_infl = 0;
+    {
+        double infl = po.config().pad_enable.getBool() * (
+                        po.config().pad_brim_size.getFloat() +
+                        po.config().pad_around_object.getBool() *
+                          po.config().pad_object_gap.getFloat() );
+
+        pad_infl = scaled(1.1 * infl);
+    }
+
+    auto laststep = po.last_completed_step();
+
+    if (laststep < slaposCount && laststep > slaposSupportTree) {
+        auto omesh = po.get_mesh_to_print();
+        auto &smesh = po.support_mesh();
+
+        Vec3d rotation = inst.get_rotation();
+        rotation.z()   = 0.;
+        Transform3f trafo_instance =
+            Geometry::assemble_transform(inst.get_offset().z() * Vec3d::UnitZ(),
+                                         rotation,
+                                         inst.get_scaling_factor(),
+                                         inst.get_mirror()).cast<float>();
+
+        trafo_instance = trafo_instance * po.trafo().cast<float>().inverse();
+
+        auto polys = reserve_vector<Polygon>(3);
+        auto zlvl = -po.get_elevation();
+
+        if (omesh) {
+            polys.emplace_back(its_convex_hull_2d_above(*omesh, trafo_instance, zlvl));
+            ret.poly.contour = polys.back();
+            ret.poly.holes = {};
+        }
+
+        polys.emplace_back(its_convex_hull_2d_above(smesh.its, trafo_instance, zlvl));
+        ret.poly.contour = Geometry::convex_hull(polys);
+        ret.poly.holes = {};
+    }
+
+    ret.inflation = pad_infl;
+}
+
+static coord_t brim_offset(const PrintObject &po, const ModelInstance &inst)
+{
+    const BrimType brim_type         = po.config().brim_type.value;
+    const float    brim_separation   = po.config().brim_separation.getFloat();
+    const float    brim_width        = po.config().brim_width.getFloat();
+    const bool     has_outer_brim    = brim_type == BrimType::btOuterOnly ||
+                                       brim_type == BrimType::btOuterAndInner;
+
+    // How wide is the brim? (in scaled units)
+    return  has_outer_brim ? scaled(brim_width + brim_separation) : 0;
 }
 
 arrangement::ArrangePolygon ArrangeJob::get_arrange_poly_(ModelInstance *mi)
@@ -160,54 +226,85 @@ arrangement::ArrangePolygon ArrangeJob::get_arrange_poly_(ModelInstance *mi)
     return ap;
 }
 
+coord_t get_skirt_offset(const Plater* plater) {
+    float skirt_inset = 0.f;
+    // Try to subtract the skirt from the bed shape so we don't arrange outside of it.
+    if (plater->printer_technology() == ptFFF && plater->fff_print().has_skirt()) {
+        const auto& print = plater->fff_print();
+        skirt_inset = print.config().skirts.value * print.skirt_flow().width() +
+                                  print.config().skirt_distance.value;
+    }
+
+    return scaled(skirt_inset);
+}
+
 void ArrangeJob::prepare()
 {
     wxGetKeyState(WXK_SHIFT) ? prepare_selected() : prepare_all();
-}
 
-void ArrangeJob::on_exception(const std::exception_ptr &eptr)
-{
-    try {
-        if (eptr)
-            std::rethrow_exception(eptr);
-    } catch (libnest2d::GeometryException &) {
-        show_error(m_plater, _(L("Could not arrange model objects! "
-                                 "Some geometries may be invalid.")));
-    } catch (std::exception &) {
-        PlaterJob::on_exception(eptr);
+    coord_t min_offset = 0;
+    for (auto &ap : m_selected) {
+        min_offset = std::max(ap.inflation, min_offset);
+    }
+
+    if (m_plater->printer_technology() == ptSLA) {
+        // Apply the max offset for all the objects
+        for (auto &ap : m_selected) {
+            ap.inflation = min_offset;
+        }
+    } else { // it's fff, brims only need to be minded from bed edges
+        for (auto &ap : m_selected) {
+            ap.inflation = 0;
+        }
+        m_min_bed_inset = min_offset;
     }
 }
 
-void ArrangeJob::process()
+void ArrangeJob::process(Ctl &ctl)
 {
-    static const auto arrangestr = _(L("Arranging"));
+    static const auto arrangestr = _u8L("Arranging");
 
-    arrangement::ArrangeParams params = get_arrange_params(m_plater);
-
-    auto count = unsigned(m_selected.size() + m_unprintable.size());
+    arrangement::ArrangeParams params;
     arrangement::ArrangeBed bed;
-    get_bed_shape(*m_plater->config(), bed);
-    
-    params.stopcondition = [this]() { return was_canceled(); };
-    
-    params.progressind = [this, count](unsigned st) {
+    ctl.call_on_main_thread([this, &params, &bed]{
+           prepare();
+           params = get_arrange_params(m_plater);
+           get_bed_shape(*m_plater->config(), bed);
+           coord_t min_inset = get_skirt_offset(m_plater) + m_min_bed_inset;
+           params.min_bed_distance = std::max(params.min_bed_distance, min_inset);
+    }).wait();
+
+    auto count  = unsigned(m_selected.size() + m_unprintable.size());
+
+    if (count == 0) // Should be taken care of by plater, but doesn't hurt
+        return;
+
+    ctl.update_status(0, arrangestr);
+
+    params.stopcondition = [&ctl]() { return ctl.was_canceled(); };
+
+    params.progressind = [this, count, &ctl](unsigned st) {
         st += m_unprintable.size();
-        if (st > 0) update_status(int(count - st), arrangestr);
+        if (st > 0) ctl.update_status(int(count - st) * 100 / status_range(), arrangestr);
     };
+
+    ctl.update_status(0, arrangestr);
 
     arrangement::arrange(m_selected, m_unselected, bed, params);
 
-    params.progressind = [this, count](unsigned st) {
-        if (st > 0) update_status(int(count - st), arrangestr);
+    params.progressind = [this, count, &ctl](unsigned st) {
+        if (st > 0) ctl.update_status(int(count - st) * 100 / status_range(), arrangestr);
     };
 
     arrangement::arrange(m_unprintable, {}, bed, params);
 
     // finalize just here.
-    update_status(int(count),
-                  was_canceled() ? _(L("Arranging canceled."))
-                                   : _(L("Arranging done.")));
+    ctl.update_status(int(count) * 100 / status_range(), ctl.was_canceled() ?
+                                      _u8L("Arranging canceled.") :
+                                      _u8L("Arranging done."));
 }
+
+ArrangeJob::ArrangeJob() : m_plater{wxGetApp().plater()} {}
 
 static std::string concat_strings(const std::set<std::string> &strings,
                                   const std::string &delim = "\n")
@@ -219,10 +316,21 @@ static std::string concat_strings(const std::set<std::string> &strings,
         });
 }
 
-void ArrangeJob::finalize() {
-    // Ignore the arrange result if aborted.
-    if (was_canceled()) return;
-    
+void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
+    try {
+        if (eptr)
+            std::rethrow_exception(eptr);
+    } catch (libnest2d::GeometryException &) {
+        show_error(m_plater, _(L("Could not arrange model objects! "
+                                 "Some geometries may be invalid.")));
+        eptr = nullptr;
+    } catch(...) {
+        eptr = std::current_exception();
+    }
+
+    if (canceled || eptr)
+        return;
+
     // Unprintable items go to the last virtual bed
     int beds = 0;
     
@@ -238,7 +346,9 @@ void ArrangeJob::finalize() {
     
     // Move the unprintable items to the last virtual bed.
     for (ArrangePolygon &ap : m_unprintable) {
-        ap.bed_idx += beds + 1;
+        if (ap.bed_idx >= 0)
+            ap.bed_idx += beds + 1;
+
         ap.apply();
     }
 
@@ -254,8 +364,6 @@ void ArrangeJob::finalize() {
             _L("Arrangement ignored the following objects which can't fit into a single bed:\n%s"),
             concat_strings(names, "\n")));
     }
-
-    Job::finalize();
 }
 
 std::optional<arrangement::ArrangePolygon>
@@ -276,7 +384,26 @@ template<>
 arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
                                              const Plater * plater)
 {
-    return get_arrange_poly(PtrWrapper{inst}, plater);
+    auto ap = get_arrange_poly(PtrWrapper{inst}, plater);
+
+    auto obj_id = inst->get_object()->id();
+    if (plater->printer_technology() == ptSLA) {
+        const SLAPrintObject *po =
+            plater->sla_print().get_print_object_by_model_object_id(obj_id);
+
+        if (po) {
+            update_arrangepoly_slaprint(ap, *po, *inst);
+        }
+    } else {
+        const PrintObject *po =
+            plater->fff_print().get_print_object_by_model_object_id(obj_id);
+
+        if (po) {
+            ap.inflation = brim_offset(*po, *inst);
+        }
+    }
+
+    return ap;
 }
 
 arrangement::ArrangeParams get_arrange_params(Plater *p)
@@ -287,6 +414,7 @@ arrangement::ArrangeParams get_arrange_params(Plater *p)
     arrangement::ArrangeParams params;
     params.allow_rotations  = settings.enable_rotation;
     params.min_obj_distance = scaled(settings.distance);
+    params.min_bed_distance = scaled(settings.distance_from_bed);
 
     arrangement::Pivots pivot = arrangement::Pivots::Center;
 

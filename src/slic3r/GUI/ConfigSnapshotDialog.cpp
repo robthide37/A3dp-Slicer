@@ -5,9 +5,11 @@
 
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Time.hpp"
+#include "libslic3r/Color.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 #include "wxExtensions.hpp"
+#include "format.hpp"
 
 namespace Slic3r { 
 namespace GUI {
@@ -31,10 +33,8 @@ static wxString format_reason(const Config::Snapshot::Reason reason)
 
 static std::string get_color(wxColour colour) 
 {
-    wxString clr_str = wxString::Format(wxT("#%02X%02X%02X"), colour.Red(), colour.Green(), colour.Blue());
-    return clr_str.ToStdString();
+    return encode_color(ColorRGB(colour.Red(), colour.Green(), colour.Blue()));
 };
-
 
 static wxString generate_html_row(const Config::Snapshot &snapshot, bool row_even, bool snapshot_active, bool dark_mode)
 {    
@@ -90,10 +90,10 @@ static wxString generate_html_row(const Config::Snapshot &snapshot, bool row_eve
     }
 
     if (! compatible) {
-        text += "<p align=\"right\">" + from_u8((boost::format(_utf8(L("Incompatible with this %s"))) % SLIC3R_APP_NAME).str()) + "</p>";
+        text += "<p align=\"right\">" + format_wxstr(_L("Incompatible with this %s"), SLIC3R_APP_NAME) + "</p>";
     }
     else if (! snapshot_active)
-        text += "<p align=\"right\"><a href=\"" + snapshot.id + "\">" + _(L("Activate")) + "</a></p>";
+        text += "<p align=\"right\"><a href=\"" + snapshot.id + "\">" + _L("Activate") + "</a></p>";
     text += "</td>";
 	text += "</tr>";
     return text;

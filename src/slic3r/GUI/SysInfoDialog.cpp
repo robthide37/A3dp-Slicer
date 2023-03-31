@@ -7,6 +7,8 @@
 
 #include <string>
 
+#include <boost/algorithm/string/replace.hpp>
+
 #include <Eigen/Core>
 
 #include <wx/clipbrd.h>
@@ -15,6 +17,7 @@
 #include "MainFrame.hpp"
 #include "wxExtensions.hpp"
 #include "../libslic3r/BlacklistedLibraryCheck.hpp"
+#include "../libslic3r/Color.hpp"
 #include "format.hpp"
 
 #ifdef _WIN32
@@ -39,10 +42,15 @@ std::string get_main_info(bool format_as_html)
     if (!format_as_html)
         out << b_start << (wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME) << b_end << line_end;
     out << b_start << "Version:   "             << b_end << SLIC3R_VERSION << line_end;
-    out << b_start << "Build:     " << b_end << (wxGetApp().is_editor() ? SLIC3R_BUILD_ID : GCODEVIEWER_BUILD_ID) << line_end;
+    
+    std::string build_id = SLIC3R_BUILD_ID;
+    if (! wxGetApp().is_editor())
+        boost::replace_first(build_id, SLIC3R_APP_NAME, GCODEVIEWER_APP_NAME);
+    out << b_start << "Build:     " << b_end << build_id << line_end;
+
     out << line_end;
     out << b_start << "Operating System:    "   << b_end << wxPlatformInfo::Get().GetOperatingSystemFamilyName() << line_end;
-    out << b_start << "System Architecture: "   << b_end << wxPlatformInfo::Get().GetArchName() << line_end;
+    out << b_start << "System Architecture: "   << b_end << wxPlatformInfo::Get().GetBitnessName() << line_end;
     out << b_start << 
 #if defined _WIN32
         "Windows Version:     "
@@ -94,8 +102,10 @@ SysInfoDialog::SysInfoDialog()
 	main_sizer->Add(hsizer, 1, wxEXPAND | wxALL, 10);
 
     // logo
-    m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 192);
-    m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bmp.bmp());
+    //m_logo_bmp = ScalableBitmap(this, wxGetApp().logo_name(), 192);
+    //m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bmp.bmp());
+    m_logo = new wxStaticBitmap(this, wxID_ANY, *get_bmp_bundle(wxGetApp().logo_name(), 192));
+
 	hsizer->Add(m_logo, 0, wxALIGN_CENTER_VERTICAL);
     
     wxBoxSizer* vsizer = new wxBoxSizer(wxVERTICAL);
@@ -114,8 +124,8 @@ SysInfoDialog::SysInfoDialog()
     // main_info_text
     wxFont font = get_default_font(this);
     const auto text_clr = wxGetApp().get_label_clr_default();
-    auto text_clr_str = wxString::Format(wxT("#%02X%02X%02X"), text_clr.Red(), text_clr.Green(), text_clr.Blue());
-    auto bgr_clr_str = wxString::Format(wxT("#%02X%02X%02X"), bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue());
+    auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+    auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
 
     const int fs = font.GetPointSize() - 1;
     int size[] = { static_cast<int>(fs*1.5), static_cast<int>(fs*1.4), static_cast<int>(fs*1.3), fs, fs, fs, fs };
@@ -186,8 +196,8 @@ SysInfoDialog::SysInfoDialog()
 
 void SysInfoDialog::on_dpi_changed(const wxRect &suggested_rect)
 {
-    m_logo_bmp.msw_rescale();
-    m_logo->SetBitmap(m_logo_bmp.bmp());
+    //m_logo_bmp.msw_rescale();
+    //m_logo->SetBitmap(m_logo_bmp.bmp());
 
     wxFont font = get_default_font(this);
     const int fs = font.GetPointSize() - 1;

@@ -11,7 +11,9 @@
 #include <string>
 
 #include <boost/nowide/cstdio.hpp>
+#include <boost/nowide/fstream.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/regex.hpp>
 #include <libslic3r/ModelArrange.hpp>
 
 using namespace std;
@@ -25,6 +27,7 @@ const std::unordered_map<TestMesh, const char*, TestMeshHash> mesh_names {
     std::pair<TestMesh, const char*>(TestMesh::V,						"V"), 
     std::pair<TestMesh, const char*>(TestMesh::_40x10,					"40x10"), 
     std::pair<TestMesh, const char*>(TestMesh::cube_20x20x20,			"cube_20x20x20"), 
+    std::pair<TestMesh, const char*>(TestMesh::cube_2x20x10,            "cube_2x20x10"), 
     std::pair<TestMesh, const char*>(TestMesh::sphere_50mm,				"sphere_50mm"), 
     std::pair<TestMesh, const char*>(TestMesh::bridge,					"bridge"), 
     std::pair<TestMesh, const char*>(TestMesh::bridge_with_hole,		"bridge_with_hole"), 
@@ -47,6 +50,9 @@ TriangleMesh mesh(TestMesh m)
     switch(m) {
         case TestMesh::cube_20x20x20:
             mesh = Slic3r::make_cube(20, 20, 20);
+            break;
+        case TestMesh::cube_2x20x10:
+            mesh = Slic3r::make_cube(2, 20, 10);
             break;
         case TestMesh::sphere_50mm:
             mesh = Slic3r::make_sphere(50, PI / 243.0);
@@ -186,6 +192,19 @@ TriangleMesh mesh(TestMesh m)
     return mesh;
 }
 
+TriangleMesh mesh(TestMesh min, Vec3d translate, Vec3d scale)
+{
+    TriangleMesh m = mesh(min);
+    m.translate(translate.cast<float>());
+    m.scale(scale.cast<float>());
+    return m;
+}
+
+TriangleMesh mesh(TestMesh m, Vec3d translate, double scale)
+{
+    return mesh(m, translate, Vec3d(scale, scale, scale));
+}
+
 static bool verbose_gcode() 
 {
     const char *v = std::getenv("SLIC3R_TESTS_GCODE");
@@ -210,6 +229,7 @@ void init_print(std::vector<TriangleMesh> &&meshes, Slic3r::Print &print, Slic3r
 		object->add_instance();
 	}
     arrange_objects(model, InfiniteBed{}, ArrangeParams{ scaled(min_object_distance(config))});
+    model.center_instances_around_point({100, 100});
 	for (ModelObject *mo : model.objects) {
         mo->ensure_on_bed();
 		print.auto_assign_extruders(mo);
@@ -286,7 +306,7 @@ std::string gcode(Print & print)
     print.set_status_silent();
     print.process();
     print.export_gcode(temp.string(), nullptr, nullptr);
-    std::ifstream t(temp.string());
+    boost::nowide::ifstream t(temp.string());
 	std::string str((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
 	boost::nowide::remove(temp.string().c_str());
 	return str;
@@ -332,6 +352,17 @@ std::string slice(std::initializer_list<TriangleMesh> meshes, std::initializer_l
 	Slic3r::Model model;
 	init_print(meshes, print, model, config_items, comments);
 	return gcode(print);
+}
+
+bool contains(const std::string &data, const std::string &pattern)
+{
+    return data.find(pattern) != data.npos;    
+}
+
+bool contains_regex(const std::string &data, const std::string &pattern)
+{
+    boost::regex re(pattern);
+    return boost::regex_match(data, re);
 }
 
 } } // namespace Slic3r::Test

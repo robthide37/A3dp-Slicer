@@ -88,10 +88,8 @@ void SVG::draw(const ExPolygon &expolygon, std::string fill, const float fill_op
     this->fill = fill;
     
     std::string d;
-    Polygons pp = expolygon;
-    for (Polygons::const_iterator p = pp.begin(); p != pp.end(); ++p) {
-        d += this->get_path_d(*p, true) + " ";
-    }
+    for (const Polygon &p : to_polygons(expolygon))
+        d += this->get_path_d(p, true) + " ";
     this->path(d, true, 0, fill_opacity);
 }
 
@@ -181,8 +179,8 @@ void SVG::draw(const ThickLines &thicklines, const std::string &fill, const std:
 
 void SVG::draw(const ThickPolylines &polylines, const std::string &stroke, coordf_t stroke_width)
 {
-    for (ThickPolylines::const_iterator it = polylines.begin(); it != polylines.end(); ++it)
-        this->draw((Polyline)*it, stroke, stroke_width);
+    for (const ThickPolyline &pl : polylines)
+        this->draw(Polyline(pl.points), stroke, stroke_width);
 }
 
 void SVG::draw(const ThickPolylines &thickpolylines, const std::string &fill, const std::string &stroke, coordf_t stroke_width)
@@ -359,7 +357,7 @@ void SVG::export_expolygons(const char *path, const std::vector<std::pair<Slic3r
     for (const auto &exp_with_attr : expolygons_with_attributes)
     	if (exp_with_attr.second.radius_points > 0)
 			for (const ExPolygon &expoly : exp_with_attr.first)
-    			svg.draw((Points)expoly, exp_with_attr.second.color_points, exp_with_attr.second.radius_points);
+    			svg.draw(to_points(expoly), exp_with_attr.second.color_points, exp_with_attr.second.radius_points);
 
     // Export legend.
     // 1st row
@@ -380,4 +378,10 @@ void SVG::export_expolygons(const char *path, const std::vector<std::pair<Slic3r
     svg.Close();
 }
 
+float SVG::to_svg_coord(float x) throw()
+{
+    // return x;
+    return unscale<float>(x) * 10.f;
 }
+
+} // namespace Slic3r

@@ -34,6 +34,7 @@ public:
     Semver                          config_version;
     std::string                     config_update_url;
     std::string                     changelog_url;
+    bool                            templates_profile { false };
 
     struct PrinterVariant {
         PrinterVariant() {}
@@ -52,6 +53,7 @@ public:
         // Vendor & Printer Model specific print bed model & texture.
         std::string 			 	bed_model;
         std::string 				bed_texture;
+        std::string                 thumbnail;
 
         PrinterVariant*       variant(const std::string &name) {
             for (auto &v : this->variants)
@@ -116,6 +118,8 @@ public:
         // This type is here to support PresetConfigSubstitutions for physical printers, however it does not belong to the Preset class,
         // PhysicalPrinter class is used instead.
         TYPE_PHYSICAL_PRINTER,
+        // This type is here to support search through the Preferences
+        TYPE_PREFERENCES,
     };
 
     Type                type        = TYPE_INVALID;
@@ -339,6 +343,10 @@ public:
     // All presets are marked as not modified and the new preset is activated.
     void            save_current_preset(const std::string &new_name, bool detach = false);
 
+    // Find the preset with a new_name or create a new one,
+    // initialize it with the initial_preset config.
+    Preset&         get_preset_with_name(const std::string& new_name, const Preset* initial_preset);
+
     // Delete the current preset, activate the first visible preset.
     // returns true if the preset was deleted successfully.
     bool            delete_current_preset();
@@ -390,8 +398,8 @@ public:
 	const Preset&   default_preset(size_t idx = 0) const { assert(idx < m_num_default_presets); return m_presets[idx]; }
 	virtual const Preset& default_preset_for(const DynamicPrintConfig & /* config */) const { return this->default_preset(); }
     // Return a preset by an index. If the preset is active, a temporary copy is returned.
-    Preset&         preset(size_t idx)          { return (idx == m_idx_selected) ? m_edited_preset : m_presets[idx]; }
-    const Preset&   preset(size_t idx) const    { return const_cast<PresetCollection*>(this)->preset(idx); }
+    Preset&         preset(size_t idx, bool respect_active_preset = true)          { return (idx == m_idx_selected && respect_active_preset) ? m_edited_preset : m_presets[idx]; }
+    const Preset&   preset(size_t idx, bool respect_active_preset = true) const    { return const_cast<PresetCollection*>(this)->preset(idx); }
     void            discard_current_changes() {
         m_presets[m_idx_selected].reset_dirty();
         m_edited_preset = m_presets[m_idx_selected];
@@ -401,9 +409,9 @@ public:
 
     // Return a preset by its name. If the preset is active, a temporary copy is returned.
     // If a preset is not found by its name, null is returned.
-    Preset*         find_preset(const std::string &name, bool first_visible_if_not_found = false);
-    const Preset*   find_preset(const std::string &name, bool first_visible_if_not_found = false) const 
-        { return const_cast<PresetCollection*>(this)->find_preset(name, first_visible_if_not_found); }
+    Preset*         find_preset(const std::string &name, bool first_visible_if_not_found = false, bool respect_active_preset = true);
+    const Preset*   find_preset(const std::string &name, bool first_visible_if_not_found = false, bool respect_active_preset = true) const 
+        { return const_cast<PresetCollection*>(this)->find_preset(name, first_visible_if_not_found, respect_active_preset); }
 
     size_t          first_visible_idx() const;
     // Return index of the first compatible preset. Certainly at least the '- default -' preset shall be compatible.
@@ -412,7 +420,7 @@ public:
     size_t          first_compatible_idx(PreferedCondition prefered_condition) const
     {
         size_t i = m_default_suppressed ? m_num_default_presets : 0;
-        size_t n = this->m_presets.size();
+        size_t n = m_presets.size();
         size_t i_compatible = n;
         int    match_quality = -1;
         for (; i < n; ++ i)
@@ -613,6 +621,7 @@ namespace PresetUtils {
 	const VendorProfile::PrinterModel* system_printer_model(const Preset &preset);
     std::string system_printer_bed_model(const Preset& preset);
     std::string system_printer_bed_texture(const Preset& preset);
+    bool        vendor_profile_has_all_resources(const VendorProfile& vp);
 } // namespace PresetUtils
 
 
@@ -673,7 +682,7 @@ public:
     bool                operator<(const PhysicalPrinter& other) const { return this->name < other.name; }
 
     // get full printer name included a name of the preset
-    std::string         get_full_name(std::string preset_name) const;
+    std::string         get_full_name(const std::string &preset_name) const;
 
     // get printer name from the full name uncluded preset name
     static std::string  get_short_name(std::string full_name);
@@ -732,9 +741,9 @@ public:
     // If there is last preset for the printer and first_check== false, then delete this printer
     // returns true if all presets were deleted successfully.
     bool            delete_preset_from_printers(const std::string& preset_name);
-
+    void            rename_preset_in_printers(const std::string& old_name, const std::string& new_name);
     // Get list of printers which have more than one preset and "preset_names" preset is one of them
-    std::vector<std::string> get_printers_with_preset( const std::string &preset_name);
+    std::vector<std::string> get_printers_with_preset( const std::string &preset_name, bool respect_only_preset = true);
     // Get list of printers which has only "preset_names" preset
     std::vector<std::string> get_printers_with_only_preset( const std::string &preset_name);
 

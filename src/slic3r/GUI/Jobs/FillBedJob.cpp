@@ -3,6 +3,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/ClipperUtils.hpp"
 
+#include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
@@ -17,6 +18,7 @@ void FillBedJob::prepare()
     m_selected.clear();
     m_unselected.clear();
     m_bedpts.clear();
+    m_min_bed_inset = 0.;
 
     m_object_idx = m_plater->get_selected_object_idx();
     if (m_object_idx == -1)
@@ -28,7 +30,7 @@ void FillBedJob::prepare()
     m_selected.reserve(model_object->instances.size());
     for (ModelInstance *inst : model_object->instances)
         if (inst->printable) {
-            ArrangePolygon ap = get_arrange_poly(PtrWrapper{inst}, m_plater);
+            ArrangePolygon ap = get_arrange_poly(inst, m_plater);
             // Existing objects need to be included in the result. Only
             // the needed amount of object will be added, no more.
             ++ap.priority;
@@ -100,23 +102,48 @@ void FillBedJob::prepare()
     for (auto &p : m_unselected)
         if (p.bed_idx > 0)
             p.translation(X) -= p.bed_idx * stride;
+
+    coord_t min_offset = 0;
+    for (auto &ap : m_selected) {
+        min_offset = std::max(ap.inflation, min_offset);
+    }
+
+    if (m_plater->printer_technology() == ptSLA) {
+        // Apply the max offset for all the objects
+        for (auto &ap : m_selected) {
+            ap.inflation = min_offset;
+        }
+    } else { // it's fff, brims only need to be minded from bed edges
+        for (auto &ap : m_selected) {
+            ap.inflation = 0;
+        }
+        m_min_bed_inset = min_offset;
+    }
 }
 
-void FillBedJob::process()
+void FillBedJob::process(Ctl &ctl)
 {
+    auto statustxt = _u8L("Filling bed");
+    arrangement::ArrangeParams params;
+    ctl.call_on_main_thread([this, &params] {
+           prepare();
+           params = get_arrange_params(m_plater);
+           coord_t min_inset = get_skirt_offset(m_plater) + m_min_bed_inset;
+           params.min_bed_distance = std::max(params.min_bed_distance, min_inset);
+    }).wait();
+    ctl.update_status(0, statustxt);
+
     if (m_object_idx == -1 || m_selected.empty())
         return;
 
-    arrangement::ArrangeParams params = get_arrange_params(m_plater);
-
     bool do_stop = false;
-    params.stopcondition = [this, &do_stop]() {
-        return was_canceled() || do_stop;
+    params.stopcondition = [&ctl, &do_stop]() {
+        return ctl.was_canceled() || do_stop;
     };
 
-    params.progressind = [this](unsigned st) {
+    params.progressind = [this, &ctl, &statustxt](unsigned st) {
         if (st > 0)
-            update_status(int(m_status_range - st), _(L("Filling bed")));
+            ctl.update_status(int(m_status_range - st) * 100 / status_range(), statustxt);
     };
 
     params.on_packed = [&do_stop] (const ArrangePolygon &ap) {
@@ -126,15 +153,18 @@ void FillBedJob::process()
     arrangement::arrange(m_selected, m_unselected, m_bedpts, params);
 
     // finalize just here.
-    update_status(m_status_range, was_canceled() ?
-                                      _(L("Bed filling canceled.")) :
-                                      _(L("Bed filling done.")));
+    ctl.update_status(100, ctl.was_canceled() ?
+                                      _u8L("Bed filling canceled.") :
+                                      _u8L("Bed filling done."));
 }
 
-void FillBedJob::finalize()
+FillBedJob::FillBedJob() : m_plater{wxGetApp().plater()} {}
+
+void FillBedJob::finalize(bool canceled, std::exception_ptr &eptr)
 {
     // Ignore the arrange result if aborted.
-    if (was_canceled()) return;
+    if (canceled || eptr)
+        return;
 
     if (m_object_idx == -1) return;
 
@@ -163,8 +193,6 @@ void FillBedJob::finalize()
         m_plater->sidebar()
             .obj_list()->increase_object_instances(m_object_idx, size_t(added_cnt));
     }
-
-    Job::finalize();
 }
 
 }} // namespace Slic3r::GUI

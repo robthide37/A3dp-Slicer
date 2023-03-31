@@ -195,7 +195,15 @@ std::vector<std::pair<size_t, bool>> chain_segments_greedy_constrained_reversals
 		}
 
 	    // Initialize a heap of end points sorted by the lowest distance to the next valid point of a path.
-	    auto queue = make_mutable_priority_queue<EndPoint*, false>(
+	    auto queue = make_mutable_priority_queue<EndPoint*, 
+#ifndef NDEBUG
+			// In debug mode, reset indices when removing an item from the queue for debugging purposes.
+			true
+#else // NDEBUG
+			// In release mode, don't reset indices when removing an item from the queue.
+			false
+#endif // NDEBUG
+			>(
 			[](EndPoint *ep, size_t idx){ ep->heap_idx = idx; }, 
 	    	[](EndPoint *l, EndPoint *r){ return l->distance_out < r->distance_out; });
 		queue.reserve(end_points.size() * 2 - 1);
@@ -213,7 +221,7 @@ std::vector<std::pair<size_t, bool>> chain_segments_greedy_constrained_reversals
 					assert(ep.chain_id == 0);
 				} else {
 					// End point is NOT on the heap, therefore it is part of the output path.
-					assert(ep.heap_idx == std::numeric_limits<size_t>::max());
+                    assert(ep.heap_idx == queue.invalid_id());
 					assert(ep.chain_id != 0);
 					if (&ep == first_point) {
 						assert(ep.edge_out == nullptr);
@@ -222,7 +230,7 @@ std::vector<std::pair<size_t, bool>> chain_segments_greedy_constrained_reversals
 						// Detect loops.
 						for (EndPoint *pt = &ep; pt != nullptr;) {
 							// Out of queue. It is a final point.
-							assert(pt->heap_idx == std::numeric_limits<size_t>::max());
+							assert(pt->heap_idx == queue.invalid_id());
 							EndPoint *pt_other = &end_points[(pt - &end_points.front()) ^ 1];
 							if (pt_other->heap_idx < queue.size())
 								// The other side of this segment is undecided yet.
@@ -1066,6 +1074,15 @@ std::vector<size_t> chain_points(const Points &points, Point *start_near)
 	for (auto &segment_and_reversal : ordered)
 		out.emplace_back(segment_and_reversal.first);
 	return out;
+}
+
+std::vector<size_t> chain_expolygons(const ExPolygons &expolygons, Point *start_near)
+{
+    Points ordering_points;
+    ordering_points.reserve(expolygons.size());
+    for (const ExPolygon &ex : expolygons)
+        ordering_points.push_back(ex.contour.first_point());
+    return chain_points(ordering_points);
 }
 
 #ifndef NDEBUG

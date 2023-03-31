@@ -30,6 +30,7 @@ public:
 
     virtual wxSizer*    get_sizer();
     ConfigOptionsGroup* get_og() { return m_og.get(); }
+    const ConfigOptionsGroup* get_og() const { return m_og.get(); }
     wxWindow*           parent() const {return m_parent; }
 };
 
@@ -56,7 +57,6 @@ public:
     bool        add_missed_options(ModelConfig *config_to, const DynamicPrintConfig &config_from);
     void        update_config_values(ModelConfig *config);
     void        UpdateAndShow(const bool show) override;
-    void        msw_rescale();
     void        sys_color_changed();
 };
 

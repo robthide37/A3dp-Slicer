@@ -38,15 +38,11 @@ inline static bool isInsideCorner(const Point &a, const Point &b, const Point &c
         return (p0.cast<int64_t>() * int64_t(len) / _len).cast<coord_t>();
     };
 
-    auto rotate_90_degree_ccw = [](const Vec2d &p) -> Vec2d {
-        return {-p.y(), p.x()};
-    };
-
     constexpr coord_t normal_length = 10000; //Create a normal vector of reasonable length in order to reduce rounding error.
     const Point ba = normal(a - b, normal_length);
     const Point bc = normal(c - b, normal_length);
     const Vec2d bq = query_point.cast<double>() - b.cast<double>();
-    const Vec2d perpendicular = rotate_90_degree_ccw(bq); //The query projects to this perpendicular to coordinate 0.
+    const Vec2d perpendicular = perp(bq); //The query projects to this perpendicular to coordinate 0.
 
     const double project_a_perpendicular = ba.cast<double>().dot(perpendicular); //Project vertex A on the perpendicular line.
     const double project_c_perpendicular = bc.cast<double>().dot(perpendicular); //Project vertex C on the perpendicular line.

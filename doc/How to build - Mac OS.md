@@ -71,7 +71,7 @@ is currently unsupported because some of the dependencies don't support this, mo
 Please note that the `CMAKE_OSX_DEPLOYMENT_TARGET` and `CMAKE_OSX_SYSROOT` options need to be set the same
 on both the dependencies bundle as well as PrusaSlicer itself.
 
-Official Mac PrusaSlicer builds are currently built against SDK 10.9 to ensure compatibility with older Macs.
+Official macOS PrusaSlicer builds are currently (as of PrusaSlicer 2.5) built against SDK 10.12 to ensure compatibility with older Macs.
 
 _Warning:_ XCode may be set such that it rejects SDKs bellow some version (silently, more or less).
 This is set in the property list file

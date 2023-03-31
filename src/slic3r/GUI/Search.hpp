@@ -17,6 +17,7 @@
 
 #include "GUI_Utils.hpp"
 #include "wxExtensions.hpp"
+#include "OptionsGroup.hpp"
 #include "libslic3r/Preset.hpp"
 
 
@@ -85,6 +86,7 @@ class OptionsSearcher
     ConfigOptionMode                        mode{ comUndef };
 
     std::vector<Option>                     options {};
+    std::vector<Option>                     preferences_options {};
     std::vector<FoundOption>                found {};
 
     void append_options(DynamicPrintConfig* config, Preset::Type type);
@@ -109,6 +111,8 @@ public:
     OptionsSearcher();
     ~OptionsSearcher();
 
+    void append_preferences_option(const GUI::Line& opt_line);
+    void append_preferences_options(const std::vector<GUI::Line>& opt_lines);
     void check_and_update(  PrinterTechnology pt_in, 
                             ConfigOptionMode mode_in, 
                             std::vector<InputInfo> input_values);
@@ -194,12 +198,16 @@ protected:
 class SearchListModel : public wxDataViewVirtualListModel
 {
     std::vector<std::pair<wxString, int>>   m_values;
-    ScalableBitmap                          m_icon[5];
+    ScalableBitmap                          m_icon[6];
 
 public:
     enum {
+#ifdef __WXMSW__
+        colIconMarkedText,
+#else
         colIcon,
         colMarkedText,
+#endif
         colMax
     };
 
@@ -209,7 +217,7 @@ public:
 
     void Clear();
     void Prepend(const std::string& text);
-    void msw_rescale();
+    void sys_color_changed();
 
     // implementation of base class virtuals to define model
 

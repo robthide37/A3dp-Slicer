@@ -1,7 +1,7 @@
 #include <cassert>
 
-#include "PresetBundle.hpp"
 #include "libslic3r.h"
+#include "PresetBundle.hpp"
 #include "Utils.hpp"
 #include "Model.hpp"
 #include "format.hpp"
@@ -159,6 +159,7 @@ void PresetBundle::setup_directories()
         data_dir,
 		data_dir / "vendor",
         data_dir / "cache",
+        data_dir / "cache" / "vendor",
         data_dir / "shapes",
 #ifdef SLIC3R_PROFILE_USE_PRESETS_SUBDIR
         // Store the print/filament/printer presets into a "presets" directory.
@@ -267,7 +268,7 @@ PresetsConfigSubstitutions PresetBundle::load_presets(AppConfig &config, Forward
     std::string errors_cummulative;
     std::tie(substitutions, errors_cummulative) = this->load_system_presets(substitution_rule);
 
-    const std::string dir_user_presets = data_dir()
+    const std::string& dir_user_presets = data_dir()
 #ifdef SLIC3R_PROFILE_USE_PRESETS_SUBDIR
         // Store the print/filament/printer presets into a "presets" directory.
         + "/presets"
@@ -425,16 +426,24 @@ void PresetBundle::load_installed_printers(const AppConfig &config)
         preset.set_visible_from_appconfig(config);
 }
 
-const std::string& PresetBundle::get_preset_name_by_alias( const Preset::Type& preset_type, const std::string& alias) const
+PresetCollection& PresetBundle::get_presets(Preset::Type type)
+{
+    assert(type >= Preset::TYPE_PRINT && type <= Preset::TYPE_PRINTER);
+
+    return  type == Preset::TYPE_PRINT          ? prints        :
+            type == Preset::TYPE_SLA_PRINT      ? sla_prints    :
+            type == Preset::TYPE_FILAMENT       ? filaments     :
+            type == Preset::TYPE_SLA_MATERIAL   ? sla_materials : printers;
+}
+
+
+const std::string& PresetBundle::get_preset_name_by_alias( const Preset::Type& preset_type, const std::string& alias)
 {
     // there are not aliases for Printers profiles
     if (preset_type == Preset::TYPE_PRINTER || preset_type == Preset::TYPE_INVALID)
         return alias;
 
-    const PresetCollection& presets = preset_type == Preset::TYPE_PRINT     ? prints :
-                                      preset_type == Preset::TYPE_SLA_PRINT ? sla_prints :
-                                      preset_type == Preset::TYPE_FILAMENT  ? filaments :
-                                      sla_materials;
+    const PresetCollection& presets = get_presets(preset_type);
 
     return presets.get_preset_name_by_alias(alias);
 }
@@ -442,16 +451,16 @@ const std::string& PresetBundle::get_preset_name_by_alias( const Preset::Type& p
 void PresetBundle::save_changes_for_preset(const std::string& new_name, Preset::Type type,
                                            const std::vector<std::string>& unselected_options)
 {
-    PresetCollection& presets = type == Preset::TYPE_PRINT          ? prints :
-                                type == Preset::TYPE_SLA_PRINT      ? sla_prints :
-                                type == Preset::TYPE_FILAMENT       ? filaments :
-                                type == Preset::TYPE_SLA_MATERIAL   ? sla_materials : printers;
+    PresetCollection& presets = get_presets(type);
 
     // if we want to save just some from selected options
     if (!unselected_options.empty()) {
         // revert unselected options to the old values
         presets.get_edited_preset().config.apply_only(presets.get_selected_preset().config, unselected_options);
     }
+
+    if (type == Preset::TYPE_PRINTER)
+        copy_bed_model_and_texture_if_needed(presets.get_edited_preset().config);
 
     // Save the preset into Slic3r::data_dir / presets / section_name / preset_name.ini
     presets.save_current_preset(new_name);
@@ -463,6 +472,49 @@ void PresetBundle::save_changes_for_preset(const std::string& new_name, Preset::
         // synchronize the first filament presets.
         set_filament_preset(0, filaments.get_selected_preset_name());
     }
+}
+
+bool PresetBundle::transfer_and_save(Preset::Type type, const std::string& preset_from_name, const std::string& preset_to_name,
+                                     const std::string& preset_new_name, const std::vector<std::string>& options)
+{
+    if (options.empty())
+        return false;
+
+    PresetCollection& presets = get_presets(type);
+
+    const Preset* preset_to   = presets.find_preset(preset_to_name, false, false);
+    if (!preset_to)
+        return false;
+
+    // Find the preset with a new_name or create a new one,
+    // initialize it with the preset_to config.
+    Preset& preset = presets.get_preset_with_name(preset_new_name, preset_to);
+    if (preset.is_default || preset.is_external || preset.is_system)
+        // Cannot overwrite the default preset.
+        return false;
+
+    // Apply options from the preset_from_name.
+    const Preset* preset_from = presets.find_preset(preset_from_name, false, false);
+    if (!preset_from)
+        return false;
+    preset.config.apply_only(preset_from->config, options);
+
+    // Store new_name preset to disk.
+    preset.save();
+
+    // Mark the print & filament enabled if they are compatible with the currently selected preset.
+    // If saving the preset changes compatibility with other presets, keep the now incompatible dependent presets selected, however with a "red flag" icon showing that they are no more compatible.
+    update_compatible(PresetSelectCompatibleType::Never);
+
+    if (type == Preset::TYPE_PRINTER)
+        copy_bed_model_and_texture_if_needed(preset.config);
+
+    if (type == Preset::TYPE_FILAMENT) {
+        // synchronize the first filament presets.
+        set_filament_preset(0, filaments.get_selected_preset_name());
+    }
+
+    return true;
 }
 
 void PresetBundle::load_installed_filaments(AppConfig &config)
@@ -1262,11 +1314,11 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
 
     const VendorProfile *vendor_profile = nullptr;
     if (flags.has(LoadConfigBundleAttribute::LoadSystem) || flags.has(LoadConfigBundleAttribute::LoadVendorOnly)) {
-        auto vp = VendorProfile::from_ini(tree, path);
-        if (vp.models.size() == 0) {
+        VendorProfile vp = VendorProfile::from_ini(tree, path);
+        if (vp.models.size() == 0 && !vp.templates_profile) {
             BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: No printer model defined.") % path;
             return std::make_pair(PresetsConfigSubstitutions{}, 0);
-        } else if (vp.num_variants() == 0) {
+        } else if (vp.num_variants() == 0 && !vp.templates_profile) {
             BOOST_LOG_TRIVIAL(error) << boost::format("Vendor bundle: `%1%`: No printer variant defined") % path;
             return std::make_pair(PresetsConfigSubstitutions{}, 0);
         }
@@ -1308,6 +1360,9 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
         } else if (boost::starts_with(section.first, "filament:")) {
             presets = &this->filaments;
             preset_name = section.first.substr(9);
+            if (vendor_profile && vendor_profile->templates_profile) {
+                preset_name += " @Template";
+            }
         } else if (boost::starts_with(section.first, "sla_print:")) {
             presets = &this->sla_prints;
             preset_name = section.first.substr(10);
@@ -1858,6 +1913,32 @@ void PresetBundle::set_default_suppressed(bool default_suppressed)
     sla_prints.set_default_suppressed(default_suppressed);
     sla_materials.set_default_suppressed(default_suppressed);
     printers.set_default_suppressed(default_suppressed);
+}
+
+void copy_bed_model_and_texture_if_needed(DynamicPrintConfig& config)
+{
+    const boost::filesystem::path user_dir = boost::filesystem::absolute(boost::filesystem::path(data_dir()) / "printer").make_preferred();
+    const boost::filesystem::path res_dir  = boost::filesystem::absolute(boost::filesystem::path(resources_dir()) / "profiles").make_preferred();
+
+    auto do_copy = [&user_dir, &res_dir](ConfigOptionString* cfg, const std::string& type) {
+        if (cfg == nullptr || cfg->value.empty())
+            return;
+
+        const boost::filesystem::path src_dir = boost::filesystem::absolute(boost::filesystem::path(cfg->value)).make_preferred().parent_path();
+        if (src_dir != user_dir && src_dir.parent_path() != res_dir) {
+            const std::string dst_value = (user_dir / boost::filesystem::path(cfg->value).filename()).string();
+            std::string error;
+            if (copy_file_inner(cfg->value, dst_value, error) == SUCCESS)
+                cfg->value = dst_value;
+            else {
+                BOOST_LOG_TRIVIAL(error) << "Copying from " << cfg->value << " to " << dst_value << " failed. Unable to set custom bed " << type << ". [" << error << "]";
+                cfg->value = "";
+            }
+        }
+    };
+
+    do_copy(config.option<ConfigOptionString>("bed_custom_texture"), "texture");
+    do_copy(config.option<ConfigOptionString>("bed_custom_model"), "model");
 }
 
 } // namespace Slic3r

@@ -48,8 +48,7 @@ public:
     void                SuppressDelete();
     void                AllowDelete();
 
-    void                msw_rescale();
-    void                on_sys_color_changed() {};
+    void                on_sys_color_changed();
 };
 
 
@@ -98,9 +97,8 @@ public:
     void        DeletePreset(PresetForPrinter* preset_for_printer);
 protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;
-    void on_sys_color_changed() override {};
+    void on_sys_color_changed() override;
 
-    bool had_all_mk3;
 };
 
 

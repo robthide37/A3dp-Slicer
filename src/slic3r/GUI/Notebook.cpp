@@ -95,10 +95,6 @@ void ButtonsListCtrl::UpdateMode()
 
 void ButtonsListCtrl::Rescale()
 {
-    m_mode_sizer->msw_rescale();
-    for (ScalableButton* btn : m_pageButtons)
-        btn->msw_rescale();
-
     int em = em_unit(this);
     m_btn_margin = std::lround(0.3 * em);
     m_line_margin = std::lround(0.1 * em);
@@ -106,6 +102,21 @@ void ButtonsListCtrl::Rescale()
     m_buttons_sizer->SetHGap(m_btn_margin);
 
     m_sizer->Layout();
+}
+
+void ButtonsListCtrl::OnColorsChanged()
+{
+    for (ScalableButton* btn : m_pageButtons)
+        btn->sys_color_changed();
+
+    m_mode_sizer->sys_color_changed();
+
+    m_sizer->Layout();
+}
+
+void ButtonsListCtrl::UpdateModeMarkers()
+{
+    m_mode_sizer->update_mode_markers();
 }
 
 void ButtonsListCtrl::SetSelection(int sel)

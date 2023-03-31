@@ -626,7 +626,8 @@ PrintObjectRegions::BoundingBox find_modifier_volume_extents(const PrintObjectRe
             const PrintObjectRegions::VolumeRegion &parent_region  = layer_range.volume_regions[parent_region_id];
             const PrintObjectRegions::BoundingBox  *parent_extents = find_volume_extents(layer_range, *parent_region.model_volume);
             assert(parent_extents);
-            out.extend(*parent_extents);
+            out.clamp(*parent_extents);
+            assert(! out.isEmpty());
             if (parent_region.model_volume->is_model_part())
                 break;
             parent_region_id = parent_region.parent;
@@ -791,7 +792,7 @@ void update_volume_bboxes(
                         layer_range.volumes.emplace_back(*it);
                 } else
                     layer_range.volumes.push_back({ model_volume->id(),
-                        transformed_its_bbox2d(model_volume->mesh().its, trafo_for_bbox(object_trafo, model_volume->get_matrix(false)), offset) });
+                        transformed_its_bbox2d(model_volume->mesh().its, trafo_for_bbox(object_trafo, model_volume->get_matrix()), offset) });
             }
     } else {
         std::vector<std::vector<PrintObjectRegions::VolumeExtents>> volumes_old;
@@ -823,7 +824,7 @@ void update_volume_bboxes(
                             layer_range.volumes.emplace_back(*it);
                     }
                 } else {
-                    transformed_its_bboxes_in_z_ranges(model_volume->mesh().its, trafo_for_bbox(object_trafo, model_volume->get_matrix(false)), ranges, bboxes, offset);
+                    transformed_its_bboxes_in_z_ranges(model_volume->mesh().its, trafo_for_bbox(object_trafo, model_volume->get_matrix()), ranges, bboxes, offset);
                     for (PrintObjectRegions::LayerRangeRegions &layer_range : layer_ranges)
                         if (auto &bbox = bboxes[&layer_range - layer_ranges.data()]; bbox.second)
                             layer_range.volumes.push_back({ model_volume->id(), bbox.first });
@@ -978,6 +979,11 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     DynamicPrintConfig   filament_overrides;
     t_config_option_keys print_diff       = print_config_diffs(m_config, new_full_config, filament_overrides);
     t_config_option_keys full_config_diff = full_print_config_diffs(m_full_print_config, new_full_config);
+    // If just a physical printer was changed, but printer preset is the same, then there is no need to apply whole print
+    // see https://github.com/prusa3d/PrusaSlicer/issues/8800
+    if (full_config_diff.size() == 1 && full_config_diff[0] == "physical_printer_settings_id")
+        full_config_diff.clear();
+
     // Collect changes to object and region configs.
     t_config_option_keys object_diff      = m_default_object_config.diff(new_full_config);
     t_config_option_keys region_diff      = m_default_region_config.diff(new_full_config);
@@ -1185,8 +1191,9 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                     update_apply_status(false);
                 }
                 // Invalidate just the supports step.
-                for (const PrintObjectStatus &print_object_status : print_objects_range)
+                for (const PrintObjectStatus &print_object_status : print_objects_range) {
                     update_apply_status(print_object_status.print_object->invalidate_step(posSupportMaterial));
+                }
                 if (supports_differ) {
                     // Copy just the support volumes.
                     model_volume_list_update_supports(model_object, model_object_new);
@@ -1234,7 +1241,6 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 	        						           l->get_transformation().get_matrix().isApprox(r->get_transformation().get_matrix()); })) {
 	        	// If some of the instances changed, the bounding box of the updated ModelObject is likely no more valid.
 	        	// This is safe as the ModelObject's bounding box is only accessed from this function, which is called from the main thread only.
-	 			model_object.invalidate_bounding_box();
 	        	// Synchronize the content of instances.
 	        	auto new_instance = model_object_new.instances.begin();
 				for (auto old_instance = model_object.instances.begin(); old_instance != model_object.instances.end(); ++ old_instance, ++ new_instance) {
@@ -1243,6 +1249,8 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
                     (*old_instance)->printable 		    = (*new_instance)->printable;
   				}
 	        }
+            // Source / dest object share the same bounding boxes, just copy them.
+            model_object.copy_transformation_caches(model_object_new);
         }
     }
 
@@ -1319,7 +1327,7 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
 					deleted_objects = true;
                 }
 			if (new_objects || deleted_objects)
-                update_apply_status(this->invalidate_steps({ psSkirtBrim, psWipeTower, psGCodeExport }));
+                update_apply_status(this->invalidate_steps({ psAlertWhenSupportsNeeded, psSkirtBrim, psWipeTower, psGCodeExport }));
 			if (new_objects)
 	            update_apply_status(false);
             print_regions_reshuffled = true;
@@ -1434,11 +1442,37 @@ Print::ApplyStatus Print::apply(const Model &model, DynamicPrintConfig new_full_
     for (PrintObject *object : m_objects)
         object->update_slicing_parameters();
 
+    if (apply_status == APPLY_STATUS_CHANGED || apply_status == APPLY_STATUS_INVALIDATED)
+        this->cleanup();
+
 #ifdef _DEBUG
     check_model_ids_equal(m_model, model);
 #endif /* _DEBUG */
 
 	return static_cast<ApplyStatus>(apply_status);
+}
+
+void Print::cleanup()
+{
+    // Invalidate data of a single ModelObject shared by multiple PrintObjects.
+    // Find spans of PrintObjects sharing the same PrintObjectRegions.
+    std::vector<PrintObject*> all_objects(m_objects);
+    std::sort(all_objects.begin(), all_objects.end(), [](const PrintObject *l, const PrintObject *r){ return l->shared_regions() < r->shared_regions(); } );
+    for (auto it = all_objects.begin(); it != all_objects.end();) {
+        PrintObjectRegions *shared_regions = (*it)->m_shared_regions;
+        auto it_begin = it;
+        for (; it != all_objects.end() && shared_regions == (*it)->shared_regions(); ++ it)
+            // Let the PrintObject clean up its data with invalidated milestones.
+            (*it)->cleanup();
+        auto this_objects = SpanOfConstPtrs<PrintObject>(const_cast<const PrintObject* const* const>(&(*it_begin)), it - it_begin);
+        if (! Print::is_shared_print_object_step_valid_unguarded(this_objects, posSupportSpotsSearch))
+            shared_regions->generated_support_points.reset();
+    }    
+}
+
+bool Print::is_shared_print_object_step_valid_unguarded(SpanOfConstPtrs<PrintObject> print_objects, PrintObjectStep print_object_step)
+{
+    return std::any_of(print_objects.begin(), print_objects.end(), [print_object_step](auto po){ return po->is_step_done_unguarded(print_object_step); });
 }
 
 } // namespace Slic3r

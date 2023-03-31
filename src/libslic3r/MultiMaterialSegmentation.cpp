@@ -713,7 +713,7 @@ struct MMU_Graph
 
             [[nodiscard]] const Vec2d &point_double() const { return m_point_double; }
             [[nodiscard]] const Point &point() const { return m_point; }
-            bool operator==(const CPoint &rhs) const { return this->m_point_double == rhs.m_point_double && this->m_contour_idx == rhs.m_contour_idx && this->m_point_idx == rhs.m_point_idx; }
+            bool operator==(const CPoint &rhs) const { return m_point_double == rhs.m_point_double && m_contour_idx == rhs.m_contour_idx && m_point_idx == rhs.m_point_idx; }
         };
         struct CPointAccessor { const Point* operator()(const CPoint &pt) const { return &pt.point(); }};
         typedef ClosestPointInRadiusLookup<CPoint, CPointAccessor> CPointLookupType;
@@ -1305,7 +1305,7 @@ static inline std::vector<std::vector<ExPolygons>> mmu_segmentation_top_and_bott
 {
     const size_t num_extruders = print_object.print()->config().nozzle_diameter.size() + 1;
     const size_t num_layers    = input_expolygons.size();
-    const ConstLayerPtrsAdaptor layers = print_object.layers();
+    const SpanOfConstPtrs<Layer> layers = print_object.layers();
 
     // Maximum number of top / bottom layers accounts for maximum overlap of one thread group into a neighbor thread group.
     int max_top_layers = 0;
@@ -1685,7 +1685,7 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
     std::vector<std::vector<PaintedLine>> painted_lines(num_layers);
     std::array<std::mutex, 64>            painted_lines_mutex;
     std::vector<EdgeGrid::Grid>           edge_grids(num_layers);
-    const ConstLayerPtrsAdaptor           layers = print_object.layers();
+    const SpanOfConstPtrs<Layer>          layers = print_object.layers();
     std::vector<ExPolygons>               input_expolygons(num_layers);
 
     throw_on_cancel_callback();
@@ -1697,7 +1697,7 @@ std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(con
             throw_on_cancel_callback();
             ExPolygons ex_polygons;
             for (LayerRegion *region : layers[layer_idx]->regions())
-                for (const Surface &surface : region->slices.surfaces)
+                for (const Surface &surface : region->slices())
                     Slic3r::append(ex_polygons, offset_ex(surface.expolygon, float(10 * SCALED_EPSILON)));
             // All expolygons are expanded by SCALED_EPSILON, merged, and then shrunk again by SCALED_EPSILON
             // to ensure that very close polygons will be merged.

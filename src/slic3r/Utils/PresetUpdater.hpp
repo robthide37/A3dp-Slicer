@@ -26,7 +26,8 @@ public:
 	~PresetUpdater();
 
 	// If either version check or config updating is enabled, get the appropriate data in the background and cache it.
-	void sync(PresetBundle *preset_bundle);
+	void sync(const PresetBundle *preset_bundle);
+	void cancel_sync();
 
 	// If version check is enabled, check if chaced online slic3r version is newer, notify if so.
 	void slic3r_update_notify();
@@ -52,9 +53,11 @@ public:
 	// Providing old slic3r version upgrade profiles on upgrade of an application even in case
 	// that the config index installed from the Internet is equal to the index contained in the installation package.
 	UpdateResult config_update(const Semver &old_slic3r_version, UpdateParams params) const;
+	
+	void update_index_db();
 
-	// "Update" a list of bundles from resources (behaves like an online update).
-	bool install_bundles_rsrc(std::vector<std::string> bundles, bool snapshot = true) const;
+	// "Update" a list of bundles from resources or cache/vendor (behaves like an online update).
+	bool install_bundles_rsrc_or_cache_vendor(std::vector<std::string> bundles, bool snapshot = true) const;
 
 	void on_update_notification_confirm();
 
@@ -65,7 +68,7 @@ private:
 	std::unique_ptr<priv> p;
 };
 
-wxDECLARE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
-wxDECLARE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
+//wxDECLARE_EVENT(EVT_SLIC3R_VERSION_ONLINE, wxCommandEvent);
+//wxDECLARE_EVENT(EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE, wxCommandEvent);
 }
 #endif

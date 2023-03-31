@@ -8,7 +8,7 @@ namespace Slic3r {
 
 void filter_by_extrusion_role_in_place(ExtrusionEntitiesPtr &extrusion_entities, ExtrusionRole role)
 {
-	if (role != erMixed) {
+	if (role != ExtrusionRole::Mixed) {
 		auto first  = extrusion_entities.begin();
 		auto last   = extrusion_entities.end();
         extrusion_entities.erase(
@@ -56,12 +56,9 @@ ExtrusionEntityCollection::operator ExtrusionPaths() const
     return paths;
 }
 
-ExtrusionEntity* ExtrusionEntityCollection::clone() const
+ExtrusionEntity *ExtrusionEntityCollection::clone() const
 {
-    ExtrusionEntityCollection* coll = new ExtrusionEntityCollection(*this);
-    for (size_t i = 0; i < coll->entities.size(); ++i)
-        coll->entities[i] = this->entities[i]->clone();
-    return coll;
+    return new ExtrusionEntityCollection(*this);
 }
 
 void ExtrusionEntityCollection::reverse()

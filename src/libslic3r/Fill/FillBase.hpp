@@ -91,6 +91,10 @@ public:
     // Octree builds on mesh for usage in the adaptive cubic infill
     FillAdaptive::Octree* adapt_fill_octree = nullptr;
 
+    // PrintConfig and PrintObjectConfig are used by infills that use Arachne (Concentric and FillEnsuring).
+    const PrintConfig       *print_config        = nullptr;
+    const PrintObjectConfig *print_object_config = nullptr;
+
 public:
     virtual ~Fill() {}
     virtual Fill* clone() const = 0;
@@ -132,7 +136,7 @@ protected:
         unsigned int                      /* thickness_layers */,
         const std::pair<float, Point>   & /* direction */,
         ExPolygon                         /* expolygon */,
-        Polylines                       & /* polylines_out */) {};
+        Polylines                       & /* polylines_out */) {}
 
     // Used for concentric infill to generate ThickPolylines using Arachne.
     virtual void _fill_surface_single(const FillParams              &params,

@@ -1,22 +1,39 @@
 #ifndef SLAIMPORTJOB_HPP
 #define SLAIMPORTJOB_HPP
 
-#include "PlaterJob.hpp"
+#include "Job.hpp"
+
+#include "libslic3r/Format/SLAArchiveReader.hpp"
 
 namespace Slic3r { namespace GUI {
 
-class SLAImportJob : public PlaterJob {
+class SLAImportJobView {
+public:
+    enum Sel { modelAndProfile, profileOnly, modelOnly};
+
+    virtual ~SLAImportJobView() = default;
+
+    virtual Sel get_selection() const = 0;
+    virtual SLAImportQuality get_quality() const = 0;
+    virtual std::string get_path() const = 0;
+    virtual std::string get_archive_format() const  { return ""; }
+};
+
+class Plater;
+
+class SLAImportJob : public Job {
     class priv;
 
     std::unique_ptr<priv> p;
-
-protected:
-    void prepare() override;
-    void process() override;
-    void finalize() override;
+    using Sel = SLAImportJobView::Sel;
+    using Quality = SLAImportQuality;
 
 public:
-    SLAImportJob(std::shared_ptr<ProgressIndicator> pri, Plater *plater);
+    void prepare();
+    void process(Ctl &ctl) override;
+    void finalize(bool canceled, std::exception_ptr &) override;
+
+    SLAImportJob(const SLAImportJobView *);
     ~SLAImportJob();
 
     void reset();

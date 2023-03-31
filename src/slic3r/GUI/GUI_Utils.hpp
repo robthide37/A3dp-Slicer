@@ -82,13 +82,16 @@ template<class P> class DPIAware : public P
 {
 public:
     DPIAware(wxWindow *parent, wxWindowID id, const wxString &title, const wxPoint &pos=wxDefaultPosition,
-        const wxSize &size=wxDefaultSize, long style=wxDEFAULT_FRAME_STYLE, const wxString &name=wxFrameNameStr)
+        const wxSize &size=wxDefaultSize, long style=wxDEFAULT_FRAME_STYLE, const wxString &name= wxFrameNameStr, const int font_point_size = -1)
         : P(parent, id, title, pos, size, style, name)
     {
         int dpi = get_dpi_for_window(this);
         m_scale_factor = (float)dpi / (float)DPI_DEFAULT;
         m_prev_scale_factor = m_scale_factor;
 		m_normal_font = get_default_font_for_dpi(this, dpi);
+
+        if (font_point_size > 0)
+            m_normal_font.SetPointSize(font_point_size);
 
         /* Because of default window font is a primary display font, 
          * We should set correct font for window before getting em_unit value.
@@ -406,14 +409,6 @@ public:
 
 std::ostream& operator<<(std::ostream &os, const WindowMetrics& metrics);
 
-inline int hex_digit_to_int(const char c)
-{
-    return
-        (c >= '0' && c <= '9') ? int(c - '0') :
-        (c >= 'A' && c <= 'F') ? int(c - 'A') + 10 :
-        (c >= 'a' && c <= 'f') ? int(c - 'a') + 10 : -1;
-}
-
 class TaskTimer
 {
     std::chrono::milliseconds   start_timer;
@@ -422,6 +417,16 @@ public:
     TaskTimer(std::string task_name);
 
     ~TaskTimer();
+};
+
+class KeyAutoRepeatFilter
+{
+    size_t m_count{ 0 };
+
+public:
+    void increase_count() { ++m_count; }
+    void reset_count() { m_count = 0; }
+    bool is_first() const { return m_count == 0; }
 };
 
 }}

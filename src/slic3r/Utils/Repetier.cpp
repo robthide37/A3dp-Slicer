@@ -35,6 +35,24 @@ Repetier::Repetier(DynamicPrintConfig *config) :
 
 const char* Repetier::get_name() const { return "Repetier"; }
 
+
+
+static bool validate_repetier(const boost::optional<std::string>& name,
+                              const boost::optional<std::string>& soft)
+{
+    if (soft) {
+        // See https://github.com/prusa3d/PrusaSlicer/issues/7807:
+        // Repetier allows "rebranding", so the "name" value is not reliable when detecting
+        // server type. Newer Repetier versions send "software", which should be invariant.
+        return ((*soft) == "Repetier-Server");
+    } else {
+        // If there is no "software" value, validate as we did before:
+        return name ? boost::starts_with(*name, "Repetier") : true;
+    }
+}
+
+
+
 bool Repetier::test(wxString &msg) const
 {
     // Since the request is performed synchronously here,
@@ -55,18 +73,19 @@ bool Repetier::test(wxString &msg) const
             res = false;
             msg = format_error(body, error, status);
         })
-        .on_complete([&, this](std::string body, unsigned) {
+        .on_complete([&](std::string body, unsigned) {
             BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: Got version: %2%") % name % body;
 
             try {
                 std::stringstream ss(body);
                 pt::ptree ptree;
                 pt::read_json(ss, ptree);
-                
+
                 const auto text = ptree.get_optional<std::string>("name");
-                res = validate_version_text(text);
+                const auto soft = ptree.get_optional<std::string>("software");
+                res = validate_repetier(text, soft);
                 if (! res) {
-                    msg = GUI::from_u8((boost::format(_utf8(L("Mismatched type of print host: %s"))) % (text ? *text : "Repetier")).str());
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (soft ? *soft : (text ? *text : "Repetier")));
                 }
             }
             catch (const std::exception &) {
@@ -86,13 +105,13 @@ wxString Repetier::get_test_ok_msg () const
 
 wxString Repetier::get_test_failed_msg (wxString &msg) const
 {
-        return GUI::from_u8((boost::format("%s: %s\n\n%s")
-        % _utf8(L("Could not connect to Repetier"))
-        % std::string(msg.ToUTF8())
-        % _utf8(L("Note: Repetier version at least 0.90.0 is required."))).str());
+        return GUI::format_wxstr("%s: %s\n\n%s"
+        , _L("Could not connect to Repetier")
+        , msg
+        , _L("Note: Repetier version at least 0.90.0 is required."));
 }
 
-bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const
+bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
     const char *name = get_name();
 
@@ -123,12 +142,13 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
     auto http = Http::post(std::move(url));
     set_auth(http);
 
-    if (! upload_data.group.empty() && upload_data.group != _utf8(L("Default"))) {
+    if (! upload_data.group.empty() && upload_data.group != _u8L("Default")) {
         http.form_add("group", upload_data.group);
     }
 
     if(upload_data.post_action == PrintHostPostUploadAction::StartPrint) {
         http.form_add("name", upload_filename.string());
+        http.form_add("autostart", "true"); // See https://github.com/prusa3d/PrusaSlicer/issues/7807#issuecomment-1235519371
     }
 
     http.form_add("a", "upload")
@@ -154,10 +174,7 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
     return res;
 }
 
-bool Repetier::validate_version_text(const boost::optional<std::string> &version_text) const
-{
-    return version_text ? boost::starts_with(*version_text, "Repetier") : true;
-}
+
 
 void Repetier::set_auth(Http &http) const
 {
@@ -206,7 +223,7 @@ bool Repetier::get_groups(wxArrayString& groups) const
 
                 BOOST_FOREACH(boost::property_tree::ptree::value_type &v, ptree.get_child("groupNames.")) {
                     if (v.second.data() == "#") {
-                        groups.push_back(_utf8(L("Default")));
+                        groups.push_back(_L("Default"));
                     } else {
                         // Is it safe to assume that the data are utf-8 encoded?
                         groups.push_back(GUI::from_u8(v.second.data()));

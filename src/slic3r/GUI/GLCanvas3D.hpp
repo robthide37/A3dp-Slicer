@@ -16,6 +16,8 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GCodeViewer.hpp"
 #include "Camera.hpp"
+#include "SceneRaycaster.hpp"
+#include "GUI_Utils.hpp"
 
 #include "libslic3r/Slicing.hpp"
 
@@ -59,24 +61,23 @@ class RetinaHelper;
 
 class Size
 {
-    int m_width;
-    int m_height;
-    float m_scale_factor;
+    int m_width{ 0 };
+    int m_height{ 0 };
+    float m_scale_factor{ 1.0f };
 
 public:
-    Size();
-    Size(int width, int height, float scale_factor = 1.0);
+    Size() = default;
+    Size(int width, int height, float scale_factor = 1.0f) : m_width(width), m_height(height), m_scale_factor(scale_factor) {}
 
-    int get_width() const;
-    void set_width(int width);
+    int get_width() const { return m_width; }
+    void set_width(int width) { m_width = width; }
 
-    int get_height() const;
-    void set_height(int height);
+    int get_height() const { return m_height; }
+    void set_height(int height) { m_height = height; }
 
-    int get_scale_factor() const;
-    void set_scale_factor(int height);
+    float get_scale_factor() const { return m_scale_factor; }
+    void set_scale_factor(float factor) { m_scale_factor = factor; }
 };
-
 
 class RenderTimerEvent : public wxEvent
 {
@@ -133,7 +134,6 @@ private:
     wxTimer* m_timer;
 };
 
-
 wxDECLARE_EVENT(EVT_GLCANVAS_OBJECT_SELECT, SimpleEvent);
 
 using Vec2dEvent = Event<Vec2d>;
@@ -157,6 +157,7 @@ wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_MOVED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_FORCE_UPDATE, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_MOVED, Vec3dEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_ROTATED, SimpleEvent);
+wxDECLARE_EVENT(EVT_GLCANVAS_RESET_SKEW, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_SCALED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3dEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, Event<bool>);
@@ -196,8 +197,8 @@ class GLCanvas3D
         };
 
         static const float THICKNESS_BAR_WIDTH;
-    private:
 
+    private:
         bool                        m_enabled{ false };
         unsigned int                m_z_texture_id{ 0 };
         // Not owned by LayersEditing.
@@ -241,6 +242,22 @@ class GLCanvas3D
         float last_z{ 0.0f };
         LayerHeightEditActionType last_action{ LAYER_HEIGHT_EDIT_ACTION_INCREASE };
 
+        struct Profile
+        {
+            GLModel baseline;
+            GLModel profile;
+            GLModel background;
+            struct OldCanvasWidth
+            {
+                float background{ 0.0f };
+                float baseline{ 0.0f };
+                float profile{ 0.0f };
+            };
+            OldCanvasWidth old_canvas_width;
+            std::vector<double> old_layer_height_profile;
+        };
+        Profile m_profile;
+
         LayersEditing() = default;
         ~LayersEditing();
 
@@ -254,7 +271,7 @@ class GLCanvas3D
         bool is_enabled() const;
         void set_enabled(bool enabled);
 
-        void render_overlay(const GLCanvas3D& canvas) const;
+        void render_overlay(const GLCanvas3D& canvas);
         void render_volumes(const GLCanvas3D& canvas, const GLVolumeCollection& volumes);
 
 		void adjust_layer_height_profile();
@@ -266,22 +283,22 @@ class GLCanvas3D
         static float get_cursor_z_relative(const GLCanvas3D& canvas);
         static bool bar_rect_contains(const GLCanvas3D& canvas, float x, float y);
         static Rect get_bar_rect_screen(const GLCanvas3D& canvas);
-        static Rect get_bar_rect_viewport(const GLCanvas3D& canvas);
         static float get_overlay_window_width() { return LayersEditing::s_overlay_window_width; }
 
         float object_max_z() const { return m_object_max_z; }
 
         std::string get_tooltip(const GLCanvas3D& canvas) const;
 
+        std::pair<SlicingParameters, const std::vector<double>> get_layers_height_data();
+
     private:
         bool is_initialized() const;
         void generate_layer_height_texture();
-        void render_active_object_annotations(const GLCanvas3D& canvas, const Rect& bar_rect) const;
-        void render_profile(const Rect& bar_rect) const;
+        void render_active_object_annotations(const GLCanvas3D& canvas);
+        void render_profile(const GLCanvas3D& canvas);
         void update_slicing_parameters();
 
-        static float thickness_bar_width(const GLCanvas3D &canvas);
-        
+        static float thickness_bar_width(const GLCanvas3D &canvas);        
     };
 
     struct Mouse
@@ -327,12 +344,12 @@ class GLCanvas3D
     {
         struct Triangles
         {
-            Pointf3s object;
-            Pointf3s supports;
+            GLModel object;
+            GLModel supports;
         };
-        typedef std::map<unsigned int, Triangles> ObjectIdToTrianglesMap;
+        typedef std::map<unsigned int, Triangles> ObjectIdToModelsMap;
         double z;
-        ObjectIdToTrianglesMap triangles;
+        ObjectIdToModelsMap triangles;
 
         SlaCap() { reset(); }
         void reset() { z = DBL_MAX; triangles.clear(); }
@@ -389,6 +406,7 @@ class GLCanvas3D
         std::chrono::steady_clock::time_point m_start_time;
         // Indicator that the mouse is inside an ImGUI dialog, therefore the tooltip should be suppressed.
         bool m_in_imgui = false;
+        float m_cursor_height{ 16.0f };
 
     public:
         bool is_empty() const { return m_text.empty(); }
@@ -439,7 +457,8 @@ public:
 
     struct ArrangeSettings
     {
-        float distance           = 6.;
+        float distance           = 6.f;
+        float distance_from_bed  = 0.f;
 //        float distance_seq_print = 6.;    // Used when sequential print is ON
 //        float distance_sla       = 6.;
         float accuracy           = 0.65f; // Unused currently
@@ -450,6 +469,7 @@ public:
 private:
     wxGLCanvas* m_canvas;
     wxGLContext* m_context;
+    SceneRaycaster m_scene_raycaster;
     Bed3D &m_bed;
 #if ENABLE_RETINA_GL
     std::unique_ptr<RetinaHelper> m_retina_helper;
@@ -464,7 +484,7 @@ private:
     std::array<ClippingPlane, 2> m_clipping_planes;
     ClippingPlane m_camera_clipping_plane;
     bool m_use_clipping_planes;
-    SlaCap m_sla_caps[2];
+    std::array<SlaCap, 2> m_sla_caps;
     std::string m_sidebar_field;
     // when true renders an extra frame by not resetting m_dirty to false
     // see request_extra_frame()
@@ -472,6 +492,9 @@ private:
     bool m_event_handlers_bound{ false };
 
     GLVolumeCollection m_volumes;
+#if ENABLE_OPENGL_ES
+    TriangleMesh m_wipe_tower_mesh;
+#endif // ENABLE_OPENGL_ES
     GCodeViewer m_gcode_viewer;
 
     RenderTimer m_render_timer;
@@ -502,13 +525,14 @@ private:
     // I just don't want to do it now before a release (Lukas Matena 24.3.2019)
     bool m_render_sla_auxiliaries;
 
-    std::string m_color_by;
-
     bool m_reload_delayed;
 
 #if ENABLE_RENDER_PICKING_PASS
     bool m_show_picking_texture;
 #endif // ENABLE_RENDER_PICKING_PASS
+
+    KeyAutoRepeatFilter m_shift_kar_filter;
+    KeyAutoRepeatFilter m_ctrl_kar_filter;
 
     RenderStats m_render_stats;
 
@@ -618,6 +642,17 @@ private:
     }
     m_gizmo_highlighter;
 
+#if ENABLE_SHOW_CAMERA_TARGET
+    struct CameraTarget
+    {
+        std::array<GLModel, 3> axis;
+        Vec3d target{ Vec3d::Zero() };
+    };
+
+    CameraTarget m_camera_target;
+#endif // ENABLE_SHOW_CAMERA_TARGET
+    GLModel m_background;
+
 public:
     explicit GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed);
     ~GLCanvas3D();
@@ -631,6 +666,25 @@ public:
 
     bool init();
     void post_event(wxEvent &&event);
+
+    std::shared_ptr<SceneRaycasterItem> add_raycaster_for_picking(SceneRaycaster::EType type, int id, const MeshRaycaster& raycaster,
+        const Transform3d& trafo = Transform3d::Identity(), bool use_back_faces = false) {
+        return m_scene_raycaster.add_raycaster(type, id, raycaster, trafo, use_back_faces);
+    }
+    void remove_raycasters_for_picking(SceneRaycaster::EType type, int id) {
+        m_scene_raycaster.remove_raycasters(type, id);
+    }
+    void remove_raycasters_for_picking(SceneRaycaster::EType type) {
+        m_scene_raycaster.remove_raycasters(type);
+    }
+
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* get_raycasters_for_picking(SceneRaycaster::EType type) {
+        return m_scene_raycaster.get_raycasters(type);
+    }
+
+    void set_raycaster_gizmos_on_top(bool value) {
+        m_scene_raycaster.set_gizmos_on_top(value);
+    }
 
     void set_as_dirty();
     void requires_check_outside_state() { m_requires_check_outside_state = true; }
@@ -675,7 +729,9 @@ public:
     bool                                get_use_clipping_planes() const { return m_use_clipping_planes; }
     const std::array<ClippingPlane, 2> &get_clipping_planes() const { return m_clipping_planes; };
 
-    void set_color_by(const std::string& value);
+    void set_use_color_clip_plane(bool use) { m_volumes.set_use_color_clip_plane(use); }
+    void set_color_clip_plane(const Vec3d& cp_normal, double offset) { m_volumes.set_color_clip_plane(cp_normal, offset); }
+    void set_color_clip_plane_colors(const std::array<ColorRGBA, 2>& colors) { m_volumes.set_color_clip_plane_colors(colors); }
 
     void refresh_camera_scene_box();
 
@@ -713,7 +769,7 @@ public:
 
     void update_volumes_colors_by_extruder();
 
-    bool is_dragging() const { return m_gizmos.is_dragging() || m_moving; }
+    bool is_dragging() const { return m_gizmos.is_dragging() || (m_moving && !m_mouse.scene_position.isApprox(m_mouse.drag.start_position_3D)); }
 
     void render();
     // printable_only == false -> render also non printable volumes as grayed
@@ -748,7 +804,7 @@ public:
     void reload_scene(bool refresh_immediately, bool force_full_scene_refresh = false);
 
     void load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
-    void refresh_gcode_preview_render_paths();
+    void refresh_gcode_preview_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last);
     void set_gcode_view_preview_type(GCodeViewer::EViewType type) { return m_gcode_viewer.set_view_type(type); }
     GCodeViewer::EViewType get_gcode_view_preview_type() const { return m_gcode_viewer.get_view_type(); }
     void load_sla_preview();
@@ -770,14 +826,20 @@ public:
     Size get_canvas_size() const;
     Vec2d get_local_mouse_position() const;
 
+    // store opening position of menu
+    std::optional<Vec2d> m_popup_menu_positon; // position of mouse right click
+    void  set_popup_menu_position(const Vec2d &position) { m_popup_menu_positon = position; }
+    const std::optional<Vec2d>& get_popup_menu_position() const { return m_popup_menu_positon; }
+    void clear_popup_menu_position() { m_popup_menu_positon.reset(); }
+
     void set_tooltip(const std::string& tooltip);
 
     // the following methods add a snapshot to the undo/redo stack, unless the given string is empty
     void do_move(const std::string& snapshot_type);
     void do_rotate(const std::string& snapshot_type);
     void do_scale(const std::string& snapshot_type);
-    void do_flatten(const Vec3d& normal, const std::string& snapshot_type);
     void do_mirror(const std::string& snapshot_type);
+    void do_reset_skew(const std::string& snapshot_type);
 
     void update_gizmos_on_off_state();
     void reset_all_gizmos() { m_gizmos.reset_all_states(); }
@@ -793,7 +855,7 @@ public:
     
     class WipeTowerInfo {
     protected:
-        Vec2d m_pos = {std::nan(""), std::nan("")};
+        Vec2d m_pos = {NaNd, NaNd};
         double m_rotation = 0.;
         BoundingBoxf m_bb;
         friend class GLCanvas3D;
@@ -815,7 +877,6 @@ public:
     // Returns the view ray line, in world coordinate, at the given mouse position.
     Linef3 mouse_ray(const Point& mouse_pos);
 
-    void set_mouse_as_dragging() { m_mouse.dragging = true; }
     bool is_mouse_dragging() const { return m_mouse.dragging; }
 
     double get_size_proportional_to_max_bed_size(double factor) const;
@@ -840,6 +901,9 @@ public:
 
     bool are_labels_shown() const { return m_labels.is_shown(); }
     void show_labels(bool show) { m_labels.show(show); }
+
+    bool is_legend_shown() const { return m_gcode_viewer.is_legend_enabled(); }
+    void show_legend(bool show) { m_gcode_viewer.enable_legend(show); m_dirty = true; }
 
     bool is_using_slope() const { return m_slope.is_used(); }
     void use_slope(bool use) { m_slope.use(use); }
@@ -886,6 +950,10 @@ public:
 
     bool is_object_sinking(int object_idx) const;
 
+    void apply_retina_scale(Vec2d &screen_coordinate) const;
+
+    std::pair<SlicingParameters, const std::vector<double>> get_layers_height_data(int object_id);
+
 private:
     bool _is_shown_on_screen() const;
 
@@ -907,19 +975,21 @@ private:
 
     void _picking_pass();
     void _rectangular_selection_picking_pass();
-    void _render_background() const;
-    void _render_bed(bool bottom, bool show_axes);
-    void _render_bed_for_picking(bool bottom);
+    void _render_background();
+    void _render_bed(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom);
+    void _render_bed_axes();
+    void _render_bed_for_picking(const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom);
     void _render_objects(GLVolumeCollection::ERenderType type);
     void _render_gcode();
-    void _render_selection() const;
+    void _render_gcode_cog();
+    void _render_selection();
     void _render_sequential_clearance();
 #if ENABLE_RENDER_SELECTION_CENTER
-    void _render_selection_center() const;
+    void _render_selection_center();
 #endif // ENABLE_RENDER_SELECTION_CENTER
     void _check_and_update_toolbar_icon_scale();
     void _render_overlays();
-    void _render_volumes_for_picking() const;
+    void _render_volumes_for_picking(const Camera& camera) const;
     void _render_current_gizmo() const;
     void _render_gizmos_overlay();
     void _render_main_toolbar();
@@ -927,10 +997,10 @@ private:
     void _render_collapse_toolbar() const;
     void _render_view_toolbar() const;
 #if ENABLE_SHOW_CAMERA_TARGET
-    void _render_camera_target() const;
+    void _render_camera_target();
 #endif // ENABLE_SHOW_CAMERA_TARGET
     void _render_sla_slices();
-    void _render_selection_sidebar_hints() const;
+    void _render_selection_sidebar_hints();
     bool _render_undo_redo_stack(const bool is_undo, float pos_x);
     bool _render_search_list(float pos_x);
     bool _render_arrange_menu(float pos_x);
@@ -975,7 +1045,7 @@ private:
     // generates a warning notification containing the given message
     void _set_warning_notification(EWarning warning, bool state);
 
-    bool _is_any_volume_outside() const;
+    std::pair<bool, const GLVolume*> _is_any_volume_outside() const;
 
     // updates the selection from the content of m_hover_volume_idxs
     void _update_selection_from_hover();
@@ -987,9 +1057,22 @@ private:
     bool _deactivate_arrange_menu();
 
     float get_overlay_window_width() { return LayersEditing::get_overlay_window_width(); }
-
-    static std::vector<std::array<float, 4>> _parse_colors(const std::vector<std::string>& colors);
 };
+
+const ModelVolume *get_model_volume(const GLVolume &v, const Model &model);
+const ModelVolume *get_model_volume(const ObjectID &volume_id, const ModelObjectPtrs &objects);
+ModelVolume *get_model_volume(const GLVolume &v, const ModelObjectPtrs &objects);
+ModelVolume *get_model_volume(const GLVolume &v, const ModelObject &object);
+
+GLVolume *get_first_hovered_gl_volume(const GLCanvas3D &canvas);
+GLVolume *get_selected_gl_volume(const GLCanvas3D &canvas);
+
+ModelObject *get_model_object(const GLVolume &gl_volume, const Model &model);
+ModelObject *get_model_object(const GLVolume &gl_volume, const ModelObjectPtrs &objects);
+
+ModelInstance *get_model_instance(const GLVolume &gl_volume, const Model &model);
+ModelInstance *get_model_instance(const GLVolume &gl_volume, const ModelObjectPtrs &objects);
+ModelInstance *get_model_instance(const GLVolume &gl_volume, const ModelObject &object);
 
 } // namespace GUI
 } // namespace Slic3r

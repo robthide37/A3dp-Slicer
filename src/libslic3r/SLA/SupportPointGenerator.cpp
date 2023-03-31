@@ -1,17 +1,14 @@
-//#include "igl/random_points_on_mesh.h"
-//#include "igl/AABB.h"
-
 #include <tbb/parallel_for.h>
 
 #include "SupportPointGenerator.hpp"
-#include "Concurrency.hpp"
+#include "Execution/ExecutionTBB.hpp"
+#include "Geometry/ConvexHull.hpp"
 #include "Model.hpp"
 #include "ExPolygon.hpp"
 #include "SVG.hpp"
 #include "Point.hpp"
 #include "ClipperUtils.hpp"
 #include "Tesselate.hpp"
-#include "ExPolygonCollection.hpp"
 #include "MinAreaBoundingBox.hpp"
 #include "libslic3r.h"
 
@@ -53,7 +50,7 @@ float SupportPointGenerator::distance_limit(float angle) const
 }*/
 
 SupportPointGenerator::SupportPointGenerator(
-        const sla::IndexedMesh &emesh,
+        const AABBMesh &emesh,
         const std::vector<ExPolygons> &slices,
         const std::vector<float> &     heights,
         const Config &                 config,
@@ -67,7 +64,7 @@ SupportPointGenerator::SupportPointGenerator(
 }
 
 SupportPointGenerator::SupportPointGenerator(
-        const IndexedMesh &emesh,
+        const AABBMesh &emesh,
         const SupportPointGenerator::Config &config,
         std::function<void ()> throw_on_cancel, 
         std::function<void (int)> statusfn)
@@ -92,7 +89,7 @@ void SupportPointGenerator::project_onto_mesh(std::vector<sla::SupportPoint>& po
     // Use a reasonable granularity to account for the worker thread synchronization cost.
     static constexpr size_t gransize = 64;
 
-    ccr_par::for_each(size_t(0), points.size(), [this, &points](size_t idx)
+    execution::for_each(ex_tbb, size_t(0), points.size(), [this, &points](size_t idx)
     {
         if ((idx % 16) == 0)
             // Don't call the following function too often as it flushes CPU write caches due to synchronization primitves.
@@ -100,8 +97,8 @@ void SupportPointGenerator::project_onto_mesh(std::vector<sla::SupportPoint>& po
 
         Vec3f& p = points[idx].pos;
         // Project the point upward and downward and choose the closer intersection with the mesh.
-        sla::IndexedMesh::hit_result hit_up   = m_emesh.query_ray_hit(p.cast<double>(), Vec3d(0., 0., 1.));
-        sla::IndexedMesh::hit_result hit_down = m_emesh.query_ray_hit(p.cast<double>(), Vec3d(0., 0., -1.));
+        AABBMesh::hit_result hit_up   = m_emesh.query_ray_hit(p.cast<double>(), Vec3d(0., 0., 1.));
+        AABBMesh::hit_result hit_down = m_emesh.query_ray_hit(p.cast<double>(), Vec3d(0., 0., -1.));
 
         bool up   = hit_up.is_hit();
         bool down = hit_down.is_hit();
@@ -109,7 +106,7 @@ void SupportPointGenerator::project_onto_mesh(std::vector<sla::SupportPoint>& po
         if (!up && !down)
             return;
 
-        sla::IndexedMesh::hit_result& hit = (!down || (hit_up.distance() < hit_down.distance())) ? hit_up : hit_down;
+        AABBMesh::hit_result& hit = (!down || (hit_up.distance() < hit_down.distance())) ? hit_up : hit_down;
         p = p + (hit.distance() * hit.direction()).cast<float>();
     }, gransize);
 }
@@ -130,7 +127,7 @@ static std::vector<SupportPointGenerator::MyLayer> make_layers(
     //const float pixel_area = pow(wxGetApp().preset_bundle->project_config.option<ConfigOptionFloat>("display_width") / wxGetApp().preset_bundle->project_config.option<ConfigOptionInt>("display_pixels_x"), 2.f); //
     const float pixel_area = pow(0.047f, 2.f);
 
-    ccr_par::for_each(size_t(0), layers.size(),
+    execution::for_each(ex_tbb, size_t(0), layers.size(),
         [&layers, &slices, &heights, pixel_area, throw_on_cancel](size_t layer_id)
     {
         if ((layer_id % 8) == 0)
@@ -155,7 +152,7 @@ static std::vector<SupportPointGenerator::MyLayer> make_layers(
     }, 32 /*gransize*/);
 
     // Calculate overlap of successive layers. Link overlapping islands.
-    ccr_par::for_each(size_t(1), layers.size(),
+    execution::for_each(ex_tbb, size_t(1), layers.size(),
                       [&layers, &heights, throw_on_cancel] (size_t layer_id)
     {
       if ((layer_id % 2) == 0)
@@ -550,7 +547,7 @@ void SupportPointGenerator::uniformly_cover(const ExPolygons& islands, Structure
 //    auto bb = get_extents(islands);
 
     if (flags & icfIsNew) {
-        auto chull = ExPolygonCollection{islands}.convex_hull();
+        auto chull = Geometry::convex_hull(islands);
         auto rotbox = MinAreaBoundigBox{chull, MinAreaBoundigBox::pcConvex};
         Vec2d bbdim = {unscaled(rotbox.width()), unscaled(rotbox.height())};
 
@@ -663,6 +660,18 @@ void SupportPointGenerator::output_expolygons(const ExPolygons& expolys, const s
     }
 }
 #endif
+
+SupportPoints transformed_support_points(const ModelObject &mo,
+                                         const Transform3d &trafo)
+{
+    auto spts = mo.sla_support_points;
+    Transform3f tr = trafo.cast<float>();
+    for (sla::SupportPoint& suppt : spts) {
+        suppt.pos = tr * suppt.pos;
+    }
+
+    return spts;
+}
 
 } // namespace sla
 } // namespace Slic3r

@@ -8,19 +8,6 @@
 #include "SVG.hpp"
 #endif /* CLIPPER_UTILS_DEBUG */
 
-// Profiling support using the Shiny intrusive profiler
-//#define CLIPPER_UTILS_PROFILE
-#if defined(SLIC3R_PROFILE) && defined(CLIPPER_UTILS_PROFILE)
-	#include <Shiny/Shiny.h>
-	#define CLIPPERUTILS_PROFILE_FUNC() PROFILE_FUNC()
-	#define CLIPPERUTILS_PROFILE_BLOCK(name) PROFILE_BLOCK(name)
-#else
-	#define CLIPPERUTILS_PROFILE_FUNC()
-	#define CLIPPERUTILS_PROFILE_BLOCK(name)
-#endif
-
-#define CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR (0.005f)
-
 namespace Slic3r {
 
 #ifdef CLIPPER_UTILS_DEBUG
@@ -59,6 +46,115 @@ err:
 namespace ClipperUtils {
     Points EmptyPathsProvider::s_empty_points;
     Points SinglePathProvider::s_end;
+
+    // Clip source polygon to be used as a clipping polygon with a bouding box around the source (to be clipped) polygon.
+    // Useful as an optimization for expensive ClipperLib operations, for example when clipping source polygons one by one
+    // with a set of polygons covering the whole layer below.
+    template<typename PointType>
+    inline void clip_clipper_polygon_with_subject_bbox_templ(const std::vector<PointType> &src, const BoundingBox &bbox, std::vector<PointType> &out)
+    {
+        out.clear();
+        const size_t cnt = src.size();
+        if (cnt < 3)
+            return;
+
+        enum class Side {
+            Left   = 1,
+            Right  = 2,
+            Top    = 4,
+            Bottom = 8
+        };
+
+        auto sides = [bbox](const PointType &p) {
+            return  int(p.x() < bbox.min.x()) * int(Side::Left) +
+                    int(p.x() > bbox.max.x()) * int(Side::Right) +
+                    int(p.y() < bbox.min.y()) * int(Side::Bottom) +
+                    int(p.y() > bbox.max.y()) * int(Side::Top);
+        };
+
+        int sides_prev = sides(src.back());
+        int sides_this = sides(src.front());
+        const size_t last = cnt - 1;
+        for (size_t i = 0; i < last; ++ i) {
+            int sides_next = sides(src[i + 1]);
+            if (// This point is inside. Take it.
+                sides_this == 0 ||
+                // Either this point is outside and previous or next is inside, or
+                // the edge possibly cuts corner of the bounding box.
+                (sides_prev & sides_this & sides_next) == 0) {
+                out.emplace_back(src[i]);
+                sides_prev = sides_this;
+            } else {
+                // All the three points (this, prev, next) are outside at the same side.
+                // Ignore this point.
+            }
+            sides_this = sides_next;
+        }
+
+        // Never produce just a single point output polygon.
+        if (! out.empty())
+            if (int sides_next = sides(out.front());
+                // The last point is inside. Take it.
+                sides_this == 0 ||
+                // Either this point is outside and previous or next is inside, or
+                // the edge possibly cuts corner of the bounding box.
+                (sides_prev & sides_this & sides_next) == 0)
+                out.emplace_back(src.back());
+    }
+
+    void clip_clipper_polygon_with_subject_bbox(const Points &src, const BoundingBox &bbox, Points &out)
+        { clip_clipper_polygon_with_subject_bbox_templ(src, bbox, out); }
+    void clip_clipper_polygon_with_subject_bbox(const ZPoints &src, const BoundingBox &bbox, ZPoints &out)
+        { clip_clipper_polygon_with_subject_bbox_templ(src, bbox, out); }
+
+    template<typename PointType>
+    [[nodiscard]] std::vector<PointType> clip_clipper_polygon_with_subject_bbox_templ(const std::vector<PointType> &src, const BoundingBox &bbox)
+    {
+        std::vector<PointType> out;
+        clip_clipper_polygon_with_subject_bbox(src, bbox, out);
+        return out;
+    }
+
+    [[nodiscard]] Points clip_clipper_polygon_with_subject_bbox(const Points &src, const BoundingBox &bbox)
+        { return clip_clipper_polygon_with_subject_bbox_templ(src, bbox); }
+    [[nodiscard]] ZPoints clip_clipper_polygon_with_subject_bbox(const ZPoints &src, const BoundingBox &bbox)
+        { return clip_clipper_polygon_with_subject_bbox_templ(src, bbox); }
+
+    void clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox, Polygon &out)
+    {
+        clip_clipper_polygon_with_subject_bbox(src.points, bbox, out.points);
+    }
+
+    [[nodiscard]] Polygon clip_clipper_polygon_with_subject_bbox(const Polygon &src, const BoundingBox &bbox)
+    {
+        Polygon out;
+        clip_clipper_polygon_with_subject_bbox(src.points, bbox, out.points);
+        return out;
+    }
+
+    [[nodiscard]] Polygons clip_clipper_polygons_with_subject_bbox(const Polygons &src, const BoundingBox &bbox)
+    {
+        Polygons out;
+        out.reserve(src.size());
+        for (const Polygon &p : src)
+            out.emplace_back(clip_clipper_polygon_with_subject_bbox(p, bbox));
+        out.erase(
+            std::remove_if(out.begin(), out.end(), [](const Polygon &polygon) { return polygon.empty(); }),
+            out.end());
+        return out;
+    }
+    [[nodiscard]] Polygons clip_clipper_polygons_with_subject_bbox(const ExPolygon &src, const BoundingBox &bbox)
+    {
+        Polygons out;
+        out.reserve(src.num_contours());
+        out.emplace_back(clip_clipper_polygon_with_subject_bbox(src.contour, bbox));
+        for (const Polygon &p : src.holes)
+            out.emplace_back(clip_clipper_polygon_with_subject_bbox(p, bbox));
+        out.erase(
+            std::remove_if(out.begin(), out.end(), [](const Polygon &polygon) { return polygon.empty(); }),
+            out.end());
+        return out;
+    }
 }
 
 static ExPolygons PolyTreeToExPolygons(ClipperLib::PolyTree &&polytree)
@@ -169,7 +265,7 @@ static ClipperLib::Paths raw_offset(PathsProvider &&paths, float offset, Clipper
         co.ArcTolerance = miterLimit;
     else
         co.MiterLimit = miterLimit;
-    co.ShortestEdgeLength = double(std::abs(offset * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR));
+    co.ShortestEdgeLength = std::abs(offset * ClipperOffsetShortestEdgeFactor);
     for (const ClipperLib::Path &path : paths) {
         co.Clear();
         // Execute reorients the contours so that the outer most contour has a positive area. Thus the output
@@ -240,7 +336,7 @@ TResult clipper_union(
 
 // Perform union of input polygons using the positive rule, convert to ExPolygons.
 //FIXME is there any benefit of not doing the boolean / using pftEvenOdd?
-ExPolygons ClipperPaths_to_Slic3rExPolygons(const ClipperLib::Paths &input, bool do_union)
+inline ExPolygons ClipperPaths_to_Slic3rExPolygons(const ClipperLib::Paths &input, bool do_union)
 {
     return PolyTreeToExPolygons(clipper_union<ClipperLib::PolyTree>(input, do_union ? ClipperLib::pftNonZero : ClipperLib::pftEvenOdd));
 }
@@ -316,7 +412,7 @@ static int offset_expolygon_inner(const Slic3r::ExPolygon &expoly, const float d
             co.ArcTolerance = miterLimit;
         else
             co.MiterLimit = miterLimit;
-        co.ShortestEdgeLength = double(std::abs(delta * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR));
+        co.ShortestEdgeLength = std::abs(delta * ClipperOffsetShortestEdgeFactor);
         co.AddPath(expoly.contour.points, joinType, ClipperLib::etClosedPolygon);
         co.Execute(contours, delta);
     }
@@ -337,7 +433,7 @@ static int offset_expolygon_inner(const Slic3r::ExPolygon &expoly, const float d
                     co.ArcTolerance = miterLimit;
                 else
                     co.MiterLimit = miterLimit;
-                co.ShortestEdgeLength = double(std::abs(delta * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR));
+                co.ShortestEdgeLength = std::abs(delta * ClipperOffsetShortestEdgeFactor);
                 co.AddPath(hole.points, joinType, ClipperLib::etClosedPolygon);
                 ClipperLib::Paths out2;
                 // Execute reorients the contours so that the outer most contour has a positive area. Thus the output
@@ -438,10 +534,12 @@ Slic3r::Polygons offset(const Slic3r::SurfacesPtr &surfaces, const float delta, 
     { return to_polygons(expolygons_offset(surfaces, delta, joinType, miterLimit)); }
 Slic3r::ExPolygons offset_ex(const Slic3r::ExPolygon &expolygon, const float delta, ClipperLib::JoinType joinType, double miterLimit)
     //FIXME one may spare one Clipper Union call.
-    { return ClipperPaths_to_Slic3rExPolygons(expolygon_offset(expolygon, delta, joinType, miterLimit)); }
+    { return ClipperPaths_to_Slic3rExPolygons(expolygon_offset(expolygon, delta, joinType, miterLimit), /* do union */ false); }
 Slic3r::ExPolygons offset_ex(const Slic3r::ExPolygons &expolygons, const float delta, ClipperLib::JoinType joinType, double miterLimit)
     { return PolyTreeToExPolygons(expolygons_offset_pt(expolygons, delta, joinType, miterLimit)); }
 Slic3r::ExPolygons offset_ex(const Slic3r::Surfaces &surfaces, const float delta, ClipperLib::JoinType joinType, double miterLimit)
+    { return PolyTreeToExPolygons(expolygons_offset_pt(surfaces, delta, joinType, miterLimit)); }
+Slic3r::ExPolygons offset_ex(const Slic3r::SurfacesPtr &surfaces, const float delta, ClipperLib::JoinType joinType, double miterLimit)
     { return PolyTreeToExPolygons(expolygons_offset_pt(surfaces, delta, joinType, miterLimit)); }
 
 Polygons offset2(const ExPolygons &expolygons, const float delta1, const float delta2, ClipperLib::JoinType joinType, double miterLimit)
@@ -546,6 +644,8 @@ Slic3r::Polygons diff(const Slic3r::Polygon &subject, const Slic3r::Polygon &cli
     { return _clipper(ClipperLib::ctDifference, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::SinglePathProvider(clip.points), do_safety_offset); }
 Slic3r::Polygons diff(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
+Slic3r::Polygons diff_clipped(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset) 
+    { return diff(subject, ClipperUtils::clip_clipper_polygons_with_subject_bbox(clip, get_extents(subject).inflated(SCALED_EPSILON)), do_safety_offset); }
 Slic3r::Polygons diff(const Slic3r::Polygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 Slic3r::Polygons diff(const Slic3r::ExPolygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
@@ -556,6 +656,8 @@ Slic3r::Polygons diff(const Slic3r::Surfaces &subject, const Slic3r::Polygons &c
     { return _clipper(ClipperLib::ctDifference, ClipperUtils::SurfacesProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::Polygons intersection(const Slic3r::Polygon &subject, const Slic3r::Polygon &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper(ClipperLib::ctIntersection, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::SinglePathProvider(clip.points), do_safety_offset); }
+Slic3r::Polygons intersection(const Slic3r::Polygons &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper(ClipperLib::ctIntersection, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonProvider(clip), do_safety_offset); }
 Slic3r::Polygons intersection(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper(ClipperLib::ctIntersection, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::Polygons intersection(const Slic3r::ExPolygon &subject, const Slic3r::ExPolygon &clip, ApplySafetyOffset do_safety_offset)
@@ -576,6 +678,15 @@ Slic3r::Polygons union_(const Slic3r::ExPolygons &subject)
     { return _clipper(ClipperLib::ctUnion, ClipperUtils::ExPolygonsProvider(subject), ClipperUtils::EmptyPathsProvider(), ApplySafetyOffset::No); }
 Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::Polygons &subject2)
     { return _clipper(ClipperLib::ctUnion, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(subject2), ApplySafetyOffset::No); }
+Slic3r::Polygons union_(Slic3r::Polygons &&subject, const Slic3r::Polygons &subject2) { 
+    if (subject.empty())
+        return subject2;
+    if (subject2.empty())
+        return std::move(subject);
+    return union_(subject, subject2);
+}
+Slic3r::Polygons union_(const Slic3r::Polygons &subject, const Slic3r::ExPolygon &subject2)
+    { return _clipper(ClipperLib::ctUnion, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonProvider(subject2), ApplySafetyOffset::No); }
 
 template <typename TSubject, typename TClip>
 static ExPolygons _clipper_ex(ClipperLib::ClipType clipType, TSubject &&subject,  TClip &&clip, ApplySafetyOffset do_safety_offset, ClipperLib::PolyFillType fill_type = ClipperLib::pftNonZero)
@@ -585,6 +696,8 @@ Slic3r::ExPolygons diff_ex(const Slic3r::Polygons &subject, const Slic3r::Polygo
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::Polygons &subject, const Slic3r::Surfaces &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::SurfacesProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons diff_ex(const Slic3r::Polygon &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::Polygons &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::ExPolygon &subject, const Slic3r::Polygon &clip, ApplySafetyOffset do_safety_offset)
@@ -605,6 +718,8 @@ Slic3r::ExPolygons diff_ex(const Slic3r::Surfaces &subject, const Slic3r::Surfac
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SurfacesProvider(subject), ClipperUtils::SurfacesProvider(clip), do_safety_offset); }
 Slic3r::ExPolygons diff_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SurfacesPtrProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
+Slic3r::ExPolygons diff_ex(const Slic3r::SurfacesPtr &subject, const Slic3r::ExPolygons &clip, ApplySafetyOffset do_safety_offset)
+    { return _clipper_ex(ClipperLib::ctDifference, ClipperUtils::SurfacesPtrProvider(subject), ClipperUtils::ExPolygonsProvider(clip), do_safety_offset); }
 
 Slic3r::ExPolygons intersection_ex(const Slic3r::Polygons &subject, const Slic3r::Polygons &clip, ApplySafetyOffset do_safety_offset)
     { return _clipper_ex(ClipperLib::ctIntersection, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip), do_safety_offset); }
@@ -701,10 +816,14 @@ Polylines _clipper_pl_closed(ClipperLib::ClipType clipType, PathProvider1 &&subj
     return retval;
 }
 
+Slic3r::Polylines diff_pl(const Slic3r::Polyline &subject, const Slic3r::Polygons &clip)
+    { return _clipper_pl_open(ClipperLib::ctDifference, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::PolygonsProvider(clip)); }
 Slic3r::Polylines diff_pl(const Slic3r::Polylines &subject, const Slic3r::Polygons &clip)
     { return _clipper_pl_open(ClipperLib::ctDifference, ClipperUtils::PolylinesProvider(subject), ClipperUtils::PolygonsProvider(clip)); }
 Slic3r::Polylines diff_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygon &clip)
     { return _clipper_pl_open(ClipperLib::ctDifference, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::ExPolygonProvider(clip)); }
+Slic3r::Polylines diff_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygons &clip)
+    { return _clipper_pl_open(ClipperLib::ctDifference, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::ExPolygonsProvider(clip)); }
 Slic3r::Polylines diff_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygon &clip)
     { return _clipper_pl_open(ClipperLib::ctDifference, ClipperUtils::PolylinesProvider(subject), ClipperUtils::ExPolygonProvider(clip)); }
 Slic3r::Polylines diff_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygons &clip)
@@ -713,8 +832,14 @@ Slic3r::Polylines diff_pl(const Slic3r::Polygons &subject, const Slic3r::Polygon
     { return _clipper_pl_closed(ClipperLib::ctDifference, ClipperUtils::PolygonsProvider(subject), ClipperUtils::PolygonsProvider(clip)); }
 Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::Polygon &clip)
     { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::PolylinesProvider(subject), ClipperUtils::SinglePathProvider(clip.points)); }
+Slic3r::Polylines intersection_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygon &clip)
+    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::ExPolygonProvider(clip)); }
+Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygon &clip)
+    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::PolylinesProvider(subject), ClipperUtils::ExPolygonProvider(clip)); }
 Slic3r::Polylines intersection_pl(const Slic3r::Polyline &subject, const Slic3r::Polygons &clip)
     { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::PolygonsProvider(clip)); }
+Slic3r::Polylines intersection_pl(const Slic3r::Polyline &subject, const Slic3r::ExPolygons &clip)
+    { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::SinglePathProvider(subject.points), ClipperUtils::ExPolygonsProvider(clip)); }
 Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::Polygons &clip)
     { return _clipper_pl_open(ClipperLib::ctIntersection, ClipperUtils::PolylinesProvider(subject), ClipperUtils::PolygonsProvider(clip)); }
 Slic3r::Polylines intersection_pl(const Slic3r::Polylines &subject, const Slic3r::ExPolygons &clip)
@@ -830,7 +955,7 @@ ExPolygons simplify_polygons_ex(const Polygons &subject, bool preserve_collinear
     if (! preserve_collinear)
         return union_ex(simplify_polygons(subject, false));
 
-    ClipperLib::PolyTree polytree;    
+    ClipperLib::PolyTree polytree;
     ClipperLib::Clipper c;
     c.PreserveCollinear(true);
     c.StrictlySimple(true);
@@ -937,7 +1062,7 @@ ClipperLib::Path mittered_offset_path_scaled(const Points &contour, const std::v
 		};
 
 		// Minimum edge length, squared.
-		double lmin  = *std::max_element(deltas.begin(), deltas.end()) * CLIPPER_OFFSET_SHORTEST_EDGE_FACTOR;
+		double lmin  = *std::max_element(deltas.begin(), deltas.end()) * ClipperOffsetShortestEdgeFactor;
 		double l2min = lmin * lmin;
 		// Minimum angle to consider two edges to be parallel.
 		// Vojtech's estimate.

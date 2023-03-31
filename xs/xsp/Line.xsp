@@ -41,7 +41,7 @@
     Clone<Point> normal();
     Clone<Point> vector();
     double ccw(Point* point)
-        %code{% RETVAL = THIS->ccw(*point); %};
+        %code{% RETVAL = cross2((THIS->a - *point).cast<double>(), (THIS->b - THIS->a).cast<double>()); %};
 %{
 
 Line*
@@ -76,17 +76,3 @@ Line::coincides_with(line_sv)
 %}
 };
 
-
-%name{Slic3r::Linef3} class Linef3 {
-    Linef3(Vec3d* a, Vec3d* b)
-        %code{% RETVAL = new Linef3(*a, *b); %};
-    ~Linef3();
-    Clone<Linef3> clone()
-        %code{% RETVAL = THIS; %};
-    Ref<Vec3d> a()
-        %code{% RETVAL = &THIS->a; %};
-    Ref<Vec3d> b()
-        %code{% RETVAL = &THIS->b; %};
-    Clone<Vec3d> intersect_plane(double z);
-    void scale(double factor);
-};

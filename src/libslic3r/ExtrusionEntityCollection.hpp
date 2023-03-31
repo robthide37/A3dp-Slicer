@@ -44,13 +44,20 @@ public:
     }
     ~ExtrusionEntityCollection() override { clear(); }
     explicit operator ExtrusionPaths() const;
-    
+
+    ExtrusionEntitiesPtr::const_iterator    cbegin() const { return this->entities.cbegin(); }
+    ExtrusionEntitiesPtr::const_iterator    cend()   const { return this->entities.cend(); }
+    ExtrusionEntitiesPtr::const_iterator    begin()  const { return this->entities.cbegin(); }
+    ExtrusionEntitiesPtr::const_iterator    end()    const { return this->entities.cend(); }
+    ExtrusionEntitiesPtr::iterator          begin()        { return this->entities.begin(); }
+    ExtrusionEntitiesPtr::iterator          end()          { return this->entities.end(); }
+
     bool is_collection() const override { return true; }
     ExtrusionRole role() const override {
-        ExtrusionRole out = erNone;
+        ExtrusionRole out{ ExtrusionRole::None };
         for (const ExtrusionEntity *ee : entities) {
             ExtrusionRole er = ee->role();
-            out = (out == erNone || out == er) ? er : erMixed;
+            out = (out == ExtrusionRole::None || out == er) ? er : ExtrusionRole::Mixed;
         }
         return out;
     }
@@ -69,7 +76,11 @@ public:
         if (entities.empty())
             entities = std::move(src);
         else {
-            std::move(std::begin(src), std::end(src), std::back_inserter(entities));
+            entities.insert(entities.end(),
+                std::make_move_iterator(src.begin()),
+                std::make_move_iterator(src.end()));
+            // Removing pointers to polymorphic extrusions from the donor object
+            // so that they will not be deleted twice.
             src.clear();
         }
     }
@@ -85,12 +96,13 @@ public:
     }
     void replace(size_t i, const ExtrusionEntity &entity);
     void remove(size_t i);
-    static ExtrusionEntityCollection chained_path_from(const ExtrusionEntitiesPtr &extrusion_entities, const Point &start_near, ExtrusionRole role = erMixed);
-    ExtrusionEntityCollection chained_path_from(const Point &start_near, ExtrusionRole role = erMixed) const 
+    static ExtrusionEntityCollection chained_path_from(const ExtrusionEntitiesPtr &extrusion_entities, const Point &start_near, ExtrusionRole role = ExtrusionRole::Mixed);
+    ExtrusionEntityCollection chained_path_from(const Point &start_near, ExtrusionRole role = ExtrusionRole::Mixed) const
     	{ return this->no_sort ? *this : chained_path_from(this->entities, start_near, role); }
     void reverse() override;
     const Point& first_point() const override { return this->entities.front()->first_point(); }
     const Point& last_point() const override { return this->entities.back()->last_point(); }
+    const Point& middle_point() const override { return this->entities[this->entities.size() / 2]->middle_point(); }
     // Produce a list of 2D polygons covered by the extruded paths, offsetted by the extrusion width.
     // Increase the offset by scaled_epsilon to achieve an overlap, so a union will produce no gaps.
     void polygons_covered_by_width(Polygons &out, const float scaled_epsilon) const override;
@@ -102,6 +114,9 @@ public:
         { Polygons out; this->polygons_covered_by_width(out, scaled_epsilon); return out; }
     Polygons polygons_covered_by_spacing(const float scaled_epsilon = 0.f) const
         { Polygons out; this->polygons_covered_by_spacing(out, scaled_epsilon); return out; }
+    size_t size() const { return entities.size(); }
+    // Recursively count paths and loops contained in this collection. 
+    // this->items_count() >= this->size()
     size_t items_count() const;
     /// Returns a flattened copy of this ExtrusionEntityCollection. That is, all of the items in its entities vector are not collections.
     /// You should be iterating over flatten().entities if you are interested in the underlying ExtrusionEntities (and don't care about hierarchy).
@@ -117,12 +132,12 @@ public:
     };
 
     void collect_polylines(Polylines &dst) const override {
-        for (ExtrusionEntity* extrusion_entity : this->entities)
+        for (const ExtrusionEntity *extrusion_entity : this->entities)
             extrusion_entity->collect_polylines(dst);
     }
 
     void   collect_points(Points &dst) const override {
-        for (ExtrusionEntity* extrusion_entity : this->entities)
+        for (const ExtrusionEntity *extrusion_entity : this->entities)
             extrusion_entity->collect_points(dst);
     }
 

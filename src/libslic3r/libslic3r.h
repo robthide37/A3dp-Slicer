@@ -4,7 +4,6 @@
 #include "libslic3r_version.h"
 #define GCODEVIEWER_APP_NAME "PrusaSlicer G-code Viewer"
 #define GCODEVIEWER_APP_KEY  "PrusaSlicerGcodeViewer"
-#define GCODEVIEWER_BUILD_ID std::string("PrusaSlicer G-code Viewer-") + std::string(SLIC3R_VERSION) + std::string("-UNKNOWN")
 
 // this needs to be included early for MSVC (listing it in Build.PL is not enough)
 #include <memory>
@@ -22,6 +21,7 @@
 #include <cassert>
 #include <cmath>
 #include <type_traits>
+#include <optional>
 
 #ifdef _WIN32
 // On MSVC, std::deque degenerates to a list of pointers, which defeats its purpose of reducing allocator load and memory fragmentation.
@@ -33,12 +33,13 @@
 #include "Technologies.hpp"
 #include "Semver.hpp"
 
+using coord_t = 
 #if 1
 // Saves around 32% RAM after slicing step, 6.7% after G-code export (tested on PrusaSlicer 2.2.0 final).
-using coord_t = int32_t;
+    int32_t;
 #else
-//FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
-typedef int64_t coord_t;
+    //FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
+    int64_t;
 #endif
 
 using coordf_t = double;
@@ -109,7 +110,7 @@ template <typename T>
 inline void append(std::vector<T>& dest, const std::vector<T>& src)
 {
     if (dest.empty())
-        dest = src;
+        dest = src; // copy
     else
         dest.insert(dest.end(), src.begin(), src.end());
 }
@@ -120,19 +121,30 @@ inline void append(std::vector<T>& dest, std::vector<T>&& src)
     if (dest.empty())
         dest = std::move(src);
     else {
-        dest.reserve(dest.size() + src.size());
-        std::move(std::begin(src), std::end(src), std::back_inserter(dest));
+        dest.insert(dest.end(),
+            std::make_move_iterator(src.begin()),
+            std::make_move_iterator(src.end()));
+        // Release memory of the source contour now.
+        src.clear();
+        src.shrink_to_fit();
     }
-    src.clear();
-    src.shrink_to_fit();
+}
+
+template<class T, class... Args> // Arbitrary allocator can be used
+void clear_and_shrink(std::vector<T, Args...>& vec)
+{
+    // shrink_to_fit does not garantee the release of memory nor does it clear()
+    std::vector<T, Args...> tmp;
+    vec.swap(tmp);
+    assert(vec.capacity() == 0);
 }
 
 // Append the source in reverse.
 template <typename T>
 inline void append_reversed(std::vector<T>& dest, const std::vector<T>& src)
 {
-    if (dest.empty())
-        dest = src;
+    if (dest.empty()) 
+        dest = {src.rbegin(), src.rend()};
     else
         dest.insert(dest.end(), src.rbegin(), src.rend());
 }
@@ -142,11 +154,13 @@ template <typename T>
 inline void append_reversed(std::vector<T>& dest, std::vector<T>&& src)
 {
     if (dest.empty())
-        dest = std::move(src);
-    else {
-        dest.reserve(dest.size() + src.size());
-        std::move(std::rbegin(src), std::rend(src), std::back_inserter(dest));
-    }
+        dest = {std::make_move_iterator(src.rbegin),
+                std::make_move_iterator(src.rend)};
+    else
+        dest.insert(dest.end(), 
+            std::make_move_iterator(src.rbegin()),
+            std::make_move_iterator(src.rend()));
+    // Release memory of the source contour now.
     src.clear();
     src.shrink_to_fit();
 }
@@ -254,9 +268,17 @@ constexpr inline T lerp(const T& a, const T& b, Number t)
 }
 
 template <typename Number>
-constexpr inline bool is_approx(Number value, Number test_value)
+constexpr inline bool is_approx(Number value, Number test_value, Number precision = EPSILON)
 {
-    return std::fabs(double(value) - double(test_value)) < double(EPSILON);
+    return std::fabs(double(value) - double(test_value)) < double(precision);
+}
+
+template<typename Number>
+constexpr inline bool is_approx(const std::optional<Number> &value,
+                                const std::optional<Number> &test_value)
+{
+    return (!value.has_value() && !test_value.has_value()) ||
+        (value.has_value() && test_value.has_value() && is_approx<Number>(*value, *test_value));
 }
 
 // A meta-predicate which is true for integers wider than or equal to coord_t
@@ -327,9 +349,14 @@ public:
     Range(It b, It e) : from(std::move(b)), to(std::move(e)) {}
 
     // Some useful container-like methods...
-    inline size_t size() const { return end() - begin(); }
-    inline bool   empty() const { return size() == 0; }
+    inline size_t size() const { return std::distance(from, to); }
+    inline bool   empty() const { return from == to; }
 };
+
+template<class Cont> auto range(Cont &&cont)
+{
+    return Range{std::begin(cont), std::end(cont)};
+}
 
 template<class T, class = FloatingOnly<T>>
 constexpr T NaN = std::numeric_limits<T>::quiet_NaN();
@@ -337,6 +364,27 @@ constexpr T NaN = std::numeric_limits<T>::quiet_NaN();
 constexpr float NaNf = NaN<float>;
 constexpr double NaNd = NaN<double>;
 
+// Rounding up.
+// 1.5 is rounded to 2
+// 1.49 is rounded to 1
+// 0.5 is rounded to 1,
+// 0.49 is rounded to 0
+// -0.5 is rounded to 0,
+// -0.51 is rounded to -1,
+// -1.5 is rounded to -1.
+// -1.51 is rounded to -2.
+// If input is not a valid float (it is infinity NaN or if it does not fit)
+// the float to int conversion produces a max int on Intel and +-max int on ARM.
+template<typename I>
+inline IntegerOnly<I, I> fast_round_up(double a)
+{
+    // Why does Java Math.round(0.49999999999999994) return 1?
+    // https://stackoverflow.com/questions/9902968/why-does-math-round0-49999999999999994-return-1
+    return a == 0.49999999999999994 ? I(0) : I(floor(a + 0.5));
+}
+
+template<class T> using SamePair = std::pair<T, T>;
+
 } // namespace Slic3r
 
-#endif
+#endif // _libslic3r_h_
