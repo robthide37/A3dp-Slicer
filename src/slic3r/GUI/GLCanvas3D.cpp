@@ -954,9 +954,7 @@ wxDEFINE_EVENT(EVT_GLCANVAS_QUESTION_MARK, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_INCREASE_INSTANCES, Event<int>);
 wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_MOVED, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_ROTATED, SimpleEvent);
-#if ENABLE_WORLD_COORDINATE
 wxDEFINE_EVENT(EVT_GLCANVAS_RESET_SKEW, SimpleEvent);
-#endif // ENABLE_WORLD_COORDINATE
 wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_SCALED, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_FORCE_UPDATE, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_WIPETOWER_MOVED, Vec3dEvent);
@@ -1641,6 +1639,9 @@ void GLCanvas3D::render()
 #if ENABLE_GLMODEL_STATISTICS
     GLModel::render_statistics();
 #endif // ENABLE_GLMODEL_STATISTICS
+#if ENABLE_OBJECT_MANIPULATION_DEBUG
+    wxGetApp().obj_manipul()->render_debug_window();
+#endif // ENABLE_OBJECT_MANIPULATION_DEBUG
 
     std::string tooltip;
 
@@ -1811,7 +1812,6 @@ std::vector<int> GLCanvas3D::load_object(const Model& model, int obj_idx)
 
 void GLCanvas3D::mirror_selection(Axis axis)
 {
-#if ENABLE_WORLD_COORDINATE
     TransformationType transformation_type;
     if (wxGetApp().obj_manipul()->is_local_coordinates())
         transformation_type.set_local();
@@ -1822,9 +1822,7 @@ void GLCanvas3D::mirror_selection(Axis axis)
 
     m_selection.setup_cache();
     m_selection.mirror(axis, transformation_type);
-#else
-    m_selection.mirror(axis);
-#endif // ENABLE_WORLD_COORDINATE
+
     do_mirror(L("Mirror Object"));
     wxGetApp().obj_manipul()->set_dirty();
 }
@@ -2719,13 +2717,9 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
             else
                 displacement = multiplier * direction;
 
-#if ENABLE_WORLD_COORDINATE
             TransformationType trafo_type;
             trafo_type.set_relative();
             m_selection.translate(displacement, trafo_type);
-#else
-            m_selection.translate(displacement);
-#endif // ENABLE_WORLD_COORDINATE
             m_dirty = true;
         }
     );
@@ -3332,14 +3326,10 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 }
             }
 
-#if ENABLE_WORLD_COORDINATE
             m_moving = true;
             TransformationType trafo_type;
             trafo_type.set_relative();
             m_selection.translate(cur_pos - m_mouse.drag.start_position_3D, trafo_type);
-#else
-            m_selection.translate(cur_pos - m_mouse.drag.start_position_3D);
-#endif // ENABLE_WORLD_COORDINATE
             if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects)
                 update_sequential_clearance();
             wxGetApp().obj_manipul()->set_dirty();
@@ -3607,17 +3597,9 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
             ModelObject* model_object = m_model->objects[object_idx];
             if (model_object != nullptr) {
                 if (selection_mode == Selection::Instance)
-#if ENABLE_WORLD_COORDINATE
                     model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
-#else
-                    model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
-#endif // ENABLE_WORLD_COORDINATE
                 else if (selection_mode == Selection::Volume)
-#if ENABLE_WORLD_COORDINATE
                     model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
-#else
-                    model_object->volumes[volume_idx]->set_offset(v->get_volume_offset());
-#endif // ENABLE_WORLD_COORDINATE
 
                 object_moved = true;
                 model_object->invalidate_bounding_box();
@@ -3688,13 +3670,9 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     for (const GLVolume* v : m_volumes.volumes) {
         if (v->is_wipe_tower) {
             const Vec3d offset = v->get_volume_offset();
-#if ENABLE_WORLD_COORDINATE
             Vec3d rot_unit_x = v->get_volume_transformation().get_matrix().linear() * Vec3d::UnitX();
             double z_rot = std::atan2(rot_unit_x.y(), rot_unit_x.x());
             post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset.x(), offset.y(), z_rot)));
-#else
-            post_event(Vec3dEvent(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3d(offset.x(), offset.y(), v->get_volume_rotation().z())));
-#endif // ENABLE_WORLD_COORDINATE
         }
         const int object_idx = v->object_idx();
         if (object_idx < 0 || (int)m_model->objects.size() <= object_idx)
@@ -3711,22 +3689,10 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
         // Rotate instances/volumes.
         ModelObject* model_object = m_model->objects[object_idx];
         if (model_object != nullptr) {
-            if (selection_mode == Selection::Instance) {
-#if ENABLE_WORLD_COORDINATE
+            if (selection_mode == Selection::Instance)
                 model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
-#else
-                model_object->instances[instance_idx]->set_rotation(v->get_instance_rotation());
-                model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
-#endif // ENABLE_WORLD_COORDINATE
-            }
-            else if (selection_mode == Selection::Volume) {
-#if ENABLE_WORLD_COORDINATE
+            else if (selection_mode == Selection::Volume)
                 model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
-#else
-                model_object->volumes[volume_idx]->set_rotation(v->get_volume_rotation());
-                model_object->volumes[volume_idx]->set_offset(v->get_volume_offset());
-#endif // ENABLE_WORLD_COORDINATE
-            }
             model_object->invalidate_bounding_box();
         }
     }
@@ -3790,23 +3756,11 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
         // Rotate instances/volumes
         ModelObject* model_object = m_model->objects[object_idx];
         if (model_object != nullptr) {
-            if (selection_mode == Selection::Instance) {
-#if ENABLE_WORLD_COORDINATE
+            if (selection_mode == Selection::Instance)
                 model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
-#else
-                model_object->instances[instance_idx]->set_scaling_factor(v->get_instance_scaling_factor());
-                model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
-#endif // ENABLE_WORLD_COORDINATE
-            }
             else if (selection_mode == Selection::Volume) {
-#if ENABLE_WORLD_COORDINATE
                 model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
                 model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
-#else
-                model_object->instances[instance_idx]->set_offset(v->get_instance_offset());
-                model_object->volumes[volume_idx]->set_scaling_factor(v->get_volume_scaling_factor());
-                model_object->volumes[volume_idx]->set_offset(v->get_volume_offset());
-#endif // ENABLE_WORLD_COORDINATE
             }
             model_object->invalidate_bounding_box();
         }
@@ -3868,18 +3822,9 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
         ModelObject* model_object = m_model->objects[object_idx];
         if (model_object != nullptr) {
             if (selection_mode == Selection::Instance)
-#if ENABLE_WORLD_COORDINATE
                 model_object->instances[instance_idx]->set_transformation(v->get_instance_transformation());
-#else
-                model_object->instances[instance_idx]->set_mirror(v->get_instance_mirror());
-#endif // ENABLE_WORLD_COORDINATE
             else if (selection_mode == Selection::Volume)
-#if ENABLE_WORLD_COORDINATE
                 model_object->volumes[volume_idx]->set_transformation(v->get_volume_transformation());
-#else
-                model_object->volumes[volume_idx]->set_mirror(v->get_volume_mirror());
-#endif // ENABLE_WORLD_COORDINATE
-
             model_object->invalidate_bounding_box();
         }
     }
@@ -3902,7 +3847,6 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
     m_dirty = true;
 }
 
-#if ENABLE_WORLD_COORDINATE
 void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
 {
     if (m_model == nullptr)
@@ -3964,7 +3908,6 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
 
     m_dirty = true;
 }
-#endif // ENABLE_WORLD_COORDINATE
 
 void GLCanvas3D::update_gizmos_on_off_state()
 {
@@ -4143,7 +4086,6 @@ void GLCanvas3D::update_sequential_clearance()
         for (size_t i = 0; i < m_model->objects.size(); ++i) {
             ModelObject* model_object = m_model->objects[i];
             ModelInstance* model_instance0 = model_object->instances.front();
-#if ENABLE_WORLD_COORDINATE
             Geometry::Transformation trafo = model_instance0->get_transformation();
             trafo.set_offset({ 0.0, 0.0, model_instance0->get_offset().z() });
             const Polygon hull_2d = offset(model_object->convex_hull_2d(trafo.get_matrix()),
@@ -4151,14 +4093,6 @@ void GLCanvas3D::update_sequential_clearance()
                 // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
                 shrink_factor,
                 jtRound, mitter_limit).front();
-#else
-            Polygon hull_2d = offset(model_object->convex_hull_2d(Geometry::assemble_transform({ 0.0, 0.0, model_instance0->get_offset().z() }, model_instance0->get_rotation(),
-                model_instance0->get_scaling_factor(), model_instance0->get_mirror())),
-                // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
-                // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
-                shrink_factor,
-                jtRound, mitter_limit).front();
-#endif // ENABLE_WORLD_COORDINATE
 
             Pointf3s& cache_hull_2d = m_sequential_print_clearance.m_hull_2d_cache.emplace_back(Pointf3s());
             cache_hull_2d.reserve(hull_2d.points.size());
@@ -5745,9 +5679,9 @@ void GLCanvas3D::_render_selection()
     if (!m_gizmos.is_running())
         m_selection.render(scale_factor);
 
-#if ENABLE_WORLD_COORDINATE_DEBUG
+#if ENABLE_MATRICES_DEBUG
     m_selection.render_debug_window();
-#endif // ENABLE_WORLD_COORDINATE_DEBUG
+#endif // ENABLE_MATRICES_DEBUG
 }
 
 void GLCanvas3D::_render_sequential_clearance()
@@ -6163,18 +6097,11 @@ void GLCanvas3D::_render_sla_slices()
 
             for (const SLAPrintObject::Instance& inst : obj->instances()) {
                 const Camera& camera = wxGetApp().plater()->get_camera();
-#if ENABLE_WORLD_COORDINATE
                 Transform3d view_model_matrix = camera.get_view_matrix() *
                     Geometry::translation_transform({ unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0 }) *
                     Geometry::rotation_transform(inst.rotation * Vec3d::UnitZ());
                 if (obj->is_left_handed())
                     view_model_matrix = view_model_matrix * Geometry::scale_transform({ -1.0f, 1.0f, 1.0f });
-#else
-                const Transform3d view_model_matrix = camera.get_view_matrix() *
-                        Geometry::assemble_transform(Vec3d(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0),
-                        inst.rotation * Vec3d::UnitZ(), Vec3d::Ones(),
-                        obj->is_left_handed() ? /* The polygons are mirrored by X */ Vec3d(-1.0f, 1.0f, 1.0f) : Vec3d::Ones());
-#endif // ENABLE_WORLD_COORDINATE
 
                 shader->set_uniform("view_model_matrix", view_model_matrix);
                 shader->set_uniform("projection_matrix", camera.get_projection_matrix());
@@ -7325,11 +7252,10 @@ const ModelVolume *get_model_volume(const GLVolume &v, const Model &model)
 {
     const ModelVolume * ret = nullptr;
 
-    if (v.object_idx() < model.objects.size()) {
+    if (v.object_idx() < (int)model.objects.size()) {
         const ModelObject *obj = model.objects[v.object_idx()];
-        if (v.volume_idx() < obj->volumes.size()) {
+        if (v.volume_idx() < (int)obj->volumes.size())
             ret = obj->volumes[v.volume_idx()];
-        }
     }
 
     return ret;
