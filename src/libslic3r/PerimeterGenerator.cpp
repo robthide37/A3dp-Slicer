@@ -1033,6 +1033,18 @@ std::tuple<std::vector<ExtrusionPaths>, Polygons> generate_extra_perimeters_over
                 };
                 if (!first_overhang_is_closed_and_anchored) {
                     std::reverse(overhang_region.begin(), overhang_region.end());
+                } else {
+                    size_t min_dist_idx = 0;
+                    double min_dist = std::numeric_limits<double>::max();
+                    for (size_t i = 0; i < overhang_region.front().polyline.size(); i++) {
+                        Point p = overhang_region.front().polyline[i];
+                        if (double d = lower_layer_aabb_tree.distance_from_lines<true>(p) < min_dist) {
+                            min_dist = d;
+                            min_dist_idx = i;
+                        }
+                    }
+                    std::rotate(overhang_region.front().polyline.begin(), overhang_region.front().polyline.begin() + min_dist_idx,
+                                overhang_region.front().polyline.end());
                 }
                 auto first_unanchored          = std::stable_partition(overhang_region.begin(), overhang_region.end(), is_anchored);
                 int  index_of_first_unanchored = first_unanchored - overhang_region.begin();

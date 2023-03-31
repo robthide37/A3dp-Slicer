@@ -3508,6 +3508,17 @@ void GCodeProcessor::post_process()
                         ret += buf;
                     }
                 }
+                for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
+                    const TimeMachine& machine = m_time_processor.machines[i];
+                    PrintEstimatedStatistics::ETimeMode mode = static_cast<PrintEstimatedStatistics::ETimeMode>(i);
+                    if (mode == PrintEstimatedStatistics::ETimeMode::Normal || machine.enabled) {
+                        char buf[128];
+                        sprintf(buf, "; estimated first layer printing time (%s mode) = %s\n",
+                            (mode == PrintEstimatedStatistics::ETimeMode::Normal) ? "normal" : "silent",
+                            get_time_dhms(machine.layers_time.empty() ? 0.f : machine.layers_time.front()).c_str());
+                        ret += buf;
+                    }
+                }
             }
         }
 

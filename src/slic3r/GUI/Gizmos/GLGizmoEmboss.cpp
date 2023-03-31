@@ -22,6 +22,7 @@
 
 #include "libslic3r/NSVGUtils.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Preset.hpp"
 #include "libslic3r/ClipperUtils.hpp" // union_ex
 #include "libslic3r/AppConfig.hpp"    // store/load font list
 #include "libslic3r/Format/OBJ.hpp" // load obj file for default object
@@ -1326,7 +1327,7 @@ void GLGizmoEmboss::draw_text_input()
     // show warning about incorrectness view of font
     std::string warning_tool_tip;
     if (!exist_font) {
-        warning_tool_tip = _u8L("Can't write text by selected font.Try to choose another font.");
+        warning_tool_tip = _u8L("The text cannot be written using the selected font. Please try choosing a different font.");
     } else {
         auto append_warning = [&warning_tool_tip](std::string t) {
             if (!warning_tool_tip.empty()) 
@@ -1335,15 +1336,15 @@ void GLGizmoEmboss::draw_text_input()
         };
 
         if (priv::is_text_empty(m_text)) 
-            append_warning(_u8L("Embossed text can NOT contain only white spaces."));
+            append_warning(_u8L("Embossed text cannot contain only white spaces."));
         if (m_text_contain_unknown_glyph)
-            append_warning(_u8L("Text contain character glyph (represented by '?') unknown by font."));
+            append_warning(_u8L("Text contains character glyph (represented by '?') unknown by font."));
 
         const FontProp &prop = m_style_manager.get_font_prop();
-        if (prop.skew.has_value()) append_warning(_u8L("Text input do not show font skew."));
-        if (prop.boldness.has_value()) append_warning(_u8L("Text input do not show font boldness."));
+        if (prop.skew.has_value()) append_warning(_u8L("Text input doesn't show font skew."));
+        if (prop.boldness.has_value()) append_warning(_u8L("Text input doesn't show font boldness."));
         if (prop.line_gap.has_value())
-            append_warning(_u8L("Text input do not show gap between lines."));
+            append_warning(_u8L("Text input doesn't show gap between lines."));
         auto &ff         = m_style_manager.get_font_file_with_cache();
         float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file, scale);
         if (imgui_size > StyleManager::max_imgui_font_size)
@@ -1959,7 +1960,7 @@ void GLGizmoEmboss::draw_font_list()
 void GLGizmoEmboss::draw_model_type()
 {
     bool is_last_solid_part = m_volume->is_the_only_one_part();
-    std::string title = _u8L("Text is to object");
+    std::string title = _u8L("Operation");
     if (is_last_solid_part) {
         ImVec4 color{.5f, .5f, .5f, 1.f};
         m_imgui->text_colored(color, title.c_str());
@@ -1973,14 +1974,15 @@ void GLGizmoEmboss::draw_model_type()
     ModelVolumeType part = ModelVolumeType::MODEL_PART;
     ModelVolumeType type = m_volume->type();
 
-    if (ImGui::RadioButton(_u8L("Added").c_str(), type == part))
+    //TRN EmbossOperation
+    if (ImGui::RadioButton(_u8L("Join").c_str(), type == part))
         new_type = part;
     else if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Click to change text into object part.").c_str());
     ImGui::SameLine();
 
     std::string last_solid_part_hint = _u8L("You can't change a type of the last solid part of the object.");
-    if (ImGui::RadioButton(_u8L("Subtracted").c_str(), type == negative))
+    if (ImGui::RadioButton(_CTX_utf8(L_CONTEXT("Cut", "EmbossOperation"), "EmbossOperation").c_str(), type == negative))
         new_type = negative;
     else if (ImGui::IsItemHovered()) {
         if (is_last_solid_part)
@@ -2187,7 +2189,7 @@ void GLGizmoEmboss::draw_style_add_button()
         }else if (only_add_style) {
             ImGui::SetTooltip("%s", _u8L("Add style to my list.").c_str());
         } else {
-            ImGui::SetTooltip("%s", _u8L("Add as new named style.").c_str());
+            ImGui::SetTooltip("%s", _u8L("Save as new style.").c_str());
         }
     }
 
@@ -2203,32 +2205,47 @@ void GLGizmoEmboss::draw_delete_style_button() {
     bool is_last    = m_style_manager.get_styles().size() == 1;
     bool can_delete = is_stored && !is_last;
 
-    std::string title = _u8L("Remove style");
-    const char * popup_id = title.c_str();
-    static size_t next_style_index = std::numeric_limits<size_t>::max();
     if (draw_button(m_icons, IconType::erase, !can_delete)) {
+        std::string style_name = m_style_manager.get_style().name; // copy
+        wxString dialog_title = _L("Remove style");
+        size_t next_style_index = std::numeric_limits<size_t>::max();
+        Plater *plater = wxGetApp().plater();
+        bool exist_change = false;
         while (true) {
             // NOTE: can't use previous loaded activ index -> erase could change index
             size_t active_index = m_style_manager.get_style_index();
             next_style_index = (active_index > 0) ? active_index - 1 :
                                                    active_index + 1;
+            
             if (next_style_index >= m_style_manager.get_styles().size()) {
-                // can't remove last font style
-                // TODO: inform user
+                MessageDialog msg(plater, _L("Can't remove the last exising style."), dialog_title, wxICON_ERROR | wxOK);
+                msg.ShowModal();
                 break;
             }
+
             // IMPROVE: add function can_load?
             // clean unactivable styles
             if (!m_style_manager.load_style(next_style_index)) {
                 m_style_manager.erase(next_style_index);
+                exist_change = true;
                 continue;
             }
 
-            // load back
-            m_style_manager.load_style(active_index);
-            ImGui::OpenPopup(popup_id);
+            wxString message = GUI::format_wxstr(_L("Are you sure,\nthat you want permanently and unrecoverable \nremove \"%1%\" style?"), style_name);
+            MessageDialog msg(plater, message, dialog_title, wxICON_WARNING | wxYES | wxNO);
+            if (msg.ShowModal() == wxID_YES) {
+                // delete style
+                m_style_manager.erase(active_index);
+                exist_change = true;
+                process();
+            } else {
+                // load back style
+                m_style_manager.load_style(active_index);
+            }
             break;
         }
+        if (exist_change)
+            m_style_manager.store_styles_to_app_config(wxGetApp().app_config);
     }
 
     if (ImGui::IsItemHovered()) {
@@ -2238,25 +2255,6 @@ void GLGizmoEmboss::draw_delete_style_button() {
         else if (is_last)      tooltip = GUI::format(_L("Can't delete \"%1%\". It is last style."), style_name);
         else/*if(!is_stored)*/ tooltip = GUI::format(_L("Can't delete temporary style \"%1%\"."), style_name);        
         ImGui::SetTooltip("%s", tooltip.c_str());
-    }
-
-    if (ImGui::BeginPopupModal(popup_id)) {
-        m_imgui->disable_background_fadeout_animation();
-        const std::string &style_name  = m_style_manager.get_style().name;
-        std::string text_in_popup = GUI::format(_L("Are you sure,\nthat you want permanently and unrecoverable \nremove style \"%1%\"?"), style_name);
-        ImGui::Text("%s", text_in_popup.c_str());
-        if (ImGui::Button(_u8L("Yes").c_str())) {
-            size_t active_index = m_style_manager.get_style_index();
-            m_style_manager.load_style(next_style_index);
-            m_style_manager.erase(active_index);
-            m_style_manager.store_styles_to_app_config(wxGetApp().app_config);
-            ImGui::CloseCurrentPopup();
-            process();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button(_u8L("No").c_str()))
-            ImGui::CloseCurrentPopup();        
-        ImGui::EndPopup();
     }
 }
 
@@ -2304,7 +2302,7 @@ void GLGizmoEmboss::draw_style_list() {
         trunc_name = ImGuiWrapper::trunc(current_name, max_style_name_width);
     }
 
-    std::string title = _u8L("Presets");
+    std::string title = _u8L("Styles");
     if (m_style_manager.exist_stored_style())
         ImGui::Text("%s", title.c_str());
     else
@@ -2313,7 +2311,7 @@ void GLGizmoEmboss::draw_style_list() {
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     auto add_text_modify = [&is_modified](const std::string& name) {
         if (!is_modified) return name;
-        return name + " (" + _u8L("modified") + ")";
+        return name + Preset::suffix_modified();
     };
     std::optional<size_t> selected_style_index;
     if (ImGui::BeginCombo("##style_selector", add_text_modify(trunc_name).c_str())) {
@@ -2846,17 +2844,17 @@ void GLGizmoEmboss::draw_advanced()
     }
     m_imgui->disabled_end(); // !can_use_surface
     // TRN EmbossGizmo: font units
-    std::string units = _u8L("font points");
+    std::string units = _u8L("points");
     std::string units_fmt = "%.0f " + units;
     
-    // input gap between letters
+    // input gap between characters
     auto def_char_gap = stored_style ?
         &stored_style->prop.char_gap : nullptr;
 
     int half_ascent = font_info.ascent / 2;
     int min_char_gap = -half_ascent, max_char_gap = half_ascent;
-    if (rev_slider(tr.char_gap, font_prop.char_gap, def_char_gap, _u8L("Revert gap between letters"), 
-        min_char_gap, max_char_gap, units_fmt, _L("Distance between letters"))){
+    if (rev_slider(tr.char_gap, font_prop.char_gap, def_char_gap, _u8L("Revert gap between characters"), 
+        min_char_gap, max_char_gap, units_fmt, _L("Distance between characters"))){
         // Condition prevent recalculation when insertint out of limits value by imgui input
         if (!priv::Limits::apply(font_prop.char_gap, priv::limits.char_gap) ||
             !m_volume->text_configuration->style.prop.char_gap.has_value() ||
@@ -2918,7 +2916,7 @@ void GLGizmoEmboss::draw_advanced()
     m_imgui->disabled_begin(!allowe_surface_distance);
     
     const std::string undo_move_tooltip = _u8L("Undo translation");
-    const wxString move_tooltip = _L("Distance of the center of text from model surface");
+    const wxString move_tooltip = _L("Distance of the center of the text to the model surface.");
     bool is_moved = false;
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
     if (use_inch) {
