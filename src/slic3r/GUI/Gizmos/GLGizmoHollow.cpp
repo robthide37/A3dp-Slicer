@@ -137,11 +137,7 @@ void GLGizmoHollow::render_points(const Selection& selection)
     trafo.translation()(2) += shift_z;
     const Geometry::Transformation transformation{trafo};
 
-#if ENABLE_WORLD_COORDINATE
     const Transform3d instance_scaling_matrix_inverse = transformation.get_scaling_factor_matrix().inverse();
-#else
-    const Transform3d instance_scaling_matrix_inverse = vol->get_instance_transformation().get_matrix(true, true, false, true).inverse();
-#endif // ENABLE_WORLD_COORDINATE
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());

@@ -4935,18 +4935,21 @@ std::string get_sla_suptree_prefix(const DynamicPrintConfig &config)
     return slatree;
 }
 
-bool is_XL_printer(const DynamicPrintConfig &cfg)
+static bool is_XL_printer(const std::string& printer_model)
 {
     static constexpr const char *ALIGN_ONLY_FOR = "XL";
+    return boost::algorithm::contains(printer_model, ALIGN_ONLY_FOR);
+}
 
-    bool ret = false;
-
+bool is_XL_printer(const DynamicPrintConfig &cfg)
+{
     auto *printer_model = cfg.opt<ConfigOptionString>("printer_model");
+    return printer_model && is_XL_printer(printer_model->value);    
+}
 
-    if (printer_model)
-        ret = boost::algorithm::contains(printer_model->value, ALIGN_ONLY_FOR);
-
-    return ret;
+bool is_XL_printer(const PrintConfig &cfg)
+{
+    return is_XL_printer(cfg.printer_model.value);
 }
 
 } // namespace Slic3r

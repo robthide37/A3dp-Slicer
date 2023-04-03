@@ -31,7 +31,7 @@
 #include "I18N.hpp"
 
 #include <libnest2d/tools/benchmark.h>
-
+#include "format.hpp"
 
 namespace Slic3r {
 

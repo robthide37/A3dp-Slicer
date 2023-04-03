@@ -64,9 +64,7 @@
 #include "GUI_ObjectManipulation.hpp"
 #include "GUI_ObjectLayers.hpp"
 #include "GUI_Utils.hpp"
-#if ENABLE_WORLD_COORDINATE
 #include "GUI_Geometry.hpp"
-#endif // ENABLE_WORLD_COORDINATE
 #include "GUI_Factories.hpp"
 #include "wxExtensions.hpp"
 #include "MainFrame.hpp"
@@ -1548,10 +1546,8 @@ void Sidebar::update_mode()
 
     wxWindowUpdateLocker noUpdates(this);
 
-#if ENABLE_WORLD_COORDINATE
     if (m_mode == comSimple)
         p->object_manipulation->set_coordinates_type(ECoordinatesType::World);
-#endif // ENABLE_WORLD_COORDINATE
 
     p->object_list->get_sizer()->Show(m_mode > comSimple);
 
@@ -2117,9 +2113,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         view3D_canvas->Bind(EVT_GLCANVAS_WIPETOWER_MOVED, &priv::on_wipetower_moved, this);
         view3D_canvas->Bind(EVT_GLCANVAS_WIPETOWER_ROTATED, &priv::on_wipetower_rotated, this);
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_ROTATED, [this](SimpleEvent&) { update(); });
-#if ENABLE_WORLD_COORDINATE
         view3D_canvas->Bind(EVT_GLCANVAS_RESET_SKEW, [this](SimpleEvent&) { update(); });
-#endif // ENABLE_WORLD_COORDINATE
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_SCALED, [this](SimpleEvent&) { update(); });
         view3D_canvas->Bind(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, [this](Event<bool>& evt) { this->sidebar->enable_buttons(evt.data); });
         view3D_canvas->Bind(EVT_GLCANVAS_UPDATE_GEOMETRY, &priv::on_update_geometry, this);
@@ -3546,11 +3540,7 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
     new_volume->set_type(old_volume->type());
     new_volume->set_material_id(old_volume->material_id());
     new_volume->set_transformation(old_volume->get_transformation());
-#if ENABLE_WORLD_COORDINATE
     new_volume->translate(new_volume->get_transformation().get_matrix_no_offset() * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
-#else
-    new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
-#endif // ENABLE_WORLD_COORDINATE
     assert(!old_volume->source.is_converted_from_inches || !old_volume->source.is_converted_from_meters);
     if (old_volume->source.is_converted_from_inches)
         new_volume->convert_from_imperial_units();
@@ -3831,19 +3821,12 @@ void Plater::priv::reload_from_disk()
                 new_volume->config.apply(old_volume->config);
                 new_volume->set_type(old_volume->type());
                 new_volume->set_material_id(old_volume->material_id());
-#if ENABLE_WORLD_COORDINATE
                 new_volume->set_transformation(
                     old_volume->get_transformation().get_matrix() *
                     old_volume->source.transform.get_matrix_no_offset() *
                     Geometry::translation_transform(new_volume->source.mesh_offset - old_volume->source.mesh_offset) *
                     new_volume->source.transform.get_matrix_no_offset().inverse()
                     );
-#else
-                new_volume->set_transformation(Geometry::assemble_transform(old_volume->source.transform.get_offset()) *
-                                               old_volume->get_transformation().get_matrix(true) *
-                                               old_volume->source.transform.get_matrix(true));
-                new_volume->translate(new_volume->get_transformation().get_matrix(true) * (new_volume->source.mesh_offset - old_volume->source.mesh_offset));
-#endif // ENABLE_WORLD_COORDINATE
                 new_volume->source.object_idx = old_volume->source.object_idx;
                 new_volume->source.volume_idx = old_volume->source.volume_idx;
                 assert(!old_volume->source.is_converted_from_inches || !old_volume->source.is_converted_from_meters);
@@ -4372,11 +4355,7 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
             const bool is_some_full_instances = selection.is_single_full_instance() || 
                                                 selection.is_single_full_object() || 
                                                 selection.is_multiple_full_instance();
-#if ENABLE_WORLD_COORDINATE
             const bool is_part = selection.is_single_volume_or_modifier() && ! selection.is_any_connector();
-#else
-            const bool is_part = selection.is_single_volume() || selection.is_single_modifier();
-#endif // ENABLE_WORLD_COORDINATE
             if (is_some_full_instances)
                 menu = printer_technology == ptSLA ? menus.sla_object_menu() : menus.object_menu();
             else if (is_part)
@@ -4674,11 +4653,7 @@ bool Plater::priv::layers_height_allowed() const
 
 bool Plater::priv::can_mirror() const
 {
-#if ENABLE_WORLD_COORDINATE
     return !sidebar->obj_list()->has_selected_cut_object();
-#else
-    return !sidebar->obj_list()->has_selected_cut_object() && get_selection().is_from_single_instance();
-#endif // ENABLE_WORLD_COORDINATE
 }
 
 
