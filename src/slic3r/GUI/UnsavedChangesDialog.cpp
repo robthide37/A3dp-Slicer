@@ -857,10 +857,10 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection* dependent_
     m_tree = new DiffViewCtrl(this, wxSize(em * (add_new_value_column ? 80 : 60), em * 30));
     m_tree->AppendToggleColumn_(L"\u2714"      , DiffModel::colToggle, wxLinux ? 9 : 6);
     m_tree->AppendBmpTextColumn(""             , DiffModel::colIconText, 28);
-    m_tree->AppendBmpTextColumn(_L("Original Value"), DiffModel::colOldValue, 12);
-    m_tree->AppendBmpTextColumn(_L("Modified Value"), DiffModel::colModValue, 12);
+    m_tree->AppendBmpTextColumn(_L("Original value"), DiffModel::colOldValue, 12);
+    m_tree->AppendBmpTextColumn(_L("Modified value"), DiffModel::colModValue, 12);
     if (add_new_value_column)
-        m_tree->AppendBmpTextColumn(_L("New Value"), DiffModel::colNewValue, 12);
+        m_tree->AppendBmpTextColumn(_L("New value"), DiffModel::colNewValue, 12);
 
     // Add Buttons 
     wxFont      btn_font = this->GetFont().Scaled(1.4f);

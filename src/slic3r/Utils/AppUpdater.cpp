@@ -221,7 +221,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 	assert(file != NULL);
 	if (file == NULL) {
 	    std::string line1 = GUI::format(_u8L("Download from %1% couldn't start:"), data.url);
-		std::string line2 = GUI::format(_u8L("Can't create file at %1%."), tmp_path.string());
+		std::string line2 = GUI::format(_u8L("Can't create file at %1%"), tmp_path.string());
 		std::string message = GUI::format("%1%\n%2%", line1, line2);
 		BOOST_LOG_TRIVIAL(error) << message;
 		wxCommandEvent* evt = new wxCommandEvent(EVT_SLIC3R_APP_DOWNLOAD_FAILED);
@@ -266,7 +266,7 @@ boost::filesystem::path AppUpdater::priv::download_file(const DownloadAppData& d
 				return false;
 			}
 			if (file == NULL) {
-				error_message = GUI::format(_u8L("Can't create file at %1%."), tmp_path.string());
+				error_message = GUI::format(_u8L("Can't create file at %1%"), tmp_path.string());
 				return false;
 			}
 			try

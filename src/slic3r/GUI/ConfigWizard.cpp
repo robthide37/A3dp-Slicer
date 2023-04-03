@@ -1425,8 +1425,7 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
     append(box_allow_downloads);
 
     // TRN ConfigWizard : Downloader : %1% = "PrusaSlicer"
-    append_text(format_wxstr(_L(
-        "If enabled, %1% registers to start on custom URL on www.printables.com."
+    append_text(format_wxstr(_L("If enabled, %1% registers to start on custom URL on www.printables.com."
         " You will be able to use button with %1% logo to open models in this %1%."
         " The model will be downloaded into folder you choose bellow."
     ), SLIC3R_APP_NAME));
@@ -1761,7 +1760,7 @@ PageBuildVolume::PageBuildVolume(ConfigWizard* parent)
     : ConfigWizardPage(parent, _L("Build Volume"), _L("Build Volume"), 1)
     , build_volume(new DiamTextCtrl(this))
 {
-    append_text(_L("Set vertical size of your printer."));
+    append_text(_L("Set the printer height."));
 
     wxString value = "200";
     build_volume->SetValue(value);

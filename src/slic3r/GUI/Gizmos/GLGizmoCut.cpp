@@ -219,7 +219,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
         {"Type"         , _u8L("Type")},
         {"Style"        , _u8L("Style")},
         {"Shape"        , _u8L("Shape")},
-        {"Depth ratio"  , _u8L("Depth ratio")},
+        {"Depth"        , _u8L("Depth")},
         {"Size"         , _u8L("Size")},
     };
 
@@ -1413,7 +1413,7 @@ void GLGizmoCut3D::render_debug_input_window(float x)
 
     ImGui::Separator();
 
-    if (m_imgui->checkbox(_L("Render cut plane as circle"), m_cut_plane_as_circle))
+    if (m_imgui->checkbox(("Render cut plane as disc"), m_cut_plane_as_circle))
         m_plane.reset();
 
     ImGui::PushItemWidth(0.5f * m_label_width);
@@ -1765,7 +1765,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
             m_imgui->disabled_end();
         };
 
-        ImGuiWrapper::text(_L("After cut") + ": ");
+        ImGuiWrapper::text(_L("Cut result") + ": ");
         add_vertical_scaled_interval(0.5f);
 
         m_imgui->disabled_begin(has_connectors || m_keep_as_parts);
@@ -1785,14 +1785,14 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         add_vertical_scaled_interval(0.75f);
 
         m_imgui->disabled_begin(has_connectors);
-            ImGuiWrapper::text(_L("Cut to") + ":");
+            ImGuiWrapper::text(_L("Cut into") + ":");
 
             add_horizontal_scaled_interval(1.2f);
-            // TRN CutGizmo: RadioButton Cut to ...
+            // TRN CutGizmo: RadioButton Cut into ...
             if (m_imgui->radio_button(_L("Objects"), !m_keep_as_parts))
                 m_keep_as_parts = false;
             ImGui::SameLine();
-            // TRN CutGizmo: RadioButton Cut to ...
+            // TRN CutGizmo: RadioButton Cut into ...
             if (m_imgui->radio_button(_L("Parts"), m_keep_as_parts))
                 m_keep_as_parts = true;
 
@@ -1917,9 +1917,9 @@ void GLGizmoCut3D::render_input_window_warning() const
         m_imgui->text(out);
     }
     if (!m_keep_upper && !m_keep_lower)
-        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Invalid state. \nNo one part is selected for keep after cut"));
+        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Select at least one object to keep after cutting."));
     if (!has_valid_contour())
-        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Warning state. \nCut plane is placed out of object"));
+        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Cut plane is placed out of object"));
 }
 
 void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
