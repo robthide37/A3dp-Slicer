@@ -203,7 +203,7 @@ bool OctoPrint::test_with_resolved_ip(wxString &msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (!res) {
-                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : name));
                 }
             }
             catch (const std::exception&) {
@@ -252,7 +252,7 @@ bool OctoPrint::test(wxString& msg) const
                 const auto text = ptree.get_optional<std::string>("text");
                 res = validate_version_text(text);
                 if (! res) {
-                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : "OctoPrint"));
+                    msg = GUI::format_wxstr(_L("Mismatched type of print host: %s"), (text ? *text : name));
                 }
             }
             catch (const std::exception &) {
@@ -396,7 +396,7 @@ bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, Progr
             prorgess_fn(std::move(progress), cancel);
             if (cancel) {
                 // Upload was canceled
-                BOOST_LOG_TRIVIAL(info) << "Octoprint: Upload canceled";
+                BOOST_LOG_TRIVIAL(info) << name << ": Upload canceled";
                 result = false;
             }
         })
@@ -473,7 +473,7 @@ bool OctoPrint::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn p
             prorgess_fn(std::move(progress), cancel);
             if (cancel) {
                 // Upload was canceled
-                BOOST_LOG_TRIVIAL(info) << "Octoprint: Upload canceled";
+                BOOST_LOG_TRIVIAL(info) << name << ": Upload canceled";
                 res = false;
             }
         })
@@ -1125,6 +1125,18 @@ wxString PrusaConnect::get_test_ok_msg() const
 wxString PrusaConnect::get_test_failed_msg(wxString& msg) const
 {
     return GUI::format_wxstr("%s: %s", _L("Could not connect to Prusa Connect"), msg);
+}
+
+
+
+wxString Mainsail::get_test_ok_msg() const
+{
+    return _(L("Connection to Mainsail/Fluidd works correctly."));
+}
+
+wxString Mainsail::get_test_failed_msg(wxString& msg) const
+{
+    return GUI::format_wxstr("%s: %s", _L("Could not connect to MainSail/Fluidd"), msg);
 }
 
 }
