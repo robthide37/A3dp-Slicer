@@ -342,6 +342,13 @@ bool GLGizmoEmboss::init_create(ModelVolumeType volume_type)
         BOOST_LOG_TRIVIAL(error) << "Can't create text. Gizmo is not activabled.";
         return false;
     }
+    
+    // Check can't be inside is_activable() cause crash
+    // steps to reproduce: start App -> key 't' -> key 'delete'
+    if (wxGetApp().obj_list()->has_selected_cut_object()) {
+        BOOST_LOG_TRIVIAL(error) << "Can't create text on cut object";
+        return false;    
+    }
 
     m_style_manager.discard_style_changes();
 
@@ -552,8 +559,7 @@ bool GLGizmoEmboss::on_init()
 }
 
 bool GLGizmoEmboss::on_is_activable() const {
-    return wxGetApp().get_mode() != comSimple && 
-        !wxGetApp().obj_list()->has_selected_cut_object();
+    return wxGetApp().get_mode() != comSimple;
 }
 
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
