@@ -218,7 +218,7 @@ float estimate_curled_up_height(
         point.distance < params.malformation_distance_factors.second * flow_width) {
         // imagine the extrusion profile. The part that has been glued (melted) with the previous layer will be called anchored section
         // and the rest will be called curling section
-        float anchored_section = flow_width - point.distance;
+        // float anchored_section = flow_width - point.distance;
         float curling_section = point.distance;
 
         // after extruding, the curling (floating) part of the extrusion starts to shrink back to the rounded shape of the nozzle
@@ -234,14 +234,8 @@ float estimate_curled_up_height(
         
         if (point.curvature > 0.01){
             float radius = std::max(1.0 / point.curvature - flow_width / 2.0, 0.001);
-            // compute radius at the point where the extrusion stops touching the previous layer and starts curling
-            float radius_anchored_section_end = radius + anchored_section;
-            // target radius represents the radius of the extrusion curling end, after curling
-            // the layer_height term aproximates that the extrusion curling part, when raising to vertical position, will stop before reaching 
-            // perpendicular position, due to various forces.
-            float target_radius = radius_anchored_section_end + radius * flow_width / 100.0;
-            
-            float b = target_radius - radius_anchored_section_end;
+            float curling_t = radius / 100;
+            float b = curling_t * flow_width;
             float a = curling_section;
             float c = sqrt(std::max(0.0f,a*a - b*b));
 
