@@ -2406,11 +2406,12 @@ arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
 {
 //    static const double SIMPLIFY_TOLERANCE_MM = 0.1;
     
-    Vec3d rotation = get_rotation();
-    rotation.z()   = 0.;
-    Transform3d trafo_instance = Geometry::assemble_transform(get_offset().z() * Vec3d::UnitZ(), rotation, get_scaling_factor(), get_mirror());
+//    Vec3d rotation = get_rotation();
+//    rotation.z()   = 0.;
+//    Transform3d trafo_instance = Geometry::assemble_transform(get_offset().z() * Vec3d::UnitZ(), rotation, get_scaling_factor(), get_mirror());
 
-    Polygon p = get_object()->convex_hull_2d(trafo_instance);
+
+    Polygon p = get_object()->convex_hull_2d(this->get_matrix());
 
 //    if (!p.points.empty()) {
 //        Polygons pp{p};
@@ -2420,8 +2421,8 @@ arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
    
     arrangement::ArrangePolygon ret;
     ret.poly.contour = std::move(p);
-    ret.translation  = Vec2crd{scaled(get_offset(X)), scaled(get_offset(Y))};
-    ret.rotation     = get_rotation(Z);
+    ret.translation  = Vec2crd::Zero(); //Vec2crd{scaled(get_offset(X)), scaled(get_offset(Y))};
+    ret.rotation     = 0.;
 
     return ret;
 }
