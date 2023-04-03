@@ -806,8 +806,10 @@ void GLGizmoEmboss::on_set_state()
     }
 }
 
-void GLGizmoEmboss::data_changed() {
+void GLGizmoEmboss::data_changed(bool is_serializing) {
     set_volume_by_selection();
+    if (!is_serializing && m_volume == nullptr)
+        close();
 }
 
 void GLGizmoEmboss::on_start_dragging() { m_rotate_gizmo.start_dragging(); }

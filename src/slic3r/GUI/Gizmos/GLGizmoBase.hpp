@@ -174,7 +174,7 @@ public:
     /// <summary>
     /// Is called when data (Selection) is changed
     /// </summary>
-    virtual void data_changed(){};
+    virtual void data_changed(bool is_serializing){};
 
     /// <summary>
     /// Implement when want to process mouse events in gizmo

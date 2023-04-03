@@ -60,8 +60,8 @@ protected:
     void on_unregister_raycasters_for_picking() override;
     void on_render_input_window(float x, float y, float bottom_limit) override;
     bool on_is_selectable() const override { return false; }
-    void on_set_state() override;    
-    void data_changed() override; // selection changed
+    void on_set_state() override;
+    void data_changed(bool is_serializing) override; // selection changed
     void on_set_hover_id() override{ m_rotate_gizmo.set_hover_id(m_hover_id); }
     void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(); }
     void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(); }
