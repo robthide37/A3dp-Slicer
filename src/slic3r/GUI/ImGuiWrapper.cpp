@@ -1700,6 +1700,10 @@ void ImGuiWrapper::init_font(bool compress)
             assert(rect->Width == icon_sz);
             assert(rect->Height == icon_sz);
             std::vector<unsigned char> raw_data = load_svg(icon.second, icon_sz, icon_sz);
+            if (raw_data.empty()) {
+                rect_id++;
+                continue;
+            }
             const ImU32* pIn = (ImU32*)raw_data.data();
             for (int y = 0; y < icon_sz; y++) {
                 ImU32* pOut = (ImU32*)pixels + (rect->Y + y) * width + (rect->X);
