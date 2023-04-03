@@ -211,8 +211,8 @@ void JPSPathFinder::add_obstacles(const Layer *layer, const Point &global_origin
 
     this->print_z = layer->print_z;
     Lines obstacles;
-    obstacles.reserve(layer->malformed_lines.size());
-    for (const Line &l : layer->malformed_lines) { obstacles.push_back(Line{l.a + global_origin, l.b + global_origin}); }
+    obstacles.reserve(layer->curled_lines.size());
+    for (const Line &l : layer->curled_lines) { obstacles.push_back(Line{l.a + global_origin, l.b + global_origin}); }
     add_obstacles(obstacles);
 }
 

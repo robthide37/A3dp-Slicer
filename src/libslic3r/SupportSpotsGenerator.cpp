@@ -39,7 +39,7 @@
 #include "Geometry/ConvexHull.hpp"
 
 // #define DETAILED_DEBUG_LOGS
-#define DEBUG_FILES
+// #define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -234,7 +234,7 @@ float estimate_curled_up_height(
         
         if (point.curvature > 0.01){
             float radius = std::max(1.0 / point.curvature - flow_width / 2.0, 0.001);
-            float curling_t = radius / 100;
+            float curling_t = sqrt(radius / 100);
             float b = curling_t * flow_width;
             float a = curling_section;
             float c = sqrt(std::max(0.0f,a*a - b*b));
@@ -1066,7 +1066,7 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
     AABBTreeLines::LinesDistancer<ExtrusionLine> prev_layer_lines{};
 
     for (SupportLayer *l : layers) {
-        l->malformed_lines.clear();
+        l->curled_lines.clear();
         std::vector<ExtrusionLine> current_layer_lines;
 
         for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities) {
@@ -1102,7 +1102,7 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
 
         for (const ExtrusionLine &line : current_layer_lines) {
             if (line.curled_up_height > params.curling_tolerance_limit) {
-                l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)});
+                l->curled_lines.push_back(CurledLine{Point::new_scale(line.a), Point::new_scale(line.b), line.curled_up_height});
             }
         }
 
@@ -1138,7 +1138,7 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
     LD prev_layer_lines{};
 
     for (Layer *l : layers) {
-        l->malformed_lines.clear();
+        l->curled_lines.clear();
         std::vector<Linef> boundary_lines = l->lower_layer != nullptr ? to_unscaled_linesf(l->lower_layer->lslices) : std::vector<Linef>();
         AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary{std::move(boundary_lines)};
         std::vector<ExtrusionLine>           current_layer_lines;
@@ -1176,7 +1176,7 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
 
         for (const ExtrusionLine &line : current_layer_lines) {
             if (line.curled_up_height > params.curling_tolerance_limit) {
-                l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)});
+                l->curled_lines.push_back(CurledLine{Point::new_scale(line.a), Point::new_scale(line.b), line.curled_up_height});
             }
         }
 
