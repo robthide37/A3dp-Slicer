@@ -1122,10 +1122,11 @@ void Tab::update_wiping_button_visibility() {
         return; // ys_FIXME
     bool wipe_tower_enabled = dynamic_cast<ConfigOptionBool*>(  (m_preset_bundle->prints.get_edited_preset().config  ).option("wipe_tower"))->value;
     bool multiple_extruders = dynamic_cast<ConfigOptionFloats*>((m_preset_bundle->printers.get_edited_preset().config).option("nozzle_diameter"))->values.size() > 1;
+    bool single_extruder_multi_material = dynamic_cast<ConfigOptionBool*>((m_preset_bundle->printers.get_edited_preset().config).option("single_extruder_multi_material"))->value;
 
     auto wiping_dialog_button = wxGetApp().sidebar().get_wiping_dialog_button();
     if (wiping_dialog_button) {
-        wiping_dialog_button->Show(wipe_tower_enabled && multiple_extruders);
+        wiping_dialog_button->Show(wipe_tower_enabled && multiple_extruders && single_extruder_multi_material);
         wiping_dialog_button->GetParent()->Layout();
     }
 }

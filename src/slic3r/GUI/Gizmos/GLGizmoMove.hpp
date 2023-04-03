@@ -7,19 +7,15 @@
 namespace Slic3r {
 namespace GUI {
 
-#if ENABLE_WORLD_COORDINATE
 class Selection;
-#endif // ENABLE_WORLD_COORDINATE
 
 class GLGizmoMove3D : public GLGizmoBase
 {
     static const double Offset;
 
     Vec3d m_displacement{ Vec3d::Zero() };
-#if ENABLE_WORLD_COORDINATE
     Vec3d m_center{ Vec3d::Zero() };
     BoundingBoxf3 m_bounding_box;
-#endif // ENABLE_WORLD_COORDINATE
     double m_snap_step{ 1.0 };
     Vec3d m_starting_drag_position{ Vec3d::Zero() };
     Vec3d m_starting_box_center{ Vec3d::Zero() };
@@ -65,9 +61,7 @@ protected:
 
 private:
     double calc_projection(const UpdateData& data) const;
-#if ENABLE_WORLD_COORDINATE
     Transform3d local_transform(const Selection& selection) const;
-#endif // ENABLE_WORLD_COORDINATE
 };
 
 

@@ -8,8 +8,6 @@
 
 #include <GL/glew.h>
 
-#if ENABLE_WORLD_COORDINATE
-
 namespace Slic3r {
 namespace GUI {
 
@@ -69,5 +67,3 @@ void CoordAxes::render(const Transform3d& trafo, float emission_factor)
 
 } // GUI
 } // Slic3r
-
-#endif // ENABLE_WORLD_COORDINATE

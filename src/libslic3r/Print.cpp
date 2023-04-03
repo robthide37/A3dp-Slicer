@@ -396,7 +396,6 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print& print, Poly
 	        // FIXME: Arrangement has different parameters for offsetting (jtMiter, limit 2)
 	        // which causes that the warning will be showed after arrangement with the
 	        // appropriate object distance. Even if I set this to jtMiter the warning still shows up.
-#if ENABLE_WORLD_COORDINATE
         Geometry::Transformation trafo = model_instance0->get_transformation();
         trafo.set_offset({ 0.0, 0.0, model_instance0->get_offset().z() });
           it_convex_hull = map_model_object_to_convex_hull.emplace_hint(it_convex_hull, model_object_id,
@@ -405,15 +404,6 @@ bool Print::sequential_print_horizontal_clearance_valid(const Print& print, Poly
                   // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
                   float(scale_(0.5 * print.config().extruder_clearance_radius.value - BuildVolume::BedEpsilon)),
                   jtRound, scale_(0.1)).front());
-#else
-            it_convex_hull = map_model_object_to_convex_hull.emplace_hint(it_convex_hull, model_object_id,
-                offset(print_object->model_object()->convex_hull_2d(
-                    Geometry::assemble_transform({ 0.0, 0.0, model_instance0->get_offset().z() }, model_instance0->get_rotation(), model_instance0->get_scaling_factor(), model_instance0->get_mirror())),
-                    // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
-                    // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
-                    float(scale_(0.5 * print.config().extruder_clearance_radius.value - BuildVolume::BedEpsilon)),
-                    jtRound, scale_(0.1)).front());
-#endif // ENABLE_WORLD_COORDINATE
       }
 	    // Make a copy, so it may be rotated for instances.
 	    Polygon convex_hull0 = it_convex_hull->second;
@@ -1347,11 +1337,23 @@ const WipeTowerData& Print::wipe_tower_data(size_t extruders_cnt) const
 {
     // If the wipe tower wasn't created yet, make sure the depth and brim_width members are set to default.
     if (! is_step_done(psWipeTower) && extruders_cnt !=0) {
+        const_cast<Print*>(this)->m_wipe_tower_data.brim_width = m_config.wipe_tower_brim_width;
+
+        // Calculating depth should take into account currently set wiping volumes.
+        // For a long time, the initial preview would just use 900/width per toolchange (15mm on a 60mm wide tower)
+        // and it worked well enough. Let's try to do slightly better by accounting for the purging volumes.
+        std::vector<std::vector<float>> wipe_volumes = WipeTower::extract_wipe_volumes(m_config);
+        std::vector<float> max_wipe_volumes;
+        for (const std::vector<float>& v : wipe_volumes)
+            max_wipe_volumes.emplace_back(*std::max_element(v.begin(), v.end()));
+        float maximum = std::accumulate(max_wipe_volumes.begin(), max_wipe_volumes.end(), 0.f);
+        maximum = maximum * extruders_cnt / max_wipe_volumes.size();
 
         float width = float(m_config.wipe_tower_width);
+        float layer_height = 0.2f; // just assume fixed value, it will still be better than before.
 
-        const_cast<Print*>(this)->m_wipe_tower_data.depth = (900.f/width) * float(extruders_cnt - 1);
-        const_cast<Print*>(this)->m_wipe_tower_data.brim_width = m_config.wipe_tower_brim_width;
+        const_cast<Print*>(this)->m_wipe_tower_data.depth = (maximum/layer_height)/width;
+        const_cast<Print*>(this)->m_wipe_tower_data.height = -1.f; // unknown yet
     }
 
     return m_wipe_tower_data;
@@ -1363,13 +1365,7 @@ void Print::_make_wipe_tower()
     if (! this->has_wipe_tower())
         return;
 
-    // Get wiping matrix to get number of extruders and convert vector<double> to vector<float>:
-    std::vector<float> wiping_matrix(cast<float>(m_config.wiping_volumes_matrix.values));
-    // Extract purging volumes for each extruder pair:
-    std::vector<std::vector<float>> wipe_volumes;
-    const unsigned int number_of_extruders = (unsigned int)(sqrt(wiping_matrix.size())+EPSILON);
-    for (unsigned int i = 0; i<number_of_extruders; ++i)
-        wipe_volumes.push_back(std::vector<float>(wiping_matrix.begin()+i*number_of_extruders, wiping_matrix.begin()+(i+1)*number_of_extruders));
+    std::vector<std::vector<float>> wipe_volumes = WipeTower::extract_wipe_volumes(m_config);
 
     // Let the ToolOrdering class know there will be initial priming extrusions at the start of the print.
     m_wipe_tower_data.tool_ordering = ToolOrdering(*this, (unsigned int)-1, true);
@@ -1422,7 +1418,7 @@ void Print::_make_wipe_tower()
     //wipe_tower.set_zhop();
 
     // Set the extruder & material properties at the wipe tower object.
-    for (size_t i = 0; i < number_of_extruders; ++ i)
+    for (size_t i = 0; i < m_config.nozzle_diameter.size(); ++ i)
         wipe_tower.set_extruder(i, m_config);
 
     m_wipe_tower_data.priming = Slic3r::make_unique<std::vector<WipeTower::ToolChangeResult>>(

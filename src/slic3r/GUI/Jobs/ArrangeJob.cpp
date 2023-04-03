@@ -212,49 +212,6 @@ static coord_t brim_offset(const PrintObject &po, const ModelInstance &inst)
     return  has_outer_brim ? scaled(brim_width + brim_separation) : 0;
 }
 
-template<class It>
-Polygon support_layers_chull (Points &pts, It from_lyr, It to_lyr) {
-
-    size_t cap = 0;
-    for (auto it = from_lyr; it != to_lyr; ++it) {
-        for (const ExPolygon &expoly : (*it)->support_islands)
-            cap += expoly.contour.points.size();
-    }
-
-    pts.reserve(pts.size() + cap);
-
-    for (auto it = from_lyr; it != to_lyr; ++it) {
-        for (const ExPolygon &expoly : (*it)->support_islands)
-            std::copy(expoly.contour.begin(), expoly.contour.end(),
-                      std::back_inserter(pts));
-    }
-
-    Polygon ret = Geometry::convex_hull(pts);
-
-    return ret;
-}
-
-static void update_arrangepoly_fffprint(arrangement::ArrangePolygon &ret,
-                                        const PrintObject &po,
-                                        const ModelInstance &inst)
-{
-    auto laststep = po.last_completed_step();
-
-    coord_t infl = brim_offset(po, inst);
-
-    if (laststep < posCount && laststep > posSupportMaterial) {
-        Points pts = std::move(ret.poly.contour.points);
-        Polygon poly = support_layers_chull(pts,
-                                            po.support_layers().begin(),
-                                            po.support_layers().end());
-
-        ret.poly.contour = std::move(poly);
-        ret.poly.holes = {};
-    }
-
-    ret.inflation = infl;
-}
-
 arrangement::ArrangePolygon ArrangeJob::get_arrange_poly_(ModelInstance *mi)
 {
     arrangement::ArrangePolygon ap = get_arrange_poly(mi, m_plater);
@@ -442,7 +399,7 @@ arrangement::ArrangePolygon get_arrange_poly(ModelInstance *inst,
             plater->fff_print().get_print_object_by_model_object_id(obj_id);
 
         if (po) {
-            update_arrangepoly_fffprint(ap, *po, *inst);
+            ap.inflation = brim_offset(*po, *inst);
         }
     }
 
