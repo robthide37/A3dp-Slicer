@@ -64,7 +64,6 @@ void GLGizmoSlaSupports::data_changed()
 
     // If we triggered autogeneration before, check backend and fetch results if they are there
     if (mo) {
-        m_c->instances_hider()->set_hide_full_scene(true);
         const SLAPrintObject* po = m_c->selection_info()->print_object();
         const int required_step = get_min_sla_print_object_step();
         auto last_comp_step = static_cast<int>(po->last_completed_step());
@@ -83,6 +82,8 @@ void GLGizmoSlaSupports::data_changed()
             register_point_raycasters_for_picking();
         else
             update_point_raycasters_for_picking_transform();
+
+        m_c->instances_hider()->set_hide_full_scene(true);
     }
 
 //    m_parent.toggle_model_objects_visibility(false);

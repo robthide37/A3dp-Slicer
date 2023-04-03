@@ -468,6 +468,12 @@ public:
         int   alignment          = 0;
     };
 
+    enum class ESLAViewType
+    {
+        Original,
+        Processed
+    };
+
 private:
     wxGLCanvas* m_canvas;
     wxGLContext* m_context;
@@ -546,6 +552,26 @@ private:
     Tooltip m_tooltip;
     bool m_tooltip_enabled{ true };
     Slope m_slope;
+
+    class SLAView
+    {
+    public:
+        explicit SLAView(GLCanvas3D& parent) : m_parent(parent) {}
+        void allow_type_detection(bool allow) { m_allow_type_detection = allow; }
+        ESLAViewType detect_type(const GLVolumePtrs& volumes);
+        ESLAViewType get_type() const { return m_type; }
+        bool set_type(ESLAViewType type);
+        void update_volumes(GLVolumePtrs& volumes);
+        void render_switch_button();
+//        void render_debug_window();
+
+    private:
+        GLCanvas3D& m_parent;
+        ESLAViewType m_type{ ESLAViewType::Original };
+        bool m_allow_type_detection{ false };
+    };
+
+    SLAView m_sla_view;
 
     ArrangeSettings m_arrange_settings_fff, m_arrange_settings_sla,
         m_arrange_settings_fff_seq_print;
@@ -656,7 +682,7 @@ private:
     GLModel m_background;
 
 public:
-    explicit GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed);
+    GLCanvas3D(wxGLCanvas* canvas, Bed3D& bed);
     ~GLCanvas3D();
 
     bool is_initialized() const { return m_initialized; }
@@ -961,6 +987,22 @@ public:
     void apply_retina_scale(Vec2d &screen_coordinate) const;
 
     std::pair<SlicingParameters, const std::vector<double>> get_layers_height_data(int object_id);
+
+    void set_sla_view_type(ESLAViewType type) {
+        if (type == ESLAViewType::Processed) {
+            assert(!m_selection.is_empty());
+            const GLVolume* v = m_selection.get_first_volume();
+            m_selection.add_instance(v->object_idx(), v->instance_idx());
+            post_event(SimpleEvent(EVT_GLCANVAS_OBJECT_SELECT));
+        }
+
+        m_dirty = type != m_sla_view.get_type();
+
+        if (m_sla_view.set_type(type))
+            m_sla_view.update_volumes(m_volumes.volumes);
+    }
+
+    void allow_sla_view_type_detection(bool allow) { m_sla_view.allow_type_detection(allow); }
 
 private:
     bool _is_shown_on_screen() const;

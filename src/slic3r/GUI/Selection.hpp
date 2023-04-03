@@ -400,6 +400,9 @@ public:
     std::pair<BoundingBoxf3, Transform3d> get_bounding_box_in_reference_system(ECoordinatesType type) const;
 #endif // ENABLE_WORLD_COORDINATE
 
+    // Returns the screen space bounding box
+    BoundingBoxf get_screen_space_bounding_box();
+
     void setup_cache();
 
 #if ENABLE_WORLD_COORDINATE

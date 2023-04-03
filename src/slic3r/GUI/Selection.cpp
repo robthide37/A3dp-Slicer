@@ -890,6 +890,43 @@ std::pair<BoundingBoxf3, Transform3d> Selection::get_bounding_box_in_reference_s
 }
 #endif // ENABLE_WORLD_COORDINATE
 
+BoundingBoxf Selection::get_screen_space_bounding_box()
+{
+    BoundingBoxf ss_box;
+    if (!is_empty()) {
+        const auto& [box, box_trafo] = get_bounding_box_in_current_reference_system();
+
+        // vertices
+        std::vector<Vec3d> vertices = {
+            { box.min.x(), box.min.y(), box.min.z() },
+            { box.max.x(), box.min.y(), box.min.z() },
+            { box.max.x(), box.max.y(), box.min.z() },
+            { box.min.x(), box.max.y(), box.min.z() },
+            { box.min.x(), box.min.y(), box.max.z() },
+            { box.max.x(), box.min.y(), box.max.z() },
+            { box.max.x(), box.max.y(), box.max.z() },
+            { box.min.x(), box.max.y(), box.max.z() }
+        };
+
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Matrix4d projection_view_matrix = camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix();
+        const std::array<int, 4>& viewport = camera.get_viewport();
+
+        const double half_w = 0.5 * double(viewport[2]);
+        const double h = double(viewport[3]);
+        const double half_h = 0.5 * h;
+        for (const Vec3d& v : vertices) {
+            const Vec3d world = box_trafo * v;
+            const Vec4d clip = projection_view_matrix * Vec4d(world.x(), world.y(), world.z(), 1.0);
+            const Vec3d ndc = Vec3d(clip.x(), clip.y(), clip.z()) / clip.w();
+            const Vec2d ss = Vec2d(half_w * ndc.x() + double(viewport[0]) + half_w, h - (half_h * ndc.y() + double(viewport[1]) + half_h));
+            ss_box.merge(ss);
+        }
+    }
+
+    return ss_box;
+}
+
 void Selection::setup_cache()
 {
     if (!m_valid)

@@ -1072,6 +1072,107 @@ void GLCanvas3D::load_arrange_settings()
     m_arrange_settings_fff_seq_print.alignment = arr_alignment ;
 }
 
+static int processed_object_idx(const Model& model, const SLAPrint& sla_print, const GLVolumePtrs& volumes)
+{
+    for (const GLVolume* v : volumes) {
+        if (v->volume_idx() == -(int)slaposDrillHoles) {
+            const int mo_idx = v->object_idx();
+            const ModelObject* model_object = (mo_idx < (int)model.objects.size()) ? model.objects[mo_idx] : nullptr;
+            if (model_object != nullptr && model_object->instances[v->instance_idx()]->is_printable()) {
+                const SLAPrintObject* print_object = sla_print.get_print_object_by_model_object_id(model_object->id());
+                if (print_object != nullptr && print_object->get_parts_to_slice().size() > 1)
+                    return mo_idx;
+            }
+        }
+    }
+
+    return -1;
+};
+
+GLCanvas3D::ESLAViewType GLCanvas3D::SLAView::detect_type(const GLVolumePtrs& volumes)
+{
+    m_type = ESLAViewType::Original;
+    if (m_allow_type_detection) {
+        for (const GLVolume* v : volumes) {
+            if (v->volume_idx() == -(int)slaposDrillHoles) {
+                m_type = ESLAViewType::Processed;
+                break;
+            }
+        }
+    }
+
+    m_parent.set_sla_view_type(m_type);
+    m_allow_type_detection = false;
+    return m_type;
+}
+
+bool GLCanvas3D::SLAView::set_type(ESLAViewType type) {
+    if (m_type != type) {
+        m_type = type;
+        return true;
+    }
+    return false;
+}
+
+void GLCanvas3D::SLAView::update_volumes(GLVolumePtrs& volumes)
+{
+    const SLAPrint* sla_print = m_parent.sla_print();
+    const int mo_idx = (sla_print != nullptr) ? processed_object_idx(*m_parent.get_model(), *sla_print, volumes) : -1;
+    const bool show_processed = m_type == ESLAViewType::Processed && mo_idx != -1;
+
+    auto show = [show_processed](const GLVolume& v) {
+        return show_processed ? v.volume_idx() < 0 : v.volume_idx() != -(int)slaposDrillHoles;
+    };
+
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = m_parent.get_raycasters_for_picking(SceneRaycaster::EType::Volume);
+
+    for (GLVolume* v : volumes) {
+        v->is_active = v->object_idx() != mo_idx || show(*v);
+        auto it = std::find_if(raycasters->begin(), raycasters->end(), [v](std::shared_ptr<SceneRaycasterItem> item) { return item->get_raycaster() == v->mesh_raycaster.get(); });
+        if (it != raycasters->end())
+            (*it)->set_active(v->is_active);
+    }
+}
+
+void GLCanvas3D::SLAView::render_switch_button()
+{
+    const SLAPrint* sla_print = m_parent.sla_print();
+    const int mo_idx = (sla_print != nullptr) ? processed_object_idx(*m_parent.get_model(), *sla_print, m_parent.get_volumes().volumes) : -1;
+    if (mo_idx == -1)
+        return;
+
+    const BoundingBoxf ss_box = m_parent.get_selection().get_screen_space_bounding_box();
+    if (ss_box.defined) {
+        ImGuiWrapper& imgui = *wxGetApp().imgui();
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui::SetNextWindowPos(ImVec2((float)ss_box.max.x(), (float)ss_box.center().y()), ImGuiCond_Always, ImVec2(0.0, 0.5));
+        imgui.begin(std::string("SLAViewSwitch"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
+        const wxString btn_text = (m_type == ESLAViewType::Original) ? _L("Processed") : _L("Original");
+        if (imgui.button(btn_text)) {
+            switch (m_type)
+            {
+            case ESLAViewType::Original:  { m_parent.set_sla_view_type(ESLAViewType::Processed); break; }
+            case ESLAViewType::Processed: { m_parent.set_sla_view_type(ESLAViewType::Original); break; }
+            default:                      { assert(false); break; }
+            }
+        }
+        imgui.end();
+        ImGui::PopStyleColor(2);
+    }
+}
+
+//void GLCanvas3D::SLAView::render_debug_window()
+//{
+//    ImGuiWrapper& imgui = *wxGetApp().imgui();
+//    imgui.begin(std::string("SLAView"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+//    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Type:");
+//    ImGui::SameLine();
+//    const std::string text = (m_type == ESLAViewType::Original) ? "Original" : "Processed";
+//    imgui.text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), text);
+//    imgui.end();
+//}
+
 PrinterTechnology GLCanvas3D::current_printer_technology() const
 {
     return m_process->current_printer_technology();
@@ -1113,6 +1214,7 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)
     , m_render_sla_auxiliaries(true)
     , m_labels(*this)
     , m_slope(m_volumes)
+    , m_sla_view(*this)
 {
     if (m_canvas != nullptr) {
         m_timer.SetOwner(m_canvas);
@@ -1642,6 +1744,13 @@ void GLCanvas3D::render()
     GLModel::render_statistics();
 #endif // ENABLE_GLMODEL_STATISTICS
 
+    if (wxGetApp().plater()->is_view3D_shown() && current_printer_technology() == ptSLA) {
+        const GLGizmosManager::EType type = m_gizmos.get_current_type();
+        if (type == GLGizmosManager::EType::Undefined)
+            m_sla_view.render_switch_button();
+//        m_sla_view.render_debug_window();
+    }
+
     std::string tooltip;
 
 	// Negative coordinate means out of the window, likely because the window was deactivated.
@@ -2114,6 +2223,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 if (!instances[istep].empty())
                     m_volumes.load_object_auxiliary(print_object, object_idx, instances[istep], sla_steps[istep], state.step[istep].timestamp);
             }
+
+            if (m_sla_view.detect_type(m_volumes.volumes) == ESLAViewType::Processed)
+                update_object_list = true;
         }
 
         // Shift-up all volumes of the object so that it has the right elevation with respect to the print bed
@@ -2168,6 +2280,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         m_selection.instances_changed(instance_ids_selected);
     else
         m_selection.volumes_changed(map_glvolume_old_to_new);
+
+    if (printer_technology == ptSLA)
+        m_sla_view.update_volumes(m_volumes.volumes);
 
     m_gizmos.update_data();
     m_gizmos.refresh_on_off_state();

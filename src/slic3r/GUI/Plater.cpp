@@ -3448,8 +3448,10 @@ unsigned int Plater::priv::update_restart_background_process(bool force_update_s
 {
     // bitmask of UpdateBackgroundProcessReturnState
     unsigned int state = this->update_background_process(false);
-    if (force_update_scene || (state & UPDATE_BACKGROUND_PROCESS_REFRESH_SCENE) != 0)
+    if (force_update_scene || (state & UPDATE_BACKGROUND_PROCESS_REFRESH_SCENE) != 0) {
+        view3D->get_canvas3d()->allow_sla_view_type_detection(true);
         view3D->reload_scene(false);
+    }
 
     if (force_update_preview)
         this->preview->reload_print();
