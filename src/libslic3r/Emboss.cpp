@@ -506,9 +506,9 @@ bool priv::remove_self_intersections(ExPolygons &shape, unsigned max_iteration) 
             hole.translate(p);
             holes.push_back(hole);
         }
-        // union overlapped holes
-        if (holes.size() > 1)
-            holes = Slic3r::union_(holes);
+        // Union of overlapped holes is not neccessary
+        // Clipper calculate winding number separately for each input parameter
+        // if (holes.size() > 1) holes = Slic3r::union_(holes);
         shape = Slic3r::diff_ex(shape, holes, ApplySafetyOffset::Yes);
         
         // TODO: find where diff ex could create same neighbor
@@ -634,7 +634,6 @@ bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
             holes.push_back(hole);
         }
 
-        holes = Slic3r::union_(holes);
         shape = Slic3r::diff_ex(shape, holes, ApplySafetyOffset::Yes);
 
         // prepare for next loop
