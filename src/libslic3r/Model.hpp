@@ -1167,21 +1167,7 @@ public:
     arrangement::ArrangePolygon get_arrange_polygon() const;
     
     // Apply the arrange result on the ModelInstance
-    void apply_arrange_result(const Vec2d& offs, double rotation)
-    {
-        // write the transformation data into the model instance
-//        set_rotation(Z, rotation);
-//        set_offset(X, unscale<double>(offs(X)));
-//        set_offset(Y, unscale<double>(offs(Y)));
-        auto trafo = get_transformation().get_matrix();
-        trafo.translate(to_3d(unscaled(offs), 0.));
-        trafo.rotate(Eigen::AngleAxisd(rotation, Vec3d::UnitZ()));
-        m_transformation.set_matrix(trafo);
-
-//        set_rotation(Z, get_rotation().z() + rotation);
-//        set_offset(get_offset() + to_3d(unscaled(offs), 0.));
-        this->object->invalidate_bounding_box();
-    }
+    void apply_arrange_result(const Vec2d& offs, double rotation);
 
 protected:
     friend class Print;
