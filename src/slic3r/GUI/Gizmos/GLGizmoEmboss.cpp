@@ -248,7 +248,8 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
 
     const GLVolume *gl_volume = get_first_hovered_gl_volume(m_parent);
     DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
-    if (gl_volume != nullptr) {
+    bool is_simple_mode = wxGetApp().get_mode() == comSimple;
+    if (gl_volume != nullptr && !is_simple_mode) {
         // Try to cast ray into scene and find object for add volume
         if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager, m_parent)) {
             // When model is broken. It could appear that hit miss the object.
@@ -275,8 +276,9 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
     Vec2d screen_center(s.get_width() / 2., s.get_height() / 2.);
     DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
     const ModelObjectPtrs &objects = selection.get_model()->objects;
+    bool is_simple_mode = wxGetApp().get_mode() == comSimple;
     // No selected object so create new object
-    if (selection.is_empty() || object_idx < 0 || static_cast<size_t>(object_idx) >= objects.size()) {
+    if (selection.is_empty() || object_idx < 0 || static_cast<size_t>(object_idx) >= objects.size() || is_simple_mode) {
         // create Object on center of screen
         // when ray throw center of screen not hit bed it create object on center of bed
         priv::start_create_object_job(emboss_data, screen_center);
