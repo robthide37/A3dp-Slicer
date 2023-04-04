@@ -246,7 +246,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
     if (!init_create(volume_type))
         return;
 
-    GLVolume *gl_volume = get_first_hovered_gl_volume(m_parent);
+    const GLVolume *gl_volume = get_first_hovered_gl_volume(m_parent);
     DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
     if (gl_volume != nullptr) {
         // Try to cast ray into scene and find object for add volume
@@ -556,10 +556,6 @@ bool GLGizmoEmboss::on_init()
     // Set rotation gizmo upwardrotate
     m_rotate_gizmo.set_angle(PI / 2);
     return true;
-}
-
-bool GLGizmoEmboss::on_is_activable() const {
-    return wxGetApp().get_mode() != comSimple;
 }
 
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
