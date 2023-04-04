@@ -1705,18 +1705,11 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_object(unsigned int ob
 std::vector<unsigned int> Selection::get_volume_idxs_from_instance(unsigned int object_idx, unsigned int instance_idx) const
 {
     std::vector<unsigned int> idxs;
-
-    const PrinterTechnology pt = wxGetApp().plater()->printer_technology();
-
     for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
         const GLVolume* v = (*m_volumes)[i];
-        const ModelVolume *mv = get_model_volume(*v, *m_model);
-        if (pt == ptSLA && v->is_modifier && mv && mv->is_modifier())
-            continue;
         if (v->object_idx() == (int)object_idx && v->instance_idx() == (int)instance_idx)
             idxs.push_back(i);
     }
-
     return idxs;
 }
 
