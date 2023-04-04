@@ -37,6 +37,7 @@ namespace pt = boost::property_tree;
 
 #include "TextConfiguration.hpp"
 #include "EmbossShape.hpp"
+#include "ExPolygonSerialize.hpp" 
 
 #include <fast_float/fast_float.h>
 
@@ -158,18 +159,26 @@ static constexpr const char *FONT_DESCRIPTOR_TYPE_ATTR = "font_descriptor_type";
 static constexpr const char *CHAR_GAP_ATTR    = "char_gap";
 static constexpr const char *LINE_GAP_ATTR    = "line_gap";
 static constexpr const char *LINE_HEIGHT_ATTR = "line_height";
-static constexpr const char *DEPTH_ATTR       = "depth";
-static constexpr const char *USE_SURFACE_ATTR = "use_surface";
 static constexpr const char *BOLDNESS_ATTR    = "boldness";
 static constexpr const char *SKEW_ATTR        = "skew";
-static constexpr const char *DISTANCE_ATTR    = "distance";
-static constexpr const char *ANGLE_ATTR       = "angle";
 static constexpr const char *COLLECTION_NUMBER_ATTR = "collection";
 
 static constexpr const char *FONT_FAMILY_ATTR    = "family";
 static constexpr const char *FONT_FACE_NAME_ATTR = "face_name";
 static constexpr const char *FONT_STYLE_ATTR     = "style";
 static constexpr const char *FONT_WEIGHT_ATTR    = "weight";
+
+// Store / load of EmbossShape
+static constexpr const char *SHAPE_TAG = "slic3rpe:shape";
+static constexpr const char *SHAPE_EXPOLYS_ATTR = "expolygons";
+static constexpr const char *SHAPE_SCALE_ATTR   = "scale";
+static constexpr const char *SVG_FILE_PATH_ATTR = "filepath";
+
+// EmbossProjection
+static constexpr const char *DEPTH_ATTR       = "depth";
+static constexpr const char *USE_SURFACE_ATTR = "use_surface";
+// static constexpr const char *FIX_TRANSFORMATION_ATTR = "transform";
+
 
 const unsigned int VALID_OBJECT_TYPES_COUNT = 1;
 const char* VALID_OBJECT_TYPES[] =
@@ -422,6 +431,7 @@ namespace Slic3r {
                 MetadataList metadata;
                 RepairedMeshErrors mesh_stats;
                 std::optional<TextConfiguration> text_configuration;
+                std::optional<EmbossShape> shape_configuration;
                 VolumeMetadata(unsigned int first_triangle_id, unsigned int last_triangle_id)
                     : first_triangle_id(first_triangle_id)
                     , last_triangle_id(last_triangle_id)
@@ -576,6 +586,7 @@ namespace Slic3r {
         bool _handle_end_metadata();
 
         bool _handle_start_text_configuration(const char** attributes, unsigned int num_attributes);
+        bool _handle_start_shape_configuration(const char **attributes, unsigned int num_attributes);
 
         bool _create_object_instance(int object_id, const Transform3d& transform, const bool printable, unsigned int recur_counter);
 
@@ -1555,6 +1566,8 @@ namespace Slic3r {
             res = _handle_start_config_volume_mesh(attributes, num_attributes);
         else if (::strcmp(METADATA_TAG, name) == 0)
             res = _handle_start_config_metadata(attributes, num_attributes);
+        else if (::strcmp(SHAPE_TAG, name) == 0)
+            res = _handle_start_shape_configuration(attributes, num_attributes);
         else if (::strcmp(TEXT_TAG, name) == 0)
             res = _handle_start_text_configuration(attributes, num_attributes);
 
@@ -1927,7 +1940,6 @@ namespace Slic3r {
         }
 
         static void to_xml(std::stringstream &stream, const TextConfiguration &tc);
-        static void create_fix_and_store(std::stringstream &stream, TextConfiguration tc, const ModelVolume& volume);
         static std::optional<TextConfiguration> read(const char **attributes, unsigned int num_attributes);
     };
 
@@ -1935,16 +1947,53 @@ namespace Slic3r {
     {
         IdToMetadataMap::iterator object = m_objects_metadata.find(m_curr_config.object_id);
         if (object == m_objects_metadata.end()) {
-            add_error("Cannot assign volume mesh to a valid object");
+            add_error("Can not assign volume mesh to a valid object");
             return false;
         }
         if (object->second.volumes.empty()) {
-            add_error("Cannot assign mesh to a valid volume");
+            add_error("Can not assign mesh to a valid volume");
             return false;
         }
         ObjectMetadata::VolumeMetadata& volume = object->second.volumes.back();
         volume.text_configuration = TextConfigurationSerialization::read(attributes, num_attributes);
-        return volume.text_configuration.has_value();
+        if (!volume.text_configuration.has_value())
+            return false;
+
+        // Is 3mf version with shapes?
+        if (volume.shape_configuration.has_value())
+            return true;
+
+        // Back compatibility for 3mf version without shapes
+        const TextConfiguration &tc = *volume.text_configuration;
+        EmbossShape es;
+        es.fix_3mf_tr = tc.fix_3mf_tr;
+        const FontProp &fp = tc.style.prop;
+        EmbossProjection& ep = es.projection;
+        ep.depth = fp.emboss;
+        ep.use_surface = fp.use_surface;
+        volume.shape_configuration = es;
+        return true;
+    }
+
+    // Definition of read/write method for EmbossShape
+    static void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume& volume);
+    static std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned int num_attributes);
+
+    bool _3MF_Importer::_handle_start_shape_configuration(const char **attributes, unsigned int num_attributes)
+    {
+        IdToMetadataMap::iterator object = m_objects_metadata.find(m_curr_config.object_id);
+        if (object == m_objects_metadata.end()) {
+            add_error("Can not assign volume mesh to a valid object");
+            return false;
+        }
+        auto &volumes = object->second.volumes;
+        if (volumes.empty()) {
+            add_error("Can not assign mesh to a valid volume");
+            return false;
+        }
+        ObjectMetadata::VolumeMetadata &volume = volumes.back();
+        volume.shape_configuration = read_emboss_shape(attributes, num_attributes);
+        return volume.shape_configuration.has_value();
     }
 
     bool _3MF_Importer::_create_object_instance(int object_id, const Transform3d& transform, const bool printable, unsigned int recur_counter)
@@ -2227,22 +2276,11 @@ namespace Slic3r {
             volume->supported_facets.shrink_to_fit();
             volume->seam_facets.shrink_to_fit();
             volume->mmu_segmentation_facets.shrink_to_fit();
-            auto &tc = volume_data.text_configuration;
-            if (tc.has_value()) {
+
+            if (auto &es = volume_data.shape_configuration; es.has_value())
+                volume->emboss_shape = std::move(es);            
+            if (auto &tc = volume_data.text_configuration; tc.has_value())
                 volume->text_configuration = std::move(tc);
-
-                //// Transformation before store to 3mf
-                //const Transform3d &pre_trmat = *tc->fix_3mf_tr;
-                //// Cannot use source tranformation
-                //// When store transformed againg to 3mf it is not modified !!!
-                //// const Transform3d &pre_trmat = volume->source.transform.get_matrix();
-
-                //// create fix transformation
-                //assert(tc->fix_3mf_tr.has_value());
-                //volume->text_configuration->fix_3mf_tr =
-                //    pre_trmat.inverse() *
-                //    volume->get_transformation().get_matrix();
-            }
             
             // apply the remaining volume's metadata
             for (const Metadata& metadata : volume_data.metadata) {
@@ -3315,11 +3353,14 @@ namespace Slic3r {
                     for (const std::string& key : volume->config.keys()) {
                         stream << "   <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << volume->config.opt_serialize(key) << "\"/>\n";
                     }
-                                                        
-                    // stores volume's text data
-                    const auto &tc = volume->text_configuration;
-                    if (tc.has_value())
-                        TextConfigurationSerialization::create_fix_and_store(stream, *tc, *volume);                    
+
+                    if (const std::optional<EmbossShape> &es = volume->emboss_shape;
+                        es.has_value())
+                        to_xml(stream, *es, *volume);
+                    
+                    if (const std::optional<TextConfiguration> &tc = volume->text_configuration;
+                        tc.has_value())
+                        TextConfigurationSerialization::to_xml(stream, *tc);
 
                     // stores mesh's statistics
                     const RepairedMeshErrors& stats = volume->mesh().stats().repaired_errors;
@@ -3507,10 +3548,10 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
 
     stream << TEXT_DATA_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(tc.text) << "\" ";
     // font item
-    const EmbossStyle &fi = tc.style;
-    stream << STYLE_NAME_ATTR <<  "=\"" << xml_escape_double_quotes_attribute_value(fi.name) << "\" ";
-    stream << FONT_DESCRIPTOR_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(fi.path) << "\" ";
-    stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::get_name(fi.type) << "\" ";
+    const EmbossStyle &style = tc.style;
+    stream << STYLE_NAME_ATTR <<  "=\"" << xml_escape_double_quotes_attribute_value(style.name) << "\" ";
+    stream << FONT_DESCRIPTOR_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(style.path) << "\" ";
+    stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::get_name(style.type) << "\" ";
 
     // font property
     const FontProp &fp = tc.style.prop;
@@ -3520,17 +3561,10 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
         stream << LINE_GAP_ATTR << "=\"" << *fp.line_gap << "\" ";
 
     stream << LINE_HEIGHT_ATTR << "=\"" << fp.size_in_mm << "\" ";
-    stream << DEPTH_ATTR << "=\"" << fp.emboss << "\" ";
-    if (fp.use_surface)
-        stream << USE_SURFACE_ATTR << "=\"" << 1 << "\" ";
     if (fp.boldness.has_value())
         stream << BOLDNESS_ATTR << "=\"" << *fp.boldness << "\" ";
     if (fp.skew.has_value())
         stream << SKEW_ATTR << "=\"" << *fp.skew << "\" ";
-    if (fp.distance.has_value())
-        stream << DISTANCE_ATTR << "=\"" << *fp.distance << "\" ";
-    if (fp.angle.has_value())
-        stream << ANGLE_ATTR << "=\"" << *fp.angle << "\" ";
     if (fp.collection_number.has_value())
         stream << COLLECTION_NUMBER_ATTR << "=\"" << *fp.collection_number << "\" ";
     // font descriptor
@@ -3543,50 +3577,7 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
     if (fp.weight.has_value())
         stream << FONT_WEIGHT_ATTR << "=\"" << *fp.weight << "\" ";
 
-    // FIX of baked transformation
-    assert(tc.fix_3mf_tr.has_value());
-    stream << TRANSFORM_ATTR << "=\"";
-    _3MF_Exporter::add_transformation(stream, *tc.fix_3mf_tr);
-    stream << "\" ";
-
     stream << "/>\n"; // end TEXT_TAG
-}
-
-void TextConfigurationSerialization::create_fix_and_store(
-    std::stringstream &stream, TextConfiguration tc, const ModelVolume &volume)
-{
-    const auto& vertices = volume.mesh().its.vertices;
-    assert(!vertices.empty());
-    if (vertices.empty()) { 
-        to_xml(stream, tc);
-        return; 
-    }
-
-    // IMPROVE: check if volume was modified (translated, rotated OR scaled)
-    // when no change do not calculate transformation only store original fix matrix
-
-    // Create transformation used after load actual stored volume
-    const Transform3d &actual_trmat = volume.get_transformation().get_matrix();
-    Vec3d min = actual_trmat * vertices.front().cast<double>();
-    Vec3d max = min;
-    for (const Vec3f &v : vertices) {
-        Vec3d vd = actual_trmat * v.cast<double>();
-        for (size_t i = 0; i < 3; ++i) {
-            if (min[i] > vd[i]) min[i] = vd[i];
-            if (max[i] < vd[i]) max[i] = vd[i];
-        }
-    }
-    Vec3d center = (max + min) / 2;
-    Transform3d post_trmat = Transform3d::Identity();
-    post_trmat.translate(center);
-
-    Transform3d fix_trmat = actual_trmat.inverse() * post_trmat;    
-    if (!tc.fix_3mf_tr.has_value()) {
-        tc.fix_3mf_tr = fix_trmat;
-    } else if (!fix_trmat.isApprox(Transform3d::Identity(), 1e-5)) {
-        tc.fix_3mf_tr = *tc.fix_3mf_tr * fix_trmat;
-    }
-    to_xml(stream, tc);
 }
 
 std::optional<TextConfiguration> TextConfigurationSerialization::read(const char **attributes, unsigned int num_attributes)
@@ -3602,19 +3593,11 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     float skew = get_attribute_value_float(attributes, num_attributes, SKEW_ATTR);
     if (std::fabs(skew) > std::numeric_limits<float>::epsilon())
         fp.skew = skew;
-    float distance = get_attribute_value_float(attributes, num_attributes, DISTANCE_ATTR);
-    if (std::fabs(distance) > std::numeric_limits<float>::epsilon())
-        fp.distance = distance;
-    int use_surface = get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR);
-    if (use_surface == 1) fp.use_surface = true;
-    float angle = get_attribute_value_float(attributes, num_attributes, ANGLE_ATTR);
-    if (std::fabs(angle) > std::numeric_limits<float>::epsilon())
-        fp.angle = angle;
+    
     int collection_number = get_attribute_value_int(attributes, num_attributes, COLLECTION_NUMBER_ATTR);
     if (collection_number > 0) fp.collection_number = static_cast<unsigned int>(collection_number);
 
     fp.size_in_mm = get_attribute_value_float(attributes, num_attributes, LINE_HEIGHT_ATTR);
-    fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
 
     std::string family = get_attribute_value_string(attributes, num_attributes, FONT_FAMILY_ATTR);
     if (!family.empty()) fp.family = family;
@@ -3629,17 +3612,103 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
     std::string type_str = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_TYPE_ATTR);
     EmbossStyle::Type type = TextConfigurationSerialization::get_type(type_str);
-    EmbossStyle fi{ style_name, std::move(font_descriptor), type, std::move(fp) };
 
     std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
+
+    // Read of old fashion save style for Back compatibility
+    std::optional<Transform3d> fix_tr_mat;
+    std::string fix_tr_mat_str = get_attribute_value_string(attributes, num_attributes, TRANSFORM_ATTR);
+    if (!fix_tr_mat_str.empty()) 
+        fix_tr_mat = get_transform_from_3mf_specs_string(fix_tr_mat_str);
+    if (get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR) == 1)
+        fp.use_surface = true;
+    fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
+
+    EmbossStyle fi{style_name, std::move(font_descriptor), type, std::move(fp)};
+    return TextConfiguration{std::move(fi), std::move(text), std::move(fix_tr_mat)};
+}
+
+namespace {
+Transform3d create_fix(const std::optional<Transform3d> &prev, const ModelVolume &volume)
+{
+    // IMPROVE: check if volume was modified (translated, rotated OR scaled)
+    // when no change do not calculate transformation only store original fix matrix
+
+    // Create transformation used after load actual stored volume
+    const Transform3d &actual_trmat = volume.get_matrix();
+
+    const auto &vertices = volume.mesh().its.vertices;
+    Vec3d       min      = actual_trmat * vertices.front().cast<double>();
+    Vec3d       max      = min;
+    for (const Vec3f &v : vertices) {
+        Vec3d vd = actual_trmat * v.cast<double>();
+        for (size_t i = 0; i < 3; ++i) {
+            if (min[i] > vd[i])
+                min[i] = vd[i];
+            if (max[i] < vd[i])
+                max[i] = vd[i];
+        }
+    }
+    Vec3d       center     = (max + min) / 2;
+    Transform3d post_trmat = Transform3d::Identity();
+    post_trmat.translate(center);
+
+    Transform3d fix_trmat = actual_trmat.inverse() * post_trmat;
+    if (!prev.has_value())
+        return fix_trmat;
+
+    // check whether fix somehow differ previous
+    if (fix_trmat.isApprox(Transform3d::Identity(), 1e-5))
+        return *prev;
+
+    return *prev * fix_trmat;
+}
+
+std::string to_string(const ExPolygons& expolygons){
+    return {};
+}
+
+} // namespace
+
+void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume &volume) {
+    stream << "   <" << SHAPE_TAG << " ";    
+    stream << SVG_FILE_PATH_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(es.svg_file_path) << "\" ";
+    stream << SHAPE_SCALE_ATTR << "=\"" << es.scale << "\" ";
+
+    std::string expolygons_str = to_string(es.shapes); // cereal serialize expolygons 
+    stream << SHAPE_EXPOLYS_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(expolygons_str) << "\" ";
+
+    // projection
+    const EmbossProjection &p = es.projection;
+    stream << DEPTH_ATTR << "=\"" << p.depth << "\" ";
+    if (p.use_surface)
+        stream << USE_SURFACE_ATTR << "=\"" << 1 << "\" ";
+        
+    // FIX of baked transformation
+    Transform3d fix = create_fix(es.fix_3mf_tr, volume);
+    stream << TRANSFORM_ATTR << "=\"";
+    _3MF_Exporter::add_transformation(stream, fix);
+    stream << "\" ";
+    stream << "/>\n"; // end SHAPE_TAG
+}
+
+std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned int num_attributes) {
+    ExPolygons shapes;
+    double scale = get_attribute_value_float(attributes, num_attributes, SHAPE_SCALE_ATTR);
+
+    EmbossProjection projection;
+    projection.depth = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
+    int use_surface  = get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR);
+    if (use_surface == 1)
+        projection.use_surface = true;     
 
     std::optional<Transform3d> fix_tr_mat;
     std::string fix_tr_mat_str = get_attribute_value_string(attributes, num_attributes, TRANSFORM_ATTR);
     if (!fix_tr_mat_str.empty()) { 
         fix_tr_mat = get_transform_from_3mf_specs_string(fix_tr_mat_str);
     }
-
-    return TextConfiguration{std::move(fi), std::move(text), std::move(fix_tr_mat)};
+    std::string file_path = get_attribute_value_string(attributes, num_attributes, SVG_FILE_PATH_ATTR);
+    return EmbossShape{std::move(shapes), scale, std::move(projection), std::move(fix_tr_mat), std::move(file_path)};
 }
 
 
