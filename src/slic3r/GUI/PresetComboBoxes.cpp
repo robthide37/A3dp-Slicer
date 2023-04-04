@@ -776,7 +776,7 @@ void PlaterPresetComboBox::show_edit_menu()
         const PhysicalPrinter& pp = m_preset_bundle->physical_printers.get_selected_printer();
         std::string host = pp.config.opt_string("print_host");
         if (!host.empty()) {
-            append_menu_item(menu, wxID_ANY, _L("Open physical printer URL"), "",
+            append_menu_item(menu, wxID_ANY, _L("Open the physical printer URL"), "",
                 [this](wxCommandEvent&) { this->open_physical_printer_url(); }, "open_browser", menu, []() { return true; }, wxGetApp().plater());
         }
         

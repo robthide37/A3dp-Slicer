@@ -584,8 +584,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBools{false});
 
     // TRN FilamentSettings : "Dynamic fan speeds"
-    auto fan_speed_setting_description = L(
-        "Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
+    auto fan_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
         "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
         "Fan speeds for overhang sizes in between are calculated via linear interpolation.");
 
@@ -2907,7 +2906,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Tip Diameter");
     def->category = L("Support material");
     // TRN PrintSettings: "Organic supports" > "Tip Diameter"
-    def->tooltip = L("The diameter of the top of the tip of the branches of organic support.");
+    def->tooltip = L("Branch tip diameter for organic supports.");
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvanced;
@@ -4666,7 +4665,7 @@ CLIActionsConfigDef::CLIActionsConfigDef()
 #if ENABLE_GL_CORE_PROFILE
     def = this->add("opengl-version", coString);
     def->label = L("OpenGL version");
-    def->tooltip = L("Select the specified OpenGL version");
+    def->tooltip = L("Select a specific version of OpenGL");
     def->cli = "opengl-version";
     def->set_default_value(new ConfigOptionString());
 
@@ -4935,18 +4934,21 @@ std::string get_sla_suptree_prefix(const DynamicPrintConfig &config)
     return slatree;
 }
 
-bool is_XL_printer(const DynamicPrintConfig &cfg)
+static bool is_XL_printer(const std::string& printer_model)
 {
     static constexpr const char *ALIGN_ONLY_FOR = "XL";
+    return boost::algorithm::contains(printer_model, ALIGN_ONLY_FOR);
+}
 
-    bool ret = false;
-
+bool is_XL_printer(const DynamicPrintConfig &cfg)
+{
     auto *printer_model = cfg.opt<ConfigOptionString>("printer_model");
+    return printer_model && is_XL_printer(printer_model->value);    
+}
 
-    if (printer_model)
-        ret = boost::algorithm::contains(printer_model->value, ALIGN_ONLY_FOR);
-
-    return ret;
+bool is_XL_printer(const PrintConfig &cfg)
+{
+    return is_XL_printer(cfg.printer_model.value);
 }
 
 } // namespace Slic3r

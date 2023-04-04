@@ -31,7 +31,7 @@
 #include "I18N.hpp"
 
 #include <libnest2d/tools/benchmark.h>
-
+#include "format.hpp"
 
 namespace Slic3r {
 
@@ -290,8 +290,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
 
     if (!handled) { // Last resort to voxelization.
         po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
-                                   _u8L("Can't perform full mesh booleans! "
-                                     "Some parts of the print will be previewed with approximated meshes. "
+                                   _u8L("Some parts of the print will be previewed with approximated meshes. "
                                      "This does not affect the quality of slices or the physical print in any way."));
         m = generate_preview_vdb(po, step);
     }
@@ -510,8 +509,7 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
 
     if(slindex_it == po.m_slice_index.end())
         //TRN To be shown at the status bar on SLA slicing error.
-        throw Slic3r::RuntimeError(
-            format(_u8L("Model named: %s can not be sliced. Please check if the model is sane."), po.model_object()->name));
+        throw Slic3r::RuntimeError(format("Model named: %s can not be sliced. Please check if the model is sane.", po.model_object()->name));
 
     po.m_model_height_levels.clear();
     po.m_model_height_levels.reserve(po.m_slice_index.size());

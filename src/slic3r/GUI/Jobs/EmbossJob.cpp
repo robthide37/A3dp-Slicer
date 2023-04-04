@@ -244,7 +244,7 @@ void UpdateJob::process(Ctl &ctl)
     m_result = priv::try_create_mesh(m_input, was_canceled);
     if (was_canceled()) return;
     if (m_result.its.empty())
-        throw priv::JobException(_u8L("Created text volume is empty. Change text or font.").c_str());
+        throw priv::JobException("Created text volume is empty. Change text or font.");
 
     // center triangle mesh
     Vec3d shift = m_result.bounding_box().center();

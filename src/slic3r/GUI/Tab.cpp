@@ -163,13 +163,15 @@ void Tab::create_preset_tab()
 
     add_scaled_button(panel, &m_btn_hide_incompatible_presets, "flag_green");
 
-    m_btn_compare_preset->SetToolTip(_L("Compare this preset with some another"));
-    // TRN Settings Tabs: Tooltip for save button: "Settings"
-    m_btn_save_preset->SetToolTip(format_wxstr(_L("Save current %s"), m_title));
-    // TRN Settings Tabs: Tooltip for rename button: "Settings"
-    m_btn_rename_preset->SetToolTip(format_wxstr(_L("Rename current %1%"), m_title));
+    //TRN Settings Tab: tooltip for toolbar button
+    m_btn_compare_preset->SetToolTip(_L("Compare preset with another"));
+    //TRN Settings Tab: tooltip for toolbar button
+    m_btn_save_preset  ->SetToolTip(_L("Save preset"));
+    //TRN Settings Tab: tooltip for toolbar button
+    m_btn_rename_preset->SetToolTip(_L("Rename preset"));
     m_btn_rename_preset->Hide();
-    m_btn_delete_preset->SetToolTip(_(L("Delete this preset")));
+    //TRN Settings Tab: tooltip for toolbar button
+    m_btn_delete_preset->SetToolTip(_(L("Delete preset")));
     m_btn_delete_preset->Hide();
 
     add_scaled_button(panel, &m_question_btn, "question");
@@ -1122,10 +1124,11 @@ void Tab::update_wiping_button_visibility() {
         return; // ys_FIXME
     bool wipe_tower_enabled = dynamic_cast<ConfigOptionBool*>(  (m_preset_bundle->prints.get_edited_preset().config  ).option("wipe_tower"))->value;
     bool multiple_extruders = dynamic_cast<ConfigOptionFloats*>((m_preset_bundle->printers.get_edited_preset().config).option("nozzle_diameter"))->values.size() > 1;
+    bool single_extruder_multi_material = dynamic_cast<ConfigOptionBool*>((m_preset_bundle->printers.get_edited_preset().config).option("single_extruder_multi_material"))->value;
 
     auto wiping_dialog_button = wxGetApp().sidebar().get_wiping_dialog_button();
     if (wiping_dialog_button) {
-        wiping_dialog_button->Show(wipe_tower_enabled && multiple_extruders);
+        wiping_dialog_button->Show(wipe_tower_enabled && multiple_extruders && single_extruder_multi_material);
         wiping_dialog_button->GetParent()->Layout();
     }
 }
@@ -2410,8 +2413,8 @@ void TabPrinter::build_fff()
                         if (!m_supports_min_feedrates && m_use_silent_mode) {
                             if (!msg.IsEmpty())
                                 msg += "\n\n";
-                            msg += _L("Stealth mode for machine limits to G-code is not supported with selected G-code flavor.\n"
-                                      "The Stealth mode was suppressed.");
+                            msg += _L("The selected G-code flavor does not support the machine limitation for Stealth mode.\n"
+                                      "Stealth mode will not be applied and will be disabled.");
 
                             auto silent_mode = static_cast<ConfigOptionBool*>(m_config->option("silent_mode")->clone());
                             silent_mode->value = false;

@@ -455,6 +455,7 @@ MsgDataLegacy::MsgDataLegacy() :
 	auto *text2 = new wxStaticText(this, wxID_ANY, _(L("For more information please visit our wiki page:")));
 	static const wxString url("https://github.com/prusa3d/PrusaSlicer/wiki/Slic3r-PE-1.40-configuration-update");
 	// The wiki page name is intentionally not localized:
+	// TRN %s = PrusaSlicer
 	auto *link = new wxHyperlinkCtrl(this, wxID_ANY, format_wxstr(_L("%s 1.40 configuration update"), SLIC3R_APP_NAME), CONFIG_UPDATE_WIKI_URL);
 	content_sizer->Add(text2);
 	content_sizer->Add(link);
@@ -491,13 +492,8 @@ MsgNoUpdates::~MsgNoUpdates() {}
 MsgNoAppUpdates::MsgNoAppUpdates() :
 	MsgDialog(nullptr, _(L("App update")), _(L("No updates available")), wxICON_ERROR | wxOK)
 {
-
-	auto* text = new wxStaticText(this, wxID_ANY, wxString::Format(
-		_(L(
-			"%s has no version updates available."
-		)),
-		SLIC3R_APP_NAME
-	));
+	//TRN %1% is PrusaSlicer
+	auto* text = new wxStaticText(this, wxID_ANY, format_wxstr(_L("Your %1% is up to date."),SLIC3R_APP_NAME));
 	text->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
 	content_sizer->Add(text);
 	content_sizer->AddSpacer(VERT_SPACING);

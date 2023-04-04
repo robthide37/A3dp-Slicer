@@ -701,11 +701,7 @@ void PhysicalPrinterDialog::on_sys_color_changed()
 void PhysicalPrinterDialog::OnOK(wxEvent& event)
 {
     wxString printer_name = m_printer_name->GetValue();
-    if (printer_name.IsEmpty()) {
-        warning_catcher(this, _L("The supplied name is empty. It can't be saved."));
-        return;
-    }
-    if (printer_name == m_default_name) {
+    if (printer_name.IsEmpty() || printer_name == m_default_name) {
         warning_catcher(this, _L("You have to enter a printer name."));
         return;
     }
