@@ -104,6 +104,8 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::PauseHoverButton        , "notification_pause_hover"        },
     {ImGui::OpenButton              , "notification_open"               },
     {ImGui::OpenHoverButton         , "notification_open_hover"         },
+    {ImGui::SlaViewOriginal         , "sla_view_original"               },
+    {ImGui::SlaViewProcessed        , "sla_view_processed"              },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_extra_large = {
@@ -488,6 +490,18 @@ bool ImGuiWrapper::radio_button(const wxString &label, bool active)
 {
     auto label_utf8 = into_u8(label);
     return ImGui::RadioButton(label_utf8.c_str(), active);
+}
+
+void ImGuiWrapper::draw_icon(ImGuiWindow& window, const ImVec2& pos, float size, wchar_t icon_id)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    const ImTextureID tex_id = io.Fonts->TexID;
+    const float tex_w = static_cast<float>(io.Fonts->TexWidth);
+    const float tex_h = static_cast<float>(io.Fonts->TexHeight);
+    const ImFontAtlas::CustomRect* const rect = GetTextureCustomRect(icon_id);
+    const ImVec2 uv0 = { static_cast<float>(rect->X) / tex_w, static_cast<float>(rect->Y) / tex_h };
+    const ImVec2 uv1 = { static_cast<float>(rect->X + rect->Width) / tex_w, static_cast<float>(rect->Y + rect->Height) / tex_h };
+    window.DrawList->AddImage(tex_id, pos, { pos.x + size, pos.y + size }, uv0, uv1, ImGuiWrapper::to_ImU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
 }
 
 bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool active,

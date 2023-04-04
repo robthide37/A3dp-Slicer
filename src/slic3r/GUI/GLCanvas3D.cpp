@@ -1146,14 +1146,40 @@ void GLCanvas3D::SLAView::render_switch_button()
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
         ImGui::SetNextWindowPos(ImVec2((float)ss_box.max.x(), (float)ss_box.center().y()), ImGuiCond_Always, ImVec2(0.0, 0.5));
         imgui.begin(std::string("SLAViewSwitch"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
-        const wxString btn_text = (m_type == ESLAViewType::Original) ? _L("Processed") : _L("Original");
-        if (imgui.button(btn_text)) {
+        const float icon_size = 1.5 * ImGui::GetTextLineHeight();
+        if (imgui.draw_radio_button(_u8L("SLA view"), 1.5f * icon_size, true, [this, &imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
+            wchar_t icon_id;
+            switch (m_type)
+            {
+            case ESLAViewType::Original:  { icon_id = ImGui::SlaViewProcessed; break; }
+            case ESLAViewType::Processed: { icon_id = ImGui::SlaViewOriginal; break; }
+            default: { assert(false); break; }
+            }
+            imgui.draw_icon(window, pos, size, icon_id);
+
+            })) {
             switch (m_type)
             {
             case ESLAViewType::Original:  { m_parent.set_sla_view_type(ESLAViewType::Processed); break; }
             case ESLAViewType::Processed: { m_parent.set_sla_view_type(ESLAViewType::Original); break; }
-            default:                      { assert(false); break; }
+            default: { assert(false); break; }
             }
+        }
+
+        if (ImGui::IsItemHovered()) {
+            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGuiWrapper::COL_WINDOW_BACKGROUND);
+            ImGui::BeginTooltip();
+            wxString tooltip;
+            switch (m_type)
+            {
+            case ESLAViewType::Original:  { tooltip = _L("Show as processed"); break; }
+            case ESLAViewType::Processed: { tooltip = _L("Show as original"); break; }
+            default: { assert(false); break; }
+            }
+
+            imgui.text(tooltip);
+            ImGui::EndTooltip();
+            ImGui::PopStyleColor();
         }
         imgui.end();
         ImGui::PopStyleColor(2);

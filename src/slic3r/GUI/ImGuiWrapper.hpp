@@ -92,9 +92,10 @@ public:
     void end();
 
     bool button(const wxString &label, const wxString& tooltip = {});
-	bool button(const wxString& label, float width, float height);
+    bool button(const wxString& label, float width, float height);
     bool button(const wxString& label, const ImVec2 &size, bool enable); // default size = ImVec2(0.f, 0.f)
     bool radio_button(const wxString &label, bool active);
+    void draw_icon(ImGuiWindow& window, const ImVec2& pos, float size, wchar_t icon_id);
     bool draw_radio_button(const std::string& name, float size, bool active, std::function<void(ImGuiWindow& window, const ImVec2& pos, float size)> draw_callback);
     bool checkbox(const wxString &label, bool &value);
     static void text(const char *label);
