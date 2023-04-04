@@ -420,7 +420,7 @@ MeshErrorsInfo ObjectList::get_mesh_errors_info(const int obj_idx, const int vol
     const ModelObject* object = (*m_objects)[obj_idx];
     if (vol_idx != -1 && vol_idx >= int(object->volumes.size())) {
         if (sidebar_info)
-            *sidebar_info = _L("Wrong volume index") + " ";
+            *sidebar_info = _L("Invalid object part index") + " ";
         return { {}, {} }; // hide tooltip
     }
 
@@ -2048,7 +2048,7 @@ bool ObjectList::del_from_cut_object(bool is_cut_connector, bool is_model_part/*
     InfoDialog dialog(wxGetApp().plater(), title,
                       _L("This action will break a cut information.\n"
                          "After that PrusaSlicer can't guarantee model consistency.") + "\n\n" +
-                      _L("To manipulate with solid parts or negative volumes you have to invalidate cut infornation first." + msg_end ),
+                      _L("To manipulate with solid parts or negative volumes you have to invalidate cut information first." + msg_end ),
                       false, buttons_style | wxCANCEL_DEFAULT | wxICON_WARNING);
 
     dialog.SetButtonLabel(wxID_YES, _L("Invalidate cut info"));

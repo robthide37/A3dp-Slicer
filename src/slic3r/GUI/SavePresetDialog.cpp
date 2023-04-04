@@ -166,34 +166,32 @@ void SavePresetDialog::Item::update()
     const std::string unusable_suffix = PresetCollection::get_suffix_modified();//"(modified)";
     for (size_t i = 0; i < std::strlen(unusable_symbols); i++) {
         if (m_preset_name.find_first_of(unusable_symbols[i]) != std::string::npos) {
-            info_line = _L("The supplied name is not valid;") + "\n" +
-                        _L("the following characters are not allowed:") + " " + unusable_symbols;
+            info_line = _L("The following characters are not allowed in the name") + ": " + unusable_symbols;
             m_valid_type = ValidationType::NoValid;
             break;
         }
     }
 
     if (m_valid_type == ValidationType::Valid && m_preset_name.find(unusable_suffix) != std::string::npos) {
-        info_line = _L("The supplied name is not valid;") + "\n" +
-                    _L("the following suffix is not allowed:") + "\n\t" +
+        info_line = _L("The following suffix is not allowed in the name") + ":\n\t" +
                     from_u8(unusable_suffix);
         m_valid_type = ValidationType::NoValid;
     }
 
     if (m_valid_type == ValidationType::Valid && m_preset_name == "- default -") {
-        info_line = _L("The supplied name is not available.");
+        info_line = _L("This name is reserved, use another.");
         m_valid_type = ValidationType::NoValid;
     }
 
     const Preset* existing = get_existing_preset();
     if (m_valid_type == ValidationType::Valid && existing && (existing->is_default || existing->is_system)) {
-        info_line = m_use_text_ctrl ? _L("The supplied name is used for a system profile.") :
+        info_line = m_use_text_ctrl ? _L("This name is used for a system profile name, use another.") :
                              _L("Cannot overwrite a system profile.");
         m_valid_type = ValidationType::NoValid;
     }
 
     if (m_valid_type == ValidationType::Valid && existing && (existing->is_external)) {
-        info_line = m_use_text_ctrl ? _L("The supplied name is used for a external profile.") :
+        info_line = m_use_text_ctrl ? _L("This name is used for an external profile name, use another.") :
                              _L("Cannot overwrite an external profile.");
         m_valid_type = ValidationType::NoValid;
     }

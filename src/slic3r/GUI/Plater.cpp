@@ -810,7 +810,7 @@ Sidebar::Sidebar(Plater *parent)
     const int margin_5 = int(0.5 * wxGetApp().em_unit());// 5;
 
     auto init_combo = [this, margin_5](PlaterPresetComboBox **combo, wxString label, Preset::Type preset_type, bool filament) {
-        auto *text = new wxStaticText(p->presets_panel, wxID_ANY, label + " :");
+        auto *text = new wxStaticText(p->presets_panel, wxID_ANY, label + ":");
         text->SetFont(wxGetApp().small_font());
         *combo = new PlaterPresetComboBox(p->presets_panel, preset_type);
 
@@ -5455,7 +5455,7 @@ LoadProjectsDialog::LoadProjectsDialog(const std::vector<fs::path>& paths)
     int id = 0;
   
     // all geometry
-    wxRadioButton* btn = new wxRadioButton(this, wxID_ANY, _L("Import geometry"), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
+    wxRadioButton* btn = new wxRadioButton(this, wxID_ANY, _L("Import 3D models"), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
     btn->SetValue(id == m_action);
     btn->Bind(wxEVT_RADIOBUTTON, [this, id, contains_projects](wxCommandEvent&) {
         m_action = id;
@@ -5468,7 +5468,7 @@ LoadProjectsDialog::LoadProjectsDialog(const std::vector<fs::path>& paths)
     id++;
     // all new window
     if (instances_allowed) {
-        btn = new wxRadioButton(this, wxID_ANY, _L("Start new PrusaSlicer instance"), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
+        btn = new wxRadioButton(this, wxID_ANY, _L("Start a new instance of PrusaSlicer"), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
         btn->SetValue(id == m_action);
         btn->Bind(wxEVT_RADIOBUTTON, [this, id, contains_projects](wxCommandEvent&) {
             m_action = id;
@@ -5493,7 +5493,7 @@ LoadProjectsDialog::LoadProjectsDialog(const std::vector<fs::path>& paths)
         stb_sizer->Add(m_combo_project, 0, wxEXPAND | wxTOP, 5);
         // one config
         id++;
-        btn = new wxRadioButton(this, wxID_ANY, _L("Select one to load config only"), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
+        btn = new wxRadioButton(this, wxID_ANY, _L("Select only one file to load the configuration."), wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
         btn->SetValue(id == m_action);
         btn->Bind(wxEVT_RADIOBUTTON, [this, id, instances_allowed](wxCommandEvent&) {
             m_action = id;
@@ -5539,7 +5539,8 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
         mz_zip_zero_struct(&archive);
 
         if (!open_zip_reader(&archive, archive_path.string())) {
-            std::string err_msg = GUI::format(_u8L("Loading of a zip archive on path %1% has failed."), archive_path.string());
+            // TRN %1% is archive path
+            std::string err_msg = GUI::format(_u8L("Loading of a ZIP archive on path %1% has failed."), archive_path.string());
             throw Slic3r::FileIOError(err_msg);
         }
         mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
@@ -5818,7 +5819,7 @@ ProjectDropDialog::ProjectDropDialog(const std::string& filename)
     wxArrayString choices;
     choices.reserve(4);
     choices.Add(_L("Open as project"));
-    choices.Add(_L("Import geometry only"));
+    choices.Add(_L("Import 3D models only"));
     choices.Add(_L("Import config only"));
     if (!single_instance_only)
         choices.Add(_L("Start new PrusaSlicer instance"));

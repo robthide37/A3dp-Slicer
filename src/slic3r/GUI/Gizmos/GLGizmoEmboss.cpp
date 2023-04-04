@@ -1886,7 +1886,7 @@ void GLGizmoEmboss::draw_font_list()
             if (ImGui::Selectable(face.name_truncated.c_str(), is_selected, flags, selectable_size)) {
                 if (!select_facename(wx_face_name)) {
                     del_index = index;
-                    wxMessageBox(GUI::format(_L("Font face \"%1%\" can't be selected."), wx_face_name));
+                    MessageDialog(wxGetApp().plater(), GUI::format_wxstr(_L("Font \"%1%\" can't be selected."), wx_face_name));
                 }
             }
             // tooltip as full name of font face
@@ -2218,7 +2218,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
                                                    active_index + 1;
             
             if (next_style_index >= m_style_manager.get_styles().size()) {
-                MessageDialog msg(plater, _L("Can't remove the last exising style."), dialog_title, wxICON_ERROR | wxOK);
+                MessageDialog msg(plater, _L("Can't remove the last existing style."), dialog_title, wxICON_ERROR | wxOK);
                 msg.ShowModal();
                 break;
             }
@@ -2231,7 +2231,7 @@ void GLGizmoEmboss::draw_delete_style_button() {
                 continue;
             }
 
-            wxString message = GUI::format_wxstr(_L("Are you sure,\nthat you want permanently and unrecoverable \nremove \"%1%\" style?"), style_name);
+            wxString message = GUI::format_wxstr(_L("Are you sure you want to permanently remove the \"%1%\" style?"), style_name);
             MessageDialog msg(plater, message, dialog_title, wxICON_WARNING | wxYES | wxNO);
             if (msg.ShowModal() == wxID_YES) {
                 // delete style
@@ -2372,10 +2372,9 @@ void GLGizmoEmboss::draw_style_list() {
         
     // Check whether user wants lose actual style modification
     if (selected_style_index.has_value() && is_modified) { 
-        wxString title   = _L("Style modification will be lost.");
         const EmbossStyle &style = m_style_manager.get_styles()[*selected_style_index].style;        
-        wxString message = GUI::format_wxstr(_L("Changing style to '%1%' will discard current style modification.\n\n Would you like to continue anyway?"), style.name);
-        MessageDialog not_loaded_style_message(nullptr, message, title, wxICON_WARNING | wxYES|wxNO);
+        wxString message = GUI::format_wxstr(_L("Changing style to \"%1%\" will discard current style modification.\n\nWould you like to continue anyway?"), style.name);
+        MessageDialog not_loaded_style_message(nullptr, message, _L("Warning"), wxICON_WARNING | wxYES | wxNO);
         if (not_loaded_style_message.ShowModal() != wxID_YES) 
             selected_style_index.reset();
     }
@@ -2391,7 +2390,7 @@ void GLGizmoEmboss::draw_style_list() {
             process();
         } else {
             wxString title   = _L("Not valid style.");
-            wxString message = GUI::format_wxstr(_L("Style '%1%' can't be used and will be removed from a list."), style.name);
+            wxString message = GUI::format_wxstr(_L("Style \"%1%\" can't be used and will be removed from a list."), style.name);
             MessageDialog not_loaded_style_message(nullptr, message, title, wxOK);
             not_loaded_style_message.ShowModal();
             m_style_manager.erase(*selected_style_index);
@@ -2790,8 +2789,8 @@ void GLGizmoEmboss::draw_advanced()
 {
     const auto &ff = m_style_manager.get_font_file_with_cache();
     if (!ff.has_value()) { 
-        ImGui::Text("%s", _u8L("Advanced font options could be changed only for correct font.\n"
-                                   "Start with select correct font.").c_str());
+        ImGui::Text("%s", _u8L("Advanced options cannot be changed for the selected font.\n"
+                                   "Select another font.").c_str());
         return;
     }
 
@@ -3038,7 +3037,7 @@ void GLGizmoEmboss::draw_advanced()
         if (priv::apply_camera_dir(cam, m_parent) && use_surface)
             process();
     } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", _u8L("Use camera direction for text orientation").c_str());
+        ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
     }
 #ifdef ALLOW_DEBUG_MODE
     ImGui::Text("family = %s", (font_prop.family.has_value() ?
@@ -3121,7 +3120,7 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
         (!use_deserialized_font && !m_style_manager.load_style(emboss_style, wx_font))) {
         m_style_manager.erase(font_index);
         wxString message = GUI::format_wxstr(
-            "Font '%1%' can't be used. Please select another.",
+            "Font \"%1%\" can't be used. Please select another.",
             emboss_style.name);
         wxString      title = "Selected font is NOT True-type.";
         MessageDialog not_loaded_font_message(nullptr, message, title, wxOK);

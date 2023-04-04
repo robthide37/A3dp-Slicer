@@ -584,8 +584,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBools{false});
 
     // TRN FilamentSettings : "Dynamic fan speeds"
-    auto fan_speed_setting_description = L(
-        "Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
+    auto fan_speed_setting_description = L("Overhang size is expressed as a percentage of overlap of the extrusion with the previous layer: "
         "100% would be full overlap (no overhang), while 0% represents full overhang (floating extrusion, bridge). "
         "Fan speeds for overhang sizes in between are calculated via linear interpolation.");
 
@@ -2907,7 +2906,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Tip Diameter");
     def->category = L("Support material");
     // TRN PrintSettings: "Organic supports" > "Tip Diameter"
-    def->tooltip = L("The diameter of the top of the tip of the branches of organic support.");
+    def->tooltip = L("Branch tip diameter for organic supports.");
     def->sidetext = L("mm");
     def->min = 0;
     def->mode = comAdvanced;
@@ -4666,7 +4665,7 @@ CLIActionsConfigDef::CLIActionsConfigDef()
 #if ENABLE_GL_CORE_PROFILE
     def = this->add("opengl-version", coString);
     def->label = L("OpenGL version");
-    def->tooltip = L("Select the specified OpenGL version");
+    def->tooltip = L("Select a specific version of OpenGL");
     def->cli = "opengl-version";
     def->set_default_value(new ConfigOptionString());
 
