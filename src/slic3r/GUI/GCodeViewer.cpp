@@ -3945,6 +3945,20 @@ void GCodeViewer::render_legend(float& legend_height)
         }
     }
 
+    if (m_view_type == EViewType::Width || m_view_type == EViewType::VolumetricRate) {
+      const auto custom_it = std::find(m_roles.begin(), m_roles.end(), GCodeExtrusionRole::Custom);
+      if (custom_it != m_roles.end()) {
+          const bool custom_visible = is_visible(GCodeExtrusionRole::Custom);
+          const wxString btn_text = custom_visible ? _u8L("Hide Custom GCode") : _u8L("Show Custom GCode");
+          ImGui::Separator();
+          if (imgui.button(btn_text, ImVec2(-1.0f, 0.0f), true)) {
+              m_extrusions.role_visibility_flags = custom_visible ? m_extrusions.role_visibility_flags & ~(1 << int(GCodeExtrusionRole::Custom)) :
+                  m_extrusions.role_visibility_flags | (1 << int(GCodeExtrusionRole::Custom));
+              wxGetApp().plater()->refresh_print();
+          }
+        }
+    }
+
     // total estimated printing time section
     if (show_estimated_time) {
         ImGui::Spacing();
