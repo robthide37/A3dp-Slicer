@@ -117,18 +117,6 @@ protected:
     void set_http_post_header_args(Http& http, PrintHostPostUploadAction post_action) const override;
 };
 
-
-class Mainsail : public OctoPrint
-{
-public:
-    Mainsail(DynamicPrintConfig* config) : OctoPrint(config) {}
-    ~Mainsail() override = default;
-
-    const char* get_name() const override { return "Mainsail/Fluidd"; }
-    wxString get_test_ok_msg() const override;
-    wxString get_test_failed_msg(wxString& msg) const override;
-};
-
 class SL1Host : public PrusaLink
 {
 public:

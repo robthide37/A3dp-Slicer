@@ -1126,17 +1126,4 @@ wxString PrusaConnect::get_test_failed_msg(wxString& msg) const
 {
     return GUI::format_wxstr("%s: %s", _L("Could not connect to Prusa Connect"), msg);
 }
-
-
-
-wxString Mainsail::get_test_ok_msg() const
-{
-    return _(L("Connection to Mainsail/Fluidd works correctly."));
-}
-
-wxString Mainsail::get_test_failed_msg(wxString& msg) const
-{
-    return GUI::format_wxstr("%s: %s", _L("Could not connect to MainSail/Fluidd"), msg);
-}
-
 }
