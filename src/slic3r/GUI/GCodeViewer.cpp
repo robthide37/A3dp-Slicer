@@ -836,7 +836,8 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
         case EMoveType::Extrude:
         {
             m_extrusions.ranges.height.update_from(round_to_bin(curr.height));
-            m_extrusions.ranges.width.update_from(round_to_bin(curr.width));
+            if (curr.extrusion_role != GCodeExtrusionRole::Custom || is_visible(GCodeExtrusionRole::Custom))
+                m_extrusions.ranges.width.update_from(round_to_bin(curr.width));
             m_extrusions.ranges.fan_speed.update_from(curr.fan_speed);
             m_extrusions.ranges.temperature.update_from(curr.temperature);
             if (curr.extrusion_role != GCodeExtrusionRole::Custom || is_visible(GCodeExtrusionRole::Custom))
