@@ -93,6 +93,7 @@ private:
 	bool 			 		m_initialized { false };
 	wxEvtHandler*			m_callback_evt_handler { nullptr };
 
+
 #ifndef REMOVABLE_DRIVE_MANAGER_OS_CALLBACKS
 	// Worker thread, worker thread synchronization and callbacks to the UI thread.
 	void 					thread_proc();
@@ -104,6 +105,12 @@ private:
     std::atomic<bool>		m_wakeup { false };
 #endif /* _WIN32 */
 #endif // REMOVABLE_DRIVE_MANAGER_OS_CALLBACKS
+
+#ifdef _WIN32
+	// Another worker thread, used only to perform alt_eject method (external SD cards only).
+	// Does not share data with m_thread
+	boost::thread 			m_eject_thread;
+#endif /* _WIN32 */
 
 	// Called from update() to enumerate removable drives.
 	std::vector<DriveData> 	search_for_removable_drives() const;
