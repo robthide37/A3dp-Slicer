@@ -1741,7 +1741,7 @@ void PrintObject::bridge_over_infill()
 
     // cluster layers by depth needed for thick bridges. Each cluster is to be processed by single thread sequentially, so that bridges cannot appear one on another
     std::vector<std::vector<size_t>> clustered_layers_for_threads;
-    float target_flow_height_factor = 0.75;
+    float target_flow_height_factor = 0.9;
     {
         std::vector<size_t> layers_with_candidates;
         std::map<size_t, Polygons> layer_area_covered_by_candidates;
@@ -1800,9 +1800,9 @@ void PrintObject::bridge_over_infill()
         ExPolygons not_sparse_infill{};
         double   bottom_z = po->get_layer(lidx)->print_z - target_flow_height * target_flow_height_factor - EPSILON;
         for (int i = int(lidx) - 1; i >= 0; --i) {
-            // Stop iterating if layer is lower than bottom_z.
+            // Stop iterating if layer is lower than bottom_z and at least one iteration was made
             const Layer *layer = po->get_layer(i);
-            if (layer->print_z < bottom_z)
+            if (layer->print_z < bottom_z && i < int(lidx) - 1)
                 break;
 
             for (const LayerRegion *region : layer->regions()) {
