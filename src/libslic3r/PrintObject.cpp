@@ -2147,12 +2147,12 @@ void PrintObject::bridge_over_infill()
                 expansion_area    = closing(expansion_area, SCALED_EPSILON);
                 expansion_area    = intersection(expansion_area, deep_infill_area);
                 Polylines anchors = intersection_pl(infill_lines[lidx - 1], shrink(expansion_area, spacing));
+                Polygons internal_unsupported_area = shrink(deep_infill_area, spacing * 4.5);
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                 debug_draw(std::to_string(lidx) + "_" + std::to_string(cluster_idx) + "_" + std::to_string(job_idx) + "_" + "_total_area",
                            to_lines(total_fill_area), to_lines(expansion_area), to_lines(deep_infill_area), to_lines(anchors));
 #endif
-
 
                 std::vector<CandidateSurface> expanded_surfaces;
                 expanded_surfaces.reserve(surfaces_by_layer[lidx].size());
@@ -2160,7 +2160,14 @@ void PrintObject::bridge_over_infill()
                     const Flow &flow              = candidate.region->bridging_flow(frSolidInfill, true);
                     Polygons    area_to_be_bridge = expand(candidate.new_polys, flow.scaled_spacing());
                     area_to_be_bridge             = intersection(area_to_be_bridge, deep_infill_area);
-                    Polygons limiting_area        = union_(area_to_be_bridge, expansion_area);
+
+                    area_to_be_bridge.erase(std::remove_if(area_to_be_bridge.begin(), area_to_be_bridge.end(),
+                                                           [internal_unsupported_area](const Polygon &p) {
+                                                               return intersection({p}, internal_unsupported_area).empty();
+                                                           }),
+                                            area_to_be_bridge.end());
+
+                    Polygons limiting_area = union_(area_to_be_bridge, expansion_area);
 
                     if (area_to_be_bridge.empty())
                         continue;
