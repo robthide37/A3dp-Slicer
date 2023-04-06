@@ -1706,7 +1706,7 @@ namespace client
 
     // This parser is to be used inside a raw[] directive to accept a single valid UTF-8 character.
     // If an invalid UTF-8 sequence is encountered, a qi::expectation_failure is thrown.
-    struct utf8_char_skipper_parser : qi::primitive_parser<utf8_char_skipper_parser>
+    struct utf8_char_parser : qi::primitive_parser<utf8_char_parser>
     { 
         // Define the attribute type exposed by this parser component 
         template <typename Context, typename Iterator>
@@ -1715,9 +1715,10 @@ namespace client
             typedef wchar_t type;
         };
 
-        // This function is called during the actual parsing process 
+        // This function is called during the actual parsing process to skip whitespaces.
+        // Also it throws if it encounters valid or invalid UTF-8 sequence.
         template <typename Iterator, typename Context , typename Skipper, typename Attribute>
-        bool parse(Iterator& first, Iterator const& last, Context& context, Skipper const& skipper, Attribute& attr) const 
+        bool parse(Iterator &first, Iterator const &last, Context &context, Skipper const &skipper, Attribute& attr) const
         { 
             // The skipper shall always be empty, any white space will be accepted.
             // skip_over(first, last, skipper);
@@ -1764,6 +1765,38 @@ namespace client
         spirit::info what(Context&) const
         { 
             return spirit::info("unicode_char");
+        }
+    };
+
+    // This parser is to be used inside a raw[] directive to accept a single valid UTF-8 character.
+    // If an invalid UTF-8 sequence is encountered, a qi::expectation_failure is thrown.
+    struct ascii_char_skipper_parser : public utf8_char_parser
+    { 
+        // This function is called during the actual parsing process 
+        template <typename Iterator, typename Context, typename Skipper, typename Attribute>
+        bool parse(Iterator &first, Iterator const &last, Context &context, Skipper const &skipper, Attribute &attr) const
+        { 
+            Iterator it = first;
+            // Let the UTF-8 parser throw if it encounters an invalid UTF-8 sequence. 
+            if (! utf8_char_parser::parse(it, last, context, skipper, attr))
+                return false;
+            char c = *first;
+            if (it - first > 1 || c < 0)
+                MyContext::throw_exception("Non-ASCII7 characters are only allowed inside text blocks and string literals, not inside code blocks.", IteratorRange(first, it));
+            if (c == '\r' || c == '\n' || c == '\t' || c == ' ') {
+                // Skip the whitespaces
+                ++ first;
+                return true;
+            } else
+                // Stop skipping, let this 7bit ASCII character be processed.
+                return false;
+        }
+
+        // This function is called during error handling to create a human readable string for the error context.
+        template <typename Context>
+        spirit::info what(Context&) const
+        { 
+            return spirit::info("ASCII7_char");
         }
     };
 
@@ -1853,11 +1886,13 @@ namespace client
         static void noexpr(expr &out) { out.reset(); }
     };
 
+    using skipper = ascii_char_skipper_parser;
+
     ///////////////////////////////////////////////////////////////////////////
     //  Our macro_processor grammar
     ///////////////////////////////////////////////////////////////////////////
     // Inspired by the C grammar rules https://www.lysator.liu.se/c/ANSI-C-grammar-y.html
-    struct macro_processor : qi::grammar<Iterator, std::string(const MyContext*), qi::locals<bool>, spirit_encoding::space_type>
+    struct macro_processor : qi::grammar<Iterator, std::string(const MyContext*), qi::locals<bool>, skipper>
     {
         macro_processor() : macro_processor::base_type(start)
         {
@@ -1871,7 +1906,7 @@ namespace client
             qi::no_skip_type            no_skip;
             qi::real_parser<double, strict_real_policies_without_nan_inf> strict_double;
             spirit_encoding::char_type  char_;
-            utf8_char_skipper_parser    utf8char;
+            utf8_char_parser            utf8char;
             spirit::bool_type           bool_;
             spirit::int_type            int_;
             spirit::double_type         double_;
@@ -2211,22 +2246,22 @@ namespace client
         }
 
         // Generic expression over expr.
-        typedef qi::rule<Iterator, expr(const MyContext*), spirit_encoding::space_type> RuleExpression;
+        typedef qi::rule<Iterator, expr(const MyContext*), skipper> RuleExpression;
 
         // The start of the grammar.
-        qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool>, spirit_encoding::space_type> start;
+        qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool>, skipper> start;
         // A free-form text.
-        qi::rule<Iterator, std::string(), spirit_encoding::space_type> text;
+        qi::rule<Iterator, std::string(), skipper> text;
         // A free-form text, possibly empty, possibly containing macro expansions.
-        qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> text_block;
+        qi::rule<Iterator, std::string(const MyContext*), skipper> text_block;
         // Statements enclosed in curely braces {}
-        qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> block, statement, macros, if_text_block, if_macros, else_macros;
+        qi::rule<Iterator, std::string(const MyContext*), skipper> block, statement, macros, if_text_block, if_macros, else_macros;
         // Legacy variable expansion of the original Slic3r, in the form of [scalar_variable] or [vector_variable_index].
-        qi::rule<Iterator, std::string(const MyContext*), spirit_encoding::space_type> legacy_variable_expansion;
+        qi::rule<Iterator, std::string(const MyContext*), skipper> legacy_variable_expansion;
         // Parsed identifier name.
-        qi::rule<Iterator, IteratorRange(), spirit_encoding::space_type> identifier;
+        qi::rule<Iterator, IteratorRange(), skipper> identifier;
         // Ternary operator (?:) over logical_or_expression.
-        qi::rule<Iterator, expr(const MyContext*), qi::locals<bool>, spirit_encoding::space_type> conditional_expression;
+        qi::rule<Iterator, expr(const MyContext*), qi::locals<bool>, skipper> conditional_expression;
         // Logical or over logical_and_expressions.
         RuleExpression logical_or_expression;
         // Logical and over relational_expressions.
@@ -2244,27 +2279,27 @@ namespace client
         // Accepting an optional parameter.
         RuleExpression optional_parameter;
         // Rule to capture a regular expression enclosed in //.
-        qi::rule<Iterator, IteratorRange(), spirit_encoding::space_type> regular_expression;
+        qi::rule<Iterator, IteratorRange(), skipper> regular_expression;
         // Evaluate boolean expression into bool.
-        qi::rule<Iterator, bool(const MyContext*), spirit_encoding::space_type> bool_expr_eval;
+        qi::rule<Iterator, bool(const MyContext*), skipper> bool_expr_eval;
         // Reference of a scalar variable, or reference to a field of a vector variable.
-        qi::rule<Iterator, OptWithPos(const MyContext*), qi::locals<OptWithPos, int>, spirit_encoding::space_type> variable_reference;
+        qi::rule<Iterator, OptWithPos(const MyContext*), qi::locals<OptWithPos, int>, skipper> variable_reference;
         // Rule to translate an identifier to a ConfigOption, or to fail.
-        qi::rule<Iterator, OptWithPos(const MyContext*), spirit_encoding::space_type> variable;
+        qi::rule<Iterator, OptWithPos(const MyContext*), skipper> variable;
         // Evaluating whether a nullable variable is nil.
-        qi::rule<Iterator, expr(const MyContext*), spirit_encoding::space_type> is_nil_test;
+        qi::rule<Iterator, expr(const MyContext*), skipper> is_nil_test;
         // Evaluating "one of" list of patterns.
-        qi::rule<Iterator, expr(const MyContext*), qi::locals<expr>, spirit_encoding::space_type> one_of;
-        qi::rule<Iterator, expr(const MyContext*, const expr &param), spirit_encoding::space_type> one_of_list;
+        qi::rule<Iterator, expr(const MyContext*), qi::locals<expr>, skipper> one_of;
+        qi::rule<Iterator, expr(const MyContext*, const expr &param), skipper> one_of_list;
         // Evaluating the "interpolate_table" expression.
-        qi::rule<Iterator, expr(const MyContext*), qi::locals<expr>, spirit_encoding::space_type> interpolate_table;
-        qi::rule<Iterator, InterpolateTableContext(const MyContext*, const expr &param), spirit_encoding::space_type> interpolate_table_list;
+        qi::rule<Iterator, expr(const MyContext*), qi::locals<expr>, skipper> interpolate_table;
+        qi::rule<Iterator, InterpolateTableContext(const MyContext*, const expr &param), skipper> interpolate_table_list;
 
-        qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool>, spirit_encoding::space_type> if_else_output;
-        qi::rule<Iterator, std::string(const MyContext*), qi::locals<OptWithPos>, spirit_encoding::space_type> assignment_statement;
+        qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool>, skipper> if_else_output;
+        qi::rule<Iterator, std::string(const MyContext*), qi::locals<OptWithPos>, skipper> assignment_statement;
         // Allocating new local or global variables.
-        qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, MyContext::NewOldVariable>, spirit_encoding::space_type> new_variable_statement;
-        qi::rule<Iterator, std::vector<expr>(const MyContext*), spirit_encoding::space_type> initializer_list;
+        qi::rule<Iterator, std::string(const MyContext*), qi::locals<bool, MyContext::NewOldVariable>, skipper> new_variable_statement;
+        qi::rule<Iterator, std::vector<expr>(const MyContext*), skipper> initializer_list;
 
         qi::symbols<char> keywords;
     };
@@ -2275,7 +2310,7 @@ static const client::macro_processor g_macro_processor_instance;
 static std::string process_macro(const std::string &templ, client::MyContext &context)
 {
     std::string output;
-    phrase_parse(templ.begin(), templ.end(), g_macro_processor_instance(&context), spirit_encoding::space_type{}, output);
+    phrase_parse(templ.begin(), templ.end(), g_macro_processor_instance(&context), client::skipper{}, output);
 	if (! context.error_message.empty()) {
         if (context.error_message.back() != '\n' && context.error_message.back() != '\r')
             context.error_message += '\n';

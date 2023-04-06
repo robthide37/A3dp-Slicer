@@ -46,6 +46,25 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
 
     SECTION("parsing string with escaped characters") { REQUIRE(parser.process("{\"hu\\nha\\\\\\\"ha\\\"\"}") == "hu\nha\\\"ha\""); }
 
+    WHEN("An UTF-8 character is used inside the code block") {
+        THEN("A std::runtime_error exception is thrown.") {
+            // full-width plus sign instead of plain +
+            REQUIRE_THROWS_AS(parser.process("{1\xEF\xBC\x8B 3}"), std::runtime_error);
+        }
+    }
+    WHEN("An UTF-8 character is used inside a string") {
+        THEN("UTF-8 sequence is processed correctly when quoted") {
+            // japanese "cool" or "stylish"
+            REQUIRE(parser.process("{1+\"\xE3\x81\x8B\xE3\x81\xA3\xE3\x81\x93\xE3\x81\x84\xE3\x81\x84\"+\" \"+3}") == "1\xE3\x81\x8B\xE3\x81\xA3\xE3\x81\x93\xE3\x81\x84\xE3\x81\x84 3");
+        }
+    }
+    WHEN("An UTF-8 character is used inside a string") {
+        THEN("UTF-8 sequence is processed correctly outside of code blocks") {
+            // japanese "cool" or "stylish"
+            REQUIRE(parser.process("{1+3}\xE3\x81\x8B\xE3\x81\xA3\xE3\x81\x93\xE3\x81\x84\xE3\x81\x84") == "4\xE3\x81\x8B\xE3\x81\xA3\xE3\x81\x93\xE3\x81\x84\xE3\x81\x84");
+        }
+    }
+
     // Test the math expressions.
     SECTION("math: 2*3") { REQUIRE(parser.process("{2*3}") == "6"); }
     SECTION("math: 2*3/6") { REQUIRE(parser.process("{2*3/6}") == "1"); }
