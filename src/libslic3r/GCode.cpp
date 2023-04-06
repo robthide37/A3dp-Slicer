@@ -3020,9 +3020,16 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
                                      {100, ConfigOptionInts{0}}};
         }
 
-        double external_perim_reference_speed = std::min(m_config.get_abs_value("external_perimeter_speed"),
-                                                         std::min(EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm,
-                                                                  m_config.max_volumetric_speed.value / path.mm3_per_mm));
+        double external_perim_reference_speed = m_config.get_abs_value("external_perimeter_speed");
+        if (external_perim_reference_speed == 0)
+            external_perim_reference_speed = m_volumetric_speed / path.mm3_per_mm;
+        if (m_config.max_volumetric_speed.value > 0)
+            external_perim_reference_speed = std::min(external_perim_reference_speed, m_config.max_volumetric_speed.value / path.mm3_per_mm);
+        if (EXTRUDER_CONFIG(filament_max_volumetric_speed) > 0) {
+            external_perim_reference_speed = std::min(external_perim_reference_speed,
+                                                      EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm);
+        }
+
         new_points = m_extrusion_quality_estimator.estimate_extrusion_quality(path, overhangs_with_speeds, overhang_w_fan_speeds,
                                                                               m_writer.extruder()->id(), external_perim_reference_speed,
                                                                               speed);
