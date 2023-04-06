@@ -16,6 +16,8 @@
 
 namespace Slic3r {
 
+  class Print;
+
     enum class EMoveType : unsigned char
     {
         Noop,
@@ -588,6 +590,8 @@ namespace Slic3r {
         TimeProcessor m_time_processor;
         UsedFilaments m_used_filaments;
 
+        Print* m_print{ nullptr };
+
         GCodeProcessorResult m_result;
         static unsigned int s_result_id;
 
@@ -601,6 +605,8 @@ namespace Slic3r {
         GCodeProcessor();
 
         void apply_config(const PrintConfig& config);
+        void set_print(Print* print) { m_print = print; }
+
         void enable_stealth_time_estimator(bool enabled);
         bool is_stealth_time_estimator_enabled() const {
             return m_time_processor.machines[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Stealth)].enabled;

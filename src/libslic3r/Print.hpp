@@ -660,6 +660,8 @@ private:
 
     // To allow GCode to set the Print's GCodeExport step status.
     friend class GCode;
+    // To allow GCodeProcessor to emit warnings.
+    friend class GCodeProcessor;
     // Allow PrintObject to access m_mutex and m_cancel_callback.
     friend class PrintObject;
 };

@@ -3384,7 +3384,7 @@ void GCodeProcessor::process_T(const std::string_view command)
             if (m_extruder_id != id) {
                 if (((m_producer == EProducer::PrusaSlicer || m_producer == EProducer::Slic3rPE || m_producer == EProducer::Slic3r) && id >= m_result.extruders_count) ||
                     ((m_producer != EProducer::PrusaSlicer && m_producer != EProducer::Slic3rPE && m_producer != EProducer::Slic3r) && id >= m_result.extruder_colors.size()))
-                    BOOST_LOG_TRIVIAL(error) << "GCodeProcessor encountered an invalid toolchange, maybe from a custom gcode.";
+                    BOOST_LOG_TRIVIAL(error) << "GCodeProcessor encountered an invalid toolchange, maybe from a custom gcode (" << command << ").";
                 else {
                     unsigned char old_extruder_id = m_extruder_id;
                     process_filaments(CustomGCode::ToolChange);
@@ -3984,13 +3984,25 @@ void GCodeProcessor::post_process()
 
 #if ENABLE_GCODE_POSTPROCESS_BACKTRACE
     // add lines XXX to exported gcode
-    auto process_line_T = [this, &export_lines](const std::string& gcode_line, const size_t g1_lines_counter, const ExportLines::Backtrace& backtrace) {
+      auto process_line_T = [this, &export_lines](const std::string& gcode_line, const size_t g1_lines_counter, const ExportLines::Backtrace& backtrace) {
         const std::string cmd = GCodeReader::GCodeLine::extract_cmd(gcode_line);
         if (cmd.size() >= 2) {
             std::stringstream ss(cmd.substr(1));
             int tool_number = -1;
             ss >> tool_number;
             if (tool_number != -1)
+                if (tool_number < 0 || (int)m_extruder_temps_config.size() <= tool_number) {
+                    // found an invalid value, clamp it to a valid one
+                    tool_number = std::clamp<int>(0, m_extruder_temps_config.size() - 1, tool_number);
+                    // emit warning
+                    std::string warning = _u8L("GCode Post-Processor encountered an invalid toolchange, maybe from a custom gcode:");
+                    warning += "\n> ";
+                    warning += gcode_line;
+                    warning += _u8L("Generated M104 lines may be incorrect.");
+                    BOOST_LOG_TRIVIAL(error) << warning;
+                    if (m_print != nullptr)
+                        m_print->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL, warning);
+                }
                 export_lines.insert_lines(backtrace, cmd,
                     // line inserter
                     [tool_number, this](unsigned int id, float time, float time_diff) {
