@@ -1,4 +1,4 @@
-#include "GLGizmoSVG.hpp"
+﻿#include "GLGizmoSVG.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/GUI_ObjectList.hpp"
@@ -555,13 +555,109 @@ void GLGizmoSVG::draw_window()
 {
     if (m_volume != nullptr && m_volume->emboss_shape.has_value())
         ImGui::Text("SVG file path is %s", m_volume->emboss_shape->svg_file_path.c_str());
+    //draw_use_surface();
+    draw_distance();
+    draw_rotation();
 
     if (ImGui::Button("change file")) {
         auto data = create_emboss_data_base(m_job_cancel);
         std::string file = choose_svg_file();
     }
+
+    ImGui::Separator();
     draw_model_type();        
  }
+
+void GLGizmoSVG::draw_distance()
+{
+    if (m_volume == nullptr)
+        return;
+
+    const EmbossProjection& projection = m_volume->emboss_shape->projection;
+    bool use_surface = projection.use_surface;
+    bool allowe_surface_distance = !use_surface && !m_volume->is_the_only_one_part();
+
+    float prev_distance = m_distance.value_or(.0f);
+    float min_distance = static_cast<float>(-2 * projection.depth);
+    float max_distance = static_cast<float>(2 * projection.depth);
+ 
+    m_imgui->disabled_begin(!allowe_surface_distance);
+    ScopeGuard sg([imgui = m_imgui]() { imgui->disabled_end(); });
+
+    ImGuiWrapper::text(_L("distance"));
+    bool use_inch = wxGetApp().app_config->get_bool("use_inches");
+    const wxString move_tooltip = _L("Distance of the center of the text to the model surface.");
+    bool is_moved = false;
+    if (use_inch) {
+        std::optional<float> distance_inch;
+        if (m_distance.has_value()) distance_inch = (*m_distance * ObjectManipulation::mm_to_in);
+        min_distance = static_cast<float>(min_distance * ObjectManipulation::mm_to_in);
+        max_distance = static_cast<float>(max_distance * ObjectManipulation::mm_to_in);
+        if (m_imgui->slider_optional_float("##distance", m_distance, min_distance, max_distance, "%.3f in", 1.f, false, move_tooltip)) {
+            if (distance_inch.has_value()) {
+                m_distance = *distance_inch * ObjectManipulation::in_to_mm;
+            } else {
+                m_distance.reset();
+            }
+            is_moved = true;
+        }
+    } else {
+        if (m_imgui->slider_optional_float("##distance", m_distance, min_distance, max_distance, "%.2f mm", 1.f, false, move_tooltip)) 
+            is_moved = true;
+    }
+
+    float undo_offset = ImGui::GetStyle().FramePadding.x;
+    ImGui::SameLine(undo_offset);
+    if (ImGui::Button("R##distance_reset")){
+        m_distance.reset();
+        is_moved = true;
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Reset distance to zero value"));
+
+    if (is_moved)
+        do_local_z_move(m_parent, m_distance.value_or(.0f) - prev_distance);
+}
+
+void GLGizmoSVG::draw_rotation()
+{
+    if (m_volume == nullptr)
+        return;
+    // slider for Clock-wise angle in degress
+    // stored angle is optional CCW and in radians
+    // Convert stored value to degress
+    // minus create clock-wise roation from CCW
+    float angle = m_angle.value_or(0.f);
+    float angle_deg = static_cast<float>(-angle * 180 / M_PI);
+    if (m_imgui->slider_float("##angle", &angle, limits.angle.min, limits.angle.max, u8"%.2f DEG", 1.f, false, _L("Rotate text Clock-wise."))){
+        // convert back to radians and CCW
+        double angle_rad = -angle_deg * M_PI / 180.0;
+        Geometry::to_range_pi_pi(angle_rad);                
+
+        double diff_angle = angle_rad - angle;
+        do_local_z_rotate(m_parent, diff_angle);
+        
+        // calc angle after rotation
+        const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
+        m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
+        
+        // recalculate for surface cut
+        if (m_volume->emboss_shape->projection.use_surface)
+            process();
+    }
+
+    // Keep up - lock button icon
+    //ImGui::SameLine(m_gui_cfg->lock_offset);
+    //const IconManager::Icon &icon = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::activable);
+    //const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_up ? IconType::lock_bold : IconType::unlock_bold, IconState::activable);
+    //const IconManager::Icon &icon_disable = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::disabled);
+    //if (button(icon, icon_hover, icon_disable))
+    //    m_keep_up = !m_keep_up;    
+    //if (ImGui::IsItemHovered())
+    //    ImGui::SetTooltip("%s", (m_keep_up?
+    //        _u8L("Unlock the text's rotation when moving text along the object's surface."):
+    //        _u8L("Lock the text's rotation when moving text along the object's surface.")
+    //    ).c_str());
+}
 
 void GLGizmoSVG::draw_model_type()
 {
@@ -740,12 +836,25 @@ EmbossShape select_shape()
     if (shape.svg_file_path.empty())
         return {};
 
-    NSVGimage *image = nsvgParseFromFile(shape.svg_file_path.c_str(), "mm", 96.0f);
-    ScopeGuard sg([image]() { nsvgDelete(image); });
-    shape.shapes = to_expolygons(image);
+    // select units
+    bool use_inch = wxGetApp().app_config->get_bool("use_inches");   
+    const char *unit_mm{"mm"};
+    const char *unit_in{"in"};
+    const char *unit = use_inch ?unit_in : unit_mm;
 
-    // TODO: get scale from file
-    shape.scale = 1.;
+    // common used DPI is 96 or 72
+    float dpi = 96.0f;
+    NSVGimage *image = nsvgParseFromFile(shape.svg_file_path.c_str(), unit, dpi);
+    ScopeGuard sg([image]() { nsvgDelete(image); });
+
+
+    shape.scale = 1e-2; // loaded in mm
+
+    constexpr float tesselation_tolerance = 1e-2f;
+    int max_level = 10;
+    float scale = static_cast<float>(1 / shape.scale);
+    bool is_y_negative = true;
+    shape.shapes = to_expolygons(image, tesselation_tolerance, max_level, scale, is_y_negative);
 
     // Must contain some shapes !!!
     if (shape.shapes.empty())

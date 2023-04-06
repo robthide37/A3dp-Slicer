@@ -98,6 +98,8 @@ private:
     bool process();
     void close();
     void draw_window();
+    void draw_distance();
+    void draw_rotation();
     void draw_model_type();
 
     // process mouse event
@@ -142,6 +144,8 @@ private:
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
     std::optional<float> m_angle;
+    std::optional<float> m_distance;
+
     // Value is set only when dragging rotation to calculate actual angle
     std::optional<float> m_rotate_start_angle;
 
@@ -151,6 +155,7 @@ private:
     
     // When true keep up vector otherwise relative rotation
     bool m_keep_up = true;
+
         
     // setted only when wanted to use - not all the time
     std::optional<ImVec2> m_set_window_offset;
