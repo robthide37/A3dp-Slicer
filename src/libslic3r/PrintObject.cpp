@@ -1770,7 +1770,7 @@ void PrintObject::bridge_over_infill()
             if (clustered_layers_for_threads.empty() ||
                 this->get_layer(clustered_layers_for_threads.back().back())->print_z <
                     this->get_layer(pair.first)->print_z -
-                        this->get_layer(pair.first)->regions()[0]->flow(frSolidInfill, true).height() * target_flow_height_factor -
+                        this->get_layer(pair.first)->regions()[0]->bridging_flow(frSolidInfill, true).height() * target_flow_height_factor -
                         EPSILON ||
                 intersection(layer_area_covered_by_candidates[clustered_layers_for_threads.back().back()],
                              layer_area_covered_by_candidates[pair.first])
@@ -2105,9 +2105,10 @@ void PrintObject::bridge_over_infill()
                 }
 
                 // Gather deep infill areas, where thick bridges fit
-                coordf_t spacing = surfaces_by_layer[lidx].front().region->flow(frSolidInfill, true).scaled_spacing();
-                coordf_t target_flow_height = surfaces_by_layer[lidx].front().region->flow(frSolidInfill, true).height() * target_flow_height_factor;
-                Polygons deep_infill_area    = gather_areas_w_depth(po, lidx, target_flow_height);
+                coordf_t spacing            = surfaces_by_layer[lidx].front().region->bridging_flow(frSolidInfill, true).scaled_spacing();
+                coordf_t target_flow_height = surfaces_by_layer[lidx].front().region->bridging_flow(frSolidInfill, true).height() *
+                                              target_flow_height_factor;
+                Polygons deep_infill_area = gather_areas_w_depth(po, lidx, target_flow_height);
 
                 {
                     // Now also remove area that has been already filled on lower layers by bridging expansion - For this
