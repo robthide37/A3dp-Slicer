@@ -8,17 +8,61 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/nowide/convert.hpp>
+#include <curl/curl.h>
 
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/format.hpp"
+#include "libslic3r/AppConfig.hpp"
 #include "Http.hpp"
 
 namespace fs = boost::filesystem;
 namespace pt = boost::property_tree;
 namespace Slic3r {
 
+namespace {
+#ifdef WIN32
+// Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+std::string substitute_host(const std::string& orig_addr, std::string sub_addr)
+{
+    // put ipv6 into [] brackets 
+    if (sub_addr.find(':') != std::string::npos && sub_addr.at(0) != '[')
+        sub_addr = "[" + sub_addr + "]";
+    // Using the new CURL API for handling URL. https://everything.curl.dev/libcurl/url
+    // If anything fails, return the input unchanged.
+    std::string out = orig_addr;
+    CURLU* hurl = curl_url();
+    if (hurl) {
+        // Parse the input URL.
+        CURLUcode rc = curl_url_set(hurl, CURLUPART_URL, orig_addr.c_str(), 0);
+        if (rc == CURLUE_OK) {
+            // Replace the address.
+            rc = curl_url_set(hurl, CURLUPART_HOST, sub_addr.c_str(), 0);
+            if (rc == CURLUE_OK) {
+                // Extract a string fromt the CURL URL handle.
+                char* url;
+                rc = curl_url_get(hurl, CURLUPART_URL, &url, 0);
+                if (rc == CURLUE_OK) {
+                    out = url;
+                    curl_free(url);
+                }
+                else
+                    BOOST_LOG_TRIVIAL(error) << "OctoPrint substitute_host: failed to extract the URL after substitution";
+            }
+            else
+                BOOST_LOG_TRIVIAL(error) << "OctoPrint substitute_host: failed to substitute host " << sub_addr << " in URL " << orig_addr;
+        }
+        else
+            BOOST_LOG_TRIVIAL(error) << "OctoPrint substitute_host: failed to parse URL " << orig_addr;
+        curl_url_cleanup(hurl);
+    }
+    else
+        BOOST_LOG_TRIVIAL(error) << "OctoPrint substitute_host: failed to allocate curl_url";
+    return out;
+}
+#endif
+}
 Mainsail::Mainsail(DynamicPrintConfig *config) :
     m_host(config->opt_string("print_host")),
     m_apikey(config->opt_string("printhost_apikey")),
@@ -85,6 +129,14 @@ bool Mainsail::test(wxString& msg) const
             msg = "Could not parse server response";
         }
     })
+#ifdef _WIN32
+    .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
+    .on_ip_resolve([&](std::string address) {
+        // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+        // Remember resolved address to be reused at successive REST API call.
+        msg = GUI::from_u8(address);
+    })
+#endif // _WIN32
     .perform_sync();
 
     return res;
@@ -108,8 +160,29 @@ bool Mainsail::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
     std::string url;
     bool res = true;
 
-    url = make_url("server/files/upload");
-    
+#ifdef WIN32
+    // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+    if (m_host.find("https://") == 0 || test_msg_or_host_ip.empty() || !GUI::get_app_config()->get_bool("allow_ip_resolve"))
+#endif // _WIN32
+    {
+        // If https is entered we assume signed ceritificate is being used
+        // IP resolving will not happen - it could resolve into address not being specified in cert
+        url = make_url("server/files/upload");
+    }
+#ifdef WIN32
+    else {
+        // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+        // Curl uses easy_getinfo to get ip address of last successful transaction.
+        // If it got the address use it instead of the stored in "host" variable.
+        // This new address returns in "test_msg_or_host_ip" variable.
+        // Solves troubles of uploades failing with name address.
+        // in original address (m_host) replace host for resolved ip 
+        info_fn(L"resolve", test_msg_or_host_ip);
+        url = substitute_host(make_url("server/files/upload"), GUI::into_u8(test_msg_or_host_ip));
+        BOOST_LOG_TRIVIAL(info) << "Upload address after ip resolve: " << url;
+    }
+#endif // _WIN32
+
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Uploading file %2% at %3%, filename: %4%, path: %5%, print: %6%")
         % name
         % upload_data.source_path
