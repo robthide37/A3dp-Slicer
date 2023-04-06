@@ -1178,19 +1178,6 @@ void PrintObject::discover_vertical_shells()
     };
     bool     spiral_vase      = this->print()->config().spiral_vase.value;
     size_t   num_layers       = spiral_vase ? std::min(size_t(this->printing_region(0).config().bottom_solid_layers), m_layers.size()) : m_layers.size();
-    coordf_t min_layer_height = this->slicing_parameters().min_layer_height;
-    // Does this region possibly produce more than 1 top or bottom layer?
-    auto has_extra_layers_fn = [min_layer_height](const PrintRegionConfig &config) {
-	    auto num_extra_layers = [min_layer_height](int num_solid_layers, coordf_t min_shell_thickness) {
-	    	if (num_solid_layers == 0)
-	    		return 0;
-	    	int n = num_solid_layers - 1;
-	    	int n2 = int(ceil(min_shell_thickness / min_layer_height));
-	    	return std::max(n, n2 - 1);
-	    };
-    	return num_extra_layers(config.top_solid_layers, config.top_solid_min_thickness) +
-	    	   num_extra_layers(config.bottom_solid_layers, config.bottom_solid_min_thickness) > 0;
-    };
     std::vector<DiscoverVerticalShellsCacheEntry> cache_top_botom_regions(num_layers, DiscoverVerticalShellsCacheEntry());
     bool top_bottom_surfaces_all_regions = this->num_printing_regions() > 1 && ! m_config.interface_shells.value;
 //    static constexpr const float top_bottom_expansion_coeff = 1.05f;
@@ -1199,18 +1186,6 @@ void PrintObject::discover_vertical_shells()
     if (top_bottom_surfaces_all_regions) {
         // This is a multi-material print and interface_shells are disabled, meaning that the vertical shell thickness
         // is calculated over all materials.
-        // Is the "ensure vertical wall thickness" applicable to any region?
-        bool has_extra_layers = false;
-        for (size_t region_id = 0; region_id < this->num_printing_regions(); ++region_id) {
-            const PrintRegionConfig &config = this->printing_region(region_id).config();
-            if (has_extra_layers_fn(config)) {
-                has_extra_layers = true;
-                break;
-            }
-        }
-        if (! has_extra_layers)
-            // The "ensure vertical wall thickness" feature is not applicable to any of the regions. Quit.
-            return;
         BOOST_LOG_TRIVIAL(debug) << "Discovering vertical shells in parallel - start : cache top / bottom";
         //FIXME Improve the heuristics for a grain size.
         size_t grain_size = std::max(num_layers / 16, size_t(1));
@@ -1280,11 +1255,6 @@ void PrintObject::discover_vertical_shells()
     }
 
     for (size_t region_id = 0; region_id < this->num_printing_regions(); ++ region_id) {
-        const PrintRegion &region = this->printing_region(region_id);
-        if (! has_extra_layers_fn(region.config()))
-            // Zero or 1 layer, there is no additional vertical wall thickness enforced.
-            continue;
-
         //FIXME Improve the heuristics for a grain size.
         size_t grain_size = std::max(num_layers / 16, size_t(1));
 
@@ -1395,13 +1365,25 @@ void PrintObject::discover_vertical_shells()
                         coordf_t print_z = layer->print_z;
                         int i = int(idx_layer) + 1;
                         int itop = int(idx_layer) + n_top_layers;
+                        bool at_least_one_top_projected = false;
 	                    for (; i < int(cache_top_botom_regions.size()) &&
 	                         (i < itop || m_layers[i]->print_z - print_z < region_config.top_solid_min_thickness - EPSILON);
 	                        ++ i) {
+                            at_least_one_top_projected = true;
 	                        const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
                             combine_holes(cache.holes);
                             combine_shells(cache.top_surfaces);
 	                    }
+                        if (!at_least_one_top_projected && i < int(cache_top_botom_regions.size())) {
+                            // Lets consider this a special case - with only 1 top solid and minimal shell thickness settings, the
+                            // boundaries of solid layers are not anchored over/under perimeters, so lets fix it by adding at least one
+                            // perimeter width of area
+                            Polygons anchor_area = intersection(expand(cache_top_botom_regions[idx_layer].top_surfaces,
+                                                                       layerm->flow(frExternalPerimeter).scaled_spacing()),
+                                                                to_polygons(m_layers[i]->lslices));
+                            combine_shells(anchor_area);
+                        }
+
                         if (one_more_layer_below_top_bottom_surfaces)
                             if (i < int(cache_top_botom_regions.size()) &&
                                 (i <= itop || m_layers[i]->bottom_z() - print_z < region_config.top_solid_min_thickness - EPSILON))
@@ -1412,13 +1394,23 @@ void PrintObject::discover_vertical_shells()
                         coordf_t bottom_z = layer->bottom_z();
                         int i = int(idx_layer) - 1;
                         int ibottom = int(idx_layer) - n_bottom_layers;
+                        bool at_least_one_bottom_projected = false;
 	                    for (; i >= 0 &&
 	                         (i > ibottom || bottom_z - m_layers[i]->bottom_z() < region_config.bottom_solid_min_thickness - EPSILON);
 	                        -- i) {
+                                at_least_one_bottom_projected = true;
 	                        const DiscoverVerticalShellsCacheEntry &cache = cache_top_botom_regions[i];
 							combine_holes(cache.holes);
                             combine_shells(cache.bottom_surfaces);
 	                    }
+
+                        if (!at_least_one_bottom_projected && i >= 0) {
+                            Polygons anchor_area = intersection(expand(cache_top_botom_regions[idx_layer].bottom_surfaces,
+                                                                       layerm->flow(frExternalPerimeter).scaled_spacing()),
+                                                                to_polygons(m_layers[i]->lslices));
+                            combine_shells(anchor_area);
+                        }
+
                         if (one_more_layer_below_top_bottom_surfaces)
                             if (i >= 0 &&
                                 (i > ibottom || bottom_z - m_layers[i]->print_z < region_config.bottom_solid_min_thickness - EPSILON))
@@ -1514,10 +1506,19 @@ void PrintObject::discover_vertical_shells()
                             // Finally expand the infill a bit to remove tiny gaps between solid infill and the other regions.
                             narrow_sparse_infill_region_radius - tiny_overlap_radius, ClipperLib::jtSquare);
 
+                        Polygons internal_volume;
+                        {
+                            Polygons shrinked_bottom_slice = idx_layer > 0 ? to_polygons(m_layers[idx_layer - 1]->lslices) : Polygons{};
+                            Polygons shrinked_upper_slice  = idx_layer > 0 ? to_polygons(m_layers[idx_layer + 1]->lslices) : Polygons{};
+                            internal_volume                = intersection(shrinked_bottom_slice, shrinked_upper_slice);
+                        }
+
                         // The opening operation may cause scattered tiny drops on the smooth parts of the model, filter them out
                         regularized_shell.erase(std::remove_if(regularized_shell.begin(), regularized_shell.end(),
-                                                               [&min_perimeter_infill_spacing](const ExPolygon &p) {
-                                                                   return p.area() < min_perimeter_infill_spacing * scaled(8.0);
+                                                               [&min_perimeter_infill_spacing, &internal_volume](const ExPolygon &p) {
+                                                                   return p.area() < min_perimeter_infill_spacing * scaled(1.5) ||
+                                                                          (p.area() < min_perimeter_infill_spacing * scaled(8.0) &&
+                                                                           diff(to_polygons(p), internal_volume).empty());
                                                                }),
                                                 regularized_shell.end());
                     }

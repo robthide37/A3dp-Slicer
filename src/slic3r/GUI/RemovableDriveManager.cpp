@@ -78,32 +78,7 @@ std::vector<DriveData> RemovableDriveManager::search_for_removable_drives() cons
 }
 
 namespace {
-int eject_alt(const std::wstring& volume_access_path)
-{
-	HANDLE handle = CreateFileW(volume_access_path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
-	if (handle == INVALID_HANDLE_VALUE) {
-		BOOST_LOG_TRIVIAL(error) << "Alt Ejecting " << volume_access_path << " failed (handle == INVALID_HANDLE_VALUE): " << GetLastError();
-		return 1;
-	}
-	DWORD deviceControlRetVal(0);
-	//these 3 commands should eject device safely but they dont, the device does disappear from file explorer but the "device was safely remove" notification doesnt trigger.
-	//sd cards does  trigger WM_DEVICECHANGE messege, usb drives dont
-	BOOL e1 = DeviceIoControl(handle, FSCTL_LOCK_VOLUME, nullptr, 0, nullptr, 0, &deviceControlRetVal, nullptr);
-	BOOST_LOG_TRIVIAL(debug) << "FSCTL_LOCK_VOLUME " << e1 << " ; " << deviceControlRetVal << " ; " << GetLastError();
-	BOOL e2 = DeviceIoControl(handle, FSCTL_DISMOUNT_VOLUME, nullptr, 0, nullptr, 0, &deviceControlRetVal, nullptr);
-	BOOST_LOG_TRIVIAL(debug) << "FSCTL_DISMOUNT_VOLUME " << e2 << " ; " << deviceControlRetVal << " ; " << GetLastError();
-	
-	// some implemenatations also calls IOCTL_STORAGE_MEDIA_REMOVAL here with FALSE as third parameter, which should set PreventMediaRemoval 
-	BOOL error = DeviceIoControl(handle, IOCTL_STORAGE_EJECT_MEDIA, nullptr, 0, nullptr, 0, &deviceControlRetVal, nullptr);
-	if (error == 0) {
-		CloseHandle(handle);
-		BOOST_LOG_TRIVIAL(error) << "Alt Ejecting " << volume_access_path << " failed (IOCTL_STORAGE_EJECT_MEDIA)" << deviceControlRetVal << " " << GetLastError();
-		return 1;
-	}
-	CloseHandle(handle);
-	BOOST_LOG_TRIVIAL(info) << "Alt Ejecting finished";
-	return 0;
-}
+
 
 
 // From https://github.com/microsoft/Windows-driver-samples/tree/main/usb/usbview
@@ -485,7 +460,7 @@ int eject_inner(const std::string& path)
 	DEVINST dev_inst = get_dev_inst_by_device_number(device_number, drive_type, dos_device_name);
 	if (dev_inst == 0) {
 		BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1%: Invalid device instance handle. Going to try alternative ejecting method.", path);
-		return eject_alt(volume_access_path);
+		return 1;
 	}
 
 	PNP_VETO_TYPE veto_type = PNP_VetoTypeUnknown;
@@ -524,7 +499,7 @@ int eject_inner(const std::string& path)
 	if (res == CR_SUCCESS && veto_type == PNP_VetoTypeUnknown) {
 		return 0;
 	}
-	BOOST_LOG_TRIVIAL(warning) << GUI::format("Ejecting of %1% has failed: Request to eject device has failed. Another request will follow. Veto type: %2%", path, veto_type);
+	BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Request to eject device has failed. Another request will follow. Veto type: %2%", path, veto_type);
 
 	// But on some PC, SD cards ejects only with its own dev_inst. 
 	res = CM_Request_Device_EjectW(dev_inst, &veto_type, veto_name, MAX_PATH, 0);
@@ -535,6 +510,76 @@ int eject_inner(const std::string& path)
 
 	BOOST_LOG_TRIVIAL(error) << GUI::format("Ejecting of %1% has failed: Request to eject device has failed. Veto type: %2%", path, veto_type);
 	return 1;
+}
+
+// this method should be called in worker thread. It does SLEEP.
+// Alternative ejecting to eject_inner method.
+// Success or Fail is passed directly to UI by events
+void eject_alt(std::string path, wxEvtHandler* callback_evt_handler, DriveData drive_data)
+{
+	// Transform path to correct form
+	std::wstring wpath = std::wstring();
+	wpath += boost::nowide::widen(path)[0]; // drive letter wide
+	wpath[0] &= ~0x20; // make sure drive letter is uppercase
+	std::wstring volume_access_path = L"\\\\.\\" + wpath + L":"; // for CreateFile			
+
+	HANDLE handle = CreateFileW(volume_access_path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+	if (handle == INVALID_HANDLE_VALUE) {
+		BOOST_LOG_TRIVIAL(error) << "Alt ejecting " << volume_access_path << " failed (handle == INVALID_HANDLE_VALUE): " << GetLastError();
+		assert(callback_evt_handler);
+		if (callback_evt_handler)
+			wxPostEvent(callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair<DriveData, bool>(std::move(drive_data), false)));
+		return;
+	}
+	DWORD deviceControlRetVal(0);
+	//these 3 commands should eject device safely but they dont, the device does disappear from file explorer but the "device was safely remove" notification doesnt trigger.
+	//sd cards does  trigger WM_DEVICECHANGE messege, usb drives dont
+	BOOL e1;
+	for (int i = 0; i < 10; i++) {
+		e1 = DeviceIoControl(handle, FSCTL_LOCK_VOLUME, nullptr, 0, nullptr, 0, &deviceControlRetVal, nullptr);
+		if (e1)
+			break;
+		BOOST_LOG_TRIVIAL(warning) << "Alt Ejecting: FSCTL_LOCK_VOLUME failed. Try " << i << ". " << GetLastError();
+		Sleep(500);
+	}
+	if (e1 == 0) {
+		CloseHandle(handle);
+		BOOST_LOG_TRIVIAL(error) << "Alt Ejecting " << volume_access_path << " failed to Lock the device. Ejecting has failed. " << GetLastError();
+		assert(callback_evt_handler);
+		if (callback_evt_handler)
+			wxPostEvent(callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair<DriveData, bool>(std::move(drive_data), false)));
+		return;
+	}
+	BOOST_LOG_TRIVIAL(info) << "Alt Ejecting: FSCTL_LOCK_VOLUME success.";
+
+	BOOL e2 = DeviceIoControl(handle, FSCTL_DISMOUNT_VOLUME, nullptr, 0, nullptr, 0, &deviceControlRetVal, nullptr);
+	if (e2 == 0) {
+		CloseHandle(handle);
+		BOOST_LOG_TRIVIAL(error) << "Alt Ejecting " << volume_access_path << " failed to dismount the volume. Ejecting has failed. " << GetLastError();
+		assert(callback_evt_handler);
+		if (callback_evt_handler)
+			wxPostEvent(callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair<DriveData, bool>(std::move(drive_data), false)));
+		return;
+	}
+	BOOST_LOG_TRIVIAL(info) << "Alt Ejecting: FSCTL_DISMOUNT_VOLUME success.";
+
+	// some implemenatations also calls IOCTL_STORAGE_MEDIA_REMOVAL here with FALSE as third parameter, which should set PreventMediaRemoval 
+	BOOL error = DeviceIoControl(handle, IOCTL_STORAGE_EJECT_MEDIA, nullptr, 0, nullptr, 0, &deviceControlRetVal, nullptr);
+	if (error == 0) {
+		CloseHandle(handle);
+		BOOST_LOG_TRIVIAL(error) << "Alt Ejecting " << volume_access_path << " failed (IOCTL_STORAGE_EJECT_MEDIA)" << deviceControlRetVal << " " << GetLastError();
+		assert(callback_evt_handler);
+		if (callback_evt_handler)
+			wxPostEvent(callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair<DriveData, bool>(std::move(drive_data), false)));
+
+		return;
+	}
+	CloseHandle(handle);
+
+	BOOST_LOG_TRIVIAL(info) << "Alt Ejecting finished";
+	assert(callback_evt_handler);
+	if (callback_evt_handler)
+		wxPostEvent(callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair< DriveData, bool >(std::move(drive_data), true)));
 }
 
 } // namespace
@@ -561,12 +606,18 @@ void RemovableDriveManager::eject_drive()
 			if (m_callback_evt_handler)
 				wxPostEvent(m_callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair< DriveData, bool >(std::move(*it_drive_data), true)));
 		} else {
+			if (m_eject_thread.joinable())
+				m_eject_thread.join();
+			m_eject_thread = boost::thread(eject_alt, m_last_save_path, m_callback_evt_handler, std::move(*it_drive_data));
+
 			// failed to eject
 			// this should not happen, throwing exception might be the way here
+			/*
 			BOOST_LOG_TRIVIAL(error) << "Ejecting has failed.";
 			assert(m_callback_evt_handler);
 			if (m_callback_evt_handler)
 				wxPostEvent(m_callback_evt_handler, RemovableDriveEjectEvent(EVT_REMOVABLE_DRIVE_EJECTED, std::pair<DriveData, bool>(*it_drive_data, false)));
+				*/
 		}
 	} else {
 		// drive not found in m_current_drives

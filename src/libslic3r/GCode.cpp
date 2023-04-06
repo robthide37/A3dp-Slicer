@@ -3083,8 +3083,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
 
     std::string cooling_marker_setspeed_comments;
     if (m_enable_cooling_markers) {
-        if (path.role().is_bridge() &&
-            (!path.role().is_perimeter() || !this->config().enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())))
+        if (path.role().is_bridge())
             gcode += ";_BRIDGE_FAN_START\n";
         else
             cooling_marker_setspeed_comments = ";_EXTRUDE_SET_SPEED";
@@ -3120,7 +3119,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         double last_set_speed     = new_points[0].speed * 60.0;
         double last_set_fan_speed = new_points[0].fan_speed;
         gcode += m_writer.set_speed(last_set_speed, "", cooling_marker_setspeed_comments);
-        gcode += ";_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
+        gcode += "\n;_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
         Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
         for (size_t i = 1; i < new_points.size(); i++) {
             const ProcessedPoint &processed_point = new_points[i];
@@ -3135,10 +3134,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             }
             if (last_set_fan_speed != processed_point.fan_speed) {
                 last_set_fan_speed = processed_point.fan_speed;
-                gcode += ";_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
+                gcode += "\n;_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
             }
         }
-        gcode += ";_RESET_FAN_SPEED\n";
+        gcode += "\n;_RESET_FAN_SPEED\n";
     }
 
     if (m_enable_cooling_markers)
