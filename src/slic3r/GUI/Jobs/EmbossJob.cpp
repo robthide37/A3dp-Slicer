@@ -277,7 +277,7 @@ void CreateVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
     if (!::finalize(canceled, eptr, *m_input.base))
         return;
     if (m_result.its.empty()) 
-        return create_message(_u8L("Can't create empty volume."));
+        return create_message("Can't create empty volume.");
     create_volume(std::move(m_result), m_input.object_id, m_input.volume_type, m_input.trmat, *m_input.base, m_input.gizmo);
 }
 
@@ -329,7 +329,7 @@ void CreateObjectJob::finalize(bool canceled, std::exception_ptr &eptr)
 
     // only for sure
     if (m_result.empty()) 
-        return create_message(_u8L("Can't create empty object."));
+        return create_message("Can't create empty object.");
 
     GUI_App &app    = wxGetApp();
     Plater  *plater = app.plater();
@@ -388,7 +388,7 @@ void UpdateJob::process(Ctl &ctl)
     m_result = ::try_create_mesh(*m_input.base, was_canceled);
     if (was_canceled()) return;
     if (m_result.its.empty())
-        throw JobException(_u8L("Created text volume is empty. Change text or font.").c_str());
+        throw JobException("Created text volume is empty. Change text or font.");
 
     // center triangle mesh
     Vec3d shift = m_result.bounding_box().center();
@@ -743,8 +743,8 @@ template<typename Fnc> TriangleMesh create_mesh(DataBase &input, const Fnc &was_
             return {};
         // only info
         ctl.call_on_main_thread([]() {
-            create_message(_u8L("It is used default volume for embossed "
-                                "text, try to change text or font to fix it."));
+            create_message("It is used default volume for embossed "
+                                "text, try to change text or font to fix it.");
         });
     }
 
@@ -764,7 +764,42 @@ TriangleMesh create_default_mesh()
     return triangle_mesh;
 }
 
-void update_name_in_list(const ObjectList &object_list, const ModelVolume &volume)
+namespace{
+void update_volume_name(const ModelVolume &volume, const ObjectList *obj_list)
+{
+    if (obj_list == nullptr)
+        return;
+
+    const std::vector<ModelObject *>* objects = obj_list->objects();
+    if (objects == nullptr)
+        return;
+
+    int object_idx = -1;
+    int volume_idx = -1;
+    for (size_t oi = 0; oi < objects->size(); ++oi) {
+        const ModelObject *mo = objects->at(oi);
+        if (mo == nullptr)
+            continue;
+        if (volume.get_object()->id() != mo->id())
+            continue;
+        const ModelVolumePtrs& volumes = mo->volumes;
+        for (size_t vi = 0; vi < volumes.size(); ++vi) {
+            const ModelVolume *mv = volumes[vi];
+            if (mv == nullptr)
+                continue;
+            if (mv->id() == volume.id()){
+                object_idx = static_cast<int>(oi);
+                volume_idx = static_cast<int>(vi);
+                break;
+            }
+        }
+        if (volume_idx > 0)
+            break;
+    }
+    obj_list->update_name_in_list(object_idx, volume_idx);
+}
+}
+void update_name_in_list(const ObjectList& object_list, const ModelVolume& volume)
 {
     const ModelObjectPtrs *objects_ptr = object_list.objects();
     if (objects_ptr == nullptr)
@@ -857,11 +892,11 @@ void create_volume(TriangleMesh                    &&mesh,
 
     // Parent object for text volume was propably removed.
     // Assumption: User know what he does, so text volume is no more needed.
-    if (obj == nullptr)
-        return create_message(_u8L("Bad object to create volume."));
+    if (obj == nullptr) 
+        return create_message("Bad object to create volume.");
 
-    if (mesh.its.empty())
-        return create_message(_u8L("Can't create empty volume."));
+    if (mesh.its.empty()) 
+        return create_message("Can't create empty volume.");
 
     plater->take_snapshot(_L("Add Emboss text Volume"));
 
@@ -931,8 +966,9 @@ void create_volume(TriangleMesh                    &&mesh,
     if (manager.get_current_type() != gizmo)
         manager.open_gizmo(gizmo);
 
-    // redraw scene
-    canvas->reload_scene(true);
+    // update model and redraw scene
+    //canvas->reload_scene(true);
+    plater->update();
 }
 
 OrthoProject create_projection_for_cut(Transform3d tr, double shape_scale, const std::pair<float, float> &z_range)
@@ -1274,12 +1310,8 @@ bool start_create_volume_on_surface_job(CreateVolumeParams &input, DataBasePtr d
     // Try to cast ray into scene and find object for add volume
     return start_create_volume_job(input.worker, *object, transform, std::move(data), input.volume_type, gizmo_type);
 }
-} // namespace
 
-#include <wx/msgdlg.h>
-namespace{
 void create_message(const std::string &message) {
-    wxMessageBox(wxString(message), _L("Issue during embossing the text."),
-                 wxOK | wxICON_WARNING);
+    show_error(nullptr, message.c_str());
 }
 } // namespace

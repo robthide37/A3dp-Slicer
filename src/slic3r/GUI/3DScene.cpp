@@ -480,21 +480,19 @@ int GLVolumeCollection::load_object_volume(
 
 #if ENABLE_OPENGL_ES
 int GLVolumeCollection::load_wipe_tower_preview(
-    float pos_x, float pos_y, float width, float depth, float height,
+    float pos_x, float pos_y, float width, float depth, float height, float cone_angle,
     float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh)
 #else
 int GLVolumeCollection::load_wipe_tower_preview(
-    float pos_x, float pos_y, float width, float depth, float height,
+    float pos_x, float pos_y, float width, float depth, float height, float cone_angle,
     float rotation_angle, bool size_unknown, float brim_width)
 #endif // ENABLE_OPENGL_ES
 {
-    if (depth < 0.01f)
-        return int(this->volumes.size() - 1);
     if (height == 0.0f)
         height = 0.1f;
 
     static const float brim_height = 0.2f;
-    const float scaled_brim_height = brim_height / height;
+//    const float scaled_brim_height = brim_height / height;
 
     TriangleMesh mesh;
     ColorRGBA color = ColorRGBA::DARK_YELLOW();
@@ -544,6 +542,21 @@ int GLVolumeCollection::load_wipe_tower_preview(
     brim_mesh.translate(-brim_width, -brim_width, 0.f);
     mesh.merge(brim_mesh);
 
+    // Now the stabilization cone and its base.
+    const auto [R, scale_x] = WipeTower::get_wipe_tower_cone_base(width, height, depth, cone_angle);
+    if (R > 0.) {
+        TriangleMesh cone_mesh(its_make_cone(R, height));
+        cone_mesh.scale(Vec3f(1.f/scale_x, 1.f, 1.f));
+
+        TriangleMesh disk_mesh(its_make_cylinder(R, brim_height));
+        disk_mesh.scale(Vec3f(1. / scale_x, 1., 1.)); // Now it matches the base, which may be elliptic.
+        disk_mesh.scale(Vec3f(1.f + scale_x*brim_width/R, 1.f + brim_width/R, 1.f)); // Scale so the brim is not deformed.
+        cone_mesh.merge(disk_mesh);
+        cone_mesh.translate(width / 2., depth / 2., 0.);
+        mesh.merge(cone_mesh);
+    }
+
+
     volumes.emplace_back(new GLVolume(color));
     GLVolume& v = *volumes.back();
 #if ENABLE_OPENGL_ES
@@ -562,6 +575,71 @@ int GLVolumeCollection::load_wipe_tower_preview(
     v.is_wipe_tower = true;
     v.shader_outside_printer_detection_enabled = !size_unknown;
     return int(volumes.size() - 1);
+}
+
+// Load SLA auxiliary GLVolumes (for support trees or pad).
+// This function produces volumes for multiple instances in a single shot,
+// as some object specific mesh conversions may be expensive.
+void GLVolumeCollection::load_object_auxiliary(
+    const SLAPrintObject*           print_object,
+    int                             obj_idx,
+    // pairs of <instance_idx, print_instance_idx>
+    const std::vector<std::pair<size_t, size_t>>& instances,
+    SLAPrintObjectStep              milestone,
+    // Timestamp of the last change of the milestone
+    size_t                          timestamp)
+{
+    if (print_object->get_mesh_to_print() == nullptr)
+        return;
+    const Transform3d mesh_trafo_inv = print_object->trafo().inverse();
+
+    auto add_volume = [this, &instances, timestamp](int obj_idx, int inst_idx, const ModelInstance& model_instance, SLAPrintObjectStep step,
+        const TriangleMesh& mesh, const ColorRGBA& color, std::optional<const TriangleMesh> convex_hull = std::nullopt) {
+        if (mesh.empty())
+            return;
+
+        GLVolume& v = *this->volumes.emplace_back(new GLVolume(color));
+#if ENABLE_SMOOTH_NORMALS
+        v.model.init_from(mesh, true);
+#else
+        v.model.init_from(mesh);
+        v.model.set_color(color);
+        v.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<const TriangleMesh>(mesh));
+#endif // ENABLE_SMOOTH_NORMALS
+        v.composite_id = GLVolume::CompositeID(obj_idx, -int(step), inst_idx);
+        v.geometry_id = std::pair<size_t, size_t>(timestamp, model_instance.id().id);
+        if (convex_hull.has_value())
+            v.set_convex_hull(*convex_hull);
+        v.is_modifier = false;
+        v.shader_outside_printer_detection_enabled = (step == slaposSupportTree);
+        v.set_instance_transformation(model_instance.get_transformation());
+    };
+ 
+    // Get the support mesh.
+    if (milestone == SLAPrintObjectStep::slaposSupportTree) {
+        TriangleMesh supports_mesh = print_object->support_mesh();
+        if (!supports_mesh.empty()) {
+            supports_mesh.transform(mesh_trafo_inv);
+            TriangleMesh convex_hull = supports_mesh.convex_hull_3d();
+            for (const std::pair<size_t, size_t>& instance_idx : instances) {
+              const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
+              add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposSupportTree, supports_mesh, GLVolume::SLA_SUPPORT_COLOR, convex_hull);
+            }
+        }
+    }
+
+    // Get the pad mesh.
+    if (milestone == SLAPrintObjectStep::slaposPad) {
+        TriangleMesh pad_mesh = print_object->pad_mesh();
+        if (!pad_mesh.empty()) {
+            pad_mesh.transform(mesh_trafo_inv);
+            TriangleMesh convex_hull = pad_mesh.convex_hull_3d();
+            for (const std::pair<size_t, size_t>& instance_idx : instances) {
+                const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
+                add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposPad, pad_mesh, GLVolume::SLA_PAD_COLOR, convex_hull);
+            }
+        }
+    }
 }
 
 GLVolume* GLVolumeCollection::new_toolpath_volume(const ColorRGBA& rgba)

@@ -56,6 +56,7 @@
 #include "MsgDialog.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "slic3r/Utils/AppUpdater.hpp"
+#include "slic3r/GUI/I18N.hpp"
 
 #if defined(__linux__) && defined(__WXGTK3__)
 #define wxLinux_gtk3 true
@@ -288,7 +289,7 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
             const auto &variant = model.variants[i];
 
             const auto label = model.technology == ptFFF
-                ? from_u8((boost::format("%1% %2% %3%") % variant.name % _utf8(L("mm")) % _utf8(L("nozzle"))).str())
+                ? format_wxstr("%1% %2% %3%", variant.name, _L("mm"), _L("nozzle"))
                 : from_u8(model.name);
 
             if (i == 1) {
@@ -508,17 +509,17 @@ void ConfigWizardPage::append_spacer(int space)
 // Wizard pages
 
 PageWelcome::PageWelcome(ConfigWizard *parent)
-    : ConfigWizardPage(parent, from_u8((boost::format(
+    : ConfigWizardPage(parent, format_wxstr(
 #ifdef __APPLE__
-            _utf8(L("Welcome to the %s Configuration Assistant"))
+            _L("Welcome to the %s Configuration Assistant")
 #else
-            _utf8(L("Welcome to the %s Configuration Wizard"))
+            _L("Welcome to the %s Configuration Wizard")
 #endif
-            ) % SLIC3R_APP_NAME).str()), _L("Welcome"))
-    , welcome_text(append_text(from_u8((boost::format(
-        _utf8(L("Hello, welcome to %s! This %s helps you with the initial configuration; just a few settings and you will be ready to print.")))
-        % SLIC3R_APP_NAME
-        % _utf8(ConfigWizard::name())).str())
+            , SLIC3R_APP_NAME), _L("Welcome"))
+    , welcome_text(append_text(format_wxstr(
+        _L("Hello, welcome to %s! This %s helps you with the initial configuration; just a few settings and you will be ready to print.")
+        , SLIC3R_APP_NAME
+        , _(ConfigWizard::name()))
     ))
     , cbox_reset(append(
         new wxCheckBox(this, wxID_ANY, _L("Remove user profiles (a snapshot will be taken beforehand)"))
@@ -576,7 +577,7 @@ PagePrinters::PagePrinters(ConfigWizard *parent,
             continue;
         }
 
-        const auto picker_title = family.empty() ? wxString() : from_u8((boost::format(_utf8(L("%s Family"))) % family).str());
+        const auto picker_title = family.empty() ? wxString() : format_wxstr(_L("%s Family"), family);
         auto *picker = new PrinterPicker(this, vendor, picker_title, MAX_COLS, *appconfig, filter);
 
         picker->Bind(EVT_PRINTER_PICK, [this, appconfig](const PrinterPickerEvent &evt) {
@@ -786,11 +787,14 @@ void PageMaterials::set_compatible_printers_html_window(const std::vector<std::s
     const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
     wxString text;
     if (materials->technology == T_FFF && template_shown) {
+        // TRN ConfigWizard: Materials : "%1%" = "Filaments"/"SLA materials"
         text = format_wxstr(_L("%1% visible for <b>(\"Template\")</b> printer are universal profiles available for all printers. These might not be compatible with your printer."), materials->technology == T_FFF ? _L("Filaments") : _L("SLA materials"));
     } else {
+        // TRN ConfigWizard: Materials : "%1%" = "Filaments"/"SLA materials"
         wxString first_line = format_wxstr(_L("%1% marked with <b>*</b> are <b>not</b> compatible with some installed printers."), materials->technology == T_FFF ? _L("Filaments") : _L("SLA materials"));
 
         if (all_printers) {
+            // TRN ConfigWizard: Materials : "%1%" = "filament"/"SLA material"
             wxString second_line = format_wxstr(_L("All installed printers are compatible with the selected %1%."), materials->technology == T_FFF ? _L("filament") : _L("SLA material"));
             text = wxString::Format(
                 "<html>"
@@ -1368,7 +1372,7 @@ Worker::Worker(wxWindow* parent)
     button_path->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
         boost::filesystem::path chosen_dest(boost::nowide::narrow(m_input_path->GetValue()));
 
-        wxDirDialog dialog(m_parent, L("Choose folder:"), chosen_dest.string() );
+        wxDirDialog dialog(m_parent, _L("Choose folder") + ":", chosen_dest.string() );
         if (dialog.ShowModal() == wxID_OK)
             this->m_input_path->SetValue(dialog.GetPath());
     });
@@ -1420,11 +1424,11 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
     box_allow_downloads->SetValue(box_allow_value);
     append(box_allow_downloads);
 
-    append_text(wxString::Format(_L(
-        "If enabled, %s registers to start on custom URL on www.printables.com."
-        " You will be able to use button with %s logo to open models in this %s."
+    // TRN ConfigWizard : Downloader : %1% = "PrusaSlicer"
+    append_text(format_wxstr(_L("If enabled, %1% registers to start on custom URL on www.printables.com."
+        " You will be able to use button with %1% logo to open models in this %1%."
         " The model will be downloaded into folder you choose bellow."
-    ), SLIC3R_APP_NAME, SLIC3R_APP_NAME, SLIC3R_APP_NAME));
+    ), SLIC3R_APP_NAME));
 
 #ifdef __linux__
     append_text(wxString::Format(_L(
@@ -1455,7 +1459,7 @@ bool DownloaderUtils::Worker::perform_register(const std::string& path_override/
         chosen_dest = aux_dest;
     ec.clear();
     if (chosen_dest.empty() || !boost::filesystem::is_directory(chosen_dest, ec) || ec) {
-        std::string err_msg = GUI::format("%1%\n\n%2%",_L("Chosen directory for downloads does not Exists.") ,chosen_dest.string());
+        std::string err_msg = GUI::format("%1%\n\n%2%",_L("Chosen directory for downloads does not exist.") ,chosen_dest.string());
         BOOST_LOG_TRIVIAL(error) << err_msg;
         show_error(m_parent, err_msg);
         return false;
@@ -1752,10 +1756,11 @@ void PageBedShape::apply_custom_config(DynamicPrintConfig &config)
 }
 
 PageBuildVolume::PageBuildVolume(ConfigWizard* parent)
+    // TRN ConfigWizard : Size of possible print, related on printer size
     : ConfigWizardPage(parent, _L("Build Volume"), _L("Build Volume"), 1)
     , build_volume(new DiamTextCtrl(this))
 {
-    append_text(_L("Set vertical size of your printer."));
+    append_text(_L("Set the printer height."));
 
     wxString value = "200";
     build_volume->SetValue(value);
@@ -1792,7 +1797,7 @@ PageBuildVolume::PageBuildVolume(ConfigWizard* parent)
     }, build_volume->GetId());
 
     auto* sizer_volume = new wxFlexGridSizer(3, 5, 5);
-    auto* text_volume = new wxStaticText(this, wxID_ANY, _L("Max print height:"));
+    auto* text_volume = new wxStaticText(this, wxID_ANY, _L("Max print height") + ":");
     auto* unit_volume = new wxStaticText(this, wxID_ANY, _L("mm"));
     sizer_volume->AddGrowableCol(0, 1);
     sizer_volume->Add(text_volume, 0, wxALIGN_CENTRE_VERTICAL);
@@ -1828,7 +1833,7 @@ PageDiameters::PageDiameters(ConfigWizard *parent)
     append_text(_L("Enter the diameter of your printer's hot end nozzle."));
 
     auto *sizer_nozzle = new wxFlexGridSizer(3, 5, 5);
-    auto *text_nozzle = new wxStaticText(this, wxID_ANY, _L("Nozzle Diameter:"));
+    auto *text_nozzle = new wxStaticText(this, wxID_ANY, _L("Nozzle Diameter") + ":");
     auto *unit_nozzle = new wxStaticText(this, wxID_ANY, _L("mm"));
     sizer_nozzle->AddGrowableCol(0, 1);
     sizer_nozzle->Add(text_nozzle, 0, wxALIGN_CENTRE_VERTICAL);
@@ -1842,7 +1847,7 @@ PageDiameters::PageDiameters(ConfigWizard *parent)
     append_text(_L("Good precision is required, so use a caliper and do multiple measurements along the filament, then compute the average."));
 
     auto *sizer_filam = new wxFlexGridSizer(3, 5, 5);
-    auto *text_filam = new wxStaticText(this, wxID_ANY, _L("Filament Diameter:"));
+    auto *text_filam = new wxStaticText(this, wxID_ANY, _L("Filament Diameter") + ":");
     auto *unit_filam = new wxStaticText(this, wxID_ANY, _L("mm"));
     sizer_filam->AddGrowableCol(0, 1);
     sizer_filam->Add(text_filam, 0, wxALIGN_CENTRE_VERTICAL);
@@ -1934,7 +1939,7 @@ PageTemperatures::PageTemperatures(ConfigWizard *parent)
     append_text(_L("A rule of thumb is 60 °C for PLA and 110 °C for ABS. Leave zero if you have no heated bed."));
 
     auto *sizer_bed = new wxFlexGridSizer(3, 5, 5);
-    auto *text_bed = new wxStaticText(this, wxID_ANY, _L("Bed Temperature:"));
+    auto *text_bed = new wxStaticText(this, wxID_ANY, _L("Bed Temperature") + ":");
     auto *unit_bed = new wxStaticText(this, wxID_ANY, _L("°C"));
     sizer_bed->AddGrowableCol(0, 1);
     sizer_bed->Add(text_bed, 0, wxALIGN_CENTRE_VERTICAL);

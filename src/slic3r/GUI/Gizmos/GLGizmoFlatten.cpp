@@ -1,4 +1,3 @@
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoFlatten.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
@@ -57,7 +56,7 @@ bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
     return false;
 }
 
-void GLGizmoFlatten::data_changed()
+void GLGizmoFlatten::data_changed(bool is_serializing)
 {
     const Selection &  selection    = m_parent.get_selection();
     const ModelObject *model_object = nullptr;
@@ -179,11 +178,7 @@ void GLGizmoFlatten::update_planes()
     ch = ch.convex_hull_3d();
     m_planes.clear();
     on_unregister_raycasters_for_picking();
-#if ENABLE_WORLD_COORDINATE
     const Transform3d inst_matrix = mo->instances.front()->get_matrix_no_offset();
-#else
-    const Transform3d& inst_matrix = mo->instances.front()->get_matrix(true);
-#endif // ENABLE_WORLD_COORDINATE
 
     // Following constants are used for discarding too small polygons.
     const float minimal_area = 5.f; // in square mm (world coordinates)

@@ -11,7 +11,6 @@
 #include "libslic3r/PrintConfig.hpp"
 
 #include "OptionsGroup.hpp"
-#include "I18N.hpp"
 
 // Translate the ifdef 
 #ifdef __WXOSX__

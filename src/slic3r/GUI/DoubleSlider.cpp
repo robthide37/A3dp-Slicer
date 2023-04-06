@@ -106,7 +106,7 @@ Control::Control( wxWindow *parent,
     m_cog_icon_dim    = m_bmp_cog.GetWidth();
 
     m_selection = ssUndef;
-    m_ticks.set_pause_print_msg(_utf8(L("Place bearings in slots and resume printing")));
+    m_ticks.set_pause_print_msg(_u8L("Place bearings in slots and resume printing"));
     m_ticks.set_extruder_colors(&m_extruder_colors);
 
     // slider events

@@ -65,13 +65,13 @@ protected:
     bool on_init() override;
     std::string on_get_name() const override;
     void on_render() override;
-    virtual void on_register_raycasters_for_picking() override;
-    virtual void on_unregister_raycasters_for_picking() override;
+    void on_register_raycasters_for_picking() override;
+    void on_unregister_raycasters_for_picking() override;
     void on_render_input_window(float x, float y, float bottom_limit) override;
     bool on_is_activable() const override { return true; }
     bool on_is_selectable() const override { return false; }
     void on_set_state() override;    
-    void data_changed() override; // selection changed
+    void data_changed(bool is_serializing) override; // selection changed
     void on_set_hover_id() override{ m_rotate_gizmo.set_hover_id(m_hover_id); }
     void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(); }
     void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(); }
@@ -86,10 +86,10 @@ protected:
     /// <returns>Propagete normaly return false.</returns>
     bool on_mouse(const wxMouseEvent &mouse_event) override;
 
-    bool wants_enter_leave_snapshots() const override { return true; }
-    std::string get_gizmo_entering_text() const override { return _u8L("Enter SVG gizmo"); }
-    std::string get_gizmo_leaving_text() const override { return _u8L("Leave SVG gizmo"); }
-    std::string get_action_snapshot_name() override { return _u8L("SVG actions"); }
+    bool wants_enter_leave_snapshots() const override;
+    std::string get_gizmo_entering_text() const override;
+    std::string get_gizmo_leaving_text() const override;
+    std::string get_action_snapshot_name() const override;
 private:
     void set_volume_by_selection();
     void reset_volume();

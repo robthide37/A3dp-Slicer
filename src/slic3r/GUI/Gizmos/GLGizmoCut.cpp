@@ -1,4 +1,3 @@
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoCut.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 
@@ -183,9 +182,9 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     , m_connector_style (size_t(CutConnectorStyle::Prism))
     , m_connector_shape_id (size_t(CutConnectorShape::Circle))
 {
-    m_modes = { _u8L("Planar")//, _u8L("Grid")
+//    m_modes = { _u8L("Planar"), _u8L("Grid")
 //              , _u8L("Radial"), _u8L("Modular")
-    };
+//    };
 
     m_connector_modes = { _u8L("Auto"), _u8L("Manual") };
 
@@ -220,7 +219,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
         {"Type"         , _u8L("Type")},
         {"Style"        , _u8L("Style")},
         {"Shape"        , _u8L("Shape")},
-        {"Depth ratio"  , _u8L("Depth ratio")},
+        {"Depth"        , _u8L("Depth")},
         {"Size"         , _u8L("Size")},
     };
 
@@ -232,7 +231,7 @@ std::string GLGizmoCut3D::get_tooltip() const
     std::string tooltip;
     if (m_hover_id == Z || (m_dragging && m_hover_id == CutPlane)) {
         double koef = m_imperial_units ? ObjectManipulation::mm_to_in : 1.0;
-        std::string unit_str = " " + (m_imperial_units ? _u8L("inch") : _u8L("mm"));
+        std::string unit_str = " " + (m_imperial_units ? _u8L("in") : _u8L("mm"));
         const BoundingBoxf3& tbb = m_transformed_bounding_box;
 
         const std::string name = m_keep_as_parts ? _u8L("Part") : _u8L("Object");
@@ -876,6 +875,7 @@ void GLGizmoCut3D::on_set_state()
         }
         m_selected.clear();
         m_parent.set_use_color_clip_plane(false);
+        m_c->selection_info()->set_use_shift(false);
     }
 }
 
@@ -1239,7 +1239,10 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(const Vec3d& plane_center, 
 {
     const Selection& selection = m_parent.get_selection();
 
-    const Vec3d& instance_offset = selection.get_first_volume()->get_instance_offset();
+    const auto first_volume = selection.get_first_volume();
+    Vec3d instance_offset   = first_volume->get_instance_offset();
+    instance_offset[Z]     += first_volume->get_sla_shift_z();
+
     const auto cut_matrix = Transform3d::Identity() * rotation_m.inverse() * translation_transform(instance_offset - plane_center);
 
     const Selection::IndicesList& idxs = selection.get_volume_idxs();
@@ -1357,6 +1360,12 @@ void GLGizmoCut3D::render_clipper_cut()
 
 void GLGizmoCut3D::on_render()
 {
+    if (m_state == On) {
+        // This gizmo is showing the object elevated. Tell the common
+        // SelectionInfo object to lie about the actual shift.
+        m_c->selection_info()->set_use_shift(true);
+    }
+
     update_clipper();
 
     init_picking_models();
@@ -1404,7 +1413,7 @@ void GLGizmoCut3D::render_debug_input_window(float x)
 
     ImGui::Separator();
 
-    if (m_imgui->checkbox(_L("Render cut plane as circle"), m_cut_plane_as_circle))
+    if (m_imgui->checkbox(("Render cut plane as disc"), m_cut_plane_as_circle))
         m_plane.reset();
 
     ImGui::PushItemWidth(0.5f * m_label_width);
@@ -1672,7 +1681,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         render_build_size();
 
         ImGui::AlignTextToFramePadding();
-        ImGuiWrapper::text(_L("Cut position: "));
+        ImGuiWrapper::text(_L("Cut position") + ": ");
         ImGui::SameLine();
         render_move_center_input(Z);
         ImGui::SameLine();
@@ -1756,7 +1765,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
             m_imgui->disabled_end();
         };
 
-        ImGuiWrapper::text(_L("After cut") + ": ");
+        ImGuiWrapper::text(_L("Cut result") + ": ");
         add_vertical_scaled_interval(0.5f);
 
         m_imgui->disabled_begin(has_connectors || m_keep_as_parts);
@@ -1776,12 +1785,14 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         add_vertical_scaled_interval(0.75f);
 
         m_imgui->disabled_begin(has_connectors);
-            ImGuiWrapper::text(_L("Cut to") + ":");
+            ImGuiWrapper::text(_L("Cut into") + ":");
 
             add_horizontal_scaled_interval(1.2f);
+            // TRN CutGizmo: RadioButton Cut into ...
             if (m_imgui->radio_button(_L("Objects"), !m_keep_as_parts))
                 m_keep_as_parts = false;
             ImGui::SameLine();
+            // TRN CutGizmo: RadioButton Cut into ...
             if (m_imgui->radio_button(_L("Parts"), m_keep_as_parts))
                 m_keep_as_parts = true;
 
@@ -1906,9 +1917,9 @@ void GLGizmoCut3D::render_input_window_warning() const
         m_imgui->text(out);
     }
     if (!m_keep_upper && !m_keep_lower)
-        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Invalid state. \nNo one part is selected for keep after cut"));
+        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Select at least one object to keep after cutting."));
     if (!has_valid_contour())
-        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Warning state. \nCut plane is placed out of object"));
+        m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Cut plane is placed out of object"));
 }
 
 void GLGizmoCut3D::on_render_input_window(float x, float y, float bottom_limit)
@@ -2287,7 +2298,10 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
             const Vec3d new_plane_center = m_bb_center + cross_dir * cross_dir.dot(pt - m_bb_center);
             // update transformed bb
             const auto new_tbb = transformed_bounding_box(new_plane_center, m);
-            const Vec3d& instance_offset = m_parent.get_selection().get_first_volume()->get_instance_offset();
+            const GLVolume* first_volume = m_parent.get_selection().get_first_volume();
+            Vec3d instance_offset = first_volume->get_instance_offset();
+            instance_offset[Z] += first_volume->get_sla_shift_z();
+
             const Vec3d trans_center_pos = m.inverse() * (new_plane_center - instance_offset) + new_tbb.center();
             if (new_tbb.contains(trans_center_pos)) {
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Cut by line"), UndoRedo::SnapshotType::GizmoAction);
@@ -2496,7 +2510,7 @@ CommonGizmosDataID GLGizmoCut3D::on_get_requirements() const {
               | int(CommonGizmosDataID::ObjectClipper));
 }
 
-void GLGizmoCut3D::data_changed()
+void GLGizmoCut3D::data_changed(bool is_serializing) 
 {
     update_bb();
     if (auto oc = m_c->object_clipper())

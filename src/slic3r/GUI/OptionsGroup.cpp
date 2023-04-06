@@ -384,8 +384,8 @@ void OptionsGroup::activate_line(Line& line)
             ConfigOptionDef option = opt.opt;
             // add label if any
             if ((option_set.size() > 1 || line.label.IsEmpty()) && !option.label.empty()) {
-                // To correct translation by context have to use wxGETTEXT_IN_CONTEXT macro from wxWidget 3.1.1
-                wxString str_label = (option.label == L_CONTEXT("Top", "Layers") || option.label == L_CONTEXT("Bottom", "Layers")) ?
+                // those two parameter names require localization with context
+                wxString str_label = (option.label == "Top" || option.label == "Bottom") ?
                     _CTX(option.label, "Layers") :
                     _(option.label);
                 label = new wxStaticText(this->ctrl_parent(), wxID_ANY, str_label + ": ", wxDefaultPosition, //wxDefaultSize);

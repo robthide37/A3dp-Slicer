@@ -1,8 +1,6 @@
 #ifndef slic3r_GLGizmoEmboss_hpp_
 #define slic3r_GLGizmoEmboss_hpp_
 
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code,
-// which overrides our localization "L" macro.
 #include "GLGizmoBase.hpp"
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/IconManager.hpp"
@@ -47,6 +45,10 @@ public:
     /// <param name="volume_type">Object part / Negative volume / Modifier</param>
     bool create_volume(ModelVolumeType volume_type);
 
+    /// <summary>
+    /// Handle pressing of shortcut
+    /// </summary>
+    void on_shortcut_key();
 protected:
     bool on_init() override;
     std::string on_get_name() const override;
@@ -54,10 +56,10 @@ protected:
     void on_register_raycasters_for_picking() override;
     void on_unregister_raycasters_for_picking() override;
     void on_render_input_window(float x, float y, float bottom_limit) override;
-    bool on_is_activable() const override { return true; }
     bool on_is_selectable() const override { return false; }
-    void on_set_state() override;    
-    void data_changed() override; // selection changed
+    bool on_is_activable() const override { return true; };
+    void on_set_state() override;
+    void data_changed(bool is_serializing) override; // selection changed
     void on_set_hover_id() override{ m_rotate_gizmo.set_hover_id(m_hover_id); }
     void on_enable_grabber(unsigned int id) override { m_rotate_gizmo.enable_grabber(); }
     void on_disable_grabber(unsigned int id) override { m_rotate_gizmo.disable_grabber(); }
@@ -72,14 +74,15 @@ protected:
     /// <returns>Propagete normaly return false.</returns>
     bool on_mouse(const wxMouseEvent &mouse_event) override;
 
-    bool wants_enter_leave_snapshots() const override { return true; }
-    std::string get_gizmo_entering_text() const override { return _u8L("Enter emboss gizmo"); }
-    std::string get_gizmo_leaving_text() const override { return _u8L("Leave emboss gizmo"); }
-    std::string get_action_snapshot_name() override { return _u8L("Embossing actions"); }
+    bool wants_enter_leave_snapshots() const override;
+    std::string get_gizmo_entering_text() const override;
+    std::string get_gizmo_leaving_text() const override;
+    std::string get_action_snapshot_name() const override;
+
 private:
     static EmbossStyles create_default_styles();
     // localized default text
-    void set_default_text();
+    bool init_create(ModelVolumeType volume_type);
 
     void set_volume_by_selection();
     void reset_volume();
@@ -139,6 +142,7 @@ private:
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
+    void on_mouse_change_selection(const wxMouseEvent &mouse_event);
 
     // When open text loaded from .3mf it could be written with unknown font
     bool m_is_unknown_font = false;

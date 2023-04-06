@@ -5,6 +5,7 @@
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
+#include "slic3r/GUI/I18N.hpp"
 #include "libslic3r/Emboss.hpp"
 
 namespace{
@@ -116,7 +117,8 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
             gl_volumes[hovered_idx_] != gl_volume_ptr)
             return false;
 
-        const ModelObject *object = get_model_object(gl_volume, canvas.get_model()->objects);
+        const ModelObjectPtrs& objects = canvas.get_model()->objects;
+        const ModelObject *object = get_model_object(gl_volume, objects);
         assert(object != nullptr);
         if (object == nullptr)
             return false;
@@ -155,7 +157,26 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         // wxCoord == int --> wx/types.h
         Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
         Vec2d mouse_pos    = mouse_coord.cast<double>();
-        Vec2d mouse_offset = calc_screen_offset_to_volume_center(mouse_pos, *volume, camera);
+
+        // world_matrix_fixed() without sla shift
+        Transform3d to_world = world_matrix_fixed(gl_volume, objects);
+        
+        // zero point of volume in world coordinate system
+        Vec3d volume_center = to_world.translation();
+        // screen coordinate of volume center
+        Vec2i coor = CameraUtils::project(camera, volume_center);
+        Vec2d mouse_offset = coor.cast<double>() - mouse_pos;
+        Vec2d mouse_offset_without_sla_shift = mouse_offset;
+        if (double sla_shift = gl_volume.get_sla_shift_z(); !is_approx(sla_shift, 0.)) {        
+            Transform3d to_world_without_sla_move = instance->get_matrix() * volume->get_matrix();
+            if (volume->emboss_shape.has_value() && volume->emboss_shape->fix_3mf_tr.has_value())
+                to_world_without_sla_move = to_world_without_sla_move * (*volume->emboss_shape->fix_3mf_tr);
+            // zero point of volume in world coordinate system
+            volume_center = to_world_without_sla_move.translation();
+            // screen coordinate of volume center
+            coor = CameraUtils::project(camera, volume_center);
+            mouse_offset_without_sla_shift = coor.cast<double>() - mouse_pos;            
+        }
 
         Transform3d volume_tr = gl_volume.get_volume_transformation().get_matrix();
         
@@ -177,7 +198,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         std::optional<float> start_distance;        
         if (!volume->emboss_shape->projection.use_surface)
             start_distance = calc_distance(gl_volume, raycast_manager, &condition);
-        surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume_ptr, condition, start_angle, start_distance};
+        surface_drag = SurfaceDrag{mouse_offset, world_tr, instance_tr_inv, gl_volume_ptr, condition, start_angle, start_distance, true, mouse_offset_without_sla_shift };
 
         // disable moving with object by mouse
         canvas.enable_moving(false);
@@ -193,7 +214,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
         // wxCoord == int --> wx/types.h
         Vec2i mouse_coord(mouse_event.GetX(), mouse_event.GetY());
         Vec2d mouse_pos      = mouse_coord.cast<double>();
-        Vec2d offseted_mouse = mouse_pos + surface_drag->mouse_offset;
+        Vec2d offseted_mouse = mouse_pos + surface_drag->mouse_offset_without_sla_shift;
 
         std::optional<RaycastManager::Hit> hit = ray_from_camera(
             raycast_manager, offseted_mouse, camera, &surface_drag->condition);

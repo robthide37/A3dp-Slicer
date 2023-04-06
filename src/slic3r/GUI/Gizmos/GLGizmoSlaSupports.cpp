@@ -1,5 +1,4 @@
 #include "libslic3r/libslic3r.h"
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoSlaSupports.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
@@ -25,8 +24,10 @@ namespace Slic3r {
 namespace GUI {
 
 GLGizmoSlaSupports::GLGizmoSlaSupports(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
-    : GLGizmoSlaBase(parent, icon_filename, sprite_id, slaposDrillHoles)
-{}
+: GLGizmoSlaBase(parent, icon_filename, sprite_id, slaposDrillHoles)
+{
+    show_sla_supports(true);
+}
 
 bool GLGizmoSlaSupports::on_init()
 {
@@ -48,7 +49,7 @@ bool GLGizmoSlaSupports::on_init()
     return true;
 }
 
-void GLGizmoSlaSupports::data_changed()
+void GLGizmoSlaSupports::data_changed(bool is_serializing)
 {
     if (! m_c->selection_info())
         return;
@@ -127,6 +128,7 @@ void GLGizmoSlaSupports::on_render()
 
     m_selection_rectangle.render(m_parent);
     m_c->object_clipper()->render_cut();
+    m_c->supports_clipper()->render_cut();
 
     glsafe(::glDisable(GL_BLEND));
 }
@@ -167,11 +169,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection)
     trafo.translation()(2) += shift_z;
     const Geometry::Transformation transformation{trafo};
 
-#if ENABLE_WORLD_COORDINATE
     const Transform3d instance_scaling_matrix_inverse = transformation.get_scaling_factor_matrix().inverse();
-#else
-    const Transform3d& instance_scaling_matrix_inverse = transformation.get_matrix(true, true, false, true).inverse();
-#endif // ENABLE_WORLD_COORDINATE
     const Camera& camera = wxGetApp().plater()->get_camera();
     const Transform3d& view_matrix = camera.get_view_matrix();
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());

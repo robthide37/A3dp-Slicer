@@ -244,7 +244,7 @@ void scale(Polygons &polygons, double multiplicator) {
 Polygons load_polygons(const std::string &svg_file) {
     std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + svg_file;
     NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
-    Polygons polygons = NSVGUtils::to_polygons(image);
+    Polygons polygons = to_polygons(image);
     nsvgDelete(image);
     return polygons;
 }
@@ -289,7 +289,7 @@ TEST_CASE("Heal of points close to line", "[Emboss]")
     std::string file_name = "points_close_to_line.svg";
     std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + file_name;
     NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
-    Polygons polygons = NSVGUtils::to_polygons(image);
+    Polygons polygons = to_polygons(image);
     nsvgDelete(image);
     REQUIRE(polygons.size() == 1);
     Polygon polygon = polygons.front();

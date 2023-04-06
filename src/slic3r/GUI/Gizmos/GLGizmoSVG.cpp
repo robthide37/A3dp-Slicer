@@ -36,12 +36,7 @@ using namespace Slic3r::GUI;
 using namespace Slic3r::GUI::Emboss;
 
 namespace priv {
-// Variable keep limits for variables
-static const struct Limits{
-    MinMax<float> emboss{0.01f, 1e4f}; // in mm
-    // distance text object from surface
-    MinMax<float> angle{-180.f, 180.f}; // in degrees
-} limits;
+
 } // namespace priv
 
 GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
@@ -55,26 +50,35 @@ GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
 }
 
 // Private functions to create emboss volume
-namespace priv {
+namespace{
+
+// Variable keep limits for variables
+const struct Limits
+{
+    MinMax<float> emboss{0.01f, 1e4f}; // in mm
+    // distance text object from surface
+    MinMax<float> angle{-180.f, 180.f}; // in degrees
+} limits;
+
 /// <summary>
 /// Open file dialog with svg files
 /// </summary>
 /// <returns>File path to svg</returns>
-static std::string choose_svg_file();
+std::string choose_svg_file();
 
 /// <summary>
 /// Let user to choose file with (S)calable (V)ector (G)raphics - SVG.
 /// Than let select contour
 /// </summary>
 /// <returns>EmbossShape to create</returns>
-static EmbossShape select_shape();
+EmbossShape select_shape();
 
 /// <summary>
 /// Create new embos data
 /// </summary>
 /// <param name="cancel">Cancel for previous job</param>
 /// <returns>Base data for emboss SVG</returns>
-static DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel);
+DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel);
 
 /// <summary>
 /// Create symbol '?' as default shape
@@ -82,7 +86,7 @@ static DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &c
 /// with size 2cm
 /// </summary>
 /// <returns>Default shape to emboss</returns>
-static ExPolygons default_shape();
+ExPolygons default_shape();
 
 /// <summary>
 /// Separate file name from file path.
@@ -90,38 +94,37 @@ static ExPolygons default_shape();
 /// </summary>
 /// <param name="file_path">path return by file dialog</param>
 /// <returns>File name without directory path</returns>
-static std::string get_file_name(const std::string &file_path);
+std::string get_file_name(const std::string &file_path);
 
 /// <summary>
 /// Create volume name from shape information
 /// </summary>
 /// <param name="shape">File path</param>
 /// <returns>Name for volume</returns>
-static std::string volume_name(const EmbossShape& shape);
+std::string volume_name(const EmbossShape& shape);
 
-static CreateVolumeParams create_input(GLCanvas3D &canvas, RaycastManager &raycaster, ModelVolumeType volume_type);
-} // namespace priv
+/// <summary>
+/// Create input for volume creation
+/// </summary>
+/// <param name="canvas">parent of gizmo</param>
+/// <param name="raycaster">Keep scene</param>
+/// <param name="volume_type">Type of volume to be created</param>
+/// <returns>Params</returns>
+CreateVolumeParams create_input(GLCanvas3D &canvas, RaycastManager &raycaster, ModelVolumeType volume_type);
+} // namespace 
 
-CreateVolumeParams priv::create_input(GLCanvas3D &canvas, RaycastManager& raycaster, ModelVolumeType volume_type)
-{
-    auto gizmo = static_cast<unsigned char>(GLGizmosManager::Svg);
-    const GLVolume *gl_volume = get_first_hovered_gl_volume(canvas);
-    Plater *plater = wxGetApp().plater();
-    return CreateVolumeParams{canvas, plater->get_camera(), plater->build_volume(),
-        plater->get_ui_job_worker(), volume_type, raycaster, gizmo, gl_volume};
-}
 
 bool GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos)
 {
-    CreateVolumeParams input = priv::create_input(m_parent, m_raycast_manager, volume_type);
-    DataBasePtr base = priv::create_emboss_data_base(m_job_cancel);
+    CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
+    DataBasePtr base = create_emboss_data_base(m_job_cancel);
     return start_create_volume(input, std::move(base), mouse_pos);
 }
 
 bool GLGizmoSVG::create_volume(ModelVolumeType volume_type) 
 {
-    CreateVolumeParams input = priv::create_input(m_parent, m_raycast_manager, volume_type);
-    DataBasePtr base = priv::create_emboss_data_base(m_job_cancel);
+    CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
+    DataBasePtr base = create_emboss_data_base(m_job_cancel);
     return start_create_volume_without_position(input, std::move(base));
 }
 
@@ -230,6 +233,11 @@ bool GLGizmoSVG::on_mouse(const wxMouseEvent &mouse_event)
 
     return false;
 }
+
+bool GLGizmoSVG::wants_enter_leave_snapshots() const { return true; }
+std::string GLGizmoSVG::get_gizmo_entering_text() const { return _u8L("Enter SVG gizmo"); }
+std::string GLGizmoSVG::get_gizmo_leaving_text() const { return _u8L("Leave SVG gizmo"); }
+std::string GLGizmoSVG::get_action_snapshot_name() const { return _u8L("SVG actions"); }
 
 bool GLGizmoSVG::on_init()
 {
@@ -376,8 +384,10 @@ void GLGizmoSVG::on_set_state()
     }
 }
 
-void GLGizmoSVG::data_changed() { 
+void GLGizmoSVG::data_changed(bool is_serializing) { 
     set_volume_by_selection();
+    if (!is_serializing && m_volume == nullptr)
+        close();
 }
 
 void GLGizmoSVG::on_start_dragging() { m_rotate_gizmo.start_dragging(); }
@@ -488,7 +498,7 @@ bool GLGizmoSVG::process()
     assert(m_volume != nullptr);
     if (m_volume == nullptr) return false;
         
-    //DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel), m_volume->id()};
+    //DataUpdate data{create_emboss_data_base(m_text, m_style_manager, m_job_cancel), m_volume->id()};
 
     //std::unique_ptr<Job> job = nullptr;
 
@@ -510,7 +520,7 @@ bool GLGizmoSVG::process()
 
     //    // when it is new applying of use surface than move origin onto surfaca
     //    if (!m_volume->text_configuration->style.prop.use_surface) {
-    //        auto offset = priv::calc_surface_offset(*m_volume, m_raycast_manager, m_parent.get_selection());
+    //        auto offset = calc_surface_offset(*m_volume, m_raycast_manager, m_parent.get_selection());
     //        if (offset.has_value())
     //            text_tr *= Eigen::Translation<double, 3>(*offset);
     //    }
@@ -543,19 +553,21 @@ void GLGizmoSVG::close()
 
 void GLGizmoSVG::draw_window()
 {
-    ImGui::Text("Preview of svg image.");
+    if (m_volume != nullptr && m_volume->emboss_shape.has_value())
+        ImGui::Text("SVG file path is %s", m_volume->emboss_shape->svg_file_path.c_str());
 
-    if (ImGui::Button("choose svg file"))
-        return;
-        
-        //choose_svg_file();
+    if (ImGui::Button("change file")) {
+        auto data = create_emboss_data_base(m_job_cancel);
+        std::string file = choose_svg_file();
+    }
+    draw_model_type();        
  }
 
 void GLGizmoSVG::draw_model_type()
 {
     assert(m_volume != nullptr);
     bool is_last_solid_part = is_svg_object(*m_volume);
-    std::string title = _u8L("SVG is to object");
+    std::string title = _u8L("Type");
     if (is_last_solid_part) {
         ImVec4 color{.5f, .5f, .5f, 1.f};
         m_imgui->text_colored(color, title.c_str());
@@ -634,10 +646,11 @@ void GLGizmoSVG::draw_model_type()
 
 
 /////////////
-// priv namespace implementation
+// private namespace implementation
 ///////////////
+namespace {
 
-std::string priv::get_file_name(const std::string &file_path)
+std::string get_file_name(const std::string &file_path)
 {
     if (file_path.empty())
         return file_path;
@@ -650,20 +663,19 @@ std::string priv::get_file_name(const std::string &file_path)
     }
 
     size_t pos_point = file_path.find_last_of('.');
-    if (pos_point == std::string::npos || 
-        pos_point < pos_last_delimiter // last point is inside of directory path
-        ) {
+    if (pos_point == std::string::npos || pos_point < pos_last_delimiter // last point is inside of directory path
+    ) {
         // there is no extension
         assert(false);
         pos_point = file_path.size();
     }
 
-    size_t offset = pos_last_delimiter + 1; // result should not contain last delimiter ( +1 )
+    size_t offset = pos_last_delimiter + 1;             // result should not contain last delimiter ( +1 )
     size_t count  = pos_point - pos_last_delimiter - 1; // result should not contain extension point ( -1 )
     return file_path.substr(offset, count);
 }
 
-std::string priv::volume_name(const EmbossShape &shape)
+std::string volume_name(const EmbossShape &shape)
 {
     std::string file_name = get_file_name(shape.svg_file_path);
     if (!file_name.empty())
@@ -671,14 +683,23 @@ std::string priv::volume_name(const EmbossShape &shape)
     return "SVG shape";
 }
 
-std::string priv::choose_svg_file()
+CreateVolumeParams create_input(GLCanvas3D &canvas, RaycastManager& raycaster, ModelVolumeType volume_type)
 {
-    wxWindow* parent = nullptr;
-    wxString message = _L("Choose SVG file for emboss:");
-    wxString defaultDir   = wxEmptyString;
-    wxString selectedFile = wxEmptyString;
-    wxString wildcard = file_wildcards(FT_SVG);
-    long style = wxFD_OPEN | wxFD_FILE_MUST_EXIST;
+    auto gizmo = static_cast<unsigned char>(GLGizmosManager::Svg);
+    const GLVolume *gl_volume = get_first_hovered_gl_volume(canvas);
+    Plater *plater = wxGetApp().plater();
+    return CreateVolumeParams{canvas, plater->get_camera(), plater->build_volume(),
+        plater->get_ui_job_worker(), volume_type, raycaster, gizmo, gl_volume};
+}
+
+std::string choose_svg_file()
+{
+    wxWindow    *parent       = nullptr;
+    wxString     message      = _L("Choose SVG file for emboss:");
+    wxString     defaultDir   = wxEmptyString;
+    wxString     selectedFile = wxEmptyString;
+    wxString     wildcard     = file_wildcards(FT_SVG);
+    long         style        = wxFD_OPEN | wxFD_FILE_MUST_EXIST;
     wxFileDialog dialog(parent, message, defaultDir, selectedFile, wildcard, style);
     if (dialog.ShowModal() != wxID_OK) {
         BOOST_LOG_TRIVIAL(warning) << "SVG file for emboss was NOT selected.";
@@ -686,7 +707,7 @@ std::string priv::choose_svg_file()
     }
 
     wxArrayString input_files;
-    dialog.GetPaths(input_files);    
+    dialog.GetPaths(input_files);
     if (input_files.IsEmpty()) {
         BOOST_LOG_TRIVIAL(warning) << "SVG file dialog result is empty.";
         return {};
@@ -695,22 +716,24 @@ std::string priv::choose_svg_file()
     if (input_files.size() != 1)
         BOOST_LOG_TRIVIAL(warning) << "SVG file dialog result contain multiple files but only first is used.";
 
-    auto &input_file = input_files.front();
-    std::string path = std::string(input_file.c_str());
+    auto       &input_file = input_files.front();
+    std::string path       = std::string(input_file.c_str());
     return path;
 }
 
-ExPolygons priv::default_shape() {
-    std::string file = Slic3r::resources_dir() + "/icons/question.svg";
-    NSVGimage *image = nsvgParseFromFile(file.c_str(), "px", 96.0f);
-    ExPolygons shape = NSVGUtils::to_ExPolygons(image);
+ExPolygons default_shape()
+{
+    std::string file  = Slic3r::resources_dir() + "/icons/question.svg";
+    NSVGimage  *image = nsvgParseFromFile(file.c_str(), "px", 96.0f);
+    ExPolygons  shape = to_expolygons(image);
     nsvgDelete(image);
     return shape;
 }
 
-EmbossShape priv::select_shape() {
+EmbossShape select_shape()
+{
     EmbossShape shape;
-    shape.projection.depth = 10.;
+    shape.projection.depth       = 10.;
     shape.projection.use_surface = false;
 
     shape.svg_file_path = choose_svg_file();
@@ -719,7 +742,7 @@ EmbossShape priv::select_shape() {
 
     NSVGimage *image = nsvgParseFromFile(shape.svg_file_path.c_str(), "mm", 96.0f);
     ScopeGuard sg([image]() { nsvgDelete(image); });
-    shape.shapes = NSVGUtils::to_ExPolygons(image);
+    shape.shapes = to_expolygons(image);
 
     // TODO: get scale from file
     shape.scale = 1.;
@@ -731,8 +754,9 @@ EmbossShape priv::select_shape() {
     return shape;
 }
 
-DataBasePtr priv::create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel) {
-    EmbossShape shape = priv::select_shape();
+DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel)
+{
+    EmbossShape shape = select_shape();
 
     if (shape.shapes.empty())
         // canceled selection of SVG file
@@ -746,10 +770,11 @@ DataBasePtr priv::create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &ca
     // create new shared ptr to cancel new job
     cancel = std::make_shared<std::atomic<bool>>(false);
 
-    std::string name = priv::volume_name(shape);
+    std::string name = volume_name(shape);
 
     return std::make_unique<DataBase>(name, cancel /*copy*/, std::move(shape));
 }
+} // namespace
 
 // any existing icon filename to not influence GUI
 const std::string GLGizmoSVG::M_ICON_FILENAME = "cut.svg";
