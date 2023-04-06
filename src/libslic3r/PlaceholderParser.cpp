@@ -1,6 +1,7 @@
 #include "PlaceholderParser.hpp"
 #include "Exception.hpp"
 #include "Flow.hpp"
+#include "Utils.hpp"
 #include <cstring>
 #include <ctime>
 #include <iomanip>
@@ -204,6 +205,7 @@ namespace client
         explicit expr(double d, const Iterator &it_begin, const Iterator &it_end) : m_type(TYPE_DOUBLE), it_range(it_begin, it_end) { m_data.d = d; }
         explicit expr(const char *s) : m_type(TYPE_STRING) { m_data.s = new std::string(s); }
         explicit expr(const std::string &s) : m_type(TYPE_STRING) { m_data.s = new std::string(s); }
+        explicit expr(std::string &&s) : m_type(TYPE_STRING) { m_data.s = new std::string(std::move(s)); }
         explicit expr(const std::string &s, const Iterator &it_begin, const Iterator &it_end) : 
             m_type(TYPE_STRING), it_range(it_begin, it_end) { m_data.s = new std::string(s); }
         explicit expr(expr &&rhs, const Iterator &it_begin, const Iterator &it_end) : m_type(rhs.type()), it_range{ it_begin, it_end }
@@ -904,9 +906,12 @@ namespace client
             const ConfigOption *opt = ctx->resolve_symbol(opt_key_str);
             if (opt == nullptr) {
                 // Check whether the opt_key ends with '_'.
-                if (opt_key_str.back() == '_')
+                if (opt_key_str.back() == '_') {
                     opt_key_str.resize(opt_key_str.size() - 1);
-                opt = ctx->resolve_symbol(opt_key_str);
+                    opt = ctx->resolve_symbol(opt_key_str);
+                }
+                if (opt == nullptr)
+                    ctx->throw_exception("Variable does not exist", opt_key);
             }
             if (! opt->is_vector())
                 ctx->throw_exception("Trying to index a scalar variable", opt_key);
@@ -1790,8 +1795,49 @@ namespace client
             if (ctx->skipping()) {
                 out.reset();
                 out.it_range = it_range;
-            } else
-                out = expr(std::string(it_range.begin() + 1, it_range.end() - 1), it_range.begin(), it_range.end());
+            } else {
+                // Unescape the string, UTF-8 safe.
+                std::string s;
+                auto        begin = std::next(it_range.begin());
+                auto        end   = std::prev(it_range.end());
+                assert(begin <= end);
+                {
+                    // 1) Get the size of the string after unescaping.
+                    size_t len = 0;
+                    for (auto it = begin; it != end;) {
+                        if (*it == '\\') {
+                            if (++ it == end ||
+                                (*it != 'r' && *it != 'n' && *it != '"' && *it != '\\'))
+                                ctx->throw_exception("Invalid escape sequence", {std::prev(it), std::next(it) });
+                            ++ len;
+                            ++ it;
+                        } else {
+                            size_t n = get_utf8_sequence_length(&*it, end - it);
+                            len += n;
+                            it  += n;
+                        }
+                    }
+                    // and reserve the string.
+                    s.reserve(len);
+                }
+                // 2) Copy & unescape the string.
+                for (auto it = begin; it != end;) {
+                    if (*it == '\\') {
+                        char c = *(++ it);
+                        if (c == 'r')
+                            c = '\r';
+                        else if (c == 'n')
+                            c = '\n';
+                        s += c;
+                        ++ it;
+                    } else {
+                        size_t n = get_utf8_sequence_length(&*it, end - it);
+                        s.append(&*it, n);
+                        it += n;
+                    }
+                }
+                out = expr(std::move(s), it_range.begin(), it_range.end());
+            }
         }
         static void expr_(expr &value, Iterator &end_pos, expr &out)
                 { auto begin_pos = out.it_range.begin(); out = expr(std::move(value), begin_pos, end_pos); }

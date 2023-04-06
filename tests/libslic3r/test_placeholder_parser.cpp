@@ -44,6 +44,8 @@ SCENARIO("Placeholder parser scripting", "[PlaceholderParser]") {
     SECTION("multiple expressions with semicolons 2") { REQUIRE(parser.process("{temperature[foo];;temperature[foo];}") == "357357"); }
     SECTION("multiple expressions with semicolons 3") { REQUIRE(parser.process("{temperature[foo];;;temperature[foo];;}") == "357357"); }
 
+    SECTION("parsing string with escaped characters") { REQUIRE(parser.process("{\"hu\\nha\\\\\\\"ha\\\"\"}") == "hu\nha\\\"ha\""); }
+
     // Test the math expressions.
     SECTION("math: 2*3") { REQUIRE(parser.process("{2*3}") == "6"); }
     SECTION("math: 2*3/6") { REQUIRE(parser.process("{2*3/6}") == "1"); }
