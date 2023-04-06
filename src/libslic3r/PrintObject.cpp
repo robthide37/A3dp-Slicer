@@ -1509,7 +1509,9 @@ void PrintObject::discover_vertical_shells()
                         Polygons internal_volume;
                         {
                             Polygons shrinked_bottom_slice = idx_layer > 0 ? to_polygons(m_layers[idx_layer - 1]->lslices) : Polygons{};
-                            Polygons shrinked_upper_slice  = idx_layer > 0 ? to_polygons(m_layers[idx_layer + 1]->lslices) : Polygons{};
+                            Polygons shrinked_upper_slice  = (idx_layer + 1) < m_layers.size() ?
+                                                                 to_polygons(m_layers[idx_layer + 1]->lslices) :
+                                                                 Polygons{};
                             internal_volume                = intersection(shrinked_bottom_slice, shrinked_upper_slice);
                         }
 
