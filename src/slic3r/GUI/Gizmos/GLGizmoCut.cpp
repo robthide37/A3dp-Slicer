@@ -459,6 +459,7 @@ void GLGizmoCut3D::update_clipper()
 void GLGizmoCut3D::set_center(const Vec3d& center, bool update_tbb /*=false*/)
 {
     set_center_pos(center, update_tbb);
+    check_and_update_connectors_state();
     update_clipper();
 }
 
@@ -1199,6 +1200,7 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
         dragging_grabber_xy(data);
     else if (m_hover_id >= m_connectors_group_id && m_connector_mode == CutConnectorMode::Manual)
         dragging_connector(data);
+    check_and_update_connectors_state();
 }
 
 void GLGizmoCut3D::on_start_dragging()
@@ -1224,6 +1226,7 @@ void GLGizmoCut3D::on_stop_dragging()
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Move cut plane"), UndoRedo::SnapshotType::GizmoAction);
         m_ar_plane_center = m_plane_center;
     }
+    //check_and_update_connectors_state();
 }
 
 void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos, bool update_tbb /*=false*/)
@@ -1586,7 +1589,7 @@ void GLGizmoCut3D::apply_selected_connectors(std::function<void(size_t idx)> app
     for (size_t idx = 0; idx < m_selected.size(); idx++)
         if (m_selected[idx])
             apply_fn(idx);
-
+    check_and_update_connectors_state();
     update_raycasters_for_picking_transform();
 }
 
@@ -2083,7 +2086,7 @@ void GLGizmoCut3D::render_input_window_warning() const
 {
     if (m_is_contour_changed)
         return;
-    if (m_has_invalid_connector) {
+    if (! m_invalid_connectors_idxs.empty()) {
         wxString out = wxString(ImGui::WarningMarkerSmall) + _L("Invalid connectors detected") + ":";
         if (m_info_stats.outside_cut_contour > size_t(0))
             out += "\n - " + format_wxstr(_L_PLURAL("%1$d connector is out of cut contour", "%1$d connectors are out of cut contour", m_info_stats.outside_cut_contour),
@@ -2195,6 +2198,26 @@ bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& co
     return false;
 }
 
+void GLGizmoCut3D::check_and_update_connectors_state()
+{
+    m_invalid_connectors_idxs.clear();
+    const ModelObject* mo = m_c->selection_info()->model_object();
+    auto inst_id = m_c->selection_info()->get_active_instance();
+    if (inst_id < 0)
+        return;
+    const CutConnectors& connectors = mo->cut_connectors;
+    const ModelInstance* mi = mo->instances[inst_id];
+    const Vec3d& instance_offset = mi->get_offset();
+    const double sla_shift       = double(m_c->selection_info()->get_sla_shift());
+
+     for (size_t i = 0; i < connectors.size(); ++i) {
+        const CutConnector& connector = connectors[i];
+        Vec3d pos = connector.pos + instance_offset + sla_shift * Vec3d::UnitZ(); // recalculate connector position to world position
+        if (is_conflict_for_connector(i, connectors, pos))
+            m_invalid_connectors_idxs.emplace_back(i);
+     }
+}
+
 void GLGizmoCut3D::render_connectors()
 {
     ::glEnable(GL_DEPTH_TEST);
@@ -2220,7 +2243,6 @@ void GLGizmoCut3D::render_connectors()
     const Vec3d& instance_offset = mi->get_offset();
     const double sla_shift       = double(m_c->selection_info()->get_sla_shift());
 
-    m_has_invalid_connector = false;
     m_info_stats.invalidate();
 
     const bool looking_forward = is_looking_forward();
@@ -2233,11 +2255,10 @@ void GLGizmoCut3D::render_connectors()
         Vec3d pos = connector.pos + instance_offset + sla_shift * Vec3d::UnitZ();
 
         // First decide about the color of the point.
-        const bool conflict_connector = is_conflict_for_connector(i, connectors, pos);
-        if (conflict_connector) {
-            m_has_invalid_connector = true;
+        assert(std::is_sorted(m_invalid_connectors_idxs.begin(), m_invalid_connectors_idxs.end()));
+        const bool conflict_connector = std::binary_search(m_invalid_connectors_idxs.begin(), m_invalid_connectors_idxs.end(), i);
+        if (conflict_connector)
             render_color = CONNECTOR_ERR_COLOR;
-        }
         else // default connector color
             render_color = connector.attribs.type == CutConnectorType::Dowel ? DOWEL_COLOR          : PLAG_COLOR;
 
@@ -2277,7 +2298,7 @@ void GLGizmoCut3D::render_connectors()
 
 bool GLGizmoCut3D::can_perform_cut() const
 {
-    if (m_has_invalid_connector || (!m_keep_upper && !m_keep_lower) || m_connectors_editing)
+    if (! m_invalid_connectors_idxs.empty() || (!m_keep_upper && !m_keep_lower) || m_connectors_editing)
         return false;
 
     return true;// has_valid_contour();
@@ -2640,6 +2661,7 @@ bool GLGizmoCut3D::add_connector(CutConnectors& connectors, const Vec2d& mouse_p
         assert(m_selected.size() == connectors.size());
         update_raycasters_for_picking();
         m_parent.set_as_dirty();
+        check_and_update_connectors_state();
 
         return true;
     }
@@ -2665,6 +2687,7 @@ bool GLGizmoCut3D::delete_selected_connectors(CutConnectors& connectors)
     assert(m_selected.size() == connectors.size());
     update_raycasters_for_picking();
     m_parent.set_as_dirty();
+    check_and_update_connectors_state();
     return true;
 }
 

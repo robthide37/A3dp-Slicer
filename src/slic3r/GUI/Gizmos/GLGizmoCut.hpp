@@ -133,7 +133,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
     GLSelectionRectangle m_selection_rectangle;
 
-    bool m_has_invalid_connector{ false };
+    std::vector<size_t> m_invalid_connectors_idxs;
     bool m_was_cut_plane_dragged { false };
     bool m_was_contour_selected { false };
 
@@ -328,6 +328,7 @@ private:
     void update_connector_shape();
     void validate_connector_settings();
     bool process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position);
+    void check_and_update_connectors_state();
 };
 
 } // namespace GUI
