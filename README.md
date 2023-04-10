@@ -1,5 +1,4 @@
-
-![PrusaSlicer logo](/resources/icons/PrusaSlicer.png?raw=true)
+ANYONE WHO HAS INTEREST IN HELPING I WILL COMPENSATE FRO TIME WHILE STILL KEEPING OPEN SOURCE . PLEASE REACHOUT FOR DETAILS
 
 # PrusaSlicer
 
