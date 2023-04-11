@@ -359,7 +359,7 @@ const Polygons& TreeModelVolumes::getCollision(const coord_t orig_radius, LayerI
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate collision at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
         tree_supports_show_error("Not precalculated Collision requested."sv, false);
     }
-    const_cast<TreeModelVolumes*>(this)->calculateCollision(radius, layer_idx, {});
+    const_cast<TreeModelVolumes*>(this)->calculateCollision(radius, layer_idx, []{});
     return getCollision(orig_radius, layer_idx, min_xy_dist);
 }
 
