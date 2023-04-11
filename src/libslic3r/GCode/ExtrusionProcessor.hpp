@@ -101,13 +101,10 @@ public:
 
 struct ExtendedPoint
 {
-    ExtendedPoint(Vec2d position, float distance = 0.0, size_t nearest_prev_layer_line = size_t(-1), float curvature = 0.0)
-        : position(position), distance(distance), nearest_prev_layer_line(nearest_prev_layer_line), curvature(curvature)
-    {}
-
     Vec2d  position;
     float  distance;
     size_t nearest_prev_layer_line;
+    Vec2d nearest_prev_layer_point;
     float  curvature;
 };
 
@@ -132,6 +129,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
         auto [distance, nearest_line, x]    = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(start_point.position.cast<AABBScalar>());
         start_point.distance                = distance + boundary_offset;
         start_point.nearest_prev_layer_line = nearest_line;
+        start_point.nearest_prev_layer_point = x.template cast<double>();
         points.push_back(start_point);
     }
     for (size_t i = 1; i < input_points.size(); i++) {
@@ -139,13 +137,19 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
         auto [distance, nearest_line, x]   = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(next_point.position.cast<AABBScalar>());
         next_point.distance                = distance + boundary_offset;
         next_point.nearest_prev_layer_line = nearest_line;
+        next_point.nearest_prev_layer_point = x.template cast<double>();
 
         if (ADD_INTERSECTIONS &&
             ((points.back().distance > boundary_offset + EPSILON) != (next_point.distance > boundary_offset + EPSILON))) {
             const ExtendedPoint &prev_point = points.back();
             auto intersections = unscaled_prev_layer.template intersections_with_line<true>(L{prev_point.position.cast<AABBScalar>(), next_point.position.cast<AABBScalar>()});
             for (const auto &intersection : intersections) {
-                points.emplace_back(intersection.first.template cast<double>(), boundary_offset, intersection.second);
+                ExtendedPoint p{};
+                p.position = intersection.first.template cast<double>();
+                p.distance = boundary_offset;
+                p.nearest_prev_layer_line = intersection.second;
+                p.nearest_prev_layer_point = p.position;
+                points.push_back(p);
             }
         }
         points.push_back(next_point);
@@ -171,12 +175,22 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
                     if (t0 < 1.0) {
                         auto p0                         = curr.position + t0 * (next.position - curr.position);
                         auto [p0_dist, p0_near_l, p0_x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(p0.cast<AABBScalar>());
-                        new_points.push_back(ExtendedPoint{p0, float(p0_dist + boundary_offset), p0_near_l});
+                        ExtendedPoint new_p{};
+                        new_p.position                 = p0;
+                        new_p.distance                 = float(p0_dist + boundary_offset);
+                        new_p.nearest_prev_layer_line  = p0_near_l;
+                        new_p.nearest_prev_layer_point = p0_x.template cast<double>();
+                        new_points.push_back(new_p);
                     }
                     if (t1 > 0.0) {
                         auto p1                         = curr.position + t1 * (next.position - curr.position);
                         auto [p1_dist, p1_near_l, p1_x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(p1.cast<AABBScalar>());
-                        new_points.push_back(ExtendedPoint{p1, float(p1_dist + boundary_offset), p1_near_l});
+                        ExtendedPoint new_p{};
+                        new_p.position                 = p1;
+                        new_p.distance                 = float(p1_dist + boundary_offset);
+                        new_p.nearest_prev_layer_line  = p1_near_l;
+                        new_p.nearest_prev_layer_point = p1_x.template cast<double>();
+                        new_points.push_back(new_p);
                     }
                 }
             }
@@ -200,7 +214,12 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
                     Vec2d pos  = curr.position * (1.0 - j * t) + next.position * (j * t);
                     auto [p_dist, p_near_l,
                           p_x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(pos.cast<AABBScalar>());
-                    new_points.push_back(ExtendedPoint{pos, float(p_dist + boundary_offset), p_near_l});
+                    ExtendedPoint new_p{};
+                    new_p.position                 = pos;
+                    new_p.distance                 = float(p_dist + boundary_offset);
+                    new_p.nearest_prev_layer_line  = p_near_l;
+                    new_p.nearest_prev_layer_point = p_x.template cast<double>();
+                    new_points.push_back(new_p);
                 }
             }
             new_points.push_back(points.back());
@@ -301,10 +320,12 @@ public:
             auto [distance_from_curled, line_idx,
                   p] = prev_curled_extrusions[current_object].distance_from_lines_extra<false>(Point::new_scale(ep.position));
             if (distance_from_curled < scale_(2.0 * path.width)) {
-                float articifally_increased_distance = path.width *
-                                                       prev_curled_extrusions[current_object].get_line(line_idx).curled_height /
-                                                       (path.height * 10.0f); // max_curled_height_factor from SupportSpotGenerator
-                ep.distance = std::max(ep.distance, articifally_increased_distance);
+                float artificially_increased_distance = path.width *
+                                                        (1.0 - (unscaled(distance_from_curled) / (2.0 * path.width)) *
+                                                                   (unscaled(distance_from_curled) / (2.0 * path.width))) *
+                                                        (prev_curled_extrusions[current_object].get_line(line_idx).curled_height /
+                                                         (path.height * 10.0f)); // max_curled_height_factor from SupportSpotGenerator
+                ep.distance = std::max(ep.distance, artificially_increased_distance);
             }
         }
 

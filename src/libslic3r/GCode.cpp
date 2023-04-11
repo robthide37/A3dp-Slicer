@@ -3036,7 +3036,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
                                                       EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm);
         }
 
-        new_points = m_extrusion_quality_estimator.estimate_extrusion_quality(path, overhangs_with_speeds, overhang_w_fan_speeds,
+        new_points = m_extrusion_quality_estimator.estimate_speed_from_extrusion_quality(path, overhangs_with_speeds, overhang_w_fan_speeds,
                                                                               m_writer.extruder()->id(), external_perim_reference_speed,
                                                                               speed);
         variable_speed_or_fan_speed = std::any_of(new_points.begin(), new_points.end(),
