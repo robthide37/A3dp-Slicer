@@ -102,7 +102,7 @@ PrintObject::PrintObject(Print* print, ModelObject* model_object, const Transfor
     m_center_offset = Point::new_scale(bbox_center.x(), bbox_center.y());
     // Size of the transformed mesh. This bounding may not be snug in XY plane, but it is snug in Z.
     m_size = (bbox.size() * (1. / SCALING_FACTOR)).cast<coord_t>();
-    m_size.z() = model_object->max_z();
+    m_size.z() = coord_t(model_object->max_z() * (1. / SCALING_FACTOR));
 
     this->set_instances(std::move(instances));
 }
