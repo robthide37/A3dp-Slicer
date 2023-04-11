@@ -546,10 +546,7 @@ public:
 
     void export_print(const std::string    &fname,
                       const ThumbnailsList &thumbnails,
-                      const std::string    &projectname = "")
-    {
-        m_archiver->export_print(fname, *this, thumbnails, projectname);
-    }
+                      const std::string    &projectname = "");
     
 private:
     

@@ -42,7 +42,7 @@ bool GLGizmoHollow::on_init()
     return true;
 }
 
-void GLGizmoHollow::data_changed()
+void GLGizmoHollow::data_changed(bool is_serializing)
 {
     if (! m_c->selection_info())
         return;
@@ -101,6 +101,8 @@ void GLGizmoHollow::on_render()
 
     m_selection_rectangle.render(m_parent);
     m_c->object_clipper()->render_cut();
+    if (are_sla_supports_shown())
+        m_c->supports_clipper()->render_cut();
 
     glsafe(::glDisable(GL_BLEND));
 }
@@ -767,6 +769,14 @@ RENDER_AGAIN:
     float clp_dist = m_c->object_clipper()->get_position();
     if (m_imgui->slider_float("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f"))
         m_c->object_clipper()->set_position_by_ratio(clp_dist, true);
+
+    // make sure supports are shown/hidden as appropriate
+    ImGui::Separator();
+    bool show_sups = are_sla_supports_shown();
+    if (m_imgui->checkbox(m_desc["show_supports"], show_sups)) {
+        show_sla_supports(show_sups);
+        force_refresh = true;
+    }
 
     m_imgui->disabled_end();
     m_imgui->end();

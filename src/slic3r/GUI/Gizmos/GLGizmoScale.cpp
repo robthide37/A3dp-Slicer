@@ -1,4 +1,3 @@
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoScale.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
@@ -100,8 +99,7 @@ void GLGizmoScale3D::enable_ununiversal_scale(bool enable)
         m_grabbers[i].enabled = enable;
 }
 
-void GLGizmoScale3D::data_changed()
-{
+void GLGizmoScale3D::data_changed(bool is_serializing) {
     set_scale(Vec3d::Ones());
 }
 

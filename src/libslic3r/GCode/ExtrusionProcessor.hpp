@@ -272,6 +272,7 @@ public:
             float distance           = path.width * (1.0 - (overhangs_w_speeds[i].first / 100.0));
             float speed              = overhangs_w_speeds[i].second.percent ? (speed_base * overhangs_w_speeds[i].second.value / 100.0) :
                                                                               overhangs_w_speeds[i].second.value;
+            if (speed < EPSILON) speed = speed_base;
             speed_sections[distance] = speed;
         }
 

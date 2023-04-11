@@ -1,4 +1,3 @@
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/ImGuiWrapper.hpp"
@@ -536,7 +535,7 @@ bool GLGizmoRotate3D::on_mouse(const wxMouseEvent &mouse_event)
     return use_grabbers(mouse_event);
 }
 
-void GLGizmoRotate3D::data_changed() {
+void GLGizmoRotate3D::data_changed(bool is_serializing) {
     if (m_parent.get_selection().is_wipe_tower()) {
         m_gizmos[0].disable_grabber();
         m_gizmos[1].disable_grabber();

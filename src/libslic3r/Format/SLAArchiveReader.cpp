@@ -1,13 +1,13 @@
 #include "SLAArchiveReader.hpp"
 #include "SL1.hpp"
 #include "SL1_SVG.hpp"
+#include "I18N.hpp"
 
 #include "libslic3r/SlicesToTriangleMesh.hpp"
 
 #include <boost/filesystem/path.hpp>
 #include <boost/algorithm/string.hpp>
 
-constexpr const char * L(const char * str) { return str; }
 
 #include <array>
 #include <map>
@@ -37,8 +37,8 @@ static const std::map<std::string, ArchiveEntry> REGISTERED_ARCHIVES {
          [] (const std::string &fname, SLAImportQuality quality, const ProgrFn &progr) { return std::make_unique<SL1Reader>(fname, quality, progr); } }
     },
     {
-        "SL2",
-        { L("SL2 archive files"), {"sl2", "sl1_svg"/*, "zip"*/}, // also a zip but unnecessary hassle to implement single extension for multiple archives
+        "SL1SVG",
+        { L("SL1SVG archive files"), {"sl1_svg"/*, "zip"*/}, // also a zip but unnecessary hassle to implement single extension for multiple archives
          [] (const std::string &fname, SLAImportQuality quality, const ProgrFn &progr) { return std::make_unique<SL1_SVGReader>(fname, quality, progr); }}
     },
     // TODO: pwmx and future others.

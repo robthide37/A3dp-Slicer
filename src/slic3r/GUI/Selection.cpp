@@ -1125,6 +1125,18 @@ void Selection::scale_to_fit_print_volume(const BuildVolume& volume)
     // used to keep track whether the undo/redo snapshot has already been taken 
     bool undoredo_snapshot = false;
 
+    if (wxGetApp().plater()->printer_technology() == ptSLA) {
+        // remove SLA auxiliary volumes from the selection to ensure that the proper bounding box is calculated
+        std::vector<unsigned int> to_remove;
+        for (unsigned int i : m_list) {
+            if ((*m_volumes)[i]->volume_idx() < 0)
+                to_remove.push_back(i);
+        }
+
+        if (!to_remove.empty())
+            remove_volumes(m_mode, to_remove);
+    }
+
     switch (volume.type())
     {
     case BuildVolume::Type::Rectangle: { undoredo_snapshot = fit_rectangle(volume, !undoredo_snapshot); break; }
@@ -1693,18 +1705,11 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_object(unsigned int ob
 std::vector<unsigned int> Selection::get_volume_idxs_from_instance(unsigned int object_idx, unsigned int instance_idx) const
 {
     std::vector<unsigned int> idxs;
-
-    const PrinterTechnology pt = wxGetApp().plater()->printer_technology();
-
     for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
         const GLVolume* v = (*m_volumes)[i];
-        const ModelVolume *mv = get_model_volume(*v, *m_model);
-        if (pt == ptSLA && v->is_modifier && mv && mv->is_modifier())
-            continue;
         if (v->object_idx() == (int)object_idx && v->instance_idx() == (int)instance_idx)
             idxs.push_back(i);
     }
-
     return idxs;
 }
 
@@ -2589,7 +2594,7 @@ static void verify_instances_rotation_synchronized(const Model &model, const GLV
             continue;
         const Transform3d::ConstLinearPart& rotation0 = volumes[idx_volume_first]->get_instance_transformation().get_matrix().linear();
         for (int i = idx_volume_first + 1; i < (int)volumes.size(); ++i)
-            if (volumes[i]->object_idx() == idx_object) {
+            if (volumes[i]->object_idx() == idx_object && volumes[i]->volume_idx() >= 0) {
                 const Transform3d::ConstLinearPart& rotation = volumes[i]->get_instance_transformation().get_matrix().linear();
                 assert(is_rotation_xy_synchronized(rotation, rotation0));
             }

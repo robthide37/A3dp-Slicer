@@ -1,4 +1,3 @@
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoFlatten.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
@@ -57,7 +56,7 @@ bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
     return false;
 }
 
-void GLGizmoFlatten::data_changed()
+void GLGizmoFlatten::data_changed(bool is_serializing)
 {
     const Selection &  selection    = m_parent.get_selection();
     const ModelObject *model_object = nullptr;

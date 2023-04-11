@@ -1,4 +1,3 @@
-// Include GLGizmoBase.hpp before I18N.hpp as it includes some libigl code, which overrides our localization "L" macro.
 #include "GLGizmoMove.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
@@ -35,7 +34,7 @@ bool GLGizmoMove3D::on_mouse(const wxMouseEvent &mouse_event) {
     return use_grabbers(mouse_event);
 }
 
-void GLGizmoMove3D::data_changed() {
+void GLGizmoMove3D::data_changed(bool is_serializing) {
     m_grabbers[2].enabled = !m_parent.get_selection().is_wipe_tower();
 }
 

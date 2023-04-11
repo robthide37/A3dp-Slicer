@@ -190,7 +190,8 @@ void FileGet::priv::get_perform()
 	//assert(file != NULL);
 	if (file == NULL) {
 		wxCommandEvent* evt = new wxCommandEvent(EVT_DWNLDR_FILE_ERROR);
-		evt->SetString(GUI::format_wxstr(_L("Can't create file at %1%."), temp_path_wstring));
+		// TRN %1% = file path
+		evt->SetString(GUI::format_wxstr(_L("Can't create file at %1%"), temp_path_wstring));
 		evt->SetInt(m_id);
 		m_evt_handler->QueueEvent(evt);
 		return;

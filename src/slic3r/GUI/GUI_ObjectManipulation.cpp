@@ -1,5 +1,6 @@
 #include "GUI_ObjectManipulation.hpp"
 #include "I18N.hpp"
+#include "format.hpp"
 #include "BitmapComboBox.hpp"
 
 #include "GLCanvas3D.hpp"
@@ -245,8 +246,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 
         // We will add a button to toggle mirroring to each axis:
         auto btn = new ScalableButton(parent, wxID_ANY, "mirroring_off", wxEmptyString, wxDefaultSize, wxDefaultPosition, wxBU_EXACTFIT | wxNO_BORDER | wxTRANSPARENT_WINDOW);
-        btn->SetToolTip(_L("Mirror along") + wxString::Format(_L(" %c "), (int)label) + _L("axis"));
-
+        btn->SetToolTip(format_wxstr(_L("Mirror along %1% axis"), label));
         m_mirror_buttons[axis_idx] = btn;
 
         sizer->AddStretchSpacer(2);
@@ -433,7 +433,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 
     m_main_grid_sizer->Add(editors_grid_sizer, 1, wxEXPAND);
 
-    m_skew_label = new wxStaticText(parent, wxID_ANY, _L("Skew"));
+    m_skew_label = new wxStaticText(parent, wxID_ANY, _L("Skew [World]"));
     m_main_grid_sizer->Add(m_skew_label, 1, wxEXPAND);
 
     m_reset_skew_button = new ScalableButton(parent, wxID_ANY, ScalableBitmap(parent, "undo"));
@@ -780,7 +780,7 @@ void ObjectManipulation::update_reset_buttons_visibility()
         show_rotation = trafo_svd.rotation;
         show_scale    = trafo_svd.scale;
         show_mirror   = trafo_svd.mirror;
-        show_skew     = trafo_svd.skew;
+        show_skew     = Geometry::TransformationSVD(volume->world_matrix()).skew;
     }
 
     wxGetApp().CallAfter([this, show_drop_to_bed, show_rotation, show_scale, show_mirror, show_skew] {

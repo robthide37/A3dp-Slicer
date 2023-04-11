@@ -31,10 +31,7 @@
 #include "I18N.hpp"
 
 #include <libnest2d/tools/benchmark.h>
-
-//! macro used to mark string used at localization,
-//! return same string
-#define L(s) Slic3r::I18N::translate(s)
+#include "format.hpp"
 
 namespace Slic3r {
 
@@ -54,14 +51,15 @@ const std::array<unsigned, slaposCount> OBJ_STEP_LEVELS = {
 std::string OBJ_STEP_LABELS(size_t idx)
 {
     switch (idx) {
-    case slaposAssembly:             return L("Assembling model from parts");
-    case slaposHollowing:            return L("Hollowing model");
-    case slaposDrillHoles:           return L("Drilling holes into model.");
-    case slaposObjectSlice:          return L("Slicing model");
-    case slaposSupportPoints:        return L("Generating support points");
-    case slaposSupportTree:          return L("Generating support tree");
-    case slaposPad:                  return L("Generating pad");
-    case slaposSliceSupports:        return L("Slicing supports");
+                                            // TRN Status of the SLA print calculation
+    case slaposAssembly:             return _u8L("Assembling model from parts");
+    case slaposHollowing:            return _u8L("Hollowing model");
+    case slaposDrillHoles:           return _u8L("Drilling holes into model.");
+    case slaposObjectSlice:          return _u8L("Slicing model");
+    case slaposSupportPoints:        return _u8L("Generating support points");
+    case slaposSupportTree:          return _u8L("Generating support tree");
+    case slaposPad:                  return _u8L("Generating pad");
+    case slaposSliceSupports:        return _u8L("Slicing supports");
     default:;
     }
     assert(false);
@@ -76,8 +74,8 @@ const std::array<unsigned, slapsCount> PRINT_STEP_LEVELS = {
 std::string PRINT_STEP_LABELS(size_t idx)
 {
     switch (idx) {
-    case slapsMergeSlicesAndEval:   return L("Merging slices and calculating statistics");
-    case slapsRasterize:            return L("Rasterizing layers");
+    case slapsMergeSlicesAndEval:   return _u8L("Merging slices and calculating statistics");
+    case slapsRasterize:            return _u8L("Rasterizing layers");
     default:;
     }
     assert(false); return "Out of bounds!";
@@ -201,7 +199,13 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
         m = csgmesh_merge_positive_parts(r);
         handled = true;
     } else if (csg::check_csgmesh_booleans(r) == r.end()) {
-        auto cgalmeshptr = csg::perform_csgmesh_booleans(r);
+        MeshBoolean::cgal::CGALMeshPtr cgalmeshptr;
+        try {
+            cgalmeshptr = csg::perform_csgmesh_booleans(r);
+        } catch (...) {
+            // leaves cgalmeshptr as nullptr
+        }
+
         if (cgalmeshptr) {
             m = MeshBoolean::cgal::cgal_to_indexed_triangle_set(*cgalmeshptr);
             handled = true;
@@ -252,14 +256,14 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
                 if (ret & static_cast<int>(sla::HollowMeshResult::FaultyMesh)) {
                     po.active_step_add_warning(
                         PrintStateBase::WarningLevel::NON_CRITICAL,
-                        L("Mesh to be hollowed is not suitable for hollowing (does not "
+                        _u8L("Mesh to be hollowed is not suitable for hollowing (does not "
                           "bound a volume)."));
                 }
 
                 if (ret & static_cast<int>(sla::HollowMeshResult::FaultyHoles)) {
                     po.active_step_add_warning(
                         PrintStateBase::WarningLevel::NON_CRITICAL,
-                        L("Unable to drill the current configuration of holes into the "
+                        _u8L("Unable to drill the current configuration of holes into the "
                           "model."));
                 }
 
@@ -267,7 +271,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
 
                 if (ret & static_cast<int>(sla::HollowMeshResult::DrillingFailed)) {
                     po.active_step_add_warning(
-                        PrintStateBase::WarningLevel::NON_CRITICAL, L(
+                        PrintStateBase::WarningLevel::NON_CRITICAL, _u8L(
                         "Drilling holes into the mesh failed. "
                         "This is usually caused by broken model. Try to fix it first."));
 
@@ -276,7 +280,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
 
                 if (hole_fail) {
                     po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
-                                               L("Failed to drill some holes into the model"));
+                                               _u8L("Failed to drill some holes into the model"));
 
                     handled = false;
                 }
@@ -286,8 +290,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
 
     if (!handled) { // Last resort to voxelization.
         po.active_step_add_warning(PrintStateBase::WarningLevel::NON_CRITICAL,
-                                   L("Can't perform full mesh booleans! "
-                                     "Some parts of the print will be previewed with approximated meshes. "
+                                   _u8L("Some parts of the print will be previewed with approximated meshes. "
                                      "This does not affect the quality of slices or the physical print in any way."));
         m = generate_preview_vdb(po, step);
     }
@@ -506,9 +509,7 @@ void SLAPrint::Steps::slice_model(SLAPrintObject &po)
 
     if(slindex_it == po.m_slice_index.end())
         //TRN To be shown at the status bar on SLA slicing error.
-        throw Slic3r::RuntimeError(
-            L("Slicing had to be stopped due to an internal error: "
-              "Inconsistent slice index."));
+        throw Slic3r::RuntimeError(format("Model named: %s can not be sliced. Please check if the model is sane.", po.model_object()->name));
 
     po.m_model_height_levels.clear();
     po.m_model_height_levels.reserve(po.m_slice_index.size());
@@ -688,7 +689,7 @@ void SLAPrint::Steps::support_points(SLAPrintObject &po)
 
         // Using RELOAD_SLA_SUPPORT_POINTS to tell the Plater to pass
         // the update status to GLGizmoSlaSupports
-        report_status(-1, L("Generating support points"),
+        report_status(-1, _u8L("Generating support points"),
                       SlicingStatus::RELOAD_SLA_SUPPORT_POINTS);
     } else {
         // There are either some points on the front-end, or the user
@@ -737,7 +738,7 @@ void SLAPrint::Steps::support_tree(SLAPrintObject &po)
     auto rc = SlicingStatus::RELOAD_SCENE;
 
     // This is to prevent "Done." being displayed during merged_mesh()
-    report_status(-1, L("Visualizing supports"));
+    report_status(-1, _u8L("Visualizing supports"));
 
     BOOST_LOG_TRIVIAL(debug) << "Processed support point count "
                              << po.m_supportdata->input.pts.size();
@@ -746,7 +747,7 @@ void SLAPrint::Steps::support_tree(SLAPrintObject &po)
     if(po.support_mesh().empty())
         BOOST_LOG_TRIVIAL(warning) << "Support mesh is empty";
 
-    report_status(-1, L("Visualizing supports"), rc);
+    report_status(-1, _u8L("Visualizing supports"), rc);
 }
 
 void SLAPrint::Steps::generate_pad(SLAPrintObject &po) {
@@ -776,7 +777,7 @@ void SLAPrint::Steps::generate_pad(SLAPrintObject &po) {
 
         if (!validate_pad(po.m_supportdata->pad_mesh.its, pcfg))
             throw Slic3r::SlicingError(
-                    L("No pad can be generated for this model with the "
+                    _u8L("No pad can be generated for this model with the "
                       "current configuration"));
 
     } else if(po.m_supportdata) {
@@ -784,7 +785,7 @@ void SLAPrint::Steps::generate_pad(SLAPrintObject &po) {
     }
 
     throw_if_canceled();
-    report_status(-1, L("Visualizing supports"), SlicingStatus::RELOAD_SCENE);
+    report_status(-1, _u8L("Visualizing supports"), SlicingStatus::RELOAD_SCENE);
 }
 
 // Slicing the support geometries similarly to the model slicing procedure.
@@ -905,7 +906,7 @@ void SLAPrint::Steps::initialize_printer_input()
         for(const SliceRecord& slicerecord : o->get_slice_index()) {
             if (!slicerecord.is_valid())
                 throw Slic3r::SlicingError(
-                    L("There are unprintable objects. Try to "
+                    _u8L("There are unprintable objects. Try to "
                       "adjust support settings to make the "
                       "objects printable."));
 

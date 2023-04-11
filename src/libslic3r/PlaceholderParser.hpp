@@ -20,7 +20,10 @@ public:
     // In the future, the context may hold variables created and modified by the PlaceholderParser
     // and shared between the PlaceholderParser::process() invocations.
     struct ContextData {
-        std::mt19937 rng;
+        std::mt19937                    rng;
+        // If defined, then this dictionary is used by the scripts to define user variables and persist them
+        // between PlaceholderParser evaluations.
+        std::unique_ptr<DynamicConfig>  global_config;
     };
 
     PlaceholderParser(const DynamicConfig *external_config = nullptr);
