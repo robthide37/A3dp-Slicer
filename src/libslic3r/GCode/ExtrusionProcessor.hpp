@@ -27,78 +27,6 @@
 
 namespace Slic3r {
 
-class SlidingWindowCurvatureAccumulator
-{
-    float        window_size;
-    float        total_distance  = 0; // accumulated distance
-    float        total_curvature = 0; // accumulated signed ccw angles
-    deque<float> distances;
-    deque<float> angles;
-
-public:
-    SlidingWindowCurvatureAccumulator(float window_size) : window_size(window_size) {}
-
-    void add_point(float distance, float angle)
-    {
-        total_distance += distance;
-        total_curvature += angle;
-        distances.push_back(distance);
-        angles.push_back(angle);
-
-        while (distances.size() > 1 && total_distance > window_size) {
-            total_distance -= distances.front();
-            total_curvature -= angles.front();
-            distances.pop_front();
-            angles.pop_front();
-        }
-    }
-
-    float get_curvature() const
-    {
-        return total_curvature / window_size;
-    }
-
-    void reset()
-    {
-        total_curvature = 0;
-        total_distance  = 0;
-        distances.clear();
-        angles.clear();
-    }
-};
-
-class CurvatureEstimator
-{
-    static const size_t               sliders_count          = 3;
-    SlidingWindowCurvatureAccumulator sliders[sliders_count] = {{1.0},{4.0}, {10.0}};
-
-public:
-    void add_point(float distance, float angle)
-    {
-        if (distance < EPSILON)
-            return;
-        for (SlidingWindowCurvatureAccumulator &slider : sliders) {
-            slider.add_point(distance, angle);
-        }
-    }
-    float get_curvature()
-    {
-        float max_curvature = 0.0f;
-        for (const SlidingWindowCurvatureAccumulator &slider : sliders) {
-            if (abs(slider.get_curvature()) > abs(max_curvature)) {
-                max_curvature = slider.get_curvature();
-            }
-        }
-        return max_curvature;
-    }
-    void reset()
-    {
-        for (SlidingWindowCurvatureAccumulator &slider : sliders) {
-            slider.reset();
-        }
-    }
-};
-
 struct ExtendedPoint
 {
     Vec2d  position;
@@ -118,7 +46,6 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
     if (input_points.empty())
         return {};
     float              boundary_offset = PREV_LAYER_BOUNDARY_OFFSET ? 0.5 * flow_width : 0.0f;
-    CurvatureEstimator cestim;
     auto maybe_unscale = [](const P &p) { return SCALED_INPUT ? unscaled(p) : p.template cast<double>(); };
 
     std::vector<ExtendedPoint> points;
@@ -227,6 +154,9 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
         points = new_points;
     }
 
+    std::vector<float> angles_for_curvature(points.size());
+    std::vector<float> distances_for_curvature(points.size());
+
     for (int point_idx = 0; point_idx < int(points.size()); ++point_idx) {
         ExtendedPoint &a    = points[point_idx];
         ExtendedPoint &prev = points[point_idx > 0 ? point_idx - 1 : point_idx];
@@ -234,22 +164,59 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
         int prev_point_idx = point_idx;
         while (prev_point_idx > 0) {
             prev_point_idx--;
-            if ((a.position - points[prev_point_idx].position).squaredNorm() > EPSILON) { break; }
+            if ((a.position - points[prev_point_idx].position).squaredNorm() > EPSILON) {
+                break;
+            }
         }
 
         int next_point_index = point_idx;
         while (next_point_index < int(points.size()) - 1) {
             next_point_index++;
-            if ((a.position - points[next_point_index].position).squaredNorm() > EPSILON) { break; }
+            if ((a.position - points[next_point_index].position).squaredNorm() > EPSILON) {
+                break;
+            }
         }
 
+        distances_for_curvature[point_idx] = (prev.position - a.position).norm();
         if (prev_point_idx != point_idx && next_point_index != point_idx) {
-            float distance = (prev.position - a.position).norm();
-            float alfa     = angle(a.position - points[prev_point_idx].position, points[next_point_index].position - a.position);
-            cestim.add_point(distance, alfa);
-        }
+            float alfa = angle(a.position - points[prev_point_idx].position, points[next_point_index].position - a.position);
+            angles_for_curvature[point_idx] = alfa;
+        } // else keep zero
+    }
 
-        a.curvature = cestim.get_curvature();
+    for (float window_size : {3.0f, 9.0f, 16.0f}) {
+        size_t tail_point      = 0;
+        float  tail_window_acc = 0;
+        float  tail_angle_acc  = 0;
+
+        size_t head_point      = 0;
+        float  head_window_acc = 0;
+        float  head_angle_acc  = 0;
+
+        for (int point_idx = 0; point_idx < int(points.size()); ++point_idx) {
+            if (point_idx > 0) {
+                tail_window_acc += distances_for_curvature[point_idx - 1];
+                tail_angle_acc += angles_for_curvature[point_idx - 1];
+                head_window_acc -= distances_for_curvature[point_idx - 1];
+                head_angle_acc -= angles_for_curvature[point_idx - 1];
+            }
+            while (tail_window_acc > window_size * 0.5 && tail_point < point_idx) {
+                tail_window_acc -= distances_for_curvature[tail_point];
+                tail_angle_acc -= angles_for_curvature[tail_point];
+                tail_point++;
+            }
+
+            while (head_window_acc < window_size * 0.5 && head_point < int(points.size()) - 1) {
+                head_window_acc += distances_for_curvature[head_point];
+                head_angle_acc += angles_for_curvature[head_point];
+                head_point++;
+            }
+
+            float curvature = (tail_angle_acc + head_angle_acc) / (tail_window_acc + head_window_acc);
+            if (std::abs(curvature) > std::abs(points[point_idx].curvature)) {
+                points[point_idx].curvature = curvature;
+            }
+        }
     }
 
     return points;

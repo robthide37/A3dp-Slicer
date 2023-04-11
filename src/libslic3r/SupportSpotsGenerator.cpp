@@ -234,7 +234,7 @@ float estimate_curled_up_height(
         // faster or slower than thin air, thus the extrusion always curles up)
         
         if (point.curvature > 0.01){
-            float radius = std::max(1.0 / point.curvature - flow_width / 2.0, 0.001);
+            float radius = (1.0 / point.curvature);
             float curling_t = sqrt(radius / 100);
             float b = curling_t * flow_width;
             float a = curling_section;
@@ -397,8 +397,8 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                 bridged_distance = 0.0f;
             }
 
-            line_out.curled_up_height = estimate_curled_up_height(curr_point, layer_region->layer()->height, flow_width,
-                                                                  prev_layer_curling, params);
+            line_out.curled_up_height = estimate_curled_up_height(layer_region->layer()->id() % 2 == 0 ? curr_point : prev_point,
+                                                                  layer_region->layer()->height, flow_width, prev_layer_curling, params);
 
             lines_out.push_back(line_out);
         }
@@ -1102,25 +1102,25 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
             auto annotated_points = estimate_points_properties<true, true, false, false>(pol.points, prev_layer_lines, flow_width);
 
             for (size_t i = 0; i < annotated_points.size(); ++i) {
-                ExtendedPoint &curr_point = annotated_points[i];
-                float          line_len   = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
-                ExtrusionLine  line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
-                                       curr_point.position.cast<float>(), line_len, extrusion};
+                ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+                ExtendedPoint &b = annotated_points[i];
+                ExtrusionLine  line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
+                                       extrusion};
 
-                auto [prev_layer_quality, prev_layer_curling] = get_bottom_extrusions_quality_and_curling(prev_layer_lines, curr_point);
-                const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
-                                                                  prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
-                                                                  ExtrusionLine{};
+                ExtendedPoint &pivot                          = l->id() % 2 == 0 ? a : b;
+                auto [prev_layer_quality, prev_layer_curling] = get_bottom_extrusions_quality_and_curling(prev_layer_lines, pivot);
+                const ExtrusionLine nearest_prev_layer_line   = prev_layer_lines.get_lines().size() > 0 ?
+                                                                    prev_layer_lines.get_line(pivot.nearest_prev_layer_line) :
+                                                                    ExtrusionLine{};
 
                 Vec2f v1 = (nearest_prev_layer_line.b - nearest_prev_layer_line.a);
-                Vec2f v2 = (curr_point.position.cast<float>() - nearest_prev_layer_line.a);
+                Vec2f v2 = (pivot.position.cast<float>() - nearest_prev_layer_line.a);
                 auto  d  = (v1.x() * v2.y()) - (v1.y() * v2.x());
                 if (d > 0) {
-                    curr_point.distance *= -1.0f;
+                    pivot.distance *= -1.0f;
                 }
 
-                line_out.curled_up_height = estimate_curled_up_height(curr_point, l->height, flow_width,
-                                                                      prev_layer_curling, params);
+                line_out.curled_up_height = estimate_curled_up_height(pivot, l->height, flow_width, prev_layer_curling, params);
 
                 current_layer_lines.push_back(line_out);
             }
@@ -1158,7 +1158,7 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
 {
 #ifdef DEBUG_FILES
     FILE *debug_file = boost::nowide::fopen(debug_out_path("object_malformations.obj").c_str(), "w");
-    FILE *full_file = boost::nowide::fopen(debug_out_path("object_full.obj").c_str(), "w");
+    FILE *full_file  = boost::nowide::fopen(debug_out_path("object_full.obj").c_str(), "w");
 #endif
 
     LD prev_layer_lines{};
@@ -1170,8 +1170,8 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
         std::vector<ExtrusionLine>           current_layer_lines;
         for (const LayerRegion *layer_region : l->regions()) {
             for (const ExtrusionEntity *extrusion : layer_region->perimeters().flatten().entities) {
-                
-                if (!extrusion->role().is_external_perimeter()) continue;
+                if (!extrusion->role().is_external_perimeter())
+                    continue;
 
                 Points extrusion_pts;
                 extrusion->collect_points(extrusion_pts);
@@ -1179,18 +1179,18 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
                 auto  annotated_points = estimate_points_properties<true, false, false, false>(extrusion_pts, prev_layer_lines, flow_width,
                                                                                               params.bridge_distance);
                 for (size_t i = 0; i < annotated_points.size(); ++i) {
-                    ExtendedPoint &curr_point = annotated_points[i];
-                    float          line_len   = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
-                    ExtrusionLine  line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
-                                           curr_point.position.cast<float>(), line_len, extrusion};
+                    ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+                    ExtendedPoint &b = annotated_points[i];
+                    ExtrusionLine  line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
+                                           extrusion};
 
-                    auto [prev_layer_quality, prev_layer_curling] = get_bottom_extrusions_quality_and_curling(prev_layer_lines, curr_point);
+                    ExtendedPoint &pivot = l->id() % 2 == 0 ? a : b;
+                    auto [prev_layer_quality, prev_layer_curling] = get_bottom_extrusions_quality_and_curling(prev_layer_lines, pivot);
 
-                    float sign = (prev_layer_boundary.distance_from_lines<true>(curr_point.position) + 0.5f * flow_width) < 0.0f ? -1.0f :
-                                                                                                                                   1.0f;
-                    curr_point.distance *= sign;
+                    float sign = (prev_layer_boundary.distance_from_lines<true>(pivot.position) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
+                    pivot.distance *= sign;
 
-                    line_out.curled_up_height = estimate_curled_up_height(curr_point, layer_region->layer()->height, flow_width,
+                    line_out.curled_up_height = estimate_curled_up_height(pivot, layer_region->layer()->height, flow_width,
                                                                           prev_layer_curling, params);
 
                     current_layer_lines.push_back(line_out);
@@ -1211,9 +1211,9 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
                 fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
             }
         }
-         for (const ExtrusionLine &line : current_layer_lines) {
-                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
-                fprintf(full_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
+        for (const ExtrusionLine &line : current_layer_lines) {
+            Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
+            fprintf(full_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
         }
 #endif
 
