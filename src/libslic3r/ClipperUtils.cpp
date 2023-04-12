@@ -1317,8 +1317,12 @@ ExPolygons variable_offset_inner_ex(const ExPolygon &expoly, const std::vector<s
 	// 2) Offset the holes one by one, collect the results.
 	ClipperLib::Paths holes;
 	holes.reserve(expoly.holes.size());
-	for (const Polygon& hole : expoly.holes)
-		append(holes, fix_after_outer_offset(mittered_offset_path_scaled(hole.points, deltas[1 + &hole - expoly.holes.data()], miter_limit), ClipperLib::pftNegative, false));
+    for (const Polygon &hole : expoly.holes) {
+        ClipperLib::Path offsetted = mittered_offset_path_scaled(hole.points, deltas[1 + &hole - expoly.holes.data()], miter_limit);
+        // Make it CCW.
+        std::reverse(offsetted.begin(), offsetted.end());
+        append(holes, fix_after_outer_offset(offsetted, ClipperLib::pftNegative, false));
+    }
 #ifndef NDEBUG
 	for (auto &c : holes)
 		assert(ClipperLib::Area(c) > 0.);
