@@ -2354,11 +2354,10 @@ void GCode::process_layer_single_object(
     // Round 1 (wiping into object or infill) or round 2 (normal extrusions).
     const bool                print_wipe_extrusions)
 {
-    //FIXME what the heck ID is this? Layer ID or Object ID? More likely an Object ID.
-    uint32_t layer_id = 0;
-    bool     first    = true;
+    bool     first     = true;
+    int      object_id = 0;
     // Delay layer initialization as many layers may not print with all extruders.
-    auto init_layer_delayed = [this, &print_instance, &layer_to_print, layer_id, &first, &gcode]() {
+    auto init_layer_delayed = [this, &print_instance, &layer_to_print, &first, &object_id, &gcode]() {
         if (first) {
             first = false;
             const PrintObject &print_object = print_instance.print_object;
@@ -2374,8 +2373,14 @@ void GCode::process_layer_single_object(
                 m_avoid_crossing_perimeters.use_external_mp_once();
             m_last_obj_copy = this_object_copy;
             this->set_origin(unscale(offset));
-            if (this->config().gcode_label_objects)
-                gcode += std::string("; printing object ") + print_object.model_object()->name + " id:" + std::to_string(layer_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
+            if (this->config().gcode_label_objects) {
+                for (const PrintObject *po : print_object.print()->objects())
+                    if (po == &print_object)
+                        break;
+                    else
+                        ++ object_id;
+                gcode += std::string("; printing object ") + print_object.model_object()->name + " id:" + std::to_string(object_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
+            }
         }
     };
 
@@ -2548,7 +2553,7 @@ void GCode::process_layer_single_object(
             }
         }
     if (! first && this->config().gcode_label_objects)
-        gcode += std::string("; stop printing object ") + print_object.model_object()->name + " id:" + std::to_string(layer_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
+        gcode += std::string("; stop printing object ") + print_object.model_object()->name + " id:" + std::to_string(object_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
 }
 
 void GCode::apply_print_config(const PrintConfig &print_config)
