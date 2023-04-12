@@ -3189,6 +3189,10 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_canvas->SetFocus();
 
     if (evt.Entering()) {
+        if (m_mouse.dragging && !evt.LeftIsDown() && !evt.RightIsDown() && !evt.MiddleIsDown())
+            // reset dragging state if the user released the mouse button outside the 3D scene
+            m_mouse.dragging = false;
+
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
         // Set focus in order to remove it from object list
