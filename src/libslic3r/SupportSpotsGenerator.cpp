@@ -25,6 +25,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <functional>
+#include <limits>
 #include <math.h>
 #include <optional>
 #include <unordered_map>
@@ -40,7 +41,7 @@
 #include "Geometry/ConvexHull.hpp"
 
 // #define DETAILED_DEBUG_LOGS
-// #define DEBUG_FILES
+#define DEBUG_FILES
 
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
@@ -208,19 +209,19 @@ std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length
 }
 
 float estimate_curled_up_height(
-    const ExtendedPoint &point, float layer_height, float flow_width, float prev_line_curled_height, Params params)
+    float distance, float curvature, float layer_height, float flow_width, float prev_line_curled_height, Params params)
 {
     float curled_up_height = 0;
-    if (fabs(point.distance) < 1.1 * flow_width) {
-        curled_up_height = std::max(prev_line_curled_height - layer_height * 0.5, 0.0);
+    if (fabs(distance) < 2.5 * flow_width) {
+        curled_up_height = std::max(prev_line_curled_height - layer_height * 0.75f, 0.0f);
     }
 
-    if (point.distance > params.malformation_distance_factors.first * flow_width &&
-        point.distance < params.malformation_distance_factors.second * flow_width) {
+    if (distance > params.malformation_distance_factors.first * flow_width &&
+        distance < params.malformation_distance_factors.second * flow_width) {
         // imagine the extrusion profile. The part that has been glued (melted) with the previous layer will be called anchored section
         // and the rest will be called curling section
         // float anchored_section = flow_width - point.distance;
-        float curling_section = point.distance;
+        float curling_section = distance;
 
         // after extruding, the curling (floating) part of the extrusion starts to shrink back to the rounded shape of the nozzle
         // The anchored part not, because the melted material holds to the previous layer well.
@@ -228,17 +229,15 @@ float estimate_curled_up_height(
         float swelling_radius = (layer_height + curling_section) / 2.0f;
         curled_up_height += std::max(0.f, (swelling_radius - layer_height) / 2.0f);
 
-        // There is one more effect. On convex turns, there is larger tension on the floating edge of the extrusion then on the middle section.
-        // The tension is caused by the shrinking tendency of the filament, and on outer edge of convex trun, the expansion is greater and thus shrinking force is greater.
-        // This tension will cause the curling section to curle up (Why not down? maybe the previous layer works as a heat block, releasing the heat
-        // faster or slower than thin air, thus the extrusion always curles up)
-        
-        if (point.curvature > 0.01){
-            float radius = (1.0 / point.curvature);
+        // On convex turns, there is larger tension on the floating edge of the extrusion then on the middle section.
+        // The tension is caused by the shrinking tendency of the filament, and on outer edge of convex trun, the expansion is greater and
+        // thus shrinking force is greater. This tension will cause the curling section to curle up
+        if (curvature > 0.01) {
+            float radius    = (1.0 / curvature);
             float curling_t = sqrt(radius / 100);
-            float b = curling_t * flow_width;
-            float a = curling_section;
-            float c = sqrt(std::max(0.0f,a*a - b*b));
+            float b         = curling_t * flow_width;
+            float a         = curling_section;
+            float c         = sqrt(std::max(0.0f, a * a - b * b));
 
             curled_up_height += c;
         }
@@ -246,32 +245,6 @@ float estimate_curled_up_height(
     }
 
     return curled_up_height;
-}
-
-std::tuple<float, float> get_bottom_extrusions_quality_and_curling(const LD &prev_layer_lines, const ExtendedPoint &curr_point)
-{
-    if (prev_layer_lines.get_lines().empty()) {
-        return {1.0,0.0};
-    }
-    const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_line(curr_point.nearest_prev_layer_line);
-    float quality = nearest_prev_layer_line.form_quality;
-    float curling = nearest_prev_layer_line.curled_up_height;
-    if ((curr_point.nearest_prev_layer_point.cast<float>() - nearest_prev_layer_line.a).squaredNorm() < 0.1) {
-        const auto& prev_line = prev_layer_lines.get_line(prev_idx_modulo(curr_point.nearest_prev_layer_line, prev_layer_lines.get_lines().size()));
-        if ((curr_point.nearest_prev_layer_point.cast<float>() - prev_line.b).squaredNorm() < 0.1) {
-            quality = 0.5 * (quality + prev_line.form_quality);
-            curling = 0.5 * (curling + prev_line.curled_up_height);
-        }
-    } else if ((curr_point.nearest_prev_layer_point.cast<float>() - nearest_prev_layer_line.b).squaredNorm() < 0.1) {
-        const auto &next_line = prev_layer_lines.get_line(
-            next_idx_modulo(curr_point.nearest_prev_layer_line, prev_layer_lines.get_lines().size()));
-        if ((curr_point.nearest_prev_layer_point.cast<float>() - next_line.a).squaredNorm() < 0.1) {
-            quality = 0.5 * (quality + next_line.form_quality);
-            curling = 0.5 * (curling + next_line.curled_up_height);
-        }
-    }
-
-    return {quality, curling};
 }
 
 std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntity                      *entity,
@@ -362,7 +335,9 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
             float                line_len   = (prev_point.position - curr_point.position).norm();
             ExtrusionLine        line_out{prev_point.position.cast<float>(), curr_point.position.cast<float>(), line_len, entity};
 
-            auto [prev_layer_quality, prev_layer_curling] = get_bottom_extrusions_quality_and_curling(prev_layer_lines, curr_point);
+            Vec2f middle                               = 0.5 * (line_out.a + line_out.b);
+            auto [middle_distance, bottom_line_idx, x] = prev_layer_lines.distance_from_lines_extra<false>(middle);
+            ExtrusionLine bottom_line = prev_layer_lines.get_lines().empty() ? ExtrusionLine{} : prev_layer_lines.get_line(bottom_line_idx);
 
             // correctify the distance sign using slice polygons
             float sign = (prev_layer_boundary.distance_from_lines<true>(curr_point.position) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
@@ -387,7 +362,7 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                 }
             } else if (curr_point.distance > flow_width * 0.8f) {
                 bridged_distance += line_len;
-                line_out.form_quality = prev_layer_quality - 0.3f;
+                line_out.form_quality = bottom_line.form_quality - 0.3f;
                 if (line_out.form_quality < 0 && bridged_distance > max_bridge_len) {
                     line_out.support_point_generated = potential_cause;
                     line_out.form_quality            = 0.5f;
@@ -397,8 +372,9 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
                 bridged_distance = 0.0f;
             }
 
-            line_out.curled_up_height = estimate_curled_up_height(layer_region->layer()->id() % 2 == 0 ? curr_point : prev_point,
-                                                                  layer_region->layer()->height, flow_width, prev_layer_curling, params);
+            line_out.curled_up_height = estimate_curled_up_height(middle_distance, 0.5 * (prev_point.curvature + curr_point.curvature),
+                                                                  layer_region->layer()->height, flow_width, bottom_line.curled_up_height,
+                                                                  params);
 
             lines_out.push_back(line_out);
         }
@@ -1102,25 +1078,23 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
             auto annotated_points = estimate_points_properties<true, true, false, false>(pol.points, prev_layer_lines, flow_width);
 
             for (size_t i = 0; i < annotated_points.size(); ++i) {
-                ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
-                ExtendedPoint &b = annotated_points[i];
-                ExtrusionLine  line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
+                const ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+                const ExtendedPoint &b = annotated_points[i];
+                ExtrusionLine        line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
                                        extrusion};
 
-                ExtendedPoint &pivot                          = l->id() % 2 == 0 ? a : b;
-                auto [prev_layer_quality, prev_layer_curling] = get_bottom_extrusions_quality_and_curling(prev_layer_lines, pivot);
-                const ExtrusionLine nearest_prev_layer_line   = prev_layer_lines.get_lines().size() > 0 ?
-                                                                    prev_layer_lines.get_line(pivot.nearest_prev_layer_line) :
-                                                                    ExtrusionLine{};
+                Vec2f middle                               = 0.5 * (line_out.a + line_out.b);
+                auto [middle_distance, bottom_line_idx, x] = prev_layer_lines.distance_from_lines_extra<false>(middle);
+                ExtrusionLine bottom_line                  = prev_layer_lines.get_lines().empty() ? ExtrusionLine{} :
+                                                                                                    prev_layer_lines.get_line(bottom_line_idx);
 
-                Vec2f v1 = (nearest_prev_layer_line.b - nearest_prev_layer_line.a);
-                Vec2f v2 = (pivot.position.cast<float>() - nearest_prev_layer_line.a);
-                auto  d  = (v1.x() * v2.y()) - (v1.y() * v2.x());
-                if (d > 0) {
-                    pivot.distance *= -1.0f;
-                }
+                Vec2f v1   = (bottom_line.b - bottom_line.a);
+                Vec2f v2   = (a.position.cast<float>() - bottom_line.a);
+                auto  d    = (v1.x() * v2.y()) - (v1.y() * v2.x());
+                float sign = (d > 0) ? -1.0f : 1.0f;
 
-                line_out.curled_up_height = estimate_curled_up_height(pivot, l->height, flow_width, prev_layer_curling, params);
+                line_out.curled_up_height = estimate_curled_up_height(middle_distance * sign, 0.5 * (a.curvature + b.curvature), l->height,
+                                                                      flow_width, bottom_line.curled_up_height, params);
 
                 current_layer_lines.push_back(line_out);
             }
@@ -1176,22 +1150,24 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
                 Points extrusion_pts;
                 extrusion->collect_points(extrusion_pts);
                 float flow_width       = get_flow_width(layer_region, extrusion->role());
-                auto  annotated_points = estimate_points_properties<true, false, false, false>(extrusion_pts, prev_layer_lines, flow_width,
-                                                                                              params.bridge_distance);
+                auto  annotated_points = estimate_points_properties<true, true, false, false>(extrusion_pts, prev_layer_lines, flow_width,
+                                                                                             params.bridge_distance);
                 for (size_t i = 0; i < annotated_points.size(); ++i) {
-                    ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
-                    ExtendedPoint &b = annotated_points[i];
-                    ExtrusionLine  line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
+                    const ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+                    const ExtendedPoint &b = annotated_points[i];
+                    ExtrusionLine line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
                                            extrusion};
 
-                    ExtendedPoint &pivot = l->id() % 2 == 0 ? a : b;
-                    auto [prev_layer_quality, prev_layer_curling] = get_bottom_extrusions_quality_and_curling(prev_layer_lines, pivot);
+                    Vec2f middle                               = 0.5 * (line_out.a + line_out.b);
+                    auto [middle_distance, bottom_line_idx, x] = prev_layer_lines.distance_from_lines_extra<false>(middle);
+                    ExtrusionLine bottom_line                  = prev_layer_lines.get_lines().empty() ? ExtrusionLine{} :
+                                                                                                        prev_layer_lines.get_line(bottom_line_idx);
 
-                    float sign = (prev_layer_boundary.distance_from_lines<true>(pivot.position) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
-                    pivot.distance *= sign;
+                    // correctify the distance sign using slice polygons
+                    float sign = (prev_layer_boundary.distance_from_lines<true>(middle.cast<double>()) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
 
-                    line_out.curled_up_height = estimate_curled_up_height(pivot, layer_region->layer()->height, flow_width,
-                                                                          prev_layer_curling, params);
+                    line_out.curled_up_height = estimate_curled_up_height(middle_distance * sign, 0.5 * (a.curvature + b.curvature),
+                                                                          l->height, flow_width, bottom_line.curled_up_height, params);
 
                     current_layer_lines.push_back(line_out);
                 }

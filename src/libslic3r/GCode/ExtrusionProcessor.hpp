@@ -31,8 +31,6 @@ struct ExtendedPoint
 {
     Vec2d  position;
     float  distance;
-    size_t nearest_prev_layer_line;
-    Vec2d nearest_prev_layer_point;
     float  curvature;
 };
 
@@ -55,16 +53,12 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
         ExtendedPoint start_point{maybe_unscale(input_points.front())};
         auto [distance, nearest_line, x]    = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(start_point.position.cast<AABBScalar>());
         start_point.distance                = distance + boundary_offset;
-        start_point.nearest_prev_layer_line = nearest_line;
-        start_point.nearest_prev_layer_point = x.template cast<double>();
         points.push_back(start_point);
     }
     for (size_t i = 1; i < input_points.size(); i++) {
         ExtendedPoint next_point{maybe_unscale(input_points[i])};
         auto [distance, nearest_line, x]   = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(next_point.position.cast<AABBScalar>());
         next_point.distance                = distance + boundary_offset;
-        next_point.nearest_prev_layer_line = nearest_line;
-        next_point.nearest_prev_layer_point = x.template cast<double>();
 
         if (ADD_INTERSECTIONS &&
             ((points.back().distance > boundary_offset + EPSILON) != (next_point.distance > boundary_offset + EPSILON))) {
@@ -74,8 +68,6 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
                 ExtendedPoint p{};
                 p.position = intersection.first.template cast<double>();
                 p.distance = boundary_offset;
-                p.nearest_prev_layer_line = intersection.second;
-                p.nearest_prev_layer_point = p.position;
                 points.push_back(p);
             }
         }
@@ -105,8 +97,6 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
                         ExtendedPoint new_p{};
                         new_p.position                 = p0;
                         new_p.distance                 = float(p0_dist + boundary_offset);
-                        new_p.nearest_prev_layer_line  = p0_near_l;
-                        new_p.nearest_prev_layer_point = p0_x.template cast<double>();
                         new_points.push_back(new_p);
                     }
                     if (t1 > 0.0) {
@@ -115,8 +105,6 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
                         ExtendedPoint new_p{};
                         new_p.position                 = p1;
                         new_p.distance                 = float(p1_dist + boundary_offset);
-                        new_p.nearest_prev_layer_line  = p1_near_l;
-                        new_p.nearest_prev_layer_point = p1_x.template cast<double>();
                         new_points.push_back(new_p);
                     }
                 }
@@ -144,8 +132,6 @@ std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>      
                     ExtendedPoint new_p{};
                     new_p.position                 = pos;
                     new_p.distance                 = float(p_dist + boundary_offset);
-                    new_p.nearest_prev_layer_line  = p_near_l;
-                    new_p.nearest_prev_layer_point = p_x.template cast<double>();
                     new_points.push_back(new_p);
                 }
             }
@@ -279,13 +265,15 @@ public:
         std::vector<ExtendedPoint> extended_points =
             estimate_points_properties<true, true, true, true>(path.polyline.points, prev_layer_boundaries[current_object], path.width);
 
-        for (ExtendedPoint &ep : extended_points) {
+        for (size_t i = 0; i < int(extended_points.size()) - 1; i++) {
+            ExtendedPoint& ep = extended_points[i];
             // We are going to enforce slowdown over curled extrusions by increasing the point distance. The overhang speed is based on
             // signed distance from the prev layer, where 0 means fully overlapping extrusions and thus no slowdown, while extrusion_width
             // and more means full overhang, thus full slowdown. However, for curling, we take unsinged distance from the curled lines and
             // artifically modifiy the distance
+            Vec2d middle = 0.5 * (ep.position + extended_points[i + 1].position);
             auto [distance_from_curled, line_idx,
-                  p] = prev_curled_extrusions[current_object].distance_from_lines_extra<false>(Point::new_scale(ep.position));
+                  p]     = prev_curled_extrusions[current_object].distance_from_lines_extra<false>(Point::new_scale(middle));
             if (distance_from_curled < scale_(2.0 * path.width)) {
                 float artificially_increased_distance = path.width *
                                                         (1.0 - (unscaled(distance_from_curled) / (2.0 * path.width)) *
