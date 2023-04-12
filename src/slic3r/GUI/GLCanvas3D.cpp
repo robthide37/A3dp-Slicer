@@ -1511,9 +1511,83 @@ void GLCanvas3D::reset_volumes()
 ModelInstanceEPrintVolumeState GLCanvas3D::check_volumes_outside_state() const
 {
     ModelInstanceEPrintVolumeState state = ModelInstanceEPrintVolumeState::ModelInstancePVS_Inside;
-    if (m_initialized)
-        m_volumes.check_outside_state(m_bed.build_volume(), &state);
+    if (m_initialized && !m_volumes.empty())
+        check_volumes_outside_state(m_bed.build_volume(), &state);
     return state;
+}
+
+bool GLCanvas3D::check_volumes_outside_state(const Slic3r::BuildVolume& build_volume, ModelInstanceEPrintVolumeState* out_state) const
+{
+    auto                volume_below = [](GLVolume& volume) -> bool
+    { return volume.object_idx() != -1 && volume.volume_idx() != -1 && volume.is_below_printbed(); };
+    // Volume is partially below the print bed, thus a pre-calculated convex hull cannot be used.
+    auto                volume_sinking = [](GLVolume& volume) -> bool
+    { return volume.object_idx() != -1 && volume.volume_idx() != -1 && volume.is_sinking(); };
+    // Cached bounding box of a volume above the print bed.
+    auto                volume_bbox = [volume_sinking](GLVolume& volume) -> BoundingBoxf3
+    { return volume_sinking(volume) ? volume.transformed_non_sinking_bounding_box() : volume.transformed_convex_hull_bounding_box(); };
+    // Cached 3D convex hull of a volume above the print bed.
+    auto                volume_convex_mesh = [this, volume_sinking](GLVolume& volume) -> const TriangleMesh&
+    { return volume_sinking(volume) ? m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh() : *volume.convex_hull(); };
+
+    auto volumes_to_process_idxs = [this]() {
+        std::vector<unsigned int> ret;
+        if (m_selection.is_empty()) {
+            ret = std::vector<unsigned int>(m_volumes.volumes.size());
+            std::iota(ret.begin(), ret.end(), 0);
+        }
+        else {
+            const GUI::Selection::IndicesList& selected_volume_idxs = m_selection.get_volume_idxs();
+            ret.assign(selected_volume_idxs.begin(), selected_volume_idxs.end());
+        }
+        return ret;
+    };
+
+    ModelInstanceEPrintVolumeState overall_state = ModelInstancePVS_Inside;
+    bool contained_min_one = false;
+
+    const std::vector<unsigned int> volumes_idxs = volumes_to_process_idxs();
+
+    for (unsigned int vol_idx : volumes_idxs) {
+        GLVolume* volume = m_volumes.volumes[vol_idx];
+        if (!volume->is_modifier && (volume->shader_outside_printer_detection_enabled || (!volume->is_wipe_tower && volume->composite_id.volume_id >= 0))) {
+            BuildVolume::ObjectState state;
+            if (volume_below(*volume))
+                state = BuildVolume::ObjectState::Below;
+            else {
+                switch (build_volume.type()) {
+                case BuildVolume::Type::Rectangle:
+                    //FIXME this test does not evaluate collision of a build volume bounding box with non-convex objects.
+                    state = build_volume.volume_state_bbox(volume_bbox(*volume));
+                    break;
+                case BuildVolume::Type::Circle:
+                case BuildVolume::Type::Convex:
+                    //FIXME doing test on convex hull until we learn to do test on non-convex polygons efficiently.
+                case BuildVolume::Type::Custom:
+                    state = build_volume.object_state(volume_convex_mesh(*volume).its, volume->world_matrix().cast<float>(), volume_sinking(*volume));
+                    break;
+                default:
+                    // Ignore, don't produce any collision.
+                    state = BuildVolume::ObjectState::Inside;
+                    break;
+                }
+                assert(state != BuildVolume::ObjectState::Below);
+            }
+            volume->is_outside = state != BuildVolume::ObjectState::Inside;
+            if (volume->printable) {
+                if (overall_state == ModelInstancePVS_Inside && volume->is_outside)
+                    overall_state = ModelInstancePVS_Fully_Outside;
+                if (overall_state == ModelInstancePVS_Fully_Outside && volume->is_outside && state == BuildVolume::ObjectState::Colliding)
+                    overall_state = ModelInstancePVS_Partly_Outside;
+                contained_min_one |= !volume->is_outside;
+            }
+        }
+    }
+
+    if (out_state != nullptr)
+        *out_state = overall_state;
+
+    return contained_min_one;
 }
 
 void GLCanvas3D::toggle_sla_auxiliaries_visibility(bool visible, const ModelObject* mo, int instance_idx)
@@ -2520,7 +2594,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     // checks for geometry outside the print volume to render it accordingly
     if (!m_volumes.empty()) {
         ModelInstanceEPrintVolumeState state;
-        const bool contained_min_one = m_volumes.check_outside_state(m_bed.build_volume(), &state);
+        const bool contained_min_one = check_volumes_outside_state(m_bed.build_volume(), &state);
         const bool partlyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Partly_Outside);
         const bool fullyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Fully_Outside);
 
@@ -6044,7 +6118,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
         }
         }
         if (m_requires_check_outside_state) {
-            m_volumes.check_outside_state(build_volume, nullptr);
+            check_volumes_outside_state(build_volume, nullptr);
             m_requires_check_outside_state = false;
         }
     }
