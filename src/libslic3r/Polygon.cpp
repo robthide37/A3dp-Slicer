@@ -4,6 +4,8 @@
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 
+#include <ankerl/unordered_dense.h>
+
 namespace Slic3r {
 
 double Polygon::length() const
@@ -400,14 +402,32 @@ bool has_duplicate_points(const Polygons &polys)
 {
 #if 1
     // Check globally.
-    size_t cnt = 0;
-    for (const Polygon &poly : polys)
-        cnt += poly.points.size();
+#if 0
+    // Detect duplicates by sorting with quicksort. It is quite fast, but ankerl::unordered_dense is around 1/4 faster.
     std::vector<Point> allpts;
-    allpts.reserve(cnt);
+    allpts.reserve(count_points(polys));
     for (const Polygon &poly : polys)
         allpts.insert(allpts.end(), poly.points.begin(), poly.points.end());
     return has_duplicate_points(std::move(allpts));
+#else
+    // Detect duplicates by inserting into an ankerl::unordered_dense hash set, which is is around 1/4 faster than qsort.
+    struct PointHash {
+        uint64_t operator()(const Point &p) const noexcept {
+            uint64_t h;
+            static_assert(sizeof(h) == sizeof(p));
+            memcpy(&h, &p, sizeof(p));
+            return ankerl::unordered_dense::detail::wyhash::hash(h);
+        }
+    };
+    ankerl::unordered_dense::set<Point, PointHash> allpts;
+    allpts.reserve(count_points(polys));
+    for (const Polygon &poly : polys)
+        for (const Point &pt : poly.points)
+        if (! allpts.insert(pt).second)
+            // Duplicate point was discovered.
+            return true;
+    return false;
+#endif
 #else
     // Check per contour.
     for (const Polygon &poly : polys)
