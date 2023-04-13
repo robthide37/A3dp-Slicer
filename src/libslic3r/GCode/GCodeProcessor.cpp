@@ -3566,7 +3566,7 @@ void GCodeProcessor::post_process()
                 ++m_curr_g1_id;
             }
 
-            if (it != init_it || m_curr_g1_id == 0)
+            if ((it != m_machine.g1_times_cache.end() && it != init_it) || m_curr_g1_id == 0)
                 m_time = it->elapsed_time;
         }
 
