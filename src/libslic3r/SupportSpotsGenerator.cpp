@@ -212,7 +212,7 @@ float estimate_curled_up_height(
     float distance, float curvature, float layer_height, float flow_width, float prev_line_curled_height, Params params)
 {
     float curled_up_height = 0;
-    if (fabs(distance) < 2.5 * flow_width) {
+    if (fabs(distance) < 3.0 * flow_width) {
         curled_up_height = std::max(prev_line_curled_height - layer_height * 0.75f, 0.0f);
     }
 

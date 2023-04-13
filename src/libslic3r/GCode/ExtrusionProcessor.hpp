@@ -21,6 +21,7 @@
 #include <iterator>
 #include <limits>
 #include <numeric>
+#include <ostream>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -268,22 +269,22 @@ public:
         std::vector<ProcessedPoint> processed_points;
         processed_points.reserve(extended_points.size());
         for (size_t i = 0; i < extended_points.size(); i++) {
-            ExtendedPoint &curr = extended_points[i];
+            const ExtendedPoint &curr = extended_points[i];
             const ExtendedPoint &next = extended_points[i + 1 < extended_points.size() ? i + 1 : i];
 
-            // We are going to enforce slowdown over curled extrusions by increasing the point distance. The overhang speed is based on
-            // signed distance from the prev layer, where 0 means fully overlapping extrusions and thus no slowdown, while extrusion_width
-            // and more means full overhang, thus full slowdown. However, for curling, we take unsinged distance from the curled lines and
-            // artifically modifiy the distance
+            float artificial_distance_to_curled_lines = 0.0;
             {
-                Vec2d middle = 0.5 * (curr.position + next.position);
-                auto [distance_from_curled, line_idx,
-                      p]     = prev_curled_extrusions[current_object].distance_from_lines_extra<false>(Point::new_scale(middle));
-                if (distance_from_curled < scale_(2.5 * path.width)) {
-                    float artificially_increased_distance = path.width * (1.0 - (unscaled(distance_from_curled) / (2.5 * path.width))) *
-                                                            (prev_curled_extrusions[current_object].get_line(line_idx).curled_height /
-                                                             (path.height * 10.0f)); // max_curled_height_factor from SupportSpotGenerator
-                    curr.distance = std::max(curr.distance, artificially_increased_distance);
+                Vec2d middle       = 0.5 * (curr.position + next.position);
+                auto  line_indices = prev_curled_extrusions[current_object].all_lines_in_radius(Point::new_scale(middle),
+                                                                                                scale_(10.0 * path.width));
+
+                for (size_t idx : line_indices) {
+                    const CurledLine &line                 = prev_curled_extrusions[current_object].get_line(idx);
+                    float             distance_from_curled = unscaled(line_alg::distance_to(line, Point::new_scale(middle)));
+                    float             dist                 = path.width * (1.0 - (distance_from_curled / (10.0 * path.width))) *
+                                 (1.0 - (distance_from_curled / (10.0 * path.width))) *
+                                 (line.curled_height / (path.height * 10.0f)); // max_curled_height_factor from SupportSpotGenerator
+                    artificial_distance_to_curled_lines = std::max(artificial_distance_to_curled_lines, dist);
                 }
             }
 
@@ -301,12 +302,14 @@ public:
                 return (1.0f - t) * lower_dist->second + t * upper_dist->second;
             };
 
-            float extrusion_speed = std::min(interpolate_speed(speed_sections, curr.distance),
-                                             interpolate_speed(speed_sections, next.distance));
-            float fan_speed       = std::min(interpolate_speed(fan_speed_sections, curr.distance),
-                                             interpolate_speed(fan_speed_sections, next.distance));
+            float extrusion_speed   = std::min(interpolate_speed(speed_sections, curr.distance),
+                                               interpolate_speed(speed_sections, next.distance));
+            float curled_base_speed = interpolate_speed(speed_sections, artificial_distance_to_curled_lines);
+            float final_speed       = std::min(curled_base_speed, extrusion_speed);
+            float fan_speed         = std::min(interpolate_speed(fan_speed_sections, curr.distance),
+                                               interpolate_speed(fan_speed_sections, next.distance));
 
-            processed_points.push_back({scaled(curr.position), extrusion_speed, int(fan_speed)});
+            processed_points.push_back({scaled(curr.position), final_speed, int(fan_speed)});
         }
         return processed_points;
     }
