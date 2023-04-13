@@ -265,30 +265,27 @@ public:
         std::vector<ExtendedPoint> extended_points =
             estimate_points_properties<true, true, true, true>(path.polyline.points, prev_layer_boundaries[current_object], path.width);
 
-        for (size_t i = 0; i < int(extended_points.size()) - 1; i++) {
-            ExtendedPoint& ep = extended_points[i];
+        std::vector<ProcessedPoint> processed_points;
+        processed_points.reserve(extended_points.size());
+        for (size_t i = 0; i < extended_points.size(); i++) {
+            ExtendedPoint &curr = extended_points[i];
+            const ExtendedPoint &next = extended_points[i + 1 < extended_points.size() ? i + 1 : i];
+
             // We are going to enforce slowdown over curled extrusions by increasing the point distance. The overhang speed is based on
             // signed distance from the prev layer, where 0 means fully overlapping extrusions and thus no slowdown, while extrusion_width
             // and more means full overhang, thus full slowdown. However, for curling, we take unsinged distance from the curled lines and
             // artifically modifiy the distance
-            Vec2d middle = 0.5 * (ep.position + extended_points[i + 1].position);
-            auto [distance_from_curled, line_idx,
-                  p]     = prev_curled_extrusions[current_object].distance_from_lines_extra<false>(Point::new_scale(middle));
-            if (distance_from_curled < scale_(2.0 * path.width)) {
-                float artificially_increased_distance = path.width *
-                                                        (1.0 - (unscaled(distance_from_curled) / (2.0 * path.width)) *
-                                                                   (unscaled(distance_from_curled) / (2.0 * path.width))) *
-                                                        (prev_curled_extrusions[current_object].get_line(line_idx).curled_height /
-                                                         (path.height * 10.0f)); // max_curled_height_factor from SupportSpotGenerator
-                ep.distance = std::max(ep.distance, artificially_increased_distance);
+            {
+                Vec2d middle = 0.5 * (curr.position + next.position);
+                auto [distance_from_curled, line_idx,
+                      p]     = prev_curled_extrusions[current_object].distance_from_lines_extra<false>(Point::new_scale(middle));
+                if (distance_from_curled < scale_(2.5 * path.width)) {
+                    float artificially_increased_distance = path.width * (1.0 - (unscaled(distance_from_curled) / (2.5 * path.width))) *
+                                                            (prev_curled_extrusions[current_object].get_line(line_idx).curled_height /
+                                                             (path.height * 10.0f)); // max_curled_height_factor from SupportSpotGenerator
+                    curr.distance = std::max(curr.distance, artificially_increased_distance);
+                }
             }
-        }
-
-        std::vector<ProcessedPoint> processed_points;
-        processed_points.reserve(extended_points.size());
-        for (size_t i = 0; i < extended_points.size(); i++) {
-            const ExtendedPoint &curr = extended_points[i];
-            const ExtendedPoint &next = extended_points[i + 1 < extended_points.size() ? i + 1 : i];
 
             auto interpolate_speed = [](const std::map<float, float> &values, float distance) {
                 auto upper_dist = values.lower_bound(distance);

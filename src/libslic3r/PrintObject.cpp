@@ -491,7 +491,9 @@ void PrintObject::generate_support_material()
 void PrintObject::estimate_curled_extrusions()
 {
     if (this->set_started(posEstimateCurledExtrusions)) {
-        if (this->print()->config().avoid_crossing_curled_overhangs) {
+        if (this->print()->config().avoid_crossing_curled_overhangs ||
+            std::any_of(this->print()->m_print_regions.begin(), this->print()->m_print_regions.end(),
+                        [](const PrintRegion *region) { return region->config().enable_dynamic_overhang_speeds.getBool(); })) {
             BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - start";
             m_print->set_status(88, _u8L("Estimating curled extrusions"));
 
