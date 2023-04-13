@@ -1827,6 +1827,7 @@ struct Plater::priv
     const Selection& get_selection() const;
     Selection& get_selection();
     int get_selected_object_idx() const;
+    int get_selected_instance_idx() const;
     int get_selected_volume_idx() const;
     void selection_changed();
     void object_list_changed();
@@ -2965,6 +2966,17 @@ int Plater::priv::get_selected_object_idx() const
 {
     const int idx = get_selection().get_object_idx();
     return (0 <= idx && idx < int(model.objects.size())) ? idx : -1;
+}
+
+int Plater::priv::get_selected_instance_idx() const
+{
+    const int obj_idx = get_selected_object_idx();
+    if (obj_idx >= 0) {
+        const int inst_idx = get_selection().get_instance_idx();
+        return (0 <= inst_idx && inst_idx < int(model.objects[obj_idx]->instances.size())) ? inst_idx : -1;
+    }
+    else
+        return -1;
 }
 
 int Plater::priv::get_selected_volume_idx() const
@@ -6062,7 +6074,8 @@ void Plater::increase_instances(size_t num, int obj_idx/* = -1*/)
     }
 
     ModelObject* model_object = p->model.objects[obj_idx];
-    ModelInstance* model_instance = model_object->instances.back();
+    const int inst_idx = p->get_selected_instance_idx();
+    ModelInstance* model_instance = (inst_idx >= 0) ? model_object->instances[inst_idx] : model_object->instances.back();
 
     bool was_one_instance = model_object->instances.size()==1;
 
