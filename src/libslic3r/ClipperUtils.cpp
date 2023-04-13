@@ -1,6 +1,7 @@
 #include "ClipperUtils.hpp"
 #include "Geometry.hpp"
 #include "ShortestPath.hpp"
+#include "Utils.hpp"
 
 // #define CLIPPER_UTILS_DEBUG
 
@@ -1167,34 +1168,45 @@ ClipperLib::Path mittered_offset_path_scaled(const Points &contour, const std::v
 	return out;
 }
 
-Polygons variable_offset_inner(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit)
+static void variable_offset_inner_raw(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit, ClipperLib::Paths &contours, ClipperLib::Paths &holes)
 {
 #ifndef NDEBUG
-	// Verify that the deltas are all non positive.
-	for (const std::vector<float> &ds : deltas)
-		for (float delta : ds)
-			assert(delta <= 0.);
-	assert(expoly.holes.size() + 1 == deltas.size());
+    // Verify that the deltas are all non positive.
+    for (const std::vector<float> &ds : deltas)
+        for (float delta : ds)
+            assert(delta <= 0.);
+    assert(expoly.holes.size() + 1 == deltas.size());
+    assert(ClipperLib::Area(expoly.contour.points) > 0.);
+    for (auto &h : expoly.holes)
+        assert(ClipperLib::Area(h.points) < 0.);
 #endif /* NDEBUG */
 
-	// 1) Offset the outer contour.
-	ClipperLib::Paths contours = fix_after_inner_offset(mittered_offset_path_scaled(expoly.contour.points, deltas.front(), miter_limit), ClipperLib::pftNegative, true);
-#ifndef NDEBUG	
-	for (auto &c : contours)
-		assert(ClipperLib::Area(c) > 0.);
+    // 1) Offset the outer contour.
+    contours = fix_after_inner_offset(mittered_offset_path_scaled(expoly.contour.points, deltas.front(), miter_limit), ClipperLib::pftNegative, true);
+#ifndef NDEBUG
+    // Shrinking a contour may split it into pieces, but never create a new hole inside the contour.
+    for (auto &c : contours)
+        assert(ClipperLib::Area(c) > 0.);
 #endif /* NDEBUG */
 
-	// 2) Offset the holes one by one, collect the results.
-	ClipperLib::Paths holes;
-	holes.reserve(expoly.holes.size());
-	for (const Polygon& hole : expoly.holes)
-		append(holes, fix_after_outer_offset(mittered_offset_path_scaled(hole.points, deltas[1 + &hole - expoly.holes.data()], miter_limit), ClipperLib::pftNegative, false));
-#ifndef NDEBUG	
-	for (auto &c : holes)
-		assert(ClipperLib::Area(c) > 0.);
+    // 2) Offset the holes one by one, collect the results.
+    holes.reserve(expoly.holes.size());
+    for (const Polygon &hole : expoly.holes)
+        append(holes, fix_after_outer_offset(mittered_offset_path_scaled(hole.points, deltas[1 + &hole - expoly.holes.data()], miter_limit), ClipperLib::pftNegative, false));
+#ifndef NDEBUG
+    // Offsetting a hole curve of a C shape may close the C into a ring with a new hole inside, thus creating a hole inside a hole shape, thus a hole will be created with negative area
+    // and the following test will fail.
+//    for (auto &c : holes)
+//        assert(ClipperLib::Area(c) > 0.);
 #endif /* NDEBUG */
+}
 
-	// 3) Subtract holes from the contours.
+Polygons variable_offset_inner(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit)
+{
+    ClipperLib::Paths contours, holes;
+    variable_offset_inner_raw(expoly, deltas, miter_limit, contours, holes);
+
+	// Subtract holes from the contours.
 	ClipperLib::Paths output;
 	if (holes.empty())
 		output = std::move(contours);
@@ -1202,90 +1214,129 @@ Polygons variable_offset_inner(const ExPolygon &expoly, const std::vector<std::v
 		ClipperLib::Clipper clipper;
 		clipper.Clear();
 		clipper.AddPaths(contours, ClipperLib::ptSubject, true);
+        // Holes may contain holes in holes produced by expanding a C hole shape.
+        // The situation is processed correctly by Clipper diff operation.
 		clipper.AddPaths(holes, ClipperLib::ptClip, true);
 		clipper.Execute(ClipperLib::ctDifference, output, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
 	}
 
 	return to_polygons(std::move(output));
+}
+
+ExPolygons variable_offset_inner_ex(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit)
+{
+    ClipperLib::Paths contours, holes;
+    variable_offset_inner_raw(expoly, deltas, miter_limit, contours, holes);
+
+    // Subtract holes from the contours.
+    ExPolygons output;
+    if (holes.empty()) {
+        output.reserve(contours.size());
+        // Shrinking a CCW contour may only produce more CCW contours, but never new holes.
+        for (ClipperLib::Path &path : contours) 
+            output.emplace_back(std::move(path));
+    } else {
+        ClipperLib::Clipper clipper;
+        clipper.AddPaths(contours, ClipperLib::ptSubject, true);
+        // Holes may contain holes in holes produced by expanding a C hole shape.
+        // The situation is processed correctly by Clipper diff operation, producing concentric expolygons.
+        clipper.AddPaths(holes, ClipperLib::ptClip, true);
+        ClipperLib::PolyTree polytree;
+        clipper.Execute(ClipperLib::ctDifference, polytree, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
+        output = PolyTreeToExPolygons(std::move(polytree));
+    }
+
+    return output;
+}
+
+static void variable_offset_outer_raw(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit, ClipperLib::Paths &contours, ClipperLib::Paths &holes)
+{
+#ifndef NDEBUG
+    // Verify that the deltas are all non positive.
+    for (const std::vector<float> &ds : deltas)
+        for (float delta : ds)
+            assert(delta >= 0.);
+    assert(expoly.holes.size() + 1 == deltas.size());
+    assert(ClipperLib::Area(expoly.contour.points) > 0.);
+    for (auto &h : expoly.holes)
+        assert(ClipperLib::Area(h.points) < 0.);
+#endif /* NDEBUG */
+
+    // 1) Offset the outer contour.
+    contours = fix_after_outer_offset(mittered_offset_path_scaled(expoly.contour.points, deltas.front(), miter_limit), ClipperLib::pftPositive, false);
+    // Inflating a contour must not remove it.
+    assert(contours.size() >= 1);
+#ifndef NDEBUG
+    // Offsetting a positive curve of a C shape may close the C into a ring with hole shape, thus a hole will be created with negative area
+    // and the following test will fail.
+//  for (auto &c : contours)
+//      assert(ClipperLib::Area(c) > 0.);
+#endif /* NDEBUG */
+
+    // 2) Offset the holes one by one, collect the results.
+    holes.reserve(expoly.holes.size());
+    for (const Polygon& hole : expoly.holes)
+        append(holes, fix_after_inner_offset(mittered_offset_path_scaled(hole.points, deltas[1 + &hole - expoly.holes.data()], miter_limit), ClipperLib::pftPositive, true));
+#ifndef NDEBUG
+    // Shrinking a hole may split it into pieces, but never create a new hole inside a hole.
+    for (auto &c : holes)
+        assert(ClipperLib::Area(c) > 0.);
+#endif /* NDEBUG */
 }
 
 Polygons variable_offset_outer(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit)
 {
-#ifndef NDEBUG
-	// Verify that the deltas are all non positive.
-for (const std::vector<float>& ds : deltas)
-		for (float delta : ds)
-			assert(delta >= 0.);
-	assert(expoly.holes.size() + 1 == deltas.size());
-#endif /* NDEBUG */
+    ClipperLib::Paths contours, holes;
+    variable_offset_outer_raw(expoly, deltas, miter_limit, contours, holes);
 
-	// 1) Offset the outer contour.
-	ClipperLib::Paths contours = fix_after_outer_offset(mittered_offset_path_scaled(expoly.contour.points, deltas.front(), miter_limit), ClipperLib::pftPositive, false);
-#ifndef NDEBUG
-	for (auto &c : contours)
-		assert(ClipperLib::Area(c) > 0.);
-#endif /* NDEBUG */
+    // Subtract holes from the contours.
+    ClipperLib::Paths output;
+    if (holes.empty())
+        output = std::move(contours);
+    else {
+        //FIXME the difference is not needed as the holes may never intersect with other holes.
+        ClipperLib::Clipper clipper;
+        clipper.Clear();
+        clipper.AddPaths(contours, ClipperLib::ptSubject, true);
+        clipper.AddPaths(holes, ClipperLib::ptClip, true);
+        clipper.Execute(ClipperLib::ctDifference, output, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
+    }
 
-	// 2) Offset the holes one by one, collect the results.
-	ClipperLib::Paths holes;
-	holes.reserve(expoly.holes.size());
-	for (const Polygon& hole : expoly.holes)
-		append(holes, fix_after_inner_offset(mittered_offset_path_scaled(hole.points, deltas[1 + &hole - expoly.holes.data()], miter_limit), ClipperLib::pftPositive, true));
-#ifndef NDEBUG
-	for (auto &c : holes)
-		assert(ClipperLib::Area(c) > 0.);
-#endif /* NDEBUG */
-
-	// 3) Subtract holes from the contours.
-	ClipperLib::Paths output;
-	if (holes.empty())
-		output = std::move(contours);
-	else {
-		ClipperLib::Clipper clipper;
-		clipper.Clear();
-		clipper.AddPaths(contours, ClipperLib::ptSubject, true);
-		clipper.AddPaths(holes, ClipperLib::ptClip, true);
-		clipper.Execute(ClipperLib::ctDifference, output, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
-	}
-
-	return to_polygons(std::move(output));
+    return to_polygons(std::move(output));
 }
 
 ExPolygons variable_offset_outer_ex(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit)
 {
-#ifndef NDEBUG
-	// Verify that the deltas are all non positive.
-for (const std::vector<float>& ds : deltas)
-		for (float delta : ds)
-			assert(delta >= 0.);
-	assert(expoly.holes.size() + 1 == deltas.size());
-#endif /* NDEBUG */
+    ClipperLib::Paths contours, holes;
+    variable_offset_outer_raw(expoly, deltas, miter_limit, contours, holes);
 
-	// 1) Offset the outer contour.
-	ClipperLib::Paths contours = fix_after_outer_offset(mittered_offset_path_scaled(expoly.contour.points, deltas.front(), miter_limit), ClipperLib::pftPositive, false);
-#ifndef NDEBUG
-	for (auto &c : contours)
-		assert(ClipperLib::Area(c) > 0.);
-#endif /* NDEBUG */
-
-	// 2) Offset the holes one by one, collect the results.
-	ClipperLib::Paths holes;
-	holes.reserve(expoly.holes.size());
-	for (const Polygon& hole : expoly.holes)
-		append(holes, fix_after_inner_offset(mittered_offset_path_scaled(hole.points, deltas[1 + &hole - expoly.holes.data()], miter_limit), ClipperLib::pftPositive, true));
-#ifndef NDEBUG
-	for (auto &c : holes)
-		assert(ClipperLib::Area(c) > 0.);
-#endif /* NDEBUG */
-
-	// 3) Subtract holes from the contours.
+	// Subtract holes from the contours.
 	ExPolygons output;
 	if (holes.empty()) {
-		output.reserve(contours.size());
-		for (ClipperLib::Path &path : contours) 
-			output.emplace_back(std::move(path));
+		output.reserve(1);
+        if (contours.size() > 1) {
+            // One expolygon with holes created by closing a C shape. Which is which?
+            output.push_back({});
+            ExPolygon &out = output.back();
+            out.holes.reserve(contours.size() - 1);
+    		for (ClipperLib::Path &path : contours) {
+                if (ClipperLib::Area(path) > 0) {
+                    // Only one contour with positive area is expected to be created by an outer offset of an ExPolygon.
+                    assert(out.contour.empty());
+                    out.contour.points = std::move(path);
+                } else
+                    out.holes.push_back(Polygon{ std::move(path) });
+            }
+        } else {
+            // Single contour must be CCW.
+            assert(contours.size() == 1);
+            assert(ClipperLib::Area(contours.front()) > 0);
+            output.push_back(ExPolygon{ std::move(contours.front()) });
+        }
 	} else {
+        //FIXME the difference is not needed as the holes may never intersect with other holes.
 		ClipperLib::Clipper clipper;
+        // Contours may have holes if they were created by closing a C shape.
 		clipper.AddPaths(contours, ClipperLib::ptSubject, true);
 		clipper.AddPaths(holes, ClipperLib::ptClip, true);
 	    ClipperLib::PolyTree polytree;
@@ -1293,52 +1344,7 @@ for (const std::vector<float>& ds : deltas)
 	    output = PolyTreeToExPolygons(std::move(polytree));
 	}
 
-	return output;
-}
-
-
-ExPolygons variable_offset_inner_ex(const ExPolygon &expoly, const std::vector<std::vector<float>> &deltas, double miter_limit)
-{
-#ifndef NDEBUG
-	// Verify that the deltas are all non positive.
-	for (const std::vector<float>& ds : deltas)
-		for (float delta : ds)
-			assert(delta <= 0.);
-	assert(expoly.holes.size() + 1 == deltas.size());
-#endif /* NDEBUG */
-
-	// 1) Offset the outer contour.
-	ClipperLib::Paths contours = fix_after_inner_offset(mittered_offset_path_scaled(expoly.contour.points, deltas.front(), miter_limit), ClipperLib::pftNegative, true);
-#ifndef NDEBUG
-	for (auto &c : contours)
-		assert(ClipperLib::Area(c) > 0.);
-#endif /* NDEBUG */
-
-	// 2) Offset the holes one by one, collect the results.
-	ClipperLib::Paths holes;
-	holes.reserve(expoly.holes.size());
-	for (const Polygon& hole : expoly.holes)
-		append(holes, fix_after_outer_offset(mittered_offset_path_scaled(hole.points, deltas[1 + &hole - expoly.holes.data()], miter_limit), ClipperLib::pftNegative, false));
-#ifndef NDEBUG
-	for (auto &c : holes)
-		assert(ClipperLib::Area(c) > 0.);
-#endif /* NDEBUG */
-
-	// 3) Subtract holes from the contours.
-	ExPolygons output;
-	if (holes.empty()) {
-		output.reserve(contours.size());
-		for (ClipperLib::Path &path : contours) 
-			output.emplace_back(std::move(path));
-	} else {
-		ClipperLib::Clipper clipper;
-		clipper.AddPaths(contours, ClipperLib::ptSubject, true);
-		clipper.AddPaths(holes, ClipperLib::ptClip, true);
-	    ClipperLib::PolyTree polytree;
-		clipper.Execute(ClipperLib::ctDifference, polytree, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
-	    output = PolyTreeToExPolygons(std::move(polytree));
-	}
-
+    assert(output.size() == 1);
 	return output;
 }
 
