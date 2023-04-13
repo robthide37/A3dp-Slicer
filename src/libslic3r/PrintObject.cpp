@@ -1603,21 +1603,18 @@ void PrintObject::bridge_over_infill()
                          int                layer_index,
                          Polygons           new_polys,
                          const LayerRegion *region,
-                         double             bridge_angle,
-                         bool               supported_by_lightning)
+                         double             bridge_angle)
             : original_surface(original_surface)
             , layer_index(layer_index)
             , new_polys(new_polys)
             , region(region)
             , bridge_angle(bridge_angle)
-            , supported_by_lightning(supported_by_lightning)
         {}
         const Surface     *original_surface;
         int                layer_index;
         Polygons           new_polys;
         const LayerRegion *region;
         double             bridge_angle;
-        bool               supported_by_lightning;
     };
 
     std::map<size_t, std::vector<CandidateSurface>> surfaces_by_layer;
@@ -1677,7 +1674,7 @@ void PrintObject::bridge_over_infill()
                                 }
                             }
                             worth_bridging = intersection(closing(worth_bridging, SCALED_EPSILON), s->expolygon);
-                            candidate_surfaces.push_back(CandidateSurface(s, lidx, worth_bridging, region, 0, contains_only_lightning));
+                            candidate_surfaces.push_back(CandidateSurface(s, lidx, worth_bridging, region, 0));
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
                             debug_draw(std::to_string(lidx) + "_candidate_surface_" + std::to_string(area(s->expolygon)),
@@ -2135,6 +2132,7 @@ void PrintObject::bridge_over_infill()
                 deep_infill_area = expand(deep_infill_area, spacing * 1.5);
 
                 // Now gather expansion polygons - internal infill on current layer, from which we can cut off anchors
+                Polygons lightning_area;
                 Polygons expansion_area;
                 Polygons total_fill_area;
                 for (const LayerRegion *region : layer->regions()) {
@@ -2142,6 +2140,10 @@ void PrintObject::bridge_over_infill()
                     expansion_area.insert(expansion_area.end(), internal_polys.begin(), internal_polys.end());
                     Polygons fill_polys = to_polygons(region->fill_expolygons());
                     total_fill_area.insert(total_fill_area.end(), fill_polys.begin(), fill_polys.end());
+                    if (region->region().config().fill_pattern == ipLightning) {
+                        Polygons l = to_polygons(region->fill_surfaces().filter_by_type(stInternal));
+                        lightning_area.insert(lightning_area.end(), l.begin(), l.end());
+                    }
                 }
                 total_fill_area   = closing(total_fill_area, SCALED_EPSILON);
                 expansion_area    = closing(expansion_area, SCALED_EPSILON);
@@ -2196,7 +2198,7 @@ void PrintObject::bridge_over_infill()
                     }
 
                     boundary_plines.insert(boundary_plines.end(), anchors.begin(), anchors.end());
-                    if (candidate.supported_by_lightning) {
+                    if (!lightning_area.empty() && !intersection(area_to_be_bridge, lightning_area).empty()) {
                         boundary_plines = intersection_pl(boundary_plines, expand(area_to_be_bridge, scale_(10)));
                     }
                     Polygons bridging_area = construct_anchored_polygon(area_to_be_bridge, to_lines(boundary_plines), flow, bridging_angle);
@@ -2229,7 +2231,7 @@ void PrintObject::bridge_over_infill()
 #endif
 
                     expanded_surfaces.push_back(CandidateSurface(candidate.original_surface, candidate.layer_index, bridging_area,
-                                                                 candidate.region, bridging_angle, candidate.supported_by_lightning));
+                                                                 candidate.region, bridging_angle));
                 }
                 surfaces_by_layer[lidx].swap(expanded_surfaces);
                 expanded_surfaces.clear();
