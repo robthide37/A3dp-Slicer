@@ -257,6 +257,8 @@ void TreeModelVolumes::precalculate(const PrintObject& print_object, const coord
             auto it = radius_until_layer.find(r);
             if (it == radius_until_layer.end())
                 radius_until_layer.emplace_hint(it, r, current_layer);
+            else
+                assert(it->second >= current_layer);
         };
         // regular radius
         update_radius_until_layer(ceilRadius(config.getRadius(distance_to_top, 0) + m_current_min_xy_dist_delta));

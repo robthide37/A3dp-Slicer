@@ -70,16 +70,17 @@ TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings& mes
       maximum_move_distance_slow((angle_slow < M_PI / 2.) ? (coord_t)(tan(angle_slow) * layer_height) : std::numeric_limits<coord_t>::max()),
       support_bottom_layers(mesh_group_settings.support_bottom_enable ? (mesh_group_settings.support_bottom_height + layer_height / 2) / layer_height : 0),
       tip_layers(std::max((branch_radius - min_radius) / (support_line_width / 3), branch_radius / layer_height)), // Ensure lines always stack nicely even if layer height is large
-      diameter_angle_scale_factor(sin(mesh_group_settings.support_tree_branch_diameter_angle) * layer_height / branch_radius),
+      branch_radius_increase_per_layer(tan(mesh_group_settings.support_tree_branch_diameter_angle) * layer_height),
       max_to_model_radius_increase(mesh_group_settings.support_tree_max_diameter_increase_by_merges_when_support_to_model / 2),
       min_dtt_to_model(round_up_divide(mesh_group_settings.support_tree_min_height_to_model, layer_height)),
       increase_radius_until_radius(mesh_group_settings.support_tree_branch_diameter / 2),
-      increase_radius_until_layer(increase_radius_until_radius <= branch_radius ? tip_layers * (increase_radius_until_radius / branch_radius) : (increase_radius_until_radius - branch_radius) / (branch_radius * diameter_angle_scale_factor)),
+      increase_radius_until_layer(increase_radius_until_radius <= branch_radius ? tip_layers * (increase_radius_until_radius / branch_radius) : (increase_radius_until_radius - branch_radius) / branch_radius_increase_per_layer),
       support_rests_on_model(! mesh_group_settings.support_material_buildplate_only),
       xy_distance(mesh_group_settings.support_xy_distance),
       xy_min_distance(std::min(mesh_group_settings.support_xy_distance, mesh_group_settings.support_xy_distance_overhang)),
       bp_radius(mesh_group_settings.support_tree_bp_diameter / 2),
-      diameter_scale_bp_radius(std::min(sin(0.7) * layer_height / branch_radius, 1.0 / (branch_radius / (support_line_width / 2.0)))), // Either 40? or as much as possible so that 2 lines will overlap by at least 50%, whichever is smaller.
+      // Increase by half a line overlap, but not faster than 40 degrees angle (0 degrees means zero increase in radius).
+      bp_radius_increase_per_layer(std::min(tan(0.7) * layer_height, 0.5 * support_line_width)),
       z_distance_bottom_layers(size_t(round(double(mesh_group_settings.support_bottom_distance) / double(layer_height)))),
       z_distance_top_layers(size_t(round(double(mesh_group_settings.support_top_distance) / double(layer_height)))),
       performance_interface_skip_layers(round_up_divide(mesh_group_settings.support_interface_skip_height, layer_height)),
@@ -96,7 +97,7 @@ TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings& mes
       settings(mesh_group_settings),
       min_feature_size(mesh_group_settings.min_feature_size)
 {
-    layer_start_bp_radius = (bp_radius - branch_radius) / (branch_radius * diameter_scale_bp_radius);
+    layer_start_bp_radius = (bp_radius - branch_radius) / bp_radius_increase_per_layer;
 
     if (TreeSupportSettings::soluble) {
         // safeOffsetInc can only work in steps of the size xy_min_distance in the worst case => xy_min_distance has to be a bit larger than 0 in this worst case and should be large enough for performance to not suffer extremely
@@ -1857,7 +1858,7 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
         }
         radius = config.getCollisionRadius(current_elem);
 
-        const coord_t foot_radius_increase = config.branch_radius * (std::max(config.diameter_scale_bp_radius - config.diameter_angle_scale_factor, 0.0));
+        const coord_t foot_radius_increase = std::max(config.bp_radius_increase_per_layer - config.branch_radius_increase_per_layer, 0.0);
         // Is nearly all of the time 1, but sometimes an increase of 1 could cause the radius to become bigger than recommendedMinRadius, 
         // which could cause the radius to become bigger than precalculated.
         double planned_foot_increase = std::min(1.0, double(config.recommendedMinRadius(layer_idx - 1) - config.getRadius(current_elem)) / foot_radius_increase);
@@ -2015,9 +2016,9 @@ static void increase_areas_one_layer(
                 config.recommendedMinRadius(layer_idx - 1) < config.getRadius(elem.effective_radius_height + 1, elem.elephant_foot_increases)) {
                 // can guarantee elephant foot radius increase
                 if (ceiled_parent_radius == volumes.ceilRadius(config.getRadius(parent.state.effective_radius_height + 1, parent.state.elephant_foot_increases + 1), parent.state.use_min_xy_dist))
-                    extra_speed += config.branch_radius * config.diameter_scale_bp_radius;
+                    extra_speed += config.bp_radius_increase_per_layer;
                 else
-                    extra_slow_speed += std::min(coord_t(config.branch_radius * config.diameter_scale_bp_radius), 
+                    extra_slow_speed += std::min(coord_t(config.bp_radius_increase_per_layer),
                                                  config.maximum_move_distance - (config.maximum_move_distance_slow + extra_slow_speed));
             }
 
@@ -2236,11 +2237,11 @@ static void increase_areas_one_layer(
     out.to_model_gracious = first.to_model_gracious && second.to_model_gracious; // valid as we do not merge non-gracious with gracious
 
     out.elephant_foot_increases = 0;
-    if (config.diameter_scale_bp_radius > 0) {
+    if (config.bp_radius_increase_per_layer > 0) {
         coord_t foot_increase_radius = std::abs(std::max(config.getCollisionRadius(second), config.getCollisionRadius(first)) - config.getCollisionRadius(out));
         // elephant_foot_increases has to be recalculated, as when a smaller tree with a larger elephant_foot_increases merge with a larger branch 
         // the elephant_foot_increases may have to be lower as otherwise the radius suddenly increases. This results often in a non integer value.
-        out.elephant_foot_increases = foot_increase_radius / (config.branch_radius * (config.diameter_scale_bp_radius - config.diameter_angle_scale_factor));
+        out.elephant_foot_increases = foot_increase_radius / (config.bp_radius_increase_per_layer - config.branch_radius_increase_per_layer);
     }
 
     // set last settings to the best out of both parents. If this is wrong, it will only cause a small performance penalty instead of weird behavior.
