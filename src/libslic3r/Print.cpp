@@ -518,8 +518,12 @@ std::string Print::validate(std::string* warning) const
         //FIXME It is quite expensive to generate object layers just to get the print height!
         if (auto layers = generate_object_layers(print_object.slicing_parameters(), layer_height_profile(print_object_idx));
             ! layers.empty() && layers.back() > this->config().max_print_height + EPSILON) {
-            return _u8L("The print is taller than the maximum allowed height. You might want to reduce the size of your model"
-                     " or change current print settings and retry.");
+            return
+                // Test whether the last slicing plane is below or above the print volume.
+                0.5 * (layers[layers.size() - 2] + layers.back()) > this->config().max_print_height + EPSILON ?
+                format(_u8L("The object %1% exceeds the maximum build volume height."), print_object.model_object()->name) :
+                format(_u8L("While the object %1% itself fits the build volume, its last layer exceeds the maximum build volume height."), print_object.model_object()->name) +
+                " " + _u8L("You might want to reduce the size of your model or change current print settings and retry.");
         }
     }
 
