@@ -2908,7 +2908,8 @@ void PrintConfigDef::init_fff_params()
     // TRN PrintSettings: "Organic supports" > "Tip Diameter"
     def->tooltip = L("Branch tip diameter for organic supports.");
     def->sidetext = L("mm");
-    def->min = 0;
+    def->min = 0.1f;
+    def->max = 100.f;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.8));
 
@@ -2919,7 +2920,8 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("The diameter of the thinnest branches of organic support. Thicker branches are more sturdy. "
                      "Branches towards the base will be thicker than this.");
     def->sidetext = L("mm");
-    def->min = 0;
+    def->min = 0.1f;
+    def->max = 100.f;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(2));
 
