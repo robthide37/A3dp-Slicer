@@ -135,7 +135,11 @@ void GLGizmoSlaBase::render_volumes()
     const Camera& camera = wxGetApp().plater()->get_camera();
 
     ClippingPlane clipping_plane = (m_c->object_clipper()->get_position() == 0.0) ? ClippingPlane::ClipsNothing() : *m_c->object_clipper()->get_clipping_plane();
-    clipping_plane.set_normal(-clipping_plane.get_normal());
+    if (m_c->object_clipper()->get_position() != 0.0)
+        clipping_plane.set_normal(-clipping_plane.get_normal());
+    else
+        // on Linux the clipping plane does not work when using DBL_MAX
+        clipping_plane.set_offset(FLT_MAX);
     m_volumes.set_clipping_plane(clipping_plane.get_data());
 
     for (GLVolume* v : m_volumes.volumes) {

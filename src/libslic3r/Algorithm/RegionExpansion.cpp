@@ -206,7 +206,7 @@ std::vector<WaveSeed> wave_seeds(
 {
     assert(tiny_expansion > 0);
 
-    if (src.empty())
+    if (src.empty() || boundary.empty())
         return {};
 
     using Intersection  = ClipperZUtils::ClipperZIntersectionVisitor::Intersection;

@@ -60,7 +60,10 @@ void Layer::make_slices()
 }
 
 // used by Layer::build_up_down_graph()
-[[nodiscard]] static ClipperLib_Z::Paths expolygons_to_zpaths(const ExPolygons &expolygons, coord_t isrc)
+// Shrink source polygons one by one, so that they will be separated if they were touching
+// at vertices (non-manifold situation).
+// Then convert them to Z-paths with Z coordinate indicating index of the source expolygon.
+[[nodiscard]] static ClipperLib_Z::Paths expolygons_to_zpaths_shrunk(const ExPolygons &expolygons, coord_t isrc)
 {
     size_t num_paths = 0;
     for (const ExPolygon &expolygon : expolygons)
@@ -69,14 +72,49 @@ void Layer::make_slices()
     ClipperLib_Z::Paths out;
     out.reserve(num_paths);
 
-    for (const ExPolygon &expolygon : expolygons) {
-        for (size_t icontour = 0; icontour < expolygon.num_contours(); ++ icontour) {
-            const Polygon &contour = expolygon.contour_or_hole(icontour);
-            out.emplace_back();
-            ClipperLib_Z::Path &path = out.back();
-            path.reserve(contour.size());
-            for (const Point &p : contour.points)
-                path.push_back({ p.x(), p.y(), isrc });
+    ClipperLib::Paths           contours;
+    ClipperLib::Paths           holes;
+    ClipperLib::Clipper         clipper;
+    ClipperLib::ClipperOffset   co;
+    ClipperLib::Paths           out2;
+
+    static constexpr const float delta = ClipperSafetyOffset; // *10.f;
+    co.MiterLimit = scaled<double>(3.);
+// Use the default zero edge merging distance. For this kind of safety offset the accuracy of normal direction is not important.
+//    co.ShortestEdgeLength = delta * ClipperOffsetShortestEdgeFactor;
+
+    for (const ExPolygon &expoly : expolygons) {
+        contours.clear();
+        co.Clear();
+        co.AddPath(expoly.contour.points, ClipperLib::jtMiter, ClipperLib::etClosedPolygon);
+        co.Execute(contours, - delta);
+        if (! contours.empty()) {
+            holes.clear();
+            for (const Polygon &hole : expoly.holes) {
+                co.Clear();
+                co.AddPath(hole.points, ClipperLib::jtMiter, ClipperLib::etClosedPolygon);
+                // Execute reorients the contours so that the outer most contour has a positive area. Thus the output
+                // contours will be CCW oriented even though the input paths are CW oriented.
+                // Offset is applied after contour reorientation, thus the signum of the offset value is reversed.
+                out2.clear();
+                co.Execute(out2, delta);
+                append(holes, std::move(out2));
+            }
+            // Subtract holes from the contours.
+            if (! holes.empty()) {
+                clipper.Clear();
+                clipper.AddPaths(contours, ClipperLib::ptSubject, true);
+                clipper.AddPaths(holes, ClipperLib::ptClip, true);
+                contours.clear();
+                clipper.Execute(ClipperLib::ctDifference, contours, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
+            }
+            for (const auto &contour : contours) {
+                out.emplace_back();
+                ClipperLib_Z::Path &path = out.back();
+                path.reserve(contour.size());
+                for (const Point &p : contour)
+                    path.push_back({ p.x(), p.y(), isrc });
+            }
         }
         ++ isrc;
     }
@@ -183,6 +221,10 @@ static void connect_layer_slices(
                                 break;
                             }
                         }
+                        //FIXME remove the following block one day, it should not be needed.
+                        // The following shall not happen now as the source expolygons are being shrunk a bit before intersecting,
+                        // thus each point of each intersection polygon should fit completely inside one of the original (unshrunk) expolygons.
+                        assert(found);
                         if (!found) {
                             // The check above might sometimes fail when the polygons overlap only on points, which causes the clipper to detect no intersection.
                             // The problem happens rarely, mostly on simple polygons (in terms of number of points), but regardless of size!
@@ -191,10 +233,7 @@ static void connect_layer_slices(
                             // layer B = Polygon{(-24877897,-11100524),(-22504249,-8726874),(-22504249,11477151),(-23244827,12218916),(-23752371,12727276),(-25002495,12727276),(-27502745,10227026),(-27502745,-12727274),(-26504645,-12727274)}
                             // note that first point is not identical, and the check above picks (-24877897,-11100524) as the first contour point (polynode.Contour.front()).
                             // that point is sadly slightly outisde of the layer A, so no link is detected, eventhough they are overlaping "completely"
-                            Polygon contour_poly;
-                            for (const auto& p : polynode.Contour) {
-                                contour_poly.points.emplace_back(p.x(), p.y());
-                            }
+                            Polygon contour_poly(ClipperZUtils::from_zpath(polynode.Contour));
                             BoundingBox contour_aabb{contour_poly.points};
                             for (int l = int(m_above.lslices_ex.size()) - 1; l >= 0; --l) {
                                 LayerSlice &lslice = m_above.lslices_ex[l];
@@ -222,11 +261,11 @@ static void connect_layer_slices(
                                 break;
                             }
                         }
+                        //FIXME remove the following block one day, it should not be needed.
+                        // The following shall not happen now as the source expolygons are being shrunk a bit before intersecting,
+                        // thus each point of each intersection polygon should fit completely inside one of the original (unshrunk) expolygons.
                         if (!found) { // Explanation for aditional check is above.
-                            Polygon contour_poly;
-                            for (const auto &p : polynode.Contour) {
-                                contour_poly.points.emplace_back(p.x(), p.y());
-                            }
+                            Polygon contour_poly(ClipperZUtils::from_zpath(polynode.Contour));
                             BoundingBox contour_aabb{contour_poly.points};
                             for (int l = int(m_below.lslices_ex.size()) - 1; l >= 0; --l) {
                                 LayerSlice &lslice = m_below.lslices_ex[l];
@@ -249,6 +288,8 @@ static void connect_layer_slices(
                     found = true;
                 }
                 if (found) {
+                    assert(i >= 0 && i < m_below.lslices_ex.size());
+                    assert(j >= 0 && j < m_above.lslices_ex.size());
                     // Subtract area of holes from the area of outer contour.
                     double area = ClipperLib_Z::Area(polynode.Contour);
                     for (int icontour = 0; icontour < polynode.ChildCount(); ++ icontour)
@@ -340,9 +381,9 @@ static void connect_layer_slices(
 void Layer::build_up_down_graph(Layer& below, Layer& above)
 {
     coord_t             paths_below_offset = 0;
-    ClipperLib_Z::Paths paths_below = expolygons_to_zpaths(below.lslices, paths_below_offset);
+    ClipperLib_Z::Paths paths_below = expolygons_to_zpaths_shrunk(below.lslices, paths_below_offset);
     coord_t             paths_above_offset = paths_below_offset + coord_t(below.lslices.size());
-    ClipperLib_Z::Paths paths_above = expolygons_to_zpaths(above.lslices, paths_above_offset);
+    ClipperLib_Z::Paths paths_above = expolygons_to_zpaths_shrunk(above.lslices, paths_above_offset);
 #ifndef NDEBUG
     coord_t             paths_end = paths_above_offset + coord_t(above.lslices.size());
 #endif // NDEBUG

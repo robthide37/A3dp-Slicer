@@ -19,6 +19,7 @@
 #include "AstroBox.hpp"
 #include "Repetier.hpp"
 #include "MKS.hpp"
+#include "Mainsail.hpp"
 #include "../GUI/PrintHostDialogs.hpp"
 
 namespace fs = boost::filesystem;
