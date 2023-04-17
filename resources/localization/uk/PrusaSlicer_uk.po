@@ -3,16 +3,16 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-05-18 15:00+0200\n"
-"PO-Revision-Date: 2021-02-03 17:15+0100\n"
+"PO-Revision-Date: 2023-04-17 12:57+0300\n"
 "Last-Translator: Oleksandra Iushchenko <yusanka@gmail.com>\n"
 "Language-Team: \n"
 "Language: uk\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 2.4.2\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
-"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
+"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"X-Generator: Poedit 3.2.2\n"
 
 #: src/slic3r/GUI/AboutDialog.cpp:46 src/slic3r/GUI/AboutDialog.cpp:304
 msgid "Portions copyright"
@@ -1130,7 +1130,7 @@ msgstr ""
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1883
 msgid "Enter the diameter of your filament."
-msgstr "Введіть діаметр вашого філаметну."
+msgstr "Введіть діаметр вашого філаменту."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1884
 msgid ""
@@ -1189,7 +1189,7 @@ msgstr ""
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1979
 msgid "Bed Temperature"
-msgstr ""
+msgstr "Температура столу"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:2452 src/slic3r/GUI/ConfigWizard.cpp:3409
 msgid "SLA Materials"
@@ -1835,7 +1835,7 @@ msgstr ""
 #: src/slic3r/GUI/GUI_ObjectList.cpp:4895
 #: src/slic3r/GUI/ObjectDataViewModel.cpp:259 src/libslic3r/PrintConfig.cpp:892
 msgid "default"
-msgstr "за замовчанням"
+msgstr "за замовчуванням"
 
 #: src/slic3r/GUI/ExtruderSequenceDialog.cpp:26
 msgid "Set extruder sequence"
@@ -1883,7 +1883,7 @@ msgstr "Додати екструдер до послідовності"
 
 #: src/slic3r/GUI/Field.cpp:188
 msgid "default value"
-msgstr "значення за замовчанням"
+msgstr "значення за замовчуванням"
 
 #: src/slic3r/GUI/Field.cpp:191
 msgid "parameter name"
@@ -7946,15 +7946,15 @@ msgstr "Інформація з нарізання"
 
 #: src/slic3r/GUI/Plater.cpp:308 src/slic3r/GUI/Plater.cpp:1411
 msgid "Used Filament (g)"
-msgstr "Використано філаметну (г)"
+msgstr "Використано філаменту (г)"
 
 #: src/slic3r/GUI/Plater.cpp:309 src/slic3r/GUI/Plater.cpp:1392
 msgid "Used Filament (m)"
-msgstr "Використано філаметну (м)"
+msgstr "Використано філаменту (м)"
 
 #: src/slic3r/GUI/Plater.cpp:310 src/slic3r/GUI/Plater.cpp:1404
 msgid "Used Filament (mm³)"
-msgstr "Використано філаметну (мм³)"
+msgstr "Використано філаменту (мм³)"
 
 #: src/slic3r/GUI/Plater.cpp:311
 msgid "Used Material (unit)"
@@ -8057,7 +8057,7 @@ msgstr "підтримки та подушка"
 
 #: src/slic3r/GUI/Plater.cpp:1392
 msgid "Used Filament (in)"
-msgstr "Використано філаметну (дюйми)"
+msgstr "Використано філаменту (дюйми)"
 
 #: src/slic3r/GUI/Plater.cpp:1394 src/slic3r/GUI/Plater.cpp:1445
 msgid "objects"
@@ -8069,7 +8069,7 @@ msgstr "вежа витирання"
 
 #: src/slic3r/GUI/Plater.cpp:1404
 msgid "Used Filament (in³)"
-msgstr "Використано філаметну (дюйми³)"
+msgstr "Використано філаменту (дюйми³)"
 
 #: src/slic3r/GUI/Plater.cpp:1428
 #, boost-format
@@ -9916,19 +9916,19 @@ msgstr "модель принтеру"
 
 #: src/slic3r/GUI/Tab.cpp:1331
 msgid "default print profile"
-msgstr "профіль друку за замовчанням"
+msgstr "профіль друку за замовчуванням"
 
 #: src/slic3r/GUI/Tab.cpp:1334
 msgid "default filament profile"
-msgstr "профіль філаметну за замовчанням"
+msgstr "профіль філаменту за замовчуванням"
 
 #: src/slic3r/GUI/Tab.cpp:1348
 msgid "default SLA material profile"
-msgstr "профіль SLA-матеріалу за замовчанням"
+msgstr "профіль SLA-матеріалу за замовчуванням"
 
 #: src/slic3r/GUI/Tab.cpp:1352
 msgid "default SLA print profile"
-msgstr "профіль SLA-друку за замовчанням"
+msgstr "профіль SLA-друку за замовчуванням"
 
 #: src/slic3r/GUI/Tab.cpp:1360
 msgid "full profile name"
@@ -12916,7 +12916,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:746
 msgid "Default filament profile"
-msgstr "Профіль філаметну за замовчанням"
+msgstr "Профіль філаменту за замовчуванням"
 
 #: src/libslic3r/PrintConfig.cpp:747
 msgid ""
@@ -12924,12 +12924,12 @@ msgid ""
 "selection of the current printer profile, this filament profile will be "
 "activated."
 msgstr ""
-"Профіль філаметну за замовчанням, пов'язаний з поточним профілем принтера. "
-"При виборі поточного профілю принтера цей профіль філаметну буде активовано."
+"Профіль філаменту за замовчуванням, пов'язаний з поточним профілем принтера. "
+"При виборі поточного профілю принтера цей профіль філаменту буде активовано."
 
 #: src/libslic3r/PrintConfig.cpp:753
 msgid "Default print profile"
-msgstr "Профіль друку за замовчанням"
+msgstr "Профіль друку за замовчуванням"
 
 #: src/libslic3r/PrintConfig.cpp:754 src/libslic3r/PrintConfig.cpp:3895
 #: src/libslic3r/PrintConfig.cpp:3906
@@ -13105,7 +13105,7 @@ msgid ""
 "of the default inverse order."
 msgstr ""
 "Друкувати контури периметра від найзовнішнього до найвнутрішнього, замість "
-"інверсного порядку за замовчанням."
+"інверсного порядку за замовчуванням."
 
 #: src/libslic3r/PrintConfig.cpp:869
 msgid "Extra perimeters if needed"
@@ -13223,7 +13223,7 @@ msgstr ""
 
 #: src/libslic3r/PrintConfig.cpp:950
 msgid "Default extrusion width"
-msgstr "Ширина екструзії за замовчанням"
+msgstr "Ширина екструзії за замовчуванням"
 
 #: src/libslic3r/PrintConfig.cpp:952
 msgid ""
@@ -13292,9 +13292,9 @@ msgid ""
 "volumetric speed of a print to the minimum of print and filament volumetric "
 "speed. Set to zero for no limit."
 msgstr ""
-"Максимальна об'ємна швидкість, припустима для цього філаметну. Обмежує "
+"Максимальна об'ємна швидкість, припустима для цього філаменту. Обмежує "
 "максимальну об'ємну швидкість друку до мінімуму об'ємної швидкості друку та "
-"філаметну. Встановити 0 для відсутності обмежень."
+"філаменту. Встановити 0 для відсутності обмежень."
 
 #: src/libslic3r/PrintConfig.cpp:1005
 msgid "Loading speed"
@@ -13699,10 +13699,11 @@ msgid ""
 "maximum allowed speed at layer \"disable_fan_first_layers\" + 1."
 msgstr ""
 "Швидкість вентилятора буде збільшена лінійно з нуля на шарі "
-"\"disable_fan_first_layers\" до максимальної на шарі \"full_fan_speed_layer"
-"\". \"full_fan_speed_layer\" буде проігноровано, якщо нижче "
-"\"disable_fan_first_layers\", і в цьому випадку вентилятор буде працювати з "
-"максимально дозволеною швидкістю на рівні \"disable_fan_first_layers\" + 1."
+"\"disable_fan_first_layers\" до максимальної на шарі "
+"\"full_fan_speed_layer\". \"full_fan_speed_layer\" буде проігноровано, якщо "
+"нижче \"disable_fan_first_layers\", і в цьому випадку вентилятор буде "
+"працювати з максимально дозволеною швидкістю на рівні "
+"\"disable_fan_first_layers\" + 1."
 
 #: src/libslic3r/PrintConfig.cpp:1343
 msgid "Fuzzy skin type."
@@ -15397,7 +15398,7 @@ msgstr "Інтерфейсні петлі"
 msgid ""
 "Cover the top contact layer of the supports with loops. Disabled by default."
 msgstr ""
-"Закрити петлями верхній контактний шар підтримки. За замовчанням вимкнено."
+"Закрити петлями верхній контактний шар підтримки. За замовчуванням вимкнено."
 
 #: src/libslic3r/PrintConfig.cpp:2720
 msgid "Support material/raft interface extruder"
@@ -16583,7 +16584,7 @@ msgstr "Тут ви можете помістити свої нотатки що
 
 #: src/libslic3r/PrintConfig.cpp:3894 src/libslic3r/PrintConfig.cpp:3905
 msgid "Default SLA material profile"
-msgstr "Профіль SLA-матеріалу за замовчанням"
+msgstr "Профіль SLA-матеріалу за замовчуванням"
 
 #: src/libslic3r/PrintConfig.cpp:3916
 msgid "Generate supports"
@@ -17256,8 +17257,9 @@ msgstr ""
 #: resources/data/hints.ini: [hint:Hiding sidebar]
 msgid ""
 "Hiding sidebar\n"
-"Did you know that you can hide the right sidebar using the shortcut <b>Shift"
-"+Tab</b>? You can also enable the icon for this from the<a>Preferences</a>."
+"Did you know that you can hide the right sidebar using the shortcut "
+"<b>Shift+Tab</b>? You can also enable the icon for this from "
+"the<a>Preferences</a>."
 msgstr ""
 
 #: resources/data/hints.ini: [hint:Perspective camera]
@@ -17704,7 +17706,7 @@ msgstr "Ко&лір тла:"
 
 #: ../src/richtext/richtextbackgroundpage.cpp:298
 msgid "&Blur distance:"
-msgstr "Відстань &розмиття"
+msgstr "Відстань &розмиття:"
 
 #: ../src/common/stockitem.cpp:143
 msgid "&Bold"
@@ -18636,7 +18638,7 @@ msgstr "Додати цю сторінку до закладок"
 
 #: ../src/generic/colrdlgg.cpp:366
 msgid "Add to custom colours"
-msgstr "Додати до створених кольорів "
+msgstr "Додати до створених кольорів"
 
 #: ../include/wx/xtiprop.h:255
 msgid "AddToPropertyCollection called on a generic accessor"
@@ -19551,7 +19553,7 @@ msgstr "Клацніть, щоб обрати шрифт для цього рі�
 #: ../src/richtext/richtextstyledlg.cpp:279
 #: ../src/richtext/richtextstyledlg.cpp:281
 msgid "Click to close this window."
-msgstr "Клацніть, щоб закрити це вікно"
+msgstr "Клацніть, щоб закрити це вікно."
 
 #: ../src/osx/carbon/fontdlg.cpp:410 ../src/osx/carbon/fontdlg.cpp:412
 msgid "Click to confirm changes to the font."
@@ -25267,7 +25269,7 @@ msgstr "збірка %lu"
 #: ../src/common/ffile.cpp:75
 #, c-format
 msgid "can't close file '%s'"
-msgstr "Не вдалося закрити файл «%s»"
+msgstr "не вдалося закрити файл «%s»"
 
 #: ../src/common/file.cpp:245
 #, c-format
