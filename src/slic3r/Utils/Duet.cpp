@@ -81,6 +81,8 @@ bool Duet::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn e
 	auto http = (dsf ? Http::put(std::move(upload_cmd)) : Http::post(std::move(upload_cmd)));
 	if (dsf) {
 		http.set_put_body(upload_data.source_path);
+		if (connect_msg.empty())
+			http.header("X-Session-Key", boost::nowide::narrow(connect_msg));
 	} else {
 		http.set_post_body(upload_data.source_path);
 	}
@@ -140,7 +142,20 @@ Duet::ConnectionType Duet::connect(wxString &msg) const
 					msg = format_error(body, error, status);
 				})
 				.on_complete([&](std::string body, unsigned) {
-					res = ConnectionType::dsf;
+					try {		
+						pt::ptree root;
+						std::istringstream iss(body);
+						pt::read_json(iss, root);
+						auto key = root.get_optional<std::string>("sessionKey");
+						if (key)
+							msg = boost::nowide::widen(*key);
+						res = ConnectionType::dsf;
+					}
+					catch (const std::exception&) {
+						BOOST_LOG_TRIVIAL(error) << "Failed to parse serverKey from Duet reply to Connect request: " << body;
+						msg = format_error(body, L("Failed to parse a Connect reply"), 0);
+						res = ConnectionType::error;
+					}
 				})
 				.perform_sync();
 		})
@@ -205,8 +220,9 @@ std::string Duet::get_upload_url(const std::string &filename, ConnectionType con
 std::string Duet::get_connect_url(const bool dsfUrl) const
 {
 	if (dsfUrl)	{
-		return (boost::format("%1%machine/status")
-				% get_base_url()).str();
+		return (boost::format("%1%machine/connect?password=%2%")
+			% get_base_url()
+			% (password.empty() ? "reprap" : password)).str();
 	} else {
 		return (boost::format("%1%rr_connect?password=%2%&%3%")
 				% get_base_url()
