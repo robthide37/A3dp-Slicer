@@ -300,7 +300,7 @@ namespace Emboss
     class ProjectZ : public IProjection
     {
     public:
-        ProjectZ(double depth) : m_depth(depth) {}
+        explicit ProjectZ(double depth) : m_depth(depth) {}
         // Inherited via IProject
         std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const override;
         Vec3d project(const Vec3d &point) const override;

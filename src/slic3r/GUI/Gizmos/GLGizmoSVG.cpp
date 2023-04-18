@@ -219,6 +219,11 @@ bool GLGizmoSVG::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         if (m_volume->emboss_shape->projection.use_surface)
             process();
 
+        // TODO: Remove it when it will be stable
+        // Distance should not change during dragging
+        const GLVolume *gl_volume = m_parent.get_selection().get_first_volume();
+        m_distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
+
         // Show correct value of height & depth inside of inputs
         calculate_scale();
     }
@@ -456,7 +461,8 @@ void GLGizmoSVG::set_volume_by_selection()
     m_volume_shape = *volume->emboss_shape; // copy
 
     // Calculate current angle of up vector
-    m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);    
+    m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
+    m_distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
 
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();
@@ -907,17 +913,11 @@ EmbossShape select_shape()
     if (shape.svg_file_path.empty())
         return {};
 
-    // select units
-    bool use_inch = wxGetApp().app_config->get_bool("use_inches");   
     const char *unit_mm{"mm"};
-    const char *unit_in{"in"};
-    const char *unit = use_inch ?unit_in : unit_mm;
-
     // common used DPI is 96 or 72
     float dpi = 96.0f;
-    NSVGimage *image = nsvgParseFromFile(shape.svg_file_path.c_str(), unit, dpi);
+    NSVGimage *image = nsvgParseFromFile(shape.svg_file_path.c_str(), unit_mm, dpi);
     ScopeGuard sg([image]() { nsvgDelete(image); });
-
 
     shape.scale = 1e-2; // loaded in mm
 

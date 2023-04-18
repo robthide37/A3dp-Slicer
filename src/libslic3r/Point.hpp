@@ -150,11 +150,11 @@ inline bool has_reflection(const Transform3d &transform) { return transform.matr
 /// <param name="index">column index</param>
 /// <param name="transform">source transformation</param>
 /// <returns>Base of transformation matrix</returns>
-inline const Vec3d &get_base(unsigned index, const Transform3d &transform) { return transform.linear().col(index); }
+inline const Vec3d get_base(unsigned index, const Transform3d &transform) { return transform.linear().col(index); }
+inline const Vec3d get_x_base(const Transform3d &transform) { return get_base(0, transform); }
+inline const Vec3d get_y_base(const Transform3d &transform) { return get_base(1, transform); }
+inline const Vec3d get_z_base(const Transform3d &transform) { return get_base(2, transform); }
 inline const Vec3d &get_base(unsigned index, const Transform3d::LinearPart &transform) { return transform.col(index); }
-inline const Vec3d& get_x_base(const Transform3d &transform) { return get_base(0, transform); }
-inline const Vec3d& get_y_base(const Transform3d &transform) { return get_base(1, transform); }
-inline const Vec3d& get_z_base(const Transform3d &transform) { return get_base(2, transform); }
 inline const Vec3d &get_x_base(const Transform3d::LinearPart &transform) { return get_base(0, transform); }
 inline const Vec3d &get_y_base(const Transform3d::LinearPart &transform) { return get_base(1, transform); }
 inline const Vec3d &get_z_base(const Transform3d::LinearPart &transform) { return get_base(2, transform); }
