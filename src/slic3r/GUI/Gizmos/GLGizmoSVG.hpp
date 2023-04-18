@@ -99,6 +99,7 @@ private:
     void close();
     void draw_window();
     void draw_depth();
+    void draw_size();
     void draw_use_surface();
     void draw_distance();
     void draw_rotation();
@@ -137,6 +138,7 @@ private:
     // When true keep up vector otherwise relative rotation
     bool m_keep_up = true;
 
+    bool m_keep_ratio = true;
         
     // setted only when wanted to use - not all the time
     std::optional<ImVec2> m_set_window_offset;

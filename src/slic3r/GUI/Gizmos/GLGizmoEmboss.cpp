@@ -2595,18 +2595,20 @@ void GLGizmoEmboss::draw_advanced()
     }
 
     // Keep up - lock button icon
-    ImGui::SameLine(m_gui_cfg->lock_offset);
-    const IconManager::Icon &icon = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::activable);
-    const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_up ? IconType::lock_bold : IconType::unlock_bold, IconState::activable);
-    const IconManager::Icon &icon_disable = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::disabled);
-    if (button(icon, icon_hover, icon_disable))
-        m_keep_up = !m_keep_up;
+    if (!m_volume->is_the_only_one_part()) {
+        ImGui::SameLine(m_gui_cfg->lock_offset);
+        const IconManager::Icon &icon = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::activable);
+        const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_up ? IconType::lock_bold : IconType::unlock_bold, IconState::activable);
+        const IconManager::Icon &icon_disable = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::disabled);
+        if (button(icon, icon_hover, icon_disable))
+            m_keep_up = !m_keep_up;
     
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", (m_keep_up?
-            _u8L("Unlock the text's rotation when moving text along the object's surface."):
-            _u8L("Lock the text's rotation when moving text along the object's surface.")
-        ).c_str());
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", (m_keep_up?
+                _u8L("Unlock the text's rotation when moving text along the object's surface."):
+                _u8L("Lock the text's rotation when moving text along the object's surface.")
+            ).c_str());
+    }
 
     // when more collection add selector
     if (ff.font_file->infos.size() > 1) {

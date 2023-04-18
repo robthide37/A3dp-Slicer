@@ -46,6 +46,9 @@ GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
 // Private functions to create emboss volume
 namespace{
 
+// Default scale of SVG image
+static constexpr double DEFAULT_SCALE = 1e-2;
+
 // Variable keep limits for variables
 const struct Limits
 {
@@ -122,10 +125,14 @@ struct GuiCfg
     float input_offset = 0.f;
 
     float icon_width   = 0.f;
+
+    // offset for checbox for lock up vector
+    float lock_offset = 0.f;
     // Only translations needed for calc GUI size
     struct Translations
     {
         std::string depth;
+        std::string size;
         std::string use_surface;
         std::string rotation;
         std::string distance; // from surface
@@ -534,23 +541,35 @@ void GLGizmoSVG::close()
 
 void GLGizmoSVG::draw_window()
 {
-    if (m_volume != nullptr && m_volume->emboss_shape.has_value())
+    assert(m_volume != nullptr);
+    assert(m_volume_id.valid());
+    if (m_volume == nullptr ||
+        m_volume_id.invalid()) {
+        ImGui::Text("Not valid state please report reproduction steps on github");
+        return;
+    }
+
+    if (m_volume->emboss_shape.has_value())
         ImGui::Text("SVG file path is %s", m_volume->emboss_shape->svg_file_path.c_str());
 
     ImGui::Indent(m_gui_cfg->icon_width);
     draw_depth();
+    draw_size();
     draw_use_surface();
     draw_distance();
     draw_rotation();
     ImGui::Unindent(m_gui_cfg->icon_width);
 
     if (ImGui::Button("change file")) {
-        auto data = create_emboss_data_base(m_job_cancel);
-        std::string file = ::choose_svg_file();
+        m_volume_shape.shapes = select_shape().shapes;
+        // TODO: use setted scale
+        process();
     }
 
-    ImGui::Separator();
-    draw_model_type();        
+    if (!m_volume->is_the_only_one_part()) {
+        ImGui::Separator();
+        draw_model_type();
+    }
 }
 
 void GLGizmoSVG::draw_depth()
@@ -561,7 +580,6 @@ void GLGizmoSVG::draw_depth()
 
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
     double &value = m_volume_shape.projection.depth;
-    const wxString tooltip = _L("Size in emboss direction.");
     if (use_inch) {
         const char *size_format = "%.2f in";
         double value_inch = value * ObjectManipulation::mm_to_in;
@@ -574,10 +592,75 @@ void GLGizmoSVG::draw_depth()
         if (ImGui::InputDouble("##depth", &value, 1., 10., size_format))
             process();
     }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Size in emboss direction.").c_str());
+}
+
+void GLGizmoSVG::draw_size() 
+{
+    ImGuiWrapper::text(m_gui_cfg->translations.size);
+
+    bool use_inch = wxGetApp().app_config->get_bool("use_inches");
+    float space         = m_gui_cfg->icon_width / 2;
+    float input_width = m_gui_cfg->input_width / 2 - space / 2;
+    float second_offset = m_gui_cfg->input_offset + input_width + space;
+
+    ImGui::SameLine(m_gui_cfg->input_offset);
+    ImGui::SetNextItemWidth(input_width);
+
+    // TODO: cache it
+    BoundingBox bb = get_extents(m_volume_shape.shapes);
+    Point size = bb.size();
+
+    const char *size_format = (use_inch) ? "%.2f in" : "%.1f mm";
+    double step = -1.0;
+    double fast_step = -1.0;
+    double width = size.x() * m_volume_shape.scale;    
+    if (use_inch) width *= ObjectManipulation::mm_to_in;
+
+    ImGuiInputTextFlags flags = 0;
+
+    if (ImGui::InputDouble("##width", &width, step, fast_step, size_format, flags)) {
+        if (use_inch) width *= ObjectManipulation::in_to_mm;
+        m_volume_shape.scale = width / size.x();
+        process();
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Width of SVG.").c_str());
+    
+    ImGui::SameLine(second_offset);
+    ImGui::SetNextItemWidth(input_width);
+
+    double height = size.y() * m_volume_shape.scale;
+    if (use_inch) height *= ObjectManipulation::mm_to_in;
+    if (ImGui::InputDouble("##height", &height, step, fast_step, size_format, flags)) {
+        if (use_inch) height *= ObjectManipulation::in_to_mm;
+        m_volume_shape.scale = height / size.y();
+        process();
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Height of SVG.").c_str());
+
+    bool can_reset = !is_approx(m_volume_shape.scale, DEFAULT_SCALE);
+    m_imgui->disabled_begin(!can_reset);
+    ScopeGuard sc([imgui = m_imgui]() { imgui->disabled_end(); });
+
+    float reset_offset = ImGui::GetStyle().FramePadding.x;
+    ImGui::SameLine(reset_offset);
+    if (ImGui::Button("R##size_reset")) {
+        m_volume_shape.scale = DEFAULT_SCALE;
+        process();
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Reset scale to loaded one from the SVG").c_str());
 }
 
 void GLGizmoSVG::draw_use_surface() 
 {
+    bool can_use_surface = (m_volume->emboss_shape->projection.use_surface)? true : // already used surface must have option to uncheck
+        !m_volume->is_the_only_one_part();
+    m_imgui->disabled_begin(!can_use_surface);
+    ScopeGuard sc([imgui = m_imgui]() { imgui->disabled_end(); });
+
     ImGuiWrapper::text(m_gui_cfg->translations.use_surface);
     ImGui::SameLine(m_gui_cfg->input_offset);
 
@@ -587,9 +670,6 @@ void GLGizmoSVG::draw_use_surface()
 
 void GLGizmoSVG::draw_distance()
 {
-    if (m_volume == nullptr)
-        return;
-
     const EmbossProjection& projection = m_volume->emboss_shape->projection;
     bool use_surface = projection.use_surface;
     bool allowe_surface_distance = !use_surface && !m_volume->is_the_only_one_part();
@@ -642,10 +722,7 @@ void GLGizmoSVG::draw_distance()
 }
 
 void GLGizmoSVG::draw_rotation()
-{
-    if (m_volume == nullptr)
-        return;
-        
+{        
     ImGuiWrapper::text(m_gui_cfg->translations.rotation);
     ImGui::SameLine(m_gui_cfg->input_offset);
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
@@ -671,6 +748,17 @@ void GLGizmoSVG::draw_rotation()
         // recalculate for surface cut
         if (m_volume->emboss_shape->projection.use_surface)
             process();
+    }
+
+    if (!m_volume->is_the_only_one_part()) {
+        // Keep up - lock button icon
+        ImGui::SameLine(m_gui_cfg->lock_offset);
+        ImGui::Checkbox("##Lock_up_vector", &m_keep_up);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", (m_keep_up ? 
+                _u8L("Unlock the rotation when moving volume along the object's surface.") :
+                _u8L("Lock the rotation when moving volume along the object's surface."))
+                .c_str());
     }
 
     // Reset button
@@ -844,19 +932,23 @@ GuiCfg create_gui_configuration() {
 
     GuiCfg::Translations &tr = cfg.translations;
 
+    float lock_width = cfg.icon_width + 3 * space;
     tr.depth       = _u8L("Depth");
+    tr.size        = _u8L("Width/Height");
     tr.use_surface = _u8L("Use surface");
     tr.distance    = _u8L("From surface");
     tr.rotation    = _u8L("Rotation");
     float max_tr_width = std::max({
         ImGui::CalcTextSize(tr.depth.c_str()).x,
+        ImGui::CalcTextSize(tr.size.c_str()).x + lock_width,
         ImGui::CalcTextSize(tr.use_surface.c_str()).x,
         ImGui::CalcTextSize(tr.distance.c_str()).x,
-        ImGui::CalcTextSize(tr.rotation.c_str()).x,
+        ImGui::CalcTextSize(tr.rotation.c_str()).x + lock_width
     });
 
     const ImGuiStyle &style = ImGui::GetStyle();
     cfg.input_offset = style.WindowPadding.x + max_tr_width + space + cfg.icon_width;
+    cfg.lock_offset = cfg.input_offset - (cfg.icon_width + 2 * space);
 
     ImVec2 letter_m_size = ImGui::CalcTextSize("M");
     const float count_letter_M_in_input = 12.f;
@@ -919,7 +1011,7 @@ EmbossShape select_shape()
     NSVGimage *image = nsvgParseFromFile(shape.svg_file_path.c_str(), unit_mm, dpi);
     ScopeGuard sg([image]() { nsvgDelete(image); });
 
-    shape.scale = 1e-2; // loaded in mm
+    shape.scale = DEFAULT_SCALE; // loaded in mm
 
     constexpr float tesselation_tolerance = 1e-2f;
     int max_level = 10;
