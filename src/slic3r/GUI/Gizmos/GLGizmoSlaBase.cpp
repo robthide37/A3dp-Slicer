@@ -59,7 +59,7 @@ void GLGizmoSlaBase::update_volumes()
         if (last_comp_step == slaposCount)
             last_comp_step = -1;
 
-        m_input_enabled = last_comp_step >= m_min_sla_print_object_step;
+        m_input_enabled = last_comp_step >= m_min_sla_print_object_step || po->model_object()->sla_points_status == sla::PointsStatus::UserModified;
 
         const int object_idx   = m_parent.get_selection().get_object_idx();
         const int instance_idx = m_parent.get_selection().get_instance_idx();
