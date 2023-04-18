@@ -835,10 +835,10 @@ const Glyph* priv::get_glyph(
             glyph.shape = Slic3r::union_ex(offset_ex(glyph.shape, delta));
         }
         if (font_prop.skew.has_value()) {
-            const float &ratio = *font_prop.skew;
+            double ratio = *font_prop.skew;
             auto skew = [&ratio](Polygon &polygon) {
                 for (Slic3r::Point &p : polygon.points)
-                    p.x() += static_cast<int>(std::round(p.y() * ratio));
+                    p.x() += static_cast<Point::coord_type>(std::round(p.y() * ratio));
             };
             for (ExPolygon &expolygon : glyph.shape) {
                 skew(expolygon.contour);
@@ -1361,10 +1361,9 @@ std::string Emboss::create_range_text(const std::string &text,
 
 double Emboss::get_text_shape_scale(const FontProp &fp, const FontFile &ff)
 {
-    const std::optional<unsigned int> &cn = fp.collection_number;
-    unsigned int font_index  = (cn.has_value()) ? *cn : 0;
-    int unit_per_em = ff.infos[font_index].unit_per_em;
-    double scale = fp.size_in_mm / unit_per_em;
+    size_t font_index  = fp.collection_number.value_or(0);
+    const FontFile::Info &info = ff.infos[font_index];
+    double scale  = fp.size_in_mm / (double) info.unit_per_em;
     // Shape is scaled for store point coordinate as integer
     return scale * SHAPE_SCALE;
 }

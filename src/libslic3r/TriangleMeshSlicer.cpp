@@ -1911,6 +1911,16 @@ std::vector<ExPolygons> slice_mesh_ex(
                     this_mode == MeshSlicingParams::SlicingMode::EvenOdd ? ClipperLib::pftEvenOdd : 
                     this_mode == MeshSlicingParams::SlicingMode::PositiveLargestContour ? ClipperLib::pftPositive : ClipperLib::pftNonZero,
                     &expolygons);
+
+#if 0
+//#ifndef _NDEBUG
+                // Test whether the expolygons in a single layer overlap.
+                for (size_t i = 0; i < expolygons.size(); ++ i)
+                    for (size_t j = i + 1; j < expolygons.size(); ++ j) {
+                        Polygons overlap = intersection(expolygons[i], expolygons[j]);
+                        assert(overlap.empty());
+                    }
+#endif
 #if 0
 //#ifndef _NDEBUG
                 for (const ExPolygon &ex : expolygons) {

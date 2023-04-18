@@ -451,8 +451,7 @@ ImFont *StyleManager::create_imgui_font(const std::string &text, double scale)
     // TODO: start using merge mode
     //font_config.MergeMode = true;
 
-    const auto  &cn = font_prop.collection_number;
-    unsigned int font_index = (cn.has_value()) ? *cn : 0;
+    unsigned int font_index = font_prop.collection_number.value_or(0);
     const auto  &font_info  = font_file.infos[font_index];
     if (font_prop.char_gap.has_value()) {
         float coef = font_size / (double) font_info.unit_per_em;
