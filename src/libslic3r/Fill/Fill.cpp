@@ -306,47 +306,15 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		}
     }
 
-	// Detect narrow internal solid infill area and use ipEnsuring pattern instead.
-	{
-		std::vector<char> narrow_expolygons;
-		static constexpr const auto narrow_pattern = ipEnsuring;
-		for (size_t surface_fill_id = 0, num_old_fills = surface_fills.size(); surface_fill_id < num_old_fills; ++ surface_fill_id)
-			if (SurfaceFill &fill = surface_fills[surface_fill_id]; fill.surface.surface_type == stInternalSolid) {
-				size_t num_expolygons = fill.expolygons.size();
-				narrow_expolygons.clear();
-				narrow_expolygons.reserve(num_expolygons);
-				// Detect narrow expolygons.
-				int num_narrow = 0;
-				for (const ExPolygon &ex : fill.expolygons) {
-					bool narrow = offset_ex(ex, -scaled<float>(NarrowInfillAreaThresholdMM)).empty();
-					num_narrow += int(narrow);
-					narrow_expolygons.emplace_back(narrow);
-				}
-				if (num_narrow == num_expolygons) {
-					// All expolygons are narrow, change the fill pattern.
-					fill.params.pattern = narrow_pattern;
-				} else if (num_narrow > 0) {
-					// Some expolygons are narrow, split the fills.
-					params = fill.params;
-					params.pattern = narrow_pattern;
-					surface_fills.emplace_back(params);
-					SurfaceFill &old_fill = surface_fills[surface_fill_id];
-					SurfaceFill &new_fill = surface_fills.back();
-					new_fill.region_id 				= old_fill.region_id;
-					new_fill.surface.surface_type 	= stInternalSolid;
-					new_fill.surface.thickness 		= old_fill.surface.thickness;
-					new_fill.expolygons.reserve(num_narrow);
-					for (size_t i = 0; i < narrow_expolygons.size(); ++ i)
-						if (narrow_expolygons[i])
-							new_fill.expolygons.emplace_back(std::move(old_fill.expolygons[i]));
-					old_fill.expolygons.erase(std::remove_if(old_fill.expolygons.begin(), old_fill.expolygons.end(),
-						[&narrow_expolygons, ex_first = old_fill.expolygons.data()](const ExPolygon& ex) { return narrow_expolygons[&ex - ex_first]; }),
-						old_fill.expolygons.end());
-				}
-			}
-	}
+    // Detect narrow internal solid infill area and use ipEnsuring pattern instead.
+    {
+        for (size_t surface_fill_id = 0; surface_fill_id < surface_fills.size(); ++surface_fill_id)
+            if (SurfaceFill &fill = surface_fills[surface_fill_id]; fill.surface.surface_type == stInternalSolid) {
+                fill.params.pattern = ipEnsuring;
+            }
+    }
 
-	return surface_fills;
+    return surface_fills;
 }
 
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
