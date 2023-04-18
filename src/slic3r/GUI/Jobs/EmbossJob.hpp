@@ -25,6 +25,7 @@ class RaycastManager;
 class Plater;
 class GLCanvas3D;
 class Worker;
+class Selection;
 }}
 
 namespace Slic3r::GUI::Emboss {
@@ -217,6 +218,17 @@ bool start_create_volume(CreateVolumeParams &input, DataBasePtr data, const Vec2
 /// Need to suggest position or put near the selection
 /// </summary>
 bool start_create_volume_without_position(CreateVolumeParams &input, DataBasePtr data);
+
+/// <summary>
+/// Start job for update embossed volume
+/// </summary>
+/// <param name="data">define update data</param>
+/// <param name="volume">Volume to be updated</param>
+/// <param name="selection">Keep model and gl_volumes - when start use surface volume must be selected</param>
+/// <param name="raycaster">Could cast ray to scene</param>
+/// <returns>True when start job otherwise false</returns>
+bool start_update_volume(DataUpdate &&data, const ModelVolume &volume, const Selection &selection, RaycastManager &raycaster);
+
 } // namespace Slic3r::GUI
 
 #endif // slic3r_EmbossJob_hpp_

@@ -98,6 +98,8 @@ private:
     bool process();
     void close();
     void draw_window();
+    void draw_depth();
+    void draw_use_surface();
     void draw_distance();
     void draw_rotation();
     void draw_model_type();
@@ -105,41 +107,20 @@ private:
     // process mouse event
     bool on_mouse_for_rotation(const wxMouseEvent &mouse_event);
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
-
-    // This configs holds GUI layout size given by translated texts.
-    // etc. When language changes, GUI is recreated and this class constructed again,
-    // so the change takes effect. (info by GLGizmoFdmSupports.hpp)
-    struct GuiCfg
-    {
-        // Detect invalid config values when change monitor DPI
-        double screen_scale;
-        float  main_toolbar_height;
-
-        // Zero means it is calculated in init function
-        ImVec2 minimal_window_size = ImVec2(0, 0);
-
-        float input_width = 0.f;
-        float input_offset = 0.f;
-
-        // Only translations needed for calc GUI size
-        struct Translations
-        {
-            std::string font;
-        };
-        Translations translations;
-    };
-    std::optional<const GuiCfg> m_gui_cfg;
-    static GuiCfg create_gui_configuration();
+    
+    struct GuiCfg;
+    std::unique_ptr<const GuiCfg> m_gui_cfg = nullptr;
 
     // actual selected only one volume - with emboss data
-    ModelVolume *m_volume;
+    ModelVolume *m_volume = nullptr;
+    EmbossShape  m_volume_shape; // copy from m_volume for edit
 
     // When work with undo redo stack there could be situation that 
     // m_volume point to unexisting volume so One need also objectID
     ObjectID m_volume_id;
 
     // cancel for previous update of volume to cancel finalize part
-    std::shared_ptr<std::atomic<bool>> m_job_cancel;
+    std::shared_ptr<std::atomic<bool>> m_job_cancel = nullptr;
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;

@@ -35,15 +35,9 @@ using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
 using namespace Slic3r::GUI::Emboss;
 
-namespace priv {
-
-} // namespace priv
-
 GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -3)
-    , m_volume(nullptr)
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
-    , m_job_cancel(nullptr)
 {
     m_rotate_gizmo.set_group_id(0);
     m_rotate_gizmo.set_force_local_coordinate(true);
@@ -111,8 +105,39 @@ std::string volume_name(const EmbossShape& shape);
 /// <param name="volume_type">Type of volume to be created</param>
 /// <returns>Params</returns>
 CreateVolumeParams create_input(GLCanvas3D &canvas, RaycastManager &raycaster, ModelVolumeType volume_type);
+
+// This configs holds GUI layout size given by translated texts.
+// etc. When language changes, GUI is recreated and this class constructed again,
+// so the change takes effect. (info by GLGizmoFdmSupports.hpp)
+struct GuiCfg
+{
+    // Detect invalid config values when change monitor DPI
+    double screen_scale;
+    float  main_toolbar_height;
+
+    // Zero means it is calculated in init function
+    ImVec2 minimal_window_size = ImVec2(0, 0);
+
+    float input_width  = 0.f;
+    float input_offset = 0.f;
+
+    float icon_width   = 0.f;
+    // Only translations needed for calc GUI size
+    struct Translations
+    {
+        std::string depth;
+        std::string use_surface;
+        std::string rotation;
+        std::string distance; // from surface
+    };
+    Translations translations;
+};
+GuiCfg create_gui_configuration();
+
 } // namespace 
 
+// use private definition
+struct GLGizmoSVG::GuiCfg: public ::GuiCfg{};
 
 bool GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos)
 {
@@ -150,9 +175,8 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
     if (!m_dragging) return used;
 
     if (mouse_event.Dragging()) {
-        auto &angle_opt = m_volume->text_configuration->style.prop.angle;
         if (!m_rotate_start_angle.has_value())
-            m_rotate_start_angle = angle_opt.has_value() ? *angle_opt : 0.f;        
+            m_rotate_start_angle = m_angle.value_or(0.f);
         double angle = m_rotate_gizmo.get_angle();
         angle -= PI / 2; // Grabber is upward
 
@@ -165,11 +189,11 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         // move to range <-M_PI, M_PI>
         Geometry::to_range_pi_pi(angle);
         // propagate angle into property
-        angle_opt = static_cast<float>(angle);
+        m_angle = static_cast<float>(angle);
 
         // do not store zero
-        if (is_approx(*angle_opt, 0.f))
-            angle_opt.reset();
+        if (is_approx(*m_angle, 0.f))
+            m_angle.reset();
     }
     return used;
 }
@@ -192,7 +216,7 @@ bool GLGizmoSVG::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     // End with surface dragging?
     if (was_dragging && !is_dragging) {
         // Update surface by new position
-        if (m_volume->text_configuration->style.prop.use_surface)
+        if (m_volume->emboss_shape->projection.use_surface)
             process();
 
         // Show correct value of height & depth inside of inputs
@@ -226,7 +250,7 @@ bool GLGizmoSVG::on_mouse(const wxMouseEvent &mouse_event)
     // not selected volume
     if (m_volume == nullptr ||
         get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr ||
-        !m_volume->text_configuration.has_value()) return false;
+        !m_volume->emboss_shape.has_value()) return false;
 
     if (on_mouse_for_rotation(mouse_event)) return true;
     if (on_mouse_for_translate(mouse_event)) return true;
@@ -244,10 +268,6 @@ bool GLGizmoSVG::on_init()
     m_rotate_gizmo.init();
     ColorRGBA gray_color(.6f, .6f, .6f, .3f);
     m_rotate_gizmo.set_highlight_color(gray_color);
-
-    // No shortCut
-    // m_shortcut_key = WXK_CONTROL_T;
-
     // Set rotation gizmo upwardrotate
     m_rotate_gizmo.set_angle(PI / 2);
     return true;
@@ -292,15 +312,18 @@ void GLGizmoSVG::on_render_input_window(float x, float y, float bottom_limit)
     // Configuration creation
     double screen_scale = wxDisplay(wxGetApp().plater()).GetScaleFactor();
     float  main_toolbar_height = m_parent.get_main_toolbar_height();
-    if (!m_gui_cfg.has_value() || // Exist configuration - first run
+    if (m_gui_cfg == nullptr || // Exist configuration - first run
         m_gui_cfg->screen_scale != screen_scale || // change of DPI
         m_gui_cfg->main_toolbar_height != main_toolbar_height // change size of view port
         ) {
         // Create cache for gui offsets
-        GuiCfg cfg       = create_gui_configuration();
+        ::GuiCfg cfg = create_gui_configuration();
         cfg.screen_scale = screen_scale;
         cfg.main_toolbar_height = main_toolbar_height;
-        m_gui_cfg.emplace(std::move(cfg));
+
+        GuiCfg gui_cfg{std::move(cfg)};
+        m_gui_cfg = std::make_unique<const GuiCfg>(std::move(gui_cfg));
+
         // set position near toolbar
         m_set_window_offset = ImVec2(-1.f, -1.f);
     }
@@ -358,29 +381,13 @@ void GLGizmoSVG::on_set_state()
 
     // Closing gizmo. e.g. selecting another one
     if (GLGizmoBase::m_state == GLGizmoBase::Off) {
-        // refuse outgoing during text preview
-        if (false) {
-            GLGizmoBase::m_state = GLGizmoBase::On;
-            auto notification_manager = wxGetApp().plater()->get_notification_manager();
-            notification_manager->push_notification(
-                NotificationType::CustomNotification,
-                NotificationManager::NotificationLevel::RegularNotificationLevel,
-                _u8L("ERROR: Wait until ends or Cancel process."));
-            return;
-        }
         reset_volume();
     } else if (GLGizmoBase::m_state == GLGizmoBase::On) {
         // Try(when exist) set text configuration by volume 
         set_volume_by_selection();
-                
-        if (!m_gui_cfg.has_value())
-            m_set_window_offset = ImGuiWrapper::change_window_position(on_get_name().c_str(), false);
-        else
-            m_set_window_offset = ImVec2(-1, -1);
-        
-        // when open by hyperlink it needs to show up
-        // or after key 'T' windows doesn't appear
-        // m_parent.set_as_dirty();
+           
+        m_set_window_offset = (m_gui_cfg != nullptr) ?
+            ImGuiWrapper::change_window_position(on_get_name().c_str(), false) : ImVec2(-1, -1);
     }
 }
 
@@ -412,14 +419,6 @@ void GLGizmoSVG::on_stop_dragging()
         process();
 }
 void GLGizmoSVG::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
-
-GLGizmoSVG::GuiCfg GLGizmoSVG::create_gui_configuration()
-{
-    GuiCfg cfg; // initialize by default values;
-
-    
-    return cfg;
-}
 
 void GLGizmoSVG::set_volume_by_selection()
 {
@@ -454,6 +453,7 @@ void GLGizmoSVG::set_volume_by_selection()
 
     m_volume = volume;
     m_volume_id = volume->id();
+    m_volume_shape = *volume->emboss_shape; // copy
 
     // Calculate current angle of up vector
     m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);    
@@ -469,6 +469,7 @@ void GLGizmoSVG::reset_volume()
 
     m_volume = nullptr;
     m_volume_id.id = 0;
+    m_volume_shape.shapes.clear();
 }
 
 void GLGizmoSVG::calculate_scale() {
@@ -496,51 +497,25 @@ bool GLGizmoSVG::process()
 {
     // no volume is selected -> selection from right panel
     assert(m_volume != nullptr);
-    if (m_volume == nullptr) return false;
-        
-    //DataUpdate data{create_emboss_data_base(m_text, m_style_manager, m_job_cancel), m_volume->id()};
+    if (m_volume == nullptr) 
+        return false;
+    
+    assert(m_volume->emboss_shape.has_value());
+    if (!m_volume->emboss_shape.has_value())
+        return false;
 
-    //std::unique_ptr<Job> job = nullptr;
+    // Cancel previous Job, when it is in process
+    // worker.cancel(); --> Use less in this case I want cancel only previous EmbossJob no other jobs
+    // Cancel only EmbossUpdateJob no others
+    if (m_job_cancel != nullptr)
+        m_job_cancel->store(true);
+    // create new shared ptr to cancel new job
+    m_job_cancel = std::make_shared<std::atomic<bool>>(false);
 
-    //// check cutting from source mesh
-    //bool &use_surface = data.text_configuration.style.prop.use_surface;
-    //bool  is_object   = m_volume->get_object()->volumes.size() == 1;
-    //if (use_surface && is_object) 
-    //    use_surface = false;
-    //
-    //if (use_surface) {
-    //    // Model to cut surface from.
-    //    SurfaceVolumeData::ModelSources sources = create_volume_sources(m_volume);
-    //    if (sources.empty()) return false;
-
-    //    Transform3d text_tr = m_volume->get_matrix();
-    //    auto& fix_3mf = m_volume->text_configuration->fix_3mf_tr;
-    //    if (fix_3mf.has_value())
-    //        text_tr = text_tr * fix_3mf->inverse();
-
-    //    // when it is new applying of use surface than move origin onto surfaca
-    //    if (!m_volume->text_configuration->style.prop.use_surface) {
-    //        auto offset = calc_surface_offset(*m_volume, m_raycast_manager, m_parent.get_selection());
-    //        if (offset.has_value())
-    //            text_tr *= Eigen::Translation<double, 3>(*offset);
-    //    }
-
-    //    bool is_outside = m_volume->is_model_part();
-    //    // check that there is not unexpected volume type
-    //    assert(is_outside || m_volume->is_negative_volume() ||
-    //           m_volume->is_modifier());
-    //    UpdateSurfaceVolumeData surface_data{std::move(data), {text_tr, is_outside, std::move(sources)}};
-    //    job = std::make_unique<UpdateSurfaceVolumeJob>(std::move(surface_data));                  
-    //} else {
-    //    job = std::make_unique<UpdateJob>(std::move(data));
-    //}
-
-    //auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    //queue_job(worker, std::move(job));
-
-    //// notification is removed befor object is changed by job
-    //remove_notification_not_valid_font();
-    return true;
+    EmbossShape shape = m_volume_shape; // copy
+    auto base = std::make_unique<DataBase>(m_volume->name, m_job_cancel, std::move(shape));
+    DataUpdate data{std::move(base), m_volume_id};
+    return start_update_volume(std::move(data), *m_volume, m_parent.get_selection(), m_raycast_manager);    
 }
 
 void GLGizmoSVG::close()
@@ -555,18 +530,54 @@ void GLGizmoSVG::draw_window()
 {
     if (m_volume != nullptr && m_volume->emboss_shape.has_value())
         ImGui::Text("SVG file path is %s", m_volume->emboss_shape->svg_file_path.c_str());
-    //draw_use_surface();
+
+    ImGui::Indent(m_gui_cfg->icon_width);
+    draw_depth();
+    draw_use_surface();
     draw_distance();
     draw_rotation();
+    ImGui::Unindent(m_gui_cfg->icon_width);
 
     if (ImGui::Button("change file")) {
         auto data = create_emboss_data_base(m_job_cancel);
-        std::string file = choose_svg_file();
+        std::string file = ::choose_svg_file();
     }
 
     ImGui::Separator();
     draw_model_type();        
- }
+}
+
+void GLGizmoSVG::draw_depth()
+{
+    ImGuiWrapper::text(m_gui_cfg->translations.depth);
+    ImGui::SameLine(m_gui_cfg->input_offset);
+    ImGui::SetNextItemWidth(m_gui_cfg->input_width);
+
+    bool use_inch = wxGetApp().app_config->get_bool("use_inches");
+    double &value = m_volume_shape.projection.depth;
+    const wxString tooltip = _L("Size in emboss direction.");
+    if (use_inch) {
+        const char *size_format = "%.2f in";
+        double value_inch = value * ObjectManipulation::mm_to_in;
+        if (ImGui::InputDouble("##depth", &value_inch, 1., 10., size_format)) {
+            value = value_inch * ObjectManipulation::in_to_mm;
+            process();
+        }
+    } else {
+        const char *size_format = "%.1f mm";
+        if (ImGui::InputDouble("##depth", &value, 1., 10., size_format))
+            process();
+    }
+}
+
+void GLGizmoSVG::draw_use_surface() 
+{
+    ImGuiWrapper::text(m_gui_cfg->translations.use_surface);
+    ImGui::SameLine(m_gui_cfg->input_offset);
+
+    if (ImGui::Checkbox("##useSurface", &m_volume_shape.projection.use_surface))
+        process();
+}
 
 void GLGizmoSVG::draw_distance()
 {
@@ -584,7 +595,10 @@ void GLGizmoSVG::draw_distance()
     m_imgui->disabled_begin(!allowe_surface_distance);
     ScopeGuard sg([imgui = m_imgui]() { imgui->disabled_end(); });
 
-    ImGuiWrapper::text(_L("distance"));
+    ImGuiWrapper::text(m_gui_cfg->translations.distance);
+    ImGui::SameLine(m_gui_cfg->input_offset);
+    ImGui::SetNextItemWidth(m_gui_cfg->input_width);
+
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
     const wxString move_tooltip = _L("Distance of the center of the text to the model surface.");
     bool is_moved = false;
@@ -606,13 +620,16 @@ void GLGizmoSVG::draw_distance()
             is_moved = true;
     }
 
-    float undo_offset = ImGui::GetStyle().FramePadding.x;
-    ImGui::SameLine(undo_offset);
+    m_imgui->disabled_begin(!m_distance.has_value() && allowe_surface_distance);
+    ScopeGuard sg2([imgui = m_imgui]() { imgui->disabled_end(); });
+
+    float reset_offset = ImGui::GetStyle().FramePadding.x;
+    ImGui::SameLine(reset_offset);
     if (ImGui::Button("R##distance_reset")){
         m_distance.reset();
         is_moved = true;
     } else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Reset distance to zero value"));
+        ImGui::SetTooltip("%s", _u8L("Reset distance to zero value").c_str());
 
     if (is_moved)
         do_local_z_move(m_parent, m_distance.value_or(.0f) - prev_distance);
@@ -622,13 +639,18 @@ void GLGizmoSVG::draw_rotation()
 {
     if (m_volume == nullptr)
         return;
+        
+    ImGuiWrapper::text(m_gui_cfg->translations.rotation);
+    ImGui::SameLine(m_gui_cfg->input_offset);
+    ImGui::SetNextItemWidth(m_gui_cfg->input_width);
+
     // slider for Clock-wise angle in degress
     // stored angle is optional CCW and in radians
     // Convert stored value to degress
     // minus create clock-wise roation from CCW
     float angle = m_angle.value_or(0.f);
     float angle_deg = static_cast<float>(-angle * 180 / M_PI);
-    if (m_imgui->slider_float("##angle", &angle, limits.angle.min, limits.angle.max, u8"%.2f DEG", 1.f, false, _L("Rotate text Clock-wise."))){
+    if (m_imgui->slider_float("##angle", &angle_deg, limits.angle.min, limits.angle.max, u8"%.2f DEG", 1.f, false, _L("Rotate text Clock-wise."))){
         // convert back to radians and CCW
         double angle_rad = -angle_deg * M_PI / 180.0;
         Geometry::to_range_pi_pi(angle_rad);                
@@ -644,6 +666,22 @@ void GLGizmoSVG::draw_rotation()
         if (m_volume->emboss_shape->projection.use_surface)
             process();
     }
+
+    // Reset button
+    m_imgui->disabled_begin(!m_angle.has_value());
+    ScopeGuard sg([imgui = m_imgui]() { imgui->disabled_end(); });
+
+    float reset_offset = ImGui::GetStyle().FramePadding.x;
+    ImGui::SameLine(reset_offset);
+    if (ImGui::Button("R##angle_reset")) {
+        do_local_z_rotate(m_parent, -(*m_angle));
+        m_angle.reset();
+
+        // recalculate for surface cut
+        if (m_volume->emboss_shape->projection.use_surface)
+            process();
+    } else if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", _u8L("Reset rotation to zero value").c_str());
 
     // Keep up - lock button icon
     //ImGui::SameLine(m_gui_cfg->lock_offset);
@@ -786,6 +824,39 @@ CreateVolumeParams create_input(GLCanvas3D &canvas, RaycastManager& raycaster, M
     Plater *plater = wxGetApp().plater();
     return CreateVolumeParams{canvas, plater->get_camera(), plater->build_volume(),
         plater->get_ui_job_worker(), volume_type, raycaster, gizmo, gl_volume};
+}
+
+GuiCfg create_gui_configuration() {
+    GuiCfg cfg; // initialize by default values;
+
+    float line_height = ImGui::GetTextLineHeight();
+    float line_height_with_spacing = ImGui::GetTextLineHeightWithSpacing();
+
+    float space = line_height_with_spacing - line_height;
+
+    cfg.icon_width  = line_height;
+
+    GuiCfg::Translations &tr = cfg.translations;
+
+    tr.depth       = _u8L("Depth");
+    tr.use_surface = _u8L("Use surface");
+    tr.distance    = _u8L("From surface");
+    tr.rotation    = _u8L("Rotation");
+    float max_tr_width = std::max({
+        ImGui::CalcTextSize(tr.depth.c_str()).x,
+        ImGui::CalcTextSize(tr.use_surface.c_str()).x,
+        ImGui::CalcTextSize(tr.distance.c_str()).x,
+        ImGui::CalcTextSize(tr.rotation.c_str()).x,
+    });
+
+    const ImGuiStyle &style = ImGui::GetStyle();
+    cfg.input_offset = style.WindowPadding.x + max_tr_width + space + cfg.icon_width;
+
+    ImVec2 letter_m_size = ImGui::CalcTextSize("M");
+    const float count_letter_M_in_input = 12.f;
+    cfg.input_width = letter_m_size.x * count_letter_M_in_input;
+
+    return cfg;
 }
 
 std::string choose_svg_file()

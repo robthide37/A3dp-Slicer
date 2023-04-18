@@ -310,7 +310,7 @@ std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastMana
     auto cond = RaycastManager::SkipVolume(volume->id().id);
     raycast_manager.actualize(*instance, &cond);
 
-    Transform3d to_world = world_matrix_fixed(gl_volume, selection.get_model()->objects);
+    Transform3d to_world = world_matrix_fixed(gl_volume, objects);
     Vec3d point     = to_world * Vec3d::Zero();
     Vec3d direction = to_world.linear() * (-Vec3d::UnitZ());
 
@@ -491,8 +491,12 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
     assert(!selection.is_empty());
     if(selection.is_empty()) return;
 
+    assert(selection.is_single_full_object() || selection.is_single_volume());
+    if (!selection.is_single_full_object() && !selection.is_single_volume()) return;
+
     selection.setup_cache();
-    TransformationType transformation_type = TransformationType::Local_Relative_Joint;
+    TransformationType transformation_type = selection.is_single_volume() ? 
+        TransformationType::Local_Relative_Joint : TransformationType::Instance_Relative_Joint;
     selection.rotate(Vec3d(0., 0., relative_angle), transformation_type);
 
     std::string snapshot_name; // empty meand no store undo / redo

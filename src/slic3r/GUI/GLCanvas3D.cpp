@@ -3508,6 +3508,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 wxGetApp().obj_list()->update_selections();
                 return;
             } else if (hover_volume->emboss_shape.has_value()) {
+                m_selection.add_volumes(Selection::EMode::Volume, {(unsigned) hover_volume_id});
                 if (type != GLGizmosManager::EType::Svg)
                     m_gizmos.open_gizmo(GLGizmosManager::EType::Svg);
                 wxGetApp().obj_list()->update_selections();

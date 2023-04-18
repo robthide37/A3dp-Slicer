@@ -62,7 +62,6 @@
 #define SHOW_FINE_POSITION // draw convex hull around volume
 #define DRAW_PLACE_TO_ADD_TEXT // Interactive draw of window position 
 #define ALLOW_OPEN_NEAR_VOLUME
-#define EXECUTE_PROCESS_ON_MAIN_THREAD // debug execution on main thread
 #endif // ALLOW_DEBUG_MODE
 
 //#define USE_PIXEL_SIZE_IN_WX_FONT
@@ -797,16 +796,10 @@ void GLGizmoEmboss::on_set_state()
         // change position of just opened emboss window
         if (m_allow_open_near_volume) {
             m_set_window_offset = calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
-        } else {
-            if (m_gui_cfg != nullptr)
-                m_set_window_offset = ImGuiWrapper::change_window_position(on_get_name().c_str(), false);
-            else
-                m_set_window_offset = ImVec2(-1, -1);
+        } else {            
+            m_set_window_offset = (m_gui_cfg != nullptr) ?
+                ImGuiWrapper::change_window_position(on_get_name().c_str(), false) : ImVec2(-1, -1);
         }
-
-        // when open by hyperlink it needs to show up
-        // or after key 'T' windows doesn't appear
-        m_parent.set_as_dirty();
     }
 }
 
@@ -1110,29 +1103,6 @@ void GLGizmoEmboss::calculate_scale() {
         m_style_manager.clear_imgui_font();
 }
 
-#ifdef EXECUTE_PROCESS_ON_MAIN_THREAD
-namespace priv {
-// Run Job on main thread (blocking) - ONLY DEBUG
-static inline void execute_job(std::shared_ptr<Job> j)
-{
-    struct MyCtl : public Job::Ctl
-    {
-        void update_status(int st, const std::string &msg = "") override{};
-        bool was_canceled() const override { return false; }
-        std::future<void> call_on_main_thread(std::function<void()> fn) override
-        {
-            return std::future<void>{};
-        }
-    } ctl;
-    j->process(ctl);
-    wxGetApp().plater()->CallAfter([j]() {
-        std::exception_ptr e_ptr = nullptr;
-        j->finalize(false, e_ptr);
-    });
-}
-} // namespace priv
-#endif
-
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
@@ -1151,50 +1121,12 @@ bool GLGizmoEmboss::process()
     if (!m_volume->emboss_shape.has_value()) return false;
     
     DataUpdate data{create_emboss_data_base(m_text, m_style_manager, m_job_cancel), m_volume->id()};
-    std::unique_ptr<Job> job = nullptr;
+    bool start = start_update_volume(std::move(data), *m_volume, m_parent.get_selection(), m_raycast_manager);    
+    if (start)
+        // notification is removed befor object is changed by job    
+        remove_notification_not_valid_font();
 
-    // check cutting from source mesh
-    bool &use_surface = data.base->shape.projection.use_surface;
-    if (use_surface && m_volume->is_the_only_one_part()) 
-        use_surface = false;
-
-    if (use_surface) {
-        // Model to cut surface from.
-        SurfaceVolumeData::ModelSources sources = create_volume_sources(*m_volume);
-        if (sources.empty()) return false;
-
-        Transform3d text_tr = m_volume->get_matrix();
-        auto& fix_3mf = m_volume->emboss_shape->fix_3mf_tr;
-        if (fix_3mf.has_value())
-            text_tr = text_tr * fix_3mf->inverse();
-
-        // when it is new applying of use surface than move origin onto surfaca
-        if (!m_volume->emboss_shape->projection.use_surface) {
-            auto offset = calc_surface_offset(m_parent.get_selection(), m_raycast_manager);
-            if (offset.has_value())
-                text_tr *= Eigen::Translation<double, 3>(*offset);
-        }
-
-        bool is_outside = m_volume->is_model_part();
-        // check that there is not unexpected volume type
-        assert(is_outside || m_volume->is_negative_volume() || m_volume->is_modifier());
-        UpdateSurfaceVolumeData surface_data{std::move(data), {text_tr, is_outside, std::move(sources)}};
-        job = std::make_unique<UpdateSurfaceVolumeJob>(std::move(surface_data));                  
-    } else {
-        job = std::make_unique<UpdateJob>(std::move(data));
-    }
-
-#ifndef EXECUTE_PROCESS_ON_MAIN_THREAD
-    auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    queue_job(worker, std::move(job));
-#else 
-    // Run Job on main thread (blocking) - ONLY DEBUG
-    priv::execute_job(std::move(job));
-#endif // EXECUTE_PROCESS_ON_MAIN_THREAD
-
-    // notification is removed befor object is changed by job
-    remove_notification_not_valid_font();
-    return true;
+    return start;
 }
 
 namespace {
@@ -2473,38 +2405,6 @@ bool GLGizmoEmboss::rev_slider(const std::string &name,
     float undo_offset = ImGui::GetStyle().FramePadding.x;
     return revertible(name, value, default_value,
         undo_tooltip, undo_offset, draw_slider_float);
-}
-
-void GLGizmoEmboss::do_translate(const Vec3d &relative_move)
-{
-    assert(m_volume != nullptr);
-    assert(m_volume->text_configuration.has_value());
-    Selection &selection = m_parent.get_selection();
-    assert(!selection.is_empty());
-    selection.setup_cache();
-    selection.translate(relative_move, TransformationType::Local);
-
-    std::string snapshot_name; // empty mean no store undo / redo
-    // NOTE: it use L instead of _L macro because prefix _ is appended inside
-    // function do_move
-    // snapshot_name = L("Set surface distance");
-    m_parent.do_move(snapshot_name);
-}
-
-void GLGizmoEmboss::do_rotate(float relative_z_angle)
-{
-    assert(m_volume != nullptr);
-    assert(m_volume->text_configuration.has_value());
-    Selection &selection = m_parent.get_selection();
-    assert(!selection.is_empty());
-    selection.setup_cache();
-    selection.rotate(Vec3d(0., 0., relative_z_angle), get_transformation_type(selection));
-
-    std::string snapshot_name; // empty meand no store undo / redo
-    // NOTE: it use L instead of _L macro because prefix _ is appended
-    // inside function do_move
-    // snapshot_name = L("Set text rotation");
-    m_parent.do_rotate(snapshot_name);
 }
 
 void GLGizmoEmboss::draw_advanced()

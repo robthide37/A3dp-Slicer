@@ -23,6 +23,8 @@
 #include "slic3r/Utils/UndoRedo.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
 
+// #define EXECUTE_UPDATE_ON_MAIN_THREAD // debug execution on main thread
+
 using namespace Slic3r;
 using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
@@ -607,6 +609,74 @@ bool start_create_volume_without_position(CreateVolumeParams &input, DataBasePtr
     bool try_no_coor = false;
     return ::start_create_volume_on_surface_job(input, std::move(data), coor, try_no_coor);
 }
+
+#ifdef EXECUTE_UPDATE_ON_MAIN_THREAD
+namespace {
+// Run Job on main thread (blocking) - ONLY DEBUG
+static inline bool execute_job(std::shared_ptr<Job> j)
+{
+    struct MyCtl : public Job::Ctl
+    {
+        void              update_status(int st, const std::string &msg = "") override{};
+        bool              was_canceled() const override { return false; }
+        std::future<void> call_on_main_thread(std::function<void()> fn) override { return std::future<void>{}; }
+    } ctl;
+    j->process(ctl);
+    wxGetApp().plater()->CallAfter([j]() {
+        std::exception_ptr e_ptr = nullptr;
+        j->finalize(false, e_ptr);
+    });
+    return true;
+}
+} // namespace
+#endif
+
+bool start_update_volume(DataUpdate &&data, const ModelVolume &volume, const Selection &selection, RaycastManager& raycaster)
+{
+    assert(data.volume_id == volume.id());
+
+    // check cutting from source mesh
+    bool &use_surface = data.base->shape.projection.use_surface;
+    if (use_surface && volume.is_the_only_one_part())
+        use_surface = false;
+
+    std::unique_ptr<Job> job = nullptr;
+    if (use_surface) {
+        // Model to cut surface from.
+        SurfaceVolumeData::ModelSources sources = create_volume_sources(volume);
+        if (sources.empty())
+            return false;
+
+        Transform3d volume_tr = volume.get_matrix();
+        const std::optional<Transform3d> &fix_3mf = volume.emboss_shape->fix_3mf_tr;
+        if (fix_3mf.has_value())
+            volume_tr = volume_tr * fix_3mf->inverse();
+
+        // when it is new applying of use surface than move origin onto surfaca
+        if (!volume.emboss_shape->projection.use_surface) {
+            auto offset = calc_surface_offset(selection, raycaster);
+            if (offset.has_value())
+                volume_tr *= Eigen::Translation<double, 3>(*offset);
+        }
+
+        bool is_outside = volume.is_model_part();
+        // check that there is not unexpected volume type
+        assert(is_outside || volume.is_negative_volume() || volume.is_modifier());
+        UpdateSurfaceVolumeData surface_data{std::move(data), {volume_tr, is_outside, std::move(sources)}};
+        job = std::make_unique<UpdateSurfaceVolumeJob>(std::move(surface_data));
+    } else {
+        job = std::make_unique<UpdateJob>(std::move(data));
+    }
+
+#ifndef EXECUTE_UPDATE_ON_MAIN_THREAD
+    auto &worker = wxGetApp().plater()->get_ui_job_worker();
+    return queue_job(worker, std::move(job));
+#else
+    // Run Job on main thread (blocking) - ONLY DEBUG
+    return execute_job(std::move(job));
+#endif // EXECUTE_UPDATE_ON_MAIN_THREAD
+}
+
 } // namespace Slic3r::GUI::Emboss
 
 ////////////////////////////
