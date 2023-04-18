@@ -2149,8 +2149,7 @@ void PrintObject::bridge_over_infill()
                         }
                         used_segments.insert(&(*maybe_first_overlap));
                     } else {
-                        // Zero or multiple overlapping segments. Resolving this is nontrivial,
-                        // so we just close this polygon and maybe open several new. This will hopefully happen much less often
+                        // Zero overlapping segments, we just close this polygon
                         traced_poly.lows.push_back(traced_poly.lows.back() + Point{bridging_flow.scaled_spacing() / 2, 0});
                         traced_poly.highs.push_back(traced_poly.highs.back() + Point{bridging_flow.scaled_spacing() / 2, 0});
                         Polygon &new_poly = expanded_bridged_area.emplace_back(std::move(traced_poly.lows));

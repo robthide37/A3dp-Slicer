@@ -6,11 +6,13 @@
 #include "ExPolygon.hpp"
 #include "FillEnsuring.hpp"
 #include "Line.hpp"
+#include "Point.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 #include "SVG.hpp"
 #include "libslic3r.h"
 
+#include <algorithm>
 #include <boost/log/trivial.hpp>
 #include <functional>
 #include <string>
@@ -18,6 +20,8 @@
 #include <vector>
 
 namespace Slic3r {
+
+static constexpr const float NarrowInfillAreaThresholdMM = 3.f;
 
 ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const FillParams &params)
 {
@@ -40,12 +44,13 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                (bhigh >= alow && bhigh <= ahigh);
     };
 
-    Polygons filled_area    = to_polygons(surface->expolygon);
-    double   aligning_angle = -this->angle + PI * 0.5;
-    polygons_rotate(filled_area, aligning_angle);
-    Polygons      internal_area  = shrink(filled_area, scale_(this->overlap));
-    BoundingBox   bb             = get_extents(internal_area);
     const coord_t scaled_spacing = scaled<coord_t>(this->spacing);
+    Polygons      filled_area    = to_polygons(surface->expolygon);
+    double        aligning_angle = -this->angle + PI * 0.5;
+    polygons_rotate(filled_area, aligning_angle);
+    Polygons    internal_area = shrink(filled_area, 0.5 * scaled_spacing - scale_(this->overlap));
+    Polygons    openned_area  = opening(internal_area, scale_(NarrowInfillAreaThresholdMM));
+    BoundingBox bb            = get_extents(openned_area);
 
     const size_t      n_vlines = (bb.max.x() - bb.min.x() + scaled_spacing - 1) / scaled_spacing;
     std::vector<Line> vertical_lines(n_vlines);
@@ -57,14 +62,14 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
         vertical_lines[i].b = Point{x, y_max};
     }
 
-    auto internal_area_distancer = AABBTreeLines::LinesDistancer<Line>{to_lines(internal_area)};
+    auto area_walls = AABBTreeLines::LinesDistancer<Line>{to_lines(internal_area)};
 
     std::vector<std::vector<Line>> polygon_sections(n_vlines);
     for (size_t i = 0; i < n_vlines; i++) {
-        auto area_intersections = internal_area_distancer.intersections_with_line<true>(vertical_lines[i]);
+        auto area_intersections = area_walls.intersections_with_line<true>(vertical_lines[i]);
         for (int intersection_idx = 0; intersection_idx < int(area_intersections.size()) - 1; intersection_idx++) {
-            if (internal_area_distancer.outside(
-                    (area_intersections[intersection_idx].first + area_intersections[intersection_idx + 1].first) / 2) < 0) {
+            if (area_walls.outside((area_intersections[intersection_idx].first + area_intersections[intersection_idx + 1].first) / 2) <
+                0) {
                 polygon_sections[i].emplace_back(area_intersections[intersection_idx].first, area_intersections[intersection_idx + 1].first);
             }
         }
@@ -92,18 +97,32 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
         std::vector<std::pair<int,int>> neighbours{};
     };
 
-    coord_t length_filter = scale_(3);
+    coord_t length_filter = scale_(4);
+    size_t skips_allowed = 2;
+    size_t min_removal_conut = 3;
     for (int section_idx = 0; section_idx < polygon_sections.size(); section_idx++) {
         for (int line_idx = 0; line_idx < polygon_sections[section_idx].size(); line_idx++) {
             if (const Line &line = polygon_sections[section_idx][line_idx]; line.a != line.b && line.length() < length_filter) {
                 std::set<std::pair<int, int>> to_remove{{section_idx, line_idx}};
                 std::vector<Node>             to_visit{{section_idx, line_idx}};
+
+                bool initial_touches_long_lines = false;
+                if (section_idx > 0) {
+                    for (int prev_line_idx = 0; prev_line_idx < polygon_sections[section_idx - 1].size(); prev_line_idx++) {
+                        if (const Line &nl = polygon_sections[section_idx - 1][prev_line_idx];
+                            nl.a != nl.b && segments_overlap(line.a.y(), line.b.y(), nl.a.y(), nl.b.y())) {
+                            initial_touches_long_lines = true;
+                        }
+                    }
+                }
+
                 while (!to_visit.empty()) {
                     Node        curr   = to_visit.back();
                     const Line &curr_l = polygon_sections[curr.section_idx][curr.line_idx];
                     if (curr.neighbours_explored) {
-                        bool is_valid_for_removal = (curr_l.length() < length_filter) && ((int(to_remove.size()) - curr.skips_taken > 3) ||
-                                                                                          to_remove.size() == polygon_sections.size());
+                        bool is_valid_for_removal = (curr_l.length() < length_filter) &&
+                                                    ((int(to_remove.size()) - curr.skips_taken > min_removal_conut) ||
+                                                     (curr.neighbours.empty() && !initial_touches_long_lines));
                         if (!is_valid_for_removal) {
                             for (const auto &n : curr.neighbours) {
                                 if (to_remove.find(n) != to_remove.end()) {
@@ -119,7 +138,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                     } else {
                         to_visit.back().neighbours_explored = true;
                         int  curr_index                     = to_visit.size() - 1;
-                        bool can_use_skip                   = curr_l.length() <= length_filter && curr.skips_taken < 2;
+                        bool can_use_skip                   = curr_l.length() <= length_filter && curr.skips_taken < skips_allowed;
                         if (curr.section_idx + 1 < polygon_sections.size()) {
                             for (int lidx = 0; lidx < polygon_sections[curr.section_idx + 1].size(); lidx++) {
                                 if (const Line &nl = polygon_sections[curr.section_idx + 1][lidx];
@@ -149,6 +168,8 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                                             polygon_sections[section_idx].end());
     }
 
+    double squared_distance_limit_reconnection = 4 * scaled_spacing * scaled_spacing;
+
     Polygons reconstructed_area{};
     // reconstruct polygon from polygon sections
     {
@@ -163,7 +184,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
             std::unordered_set<const Line *> used_segments;
             for (TracedPoly &traced_poly : current_traced_polys) {
                 auto maybe_first_overlap = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.lows.back(),
-                                                            [](const Point &low, const Line &seg) { return seg.b.y() > low.y(); });
+                                                            [](const Point &low, const Line &seg) { return seg.b.y() < low.y(); });
 
                 if (maybe_first_overlap != polygon_slice.end() && // segment exists
                     segments_overlap(traced_poly.lows.back().y(), traced_poly.highs.back().y(), maybe_first_overlap->a.y(),
@@ -171,13 +192,23 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                 {
                     // Overlapping segment. In that case, add it
                     // to the traced polygon and add segment to used segments
-                    traced_poly.lows.push_back(traced_poly.lows.back() + Point{scaled_spacing / 2, 0});
-                    traced_poly.lows.push_back(maybe_first_overlap->a - Point{scaled_spacing / 2, 0});
-                    traced_poly.lows.push_back(maybe_first_overlap->a);
+                    if ((traced_poly.lows.back() - maybe_first_overlap->a).cast<double>().squaredNorm() <
+                        squared_distance_limit_reconnection) {
+                        traced_poly.lows.push_back(maybe_first_overlap->a);
+                    } else {
+                        traced_poly.lows.push_back(traced_poly.lows.back() + Point{scaled_spacing / 2, 0});
+                        traced_poly.lows.push_back(maybe_first_overlap->a - Point{scaled_spacing / 2, 0});
+                        traced_poly.lows.push_back(maybe_first_overlap->a);
+                    }
 
-                    traced_poly.highs.push_back(traced_poly.highs.back() + Point{scaled_spacing / 2, 0});
-                    traced_poly.highs.push_back(maybe_first_overlap->b - Point{scaled_spacing / 2, 0});
-                    traced_poly.highs.push_back(maybe_first_overlap->b);
+                    if ((traced_poly.highs.back() - maybe_first_overlap->b).cast<double>().squaredNorm() <
+                        squared_distance_limit_reconnection) {
+                        traced_poly.highs.push_back(maybe_first_overlap->b);
+                    } else {
+                        traced_poly.highs.push_back(traced_poly.highs.back() + Point{scaled_spacing / 2, 0});
+                        traced_poly.highs.push_back(maybe_first_overlap->b - Point{scaled_spacing / 2, 0});
+                        traced_poly.highs.push_back(maybe_first_overlap->b);
+                    }
                     used_segments.insert(&(*maybe_first_overlap));
                 } else {
                     // Zero or multiple overlapping segments. Resolving this is nontrivial,
@@ -214,13 +245,60 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     }
 
     ThickPolylines thick_polylines_out;
-    for (const auto &a : polygon_sections) {
-        for (const auto &l : a) {
-            ThickPolyline tp{};
-            tp.points = {l.a, l.b};
-            tp.width  = {double(scaled_spacing), double(scaled_spacing)};
-            thick_polylines_out.push_back(tp);
+    {
+        ThickPolylines current_traced_paths;
+        for (const auto &polygon_slice : polygon_sections) {
+            std::unordered_set<const Line *> used_segments;
+            for (ThickPolyline &traced_path : current_traced_paths) {
+                auto maybe_overlap = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_path.last_point(),
+                                                      [](const Point &low, const Line &seg) { return seg.a.y() < low.y(); });
+                bool segment_added = false;
+                if (maybe_overlap != polygon_slice.begin())
+                    maybe_overlap--;
+                while (!segment_added && maybe_overlap != polygon_slice.end()) {
+                    if ((traced_path.last_point() - maybe_overlap->a).cast<double>().squaredNorm() < 
+                                squared_distance_limit_reconnection) {
+                        traced_path.points.push_back(maybe_overlap->a);
+                        traced_path.width.push_back(scaled_spacing);
+                        traced_path.points.push_back(maybe_overlap->b);
+                        traced_path.width.push_back(scaled_spacing);
+                        used_segments.insert(&(*maybe_overlap));
+                        segment_added = true;
+                    } else if ((traced_path.last_point() - maybe_overlap->b).cast<double>().squaredNorm() <
+                               squared_distance_limit_reconnection) {
+                        traced_path.points.push_back(maybe_overlap->b);
+                        traced_path.width.push_back(scaled_spacing);
+                        traced_path.points.push_back(maybe_overlap->a);
+                        traced_path.width.push_back(scaled_spacing);
+                        used_segments.insert(&(*maybe_overlap));
+                        segment_added = true;
+                    }
+                    maybe_overlap++;
+                }
+
+                if (!segment_added) {
+                    // Zero overlapping segments. Finish the polyline.
+                    thick_polylines_out.push_back(std::move(traced_path));
+                    traced_path.clear();
+                }
+            }
+
+            current_traced_paths.erase(std::remove_if(current_traced_paths.begin(), current_traced_paths.end(),
+                                                      [](const ThickPolyline &tp) { return tp.empty(); }),
+                                       current_traced_paths.end());
+
+            for (const auto &segment : polygon_slice) {
+                if (used_segments.find(&segment) == used_segments.end()) {
+                    ThickPolyline &new_path = current_traced_paths.emplace_back();
+                    new_path.points.push_back(segment.a);
+                    new_path.width.push_back(scaled_spacing);
+                    new_path.points.push_back(segment.b);
+                    new_path.width.push_back(scaled_spacing);
+                }
+            }
         }
+
+        thick_polylines_out.insert(thick_polylines_out.end(), current_traced_paths.begin(), current_traced_paths.end());
     }
 
     reconstructed_area                     = closing(reconstructed_area, float(SCALED_EPSILON), float(SCALED_EPSILON));
@@ -238,11 +316,11 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     svg.draw(to_lines(gaps_for_additional_filling), "green", scale_(0.1));
     svg.Close();
 
-    for (const ExPolygon &expoly : gaps_for_additional_filling) {
-        Point                  bbox_size   = expoly.contour.bounding_box().size();
-        coord_t                loops_count = std::max(bbox_size.x(), bbox_size.y()) / scaled_spacing + 1;
-        Arachne::WallToolPaths wall_tool_paths(to_polygons(expoly), scaled_spacing, scaled_spacing, loops_count, 0, params.layer_height,
-                                               *this->print_object_config, *this->print_config);
+    for (ExPolygon &ex_poly : gaps_for_additional_filling) {
+        Point    bbox_size   = ex_poly.contour.bounding_box().size();
+        coord_t  loops_count = std::max(bbox_size.x(), bbox_size.y()) / scaled_spacing + 1;
+        Polygons polygons    = to_polygons(ex_poly);
+        Arachne::WallToolPaths wall_tool_paths(polygons, scaled_spacing, scaled_spacing, loops_count, 0, params.layer_height, *this->print_object_config, *this->print_config);
         if (std::vector<Arachne::VariableWidthLines> loops = wall_tool_paths.getToolPaths(); !loops.empty()) {
             std::vector<const Arachne::ExtrusionLine *> all_extrusions;
             for (Arachne::VariableWidthLines &loop : loops) {
