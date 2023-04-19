@@ -499,15 +499,16 @@ TEST_CASE("UndoRedo TextConfiguration serialization", "[Emboss]")
     TextConfiguration tc;
     tc.text = "Dovede-li se člověk zasmát sám sobě, nevyjde ze smíchu po celý život.";
     EmbossStyle& es = tc.style;
-    es.name       = "Seneca";
-    es.path       = "Simply the best";
-    es.type       = EmbossStyle::Type::file_path;
-    FontProp &fp  = es.prop;
-    fp.angle      = 100.;
-    fp.distance   = 10.;
-    fp.char_gap   = 1;
-    fp.use_surface = true;
-    tc.fix_3mf_tr = Transform3d::Identity();
+    es.name      = "Seneca";
+    es.path      = "Simply the best";
+    es.type      = EmbossStyle::Type::file_path;
+    FontProp &fp = es.prop;
+    fp.char_gap  = 3;
+    fp.line_gap  = 7;
+    fp.boldness  = 2.3f;
+    fp.skew      = 4.5f;
+    fp.collection_number = 13;
+    fp.size_in_mm= 6.7f;
 
     std::stringstream ss; // any stream can be used
     {
@@ -522,7 +523,6 @@ TEST_CASE("UndoRedo TextConfiguration serialization", "[Emboss]")
     }
     CHECK(tc.style == tc_loaded.style);
     CHECK(tc.text == tc_loaded.text);
-    CHECK(tc.fix_3mf_tr.has_value() == tc_loaded.fix_3mf_tr.has_value());
 }
 
 #include "libslic3r/EmbossShape.hpp"
