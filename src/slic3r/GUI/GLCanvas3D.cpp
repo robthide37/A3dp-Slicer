@@ -2939,8 +2939,21 @@ void GLCanvas3D::on_mouse_wheel(wxMouseEvent& evt)
         return;
 
     // Calculate the zoom delta and apply it to the current zoom factor
-    double direction_factor = wxGetApp().app_config->get_bool("reverse_mouse_wheel_zoom") ? -1.0 : 1.0;
-    _update_camera_zoom(direction_factor * (double)evt.GetWheelRotation() / (double)evt.GetWheelDelta());
+    const double direction_factor = wxGetApp().app_config->get_bool("reverse_mouse_wheel_zoom") ? -1.0 : 1.0;
+    const double delta = direction_factor * (double)evt.GetWheelRotation() / (double)evt.GetWheelDelta();
+    if (wxGetKeyState(WXK_SHIFT)) {
+        const auto cnv_size = get_canvas_size();
+        const auto screen_center_3d_pos = _mouse_to_3d({ cnv_size.get_width() * 0.5, cnv_size.get_height() * 0.5 });
+        const auto mouse_3d_pos = _mouse_to_3d({ evt.GetX(), evt.GetY() });
+        const Vec3d displacement = mouse_3d_pos - screen_center_3d_pos;
+        wxGetApp().plater()->get_camera().translate_world(displacement);
+        const double origin_zoom = wxGetApp().plater()->get_camera().get_zoom();
+        _update_camera_zoom(delta);
+        const double new_zoom = wxGetApp().plater()->get_camera().get_zoom();
+        wxGetApp().plater()->get_camera().translate_world((-displacement) / (new_zoom / origin_zoom));
+    }
+    else
+        _update_camera_zoom(delta);
 }
 
 void GLCanvas3D::on_timer(wxTimerEvent& evt)
