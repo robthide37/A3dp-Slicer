@@ -206,6 +206,9 @@ struct ThickPolyline {
     void start_at_index(int index);
 
     Points                  points;
+    // vector of startpoint width and endpoint width of each line segment. The size should be always (points.size()-1) * 2
+    // e.g. let four be points a,b,c,d. that are three lines ab, bc, cd. for each line, there should be start width, so the width vector is:
+    // w(a), w(b), w(b), w(c), w(c), w(d)
     std::vector<coordf_t>   width;
     std::pair<bool,bool>    endpoints { false, false };
 };

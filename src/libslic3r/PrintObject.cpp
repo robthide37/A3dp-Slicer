@@ -2122,8 +2122,10 @@ void PrintObject::bridge_over_infill()
                 std::unordered_set<const Line *> used_segments;
                 for (TracedPoly &traced_poly : current_traced_polys) {
                     auto maybe_first_overlap = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.lows.back(),
-                                                                [](const Point &low, const Line &seg) { return seg.b.y() > low.y(); });
-
+                                                                [](const Point &low, const Line &seg) { return seg.b.y() < low.y(); });
+                    if (maybe_first_overlap != polygon_slice.begin()) {
+                        maybe_first_overlap--;
+                    }
                     if (maybe_first_overlap != polygon_slice.end() && // segment exists
                         segments_overlap(traced_poly.lows.back().y(), traced_poly.highs.back().y(), maybe_first_overlap->a.y(),
                                          maybe_first_overlap->b.y())) // segment is overlapping

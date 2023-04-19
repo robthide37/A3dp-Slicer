@@ -168,7 +168,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                                             polygon_sections[section_idx].end());
     }
 
-    double squared_distance_limit_reconnection = 4 * scaled_spacing * scaled_spacing;
+    double squared_distance_limit_reconnection = 4 * double(scaled_spacing) * double(scaled_spacing);
 
     Polygons reconstructed_area{};
     // reconstruct polygon from polygon sections
@@ -185,7 +185,9 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
             for (TracedPoly &traced_poly : current_traced_polys) {
                 auto maybe_first_overlap = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.lows.back(),
                                                             [](const Point &low, const Line &seg) { return seg.b.y() < low.y(); });
-
+                if (maybe_first_overlap != polygon_slice.begin()) {
+                    maybe_first_overlap--;
+                }
                 if (maybe_first_overlap != polygon_slice.end() && // segment exists
                     segments_overlap(traced_poly.lows.back().y(), traced_poly.highs.back().y(), maybe_first_overlap->a.y(),
                                      maybe_first_overlap->b.y())) // segment is overlapping
@@ -252,13 +254,16 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
             for (ThickPolyline &traced_path : current_traced_paths) {
                 auto maybe_overlap = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_path.last_point(),
                                                       [](const Point &low, const Line &seg) { return seg.a.y() < low.y(); });
-                bool segment_added = false;
-                if (maybe_overlap != polygon_slice.begin())
+                if (maybe_overlap != polygon_slice.begin()) {
                     maybe_overlap--;
+                }
+                bool segment_added = false;
                 while (!segment_added && maybe_overlap != polygon_slice.end()) {
                     if ((traced_path.last_point() - maybe_overlap->a).cast<double>().squaredNorm() < 
                                 squared_distance_limit_reconnection) {
+                        traced_path.width.push_back(scaled_spacing);
                         traced_path.points.push_back(maybe_overlap->a);
+                        traced_path.width.push_back(scaled_spacing);
                         traced_path.width.push_back(scaled_spacing);
                         traced_path.points.push_back(maybe_overlap->b);
                         traced_path.width.push_back(scaled_spacing);
@@ -266,7 +271,9 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                         segment_added = true;
                     } else if ((traced_path.last_point() - maybe_overlap->b).cast<double>().squaredNorm() <
                                squared_distance_limit_reconnection) {
+                        traced_path.width.push_back(scaled_spacing);
                         traced_path.points.push_back(maybe_overlap->b);
+                        traced_path.width.push_back(scaled_spacing);
                         traced_path.width.push_back(scaled_spacing);
                         traced_path.points.push_back(maybe_overlap->a);
                         traced_path.width.push_back(scaled_spacing);
@@ -287,13 +294,14 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                                                       [](const ThickPolyline &tp) { return tp.empty(); }),
                                        current_traced_paths.end());
 
-            for (const auto &segment : polygon_slice) {
+            for (const Line &segment : polygon_slice) {
                 if (used_segments.find(&segment) == used_segments.end()) {
                     ThickPolyline &new_path = current_traced_paths.emplace_back();
                     new_path.points.push_back(segment.a);
                     new_path.width.push_back(scaled_spacing);
                     new_path.points.push_back(segment.b);
                     new_path.width.push_back(scaled_spacing);
+                    new_path.endpoints = {true,true};
                 }
             }
         }
