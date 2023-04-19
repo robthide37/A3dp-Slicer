@@ -37,6 +37,7 @@ using namespace Slic3r::GUI::Emboss;
 
 GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -3)
+    , m_gui_cfg(nullptr)
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
 {
     m_rotate_gizmo.set_group_id(0);

@@ -151,7 +151,7 @@ private:
     void remove_notification_not_valid_font();
 
     struct GuiCfg;
-    std::unique_ptr<const GuiCfg> m_gui_cfg = nullptr;
+    std::unique_ptr<const GuiCfg> m_gui_cfg;
 
     // Is open tree with advanced options
     bool m_is_advanced_edit_style = false;
@@ -167,7 +167,7 @@ private:
 
     // pImpl to hide implementation of FaceNames to .cpp file
     struct Facenames; // forward declaration
-    std::unique_ptr<Facenames> m_face_names = nullptr;
+    std::unique_ptr<Facenames> m_face_names;
 
     // Text to emboss
     std::string m_text; // Sequence of Unicode UTF8 symbols
