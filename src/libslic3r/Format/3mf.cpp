@@ -867,9 +867,12 @@ namespace Slic3r {
             IdToCutObjectInfoMap::iterator cut_object_info = m_cut_object_infos.find(object.second + 1);
             if (cut_object_info != m_cut_object_infos.end()) {
                 model_object->cut_id = cut_object_info->second.id;
-
+                int vol_cnt = int(model_object->volumes.size());
                 for (auto connector : cut_object_info->second.connectors) {
-                    assert(0 <= connector.volume_id && connector.volume_id <= int(model_object->volumes.size()));
+                    if (connector.volume_id < 0 || connector.volume_id >= vol_cnt) {
+                        add_error("Invalid connector is found");
+                        continue;
+                    }
                     model_object->volumes[connector.volume_id]->cut_info = 
                         ModelVolume::CutInfo(CutConnectorType(connector.type), connector.r_tolerance, connector.h_tolerance, true);
                 }
