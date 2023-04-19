@@ -16,6 +16,7 @@
 #include <boost/log/trivial.hpp>
 #include <functional>
 #include <string>
+#include <type_traits>
 #include <unordered_set>
 #include <vector>
 
@@ -87,6 +88,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
         polygon_sections[i].erase(std::remove_if(polygon_sections[i].begin(), polygon_sections[i].end(),
                                                  [](const Line &s) { return s.a == s.b; }),
                                   polygon_sections[i].end());
+        std::sort(polygon_sections[i].begin(), polygon_sections[i].end(), [](const Line &a, const Line &b) { return a.a.y() < b.b.y(); });
     }
 
     struct Node{
@@ -166,9 +168,87 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
         polygon_sections[section_idx].erase(std::remove_if(polygon_sections[section_idx].begin(), polygon_sections[section_idx].end(),
                                                            [](const Line &s) { return s.a == s.b; }),
                                             polygon_sections[section_idx].end());
+        std::sort(polygon_sections[section_idx].begin(), polygon_sections[section_idx].end(),
+                  [](const Line &a, const Line &b) { return a.a.y() < b.b.y(); });
     }
 
     double squared_distance_limit_reconnection = 4 * double(scaled_spacing) * double(scaled_spacing);
+
+    ThickPolylines thick_polylines_out;
+    {
+        struct TracedPath {
+            ThickPolyline polyline;
+            const Line* origin_line;
+        };
+
+        std::vector<TracedPath> current_traced_paths;
+        for (const auto &polygon_slice : polygon_sections) {
+            std::unordered_set<const Line *> used_segments;
+            for (TracedPath &traced_path : current_traced_paths) {
+                ThickPolyline& traced_polyline = traced_path.polyline;
+                Point max_y = traced_polyline.last_point();
+                Point min_y = traced_polyline.points[traced_polyline.size() - 2];
+
+                if (max_y.y() < min_y.y())
+                    std::swap(max_y, min_y);
+
+                auto candidates_begin = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), min_y,
+                                                         [](const Point &low, const Line &seg) { return seg.b.y() > low.y(); });
+                auto candidates_end   = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), max_y,
+                                                         [](const Point &high, const Line &seg) { return seg.a.y() > high.y(); });
+                bool segment_added    = false;
+                for (auto candidate = candidates_begin; candidate != candidates_end && !segment_added; candidate++) {
+                    if (used_segments.find(&(*candidate)) != used_segments.end()) {
+                        continue;
+                    }
+                    if ((traced_polyline.last_point() - candidate->a).cast<double>().squaredNorm() < squared_distance_limit_reconnection) {
+                        traced_polyline.width.push_back(scaled_spacing);
+                        traced_polyline.points.push_back(candidate->a);
+                        traced_polyline.width.push_back(scaled_spacing);
+                        traced_polyline.width.push_back(scaled_spacing);
+                        traced_polyline.points.push_back(candidate->b);
+                        traced_polyline.width.push_back(scaled_spacing);
+                        used_segments.insert(&(*candidate));
+                        segment_added = true;
+                    } else if ((traced_polyline.last_point() - candidate->b).cast<double>().squaredNorm() <
+                               squared_distance_limit_reconnection) {
+                        traced_polyline.width.push_back(scaled_spacing);
+                        traced_polyline.points.push_back(candidate->b);
+                        traced_polyline.width.push_back(scaled_spacing);
+                        traced_polyline.width.push_back(scaled_spacing);
+                        traced_polyline.points.push_back(candidate->a);
+                        traced_polyline.width.push_back(scaled_spacing);
+                        used_segments.insert(&(*candidate));
+                        segment_added = true;
+                    }
+                }
+
+                if (!segment_added) {
+                    // Zero overlapping segments. Finish the polyline.
+                    thick_polylines_out.push_back(std::move(traced_polyline));
+                    traced_polyline.clear();
+                }
+            }
+
+            current_traced_paths.erase(std::remove_if(current_traced_paths.begin(), current_traced_paths.end(),
+                                                      [](const ThickPolyline &tp) { return tp.empty(); }),
+                                       current_traced_paths.end());
+
+            for (const Line &segment : polygon_slice) {
+                if (used_segments.find(&segment) == used_segments.end()) {
+                    TracedPath &new_path = current_traced_paths.emplace_back();
+                    new_path.polyline.points.push_back(segment.a);
+                    new_path.polyline.width.push_back(scaled_spacing);
+                    new_path.polyline.points.push_back(segment.b);
+                    new_path.polyline.width.push_back(scaled_spacing);
+                    new_path.polyline.endpoints = {true, true};
+                    new_path.origin_line = &segment;
+                }
+            }
+        }
+
+        thick_polylines_out.insert(thick_polylines_out.end(), current_traced_paths.begin(), current_traced_paths.end());
+    }
 
     Polygons reconstructed_area{};
     // reconstruct polygon from polygon sections
@@ -183,36 +263,37 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
         for (const auto &polygon_slice : polygon_sections) {
             std::unordered_set<const Line *> used_segments;
             for (TracedPoly &traced_poly : current_traced_polys) {
-                auto maybe_first_overlap = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.lows.back(),
-                                                            [](const Point &low, const Line &seg) { return seg.b.y() < low.y(); });
-                if (maybe_first_overlap != polygon_slice.begin()) {
-                    maybe_first_overlap--;
-                }
-                if (maybe_first_overlap != polygon_slice.end() && // segment exists
-                    segments_overlap(traced_poly.lows.back().y(), traced_poly.highs.back().y(), maybe_first_overlap->a.y(),
-                                     maybe_first_overlap->b.y())) // segment is overlapping
-                {
-                    // Overlapping segment. In that case, add it
-                    // to the traced polygon and add segment to used segments
-                    if ((traced_poly.lows.back() - maybe_first_overlap->a).cast<double>().squaredNorm() <
-                        squared_distance_limit_reconnection) {
-                        traced_poly.lows.push_back(maybe_first_overlap->a);
+                auto candidates_begin = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.lows.back(),
+                                                    [](const Point &low, const Line &seg) { return seg.b.y() > low.y(); });
+                auto candidates_end = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.highs.back(),
+                                                  [](const Point &high, const Line &seg) { return seg.a.y() > high.y(); });
+
+                bool segment_added = false;
+                for (auto candidate = candidates_begin; candidate != candidates_end && !segment_added; candidate++) {
+                    if (used_segments.find(&(*candidate)) != used_segments.end()) {
+                        continue;
+                    }
+                    if ((traced_poly.lows.back() - candidates_begin->a).cast<double>().squaredNorm() < squared_distance_limit_reconnection) {
+                        traced_poly.lows.push_back(candidates_begin->a);
                     } else {
                         traced_poly.lows.push_back(traced_poly.lows.back() + Point{scaled_spacing / 2, 0});
-                        traced_poly.lows.push_back(maybe_first_overlap->a - Point{scaled_spacing / 2, 0});
-                        traced_poly.lows.push_back(maybe_first_overlap->a);
+                        traced_poly.lows.push_back(candidates_begin->a - Point{scaled_spacing / 2, 0});
+                        traced_poly.lows.push_back(candidates_begin->a);
                     }
 
-                    if ((traced_poly.highs.back() - maybe_first_overlap->b).cast<double>().squaredNorm() <
+                    if ((traced_poly.highs.back() - candidates_begin->b).cast<double>().squaredNorm() <
                         squared_distance_limit_reconnection) {
-                        traced_poly.highs.push_back(maybe_first_overlap->b);
+                        traced_poly.highs.push_back(candidates_begin->b);
                     } else {
                         traced_poly.highs.push_back(traced_poly.highs.back() + Point{scaled_spacing / 2, 0});
-                        traced_poly.highs.push_back(maybe_first_overlap->b - Point{scaled_spacing / 2, 0});
-                        traced_poly.highs.push_back(maybe_first_overlap->b);
+                        traced_poly.highs.push_back(candidates_begin->b - Point{scaled_spacing / 2, 0});
+                        traced_poly.highs.push_back(candidates_begin->b);
                     }
-                    used_segments.insert(&(*maybe_first_overlap));
-                } else {
+                    segment_added = true;
+                    used_segments.insert(&(*candidates_begin));
+                }
+
+                if (!segment_added) {
                     // Zero or multiple overlapping segments. Resolving this is nontrivial,
                     // so we just close this polygon and maybe open several new. This will hopefully happen much less often
                     traced_poly.lows.push_back(traced_poly.lows.back() + Point{scaled_spacing / 2, 0});
@@ -244,69 +325,6 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
             Polygon &new_poly = reconstructed_area.emplace_back(std::move(traced_poly.lows));
             new_poly.points.insert(new_poly.points.end(), traced_poly.highs.rbegin(), traced_poly.highs.rend());
         }
-    }
-
-    ThickPolylines thick_polylines_out;
-    {
-        ThickPolylines current_traced_paths;
-        for (const auto &polygon_slice : polygon_sections) {
-            std::unordered_set<const Line *> used_segments;
-            for (ThickPolyline &traced_path : current_traced_paths) {
-                auto maybe_overlap = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_path.last_point(),
-                                                      [](const Point &low, const Line &seg) { return seg.a.y() < low.y(); });
-                if (maybe_overlap != polygon_slice.begin()) {
-                    maybe_overlap--;
-                }
-                bool segment_added = false;
-                while (!segment_added && maybe_overlap != polygon_slice.end()) {
-                    if ((traced_path.last_point() - maybe_overlap->a).cast<double>().squaredNorm() < 
-                                squared_distance_limit_reconnection) {
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(maybe_overlap->a);
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(maybe_overlap->b);
-                        traced_path.width.push_back(scaled_spacing);
-                        used_segments.insert(&(*maybe_overlap));
-                        segment_added = true;
-                    } else if ((traced_path.last_point() - maybe_overlap->b).cast<double>().squaredNorm() <
-                               squared_distance_limit_reconnection) {
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(maybe_overlap->b);
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(maybe_overlap->a);
-                        traced_path.width.push_back(scaled_spacing);
-                        used_segments.insert(&(*maybe_overlap));
-                        segment_added = true;
-                    }
-                    maybe_overlap++;
-                }
-
-                if (!segment_added) {
-                    // Zero overlapping segments. Finish the polyline.
-                    thick_polylines_out.push_back(std::move(traced_path));
-                    traced_path.clear();
-                }
-            }
-
-            current_traced_paths.erase(std::remove_if(current_traced_paths.begin(), current_traced_paths.end(),
-                                                      [](const ThickPolyline &tp) { return tp.empty(); }),
-                                       current_traced_paths.end());
-
-            for (const Line &segment : polygon_slice) {
-                if (used_segments.find(&segment) == used_segments.end()) {
-                    ThickPolyline &new_path = current_traced_paths.emplace_back();
-                    new_path.points.push_back(segment.a);
-                    new_path.width.push_back(scaled_spacing);
-                    new_path.points.push_back(segment.b);
-                    new_path.width.push_back(scaled_spacing);
-                    new_path.endpoints = {true,true};
-                }
-            }
-        }
-
-        thick_polylines_out.insert(thick_polylines_out.end(), current_traced_paths.begin(), current_traced_paths.end());
     }
 
     reconstructed_area                     = closing(reconstructed_area, float(SCALED_EPSILON), float(SCALED_EPSILON));

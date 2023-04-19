@@ -2108,6 +2108,8 @@ void PrintObject::bridge_over_infill()
                 polygon_sections[i].erase(std::remove_if(polygon_sections[i].begin(), polygon_sections[i].end(),
                                                          [](const Line &s) { return s.a == s.b; }),
                                           polygon_sections[i].end());
+                std::sort(polygon_sections[i].begin(), polygon_sections[i].end(),
+                          [](const Line &a, const Line &b) { return a.a.y() < b.b.y(); });
             }
 
             // reconstruct polygon from polygon sections
@@ -2121,36 +2123,39 @@ void PrintObject::bridge_over_infill()
             for (const auto &polygon_slice : polygon_sections) {
                 std::unordered_set<const Line *> used_segments;
                 for (TracedPoly &traced_poly : current_traced_polys) {
-                    auto maybe_first_overlap = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.lows.back(),
-                                                                [](const Point &low, const Line &seg) { return seg.b.y() < low.y(); });
-                    if (maybe_first_overlap != polygon_slice.begin()) {
-                        maybe_first_overlap--;
-                    }
-                    if (maybe_first_overlap != polygon_slice.end() && // segment exists
-                        segments_overlap(traced_poly.lows.back().y(), traced_poly.highs.back().y(), maybe_first_overlap->a.y(),
-                                         maybe_first_overlap->b.y())) // segment is overlapping
-                    {
-                        // Overlapping segment. In that case, add it
-                        // to the traced polygon and add segment to used segments
-                        if ((traced_poly.lows.back() - maybe_first_overlap->a).cast<double>().squaredNorm() <
-                            36.0 * double(bridging_flow.scaled_spacing()) * bridging_flow.scaled_spacing()) {
-                            traced_poly.lows.push_back(maybe_first_overlap->a);
-                        } else {
-                            traced_poly.lows.push_back(traced_poly.lows.back() + Point{bridging_flow.scaled_spacing() / 2, 0});
-                            traced_poly.lows.push_back(maybe_first_overlap->a - Point{bridging_flow.scaled_spacing() / 2, 0});
-                            traced_poly.lows.push_back(maybe_first_overlap->a);
+                    auto candidates_begin = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.lows.back(),
+                                                             [](const Point &low, const Line &seg) { return seg.b.y() > low.y(); });
+                    auto candidates_end   = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.highs.back(),
+                                                             [](const Point &high, const Line &seg) { return seg.a.y() > high.y(); });
+
+                    bool segment_added = false;
+                    for (auto candidate = candidates_begin; candidate != candidates_end && !segment_added; candidate++) {
+                        if (used_segments.find(&(*candidate)) != used_segments.end()) {
+                            continue;
                         }
 
-                        if ((traced_poly.highs.back() - maybe_first_overlap->b).cast<double>().squaredNorm() <
+                        if ((traced_poly.lows.back() - candidate->a).cast<double>().squaredNorm() <
                             36.0 * double(bridging_flow.scaled_spacing()) * bridging_flow.scaled_spacing()) {
-                            traced_poly.highs.push_back(maybe_first_overlap->b);
+                            traced_poly.lows.push_back(candidate->a);
+                        } else {
+                            traced_poly.lows.push_back(traced_poly.lows.back() + Point{bridging_flow.scaled_spacing() / 2, 0});
+                            traced_poly.lows.push_back(candidate->a - Point{bridging_flow.scaled_spacing() / 2, 0});
+                            traced_poly.lows.push_back(candidate->a);
+                        }
+
+                        if ((traced_poly.highs.back() - candidate->b).cast<double>().squaredNorm() <
+                            36.0 * double(bridging_flow.scaled_spacing()) * bridging_flow.scaled_spacing()) {
+                            traced_poly.highs.push_back(candidate->b);
                         } else {
                             traced_poly.highs.push_back(traced_poly.highs.back() + Point{bridging_flow.scaled_spacing() / 2, 0});
-                            traced_poly.highs.push_back(maybe_first_overlap->b - Point{bridging_flow.scaled_spacing() / 2, 0});
-                            traced_poly.highs.push_back(maybe_first_overlap->b);
+                            traced_poly.highs.push_back(candidate->b - Point{bridging_flow.scaled_spacing() / 2, 0});
+                            traced_poly.highs.push_back(candidate->b);
                         }
-                        used_segments.insert(&(*maybe_first_overlap));
-                    } else {
+                        segment_added = true;
+                        used_segments.insert(&(*candidate));
+                    }
+
+                    if (!segment_added) {
                         // Zero overlapping segments, we just close this polygon
                         traced_poly.lows.push_back(traced_poly.lows.back() + Point{bridging_flow.scaled_spacing() / 2, 0});
                         traced_poly.highs.push_back(traced_poly.highs.back() + Point{bridging_flow.scaled_spacing() / 2, 0});

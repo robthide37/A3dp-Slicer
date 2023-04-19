@@ -5,6 +5,7 @@
 #include "libslic3r/format.hpp"
 #include "libslic3r/I18N.hpp"
 #include "libslic3r/GCodeWriter.hpp"
+#include "libslic3r/I18N.hpp"
 #include "GCodeProcessor.hpp"
 
 #include <boost/algorithm/string/case_conv.hpp>
