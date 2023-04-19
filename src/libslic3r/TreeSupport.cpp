@@ -1464,17 +1464,21 @@ static void generate_initial_areas(
     const size_t  num_support_roof_layers = mesh_group_settings.support_roof_enable ? (mesh_group_settings.support_roof_height + config.layer_height / 2) / config.layer_height : 0;
     const bool    roof_enabled        = num_support_roof_layers > 0;
     const bool    force_tip_to_roof   = sqr<double>(config.min_radius) * M_PI > mesh_group_settings.minimum_roof_area && roof_enabled;
-    //FIXME mesh_group_settings.support_angle does not apply to enforcers and also it does not apply to automatic support angle (by half the external perimeter width).
-    //used by max_overhang_insert_lag, only if not min_xy_dist.
-    const coord_t max_overhang_speed  = mesh_group_settings.support_angle < 0.5 * M_PI ? coord_t(tan(mesh_group_settings.support_angle) * config.layer_height) : std::numeric_limits<coord_t>::max();
     // cap for how much layer below the overhang a new support point may be added, as other than with regular support every new inserted point 
     // may cause extra material and time cost.  Could also be an user setting or differently calculated. Idea is that if an overhang 
     // does not turn valid in double the amount of layers a slope of support angle would take to travel xy_distance, nothing reasonable will come from it. 
     // The 2*z_distance_delta is only a catch for when the support angle is very high.
     // Used only if not min_xy_dist.
-    const coord_t max_overhang_insert_lag = config.z_distance_top_layers > 0 ?
-        std::max<coord_t>(round_up_divide(config.xy_distance, max_overhang_speed / 2), 2 * config.z_distance_top_layers) :
-        0;
+    coord_t max_overhang_insert_lag = 0;
+    if (config.z_distance_top_layers > 0) {
+        max_overhang_insert_lag = 2 * config.z_distance_top_layers;
+        if (mesh_group_settings.support_angle > EPSILON && mesh_group_settings.support_angle < 0.5 * M_PI - EPSILON) {
+            //FIXME mesh_group_settings.support_angle does not apply to enforcers and also it does not apply to automatic support angle (by half the external perimeter width).
+            //used by max_overhang_insert_lag, only if not min_xy_dist.
+            const auto max_overhang_speed  = coord_t(tan(mesh_group_settings.support_angle) * config.layer_height);
+            max_overhang_insert_lag = std::max(max_overhang_insert_lag, round_up_divide(config.xy_distance, max_overhang_speed / 2));
+        }
+    }
 
     size_t                                          num_support_layers;
     int                                             raft_contact_layer_idx;
@@ -3709,12 +3713,13 @@ static std::pair<int, int> discretize_circle(const Vec3f &center, const Vec3f &n
     return { begin, int(pts.size()) };
 }
 
-static void extrude_branch(
-    const std::vector<SupportElement*>      &path, 
-    const TreeSupportSettings               &config,
-    const SlicingParameters                 &slicing_params,
-    const std::vector<SupportElements>      &move_bounds, 
-    indexed_triangle_set                    &result)
+// Returns Z span of the generated mesh.
+static std::pair<float, float> extrude_branch(
+    const std::vector<const SupportElement*>    &path,
+    const TreeSupportSettings                   &config,
+    const SlicingParameters                     &slicing_params,
+    const std::vector<SupportElements>          &move_bounds,
+    indexed_triangle_set                        &result)
 {
     Vec3d p1, p2, p3;
     Vec3d v1, v2;
@@ -3726,6 +3731,8 @@ static void extrude_branch(
 
 //    char fname[2048];
 //    static int irun = 0;
+
+    float zmin, zmax;
 
     for (size_t ipath = 1; ipath < path.size(); ++ ipath) {
         const SupportElement &prev    = *path[ipath - 1];
@@ -3743,6 +3750,7 @@ static void extrude_branch(
             angle_step       = M_PI / (2. * nsteps);
             int   ifan       = int(result.vertices.size());
             result.vertices.emplace_back((p1 - nprev * radius).cast<float>());
+            zmin = result.vertices.back().z();
             float angle = angle_step;
             for (int i = 1; i < nsteps; ++ i, angle += angle_step) {
                 std::pair<int, int> strip = discretize_circle((p1 - nprev * radius * cos(angle)).cast<float>(), nprev.cast<float>(), radius * sin(angle), eps, result.vertices);
@@ -3773,6 +3781,7 @@ static void extrude_branch(
             }
             int ifan = int(result.vertices.size());
             result.vertices.emplace_back((p2 + ncurrent * radius).cast<float>());
+            zmax = result.vertices.back().z();
             triangulate_fan<true>(result, ifan, prev_strip.first, prev_strip.second);
 //            sprintf(fname, "d:\\temp\\meshes\\tree-partial-%d.obj", ++ irun);
 //            its_write_obj(result, fname);
@@ -3800,6 +3809,8 @@ static void extrude_branch(
         }
 #endif
     }
+
+    return std::make_pair(zmin, zmax);
 }
 #endif
 
@@ -4121,15 +4132,13 @@ static void organic_smooth_branches_avoid_collisions(
 #endif // TREE_SUPPORT_ORGANIC_NUDGE_NEW
 
 // Organic specific: Smooth branches and produce one cummulative mesh to be sliced.
-static indexed_triangle_set draw_branches(
+static std::vector<Polygons> draw_branches(
     PrintObject                     &print_object,
-    const TreeModelVolumes          &volumes, 
+    TreeModelVolumes                &volumes, 
     const TreeSupportSettings       &config,
     std::vector<SupportElements>    &move_bounds,
     std::function<void()>            throw_on_cancel)
 {
-    static int irun = 0;
-
     // All SupportElements are put into a layer independent storage to improve parallelization.
     std::vector<std::pair<SupportElement*, int>> elements_with_link_down;
     std::vector<size_t>                          linear_data_layers;
@@ -4176,127 +4185,188 @@ static indexed_triangle_set draw_branches(
 
     organic_smooth_branches_avoid_collisions(print_object, volumes, config, move_bounds, elements_with_link_down, linear_data_layers, throw_on_cancel);
 
+    // Reduce memory footprint. After this point only finalize_interface_and_support_areas() will use volumes and from that only collisions with zero radius will be used.
+    volumes.clear_all_but_object_collision();
+
     // Unmark all nodes.
     for (SupportElements &elements : move_bounds)
         for (SupportElement &element : elements)
             element.state.marked = false;
 
     // Traverse all nodes, generate tubes.
-    // Traversal stack with nodes and thier current parent
-    const SlicingParameters &slicing_params = print_object.slicing_parameters();
-    std::vector<SupportElement*> path;
-    indexed_triangle_set cummulative_mesh;
-    indexed_triangle_set partial_mesh;
-    indexed_triangle_set temp_mesh;
-    for (LayerIndex layer_idx = 0; layer_idx + 1 < LayerIndex(move_bounds.size()); ++ layer_idx) {
-        SupportElements &layer = move_bounds[layer_idx];
-        SupportElements &layer_above = move_bounds[layer_idx + 1];
+    // Traversal stack with nodes and their current parent
 
-        for (SupportElement &start_element : layer)
-            if (! start_element.state.marked && ! start_element.parents.empty()) {
-                // Collect elements up to a bifurcation above.
-                start_element.state.marked = true;
-                for (size_t parent_idx = 0; parent_idx < start_element.parents.size(); ++ parent_idx) {
-                    path.clear();
-                    path.emplace_back(&start_element);
-                    // Traverse each branch until it branches again.
-                    SupportElement &first_parent = layer_above[start_element.parents[parent_idx]];
-                    assert(path.back()->state.layer_idx + 1 == first_parent.state.layer_idx);
-                    path.emplace_back(&first_parent);
-                    if (first_parent.parents.size() < 2)
-                        first_parent.state.marked = true;
-                    if (first_parent.parents.size() == 1) {
-                        for (SupportElement *parent = &first_parent;;) {
-                            SupportElement &next_parent = move_bounds[parent->state.layer_idx + 1][parent->parents.front()];
-                            assert(path.back()->state.layer_idx + 1 == next_parent.state.layer_idx);
-                            path.emplace_back(&next_parent);
-                            if (next_parent.parents.size() > 1)
-                                break;
-                            next_parent.state.marked = true;
-                            if (next_parent.parents.size() == 0)
-                                break;
-                            parent = &next_parent;
+    struct Branch {
+        std::vector<const SupportElement*> path;
+        bool                               has_root{ false };
+        bool                               has_tip { false };
+    };
+
+    struct Slice {
+        Polygons polygons;
+        size_t   num_branches{ 0 };
+    };
+
+    struct Tree {
+        std::vector<Branch>  branches;
+
+        std::vector<Slice>   slices;
+        LayerIndex           first_layer_id{ -1 };
+    };
+
+    std::vector<Tree>        trees;
+
+    struct TreeVisitor {
+        static void visit_recursive(std::vector<SupportElements> &move_bounds, SupportElement &start_element, Tree &out) {
+            assert(! start_element.state.marked && ! start_element.parents.empty());
+            // Collect elements up to a bifurcation above.
+            start_element.state.marked = true;
+            // For each branch bifurcating from this point:
+            SupportElements &layer       = move_bounds[start_element.state.layer_idx];
+            SupportElements &layer_above = move_bounds[start_element.state.layer_idx + 1];
+            bool root = out.branches.empty();
+            for (size_t parent_idx = 0; parent_idx < start_element.parents.size(); ++ parent_idx) {
+                Branch branch;
+                branch.path.emplace_back(&start_element);
+                // Traverse each branch until it branches again.
+                SupportElement &first_parent = layer_above[start_element.parents[parent_idx]];
+                assert(branch.path.back()->state.layer_idx + 1 == first_parent.state.layer_idx);
+                branch.path.emplace_back(&first_parent);
+                if (first_parent.parents.size() < 2)
+                    first_parent.state.marked = true;
+                SupportElement *next_branch = nullptr;
+                if (first_parent.parents.size() == 1)
+                    for (SupportElement *parent = &first_parent;;) {
+                        SupportElement &next_parent = move_bounds[parent->state.layer_idx + 1][parent->parents.front()];
+                        assert(branch.path.back()->state.layer_idx + 1 == next_parent.state.layer_idx);
+                        branch.path.emplace_back(&next_parent);
+                        if (next_parent.parents.size() > 1) {
+                            next_branch = &next_parent;
+                            break;
                         }
+                        next_parent.state.marked = true;
+                        if (next_parent.parents.size() == 0)
+                            break;
+                        parent = &next_parent;
                     }
+                assert(branch.path.size() >= 2);
+                branch.has_root = root;
+                branch.has_tip  = ! next_branch;
+                out.branches.emplace_back(std::move(branch));
+                if (next_branch)
+                    visit_recursive(move_bounds, *next_branch, out);
+            }
+        }
+    };
+
+    for (LayerIndex layer_idx = 0; layer_idx + 1 < LayerIndex(move_bounds.size()); ++ layer_idx)
+        for (SupportElement &start_element : move_bounds[layer_idx])
+            if (! start_element.state.marked && ! start_element.parents.empty()) {
+                trees.push_back({});
+                TreeVisitor::visit_recursive(move_bounds, start_element, trees.back());
+                assert(! trees.back().branches.empty());
+            }
+
+    const SlicingParameters &slicing_params = print_object.slicing_parameters();
+    MeshSlicingParams mesh_slicing_params;
+    mesh_slicing_params.mode = MeshSlicingParams::SlicingMode::Positive;
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, trees.size()),
+        [&trees, &config, &slicing_params, &move_bounds, &mesh_slicing_params, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
+            indexed_triangle_set    partial_mesh;
+            std::vector<float>      slice_z;
+            for (size_t tree_id = range.begin(); tree_id < range.end(); ++ tree_id) {
+                Tree &tree = trees[tree_id];
+                for (const Branch &branch : tree.branches) {
                     // Triangulate the tube.
                     partial_mesh.clear();
-                    extrude_branch(path, config, slicing_params, move_bounds, partial_mesh);
-#if 0
-                    {
-                        char fname[2048];
-                        static int irun = 0;
-                        sprintf(fname, "d:\\temp\\meshes\\tree-raw-%d.obj", ++ irun);
-                        its_write_obj(partial_mesh, fname);
-    #if 0
-                        temp_mesh.clear();
-                        cut_mesh(partial_mesh, layer_z(slicing_params, path.back()->state.layer_idx) + EPSILON, nullptr, &temp_mesh, false);
-                        sprintf(fname, "d:\\temp\\meshes\\tree-trimmed1-%d.obj", irun);
-                        its_write_obj(temp_mesh, fname);
-                        partial_mesh.clear();
-                        cut_mesh(temp_mesh, layer_z(slicing_params, path.front()->state.layer_idx) - EPSILON, &partial_mesh, nullptr, false);
-                        sprintf(fname, "d:\\temp\\meshes\\tree-trimmed2-%d.obj", irun);
-    #endif
-                        its_write_obj(partial_mesh, fname);
+                    std::pair<float, float> zspan = extrude_branch(branch.path, config, slicing_params, move_bounds, partial_mesh);
+                    LayerIndex layer_begin = branch.has_root ?
+                        branch.path.front()->state.layer_idx : 
+                        std::min(branch.path.front()->state.layer_idx, layer_idx_ceil(slicing_params, config, zspan.first));
+                    LayerIndex layer_end   = (branch.has_tip ?
+                        branch.path.back()->state.layer_idx :
+                        std::max(branch.path.back()->state.layer_idx, layer_idx_floor(slicing_params, config, zspan.second))) + 1;
+                    slice_z.clear();
+                    for (LayerIndex layer_idx = layer_begin; layer_idx < layer_end; ++ layer_idx) {
+                        const double print_z  = layer_z(slicing_params, config, layer_idx);
+                        const double bottom_z = layer_idx > 0 ? layer_z(slicing_params, config, layer_idx - 1) : 0.;
+                        slice_z.emplace_back(float(0.5 * (bottom_z + print_z)));
                     }
-#endif
-                    its_merge(cummulative_mesh, partial_mesh);
+                    std::vector<Polygons> slices = slice_mesh(partial_mesh, slice_z, mesh_slicing_params, throw_on_cancel);
+                    size_t num_empty = std::find_if(slices.begin(), slices.end(), [](auto &s) { return !s.empty(); }) - slices.begin();
+                    layer_begin += LayerIndex(num_empty);
+                    for (; slices.back().empty(); -- layer_end);
+                    LayerIndex new_begin = tree.first_layer_id == -1 ? layer_begin : std::min(tree.first_layer_id, layer_begin);
+                    LayerIndex new_end   = tree.first_layer_id == -1 ? layer_end : std::max(tree.first_layer_id + LayerIndex(tree.slices.size()), layer_end);
+                    size_t     new_size  = size_t(new_end - new_begin);
+                    if (tree.first_layer_id == -1) {
+                    } else if (tree.slices.capacity() < new_size) {
+                        std::vector<Slice> new_slices;
+                        new_slices.reserve(new_size);
+                        if (LayerIndex dif = tree.first_layer_id - new_begin; dif > 0)
+                            new_slices.insert(new_slices.end(), dif, {});
+                        append(new_slices, std::move(tree.slices));
+                        tree.slices.swap(new_slices);
+                    } else if (LayerIndex dif = tree.first_layer_id - new_begin; dif > 0)
+                        tree.slices.insert(tree.slices.begin(), tree.first_layer_id - new_begin, {});
+                    tree.slices.insert(tree.slices.end(), new_size - tree.slices.size(), {});
+                    layer_begin -= LayerIndex(num_empty);
+                    for (LayerIndex i = layer_begin; i != layer_end; ++ i)
+                        if (Polygons &src = slices[i - layer_begin]; ! src.empty()) {
+                            Slice &dst = tree.slices[i - new_begin];
+                            if (++ dst.num_branches > 1)
+                                append(dst.polygons, std::move(src));
+                            else
+                                dst.polygons = std::move(std::move(src));
+                        }
+                    tree.first_layer_id = new_begin;
                 }
-                throw_on_cancel();
             }
-    }
-    return cummulative_mesh;
-}
-
-// Organic specific: Slice the cummulative mesh produced by draw_branches().
-static void slice_branches(
-    PrintObject                     &print_object,
-    const TreeModelVolumes          &volumes, 
-    const TreeSupportSettings       &config,
-    const std::vector<Polygons>     &overhangs,
-    std::vector<SupportElements>    &move_bounds,
-    const indexed_triangle_set      &cummulative_mesh,
-
-    SupportGeneratorLayersPtr       &bottom_contacts,
-    SupportGeneratorLayersPtr       &top_contacts,
-    SupportGeneratorLayersPtr       &intermediate_layers,
-    SupportGeneratorLayerStorage    &layer_storage,
-    
-    std::function<void()>            throw_on_cancel)
-{
-    const SlicingParameters &slicing_params = print_object.slicing_parameters();
-    std::vector<float> slice_z;
-    for (size_t layer_idx = 0; layer_idx < move_bounds.size(); ++ layer_idx) {
-        const double print_z  = layer_z(print_object.slicing_parameters(), config, layer_idx);
-        const double bottom_z = layer_idx > 0 ? layer_z(print_object.slicing_parameters(), config, layer_idx - 1) : 0.;
-        slice_z.emplace_back(float(0.5 * (bottom_z + print_z)));
-    }
-    // Remove the trailing slices.
-    while (! slice_z.empty())
-        if (move_bounds[slice_z.size() - 1].empty())
-            slice_z.pop_back();
-        else
-            break;
-
-#if 0
-    its_write_obj(cummulative_mesh, "d:\\temp\\meshes\\tree.obj");
-#endif
-
-    MeshSlicingParamsEx params;
-    params.closing_radius = float(print_object.config().slice_closing_radius.value);
-    params.mode = MeshSlicingParams::SlicingMode::Positive;
-    std::vector<ExPolygons> slices = slice_mesh_ex(cummulative_mesh, slice_z, params, throw_on_cancel);
-    // Trim the slices.
-    std::vector<Polygons> support_layer_storage(move_bounds.size());
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, slices.size()),
-        [&](const tbb::blocked_range<size_t> &range) {
-            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx)
-                if (ExPolygons &src = slices[layer_idx]; ! src.empty())
-                    support_layer_storage[layer_idx] = diff_clipped(to_polygons(std::move(src)), volumes.getCollision(0, layer_idx, true));
         });
 
-    std::vector<Polygons> support_roof_storage(move_bounds.size());
-    finalize_interface_and_support_areas(print_object, volumes, config, overhangs, support_layer_storage, support_roof_storage,
-        bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, trees.size()),
+        [&trees, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
+        for (size_t tree_id = range.begin(); tree_id < range.end(); ++ tree_id) {
+            Tree &tree = trees[tree_id];
+            for (Slice &slice : tree.slices)
+                if (slice.num_branches > 1) {
+                    slice.polygons = union_(slice.polygons);
+                    slice.num_branches = 1;
+                }
+            throw_on_cancel();
+        }
+    });
+
+    size_t num_layers = 0;
+    for (Tree &tree : trees)
+        if (tree.first_layer_id >= 0)
+            num_layers = std::max(num_layers, size_t(tree.first_layer_id + tree.slices.size()));
+
+    std::vector<Slice> slices(num_layers, Slice{});
+    for (Tree &tree : trees)
+        if (tree.first_layer_id >= 0) {
+            for (LayerIndex i = tree.first_layer_id; i != tree.first_layer_id + LayerIndex(tree.slices.size()); ++ i)
+                if (Slice &src = tree.slices[i - tree.first_layer_id]; ! src.polygons.empty()) {
+                    Slice &dst = slices[i];
+                    if (++ dst.num_branches > 1)
+                        append(dst.polygons, std::move(src.polygons));
+                    else
+                        dst.polygons = std::move(src.polygons);
+                }
+        }
+
+    std::vector<Polygons> support_layer_storage(move_bounds.size());
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, std::min(move_bounds.size(), slices.size())),
+        [&slices, &support_layer_storage, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
+        for (size_t slice_id = range.begin(); slice_id < range.end(); ++ slice_id) {
+            Slice &slice = slices[slice_id];
+            support_layer_storage[slice_id] = slice.num_branches > 1 ? union_(slice.polygons) : std::move(slice.polygons);
+            throw_on_cancel();
+        }
+    });
+
+    //FIXME simplify!
+    return support_layer_storage;
 }
 
 /*!
@@ -4413,10 +4483,9 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
                     bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
             else {
                 assert(print_object.config().support_material_style == smsOrganic);
-                indexed_triangle_set branches = draw_branches(*print.get_object(processing.second.front()), volumes, config, move_bounds, throw_on_cancel);
-                // Reduce memory footprint. After this point only slice_branches() will use volumes and from that only collisions with zero radius will be used.
-                volumes.clear_all_but_object_collision();
-                slice_branches(*print.get_object(processing.second.front()), volumes, config, overhangs, move_bounds, branches,
+                std::vector<Polygons> support_layer_storage = draw_branches(*print.get_object(processing.second.front()), volumes, config, move_bounds, throw_on_cancel);
+                std::vector<Polygons> support_roof_storage(support_layer_storage.size());
+                finalize_interface_and_support_areas(print_object, volumes, config, overhangs, support_layer_storage, support_roof_storage,
                     bottom_contacts, top_contacts, intermediate_layers, layer_storage, throw_on_cancel);
             }
 
