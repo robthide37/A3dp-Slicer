@@ -6057,7 +6057,7 @@ void Plater::remove_selected()
     p->view3D->delete_selected();
 }
 
-void Plater::increase_instances(size_t num, int obj_idx/* = -1*/)
+void Plater::increase_instances(size_t num, int obj_idx, std::optional<Selection::ObjectIdxsToInstanceIdxsMap> selection_map)
 {
     if (! can_increase_instances()) { return; }
 
@@ -6067,14 +6067,26 @@ void Plater::increase_instances(size_t num, int obj_idx/* = -1*/)
         obj_idx = p->get_selected_object_idx();
 
     if (obj_idx < 0) {
-        if (const auto obj_idxs = get_selection().get_object_idxs(); !obj_idxs.empty())
-            for (const size_t obj_id : obj_idxs)
-                increase_instances(1, int(obj_id));
+        if (const auto obj_idxs = get_selection().get_object_idxs(); !obj_idxs.empty()) {
+            // we need a copy made here because the selection changes at every call of increase_instances()
+            const Selection::ObjectIdxsToInstanceIdxsMap content = selection_map.has_value() ? *selection_map : p->get_selection().get_content();
+            for (const size_t obj_id : obj_idxs) {
+                increase_instances(1, int(obj_id), content);
+            }
+        }
         return;
     }
 
     ModelObject* model_object = p->model.objects[obj_idx];
-    const int inst_idx = p->get_selected_instance_idx();
+    int inst_idx = -1;
+    if (selection_map.has_value()) {
+        auto obj_it = selection_map->find(obj_idx);
+        if (obj_it != selection_map->end() && obj_it->second.size() == 1)
+            inst_idx = *obj_it->second.begin();
+    }
+    else
+        inst_idx = p->get_selected_instance_idx();
+
     ModelInstance* model_instance = (inst_idx >= 0) ? model_object->instances[inst_idx] : model_object->instances.back();
 
     bool was_one_instance = model_object->instances.size()==1;
