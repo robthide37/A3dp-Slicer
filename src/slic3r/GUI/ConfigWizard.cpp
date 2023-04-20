@@ -57,6 +57,7 @@
 #include "UnsavedChangesDialog.hpp"
 #include "slic3r/Utils/AppUpdater.hpp"
 #include "slic3r/GUI/I18N.hpp"
+#include "slic3r/Config/Version.hpp"
 
 #if defined(__linux__) && defined(__WXGTK3__)
 #define wxLinux_gtk3 true
@@ -118,7 +119,7 @@ BundleMap BundleMap::load()
     const auto vendor_dir = (boost::filesystem::path(Slic3r::data_dir()) / "vendor").make_preferred();
     const auto archive_dir = (boost::filesystem::path(Slic3r::data_dir()) / "cache" / "vendor").make_preferred();
     const auto rsrc_vendor_dir = (boost::filesystem::path(resources_dir()) / "profiles").make_preferred();
-
+    const auto cache_dir = boost::filesystem::path(Slic3r::data_dir()) / "cache"; // for Index
     // Load Prusa bundle from the datadir/vendor directory or from datadir/cache/vendor (archive) or from resources/profiles.
     auto prusa_bundle_path = (vendor_dir / PresetBundle::PRUSA_BUNDLE).replace_extension(".ini");
     BundleLocation prusa_bundle_loc = BundleLocation::IN_VENDOR;
@@ -138,7 +139,7 @@ BundleMap BundleMap::load()
 
     // Load the other bundles in the datadir/vendor directory
     // and then additionally from datadir/cache/vendor (archive) and resources/profiles.
-    // Should we concider case where archive has older profiles than resources (shouldnt happen)?
+    // Should we concider case where archive has older profiles than resources (shouldnt happen)? -> YES, it happens during re-configuration when running older PS after newer version
     typedef std::pair<const fs::path&, BundleLocation> DirData;
     std::vector<DirData> dir_list { {vendor_dir, BundleLocation::IN_VENDOR},  {archive_dir, BundleLocation::IN_ARCHIVE},  {rsrc_vendor_dir, BundleLocation::IN_RESOURCES} };
     for ( auto dir : dir_list) {
@@ -150,6 +151,42 @@ BundleMap BundleMap::load()
 
                 // Don't load this bundle if we've already loaded it.
                 if (res.find(id) != res.end()) { continue; }
+
+                // Fresh index should be in archive_dir, otherwise look for it in cache 
+                fs::path idx_path (archive_dir / (id + ".idx"));
+                if (!boost::filesystem::exists(idx_path)) {
+                    BOOST_LOG_TRIVIAL(warning) << format("Missing index %1% when loading bundle %2%.", idx_path.string(), id);
+                    idx_path = fs::path(cache_dir / (id + ".idx"));
+                }
+                if (!boost::filesystem::exists(idx_path)) {
+                    BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to missing index %1%.", id, idx_path.string());
+                    continue;
+                }
+                Slic3r::GUI::Config::Index index;
+                try {
+                    index.load(idx_path);
+                }
+                catch (const std::exception& /* err */) {
+                    BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to invalid index %1%.", id, idx_path.string());
+                    continue;
+                }
+                const auto recommended_it = index.recommended();
+                if (recommended_it == index.end()) {
+                    BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to no recommended version in index %2%.", id, idx_path.string());
+                    continue;
+                }
+                const auto recommended = recommended_it->config_version;
+                VendorProfile vp;
+                try {
+                    vp = VendorProfile::from_ini(dir_entry, true);
+                }
+                catch (const std::exception& e) {
+                    BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to corrupted profile file %2%. Message: %3%", id, dir_entry.path().string(), e.what());
+                    continue;
+                }
+                // Don't load
+                if (vp.config_version > recommended)
+                    continue;
 
                 Bundle bundle;
                 if (bundle.load(dir_entry.path(), dir.second))
