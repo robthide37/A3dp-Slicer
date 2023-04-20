@@ -571,6 +571,81 @@ bool GLGizmoEmboss::on_init()
 
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 
+
+#include "libslic3r/TriangleMeshSlicer.hpp"
+#include "libslic3r/Tesselate.hpp"
+
+namespace {
+
+void slice_object(const Selection& selection) {
+    const GLVolume* gl_volume_ptr = selection.get_first_volume();
+    if (gl_volume_ptr == nullptr)
+        return;
+    const GLVolume& gl_volume = *gl_volume_ptr;
+    const ModelObjectPtrs& objects = selection.get_model()->objects;
+    const ModelObject *mo_ptr = get_model_object(gl_volume, objects);
+    if (mo_ptr == nullptr)
+        return;
+    const ModelObject &mo = *mo_ptr;
+    const Transform3d &mv_trafo = gl_volume.get_volume_transformation().get_matrix();
+
+    // Cut transformation
+    auto rot = Eigen::AngleAxis(M_PI_2, Vec3d::UnitX());
+    Transform3d trafo = rot * mv_trafo.inverse();
+    //Transform3d trafo_inv = trafo.inverse();
+
+    Polygons contours;
+    for (const ModelVolume* volume: mo.volumes){
+        MeshSlicingParams slicing_params;
+        slicing_params.trafo = trafo * volume->get_matrix();
+        const Polygons polys = Slic3r::slice_mesh(volume->mesh().its, 0., slicing_params);
+        contours.insert(contours.end(), polys.begin(), polys.end());
+    }
+
+
+    // coppied from 3DScene.cpp void GLVolume::SinkingContours::update()
+    GUI::GLModel::Geometry init_data;
+    init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3 };
+    init_data.color = ColorRGBA::WHITE();
+    unsigned int vertices_counter = 0;
+    if (contours.empty())
+        return;
+
+    float half_width = static_cast<float>(scale_(0.25));
+    for (const ExPolygon &expoly : diff_ex(expand(contours, half_width), shrink(contours, half_width))) {
+        const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
+        init_data.reserve_vertices(init_data.vertices_count() + triangulation.size());
+        init_data.reserve_indices(init_data.indices_count() + triangulation.size());
+        for (const Vec3d& v : triangulation) {
+            init_data.add_vertex((Vec3f)(v.cast<float>() + 0.015f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
+            ++vertices_counter;
+            if (vertices_counter % 3 == 0)
+                init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
+        }
+    }
+
+    if (init_data.is_empty())
+        return;
+
+    GLModel m_model;
+    m_model.init_from(std::move(init_data));
+
+    const GLShaderProgram *shader = wxGetApp().get_shader("flat");
+    if (shader == nullptr)
+        return;
+    const Camera &camera = wxGetApp().plater()->get_camera();
+
+    const Transform3d &mi_trafo = gl_volume.get_instance_transformation().get_matrix();
+    shader->start_using();
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * mi_trafo * mv_trafo * rot.inverse()); // * Geometry::translation_transform(m_shift));
+    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+    m_model.render();
+    shader->stop_using();
+}
+
+} // namespace
+
+
 void GLGizmoEmboss::on_render() {
     // no volume selected
     if (m_volume == nullptr ||
@@ -578,6 +653,8 @@ void GLGizmoEmboss::on_render() {
         return;
     Selection &selection = m_parent.get_selection();
     if (selection.is_empty()) return;
+
+    slice_object(selection);
 
     // prevent get local coordinate system on multi volumes
     if (!selection.is_single_volume_or_modifier() && 
