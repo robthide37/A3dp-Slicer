@@ -577,6 +577,56 @@ std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 
 namespace {
 
+GLModel create_model(const Polygons &polygons, float width_half = 0.5f, ColorRGBA color = ColorRGBA::DARK_GRAY())
+{
+    assert(!polygons.empty());
+
+    // add a small positive offset to avoid z-fighting
+    float offset = static_cast<float>(scale_(0.015f));
+    Polygons polygons_expanded = expand(polygons, offset);
+
+    // inspired by 3DScene.cpp void GLVolume::SinkingContours::update()
+    GLModel::Geometry init_data;
+    init_data.format = {GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3};
+    init_data.color  = color;
+
+    size_t count = count_points(polygons);
+    init_data.reserve_vertices(2 * count);
+    init_data.reserve_indices(2 * count);
+
+    unsigned int vertices_counter = 0;
+    for (const Slic3r::Polygon &polygon : polygons_expanded) {
+        for (const Point &point : polygon.points) {
+            Vec2f point_d = unscale(point).cast<float>();
+            Vec3f vertex(point_d.x(), point_d.y(), width_half);
+            init_data.add_vertex(vertex);
+            vertex.z() *= -1;
+            init_data.add_vertex(vertex);
+        }
+
+        auto points_count = static_cast<unsigned int>(polygon.points.size());
+        unsigned int prev_i = points_count - 1;
+        for (unsigned int i = 0; i < points_count; i++) {
+            // t .. top
+            // b .. bottom
+            unsigned int t1 = vertices_counter + prev_i * 2;
+            unsigned int b1 = t1 + 1;
+            unsigned int t2 = vertices_counter + i * 2;
+            unsigned int b2 = t2 + 1;
+            init_data.add_triangle(t1, b1, t2);
+            init_data.add_triangle(b2, t2, b1);
+            prev_i = i;
+        }
+        vertices_counter += 2 * points_count;
+    }
+
+    assert(!init_data.is_empty());
+
+    GLModel gl_model;
+    gl_model.init_from(std::move(init_data));
+    return gl_model;
+}
+
 void slice_object(const Selection& selection) {
     const GLVolume* gl_volume_ptr = selection.get_first_volume();
     if (gl_volume_ptr == nullptr)
@@ -589,46 +639,18 @@ void slice_object(const Selection& selection) {
     const ModelObject &mo = *mo_ptr;
     const Transform3d &mv_trafo = gl_volume.get_volume_transformation().get_matrix();
 
-    // Cut transformation
+    // contour transformation
     auto rot = Eigen::AngleAxis(M_PI_2, Vec3d::UnitX());
-    Transform3d trafo = rot * mv_trafo.inverse();
-    //Transform3d trafo_inv = trafo.inverse();
+    Transform3d c_trafo = mv_trafo * rot;
+    Transform3d c_trafo_inv = c_trafo.inverse();
 
     Polygons contours;
     for (const ModelVolume* volume: mo.volumes){
         MeshSlicingParams slicing_params;
-        slicing_params.trafo = trafo * volume->get_matrix();
+        slicing_params.trafo = c_trafo_inv * volume->get_matrix();
         const Polygons polys = Slic3r::slice_mesh(volume->mesh().its, 0., slicing_params);
         contours.insert(contours.end(), polys.begin(), polys.end());
     }
-
-
-    // coppied from 3DScene.cpp void GLVolume::SinkingContours::update()
-    GUI::GLModel::Geometry init_data;
-    init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3 };
-    init_data.color = ColorRGBA::WHITE();
-    unsigned int vertices_counter = 0;
-    if (contours.empty())
-        return;
-
-    float half_width = static_cast<float>(scale_(0.25));
-    for (const ExPolygon &expoly : diff_ex(expand(contours, half_width), shrink(contours, half_width))) {
-        const std::vector<Vec3d> triangulation = triangulate_expolygon_3d(expoly);
-        init_data.reserve_vertices(init_data.vertices_count() + triangulation.size());
-        init_data.reserve_indices(init_data.indices_count() + triangulation.size());
-        for (const Vec3d& v : triangulation) {
-            init_data.add_vertex((Vec3f)(v.cast<float>() + 0.015f * Vec3f::UnitZ())); // add a small positive z to avoid z-fighting
-            ++vertices_counter;
-            if (vertices_counter % 3 == 0)
-                init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
-        }
-    }
-
-    if (init_data.is_empty())
-        return;
-
-    GLModel m_model;
-    m_model.init_from(std::move(init_data));
 
     const GLShaderProgram *shader = wxGetApp().get_shader("flat");
     if (shader == nullptr)
@@ -637,9 +659,9 @@ void slice_object(const Selection& selection) {
 
     const Transform3d &mi_trafo = gl_volume.get_instance_transformation().get_matrix();
     shader->start_using();
-    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * mi_trafo * mv_trafo * rot.inverse()); // * Geometry::translation_transform(m_shift));
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * mi_trafo * c_trafo); // * Geometry::translation_transform(m_shift));
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-    m_model.render();
+    create_model(contours).render();
     shader->stop_using();
 }
 
