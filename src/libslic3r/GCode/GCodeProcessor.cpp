@@ -3610,7 +3610,7 @@ void GCodeProcessor::post_process()
                     last_time_insertion = rev_it->time;
                     const std::string out_line = line_inserter(i + 1, last_time_insertion, m_time - last_time_insertion);
                     rev_it_dist = std::distance(m_lines.rbegin(), rev_it) + 1;
-                    const auto new_it = m_lines.insert(rev_it.base(), { out_line, rev_it->time });
+                    m_lines.insert(rev_it.base(), { out_line, rev_it->time });
 #ifndef NDEBUG
                     m_statistics.add_line(out_line.length());
 #endif // NDEBUG
@@ -3984,7 +3984,7 @@ void GCodeProcessor::post_process()
 
 #if ENABLE_GCODE_POSTPROCESS_BACKTRACE
     // add lines XXX to exported gcode
-      auto process_line_T = [this, &export_lines](const std::string& gcode_line, const size_t g1_lines_counter, const ExportLines::Backtrace& backtrace) {
+    auto process_line_T = [this, &export_lines](const std::string& gcode_line, const size_t g1_lines_counter, const ExportLines::Backtrace& backtrace) {
         const std::string cmd = GCodeReader::GCodeLine::extract_cmd(gcode_line);
         if (cmd.size() >= 2) {
             std::stringstream ss(cmd.substr(1));
