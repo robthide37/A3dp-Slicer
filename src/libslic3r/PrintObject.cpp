@@ -1990,8 +1990,8 @@ void PrintObject::bridge_over_infill()
             // reconstruct polygon from polygon sections
             struct TracedPoly
             {
-                std::vector<Point> lows;
-                std::vector<Point> highs;
+                Points lows;
+                Points highs;
             };
 
             std::vector<TracedPoly> current_traced_polys;

@@ -1132,9 +1132,9 @@ Polygons Print::first_layer_islands() const
     return islands;
 }
 
-std::vector<Point> Print::first_layer_wipe_tower_corners() const
+Points Print::first_layer_wipe_tower_corners() const
 {
-    std::vector<Point> pts_scaled;
+    Points pts_scaled;
 
     if (has_wipe_tower() && ! m_wipe_tower_data.tool_changes.empty()) {
         double width = m_config.wipe_tower_width + 2*m_wipe_tower_data.brim_width;

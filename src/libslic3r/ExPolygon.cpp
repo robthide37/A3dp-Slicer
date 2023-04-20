@@ -397,7 +397,7 @@ bool has_duplicate_points(const ExPolygon &expoly)
     size_t cnt = expoly.contour.points.size();
     for (const Polygon &hole : expoly.holes)
         cnt += hole.points.size();
-    std::vector<Point> allpts;
+    Points allpts;
     allpts.reserve(cnt);
     allpts.insert(allpts.begin(), expoly.contour.points.begin(), expoly.contour.points.end());
     for (const Polygon &hole : expoly.holes)
@@ -420,7 +420,7 @@ bool has_duplicate_points(const ExPolygons &expolys)
     // Check globally.
 #if 0
     // Detect duplicates by sorting with quicksort. It is quite fast, but ankerl::unordered_dense is around 1/4 faster.
-    std::vector<Point> allpts;
+    Points allpts;
     allpts.reserve(count_points(expolys));
     for (const ExPolygon &expoly : expolys) {
         allpts.insert(allpts.begin(), expoly.contour.points.begin(), expoly.contour.points.end());

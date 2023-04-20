@@ -204,7 +204,7 @@ protected:
      * \return A number of coordinates along the edge where the edge is broken
      * up into discrete pieces.
      */
-    std::vector<Point> discretize(const vd_t::edge_type& segment, const std::vector<Segment>& segments);
+    Points discretize(const vd_t::edge_type& segment, const std::vector<Segment>& segments);
 
     /*!
      * Compute the range of line segments that surround a cell of the skeletal

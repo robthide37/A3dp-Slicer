@@ -181,7 +181,7 @@ void SkeletalTrapezoidation::transferEdge(Point from, Point to, vd_t::edge_type&
     }
     else
     {
-        std::vector<Point> discretized = discretize(vd_edge, segments);
+        Points discretized = discretize(vd_edge, segments);
         assert(discretized.size() >= 2);
         if(discretized.size() < 2)
         {
@@ -236,7 +236,7 @@ void SkeletalTrapezoidation::transferEdge(Point from, Point to, vd_t::edge_type&
     }
 }
 
-std::vector<Point> SkeletalTrapezoidation::discretize(const vd_t::edge_type& vd_edge, const std::vector<Segment>& segments)
+Points SkeletalTrapezoidation::discretize(const vd_t::edge_type& vd_edge, const std::vector<Segment>& segments)
 {
     /*Terminology in this function assumes that the edge moves horizontally from
     left to right. This is not necessarily the case; the edge can go in any
@@ -257,7 +257,7 @@ std::vector<Point> SkeletalTrapezoidation::discretize(const vd_t::edge_type& vd_
     bool point_right = right_cell->contains_point();
     if ((!point_left && !point_right) || vd_edge.is_secondary()) // Source vert is directly connected to source segment
     {
-        return std::vector<Point>({ start, end });
+        return Points({ start, end });
     }
     else if (point_left != point_right) //This is a parabolic edge between a point and a line.
     {
@@ -311,7 +311,7 @@ std::vector<Point> SkeletalTrapezoidation::discretize(const vd_t::edge_type& vd_
         //Start generating points along the edge.
         Point a = start;
         Point b = end;
-        std::vector<Point> ret;
+        Points ret;
         ret.emplace_back(a);
 
         //Introduce an extra edge at the borders of the markings?

@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include "Line.hpp"
+#include "Point.hpp"
 #include "MultiPoint.hpp"
 #include "Polyline.hpp"
 
@@ -241,7 +242,7 @@ inline Polylines to_polylines(Polygons &&polys)
     return polylines;
 }
 
-inline Polygons to_polygons(const std::vector<Points> &paths)
+inline Polygons to_polygons(const VecOfPoints &paths)
 {
     Polygons out;
     out.reserve(paths.size());
@@ -250,7 +251,7 @@ inline Polygons to_polygons(const std::vector<Points> &paths)
     return out;
 }
 
-inline Polygons to_polygons(std::vector<Points> &&paths)
+inline Polygons to_polygons(VecOfPoints &&paths)
 {
     Polygons out;
     out.reserve(paths.size());

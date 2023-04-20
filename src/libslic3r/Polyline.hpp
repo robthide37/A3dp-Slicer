@@ -158,9 +158,10 @@ inline void polylines_append(Polylines &dst, Polylines &&src)
 // src_first: the merge point is at src.begin() or src.end()?
 // The orientation of the resulting polyline is unknown, the output polyline may start
 // either with src piece or dst piece.
-template<typename PointType>
-inline void polylines_merge(std::vector<PointType> &dst, bool dst_first, std::vector<PointType> &&src, bool src_first)
+template<typename PointsType>
+inline void polylines_merge(PointsType &dst, bool dst_first, PointsType &&src, bool src_first)
 {
+    using PointType = typename PointsType::value_type;
     if (dst_first) {
         if (src_first)
             std::reverse(dst.begin(), dst.end());
