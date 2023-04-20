@@ -183,7 +183,8 @@ static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
 
         trafo_instance = trafo_instance * po.trafo().cast<float>().inverse();
 
-        auto polys = reserve_vector<Polygon>(3);
+        Polygons polys;
+        polys.reserve(3);
         auto zlvl = -po.get_elevation();
 
         if (omesh) {

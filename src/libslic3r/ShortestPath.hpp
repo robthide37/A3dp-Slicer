@@ -8,13 +8,11 @@
 #include <utility>
 #include <vector>
 
-#include <oneapi/tbb/scalable_allocator.h>
-
 namespace Slic3r {
 
 	namespace ClipperLib {
 		class PolyNode;
-		using PolyNodes = std::vector<PolyNode*, tbb::scalable_allocator<PolyNode*>>;
+		using PolyNodes = std::vector<PolyNode*, PointsAllocator<PolyNode*>>;
 	}
 
 class ExPolygon;
