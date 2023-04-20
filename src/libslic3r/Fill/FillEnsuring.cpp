@@ -22,8 +22,6 @@
 
 namespace Slic3r {
 
-static constexpr const float NarrowInfillAreaThresholdMM = 2.f;
-
 ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const FillParams &params)
 {
     assert(params.use_arachne);
@@ -51,22 +49,21 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     double        aligning_angle                      = -this->angle + PI * 0.5;
     polygons_rotate(filled_area, aligning_angle);
     Polygons    internal_area = shrink(filled_area, 0.5 * scaled_spacing - scale_(this->overlap));
-    Polygons    openned_area  = opening(internal_area, scale_(NarrowInfillAreaThresholdMM));
-    BoundingBox bb            = get_extents(openned_area);
+    BoundingBox bb            = get_extents(filled_area);
 
     const size_t      n_vlines = (bb.max.x() - bb.min.x() + scaled_spacing - 1) / scaled_spacing;
     std::vector<Line> vertical_lines(2 * n_vlines + 1);
     coord_t           y_min = bb.min.y();
     coord_t           y_max = bb.max.y();
     for (size_t i = 0; i < n_vlines; i++) {
-        coord_t x0                  = bb.min.x() + i * scaled_spacing - scaled_spacing * 0.5;
-        coord_t x1                  = bb.min.x() + i * scaled_spacing;
+        coord_t x0                  = bb.min.x() + i * double(scaled_spacing) - scaled_spacing * 0.5;
+        coord_t x1                  = bb.min.x() + i * double(scaled_spacing);
         vertical_lines[i * 2].a     = Point{x0, y_min};
         vertical_lines[i * 2].b     = Point{x0, y_max};
         vertical_lines[i * 2 + 1].a = Point{x1, y_min};
         vertical_lines[i * 2 + 1].b = Point{x1, y_max};
     }
-    vertical_lines.back().a = Point{coord_t(bb.min.x() + n_vlines * scaled_spacing + scaled_spacing * 0.5), y_min};
+    vertical_lines.back().a = Point{coord_t(bb.min.x() + n_vlines * double(scaled_spacing) + scaled_spacing * 0.5), y_min};
     vertical_lines.back().b = Point{vertical_lines.back().a.x(), y_max};
 
     auto                                                         area_walls = AABBTreeLines::LinesDistancer<Line>{to_lines(internal_area)};
@@ -111,18 +108,18 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                 Point section_a = a.first;
                 Point section_b = b.first;
 
-                double max_a_dist = std::max(get_closest_intersection_squared_dist(a, left_intersections),
+                double max_a_squared_dist = std::max(get_closest_intersection_squared_dist(a, left_intersections),
                                              get_closest_intersection_squared_dist(a, right_intersections));
 
-                double max_b_dist = std::max(get_closest_intersection_squared_dist(b, left_intersections),
+                double max_b_squared_dist = std::max(get_closest_intersection_squared_dist(b, left_intersections),
                                              get_closest_intersection_squared_dist(b, right_intersections));
 
-                if (max_a_dist > 0.5 * squared_distance_limit_reconnection) {
-                    section_a.y() += std::min(2.0 * scaled_spacing, sqrt(max_a_dist));
+                if (max_a_squared_dist > 0.4 * squared_distance_limit_reconnection) {
+                    section_a.y() += std::min(2.0 * scaled_spacing, sqrt(max_a_squared_dist));
                 }
 
-                if (max_b_dist > 0.5 * squared_distance_limit_reconnection) {
-                    section_b.y() -= std::min(2.0 * scaled_spacing, sqrt(max_b_dist));
+                if (max_b_squared_dist > 0.4 * squared_distance_limit_reconnection) {
+                    section_b.y() -= std::min(2.0 * scaled_spacing, sqrt(max_b_squared_dist));
                 }
 
                 section_a.y() = std::min(section_a.y(), section_b.y());
@@ -370,9 +367,10 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     BoundingBox bbox = get_extents(filled_area);
     bbox.offset(scale_(1.));
     ::Slic3r::SVG svg(debug_out_path(("surface" + std::to_string(surface->area())).c_str()).c_str(), bbox);
-    svg.draw(to_lines(filled_area), "red", scale_(0.3));
-    svg.draw(to_lines(reconstructed_area), "blue", scale_(0.2));
-    svg.draw(to_lines(gaps_for_additional_filling), "green", scale_(0.1));
+    svg.draw(to_lines(filled_area), "red", scale_(0.4));
+    svg.draw(to_lines(reconstructed_area), "blue", scale_(0.3));
+    svg.draw(to_lines(gaps_for_additional_filling), "green", scale_(0.2));
+    svg.draw(vertical_lines, "black", scale_(0.1));
     svg.Close();
 
     for (ExPolygon &ex_poly : gaps_for_additional_filling) {
