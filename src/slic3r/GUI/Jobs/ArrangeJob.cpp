@@ -231,8 +231,10 @@ coord_t get_skirt_offset(const Plater* plater) {
     // Try to subtract the skirt from the bed shape so we don't arrange outside of it.
     if (plater->printer_technology() == ptFFF && plater->fff_print().has_skirt()) {
         const auto& print = plater->fff_print();
-        skirt_inset = print.config().skirts.value * print.skirt_flow().width() +
-                                  print.config().skirt_distance.value;
+        if (!print.objects().empty()) {
+            skirt_inset = print.config().skirts.value * print.skirt_flow().width() +
+                          print.config().skirt_distance.value;
+        }
     }
 
     return scaled(skirt_inset);
