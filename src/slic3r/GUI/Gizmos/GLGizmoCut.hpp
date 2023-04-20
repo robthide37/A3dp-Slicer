@@ -20,6 +20,8 @@ class Selection;
 
 enum class SLAGizmoEventType : unsigned char;
 
+namespace CommonGizmosDataObjects { class ObjectClipper; }
+
 class GLGizmoCut3D : public GLGizmoBase
 {
     enum GrabberID {
@@ -140,7 +142,7 @@ class GLGizmoCut3D : public GLGizmoBase
     class PartSelection {
     public:
         PartSelection() = default;
-        PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx, const Vec3d& center, const Vec3d& normal);
+        PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc);
 
         struct Part {
             GLModel glmodel;

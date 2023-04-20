@@ -1467,6 +1467,19 @@ void GLGizmoCut3D::on_render()
         m_c->selection_info()->set_use_shift(true);
     }
 
+
+    ::glDisable(GL_DEPTH_TEST);
+    std::vector<Vec3d> pts = m_c->object_clipper()->point_per_contour();
+    if (! pts.empty()) {
+        const Vec3d dir = (m_plane_center-pts.front()).dot(m_cut_normal) * m_cut_normal;
+        for (const Vec3d& pt : pts)
+            render_model(m_sphere.model, ColorRGBA::GREEN(), wxGetApp().plater()->get_camera().get_view_matrix() * translation_transform(pt+dir));
+    }
+    ::glEnable(GL_DEPTH_TEST);
+
+
+
+
     update_clipper();
 
     init_picking_models();
@@ -1733,7 +1746,7 @@ void GLGizmoCut3D::flip_cut_plane()
 }
 
 
-GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx_in, const Vec3d& center, const Vec3d& normal)
+GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx_in, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc)
 {
     m_model = Model();
     m_model.add_object(*mo);
@@ -1773,6 +1786,15 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transfor
             }
         }
     }
+
+    // Now go through the contours and create a map from contours to parts.
+    if (std::vector<Vec3d> pts = oc.point_per_contour();! pts.empty()) {
+        const Vec3d dir = (center-pts.front()).dot(normal) * normal;
+        for (Vec3d& pt : pts)
+            pt = pt+dir;
+        // pts are now in world coordinates.
+    }
+
     
     m_valid = true;
 }
@@ -1798,7 +1820,7 @@ void GLGizmoCut3D::process_contours()
     const int instance_idx = selection.get_instance_idx();
     const int object_idx = selection.get_object_idx();
 
-    m_part_selection = PartSelection(model_objects[object_idx], get_cut_matrix(selection), instance_idx, m_plane_center, m_cut_normal);
+    m_part_selection = PartSelection(model_objects[object_idx], get_cut_matrix(selection), instance_idx, m_plane_center, m_cut_normal, *m_c->object_clipper());
     m_parent.toggle_model_objects_visibility(false);
 }
 

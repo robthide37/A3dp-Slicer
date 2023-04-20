@@ -242,12 +242,13 @@ public:
     void set_normal(const Vec3d& dir);
     double get_position() const { return m_clp_ratio; }
     const ClippingPlane* get_clipping_plane(bool ignore_hide_clipped = false) const;
-    void render_cut() const;
+    void render_cut(const std::vector<size_t>* ignore_idxs = nullptr) const;
     void set_position_by_ratio(double pos, bool keep_normal);
     void set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos);
     void set_behavior(bool hide_clipped, bool fill_cut, double contour_width);
     
     int get_number_of_contours() const;
+    std::vector<Vec3d> point_per_contour() const;
 
     int is_projection_inside_cut(const Vec3d& point_in) const;
     bool has_valid_contour() const;

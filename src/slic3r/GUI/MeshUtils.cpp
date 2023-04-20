@@ -94,7 +94,7 @@ void MeshClipper::set_transformation(const Geometry::Transformation& trafo)
     }
 }
 
-void MeshClipper::render_cut(const ColorRGBA& color)
+void MeshClipper::render_cut(const ColorRGBA& color, const std::vector<size_t>* ignore_idxs)
 {
     if (! m_result)
         recalculate_triangles();
@@ -108,7 +108,10 @@ void MeshClipper::render_cut(const ColorRGBA& color)
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        for (CutIsland& isl : m_result->cut_islands) {
+        for (size_t i=0; i<m_result->cut_islands.size(); ++i) {
+            if (ignore_idxs && std::binary_search(ignore_idxs->begin(), ignore_idxs->end(), i))
+                continue;
+            CutIsland& isl = m_result->cut_islands[i];
             isl.model.set_color(isl.disabled ? ColorRGBA(0.5f, 0.5f, 0.5f, 1.f) : color);
             isl.model.render();
         }
@@ -120,7 +123,7 @@ void MeshClipper::render_cut(const ColorRGBA& color)
 }
 
 
-void MeshClipper::render_contour(const ColorRGBA& color)
+void MeshClipper::render_contour(const ColorRGBA& color, const std::vector<size_t>* ignore_idxs)
 {
     if (! m_result)
         recalculate_triangles();
@@ -135,7 +138,10 @@ void MeshClipper::render_contour(const ColorRGBA& color)
         const Camera& camera = wxGetApp().plater()->get_camera();
         shader->set_uniform("view_model_matrix", camera.get_view_matrix());
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        for (CutIsland& isl : m_result->cut_islands) {
+        for (size_t i=0; i<m_result->cut_islands.size(); ++i) {
+            if (ignore_idxs && std::binary_search(ignore_idxs->begin(), ignore_idxs->end(), i))
+                continue;
+            CutIsland& isl = m_result->cut_islands[i];
             isl.model_expanded.set_color(isl.disabled ? ColorRGBA(1.f, 0.f, 0.f, 1.f) : color);
             isl.model_expanded.render();
         }
@@ -164,6 +170,20 @@ int MeshClipper::is_projection_inside_cut(const Vec3d& point_in) const
 bool MeshClipper::has_valid_contour() const
 {
     return m_result && std::any_of(m_result->cut_islands.begin(), m_result->cut_islands.end(), [](const CutIsland& isl) { return !isl.expoly.empty(); });
+}
+
+std::vector<Vec3d> MeshClipper::point_per_contour() const
+{
+    std::vector<Vec3d> out;
+    if (!m_result || m_result->cut_islands.empty())
+        return out;
+
+    for (const CutIsland& isl : m_result->cut_islands) {
+        // FIXME: There might be holes !
+        Vec2d c = unscale(isl.expoly.contour.centroid());
+        out.emplace_back(m_result->trafo * Vec3d(c.x(), c.y(), 0.));
+    }
+    return out;
 }
 
 
