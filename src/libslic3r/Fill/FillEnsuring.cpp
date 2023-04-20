@@ -100,7 +100,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                         }
                         double candidate_dist = (point.first - closest_higher->first).cast<double>().squaredNorm();
                         if (closest_higher != sorted_intersections.begin()) {
-                            double closest_lower_dist = (point.first - (closest_higher--)->first).cast<double>().squaredNorm();
+                            double closest_lower_dist = (point.first - (--closest_higher)->first).cast<double>().squaredNorm();
                             candidate_dist            = std::min(candidate_dist, closest_lower_dist);
                         }
                         return candidate_dist;
@@ -109,22 +109,22 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                 Point section_b = b.first;
 
                 double max_a_squared_dist = std::max(get_closest_intersection_squared_dist(a, left_intersections),
-                                             get_closest_intersection_squared_dist(a, right_intersections));
+                                                     get_closest_intersection_squared_dist(a, right_intersections));
 
                 double max_b_squared_dist = std::max(get_closest_intersection_squared_dist(b, left_intersections),
-                                             get_closest_intersection_squared_dist(b, right_intersections));
+                                                     get_closest_intersection_squared_dist(b, right_intersections));
 
-                if (max_a_squared_dist > 0.4 * squared_distance_limit_reconnection) {
-                    section_a.y() += std::min(2.0 * scaled_spacing, sqrt(max_a_squared_dist));
+                if (max_a_squared_dist > 0.3 * squared_distance_limit_reconnection) {
+                    section_a.y() += 4.0 * scaled_spacing;
                 }
 
-                if (max_b_squared_dist > 0.4 * squared_distance_limit_reconnection) {
-                    section_b.y() -= std::min(2.0 * scaled_spacing, sqrt(max_b_squared_dist));
+                if (max_b_squared_dist > 0.3 * squared_distance_limit_reconnection) {
+                    section_b.y() -= 4.0 * scaled_spacing;
                 }
 
-                section_a.y() = std::min(section_a.y(), section_b.y());
-                section_b.y() = std::max(section_a.y(), section_b.y());
-                polygon_sections[i].emplace_back(section_a, section_b);
+                if (section_a.y() < section_b.y()) {
+                    polygon_sections[i].emplace_back(section_a, section_b);
+                }
             }
         }
     }
@@ -362,7 +362,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
      if (this->overlap != 0) {
         gaps_for_additional_filling = offset_ex(gaps_for_additional_filling, scaled<float>(this->overlap));
     }
-    gaps_for_additional_filling            = opening_ex(gaps_for_additional_filling, 0.3 * scaled_spacing);
+    // gaps_for_additional_filling            = opening_ex(gaps_for_additional_filling, 0.3 * scaled_spacing);
 
     BoundingBox bbox = get_extents(filled_area);
     bbox.offset(scale_(1.));
@@ -429,6 +429,9 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                 thick_polylines_out.erase(thick_polylines_out.begin() + int(j), thick_polylines_out.end());
         }
     }
+
+    // reconnect ThickPolylines
+
 
     rotate_thick_polylines(thick_polylines_out, cos(-aligning_angle), sin(-aligning_angle));
 
