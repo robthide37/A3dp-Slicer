@@ -404,7 +404,7 @@ bool has_duplicate_points(const Polygons &polys)
     // Check globally.
 #if 0
     // Detect duplicates by sorting with quicksort. It is quite fast, but ankerl::unordered_dense is around 1/4 faster.
-    std::vector<Point> allpts;
+    Points allpts;
     allpts.reserve(count_points(polys));
     for (const Polygon &poly : polys)
         allpts.insert(allpts.end(), poly.points.begin(), poly.points.end());

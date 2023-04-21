@@ -39,10 +39,10 @@
 #include <ostream>
 #include <stack>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
+
+#include <ankerl/unordered_dense.h>
 
 // #define ARACHNE_DEBUG
 
@@ -569,7 +569,7 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
                         size_t occurrence  = 0;
                         bool   is_overhang = false;
                     };
-                    std::unordered_map<Point, PointInfo, PointHash> point_occurrence;
+                    ankerl::unordered_dense::map<Point, PointInfo, PointHash> point_occurrence;
                     for (const ExtrusionPath &path : paths) {
                         ++point_occurrence[path.polyline.first_point()].occurrence;
                         ++point_occurrence[path.polyline.last_point()].occurrence;
@@ -681,7 +681,7 @@ Polylines reconnect_polylines(const Polylines &polylines, double limit_distance)
     if (polylines.empty())
         return polylines;
 
-    std::unordered_map<size_t, Polyline> connected;
+    ankerl::unordered_dense::map<size_t, Polyline> connected;
     connected.reserve(polylines.size());
     for (size_t i = 0; i < polylines.size(); i++) {
         if (!polylines[i].empty()) {
@@ -731,7 +731,7 @@ ExtrusionPaths sort_extra_perimeters(ExtrusionPaths extra_perims, int index_of_f
 {
     if (extra_perims.empty()) return {};
 
-    std::vector<std::unordered_set<size_t>> dependencies(extra_perims.size());
+    std::vector<ankerl::unordered_dense::set<size_t>> dependencies(extra_perims.size());
     for (size_t path_idx = 0; path_idx < extra_perims.size(); path_idx++) {
         for (size_t prev_path_idx = 0; prev_path_idx < path_idx; prev_path_idx++) {
             if (paths_touch(extra_perims[path_idx], extra_perims[prev_path_idx], extrusion_spacing * 1.5f)) {
@@ -1153,11 +1153,11 @@ void PerimeterGenerator::process_arachne(
     // Find topological order with constraints from extrusions_constrains.
     std::vector<size_t>              blocked(all_extrusions.size(), 0); // Value indicating how many extrusions it is blocking (preceding extrusions) an extrusion.
     std::vector<std::vector<size_t>> blocking(all_extrusions.size());   // Each extrusion contains a vector of extrusions that are blocked by this extrusion.
-    std::unordered_map<const Arachne::ExtrusionLine *, size_t> map_extrusion_to_idx;
+    ankerl::unordered_dense::map<const Arachne::ExtrusionLine *, size_t> map_extrusion_to_idx;
     for (size_t idx = 0; idx < all_extrusions.size(); idx++)
         map_extrusion_to_idx.emplace(all_extrusions[idx], idx);
 
-    auto extrusions_constrains = Arachne::WallToolPaths::getRegionOrder(all_extrusions, params.config.external_perimeters_first);
+    Arachne::WallToolPaths::ExtrusionLineSet extrusions_constrains = Arachne::WallToolPaths::getRegionOrder(all_extrusions, params.config.external_perimeters_first);
     for (auto [before, after] : extrusions_constrains) {
         auto after_it = map_extrusion_to_idx.find(after);
         ++blocked[after_it->second];

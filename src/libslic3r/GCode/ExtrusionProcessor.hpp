@@ -35,12 +35,14 @@ struct ExtendedPoint
     float  curvature;
 };
 
-template<bool SCALED_INPUT, bool ADD_INTERSECTIONS, bool PREV_LAYER_BOUNDARY_OFFSET, bool SIGNED_DISTANCE, typename P, typename L>
-std::vector<ExtendedPoint> estimate_points_properties(const std::vector<P>                   &input_points,
+template<bool SCALED_INPUT, bool ADD_INTERSECTIONS, bool PREV_LAYER_BOUNDARY_OFFSET, bool SIGNED_DISTANCE, typename POINTS, typename L>
+std::vector<ExtendedPoint> estimate_points_properties(const POINTS                           &input_points,
                                                       const AABBTreeLines::LinesDistancer<L> &unscaled_prev_layer,
                                                       float                                   flow_width,
                                                       float                                   max_line_length = -1.0f)
 {
+    using P = typename POINTS::value_type;
+
     using AABBScalar = typename AABBTreeLines::LinesDistancer<L>::Scalar;
     if (input_points.empty())
         return {};

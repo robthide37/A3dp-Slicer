@@ -485,6 +485,7 @@ target_link_libraries(libslic3r
     qhull
     semver
     TBB::tbb
+    TBB::tbbmalloc
     libslic3r_cgal
     ${CMAKE_DL_LIBS}
     PNG::PNG
