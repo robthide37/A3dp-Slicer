@@ -161,7 +161,6 @@ inline void polylines_append(Polylines &dst, Polylines &&src)
 template<typename PointsType>
 inline void polylines_merge(PointsType &dst, bool dst_first, PointsType &&src, bool src_first)
 {
-    using PointType = typename PointsType::value_type;
     if (dst_first) {
         if (src_first)
             std::reverse(dst.begin(), dst.end());
