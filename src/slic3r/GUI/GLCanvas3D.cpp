@@ -2943,8 +2943,8 @@ void GLCanvas3D::on_mouse_wheel(wxMouseEvent& evt)
     const double delta = direction_factor * (double)evt.GetWheelRotation() / (double)evt.GetWheelDelta();
     if (wxGetKeyState(WXK_SHIFT)) {
         const auto cnv_size = get_canvas_size();
-        const auto screen_center_3d_pos = _mouse_to_3d({ cnv_size.get_width() * 0.5, cnv_size.get_height() * 0.5 });
-        const auto mouse_3d_pos = _mouse_to_3d({ evt.GetX(), evt.GetY() });
+        const Vec3d screen_center_3d_pos = _mouse_to_3d({ cnv_size.get_width() * 0.5, cnv_size.get_height() * 0.5 });
+        const Vec3d mouse_3d_pos = _mouse_to_3d({ evt.GetX(), evt.GetY() });
         const Vec3d displacement = mouse_3d_pos - screen_center_3d_pos;
         wxGetApp().plater()->get_camera().translate_world(displacement);
         const double origin_zoom = wxGetApp().plater()->get_camera().get_zoom();
@@ -6267,7 +6267,8 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
 
 Vec3d GLCanvas3D::_mouse_to_bed_3d(const Point& mouse_pos)
 {
-    return mouse_ray(mouse_pos).intersect_plane(0.0);
+    const Linef3 ray = mouse_ray(mouse_pos);
+    return (std::abs(ray.unit_vector().z() < EPSILON)) ? ray.a : ray.intersect_plane(0.0);
 }
 
 void GLCanvas3D::_start_timer()
