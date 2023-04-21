@@ -54,6 +54,7 @@ using Vec4d   = Eigen::Matrix<double,   4, 1, Eigen::DontAlign>;
 
 template<typename BaseType>
 using PointsAllocator = tbb::scalable_allocator<BaseType>;
+//using PointsAllocator = std::allocator<BaseType>;
 using Points         = std::vector<Point, PointsAllocator<Point>>;
 using PointPtrs      = std::vector<Point*>;
 using PointConstPtrs = std::vector<const Point*>;

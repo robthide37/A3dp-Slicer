@@ -116,7 +116,8 @@ using DoublePoint = Eigen::Matrix<double, 2, 1, Eigen::DontAlign>;
 
 template<typename BaseType>
 using Allocator = tbb::scalable_allocator<BaseType>;
-using Path    = std::vector<IntPoint, Allocator<IntPoint>>;
+//using Allocator = std::allocator<BaseType>;
+using Path      = std::vector<IntPoint, Allocator<IntPoint>>;
 using Paths     = std::vector<Path, Allocator<Path>>;
 
 inline Path& operator <<(Path& poly, const IntPoint& p) {poly.push_back(p); return poly;}
