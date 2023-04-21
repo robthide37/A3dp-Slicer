@@ -123,6 +123,8 @@ void GLGizmoSlaSupports::on_render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glEnable(GL_DEPTH_TEST));
 
+    show_sla_supports(!m_editing_mode);
+
     render_volumes();
     render_points(selection);
 
