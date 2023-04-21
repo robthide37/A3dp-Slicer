@@ -3,6 +3,7 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/format.hpp"
+#include "libslic3r/I18N.hpp"
 #include "libslic3r/GCodeWriter.hpp"
 #include "GCodeProcessor.hpp"
 
