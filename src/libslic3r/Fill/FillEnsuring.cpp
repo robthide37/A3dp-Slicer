@@ -5,6 +5,7 @@
 #include "AABBTreeLines.hpp"
 #include "ExPolygon.hpp"
 #include "FillEnsuring.hpp"
+#include "KDTreeIndirect.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
@@ -44,7 +45,8 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     };
 
     const coord_t scaled_spacing                      = scaled<coord_t>(this->spacing);
-    double        squared_distance_limit_reconnection = 4 * double(scaled_spacing) * double(scaled_spacing);
+    double        distance_limit_reconnection         = 2 * double(scaled_spacing);
+    double        squared_distance_limit_reconnection = distance_limit_reconnection * distance_limit_reconnection;
     Polygons      filled_area                         = to_polygons(surface->expolygon);
     double        aligning_angle                      = -this->angle + PI * 0.5;
     polygons_rotate(filled_area, aligning_angle);
@@ -52,78 +54,29 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     BoundingBox bb            = get_extents(filled_area);
 
     const size_t      n_vlines = (bb.max.x() - bb.min.x() + scaled_spacing - 1) / scaled_spacing;
-    std::vector<Line> vertical_lines(2 * n_vlines + 1);
+    std::vector<Line> vertical_lines(n_vlines);
     coord_t           y_min = bb.min.y();
     coord_t           y_max = bb.max.y();
     for (size_t i = 0; i < n_vlines; i++) {
-        coord_t x0                  = bb.min.x() + i * double(scaled_spacing) - scaled_spacing * 0.5;
-        coord_t x1                  = bb.min.x() + i * double(scaled_spacing);
-        vertical_lines[i * 2].a     = Point{x0, y_min};
-        vertical_lines[i * 2].b     = Point{x0, y_max};
-        vertical_lines[i * 2 + 1].a = Point{x1, y_min};
-        vertical_lines[i * 2 + 1].b = Point{x1, y_max};
+        coord_t x           = bb.min.x() + i * double(scaled_spacing);
+        vertical_lines[i].a = Point{x, y_min};
+        vertical_lines[i].b = Point{x, y_max};
     }
     vertical_lines.back().a = Point{coord_t(bb.min.x() + n_vlines * double(scaled_spacing) + scaled_spacing * 0.5), y_min};
     vertical_lines.back().b = Point{vertical_lines.back().a.x(), y_max};
 
-    auto                                                         area_walls = AABBTreeLines::LinesDistancer<Line>{to_lines(internal_area)};
-    std::vector<std::vector<std::pair<Vec<2, coord_t>, size_t>>> vertical_lines_intersections(vertical_lines.size());
-    for (int i = 0; i < vertical_lines.size(); i++) {
-        vertical_lines_intersections[i] = area_walls.intersections_with_line<true>(vertical_lines[i]);
-    }
+    auto area_walls = AABBTreeLines::LinesDistancer<Line>{to_lines(intersection(filled_area, opening(filled_area, scale_(2), scale_(3))))};
     std::vector<std::vector<Line>> polygon_sections(n_vlines);
 
     for (size_t i = 0; i < n_vlines; i++) {
-        const auto &central_intersections = vertical_lines_intersections[i * 2 + 1];
-        const auto &left_intersections    = vertical_lines_intersections[i * 2];
-        const auto &right_intersections   = vertical_lines_intersections[i * 2 + 2];
+        const auto intersections = area_walls.intersections_with_line<true>(vertical_lines[i]);
 
-        for (int intersection_idx = 0; intersection_idx < int(central_intersections.size()) - 1; intersection_idx++) {
-            const auto &a = central_intersections[intersection_idx];
-            const auto &b = central_intersections[intersection_idx + 1];
+        for (int intersection_idx = 0; intersection_idx < int(intersections.size()) - 1; intersection_idx++) {
+            const auto &a = intersections[intersection_idx];
+            const auto &b = intersections[intersection_idx + 1];
             if (area_walls.outside((a.first + b.first) / 2) < 0) {
-                // central part is inside. Now check for reasonable side distances
-
-                auto get_closest_intersection_squared_dist =
-                    [](const std::pair<Vec<2, coord_t>, size_t>              &point,
-                       const std::vector<std::pair<Vec<2, coord_t>, size_t>> &sorted_intersections) {
-                        if (sorted_intersections.empty()) {
-                            return 0.0;
-                        }
-                        auto closest_higher = std::upper_bound(sorted_intersections.begin(), sorted_intersections.end(), point,
-                                                               [](const std::pair<Vec<2, coord_t>, size_t> &left,
-                                                                  const std::pair<Vec<2, coord_t>, size_t> &right) {
-                                                                   return left.first.y() < right.first.y();
-                                                               });
-                        if (closest_higher == sorted_intersections.end()) {
-                            return (point.first - sorted_intersections.back().first).cast<double>().squaredNorm();
-                        }
-                        double candidate_dist = (point.first - closest_higher->first).cast<double>().squaredNorm();
-                        if (closest_higher != sorted_intersections.begin()) {
-                            double closest_lower_dist = (point.first - (--closest_higher)->first).cast<double>().squaredNorm();
-                            candidate_dist            = std::min(candidate_dist, closest_lower_dist);
-                        }
-                        return candidate_dist;
-                    };
-                Point section_a = a.first;
-                Point section_b = b.first;
-
-                double max_a_squared_dist = std::max(get_closest_intersection_squared_dist(a, left_intersections),
-                                                     get_closest_intersection_squared_dist(a, right_intersections));
-
-                double max_b_squared_dist = std::max(get_closest_intersection_squared_dist(b, left_intersections),
-                                                     get_closest_intersection_squared_dist(b, right_intersections));
-
-                if (max_a_squared_dist > 0.3 * squared_distance_limit_reconnection) {
-                    section_a.y() += 4.0 * scaled_spacing;
-                }
-
-                if (max_b_squared_dist > 0.3 * squared_distance_limit_reconnection) {
-                    section_b.y() -= 4.0 * scaled_spacing;
-                }
-
-                if (section_a.y() < section_b.y()) {
-                    polygon_sections[i].emplace_back(section_a, section_b);
+                if (std::abs(a.first.y() - b.first.y()) > scaled_spacing) {
+                    polygon_sections[i].emplace_back(a.first, b.first);
                 }
             }
         }
@@ -140,7 +93,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
 
     coord_t length_filter = scale_(4);
     size_t skips_allowed = 2;
-    size_t min_removal_conut = 4;
+    size_t min_removal_conut = 5;
     for (int section_idx = 0; section_idx < polygon_sections.size(); section_idx++) {
         for (int line_idx = 0; line_idx < polygon_sections[section_idx].size(); line_idx++) {
             if (const Line &line = polygon_sections[section_idx][line_idx]; line.a != line.b && line.length() < length_filter) {
@@ -233,8 +186,9 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                         continue;
                     }
                     if ((traced_path.last_point() - candidate->a).cast<double>().squaredNorm() < squared_distance_limit_reconnection) {
+                        traced_path.points.back() += Point{0.0, scaled_spacing * 0.5};
                         traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(candidate->a);
+                        traced_path.points.push_back(candidate->a + Point{0.0, scaled_spacing * 0.5});
                         traced_path.width.push_back(scaled_spacing);
                         traced_path.width.push_back(scaled_spacing);
                         traced_path.points.push_back(candidate->b);
@@ -243,8 +197,9 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                         segment_added = true;
                     } else if ((traced_path.last_point() - candidate->b).cast<double>().squaredNorm() <
                                squared_distance_limit_reconnection) {
+                        traced_path.points.back() -= Point{0.0, scaled_spacing * 0.5};
                         traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(candidate->b);
+                        traced_path.points.push_back(candidate->b - Point{0.0, scaled_spacing * 0.5});
                         traced_path.width.push_back(scaled_spacing);
                         traced_path.width.push_back(scaled_spacing);
                         traced_path.points.push_back(candidate->a);
@@ -431,6 +386,64 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     }
 
     // reconnect ThickPolylines
+    struct EndPoint
+    {
+        Vec2d  position;
+        size_t polyline_idx;
+        size_t other_end_point_idx;
+        bool   is_first;
+        bool   used  = false;
+    };
+    std::vector<EndPoint> connection_endpoints;
+    connection_endpoints.reserve(thick_polylines_out.size() * 2);
+    for (size_t pl_idx = 0; pl_idx < thick_polylines_out.size(); pl_idx++) {
+        size_t current_idx = connection_endpoints.size();
+        connection_endpoints.push_back({thick_polylines_out[pl_idx].first_point().cast<double>(), pl_idx, current_idx + 1, true});
+        connection_endpoints.push_back({thick_polylines_out[pl_idx].last_point().cast<double>(), pl_idx, current_idx, false});
+    }
+    auto coord_fn = [&connection_endpoints](size_t idx, size_t dim) { return connection_endpoints[idx].position[dim]; };
+    KDTreeIndirect<2, double, decltype(coord_fn)> endpoints_tree{coord_fn, connection_endpoints.size()};
+    for (size_t ep_idx = 0; ep_idx < connection_endpoints.size(); ep_idx++) {
+        EndPoint &ep = connection_endpoints[ep_idx];
+        if (!ep.used) {
+            std::vector<size_t> close_endpoints = find_nearby_points(endpoints_tree, ep.position, scaled_spacing);
+            for (size_t close_endpoint_idx : close_endpoints) {
+                EndPoint &ep2 = connection_endpoints[close_endpoint_idx];
+                if (ep2.used || ep2.polyline_idx == ep.polyline_idx) {
+                    continue;
+                }
+
+                // connect ep and ep2;
+                ThickPolyline &tp1 = thick_polylines_out[ep.polyline_idx];
+                ThickPolyline &tp2 = thick_polylines_out[ep2.polyline_idx];
+
+                if (ep.is_first) {
+                    tp1.reverse();
+                    ep.is_first                                           = false;
+                    connection_endpoints[ep.other_end_point_idx].is_first = true;
+                }
+
+                if (!ep2.is_first) {
+                    tp2.reverse();
+                    ep2.is_first                                           = true;
+                    connection_endpoints[ep2.other_end_point_idx].is_first = false;
+                }
+
+                tp1.points.insert(tp1.points.end(), tp2.points.begin(), tp2.points.end());
+                tp1.width.push_back(tp1.width.back());
+                tp1.width.push_back(tp2.width.front());
+                tp1.width.insert(tp1.width.end(), tp2.width.begin(), tp2.width.end());
+                ep2.used                                                          = true;
+                ep.used                                                           = true;
+                connection_endpoints[ep2.other_end_point_idx].polyline_idx        = ep.polyline_idx;
+                connection_endpoints[ep2.other_end_point_idx].other_end_point_idx = ep_idx;
+                connection_endpoints[ep.other_end_point_idx].other_end_point_idx  = close_endpoint_idx;
+                tp2.clear();
+                break;
+            }
+        }
+    }
+
 
 
     rotate_thick_polylines(thick_polylines_out, cos(-aligning_angle), sin(-aligning_angle));
@@ -439,3 +452,85 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
 }
 
 } // namespace Slic3r
+
+
+
+
+
+    // const size_t      n_vlines = (bb.max.x() - bb.min.x() + scaled_spacing - 1) / scaled_spacing;
+    // std::vector<Line> vertical_lines(2 * n_vlines + 1);
+    // coord_t           y_min = bb.min.y();
+    // coord_t           y_max = bb.max.y();
+    // for (size_t i = 0; i < n_vlines; i++) {
+    //     coord_t x0                  = bb.min.x() + i * double(scaled_spacing) - scaled_spacing * 0.5;
+    //     coord_t x1                  = bb.min.x() + i * double(scaled_spacing);
+    //     vertical_lines[i * 2].a     = Point{x0, y_min};
+    //     vertical_lines[i * 2].b     = Point{x0, y_max};
+    //     vertical_lines[i * 2 + 1].a = Point{x1, y_min};
+    //     vertical_lines[i * 2 + 1].b = Point{x1, y_max};
+    // }
+    // vertical_lines.back().a = Point{coord_t(bb.min.x() + n_vlines * double(scaled_spacing) + scaled_spacing * 0.5), y_min};
+    // vertical_lines.back().b = Point{vertical_lines.back().a.x(), y_max};
+
+    // auto                                                         area_walls = AABBTreeLines::LinesDistancer<Line>{to_lines(internal_area)};
+    // std::vector<std::vector<std::pair<Vec<2, coord_t>, size_t>>> vertical_lines_intersections(vertical_lines.size());
+    // for (int i = 0; i < vertical_lines.size(); i++) {
+    //     vertical_lines_intersections[i] = area_walls.intersections_with_line<true>(vertical_lines[i]);
+    // }
+    // std::vector<std::vector<Line>> polygon_sections(n_vlines);
+
+    // for (size_t i = 0; i < n_vlines; i++) {
+    //     const auto &central_intersections = vertical_lines_intersections[i * 2 + 1];
+    //     const auto &left_intersections    = vertical_lines_intersections[i * 2];
+    //     const auto &right_intersections   = vertical_lines_intersections[i * 2 + 2];
+
+    //     for (int intersection_idx = 0; intersection_idx < int(central_intersections.size()) - 1; intersection_idx++) {
+    //         const auto &a = central_intersections[intersection_idx];
+    //         const auto &b = central_intersections[intersection_idx + 1];
+    //         if (area_walls.outside((a.first + b.first) / 2) < 0) {
+    //             // central part is inside. Now check for reasonable side distances
+
+    //             auto get_closest_intersection_squared_dist =
+    //                 [](const std::pair<Vec<2, coord_t>, size_t>              &point,
+    //                    const std::vector<std::pair<Vec<2, coord_t>, size_t>> &sorted_intersections) {
+    //                     if (sorted_intersections.empty()) {
+    //                         return 0.0;
+    //                     }
+    //                     auto closest_higher = std::upper_bound(sorted_intersections.begin(), sorted_intersections.end(), point,
+    //                                                            [](const std::pair<Vec<2, coord_t>, size_t> &left,
+    //                                                               const std::pair<Vec<2, coord_t>, size_t> &right) {
+    //                                                                return left.first.y() < right.first.y();
+    //                                                            });
+    //                     if (closest_higher == sorted_intersections.end()) {
+    //                         return (point.first - sorted_intersections.back().first).cast<double>().squaredNorm();
+    //                     }
+    //                     double candidate_dist = (point.first - closest_higher->first).cast<double>().squaredNorm();
+    //                     if (closest_higher != sorted_intersections.begin()) {
+    //                         double closest_lower_dist = (point.first - (--closest_higher)->first).cast<double>().squaredNorm();
+    //                         candidate_dist            = std::min(candidate_dist, closest_lower_dist);
+    //                     }
+    //                     return candidate_dist;
+    //                 };
+    //             Point section_a = a.first;
+    //             Point section_b = b.first;
+
+    //             double max_a_squared_dist = std::max(get_closest_intersection_squared_dist(a, left_intersections),
+    //                                                  get_closest_intersection_squared_dist(a, right_intersections));
+
+    //             double max_b_squared_dist = std::max(get_closest_intersection_squared_dist(b, left_intersections),
+    //                                                  get_closest_intersection_squared_dist(b, right_intersections));
+
+    //             if (max_a_squared_dist > 0.3 * squared_distance_limit_reconnection) {
+    //                 section_a.y() += 4.0 * scaled_spacing;
+    //             }
+
+    //             if (max_b_squared_dist > 0.3 * squared_distance_limit_reconnection) {
+    //                 section_b.y() -= 4.0 * scaled_spacing;
+    //             }
+
+    //             if (section_a.y() < section_b.y()) {
+    //                 polygon_sections[i].emplace_back(section_a, section_b);
+    //             }
+    //         }
+    //     }
+    // }
