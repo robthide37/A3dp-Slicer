@@ -172,6 +172,7 @@ protected:
 	ScalableButton*		m_search_btn;
 	ScalableButton*		m_btn_compare_preset;
 	ScalableButton*		m_btn_save_preset;
+	ScalableButton*		m_btn_save_preset_as;
 	ScalableButton*		m_btn_delete_preset;
 	ScalableButton*		m_btn_edit_ph_printer {nullptr};
 	ScalableButton*		m_btn_hide_incompatible_presets;
