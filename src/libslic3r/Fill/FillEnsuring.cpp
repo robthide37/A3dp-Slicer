@@ -3,6 +3,7 @@
 #include "../Arachne/WallToolPaths.hpp"
 
 #include "AABBTreeLines.hpp"
+#include "Algorithm/PathSorting.hpp"
 #include "ExPolygon.hpp"
 #include "FillEnsuring.hpp"
 #include "KDTreeIndirect.hpp"
@@ -242,8 +243,8 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     {
         struct TracedPoly
         {
-            std::vector<Point> lows;
-            std::vector<Point> highs;
+            Points lows;
+            Points highs;
         };
 
         std::vector<TracedPoly> current_traced_polys;
@@ -321,14 +322,14 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     }
     // gaps_for_additional_filling            = opening_ex(gaps_for_additional_filling, 0.3 * scaled_spacing);
 
-    BoundingBox bbox = get_extents(filled_area);
-    bbox.offset(scale_(1.));
-    ::Slic3r::SVG svg(debug_out_path(("surface" + std::to_string(surface->area())).c_str()).c_str(), bbox);
-    svg.draw(to_lines(filled_area), "red", scale_(0.4));
-    svg.draw(to_lines(reconstructed_area), "blue", scale_(0.3));
-    svg.draw(to_lines(gaps_for_additional_filling), "green", scale_(0.2));
-    svg.draw(vertical_lines, "black", scale_(0.1));
-    svg.Close();
+    // BoundingBox bbox = get_extents(filled_area);
+    // bbox.offset(scale_(1.));
+    // ::Slic3r::SVG svg(debug_out_path(("surface" + std::to_string(surface->area())).c_str()).c_str(), bbox);
+    // svg.draw(to_lines(filled_area), "red", scale_(0.4));
+    // svg.draw(to_lines(reconstructed_area), "blue", scale_(0.3));
+    // svg.draw(to_lines(gaps_for_additional_filling), "green", scale_(0.2));
+    // svg.draw(vertical_lines, "black", scale_(0.1));
+    // svg.Close();
 
     for (ExPolygon &ex_poly : gaps_for_additional_filling) {
         Point    bbox_size   = ex_poly.contour.bounding_box().size();
@@ -456,14 +457,21 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                                              }),
                               thick_polylines_out.end());
 
+    Algorithm::sort_paths(thick_polylines_out.begin(), thick_polylines_out.end(), thick_polylines_out.begin(), scaled_spacing * 2,
+                          [](const ThickPolyline &tp) {
+                              Lines ls;
+                              Point prev = tp.first_point();
+                              for (size_t i = 1; i < tp.points.size(); i++) {
+                                  ls.emplace_back(prev, tp.points[i]);
+                                  prev = ls.back().b;
+                              }
+                              return ls;
+                          });
+
     return thick_polylines_out;
 }
 
 } // namespace Slic3r
-
-
-
-
 
     // const size_t      n_vlines = (bb.max.x() - bb.min.x() + scaled_spacing - 1) / scaled_spacing;
     // std::vector<Line> vertical_lines(2 * n_vlines + 1);

@@ -728,7 +728,7 @@ Polylines reconnect_polylines(const Polylines &polylines, double limit_distance)
     return result;
 }
 
-ExtrusionPaths sort_extra_perimeters(ExtrusionPaths extra_perims, int index_of_first_unanchored, double extrusion_spacing)
+ExtrusionPaths sort_extra_perimeters(const ExtrusionPaths& extra_perims, int index_of_first_unanchored, double extrusion_spacing)
 {
     if (extra_perims.empty()) return {};
 
