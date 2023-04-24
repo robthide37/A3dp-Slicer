@@ -56,6 +56,20 @@
 
 using namespace std::literals;
 
+// #define PRINT_OBJECT_TIMING
+
+#ifdef PRINT_OBJECT_TIMING
+    // time limit for one ClipperLib operation (union / diff / offset), in ms
+    #define PRINT_OBJECT_TIME_LIMIT_DEFAULT 50
+    #include <boost/current_function.hpp>
+    #include "Timer.hpp"
+    #define PRINT_OBJECT_TIME_LIMIT_SECONDS(limit) Timing::TimeLimitAlarm time_limit_alarm(uint64_t(limit) * 1000000000l, BOOST_CURRENT_FUNCTION)
+    #define PRINT_OBJECT_TIME_LIMIT_MILLIS(limit) Timing::TimeLimitAlarm time_limit_alarm(uint64_t(limit) * 1000000l, BOOST_CURRENT_FUNCTION)
+#else
+    #define PRINT_OBJECT_TIME_LIMIT_SECONDS(limit) do {} while(false)
+    #define PRINT_OBJECT_TIME_LIMIT_MILLIS(limit) do {} while(false)
+#endif // PRINT_OBJECT_TIMING
+
 #ifdef SLIC3R_DEBUG_SLICE_PROCESSING
 #define SLIC3R_DEBUG
 #endif
@@ -178,6 +192,7 @@ void PrintObject::make_perimeters()
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size() - 1),
             [this, &region, region_id](const tbb::blocked_range<size_t>& range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                 for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                     m_print->throw_if_canceled();
                     LayerRegion &layerm                     = *m_layers[layer_idx]->get_region(region_id);
@@ -237,6 +252,7 @@ void PrintObject::make_perimeters()
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0, m_layers.size()),
         [this](const tbb::blocked_range<size_t>& range) {
+            PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
             for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                 m_print->throw_if_canceled();
                 m_layers[layer_idx]->make_perimeters();
@@ -408,6 +424,7 @@ void PrintObject::infill()
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size()),
             [this, &adaptive_fill_octree = adaptive_fill_octree, &support_fill_octree = support_fill_octree](const tbb::blocked_range<size_t>& range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                 for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                     m_print->throw_if_canceled();
                     m_layers[layer_idx]->make_fills(adaptive_fill_octree.get(), support_fill_octree.get(), this->m_lightning_generator.get());
@@ -431,6 +448,7 @@ void PrintObject::ironing()
             // Ironing starting with layer 0 to support ironing all surfaces.
             tbb::blocked_range<size_t>(0, m_layers.size()),
             [this](const tbb::blocked_range<size_t>& range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                 for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                     m_print->throw_if_canceled();
                     m_layers[layer_idx]->make_ironing();
@@ -530,16 +548,17 @@ std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> PrintObject::prepare
     std::vector<std::vector<Vec3d>> overhangs(std::max(surfaces_w_bottom_z.size(), size_t(1)));
     // ^ make sure vector is not empty, even with no briding surfaces we still want to build the adaptive trees later, some continue normally
     tbb::parallel_for(tbb::blocked_range<int>(0, surfaces_w_bottom_z.size()),
-                      [this, &to_octree, &overhangs, &surfaces_w_bottom_z](const tbb::blocked_range<int> &range) {
-                          for (int surface_idx = range.begin(); surface_idx < range.end(); ++surface_idx) {
-                              std::vector<Vec3d> &out = overhangs[surface_idx];
-                              m_print->throw_if_canceled();
-                              append(out, triangulate_expolygon_3d(surfaces_w_bottom_z[surface_idx].first->expolygon,
-                                                                   surfaces_w_bottom_z[surface_idx].second));
-                              for (Vec3d &p : out)
-                                  p = (to_octree * p).eval();
-                          }
-                      });
+        [this, &to_octree, &overhangs, &surfaces_w_bottom_z](const tbb::blocked_range<int> &range) {
+            PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
+            for (int surface_idx = range.begin(); surface_idx < range.end(); ++surface_idx) {
+                std::vector<Vec3d> &out = overhangs[surface_idx];
+                m_print->throw_if_canceled();
+                append(out, triangulate_expolygon_3d(surfaces_w_bottom_z[surface_idx].first->expolygon,
+                                                   surfaces_w_bottom_z[surface_idx].second));
+                for (Vec3d &p : out)
+                    p = (to_octree * p).eval();
+            }
+        });
     // and gather them.
     for (size_t i = 1; i < overhangs.size(); ++ i)
         append(overhangs.front(), std::move(overhangs[i]));
@@ -911,6 +930,7 @@ void PrintObject::detect_surfaces_type()
             		// In non-spiral vase mode, go over all layers.
             		m_layers.size()),
             [this, region_id, interface_shells, &surfaces_new](const tbb::blocked_range<size_t>& range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                 // If we have soluble support material, don't bridge. The overhang will be squished against a soluble layer separating
                 // the support from the print.
                 SurfaceType surface_type_bottom_other =
@@ -1059,6 +1079,7 @@ void PrintObject::detect_surfaces_type()
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size()),
             [this, region_id](const tbb::blocked_range<size_t>& range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                 for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
                     m_print->throw_if_canceled();
                     LayerRegion *layerm = m_layers[idx_layer]->m_regions[region_id];
@@ -1117,6 +1138,7 @@ void PrintObject::process_external_surfaces()
 	    tbb::parallel_for(
 	        tbb::blocked_range<size_t>(0, m_layers.size() - 1),
 	        [this, &surfaces_covered, &layer_expansions_and_voids, unsupported_width](const tbb::blocked_range<size_t>& range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
 	            for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
 	            	if (layer_expansions_and_voids[layer_idx + 1]) {
                         // Layer above is partially filled with solid infill (top, bottom, bridging...),
@@ -1142,6 +1164,7 @@ void PrintObject::process_external_surfaces()
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, m_layers.size()),
             [this, &surfaces_covered, region_id](const tbb::blocked_range<size_t>& range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                 for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
                     m_print->throw_if_canceled();
                     // BOOST_LOG_TRIVIAL(trace) << "Processing external surface, layer" << m_layers[layer_idx]->print_z;
@@ -1194,6 +1217,7 @@ void PrintObject::discover_vertical_shells()
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, num_layers, grain_size),
             [this, &cache_top_botom_regions](const tbb::blocked_range<size_t>& range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                 const std::initializer_list<SurfaceType> surfaces_bottom { stBottom, stBottomBridge };
                 const size_t num_regions = this->num_printing_regions();
                 for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
@@ -1267,6 +1291,7 @@ void PrintObject::discover_vertical_shells()
             tbb::parallel_for(
                 tbb::blocked_range<size_t>(0, num_layers, grain_size),
                 [this, region_id, &cache_top_botom_regions](const tbb::blocked_range<size_t>& range) {
+                    PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                     const std::initializer_list<SurfaceType> surfaces_bottom { stBottom, stBottomBridge };
                     for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
                         m_print->throw_if_canceled();
@@ -1292,10 +1317,12 @@ void PrintObject::discover_vertical_shells()
         }
 
         BOOST_LOG_TRIVIAL(debug) << "Discovering vertical shells for region " << region_id << " in parallel - start : ensure vertical wall thickness";
+        grain_size = 1;
         tbb::parallel_for(
             tbb::blocked_range<size_t>(0, num_layers, grain_size),
             [this, region_id, &cache_top_botom_regions]
             (const tbb::blocked_range<size_t>& range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
                 // printf("discover_vertical_shells from %d to %d\n", range.begin(), range.end());
                 for (size_t idx_layer = range.begin(); idx_layer < range.end(); ++ idx_layer) {
                     m_print->throw_if_canceled();
@@ -1626,6 +1653,7 @@ void PrintObject::bridge_over_infill()
         tbb::concurrent_vector<CandidateSurface> candidate_surfaces;
         tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = static_cast<const PrintObject *>(this),
                                                                                  &candidate_surfaces](tbb::blocked_range<size_t> r) {
+            PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
             for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
                 const Layer *layer = po->get_layer(lidx);
                 if (layer->lower_layer == nullptr) {
@@ -1723,6 +1751,7 @@ void PrintObject::bridge_over_infill()
         tbb::parallel_for(tbb::blocked_range<size_t>(0, layers_to_generate_infill.size()), [po = static_cast<const PrintObject *>(this),
                                                                                             &layers_to_generate_infill,
                                                                                             &infill_lines](tbb::blocked_range<size_t> r) {
+            PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
             for (size_t job_idx = r.begin(); job_idx < r.end(); job_idx++) {
                 size_t lidx = layers_to_generate_infill[job_idx];
                 infill_lines.at(
@@ -1754,6 +1783,7 @@ void PrintObject::bridge_over_infill()
         tbb::parallel_for(tbb::blocked_range<size_t>(0, layers_with_candidates.size()), [&layers_with_candidates, &surfaces_by_layer,
                                                                                          &layer_area_covered_by_candidates](
                                                                                             tbb::blocked_range<size_t> r) {
+            PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
             for (size_t job_idx = r.begin(); job_idx < r.end(); job_idx++) {
                 size_t lidx = layers_with_candidates[job_idx];
                 for (const auto &candidate : surfaces_by_layer.at(lidx)) {
@@ -2072,6 +2102,7 @@ void PrintObject::bridge_over_infill()
                                                                                            determine_bridging_angle,
                                                                                            construct_anchored_polygon](
                                                                                               tbb::blocked_range<size_t> r) {
+        PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
         for (size_t cluster_idx = r.begin(); cluster_idx < r.end(); cluster_idx++) {
             for (size_t job_idx = 0; job_idx < clustered_layers_for_threads[cluster_idx].size(); job_idx++) {
                 size_t       lidx  = clustered_layers_for_threads[cluster_idx][job_idx];
@@ -2244,6 +2275,7 @@ void PrintObject::bridge_over_infill()
     BOOST_LOG_TRIVIAL(info) << "Bridge over infill - Directions and expanded surfaces computed" << log_memory_info();
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this, &surfaces_by_layer](tbb::blocked_range<size_t> r) {
+        PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
         for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
             if (surfaces_by_layer.find(lidx) == surfaces_by_layer.end())
                 continue;
@@ -2760,6 +2792,7 @@ static void project_triangles_to_slabs(SpanOfConstPtrs<Layer> layers, const inde
         [&custom_facets, &tr, tr_det_sign, seam, layers, &projections_of_triangles](const tbb::blocked_range<size_t>& range) {
         for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
 
+        PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
         std::array<Vec3f, 3> facet;
 
         // Transform the triangle into worlds coords.
