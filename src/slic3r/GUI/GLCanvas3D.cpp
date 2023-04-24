@@ -615,7 +615,7 @@ void GLCanvas3D::LayersEditing::accept_changes(GLCanvas3D& canvas)
         if (m_layer_height_profile_modified) {
             wxGetApp().plater()->take_snapshot(_L("Variable layer height - Manual edit"));
             const_cast<ModelObject*>(m_model_object)->layer_height_profile.set(m_layer_height_profile);
-			canvas.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
+            canvas.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
             wxGetApp().obj_list()->update_info_items(last_object_id);
         }
     }
@@ -3189,9 +3189,15 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_canvas->SetFocus();
 
     if (evt.Entering()) {
-        if (m_mouse.dragging && !evt.LeftIsDown() && !evt.RightIsDown() && !evt.MiddleIsDown())
-            // reset dragging state if the user released the mouse button outside the 3D scene
-            m_mouse.dragging = false;
+        if (m_mouse.dragging && !evt.LeftIsDown() && !evt.RightIsDown() && !evt.MiddleIsDown()) {
+            // ensure to stop layers editing if enabled
+            if (m_layers_editing.state != LayersEditing::Unknown) {
+                m_layers_editing.state = LayersEditing::Unknown;
+                _stop_timer();
+                m_layers_editing.accept_changes(*this);
+            }
+            mouse_up_cleanup();
+        }
 
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
