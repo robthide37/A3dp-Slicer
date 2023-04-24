@@ -44,11 +44,12 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                (bhigh >= alow && bhigh <= ahigh);
     };
 
-    const coord_t scaled_spacing                      = scaled<coord_t>(this->spacing);
-    double        distance_limit_reconnection         = 2 * double(scaled_spacing);
-    double        squared_distance_limit_reconnection = distance_limit_reconnection * distance_limit_reconnection;
-    Polygons      filled_area                         = to_polygons(surface->expolygon);
-    double        aligning_angle                      = -this->angle + PI * 0.5;
+    const coord_t           scaled_spacing                      = scaled<coord_t>(this->spacing);
+    double                  distance_limit_reconnection         = 2 * double(scaled_spacing);
+    double                  squared_distance_limit_reconnection = distance_limit_reconnection * distance_limit_reconnection;
+    Polygons                filled_area                         = to_polygons(surface->expolygon);
+    std::pair<float, Point> rotate_vector                       = this->_infill_direction(surface);
+    double                  aligning_angle                      = -rotate_vector.first + PI;
     polygons_rotate(filled_area, aligning_angle);
     Polygons    internal_area = shrink(filled_area, 0.5 * scaled_spacing - scale_(this->overlap));
     BoundingBox bb            = get_extents(filled_area);
@@ -65,7 +66,8 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     vertical_lines.back().a = Point{coord_t(bb.min.x() + n_vlines * double(scaled_spacing) + scaled_spacing * 0.5), y_min};
     vertical_lines.back().b = Point{vertical_lines.back().a.x(), y_max};
 
-    auto area_walls = AABBTreeLines::LinesDistancer<Line>{to_lines(intersection(filled_area, opening(filled_area, scale_(2), scale_(3))))};
+    auto area_walls = AABBTreeLines::LinesDistancer<Line>{
+        to_lines(intersection(filled_area, opening(filled_area, 2 * scaled_spacing, 3 * scaled_spacing)))};
     std::vector<std::vector<Line>> polygon_sections(n_vlines);
 
     for (size_t i = 0; i < n_vlines; i++) {
@@ -444,9 +446,15 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
         }
     }
 
-
-
     rotate_thick_polylines(thick_polylines_out, cos(-aligning_angle), sin(-aligning_angle));
+
+    thick_polylines_out.erase(std::remove_if(thick_polylines_out.begin(), thick_polylines_out.end(),
+                                             [scaled_spacing](const ThickPolyline &tp) {
+                                                 return tp.length() < scaled_spacing &&
+                                                        std::all_of(tp.width.begin(), tp.width.end(),
+                                                                    [scaled_spacing](double w) { return w < scaled_spacing; });
+                                             }),
+                              thick_polylines_out.end());
 
     return thick_polylines_out;
 }
