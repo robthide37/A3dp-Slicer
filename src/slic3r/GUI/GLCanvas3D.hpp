@@ -261,7 +261,7 @@ class GLCanvas3D
 		void adjust_layer_height_profile();
 		void accept_changes(GLCanvas3D& canvas);
         void reset_layer_height_profile(GLCanvas3D& canvas);
-        void adaptive_layer_height_profile(GLCanvas3D& canvas, float quality_factor, float max_adaptive_layer_height);
+        void adaptive_layer_height_profile(GLCanvas3D& canvas, const HeightProfileAdaptiveParams& adaptative_params);
         void smooth_layer_height_profile(GLCanvas3D& canvas, const HeightProfileSmoothingParams& smoothing_params);
 
         static float get_cursor_z_relative(const GLCanvas3D& canvas);

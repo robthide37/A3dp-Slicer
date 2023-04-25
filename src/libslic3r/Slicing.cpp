@@ -363,8 +363,16 @@ std::vector<coordf_t> layer_height_profile_from_ranges(
 
 // Based on the work of @platsch
 // Fill layer_height_profile by heights ensuring a prescribed maximum cusp height.
-std::vector<double> layer_height_profile_adaptive(const SlicingParameters& slicing_params, const ModelObject& object, float quality_factor, float max_adaptive_layer_height)
+std::vector<double> layer_height_profile_adaptive(const SlicingParameters& slicing_params, const ModelObject& object, const HeightProfileAdaptiveParams& adaptative_params)
 {
+    float min_adaptive_layer_height = adaptative_params.min_adaptive_layer_height;
+    float max_adaptive_layer_height = adaptative_params.max_adaptive_layer_height;
+    if (min_adaptive_layer_height > max_adaptive_layer_height) {
+        float temp = max_adaptive_layer_height;
+        max_adaptive_layer_height = min_adaptive_layer_height;
+        min_adaptive_layer_height = temp;
+    }
+
     // 1) Initialize the SlicingAdaptive class with the object meshes.
     SlicingAdaptive as;
     as.set_slicing_parameters(&slicing_params);
@@ -383,10 +391,14 @@ std::vector<double> layer_height_profile_adaptive(const SlicingParameters& slici
     size_t current_facet = 0;
     // loop until we have at least one layer and the max slice_z reaches the object height
     while (print_z + EPSILON < slicing_params.object_print_z_height()) {
-        coordf_t height = std::min(slicing_params.max_layer_height, (coordf_t)max_adaptive_layer_height);
+        double height = max_adaptive_layer_height > 0 ? std::min(max_adaptive_layer_height, float(slicing_params.max_layer_height)) : float(slicing_params.max_layer_height);
+        height = check_z_step(height, slicing_params.z_step);
         // Slic3r::debugf "\n Slice layer: %d\n", $id;
         // determine next layer height
-        float cusp_height = as.next_layer_height(float(print_z), quality_factor, current_facet);
+        double cusp_height = as.next_layer_height(float(print_z), adaptative_params.adaptive_quality, current_facet);
+        if (min_adaptive_layer_height >= 0) {
+            cusp_height = std::max(double(min_adaptive_layer_height), cusp_height);
+        }
 
 #if 0
         // check for horizontal features and object size
