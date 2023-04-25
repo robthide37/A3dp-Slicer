@@ -4276,7 +4276,7 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     ExtrusionPaths& building_paths = loop_to_seam.paths;
     //direction is now set, make the path unreversable
     for (ExtrusionPath& path : building_paths) {
-        assert(!path.can_reverse() || path.role() == erGapFill);
+        assert(!path.can_reverse() || !is_perimeter(path.role())); //just ensure the perimeter have their direction enforced.
         path.set_can_reverse(false);
     }
     if (m_enable_loop_clipping && m_writer.tool_is_extruder()) {
