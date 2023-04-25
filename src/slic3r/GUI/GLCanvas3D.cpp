@@ -6244,10 +6244,10 @@ void GLCanvas3D::_perform_layer_editing_action(wxMouseEvent* evt)
         m_layers_editing.last_action = 
             evt->ShiftDown() ? (evt->RightIsDown() ? LAYER_HEIGHT_EDIT_ACTION_SMOOTH : LAYER_HEIGHT_EDIT_ACTION_REDUCE) : 
                                (evt->RightIsDown() ? LAYER_HEIGHT_EDIT_ACTION_INCREASE : LAYER_HEIGHT_EDIT_ACTION_DECREASE);
-    }
 
-    m_layers_editing.adjust_layer_height_profile();
-    _refresh_if_shown_on_screen();
+        m_layers_editing.adjust_layer_height_profile();
+        _refresh_if_shown_on_screen();
+    }
 
     // Automatic action on mouse down with the same coordinate.
     _start_timer();
