@@ -85,6 +85,17 @@ ObjectList::ObjectList(wxWindow* parent) :
 
     // describe control behavior 
     Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxDataViewEvent& event) {
+        // do not allow to change selection while the sla support gizmo is in editing mode
+        const GLGizmosManager& gizmos = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
+        if (gizmos.get_current_type() == GLGizmosManager::EType::SlaSupports && gizmos.is_in_editing_mode(true)) {
+            wxDataViewItemArray sels;
+            GetSelections(sels);
+            if (sels.size() > 1 || event.GetItem() != m_last_selected_item) {
+                select_item(m_last_selected_item);
+                return;
+            }
+        }
+
         // detect the current mouse position here, to pass it to list_manipulation() method
         // if we detect it later, the user may have moved the mouse pointer while calculations are performed, and this would mess-up the HitTest() call performed into list_manipulation()
         // see: https://github.com/prusa3d/PrusaSlicer/issues/3802
@@ -4960,6 +4971,11 @@ void ObjectList::update_printable_state(int obj_idx, int instance_idx)
 
 void ObjectList::toggle_printable_state()
 {
+    // do not allow to toggle the printable state while the sla support gizmo is in editing mode
+    const GLGizmosManager& gizmos = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
+    if (gizmos.get_current_type() == GLGizmosManager::EType::SlaSupports && gizmos.is_in_editing_mode(true))
+        return;
+
     wxDataViewItemArray sels;
     GetSelections(sels);
     if (sels.IsEmpty())
