@@ -743,6 +743,14 @@ wxMenuItem* MenuFactory::append_menu_item_printable(wxMenu* menu)
         }
             
         evt.Check(check);
+
+        // disable the menu item if SLA supports or Hollow gizmos are active
+        if (printer_technology() == ptSLA) {
+            const auto gizmo_type = plater()->canvas3D()->get_gizmos_manager().get_current_type();
+            const bool enable = gizmo_type != GLGizmosManager::SlaSupports && gizmo_type != GLGizmosManager::Hollow;
+            evt.Enable(enable);
+        }
+
         plater()->set_current_canvas_as_dirty();
 
     }, menu_item_printable->GetId());
@@ -998,12 +1006,13 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
 
     wxString description = _L("Ability to change text, font, size, ...");
     std::string icon = "";
-    append_menu_item(
-        menu, wxID_ANY, name, description,
-        [](wxCommandEvent &) {
-            plater()->canvas3D()->get_gizmos_manager().open_gizmo(GLGizmosManager::Emboss);
-        },
-        icon, nullptr, can_edit_text, m_parent);
+    auto open_emboss = [](const wxCommandEvent &) {
+        GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
+        if (mng.get_current_type() == GLGizmosManager::Emboss)
+            mng.open_gizmo(GLGizmosManager::Emboss); // close() and reopen - move to be visible
+        mng.open_gizmo(GLGizmosManager::Emboss);
+    };
+    append_menu_item(menu, wxID_ANY, name, description, open_emboss, icon, nullptr, can_edit_text, m_parent);
 }
 
 MenuFactory::MenuFactory()

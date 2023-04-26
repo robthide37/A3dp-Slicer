@@ -56,15 +56,17 @@ bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
     return false;
 }
 
-void GLGizmoFlatten::data_changed()
+void GLGizmoFlatten::data_changed(bool is_serializing)
 {
     const Selection &  selection    = m_parent.get_selection();
     const ModelObject *model_object = nullptr;
+    int                instance_id = -1;
     if (selection.is_single_full_instance() ||
         selection.is_from_single_object() ) {        
         model_object = selection.get_model()->objects[selection.get_object_idx()];
+        instance_id = selection.get_instance_idx();
     }    
-    set_flattening_data(model_object);
+    set_flattening_data(model_object, instance_id);
 }
 
 bool GLGizmoFlatten::on_init()
@@ -156,9 +158,9 @@ void GLGizmoFlatten::on_unregister_raycasters_for_picking()
     m_planes_casters.clear();
 }
 
-void GLGizmoFlatten::set_flattening_data(const ModelObject* model_object)
+void GLGizmoFlatten::set_flattening_data(const ModelObject* model_object, int instance_id)
 {
-    if (model_object != m_old_model_object) {
+    if (model_object != m_old_model_object || instance_id != m_old_instance_id) {
         m_planes.clear();
         on_unregister_raycasters_for_picking();
     }
@@ -363,6 +365,7 @@ void GLGizmoFlatten::update_planes()
     m_first_instance_scale = mo->instances.front()->get_scaling_factor();
     m_first_instance_mirror = mo->instances.front()->get_mirror();
     m_old_model_object = mo;
+    m_old_instance_id = m_c->selection_info()->get_active_instance();
 
     // And finally create respective VBOs. The polygon is convex with
     // the vertices in order, so triangulation is trivial.

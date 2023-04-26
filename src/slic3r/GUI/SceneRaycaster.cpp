@@ -117,7 +117,7 @@ SceneRaycaster::HitResult SceneRaycaster::hit(const Vec2d& mouse_pos, const Came
                 return false;
 
             if (hit.type == SceneRaycaster::EType::Volume)
-                m_selected_volume_already_found = *m_selected_volume_id == decode_id(hit.type, hit.raycaster_id);
+                m_selected_volume_already_found = *m_selected_volume_id == (unsigned int)decode_id(hit.type, hit.raycaster_id);
 
             m_closest_hit_pos = hit.position;
             return true;

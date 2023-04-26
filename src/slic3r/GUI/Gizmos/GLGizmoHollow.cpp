@@ -42,7 +42,7 @@ bool GLGizmoHollow::on_init()
     return true;
 }
 
-void GLGizmoHollow::data_changed()
+void GLGizmoHollow::data_changed(bool is_serializing)
 {
     if (! m_c->selection_info())
         return;
@@ -819,6 +819,12 @@ bool GLGizmoHollow::on_is_activable() const
     for (const auto& idx : list)
         if (selection.get_volume(idx)->is_outside && selection.get_volume(idx)->composite_id.volume_id >= 0)
             return false;
+
+    // Check that none of the selected volumes is marked as non-pritable.
+    for (const auto& idx : list) {
+        if (!selection.get_volume(idx)->printable)
+            return false;
+    }
 
     return true;
 }

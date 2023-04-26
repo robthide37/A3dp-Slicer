@@ -836,6 +836,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     path_tmp += ".tmp";
 
     m_processor.initialize(path_tmp);
+    m_processor.set_print(print);
     GCodeOutputStream file(boost::nowide::fopen(path_tmp.c_str(), "wb"), m_processor);
     if (! file.is_open())
         throw Slic3r::RuntimeError(std::string("G-code export to ") + path + " failed.\nCannot open the file for writing.\n");
@@ -2354,11 +2355,10 @@ void GCode::process_layer_single_object(
     // Round 1 (wiping into object or infill) or round 2 (normal extrusions).
     const bool                print_wipe_extrusions)
 {
-    //FIXME what the heck ID is this? Layer ID or Object ID? More likely an Object ID.
-    uint32_t layer_id = 0;
-    bool     first    = true;
+    bool     first     = true;
+    int      object_id = 0;
     // Delay layer initialization as many layers may not print with all extruders.
-    auto init_layer_delayed = [this, &print_instance, &layer_to_print, layer_id, &first, &gcode]() {
+    auto init_layer_delayed = [this, &print_instance, &layer_to_print, &first, &object_id, &gcode]() {
         if (first) {
             first = false;
             const PrintObject &print_object = print_instance.print_object;
@@ -2374,8 +2374,14 @@ void GCode::process_layer_single_object(
                 m_avoid_crossing_perimeters.use_external_mp_once();
             m_last_obj_copy = this_object_copy;
             this->set_origin(unscale(offset));
-            if (this->config().gcode_label_objects)
-                gcode += std::string("; printing object ") + print_object.model_object()->name + " id:" + std::to_string(layer_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
+            if (this->config().gcode_label_objects) {
+                for (const PrintObject *po : print_object.print()->objects())
+                    if (po == &print_object)
+                        break;
+                    else
+                        ++ object_id;
+                gcode += std::string("; printing object ") + print_object.model_object()->name + " id:" + std::to_string(object_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
+            }
         }
     };
 
@@ -2548,7 +2554,7 @@ void GCode::process_layer_single_object(
             }
         }
     if (! first && this->config().gcode_label_objects)
-        gcode += std::string("; stop printing object ") + print_object.model_object()->name + " id:" + std::to_string(layer_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
+        gcode += std::string("; stop printing object ") + print_object.model_object()->name + " id:" + std::to_string(object_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
 }
 
 void GCode::apply_print_config(const PrintConfig &print_config)
@@ -3020,10 +3026,17 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
                                      {100, ConfigOptionInts{0}}};
         }
 
-        double external_perim_reference_speed = std::min(m_config.get_abs_value("external_perimeter_speed"),
-                                                         std::min(EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm,
-                                                                  m_config.max_volumetric_speed.value / path.mm3_per_mm));
-        new_points = m_extrusion_quality_estimator.estimate_extrusion_quality(path, overhangs_with_speeds, overhang_w_fan_speeds,
+        double external_perim_reference_speed = m_config.get_abs_value("external_perimeter_speed");
+        if (external_perim_reference_speed == 0)
+            external_perim_reference_speed = m_volumetric_speed / path.mm3_per_mm;
+        if (m_config.max_volumetric_speed.value > 0)
+            external_perim_reference_speed = std::min(external_perim_reference_speed, m_config.max_volumetric_speed.value / path.mm3_per_mm);
+        if (EXTRUDER_CONFIG(filament_max_volumetric_speed) > 0) {
+            external_perim_reference_speed = std::min(external_perim_reference_speed,
+                                                      EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm);
+        }
+
+        new_points = m_extrusion_quality_estimator.estimate_speed_from_extrusion_quality(path, overhangs_with_speeds, overhang_w_fan_speeds,
                                                                               m_writer.extruder()->id(), external_perim_reference_speed,
                                                                               speed);
         variable_speed_or_fan_speed = std::any_of(new_points.begin(), new_points.end(),
@@ -3083,8 +3096,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
 
     std::string cooling_marker_setspeed_comments;
     if (m_enable_cooling_markers) {
-        if (path.role().is_bridge() &&
-            (!path.role().is_perimeter() || !this->config().enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())))
+        if (path.role().is_bridge())
             gcode += ";_BRIDGE_FAN_START\n";
         else
             cooling_marker_setspeed_comments = ";_EXTRUDE_SET_SPEED";
@@ -3120,7 +3132,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
         double last_set_speed     = new_points[0].speed * 60.0;
         double last_set_fan_speed = new_points[0].fan_speed;
         gcode += m_writer.set_speed(last_set_speed, "", cooling_marker_setspeed_comments);
-        gcode += ";_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
+        gcode += "\n;_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
         Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
         for (size_t i = 1; i < new_points.size(); i++) {
             const ProcessedPoint &processed_point = new_points[i];
@@ -3135,10 +3147,10 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
             }
             if (last_set_fan_speed != processed_point.fan_speed) {
                 last_set_fan_speed = processed_point.fan_speed;
-                gcode += ";_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
+                gcode += "\n;_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
             }
         }
-        gcode += ";_RESET_FAN_SPEED\n";
+        gcode += "\n;_RESET_FAN_SPEED\n";
     }
 
     if (m_enable_cooling_markers)

@@ -697,7 +697,9 @@ void GCodeViewer::init()
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Line;
             buffer.vertices.format = VBuffer::EFormat::Position;
 #if ENABLE_GL_CORE_PROFILE
-            buffer.shader = OpenGLManager::get_gl_info().is_core_profile() ? "dashed_thick_lines" : "flat";
+            // on MAC using the geometry shader of dashed_thick_lines is too slow
+            buffer.shader = "flat";
+//            buffer.shader = OpenGLManager::get_gl_info().is_core_profile() ? "dashed_thick_lines" : "flat";
 #else
             buffer.shader = "flat";
 #endif // ENABLE_GL_CORE_PROFILE
@@ -836,7 +838,8 @@ void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::v
         case EMoveType::Extrude:
         {
             m_extrusions.ranges.height.update_from(round_to_bin(curr.height));
-            m_extrusions.ranges.width.update_from(round_to_bin(curr.width));
+            if (curr.extrusion_role != GCodeExtrusionRole::Custom || is_visible(GCodeExtrusionRole::Custom))
+                m_extrusions.ranges.width.update_from(round_to_bin(curr.width));
             m_extrusions.ranges.fan_speed.update_from(curr.fan_speed);
             m_extrusions.ranges.temperature.update_from(curr.temperature);
             if (curr.extrusion_role != GCodeExtrusionRole::Custom || is_visible(GCodeExtrusionRole::Custom))
@@ -3941,6 +3944,20 @@ void GCodeViewer::render_legend(float& legend_height)
                 }
             }
             ImGui::EndTable();
+        }
+    }
+
+    if (m_view_type == EViewType::Width || m_view_type == EViewType::VolumetricRate) {
+      const auto custom_it = std::find(m_roles.begin(), m_roles.end(), GCodeExtrusionRole::Custom);
+      if (custom_it != m_roles.end()) {
+          const bool custom_visible = is_visible(GCodeExtrusionRole::Custom);
+          const wxString btn_text = custom_visible ? _u8L("Hide Custom GCode") : _u8L("Show Custom GCode");
+          ImGui::Separator();
+          if (imgui.button(btn_text, ImVec2(-1.0f, 0.0f), true)) {
+              m_extrusions.role_visibility_flags = custom_visible ? m_extrusions.role_visibility_flags & ~(1 << int(GCodeExtrusionRole::Custom)) :
+                  m_extrusions.role_visibility_flags | (1 << int(GCodeExtrusionRole::Custom));
+              wxGetApp().plater()->refresh_print();
+          }
         }
     }
 

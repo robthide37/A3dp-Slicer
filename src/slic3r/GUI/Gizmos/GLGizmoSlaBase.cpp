@@ -59,7 +59,7 @@ void GLGizmoSlaBase::update_volumes()
         if (last_comp_step == slaposCount)
             last_comp_step = -1;
 
-        m_input_enabled = last_comp_step >= m_min_sla_print_object_step;
+        m_input_enabled = last_comp_step >= m_min_sla_print_object_step || po->model_object()->sla_points_status == sla::PointsStatus::UserModified;
 
         const int object_idx   = m_parent.get_selection().get_object_idx();
         const int instance_idx = m_parent.get_selection().get_instance_idx();
@@ -135,7 +135,11 @@ void GLGizmoSlaBase::render_volumes()
     const Camera& camera = wxGetApp().plater()->get_camera();
 
     ClippingPlane clipping_plane = (m_c->object_clipper()->get_position() == 0.0) ? ClippingPlane::ClipsNothing() : *m_c->object_clipper()->get_clipping_plane();
-    clipping_plane.set_normal(-clipping_plane.get_normal());
+    if (m_c->object_clipper()->get_position() != 0.0)
+        clipping_plane.set_normal(-clipping_plane.get_normal());
+    else
+        // on Linux the clipping plane does not work when using DBL_MAX
+        clipping_plane.set_offset(FLT_MAX);
     m_volumes.set_clipping_plane(clipping_plane.get_data());
 
     for (GLVolume* v : m_volumes.volumes) {

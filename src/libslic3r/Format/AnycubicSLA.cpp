@@ -1,4 +1,4 @@
-#include "pwmx.hpp"
+#include "AnycubicSLA.hpp"
 #include "GCode/ThumbnailData.hpp"
 #include "SLA/RasterBase.hpp"
 #include "libslic3r/SLAPrint.hpp"
@@ -22,6 +22,8 @@
 #define CFG_DELAY_BEFORE_EXPOSURE "DELAY_BEFORE_EXPOSURE"
 #define CFG_BOTTOM_LIFT_SPEED "BOTTOM_LIFT_SPEED"
 #define CFG_BOTTOM_LIFT_DISTANCE "BOTTOM_LIFT_DISTANCE"
+#define CFG_ANTIALIASING "ANTIALIASING"
+
 
 #define PREV_W 224
 #define PREV_H 168
@@ -31,7 +33,7 @@
 
 namespace Slic3r {
 
-static void pwx_get_pixel_span(const std::uint8_t* ptr, const std::uint8_t* end,
+static void anycubicsla_get_pixel_span(const std::uint8_t* ptr, const std::uint8_t* end,
                                std::uint8_t& pixel, size_t& span_len)
 {
     size_t max_len;
@@ -46,7 +48,7 @@ static void pwx_get_pixel_span(const std::uint8_t* ptr, const std::uint8_t* end,
     }
 }
 
-struct PWXRasterEncoder
+struct AnycubicSLARasterEncoder
 {
     sla::EncodedRaster operator()(const void *ptr,
                                   size_t      w,
@@ -62,7 +64,7 @@ struct PWXRasterEncoder
         const std::uint8_t *src = reinterpret_cast<const std::uint8_t *>(ptr);
         const std::uint8_t *src_end = src + size;
         while (src < src_end) {
-            pwx_get_pixel_span(src, src_end, pixel, span_len);
+            anycubicsla_get_pixel_span(src, src_end, pixel, span_len);
             src += span_len;
             // fully transparent of fully opaque pixel
             if (pixel == 0 || pixel == 0xF0) {
@@ -78,27 +80,27 @@ struct PWXRasterEncoder
             }
         }
 
-        return sla::EncodedRaster(std::move(dst), "pwx");
+        return sla::EncodedRaster(std::move(dst), "pwimg");
     }
 };
 
 using ConfMap = std::map<std::string, std::string>;
 
-typedef struct pwmx_format_intro
+typedef struct anycubicsla_format_intro
 {
     char          tag[12];
-    std::uint32_t version;  // value 1
-    std::uint32_t area_num; // unknown - usually 4
+    std::uint32_t version;  // value 1 (also known as 515, 516 and 517)
+    std::uint32_t area_num; // Number of tables - usually 4
     std::uint32_t header_data_offset;
-    std::float_t  intro24; // unknown - usually 0
+    std::uint32_t software_data_offset; // unused in version 1
     std::uint32_t preview_data_offset;
-    std::float_t  intro32; // unknown
+    std::uint32_t layer_color_offset; // unused in version 1
     std::uint32_t layer_data_offset;
-    std::float_t  intro40; // unknown
+    std::uint32_t extra_data_offset; // unused here (only used in version 516)
     std::uint32_t image_data_offset;
-} pwmx_format_intro;
+} anycubicsla_format_intro;
 
-typedef struct pwmx_format_header
+typedef struct anycubicsla_format_header
 {
     char          tag[12];
     std::uint32_t payload_size;
@@ -121,11 +123,11 @@ typedef struct pwmx_format_header
     std::uint32_t per_layer_override; // ? unknown meaning ?
     std::uint32_t print_time_s;
     std::uint32_t transition_layer_count;
-    std::uint32_t unknown; // ? usually 0 ?
+    std::uint32_t transition_layer_type; // usually 0
 
-} pwmx_format_header;
+} anycubicsla_format_header;
 
-typedef struct pwmx_format_preview
+typedef struct anycubicsla_format_preview
 {
     char          tag[12];
     std::uint32_t payload_size;
@@ -134,16 +136,16 @@ typedef struct pwmx_format_preview
     std::uint32_t preview_h;
     // raw image data in BGR565 format
      std::uint8_t pixels[PREV_W * PREV_H * 2];
-} pwmx_format_preview;
+} anycubicsla_format_preview;
 
-typedef struct pwmx_format_layers_header
+typedef struct anycubicsla_format_layers_header
 {
     char          tag[12];
     std::uint32_t payload_size;
     std::uint32_t layer_count;
-} pwmx_format_layers_header;
+} anycubicsla_format_layers_header;
 
-typedef struct pwmx_format_layer
+typedef struct anycubicsla_format_layer
 {
     std::uint32_t image_offset;
     std::uint32_t image_size;
@@ -153,20 +155,20 @@ typedef struct pwmx_format_layer
     std::float_t  layer_height_mm;
     std::float_t  layer44; // unkown - usually 0
     std::float_t  layer48; // unkown - usually 0
-} pwmx_format_layer;
+} anycubicsla_format_layer;
 
-typedef struct pwmx_format_misc
+typedef struct anycubicsla_format_misc
 {
     std::float_t bottom_layer_height_mm;
     std::float_t bottom_lift_distance_mm;
     std::float_t bottom_lift_speed_mms;
 
-} pwmx_format_misc;
+} anycubicsla_format_misc;
 
-class PwmxFormatConfigDef : public ConfigDef
+class AnycubicSLAFormatConfigDef : public ConfigDef
 {
 public:
-    PwmxFormatConfigDef()
+    AnycubicSLAFormatConfigDef()
     {
         add(CFG_LIFT_DISTANCE, coFloat);
         add(CFG_LIFT_SPEED, coFloat);
@@ -174,17 +176,18 @@ public:
         add(CFG_DELAY_BEFORE_EXPOSURE, coFloat);
         add(CFG_BOTTOM_LIFT_DISTANCE, coFloat);
         add(CFG_BOTTOM_LIFT_SPEED, coFloat);
+        add(CFG_ANTIALIASING, coInt);
     }
 };
 
-class PwmxFormatDynamicConfig : public DynamicConfig
+class AnycubicSLAFormatDynamicConfig : public DynamicConfig
 {
 public:
-    PwmxFormatDynamicConfig(){};
+    AnycubicSLAFormatDynamicConfig(){};
     const ConfigDef *def() const override { return &config_def; }
 
 private:
-    PwmxFormatConfigDef config_def;
+    AnycubicSLAFormatConfigDef config_def;
 };
 
 namespace {
@@ -222,8 +225,8 @@ template<class T> void crop_value(T &val, T val_min, T val_max)
     }
 }
 
-void fill_preview(pwmx_format_preview &p,
-                  pwmx_format_misc   &/*m*/,
+void fill_preview(anycubicsla_format_preview &p,
+                  anycubicsla_format_misc   &/*m*/,
                   const ThumbnailsList &thumbnails)
 {
 
@@ -266,9 +269,8 @@ void fill_preview(pwmx_format_preview &p,
     }
 }
 
-
-void fill_header(pwmx_format_header &h,
-                 pwmx_format_misc   &m,
+void fill_header(anycubicsla_format_header &h,
+                 anycubicsla_format_misc   &m,
                  const SLAPrint     &print,
                  std::uint32_t       layer_count)
 {
@@ -282,7 +284,7 @@ void fill_header(pwmx_format_header &h,
     auto         mat_opt = cfg.option("material_notes");
     std::string  mnotes  = mat_opt? cfg.option("material_notes")->serialize() : "";
     // create a config parser from the material notes
-    Slic3r::PwmxFormatDynamicConfig mat_cfg;
+    Slic3r::AnycubicSLAFormatDynamicConfig mat_cfg;
     SLAPrintStatistics              stats = print.print_statistics();
 
     // sanitize the string config
@@ -314,6 +316,13 @@ void fill_header(pwmx_format_header &h,
     h.per_layer_override = 0;
 
     // TODO - expose these variables to the UI rather than using material notes
+    if (mat_cfg.has(CFG_ANTIALIASING)) {
+        h.antialiasing = get_cfg_value_i(mat_cfg, CFG_ANTIALIASING);
+        crop_value(h.antialiasing, (uint32_t) 0, (uint32_t) 1);
+    } else {
+        h.antialiasing = 1;
+    }
+
     h.delay_before_exposure_s = get_cfg_value_f(mat_cfg, CFG_DELAY_BEFORE_EXPOSURE, 0.5f);
     crop_value(h.delay_before_exposure_s, 0.0f, 1000.0f);
 
@@ -356,7 +365,7 @@ void fill_header(pwmx_format_header &h,
 
 } // namespace
 
-std::unique_ptr<sla::RasterBase> PwmxArchive::create_raster() const
+std::unique_ptr<sla::RasterBase> AnycubicSLAArchive::create_raster() const
 {
     sla::Resolution     res;
     sla::PixelDim       pxdim;
@@ -389,13 +398,13 @@ std::unique_ptr<sla::RasterBase> PwmxArchive::create_raster() const
     return sla::create_raster_grayscale_aa(res, pxdim, gamma, tr);
 }
 
-sla::RasterEncoder PwmxArchive::get_encoder() const
+sla::RasterEncoder AnycubicSLAArchive::get_encoder() const
 {
-    return PWXRasterEncoder{};
+    return AnycubicSLARasterEncoder{};
 }
 
 // Endian safe write of little endian 32bit ints
-static void pwmx_write_int32(std::ofstream &out, std::uint32_t val)
+static void anycubicsla_write_int32(std::ofstream &out, std::uint32_t val)
 {
     const char i1 = (val & 0xFF);
     const char i2 = (val >> 8) & 0xFF;
@@ -407,104 +416,106 @@ static void pwmx_write_int32(std::ofstream &out, std::uint32_t val)
     out.write((const char *) &i3, 1);
     out.write((const char *) &i4, 1);
 }
-static void pwmx_write_float(std::ofstream &out, std::float_t val)
+static void anycubicsla_write_float(std::ofstream &out, std::float_t val)
 {
     std::uint32_t *f = (std::uint32_t *) &val;
-    pwmx_write_int32(out, *f);
+    anycubicsla_write_int32(out, *f);
 }
 
-static void pwmx_write_intro(std::ofstream &out, pwmx_format_intro &i)
+static void anycubicsla_write_intro(std::ofstream &out, anycubicsla_format_intro &i)
 {
     out.write(TAG_INTRO, sizeof(i.tag));
-    pwmx_write_int32(out, i.version);
-    pwmx_write_int32(out, i.area_num);
-    pwmx_write_int32(out, i.header_data_offset);
-    pwmx_write_int32(out, i.intro24);
-    pwmx_write_int32(out, i.preview_data_offset);
-    pwmx_write_int32(out, i.intro32);
-    pwmx_write_int32(out, i.layer_data_offset);
-    pwmx_write_int32(out, i.intro40);
-    pwmx_write_int32(out, i.image_data_offset);
+    anycubicsla_write_int32(out, i.version);
+    anycubicsla_write_int32(out, i.area_num);
+    anycubicsla_write_int32(out, i.header_data_offset);
+    anycubicsla_write_int32(out, i.software_data_offset);
+    anycubicsla_write_int32(out, i.preview_data_offset);
+    anycubicsla_write_int32(out, i.layer_color_offset);
+    anycubicsla_write_int32(out, i.layer_data_offset);
+    anycubicsla_write_int32(out, i.extra_data_offset);
+    anycubicsla_write_int32(out, i.image_data_offset);
 }
 
-static void pwmx_write_header(std::ofstream &out, pwmx_format_header &h)
+static void anycubicsla_write_header(std::ofstream &out, anycubicsla_format_header &h)
 {
     out.write(TAG_HEADER, sizeof(h.tag));
-    pwmx_write_int32(out, h.payload_size);
-    pwmx_write_float(out, h.pixel_size_um);
-    pwmx_write_float(out, h.layer_height_mm);
-    pwmx_write_float(out, h.exposure_time_s);
-    pwmx_write_float(out, h.delay_before_exposure_s);
-    pwmx_write_float(out, h.bottom_exposure_time_s);
-    pwmx_write_float(out, h.bottom_layer_count);
-    pwmx_write_float(out, h.lift_distance_mm);
-    pwmx_write_float(out, h.lift_speed_mms);
-    pwmx_write_float(out, h.retract_speed_mms);
-    pwmx_write_float(out, h.volume_ml);
-    pwmx_write_int32(out, h.antialiasing);
-    pwmx_write_int32(out, h.res_x);
-    pwmx_write_int32(out, h.res_y);
-    pwmx_write_float(out, h.weight_g);
-    pwmx_write_float(out, h.price);
-    pwmx_write_int32(out, h.price_currency);
-    pwmx_write_int32(out, h.per_layer_override);
-    pwmx_write_int32(out, h.print_time_s);
-    pwmx_write_int32(out, h.transition_layer_count);
-    pwmx_write_int32(out, h.unknown);
+    anycubicsla_write_int32(out, h.payload_size);
+    anycubicsla_write_float(out, h.pixel_size_um);
+    anycubicsla_write_float(out, h.layer_height_mm);
+    anycubicsla_write_float(out, h.exposure_time_s);
+    anycubicsla_write_float(out, h.delay_before_exposure_s);
+    anycubicsla_write_float(out, h.bottom_exposure_time_s);
+    anycubicsla_write_float(out, h.bottom_layer_count);
+    anycubicsla_write_float(out, h.lift_distance_mm);
+    anycubicsla_write_float(out, h.lift_speed_mms);
+    anycubicsla_write_float(out, h.retract_speed_mms);
+    anycubicsla_write_float(out, h.volume_ml);
+    anycubicsla_write_int32(out, h.antialiasing);
+    anycubicsla_write_int32(out, h.res_x);
+    anycubicsla_write_int32(out, h.res_y);
+    anycubicsla_write_float(out, h.weight_g);
+    anycubicsla_write_float(out, h.price);
+    anycubicsla_write_int32(out, h.price_currency);
+    anycubicsla_write_int32(out, h.per_layer_override);
+    anycubicsla_write_int32(out, h.print_time_s);
+    anycubicsla_write_int32(out, h.transition_layer_count);
+    anycubicsla_write_int32(out, h.transition_layer_type);
 }
 
-static void pwmx_write_preview(std::ofstream &out, pwmx_format_preview &p)
+static void anycubicsla_write_preview(std::ofstream &out, anycubicsla_format_preview &p)
 {
     out.write(TAG_PREVIEW, sizeof(p.tag));
-    pwmx_write_int32(out, p.payload_size);
-    pwmx_write_int32(out, p.preview_w);
-    pwmx_write_int32(out, p.preview_dpi);
-    pwmx_write_int32(out, p.preview_h);
+    anycubicsla_write_int32(out, p.payload_size);
+    anycubicsla_write_int32(out, p.preview_w);
+    anycubicsla_write_int32(out, p.preview_dpi);
+    anycubicsla_write_int32(out, p.preview_h);
     out.write((const char*) p.pixels, sizeof(p.pixels));
 }
 
-static void pwmx_write_layers_header(std::ofstream &out, pwmx_format_layers_header &h)
+static void anycubicsla_write_layers_header(std::ofstream &out, anycubicsla_format_layers_header &h)
 {
     out.write(TAG_LAYERS, sizeof(h.tag));
-    pwmx_write_int32(out, h.payload_size);
-    pwmx_write_int32(out, h.layer_count);
+    anycubicsla_write_int32(out, h.payload_size);
+    anycubicsla_write_int32(out, h.layer_count);
 }
 
-static void pwmx_write_layer(std::ofstream &out, pwmx_format_layer &l)
+static void anycubicsla_write_layer(std::ofstream &out, anycubicsla_format_layer &l)
 {
-    pwmx_write_int32(out, l.image_offset);
-    pwmx_write_int32(out, l.image_size);
-    pwmx_write_float(out, l.lift_distance_mm);
-    pwmx_write_float(out, l.lift_speed_mms);
-    pwmx_write_float(out, l.exposure_time_s);
-    pwmx_write_float(out, l.layer_height_mm);
-    pwmx_write_float(out, l.layer44);
-    pwmx_write_float(out, l.layer48);
+    anycubicsla_write_int32(out, l.image_offset);
+    anycubicsla_write_int32(out, l.image_size);
+    anycubicsla_write_float(out, l.lift_distance_mm);
+    anycubicsla_write_float(out, l.lift_speed_mms);
+    anycubicsla_write_float(out, l.exposure_time_s);
+    anycubicsla_write_float(out, l.layer_height_mm);
+    anycubicsla_write_float(out, l.layer44);
+    anycubicsla_write_float(out, l.layer48);
 }
 
-void PwmxArchive::export_print(const std::string     fname,
+void AnycubicSLAArchive::export_print(const std::string     fname,
                                const SLAPrint       &print,
                                const ThumbnailsList &thumbnails,
                                const std::string    &/*projectname*/)
 {
     std::uint32_t layer_count = m_layers.size();
 
-    pwmx_format_intro         intro = {};
-    pwmx_format_header        header = {};
-    pwmx_format_preview       preview = {};
-    pwmx_format_layers_header layers_header = {};
-    pwmx_format_misc          misc = {};
+    anycubicsla_format_intro         intro = {};
+    anycubicsla_format_header        header = {};
+    anycubicsla_format_preview       preview = {};
+    anycubicsla_format_layers_header layers_header = {};
+    anycubicsla_format_misc          misc = {};
     std::vector<uint8_t>      layer_images;
     std::uint32_t             image_offset;
 
-    intro.version             = 1;
+    assert(m_version == ANYCUBIC_SLA_FORMAT_VERSION_1);
+
+    intro.version             = m_version;
     intro.area_num            = 4;
     intro.header_data_offset  = sizeof(intro);
     intro.preview_data_offset = sizeof(intro) + sizeof(header);
     intro.layer_data_offset   = intro.preview_data_offset + sizeof(preview);
     intro.image_data_offset = intro.layer_data_offset +
                               sizeof(layers_header) +
-                              (sizeof(pwmx_format_layer) * layer_count);
+                              (sizeof(anycubicsla_format_layer) * layer_count);
 
     fill_header(header, misc, print, layer_count);
     fill_preview(preview, misc, thumbnails);
@@ -513,21 +524,21 @@ void PwmxArchive::export_print(const std::string     fname,
         // open the file and write the contents
         std::ofstream out;
         out.open(fname, std::ios::binary | std::ios::out | std::ios::trunc);
-        pwmx_write_intro(out, intro);
-        pwmx_write_header(out, header);
-        pwmx_write_preview(out, preview);
+        anycubicsla_write_intro(out, intro);
+        anycubicsla_write_header(out, header);
+        anycubicsla_write_preview(out, preview);
 
         layers_header.payload_size = intro.image_data_offset - intro.layer_data_offset -
                         sizeof(layers_header.tag)  - sizeof(layers_header.payload_size);
         layers_header.layer_count = layer_count;
-        pwmx_write_layers_header(out, layers_header);
+        anycubicsla_write_layers_header(out, layers_header);
 
         //layers
         layer_images.reserve(layer_count * LAYER_SIZE_ESTIMATE);
         image_offset = intro.image_data_offset;
         size_t i = 0;
         for (const sla::EncodedRaster &rst : m_layers) {
-            pwmx_format_layer l;
+            anycubicsla_format_layer l;
             std::memset(&l, 0, sizeof(l));
             l.image_offset = image_offset;
             l.image_size = rst.size();
@@ -543,7 +554,7 @@ void PwmxArchive::export_print(const std::string     fname,
                 l.lift_speed_mms = header.lift_speed_mms;
             }
             image_offset += l.image_size;
-            pwmx_write_layer(out, l);
+            anycubicsla_write_layer(out, l);
             // add the rle encoded layer image into the buffer
             const char* img_start = reinterpret_cast<const char*>(rst.data());
             const char* img_end = img_start + rst.size();

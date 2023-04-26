@@ -5,7 +5,6 @@
 
 #include <stack>
 #include <functional>
-#include <unordered_set>
 #include <sstream>
 #include <queue>
 #include <functional>
@@ -181,7 +180,7 @@ void SkeletalTrapezoidation::transferEdge(Point from, Point to, vd_t::edge_type&
     }
     else
     {
-        std::vector<Point> discretized = discretize(vd_edge, segments);
+        Points discretized = discretize(vd_edge, segments);
         assert(discretized.size() >= 2);
         if(discretized.size() < 2)
         {
@@ -236,7 +235,7 @@ void SkeletalTrapezoidation::transferEdge(Point from, Point to, vd_t::edge_type&
     }
 }
 
-std::vector<Point> SkeletalTrapezoidation::discretize(const vd_t::edge_type& vd_edge, const std::vector<Segment>& segments)
+Points SkeletalTrapezoidation::discretize(const vd_t::edge_type& vd_edge, const std::vector<Segment>& segments)
 {
     /*Terminology in this function assumes that the edge moves horizontally from
     left to right. This is not necessarily the case; the edge can go in any
@@ -257,7 +256,7 @@ std::vector<Point> SkeletalTrapezoidation::discretize(const vd_t::edge_type& vd_
     bool point_right = right_cell->contains_point();
     if ((!point_left && !point_right) || vd_edge.is_secondary()) // Source vert is directly connected to source segment
     {
-        return std::vector<Point>({ start, end });
+        return Points({ start, end });
     }
     else if (point_left != point_right) //This is a parabolic edge between a point and a line.
     {
@@ -311,7 +310,7 @@ std::vector<Point> SkeletalTrapezoidation::discretize(const vd_t::edge_type& vd_
         //Start generating points along the edge.
         Point a = start;
         Point b = end;
-        std::vector<Point> ret;
+        Points ret;
         ret.emplace_back(a);
 
         //Introduce an extra edge at the borders of the markings?
@@ -522,9 +521,11 @@ static bool has_missing_twin_edge(const SkeletalTrapezoidationGraph &graph)
     return false;
 }
 
-inline static void rotate_back_skeletal_trapezoidation_graph_after_fix(SkeletalTrapezoidationGraph                       &graph,
-                                                                       const double                                       fix_angle,
-                                                                       const std::unordered_map<Point, Point, PointHash> &vertex_mapping)
+using PointMap = SkeletalTrapezoidation::PointMap;
+
+inline static void rotate_back_skeletal_trapezoidation_graph_after_fix(SkeletalTrapezoidationGraph  &graph,
+                                                                       const double                  fix_angle,
+                                                                       const PointMap               &vertex_mapping)
 {
     for (STHalfEdgeNode &node : graph.nodes) {
         // If a mapping exists between a rotated point and an original point, use this mapping. Otherwise, rotate a point in the opposite direction.
@@ -588,7 +589,7 @@ VoronoiDiagramStatus detect_voronoi_diagram_known_issues(const Geometry::Voronoi
     return VoronoiDiagramStatus::NO_ISSUE_DETECTED;
 }
 
-inline static std::pair<std::unordered_map<Point, Point, PointHash>, double> try_to_fix_degenerated_voronoi_diagram_by_rotation(
+inline static std::pair<PointMap, double> try_to_fix_degenerated_voronoi_diagram_by_rotation(
     Geometry::VoronoiDiagram                     &voronoi_diagram,
     const Polygons                               &polys,
     Polygons                                     &polys_rotated,
@@ -597,7 +598,7 @@ inline static std::pair<std::unordered_map<Point, Point, PointHash>, double> try
 {
     const Polygons                              polys_rotated_original = polys_rotated;
     double                                      fixed_by_angle         = fix_angles.front();
-    std::unordered_map<Point, Point, PointHash> vertex_mapping;
+    PointMap                                    vertex_mapping;
 
     for (const double &fix_angle : fix_angles) {
         vertex_mapping.clear();
@@ -685,7 +686,7 @@ void SkeletalTrapezoidation::constructFromPolygons(const Polygons& polys)
     const std::vector<double> fix_angles     = {PI / 6, PI / 5, PI / 7, PI / 11};
     double                    fixed_by_angle = fix_angles.front();
 
-    std::unordered_map<Point, Point, PointHash> vertex_mapping;
+    PointMap vertex_mapping;
     // polys_copy is referenced through items stored in the std::vector segments.
     Polygons                                    polys_copy = polys;
     if (status != VoronoiDiagramStatus::NO_ISSUE_DETECTED) {
@@ -813,9 +814,11 @@ process_voronoi_diagram:
             edge.from->incident_edge = &edge;
 }
 
+using NodeSet = SkeletalTrapezoidation::NodeSet;
+
 void SkeletalTrapezoidation::separatePointyQuadEndNodes()
 {
-    std::unordered_set<node_t*> visited_nodes;
+    NodeSet visited_nodes;
     for (edge_t& edge : graph.edges)
     {
         if (edge.prev) 
@@ -2285,16 +2288,18 @@ void SkeletalTrapezoidation::addToolpathSegment(const ExtrusionJunction& from, c
 
 void SkeletalTrapezoidation::connectJunctions(ptr_vector_t<LineJunctions>& edge_junctions)
 {
-    std::unordered_set<edge_t*> unprocessed_quad_starts(graph.edges.size() * 5 / 2);
+    using EdgeSet = ankerl::unordered_dense::set<edge_t*>;
+
+    EdgeSet unprocessed_quad_starts(graph.edges.size() * 5 / 2);
     for (edge_t& edge : graph.edges)
     {
         if (!edge.prev)
         {
-            unprocessed_quad_starts.insert(&edge);
+            unprocessed_quad_starts.emplace(&edge);
         }
     }
 
-    std::unordered_set<edge_t*> passed_odd_edges;
+    EdgeSet passed_odd_edges;
 
     while (!unprocessed_quad_starts.empty())
     {

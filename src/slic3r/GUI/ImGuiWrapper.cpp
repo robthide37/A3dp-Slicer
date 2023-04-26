@@ -462,7 +462,7 @@ bool ImGuiWrapper::button(const wxString &label, const wxString& tooltip)
 
     if (!tooltip.IsEmpty() && ImGui::IsItemHovered()) {
         auto tooltip_utf8 = into_u8(tooltip);
-        ImGui::SetTooltip(tooltip_utf8.c_str());
+        ImGui::SetTooltip(tooltip_utf8.c_str(), nullptr);
     }
 
     return ret;

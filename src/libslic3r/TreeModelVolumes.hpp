@@ -512,7 +512,7 @@ private:
      */
     void calculateCollisionHolefree(RadiusLayerPair key)
     {
-        calculateCollisionHolefree(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, {});
+        calculateCollisionHolefree(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, []{});
     }
 
     /*!
@@ -533,7 +533,7 @@ private:
      */
     void calculateAvoidance(RadiusLayerPair key, bool to_build_plate, bool to_model)
     {
-        calculateAvoidance(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, to_build_plate, to_model, {});
+        calculateAvoidance(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, to_build_plate, to_model, []{});
     }
 
     /*!
@@ -567,7 +567,7 @@ private:
      */
     void calculateWallRestrictions(RadiusLayerPair key)
     {
-        calculateWallRestrictions(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, {});
+        calculateWallRestrictions(std::vector<RadiusLayerPair>{ RadiusLayerPair(key) }, []{});
     }
 
     /*!

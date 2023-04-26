@@ -593,7 +593,7 @@ void GLVolumeCollection::load_object_auxiliary(
         return;
     const Transform3d mesh_trafo_inv = print_object->trafo().inverse();
 
-    auto add_volume = [this, &instances, timestamp](int obj_idx, int inst_idx, const ModelInstance& model_instance, SLAPrintObjectStep step,
+    auto add_volume = [this, timestamp](int obj_idx, int inst_idx, const ModelInstance& model_instance, SLAPrintObjectStep step,
         const TriangleMesh& mesh, const ColorRGBA& color, std::optional<const TriangleMesh> convex_hull = std::nullopt) {
         if (mesh.empty())
             return;

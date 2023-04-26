@@ -302,9 +302,9 @@ public:
      */
     size_t tip_layers;
     /*!
-     * \brief Factor by which to increase the branch radius.
+     * \brief How much a branch radius increases with each layer to guarantee the prescribed tree widening.
      */
-    double diameter_angle_scale_factor;
+    double branch_radius_increase_per_layer;
     /*!
      * \brief How much a branch resting on the model may grow in radius by merging with branches that can reach the buildplate.
      */
@@ -330,17 +330,18 @@ public:
      */
     coord_t xy_distance;
     /*!
-     * \brief Radius a branch should have when reaching the buildplate.
+     * \brief A minimum radius a tree trunk should expand to at the buildplate if possible.
      */
     coord_t bp_radius;
     /*!
      * \brief The layer index at which an increase in radius may be required to reach the bp_radius.
      */
-    coord_t layer_start_bp_radius;
+    LayerIndex layer_start_bp_radius;
     /*!
-     * \brief Factor by which to increase the branch radius to reach the required bp_radius at layer 0. Note that this radius increase will not happen in the tip, to ensure the tip is structurally sound.
+     * \brief How much one is allowed to increase the tree branch radius close to print bed to reach the required bp_radius at layer 0.
+     * Note that this radius increase will not happen in the tip, to ensure the tip is structurally sound.
      */
-    double diameter_scale_bp_radius;
+    double bp_radius_increase_per_layer;
     /*!
      * \brief minimum xy_distance. Only relevant when Z overrides XY, otherwise equal to xy_distance-
      */
@@ -418,7 +419,9 @@ public:
   public:
     bool operator==(const TreeSupportSettings& other) const
     {
-        return branch_radius == other.branch_radius && tip_layers == other.tip_layers && diameter_angle_scale_factor == other.diameter_angle_scale_factor && layer_start_bp_radius == other.layer_start_bp_radius && bp_radius == other.bp_radius && diameter_scale_bp_radius == other.diameter_scale_bp_radius && min_radius == other.min_radius && xy_min_distance == other.xy_min_distance && // as a recalculation of the collision areas is required to set a new min_radius.
+        return branch_radius == other.branch_radius && tip_layers == other.tip_layers && branch_radius_increase_per_layer == other.branch_radius_increase_per_layer && layer_start_bp_radius == other.layer_start_bp_radius && bp_radius == other.bp_radius && 
+               // as a recalculation of the collision areas is required to set a new min_radius.
+               bp_radius_increase_per_layer == other.bp_radius_increase_per_layer && min_radius == other.min_radius && xy_min_distance == other.xy_min_distance &&
                xy_distance - xy_min_distance == other.xy_distance - other.xy_min_distance && // if the delta of xy_min_distance and xy_distance is different the collision areas have to be recalculated.
                support_rests_on_model == other.support_rests_on_model && increase_radius_until_layer == other.increase_radius_until_layer && min_dtt_to_model == other.min_dtt_to_model && max_to_model_radius_increase == other.max_to_model_radius_increase && maximum_move_distance == other.maximum_move_distance && maximum_move_distance_slow == other.maximum_move_distance_slow && z_distance_bottom_layers == other.z_distance_bottom_layers && support_line_width == other.support_line_width && 
                support_line_spacing == other.support_line_spacing && support_roof_line_width == other.support_roof_line_width && // can not be set on a per-mesh basis currently, so code to enable processing different roof line width in the same iteration seems useless.
@@ -470,9 +473,9 @@ public:
     {
         return (distance_to_top <= tip_layers ? min_radius + (branch_radius - min_radius) * distance_to_top / tip_layers : // tip
                        branch_radius + // base
-                           branch_radius * (distance_to_top - tip_layers) * diameter_angle_scale_factor)
+                       (distance_to_top - tip_layers) * branch_radius_increase_per_layer)
                + // gradual increase
-               branch_radius * elephant_foot_increases * (std::max(diameter_scale_bp_radius - diameter_angle_scale_factor, 0.0));
+               elephant_foot_increases * (std::max(bp_radius_increase_per_layer - branch_radius_increase_per_layer, 0.0));
     }
 
     /*!
@@ -502,8 +505,8 @@ public:
      */
     [[nodiscard]] inline coord_t recommendedMinRadius(LayerIndex layer_idx) const
     {
-        double scale = (layer_start_bp_radius - int(layer_idx)) * diameter_scale_bp_radius;
-        return scale > 0 ? branch_radius + branch_radius * scale : 0;
+        double num_layers_widened = layer_start_bp_radius - layer_idx;
+        return num_layers_widened > 0 ? branch_radius + num_layers_widened * bp_radius_increase_per_layer : 0;
     }
 
     /*!

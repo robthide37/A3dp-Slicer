@@ -3171,6 +3171,8 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
         }
         else {
             auto changed = [app_config, &appconfig_new = std::as_const(this->appconfig_new)](const std::string& section_name) {
+                if (!appconfig_new.has_section(section_name))
+                    return false;
                 return (app_config->has_section(section_name) ? app_config->get_section(section_name) : std::map<std::string, std::string>()) != appconfig_new.get_section(section_name);
             };
             bool is_filaments_changed     = changed(AppConfig::SECTION_FILAMENTS);

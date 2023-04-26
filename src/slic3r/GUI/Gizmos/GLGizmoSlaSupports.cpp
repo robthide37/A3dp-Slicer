@@ -49,7 +49,7 @@ bool GLGizmoSlaSupports::on_init()
     return true;
 }
 
-void GLGizmoSlaSupports::data_changed()
+void GLGizmoSlaSupports::data_changed(bool is_serializing)
 {
     if (! m_c->selection_info())
         return;
@@ -64,9 +64,14 @@ void GLGizmoSlaSupports::data_changed()
 
     // If we triggered autogeneration before, check backend and fetch results if they are there
     if (mo) {
-        const SLAPrintObject* po = m_c->selection_info()->print_object();
+        m_c->instances_hider()->set_hide_full_scene(true);
+
+        int last_comp_step = slaposCount;
         const int required_step = get_min_sla_print_object_step();
-        auto last_comp_step = static_cast<int>(po->last_completed_step());
+        const SLAPrintObject* po = m_c->selection_info()->print_object();
+        if (po != nullptr)
+            last_comp_step = static_cast<int>(po->last_completed_step());
+
         if (last_comp_step == slaposCount)
             last_comp_step = -1;
 
@@ -123,6 +128,8 @@ void GLGizmoSlaSupports::on_render()
 
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glEnable(GL_DEPTH_TEST));
+
+    show_sla_supports(!m_editing_mode);
 
     render_volumes();
     render_points(selection);
@@ -791,6 +798,12 @@ bool GLGizmoSlaSupports::on_is_activable() const
     for (const auto& idx : list)
         if (selection.get_volume(idx)->is_outside && selection.get_volume(idx)->composite_id.volume_id >= 0)
             return false;
+
+    // Check that none of the selected volumes is marked as non-pritable.
+    for (const auto& idx : list) {
+        if (!selection.get_volume(idx)->printable)
+          return false;
+    }
 
     return true;
 }

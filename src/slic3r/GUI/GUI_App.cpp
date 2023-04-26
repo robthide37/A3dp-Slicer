@@ -3381,6 +3381,9 @@ void GUI_App::on_version_read(wxCommandEvent& evt)
                 ? _u8L("Check for application update has failed.")
                 : Slic3r::format(_u8L("You are currently running the latest released version %1%."), evt.GetString());
 
+            if (*Semver::parse(SLIC3R_VERSION) > *Semver::parse(into_u8(evt.GetString())))
+                text = Slic3r::format(_u8L("There are no new released versions online. The latest release version is %1%."), evt.GetString());
+
             this->plater_->get_notification_manager()->push_version_notification(NotificationType::NoNewReleaseAvailable
                 , NotificationManager::NotificationLevel::RegularNotificationLevel
                 , text
