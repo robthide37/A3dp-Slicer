@@ -6274,7 +6274,7 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
 Vec3d GLCanvas3D::_mouse_to_bed_3d(const Point& mouse_pos)
 {
     const Linef3 ray = mouse_ray(mouse_pos);
-    return (std::abs(ray.unit_vector().z() < EPSILON)) ? ray.a : ray.intersect_plane(0.0);
+    return (std::abs(ray.unit_vector().z()) < EPSILON) ? ray.a : ray.intersect_plane(0.0);
 }
 
 void GLCanvas3D::_start_timer()
