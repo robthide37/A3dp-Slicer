@@ -428,17 +428,9 @@ std::vector<Vec3d> ObjectClipper::point_per_contour() const
 {
     std::vector<Vec3d> pts;
 
-    const SelectionInfo* sel_info = get_pool()->selection_info();
-    const Geometry::Transformation inst_trafo = sel_info->model_object()->instances[sel_info->get_active_instance()]->get_transformation();
-
-    for (auto& clipper : m_clippers) {
-        Geometry::Transformation trafo = inst_trafo * clipper.second;
-        trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
-        
-        // FIXME: do not assume just one clipper
-        pts = clipper.first->point_per_contour();
-        //for (Vec3d& v : pts)
-        //    v = trafo.get_matrix() * v;
+    for (const auto& clipper : m_clippers) {
+        const std::vector<Vec3d> pts_clipper = clipper.first->point_per_contour();
+        pts.insert(pts.end(), pts_clipper.begin(), pts_clipper.end());;
     }
     return pts;
 }

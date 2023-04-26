@@ -1390,19 +1390,110 @@ void GLGizmoCut3D::render_clipper_cut()
 {
     if (! m_connectors_editing)
         ::glDisable(GL_DEPTH_TEST);
-    m_c->object_clipper()->render_cut();
+
+    GLboolean cull_face = GL_FALSE;
+    ::glGetBooleanv(GL_CULL_FACE, &cull_face);
+    ::glDisable(GL_CULL_FACE);
+    m_c->object_clipper()->render_cut(m_part_selection.get_ignored_contours_ptr());
+    if (cull_face)
+        ::glEnable(GL_CULL_FACE);
+
     if (! m_connectors_editing)
         ::glEnable(GL_DEPTH_TEST);
 }
 
-void GLGizmoCut3D::PartSelection::render(const Vec3d* normal)
+
+GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx_in, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc)
+{
+    m_model = Model();
+    m_model.add_object(*mo);
+    ModelObjectPtrs cut_part_ptrs = m_model.objects.front()->cut(instance_idx_in, cut_matrix,
+        ModelObjectCutAttribute::KeepUpper |
+        ModelObjectCutAttribute::KeepLower |
+        ModelObjectCutAttribute::KeepAsParts);
+    assert(cut_part_ptrs.size() == 1);
+    m_model = Model();
+    m_model.add_object(*cut_part_ptrs.front());
+
+    m_instance_idx = instance_idx_in;
+
+    const ModelVolumePtrs& volumes = model_object()->volumes;
+
+    // split to parts
+    for (int id = int(volumes.size())-1; id >= 0; id--)
+        if (volumes[id]->is_splittable())
+            volumes[id]->split(1);
+
+    m_parts.clear();
+    for (const ModelVolume* volume : volumes) {
+        assert(volume != nullptr);
+        m_parts.emplace_back(Part{GLModel(), MeshRaycaster(volume->mesh()), true});
+        m_parts.back().glmodel.set_color({ 0.f, 0.f, 1.f, 1.f });
+        m_parts.back().glmodel.init_from(volume->mesh());
+
+        // Now check whether this part is below or above the plane.
+        Transform3d tr = (model_object()->instances[m_instance_idx]->get_matrix() * volume->get_matrix()).inverse();
+        Vec3f pos = (tr * center).cast<float>();
+        Vec3f norm = (tr.linear().inverse().transpose() * normal).cast<float>();
+        for (const Vec3f& v : volume->mesh().its.vertices) {
+            double p = (v - pos).dot(norm);
+            if (std::abs(p) > EPSILON) {
+                m_parts.back().selected = p > 0.;
+                break;
+            }
+        }
+    }
+
+    // Now go through the contours and create a map from contours to parts.
+    m_contour_points.clear();
+    m_contour_to_parts.clear();
+    m_debug_pts = std::vector<std::vector<Vec3d>>(m_parts.size(), std::vector<Vec3d>());
+    if (std::vector<Vec3d> pts = oc.point_per_contour();! pts.empty()) {
+        
+        m_contour_to_parts.resize(pts.size());
+
+        for (size_t pt_idx=0; pt_idx<pts.size(); ++pt_idx) {
+            const Vec3d& pt = pts[pt_idx];
+            const Vec3d dir = (center-pt).dot(normal) * normal;
+            m_contour_points.emplace_back(dir + pt); // the result is in world coordinates.
+            
+            // Now, cast a ray from every contour point and see which volumes of the ones above
+            // the plane are hit from the inside.
+            for (size_t part_id=0; part_id<m_parts.size(); ++part_id) {
+                const AABBMesh& aabb = m_parts[part_id].raycaster.get_aabb_mesh();
+                const Transform3d& tr = (translation_transform(model_object()->instances[m_instance_idx]->get_offset()) * translation_transform(model_object()->volumes[part_id]->get_offset())).inverse();
+                for (double d : {-1., 1.}) {
+                    const Vec3d dir_mesh = d * tr.linear().inverse().transpose() * normal;
+                    const Vec3d src = tr * (m_contour_points[pt_idx] + d*0.01 * normal);
+                    AABBMesh::hit_result hit = aabb.query_ray_hit(src, dir_mesh);
+
+                    m_debug_pts[part_id].emplace_back(src);
+
+                    if (hit.is_inside()) {
+                        // This part belongs to this point.
+                        if (d == 1.)
+                            m_contour_to_parts[pt_idx].first.emplace_back(part_id);
+                        else
+                            m_contour_to_parts[pt_idx].second.emplace_back(part_id);
+                    }
+                }
+            }
+        }
+
+    }
+
+    
+    m_valid = true;
+}
+
+void GLGizmoCut3D::PartSelection::render(const Vec3d* normal, GLModel& sphere_model)
 {
     if (! valid())
         return;
 
-    if (GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light")) {
-        const Camera&       camera          = wxGetApp().plater()->get_camera();
+    const Camera&       camera          = wxGetApp().plater()->get_camera();
 
+    if (GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light")) {
         shader->start_using();
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
         shader->set_uniform("emission_factor", 0.f);
@@ -1426,7 +1517,51 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal)
 
         shader->stop_using();
     }
+
+
+
+    // { // Debugging render:
+
+    //     static int idx = -1;
+    //     ImGui::Begin("DEBUG");
+    //     for (int i=0; i<m_parts.size(); ++i)
+    //         if (ImGui::Button(std::to_string(i).c_str()))
+    //             idx = i;
+    //     if (idx >= m_parts.size())
+    //         idx = -1;
+    //     ImGui::End();
+
+    //     ::glDisable(GL_DEPTH_TEST);
+    //     if (valid()) {
+    //         for (size_t i=0; i<m_contour_points.size(); ++i) {
+    //             const Vec3d& pt = m_contour_points[i];
+    //             ColorRGBA col = ColorRGBA::GREEN();
+            
+    //             bool red = false;
+    //             bool yellow = false;
+    //             for (size_t j=0; j<m_contour_to_parts[i].first.size(); ++j) {
+    //                 red |= m_parts[m_contour_to_parts[i].first[j]].selected;
+    //                 yellow |= m_parts[m_contour_to_parts[i].second[j]].selected;
+    //             }
+    //             if (red)
+    //                 col = ColorRGBA::RED();
+    //             if (yellow)
+    //                 col = ColorRGBA::YELLOW();
+                    
+    //             GLGizmoCut3D::render_model(sphere_model, col, camera.get_view_matrix() * translation_transform(pt));
+    //         }
+    //     }
+        
+    //     if (idx != -1) {
+    //         render_model(m_parts[idx].glmodel, ColorRGBA::RED(), camera.get_view_matrix());
+    //         for (const Vec3d& pt : m_debug_pts[idx]) {
+    //             render_model(sphere_model, ColorRGBA::GREEN(), camera.get_view_matrix() * translation_transform(pt));
+    //         }
+    //     }
+    //     ::glEnable(GL_DEPTH_TEST);
+    // }
 }
+
 
 void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
 {
@@ -1441,7 +1576,7 @@ void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
 
     for (size_t id=0; id<m_parts.size(); ++id) {
         const Vec3d volume_offset = model_object()->volumes[id]->get_offset();
-        Transform3d tr = model_object()->instances[m_instance_idx]->get_matrix() * model_object()->volumes[id]->get_matrix();
+        Transform3d tr = translation_transform(model_object()->instances[m_instance_idx]->get_offset()) * translation_transform(model_object()->volumes[id]->get_offset());
         if (m_parts[id].raycaster.unproject_on_mesh(mouse_pos, tr, camera, pos, normal)) {
             hits_id_and_sqdist.emplace_back(id, (camera_pos - tr*(pos.cast<double>())).squaredNorm());
         }
@@ -1450,6 +1585,20 @@ void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
         size_t id = std::min_element(hits_id_and_sqdist.begin(), hits_id_and_sqdist.end(),
             [](const std::pair<size_t, double>& a, const std::pair<size_t, double>& b) { return a.second < b.second; })->first;
         m_parts[id].selected = ! m_parts[id].selected;
+
+        // And now recalculate the contours which should be ignored.
+        m_ignored_contours.clear();
+        size_t cont_id = 0;
+        for (const auto& [parts_above, parts_below] : m_contour_to_parts) {
+            for (size_t upper : parts_above) {
+                bool upper_sel = m_parts[upper].selected;
+                if (std::find_if(parts_below.begin(), parts_below.end(), [this, &upper_sel](const size_t& i) { return m_parts[i].selected == upper_sel; }) != parts_below.end()) {
+                    m_ignored_contours.emplace_back(cont_id);
+                    break;
+                }
+            }
+            ++cont_id;
+        }
     }
 }
 
@@ -1468,18 +1617,6 @@ void GLGizmoCut3D::on_render()
     }
 
 
-    ::glDisable(GL_DEPTH_TEST);
-    std::vector<Vec3d> pts = m_c->object_clipper()->point_per_contour();
-    if (! pts.empty()) {
-        const Vec3d dir = (m_plane_center-pts.front()).dot(m_cut_normal) * m_cut_normal;
-        for (const Vec3d& pt : pts)
-            render_model(m_sphere.model, ColorRGBA::GREEN(), wxGetApp().plater()->get_camera().get_view_matrix() * translation_transform(pt+dir));
-    }
-    ::glEnable(GL_DEPTH_TEST);
-
-
-
-
     update_clipper();
 
     init_picking_models();
@@ -1489,9 +1626,9 @@ void GLGizmoCut3D::on_render()
     render_connectors();
 
     if (!m_connectors_editing)
-        m_part_selection.render();
+        m_part_selection.render(nullptr, m_sphere.model);
     else
-        m_part_selection.render(&m_cut_normal);
+        m_part_selection.render(&m_cut_normal, m_sphere.model);
 
     render_clipper_cut();
 
@@ -1744,61 +1881,6 @@ void GLGizmoCut3D::flip_cut_plane()
     update_clipper();
     m_part_selection.turn_over_selection();
 }
-
-
-GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx_in, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc)
-{
-    m_model = Model();
-    m_model.add_object(*mo);
-    ModelObjectPtrs cut_part_ptrs = m_model.objects.front()->cut(instance_idx_in, cut_matrix,
-        ModelObjectCutAttribute::KeepUpper |
-        ModelObjectCutAttribute::KeepLower |
-        ModelObjectCutAttribute::KeepAsParts);
-    assert(cut_part_ptrs.size() == 1);
-    m_model = Model();
-    m_model.add_object(*cut_part_ptrs.front());
-
-    m_instance_idx = instance_idx_in;
-
-    const ModelVolumePtrs& volumes = model_object()->volumes;
-
-    // split to parts
-    for (int id = int(volumes.size())-1; id >= 0; id--)
-        if (volumes[id]->is_splittable())
-            volumes[id]->split(1);
-
-    m_parts.clear();
-    for (const ModelVolume* volume : volumes) {
-        assert(volume != nullptr);
-        m_parts.emplace_back(Part{GLModel(), MeshRaycaster(volume->mesh()), true});
-        m_parts.back().glmodel.set_color({ 0.f, 0.f, 1.f, 1.f });
-        m_parts.back().glmodel.init_from(volume->mesh());
-
-        // Now check whether this part is below or above the plane.
-        Transform3d tr = (model_object()->instances[m_instance_idx]->get_matrix() * volume->get_matrix()).inverse();
-        Vec3f pos = (tr * center).cast<float>();
-        Vec3f norm = (tr.linear().inverse().transpose() * normal).cast<float>();
-        for (const Vec3f& v : volume->mesh().its.vertices) {
-            double p = (v - pos).dot(norm);
-            if (std::abs(p) > EPSILON) {
-                m_parts.back().selected = p > 0.;
-                break;
-            }
-        }
-    }
-
-    // Now go through the contours and create a map from contours to parts.
-    if (std::vector<Vec3d> pts = oc.point_per_contour();! pts.empty()) {
-        const Vec3d dir = (center-pts.front()).dot(normal) * normal;
-        for (Vec3d& pt : pts)
-            pt = pt+dir;
-        // pts are now in world coordinates.
-    }
-
-    
-    m_valid = true;
-}
-
 
 void GLGizmoCut3D::reset_cut_by_contours()
 {
@@ -2542,8 +2624,18 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& po
         }
     }*/
 
-    if (m_c->object_clipper()->is_projection_inside_cut(hit) == -1)
-        return false;
+    {
+        // Do not react to clicks outside a contour (or inside a contour that is ignored)
+        int cont_id = m_c->object_clipper()->is_projection_inside_cut(hit);
+        if (cont_id == -1)
+            return false;
+        if (m_part_selection.valid()) {
+            const std::vector<size_t>& ign = *m_part_selection.get_ignored_contours_ptr();
+            if (std::find(ign.begin(), ign.end(), cont_id) != ign.end())
+                return false;
+        }    
+    }
+    
 
     // recalculate hit to object's local position
     Vec3d hit_d = hit;

@@ -150,12 +150,18 @@ class GLGizmoCut3D : public GLGizmoBase
             bool selected;
         };
 
-        void render(const Vec3d* normal = nullptr);
+        void render(const Vec3d* normal, GLModel& sphere_model);
         void toggle_selection(const Vec2d& mouse_pos);
         void turn_over_selection();
         ModelObject* model_object() { return m_model.objects.front(); }
         bool valid() const { return m_valid; }
         const std::vector<Part>& parts() const { return m_parts; }
+        const std::vector<size_t>* get_ignored_contours_ptr() const { return (valid() ? &m_ignored_contours : nullptr); }
+
+        std::vector<Vec3d> m_contour_points; // TEMPORARILY PUBLIC
+        std::vector<std::pair<std::vector<size_t>, std::vector<size_t>>> m_contour_to_parts; // for each contour, there is a vector of parts above and a vector of parts below
+        std::vector<size_t> m_ignored_contours; // contour that should not be rendered (the parts on both sides will both be parts of the same object)
+        std::vector<std::vector<Vec3d>> m_debug_pts;
 
 
     private:
@@ -312,7 +318,7 @@ private:
     void discard_cut_line_processing();
 
     void render_cut_plane();
-    void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
+    static void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
     void render_line(GLModel& line_model, const ColorRGBA& color, Transform3d view_model_matrix, float width);
     void render_rotation_snapping(GrabberID axis, const ColorRGBA& color);
     void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix);
