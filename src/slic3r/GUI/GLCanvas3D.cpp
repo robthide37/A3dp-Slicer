@@ -2692,6 +2692,9 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, co
     if (wxGetApp().is_editor()) {
         m_gcode_viewer.update_shells_color_by_extruder(m_config);
         _set_warning_notification_if_needed(EWarning::ToolpathOutside);
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+        _set_warning_notification_if_needed(EWarning::GCodeConflict);
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     }
 
     m_gcode_viewer.refresh(gcode_result, str_tool_colors);
@@ -7440,8 +7443,21 @@ void GLCanvas3D::_set_warning_notification_if_needed(EWarning warning)
     }
     else {
         if (wxGetApp().is_editor()) {
-            if (current_printer_technology() != ptSLA)
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+          if (current_printer_technology() != ptSLA) {
+              if (warning == EWarning::ToolpathOutside)
+                  show = m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
+              else if (warning == EWarning::GCodeConflict)
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+                  show = m_gcode_viewer.has_data() && m_gcode_viewer.is_contained_in_bed() && m_gcode_viewer.get_conflict_result().has_value();
+#else
+                  show = m_gcode_viewer.has_data() && m_gcode_viewer.is_contained_in_bed() && m_gcode_viewer.m_conflict_result.has_value();
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+          }
+#else
+          if (current_printer_technology() != ptSLA)
                 show = m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
         }
     }
 
@@ -7467,8 +7483,88 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
             "Resolve the current problem to continue slicing.");
         error = ErrorType::PLATER_ERROR;
         break;
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+    case EWarning::GCodeConflict: {
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+      const ConflictResultOpt& conflict_result = m_gcode_viewer.get_conflict_result();
+      if (!conflict_result.has_value()) { break; }
+      std::string objName1 = conflict_result->_objName1;
+      std::string objName2 = conflict_result->_objName2;
+      double      height = conflict_result->_height;
+      int         layer = conflict_result->layer;
+      text = (boost::format(_u8L("Conflicts of gcode paths have been found at layer %d, z = %.2lf mm. Please separate the conflicted objects farther (%s <-> %s).")) % layer %
+          height % objName1 % objName2).str();
+#else
+        if (!m_gcode_viewer.m_conflict_result) { break; }
+        std::string objName1 = m_gcode_viewer.m_conflict_result.value()._objName1;
+        std::string objName2 = m_gcode_viewer.m_conflict_result.value()._objName2;
+        double      height = m_gcode_viewer.m_conflict_result.value()._height;
+        int         layer = m_gcode_viewer.m_conflict_result.value().layer;
+        text = (boost::format(_u8L("Conflicts of gcode paths have been found at layer %d, z = %.2lf mm. Please separate the conflicted objects farther (%s <-> %s).")) % layer %
+          height % objName1 % objName2)
+          .str();
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+        error = ErrorType::SLICING_ERROR;
+        break;
+    }
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     }
     auto& notification_manager = *wxGetApp().plater()->get_notification_manager();
+
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+    const ConflictResultOpt& conflict_result = m_gcode_viewer.get_conflict_result();
+    if (warning == EWarning::GCodeConflict) {
+        if (conflict_result.has_value()) {
+            const PrintObject* obj2 = reinterpret_cast<const PrintObject*>(conflict_result->_obj2);
+#else
+    if (warning == EWarning::GCodeConflict && m_gcode_viewer.m_conflict_result) {
+        const PrintObject* obj2 = reinterpret_cast<const PrintObject*>(m_gcode_viewer.m_conflict_result.value()._obj2);
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+            auto     mo = obj2->model_object();
+            ObjectID id = mo->id();
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+            auto     action_fn = [this, id](wxEvtHandler*) {
+#else
+        auto               action_fn = [id](wxEvtHandler*) {
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+                auto& objects = wxGetApp().model().objects;
+                auto  iter = id.id ? std::find_if(objects.begin(), objects.end(), [id](auto o) { return o->id() == id; }) : objects.end();
+                if (iter != objects.end()) {
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+                    const unsigned int obj_idx = std::distance(objects.begin(), iter);
+                    wxGetApp().CallAfter([this, obj_idx]() {
+                        wxGetApp().plater()->select_view_3D("3D");
+                        wxGetApp().plater()->canvas3D()->get_selection().add_object(obj_idx, true);
+                        wxGetApp().obj_list()->update_selections();
+                    });
+#else
+            wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
+            wxGetApp().obj_list()->select_items({ { *iter, nullptr } });
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+                }
+                return false;
+            };
+            auto hypertext = _u8L("Jump to");
+            hypertext += std::string(" [") + mo->name + "]";
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+            notification_manager.push_notification(NotificationType::SlicingError, NotificationManager::NotificationLevel::ErrorNotificationLevel,
+                _u8L("ERROR:") + "\n" + text, hypertext, action_fn);
+#else
+        notification_manager.push_notification(NotificationType::PlaterError, NotificationManager::NotificationLevel::ErrorNotificationLevel,
+            _u8L("ERROR:") + "\n" + text, hypertext, action_fn);
+        return;
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+        }
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+        else
+            notification_manager.close_slicing_error_notification(text);
+
+        return;
+    }
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+
     switch (error)
     {
     case PLATER_WARNING:

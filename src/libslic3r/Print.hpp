@@ -418,6 +418,78 @@ private:
     FillLightning::GeneratorPtr m_lightning_generator;
 };
 
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+struct FakeWipeTower
+{
+    // generate fake extrusion
+    Vec2f pos;
+    float width;
+    float height;
+    float layer_height;
+    float depth;
+    float brim_width;
+    Vec2d plate_origin;
+
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+    void set_fake_extrusion_data(const Vec2f& p, float w, float h, float lh, float d, float bd, const Vec2d& o)
+#else
+    void set_fake_extrusion_data(Vec2f p, float w, float h, float lh, float d, float bd, Vec2d o)
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+    {
+        pos = p;
+        width = w;
+        height = h;
+        layer_height = lh;
+        depth = d;
+        brim_width = bd;
+        plate_origin = o;
+    }
+
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+    void set_pos(const Vec2f& p) { pos = p; }
+#else
+    void set_pos(Vec2f p) { pos = p; }
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+
+    std::vector<ExtrusionPaths> getFakeExtrusionPathsFromWipeTower() const
+    {
+        float h = height;
+        float lh = layer_height;
+        int   d = scale_(depth);
+        int   w = scale_(width);
+        int   bd = scale_(brim_width);
+        Point minCorner = { scale_(pos.x()), scale_(pos.y()) };
+        Point maxCorner = { minCorner.x() + w, minCorner.y() + d };
+
+        std::vector<ExtrusionPaths> paths;
+        for (float hh = 0.f; hh < h; hh += lh) {
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+            ExtrusionPath path(ExtrusionRole::WipeTower, 0.0, 0.0, lh);
+#else
+            ExtrusionPath path(ExtrusionRole::erWipeTower, 0.0, 0.0, lh);
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+            path.polyline = { minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner };
+            paths.push_back({ path });
+
+#if !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+            //
+            // INTEGRATION WHAT TO DO ???
+            // we do not define erBrim
+            //
+            if (hh == 0.f) { // add brim
+                ExtrusionPath fakeBrim(ExtrusionRole::erBrim, 0.0, 0.0, lh);
+                Point         wtbminCorner = { minCorner - Point{bd, bd} };
+                Point         wtbmaxCorner = { maxCorner + Point{bd, bd} };
+                fakeBrim.polyline = { wtbminCorner, {wtbmaxCorner.x(), wtbminCorner.y()}, wtbmaxCorner, {wtbminCorner.x(), wtbmaxCorner.y()}, wtbminCorner };
+                paths.back().push_back(fakeBrim);
+            }
+#endif // !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+        }
+        return paths;
+    }
+};
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+
 struct WipeTowerData
 {
     // Following section will be consumed by the GCodeGenerator.
@@ -668,6 +740,11 @@ private:
     friend class GCodeProcessor;
     // Allow PrintObject to access m_mutex and m_cancel_callback.
     friend class PrintObject;
+
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+    ConflictResultOpt m_conflict_result;
+    FakeWipeTower     m_fake_wipe_tower;
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 };
 
 } /* slic3r_Print_hpp_ */

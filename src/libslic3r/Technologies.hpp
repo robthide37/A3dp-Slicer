@@ -62,4 +62,27 @@
 #define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_6_0_ALPHA1)
 
 
+//====================
+// 2.6.0.beta1 techs
+//====================
+#define ENABLE_2_6_0_BETA1 1
+
+// Toolpaths conflicts detection
+// Succesfully enhanced and integrated into PrusaSlicer from BambuStudio:
+// https://github.com/bambulab/BambuStudio/commit/d43c7d5c9293508241ee88cee860ea7ea51c2080
+// https://github.com/bambulab/BambuStudio/commit/d72b4c1bfe3f0c275241250a0b1797944147b3b7
+// https://github.com/bambulab/BambuStudio/commit/87eb0f366560b895cb7219a2eb6820027aaf69d3
+// https://github.com/bambulab/BambuStudio/commit/b5b7264e99ea0872d39455bf61af56209cb4cd39
+// Co-authored-by: manch1n <miaoxin.chen@bambulab.com>
+// Co-authored-by: miaoxin <miaoxin.chen@bambulab.com>
+// Co-authored-by: lane.wei <lane.wei@bambulab.com>
+
+#define ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION (1 && ENABLE_2_6_0_BETA1)
+
+// Modifications to original BambuStudio code:
+// * compliance with PS code
+// * removed code which has no clear counterpart in PS
+#define ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD (1 && ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION)
+
+
 #endif // _prusaslicer_technologies_h_

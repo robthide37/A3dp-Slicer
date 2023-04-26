@@ -362,7 +362,12 @@ class GLCanvas3D
         ToolpathOutside,
         SlaSupportsOutside,
         SomethingNotShown,
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+        ObjectClashed,
+        GCodeConflict
+#else
         ObjectClashed
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     };
 
     class RenderStats

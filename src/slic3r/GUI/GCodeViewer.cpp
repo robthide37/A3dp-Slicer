@@ -799,6 +799,15 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
             short_time(get_time_dhms(time)) == short_time(get_time_dhms(m_print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time)))
             m_time_estimate_mode = PrintEstimatedStatistics::ETimeMode::Normal;
     }
+
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+    m_conflict_result = gcode_result.conflict_result;
+#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+    if (m_conflict_result.has_value()) { m_conflict_result->layer = m_layers.get_l_at(m_conflict_result->_height); }
+#else
+    if (m_conflict_result) { m_conflict_result.value().layer = m_layers.get_l_at(m_conflict_result.value()._height); }
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 }
 
 void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
