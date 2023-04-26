@@ -437,7 +437,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
     support_def.label = L("Supports");
     support_def.type = coStrings;
     support_def.tooltip = L("Select what kind of support do you need");
-    support_def.set_enum_labels(ConfigOptionDef::GUIType::select_open, {
+    support_def.set_enum_labels(ConfigOptionDef::GUIType::select_close, {
         L("None"),
         L("Support on build plate only"),
         L("For support enforcers only"),
@@ -592,7 +592,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
     pad_def.label = L("Pad");
     pad_def.type = coStrings;
     pad_def.tooltip = L("Select what kind of pad do you need");
-    pad_def.set_enum_labels(ConfigOptionDef::GUIType::select_open, {
+    pad_def.set_enum_labels(ConfigOptionDef::GUIType::select_close, {
         L("None"),
         L("Below object"),
         L("Around object")
