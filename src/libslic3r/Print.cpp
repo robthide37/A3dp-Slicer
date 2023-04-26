@@ -967,39 +967,16 @@ void Print::process()
     }
 
 #if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
-#if !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-    //
-    // INTEGRATION WHAT TO DO ???
-    // we do not define m_no_check
-    //
-    if (!m_no_check) {
-        using Clock = std::chrono::high_resolution_clock;
-        auto            startTime = Clock::now();
-#endif // !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-        std::optional<const FakeWipeTower*> wipe_tower_opt = {};
-        if (this->has_wipe_tower()) {
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-            m_fake_wipe_tower.set_pos({ m_config.wipe_tower_x, m_config.wipe_tower_y });
-#else
-            m_fake_wipe_tower.set_pos({ m_config.wipe_tower_x.get_at(m_plate_index), m_config.wipe_tower_y.get_at(m_plate_index) });
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-            wipe_tower_opt = std::make_optional<const FakeWipeTower*>(&m_fake_wipe_tower);
-        }
-        auto            conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(m_objects, wipe_tower_opt);
-#if !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-        auto            endTime = Clock::now();
-        volatile double seconds = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() / (double)1000;
-        BOOST_LOG_TRIVIAL(info) << "gcode path conflicts check takes " << seconds << " secs.";
-#endif // !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-
-        m_conflict_result = conflictRes;
-        if (conflictRes.has_value())
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-            BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%") % conflictRes->_objName1 % conflictRes->_objName2;
-#else
-            BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%") % conflictRes.value()._objName1 % conflictRes.value()._objName2;
+    std::optional<const FakeWipeTower*> wipe_tower_opt = {};
+    if (this->has_wipe_tower()) {
+        m_fake_wipe_tower.set_pos({ m_config.wipe_tower_x, m_config.wipe_tower_y });
+        wipe_tower_opt = std::make_optional<const FakeWipeTower*>(&m_fake_wipe_tower);
     }
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+    auto conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(m_objects, wipe_tower_opt);
+
+    m_conflict_result = conflictRes;
+    if (conflictRes.has_value())
+        BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%") % conflictRes->_objName1 % conflictRes->_objName2;
 #endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();

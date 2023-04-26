@@ -18,15 +18,9 @@ struct LineWithID
 {
     Line _line;
     int  _id;
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
     ExtrusionRole _role;
 
     LineWithID(const Line& line, int id, const ExtrusionRole& role) : _line(line), _id(id), _role(role) {}
-#else
-    int  _role;
-
-    LineWithID(const Line& line, int id, int role) : _line(line), _id(id), _role(role) {}
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
 };
 
 using LineWithIDs = std::vector<LineWithID>;
@@ -58,20 +52,10 @@ public:
     {
         LineWithIDs lines;
         for (const ExtrusionPath &path : _piles[_curPileIdx]) {
-#if !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-            //
-            // INTEGRATION WHAT TO DO ???
-            // we do not define path.is_force_no_extrusion()
-            //
-            if (path.is_force_no_extrusion() == false) {
-#endif // !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-                Polyline check_polyline = path.polyline;
-                check_polyline.translate(_offset);
-                Lines tmpLines = check_polyline.lines();
-                for (const Line &line : tmpLines) { lines.emplace_back(line, _id, path.role()); }
-#if !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
-            }
-#endif // !ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
+            Polyline check_polyline = path.polyline;
+            check_polyline.translate(_offset);
+            Lines tmpLines = check_polyline.lines();
+            for (const Line &line : tmpLines) { lines.emplace_back(line, _id, path.role()); }
         }
         return lines;
     }

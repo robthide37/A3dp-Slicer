@@ -802,11 +802,7 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
 
 #if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     m_conflict_result = gcode_result.conflict_result;
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
     if (m_conflict_result.has_value()) { m_conflict_result->layer = m_layers.get_l_at(m_conflict_result->_height); }
-#else
-    if (m_conflict_result) { m_conflict_result.value().layer = m_layers.get_l_at(m_conflict_result.value()._height); }
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
 #endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 }
 

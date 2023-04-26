@@ -163,13 +163,8 @@ ExtrusionPaths getExtrusionPathsFromLayer(LayerRegionPtrs layerRegionPtrs)
 {
     ExtrusionPaths paths;
     for (auto regionPtr : layerRegionPtrs) {
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
         getExtrusionPathsFromEntity(&regionPtr->perimeters(), paths);
         if (!regionPtr->perimeters().empty()) { getExtrusionPathsFromEntity(&regionPtr->fills(), paths); }
-#else
-        getExtrusionPathsFromEntity(&regionPtr->perimeters, paths);
-        if (regionPtr->perimeters.empty() == false) { getExtrusionPathsFromEntity(&regionPtr->fills, paths); }
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
     }
     return paths;
 }
@@ -218,13 +213,8 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectP
     if (objs.size() <= 1) { return {}; }
     LinesBucketQueue conflictQueue;
     if (wtdptr.has_value()) { // wipe tower at 0 by default
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
         auto wtpaths = (*wtdptr)->getFakeExtrusionPathsFromWipeTower();
         conflictQueue.emplace_back_bucket(std::move(wtpaths), *wtdptr, { (*wtdptr)->plate_origin.x(), (*wtdptr)->plate_origin.y() });
-#else
-        auto wtpaths = wtdptr.value()->getFakeExtrusionPathsFromWipeTower();
-        conflictQueue.emplace_back_bucket(std::move(wtpaths), wtdptr.value(), {wtdptr.value()->plate_origin.x(),wtdptr.value()->plate_origin.y()});
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
     }
     for (PrintObject *obj : objs) {
         auto layers = getAllLayersExtrusionPathsFromObject(obj);
@@ -249,11 +239,7 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectP
             auto interRes = find_inter_of_lines(layersLines[i]);
             if (interRes.has_value()) {
                 find = true;
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
                 conflict.emplace_back(*interRes, heights[i]);
-#else
-                conflict.emplace_back(interRes.value(),heights[i]);
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
                 break;
             }
         }
@@ -264,11 +250,7 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectP
         const void *ptr2           = conflictQueue.idToObjsPtr(conflict[0].first._obj2);
         double      conflictHeight = conflict[0].second;
         if (wtdptr.has_value()) {
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
             const FakeWipeTower* wtdp = *wtdptr;
-#else
-            const FakeWipeTower *wtdp = wtdptr.value();
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD
             if (ptr1 == wtdp || ptr2 == wtdp) {
                 if (ptr2 == wtdp) { std::swap(ptr1, ptr2); }
                 const PrintObject *obj2 = reinterpret_cast<const PrintObject *>(ptr2);

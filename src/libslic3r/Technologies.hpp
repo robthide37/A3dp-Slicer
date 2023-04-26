@@ -79,10 +79,5 @@
 
 #define ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION (1 && ENABLE_2_6_0_BETA1)
 
-// Modifications to original BambuStudio code:
-// * compliance with PS code
-// * removed code which has no clear counterpart in PS
-#define ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION_MOD (1 && ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION)
-
 
 #endif // _prusaslicer_technologies_h_
