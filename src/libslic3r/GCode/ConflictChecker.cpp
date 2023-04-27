@@ -189,7 +189,7 @@ ConflictComputeOpt ConflictChecker::find_inter_of_lines(const LineWithIDs &lines
     using namespace RasterizationImpl;
     std::map<IndexPair, std::vector<int>> indexToLine;
 
-    for (int i = 0; i < lines.size(); ++i) {
+    for (int i = 0; i < (int)lines.size(); ++i) {
         const LineWithID &l1      = lines[i];
         auto              indexes = line_rasterization(l1._line);
         for (auto index : indexes) {
