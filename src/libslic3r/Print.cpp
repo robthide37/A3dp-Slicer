@@ -1001,7 +1001,8 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     std::unique_ptr<GCode> gcode(new GCode);
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
 
-    result->conflict_result = m_conflict_result;
+    if (m_conflict_result.has_value())
+        result->conflict_result = *m_conflict_result;
 
     return path.c_str();
 }
