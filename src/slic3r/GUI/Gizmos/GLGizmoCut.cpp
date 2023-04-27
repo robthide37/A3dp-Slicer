@@ -1563,6 +1563,21 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal, GLModel& sphere_mo
 }
 
 
+bool GLGizmoCut3D::PartSelection::is_one_object() const
+{
+    // In theory, the implementation could be just this:
+    // return m_contour_to_parts.size() == m_ignored_contours.size();
+    // However, this would require that the part-contour correspondence works
+    // flawlessly. Because it is currently not always so for self-intersecting
+    // objects, let's better check the parts itself:
+    if (m_parts.size() < 2)
+        return true;
+    return std::all_of(m_parts.begin(), m_parts.end(), [this](const Part& part) {
+        return part.selected == m_parts.front().selected;
+    });
+}
+
+
 void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
 {
     // FIXME: Cache the transforms.
@@ -1984,7 +1999,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
         add_vertical_scaled_interval(0.75f);
 
-        m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower || m_keep_as_parts);
+        m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower || m_keep_as_parts || (m_part_selection.valid() && m_part_selection.is_one_object()));
             if (m_imgui->button(has_connectors ? _L("Edit connectors") : _L("Add connectors")))
                 set_connectors_editing(true);
         m_imgui->disabled_end();
@@ -2404,6 +2419,8 @@ bool GLGizmoCut3D::can_perform_cut() const
 {
     if (! m_invalid_connectors_idxs.empty() || (!m_keep_upper && !m_keep_lower) || m_connectors_editing)
         return false;
+    if (m_part_selection.valid())
+        return ! m_part_selection.is_one_object();
 
     return true;// has_valid_contour();
 }

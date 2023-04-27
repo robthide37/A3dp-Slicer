@@ -174,13 +174,40 @@ bool MeshClipper::has_valid_contour() const
 
 std::vector<Vec3d> MeshClipper::point_per_contour() const
 {
+    assert(m_result);
     std::vector<Vec3d> out;
-    if (!m_result || m_result->cut_islands.empty())
-        return out;
-
+    
     for (const CutIsland& isl : m_result->cut_islands) {
-        // FIXME: There might be holes !
-        Vec2d c = unscale(isl.expoly.contour.centroid());
+        assert(isl.expoly.contour.size() > 2);
+        // Now return a point lying inside the contour but not in a hole.
+        // We do this by taking a point lying close to the edge, repeating
+        // this several times for different edges and distances from them.
+        // (We prefer point not extremely close to the border.
+        bool done = false;
+        Vec2d p;
+        size_t i = 1;
+        while (i < isl.expoly.contour.size()) {
+            const Vec2d& a = unscale(isl.expoly.contour.points[i-1]);
+            const Vec2d& b = unscale(isl.expoly.contour.points[i]);
+            Vec2d n = (b-a).normalized();
+            std::swap(n.x(), n.y());
+            n.x() = -1 * n.x();
+            double f = 10.;
+            while (f > 0.05) {
+                p = (0.5*(b+a)) + f * n;
+                if (isl.expoly.contains(Point::new_scale(p))) {
+                    done = true;
+                    break;
+                }
+                f = f/10.;
+            }
+            if (done)
+                break;
+            i += isl.expoly.contour.size() / 5;
+        }
+        // If the above failed, just return the centroid, regardless of whether
+        // it is inside the contour or in a hole (we must return something).
+        Vec2d c = done ? p : unscale(isl.expoly.contour.centroid());
         out.emplace_back(m_result->trafo * Vec3d(c.x(), c.y(), 0.));
     }
     return out;
@@ -366,7 +393,18 @@ void MeshClipper::recalculate_triangles()
 
         isl.expoly = std::move(exp);
         isl.expoly_bb = get_extents(exp);
+        isl.hash = 0;
+        for (const Point& pt : isl.expoly.contour) {
+            isl.hash ^= pt.x();
+            isl.hash ^= pt.y();
+        }
     }
+
+    // Now sort the islands so they are in defined order. This is a hack needed by cut gizmo, which sometimes
+    // flips the normal of the cut, in which case the contours stay the same but their order may change.
+    std::sort(m_result->cut_islands.begin(), m_result->cut_islands.end(), [](const CutIsland& a, const CutIsland& b) {
+        return a.hash < b.hash;
+    });
 }
 
 

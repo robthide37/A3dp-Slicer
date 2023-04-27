@@ -141,6 +141,7 @@ private:
         ExPolygon expoly;
         BoundingBox expoly_bb;
         bool disabled = false;
+        coord_t hash;
     };
     struct ClipResult {
         std::vector<CutIsland> cut_islands;

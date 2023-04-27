@@ -155,20 +155,20 @@ class GLGizmoCut3D : public GLGizmoBase
         void turn_over_selection();
         ModelObject* model_object() { return m_model.objects.front(); }
         bool valid() const { return m_valid; }
+        bool is_one_object() const;
         const std::vector<Part>& parts() const { return m_parts; }
         const std::vector<size_t>* get_ignored_contours_ptr() const { return (valid() ? &m_ignored_contours : nullptr); }
-
-        std::vector<Vec3d> m_contour_points; // TEMPORARILY PUBLIC
-        std::vector<std::pair<std::vector<size_t>, std::vector<size_t>>> m_contour_to_parts; // for each contour, there is a vector of parts above and a vector of parts below
-        std::vector<size_t> m_ignored_contours; // contour that should not be rendered (the parts on both sides will both be parts of the same object)
-        std::vector<std::vector<Vec3d>> m_debug_pts;
-
 
     private:
         Model m_model;
         int m_instance_idx;
         std::vector<Part> m_parts;
         bool m_valid = false;
+        std::vector<std::pair<std::vector<size_t>, std::vector<size_t>>> m_contour_to_parts; // for each contour, there is a vector of parts above and a vector of parts below
+        std::vector<size_t> m_ignored_contours; // contour that should not be rendered (the parts on both sides will both be parts of the same object)
+
+        std::vector<Vec3d> m_contour_points;         // Debugging
+        std::vector<std::vector<Vec3d>> m_debug_pts; // Debugging
     };
 
     PartSelection m_part_selection;
