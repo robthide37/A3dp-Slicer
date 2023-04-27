@@ -905,6 +905,13 @@ void GLGizmoCut3D::on_set_state()
         m_selected.clear();
         m_parent.set_use_color_clip_plane(false);
         m_c->selection_info()->set_use_shift(false);
+
+        // Make sure that the part selection data are released when the gizmo is closed.
+        // The CallAfter is needed because in perform_cut, the gizmo is closed BEFORE
+        // the cut is performed (because of undo/redo snapshots), so the data would
+        // be deleted prematurely.
+        if (m_part_selection.valid())
+            wxGetApp().CallAfter([this]() { m_part_selection = PartSelection(); });
     }
 }
 

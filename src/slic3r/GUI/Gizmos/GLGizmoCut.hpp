@@ -143,6 +143,7 @@ class GLGizmoCut3D : public GLGizmoBase
     public:
         PartSelection() = default;
         PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc);
+        ~PartSelection() { m_model.clear_objects(); }
 
         struct Part {
             GLModel glmodel;
