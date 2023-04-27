@@ -168,77 +168,6 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                   [](const Line &a, const Line &b) { return a.a.y() < b.b.y(); });
     }
 
-    ThickPolylines thick_polylines_out;
-    {
-        ThickPolylines current_traced_paths;
-        for (const auto &polygon_slice : polygon_sections) {
-            std::unordered_set<const Line *> used_segments;
-            for (ThickPolyline &traced_path : current_traced_paths) {
-                Point max_y = traced_path.last_point();
-                Point min_y = traced_path.points[traced_path.size() - 2];
-
-                if (max_y.y() < min_y.y())
-                    std::swap(max_y, min_y);
-
-                auto candidates_begin = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), min_y,
-                                                         [](const Point &low, const Line &seg) { return seg.b.y() > low.y(); });
-                auto candidates_end   = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), max_y,
-                                                         [](const Point &high, const Line &seg) { return seg.a.y() > high.y(); });
-                bool segment_added    = false;
-                for (auto candidate = candidates_begin; candidate != candidates_end && !segment_added; candidate++) {
-                    if (used_segments.find(&(*candidate)) != used_segments.end()) {
-                        continue;
-                    }
-                    if ((traced_path.last_point() - candidate->a).cast<double>().squaredNorm() < squared_distance_limit_reconnection) {
-                        traced_path.points.back() += Point{0.0, scaled_spacing * 0.5};
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(candidate->a + Point{0.0, scaled_spacing * 0.5});
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(candidate->b);
-                        traced_path.width.push_back(scaled_spacing);
-                        used_segments.insert(&(*candidate));
-                        segment_added = true;
-                    } else if ((traced_path.last_point() - candidate->b).cast<double>().squaredNorm() <
-                               squared_distance_limit_reconnection) {
-                        traced_path.points.back() -= Point{0.0, scaled_spacing * 0.5};
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(candidate->b - Point{0.0, scaled_spacing * 0.5});
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.width.push_back(scaled_spacing);
-                        traced_path.points.push_back(candidate->a);
-                        traced_path.width.push_back(scaled_spacing);
-                        used_segments.insert(&(*candidate));
-                        segment_added = true;
-                    }
-                }
-
-                if (!segment_added) {
-                    // Zero overlapping segments. Finish the polyline.
-                    thick_polylines_out.push_back(std::move(traced_path));
-                    traced_path.clear();
-                }
-            }
-
-            current_traced_paths.erase(std::remove_if(current_traced_paths.begin(), current_traced_paths.end(),
-                                                      [](const ThickPolyline &tp) { return tp.empty(); }),
-                                       current_traced_paths.end());
-
-            for (const Line &segment : polygon_slice) {
-                if (used_segments.find(&segment) == used_segments.end()) {
-                    ThickPolyline &new_path = current_traced_paths.emplace_back();
-                    new_path.points.push_back(segment.a);
-                    new_path.width.push_back(scaled_spacing);
-                    new_path.points.push_back(segment.b);
-                    new_path.width.push_back(scaled_spacing);
-                    new_path.endpoints = {true, true};
-                }
-            }
-        }
-
-        thick_polylines_out.insert(thick_polylines_out.end(), current_traced_paths.begin(), current_traced_paths.end());
-    }
-
     Polygons reconstructed_area{};
     // reconstruct polygon from polygon sections
     {
@@ -332,6 +261,20 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     svg.draw(vertical_lines, "black", scale_(0.1));
     svg.Close();
 
+    ThickPolylines thick_polylines;
+    {
+        for (const auto &polygon_slice : polygon_sections) {
+            for (const Line &segment : polygon_slice) {
+                ThickPolyline &new_path = thick_polylines.emplace_back();
+                new_path.points.push_back(segment.a);
+                new_path.width.push_back(scaled_spacing);
+                new_path.points.push_back(segment.b);
+                new_path.width.push_back(scaled_spacing);
+                new_path.endpoints = {true, true};
+            }
+        }
+    }
+
     for (ExPolygon &ex_poly : gaps_for_additional_filling) {
         Point    bbox_size   = ex_poly.contour.bounding_box().size();
         coord_t  loops_count = std::max(bbox_size.x(), bbox_size.y()) / scaled_spacing + 1;
@@ -347,7 +290,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
             }
 
             // Split paths using a nearest neighbor search.
-            size_t firts_poly_idx = thick_polylines_out.size();
+            size_t firts_poly_idx = thick_polylines.size();
             Point  last_pos(0, 0);
             for (const Arachne::ExtrusionLine *extrusion : all_extrusions) {
                 if (extrusion->empty())
@@ -365,102 +308,48 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
 
                 assert(thick_polyline.size() > 1);
                 //assert(thick_polyline.points.size() == thick_polyline.width.size());
-                thick_polylines_out.emplace_back(std::move(thick_polyline));
-                last_pos = thick_polylines_out.back().last_point();
+                thick_polylines.emplace_back(std::move(thick_polyline));
+                last_pos = thick_polylines.back().last_point();
             }
 
             // clip the paths to prevent the extruder from getting exactly on the first point of the loop
             // Keep valid paths only.
             size_t j = firts_poly_idx;
-            for (size_t i = firts_poly_idx; i < thick_polylines_out.size(); ++i) {
+            for (size_t i = firts_poly_idx; i < thick_polylines.size(); ++i) {
                 assert(thick_polylines_out[i].size() > 1);
                 assert(thick_polylines_out[i].length() > 0.);
                 //assert(thick_polylines_out[i].points.size() == thick_polylines_out[i].width.size());
-                thick_polylines_out[i].clip_end(this->loop_clipping);
+                thick_polylines[i].clip_end(this->loop_clipping);
                 assert(thick_polylines_out[i].size() > 1);
-                if (thick_polylines_out[i].is_valid()) {
+                if (thick_polylines[i].is_valid()) {
                     if (j < i)
-                        thick_polylines_out[j] = std::move(thick_polylines_out[i]);
+                        thick_polylines[j] = std::move(thick_polylines[i]);
                     ++j;
                 }
             }
-            if (j < thick_polylines_out.size())
-                thick_polylines_out.erase(thick_polylines_out.begin() + int(j), thick_polylines_out.end());
+            if (j < thick_polylines.size())
+                thick_polylines.erase(thick_polylines.begin() + int(j), thick_polylines.end());
         }
     }
 
-    // reconnect ThickPolylines
-    struct EndPoint
-    {
-        Vec2d  position;
-        size_t polyline_idx;
-        size_t other_end_point_idx;
-        bool   is_first;
-        bool   used  = false;
-    };
-    std::vector<EndPoint> connection_endpoints;
-    connection_endpoints.reserve(thick_polylines_out.size() * 2);
-    for (size_t pl_idx = 0; pl_idx < thick_polylines_out.size(); pl_idx++) {
-        size_t current_idx = connection_endpoints.size();
-        connection_endpoints.push_back({thick_polylines_out[pl_idx].first_point().cast<double>(), pl_idx, current_idx + 1, true});
-        connection_endpoints.push_back({thick_polylines_out[pl_idx].last_point().cast<double>(), pl_idx, current_idx, false});
-    }
-    auto coord_fn = [&connection_endpoints](size_t idx, size_t dim) { return connection_endpoints[idx].position[dim]; };
-    KDTreeIndirect<2, double, decltype(coord_fn)> endpoints_tree{coord_fn, connection_endpoints.size()};
-    for (size_t ep_idx = 0; ep_idx < connection_endpoints.size(); ep_idx++) {
-        EndPoint &ep = connection_endpoints[ep_idx];
-        if (!ep.used) {
-            std::vector<size_t> close_endpoints = find_nearby_points(endpoints_tree, ep.position, scaled_spacing);
-            for (size_t close_endpoint_idx : close_endpoints) {
-                EndPoint &ep2 = connection_endpoints[close_endpoint_idx];
-                if (ep2.used || ep2.polyline_idx == ep.polyline_idx) {
-                    continue;
-                }
-
-                // connect ep and ep2;
-                ThickPolyline &tp1 = thick_polylines_out[ep.polyline_idx];
-                ThickPolyline &tp2 = thick_polylines_out[ep2.polyline_idx];
-
-                if (ep.is_first) {
-                    tp1.reverse();
-                    ep.is_first                                           = false;
-                    connection_endpoints[ep.other_end_point_idx].is_first = true;
-                }
-
-                if (!ep2.is_first) {
-                    tp2.reverse();
-                    ep2.is_first                                           = true;
-                    connection_endpoints[ep2.other_end_point_idx].is_first = false;
-                }
-
-                tp1.points.insert(tp1.points.end(), tp2.points.begin(), tp2.points.end());
-                tp1.width.push_back(tp1.width.back());
-                tp1.width.push_back(tp2.width.front());
-                tp1.width.insert(tp1.width.end(), tp2.width.begin(), tp2.width.end());
-                ep2.used                                                          = true;
-                ep.used                                                           = true;
-                connection_endpoints[ep2.other_end_point_idx].polyline_idx        = ep.polyline_idx;
-                connection_endpoints[ep2.other_end_point_idx].other_end_point_idx = ep_idx;
-                connection_endpoints[ep.other_end_point_idx].other_end_point_idx  = close_endpoint_idx;
-                tp2.clear();
-                break;
-            }
-        }
-    }
-
-    thick_polylines_out.erase(std::remove_if(thick_polylines_out.begin(), thick_polylines_out.end(),
+    thick_polylines.erase(std::remove_if(thick_polylines.begin(), thick_polylines.end(),
                                              [scaled_spacing](const ThickPolyline &tp) {
                                                  return tp.length() < scaled_spacing &&
                                                         std::all_of(tp.width.begin(), tp.width.end(),
                                                                     [scaled_spacing](double w) { return w < scaled_spacing; });
                                              }),
-                              thick_polylines_out.end());
+                              thick_polylines.end());
 
-    std::sort(thick_polylines_out.begin(), thick_polylines_out.end(), [](const ThickPolyline &left, const ThickPolyline &right) {
-        return BoundingBox(left.points).min.x() < BoundingBox(right.points).min.x();
+    std::stable_sort(thick_polylines.begin(), thick_polylines.end(), [](const ThickPolyline &left, const ThickPolyline &right) {
+        BoundingBox lbb(left.points);
+        BoundingBox rbb(right.points);
+        if (lbb.min.x() == rbb.min.x())
+            return lbb.min.y() < rbb.min.y();
+        else
+            return lbb.min.x() < rbb.min.x();
     });
 
-    Algorithm::sort_paths(thick_polylines_out.begin(), thick_polylines_out.end(), bb.min, scaled_spacing * 1.2, [](const ThickPolyline
+    Algorithm::sort_paths(thick_polylines.begin(), thick_polylines.end(), bb.min, scaled_spacing * 1.2, [](const ThickPolyline
     &tp) {
         Lines ls;
         Point prev = tp.first_point();
@@ -471,8 +360,27 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
         return ls;
     });
 
-    rotate_thick_polylines(thick_polylines_out, cos(-aligning_angle), sin(-aligning_angle));
-    return thick_polylines_out;
+    ThickPolylines connected_thick_polylines;
+    if (!thick_polylines.empty()) {
+        connected_thick_polylines.push_back(thick_polylines.front());
+        for (ThickPolyline &tp : thick_polylines) {
+            ThickPolyline &tail = connected_thick_polylines.back();
+            Point          last = tail.last_point();
+            if ((last - tp.last_point()).cast<double>().squaredNorm() < (last - tp.first_point()).cast<double>().squaredNorm()) {
+                tp.reverse();
+            }
+            if ((last - tp.first_point()).cast<double>().squaredNorm() < squared_distance_limit_reconnection) {
+                tail.points.insert(tail.points.end(), tp.points.begin(), tp.points.end());
+                tail.width.push_back(tail.width.back());
+                tail.width.push_back(tp.width.front());
+                tail.width.insert(tail.width.end(), tp.width.begin(), tp.width.end());
+            } else {
+                connected_thick_polylines.push_back(tp);
+            }
+        }
+    }
+    rotate_thick_polylines(connected_thick_polylines, cos(-aligning_angle), sin(-aligning_angle));
+    return connected_thick_polylines;
 }
 
 } // namespace Slic3r
