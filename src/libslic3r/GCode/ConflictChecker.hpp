@@ -78,6 +78,7 @@ private:
 
 public:
     void        emplace_back_bucket(std::vector<ExtrusionPaths> &&paths, const void *objPtr, Point offset);
+    void        build_queue();
     bool        valid() const { return _pq.empty() == false; }
     const void *idToObjsPtr(int id)
     {

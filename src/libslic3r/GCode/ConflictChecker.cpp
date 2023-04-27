@@ -91,19 +91,18 @@ inline Grids line_rasterization(const Line &line, int64_t xdist = RasteXDistance
 
 void LinesBucketQueue::emplace_back_bucket(std::vector<ExtrusionPaths> &&paths, const void *objPtr, Point offset)
 {
-    auto oldSize = _buckets.capacity();
     if (_objsPtrToId.find(objPtr) == _objsPtrToId.end()) {
         _objsPtrToId.insert({objPtr, _objsPtrToId.size()});
         _idToObjsPtr.insert({_objsPtrToId.size() - 1, objPtr});
     }
     _buckets.emplace_back(std::move(paths), _objsPtrToId[objPtr], offset);
-    _pq.push(&_buckets.back());
-    auto newSize = _buckets.capacity();
-    if (oldSize != newSize) { // pointers change
-        decltype(_pq) newQueue;
-        for (LinesBucket &bucket : _buckets) { newQueue.push(&bucket); }
-        std::swap(_pq, newQueue);
-    }
+}
+
+void LinesBucketQueue::build_queue()
+{
+    assert(_pq.empty);
+    for (LinesBucket &bucket : _buckets)
+        _pq.push(&bucket);
 }
 
 double LinesBucketQueue::removeLowests()
@@ -218,6 +217,7 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectP
         conflictQueue.emplace_back_bucket(std::move(layers.first), obj, obj->instances().front().shift);
         conflictQueue.emplace_back_bucket(std::move(layers.second), obj, obj->instances().front().shift);
     }
+    conflictQueue.build_queue();
 
     std::vector<LineWithIDs> layersLines;
     std::vector<double>      heights;
