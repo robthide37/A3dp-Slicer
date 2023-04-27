@@ -82,7 +82,6 @@ namespace Slic3r {
         }
     };
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     struct ConflictResult
     {
         std::string _objName1;
@@ -98,7 +97,6 @@ namespace Slic3r {
     };
 
     using ConflictResultOpt = std::optional<ConflictResult>;
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 
     struct GCodeProcessorResult
     {
@@ -155,9 +153,7 @@ namespace Slic3r {
         std::vector<CustomGCode::Item> custom_gcode_per_print_z;
         std::vector<std::pair<float, std::pair<size_t, size_t>>> spiral_vase_layers;
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
         ConflictResultOpt conflict_result;
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
         int64_t time{ 0 };

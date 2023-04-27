@@ -1,8 +1,6 @@
 #ifndef slic3r_ConflictChecker_hpp_
 #define slic3r_ConflictChecker_hpp_
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
-
 #include "../Utils.hpp"
 #include "../Model.hpp"
 #include "../Print.hpp"
@@ -121,7 +119,5 @@ struct ConflictChecker
 };
 
 } // namespace Slic3r
-
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 
 #endif

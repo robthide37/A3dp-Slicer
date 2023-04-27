@@ -11,9 +11,7 @@
 #include "Thread.hpp"
 #include "GCode.hpp"
 #include "GCode/WipeTower.hpp"
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 #include "GCode/ConflictChecker.hpp"
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 #include "Utils.hpp"
 #include "BuildVolume.hpp"
 #include "format.hpp"
@@ -966,7 +964,6 @@ void Print::process()
         this->set_done(psSkirtBrim);
     }
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     std::optional<const FakeWipeTower*> wipe_tower_opt = {};
     if (this->has_wipe_tower()) {
         m_fake_wipe_tower.set_pos({ m_config.wipe_tower_x, m_config.wipe_tower_y });
@@ -977,7 +974,6 @@ void Print::process()
     m_conflict_result = conflictRes;
     if (conflictRes.has_value())
         BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%") % conflictRes->_objName1 % conflictRes->_objName2;
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
 }
@@ -1005,9 +1001,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     std::unique_ptr<GCode> gcode(new GCode);
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     result->conflict_result = m_conflict_result;
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 
     return path.c_str();
 }

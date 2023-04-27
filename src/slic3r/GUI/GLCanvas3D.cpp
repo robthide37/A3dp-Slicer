@@ -2692,9 +2692,7 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, co
     if (wxGetApp().is_editor()) {
         m_gcode_viewer.update_shells_color_by_extruder(m_config);
         _set_warning_notification_if_needed(EWarning::ToolpathOutside);
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
         _set_warning_notification_if_needed(EWarning::GCodeConflict);
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     }
 
     m_gcode_viewer.refresh(gcode_result, str_tool_colors);
@@ -7443,17 +7441,12 @@ void GLCanvas3D::_set_warning_notification_if_needed(EWarning warning)
     }
     else {
         if (wxGetApp().is_editor()) {
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
-          if (current_printer_technology() != ptSLA) {
-              if (warning == EWarning::ToolpathOutside)
-                  show = m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
-              else if (warning == EWarning::GCodeConflict)
-                  show = m_gcode_viewer.has_data() && m_gcode_viewer.is_contained_in_bed() && m_gcode_viewer.get_conflict_result().has_value();
-          }
-#else
-          if (current_printer_technology() != ptSLA)
-                show = m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
+            if (current_printer_technology() != ptSLA) {
+                if (warning == EWarning::ToolpathOutside)
+                    show = m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
+                else if (warning == EWarning::GCodeConflict)
+                    show = m_gcode_viewer.has_data() && m_gcode_viewer.is_contained_in_bed() && m_gcode_viewer.get_conflict_result().has_value();
+            }
         }
     }
 
@@ -7479,7 +7472,6 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
             "Resolve the current problem to continue slicing.");
         error = ErrorType::PLATER_ERROR;
         break;
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     case EWarning::GCodeConflict: {
         const ConflictResultOpt& conflict_result = m_gcode_viewer.get_conflict_result();
         if (!conflict_result.has_value()) { break; }
@@ -7492,11 +7484,9 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
         error = ErrorType::SLICING_ERROR;
         break;
     }
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     }
     auto& notification_manager = *wxGetApp().plater()->get_notification_manager();
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     const ConflictResultOpt& conflict_result = m_gcode_viewer.get_conflict_result();
     if (warning == EWarning::GCodeConflict) {
         if (conflict_result.has_value()) {
@@ -7526,7 +7516,6 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
 
         return;
     }
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 
     switch (error)
     {

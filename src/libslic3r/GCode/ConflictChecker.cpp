@@ -1,8 +1,6 @@
 #include "libslic3r.h"
 #include "ConflictChecker.hpp"
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
-
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_vector.h>
 
@@ -280,4 +278,3 @@ ConflictComputeOpt ConflictChecker::line_intersect(const LineWithID &l1, const L
 
 } // namespace Slic3r
 
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION

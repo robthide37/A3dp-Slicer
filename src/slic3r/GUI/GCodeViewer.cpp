@@ -800,10 +800,8 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
             m_time_estimate_mode = PrintEstimatedStatistics::ETimeMode::Normal;
     }
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     m_conflict_result = gcode_result.conflict_result;
     if (m_conflict_result.has_value()) { m_conflict_result->layer = m_layers.get_l_at(m_conflict_result->_height); }
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 }
 
 void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)

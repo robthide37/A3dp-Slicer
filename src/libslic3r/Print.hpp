@@ -418,7 +418,6 @@ private:
     FillLightning::GeneratorPtr m_lightning_generator;
 };
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 struct FakeWipeTower
 {
     // generate fake extrusion
@@ -462,7 +461,6 @@ struct FakeWipeTower
         return paths;
     }
 };
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 
 struct WipeTowerData
 {
@@ -715,10 +713,8 @@ private:
     // Allow PrintObject to access m_mutex and m_cancel_callback.
     friend class PrintObject;
 
-#if ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
     ConflictResultOpt m_conflict_result;
     FakeWipeTower     m_fake_wipe_tower;
-#endif // ENABLE_BAMBUSTUDIO_TOOLPATHS_CONFLICTS_DETECTION
 };
 
 } /* slic3r_Print_hpp_ */
