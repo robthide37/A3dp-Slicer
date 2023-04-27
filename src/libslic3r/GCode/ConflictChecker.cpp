@@ -100,7 +100,7 @@ void LinesBucketQueue::emplace_back_bucket(std::vector<ExtrusionPaths> &&paths, 
     _pq.push(&_buckets.back());
     auto newSize = _buckets.capacity();
     if (oldSize != newSize) { // pointers change
-        decltype(_pq) newQueue;
+        std::priority_queue<LinesBucket*, std::vector<LinesBucket*>, LinesBucketPtrComp> newQueue;
         for (LinesBucket &bucket : _buckets) { newQueue.push(&bucket); }
         std::swap(_pq, newQueue);
     }
