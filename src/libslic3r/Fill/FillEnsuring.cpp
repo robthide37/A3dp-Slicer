@@ -47,7 +47,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     };
 
     const coord_t           scaled_spacing                      = scaled<coord_t>(this->spacing);
-    double                  distance_limit_reconnection         = 2 * double(scaled_spacing);
+    double                  distance_limit_reconnection         = double(scaled_spacing);
     double                  squared_distance_limit_reconnection = distance_limit_reconnection * distance_limit_reconnection;
     Polygons                filled_area                         = to_polygons(surface->expolygon);
     std::pair<float, Point> rotate_vector                       = this->_infill_direction(surface);
@@ -250,16 +250,15 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
      if (this->overlap != 0) {
         gaps_for_additional_filling = offset_ex(gaps_for_additional_filling, scaled<float>(this->overlap));
     }
-    // gaps_for_additional_filling            = opening_ex(gaps_for_additional_filling, 0.3 * scaled_spacing);
 
-    BoundingBox bbox = get_extents(filled_area);
-    bbox.offset(scale_(1.));
-    ::Slic3r::SVG svg(debug_out_path(("surface" + std::to_string(surface->area())).c_str()).c_str(), bbox);
-    svg.draw(to_lines(filled_area), "red", scale_(0.4));
-    svg.draw(to_lines(reconstructed_area), "blue", scale_(0.3));
-    svg.draw(to_lines(gaps_for_additional_filling), "green", scale_(0.2));
-    svg.draw(vertical_lines, "black", scale_(0.1));
-    svg.Close();
+    // BoundingBox bbox = get_extents(filled_area);
+    // bbox.offset(scale_(1.));
+    // ::Slic3r::SVG svg(debug_out_path(("surface" + std::to_string(surface->area())).c_str()).c_str(), bbox);
+    // svg.draw(to_lines(filled_area), "red", scale_(0.4));
+    // svg.draw(to_lines(reconstructed_area), "blue", scale_(0.3));
+    // svg.draw(to_lines(gaps_for_additional_filling), "green", scale_(0.2));
+    // svg.draw(vertical_lines, "black", scale_(0.1));
+    // svg.Close();
 
     ThickPolylines thick_polylines;
     {
@@ -316,11 +315,11 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
             // Keep valid paths only.
             size_t j = firts_poly_idx;
             for (size_t i = firts_poly_idx; i < thick_polylines.size(); ++i) {
-                assert(thick_polylines_out[i].size() > 1);
-                assert(thick_polylines_out[i].length() > 0.);
-                //assert(thick_polylines_out[i].points.size() == thick_polylines_out[i].width.size());
+                assert(thick_polylines[i].size() > 1);
+                assert(thick_polylines[i].length() > 0.);
+                //assert(thick_polylines[i].points.size() == thick_polylines[i].width.size());
                 thick_polylines[i].clip_end(this->loop_clipping);
-                assert(thick_polylines_out[i].size() > 1);
+                assert(thick_polylines[i].size() > 1);
                 if (thick_polylines[i].is_valid()) {
                     if (j < i)
                         thick_polylines[j] = std::move(thick_polylines[i]);
@@ -329,6 +328,75 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
             }
             if (j < thick_polylines.size())
                 thick_polylines.erase(thick_polylines.begin() + int(j), thick_polylines.end());
+        }
+    }
+
+     // connect tiny gap fills to close colinear line
+    struct EndPoint
+    {
+        Vec2d  position;
+        size_t polyline_idx;
+        size_t other_end_point_idx;
+        bool   is_first;
+        bool   used  = false;
+    };
+    std::vector<EndPoint> connection_endpoints;
+    connection_endpoints.reserve(thick_polylines.size() * 2);
+    for (size_t pl_idx = 0; pl_idx < thick_polylines.size(); pl_idx++) {
+        size_t current_idx = connection_endpoints.size();
+        connection_endpoints.push_back({thick_polylines[pl_idx].first_point().cast<double>(), pl_idx, current_idx + 1, true});
+        connection_endpoints.push_back({thick_polylines[pl_idx].last_point().cast<double>(), pl_idx, current_idx, false});
+    }
+
+    auto coord_fn = [&connection_endpoints](size_t idx, size_t dim) { return connection_endpoints[idx].position[dim]; };
+    KDTreeIndirect<2, double, decltype(coord_fn)> endpoints_tree{coord_fn, connection_endpoints.size()};
+    for (size_t ep_idx = 0; ep_idx < connection_endpoints.size(); ep_idx++) {
+        EndPoint &ep1 = connection_endpoints[ep_idx];
+        if (!ep1.used) {
+            std::vector<size_t> close_endpoints = find_nearby_points(endpoints_tree, ep1.position, scaled_spacing);
+            for (size_t close_endpoint_idx : close_endpoints) {
+                EndPoint &ep2 = connection_endpoints[close_endpoint_idx];
+                if (ep2.used || ep2.polyline_idx == ep1.polyline_idx) {
+                    continue;
+                }
+
+                ThickPolyline &tp1 = thick_polylines[ep1.polyline_idx];
+                ThickPolyline &tp2 = thick_polylines[ep2.polyline_idx];
+
+                Vec2d v1 = ep1.is_first ? (tp1.points[0] - tp1.points[1]).cast<double>() :
+                                          (tp1.points.back() - tp1.points[tp1.points.size() - 1]).cast<double>();
+                Vec2d v2 = ep2.is_first ? (tp2.points[1] - tp2.points[0]).cast<double>() :
+                                          (tp2.points[tp2.points.size() - 1] - tp2.points.back()).cast<double>();
+
+                if (std::abs(Slic3r::angle(v1, v2)) > PI / 6.0) {
+                    continue;
+                }
+
+                // connect ep and ep2;
+                if (ep1.is_first) {
+                    tp1.reverse();
+                    ep1.is_first                                           = false;
+                    connection_endpoints[ep1.other_end_point_idx].is_first = true;
+                }
+
+                if (!ep2.is_first) {
+                    tp2.reverse();
+                    ep2.is_first                                           = true;
+                    connection_endpoints[ep2.other_end_point_idx].is_first = false;
+                }
+
+                tp1.points.insert(tp1.points.end(), tp2.points.begin(), tp2.points.end());
+                tp1.width.push_back(tp1.width.back());
+                tp1.width.push_back(tp2.width.front());
+                tp1.width.insert(tp1.width.end(), tp2.width.begin(), tp2.width.end());
+                ep2.used                                                          = true;
+                ep1.used                                                           = true;
+                connection_endpoints[ep2.other_end_point_idx].polyline_idx        = ep1.polyline_idx;
+                connection_endpoints[ep2.other_end_point_idx].other_end_point_idx = ep_idx;
+                connection_endpoints[ep1.other_end_point_idx].other_end_point_idx  = close_endpoint_idx;
+                tp2.clear();
+                break;
+            }
         }
     }
 
@@ -360,27 +428,27 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
         return ls;
     });
 
-    ThickPolylines connected_thick_polylines;
-    if (!thick_polylines.empty()) {
-        connected_thick_polylines.push_back(thick_polylines.front());
-        for (ThickPolyline &tp : thick_polylines) {
-            ThickPolyline &tail = connected_thick_polylines.back();
-            Point          last = tail.last_point();
-            if ((last - tp.last_point()).cast<double>().squaredNorm() < (last - tp.first_point()).cast<double>().squaredNorm()) {
-                tp.reverse();
-            }
-            if ((last - tp.first_point()).cast<double>().squaredNorm() < squared_distance_limit_reconnection) {
-                tail.points.insert(tail.points.end(), tp.points.begin(), tp.points.end());
-                tail.width.push_back(tail.width.back());
-                tail.width.push_back(tp.width.front());
-                tail.width.insert(tail.width.end(), tp.width.begin(), tp.width.end());
-            } else {
-                connected_thick_polylines.push_back(tp);
-            }
-        }
-    }
-    rotate_thick_polylines(connected_thick_polylines, cos(-aligning_angle), sin(-aligning_angle));
-    return connected_thick_polylines;
+    // ThickPolylines connected_thick_polylines;
+    // if (!thick_polylines.empty()) {
+    //     connected_thick_polylines.push_back(thick_polylines.front());
+    //     for (ThickPolyline &tp : thick_polylines) {
+    //         ThickPolyline &tail = connected_thick_polylines.back();
+    //         Point          last = tail.last_point();
+    //         if ((last - tp.last_point()).cast<double>().squaredNorm() < (last - tp.first_point()).cast<double>().squaredNorm()) {
+    //             tp.reverse();
+    //         }
+    //         if ((last - tp.first_point()).cast<double>().squaredNorm() < squared_distance_limit_reconnection) {
+    //             tail.points.insert(tail.points.end(), tp.points.begin(), tp.points.end());
+    //             tail.width.push_back(0);
+    //             tail.width.push_back(0);
+    //             tail.width.insert(tail.width.end(), tp.width.begin(), tp.width.end());
+    //         } else {
+    //             connected_thick_polylines.push_back(tp);
+    //         }
+    //     }
+    // }
+    rotate_thick_polylines(thick_polylines, cos(-aligning_angle), sin(-aligning_angle));
+    return thick_polylines;
 }
 
 } // namespace Slic3r

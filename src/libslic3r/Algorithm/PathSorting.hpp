@@ -30,26 +30,26 @@ void sort_paths(RandomAccessIterator begin, RandomAccessIterator end, Point star
     if (paths_count <= 1)
         return;
 
-    auto paths_min_distance = [](const AABBTreeLines::LinesDistancer<Line> &left, const AABBTreeLines::LinesDistancer<Line> &right) {
-        double min_distance = std::numeric_limits<double>::max();
+    auto paths_touch = [touch_limit_distance](const AABBTreeLines::LinesDistancer<Line> &left,
+                                              const AABBTreeLines::LinesDistancer<Line> &right) {
         for (const Line &l : left.get_lines()) {
-            if (double dist = right.distance_from_lines<false>(l.a); dist < min_distance) {
-                min_distance = dist;
+            if (right.distance_from_lines<false>(l.a) < touch_limit_distance) {
+                return true;
             }
         }
-        if (double dist = right.distance_from_lines<false>(left.get_lines().back().b); dist < min_distance) {
-            min_distance = dist;
+        if (right.distance_from_lines<false>(left.get_lines().back().b) < touch_limit_distance) {
+            return true;
         }
 
         for (const Line &l : right.get_lines()) {
-            if (double dist = left.distance_from_lines<false>(l.a); dist < min_distance) {
-                min_distance = dist;
+            if (left.distance_from_lines<false>(l.a) < touch_limit_distance) {
+                return true;
             }
         }
-        if (double dist = left.distance_from_lines<false>(right.get_lines().back().b); dist < min_distance) {
-            min_distance = dist;
+        if (left.distance_from_lines<false>(right.get_lines().back().b) < touch_limit_distance) {
+            return true;
         }
-        return min_distance;
+        return false;
     };
 
     std::vector<AABBTreeLines::LinesDistancer<Line>> distancers(paths_count);
@@ -60,18 +60,10 @@ void sort_paths(RandomAccessIterator begin, RandomAccessIterator end, Point star
     std::vector<std::unordered_set<size_t>> dependencies(paths_count);
     for (size_t path_idx = 0; path_idx < paths_count; path_idx++) {
         for (size_t next_path_idx = path_idx + 1; next_path_idx < paths_count; next_path_idx++) {
-            double dist = paths_min_distance(distancers[path_idx], distancers[next_path_idx]);
-            if (dist < touch_limit_distance) {
+            if (paths_touch(distancers[path_idx], distancers[next_path_idx])) {
                 dependencies[next_path_idx].insert(path_idx);
             }
         }
-    }
-
-    for (size_t path_idx = 0; path_idx < paths_count; path_idx++) {
-        std::cout << "Dependencies of " << path_idx << " are ";
-        for (size_t dep : dependencies[path_idx])
-            std::cout << dep << ", ";
-        std::cout << std::endl;
     }
 
     Point current_point = start;
@@ -91,14 +83,11 @@ void sort_paths(RandomAccessIterator begin, RandomAccessIterator end, Point star
             double ldist = distancers[path_idx].distance_from_lines<false>(current_point);
             if (ldist < lines_dist) {
                 const auto &lines  = distancers[path_idx].get_lines();
-                double      dist_a = line_alg::distance_to(lines.front(), current_point);
-                double      dist_b = line_alg::distance_to(lines.back(), current_point);
-                if (std::abs(dist_a - dist_b) < touch_limit_distance) {
-                    dist_a = (lines.front().a - current_point).squaredNorm();
-                    dist_b = (lines.back().b - current_point).squaredNorm();
-                }
-                next_idx = path_idx;
-                reverse  = dist_b < dist_a;
+                double      dist_a = (lines.front().a - current_point).cast<double>().squaredNorm();
+                double      dist_b = (lines.back().b - current_point).cast<double>().squaredNorm();
+                next_idx           = path_idx;
+                reverse            = dist_b < dist_a;
+                lines_dist         = ldist;
             }
         }
 
@@ -112,12 +101,6 @@ void sort_paths(RandomAccessIterator begin, RandomAccessIterator end, Point star
             dependencies[path_idx].erase(next_idx);
         }
     }
-
-    std::cout << "Final order is ";
-    for (size_t path_idx = 0; path_idx < paths_count; path_idx++) {
-        std::cout << correct_order_and_direction[path_idx].first << ", ";
-    }
-    std::cout << std::endl;
 
     for (size_t path_idx = 0; path_idx < paths_count; path_idx++) {
         if (correct_order_and_direction[path_idx].second) {
