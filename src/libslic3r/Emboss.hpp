@@ -112,7 +112,7 @@ namespace Emboss
         std::shared_ptr<Emboss::Glyphs> cache;
 
         FontFileWithCache() : font_file(nullptr), cache(nullptr) {}
-        FontFileWithCache(std::unique_ptr<FontFile> font_file)
+        explicit FontFileWithCache(std::unique_ptr<FontFile> font_file)
             : font_file(std::move(font_file))
             , cache(std::make_shared<Emboss::Glyphs>())
         {}
@@ -151,7 +151,11 @@ namespace Emboss
     /// <param name="font_prop">User defined property of the font</param>
     /// <param name="was_canceled">Way to interupt processing</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    ExPolygons text2shapes(FontFileWithCache &font, const char *text, const FontProp &font_prop, std::function<bool()> was_canceled = nullptr);
+    ExPolygons              text2shapes (FontFileWithCache &font, const char *text,         const FontProp &font_prop, const std::function<bool()> &was_canceled = []() {return false;});
+    std::vector<ExPolygons> text2vshapes(FontFileWithCache &font, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled = []() {return false;});
+
+    unsigned get_count_lines(const std::wstring &ws);
+    unsigned get_count_lines(const std::string &text);
 
     /// <summary>
     /// Fix duplicit points and self intersections in polygons.
@@ -333,6 +337,36 @@ namespace Emboss
         std::optional<Vec2d> unproject(const Vec3d &p, double *depth = nullptr) const override {
             auto res = core->unproject(p / m_scale, depth);
             if (depth != nullptr) *depth *= m_scale;
+            return res;
+        }
+    };
+
+    class ProjectTransform : public IProjection
+    {
+        std::unique_ptr<IProjection> m_core;
+        Transform3d m_tr;
+        Transform3d m_tr_inv;
+        double z_scale;
+    public:
+        ProjectTransform(std::unique_ptr<IProjection> core, const Transform3d &tr) : m_core(std::move(core)), m_tr(tr)
+        {
+            m_tr_inv = m_tr.inverse();
+            z_scale  = (m_tr.linear() * Vec3d::UnitZ()).norm();
+        }
+
+        // Inherited via IProject
+        std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const override
+        {
+            auto [front, back] = m_core->create_front_back(p);
+            return std::make_pair(m_tr * front, m_tr * back);
+        }
+        Vec3d project(const Vec3d &point) const override{
+            return m_core->project(point);
+        }
+        std::optional<Vec2d> unproject(const Vec3d &p, double *depth = nullptr) const override {
+            auto res = m_core->unproject(m_tr_inv * p, depth);
+            if (depth != nullptr)
+                *depth *= z_scale;
             return res;
         }
     };

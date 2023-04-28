@@ -1207,62 +1207,133 @@ std::optional<Glyph> Emboss::letter2glyph(const FontFile &font,
     return priv::get_glyph(*font_info_opt, letter, flatness);
 }
 
-ExPolygons Emboss::text2shapes(FontFileWithCache    &font_with_cache,
-                               const char           *text,
-                               const FontProp       &font_prop,
-                               std::function<bool()> was_canceled)
+namespace {
+
+ExPolygons letter2shapes(
+    wchar_t letter, Point &cursor, FontFileWithCache &font_with_cache, const FontProp &font_prop, fontinfo_opt& font_info_cache)
 {
     assert(font_with_cache.has_value());
-    fontinfo_opt font_info_opt;    
-    Point    cursor(0, 0);
-    ExPolygons result;
+    if (!font_with_cache.has_value())
+        return {};
+
+    Glyphs &cache = *font_with_cache.cache;
+    const FontFile &font  = *font_with_cache.font_file;
+
+    if (letter == '\n') {
+        unsigned int font_index = font_prop.collection_number.value_or(0);
+        assert(priv::is_valid(font, font_index));
+        const FontFile::Info &info        = font.infos[font_index];
+        int                   line_height = info.ascent - info.descent + info.linegap;
+        if (font_prop.line_gap.has_value())
+            line_height += *font_prop.line_gap;
+        line_height = static_cast<int>(line_height / SHAPE_SCALE);
+
+        cursor.x() = 0;
+        cursor.y() -= line_height;
+        return {};
+    }
+    if (letter == '\t') {
+        // '\t' = 4*space => same as imgui
+        const int count_spaces = 4;
+        const Glyph *space = priv::get_glyph(int(' '), font, font_prop, cache, font_info_cache);
+        if (space == nullptr)
+            return {};
+        cursor.x() += count_spaces * space->advance_width;
+        return {};
+    }
+    if (letter == '\r')
+        return {};
+
+    int unicode = static_cast<int>(letter);
+    auto it = cache.find(unicode);
+
+    // Create glyph from font file and cache it
+    const Glyph *glyph_ptr = (it != cache.end()) ? &it->second : priv::get_glyph(unicode, font, font_prop, cache, font_info_cache);
+    if (glyph_ptr == nullptr)
+        return {};
+
+    // move glyph to cursor position
+    ExPolygons expolygons = glyph_ptr->shape; // copy
+    for (ExPolygon &expolygon : expolygons)
+        expolygon.translate(cursor);
+
+    cursor.x() += glyph_ptr->advance_width;
+    return expolygons;
+}
+
+// Check cancel every X letters in text
+// Lower number - too much checks(slows down)
+// Higher number - slows down response on cancelation
+const int CANCEL_CHECK = 10;
+} // namespace
+
+ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache, const char *text, const FontProp &font_prop, const std::function<bool()>& was_canceled)
+{
+    assert(font_with_cache.has_value());
     const FontFile& font = *font_with_cache.font_file;
-    unsigned int font_index = font_prop.collection_number.has_value()?
-        *font_prop.collection_number : 0;
+    unsigned int font_index = font_prop.collection_number.value_or(0);
     if (!priv::is_valid(font, font_index)) return {};
-    const FontFile::Info& info = font.infos[font_index];
-    Glyphs& cache = *font_with_cache.cache;
+
+    unsigned counter = 0;
+    Point cursor(0, 0);
+    ExPolygons result;
+    fontinfo_opt font_info_cache;   
     std::wstring ws = boost::nowide::widen(text);
     for (wchar_t wc: ws){
-        if (wc == '\n') { 
-            int line_height = info.ascent - info.descent + info.linegap;
-            if (font_prop.line_gap.has_value())
-                line_height += *font_prop.line_gap;
-            line_height = static_cast<int>(line_height / SHAPE_SCALE);
-
-            cursor.x() = 0;
-            cursor.y() -= line_height;
-            continue;
-        } 
-        if (wc == '\t') {
-            // '\t' = 4*space => same as imgui
-            const int count_spaces = 4;
-            const Glyph* space = priv::get_glyph(int(' '), font, font_prop, cache, font_info_opt);
-            if (space == nullptr) continue;
-            cursor.x() += count_spaces * space->advance_width;
-            continue;
+        if (++counter == CANCEL_CHECK) {
+            counter = 0;
+            if (was_canceled())
+                return {};
         }
-        if (wc == '\r') continue;
-
-        int unicode = static_cast<int>(wc);
-        // check cancelation only before unknown symbol - loading of symbol could be timeconsuming on slow computer and dificult fonts
-        auto it = cache.find(unicode);
-        if (it == cache.end() && was_canceled != nullptr && was_canceled()) return {};
-        const Glyph *glyph_ptr = (it != cache.end())? &it->second :
-            priv::get_glyph(unicode, font, font_prop, cache, font_info_opt);
-        if (glyph_ptr == nullptr) continue;
-        
-        // move glyph to cursor position
-        ExPolygons expolygons = glyph_ptr->shape; // copy
-        for (ExPolygon &expolygon : expolygons) 
-            expolygon.translate(cursor);
-
-        cursor.x() += glyph_ptr->advance_width;
+        ExPolygons expolygons = letter2shapes(wc, cursor, font_with_cache, font_prop, font_info_cache);
+        if (expolygons.empty())
+            continue;
         expolygons_append(result, std::move(expolygons));
     }
     result = Slic3r::union_ex(result);
     heal_shape(result);
     return result;
+}
+
+std::vector<ExPolygons> Emboss::text2vshapes(FontFileWithCache &font_with_cache, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled){
+    assert(font_with_cache.has_value());
+    const FontFile &font = *font_with_cache.font_file;
+    unsigned int font_index = font_prop.collection_number.value_or(0);
+    if (!priv::is_valid(font, font_index))
+        return {};
+
+    unsigned counter = 0;
+    Point cursor(0, 0);
+
+    std::vector<ExPolygons> result;
+    fontinfo_opt font_info_cache;  
+    result.reserve(text.size());
+    for (wchar_t letter : text) {
+        if (++counter == CANCEL_CHECK) {
+            counter = 0;
+            if (was_canceled())
+                return {};
+        }
+        result.emplace_back(letter2shapes(letter, cursor, font_with_cache, font_prop, font_info_cache));
+    }
+    return result;
+}
+
+unsigned Emboss::get_count_lines(const std::wstring& ws)
+{
+    if (ws.empty())
+        return 0;
+    unsigned count = 1;
+    for (wchar_t wc : ws)
+        if (wc == '\n')
+            ++count;
+    return count;
+}
+
+unsigned Emboss::get_count_lines(const std::string &text)
+{
+    std::wstring ws = boost::nowide::widen(text.c_str());
+    return get_count_lines(ws);
 }
 
 void Emboss::apply_transformation(const FontProp &font_prop, Transform3d &transformation){

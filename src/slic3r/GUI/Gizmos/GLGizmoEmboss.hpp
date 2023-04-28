@@ -6,6 +6,7 @@
 #include "slic3r/GUI/IconManager.hpp"
 #include "slic3r/GUI/SurfaceDrag.hpp"
 #include "slic3r/GUI/I18N.hpp"
+#include "slic3r/GUI/TextLines.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/Utils/EmbossStyleManager.hpp"
 
@@ -310,6 +311,9 @@ private:
 
     // cancel for previous update of volume to cancel finalize part
     std::shared_ptr<std::atomic<bool>> m_job_cancel;
+
+    // Keep information about curvature of text line around surface
+    TextLinesModel m_text_lines;
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;

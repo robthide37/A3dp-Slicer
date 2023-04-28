@@ -428,6 +428,88 @@ ExPolygons priv::create_shape(DataBase &input, Fnc was_canceled) {
 template<typename Fnc>
 TriangleMesh priv::try_create_mesh(DataBase &input, Fnc was_canceled)
 {
+    if (!input.text_lines.empty()){
+        FontFileWithCache       &font = input.font_file;
+        const TextConfiguration &tc   = input.text_configuration;
+        assert(get_count_lines(tc.text) == input.text_lines.size());
+        size_t                   count_lines = input.text_lines.size();
+        std::wstring             ws   = boost::nowide::widen(tc.text.c_str());
+        const FontProp          &prop = tc.style.prop;
+
+        assert(font.has_value());
+        std::vector<ExPolygons> shapes = text2vshapes(font, ws, prop, was_canceled);
+        if (shapes.empty())
+            return {};
+                
+        BoundingBox extents; // whole text to find center
+        // separate lines of text to vector
+        std::vector<BoundingBoxes> bbs(count_lines);
+        size_t line_index = 0;
+        // s_i .. shape index
+        for (size_t s_i = 0; s_i < shapes.size(); ++s_i) {
+            const ExPolygons &shape = shapes[s_i];
+            BoundingBox bb;
+            if (!shape.empty()) {
+                bb = get_extents(shape);
+                extents.merge(bb);
+            }
+            BoundingBoxes &line_bbs = bbs[line_index];
+            line_bbs.push_back(bb);
+            if (ws[s_i] == '\n')
+                ++line_index;
+        }
+
+        Point center = extents.center();
+        size_t s_i_offset = 0; // shape index offset(for next lines)
+        for (line_index = 0; line_index < input.text_lines.size(); ++line_index) {
+            const BoundingBoxes &line_bbs = bbs[line_index];
+            // find BB in center of line
+            size_t first_right_index = 0;
+            for (const BoundingBox &bb : line_bbs)
+                if (bb.min.x() > center.x()) {
+                    break;
+                } else {
+                    ++first_right_index;
+                }
+
+            // calc transformation for letters on the Right side from center            
+            for (size_t index = first_right_index; index != line_bbs.size(); ++index) {
+                const BoundingBox &bb = line_bbs[index];
+                Point letter_center = bb.center();
+
+
+                const ExPolygons &letter_shape = shapes[s_i_offset + index];
+            }
+
+            // calc transformation for letters on the Left side from center            
+            for (size_t index = first_right_index; index < line_bbs.size(); --index) {
+
+            }
+
+            size_t s_i = s_i_offset; // shape index
+
+            s_i_offset += line_bbs.size();
+        }
+        
+        // create per letter transformation
+        const FontFile &ff = *input.font_file.font_file;
+        // NOTE: SHAPE_SCALE is applied in ProjectZ
+        double scale = get_shape_scale(prop, ff) / SHAPE_SCALE;
+        double depth = prop.emboss / scale;    
+        auto projectZ = std::make_unique<ProjectZ>(depth);
+        auto scale_tr = Eigen::Scaling(scale);
+
+        for (wchar_t wc: ws){
+            
+        }
+        
+        //ProjectTransform project(std::move(projectZ), )
+        //if (was_canceled()) return {};
+        //return TriangleMesh(polygons2model(shapes, project));
+        //indexed_triangle_set result;
+
+    }
+
     ExPolygons shapes = priv::create_shape(input, was_canceled);
     if (shapes.empty()) return {};
     if (was_canceled()) return {}; 

@@ -571,116 +571,24 @@ bool GLGizmoEmboss::on_init()
 
 std::string GLGizmoEmboss::on_get_name() const { return _u8L("Emboss"); }
 
-
-#include "libslic3r/TriangleMeshSlicer.hpp"
-#include "libslic3r/Tesselate.hpp"
-
-namespace {
-
-GLModel create_model(const Polygons &polygons, float width_half = 0.5f, ColorRGBA color = ColorRGBA::DARK_GRAY())
-{
-    assert(!polygons.empty());
-
-    // add a small positive offset to avoid z-fighting
-    float offset = static_cast<float>(scale_(0.015f));
-    Polygons polygons_expanded = expand(polygons, offset);
-
-    // inspired by 3DScene.cpp void GLVolume::SinkingContours::update()
-    GLModel::Geometry init_data;
-    init_data.format = {GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3};
-    init_data.color  = color;
-
-    size_t count = count_points(polygons);
-    init_data.reserve_vertices(2 * count);
-    init_data.reserve_indices(2 * count);
-
-    unsigned int vertices_counter = 0;
-    for (const Slic3r::Polygon &polygon : polygons_expanded) {
-        for (const Point &point : polygon.points) {
-            Vec2f point_d = unscale(point).cast<float>();
-            Vec3f vertex(point_d.x(), point_d.y(), width_half);
-            init_data.add_vertex(vertex);
-            vertex.z() *= -1;
-            init_data.add_vertex(vertex);
-        }
-
-        auto points_count = static_cast<unsigned int>(polygon.points.size());
-        unsigned int prev_i = points_count - 1;
-        for (unsigned int i = 0; i < points_count; i++) {
-            // t .. top
-            // b .. bottom
-            unsigned int t1 = vertices_counter + prev_i * 2;
-            unsigned int b1 = t1 + 1;
-            unsigned int t2 = vertices_counter + i * 2;
-            unsigned int b2 = t2 + 1;
-            init_data.add_triangle(t1, b1, t2);
-            init_data.add_triangle(b2, t2, b1);
-            prev_i = i;
-        }
-        vertices_counter += 2 * points_count;
-    }
-
-    assert(!init_data.is_empty());
-
-    GLModel gl_model;
-    gl_model.init_from(std::move(init_data));
-    return gl_model;
-}
-
-void slice_object(const Selection& selection) {
-    const GLVolume* gl_volume_ptr = selection.get_first_volume();
-    if (gl_volume_ptr == nullptr)
-        return;
-    const GLVolume& gl_volume = *gl_volume_ptr;
-    const ModelObjectPtrs& objects = selection.get_model()->objects;
-    const ModelObject *mo_ptr = get_model_object(gl_volume, objects);
-    if (mo_ptr == nullptr)
-        return;
-    const ModelObject &mo = *mo_ptr;
-    const Transform3d &mv_trafo = gl_volume.get_volume_transformation().get_matrix();
-
-    // contour transformation
-    auto rot = Eigen::AngleAxis(M_PI_2, Vec3d::UnitX());
-    Transform3d c_trafo = mv_trafo * rot;
-    Transform3d c_trafo_inv = c_trafo.inverse();
-
-    Polygons contours;
-    for (const ModelVolume* volume: mo.volumes){
-        MeshSlicingParams slicing_params;
-        slicing_params.trafo = c_trafo_inv * volume->get_matrix();
-        const Polygons polys = Slic3r::slice_mesh(volume->mesh().its, 0., slicing_params);
-        contours.insert(contours.end(), polys.begin(), polys.end());
-    }
-
-    const GLShaderProgram *shader = wxGetApp().get_shader("flat");
-    if (shader == nullptr)
-        return;
-    const Camera &camera = wxGetApp().plater()->get_camera();
-
-    const Transform3d &mi_trafo = gl_volume.get_instance_transformation().get_matrix();
-    shader->start_using();
-    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * mi_trafo * c_trafo); // * Geometry::translation_transform(m_shift));
-    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-    create_model(contours).render();
-    shader->stop_using();
-}
-
-} // namespace
-
-
 void GLGizmoEmboss::on_render() {
     // no volume selected
     if (m_volume == nullptr ||
         get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr)
         return;
-    Selection &selection = m_parent.get_selection();
+    const Selection &selection = m_parent.get_selection();
     if (selection.is_empty()) return;
-
-    slice_object(selection);
 
     // prevent get local coordinate system on multi volumes
     if (!selection.is_single_volume_or_modifier() && 
         !selection.is_single_volume_instance()) return;
+    
+    const GLVolume *gl_volume_ptr = m_parent.get_selection().get_first_volume();
+    if (gl_volume_ptr == nullptr) return;
+
+    if (m_text_lines.is_init())
+        m_text_lines.render(gl_volume_ptr->world_matrix());
+
     bool is_surface_dragging = m_surface_drag.has_value();
     bool is_parent_dragging = m_parent.is_mouse_dragging();
     // Do NOT render rotation grabbers when dragging object
@@ -1245,6 +1153,9 @@ void GLGizmoEmboss::set_volume_by_selection()
         m_job_cancel->store(true);
         m_job_cancel = nullptr;
     }
+
+    if (tc.style.prop.per_glyph)
+        m_text_lines.init(m_parent.get_selection());
 
     m_text   = tc.text;
     m_volume = volume;
@@ -3237,11 +3148,6 @@ void GLGizmoEmboss::draw_advanced()
         }
     }
 
-    if (exist_change) {
-        m_style_manager.clear_glyphs_cache();
-        process();
-    }
-
     if (ImGui::Button(_u8L("Set text to face camera").c_str())) {
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam         = wxGetApp().plater()->get_camera();
@@ -3250,6 +3156,30 @@ void GLGizmoEmboss::draw_advanced()
             process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
+    }
+
+    ImGui::SameLine();
+    bool *per_glyph = &font_prop.per_glyph;
+    if (ImGui::Checkbox("##PerGlyph", per_glyph)) {
+        if (*per_glyph) {
+            if (!m_text_lines.is_init())
+                m_text_lines.init(m_parent.get_selection());
+        }
+        exist_change = true;
+    } else if (ImGui::IsItemHovered()) {
+        if (*per_glyph) {
+            ImGui::SetTooltip("%s", _u8L("Set global orientation for whole text.").c_str());
+        } else {
+            ImGui::SetTooltip("%s", _u8L("Set position and orientation of projection per Glyph.").c_str());
+            if (!m_text_lines.is_init())
+                m_text_lines.init(m_parent.get_selection());
+        }
+    } else if (!*per_glyph && m_text_lines.is_init())
+        m_text_lines.reset();
+    
+    if (exist_change) {
+        m_style_manager.clear_glyphs_cache();
+        process();
     }
 #ifdef ALLOW_DEBUG_MODE
     ImGui::Text("family = %s", (font_prop.family.has_value() ?

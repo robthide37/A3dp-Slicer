@@ -7,6 +7,7 @@
 #include <libslic3r/Emboss.hpp>
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/GUI/Camera.hpp"
+#include "slic3r/GUI/TextLines.hpp"
 #include "Job.hpp"
 
 namespace Slic3r {
@@ -31,6 +32,10 @@ struct DataBase
     // flag that job is canceled
     // for time after process.
     std::shared_ptr<std::atomic<bool>> cancel;
+
+    // Define per letter projection on one text line
+    // [optional] It is not used when empty
+    TextLines text_lines;
 };
 
 /// <summary>

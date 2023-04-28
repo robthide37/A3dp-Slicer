@@ -316,7 +316,9 @@ nor why it should choose to collapse on Betelgeuse Seven\".";
 
     Emboss::FontFileWithCache ffwc(std::move(font));
     FontProp fp{line_height, depth};
-    ExPolygons shapes = Emboss::text2shapes(ffwc, text.c_str(), fp);
+
+    auto was_canceled = []() { return false; };
+    ExPolygons shapes = Emboss::text2shapes(ffwc, text.c_str(), fp, was_canceled);
     REQUIRE(!shapes.empty());
 
     Emboss::ProjectZ projection(depth);

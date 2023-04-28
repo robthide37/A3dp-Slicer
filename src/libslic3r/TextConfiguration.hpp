@@ -60,6 +60,9 @@ struct FontProp
     // Select index of font in collection
     std::optional<unsigned int> collection_number;
 
+    // Distiguish projection per glyph
+    bool per_glyph;
+
     //enum class Align {
     //    left,
     //    right,
@@ -96,8 +99,7 @@ struct FontProp
     /// </summary>
     /// <param name="line_height">Y size of text [in mm]</param>
     /// <param name="depth">Z size of text [in mm]</param>
-    FontProp(float line_height = 10.f, float depth = 2.f)
-        : emboss(depth), size_in_mm(line_height), use_surface(false)
+    FontProp(float line_height = 10.f, float depth = 2.f) : emboss(depth), size_in_mm(line_height), use_surface(false), per_glyph(false)
     {}
 
     bool operator==(const FontProp& other) const {
