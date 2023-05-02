@@ -103,7 +103,7 @@ bool MultiPoint::remove_duplicate_points()
     return false;
 }
 
-Points MultiPoint::_douglas_peucker(const Points &pts, const double tolerance)
+Points MultiPoint::douglas_peucker(const Points &pts, const double tolerance)
 {
     Points result_pts;
 	double tolerance_sq = tolerance * tolerance;

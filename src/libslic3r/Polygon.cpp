@@ -96,7 +96,7 @@ bool Polygon::make_clockwise()
 void Polygon::douglas_peucker(double tolerance)
 {
     this->points.push_back(this->points.front());
-    Points p = MultiPoint::_douglas_peucker(this->points, tolerance);
+    Points p = MultiPoint::douglas_peucker(this->points, tolerance);
     p.pop_back();
     this->points = std::move(p);
 }
@@ -110,7 +110,7 @@ Polygons Polygon::simplify(double tolerance) const
     // on the whole polygon
     Points points = this->points;
     points.push_back(points.front());
-    Polygon p(MultiPoint::_douglas_peucker(points, tolerance));
+    Polygon p(MultiPoint::douglas_peucker(points, tolerance));
     p.points.pop_back();
     
     Polygons pp;
@@ -577,23 +577,40 @@ void remove_collinear(Polygons &polys)
 		remove_collinear(poly);
 }
 
-Polygons polygons_simplify(const Polygons &source_polygons, double tolerance)
+static inline void simplify_polygon_impl(const Points &points, double tolerance, bool strictly_simple, Polygons &out)
+{
+    Points simplified = MultiPoint::douglas_peucker(points, tolerance);
+    // then remove the last (repeated) point.
+    simplified.pop_back();
+    // Simplify the decimated contour by ClipperLib.
+    bool ccw = ClipperLib::Area(simplified) > 0.;
+    for (Points& path : ClipperLib::SimplifyPolygons(ClipperUtils::SinglePathProvider(simplified), ClipperLib::pftNonZero, strictly_simple)) {
+        if (!ccw)
+            // ClipperLib likely reoriented negative area contours to become positive. Reverse holes back to CW.
+            std::reverse(path.begin(), path.end());
+        out.emplace_back(std::move(path));
+    }
+}
+
+Polygons polygons_simplify(Polygons &&source_polygons, double tolerance, bool strictly_simple /* = true */)
+{
+    Polygons out;
+    out.reserve(source_polygons.size());
+    for (Polygon &source_polygon : source_polygons) {
+        // Run Douglas / Peucker simplification algorithm on an open polyline (by repeating the first point at the end of the polyline),
+        source_polygon.points.emplace_back(source_polygon.points.front());
+        simplify_polygon_impl(source_polygon.points, tolerance, strictly_simple, out);
+    }
+    return out;
+}
+
+Polygons polygons_simplify(const Polygons &source_polygons, double tolerance, bool strictly_simple /* = true */)
 {
     Polygons out;
     out.reserve(source_polygons.size());
     for (const Polygon &source_polygon : source_polygons) {
         // Run Douglas / Peucker simplification algorithm on an open polyline (by repeating the first point at the end of the polyline),
-        Points simplified = MultiPoint::_douglas_peucker(to_polyline(source_polygon).points, tolerance);
-        // then remove the last (repeated) point.
-        simplified.pop_back();
-        // Simplify the decimated contour by ClipperLib.
-        bool ccw = ClipperLib::Area(simplified) > 0.;
-        for (Points &path : ClipperLib::SimplifyPolygons(ClipperUtils::SinglePathProvider(simplified), ClipperLib::pftNonZero)) {
-            if (! ccw)
-                // ClipperLib likely reoriented negative area contours to become positive. Reverse holes back to CW.
-                std::reverse(path.begin(), path.end());
-            out.emplace_back(std::move(path));
-        }
+        simplify_polygon_impl(to_polyline(source_polygon).points, tolerance, strictly_simple, out);
     }
     return out;
 }
