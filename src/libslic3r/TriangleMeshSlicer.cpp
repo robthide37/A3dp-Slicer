@@ -10,6 +10,7 @@
 #include <deque>
 #include <queue>
 #include <mutex>
+#include <new>
 #include <utility>
 
 #include <boost/log/trivial.hpp>
