@@ -275,10 +275,11 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     }
 
     for (ExPolygon &ex_poly : gaps_for_additional_filling) {
-        Point    bbox_size   = ex_poly.contour.bounding_box().size();
-        coord_t  loops_count = std::max(bbox_size.x(), bbox_size.y()) / scaled_spacing + 1;
-        Polygons polygons    = to_polygons(ex_poly);
-        Arachne::WallToolPaths wall_tool_paths(polygons, scaled_spacing, scaled_spacing, loops_count, 0, params.layer_height, *this->print_object_config, *this->print_config);
+        BoundingBox            ex_bb       = ex_poly.contour.bounding_box();
+        coord_t                loops_count = (std::max(ex_bb.size().x(), ex_bb.size().y()) + scaled_spacing - 1) / scaled_spacing;
+        Polygons               polygons    = to_polygons(ex_poly);
+        Arachne::WallToolPaths wall_tool_paths(polygons, scaled_spacing, scaled_spacing, loops_count, 0, params.layer_height,
+                                               *this->print_object_config, *this->print_config);
         if (std::vector<Arachne::VariableWidthLines> loops = wall_tool_paths.getToolPaths(); !loops.empty()) {
             std::vector<const Arachne::ExtrusionLine *> all_extrusions;
             for (Arachne::VariableWidthLines &loop : loops) {
@@ -288,46 +289,17 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                     all_extrusions.emplace_back(&wall);
             }
 
-            // Split paths using a nearest neighbor search.
-            size_t firts_poly_idx = thick_polylines.size();
-            Point  last_pos(0, 0);
             for (const Arachne::ExtrusionLine *extrusion : all_extrusions) {
-                if (extrusion->empty())
+                if (extrusion->junctions.size() < 2) {
                     continue;
-
-                ThickPolyline thick_polyline = Arachne::to_thick_polyline(*extrusion);
-                if (thick_polyline.length() == 0.)
-                    //FIXME this should not happen.
-                    continue;
-                assert(thick_polyline.size() > 1);
-                assert(thick_polyline.length() > 0.);
-                //assert(thick_polyline.points.size() == thick_polyline.width.size());
-                if (extrusion->is_closed)
-                    thick_polyline.start_at_index(nearest_point_index(thick_polyline.points, last_pos));
-
-                assert(thick_polyline.size() > 1);
-                //assert(thick_polyline.points.size() == thick_polyline.width.size());
-                thick_polylines.emplace_back(std::move(thick_polyline));
-                last_pos = thick_polylines.back().last_point();
-            }
-
-            // clip the paths to prevent the extruder from getting exactly on the first point of the loop
-            // Keep valid paths only.
-            size_t j = firts_poly_idx;
-            for (size_t i = firts_poly_idx; i < thick_polylines.size(); ++i) {
-                assert(thick_polylines[i].size() > 1);
-                assert(thick_polylines[i].length() > 0.);
-                //assert(thick_polylines[i].points.size() == thick_polylines[i].width.size());
-                thick_polylines[i].clip_end(this->loop_clipping);
-                assert(thick_polylines[i].size() > 1);
-                if (thick_polylines[i].is_valid()) {
-                    if (j < i)
-                        thick_polylines[j] = std::move(thick_polylines[i]);
-                    ++j;
                 }
+                ThickPolyline thick_polyline = Arachne::to_thick_polyline(*extrusion);
+                if (extrusion->is_closed) {
+                    thick_polyline.start_at_index(nearest_point_index(thick_polyline.points, ex_bb.min));
+                    thick_polyline.clip_end(scaled_spacing * 0.5);
+                }
+                thick_polylines.push_back(thick_polyline);
             }
-            if (j < thick_polylines.size())
-                thick_polylines.erase(thick_polylines.begin() + int(j), thick_polylines.end());
         }
     }
 
@@ -353,7 +325,7 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
     for (size_t ep_idx = 0; ep_idx < connection_endpoints.size(); ep_idx++) {
         EndPoint &ep1 = connection_endpoints[ep_idx];
         if (!ep1.used) {
-            std::vector<size_t> close_endpoints = find_nearby_points(endpoints_tree, ep1.position, scaled_spacing);
+            std::vector<size_t> close_endpoints = find_nearby_points(endpoints_tree, ep1.position, double(scaled_spacing));
             for (size_t close_endpoint_idx : close_endpoints) {
                 EndPoint &ep2 = connection_endpoints[close_endpoint_idx];
                 if (ep2.used || ep2.polyline_idx == ep1.polyline_idx) {
@@ -379,21 +351,27 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                     connection_endpoints[ep1.other_end_point_idx].is_first = true;
                 }
 
+                size_t new_start_idx = ep1.other_end_point_idx;
+
                 if (!ep2.is_first) {
                     tp2.reverse();
                     ep2.is_first                                           = true;
                     connection_endpoints[ep2.other_end_point_idx].is_first = false;
                 }
 
+                size_t new_end_idx = ep2.other_end_point_idx;
+
                 tp1.points.insert(tp1.points.end(), tp2.points.begin(), tp2.points.end());
                 tp1.width.push_back(tp1.width.back());
                 tp1.width.push_back(tp2.width.front());
                 tp1.width.insert(tp1.width.end(), tp2.width.begin(), tp2.width.end());
-                ep2.used                                                          = true;
-                ep1.used                                                           = true;
-                connection_endpoints[ep2.other_end_point_idx].polyline_idx        = ep1.polyline_idx;
-                connection_endpoints[ep2.other_end_point_idx].other_end_point_idx = ep_idx;
-                connection_endpoints[ep1.other_end_point_idx].other_end_point_idx  = close_endpoint_idx;
+                ep1.used = true;
+                ep2.used = true;
+
+                connection_endpoints[new_start_idx].polyline_idx        = ep1.polyline_idx;
+                connection_endpoints[new_end_idx].polyline_idx          = ep1.polyline_idx;
+                connection_endpoints[new_start_idx].other_end_point_idx = new_end_idx;
+                connection_endpoints[new_end_idx].other_end_point_idx   = new_start_idx;
                 tp2.clear();
                 break;
             }
@@ -408,16 +386,16 @@ ThickPolylines FillEnsuring::fill_surface_arachne(const Surface *surface, const 
                                              }),
                               thick_polylines.end());
 
-    std::stable_sort(thick_polylines.begin(), thick_polylines.end(), [](const ThickPolyline &left, const ThickPolyline &right) {
+    std::sort(thick_polylines.begin(), thick_polylines.end(), [](const ThickPolyline &left, const ThickPolyline &right) {
         BoundingBox lbb(left.points);
         BoundingBox rbb(right.points);
         if (lbb.min.x() == rbb.min.x())
-            return lbb.min.y() < rbb.min.y();
+            return lbb.max.y() < rbb.max.y();
         else
-            return lbb.min.x() < rbb.min.x();
+            return lbb.max.x() < rbb.max.x();
     });
 
-    Algorithm::sort_paths(thick_polylines.begin(), thick_polylines.end(), bb.min, scaled_spacing * 1.2, [](const ThickPolyline
+    Algorithm::sort_paths(thick_polylines.begin(), thick_polylines.end(), bb.min, double(scaled_spacing) * 1.2, [](const ThickPolyline
     &tp) {
         Lines ls;
         Point prev = tp.first_point();
