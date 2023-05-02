@@ -59,6 +59,8 @@ namespace Slic3r
 namespace FFFTreeSupport
 {
 
+static constexpr const bool polygons_strictly_simple = false;
+
 TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings& mesh_group_settings, const SlicingParameters &slicing_params)
     : angle(mesh_group_settings.support_tree_angle),
       angle_slow(mesh_group_settings.support_tree_angle_slow),
@@ -925,13 +927,13 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
         ret = diff(offset(ret, step_size, ClipperLib::jtRound, scaled<float>(0.01)), collision_trimmed());
         // ensure that if many offsets are done the performance does not suffer extremely by the new vertices of jtRound.
         if (i % 10 == 7)
-            ret = polygons_simplify(ret, scaled<double>(0.015));
+            ret = polygons_simplify(ret, scaled<double>(0.015), polygons_strictly_simple);
     }
     // offset the remainder
     float last_offset = distance - steps * step_size;
     if (last_offset > SCALED_EPSILON)
         ret = offset(ret, distance - steps * step_size, ClipperLib::jtRound, scaled<float>(0.01));
-    ret = polygons_simplify(ret, scaled<double>(0.015));
+    ret = polygons_simplify(ret, scaled<double>(0.015), polygons_strictly_simple);
 
     if (do_final_difference)
         ret = diff(ret, collision_trimmed());
@@ -1797,7 +1799,7 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
         }
         if (settings.no_error && settings.move)
             // as ClipperLib::jtRound has to be used for offsets this simplify is VERY important for performance.
-            polygons_simplify(increased, scaled<float>(0.025));
+            polygons_simplify(increased, scaled<float>(0.025), polygons_strictly_simple);
     } else 
         // if no movement is done the areas keep parent area as no move == offset(0)
         increased = parent.influence_area;
@@ -1821,6 +1823,7 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
                 BOOST_LOG_TRIVIAL(debug) << "Corrected taint leading to a wrong non gracious value on layer " << layer_idx - 1 << " targeting " << 
                     current_elem.target_height << " with radius " << radius;
             } else
+                // Cannot route to gracious areas. Push the tree away from object and route it down anyways.
                 to_model_data = safe_union(diff_clipped(increased, volumes.getCollision(radius, layer_idx - 1, settings.use_min_distance)));
         }
     }
@@ -1966,7 +1969,7 @@ static void increase_areas_one_layer(
 {
     using AvoidanceType = TreeModelVolumes::AvoidanceType;
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, merging_areas.size()),
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, merging_areas.size(), 1),
         [&](const tbb::blocked_range<size_t> &range) {
         for (size_t merging_area_idx = range.begin(); merging_area_idx < range.end(); ++ merging_area_idx) {
             SupportElementMerging   &merging_area   = merging_areas[merging_area_idx];
@@ -2209,9 +2212,10 @@ static void increase_areas_one_layer(
                 // A point can be set on the top most tip layer (maybe more if it should not move for a few layers).
                 parent.state.result_on_layer_reset();
             }
+
             throw_on_cancel();
         }
-    });
+    }, tbb::simple_partitioner());
 }
 
 [[nodiscard]] static SupportElementState merge_support_element_states(
@@ -3325,7 +3329,7 @@ static void finalize_interface_and_support_areas(
                 base_layer_polygons = smooth_outward(union_(base_layer_polygons), config.support_line_width); //FIXME was .smooth(50);
                 //smooth_outward(closing(std::move(bottom), closing_distance + minimum_island_radius, closing_distance, SUPPORT_SURFACES_OFFSET_PARAMETERS), smoothing_distance) :
                 // simplify a bit, to ensure the output does not contain outrageous amounts of vertices. Should not be necessary, just a precaution.
-                base_layer_polygons = polygons_simplify(base_layer_polygons, std::min(scaled<double>(0.03), double(config.resolution)));
+                base_layer_polygons = polygons_simplify(base_layer_polygons, std::min(scaled<double>(0.03), double(config.resolution)), polygons_strictly_simple);
             }
 
             if (! support_roof_polygons.empty() && ! base_layer_polygons.empty()) {
@@ -4270,7 +4274,7 @@ static std::vector<Polygons> draw_branches(
     const SlicingParameters &slicing_params = print_object.slicing_parameters();
     MeshSlicingParams mesh_slicing_params;
     mesh_slicing_params.mode = MeshSlicingParams::SlicingMode::Positive;
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, trees.size()),
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, trees.size(), 1),
         [&trees, &config, &slicing_params, &move_bounds, &mesh_slicing_params, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
             indexed_triangle_set    partial_mesh;
             std::vector<float>      slice_z;
@@ -4322,9 +4326,9 @@ static std::vector<Polygons> draw_branches(
                     tree.first_layer_id = new_begin;
                 }
             }
-        });
+        }, tbb::simple_partitioner());
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, trees.size()),
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, trees.size(), 1),
         [&trees, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
         for (size_t tree_id = range.begin(); tree_id < range.end(); ++ tree_id) {
             Tree &tree = trees[tree_id];
@@ -4335,7 +4339,7 @@ static std::vector<Polygons> draw_branches(
                 }
             throw_on_cancel();
         }
-    });
+    }, tbb::simple_partitioner());
 
     size_t num_layers = 0;
     for (Tree &tree : trees)
@@ -4356,14 +4360,14 @@ static std::vector<Polygons> draw_branches(
         }
 
     std::vector<Polygons> support_layer_storage(move_bounds.size());
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, std::min(move_bounds.size(), slices.size())),
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, std::min(move_bounds.size(), slices.size()), 1),
         [&slices, &support_layer_storage, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
         for (size_t slice_id = range.begin(); slice_id < range.end(); ++ slice_id) {
             Slice &slice = slices[slice_id];
             support_layer_storage[slice_id] = slice.num_branches > 1 ? union_(slice.polygons) : std::move(slice.polygons);
             throw_on_cancel();
         }
-    });
+    }, tbb::simple_partitioner());
 
     //FIXME simplify!
     return support_layer_storage;
