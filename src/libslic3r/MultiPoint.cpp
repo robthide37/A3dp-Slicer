@@ -124,12 +124,10 @@ Points MultiPoint::douglas_peucker(const Points &pts, const double tolerance)
                 size_t  furthest_idx = anchor_idx;
                 // find point furthest from line seg created by (anchor, floater) and note it
                 {
-                    const Point a = *anchor;
-                    const Point f = *floater;
+                    const Point   a = *anchor;
+                    const Point   f = *floater;
                     const Vec2i64 v = (f - a).cast<int64_t>();
-                    const int64_t l2 = v.squaredNorm();
-                    // Make up for rounding when converting from int64_t to double. Double mantissa is just 52 bits.
-                    if (l2 < (1 << 14)) {
+                    if (const int64_t l2 = v.squaredNorm(); l2 == 0) {
                         for (size_t i = anchor_idx + 1; i < floater_idx; ++ i)
                             if (int64_t dist_sq = (pts[i] - a).cast<int64_t>().squaredNorm(); dist_sq > max_dist_sq) {
                                 max_dist_sq  = dist_sq;
