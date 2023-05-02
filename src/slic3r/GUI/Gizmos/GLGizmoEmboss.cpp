@@ -1020,6 +1020,26 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
     return styles;
 }
 
+void GLGizmoEmboss::init_text_lines(){
+    assert(m_style_manager.is_active_font());
+    if (!m_style_manager.is_active_font())
+        return;
+    const auto& ffc = m_style_manager.get_font_file_with_cache();
+    assert(ffc.has_value());
+    if (!ffc.has_value())
+        return;
+    const auto &ff_ptr = ffc.font_file;
+    assert(ff_ptr != nullptr);
+    if (ff_ptr == nullptr)
+        return;
+
+    const FontProp& fp = m_style_manager.get_font_prop();
+    const FontFile &ff = *ff_ptr;
+
+    double line_height = TextLinesModel::calc_line_height(ff, fp); 
+    m_text_lines.init(m_parent.get_selection(), line_height);
+}
+
 void GLGizmoEmboss::set_volume_by_selection()
 {
     const Selection &selection = m_parent.get_selection();
@@ -1155,7 +1175,7 @@ void GLGizmoEmboss::set_volume_by_selection()
     }
 
     if (tc.style.prop.per_glyph)
-        m_text_lines.init(m_parent.get_selection());
+        init_text_lines();
 
     m_text   = tc.text;
     m_volume = volume;
@@ -3163,7 +3183,7 @@ void GLGizmoEmboss::draw_advanced()
     if (ImGui::Checkbox("##PerGlyph", per_glyph)) {
         if (*per_glyph) {
             if (!m_text_lines.is_init())
-                m_text_lines.init(m_parent.get_selection());
+                init_text_lines();
         }
         exist_change = true;
     } else if (ImGui::IsItemHovered()) {
@@ -3172,7 +3192,7 @@ void GLGizmoEmboss::draw_advanced()
         } else {
             ImGui::SetTooltip("%s", _u8L("Set position and orientation of projection per Glyph.").c_str());
             if (!m_text_lines.is_init())
-                m_text_lines.init(m_parent.get_selection());
+                init_text_lines();
         }
     } else if (!*per_glyph && m_text_lines.is_init())
         m_text_lines.reset();

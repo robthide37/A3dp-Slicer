@@ -154,6 +154,7 @@ namespace Emboss
     ExPolygons              text2shapes (FontFileWithCache &font, const char *text,         const FontProp &font_prop, const std::function<bool()> &was_canceled = []() {return false;});
     std::vector<ExPolygons> text2vshapes(FontFileWithCache &font, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled = []() {return false;});
 
+    /// Sum of character '\n'
     unsigned get_count_lines(const std::wstring &ws);
     unsigned get_count_lines(const std::string &text);
 
@@ -225,6 +226,14 @@ namespace Emboss
     /// <param name="ff">Font data</param>
     /// <returns>Conversion to mm</returns>
     double get_shape_scale(const FontProp &fp, const FontFile &ff);
+
+    /// <summary>
+    /// Read from font file and properties height of line with spacing
+    /// </summary>
+    /// <param name="font">Infos for collections</param>
+    /// <param name="prop">Collection index + Additional line gap</param>
+    /// <returns>Line height with spacing in ExPolygon size</returns>
+    int get_line_height(const FontFile &font, const FontProp &prop);
 
     /// <summary>
     /// Project spatial point

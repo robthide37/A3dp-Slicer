@@ -45,10 +45,54 @@ const Slic3r::Polygon *largest(const Slic3r::Polygons &polygons)
     return result;
 }
 
-GLModel create_model(const Slic3r::Polygon &polygon, float width_half = 0.5f, ColorRGBA color = ColorRGBA(0.f, 1.f, .2f, 0.5f))
+indexed_triangle_set create_its(const Slic3r::Polygon &polygon, float width_half) {
+    // Improve: Create torus instead of flat path (with model overlaps)
+    assert(!polygon.empty());
+    if (polygon.empty())
+        return {};
+
+    // add a small positive offset to avoid z-fighting
+    float                  offset               = static_cast<float>(scale_(0.015f));
+    Polygons               polygons_expanded    = expand(polygon, offset);
+    const Slic3r::Polygon *polygon_expanded_ptr = largest(polygons_expanded);
+    assert(polygon_expanded_ptr != nullptr);
+    if (polygon_expanded_ptr == nullptr || polygon_expanded_ptr->empty())
+        return {};
+    const Slic3r::Polygon &polygon_expanded = *polygon_expanded_ptr;
+
+    // inspired by 3DScene.cpp void GLVolume::SinkingContours::update()
+    indexed_triangle_set model;
+    size_t count = polygon_expanded.size();
+    model.vertices.reserve(2 * count);
+    model.indices.reserve(2 * count);
+
+    for (const Point &point : polygon_expanded.points) {
+        Vec2f point_d = unscale(point).cast<float>();
+        Vec3f vertex(point_d.x(), point_d.y(), width_half);
+        model.vertices.push_back(vertex);
+        vertex.z() *= -1;
+        model.vertices.push_back(vertex);
+    }
+
+    unsigned int prev_i = count - 1;
+    for (unsigned int i = 0; i < count; ++i) {
+        // t .. top
+        // b .. bottom
+        unsigned int t1 = prev_i * 2;
+        unsigned int b1 = t1 + 1;
+        unsigned int t2 = i * 2;
+        unsigned int b2 = t2 + 1;
+        model.indices.emplace_back(t1, b1, t2);
+        model.indices.emplace_back(b2, t2, b1);
+        prev_i = i;
+    }
+
+    return model;
+}
+
+/* GLModel create_model(const Slic3r::Polygon &polygon, float width_half = 0.5f, ColorRGBA color = ColorRGBA(0.f, 1.f, .2f, 0.5f))
 {
     // Improve: Create torus instead of flat path (with model overlaps)
-
     assert(!polygon.empty());
     if (polygon.empty())
         return {};
@@ -92,62 +136,86 @@ GLModel create_model(const Slic3r::Polygon &polygon, float width_half = 0.5f, Co
         prev_i = i;
     }
 
+    
+    // line .. y offset from volume(define line for sliced polygon) 
+
+
     GLModel gl_model;
     gl_model.init_from(std::move(init_data));
     return gl_model;
+}*/
+
+
+// select closest contour for each line
+TextLines select_closest_contour(const std::vector<Polygons> &line_contours) {
+    TextLines result;
+    result.reserve(line_contours.size());
+    Vec2d zero(0., 0.);
+    for (const Polygons &polygons : line_contours){
+        if (polygons.empty()) {
+            result.emplace_back();
+            continue;
+        }
+        // Improve: use int values and polygons only
+        // Slic3r::Polygons polygons = union_(polygons);
+        // std::vector<Slic3r::Line> lines = to_lines(polygons);
+        // AABBTreeIndirect::Tree<2, Point> tree;
+        // size_t line_idx;
+        // Point hit_point;
+        // Point::Scalar distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, point, line_idx, hit_point);
+
+        ExPolygons expolygons = union_ex(polygons);
+        std::vector<Linef> linesf = to_linesf(expolygons);
+        AABBTreeIndirect::Tree2d tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(linesf);
+
+        size_t line_idx;
+        Vec2d  hit_point;
+        double distance = AABBTreeLines::squared_distance_to_indexed_lines(linesf, tree, zero, line_idx, hit_point);
+
+        // conversion between index of point and expolygon
+        ExPolygonsIndices cvt(expolygons);
+        ExPolygonsIndex index = cvt.cvt(static_cast<uint32_t>(line_idx));
+
+        const Slic3r::Polygon& polygon = index.is_contour() ?
+            expolygons[index.expolygons_index].contour :
+            expolygons[index.expolygons_index].holes[index.hole_index()];
+
+        Point hit_point_int = hit_point.cast<Point::coord_type>();
+        TextLine tl{polygon, index.point_index, hit_point_int};
+        result.emplace_back(tl);
+    }
+    return result;
 }
 
-GLModel create_model(const Polygons &polygons, float width_half = 0.5f, ColorRGBA color = ColorRGBA(0.f, 1.f, .2f, 0.5f))
+GLModel create_model(const TextLines &lines, const std::vector<float> &line_centers)
 {
-    assert(!polygons.empty());
+    double model_half_width = 0.5; // [in volume mm]
+    ColorRGBA color(.7f, .7f, .7f, .7f); // Gray
 
-    // add a small positive offset to avoid z-fighting
-    float    offset            = static_cast<float>(scale_(0.015f));
-    Polygons polygons_expanded = expand(polygons, offset);
+    indexed_triangle_set its;
+    auto rot = Eigen::AngleAxis(M_PI_2, Vec3d::UnitX());
 
-    // inspired by 3DScene.cpp void GLVolume::SinkingContours::update()
-    GLModel::Geometry init_data;
-    init_data.format = {GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3};
-    init_data.color  = color;
-
-    size_t count = count_points(polygons);
-    init_data.reserve_vertices(2 * count);
-    init_data.reserve_indices(2 * count);
-
-    unsigned int vertices_counter = 0;
-    for (const Slic3r::Polygon &polygon : polygons_expanded) {
-        for (const Point &point : polygon.points) {
-            Vec2f point_d = unscale(point).cast<float>();
-            Vec3f vertex(point_d.x(), point_d.y(), width_half);
-            init_data.add_vertex(vertex);
-            vertex.z() *= -1;
-            init_data.add_vertex(vertex);
-        }
-
-        auto         points_count = static_cast<unsigned int>(polygon.points.size());
-        unsigned int prev_i       = points_count - 1;
-        for (unsigned int i = 0; i < points_count; i++) {
-            // t .. top
-            // b .. bottom
-            unsigned int t1 = vertices_counter + prev_i * 2;
-            unsigned int b1 = t1 + 1;
-            unsigned int t2 = vertices_counter + i * 2;
-            unsigned int b2 = t2 + 1;
-            init_data.add_triangle(t1, b1, t2);
-            init_data.add_triangle(b2, t2, b1);
-            prev_i = i;
-        }
-        vertices_counter += 2 * points_count;
+    assert(lines.size() == line_centers.size());
+    // create model from polygons
+    for (size_t i = 0; i < lines.size(); ++i) {
+        const Slic3r::Polygon &polygon = lines[i].polygon;
+        if (polygon.empty()) continue;
+        double line_center = line_centers[i];
+        indexed_triangle_set line_its = create_its(polygon, model_half_width);
+        auto transl = Eigen::Translation3d(0., -line_center, 0.);
+        Transform3d tr = transl * rot;
+        its_transform(line_its, tr);
+        its_merge(its, line_its);
     }
 
     GLModel gl_model;
-    gl_model.init_from(std::move(init_data));
+    gl_model.init_from(its);
+    gl_model.set_color(color);
     return gl_model;
 }
-
 } // namespace
 
-void TextLinesModel::init(const Selection &selection)
+void TextLinesModel::init(const Selection &selection, double line_height)
 {
     const GLVolume *gl_volume_ptr = selection.get_first_volume();
     if (gl_volume_ptr == nullptr)
@@ -172,13 +240,10 @@ void TextLinesModel::init(const Selection &selection)
     if (count_lines == 0)
         return;
     
-    // TODO: Calc correct line height by line gap + font file info
-    // Be carefull it is not correct !!!
-    double line_height = tc_opt->style.prop.size_in_mm;
-    double first_line_center = -(count_lines / 2) * line_height - ((count_lines % 2 == 0)? line_height/2. : 0.);
+    double first_line_center = -((count_lines / 2) * line_height) - ((count_lines % 2 == 0)? line_height/2. : 0.);
     std::vector<float> line_centers(count_lines);
     for (size_t i = 0; i < count_lines; ++i)
-        line_centers[i] = first_line_center + i * line_height;
+        line_centers[i] = static_cast<float>(first_line_center + i * line_height);
 
     const Transform3d &mv_trafo = gl_volume.get_volume_transformation().get_matrix();
 
@@ -209,48 +274,13 @@ void TextLinesModel::init(const Selection &selection)
         }
     }
 
-    lines.reserve(count_lines);
-    lines.clear();
-    // select closest contour
-    Vec2d zero(0., 0.);
-    for (const Polygons &polygons : line_contours) {
-        // Improve: use int values and polygons only
-        // Slic3r::Polygons polygons = union_(polygons);
-        // std::vector<Slic3r::Line> lines = to_lines(polygons);
-        // AABBTreeIndirect::Tree<2, Point> tree;
-        // size_t line_idx;
-        // Point hit_point;
-        // Point::Scalar distance = AABBTreeLines::squared_distance_to_indexed_lines(lines, tree, point, line_idx, hit_point);
-
-        ExPolygons expolygons = union_ex(polygons);
-        std::vector<Linef> linesf = to_linesf(expolygons);
-        AABBTreeIndirect::Tree2d tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(linesf);
-
-        size_t line_idx;
-        Vec2d  hit_point;
-        double distance = AABBTreeLines::squared_distance_to_indexed_lines(linesf, tree, zero, line_idx, hit_point);
-
-        // conversion between index of point and expolygon
-        ExPolygonsIndices cvt(expolygons);
-        ExPolygonsIndex index = cvt.cvt(static_cast<uint32_t>(line_idx));
-
-        const Polygon& polygon = index.is_contour() ? expolygons[index.expolygons_index].contour :
-                                    expolygons[index.expolygons_index].holes[index.hole_index()];
-
-        Point hit_point_int = hit_point.cast<Point::coord_type>();
-        TextLine tl{polygon, index.point_index, hit_point_int};
-        lines.emplace_back(tl);
-    }
-
-    ColorRGBA color(.7f, .7f, .7f, .7f); // Gray
-
-    // TODO: create model from all lines
-    model = create_model(lines.front().polygon, 0.7f, color);
+    m_lines = select_closest_contour(line_contours);    
+    m_model = create_model(m_lines, line_centers);
 }
 
 void TextLinesModel::render(const Transform3d &text_world)
 {
-    if (!model.is_initialized())
+    if (!m_model.is_initialized())
         return;
 
     GUI_App &app = wxGetApp();
@@ -259,10 +289,9 @@ void TextLinesModel::render(const Transform3d &text_world)
         return;
 
     const Camera &camera = app.plater()->get_camera();
-    auto          rot    = Eigen::AngleAxis(M_PI_2, Vec3d::UnitX());
 
     shader->start_using();
-    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * text_world * rot);
+    shader->set_uniform("view_model_matrix", camera.get_view_matrix() * text_world);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
     bool is_depth_test = glIsEnabled(GL_DEPTH_TEST);
@@ -274,7 +303,7 @@ void TextLinesModel::render(const Transform3d &text_world)
         glsafe(::glEnable(GL_BLEND));
     // glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-    model.render();
+    m_model.render();
 
     if (!is_depth_test)
         glsafe(::glDisable(GL_DEPTH_TEST));
@@ -282,4 +311,11 @@ void TextLinesModel::render(const Transform3d &text_world)
         glsafe(::glDisable(GL_BLEND));
 
     shader->stop_using();
+}
+
+double TextLinesModel::calc_line_height(const Slic3r::Emboss::FontFile &ff, const FontProp &fp)
+{
+    int line_height = Emboss::get_line_height(ff, fp); // In shape size
+    double scale = Emboss::get_shape_scale(fp, ff);
+    return line_height * scale;
 }

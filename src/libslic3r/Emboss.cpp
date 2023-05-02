@@ -1207,6 +1207,15 @@ std::optional<Glyph> Emboss::letter2glyph(const FontFile &font,
     return priv::get_glyph(*font_info_opt, letter, flatness);
 }
 
+int Emboss::get_line_height(const FontFile &font, const FontProp &prop) {
+    unsigned int font_index = prop.collection_number.value_or(0);
+    assert(priv::is_valid(font, font_index));
+    const FontFile::Info &info = font.infos[font_index];
+    int line_height = info.ascent - info.descent + info.linegap;
+    line_height += prop.line_gap.value_or(0);
+    return static_cast<int>(line_height / SHAPE_SCALE);
+}
+
 namespace {
 
 ExPolygons letter2shapes(
@@ -1220,16 +1229,9 @@ ExPolygons letter2shapes(
     const FontFile &font  = *font_with_cache.font_file;
 
     if (letter == '\n') {
-        unsigned int font_index = font_prop.collection_number.value_or(0);
-        assert(priv::is_valid(font, font_index));
-        const FontFile::Info &info        = font.infos[font_index];
-        int                   line_height = info.ascent - info.descent + info.linegap;
-        if (font_prop.line_gap.has_value())
-            line_height += *font_prop.line_gap;
-        line_height = static_cast<int>(line_height / SHAPE_SCALE);
-
         cursor.x() = 0;
-        cursor.y() -= line_height;
+        // 2d shape has opposit direction of y
+        cursor.y() -= get_line_height(font, font_prop);
         return {};
     }
     if (letter == '\t') {

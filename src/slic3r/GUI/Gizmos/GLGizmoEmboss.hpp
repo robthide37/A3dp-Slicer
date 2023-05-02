@@ -314,6 +314,7 @@ private:
 
     // Keep information about curvature of text line around surface
     TextLinesModel m_text_lines;
+    void init_text_lines();
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;
