@@ -4275,7 +4275,7 @@ static std::vector<Polygons> draw_branches(
     MeshSlicingParams mesh_slicing_params;
     mesh_slicing_params.mode = MeshSlicingParams::SlicingMode::Positive;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, trees.size(), 1),
-        [&trees, &config, &slicing_params, &move_bounds, &mesh_slicing_params, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
+        [&trees, &volumes, &config, &slicing_params, &move_bounds, &mesh_slicing_params, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
             indexed_triangle_set    partial_mesh;
             std::vector<float>      slice_z;
             for (size_t tree_id = range.begin(); tree_id < range.end(); ++ tree_id) {
@@ -4297,7 +4297,23 @@ static std::vector<Polygons> draw_branches(
                         slice_z.emplace_back(float(0.5 * (bottom_z + print_z)));
                     }
                     std::vector<Polygons> slices = slice_mesh(partial_mesh, slice_z, mesh_slicing_params, throw_on_cancel);
-                    size_t num_empty = std::find_if(slices.begin(), slices.end(), [](auto &s) { return !s.empty(); }) - slices.begin();
+                    size_t                num_empty = 0;
+
+                    if (layer_begin > 0 && branch.has_root && ! branch.path.front()->state.to_model_gracious && ! slices.front().empty()) {
+                        // Drop down areas that do rest non - gracefully on the model to ensure the branch actually rests on something.
+                        std::vector<Polygons>   bottom_extra_slices;
+                        Polygons                rest_support;
+                        for (LayerIndex layer_idx = layer_begin - 1; layer_idx >= 0; -- layer_idx) {
+                            rest_support = diff_clipped(rest_support.empty() ? slices.front() : rest_support, volumes.getCollision(0, layer_idx, false));
+                            if (area(rest_support) < tiny_area_threshold)
+                                break;
+                            bottom_extra_slices.emplace_back(rest_support);
+                        }
+                        layer_begin -= LayerIndex(bottom_extra_slices.size());
+                        slices.insert(slices.begin(), std::make_move_iterator(bottom_extra_slices.rbegin()), std::make_move_iterator(bottom_extra_slices.rend()));
+                    } else 
+                        num_empty = std::find_if(slices.begin(), slices.end(), [](auto &s) { return !s.empty(); }) - slices.begin();
+
                     layer_begin += LayerIndex(num_empty);
                     for (; slices.back().empty(); -- layer_end);
                     LayerIndex new_begin = tree.first_layer_id == -1 ? layer_begin : std::min(tree.first_layer_id, layer_begin);
