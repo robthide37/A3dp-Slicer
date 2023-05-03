@@ -199,11 +199,16 @@ ThickPolylines make_fill_polylines(
                 Points highs;
             };
 
-            //additional connection thickness
-            Point act{0, coord_t(connect_extrusions ? 0.5 * scaled_spacing : 0)};
+            std::vector<std::vector<Line>> polygon_sections_w_width = polygon_sections;
+            for (auto &slice : polygon_sections_w_width) {
+                for (Line &l : slice) {
+                    l.a -= Point{0.0, 0.5 * scaled_spacing};
+                    l.b += Point{0.0, 0.5 * scaled_spacing};
+                }
+            }
 
             std::vector<TracedPoly> current_traced_polys;
-            for (const auto &polygon_slice : polygon_sections) {
+            for (const auto &polygon_slice : polygon_sections_w_width) {
                 std::unordered_set<const Line *> used_segments;
                 for (TracedPoly &traced_poly : current_traced_polys) {
                     auto candidates_begin = std::upper_bound(polygon_slice.begin(), polygon_slice.end(), traced_poly.lows.back(),
@@ -216,20 +221,18 @@ ThickPolylines make_fill_polylines(
                         if (used_segments.find(&(*candidate)) != used_segments.end()) {
                             continue;
                         }
-                        if ((traced_poly.lows.back() - candidates_begin->a).cast<double>().squaredNorm() <
-                            squared_distance_limit_reconnection) {
-                            traced_poly.lows.back() -= act;
-                            traced_poly.lows.push_back(candidates_begin->a - act);
+                        if (connect_extrusions && (traced_poly.lows.back() - candidates_begin->a).cast<double>().squaredNorm() <
+                                                      squared_distance_limit_reconnection) {
+                            traced_poly.lows.push_back(candidates_begin->a);
                         } else {
                             traced_poly.lows.push_back(traced_poly.lows.back() + Point{scaled_spacing / 2, 0});
                             traced_poly.lows.push_back(candidates_begin->a - Point{scaled_spacing / 2, 0});
                             traced_poly.lows.push_back(candidates_begin->a);
                         }
 
-                        if ((traced_poly.highs.back() - candidates_begin->b).cast<double>().squaredNorm() <
-                            squared_distance_limit_reconnection) {
-                            traced_poly.highs.back() += act;
-                            traced_poly.highs.push_back(candidates_begin->b + act);
+                        if (connect_extrusions && (traced_poly.highs.back() - candidates_begin->b).cast<double>().squaredNorm() <
+                                                      squared_distance_limit_reconnection) {
+                            traced_poly.highs.push_back(candidates_begin->b);
                         } else {
                             traced_poly.highs.push_back(traced_poly.highs.back() + Point{scaled_spacing / 2, 0});
                             traced_poly.highs.push_back(candidates_begin->b - Point{scaled_spacing / 2, 0});
@@ -345,6 +348,13 @@ ThickPolylines make_fill_polylines(
             connection_endpoints.push_back({thick_polylines[pl_idx].last_point().cast<double>(), pl_idx, current_idx, false});
         }
 
+        std::vector<bool> linear_segment_flags(thick_polylines.size());
+        for (size_t i = 0;i < thick_polylines.size(); i++) {
+            const ThickPolyline& tp = thick_polylines[i];
+            linear_segment_flags[i] = tp.points.size() == 2 && tp.points.front().x() == tp.points.back().x() &&
+                                      tp.width.front() == scaled_spacing && tp.width.back() == scaled_spacing;
+        }
+
         auto coord_fn = [&connection_endpoints](size_t idx, size_t dim) { return connection_endpoints[idx].position[dim]; };
         KDTreeIndirect<2, double, decltype(coord_fn)> endpoints_tree{coord_fn, connection_endpoints.size()};
         for (size_t ep_idx = 0; ep_idx < connection_endpoints.size(); ep_idx++) {
@@ -353,20 +363,25 @@ ThickPolylines make_fill_polylines(
                 std::vector<size_t> close_endpoints = find_nearby_points(endpoints_tree, ep1.position, double(scaled_spacing));
                 for (size_t close_endpoint_idx : close_endpoints) {
                     EndPoint &ep2 = connection_endpoints[close_endpoint_idx];
-                    if (ep2.used || ep2.polyline_idx == ep1.polyline_idx) {
+                    if (ep2.used || ep2.polyline_idx == ep1.polyline_idx ||
+                        (linear_segment_flags[ep1.polyline_idx] && linear_segment_flags[ep2.polyline_idx])) {
                         continue;
                     }
 
                     EndPoint &target_ep = ep1.polyline_idx > ep2.polyline_idx ? ep1 : ep2;
                     EndPoint &source_ep = ep1.polyline_idx > ep2.polyline_idx ? ep2 : ep1;
 
-                    ThickPolyline &target_tp = thick_polylines[target_ep.polyline_idx];
-                    ThickPolyline &source_tp = thick_polylines[source_ep.polyline_idx];
+                    ThickPolyline &target_tp                     = thick_polylines[target_ep.polyline_idx];
+                    ThickPolyline &source_tp                     = thick_polylines[source_ep.polyline_idx];
+                    linear_segment_flags[target_ep.polyline_idx] = linear_segment_flags[ep1.polyline_idx] ||
+                                                                   linear_segment_flags[ep2.polyline_idx];
 
-                    Vec2d v1 = target_ep.is_first ? (target_tp.points[0] - target_tp.points[1]).cast<double>() :
-                                              (target_tp.points.back() - target_tp.points[target_tp.points.size() - 1]).cast<double>();
-                    Vec2d v2 = source_ep.is_first ? (source_tp.points[1] - source_tp.points[0]).cast<double>() :
-                                              (source_tp.points[source_tp.points.size() - 1] - source_tp.points.back()).cast<double>();
+                    Vec2d v1 = target_ep.is_first ?
+                                   (target_tp.points[0] - target_tp.points[1]).cast<double>() :
+                                   (target_tp.points.back() - target_tp.points[target_tp.points.size() - 1]).cast<double>();
+                    Vec2d v2 = source_ep.is_first ?
+                                   (source_tp.points[1] - source_tp.points[0]).cast<double>() :
+                                   (source_tp.points[source_tp.points.size() - 1] - source_tp.points.back()).cast<double>();
 
                     if (std::abs(Slic3r::angle(v1, v2)) > PI / 6.0) {
                         continue;
@@ -429,7 +444,8 @@ ThickPolylines make_fill_polylines(
         ThickPolylines connected_thick_polylines;
         if (!thick_polylines.empty()) {
             connected_thick_polylines.push_back(thick_polylines.front());
-            for (ThickPolyline &tp : thick_polylines) {
+            for (size_t tp_idx = 1; tp_idx < thick_polylines.size(); tp_idx++) {
+                ThickPolyline &tp   = thick_polylines[tp_idx];
                 ThickPolyline &tail = connected_thick_polylines.back();
                 Point          last = tail.last_point();
                 if ((last - tp.last_point()).cast<double>().squaredNorm() < (last - tp.first_point()).cast<double>().squaredNorm()) {
