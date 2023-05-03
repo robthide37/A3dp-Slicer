@@ -57,9 +57,9 @@ ThickPolylines make_fill_polylines(
 
     Polygons inner_area = stop_vibrations ? intersection(filled_area, opening(filled_area, 2 * scaled_spacing, 3 * scaled_spacing)) :
                                             filled_area;
-    if (connect_extrusions) {
-        inner_area = shrink(inner_area, scaled_spacing * 0.5);
-    }
+    
+    inner_area = shrink(inner_area, scaled_spacing * 0.5 - scaled<double>(fill->overlap));
+    
     AABBTreeLines::LinesDistancer<Line> area_walls{to_lines(inner_area)};
 
     const size_t      n_vlines = (bb.max.x() - bb.min.x() + scaled_spacing - 1) / scaled_spacing;
