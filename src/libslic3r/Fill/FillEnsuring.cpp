@@ -357,47 +357,50 @@ ThickPolylines make_fill_polylines(
                         continue;
                     }
 
-                    ThickPolyline &tp1 = thick_polylines[ep1.polyline_idx];
-                    ThickPolyline &tp2 = thick_polylines[ep2.polyline_idx];
+                    EndPoint &target_ep = ep1.polyline_idx > ep2.polyline_idx ? ep1 : ep2;
+                    EndPoint &source_ep = ep1.polyline_idx > ep2.polyline_idx ? ep2 : ep1;
 
-                    Vec2d v1 = ep1.is_first ? (tp1.points[0] - tp1.points[1]).cast<double>() :
-                                              (tp1.points.back() - tp1.points[tp1.points.size() - 1]).cast<double>();
-                    Vec2d v2 = ep2.is_first ? (tp2.points[1] - tp2.points[0]).cast<double>() :
-                                              (tp2.points[tp2.points.size() - 1] - tp2.points.back()).cast<double>();
+                    ThickPolyline &target_tp = thick_polylines[target_ep.polyline_idx];
+                    ThickPolyline &source_tp = thick_polylines[source_ep.polyline_idx];
+
+                    Vec2d v1 = target_ep.is_first ? (target_tp.points[0] - target_tp.points[1]).cast<double>() :
+                                              (target_tp.points.back() - target_tp.points[target_tp.points.size() - 1]).cast<double>();
+                    Vec2d v2 = source_ep.is_first ? (source_tp.points[1] - source_tp.points[0]).cast<double>() :
+                                              (source_tp.points[source_tp.points.size() - 1] - source_tp.points.back()).cast<double>();
 
                     if (std::abs(Slic3r::angle(v1, v2)) > PI / 6.0) {
                         continue;
                     }
 
-                    // connect ep and ep2;
-                    if (ep1.is_first) {
-                        tp1.reverse();
-                        ep1.is_first                                           = false;
-                        connection_endpoints[ep1.other_end_point_idx].is_first = true;
+                    // connect target_ep and source_ep, result is stored in target_tp, source_tp will be cleared
+                    if (target_ep.is_first) {
+                        target_tp.reverse();
+                        target_ep.is_first                                           = false;
+                        connection_endpoints[target_ep.other_end_point_idx].is_first = true;
                     }
 
-                    size_t new_start_idx = ep1.other_end_point_idx;
+                    size_t new_start_idx = target_ep.other_end_point_idx;
 
-                    if (!ep2.is_first) {
-                        tp2.reverse();
-                        ep2.is_first                                           = true;
-                        connection_endpoints[ep2.other_end_point_idx].is_first = false;
+                    if (!source_ep.is_first) {
+                        source_tp.reverse();
+                        source_ep.is_first                                           = true;
+                        connection_endpoints[source_ep.other_end_point_idx].is_first = false;
                     }
 
-                    size_t new_end_idx = ep2.other_end_point_idx;
+                    size_t new_end_idx = source_ep.other_end_point_idx;
 
-                    tp1.points.insert(tp1.points.end(), tp2.points.begin(), tp2.points.end());
-                    tp1.width.push_back(tp1.width.back());
-                    tp1.width.push_back(tp2.width.front());
-                    tp1.width.insert(tp1.width.end(), tp2.width.begin(), tp2.width.end());
-                    ep1.used = true;
-                    ep2.used = true;
+                    target_tp.points.insert(target_tp.points.end(), source_tp.points.begin(), source_tp.points.end());
+                    target_tp.width.push_back(target_tp.width.back());
+                    target_tp.width.push_back(source_tp.width.front());
+                    target_tp.width.insert(target_tp.width.end(), source_tp.width.begin(), source_tp.width.end());
+                    target_ep.used = true;
+                    source_ep.used = true;
 
-                    connection_endpoints[new_start_idx].polyline_idx        = ep1.polyline_idx;
-                    connection_endpoints[new_end_idx].polyline_idx          = ep1.polyline_idx;
+                    connection_endpoints[new_start_idx].polyline_idx        = target_ep.polyline_idx;
+                    connection_endpoints[new_end_idx].polyline_idx          = target_ep.polyline_idx;
                     connection_endpoints[new_start_idx].other_end_point_idx = new_end_idx;
                     connection_endpoints[new_end_idx].other_end_point_idx   = new_start_idx;
-                    tp2.clear();
+                    source_tp.clear();
                     break;
                 }
             }
