@@ -31,10 +31,10 @@ private:
 
     std::vector<ExtrusionPaths> _piles;
     int                         _id;
-    Point                       _offset;
+    Points                      _offsets;
 
 public:
-    LinesBucket(std::vector<ExtrusionPaths> &&paths, int id, Point offset) : _piles(paths), _id(id), _offset(offset) {}
+    LinesBucket(std::vector<ExtrusionPaths> &&paths, int id, Points offsets) : _piles(paths), _id(id), _offsets(offsets) {}
     LinesBucket(LinesBucket &&) = default;
 
     bool valid() const { return _curPileIdx < _piles.size(); }
@@ -50,10 +50,13 @@ public:
     {
         LineWithIDs lines;
         for (const ExtrusionPath &path : _piles[_curPileIdx]) {
-            Polyline check_polyline = path.polyline;
-            check_polyline.translate(_offset);
-            Lines tmpLines = check_polyline.lines();
-            for (const Line &line : tmpLines) { lines.emplace_back(line, _id, path.role()); }
+            Polyline check_polyline;
+            for (const Point& offset : _offsets) {
+                check_polyline = path.polyline;
+                check_polyline.translate(offset);
+                Lines tmpLines = check_polyline.lines();
+                for (const Line &line : tmpLines) { lines.emplace_back(line, _id, path.role()); }
+            }
         }
         return lines;
     }
@@ -77,7 +80,7 @@ private:
     std::map<const void *, int>                                                        _objsPtrToId;
 
 public:
-    void        emplace_back_bucket(std::vector<ExtrusionPaths> &&paths, const void *objPtr, Point offset);
+    void        emplace_back_bucket(std::vector<ExtrusionPaths> &&paths, const void *objPtr, Points offset);
     void        build_queue();
     bool        valid() const { return _pq.empty() == false; }
     const void *idToObjsPtr(int id)

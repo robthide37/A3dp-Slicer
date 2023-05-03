@@ -89,18 +89,18 @@ inline Grids line_rasterization(const Line &line, int64_t xdist = RasteXDistance
 }
 } // namespace RasterizationImpl
 
-void LinesBucketQueue::emplace_back_bucket(std::vector<ExtrusionPaths> &&paths, const void *objPtr, Point offset)
+void LinesBucketQueue::emplace_back_bucket(std::vector<ExtrusionPaths> &&paths, const void *objPtr, Points offsets)
 {
     if (_objsPtrToId.find(objPtr) == _objsPtrToId.end()) {
         _objsPtrToId.insert({objPtr, _objsPtrToId.size()});
         _idToObjsPtr.insert({_objsPtrToId.size() - 1, objPtr});
     }
-    _buckets.emplace_back(std::move(paths), _objsPtrToId[objPtr], offset);
+    _buckets.emplace_back(std::move(paths), _objsPtrToId[objPtr], offsets);
 }
 
 void LinesBucketQueue::build_queue()
 {
-    assert(_pq.empty);
+    assert(_pq.empty());
     for (LinesBucket &bucket : _buckets)
         _pq.push(&bucket);
 }
@@ -210,12 +210,17 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectP
     LinesBucketQueue conflictQueue;
     if (wtdptr.has_value()) { // wipe tower at 0 by default
         auto wtpaths = (*wtdptr)->getFakeExtrusionPathsFromWipeTower();
-        conflictQueue.emplace_back_bucket(std::move(wtpaths), *wtdptr, { (*wtdptr)->plate_origin.x(), (*wtdptr)->plate_origin.y() });
+        conflictQueue.emplace_back_bucket(std::move(wtpaths), *wtdptr, Points{Point((*wtdptr)->plate_origin)});
     }
     for (PrintObject *obj : objs) {
         auto layers = getAllLayersExtrusionPathsFromObject(obj);
-        conflictQueue.emplace_back_bucket(std::move(layers.first), obj, obj->instances().front().shift);
-        conflictQueue.emplace_back_bucket(std::move(layers.second), obj, obj->instances().front().shift);
+
+        Points instances_shifts;
+        for (const PrintInstance& inst : obj->instances())
+            instances_shifts.emplace_back(inst.shift);
+
+        conflictQueue.emplace_back_bucket(std::move(layers.first), obj, instances_shifts);
+        conflictQueue.emplace_back_bucket(std::move(layers.second), obj, instances_shifts);
     }
     conflictQueue.build_queue();
 
