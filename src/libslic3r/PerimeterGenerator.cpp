@@ -39,6 +39,7 @@
 #include <ostream>
 #include <stack>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -681,7 +682,7 @@ Polylines reconnect_polylines(const Polylines &polylines, double limit_distance)
     if (polylines.empty())
         return polylines;
 
-    ankerl::unordered_dense::map<size_t, Polyline> connected;
+    std::unordered_map<size_t, Polyline> connected;
     connected.reserve(polylines.size());
     for (size_t i = 0; i < polylines.size(); i++) {
         if (!polylines[i].empty()) {
@@ -731,7 +732,7 @@ ExtrusionPaths sort_extra_perimeters(ExtrusionPaths extra_perims, int index_of_f
 {
     if (extra_perims.empty()) return {};
 
-    std::vector<ankerl::unordered_dense::set<size_t>> dependencies(extra_perims.size());
+    std::vector<std::unordered_set<size_t>> dependencies(extra_perims.size());
     for (size_t path_idx = 0; path_idx < extra_perims.size(); path_idx++) {
         for (size_t prev_path_idx = 0; prev_path_idx < path_idx; prev_path_idx++) {
             if (paths_touch(extra_perims[path_idx], extra_perims[prev_path_idx], extrusion_spacing * 1.5f)) {

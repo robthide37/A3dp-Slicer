@@ -880,7 +880,6 @@ void Print::process()
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
     for (PrintObject *obj : m_objects)
         obj->make_perimeters();
-    this->set_status(70, _u8L("Infilling layers"));
     for (PrintObject *obj : m_objects)
         obj->infill();
     for (PrintObject *obj : m_objects)
