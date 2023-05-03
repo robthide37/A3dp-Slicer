@@ -2994,21 +2994,19 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
                 wxGetApp().notification_manager()->push_updated_item_info_notification(type); 
         }
         else if (shows && ! should_show) {
-            if (!selections)
+            if (!selections && IsSelected(item)) {
                 Unselect(item);
-            m_objects_model->Delete(item);
-            if (selections) {
-                if (selections->Index(item) != wxNOT_FOUND) {
-                    // If info item was deleted from the list, 
-                    // it's need to be deleted from selection array, if it was there
-                    selections->Remove(item);
-                    // Select item_obj, if info_item doesn't exist for item anymore, but was selected
-                    if (selections->Index(item_obj) == wxNOT_FOUND)
-                        selections->Add(item_obj);
-                }
-            }
-            else
                 Select(item_obj);
+            }
+            m_objects_model->Delete(item);
+            if (selections && selections->Index(item) != wxNOT_FOUND) {
+                // If info item was deleted from the list, 
+                // it's need to be deleted from selection array, if it was there
+                selections->Remove(item);
+                // Select item_obj, if info_item doesn't exist for item anymore, but was selected
+                if (selections->Index(item_obj) == wxNOT_FOUND)
+                    selections->Add(item_obj);
+            }
         }
     }
 }
