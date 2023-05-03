@@ -392,12 +392,11 @@ void MeshClipper::recalculate_triangles()
         }
 
         isl.expoly = std::move(exp);
-        isl.expoly_bb = get_extents(exp);
-        isl.hash = 0;
-        for (const Point& pt : isl.expoly.contour) {
-            isl.hash ^= pt.x();
-            isl.hash ^= pt.y();
-        }
+        isl.expoly_bb = get_extents(isl.expoly);
+
+        Point centroid_scaled = isl.expoly.contour.centroid();
+        Vec3d centroid_world = m_result->trafo * Vec3d(unscale(centroid_scaled).x(), unscale(centroid_scaled).y(), 0.);
+        isl.hash = isl.expoly.contour.size() + size_t(std::abs(100.*centroid_world.x())) + size_t(std::abs(100.*centroid_world.y())) + size_t(std::abs(100.*centroid_world.z()));
     }
 
     // Now sort the islands so they are in defined order. This is a hack needed by cut gizmo, which sometimes
