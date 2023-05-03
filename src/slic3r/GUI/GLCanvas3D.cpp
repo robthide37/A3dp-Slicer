@@ -1070,132 +1070,246 @@ void GLCanvas3D::load_arrange_settings()
     m_arrange_settings_fff_seq_print.alignment = arr_alignment ;
 }
 
-static int processed_object_idx(const Model& model, const SLAPrint& sla_print, const GLVolumePtrs& volumes)
+static std::vector<int> processed_objects_idxs(const Model& model, const SLAPrint& sla_print, const GLVolumePtrs& volumes)
 {
-    for (const GLVolume* v : volumes) {
-        if (v->volume_idx() == -(int)slaposDrillHoles) {
-            const int mo_idx = v->object_idx();
-            const ModelObject* model_object = (mo_idx < (int)model.objects.size()) ? model.objects[mo_idx] : nullptr;
-            if (model_object != nullptr && model_object->instances[v->instance_idx()]->is_printable()) {
-                const SLAPrintObject* print_object = sla_print.get_print_object_by_model_object_id(model_object->id());
-                if (print_object != nullptr && print_object->get_parts_to_slice().size() > 1)
-                    return mo_idx;
-            }
+    std::vector<int> ret;
+    GLVolumePtrs matching_volumes;
+    std::copy_if(volumes.begin(), volumes.end(), std::back_inserter(matching_volumes), [](GLVolume* v) {
+        return v->volume_idx() == -(int)slaposDrillHoles; });
+    for (const GLVolume* v : matching_volumes) {
+        const int mo_idx = v->object_idx();
+        const ModelObject* model_object = (mo_idx < (int)model.objects.size()) ? model.objects[mo_idx] : nullptr;
+        if (model_object != nullptr && model_object->instances[v->instance_idx()]->is_printable()) {
+            const SLAPrintObject* print_object = sla_print.get_print_object_by_model_object_id(model_object->id());
+            if (print_object != nullptr && print_object->get_parts_to_slice().size() > 1)
+                ret.push_back(mo_idx);
         }
     }
-
-    return -1;
+    std::sort(ret.begin(), ret.end());
+    ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
+    return ret;
 };
 
-GLCanvas3D::ESLAViewType GLCanvas3D::SLAView::detect_type(const GLVolumePtrs& volumes)
+static bool composite_id_match(const GLVolume::CompositeID& id1, const GLVolume::CompositeID& id2)
 {
-    m_type = ESLAViewType::Original;
-    if (m_allow_type_detection) {
-        for (const GLVolume* v : volumes) {
-            if (v->volume_idx() == -(int)slaposDrillHoles) {
-                m_type = ESLAViewType::Processed;
-                break;
-            }
+    return id1.object_id == id2.object_id && id1.instance_id == id2.instance_id;
+}
+
+void GLCanvas3D::SLAView::detect_type_from_volumes(const GLVolumePtrs& volumes)
+{
+    for (auto& [id, type] : m_instances_cache) {
+        type = ESLAViewType::Original;
+    }
+
+    for (const GLVolume* v : volumes) {
+        if (v->volume_idx() == -(int)slaposDrillHoles) {
+            const InstancesCacheItem* instance = find_instance_item(v->composite_id);
+            assert(instance != nullptr);
+            set_type(instance->first, ESLAViewType::Processed);
         }
     }
-
-    m_parent.set_sla_view_type(m_type);
-    m_allow_type_detection = false;
-    return m_type;
 }
 
-bool GLCanvas3D::SLAView::set_type(ESLAViewType type) {
-    if (m_type != type) {
-        m_type = type;
-        return true;
+void GLCanvas3D::SLAView::set_type(ESLAViewType new_type)
+{
+    for (auto& [id, type] : m_instances_cache) {
+        type = new_type;
+        if (new_type == ESLAViewType::Processed)
+            select_full_instance(id);
     }
-    return false;
 }
 
-void GLCanvas3D::SLAView::update_volumes(GLVolumePtrs& volumes)
+void GLCanvas3D::SLAView::set_type(const GLVolume::CompositeID& id, ESLAViewType new_type)
+{
+    InstancesCacheItem* instance = find_instance_item(id);
+    assert(instance != nullptr);
+    instance->second = new_type;
+    if (new_type == ESLAViewType::Processed)
+        select_full_instance(id);
+}
+
+void GLCanvas3D::SLAView::update_volumes_visibility(GLVolumePtrs& volumes)
 {
     const SLAPrint* sla_print = m_parent.sla_print();
-    const int mo_idx = (sla_print != nullptr) ? processed_object_idx(*m_parent.get_model(), *sla_print, volumes) : -1;
-    const bool show_processed = m_type == ESLAViewType::Processed && mo_idx != -1;
-
-    auto show = [show_processed](const GLVolume& v) {
-        return show_processed ? v.volume_idx() < 0 : v.volume_idx() != -(int)slaposDrillHoles;
-    };
+    const std::vector<int> mo_idxs = (sla_print != nullptr) ? processed_objects_idxs(*m_parent.get_model(), *sla_print, volumes) : std::vector<int>();
 
     std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = m_parent.get_raycasters_for_picking(SceneRaycaster::EType::Volume);
 
     for (GLVolume* v : volumes) {
-        v->is_active = v->object_idx() != mo_idx || show(*v);
+        const int obj_idx = v->object_idx();
+        bool active = std::find(mo_idxs.begin(), mo_idxs.end(), obj_idx) == mo_idxs.end();
+        if (!active) {
+            const InstancesCacheItem* instance = find_instance_item(v->composite_id);
+            assert(instance != nullptr);
+            active = (instance->second == ESLAViewType::Processed) ? v->volume_idx() < 0 : v->volume_idx() != -(int)slaposDrillHoles;
+        }
+        v->is_active = active;
         auto it = std::find_if(raycasters->begin(), raycasters->end(), [v](std::shared_ptr<SceneRaycasterItem> item) { return item->get_raycaster() == v->mesh_raycaster.get(); });
         if (it != raycasters->end())
             (*it)->set_active(v->is_active);
     }
 }
 
+void GLCanvas3D::SLAView::update_instances_cache(const std::vector<std::pair<GLVolume::CompositeID, GLVolume::CompositeID>>& new_to_old_ids_map)
+{
+    // First, extract current instances list from the volumes
+    const GLVolumePtrs& volumes = m_parent.get_volumes().volumes;
+    std::vector<InstancesCacheItem> new_instances_cache;
+    for (const GLVolume* v : volumes) {
+        new_instances_cache.emplace_back(v->composite_id, ESLAViewType::Original);
+    }
+
+    std::sort(new_instances_cache.begin(), new_instances_cache.end(),
+        [](const InstancesCacheItem& i1, const InstancesCacheItem& i2) {
+            return i1.first.object_id < i2.first.object_id || (i1.first.object_id == i2.first.object_id && i1.first.instance_id < i2.first.instance_id); });
+
+    new_instances_cache.erase(std::unique(new_instances_cache.begin(), new_instances_cache.end(),
+        [](const InstancesCacheItem& i1, const InstancesCacheItem& i2) {
+            return composite_id_match(i1.first, i2.first); }), new_instances_cache.end());
+
+    // Second, update instances type from previous state
+    for (auto& inst_type : new_instances_cache) {
+        const auto map_to_old_it = std::find_if(new_to_old_ids_map.begin(), new_to_old_ids_map.end(), [&inst_type](const std::pair<GLVolume::CompositeID, GLVolume::CompositeID>& item) {
+            return composite_id_match(inst_type.first, item.first); });
+
+        const GLVolume::CompositeID old_inst_id = (map_to_old_it != new_to_old_ids_map.end()) ? map_to_old_it->second : inst_type.first;
+        const InstancesCacheItem* old_instance = find_instance_item(old_inst_id);
+        if (old_instance != nullptr)
+            inst_type.second = old_instance->second;
+    }
+
+    m_instances_cache = new_instances_cache;
+}
+
 void GLCanvas3D::SLAView::render_switch_button()
 {
     const SLAPrint* sla_print = m_parent.sla_print();
-    const int mo_idx = (sla_print != nullptr) ? processed_object_idx(*m_parent.get_model(), *sla_print, m_parent.get_volumes().volumes) : -1;
-    if (mo_idx == -1)
+    if (sla_print == nullptr)
         return;
 
-    const BoundingBoxf ss_box = m_parent.get_selection().get_screen_space_bounding_box();
-    if (ss_box.defined) {
-        ImGuiWrapper& imgui = *wxGetApp().imgui();
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-        ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-        ImGui::SetNextWindowPos(ImVec2((float)ss_box.max.x(), (float)ss_box.center().y()), ImGuiCond_Always, ImVec2(0.0, 0.5));
-        imgui.begin(std::string("SLAViewSwitch"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
-        const float icon_size = 1.5 * ImGui::GetTextLineHeight();
-        if (imgui.draw_radio_button(_u8L("SLA view"), 1.5f * icon_size, true, [this, &imgui](ImGuiWindow& window, const ImVec2& pos, float size) {
+    const std::vector<int> mo_idxs = processed_objects_idxs(*m_parent.get_model(), *sla_print, m_parent.get_volumes().volumes);
+    if (mo_idxs.empty())
+        return;
+
+    Selection& selection = m_parent.get_selection();
+    const int obj_idx = selection.get_object_idx();
+    if (std::find(mo_idxs.begin(), mo_idxs.end(), obj_idx) == mo_idxs.end())
+        return;
+
+    const int inst_idx = selection.get_instance_idx();
+    if (inst_idx < 0)
+        return;
+
+    const GLVolume::CompositeID composite_id(obj_idx, 0, inst_idx);
+    const InstancesCacheItem* sel_instance = find_instance_item(composite_id);
+    if (sel_instance == nullptr)
+        return;
+
+    const ESLAViewType type = sel_instance->second;
+
+    BoundingBoxf ss_box;
+    if (m_use_instance_bbox) {
+        const Selection::EMode mode = selection.get_mode();
+        if (obj_idx >= 0 && inst_idx >= 0) {
+            const Selection::IndicesList selected_idxs = selection.get_volume_idxs();
+            std::vector<unsigned int> idxs_as_vector;
+            idxs_as_vector.assign(selected_idxs.begin(), selected_idxs.end());
+            selection.add_instance(obj_idx, inst_idx, true);
+            ss_box = selection.get_screen_space_bounding_box();
+            selection.add_volumes(mode, idxs_as_vector, true);
+        }
+    }
+        
+    if (!ss_box.defined)
+        ss_box = selection.get_screen_space_bounding_box();
+    assert(ss_box.defined);
+
+    ImGuiWrapper& imgui = *wxGetApp().imgui();
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::SetNextWindowPos(ImVec2((float)ss_box.max.x(), (float)ss_box.center().y()), ImGuiCond_Always, ImVec2(0.0, 0.5));
+    imgui.begin(std::string("SLAViewSwitch"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
+    const float icon_size = 1.5 * ImGui::GetTextLineHeight();
+    if (imgui.draw_radio_button(_u8L("SLA view"), 1.5f * icon_size, true,
+        [this, &imgui, sel_instance](ImGuiWindow& window, const ImVec2& pos, float size) {
             wchar_t icon_id;
-            switch (m_type)
+            switch (sel_instance->second)
             {
             case ESLAViewType::Original:  { icon_id = ImGui::SlaViewProcessed; break; }
             case ESLAViewType::Processed: { icon_id = ImGui::SlaViewOriginal; break; }
             default: { assert(false); break; }
             }
             imgui.draw_icon(window, pos, size, icon_id);
-
-            })) {
-            switch (m_type)
-            {
-            case ESLAViewType::Original:  { m_parent.set_sla_view_type(ESLAViewType::Processed); break; }
-            case ESLAViewType::Processed: { m_parent.set_sla_view_type(ESLAViewType::Original); break; }
-            default: { assert(false); break; }
-            }
+        })) {
+        switch (sel_instance->second)
+        {
+        case ESLAViewType::Original:  { m_parent.set_sla_view_type(sel_instance->first, ESLAViewType::Processed); break; }
+        case ESLAViewType::Processed: { m_parent.set_sla_view_type(sel_instance->first, ESLAViewType::Original); break; }
+        default: { assert(false); break; }
         }
-
-        if (ImGui::IsItemHovered()) {
-            ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGuiWrapper::COL_WINDOW_BACKGROUND);
-            ImGui::BeginTooltip();
-            wxString tooltip;
-            switch (m_type)
-            {
-            case ESLAViewType::Original:  { tooltip = _L("Show as processed"); break; }
-            case ESLAViewType::Processed: { tooltip = _L("Show as original"); break; }
-            default: { assert(false); break; }
-            }
-
-            imgui.text(tooltip);
-            ImGui::EndTooltip();
-            ImGui::PopStyleColor();
-        }
-        imgui.end();
-        ImGui::PopStyleColor(2);
     }
+
+    if (ImGui::IsItemHovered()) {
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGuiWrapper::COL_WINDOW_BACKGROUND);
+        ImGui::BeginTooltip();
+        wxString tooltip;
+        switch (type)
+        {
+        case ESLAViewType::Original:  { tooltip = _L("Show as processed"); break; }
+        case ESLAViewType::Processed: { tooltip = _L("Show as original"); break; }
+        default: { assert(false); break; }
+        }
+
+        imgui.text(tooltip);
+        ImGui::EndTooltip();
+        ImGui::PopStyleColor();
+    }
+    imgui.end();
+    ImGui::PopStyleColor(2);
 }
 
-//void GLCanvas3D::SLAView::render_debug_window()
-//{
-//    ImGuiWrapper& imgui = *wxGetApp().imgui();
-//    imgui.begin(std::string("SLAView"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
-//    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Type:");
-//    ImGui::SameLine();
-//    const std::string text = (m_type == ESLAViewType::Original) ? "Original" : "Processed";
-//    imgui.text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), text);
-//    imgui.end();
-//}
+#if ENABLE_SLA_VIEW_DEBUG_WINDOW
+void GLCanvas3D::SLAView::render_debug_window()
+{
+    ImGuiWrapper& imgui = *wxGetApp().imgui();
+    imgui.begin(std::string("SLAView"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+    for (const auto& [id, type] : m_instances_cache) {
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "(" + std::to_string(id.object_id) + ", " + std::to_string(id.instance_id) + ")");
+        ImGui::SameLine();
+        imgui.text_colored(ImGui::GetStyleColorVec4(ImGuiCol_Text), (type == ESLAViewType::Original) ? "Original" : "Processed");
+    }
+    if (!m_instances_cache.empty())
+        ImGui::Separator();
+
+    imgui.checkbox("Use instance bounding box", m_use_instance_bbox);
+    imgui.end();
+}
+#endif // ENABLE_SLA_VIEW_DEBUG_WINDOW
+
+GLCanvas3D::SLAView::InstancesCacheItem* GLCanvas3D::SLAView::find_instance_item(const GLVolume::CompositeID& id)
+{
+    auto it = std::find_if(m_instances_cache.begin(), m_instances_cache.end(),
+        [&id](const InstancesCacheItem& item) { return composite_id_match(item.first, id); });
+    return (it == m_instances_cache.end()) ? nullptr : &(*it);
+}
+
+void GLCanvas3D::SLAView::select_full_instance(const GLVolume::CompositeID& id)
+{
+    bool extended_selection = false;
+    Selection& selection = m_parent.get_selection();
+    const Selection::ObjectIdxsToInstanceIdxsMap& sel_cache = selection.get_content();
+    auto obj_it = sel_cache.find(id.object_id);
+    if (obj_it != sel_cache.end()) {
+        auto inst_it = std::find(obj_it->second.begin(), obj_it->second.end(), id.instance_id);
+        if (inst_it != obj_it->second.end()) {
+            selection.add_instance(id.object_id, id.instance_id);
+            extended_selection = true;
+        }
+    }
+
+    if (extended_selection)
+        m_parent.post_event(SimpleEvent(EVT_GLCANVAS_OBJECT_SELECT));
+}
 
 PrinterTechnology GLCanvas3D::current_printer_technology() const
 {
@@ -1775,7 +1889,9 @@ void GLCanvas3D::render()
         const GLGizmosManager::EType type = m_gizmos.get_current_type();
         if (type == GLGizmosManager::EType::Undefined)
             m_sla_view.render_switch_button();
-//        m_sla_view.render_debug_window();
+#if ENABLE_SLA_VIEW_DEBUG_WINDOW
+        m_sla_view.render_debug_window();
+#endif // ENABLE_SLA_VIEW_DEBUG_WINDOW
     }
 
     std::string tooltip;
@@ -2017,6 +2133,8 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         size_t                      volume_idx;
     };
 
+    std::vector<std::pair<GLVolume::CompositeID, GLVolume::CompositeID>> new_to_old_ids_map;
+
     // SLA steps to pull the preview meshes for.
     typedef std::array<SLAPrintObjectStep, 3> SLASteps;
     SLASteps sla_steps = { slaposDrillHoles, slaposSupportTree, slaposPad };
@@ -2164,12 +2282,12 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     for (unsigned int obj_idx = 0; obj_idx < (unsigned int)m_model->objects.size(); ++ obj_idx) {
         const ModelObject &model_object = *m_model->objects[obj_idx];
         for (int volume_idx = 0; volume_idx < (int)model_object.volumes.size(); ++ volume_idx) {
-			const ModelVolume &model_volume = *model_object.volumes[volume_idx];
+            const ModelVolume &model_volume = *model_object.volumes[volume_idx];
             for (int instance_idx = 0; instance_idx < (int)model_object.instances.size(); ++ instance_idx) {
-				const ModelInstance &model_instance = *model_object.instances[instance_idx];
-				ModelVolumeState key(model_volume.id(), model_instance.id());
-				auto it = std::lower_bound(model_volume_state.begin(), model_volume_state.end(), key, model_volume_state_lower);
-				assert(it != model_volume_state.end() && it->geometry_id == key.geometry_id);
+                const ModelInstance &model_instance = *model_object.instances[instance_idx];
+                ModelVolumeState key(model_volume.id(), model_instance.id());
+                auto it = std::lower_bound(model_volume_state.begin(), model_volume_state.end(), key, model_volume_state_lower);
+                assert(it != model_volume_state.end() && it->geometry_id == key.geometry_id);
                 if (it->new_geometry()) {
                     // New volume.
                     auto it_old_volume = std::lower_bound(deleted_volumes.begin(), deleted_volumes.end(), GLVolumeState(it->composite_id), deleted_volumes_lower);
@@ -2182,15 +2300,17 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                     m_volumes.load_object_volume(&model_object, obj_idx, volume_idx, instance_idx);
                     m_volumes.volumes.back()->geometry_id = key.geometry_id;
                     update_object_list = true;
-                } else {
-					// Recycling an old GLVolume.
-					GLVolume &existing_volume = *m_volumes.volumes[it->volume_idx];
+                }
+                else {
+                    // Recycling an old GLVolume.
+                    GLVolume &existing_volume = *m_volumes.volumes[it->volume_idx];
                     assert(existing_volume.geometry_id == key.geometry_id);
-					// Update the Object/Volume/Instance indices into the current Model.
-					if (existing_volume.composite_id != it->composite_id) {
-						existing_volume.composite_id = it->composite_id;
-						update_object_list = true;
-					}
+                    // Update the Object/Volume/Instance indices into the current Model.
+                    if (existing_volume.composite_id != it->composite_id) {
+                        new_to_old_ids_map.push_back(std::make_pair(it->composite_id, existing_volume.composite_id));
+                        existing_volume.composite_id = it->composite_id;
+                        update_object_list = true;
+                    }
                 }
             }
         }
@@ -2241,7 +2361,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                         }
                         else {
                             // Recycling an old GLVolume. Update the Object/Instance indices into the current Model.
-                            m_volumes.volumes[it->volume_idx]->composite_id = GLVolume::CompositeID(object_idx, m_volumes.volumes[it->volume_idx]->volume_idx(), instance_idx);
+                            const GLVolume::CompositeID new_id(object_idx, m_volumes.volumes[it->volume_idx]->volume_idx(), instance_idx);
+                            new_to_old_ids_map.push_back(std::make_pair(new_id, m_volumes.volumes[it->volume_idx]->composite_id));
+                            m_volumes.volumes[it->volume_idx]->composite_id = new_id;
                             m_volumes.volumes[it->volume_idx]->set_instance_transformation(model_object->instances[instance_idx]->get_transformation());
                         }
                     }
@@ -2252,9 +2374,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 if (!instances[istep].empty())
                     m_volumes.load_object_auxiliary(print_object, object_idx, instances[istep], sla_steps[istep], state.step[istep].timestamp);
             }
-
-            if (m_sla_view.detect_type(m_volumes.volumes) == ESLAViewType::Processed)
-                update_object_list = true;
         }
 
         // Shift-up all volumes of the object so that it has the right elevation with respect to the print bed
@@ -2312,15 +2431,30 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     else
         m_selection.volumes_changed(map_glvolume_old_to_new);
 
-    if (printer_technology == ptSLA)
-        m_sla_view.update_volumes(m_volumes.volumes);
+    if (printer_technology == ptSLA) {
+        std::sort(new_to_old_ids_map.begin(), new_to_old_ids_map.end(),
+            [](const std::pair<GLVolume::CompositeID, GLVolume::CompositeID>& i1, const std::pair<GLVolume::CompositeID, GLVolume::CompositeID>& i2) {
+                return i1.first.object_id < i2.first.object_id || (i1.first.object_id == i2.first.object_id && i1.first.instance_id < i2.first.instance_id); });
+
+        new_to_old_ids_map.erase(std::unique(new_to_old_ids_map.begin(), new_to_old_ids_map.end(),
+            [](const std::pair<GLVolume::CompositeID, GLVolume::CompositeID>& i1, const std::pair<GLVolume::CompositeID, GLVolume::CompositeID>& i2) {
+                return composite_id_match(i1.first, i2.first); }), new_to_old_ids_map.end());
+
+        m_sla_view.update_instances_cache(new_to_old_ids_map);
+        if (m_sla_view_type_detection_active) {
+            m_sla_view.detect_type_from_volumes(m_volumes.volumes);
+            m_sla_view_type_detection_active = false;
+        }
+        m_sla_view.update_volumes_visibility(m_volumes.volumes);
+        update_object_list = true;
+    }
 
     m_gizmos.update_data();
     m_gizmos.refresh_on_off_state();
 
     // Update the toolbar
-	if (update_object_list)
-		post_event(SimpleEvent(EVT_GLCANVAS_OBJECT_SELECT));
+    if (update_object_list)
+        post_event(SimpleEvent(EVT_GLCANVAS_OBJECT_SELECT));
 
     // checks for geometry outside the print volume to render it accordingly
     if (!m_volumes.empty()) {
@@ -4322,6 +4456,20 @@ std::pair<SlicingParameters, const std::vector<double>> GLCanvas3D::get_layers_h
     std::pair<SlicingParameters, const std::vector<double>> ret = m_layers_editing.get_layers_height_data();
     m_layers_editing.select_object(*m_model, -1);
     return ret;
+}
+
+void GLCanvas3D::set_sla_view_type(ESLAViewType type)
+{
+    m_sla_view.set_type(type);
+    m_sla_view.update_volumes_visibility(m_volumes.volumes);
+    m_dirty = true;
+}
+
+void GLCanvas3D::set_sla_view_type(const GLVolume::CompositeID& id, ESLAViewType type)
+{
+    m_sla_view.set_type(id, type);
+    m_sla_view.update_volumes_visibility(m_volumes.volumes);
+    m_dirty = true;
 }
 
 bool GLCanvas3D::_is_shown_on_screen() const

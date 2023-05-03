@@ -555,26 +555,32 @@ private:
     {
     public:
         explicit SLAView(GLCanvas3D& parent) : m_parent(parent) {}
-        void allow_type_detection(bool allow) { m_allow_type_detection = allow; }
-        ESLAViewType detect_type(const GLVolumePtrs& volumes);
-        ESLAViewType get_type() const { return m_type; }
-        bool set_type(ESLAViewType type);
-        void update_volumes(GLVolumePtrs& volumes);
+        void detect_type_from_volumes(const GLVolumePtrs& volumes);
+        void set_type(ESLAViewType type);
+        void set_type(const GLVolume::CompositeID& id, ESLAViewType type);
+        void update_volumes_visibility(GLVolumePtrs& volumes);
+        void update_instances_cache(const std::vector<std::pair<GLVolume::CompositeID, GLVolume::CompositeID>>& new_to_old_ids_map);
         void render_switch_button();
-//        void render_debug_window();
+
+#if ENABLE_SLA_VIEW_DEBUG_WINDOW
+        void render_debug_window();
+#endif // ENABLE_SLA_VIEW_DEBUG_WINDOW
 
     private:
         GLCanvas3D& m_parent;
-        ESLAViewType m_type{ ESLAViewType::Original };
-        bool m_allow_type_detection{ false };
+        typedef std::pair<GLVolume::CompositeID, ESLAViewType> InstancesCacheItem;
+        std::vector<InstancesCacheItem> m_instances_cache;
+        bool m_use_instance_bbox{ false };
+
+        InstancesCacheItem* find_instance_item(const GLVolume::CompositeID& id);
+        void select_full_instance(const GLVolume::CompositeID& id);
     };
 
     SLAView m_sla_view;
+    bool m_sla_view_type_detection_active{ false };
 
     ArrangeSettings m_arrange_settings_fff, m_arrange_settings_sla,
         m_arrange_settings_fff_seq_print;
-
-    PrinterTechnology current_printer_technology() const;
 
     bool is_arrange_alignment_enabled() const;
 
@@ -793,6 +799,8 @@ public:
     void zoom_to_gcode();
     void select_view(const std::string& direction);
 
+    PrinterTechnology current_printer_technology() const;
+
     void update_volumes_colors_by_extruder();
 
     bool is_dragging() const { return m_gizmos.is_dragging() || (m_moving && !m_mouse.scene_position.isApprox(m_mouse.drag.start_position_3D)); }
@@ -980,21 +988,9 @@ public:
 
     std::pair<SlicingParameters, const std::vector<double>> get_layers_height_data(int object_id);
 
-    void set_sla_view_type(ESLAViewType type) {
-        if (type == ESLAViewType::Processed) {
-            assert(!m_selection.is_empty());
-            const GLVolume* v = m_selection.get_first_volume();
-            m_selection.add_instance(v->object_idx(), v->instance_idx());
-            post_event(SimpleEvent(EVT_GLCANVAS_OBJECT_SELECT));
-        }
-
-        m_dirty = type != m_sla_view.get_type();
-
-        if (m_sla_view.set_type(type))
-            m_sla_view.update_volumes(m_volumes.volumes);
-    }
-
-    void allow_sla_view_type_detection(bool allow) { m_sla_view.allow_type_detection(allow); }
+    void set_sla_view_type(ESLAViewType type);
+    void set_sla_view_type(const GLVolume::CompositeID& id, ESLAViewType type);
+    void enable_sla_view_type_detection() { m_sla_view_type_detection_active = true; }
 
 private:
     bool _is_shown_on_screen() const;

@@ -3454,10 +3454,8 @@ unsigned int Plater::priv::update_restart_background_process(bool force_update_s
 {
     // bitmask of UpdateBackgroundProcessReturnState
     unsigned int state = this->update_background_process(false);
-    if (force_update_scene || (state & UPDATE_BACKGROUND_PROCESS_REFRESH_SCENE) != 0) {
-        view3D->get_canvas3d()->allow_sla_view_type_detection(true);
+    if (force_update_scene || (state & UPDATE_BACKGROUND_PROCESS_REFRESH_SCENE) != 0)
         view3D->reload_scene(false);
-    }
 
     if (force_update_preview)
         this->preview->reload_print();
@@ -4082,8 +4080,10 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
             // If RELOAD_SLA_SUPPORT_POINTS, then the SLA gizmo is updated (reload_scene calls update_gizmos_data)
             if (view3D->is_dragging())
                 delayed_scene_refresh = true;
-            else
+            else {
+                view3D->get_canvas3d()->enable_sla_view_type_detection();
                 this->update_sla_scene();
+            }
             break;
         default: break;
         }
@@ -6946,11 +6946,13 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
         
         p->config->set_key_value(opt_key, config.option(opt_key)->clone());
         if (opt_key == "printer_technology") {
-            this->set_printer_technology(config.opt_enum<PrinterTechnology>(opt_key));
+            const PrinterTechnology printer_technology = config.opt_enum<PrinterTechnology>(opt_key);
+            this->set_printer_technology(printer_technology);
             p->sidebar->show_sliced_info_sizer(false);
             p->reset_gcode_toolpaths();
             p->view3D->get_canvas3d()->reset_sequential_print_clearance();
-            p->view3D->get_canvas3d()->set_sla_view_type(GLCanvas3D::ESLAViewType::Original);
+            if (printer_technology == ptSLA)
+                p->view3D->get_canvas3d()->set_sla_view_type(GLCanvas3D::ESLAViewType::Original);
         }
         else if (opt_key == "bed_shape" || opt_key == "bed_custom_texture" || opt_key == "bed_custom_model") {
             bed_shape_changed = true;
