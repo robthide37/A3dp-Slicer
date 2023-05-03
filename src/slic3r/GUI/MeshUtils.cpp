@@ -203,7 +203,7 @@ std::vector<Vec3d> MeshClipper::point_per_contour() const
             }
             if (done)
                 break;
-            i += isl.expoly.contour.size() / 5;
+            i += std::max(size_t(2), isl.expoly.contour.size() / 5);
         }
         // If the above failed, just return the centroid, regardless of whether
         // it is inside the contour or in a hole (we must return something).

@@ -356,6 +356,7 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
             if (! m_part_selection.valid())
                 process_contours();
             m_part_selection.toggle_selection(mouse_pos);
+            check_and_update_connectors_state(); // after a contour is deactivated, its connectors are inside the object
             return true;
         }
 
@@ -2283,9 +2284,18 @@ bool GLGizmoCut3D::is_outside_of_cut_contour(size_t idx, const CutConnectors& co
     its_transform(mesh, translation_transform(cur_pos) * m_rotation_m);
 
     for (const Vec3f& vertex : vertices) {
-        if (m_c->object_clipper() && m_c->object_clipper()->is_projection_inside_cut(vertex.cast<double>()) == -1) {
-            m_info_stats.outside_cut_contour++;
-            return true;
+        if (m_c->object_clipper()) {
+            int contour_idx = m_c->object_clipper()->is_projection_inside_cut(vertex.cast<double>());
+            bool is_invalid = (contour_idx == -1);
+            if (m_part_selection.valid() && ! is_invalid) {
+                assert(contour_idx >= 0);
+                const std::vector<size_t>& ignored = *(m_part_selection.get_ignored_contours_ptr());
+                is_invalid = (std::find(ignored.begin(), ignored.end(), size_t(contour_idx)) != ignored.end());
+            }
+            if (is_invalid) {
+                m_info_stats.outside_cut_contour++;
+                return true;
+            }
         }
     }
 
@@ -2326,6 +2336,7 @@ bool GLGizmoCut3D::is_conflict_for_connector(size_t idx, const CutConnectors& co
 
 void GLGizmoCut3D::check_and_update_connectors_state()
 {
+    m_info_stats.invalidate();
     m_invalid_connectors_idxs.clear();
     const ModelObject* mo = m_c->selection_info()->model_object();
     auto inst_id = m_c->selection_info()->get_active_instance();
@@ -2368,8 +2379,6 @@ void GLGizmoCut3D::render_connectors()
     const ModelInstance* mi = mo->instances[inst_id];
     const Vec3d& instance_offset = mi->get_offset();
     const double sla_shift       = double(m_c->selection_info()->get_sla_shift());
-
-    m_info_stats.invalidate();
 
     const bool looking_forward = is_looking_forward();
 
