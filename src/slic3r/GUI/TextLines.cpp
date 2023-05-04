@@ -223,7 +223,7 @@ indexed_triangle_set create_its(const TextLines &lines)
         if (polygon.empty()) continue;
         indexed_triangle_set line_its = its_create_belt(polygon, model_half_width); 
         //indexed_triangle_set line_its = its_create_torus(polygon, model_half_width);
-        auto transl = Eigen::Translation3d(0., -line.y, 0.);
+        auto transl = Eigen::Translation3d(0., line.y, 0.);
         Transform3d tr = transl * get_rotation();
         its_transform(line_its, tr);
         its_merge(its, line_its);
@@ -251,7 +251,7 @@ GLModel::Geometry create_geometry(const TextLines &lines)
 }
 } // namespace
 
-void TextLinesModel::init(const Selection &selection, double line_height, double line_offset)
+void TextLinesModel::init(const Selection &selection, double line_height)
 {
     const GLVolume *gl_volume_ptr = selection.get_first_volume();
     if (gl_volume_ptr == nullptr)
@@ -276,7 +276,7 @@ void TextLinesModel::init(const Selection &selection, double line_height, double
     if (count_lines == 0)
         return;
     
-    double first_line_center = line_offset + (count_lines / 2) * line_height - ((count_lines % 2 == 0) ? line_height / 2. : 0.);
+    double first_line_center = offset + (count_lines / 2) * line_height - ((count_lines % 2 == 0) ? line_height / 2. : 0.);
     std::vector<float> line_centers(count_lines);
     for (size_t i = 0; i < count_lines; ++i)
         line_centers[i] = static_cast<float>(first_line_center - i * line_height);

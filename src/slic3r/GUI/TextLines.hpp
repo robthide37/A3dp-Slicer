@@ -12,13 +12,15 @@ class Selection;
 class TextLinesModel
 {
 public:
+    // line offset in y direction (up/down)
+    float offset = 0;
     /// <summary>
     /// Initialize model and lines
     /// </summary>
     /// <param name="selection">Must be selected text volume</param>
     /// <param name="line_height">Height of text line with spacing [in mm]</param>
     /// <param name="line_offset">Offset of base line from center [in mm]</param>
-    void init(const Selection &selection, double line_height, double line_offset = 0.);
+    void init(const Selection &selection, double line_height);
     void render(const Transform3d &text_world);
 
     bool is_init() const { return m_model.is_initialized(); }

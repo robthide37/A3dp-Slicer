@@ -1059,6 +1059,9 @@ void GLGizmoEmboss::init_text_lines(){
     if (ff_ptr == nullptr)
         return;
 
+    if (m_volume->is_the_only_one_part())
+        return;
+
     const FontProp& fp = m_style_manager.get_font_prop();
     const FontFile &ff = *ff_ptr;
 
@@ -3226,6 +3229,32 @@ void GLGizmoEmboss::draw_advanced()
         }
     } else if (!*per_glyph && m_text_lines.is_init())
         m_text_lines.reset();
+
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(100);
+    if (ImGui::SliderFloat("##base_line_y_offset", &m_text_lines.offset, -10.f, 10.f, "%f mm")) {
+        init_text_lines();
+    } else if (ImGui::IsItemHovered()) 
+        ImGui::SetTooltip("%s", _u8L("Move base line (up/down) for allign letters").c_str());
+
+    // order must match align enum
+    const char* align_names[] = {
+        "start_first_line",
+        "center_left",
+        "center_right",
+        "center_center",
+        "top_left",
+        "top_right",
+        "top_center",
+        "bottom_left",
+        "bottom_right",
+        "bottom_center"
+    };
+    int selected_align = static_cast<int>(font_prop.align);
+    if (ImGui::Combo("align", &selected_align, align_names, IM_ARRAYSIZE(align_names))) {
+        font_prop.align = static_cast<FontProp::Align>(selected_align);
+    }
+
     
     if (exist_change) {
         m_style_manager.clear_glyphs_cache();

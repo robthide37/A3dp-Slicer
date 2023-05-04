@@ -427,7 +427,12 @@ ExPolygons priv::create_shape(DataBase &input, Fnc was_canceled) {
     if (!font.has_value())
         return {};
 
-    return text2shapes(font, text, prop, was_canceled);
+    ExPolygons shapes = text2shapes(font, text, prop, was_canceled);
+    if (shapes.empty())
+        return {};
+
+    align_shape(input.text_configuration.style.prop.align, shapes);
+    return shapes;
 }
 
 #define STORE_SAMPLING
@@ -563,15 +568,16 @@ TriangleMesh priv::try_create_mesh(DataBase &input, Fnc was_canceled)
 
     ExPolygons shapes = priv::create_shape(input, was_canceled);
     if (shapes.empty()) return {};
-    if (was_canceled()) return {}; 
-    
+    if (was_canceled()) return {};
+
     const FontProp &prop = input.text_configuration.style.prop;
     const FontFile &ff = *input.font_file.font_file;
     // NOTE: SHAPE_SCALE is applied in ProjectZ
     double scale = get_shape_scale(prop, ff) / SHAPE_SCALE;
     double depth = prop.emboss / scale;    
-    auto  projectZ = std::make_unique<ProjectZ>(depth);
-    ProjectScale project(std::move(projectZ), scale);
+    auto projectZ = std::make_unique<ProjectZ>(depth);
+    //auto scaled = std::make_unique<ProjectScale>(std::move(projectZ), scale);
+    ProjectTransform project(std::move(projectZ), Eigen::Translation<double, 3>(0., 0., -prop.emboss / 2) * Eigen::Scaling(scale));
     if (was_canceled()) return {};
     return TriangleMesh(polygons2model(shapes, project));
 }
@@ -867,12 +873,7 @@ TriangleMesh priv::cut_surface(DataBase& input1, const SurfaceVolumeData& input2
 
     if (was_canceled()) return {};
 
-    // Define alignment of text - left, right, center, top bottom, ....
-    BoundingBox bb                = get_extents(shapes);
-    Point       projection_center = bb.center();
-    for (ExPolygon &shape : shapes) shape.translate(-projection_center);
-    bb.translate(-projection_center);
-
+    BoundingBox bb = get_extents(shapes);
     const FontFile &ff = *input1.font_file.font_file;
     const FontProp &fp = input1.text_configuration.style.prop;
     double shape_scale = get_shape_scale(fp, ff);

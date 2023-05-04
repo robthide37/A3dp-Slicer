@@ -1918,6 +1918,73 @@ PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &b
     return samples;
 }
 
+namespace {
+Point get_align_offset(FontProp::Align type, const BoundingBox &bb)
+{
+    Point offset;
+    switch (type) {
+    // case Slic3r::FontProp::Align::start_first_line: break;
+    case Slic3r::FontProp::Align::center_left:
+    case Slic3r::FontProp::Align::center_right:
+    case Slic3r::FontProp::Align::center_center: offset.y() = bb.center().y(); break;
+    case Slic3r::FontProp::Align::top_left:
+    case Slic3r::FontProp::Align::top_right:
+    case Slic3r::FontProp::Align::top_center: offset.y() = bb.min.y(); break;
+    case Slic3r::FontProp::Align::bottom_left:
+    case Slic3r::FontProp::Align::bottom_right:
+    case Slic3r::FontProp::Align::bottom_center: offset.y() = bb.max.y(); break;
+    default: break;
+    }
+
+    switch (type) {
+    // case Slic3r::FontProp::Align::start_first_line: break;
+    case Slic3r::FontProp::Align::center_center:
+    case Slic3r::FontProp::Align::top_center:
+    case Slic3r::FontProp::Align::bottom_center: offset.x() = bb.center().x(); break;
+    case Slic3r::FontProp::Align::center_left:
+    case Slic3r::FontProp::Align::top_left:
+    case Slic3r::FontProp::Align::bottom_left: offset.x() = bb.min.x(); break;
+    case Slic3r::FontProp::Align::center_right:
+    case Slic3r::FontProp::Align::top_right:
+    case Slic3r::FontProp::Align::bottom_right: offset.x() = bb.max.x(); break;
+    default: break;
+    }
+    return -offset;
+}
+} // namespace
+
+void Emboss::align_shape(FontProp::Align type, ExPolygons &shape, BoundingBox *bb)
+{
+    if (type == FontProp::Align::start_first_line)
+        return; // no alignement
+
+    BoundingBox shape_bb_data;
+    BoundingBox &shape_bb = (bb != nullptr) ? *bb : shape_bb_data;
+    if (!shape_bb.defined)
+        shape_bb = get_extents(shape);
+
+    Point offset = get_align_offset(type, shape_bb);
+    for (ExPolygon &s : shape)
+        s.translate(offset);
+}
+
+void Emboss::align_shape(FontProp::Align type, std::vector<ExPolygons> &shapes, BoundingBox *bb)
+{
+    if (type == FontProp::Align::start_first_line)
+        return; // no alignement
+
+    BoundingBox  shape_bb_data;
+    BoundingBox &shape_bb = (bb != nullptr) ? *bb : shape_bb_data;
+    if (!shape_bb.defined)
+        for (const ExPolygons& shape: shapes)
+            shape_bb.merge(get_extents(shape));
+
+    Point offset = get_align_offset(type, shape_bb);
+    for (ExPolygons &shape : shapes)
+        for (ExPolygon &s : shape)
+            s.translate(offset);
+}
+
 #ifdef REMOVE_SPIKES
 #include <Geometry.hpp>
 void priv::remove_spikes(Polygon &polygon, const SpikeDesc &spike_desc)

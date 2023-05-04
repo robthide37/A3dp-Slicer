@@ -63,20 +63,21 @@ struct FontProp
     // Distiguish projection per glyph
     bool per_glyph;
 
-    //enum class Align {
-    //    left,
-    //    right,
-    //    center,
-    //    top_left,
-    //    top_right,
-    //    top_center,
-    //    bottom_left,
-    //    bottom_right,
-    //    bottom_center
-    //};
-    //// change pivot of text
-    //// When not set, center is used and is not stored
-    //std::optional<Align> align;
+    enum class Align {
+        start_first_line, // it depends on position of zero for first letter
+        center_left,
+        center_right,
+        center_center,
+        top_left,
+        top_right,
+        top_center,
+        bottom_left,
+        bottom_right,
+        bottom_center
+    };
+    // change pivot of text
+    // When not set, center is used and is not stored
+    Align align = Align::center_center;
 
     //////
     // Duplicit data to wxFontDescriptor
