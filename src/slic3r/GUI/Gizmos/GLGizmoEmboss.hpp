@@ -82,6 +82,9 @@ protected:
     std::string get_gizmo_leaving_text() const override { return _u8L("Leave emboss gizmo"); }
     std::string get_action_snapshot_name() const override { return _u8L("Embossing actions"); }
 private:
+    void volume_transformation_changing();
+    void volume_transformation_changed();
+
     static EmbossStyles create_default_styles();
     // localized default text
     bool init_create(ModelVolumeType volume_type);

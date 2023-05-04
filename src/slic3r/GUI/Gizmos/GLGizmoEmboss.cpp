@@ -403,6 +403,8 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
                 angle_opt = angle;
             m_style_manager.get_font_prop().angle = angle_opt;
         }
+
+        volume_transformation_changing();
     }
     return used;
 }
@@ -421,15 +423,9 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     bool is_dragging = m_surface_drag.has_value();
 
     // End with surface dragging?
-    if (was_dragging && !is_dragging) {
-        // Update surface by new position
-        if (m_volume->text_configuration->style.prop.use_surface)
-            process();
-
-        // Show correct value of height & depth inside of inputs
-        calculate_scale();
-    }
-
+    if (was_dragging && !is_dragging) 
+        volume_transformation_changed();
+    
     // Start with dragging
     else if (!was_dragging && is_dragging) {
         // Cancel job to prevent interuption of dragging (duplicit result)
@@ -452,6 +448,8 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
             m_style_manager.get_style().prop.angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
         }
+
+        volume_transformation_changing();
     }
     return res;
 }
@@ -550,6 +548,36 @@ bool GLGizmoEmboss::on_mouse(const wxMouseEvent &mouse_event)
     if (on_mouse_for_translate(mouse_event)) return true;
     on_mouse_change_selection(mouse_event);
     return false;
+}
+
+void GLGizmoEmboss::volume_transformation_changing()
+{
+    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
+        assert(false);
+        return;
+    }
+    const FontProp &prop = m_volume->text_configuration->style.prop;
+    if (prop.per_glyph)
+        init_text_lines();
+}
+
+void GLGizmoEmboss::volume_transformation_changed()
+{
+    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
+        assert(false);
+        return;
+    }
+
+    const FontProp &prop = m_volume->text_configuration->style.prop;
+    if (prop.per_glyph)
+        init_text_lines();
+
+    // Update surface by new position
+    if (prop.use_surface || prop.per_glyph)
+        process();
+
+    // Show correct value of height & depth inside of inputs
+    calculate_scale();
 }
 
 bool GLGizmoEmboss::on_init()
@@ -848,9 +876,7 @@ void GLGizmoEmboss::on_stop_dragging()
 
     m_rotate_start_angle.reset();
 
-    // recalculate for surface cut
-    const FontProp &font_prop = m_style_manager.get_style().prop;
-    if (font_prop.use_surface) process();
+    volume_transformation_changed();
 }
 void GLGizmoEmboss::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
 
@@ -1263,7 +1289,11 @@ bool GLGizmoEmboss::process()
     if (!m_style_manager.is_active_font()) return false;
     
     DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel), m_volume->id()};
-
+    if (data.text_configuration.style.prop.per_glyph){
+        if (!m_text_lines.is_init())
+            init_text_lines();
+        data.text_lines = m_text_lines.get_lines(); // copy
+    }
     std::unique_ptr<Job> job = nullptr;
 
     // check cutting from source mesh

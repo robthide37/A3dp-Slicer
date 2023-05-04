@@ -8,6 +8,7 @@
 #include <admesh/stl.h> // indexed_triangle_set
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
+#include "BoundingBox.hpp"
 #include "TextConfiguration.hpp"
 
 namespace Slic3r {
@@ -403,7 +404,44 @@ namespace Emboss
         Vec3d project(const Vec3d &point) const override;
         std::optional<Vec2d> unproject(const Vec3d &p, double * depth = nullptr) const override;     
     };
-} // namespace Emboss
 
+    /// <summary>
+    /// Define polygon for draw letters
+    /// </summary>
+    struct TextLine
+    {
+        // slice of object
+        Polygon polygon;
+
+        // point laying on polygon closest to zero
+        PolygonPoint start;
+
+        // offset of text line in volume mm
+        float y;
+    };
+    using TextLines = std::vector<TextLine>;
+
+    /// <summary>
+    /// Sample slice polygon by bounding boxes centers
+    /// slice start point has shape_center_x coor
+    /// </summary>
+    /// <param name="slice">Polygon and start point</param>
+    /// <param name="bbs">Bounding boxes of letter on one line</param>
+    /// <param name="center_x">Center x coor of bbs line</param>
+    /// <param name="scale">Scale for bbs</param>
+    /// <returns>Sampled polygon by bounding boxes</returns>
+    PolygonPoints sample_slice(const TextLine &slice, const BoundingBoxes &bbs, int32_t center_x, double scale);
+
+    /// <summary>
+    /// Calculate angle for polygon point
+    /// </summary>
+    /// <param name="distance">Distance for found normal in point</param>
+    /// <param name="polygon_point">Select point on polygon</param>
+    /// <param name="polygon">Polygon know neighbor of point</param>
+    /// <returns>angle(atan2) of normal in polygon point</returns>
+    double calculate_angle(int32_t distance, PolygonPoint polygon_point, const Polygon &polygon);
+    std::vector<double> calculate_angles(int32_t distance, const PolygonPoints& polygon_points, const Polygon &polygon);
+
+} // namespace Emboss
 } // namespace Slic3r
 #endif // slic3r_Emboss_hpp_

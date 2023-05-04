@@ -35,7 +35,7 @@ struct DataBase
 
     // Define per letter projection on one text line
     // [optional] It is not used when empty
-    TextLines text_lines;
+    Slic3r::Emboss::TextLines text_lines;
 };
 
 /// <summary>
@@ -220,7 +220,6 @@ SurfaceVolumeData::ModelSources create_sources(const ModelVolumePtrs &volumes, s
 /// <returns>Source data for cut surface from</returns>
 SurfaceVolumeData::ModelSources create_volume_sources(const ModelVolume *text_volume);
 
-
 /// <summary>
 /// Update text volume to use surface from object
 /// </summary>
@@ -235,7 +234,6 @@ public:
     void process(Ctl &ctl) override;
     void finalize(bool canceled, std::exception_ptr &eptr) override;
 };
-
 } // namespace Slic3r::GUI
 
 #endif // slic3r_EmbossJob_hpp_

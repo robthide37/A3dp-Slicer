@@ -7,40 +7,26 @@
 #include <libslic3r/Emboss.hpp>
 #include "slic3r/GUI/GLModel.hpp"
 
-
 namespace Slic3r::GUI {
-
 class Selection;
-
-/// <summary>
-/// Define polygon for draw letters
-/// </summary>
-struct TextLine
-{
-    // slice of object
-    Polygon polygon;
-
-    // index to point in polygon which starts line, which is closest to zero
-    size_t start_index;
-
-    // Point on line closest to zero
-    Point start_point;
-};
-using TextLines = std::vector<TextLine>;
-
 class TextLinesModel
 {
 public:
-    // line_height in mm
-    void init(const Selection &selection, double line_height);
+    /// <summary>
+    /// Initialize model and lines
+    /// </summary>
+    /// <param name="selection">Must be selected text volume</param>
+    /// <param name="line_height">Height of text line with spacing [in mm]</param>
+    /// <param name="line_offset">Offset of base line from center [in mm]</param>
+    void init(const Selection &selection, double line_height, double line_offset = 0.);
     void render(const Transform3d &text_world);
 
     bool is_init() const { return m_model.is_initialized(); }
     void reset() { m_model.reset(); }
-    const TextLines &get_lines() const { return m_lines; }
+    const Slic3r::Emboss::TextLines &get_lines() const { return m_lines; }
     static double calc_line_height(const Slic3r::Emboss::FontFile& ff, const FontProp& fp);
 private:
-    TextLines m_lines;
+    Slic3r::Emboss::TextLines m_lines;
 
     // Keep model for visualization text lines
     GLModel m_model;

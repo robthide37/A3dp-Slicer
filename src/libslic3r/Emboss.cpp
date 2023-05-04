@@ -1321,15 +1321,31 @@ std::vector<ExPolygons> Emboss::text2vshapes(FontFileWithCache &font_with_cache,
     return result;
 }
 
+#include <boost/range/adaptor/reversed.hpp>
 unsigned Emboss::get_count_lines(const std::wstring& ws)
 {
     if (ws.empty())
         return 0;
+    unsigned prev_count = 0;
+    for (wchar_t wc : ws)
+        if (wc == '\n')
+            ++prev_count;
+        else
+            break;
+    
+    unsigned post_count = 0;
+    for (wchar_t wc : boost::adaptors::reverse(ws))
+        if (wc == '\n')
+            ++post_count;
+        else
+            break;
+
     unsigned count = 1;
     for (wchar_t wc : ws)
         if (wc == '\n')
             ++count;
-    return count;
+
+    return count - prev_count - post_count;
 }
 
 unsigned Emboss::get_count_lines(const std::string &text)
@@ -1728,6 +1744,178 @@ std::optional<Vec2d> Emboss::OrthoProject::unproject(const Vec3d &p, double *dep
     Vec3d pp = m_matrix_inv * p;
     if (depth != nullptr) *depth = pp.z();
     return Vec2d(pp.x(), pp.y());
+}
+
+// sample slice
+namespace {
+
+// using coor2 = int64_t;
+using Coord2 = double;
+using P2     = Eigen::Matrix<Coord2, 2, 1, Eigen::DontAlign>;
+
+bool point_in_distance(const Coord2 &distance_sq, PolygonPoint &polygon_point, const size_t &i, const Slic3r::Polygon &polygon, bool is_first, bool is_reverse = false)
+{
+    size_t s  = polygon.size();
+    size_t ii = (i + polygon_point.index) % s;
+
+    // second point of line
+    const Point &p = polygon[ii];
+    Point p_d = p - polygon_point.point;
+
+    P2 p_d2 = p_d.cast<Coord2>();
+    Coord2 p_distance_sq = p_d2.squaredNorm();
+    if (p_distance_sq < distance_sq)
+        return false;
+
+    // found line
+    if (is_first) {
+        // on same line
+        // center also lay on line
+        // new point is distance moved from point by direction
+        polygon_point.point += p_d * sqrt(distance_sq / p_distance_sq);
+        return true;
+    }
+
+    // line cross circle
+
+    // start point of line
+    size_t ii2          = (is_reverse) ? (ii + 1) % s : (ii + s - 1) % s;
+    polygon_point.index = (is_reverse) ? ii : ii2;
+    const Point &p2 = polygon[ii2];
+
+    Point line_dir  = p2 - p;
+    P2    line_dir2 = line_dir.cast<Coord2>();
+
+    Coord2 a = line_dir2.dot(line_dir2);
+    Coord2 b = 2 * p_d2.dot(line_dir2);
+    Coord2 c = p_d2.dot(p_d2) - distance_sq;
+
+    double discriminant = b * b - 4 * a * c;
+    if (discriminant < 0) {
+        assert(false);
+        // no intersection
+        polygon_point.point = p;
+        return true;
+    }
+
+    // ray didn't totally miss sphere,
+    // so there is a solution to
+    // the equation.
+    discriminant = sqrt(discriminant);
+
+    // either solution may be on or off the ray so need to test both
+    // t1 is always the smaller value, because BOTH discriminant and
+    // a are nonnegative.
+    double t1 = (-b - discriminant) / (2 * a);
+    double t2 = (-b + discriminant) / (2 * a);
+
+    double t = std::min(t1, t2);
+    if (t < 0. || t > 1.) {
+        // Bad intersection
+        assert(false);
+        polygon_point.point = p;
+        return true;
+    }
+
+    polygon_point.point = p + (t * line_dir2).cast<Point::coord_type>();
+    return true;
+}
+
+void point_in_distance(int32_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
+{
+    Coord2 distance_sq = static_cast<Coord2>(distance) * distance;
+    bool is_first = true;
+    for (size_t i = 1; i < polygon.size(); ++i) {
+        if (point_in_distance(distance_sq, p, i, polygon, is_first))
+            return;
+        is_first = false;
+    }
+    // There is not point on polygon with this distance
+}
+
+void point_in_reverse_distance(int32_t distance, PolygonPoint &p, const Slic3r::Polygon &polygon)
+{
+    Coord2 distance_sq = static_cast<Coord2>(distance) * distance;
+    bool is_first = true;
+    bool is_reverse = true;
+    for (size_t i = polygon.size(); i > 0; --i) {
+        if (point_in_distance(distance_sq, p, i, polygon, is_first, is_reverse))
+            return;
+        is_first = false;
+    }
+    // There is not point on polygon with this distance
+}
+} // namespace
+
+// calculate rotation, need copy of polygon point
+double Emboss::calculate_angle(int32_t distance, PolygonPoint polygon_point, const Polygon &polygon)
+{
+    PolygonPoint polygon_point2 = polygon_point; // copy
+    point_in_distance(distance, polygon_point, polygon);
+    point_in_reverse_distance(distance, polygon_point2, polygon);
+
+    Point surface_dir = polygon_point2.point - polygon_point.point;
+    Point norm(-surface_dir.y(), surface_dir.x());
+    Vec2d norm_d = norm.cast<double>();
+    //norm_d.normalize();
+    return std::atan2(norm_d.y(), norm_d.x());
+}
+
+std::vector<double> Emboss::calculate_angles(int32_t distance, const PolygonPoints& polygon_points, const Polygon &polygon)
+{
+    std::vector<double> result;
+    result.reserve(polygon_points.size());
+    for(const PolygonPoint& pp: polygon_points)
+        result.emplace_back(calculate_angle(distance, pp, polygon));
+    return result;
+}
+
+PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &bbs, int32_t center_x, double scale)
+{
+    // find BB in center of line
+    size_t first_right_index = 0;
+    for (const BoundingBox &bb : bbs)
+        if (bb.min.x() > center_x) {
+            break;
+        } else {
+            ++first_right_index;
+        }
+
+    PolygonPoints samples(bbs.size());
+    int32_t shapes_x_cursor = center_x;
+
+    PolygonPoint cursor = slice.start; //copy
+
+    auto create_sample = [&] //polygon_cursor, &polygon_line_index, &line_bbs, &shapes_x_cursor, &shape_scale, &em_2_polygon, &line, &offsets]
+    (const BoundingBox &bb, bool is_reverse) {
+        if (!bb.defined)
+            return cursor;
+        Point   letter_center  = bb.center();
+        int32_t shape_distance = shapes_x_cursor - letter_center.x();
+        shapes_x_cursor        = letter_center.x();
+        double  distance_mm    = shape_distance * scale;
+        int32_t distance_polygon = static_cast<int32_t>(std::round(scale_(distance_mm)));
+        if (is_reverse)
+            point_in_distance(distance_polygon, cursor, slice.polygon);
+        else
+            point_in_reverse_distance(distance_polygon, cursor, slice.polygon);
+        return cursor;
+    };
+
+    // calc transformation for letters on the Right side from center
+    bool is_reverse = true;
+    for (size_t index = first_right_index; index < bbs.size(); ++index)
+        samples[index] = create_sample(bbs[index], is_reverse);
+
+    // calc transformation for letters on the Left side from center
+    shapes_x_cursor = center_x;
+    cursor = slice.start; // copy    
+    is_reverse = false;
+    for (size_t index_plus_one = first_right_index; index_plus_one > 0; --index_plus_one) {
+        size_t index = index_plus_one - 1;
+        samples[index] = create_sample(bbs[index], is_reverse);
+    }
+    return samples;
 }
 
 #ifdef REMOVE_SPIKES
