@@ -249,6 +249,10 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectP
     });
 
     if (find) {
+        std::sort(conflict.begin(), conflict.end(), [](const std::pair<ConflictComputeResult, double>& i1, const std::pair<ConflictComputeResult, double>& i2) {
+            return i1.second < i2.second;
+        });
+
         const void *ptr1           = conflictQueue.idToObjsPtr(conflict[0].first._obj1);
         const void *ptr2           = conflictQueue.idToObjsPtr(conflict[0].first._obj2);
         double      conflictHeight = conflict[0].second;
