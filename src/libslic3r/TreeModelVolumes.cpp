@@ -17,6 +17,7 @@
 #include "Print.hpp"
 #include "PrintConfig.hpp"
 #include "Utils.hpp"
+#include "format.hpp"
 
 #include <string_view>
 
