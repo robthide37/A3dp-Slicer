@@ -299,7 +299,7 @@ static bool inline g_showed_critical_error = false;
 static bool inline g_showed_performance_warning = false;
 void tree_supports_show_error(std::string_view message, bool critical)
 { // todo Remove!  ONLY FOR PUBLIC BETA!!
-
+//    printf("Error: %s, critical: %d\n", message.data(), int(critical));
 #ifdef TREE_SUPPORT_SHOW_ERRORS_WIN32
     static bool showed_critical = false;
     static bool showed_performance = false;
@@ -2158,6 +2158,10 @@ static void increase_areas_one_layer(
                              " Distance to top: " << parent.state.distance_to_top << " Elephant foot increases " << parent.state.elephant_foot_increases << "  use_min_xy_dist " << parent.state.use_min_xy_dist <<
                              " to buildplate " << parent.state.to_buildplate << " gracious " << parent.state.to_model_gracious << " safe " << parent.state.can_use_safe_radius << " until move " << parent.state.dont_move_until;
                     tree_supports_show_error("Potentially lost branch!"sv, true);
+#ifdef TREE_SUPPORTS_TRACK_LOST
+                    if (result)
+                        result->lost = true;
+#endif // TREE_SUPPORTS_TRACK_LOST
                 } else
                     result = increase_single_area(volumes, config, settings, layer_idx, parent,
                         settings.increase_speed == slow_speed ? offset_slow : offset_fast, to_bp_data, to_model_data, inc_wo_collision, 0, mergelayer);
@@ -2211,6 +2215,9 @@ static void increase_areas_one_layer(
                 // But as branches connecting with the model that are to small have to be culled, the bottom most point has to be not set.
                 // A point can be set on the top most tip layer (maybe more if it should not move for a few layers).
                 parent.state.result_on_layer_reset();
+#ifdef TREE_SUPPORTS_TRACK_LOST
+                parent.state.verylost = true;
+#endif // TREE_SUPPORTS_TRACK_LOST
             }
 
             throw_on_cancel();
@@ -4234,26 +4241,35 @@ static std::vector<Polygons> draw_branches(
                 branch.path.emplace_back(&start_element);
                 // Traverse each branch until it branches again.
                 SupportElement &first_parent = layer_above[start_element.parents[parent_idx]];
+                assert(! first_parent.state.marked);
                 assert(branch.path.back()->state.layer_idx + 1 == first_parent.state.layer_idx);
                 branch.path.emplace_back(&first_parent);
                 if (first_parent.parents.size() < 2)
                     first_parent.state.marked = true;
                 SupportElement *next_branch = nullptr;
-                if (first_parent.parents.size() == 1)
+                if (first_parent.parents.size() == 1) {
                     for (SupportElement *parent = &first_parent;;) {
+                        assert(parent->state.marked);
                         SupportElement &next_parent = move_bounds[parent->state.layer_idx + 1][parent->parents.front()];
+                        assert(! next_parent.state.marked);
                         assert(branch.path.back()->state.layer_idx + 1 == next_parent.state.layer_idx);
                         branch.path.emplace_back(&next_parent);
                         if (next_parent.parents.size() > 1) {
+                            // Branching point was reached.
                             next_branch = &next_parent;
                             break;
                         }
                         next_parent.state.marked = true;
                         if (next_parent.parents.size() == 0)
+                            // Tip is reached.
                             break;
                         parent = &next_parent;
                     }
+                } else if (first_parent.parents.size() > 1)
+                    // Branching point was reached.
+                    next_branch = &first_parent;
                 assert(branch.path.size() >= 2);
+                assert(next_branch == nullptr || ! next_branch->state.marked);
                 branch.has_root = root;
                 branch.has_tip  = ! next_branch;
                 out.branches.emplace_back(std::move(branch));
@@ -4263,13 +4279,37 @@ static std::vector<Polygons> draw_branches(
         }
     };
 
-    for (LayerIndex layer_idx = 0; layer_idx + 1 < LayerIndex(move_bounds.size()); ++ layer_idx)
-        for (SupportElement &start_element : move_bounds[layer_idx])
-            if (! start_element.state.marked && ! start_element.parents.empty()) {
+    for (LayerIndex layer_idx = 0; layer_idx + 1 < LayerIndex(move_bounds.size()); ++ layer_idx) {
+//        int ielement;
+        for (SupportElement& start_element : move_bounds[layer_idx]) {
+            if (!start_element.state.marked && !start_element.parents.empty()) {
+#if 0
+                int found = 0;
+                if (layer_idx > 0) {
+                    for (auto& el : move_bounds[layer_idx - 1]) {
+                        for (auto iparent : el.parents)
+                            if (iparent == ielement)
+                                ++found;
+                    }
+                    if (found != 0)
+                        printf("Found: %d\n", found);
+                }
+#endif
                 trees.push_back({});
                 TreeVisitor::visit_recursive(move_bounds, start_element, trees.back());
-                assert(! trees.back().branches.empty());
+                assert(!trees.back().branches.empty());
+                //FIXME debugging
+#if 0
+                if (start_element.state.lost) {
+                }
+                else if (start_element.state.verylost) {
+                } else
+                    trees.pop_back();
+#endif
             }
+//            ++ ielement;
+        }
+    }
 
     const SlicingParameters &slicing_params = print_object.slicing_parameters();
     MeshSlicingParams mesh_slicing_params;
@@ -4297,49 +4337,89 @@ static std::vector<Polygons> draw_branches(
                         slice_z.emplace_back(float(0.5 * (bottom_z + print_z)));
                     }
                     std::vector<Polygons> slices = slice_mesh(partial_mesh, slice_z, mesh_slicing_params, throw_on_cancel);
-                    size_t                num_empty = 0;
+                    //FIXME parallelize?
+                    for (LayerIndex i = 0; i < LayerIndex(slices.size()); ++ i)
+                        slices[i] = diff_clipped(slices[i], volumes.getCollision(0, layer_begin + i, true)); //FIXME parent_uses_min || draw_area.element->state.use_min_xy_dist);
 
+                    size_t num_empty = 0;
                     if (layer_begin > 0 && branch.has_root && ! branch.path.front()->state.to_model_gracious && ! slices.front().empty()) {
                         // Drop down areas that do rest non - gracefully on the model to ensure the branch actually rests on something.
-                        std::vector<Polygons>   bottom_extra_slices;
-                        Polygons                rest_support;
-                        for (LayerIndex layer_idx = layer_begin - 1; layer_idx >= 0; -- layer_idx) {
+                        struct BottomExtraSlice {
+                            Polygons polygons;
+                            Polygons supported;
+                            double   area;
+                            double   supported_area;
+                        };
+                        std::vector<BottomExtraSlice>   bottom_extra_slices;
+                        Polygons                        rest_support;
+                        coord_t                         bottom_radius = config.getRadius(branch.path.front()->state);
+                        // Don't propagate further than 1.5 * bottom radius.
+                        //LayerIndex                      layers_propagate_max = 2 * bottom_radius / config.layer_height;
+                        LayerIndex                      layers_propagate_max = 5 * bottom_radius / config.layer_height;
+                        LayerIndex                      layer_bottommost = std::max(0, layer_begin - layers_propagate_max);
+                        // Only propagate until the rest area is smaller than this threshold.
+                        double                          support_area_stop = 0.2 * M_PI * sqr(double(bottom_radius));
+                        // Only propagate until the rest area is smaller than this threshold.
+                        double                          support_area_min = 0.1 * M_PI * sqr(double(config.min_radius));
+                        for (LayerIndex layer_idx = layer_begin - 1; layer_idx >= layer_bottommost; -- layer_idx) {
                             rest_support = diff_clipped(rest_support.empty() ? slices.front() : rest_support, volumes.getCollision(0, layer_idx, false));
-                            if (area(rest_support) < tiny_area_threshold)
+                            double rest_support_area = area(rest_support);
+                            if (rest_support_area < support_area_stop)
+                                // Don't propagate a fraction of the tree contact surface.
                                 break;
-                            bottom_extra_slices.emplace_back(rest_support);
+                            // Measure how much the rest_support is actually supported.
+                            /*
+                            Polygons supported = intersection_clipped(rest_support, volumes.getPlaceableAreas(0, layer_idx, []{}));
+                            double supported_area = area(supported);
+                            printf("Supported area: %d, %lf\n", layer_idx, supported_area);
+                            */
+                            Polygons supported;
+                            double supported_area;
+                            bottom_extra_slices.push_back({ rest_support, std::move(supported), rest_support_area, supported_area });
                         }
+                        // Now remove those bottom slices that are not supported at all.
+                        while (! bottom_extra_slices.empty() && 
+                            area(intersection_clipped(bottom_extra_slices.back().polygons, volumes.getPlaceableAreas(0, layer_begin - LayerIndex(bottom_extra_slices.size()), [] {}))) < support_area_min)
+                            bottom_extra_slices.pop_back();
                         layer_begin -= LayerIndex(bottom_extra_slices.size());
-                        slices.insert(slices.begin(), std::make_move_iterator(bottom_extra_slices.rbegin()), std::make_move_iterator(bottom_extra_slices.rend()));
+                        slices.insert(slices.begin(), bottom_extra_slices.size(), {});
+                        size_t i = 0;
+                        for (auto it = bottom_extra_slices.rbegin(); it != bottom_extra_slices.rend(); ++it, ++i)
+                            slices[i] = std::move(it->polygons);
                     } else 
                         num_empty = std::find_if(slices.begin(), slices.end(), [](auto &s) { return !s.empty(); }) - slices.begin();
 
                     layer_begin += LayerIndex(num_empty);
-                    for (; slices.back().empty(); -- layer_end);
-                    LayerIndex new_begin = tree.first_layer_id == -1 ? layer_begin : std::min(tree.first_layer_id, layer_begin);
-                    LayerIndex new_end   = tree.first_layer_id == -1 ? layer_end : std::max(tree.first_layer_id + LayerIndex(tree.slices.size()), layer_end);
-                    size_t     new_size  = size_t(new_end - new_begin);
-                    if (tree.first_layer_id == -1) {
-                    } else if (tree.slices.capacity() < new_size) {
-                        std::vector<Slice> new_slices;
-                        new_slices.reserve(new_size);
-                        if (LayerIndex dif = tree.first_layer_id - new_begin; dif > 0)
-                            new_slices.insert(new_slices.end(), dif, {});
-                        append(new_slices, std::move(tree.slices));
-                        tree.slices.swap(new_slices);
-                    } else if (LayerIndex dif = tree.first_layer_id - new_begin; dif > 0)
-                        tree.slices.insert(tree.slices.begin(), tree.first_layer_id - new_begin, {});
-                    tree.slices.insert(tree.slices.end(), new_size - tree.slices.size(), {});
-                    layer_begin -= LayerIndex(num_empty);
-                    for (LayerIndex i = layer_begin; i != layer_end; ++ i)
-                        if (Polygons &src = slices[i - layer_begin]; ! src.empty()) {
-                            Slice &dst = tree.slices[i - new_begin];
-                            if (++ dst.num_branches > 1)
-                                append(dst.polygons, std::move(src));
-                            else
-                                dst.polygons = std::move(std::move(src));
-                        }
-                    tree.first_layer_id = new_begin;
+                    while (! slices.empty() && slices.back().empty()) {
+                        slices.pop_back();
+                        -- layer_end;
+                    }
+                    if (layer_begin < layer_end) {
+                        LayerIndex new_begin = tree.first_layer_id == -1 ? layer_begin : std::min(tree.first_layer_id, layer_begin);
+                        LayerIndex new_end   = tree.first_layer_id == -1 ? layer_end : std::max(tree.first_layer_id + LayerIndex(tree.slices.size()), layer_end);
+                        size_t     new_size  = size_t(new_end - new_begin);
+                        if (tree.first_layer_id == -1) {
+                        } else if (tree.slices.capacity() < new_size) {
+                            std::vector<Slice> new_slices;
+                            new_slices.reserve(new_size);
+                            if (LayerIndex dif = tree.first_layer_id - new_begin; dif > 0)
+                                new_slices.insert(new_slices.end(), dif, {});
+                            append(new_slices, std::move(tree.slices));
+                            tree.slices.swap(new_slices);
+                        } else if (LayerIndex dif = tree.first_layer_id - new_begin; dif > 0)
+                            tree.slices.insert(tree.slices.begin(), tree.first_layer_id - new_begin, {});
+                        tree.slices.insert(tree.slices.end(), new_size - tree.slices.size(), {});
+                        layer_begin -= LayerIndex(num_empty);
+                        for (LayerIndex i = layer_begin; i != layer_end; ++ i)
+                            if (Polygons &src = slices[i - layer_begin]; ! src.empty()) {
+                                Slice &dst = tree.slices[i - new_begin];
+                                if (++ dst.num_branches > 1)
+                                    append(dst.polygons, std::move(src));
+                                else
+                                    dst.polygons = std::move(std::move(src));
+                            }
+                        tree.first_layer_id = new_begin;
+                    }
                 }
             }
         }, tbb::simple_partitioner());

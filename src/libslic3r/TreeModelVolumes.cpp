@@ -426,7 +426,7 @@ const Polygons& TreeModelVolumes::getPlaceableAreas(const coord_t orig_radius, L
         return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Placeable Areas at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-        tree_supports_show_error("Not precalculated Placeable areas requested."sv, false);
+        tree_supports_show_error(format("Not precalculated Placeable areas requested, radius %1%, layer %2%", radius, layer_idx), false);
     }
     if (orig_radius == 0)
         // Placable areas for radius 0 are calculated in the general collision code.
@@ -597,16 +597,19 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
             // 3) Optionally calculate placables.
             if (calculate_placable) {
                 // Now calculate the placable areas.
-                tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(data.idx_begin, 1), data.idx_end),
-                    [&collision_areas_offsetted, &anti_overhang = m_anti_overhang, processing_last_mesh,
-                     min_resolution = m_min_resolution, &data_placeable, &throw_on_cancel]
+                tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(z_distance_bottom_layers + 1, data.idx_begin), data.idx_end),
+                    [&collision_areas_offsetted, &outlines, &anti_overhang = m_anti_overhang, processing_last_mesh,
+                     min_resolution = m_min_resolution, z_distance_bottom_layers, xy_distance, &data_placeable, &throw_on_cancel]
                 (const tbb::blocked_range<LayerIndex>& range) {
                     for (LayerIndex layer_idx = range.begin(); layer_idx != range.end(); ++ layer_idx) {
-                        LayerIndex layer_idx_below = layer_idx - 1;
+                        LayerIndex layer_idx_below = layer_idx - z_distance_bottom_layers - 1;
                         assert(layer_idx_below >= 0);
                         const Polygons &current = collision_areas_offsetted[layer_idx];
-                        const Polygons &below   = collision_areas_offsetted[layer_idx_below];
-                        Polygons placable = diff(below, layer_idx_below < int(anti_overhang.size()) ? union_(current, anti_overhang[layer_idx_below]) : current);
+                        const Polygons &below   = outlines[layer_idx_below];
+                        Polygons placable = diff(
+                            // Inflate the surface to sit on by the separation distance to increase chance of a support being placed on a sloped surface.
+                            offset(below, xy_distance), 
+                            layer_idx_below < int(anti_overhang.size()) ? union_(current, anti_overhang[layer_idx_below]) : current);
                         auto &dst     = data_placeable[layer_idx];
                         if (processing_last_mesh) {
                             if (! dst.empty())
