@@ -1620,6 +1620,8 @@ void ImGuiWrapper::init_font(bool compress)
     ImFontGlyphRangesBuilder builder;
 	builder.AddRanges(m_glyph_ranges);
 
+    builder.AddChar(ImWchar(0x2026)); // …
+
     if (m_font_cjk) {
         // This is a temporary fix of https://github.com/prusa3d/PrusaSlicer/issues/8171. The translation
         // contains characters not in the ImGui ranges for simplified Chinese. For now, just add them manually.
