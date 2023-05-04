@@ -10,6 +10,7 @@
 #include <deque>
 #include <queue>
 #include <mutex>
+#include <new>
 #include <utility>
 
 #include <boost/log/trivial.hpp>
@@ -34,6 +35,13 @@
 #include <assert.h>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+
+#if defined(__cpp_lib_hardware_interference_size) && ! defined(__APPLE__)
+    using std::hardware_destructive_interference_size;
+#else
+    // 64 bytes on x86-64 │ L1_CACHE_BYTES │ L1_CACHE_SHIFT │ __cacheline_aligned │ ...
+    constexpr std::size_t hardware_destructive_interference_size = 64;
+#endif
 
 // #define SLIC3R_DEBUG_SLICE_PROCESSING
 
@@ -364,7 +372,7 @@ public:
 private:
     struct CacheLineAlignedMutex
     {
-        alignas(std::hardware_destructive_interference_size) std::mutex mutex;
+        alignas(hardware_destructive_interference_size) std::mutex mutex;
     };
     std::array<CacheLineAlignedMutex, 64> m_mutexes;
 };

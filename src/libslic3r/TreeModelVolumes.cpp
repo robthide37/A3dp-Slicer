@@ -34,6 +34,8 @@ using namespace std::literals;
 // had to use a define beacuse the macro processing inside macro BOOST_LOG_TRIVIAL()
 #define error_level_not_in_cache error
 
+static constexpr const bool polygons_strictly_simple = false;
+
 TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &print_object)
 {
     const PrintConfig       &print_config       = print_object.print()->config();
@@ -175,7 +177,7 @@ TreeModelVolumes::TreeModelVolumes(
         tbb::parallel_for(tbb::blocked_range<size_t>(num_raft_layers, num_layers, std::min<size_t>(1, std::max<size_t>(16, num_layers / (8 * tbb::this_task_arena::max_concurrency())))),
             [&](const tbb::blocked_range<size_t> &range) {
             for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx)
-                outlines[layer_idx] = to_polygons(expolygons_simplify(print_object.get_layer(layer_idx - num_raft_layers)->lslices, mesh_settings.resolution));
+                outlines[layer_idx] = polygons_simplify(to_polygons(print_object.get_layer(layer_idx - num_raft_layers)->lslices), mesh_settings.resolution, polygons_strictly_simple);
         });
     }
 #endif
@@ -424,7 +426,7 @@ const Polygons& TreeModelVolumes::getPlaceableAreas(const coord_t orig_radius, L
         return (*result).get();
     if (m_precalculated) {
         BOOST_LOG_TRIVIAL(error_level_not_in_cache) << "Had to calculate Placeable Areas at radius " << radius << " and layer " << layer_idx << ", but precalculate was called. Performance may suffer!";
-        tree_supports_show_error("Not precalculated Placeable areas requested."sv, false);
+        tree_supports_show_error(format("Not precalculated Placeable areas requested, radius %1%, layer %2%", radius, layer_idx), false);
     }
     if (orig_radius == 0)
         // Placable areas for radius 0 are calculated in the general collision code.
@@ -585,7 +587,7 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
                         if (processing_last_mesh) {
                             if (! dst.empty())
                                 collisions = union_(collisions, dst);
-                            dst = polygons_simplify(collisions, min_resolution);
+                            dst = polygons_simplify(collisions, min_resolution, polygons_strictly_simple);
                         } else
                             append(dst, std::move(collisions));
                         throw_on_cancel();
@@ -595,21 +597,24 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
             // 3) Optionally calculate placables.
             if (calculate_placable) {
                 // Now calculate the placable areas.
-                tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(data.idx_begin, 1), data.idx_end),
-                    [&collision_areas_offsetted, &anti_overhang = m_anti_overhang, processing_last_mesh,
-                     min_resolution = m_min_resolution, &data_placeable, &throw_on_cancel]
+                tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(z_distance_bottom_layers + 1, data.idx_begin), data.idx_end),
+                    [&collision_areas_offsetted, &outlines, &anti_overhang = m_anti_overhang, processing_last_mesh,
+                     min_resolution = m_min_resolution, z_distance_bottom_layers, xy_distance, &data_placeable, &throw_on_cancel]
                 (const tbb::blocked_range<LayerIndex>& range) {
                     for (LayerIndex layer_idx = range.begin(); layer_idx != range.end(); ++ layer_idx) {
-                        LayerIndex layer_idx_below = layer_idx - 1;
+                        LayerIndex layer_idx_below = layer_idx - z_distance_bottom_layers - 1;
                         assert(layer_idx_below >= 0);
                         const Polygons &current = collision_areas_offsetted[layer_idx];
-                        const Polygons &below   = collision_areas_offsetted[layer_idx_below];
-                        Polygons placable = diff(below, layer_idx_below < int(anti_overhang.size()) ? union_(current, anti_overhang[layer_idx_below]) : current);
+                        const Polygons &below   = outlines[layer_idx_below];
+                        Polygons placable = diff(
+                            // Inflate the surface to sit on by the separation distance to increase chance of a support being placed on a sloped surface.
+                            offset(below, xy_distance), 
+                            layer_idx_below < int(anti_overhang.size()) ? union_(current, anti_overhang[layer_idx_below]) : current);
                         auto &dst     = data_placeable[layer_idx];
                         if (processing_last_mesh) {
                             if (! dst.empty())
                                 placable = union_(placable, dst);
-                            dst = polygons_simplify(placable, min_resolution);
+                            dst = polygons_simplify(placable, min_resolution, polygons_strictly_simple);
                         } else
                             append(dst, placable);
                         throw_on_cancel();
@@ -657,7 +662,7 @@ void TreeModelVolumes::calculateCollisionHolefree(const std::vector<RadiusLayerP
                     data.emplace_back(RadiusLayerPair(radius, layer_idx), polygons_simplify(
                         offset(union_ex(this->getCollision(m_increase_until_radius, layer_idx, false)),
                             5 - increase_radius_ceil, ClipperLib::jtRound, m_min_resolution),
-                        m_min_resolution));
+                        m_min_resolution, polygons_strictly_simple));
                     throw_on_cancel();
                 }
         }
@@ -744,7 +749,7 @@ void TreeModelVolumes::calculateAvoidance(const std::vector<RadiusLayerPair> &ke
                             ClipperLib::jtRound, m_min_resolution));
                 if (task.to_model)
                     latest_avoidance = diff(latest_avoidance, getPlaceableAreas(task.radius, layer_idx, throw_on_cancel));
-                latest_avoidance = polygons_simplify(latest_avoidance, m_min_resolution);
+                latest_avoidance = polygons_simplify(latest_avoidance, m_min_resolution, polygons_strictly_simple);
                 data.emplace_back(RadiusLayerPair{task.radius, layer_idx}, latest_avoidance);
                 throw_on_cancel();
             }
@@ -865,12 +870,12 @@ void TreeModelVolumes::calculateWallRestrictions(const std::vector<RadiusLayerPa
                     data[layer_idx - min_layer_bottom] = polygons_simplify(
                         // radius contains m_current_min_xy_dist_delta already if required
                         intersection(getCollision(0, layer_idx, false), getCollision(radius, layer_idx - 1, true)),
-                        m_min_resolution);
+                        m_min_resolution, polygons_strictly_simple);
                     if (! data_min.empty())
                         data_min[layer_idx - min_layer_bottom] = 
                             polygons_simplify(
                                 intersection(getCollision(0, layer_idx, true), getCollision(radius, layer_idx - 1, true)),
-                                m_min_resolution);
+                                m_min_resolution, polygons_strictly_simple);
                     throw_on_cancel();
                 }
             });

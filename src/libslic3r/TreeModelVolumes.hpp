@@ -215,6 +215,7 @@ public:
     void clear() { 
         this->clear_all_but_object_collision();
         m_collision_cache.clear();
+        m_placeable_areas_cache.clear();
     }
     void clear_all_but_object_collision() { 
         //m_collision_cache.clear_all_but_radius0();
@@ -223,7 +224,7 @@ public:
         m_avoidance_cache_slow.clear();
         m_avoidance_cache_to_model.clear();
         m_avoidance_cache_to_model_slow.clear();
-        m_placeable_areas_cache.clear();
+        m_placeable_areas_cache.clear_all_but_radius0();
         m_avoidance_cache_holefree.clear();
         m_avoidance_cache_holefree_to_model.clear();
         m_wall_restrictions_cache.clear();
