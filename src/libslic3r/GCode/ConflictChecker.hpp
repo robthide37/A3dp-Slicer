@@ -15,10 +15,12 @@ namespace Slic3r {
 struct LineWithID
 {
     Line _line;
-    int  _id;
+    int  _obj_id;
+    int  _inst_id;
     ExtrusionRole _role;
 
-    LineWithID(const Line& line, int id, const ExtrusionRole& role) : _line(line), _id(id), _role(role) {}
+    LineWithID(const Line& line, int obj_id, int inst_id, const ExtrusionRole& role) :
+        _line(line), _obj_id(obj_id), _inst_id(inst_id), _role(role) {}
 };
 
 using LineWithIDs = std::vector<LineWithID>;
@@ -51,11 +53,11 @@ public:
         LineWithIDs lines;
         for (const ExtrusionPath &path : _piles[_curPileIdx]) {
             Polyline check_polyline;
-            for (const Point& offset : _offsets) {
+            for (int i = 0; i < (int)_offsets.size(); ++i) {
                 check_polyline = path.polyline;
-                check_polyline.translate(offset);
+                check_polyline.translate(_offsets[i]);
                 Lines tmpLines = check_polyline.lines();
-                for (const Line &line : tmpLines) { lines.emplace_back(line, _id, path.role()); }
+                for (const Line& line : tmpLines) { lines.emplace_back(line, _id, i, path.role()); }
             }
         }
         return lines;

@@ -206,7 +206,8 @@ ConflictComputeOpt ConflictChecker::find_inter_of_lines(const LineWithIDs &lines
 ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectPtrs                      objs,
                                                                   std::optional<const FakeWipeTower *> wtdptr) // find the first intersection point of lines in different objects
 {
-    if (objs.size() <= 1) { return {}; }
+    if (objs.empty() || (objs.size() == 1 && objs.front()->instances().size() == 1)) { return {}; }
+
     LinesBucketQueue conflictQueue;
     if (wtdptr.has_value()) { // wipe tower at 0 by default
         auto wtpaths = (*wtdptr)->getFakeExtrusionPathsFromWipeTower();
@@ -268,14 +269,15 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectP
 
 ConflictComputeOpt ConflictChecker::line_intersect(const LineWithID &l1, const LineWithID &l2)
 {
-    if (l1._id == l2._id) { return {}; } // return true if lines are from same object
+    if (l1._obj_id == l2._obj_id && l1._inst_id == l2._inst_id) { return {}; } // lines are from same instance
+
     Point inter;
     bool  intersect = l1._line.intersection(l2._line, &inter);
     if (intersect) {
         auto dist1 = std::min(unscale(Point(l1._line.a - inter)).norm(), unscale(Point(l1._line.b - inter)).norm());
         auto dist2 = std::min(unscale(Point(l2._line.a - inter)).norm(), unscale(Point(l2._line.b - inter)).norm());
         auto dist  = std::min(dist1, dist2);
-        if (dist > 0.01) { return std::make_optional<ConflictComputeResult>(l1._id, l2._id); } // the two lines intersects if dist>0.01mm
+        if (dist > 0.01) { return std::make_optional<ConflictComputeResult>(l1._obj_id, l2._obj_id); } // the two lines intersects if dist>0.01mm
     }
     return {};
 }
