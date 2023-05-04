@@ -546,6 +546,7 @@ foreach(po_file ${L10N_PO_FILES})
 endforeach()
 
 find_package(NLopt 1.4 REQUIRED)
+slic3r_remap_configs(NLopt::nlopt RelWithDebInfo Release)
 
 if(SLIC3R_STATIC)
     set(OPENVDB_USE_STATIC_LIBS ON)
