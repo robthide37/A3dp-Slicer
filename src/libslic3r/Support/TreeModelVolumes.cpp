@@ -79,7 +79,9 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
 //    this->support_interface_skip_height =
 //    this->support_infill_angles     = 
     this->support_roof_enable       = config.support_material_interface_layers.value > 0;
-    this->support_roof_height       = config.support_material_interface_layers.value * this->layer_height;
+    this->support_roof_layers       = this->support_roof_enable ? config.support_material_interface_layers.value : 0;
+    this->support_floor_enable      = config.support_material_interface_layers.value > 0 && config.support_material_bottom_interface_layers.value > 0;
+    this->support_floor_layers      = this->support_floor_enable ? config.support_material_bottom_interface_layers.value : 0;
 //    this->minimum_roof_area         = 
 //    this->support_roof_angles       = 
     this->support_roof_pattern      = config.support_material_interface_pattern;

@@ -1460,7 +1460,7 @@ static void generate_initial_areas(
         //FIXME this is a heuristic value for support enforcers to work.
 //        + 10 * config.support_line_width;
         ;
-    const size_t  num_support_roof_layers = mesh_group_settings.support_roof_enable ? (mesh_group_settings.support_roof_height + config.layer_height / 2) / config.layer_height : 0;
+    const size_t  num_support_roof_layers = mesh_group_settings.support_roof_layers;
     const bool    roof_enabled        = num_support_roof_layers > 0;
     const bool    force_tip_to_roof   = sqr<double>(config.min_radius) * M_PI > mesh_group_settings.minimum_roof_area && roof_enabled;
     // cap for how much layer below the overhang a new support point may be added, as other than with regular support every new inserted point 
@@ -4211,6 +4211,7 @@ static std::vector<Polygons> draw_branches(
 
     struct Slice {
         Polygons polygons;
+        Polygons bottom_interfaces;
         size_t   num_branches{ 0 };
     };
 
@@ -4310,6 +4311,7 @@ static std::vector<Polygons> draw_branches(
     const SlicingParameters &slicing_params = print_object.slicing_parameters();
     MeshSlicingParams mesh_slicing_params;
     mesh_slicing_params.mode = MeshSlicingParams::SlicingMode::Positive;
+
     tbb::parallel_for(tbb::blocked_range<size_t>(0, trees.size(), 1),
         [&trees, &volumes, &config, &slicing_params, &move_bounds, &mesh_slicing_params, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
             indexed_triangle_set    partial_mesh;
@@ -4343,6 +4345,7 @@ static std::vector<Polygons> draw_branches(
                         struct BottomExtraSlice {
                             Polygons polygons;
                             Polygons supported;
+                            Polygons bottom_interfaces;
                             double   area;
                             double   supported_area;
                         };
@@ -4371,12 +4374,17 @@ static std::vector<Polygons> draw_branches(
                             */
                             Polygons supported;
                             double supported_area;
-                            bottom_extra_slices.push_back({ rest_support, std::move(supported), rest_support_area, supported_area });
+                            bottom_extra_slices.push_back({ rest_support, std::move(supported), {}, rest_support_area, supported_area });
                         }
                         // Now remove those bottom slices that are not supported at all.
-                        while (! bottom_extra_slices.empty() && 
-                            area(intersection_clipped(bottom_extra_slices.back().polygons, volumes.getPlaceableAreas(0, layer_begin - LayerIndex(bottom_extra_slices.size()), [] {}))) < support_area_min)
-                            bottom_extra_slices.pop_back();
+                        while (! bottom_extra_slices.empty()) {
+                            Polygons bottom_interfaces = intersection_clipped(bottom_extra_slices.back().polygons, volumes.getPlaceableAreas(0, layer_begin - LayerIndex(bottom_extra_slices.size()), [] {}));
+                            if (area(bottom_interfaces) < support_area_min)
+                                bottom_extra_slices.pop_back();
+                            else {
+                                bottom_extra_slices.back().bottom_interfaces = std::move(bottom_interfaces);
+                            }
+                        }
                         layer_begin -= LayerIndex(bottom_extra_slices.size());
                         slices.insert(slices.begin(), bottom_extra_slices.size(), {});
                         size_t i = 0;
