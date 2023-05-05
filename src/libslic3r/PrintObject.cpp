@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <float.h>
 #include <limits>
 #include <map>
@@ -1603,11 +1604,11 @@ void PrintObject::discover_vertical_shells()
     } // for each region
 } // void PrintObject::discover_vertical_shells()
 
-// #define DEBUG_BRIDGE_OVER_INFILL
+#define DEBUG_BRIDGE_OVER_INFILL
 #ifdef DEBUG_BRIDGE_OVER_INFILL
 template<typename T> void debug_draw(std::string name, const T& a, const T& b, const T& c, const T& d)
 {
-    std::vector<std::string> colors = {"red", "blue", "orange", "green"};
+    std::vector<std::string> colors = {"red", "green", "blue", "orange"};
     BoundingBox              bbox   = get_extents(a);
     bbox.merge(get_extents(b));
     bbox.merge(get_extents(c));
@@ -1664,11 +1665,7 @@ void PrintObject::bridge_over_infill()
                 // unsupported area will serve as a filter for polygons worth bridging.
                 Polygons   unsupported_area;
                 Polygons   lower_layer_solids;
-                bool contains_only_lightning = true;
                 for (const LayerRegion *region : layer->lower_layer->regions()) {
-                    if (region->region().config().fill_pattern.value != ipLightning) {
-                        contains_only_lightning = false;
-                    }
                     Polygons fill_polys = to_polygons(region->fill_expolygons());
                     // initially consider the whole layer unsupported, but also gather solid layers to later cut off supported parts
                     unsupported_area.insert(unsupported_area.end(), fill_polys.begin(), fill_polys.end());
@@ -2278,42 +2275,71 @@ void PrintObject::bridge_over_infill()
     tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this, &surfaces_by_layer](tbb::blocked_range<size_t> r) {
         PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
         for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
-            if (surfaces_by_layer.find(lidx) == surfaces_by_layer.end())
+            if (surfaces_by_layer.find(lidx) == surfaces_by_layer.end() && surfaces_by_layer.find(lidx + 1) == surfaces_by_layer.end())
                 continue;
             Layer *layer = po->get_layer(lidx);
 
             Polygons cut_from_infill{};
-            for (const auto &surface : surfaces_by_layer.at(lidx)) {
-                cut_from_infill.insert(cut_from_infill.end(), surface.new_polys.begin(), surface.new_polys.end());
+            if (surfaces_by_layer.find(lidx) != surfaces_by_layer.end()) {
+                for (const auto &surface : surfaces_by_layer.at(lidx)) {
+                    cut_from_infill.insert(cut_from_infill.end(), surface.new_polys.begin(), surface.new_polys.end());
+                }
+            }
+
+            Polygons additional_ensuring_areas{};
+            if (surfaces_by_layer.find(lidx + 1) != surfaces_by_layer.end()) {
+                for (const auto &surface : surfaces_by_layer.at(lidx + 1)) {
+                    auto additional_area = diff(surface.new_polys,
+                                                shrink(surface.new_polys, surface.region->flow(frSolidInfill).scaled_spacing()));
+                    additional_ensuring_areas.insert(additional_ensuring_areas.end(), additional_area.begin(), additional_area.end());
+                }
             }
 
             for (LayerRegion *region : layer->regions()) {
                 Surfaces new_surfaces;
 
-                SurfacesPtr internal_infills     = region->m_fill_surfaces.filter_by_type(stInternal);
-                ExPolygons  new_internal_infills = diff_ex(internal_infills, cut_from_infill);
+                Polygons near_perimeters = to_polygons(union_safety_offset_ex(to_polygons(region->fill_surfaces().surfaces)));
+                near_perimeters          = diff(near_perimeters, shrink(near_perimeters, region->flow(frSolidInfill).scaled_spacing()));
+                ExPolygons additional_ensuring = intersection_ex(additional_ensuring_areas, near_perimeters);
+
+                SurfacesPtr internal_infills = region->m_fill_surfaces.filter_by_type(stInternal);
+                ExPolygons new_internal_infills = diff_ex(internal_infills, cut_from_infill);
+                new_internal_infills            = diff_ex(new_internal_infills, additional_ensuring);
                 for (const ExPolygon &ep : new_internal_infills) {
                     new_surfaces.emplace_back(*internal_infills.front(), ep);
                 }
 
                 SurfacesPtr internal_solids = region->m_fill_surfaces.filter_by_type(stInternalSolid);
-                for (const CandidateSurface &cs : surfaces_by_layer.at(lidx)) {
-                    for (const Surface *surface : internal_solids) {
-                        if (cs.original_surface == surface) {
-                            Surface tmp{*surface, {}};
-                            tmp.surface_type = stInternalBridge;
-                            tmp.bridge_angle = cs.bridge_angle;
-                            for (const ExPolygon &ep : union_ex(cs.new_polys)) {
-                                new_surfaces.emplace_back(tmp, ep);
+                if (surfaces_by_layer.find(lidx) != surfaces_by_layer.end()) {
+                    for (const CandidateSurface &cs : surfaces_by_layer.at(lidx)) {
+                        for (const Surface *surface : internal_solids) {
+                            if (cs.original_surface == surface) {
+                                Surface tmp{*surface, {}};
+                                tmp.surface_type = stInternalBridge;
+                                tmp.bridge_angle = cs.bridge_angle;
+                                for (const ExPolygon &ep : union_ex(cs.new_polys)) {
+                                    new_surfaces.emplace_back(tmp, ep);
+                                }
+                                break;
                             }
-                            break;
                         }
                     }
                 }
-                ExPolygons new_internal_solids = diff_ex(internal_solids, cut_from_infill);
+                ExPolygons new_internal_solids = to_expolygons(internal_solids);
+                new_internal_solids.insert(new_internal_solids.end(), additional_ensuring.begin(), additional_ensuring.end());
+                new_internal_solids = diff_ex(internal_solids, cut_from_infill);
                 for (const ExPolygon &ep : new_internal_solids) {
-                    new_surfaces.emplace_back(*internal_solids.front(), ep);
+                    new_surfaces.emplace_back(stInternalSolid, ep);
                 }
+
+#ifdef DEBUG_BRIDGE_OVER_INFILL
+                debug_draw("AdditionalEnsuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)),
+                           to_polylines(additional_ensuring_areas), to_polylines(near_perimeters), to_polylines(to_polygons(internal_infills)),
+                           to_polylines(to_polygons(internal_solids)));
+                debug_draw("AddditionalEnsuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)) + "_new",
+                           to_polylines(additional_ensuring_areas), to_polylines(near_perimeters), to_polylines(to_polygons(new_internal_infills)),
+                           to_polylines(to_polygons(new_internal_solids)));
+#endif
 
                 region->m_fill_surfaces.remove_types({stInternalSolid, stInternal});
                 region->m_fill_surfaces.append(new_surfaces);
