@@ -276,10 +276,12 @@ set(SLIC3R_SOURCES
     SlicingAdaptive.hpp
     Subdivide.cpp
     Subdivide.hpp
-    SupportSpotsGenerator.cpp
-    SupportSpotsGenerator.hpp
+    Support/SupportLayer.hpp
+    Support/SupportParameters.hpp
     SupportMaterial.cpp
     SupportMaterial.hpp
+    SupportSpotsGenerator.cpp
+    SupportSpotsGenerator.hpp
     Surface.cpp
     Surface.hpp
     SurfaceCollection.cpp

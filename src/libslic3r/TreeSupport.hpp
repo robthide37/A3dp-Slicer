@@ -11,6 +11,7 @@
 
 #include "TreeModelVolumes.hpp"
 #include "Point.hpp"
+#include "Support/SupportLayer.hpp"
 
 #include <boost/container/small_vector.hpp>
 
@@ -39,10 +40,7 @@ namespace Slic3r
 // Forward declarations
 class Print;
 class PrintObject;
-class SupportGeneratorLayer;
 struct SlicingParameters;
-using SupportGeneratorLayerStorage  = std::deque<SupportGeneratorLayer>;
-using SupportGeneratorLayersPtr     = std::vector<SupportGeneratorLayer*>;
 
 namespace FFFTreeSupport
 {
