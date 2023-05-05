@@ -3,8 +3,10 @@
 
 #include <oneapi/tbb/scalable_allocator.h>
 #include <oneapi/tbb/spin_mutex.h>
+// for Slic3r::deque
+#include "../libslic3r.h"
 
-namespace Slic3r {
+namespace Slic3r::FFFSupport {
 
 // Support layer type to be used by SupportGeneratorLayer. This type carries a much more detailed information
 // about the support layer type than the final support layers stored in a PrintObject.
@@ -111,18 +113,30 @@ public:
 // Layers are allocated and owned by a deque. Once a layer is allocated, it is maintained
 // up to the end of a generate() method. The layer storage may be replaced by an allocator class in the future, 
 // which would allocate layers by multiple chunks.
-#if 0
 class SupportGeneratorLayerStorage {
 public:
+	SupportGeneratorLayer& allocate_unguarded(SupporLayerType layer_type) { 
+		m_storage.emplace_back();
+		m_storage.back().layer_type = layer_type;
+	    return m_storage.back();
+	}
+
+	SupportGeneratorLayer& allocate(SupporLayerType layer_type)
+	{ 
+		m_mutex.lock();
+		m_storage.emplace_back();
+	    SupportGeneratorLayer *layer_new = &m_storage.back();
+		m_mutex.unlock();
+	    layer_new->layer_type = layer_type;
+	    return *layer_new;
+	}
+
 private:
 	template<typename BaseType>
 	using Allocator = tbb::scalable_allocator<BaseType>;
-	Slic3r::deque<SupportGeneratorLayer, Allocator<SupportGeneratorLayer>> 		m_data;
+	Slic3r::deque<SupportGeneratorLayer, Allocator<SupportGeneratorLayer>> 		m_storage;
 	tbb::spin_mutex                         									m_mutex;
 };
-#else
-#endif
-using SupportGeneratorLayerStorage	= std::deque<SupportGeneratorLayer>;
 using SupportGeneratorLayersPtr		= std::vector<SupportGeneratorLayer*>;
 
 } // namespace Slic3r

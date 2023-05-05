@@ -276,7 +276,12 @@ set(SLIC3R_SOURCES
     SlicingAdaptive.hpp
     Subdivide.cpp
     Subdivide.hpp
+    Support/SupportCommon.cpp
+    Support/SupportCommon.hpp
+    Support/SupportDebug.cpp
+    Support/SupportDebug.hpp
     Support/SupportLayer.hpp
+    Support/SupportParameters.cpp
     Support/SupportParameters.hpp
     SupportMaterial.cpp
     SupportMaterial.hpp

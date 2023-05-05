@@ -19,8 +19,9 @@
 #include "Polygon.hpp"
 #include "Polyline.hpp"
 #include "MutablePolygon.hpp"
-#include "SupportMaterial.hpp"
 #include "TriangleMeshSlicer.hpp"
+
+#include "Support/SupportCommon.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -37,7 +38,6 @@
 
 #include <tbb/global_control.h>
 #include <tbb/parallel_for.h>
-#include <tbb/spin_mutex.h>
 
 #if defined(TREE_SUPPORT_SHOW_ERRORS) && defined(_WIN32)
     #define TREE_SUPPORT_SHOW_ERRORS_WIN32
@@ -52,6 +52,8 @@
 #endif // TREE_SUPPORT_ORGANIC_NUDGE_NEW
 
 // #define TREESUPPORT_DEBUG_SVG
+
+using namespace Slic3r::FFFSupport;
 
 namespace Slic3r
 {
@@ -962,13 +964,11 @@ static LayerIndex layer_idx_floor(const SlicingParameters &slicing_params, const
 }
 
 static inline SupportGeneratorLayer& layer_initialize(
-    SupportGeneratorLayer   &layer_new,
-    const SupporLayerType    layer_type,
-    const SlicingParameters &slicing_params,
+    SupportGeneratorLayer     &layer_new,
+    const SlicingParameters   &slicing_params,
     const TreeSupportSettings &config, 
-    const size_t             layer_idx)
+    const size_t               layer_idx)
 {
-    layer_new.layer_type = layer_type;
     layer_new.print_z  = layer_z(slicing_params, config, layer_idx);
     layer_new.bottom_z = layer_idx > 0 ? layer_z(slicing_params, config, layer_idx - 1) : 0;
     layer_new.height   = layer_new.print_z - layer_new.bottom_z;
@@ -976,29 +976,26 @@ static inline SupportGeneratorLayer& layer_initialize(
 }
 
 // Using the std::deque as an allocator.
-inline SupportGeneratorLayer& layer_allocate(
-    std::deque<SupportGeneratorLayer> &layer_storage,
+inline SupportGeneratorLayer& layer_allocate_unguarded(
+    SupportGeneratorLayerStorage      &layer_storage,
     SupporLayerType                    layer_type,
     const SlicingParameters           &slicing_params,
     const TreeSupportSettings         &config, 
     size_t                             layer_idx)
 {
-    //FIXME take raft into account.
-    layer_storage.push_back(SupportGeneratorLayer());
-    return layer_initialize(layer_storage.back(), layer_type, slicing_params, config, layer_idx);
+    SupportGeneratorLayer &layer = layer_storage.allocate_unguarded(layer_type);
+    return layer_initialize(layer, slicing_params, config, layer_idx);
 }
 
 inline SupportGeneratorLayer& layer_allocate(
-    std::deque<SupportGeneratorLayer> &layer_storage,
-    tbb::spin_mutex&                   layer_storage_mutex,
+    SupportGeneratorLayerStorage      &layer_storage,
     SupporLayerType                    layer_type,
     const SlicingParameters           &slicing_params,
     const TreeSupportSettings         &config, 
     size_t                             layer_idx)
 {
-    tbb::spin_mutex::scoped_lock lock(layer_storage_mutex);
-    layer_storage.push_back(SupportGeneratorLayer());
-    return layer_initialize(layer_storage.back(), layer_type, slicing_params, config, layer_idx);
+    SupportGeneratorLayer &layer = layer_storage.allocate(layer_type);
+    return layer_initialize(layer, slicing_params, config, layer_idx);
 }
 
 int generate_raft_contact(
@@ -1016,7 +1013,7 @@ int generate_raft_contact(
         while (raft_contact_layer_idx > 0 && config.raft_layers[raft_contact_layer_idx] > print_object.slicing_parameters().raft_contact_top_z + EPSILON)
             -- raft_contact_layer_idx;
         // Create the raft contact layer.
-        SupportGeneratorLayer &raft_contact_layer = layer_allocate(layer_storage, SupporLayerType::TopContact, print_object.slicing_parameters(), config, raft_contact_layer_idx);
+        SupportGeneratorLayer &raft_contact_layer = layer_allocate_unguarded(layer_storage, SupporLayerType::TopContact, print_object.slicing_parameters(), config, raft_contact_layer_idx);
         top_contacts[raft_contact_layer_idx] = &raft_contact_layer;
         const ExPolygons &lslices   = print_object.get_layer(0)->lslices;
         double            expansion = print_object.config().raft_expansion.value;
@@ -1115,7 +1112,7 @@ public:
     {
         SupportGeneratorLayer*& l = top_contacts[insert_layer_idx];
         if (l == nullptr)
-            l = &layer_allocate(layer_storage, SupporLayerType::TopContact, slicing_parameters, config, insert_layer_idx);
+            l = &layer_allocate_unguarded(layer_storage, SupporLayerType::TopContact, slicing_parameters, config, insert_layer_idx);
         // will be unioned in finalize_interface_and_support_areas()
         append(l->polygons, std::move(new_roofs));
     }
@@ -1141,7 +1138,7 @@ public:
         std::lock_guard<std::mutex> lock(m_mutex_layer_storage);
         SupportGeneratorLayer*& l = top_contacts[0];
         if (l == nullptr)
-            l = &layer_allocate(layer_storage, SupporLayerType::TopContact, slicing_parameters, config, 0);
+            l = &layer_allocate_unguarded(layer_storage, SupporLayerType::TopContact, slicing_parameters, config, 0);
         append(l->polygons, std::move(overhang_areas));
     }
 
@@ -3309,7 +3306,6 @@ static void finalize_interface_and_support_areas(
 #endif // SLIC3R_TREESUPPORTS_PROGRESS
 
     // Iterate over the generated circles in parallel and clean them up. Also add support floor.
-    tbb::spin_mutex layer_storage_mutex;
     tbb::parallel_for(tbb::blocked_range<size_t>(0, support_layer_storage.size()),
         [&](const tbb::blocked_range<size_t> &range) {
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
@@ -3402,7 +3398,7 @@ static void finalize_interface_and_support_areas(
                 }
                 if (! floor_layer.empty()) {
                     if (support_bottom == nullptr)
-                        support_bottom = &layer_allocate(layer_storage, layer_storage_mutex, SupporLayerType::BottomContact, print_object.slicing_parameters(), config, layer_idx);
+                        support_bottom = &layer_allocate(layer_storage, SupporLayerType::BottomContact, print_object.slicing_parameters(), config, layer_idx);
                     support_bottom->polygons = union_(floor_layer, support_bottom->polygons);
                     base_layer_polygons = diff_clipped(base_layer_polygons, offset(support_bottom->polygons, scaled<float>(0.01), jtMiter, 1.2)); // Subtract the support floor from the normal support.
                 }
@@ -3410,11 +3406,11 @@ static void finalize_interface_and_support_areas(
 
             if (! support_roof_polygons.empty()) {
                 if (support_roof == nullptr)
-                    support_roof = top_contacts[layer_idx] = &layer_allocate(layer_storage, layer_storage_mutex, SupporLayerType::TopContact, print_object.slicing_parameters(), config, layer_idx);
+                    support_roof = top_contacts[layer_idx] = &layer_allocate(layer_storage, SupporLayerType::TopContact, print_object.slicing_parameters(), config, layer_idx);
                 support_roof->polygons = union_(support_roof_polygons);
             }
             if (! base_layer_polygons.empty()) {
-                SupportGeneratorLayer *base_layer = intermediate_layers[layer_idx] = &layer_allocate(layer_storage, layer_storage_mutex, SupporLayerType::Base, print_object.slicing_parameters(), config, layer_idx);
+                SupportGeneratorLayer *base_layer = intermediate_layers[layer_idx] = &layer_allocate(layer_storage, SupporLayerType::Base, print_object.slicing_parameters(), config, layer_idx);
                 base_layer->polygons = union_(base_layer_polygons);
             }
 

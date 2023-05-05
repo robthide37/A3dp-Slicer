@@ -12,54 +12,6 @@ namespace Slic3r {
 
 class PrintObject;
 
-// Remove bridges from support contact areas.
-// To be called if PrintObjectConfig::dont_support_bridges.
-void remove_bridges_from_contacts(
-    const PrintConfig   &print_config, 
-    const Layer         &lower_layer,
-    const LayerRegion   &layerm,
-    float                fw, 
-    Polygons            &contact_polygons);
-
-// Generate raft layers, also expand the 1st support layer
-// in case there is no raft layer to improve support adhesion.
-SupportGeneratorLayersPtr generate_raft_base(
-	const PrintObject				&object,
-	const SupportParameters			&support_params,
-	const SlicingParameters			&slicing_params,
-	const SupportGeneratorLayersPtr &top_contacts,
-	const SupportGeneratorLayersPtr &interface_layers,
-	const SupportGeneratorLayersPtr &base_interface_layers,
-	const SupportGeneratorLayersPtr &base_layers,
-	SupportGeneratorLayerStorage    &layer_storage);
-
-// returns sorted layers
-SupportGeneratorLayersPtr generate_support_layers(
-	PrintObject							&object,
-    const SupportGeneratorLayersPtr     &raft_layers,
-    const SupportGeneratorLayersPtr     &bottom_contacts,
-    const SupportGeneratorLayersPtr     &top_contacts,
-    const SupportGeneratorLayersPtr     &intermediate_layers,
-    const SupportGeneratorLayersPtr     &interface_layers,
-    const SupportGeneratorLayersPtr     &base_interface_layers);
-
-// Produce the support G-code.
-// Used by both classic and tree supports.
-void generate_support_toolpaths(
-	SupportLayerPtrs    				&support_layers,
-	const PrintObjectConfig 			&config,
-	const SupportParameters 			&support_params,
-	const SlicingParameters 			&slicing_params,
-    const SupportGeneratorLayersPtr 	&raft_layers,
-    const SupportGeneratorLayersPtr   	&bottom_contacts,
-    const SupportGeneratorLayersPtr   	&top_contacts,
-    const SupportGeneratorLayersPtr   	&intermediate_layers,
-	const SupportGeneratorLayersPtr   	&interface_layers,
-    const SupportGeneratorLayersPtr   	&base_interface_layers);
-
-void export_print_z_polygons_to_svg(const char *path, SupportGeneratorLayer ** const layers, size_t n_layers);
-void export_print_z_polygons_and_extrusions_to_svg(const char *path, SupportGeneratorLayer ** const layers, size_t n_layers, SupportLayer& support_layer);
-
 // This class manages raft and supports for a single PrintObject.
 // Instantiated by Slic3r::Print::Object->_support_material()
 // This class is instantiated before the slicing starts as Object.pm will query
@@ -84,6 +36,10 @@ public:
 	void 		generate(PrintObject &object);
 
 private:
+	using SupportGeneratorLayersPtr    = FFFSupport::SupportGeneratorLayersPtr;
+	using SupportGeneratorLayerStorage = FFFSupport::SupportGeneratorLayerStorage;
+	using SupportParameters            = FFFSupport::SupportParameters;
+
 	std::vector<Polygons> buildplate_covered(const PrintObject &object) const;
 
 	// Generate top contact layers supporting overhangs.

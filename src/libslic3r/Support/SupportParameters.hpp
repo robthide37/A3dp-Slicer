@@ -9,6 +9,8 @@ namespace Slic3r {
 class PrintObject;
 enum InfillPattern : int;
 
+namespace FFFSupport {
+
 struct SupportParameters {
 	SupportParameters(const PrintObject &object);
 
@@ -60,6 +62,8 @@ struct SupportParameters {
     float 					raft_interface_angle(size_t interface_id) const 
     	{ return this->raft_angle_interface + ((interface_id & 1) ? float(- M_PI / 4.) : float(+ M_PI / 4.)); }
 };
+
+} // namespace FFFSupport
 
 } // namespace Slic3r
 
