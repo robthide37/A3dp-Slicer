@@ -1,0 +1,36 @@
+diff --git a/OpenEXR/IlmImf/ImfDwaCompressor.cpp b/OpenEXR/IlmImf/ImfDwaCompressor.cpp
+index 59d1d5d1..585a3e65 100644
+--- a/OpenEXR/IlmImf/ImfDwaCompressor.cpp
++++ b/OpenEXR/IlmImf/ImfDwaCompressor.cpp
+@@ -159,6 +159,7 @@
+ #include <limits>
+ 
+ #include <cstddef>
++#include <cstdint>
+ 
+ 
+ // Windows specific addition to prevent the indirect import of the redefined min/max macros
+diff --git a/OpenEXR/IlmImf/ImfHuf.cpp b/OpenEXR/IlmImf/ImfHuf.cpp
+index 271849b7..165fac58 100644
+--- a/OpenEXR/IlmImf/ImfHuf.cpp
++++ b/OpenEXR/IlmImf/ImfHuf.cpp
+@@ -53,6 +53,7 @@
+ #include <cstring>
+ #include <cassert>
+ #include <algorithm>
++#include <cstdint>
+ 
+ 
+ using namespace std;
+diff --git a/OpenEXR/IlmImf/ImfMisc.cpp b/OpenEXR/IlmImf/ImfMisc.cpp
+index d2c84787..4b487940 100644
+--- a/OpenEXR/IlmImf/ImfMisc.cpp
++++ b/OpenEXR/IlmImf/ImfMisc.cpp
+@@ -40,6 +40,7 @@
+ //
+ //-----------------------------------------------------------------------------
+ 
++#include <cstdint>
+ #include <ImfMisc.h>
+ #include <ImfHeader.h>
+ #include <ImfAttribute.h>
