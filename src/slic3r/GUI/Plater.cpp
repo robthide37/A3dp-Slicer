@@ -1794,6 +1794,8 @@ struct Plater::priv
     bool init_view_toolbar();
     bool init_collapse_toolbar();
 
+    void set_preview_layers_slider_values_range(int bottom, int top);
+
     void update_preview_moves_slider();
     void enable_preview_moves_slider(bool enable);
 
@@ -4630,6 +4632,11 @@ bool Plater::priv::init_collapse_toolbar()
     // is updated before the toolbar is first used.
     wxGetApp().plater()->collapse_sidebar(wxGetApp().plater()->is_sidebar_collapsed());
     return true;
+}
+
+void Plater::priv::set_preview_layers_slider_values_range(int bottom, int top)
+{
+    preview->set_layers_slider_values_range(bottom, top);
 }
 
 void Plater::priv::update_preview_moves_slider()
@@ -7504,6 +7511,11 @@ const GLToolbar& Plater::get_collapse_toolbar() const
 GLToolbar& Plater::get_collapse_toolbar()
 {
     return p->collapse_toolbar;
+}
+
+void Plater::set_preview_layers_slider_values_range(int bottom, int top)
+{
+    p->set_preview_layers_slider_values_range(bottom, top);
 }
 
 void Plater::update_preview_moves_slider()

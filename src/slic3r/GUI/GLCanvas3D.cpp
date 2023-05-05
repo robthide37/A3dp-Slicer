@@ -7493,12 +7493,14 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
             const PrintObject* obj2 = reinterpret_cast<const PrintObject*>(conflict_result->_obj2);
             auto     mo = obj2->model_object();
             ObjectID id = mo->id();
-            auto     action_fn = [id](wxEvtHandler*) {
+            int layer_id = conflict_result->layer;
+            auto     action_fn = [id, layer_id](wxEvtHandler*) {
                 auto& objects = wxGetApp().model().objects;
                 auto  iter = id.id ? std::find_if(objects.begin(), objects.end(), [id](auto o) { return o->id() == id; }) : objects.end();
                 if (iter != objects.end()) {
                     const unsigned int obj_idx = std::distance(objects.begin(), iter);
-                    wxGetApp().CallAfter([obj_idx]() {
+                    wxGetApp().CallAfter([obj_idx, layer_id]() {
+                        wxGetApp().plater()->set_preview_layers_slider_values_range(0, layer_id - 1);
                         wxGetApp().plater()->select_view_3D("3D");
                         wxGetApp().plater()->canvas3D()->get_selection().add_object(obj_idx, true);
                         wxGetApp().obj_list()->update_selections();
