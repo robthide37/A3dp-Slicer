@@ -1,12 +1,12 @@
 #ifndef slic3r_SupportMaterial_hpp_
 #define slic3r_SupportMaterial_hpp_
 
-#include "Flow.hpp"
-#include "PrintConfig.hpp"
-#include "Slicing.hpp"
+#include "../Flow.hpp"
+#include "../PrintConfig.hpp"
+#include "../Slicing.hpp"
 
-#include "Support/SupportLayer.hpp"
-#include "Support/SupportParameters.hpp"
+#include "SupportLayer.hpp"
+#include "SupportParameters.hpp"
 
 namespace Slic3r {
 

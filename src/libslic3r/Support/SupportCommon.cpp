@@ -22,8 +22,8 @@
     #define DEBUG
     #define _DEBUG
     #undef NDEBUG
-    #include "utils.hpp"
-    #include "SVG.hpp"
+    #include "../utils.hpp"
+    #include "../SVG.hpp"
 #endif
 
 #include <cassert>

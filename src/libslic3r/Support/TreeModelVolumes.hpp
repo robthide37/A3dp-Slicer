@@ -14,9 +14,9 @@
 
 #include <boost/functional/hash.hpp>
 
-#include "Point.hpp"
-#include "Polygon.hpp"
-#include "PrintConfig.hpp"
+#include "../Point.hpp"
+#include "../Polygon.hpp"
+#include "../PrintConfig.hpp"
 
 namespace Slic3r
 {

@@ -1,9 +1,9 @@
 #if 1 //#ifdef SLIC3R_DEBUG
 
-#include "ClipperUtils.hpp"
-#include "SVG.hpp"
-
+#include "../ClipperUtils.hpp"
+#include "../SVG.hpp"
 #include "../Layer.hpp"
+
 #include "SupportLayer.hpp"
 
 namespace Slic3r::FFFSupport {

@@ -281,10 +281,14 @@ set(SLIC3R_SOURCES
     Support/SupportDebug.cpp
     Support/SupportDebug.hpp
     Support/SupportLayer.hpp
+    Support/SupportMaterial.cpp
+    Support/SupportMaterial.hpp
     Support/SupportParameters.cpp
     Support/SupportParameters.hpp
-    SupportMaterial.cpp
-    SupportMaterial.hpp
+    Support/TreeSupport.cpp
+    Support/TreeSupport.hpp
+    Support/TreeModelVolumes.cpp
+    Support/TreeModelVolumes.hpp
     SupportSpotsGenerator.cpp
     SupportSpotsGenerator.hpp
     Surface.cpp
@@ -298,10 +302,6 @@ set(SLIC3R_SOURCES
     Tesselate.cpp
     Tesselate.hpp
     TextConfiguration.hpp
-    TreeSupport.cpp
-    TreeSupport.hpp
-    TreeModelVolumes.cpp
-    TreeModelVolumes.hpp
     TriangleMesh.cpp
     TriangleMesh.hpp
     TriangleMeshSlicer.cpp

@@ -1,14 +1,14 @@
-#include "ClipperUtils.hpp"
-#include "ExtrusionEntityCollection.hpp"
-#include "Layer.hpp"
-#include "Print.hpp"
-#include "SupportMaterial.hpp"
-#include "Fill/FillBase.hpp"
-#include "Geometry.hpp"
-#include "Point.hpp"
-#include "MutablePolygon.hpp"
+#include "../ClipperUtils.hpp"
+#include "../ExtrusionEntityCollection.hpp"
+#include "../Layer.hpp"
+#include "../Print.hpp"
+#include "../Fill/FillBase.hpp"
+#include "../Geometry.hpp"
+#include "../Point.hpp"
+#include "../MutablePolygon.hpp"
 
 #include "Support/SupportCommon.hpp"
+#include "SupportMaterial.hpp"
 
 #include <clipper/clipper_z.hpp>
 
@@ -40,8 +40,8 @@
     #define DEBUG
     #define _DEBUG
     #undef NDEBUG
-    #include "utils.hpp"
-    #include "SVG.hpp"
+    #include "../utils.hpp"
+    #include "../SVG.hpp"
 #endif
 
 #include <cassert>
