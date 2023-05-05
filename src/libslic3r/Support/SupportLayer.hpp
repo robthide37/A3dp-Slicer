@@ -5,6 +5,8 @@
 #include <oneapi/tbb/spin_mutex.h>
 // for Slic3r::deque
 #include "../libslic3r.h"
+#include "ClipperUtils.hpp"
+#include "Polygon.hpp"
 
 namespace Slic3r::FFFSupport {
 

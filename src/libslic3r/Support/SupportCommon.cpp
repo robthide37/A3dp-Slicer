@@ -1,4 +1,5 @@
 #include "../ClipperUtils.hpp"
+#include "../ClipperZUtils.hpp"
 #include "../ExtrusionEntityCollection.hpp"
 #include "../Layer.hpp"
 #include "../Print.hpp"
