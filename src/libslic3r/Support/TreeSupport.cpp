@@ -1119,7 +1119,7 @@ public:
     void add_roof_build_plate(Polygons &&overhang_areas, size_t dtt_roof)
     {
         std::lock_guard<std::mutex> lock(m_mutex_layer_storage);
-        this->add_roof_unguarded(std::move(overhang_areas), 0, dtt_roof);
+        this->add_roof_unguarded(std::move(overhang_areas), 0, std::min(dtt_roof, this->support_parameters.num_top_interface_layers));
     }
 
     // called by sample_overhang_area()
@@ -1204,6 +1204,8 @@ public:
 private:
     void add_roof_unguarded(Polygons &&new_roofs, const size_t insert_layer_idx, const size_t dtt_roof)
     {
+        assert(support_parameters.has_top_contacts);
+        assert(dtt_roof <= support_parameters.num_top_interface_layers);
         SupportGeneratorLayersPtr &layers =
             dtt_roof == 0 ? this->top_contacts :
             dtt_roof <= support_parameters.num_top_interface_layers_only() ? this->top_interfaces : this->top_base_interfaces;
@@ -4413,8 +4415,13 @@ static void draw_branches(
                                         bottom_extra_slices.back().polygons, volumes.getPlaceableAreas(0, layer_begin - LayerIndex(bottom_extra_slices.size()), [] {}));
                                     if (area(this_bottom_contacts) < support_area_min)
                                         bottom_extra_slices.pop_back();
-                                    else if (config.settings.support_floor_layers > 0)
-                                        bottom_contacts.emplace_back(std::move(this_bottom_contacts));
+                                    else {
+                                        // At least a fraction of the tree bottom is considered to be supported.
+                                        if (config.settings.support_floor_layers > 0)
+                                            // Turn this fraction of the tree bottom into a contact layer.
+                                            bottom_contacts.emplace_back(std::move(this_bottom_contacts));
+                                        break;
+                                    }
                                 }
                                 if (config.settings.support_floor_layers > 0)
                                     for (int i = int(bottom_extra_slices.size()) - 2; i >= 0; -- i)
