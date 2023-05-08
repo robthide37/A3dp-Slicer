@@ -21,6 +21,23 @@ void remove_bridges_from_contacts(
     float                fw, 
     Polygons            &contact_polygons);
 
+// Turn some of the base layers into base interface layers.
+// For soluble interfaces with non-soluble bases, print maximum two first interface layers with the base
+// extruder to improve adhesion of the soluble filament to the base.
+// For Organic supports, merge top_interface_layers & top_base_interface_layers with the interfaces
+// produced by this function.
+std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interface_layers(
+    const PrintObjectConfig           &config,
+    const SupportParameters           &support_params,
+    const SupportGeneratorLayersPtr   &bottom_contacts,
+    const SupportGeneratorLayersPtr   &top_contacts,
+    // Input / output, will be merged with output
+    SupportGeneratorLayersPtr         &top_interface_layers,
+    SupportGeneratorLayersPtr         &top_base_interface_layers,
+    // Input, will be trimmed with the newly created interface layers.
+    SupportGeneratorLayersPtr         &intermediate_layers,
+    SupportGeneratorLayerStorage      &layer_storage);
+
 // Generate raft layers, also expand the 1st support layer
 // in case there is no raft layer to improve support adhesion.
 SupportGeneratorLayersPtr generate_raft_base(

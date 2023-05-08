@@ -72,16 +72,6 @@ private:
 	    SupportGeneratorLayersPtr         &intermediate_layers,
 	    const std::vector<Polygons> &layer_support_areas) const;
 
-	// Turn some of the base layers into base interface layers.
-	// For soluble interfaces with non-soluble bases, print maximum two first interface layers with the base
-	// extruder to improve adhesion of the soluble filament to the base.
-	std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interface_layers(
-	    const SupportGeneratorLayersPtr   &bottom_contacts,
-	    const SupportGeneratorLayersPtr   &top_contacts,
-	    SupportGeneratorLayersPtr         &intermediate_layers,
-	    SupportGeneratorLayerStorage      &layer_storage) const;
-	
-
 	// Trim support layers by an object to leave a defined gap between
 	// the support volume and the object.
 	void trim_support_layers_by_object(

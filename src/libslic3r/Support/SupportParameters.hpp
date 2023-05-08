@@ -14,6 +14,30 @@ namespace FFFSupport {
 struct SupportParameters {
 	SupportParameters(const PrintObject &object);
 
+    // Both top / bottom contacts and interfaces are soluble.
+    bool                    soluble_interface;
+    // Support contact & interface are soluble, but support base is non-soluble.
+    bool                    soluble_interface_non_soluble_base;
+
+    // Is there at least a top contact layer extruded above support base?
+    bool                    has_top_contacts;
+    // Is there at least a bottom contact layer extruded below support base?
+    bool                    has_bottom_contacts;
+    // Number of top interface layers without counting the contact layer.
+    size_t                  num_top_interface_layers;
+    // Number of bottom interface layers without counting the contact layer.
+    size_t                  num_bottom_interface_layers;
+    // Number of top base interface layers. Zero if not soluble_interface_non_soluble_base.
+    size_t                  num_top_base_interface_layers;
+    // Number of bottom base interface layers. Zero if not soluble_interface_non_soluble_base.
+    size_t                  num_bottom_base_interface_layers;
+
+    bool                    has_contacts() const { return this->has_top_contacts || this->has_bottom_contacts; }
+    bool                    has_interfaces() const { return this->num_top_interface_layers + this->num_bottom_interface_layers > 0; }
+    bool                    has_base_interfaces() const { return this->num_top_base_interface_layers + this->num_bottom_base_interface_layers > 0; }
+    size_t                  num_top_interface_layers_only() const { return this->num_top_interface_layers - this->num_top_base_interface_layers; }
+    size_t                  num_bottom_interface_layers_only() const { return this->num_bottom_interface_layers - this->num_bottom_base_interface_layers; }
+
 	// Flow at the 1st print layer.
 	Flow 					first_layer_flow;
 	// Flow at the support base (neither top, nor bottom interface).

@@ -3,6 +3,7 @@
 #include "../Layer.hpp"
 #include "../Print.hpp"
 #include "../Fill/FillBase.hpp"
+#include "../MutablePolygon.hpp"
 #include "../Geometry.hpp"
 #include "../Point.hpp"
 
@@ -116,6 +117,194 @@ void remove_bridges_from_contacts(
               { { union_ex(contact_polygons) },            { "contact_polygons",           "blue",   0.5f } },
               { { union_ex(bridges) },                     { "bridges",                    "red",    "black", "", scaled<coord_t>(0.1f), 0.5f } } });
     #endif /* SLIC3R_DEBUG */
+}
+
+// Convert some of the intermediate layers into top/bottom interface layers as well as base interface layers.
+std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interface_layers(
+    const PrintObjectConfig           &config,
+    const SupportParameters           &support_params,
+    const SupportGeneratorLayersPtr   &bottom_contacts,
+    const SupportGeneratorLayersPtr   &top_contacts,
+    // Input / output, will be merged with output. Only provided for Organic supports.
+    SupportGeneratorLayersPtr         &top_interface_layers,
+    SupportGeneratorLayersPtr         &top_base_interface_layers,
+    // Input, will be trimmed with the newly created interface layers.
+    SupportGeneratorLayersPtr         &intermediate_layers,
+    SupportGeneratorLayerStorage      &layer_storage)
+{
+    std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> base_and_interface_layers;
+
+    if (! intermediate_layers.empty() && support_params.has_interfaces()) {
+        // For all intermediate layers, collect top contact surfaces, which are not further than support_material_interface_layers.
+        BOOST_LOG_TRIVIAL(debug) << "PrintObjectSupportMaterial::generate_interface_layers() in parallel - start";
+        const bool snug_supports = config.support_material_style.value != smsGrid;
+        SupportGeneratorLayersPtr &interface_layers       = base_and_interface_layers.first;
+        SupportGeneratorLayersPtr &base_interface_layers  = base_and_interface_layers.second;
+        interface_layers.assign(intermediate_layers.size(), nullptr);
+        if (support_params.has_base_interfaces())
+            base_interface_layers.assign(intermediate_layers.size(), nullptr);
+        const auto smoothing_distance    = support_params.support_material_interface_flow.scaled_spacing() * 1.5;
+        const auto minimum_island_radius = support_params.support_material_interface_flow.scaled_spacing() / support_params.interface_density;
+        const auto closing_distance      = smoothing_distance; // scaled<float>(config.support_material_closing_radius.value);
+        // Insert a new layer into base_interface_layers, if intersection with base exists.
+        auto insert_layer = [&layer_storage, snug_supports, closing_distance, smoothing_distance, minimum_island_radius](
+                SupportGeneratorLayer &intermediate_layer, Polygons &bottom, Polygons &&top, SupportGeneratorLayer *top_interface_layer, 
+                const Polygons *subtract, SupporLayerType type) -> SupportGeneratorLayer* {
+            bool has_top_interface = top_interface_layer && ! top_interface_layer->polygons.empty();
+            assert(! bottom.empty() || ! top.empty() || has_top_interface);
+            // Merge top into bottom, unite them with a safety offset.
+            append(bottom, std::move(top));
+            // Merge top / bottom interfaces. For snug supports, merge using closing distance and regularize (close concave corners).
+            bottom = intersection(
+                snug_supports ?
+                    smooth_outward(closing(std::move(bottom), closing_distance + minimum_island_radius, closing_distance, SUPPORT_SURFACES_OFFSET_PARAMETERS), smoothing_distance) :
+                    union_safety_offset(std::move(bottom)),
+                intermediate_layer.polygons);
+            if (has_top_interface)
+                // Don't trim the precomputed Organic supports top interface with base layer
+                // as the precomputed top interface likely expands over multiple tree tips.
+                bottom = union_(std::move(top_interface_layer->polygons), bottom);
+            if (! bottom.empty()) {
+                //FIXME Remove non-printable tiny islands, let them be printed using the base support.
+                //bottom = opening(std::move(bottom), minimum_island_radius);
+                if (! bottom.empty()) {
+                    SupportGeneratorLayer &layer_new = top_interface_layer ? *top_interface_layer : layer_storage.allocate(type);
+                    layer_new.polygons   = std::move(bottom);
+                    layer_new.print_z    = intermediate_layer.print_z;
+                    layer_new.bottom_z   = intermediate_layer.bottom_z;
+                    layer_new.height     = intermediate_layer.height;
+                    layer_new.bridging   = intermediate_layer.bridging;
+                    // Subtract the interface from the base regions.
+                    intermediate_layer.polygons = diff(intermediate_layer.polygons, layer_new.polygons);
+                    if (subtract)
+                        // Trim the base interface layer with the interface layer.
+                        layer_new.polygons = diff(std::move(layer_new.polygons), *subtract);
+                    //FIXME filter layer_new.polygons islands by a minimum area?
+        //                  $interface_area = [ grep abs($_->area) >= $area_threshold, @$interface_area ];
+                    return &layer_new;
+                }
+            }
+            return nullptr;
+        };
+        tbb::parallel_for(tbb::blocked_range<int>(0, int(intermediate_layers.size())),
+            [&bottom_contacts, &top_contacts, &top_interface_layers, &top_base_interface_layers, &intermediate_layers, &insert_layer, &support_params,
+             snug_supports, &interface_layers, &base_interface_layers](const tbb::blocked_range<int>& range) {                
+                // Gather the top / bottom contact layers intersecting with num_interface_layers resp. num_interface_layers_only intermediate layers above / below
+                // this intermediate layer.
+                // Index of the first top contact layer intersecting the current intermediate layer.
+                auto idx_top_contact_first        = -1;
+                // Index of the first bottom contact layer intersecting the current intermediate layer.
+                auto idx_bottom_contact_first     = -1;
+                // Index of the first top interface layer intersecting the current intermediate layer.
+                auto idx_top_interface_first      = -1;
+                // Index of the first top contact interface layer intersecting the current intermediate layer.
+                auto idx_top_base_interface_first = -1;
+                auto num_intermediate = int(intermediate_layers.size());
+                for (int idx_intermediate_layer = range.begin(); idx_intermediate_layer < range.end(); ++ idx_intermediate_layer) {
+                    SupportGeneratorLayer &intermediate_layer = *intermediate_layers[idx_intermediate_layer];
+                    Polygons polygons_top_contact_projected_interface;
+                    Polygons polygons_top_contact_projected_base;
+                    Polygons polygons_bottom_contact_projected_interface;
+                    Polygons polygons_bottom_contact_projected_base;
+                    if (support_params.num_top_interface_layers > 0) {
+                        // Top Z coordinate of a slab, over which we are collecting the top / bottom contact surfaces
+                        coordf_t top_z              = intermediate_layers[std::min(num_intermediate - 1, idx_intermediate_layer + int(support_params.num_top_interface_layers) - 1)]->print_z;
+                        coordf_t top_inteface_z     = std::numeric_limits<coordf_t>::max();
+                        if (support_params.num_top_base_interface_layers > 0)
+                            // Some top base interface layers will be generated.
+                            top_inteface_z = support_params.num_top_interface_layers_only() == 0 ?
+                                // Only base interface layers to generate.
+                                - std::numeric_limits<coordf_t>::max() :
+                                intermediate_layers[std::min(num_intermediate - 1, idx_intermediate_layer + int(support_params.num_top_interface_layers_only()) - 1)]->print_z;
+                        // Move idx_top_contact_first up until above the current print_z.
+                        idx_top_contact_first = idx_higher_or_equal(top_contacts, idx_top_contact_first, [&intermediate_layer](const SupportGeneratorLayer *layer){ return layer->print_z >= intermediate_layer.print_z; }); //  - EPSILON
+                        // Collect the top contact areas above this intermediate layer, below top_z.
+                        for (int idx_top_contact = idx_top_contact_first; idx_top_contact < int(top_contacts.size()); ++ idx_top_contact) {
+                            const SupportGeneratorLayer &top_contact_layer = *top_contacts[idx_top_contact];
+                            //FIXME maybe this adds one interface layer in excess?
+                            if (top_contact_layer.bottom_z - EPSILON > top_z)
+                                break;
+                            polygons_append(top_contact_layer.bottom_z - EPSILON > top_inteface_z ? polygons_top_contact_projected_base : polygons_top_contact_projected_interface, 
+                                // For snug supports, project the overhang polygons covering the whole overhang, so that they will merge without a gap with support polygons of the other layers.
+                                // For grid supports, merging of support regions will be performed by the projection into grid.
+                                snug_supports ? *top_contact_layer.overhang_polygons : top_contact_layer.polygons);
+                        }
+                    }
+                    if (support_params.num_bottom_interface_layers > 0) {
+                        // Bottom Z coordinate of a slab, over which we are collecting the top / bottom contact surfaces
+                        coordf_t bottom_z           = intermediate_layers[std::max(0, idx_intermediate_layer - int(support_params.num_bottom_interface_layers) + 1)]->bottom_z;
+                        coordf_t bottom_interface_z = - std::numeric_limits<coordf_t>::max();
+                        if (support_params.num_bottom_base_interface_layers > 0)
+                            // Some bottom base interface layers will be generated.
+                            bottom_interface_z = support_params.num_bottom_interface_layers_only() == 0 ? 
+                                // Only base interface layers to generate.
+                                std::numeric_limits<coordf_t>::max() :
+                                intermediate_layers[std::max(0, idx_intermediate_layer - int(support_params.num_bottom_interface_layers_only()))]->bottom_z;
+                        // Move idx_bottom_contact_first up until touching bottom_z.
+                        idx_bottom_contact_first = idx_higher_or_equal(bottom_contacts, idx_bottom_contact_first, [bottom_z](const SupportGeneratorLayer *layer){ return layer->print_z >= bottom_z - EPSILON; });
+                        // Collect the top contact areas above this intermediate layer, below top_z.
+                        for (int idx_bottom_contact = idx_bottom_contact_first; idx_bottom_contact < int(bottom_contacts.size()); ++ idx_bottom_contact) {
+                            const SupportGeneratorLayer &bottom_contact_layer = *bottom_contacts[idx_bottom_contact];
+                            if (bottom_contact_layer.print_z - EPSILON > intermediate_layer.bottom_z)
+                                break;
+                            polygons_append(bottom_contact_layer.print_z - EPSILON > bottom_interface_z ? polygons_bottom_contact_projected_interface : polygons_bottom_contact_projected_base, bottom_contact_layer.polygons);
+                        }
+                    }
+                    auto resolve_same_layer = [](SupportGeneratorLayersPtr &layers, int &idx, coordf_t print_z) -> SupportGeneratorLayer* {
+                        if (! layers.empty()) {
+                            idx = idx_higher_or_equal(layers, idx, [print_z](const SupportGeneratorLayer *layer) { return layer->print_z > print_z - EPSILON; });
+                            if (idx < int(layers.size()) && layers[idx]->print_z < print_z + EPSILON) {
+                                SupportGeneratorLayer *l = layers[idx];
+                                // Remove the layer from the source container, as it will be consumed here: It will be merged
+                                // with the newly produced interfaces.
+                                layers[idx] = nullptr;
+                                return l;
+                            }
+                        }
+                        return nullptr;
+                    };
+                    SupportGeneratorLayer *top_interface_layer      = resolve_same_layer(top_interface_layers, idx_top_interface_first, intermediate_layer.print_z);
+                    SupportGeneratorLayer *top_base_interface_layer = resolve_same_layer(top_base_interface_layers, idx_top_base_interface_first, intermediate_layer.print_z);
+                    SupportGeneratorLayer *interface_layer          = nullptr;
+                    if (! polygons_bottom_contact_projected_interface.empty() || ! polygons_top_contact_projected_interface.empty() ||
+                        (top_interface_layer && ! top_interface_layer->polygons.empty())) {
+                        interface_layer = insert_layer(
+                            intermediate_layer, polygons_bottom_contact_projected_interface, std::move(polygons_top_contact_projected_interface), top_interface_layer,
+                            nullptr, polygons_top_contact_projected_interface.empty() ? SupporLayerType::BottomInterface : SupporLayerType::TopInterface);
+                        interface_layers[idx_intermediate_layer] = interface_layer;
+                    }
+                    if (! polygons_bottom_contact_projected_base.empty() || ! polygons_top_contact_projected_base.empty() ||
+                        (top_base_interface_layer && ! top_base_interface_layer->polygons.empty()))
+                        base_interface_layers[idx_intermediate_layer] = insert_layer(
+                            intermediate_layer, polygons_bottom_contact_projected_base, std::move(polygons_top_contact_projected_base), top_base_interface_layer,
+                            interface_layer ? &interface_layer->polygons : nullptr, SupporLayerType::Base);
+                }
+            });
+
+        // Compress contact_out, remove the nullptr items.
+        // The parallel_for above may not have merged all the interface and base_interface layers
+        // generated by the Organic supports code, do it here.
+        auto merge_remove_nulls = [](SupportGeneratorLayersPtr &in1, SupportGeneratorLayersPtr &in2) {
+            size_t nonzeros = std::count_if(in1.begin(), in1.end(), [](auto *l) { return l != nullptr; }) +
+                              std::count_if(in2.begin(), in2.end(), [](auto *l) { return l != nullptr; });
+            remove_nulls(in1);
+            remove_nulls(in2);
+            if (in2.empty())
+                return std::move(in1);
+            else if (in1.empty())
+                return std::move(in2);
+            else {
+                SupportGeneratorLayersPtr out(in1.size() + in2.size(), nullptr);
+                std::merge(in1.begin(), in1.end(), in2.begin(), in2.end(), out.begin(), [](auto* l, auto* r) { return l->print_z < r->print_z; });
+                return std::move(out);
+            }
+        };
+        interface_layers      = merge_remove_nulls(interface_layers,      top_interface_layers);
+        base_interface_layers = merge_remove_nulls(base_interface_layers, top_base_interface_layers);
+        BOOST_LOG_TRIVIAL(debug) << "PrintObjectSupportMaterial::generate_interface_layers() in parallel - end";
+    }
+    
+    return base_and_interface_layers;
 }
 
 SupportGeneratorLayersPtr generate_raft_base(
