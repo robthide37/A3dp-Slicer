@@ -626,7 +626,7 @@ private:
     // Islands of objects and their supports extruded at the 1st layer.
     Polygons            first_layer_islands() const;
     // Return 4 wipe tower corners in the world coordinates (shifted and rotated), including the wipe tower brim.
-    std::vector<Point>  first_layer_wipe_tower_corners() const;
+    Points              first_layer_wipe_tower_corners() const;
 
     // Returns true if any of the print_objects has print_object_step valid.
     // That means data shared by all print objects of the print_objects span may still use the shared data.

@@ -24,14 +24,8 @@ GLGizmoFlatten::GLGizmoFlatten(GLCanvas3D& parent, const std::string& icon_filen
 
 bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
 {
-    if (mouse_event.Moving()) {
-        // only for sure 
-        m_mouse_left_down = false;
-        return false;
-    }
     if (mouse_event.LeftDown()) {
         if (m_hover_id != -1) {
-            m_mouse_left_down = true;
             Selection &selection = m_parent.get_selection();
             if (selection.is_single_full_instance()) {
                 // Rotate the object so the normal points downward:
@@ -42,16 +36,8 @@ bool GLGizmoFlatten::on_mouse(const wxMouseEvent &mouse_event)
             return true;
         }
     }
-    else if (mouse_event.LeftUp()) {
-        if (m_mouse_left_down) {
-            // responsible for mouse left up after selecting plane
-            m_mouse_left_down = false;
-            return true;
-        }
-
-    }
-    else if (mouse_event.Leaving())
-        m_mouse_left_down = false;
+    else if (mouse_event.LeftUp())
+        return m_hover_id != -1;
 
     return false;
 }

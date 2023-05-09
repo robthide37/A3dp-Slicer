@@ -37,7 +37,6 @@ private:
 
     std::vector<PlaneData> m_planes;
     std::vector<std::shared_ptr<SceneRaycasterItem>> m_planes_casters;
-    bool m_mouse_left_down = false; // for detection left_up of this gizmo
     const ModelObject* m_old_model_object = nullptr;
     int                m_old_instance_id{ -1 };
 
