@@ -365,10 +365,6 @@ public:
      */
     size_t z_distance_bottom_layers;
     /*!
-     * \brief used for performance optimization at the support floor. Should have no impact on the resulting tree.
-     */
-    size_t performance_interface_skip_layers;
-    /*!
      * \brief User specified angles for the support infill.
      */
 //        std::vector<double> support_infill_angles;
