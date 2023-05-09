@@ -236,8 +236,9 @@ static bool draw_button(const IconManager::VIcons& icons, IconType type, bool di
 /// </summary>
 /// <param name="camera">Define view vector</param>
 /// <param name="canvas">Containe Selected Model to modify</param>
+/// <param name="keep_up">Keep same up vector</param>
 /// <returns>True when apply change otherwise false</returns>
-static bool apply_camera_dir(const Camera &camera, GLCanvas3D &canvas);
+static bool apply_camera_dir(const Camera &camera, GLCanvas3D &canvas, bool keep_up);
 
 } // namespace priv
 
@@ -3201,11 +3202,16 @@ void GLGizmoEmboss::draw_advanced()
         }
     }
 
+    if (exist_change) {
+        m_style_manager.clear_glyphs_cache();
+        process();
+    }
+
     if (ImGui::Button(_u8L("Set text to face camera").c_str())) {
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
-        const Camera &cam         = wxGetApp().plater()->get_camera();
-        bool          use_surface = m_style_manager.get_style().prop.use_surface;
-        if (priv::apply_camera_dir(cam, m_parent) && use_surface)
+        const Camera &cam  = wxGetApp().plater()->get_camera();
+        bool use_surface = m_style_manager.get_style().prop.use_surface;
+        if (priv::apply_camera_dir(cam, m_parent, m_keep_up) && use_surface)
             process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
@@ -3218,7 +3224,7 @@ void GLGizmoEmboss::draw_advanced()
             if (!m_text_lines.is_init())
                 init_text_lines();
         }
-        exist_change = true;
+        process();
     } else if (ImGui::IsItemHovered()) {
         if (*per_glyph) {
             ImGui::SetTooltip("%s", _u8L("Set global orientation for whole text.").c_str());
@@ -3234,6 +3240,7 @@ void GLGizmoEmboss::draw_advanced()
     ImGui::SetNextItemWidth(100);
     if (ImGui::SliderFloat("##base_line_y_offset", &m_text_lines.offset, -10.f, 10.f, "%f mm")) {
         init_text_lines();
+        process();
     } else if (ImGui::IsItemHovered()) 
         ImGui::SetTooltip("%s", _u8L("Move base line (up/down) for allign letters").c_str());
 
@@ -3253,13 +3260,10 @@ void GLGizmoEmboss::draw_advanced()
     int selected_align = static_cast<int>(font_prop.align);
     if (ImGui::Combo("align", &selected_align, align_names, IM_ARRAYSIZE(align_names))) {
         font_prop.align = static_cast<FontProp::Align>(selected_align);
-    }
-
-    
-    if (exist_change) {
-        m_style_manager.clear_glyphs_cache();
+        // TODO: move with text in finalize to not change position
         process();
     }
+
 #ifdef ALLOW_DEBUG_MODE
     ImGui::Text("family = %s", (font_prop.family.has_value() ?
                                     font_prop.family->c_str() :
@@ -3743,8 +3747,7 @@ void priv::change_window_position(std::optional<ImVec2>& output_window_offset, b
         output_window_offset = ImVec2(-1, -1); // Cannot 
 }
 
-
-bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas) {
+bool priv::apply_camera_dir(const Camera &camera, GLCanvas3D &canvas, bool keep_up) {
     const Vec3d &cam_dir = camera.get_dir_forward();
 
     Selection &sel = canvas.get_selection();

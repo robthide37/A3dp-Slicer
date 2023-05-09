@@ -427,10 +427,9 @@ namespace Emboss
     /// </summary>
     /// <param name="slice">Polygon and start point</param>
     /// <param name="bbs">Bounding boxes of letter on one line</param>
-    /// <param name="center_x">Center x coor of bbs line</param>
     /// <param name="scale">Scale for bbs</param>
     /// <returns>Sampled polygon by bounding boxes</returns>
-    PolygonPoints sample_slice(const TextLine &slice, const BoundingBoxes &bbs, int32_t center_x, double scale);
+    PolygonPoints sample_slice(const TextLine &slice, const BoundingBoxes &bbs, double scale);
 
     /// <summary>
     /// Calculate angle for polygon point

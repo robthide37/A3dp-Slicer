@@ -457,11 +457,13 @@ template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc w
     if (shapes.empty())
         return {};
 
-    const FontFile &ff          = *font.font_file;
-    double          shape_scale = get_shape_scale(prop, ff);
+    align_shape(prop.align, shapes); 
 
-    BoundingBox extents; // whole text to find center
-    // separate lines of text to vector
+    const FontFile &ff = *font.font_file;
+    double shape_scale = get_shape_scale(prop, ff);
+
+    // Precalculate bounding boxes of glyphs
+    // Separate lines of text to vector of Bounds
     std::vector<BoundingBoxes> bbs(count_lines);
     size_t                     text_line_index = 0;
     // s_i .. shape index
@@ -470,7 +472,6 @@ template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc w
         BoundingBox       bb;
         if (!shape.empty()) {
             bb = get_extents(shape);
-            extents.merge(bb);
         }
         BoundingBoxes &line_bbs = bbs[text_line_index];
         line_bbs.push_back(bb);
@@ -487,14 +488,13 @@ template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc w
     double  em_2_mm      = prop.size_in_mm / 2.;
     int32_t em_2_polygon = static_cast<int32_t>(std::round(scale_(em_2_mm)));
 
-    Point  center     = extents.center();
     size_t s_i_offset = 0; // shape index offset(for next lines)
     indexed_triangle_set result;
     for (text_line_index = 0; text_line_index < input.text_lines.size(); ++text_line_index) {
         const BoundingBoxes &line_bbs = bbs[text_line_index];
         const TextLine      &line     = input.text_lines[text_line_index];
         // IMPROVE: do not precalculate samples do it inline - store result its
-        PolygonPoints        samples  = sample_slice(line, line_bbs, center.x(), shape_scale);
+        PolygonPoints        samples  = sample_slice(line, line_bbs, shape_scale);
         std::vector<double>  angles   = calculate_angles(em_2_polygon, samples, line.polygon);
 
         for (size_t i = 0; i < line_bbs.size(); ++i) {

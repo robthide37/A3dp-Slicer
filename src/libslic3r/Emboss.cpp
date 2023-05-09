@@ -1870,19 +1870,19 @@ std::vector<double> Emboss::calculate_angles(int32_t distance, const PolygonPoin
     return result;
 }
 
-PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &bbs, int32_t center_x, double scale)
+PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &bbs, double scale)
 {
     // find BB in center of line
     size_t first_right_index = 0;
     for (const BoundingBox &bb : bbs)
-        if (bb.min.x() > center_x) {
+        if (bb.min.x() > 0) {
             break;
         } else {
             ++first_right_index;
         }
 
     PolygonPoints samples(bbs.size());
-    int32_t shapes_x_cursor = center_x;
+    int32_t shapes_x_cursor = 0;
 
     PolygonPoint cursor = slice.start; //copy
 
@@ -1908,7 +1908,7 @@ PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &b
         samples[index] = create_sample(bbs[index], is_reverse);
 
     // calc transformation for letters on the Left side from center
-    shapes_x_cursor = center_x;
+    shapes_x_cursor = 0;
     cursor = slice.start; // copy    
     is_reverse = false;
     for (size_t index_plus_one = first_right_index; index_plus_one > 0; --index_plus_one) {
