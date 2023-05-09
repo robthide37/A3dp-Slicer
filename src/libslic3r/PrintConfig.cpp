@@ -416,12 +416,12 @@ void PrintConfigDef::init_common_params()
     def->label = L("Authorization Type");
 //    def->tooltip = L("");
     def->set_enum<AuthorizationType>({
-        { "key", L("API key") },
-        { "user", L("HTTP digest") }
+        { "user", L("HTTP digest") },
+        { "key", L("API key") }
     });
     def->mode = comAdvanced;
     def->cli = ConfigOptionDef::nocli;
-    def->set_default_value(new ConfigOptionEnum<AuthorizationType>(atKeyPassword));
+    def->set_default_value(new ConfigOptionEnum<AuthorizationType>(atUserPassword));
 
     // temporary workaround for compatibility with older Slicer
     {
