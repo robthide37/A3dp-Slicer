@@ -1604,7 +1604,7 @@ void PrintObject::discover_vertical_shells()
     } // for each region
 } // void PrintObject::discover_vertical_shells()
 
-#define DEBUG_BRIDGE_OVER_INFILL
+// #define DEBUG_BRIDGE_OVER_INFILL
 #ifdef DEBUG_BRIDGE_OVER_INFILL
 template<typename T> void debug_draw(std::string name, const T& a, const T& b, const T& c, const T& d)
 {
@@ -2306,7 +2306,7 @@ void PrintObject::bridge_over_infill()
                 ExPolygons new_internal_infills = diff_ex(internal_infills, cut_from_infill);
                 new_internal_infills            = diff_ex(new_internal_infills, additional_ensuring);
                 for (const ExPolygon &ep : new_internal_infills) {
-                    new_surfaces.emplace_back(*internal_infills.front(), ep);
+                    new_surfaces.emplace_back(stInternal, ep);
                 }
 
                 SurfacesPtr internal_solids = region->m_fill_surfaces.filter_by_type(stInternalSolid);
@@ -2327,17 +2327,18 @@ void PrintObject::bridge_over_infill()
                 }
                 ExPolygons new_internal_solids = to_expolygons(internal_solids);
                 new_internal_solids.insert(new_internal_solids.end(), additional_ensuring.begin(), additional_ensuring.end());
-                new_internal_solids = diff_ex(internal_solids, cut_from_infill);
+                new_internal_solids = diff_ex(new_internal_solids, cut_from_infill);
+                new_internal_solids = union_safety_offset_ex(new_internal_solids);
                 for (const ExPolygon &ep : new_internal_solids) {
                     new_surfaces.emplace_back(stInternalSolid, ep);
                 }
 
 #ifdef DEBUG_BRIDGE_OVER_INFILL
-                debug_draw("AdditionalEnsuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)),
-                           to_polylines(additional_ensuring_areas), to_polylines(near_perimeters), to_polylines(to_polygons(internal_infills)),
+                debug_draw("Aensuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)), to_polylines(additional_ensuring),
+                           to_polylines(near_perimeters), to_polylines(to_polygons(internal_infills)),
                            to_polylines(to_polygons(internal_solids)));
-                debug_draw("AddditionalEnsuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)) + "_new",
-                           to_polylines(additional_ensuring_areas), to_polylines(near_perimeters), to_polylines(to_polygons(new_internal_infills)),
+                debug_draw("Aensuring_" + std::to_string(reinterpret_cast<uint64_t>(&region)) + "_new", to_polylines(additional_ensuring),
+                           to_polylines(near_perimeters), to_polylines(to_polygons(new_internal_infills)),
                            to_polylines(to_polygons(new_internal_solids)));
 #endif
 
