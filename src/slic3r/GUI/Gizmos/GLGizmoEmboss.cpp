@@ -1204,12 +1204,12 @@ void GLGizmoEmboss::set_volume_by_selection()
         m_job_cancel = nullptr;
     }
 
-    if (tc.style.prop.per_glyph)
-        init_text_lines();
-
     m_text   = tc.text;
     m_volume = volume;
     m_volume_id = volume->id();
+        
+    if (tc.style.prop.per_glyph)
+        init_text_lines();
 
     // Calculate current angle of up vector
     assert(m_style_manager.is_active_font());
