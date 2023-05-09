@@ -554,6 +554,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,               support_tree_angle_slow))
     ((ConfigOptionFloat,               support_tree_branch_diameter))
     ((ConfigOptionFloat,               support_tree_branch_diameter_angle))
+    ((ConfigOptionFloat,               support_tree_branch_diameter_double_wall))
     ((ConfigOptionPercent,             support_tree_top_rate))
     ((ConfigOptionFloat,               support_tree_branch_distance))
     ((ConfigOptionFloat,               support_tree_tip_diameter))

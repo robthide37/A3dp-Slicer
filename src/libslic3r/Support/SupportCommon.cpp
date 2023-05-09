@@ -537,7 +537,8 @@ static Polylines draw_perimeters(const ExPolygon &expoly, double clip_length)
 static inline void tree_supports_generate_paths(
     ExtrusionEntitiesPtr    &dst,
     const Polygons          &polygons,
-    const Flow              &flow)
+    const Flow              &flow, 
+    const SupportParameters &support_params)
 {
     // Offset expolygon inside, returns number of expolygons collected (0 or 1).
     // Vertices of output paths are marked with Z = source contour index of the expoly.
@@ -634,21 +635,21 @@ static inline void tree_supports_generate_paths(
     ClipperLib_Z::Paths anchor_candidates;
     for (ExPolygon& expoly : closing_ex(polygons, float(SCALED_EPSILON), float(SCALED_EPSILON + 0.5 * flow.scaled_width()))) {
         std::unique_ptr<ExtrusionEntityCollection> eec;
-        double area = expoly.area();
-        if (area > sqr(scaled<double>(5.))) {
-            eec = std::make_unique<ExtrusionEntityCollection>();
-            // Don't reoder internal / external loops of the same island, always start with the internal loop.
-            eec->no_sort = true;
-            // Make the tree branch stable by adding another perimeter.
-            ExPolygons level2 = offset2_ex({ expoly }, -1.5 * flow.scaled_width(), 0.5 * flow.scaled_width());
-            if (level2.size() == 1) {
-                Polylines polylines;
-                extrusion_entities_append_paths(eec->entities, draw_perimeters(expoly, clip_length), ExtrusionRole::SupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(),
-                    // Disable reversal of the path, always start with the anchor, always print CCW.
-                    false);
-                expoly = level2.front();
+        if (support_params.tree_branch_diameter_double_wall_area_scaled > 0)
+            if (double area = expoly.area(); area > support_params.tree_branch_diameter_double_wall_area_scaled) {
+                eec = std::make_unique<ExtrusionEntityCollection>();
+                // Don't reoder internal / external loops of the same island, always start with the internal loop.
+                eec->no_sort = true;
+                // Make the tree branch stable by adding another perimeter.
+                ExPolygons level2 = offset2_ex({ expoly }, -1.5 * flow.scaled_width(), 0.5 * flow.scaled_width());
+                if (level2.size() == 1) {
+                    Polylines polylines;
+                    extrusion_entities_append_paths(eec->entities, draw_perimeters(expoly, clip_length), ExtrusionRole::SupportMaterial, flow.mm3_per_mm(), flow.width(), flow.height(),
+                        // Disable reversal of the path, always start with the anchor, always print CCW.
+                        false);
+                    expoly = level2.front();
+                }
             }
-        }
 
         // Try to produce one more perimeter to place the seam anchor.
         // First genrate a 2nd perimeter loop as a source for anchor candidates.
@@ -1531,7 +1532,7 @@ void generate_support_toolpaths(
                         support_params.with_sheath, false);
                 }
                 if (! tree_polygons.empty())
-                    tree_supports_generate_paths(support_layer.support_fills.entities, tree_polygons, flow);
+                    tree_supports_generate_paths(support_layer.support_fills.entities, tree_polygons, flow, support_params);
             }
 
             Fill *filler = filler_interface.get();
@@ -1790,7 +1791,7 @@ void generate_support_toolpaths(
                     sheath  = true;
                     no_sort = true;
                 } else if (config.support_material_style == SupportMaterialStyle::smsOrganic) {
-                    tree_supports_generate_paths(base_layer.extrusions, base_layer.polygons_to_extrude(), flow);
+                    tree_supports_generate_paths(base_layer.extrusions, base_layer.polygons_to_extrude(), flow, support_params);
                     done = true;
                 }
                 if (! done)
