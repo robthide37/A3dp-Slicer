@@ -1644,9 +1644,9 @@ namespace client
             }
             if (! evaluated) {
                 // Clamp x into the table range with EPSILON.
-                if (x > table.table.front().x - EPSILON)
+                if (double x0 = table.table.front().x; x > x0 - EPSILON && x < x0)
                     out.set_d(table.table.front().y);
-                else if (x < table.table.back().x + EPSILON)
+                else if (double x1 = table.table.back().x; x > x1 && x < x1 + EPSILON)
                     out.set_d(table.table.back().y);
                 else
                     // The value is really outside the table range.
