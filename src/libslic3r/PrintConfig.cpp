@@ -3235,6 +3235,27 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(10.));
 
+    def = this->add("wipe_tower_extruder", coInt);
+    def->label = L("Wipe tower extruder");
+    def->category = L("Extruders");
+    def->tooltip = L("The extruder to use when printing perimeter of the wipe tower. "
+                     "Set to 0 to use the one that is available (non-soluble would be preferred).");
+    def->min = 0;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionInt(0));
+
+    def = this->add("solid_infill_every_layers", coInt);
+    def->label = L("Solid infill every");
+    def->category = L("Infill");
+    def->tooltip = L("This feature allows to force a solid layer every given number of layers. "
+                   "Zero to disable. You can set this to any value (for example 9999); "
+                   "Slic3r will automatically choose the maximum possible number of layers "
+                   "to combine according to nozzle diameter and layer height.");
+    def->sidetext = L("layers");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionInt(0));
+
     def = this->add("xy_size_compensation", coFloat);
     def->label = L("XY Size Compensation");
     def->category = L("Advanced");
