@@ -21,6 +21,7 @@
 #include "Support/TreeSupport.hpp"
 #include "Surface.hpp"
 #include "Slicing.hpp"
+#include "SurfaceCollection.hpp"
 #include "Tesselate.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "Utils.hpp"
@@ -38,6 +39,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <float.h>
+#include <functional>
 #include <limits>
 #include <map>
 #include <oneapi/tbb/blocked_range.h>
@@ -1726,6 +1728,98 @@ void PrintObject::bridge_over_infill()
         }
     }
 
+    // LIGHTNING INFILL SECTION - If lightning infill is used somewhere, we check the areas that are going to be bridges, and those that rely on the 
+    // lightning infill under them get expanded. This somewhat helps to ensure that most of the extrusions are anchored to the lightning infill at the ends.
+    // It requires modifying this instance of print object in a specific way, so that we do not invalidate the pointers in our surfaces_by_layer structure.
+    bool has_lightning_infill = false;
+    for (size_t i = 0; i < this->num_printing_regions(); i++) {
+        if (this->printing_region(i).config().fill_pattern == ipLightning) {
+            has_lightning_infill = true;
+            break;
+        }
+    }
+    if (has_lightning_infill) {
+        // Prepare backup data for the Layer Region infills. Before modfiyng the layer region, we backup its fill surfaces by moving! them into this map.
+        // then a copy is created, modifiyed and passed to lightning infill generator. After generator is created, we restore the original state of the fills
+        // again by moving the data from this map back to the layer regions. This ensures that pointers to surfaces stay valid.
+        std::map<size_t, std::map<const LayerRegion *, SurfaceCollection>> backup_surfaces;
+        for (size_t lidx = 0; lidx < this->layer_count(); lidx++) {
+            backup_surfaces[lidx] = {};
+        }
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, this->layers().size()), [po = this, &backup_surfaces,
+                                                                                 &surfaces_by_layer](tbb::blocked_range<size_t> r) {
+            PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
+            for (size_t lidx = r.begin(); lidx < r.end(); lidx++) {
+                if (surfaces_by_layer.find(lidx) == surfaces_by_layer.end())
+                    continue;
+
+                Layer       *layer       = po->get_layer(lidx);
+                const Layer *lower_layer = layer->lower_layer;
+                if (lower_layer == nullptr)
+                    continue;
+
+                Polygons lightning_fill;
+                for (const LayerRegion *region : lower_layer->regions()) {
+                    if (region->region().config().fill_pattern == ipLightning) {
+                        Polygons lf = to_polygons(region->fill_surfaces().filter_by_type(stInternal));
+                        lightning_fill.insert(lightning_fill.end(), lf.begin(), lf.end());
+                    }
+                }
+
+                if (lightning_fill.empty())
+                    continue;
+
+                for (LayerRegion *region : layer->regions()) {
+                    backup_surfaces[lidx][region] = std::move(
+                        region->m_fill_surfaces); // Make backup copy by move!! so that pointers in candidate surfaces stay valid
+                    // Copy the surfaces back, this will make copy, but we will later discard it anyway
+                    region->m_fill_surfaces = backup_surfaces[lidx][region];
+                }
+
+                for (LayerRegion *region : layer->regions()) {
+                    ExPolygons sparse_infill = to_expolygons(region->fill_surfaces().filter_by_type(stInternal));
+                    ExPolygons solid_infill  = to_expolygons(region->fill_surfaces().filter_by_type(stInternalSolid));
+
+                    if (sparse_infill.empty()) {
+                        break;
+                    }
+                    for (const auto &surface : surfaces_by_layer[lidx]) {
+                        if (surface.region != region)
+                            continue;
+                        ExPolygons expansion = intersection_ex(sparse_infill, expand(surface.new_polys, scaled<float>(3.0)));
+                        solid_infill.insert(solid_infill.end(), expansion.begin(), expansion.end());
+                    }
+
+                    solid_infill  = union_safety_offset_ex(solid_infill);
+                    sparse_infill = diff_ex(sparse_infill, solid_infill);
+
+                    region->m_fill_surfaces.remove_types({stInternalSolid, stInternal});
+                    for (const ExPolygon &ep : solid_infill) {
+                        region->m_fill_surfaces.surfaces.emplace_back(stInternalSolid, ep);
+                    }
+                    for (const ExPolygon &ep : sparse_infill) {
+                        region->m_fill_surfaces.surfaces.emplace_back(stInternal, ep);
+                    }
+                }
+            }
+        });
+
+        // Use the modified surfaces to generate expanded lightning anchors
+        this->m_lightning_generator = this->prepare_lightning_infill_data();
+
+        // And now restore carefully the original surfaces, again using move to avoid reallocation and preserving the validity of the
+        // pointers in surface candidates
+        for (size_t lidx = 0; lidx < this->layer_count(); lidx++) {
+            Layer *layer = this->get_layer(lidx);
+            for (LayerRegion *region : layer->regions()) {
+                if (backup_surfaces[lidx].find(region) != backup_surfaces[lidx].end()) {
+                    region->m_fill_surfaces = std::move(backup_surfaces[lidx][region]);
+                }
+            }
+        }
+    }
+
     std::map<size_t, Polylines> infill_lines;
     // SECTION to generate infill polylines
     {
@@ -1737,7 +1831,6 @@ void PrintObject::bridge_over_infill()
         }
 
         this->m_adaptive_fill_octrees = this->prepare_adaptive_infill_data(surfaces_w_bottom_z);
-        this->m_lightning_generator = this->prepare_lightning_infill_data();
 
         std::vector<size_t> layers_to_generate_infill;
         for (const auto &pair : surfaces_by_layer) {
