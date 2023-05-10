@@ -1875,7 +1875,7 @@ PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &b
     // find BB in center of line
     size_t first_right_index = 0;
     for (const BoundingBox &bb : bbs)
-        if (bb.min.x() > 0) {
+        if (bb.min.x() >= 0) {
             break;
         } else {
             ++first_right_index;

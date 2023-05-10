@@ -317,7 +317,10 @@ void TextLinesModel::init(const Selection &selection, double line_height)
 
     m_model.reset();
     //*
-    m_model.init_from(create_geometry(m_lines));
+    GLModel::Geometry geometry = create_geometry(m_lines);
+    if (geometry.vertices_count() == 0 || geometry.indices_count() == 0)
+        return;
+    m_model.init_from(std::move(geometry));
     /*/
     ColorRGBA color(.7f, .7f, .7f, .7f); // Transparent Gray
     m_model.set_color(color);
