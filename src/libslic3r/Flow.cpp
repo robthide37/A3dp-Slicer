@@ -176,7 +176,7 @@ Flow Flow::with_cross_section(float area_new) const
             return this->with_width(width_new);
         } else {
             // Create a rounded extrusion.
-            auto dmr = float(sqrt(area_new / M_PI));
+            auto dmr = 2.0 * float(sqrt(area_new / M_PI));
             return Flow(dmr, dmr, m_spacing, m_nozzle_diameter, false);
         }
     } else

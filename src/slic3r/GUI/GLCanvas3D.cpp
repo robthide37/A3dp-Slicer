@@ -3916,6 +3916,7 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
     }
 
     // Fixes flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         const double shift_z = m->get_instance_min_z(i.second);
@@ -3924,8 +3925,11 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
             m_selection.translate(i.first, i.second, shift);
             m->translate_instance(i.second, shift);
         }
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     // if the selection is not valid to allow for layer editing after the move, we need to turn off the tool if it is running
     // similar to void Plater::priv::selection_changed()
@@ -4003,6 +4007,7 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     }
 
     // Fixes sinking/flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         const double shift_z = m->get_instance_min_z(i.second);
@@ -4013,8 +4018,11 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
             m->translate_instance(i.second, shift);
         }
 
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     if (!done.empty())
         post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_ROTATED));
@@ -4072,6 +4080,7 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
     }
 
     // Fixes sinking/flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         const double shift_z = m->get_instance_min_z(i.second);
@@ -4081,8 +4090,11 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
             m_selection.translate(i.first, i.second, shift);
             m->translate_instance(i.second, shift);
         }
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     if (!done.empty())
         post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_SCALED));
@@ -4135,6 +4147,7 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
     }
 
     // Fixes sinking/flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         double shift_z = m->get_instance_min_z(i.second);
@@ -4144,8 +4157,11 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
             m_selection.translate(i.first, i.second, shift);
             m->translate_instance(i.second, shift);
         }
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
 
@@ -4197,6 +4213,7 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
     }
 
     // Fixes sinking/flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         double shift_z = m->get_instance_min_z(i.second);
@@ -4206,8 +4223,11 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
             m_selection.translate(i.first, i.second, shift);
             m->translate_instance(i.second, shift);
         }
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     post_event(SimpleEvent(EVT_GLCANVAS_RESET_SKEW));
 

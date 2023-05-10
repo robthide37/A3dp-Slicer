@@ -11,6 +11,7 @@
 
 #include "TreeModelVolumes.hpp"
 #include "Point.hpp"
+#include "Support/SupportLayer.hpp"
 
 #include <boost/container/small_vector.hpp>
 
@@ -39,10 +40,7 @@ namespace Slic3r
 // Forward declarations
 class Print;
 class PrintObject;
-class SupportGeneratorLayer;
 struct SlicingParameters;
-using SupportGeneratorLayerStorage  = std::deque<SupportGeneratorLayer>;
-using SupportGeneratorLayersPtr     = std::vector<SupportGeneratorLayer*>;
 
 namespace FFFTreeSupport
 {
@@ -93,6 +91,8 @@ struct AreaIncreaseSettings
 
 struct TreeSupportSettings;
 
+// #define TREE_SUPPORTS_TRACK_LOST
+
 // C++17 does not support in place initializers of bit values, thus a constructor zeroing the bits is provided.
 struct SupportElementStateBits {
     SupportElementStateBits() :
@@ -102,6 +102,10 @@ struct SupportElementStateBits {
         supports_roof(false),
         can_use_safe_radius(false),
         skip_ovalisation(false),
+#ifdef TREE_SUPPORTS_TRACK_LOST
+        lost(false),
+        verylost(false),
+#endif // TREE_SUPPORTS_TRACK_LOST
         deleted(false),
         marked(false)
         {}
@@ -135,6 +139,12 @@ struct SupportElementStateBits {
      * \brief Skip the ovalisation to parent and children when generating the final circles.
      */
     bool skip_ovalisation : 1;
+
+#ifdef TREE_SUPPORTS_TRACK_LOST
+    // Likely a lost branch, debugging information.
+    bool lost : 1;
+    bool verylost : 1;
+#endif // TREE_SUPPORTS_TRACK_LOST
 
     // Not valid anymore, to be deleted.
     bool deleted : 1;
@@ -354,10 +364,6 @@ public:
      * \brief Amount of layers distance required from the top of the model to the bottom of a support structure.
      */
     size_t z_distance_bottom_layers;
-    /*!
-     * \brief used for performance optimization at the support floor. Should have no impact on the resulting tree.
-     */
-    size_t performance_interface_skip_layers;
     /*!
      * \brief User specified angles for the support infill.
      */

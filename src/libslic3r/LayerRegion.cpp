@@ -230,10 +230,13 @@ Surfaces expand_bridges_detect_orientations(
                         bboxes[it - it_begin].overlap(bboxes[it2 - it_begin]) &&
                         // One may ignore holes, they are irrelevant for intersection test.
                         ! intersection(it->expolygon.contour, it2->expolygon.contour).empty()) {
-                        // The two bridge regions intersect. Give them the same group id.
+                        // The two bridge regions intersect. Give them the same (lower) group id.
                         uint32_t id  = group_id(it->src_id);
                         uint32_t id2 = group_id(it2->src_id);
-                        bridges[it->src_id].group_id = bridges[it2->src_id].group_id = std::min(id, id2);
+                        if (id < id2)
+                            bridges[id2].group_id = id;
+                        else
+                            bridges[id].group_id = id2;
                     }
             }
         }
