@@ -525,9 +525,6 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
 
     m_full_print_config = std::move(config);
 
-    const char *default_ext = get_default_extension(m_printer_config.sla_archive_format.value.c_str());
-    m_placeholder_parser.set("default_output_extension", default_ext);
-
     return static_cast<ApplyStatus>(apply_status);
 }
 
@@ -542,6 +539,10 @@ std::string SLAPrint::output_filename(const std::string &filename_base) const
         default_ext = "sl1";
 
     default_ext.insert(default_ext.begin(), '.');
+
+    config.set_key_value("default_output_extension",
+                         new ConfigOptionString(default_ext));
+
     return this->PrintBase::output_filename(m_print_config.output_filename_format.value, default_ext, filename_base, &config);
 }
 
