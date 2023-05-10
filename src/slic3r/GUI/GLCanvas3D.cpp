@@ -1095,6 +1095,19 @@ static bool composite_id_match(const GLVolume::CompositeID& id1, const GLVolume:
     return id1.object_id == id2.object_id && id1.instance_id == id2.instance_id;
 }
 
+static bool object_contains_negative_volumes(const Model& model, int obj_id) {
+    bool ret = false;
+    if (0 <= obj_id && obj_id < model.objects.size()) {
+        for (const ModelVolume* v : model.objects[obj_id]->volumes) {
+            if (v->is_negative_volume()) {
+                ret = true;
+                break;
+            }
+        }
+    }
+    return ret;
+}
+
 void GLCanvas3D::SLAView::detect_type_from_volumes(const GLVolumePtrs& volumes)
 {
     for (auto& [id, type] : m_instances_cache) {
@@ -1103,9 +1116,11 @@ void GLCanvas3D::SLAView::detect_type_from_volumes(const GLVolumePtrs& volumes)
 
     for (const GLVolume* v : volumes) {
         if (v->volume_idx() == -(int)slaposDrillHoles) {
-            const InstancesCacheItem* instance = find_instance_item(v->composite_id);
-            assert(instance != nullptr);
-            set_type(instance->first, ESLAViewType::Processed);
+            if (object_contains_negative_volumes(*m_parent.get_model(), v->composite_id.object_id)) {
+                const InstancesCacheItem* instance = find_instance_item(v->composite_id);
+                assert(instance != nullptr);
+                set_type(instance->first, ESLAViewType::Processed);
+            }
         }
     }
 }
@@ -1194,6 +1209,9 @@ void GLCanvas3D::SLAView::render_switch_button()
     Selection& selection = m_parent.get_selection();
     const int obj_idx = selection.get_object_idx();
     if (std::find(mo_idxs.begin(), mo_idxs.end(), obj_idx) == mo_idxs.end())
+        return;
+
+    if (!object_contains_negative_volumes(*m_parent.get_model(), obj_idx))
         return;
 
     const int inst_idx = selection.get_instance_idx();
