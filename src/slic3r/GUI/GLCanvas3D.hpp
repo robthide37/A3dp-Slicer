@@ -570,7 +570,7 @@ private:
         GLCanvas3D& m_parent;
         typedef std::pair<GLVolume::CompositeID, ESLAViewType> InstancesCacheItem;
         std::vector<InstancesCacheItem> m_instances_cache;
-        bool m_use_instance_bbox{ false };
+        bool m_use_instance_bbox{ true };
 
         InstancesCacheItem* find_instance_item(const GLVolume::CompositeID& id);
         void select_full_instance(const GLVolume::CompositeID& id);
