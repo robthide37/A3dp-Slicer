@@ -1096,16 +1096,7 @@ static bool composite_id_match(const GLVolume::CompositeID& id1, const GLVolume:
 }
 
 static bool object_contains_negative_volumes(const Model& model, int obj_id) {
-    bool ret = false;
-    if (0 <= obj_id && obj_id < (int)model.objects.size()) {
-        for (const ModelVolume* v : model.objects[obj_id]->volumes) {
-            if (v->is_negative_volume()) {
-                ret = true;
-                break;
-            }
-        }
-    }
-    return ret;
+    return (0 <= obj_id && obj_id < (int)model.objects.size()) ? model.objects[obj_id]->has_negative_volume_mesh() : false;
 }
 
 void GLCanvas3D::SLAView::detect_type_from_volumes(const GLVolumePtrs& volumes)
