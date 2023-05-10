@@ -1097,7 +1097,7 @@ static bool composite_id_match(const GLVolume::CompositeID& id1, const GLVolume:
 
 static bool object_contains_negative_volumes(const Model& model, int obj_id) {
     bool ret = false;
-    if (0 <= obj_id && obj_id < model.objects.size()) {
+    if (0 <= obj_id && obj_id < (int)model.objects.size()) {
         for (const ModelVolume* v : model.objects[obj_id]->volumes) {
             if (v->is_negative_volume()) {
                 ret = true;
@@ -1250,13 +1250,7 @@ void GLCanvas3D::SLAView::render_switch_button()
     const float icon_size = 1.5 * ImGui::GetTextLineHeight();
     if (imgui.draw_radio_button(_u8L("SLA view"), 1.5f * icon_size, true,
         [this, &imgui, sel_instance](ImGuiWindow& window, const ImVec2& pos, float size) {
-            wchar_t icon_id;
-            switch (sel_instance->second)
-            {
-            case ESLAViewType::Original:  { icon_id = ImGui::SlaViewProcessed; break; }
-            case ESLAViewType::Processed: { icon_id = ImGui::SlaViewOriginal; break; }
-            default: { assert(false); break; }
-            }
+            const wchar_t icon_id = (sel_instance->second == ESLAViewType::Original) ? ImGui::SlaViewProcessed : ImGui::SlaViewOriginal;
             imgui.draw_icon(window, pos, size, icon_id);
         })) {
         switch (sel_instance->second)
