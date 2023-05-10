@@ -438,7 +438,7 @@ ConfigSubstitutions SL1Reader::read(std::vector<ExPolygons> &slices,
 
 ConfigSubstitutions SL1Reader::read(DynamicPrintConfig &out)
 {
-    ZipperArchive arch = read_zipper_archive(m_fname, {}, {"png"});
+    ZipperArchive arch = read_zipper_archive(m_fname, {"ini"}, {"png", "thumbnail"});
     return out.load(arch.profile, ForwardCompatibilitySubstitutionRule::Enable);
 }
 
