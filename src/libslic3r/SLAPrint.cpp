@@ -537,7 +537,12 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
 std::string SLAPrint::output_filename(const std::string &filename_base) const
 {
     DynamicConfig config = this->finished() ? this->print_statistics().config() : this->print_statistics().placeholders();
-    return this->PrintBase::output_filename(m_print_config.output_filename_format.value, ".sl1", filename_base, &config);
+    std::string default_ext = get_default_extension(m_printer_config.sla_archive_format.value.c_str());
+    if (default_ext.empty())
+        default_ext = "sl1";
+
+    default_ext.insert(default_ext.begin(), '.');
+    return this->PrintBase::output_filename(m_print_config.output_filename_format.value, default_ext, filename_base, &config);
 }
 
 std::string SLAPrint::validate(std::vector<std::string>*) const
