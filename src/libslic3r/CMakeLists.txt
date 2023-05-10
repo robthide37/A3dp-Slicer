@@ -131,6 +131,8 @@ set(SLIC3R_SOURCES
     Format/AnycubicSLA.cpp
     Format/STEP.hpp
     Format/STEP.cpp
+    Format/SLAArchiveFormatRegistry.hpp
+    Format/SLAArchiveFormatRegistry.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp

@@ -17,6 +17,7 @@
 #include "libslic3r/GCode/ThumbnailData.hpp"
 
 #include "SLAArchiveReader.hpp"
+#include "SLAArchiveFormatRegistry.hpp"
 #include "ZipperArchiveImport.hpp"
 
 #include "libslic3r/MarchingSquares.hpp"
@@ -25,6 +26,7 @@
 #include "libslic3r/Execution/ExecutionTBB.hpp"
 
 #include "libslic3r/SLA/RasterBase.hpp"
+
 
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/filesystem/path.hpp>
