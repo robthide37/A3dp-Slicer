@@ -4,6 +4,8 @@
 #include "CSGMesh/PerformCSGMeshBooleans.hpp"
 #include "format.hpp"
 
+#include "Format/SLAArchiveFormatRegistry.hpp"
+
 #include "Geometry.hpp"
 #include "Thread.hpp"
 
@@ -522,6 +524,10 @@ SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig con
 #endif /* _DEBUG */
 
     m_full_print_config = std::move(config);
+
+    const char *default_ext = get_default_extension(m_printer_config.sla_archive_format.value.c_str());
+    m_placeholder_parser.set("default_output_extension", default_ext);
+
     return static_cast<ApplyStatus>(apply_status);
 }
 
