@@ -961,7 +961,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 					BOOST_LOG_TRIVIAL(error) << format("Cannot load the installed index at `%1%`: %2%", bundle_path_idx, err.what());
 				}
 			}
-
+#if 0
 			// Check if the update is already present in a snapshot
 			if(!current_not_supported)
 			{
@@ -974,7 +974,7 @@ Updates PresetUpdater::priv::get_config_updates(const Semver &old_slic3r_version
 					continue;
 				}
 			}
-
+#endif // 0
 			updates.updates.emplace_back(std::move(new_update));
 			// 'Install' the index in the vendor directory. This is used to memoize
 			// offered updates and to not offer the same update again if it was cancelled by the user.
