@@ -466,6 +466,12 @@ public:
         int   alignment          = 0;
     };
 
+    enum class ESLAViewType
+    {
+        Original,
+        Processed
+    };
+
 private:
     wxGLCanvas* m_canvas;
     wxGLContext* m_context;
@@ -545,10 +551,36 @@ private:
     bool m_tooltip_enabled{ true };
     Slope m_slope;
 
+    class SLAView
+    {
+    public:
+        explicit SLAView(GLCanvas3D& parent) : m_parent(parent) {}
+        void detect_type_from_volumes(const GLVolumePtrs& volumes);
+        void set_type(ESLAViewType type);
+        void set_type(const GLVolume::CompositeID& id, ESLAViewType type);
+        void update_volumes_visibility(GLVolumePtrs& volumes);
+        void update_instances_cache(const std::vector<std::pair<GLVolume::CompositeID, GLVolume::CompositeID>>& new_to_old_ids_map);
+        void render_switch_button();
+
+#if ENABLE_SLA_VIEW_DEBUG_WINDOW
+        void render_debug_window();
+#endif // ENABLE_SLA_VIEW_DEBUG_WINDOW
+
+    private:
+        GLCanvas3D& m_parent;
+        typedef std::pair<GLVolume::CompositeID, ESLAViewType> InstancesCacheItem;
+        std::vector<InstancesCacheItem> m_instances_cache;
+        bool m_use_instance_bbox{ true };
+
+        InstancesCacheItem* find_instance_item(const GLVolume::CompositeID& id);
+        void select_full_instance(const GLVolume::CompositeID& id);
+    };
+
+    SLAView m_sla_view;
+    bool m_sla_view_type_detection_active{ false };
+
     ArrangeSettings m_arrange_settings_fff, m_arrange_settings_sla,
         m_arrange_settings_fff_seq_print;
-
-    PrinterTechnology current_printer_technology() const;
 
     bool is_arrange_alignment_enabled() const;
 
@@ -654,7 +686,7 @@ private:
     GLModel m_background;
 
 public:
-    explicit GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed);
+    GLCanvas3D(wxGLCanvas* canvas, Bed3D& bed);
     ~GLCanvas3D();
 
     bool is_initialized() const { return m_initialized; }
@@ -766,6 +798,8 @@ public:
     void zoom_to_selection();
     void zoom_to_gcode();
     void select_view(const std::string& direction);
+
+    PrinterTechnology current_printer_technology() const;
 
     void update_volumes_colors_by_extruder();
 
@@ -953,6 +987,10 @@ public:
     void apply_retina_scale(Vec2d &screen_coordinate) const;
 
     std::pair<SlicingParameters, const std::vector<double>> get_layers_height_data(int object_id);
+
+    void set_sla_view_type(ESLAViewType type);
+    void set_sla_view_type(const GLVolume::CompositeID& id, ESLAViewType type);
+    void enable_sla_view_type_detection() { m_sla_view_type_detection_active = true; }
 
 private:
     bool _is_shown_on_screen() const;

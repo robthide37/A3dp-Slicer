@@ -87,6 +87,8 @@ void GLGizmoSlaSupports::data_changed(bool is_serializing)
             register_point_raycasters_for_picking();
         else
             update_point_raycasters_for_picking_transform();
+
+        m_c->instances_hider()->set_hide_full_scene(true);
     }
 
 //    m_parent.toggle_model_objects_visibility(false);

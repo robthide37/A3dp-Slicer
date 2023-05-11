@@ -978,6 +978,9 @@ bool GLGizmosManager::activate_gizmo(EType type)
         return false; // gizmo refused to be turned on.
     }
 
+    if (m_parent.current_printer_technology() == ptSLA)
+        m_parent.set_sla_view_type(GLCanvas3D::ESLAViewType::Original);
+
     new_gizmo.register_raycasters_for_picking();
 
     // sucessful activation of gizmo

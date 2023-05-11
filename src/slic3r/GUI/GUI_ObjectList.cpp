@@ -758,6 +758,10 @@ void ObjectList::selection_changed()
                 wxGetApp().obj_layers()->update_scene_from_editor_selection();
             }
         }
+        else if (type & itVolume) {
+            if (printer_technology() == ptSLA)
+                wxGetApp().plater()->canvas3D()->set_sla_view_type(scene_selection().get_first_volume()->composite_id, GLCanvas3D::ESLAViewType::Original);
+        }
     }
 
     part_selection_changed();

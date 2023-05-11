@@ -319,6 +319,9 @@ public:
     // and the transform to place and orient it in world coordinates
     std::pair<BoundingBoxf3, Transform3d> get_bounding_box_in_reference_system(ECoordinatesType type) const;
 
+    // Returns the screen space bounding box
+    BoundingBoxf get_screen_space_bounding_box();
+
     void setup_cache();
 
     void translate(const Vec3d& displacement, TransformationType transformation_type);
