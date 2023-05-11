@@ -4247,6 +4247,14 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
         return Geometry::Transformation();
     };
 
+    auto is_object_outside_printbed = [this](int object_idx) {
+        for (const GLVolume* v : m_volumes.volumes) {
+            if (v->object_idx() == object_idx && v->is_outside)
+                return true;
+        }
+        return false;
+    };
+
     // collects instance transformations from volumes
     // first: define temporary cache
     unsigned int instances_count = 0;
@@ -4296,13 +4304,19 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
             ModelObject* model_object = m_model->objects[i];
             Geometry::Transformation trafo = instance_transform_from_volumes((int)i, 0);
             trafo.set_offset({ 0.0, 0.0, trafo.get_offset().z() });
-            const Polygon hull_2d = offset(model_object->convex_hull_2d(trafo.get_matrix()),
+            Pointf3s& new_hull_2d = m_sequential_print_clearance.m_hulls_2d_cache.emplace_back(std::make_pair(Pointf3s(), trafo.get_matrix())).first;
+            if (is_object_outside_printbed((int)i))
+                continue;
+
+            Polygon hull_2d = model_object->convex_hull_2d(trafo.get_matrix());
+            if (!hull_2d.empty()) {
                 // Shrink the extruder_clearance_radius a tiny bit, so that if the object arrangement algorithm placed the objects
                 // exactly by satisfying the extruder_clearance_radius, this test will not trigger collision.
-                shrink_factor,
-                jtRound, mitter_limit).front();
+                const Polygons offset_res = offset(hull_2d, shrink_factor, jtRound, mitter_limit);
+                if (!offset_res.empty())
+                    hull_2d = offset_res.front();
+            }
 
-            Pointf3s& new_hull_2d = m_sequential_print_clearance.m_hulls_2d_cache.emplace_back(std::make_pair(Pointf3s(), trafo.get_matrix())).first;
             new_hull_2d.reserve(hull_2d.points.size());
             const Transform3d inv_trafo = trafo.get_matrix().inverse();
             for (const Point& p : hull_2d.points) {

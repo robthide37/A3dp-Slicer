@@ -589,7 +589,7 @@ public:
     struct ContoursList
     {
         // list of unique contours
-        std::vector<Polygon> contours;
+        Polygons contours;
         // if defined: list of transforms to apply to contours
         std::optional<std::vector<std::pair<size_t, Transform3d>>> trafos;
 
