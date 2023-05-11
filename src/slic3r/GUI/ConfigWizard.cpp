@@ -3323,6 +3323,8 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     : DPIDialog(parent, wxID_ANY, wxString(SLIC3R_APP_NAME) + " - " + _(name()), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
     , p(new priv(this))
 {
+    wxBusyCursor wait;
+
     this->SetFont(wxGetApp().normal_font());
 
     p->load_vendors();
