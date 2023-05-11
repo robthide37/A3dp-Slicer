@@ -307,12 +307,13 @@ public:
                                   long style = wxBU_EXACTFIT | wxNO_BORDER);
     void        add_scaled_bitmap(wxWindow* parent, ScalableBitmap& btn, const std::string& icon_name);
 	void		update_ui_items_related_on_parent_preset(const Preset* selected_preset_parent);
-    void		load_current_preset();
+    virtual void load_current_preset();
 	void        rebuild_page_tree();
     void		update_btns_enabling();
     void		update_preset_choice();
     // Select a new preset, possibly delete the current one.
-	void		select_preset(std::string preset_name = "", bool delete_current = false, const std::string& last_selected_ph_printer_name = "");
+    // return false, if action was canceled
+    bool        select_preset(std::string preset_name = "", bool delete_current = false, const std::string& last_selected_ph_printer_name = "");
 	bool		may_discard_current_dirty_preset(PresetCollection* presets = nullptr, const std::string& new_printer_name = "");
 
     virtual void    clear_pages();
@@ -402,6 +403,10 @@ protected:
 	void			fill_icon_descriptions();
 	void			set_tooltips_text();
 
+    virtual bool    select_preset_by_name(const std::string& name_w_suffix, bool force);
+    virtual bool    save_current_preset(const std::string& new_name, bool detach);
+    virtual bool    delete_current_preset();
+
     ConfigManipulation m_config_manipulation;
     ConfigManipulation get_config_manipulation();
 };
@@ -432,7 +437,8 @@ private:
 
 class TabFilament : public Tab
 {
-private:
+    BitmapComboBox* m_extruders_cb {nullptr};
+    int             m_active_extruder {0};
 	ogStaticText*	m_volumetric_speed_description_line {nullptr};
 	ogStaticText*	m_cooling_description_line {nullptr};
 
@@ -440,6 +446,7 @@ private:
     void            update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string &opt_key, int opt_index = 0, bool is_checked = true);
     void            add_filament_overrides_page();
     void            update_filament_overrides_page();
+    void            create_extruder_combobox();
 	void 			update_volumetric_flow_preset_hints();
 
     std::map<std::string, wxCheckBox*> m_overrides_options;
@@ -455,6 +462,18 @@ public:
 	void		clear_pages() override;
 	void        msw_rescale() override;
 	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptFFF; }
+    void        load_current_preset() override;
+
+    // set actiev extruder and update preset combobox if needed
+    // return false, if new preset wasn't selected
+    bool        set_active_extruder(int new_selected_extruder);
+    void        update_extruder_combobox();
+    int         get_active_extruder() const { return m_active_extruder; }
+
+protected:
+    bool        select_preset_by_name(const std::string& name_w_suffix, bool force) override;
+    bool        save_current_preset(const std::string& new_name, bool detach) override;
+    bool        delete_current_preset() override;
 };
 
 class TabPrinter : public Tab
