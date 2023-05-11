@@ -743,6 +743,14 @@ wxMenuItem* MenuFactory::append_menu_item_printable(wxMenu* menu)
         }
             
         evt.Check(check);
+
+        // disable the menu item if SLA supports or Hollow gizmos are active
+        if (printer_technology() == ptSLA) {
+            const auto gizmo_type = plater()->canvas3D()->get_gizmos_manager().get_current_type();
+            const bool enable = gizmo_type != GLGizmosManager::SlaSupports && gizmo_type != GLGizmosManager::Hollow;
+            evt.Enable(enable);
+        }
+
         plater()->set_current_canvas_as_dirty();
 
     }, menu_item_printable->GetId());

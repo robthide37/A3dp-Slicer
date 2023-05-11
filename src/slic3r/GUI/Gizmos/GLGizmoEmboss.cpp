@@ -359,6 +359,16 @@ bool GLGizmoEmboss::init_create(ModelVolumeType volume_type)
     return true;
 }
 
+namespace {
+TransformationType get_transformation_type(const Selection &selection)
+{
+    assert(selection.is_single_full_object() || selection.is_single_volume());
+    return selection.is_single_volume() ? 
+        TransformationType::Local_Relative_Joint :
+        TransformationType::Instance_Relative_Joint; // object
+}
+} // namespace
+
 bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
     if (mouse_event.Moving()) return false;
@@ -378,9 +388,8 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         angle -= PI / 2; // Grabber is upward
 
         // temporary rotation
-        const TransformationType transformation_type = m_parent.get_selection().is_single_text() ?
-          TransformationType::Local_Relative_Joint : TransformationType::World_Relative_Joint;
-        m_parent.get_selection().rotate(Vec3d(0., 0., angle), transformation_type);
+        Selection& selection = m_parent.get_selection();
+        selection.rotate(Vec3d(0., 0., angle), get_transformation_type(selection));
 
         angle += *m_rotate_start_angle;
         // move to range <-M_PI, M_PI>
@@ -2880,8 +2889,7 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     Selection &selection = m_parent.get_selection();
     assert(!selection.is_empty());
     selection.setup_cache();
-    TransformationType transformation_type = TransformationType::Local_Relative_Joint;
-    selection.rotate(Vec3d(0., 0., relative_z_angle), transformation_type);
+    selection.rotate(Vec3d(0., 0., relative_z_angle), get_transformation_type(selection));
 
     std::string snapshot_name; // empty meand no store undo / redo
     // NOTE: it use L instead of _L macro because prefix _ is appended

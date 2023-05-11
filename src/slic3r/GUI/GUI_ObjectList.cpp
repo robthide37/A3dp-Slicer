@@ -85,6 +85,17 @@ ObjectList::ObjectList(wxWindow* parent) :
 
     // describe control behavior 
     Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxDataViewEvent& event) {
+        // do not allow to change selection while the sla support gizmo is in editing mode
+        const GLGizmosManager& gizmos = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
+        if (gizmos.get_current_type() == GLGizmosManager::EType::SlaSupports && gizmos.is_in_editing_mode(true)) {
+            wxDataViewItemArray sels;
+            GetSelections(sels);
+            if (sels.size() > 1 || event.GetItem() != m_last_selected_item) {
+                select_item(m_last_selected_item);
+                return;
+            }
+        }
+
         // detect the current mouse position here, to pass it to list_manipulation() method
         // if we detect it later, the user may have moved the mouse pointer while calculations are performed, and this would mess-up the HitTest() call performed into list_manipulation()
         // see: https://github.com/prusa3d/PrusaSlicer/issues/3802
@@ -1177,6 +1188,13 @@ void ObjectList::key_event(wxKeyEvent& event)
 
 void ObjectList::OnBeginDrag(wxDataViewEvent &event)
 {
+    if (m_is_editing_started)
+        m_is_editing_started = false;
+#ifdef __WXGTK__
+    const auto renderer = dynamic_cast<BitmapTextRenderer*>(GetColumn(colName)->GetRenderer());
+    renderer->FinishEditing();
+#endif
+
     const wxDataViewItem item(event.GetItem());
 
     const bool mult_sel = multiple_selection();
@@ -1210,18 +1228,11 @@ void ObjectList::OnBeginDrag(wxDataViewEvent &event)
                                         m_objects_model->GetInstanceIdByItem(item), 
                             type);
 
-    /* Under MSW or OSX, DnD moves an item to the place of another selected item
-    * But under GTK, DnD moves an item between another two items.
-    * And as a result - call EVT_CHANGE_SELECTION to unselect all items.
-    * To prevent such behavior use m_prevent_list_events
-    **/
-    m_prevent_list_events = true;//it's needed for GTK
-
     /* Under GTK, DnD requires to the wxTextDataObject been initialized with some valid value,
      * so set some nonempty string
      */
     wxTextDataObject* obj = new wxTextDataObject;
-    obj->SetText("Some text");//it's needed for GTK
+    obj->SetText(mult_sel ? "SomeText" : m_objects_model->GetItemName(item));//it's needed for GTK
 
     event.SetDataObject(obj);
     event.SetDragFlags(wxDrag_DefaultMove); // allows both copy and move;
@@ -1284,11 +1295,8 @@ bool ObjectList::can_drop(const wxDataViewItem& item) const
 void ObjectList::OnDropPossible(wxDataViewEvent &event)
 {
     const wxDataViewItem& item = event.GetItem();
-
-    if (!can_drop(item)) {
+    if (!can_drop(item))
         event.Veto();
-        m_prevent_list_events = false;
-    }
 }
 
 void ObjectList::OnDrop(wxDataViewEvent &event)
@@ -1301,6 +1309,13 @@ void ObjectList::OnDrop(wxDataViewEvent &event)
         m_dragged_data.clear();
         return;
     }
+
+    /* Under MSW or OSX, DnD moves an item to the place of another selected item
+    * But under GTK, DnD moves an item between another two items.
+    * And as a result - call EVT_CHANGE_SELECTION to unselect all items.
+    * To prevent such behavior use m_prevent_list_events
+    **/
+    m_prevent_list_events = true;//it's needed for GTK
 
     if (m_dragged_data.type() == itInstance)
     {
@@ -2983,21 +2998,19 @@ void ObjectList::update_info_items(size_t obj_idx, wxDataViewItemArray* selectio
                 wxGetApp().notification_manager()->push_updated_item_info_notification(type); 
         }
         else if (shows && ! should_show) {
-            if (!selections)
+            if (!selections && IsSelected(item)) {
                 Unselect(item);
-            m_objects_model->Delete(item);
-            if (selections) {
-                if (selections->Index(item) != wxNOT_FOUND) {
-                    // If info item was deleted from the list, 
-                    // it's need to be deleted from selection array, if it was there
-                    selections->Remove(item);
-                    // Select item_obj, if info_item doesn't exist for item anymore, but was selected
-                    if (selections->Index(item_obj) == wxNOT_FOUND)
-                        selections->Add(item_obj);
-                }
-            }
-            else
                 Select(item_obj);
+            }
+            m_objects_model->Delete(item);
+            if (selections && selections->Index(item) != wxNOT_FOUND) {
+                // If info item was deleted from the list, 
+                // it's need to be deleted from selection array, if it was there
+                selections->Remove(item);
+                // Select item_obj, if info_item doesn't exist for item anymore, but was selected
+                if (selections->Index(item_obj) == wxNOT_FOUND)
+                    selections->Add(item_obj);
+            }
         }
     }
 }
@@ -4806,6 +4819,9 @@ void ObjectList::sys_color_changed()
 
 void ObjectList::ItemValueChanged(wxDataViewEvent &event)
 {
+    if (!m_is_editing_started)
+        return;
+
     if (event.GetColumn() == colName)
         update_name_in_model(event.GetItem());
     else if (event.GetColumn() == colExtruder) {
@@ -4828,6 +4844,9 @@ void ObjectList::OnEditingStarted(wxDataViewEvent &event)
 
 void ObjectList::OnEditingDone(wxDataViewEvent &event)
 {
+    if (!m_is_editing_started)
+        return;
+
     m_is_editing_started = false;
     if (event.GetColumn() != colName)
         return;
@@ -4960,6 +4979,11 @@ void ObjectList::update_printable_state(int obj_idx, int instance_idx)
 
 void ObjectList::toggle_printable_state()
 {
+    // do not allow to toggle the printable state while the sla support gizmo is in editing mode
+    const GLGizmosManager& gizmos = wxGetApp().plater()->canvas3D()->get_gizmos_manager();
+    if (gizmos.get_current_type() == GLGizmosManager::EType::SlaSupports && gizmos.is_in_editing_mode(true))
+        return;
+
     wxDataViewItemArray sels;
     GetSelections(sels);
     if (sels.IsEmpty())

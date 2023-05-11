@@ -339,15 +339,15 @@ public:
         return {distance, nearest_line_index_out, nearest_point_out};
     }
 
-    template<bool SIGNED_DISTANCE> Floating distance_from_lines(const Vec<2, typename LineType::Scalar> &point) const
+    template<bool SIGNED_DISTANCE> Floating distance_from_lines(const Vec<2, Scalar> &point) const
     {
         auto [dist, idx, np] = distance_from_lines_extra<SIGNED_DISTANCE>(point);
         return dist;
     }
 
-    std::vector<size_t> all_lines_in_radius(const Vec<2, typename LineType::Scalar> &point, Floating radius)
+    std::vector<size_t> all_lines_in_radius(const Vec<2, Scalar> &point, Floating radius)
     {
-        return all_lines_in_radius(this->lines, this->tree, point, radius * radius);
+        return AABBTreeLines::all_lines_in_radius(this->lines, this->tree, point.template cast<Floating>(), radius * radius);
     }
 
     template<bool sorted> std::vector<std::pair<Vec<2, Scalar>, size_t>> intersections_with_line(const LineType &line) const

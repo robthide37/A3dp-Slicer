@@ -392,7 +392,7 @@ public:
 
     ModelInstance*          add_instance();
     ModelInstance*          add_instance(const ModelInstance &instance);
-    ModelInstance*          add_instance(const Vec3d &offset, const Vec3d &scaling_factor, const Vec3d &rotation, const Vec3d &mirror);
+    ModelInstance*          add_instance(const Geometry::Transformation& trafo);
     void                    delete_instance(size_t idx);
     void                    delete_last_instance();
     void                    clear_instances();
@@ -1167,14 +1167,7 @@ public:
     arrangement::ArrangePolygon get_arrange_polygon() const;
     
     // Apply the arrange result on the ModelInstance
-    void apply_arrange_result(const Vec2d& offs, double rotation)
-    {
-        // write the transformation data into the model instance
-        set_rotation(Z, rotation);
-        set_offset(X, unscale<double>(offs(X)));
-        set_offset(Y, unscale<double>(offs(Y)));
-        this->object->invalidate_bounding_box();
-    }
+    void apply_arrange_result(const Vec2d& offs, double rotation);
 
 protected:
     friend class Print;

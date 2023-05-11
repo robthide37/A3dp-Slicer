@@ -430,16 +430,13 @@ TriangleMesh priv::try_create_mesh(DataBase &input, Fnc was_canceled)
 {
     ExPolygons shapes = priv::create_shape(input, was_canceled);
     if (shapes.empty()) return {};
-    if (was_canceled()) return {};
+    if (was_canceled()) return {}; 
     
     const FontProp &prop = input.text_configuration.style.prop;
-    const std::optional<unsigned int> &cn = prop.collection_number;
-    unsigned int font_index = (cn.has_value()) ? *cn : 0;
-    const FontFileWithCache &font = input.font_file;
-    assert(font_index < font.font_file->infos.size());
-    int unit_per_em = font.font_file->infos[font_index].unit_per_em;
-    float scale    = prop.size_in_mm / unit_per_em;
-    float depth    = prop.emboss / scale;
+    const FontFile &ff = *input.font_file.font_file;
+    // NOTE: SHAPE_SCALE is applied in ProjectZ
+    double scale = get_shape_scale(prop, ff) / SHAPE_SCALE;
+    double depth = prop.emboss / scale;    
     auto  projectZ = std::make_unique<ProjectZ>(depth);
     ProjectScale project(std::move(projectZ), scale);
     if (was_canceled()) return {};

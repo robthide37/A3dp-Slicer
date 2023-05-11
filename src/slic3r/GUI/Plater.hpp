@@ -250,7 +250,7 @@ public:
     void reset_with_confirm();
     bool delete_object_from_model(size_t obj_idx);
     void remove_selected();
-    void increase_instances(size_t num = 1, int obj_idx = -1);
+    void increase_instances(size_t num = 1, int obj_idx = -1, std::optional<Selection::ObjectIdxsToInstanceIdxsMap> selection_map = std::nullopt);
     void decrease_instances(size_t num = 1, int obj_idx = -1);
     void set_number_of_copies();
     void fill_bed_with_instances();

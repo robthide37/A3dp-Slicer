@@ -305,7 +305,7 @@ void SLAPrint::Steps::generate_preview(SLAPrintObject &po, SLAPrintObjectStep st
 
     bench.stop();
 
-    if (!m.empty())
+    if (!po.m_preview_meshes[step]->empty())
         BOOST_LOG_TRIVIAL(trace) << "Preview gen took: " << bench.getElapsedSec();
     else
         BOOST_LOG_TRIVIAL(error) << "Preview failed!";

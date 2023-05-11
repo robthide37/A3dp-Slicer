@@ -837,13 +837,10 @@ ModelInstance* ModelObject::add_instance(const ModelInstance &other)
     return i;
 }
 
-ModelInstance* ModelObject::add_instance(const Vec3d &offset, const Vec3d &scaling_factor, const Vec3d &rotation, const Vec3d &mirror)
+ModelInstance* ModelObject::add_instance(const Geometry::Transformation& trafo)
 {
-    auto *instance = add_instance();
-    instance->set_offset(offset);
-    instance->set_scaling_factor(scaling_factor);
-    instance->set_rotation(rotation);
-    instance->set_mirror(mirror);
+    ModelInstance* instance = add_instance();
+    instance->set_transformation(trafo);
     return instance;
 }
 
@@ -2408,12 +2405,8 @@ void ModelInstance::transform_polygon(Polygon* polygon) const
 arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
 {
 //    static const double SIMPLIFY_TOLERANCE_MM = 0.1;
-    
-    Vec3d rotation = get_rotation();
-    rotation.z()   = 0.;
-    Transform3d trafo_instance = Geometry::assemble_transform(get_offset().z() * Vec3d::UnitZ(), rotation, get_scaling_factor(), get_mirror());
 
-    Polygon p = get_object()->convex_hull_2d(trafo_instance);
+    Polygon p = get_object()->convex_hull_2d(this->get_matrix());
 
 //    if (!p.points.empty()) {
 //        Polygons pp{p};
@@ -2423,10 +2416,22 @@ arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
    
     arrangement::ArrangePolygon ret;
     ret.poly.contour = std::move(p);
-    ret.translation  = Vec2crd{scaled(get_offset(X)), scaled(get_offset(Y))};
-    ret.rotation     = get_rotation(Z);
+    ret.translation  = Vec2crd::Zero();
+    ret.rotation     = 0.;
 
     return ret;
+}
+
+void ModelInstance::apply_arrange_result(const Vec2d &offs, double rotation)
+{
+    // write the transformation data into the model instance
+    auto trafo = get_transformation().get_matrix();
+    auto tr = Transform3d::Identity();
+    tr.translate(to_3d(unscaled(offs), 0.));
+    trafo = tr * Eigen::AngleAxisd(rotation, Vec3d::UnitZ()) * trafo;
+    m_transformation.set_matrix(trafo);
+
+    this->object->invalidate_bounding_box();
 }
 
 indexed_triangle_set FacetsAnnotation::get_facets(const ModelVolume& mv, EnforcerBlockerType type) const

@@ -615,7 +615,7 @@ void GLCanvas3D::LayersEditing::accept_changes(GLCanvas3D& canvas)
         if (m_layer_height_profile_modified) {
             wxGetApp().plater()->take_snapshot(_L("Variable layer height - Manual edit"));
             const_cast<ModelObject*>(m_model_object)->layer_height_profile.set(m_layer_height_profile);
-			canvas.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
+            canvas.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
             wxGetApp().obj_list()->update_info_items(last_object_id);
         }
     }
@@ -3070,8 +3070,21 @@ void GLCanvas3D::on_mouse_wheel(wxMouseEvent& evt)
         return;
 
     // Calculate the zoom delta and apply it to the current zoom factor
-    double direction_factor = wxGetApp().app_config->get_bool("reverse_mouse_wheel_zoom") ? -1.0 : 1.0;
-    _update_camera_zoom(direction_factor * (double)evt.GetWheelRotation() / (double)evt.GetWheelDelta());
+    const double direction_factor = wxGetApp().app_config->get_bool("reverse_mouse_wheel_zoom") ? -1.0 : 1.0;
+    const double delta = direction_factor * (double)evt.GetWheelRotation() / (double)evt.GetWheelDelta();
+    if (wxGetKeyState(WXK_SHIFT)) {
+        const auto cnv_size = get_canvas_size();
+        const Vec3d screen_center_3d_pos = _mouse_to_3d({ cnv_size.get_width() * 0.5, cnv_size.get_height() * 0.5 });
+        const Vec3d mouse_3d_pos = _mouse_to_3d({ evt.GetX(), evt.GetY() });
+        const Vec3d displacement = mouse_3d_pos - screen_center_3d_pos;
+        wxGetApp().plater()->get_camera().translate_world(displacement);
+        const double origin_zoom = wxGetApp().plater()->get_camera().get_zoom();
+        _update_camera_zoom(delta);
+        const double new_zoom = wxGetApp().plater()->get_camera().get_zoom();
+        wxGetApp().plater()->get_camera().translate_world((-displacement) / (new_zoom / origin_zoom));
+    }
+    else
+        _update_camera_zoom(delta);
 }
 
 void GLCanvas3D::on_timer(wxTimerEvent& evt)
@@ -3302,6 +3315,16 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_canvas->SetFocus();
 
     if (evt.Entering()) {
+        if (m_mouse.dragging && !evt.LeftIsDown() && !evt.RightIsDown() && !evt.MiddleIsDown()) {
+            // ensure to stop layers editing if enabled
+            if (m_layers_editing.state != LayersEditing::Unknown) {
+                m_layers_editing.state = LayersEditing::Unknown;
+                _stop_timer();
+                m_layers_editing.accept_changes(*this);
+            }
+            mouse_up_cleanup();
+        }
+
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
         // Set focus in order to remove it from object list
@@ -3744,6 +3767,7 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
     }
 
     // Fixes flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         const double shift_z = m->get_instance_min_z(i.second);
@@ -3752,8 +3776,11 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
             m_selection.translate(i.first, i.second, shift);
             m->translate_instance(i.second, shift);
         }
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     // if the selection is not valid to allow for layer editing after the move, we need to turn off the tool if it is running
     // similar to void Plater::priv::selection_changed()
@@ -3834,6 +3861,7 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
     }
 
     // Fixes sinking/flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         const double shift_z = m->get_instance_min_z(i.second);
@@ -3844,8 +3872,11 @@ void GLCanvas3D::do_rotate(const std::string& snapshot_type)
             m->translate_instance(i.second, shift);
         }
 
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     if (!done.empty())
         post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_ROTATED));
@@ -3908,6 +3939,7 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
     }
 
     // Fixes sinking/flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         const double shift_z = m->get_instance_min_z(i.second);
@@ -3917,8 +3949,11 @@ void GLCanvas3D::do_scale(const std::string& snapshot_type)
             m_selection.translate(i.first, i.second, shift);
             m->translate_instance(i.second, shift);
         }
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     if (!done.empty())
         post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_SCALED));
@@ -3976,6 +4011,7 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
     }
 
     // Fixes sinking/flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         double shift_z = m->get_instance_min_z(i.second);
@@ -3985,8 +4021,11 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
             m_selection.translate(i.first, i.second, shift);
             m->translate_instance(i.second, shift);
         }
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
 
@@ -4038,6 +4077,7 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
     }
 
     // Fixes sinking/flying instances
+    std::set<int> obj_idx_for_update_info_items;
     for (const std::pair<int, int>& i : done) {
         ModelObject* m = m_model->objects[i.first];
         double shift_z = m->get_instance_min_z(i.second);
@@ -4047,8 +4087,11 @@ void GLCanvas3D::do_reset_skew(const std::string& snapshot_type)
             m_selection.translate(i.first, i.second, shift);
             m->translate_instance(i.second, shift);
         }
-        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(i.first));
+        obj_idx_for_update_info_items.emplace(i.first);
     }
+    //update sinking information in ObjectList
+    for (int id : obj_idx_for_update_info_items)
+        wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
     post_event(SimpleEvent(EVT_GLCANVAS_RESET_SKEW));
 
@@ -4626,7 +4669,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     const Transform3d& projection_matrix = camera.get_projection_matrix();
 
     for (GLVolume* vol : visible_volumes) {
-        vol->model.set_color((vol->printable && !vol->is_outside) ? (current_printer_technology() == ptSLA ? vol->color : ColorRGBA::ORANGE()) : ColorRGBA::GRAY());
+        vol->model.set_color((vol->printable && !vol->is_outside) ? vol->color : ColorRGBA::GRAY());
         // the volume may have been deactivated by an active gizmo
         const bool is_active = vol->is_active;
         vol->is_active = true;
@@ -6396,10 +6439,10 @@ void GLCanvas3D::_perform_layer_editing_action(wxMouseEvent* evt)
         m_layers_editing.last_action = 
             evt->ShiftDown() ? (evt->RightIsDown() ? LAYER_HEIGHT_EDIT_ACTION_SMOOTH : LAYER_HEIGHT_EDIT_ACTION_REDUCE) : 
                                (evt->RightIsDown() ? LAYER_HEIGHT_EDIT_ACTION_INCREASE : LAYER_HEIGHT_EDIT_ACTION_DECREASE);
-    }
 
-    m_layers_editing.adjust_layer_height_profile();
-    _refresh_if_shown_on_screen();
+        m_layers_editing.adjust_layer_height_profile();
+        _refresh_if_shown_on_screen();
+    }
 
     // Automatic action on mouse down with the same coordinate.
     _start_timer();
@@ -6425,7 +6468,8 @@ Vec3d GLCanvas3D::_mouse_to_3d(const Point& mouse_pos, float* z)
 
 Vec3d GLCanvas3D::_mouse_to_bed_3d(const Point& mouse_pos)
 {
-    return mouse_ray(mouse_pos).intersect_plane(0.0);
+    const Linef3 ray = mouse_ray(mouse_pos);
+    return (std::abs(ray.unit_vector().z()) < EPSILON) ? ray.a : ray.intersect_plane(0.0);
 }
 
 void GLCanvas3D::_start_timer()

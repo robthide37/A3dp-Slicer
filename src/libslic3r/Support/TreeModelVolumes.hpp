@@ -14,9 +14,9 @@
 
 #include <boost/functional/hash.hpp>
 
-#include "Point.hpp"
-#include "Polygon.hpp"
-#include "PrintConfig.hpp"
+#include "../Point.hpp"
+#include "../Polygon.hpp"
+#include "../PrintConfig.hpp"
 
 namespace Slic3r
 {
@@ -94,7 +94,9 @@ struct TreeSupportMeshGroupSettings {
     bool                            support_roof_enable                     { false };
     // Support Roof Thickness
     // The thickness of the support roofs. This controls the amount of dense layers at the top of the support on which the model rests.
-    coord_t                         support_roof_height                     { scaled<coord_t>(1.) };
+    coord_t                         support_roof_layers                     { 2 };
+    bool                            support_floor_enable                    { false };
+    coord_t                         support_floor_layers                    { 2 };
     // Minimum Support Roof Area
     // Minimum area size for the roofs of the support. Polygons which have an area smaller than this value will be printed as normal support.
     double                          minimum_roof_area                       { scaled<double>(scaled<double>(1.)) };
@@ -215,6 +217,7 @@ public:
     void clear() { 
         this->clear_all_but_object_collision();
         m_collision_cache.clear();
+        m_placeable_areas_cache.clear();
     }
     void clear_all_but_object_collision() { 
         //m_collision_cache.clear_all_but_radius0();
@@ -223,7 +226,7 @@ public:
         m_avoidance_cache_slow.clear();
         m_avoidance_cache_to_model.clear();
         m_avoidance_cache_to_model_slow.clear();
-        m_placeable_areas_cache.clear();
+        m_placeable_areas_cache.clear_all_but_radius0();
         m_avoidance_cache_holefree.clear();
         m_avoidance_cache_holefree_to_model.clear();
         m_wall_restrictions_cache.clear();

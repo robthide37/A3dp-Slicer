@@ -460,7 +460,7 @@ bool ImGuiWrapper::button(const wxString &label, const wxString& tooltip)
 
     if (!tooltip.IsEmpty() && ImGui::IsItemHovered()) {
         auto tooltip_utf8 = into_u8(tooltip);
-        ImGui::SetTooltip(tooltip_utf8.c_str());
+        ImGui::SetTooltip(tooltip_utf8.c_str(), nullptr);
     }
 
     return ret;
@@ -1619,6 +1619,8 @@ void ImGuiWrapper::init_font(bool compress)
 	ImVector<ImWchar> ranges;
     ImFontGlyphRangesBuilder builder;
 	builder.AddRanges(m_glyph_ranges);
+
+    builder.AddChar(ImWchar(0x2026)); // …
 
     if (m_font_cjk) {
         // This is a temporary fix of https://github.com/prusa3d/PrusaSlicer/issues/8171. The translation

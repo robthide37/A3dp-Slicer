@@ -2908,7 +2908,8 @@ void PrintConfigDef::init_fff_params()
     // TRN PrintSettings: "Organic supports" > "Tip Diameter"
     def->tooltip = L("Branch tip diameter for organic supports.");
     def->sidetext = L("mm");
-    def->min = 0;
+    def->min = 0.1f;
+    def->max = 100.f;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.8));
 
@@ -2919,7 +2920,8 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("The diameter of the thinnest branches of organic support. Thicker branches are more sturdy. "
                      "Branches towards the base will be thicker than this.");
     def->sidetext = L("mm");
-    def->min = 0;
+    def->min = 0.1f;
+    def->max = 100.f;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(2));
 
@@ -2936,6 +2938,18 @@ void PrintConfigDef::init_fff_params()
     def->max = 15;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(5));
+
+    def = this->add("support_tree_branch_diameter_double_wall", coFloat);
+    def->label = L("Branch Diameter with double walls");
+    def->category = L("Support material");
+    // TRN PrintSettings: "Organic supports" > "Branch Diameter"
+    def->tooltip = L("Branches with area larger than the area of a circle of this diameter will be printed with double walls for stability. "
+                     "Set this value to zero for no double walls.");
+    def->sidetext = L("mm");
+    def->min = 0;
+    def->max = 100.f;
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionFloat(3));
 
     // Tree Support Branch Distance
     // How far apart the branches need to be when they touch the model. Making this distance small will cause 
