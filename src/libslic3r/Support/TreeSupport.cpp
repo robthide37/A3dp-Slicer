@@ -4558,7 +4558,7 @@ static void draw_branches(
             }
 
             // Subtract top contact layer polygons from support base.
-            SupportGeneratorLayer *top_contact_layer = top_contacts[layer_idx];
+            SupportGeneratorLayer *top_contact_layer = top_contacts.empty() ? nullptr : top_contacts[layer_idx];
             if (top_contact_layer && ! top_contact_layer->polygons.empty() && ! base_layer_polygons.empty()) {
                 base_layer_polygons = diff(base_layer_polygons, top_contact_layer->polygons);
                 if (! bottom_contact_polygons.empty())
