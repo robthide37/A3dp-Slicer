@@ -91,7 +91,7 @@ struct AreaIncreaseSettings
 
 struct TreeSupportSettings;
 
-// #define TREE_SUPPORTS_TRACK_LOST
+#define TREE_SUPPORTS_TRACK_LOST
 
 // C++17 does not support in place initializers of bit values, thus a constructor zeroing the bits is provided.
 struct SupportElementStateBits {
