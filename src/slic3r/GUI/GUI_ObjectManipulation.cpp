@@ -15,6 +15,8 @@
 #include "MainFrame.hpp"
 #include "MsgDialog.hpp"
 
+#include <wx/glcanvas.h>
+
 #include <boost/algorithm/string.hpp>
 #include "slic3r/Utils/FixModelByWin10.hpp"
 
@@ -519,19 +521,18 @@ void ObjectManipulation::UpdateAndShow(const bool show)
     OG_Settings::UpdateAndShow(show);
 }
 
-void ObjectManipulation::Enable(const bool enadle)
+void ObjectManipulation::Enable(const bool enable)
 {
-    for (auto editor : m_editors)
-        editor->Enable(enadle);
+    m_is_enabled = m_is_enabled_size_and_scale = enable;
     for (wxWindow* win : std::initializer_list<wxWindow*>{ m_reset_scale_button, m_reset_rotation_button, m_drop_to_bed_button, m_check_inch, m_lock_bnt
       , m_reset_skew_button })
-        win->Enable(enadle);
+        win->Enable(enable);
 }
 
 void ObjectManipulation::DisableScale()
 {
-    for (auto editor : m_editors)
-        editor->Enable(editor->has_opt_key("scale") || editor->has_opt_key("size") ? false : true);
+    m_is_enabled = true;
+    m_is_enabled_size_and_scale = false;
     for (wxWindow* win : std::initializer_list<wxWindow*>{ m_reset_scale_button, m_lock_bnt, m_reset_skew_button })
         win->Enable(false);
 }
@@ -1229,6 +1230,12 @@ ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
             this->SetSelection(-1, -1); //select all
         event.Skip();
     }));
+
+    this->Bind(wxEVT_UPDATE_UI, [parent, this](wxUpdateUIEvent& evt) {
+        const bool is_gizmo_in_editing_mode = wxGetApp().plater()->canvas3D()->get_gizmos_manager().is_in_editing_mode();
+        const bool is_enabled_editing       = has_opt_key("scale") || has_opt_key("size") ? parent->is_enabled_size_and_scale() : true;
+        evt.Enable(!is_gizmo_in_editing_mode && parent->is_enabled() && is_enabled_editing);
+    });
 }
 
 void ManipulationEditor::msw_rescale()

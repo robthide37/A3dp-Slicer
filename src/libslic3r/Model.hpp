@@ -503,6 +503,8 @@ public:
 
     // Detect if object has at least one solid mash
     bool has_solid_mesh() const;
+    // Detect if object has at least one negative volume mash
+    bool has_negative_volume_mesh() const;
     bool is_cut() const { return cut_id.id().valid(); }
     bool has_connectors() const;
 

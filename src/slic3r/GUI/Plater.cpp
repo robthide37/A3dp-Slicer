@@ -1068,12 +1068,6 @@ void Sidebar::update_presets(Preset::Type preset_type)
                                 dynamic_cast<ConfigOptionFloats*>(preset_bundle.printers.get_edited_preset().config.option("nozzle_diameter"))->values.size();
         const size_t filament_cnt = p->combos_filament.size() > extruder_cnt ? extruder_cnt : p->combos_filament.size();
 
-        if (filament_cnt == 1) {
-            // Single filament printer, synchronize the filament presets.
-            const std::string &name = preset_bundle.filaments.get_selected_preset_name();
-            preset_bundle.set_filament_preset(0, name);
-        }
-
         for (size_t i = 0; i < filament_cnt; i++)
             p->combos_filament[i]->update();
 
@@ -1417,14 +1411,14 @@ void Sidebar::update_sliced_info_sizer()
                 new_label = _L("Used Filament (g)");
                 info_text = wxString::Format("%.2f", ps.total_weight);
 
-                const std::vector<std::string>& filament_presets = wxGetApp().preset_bundle->filament_presets;
+                const auto& extruders_filaments = wxGetApp().preset_bundle->extruders_filaments;
                 const PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
 
                 if (ps.filament_stats.size() > 1)
                     new_label += ":";
 
                 for (auto filament : ps.filament_stats) {
-                    const Preset* filament_preset = filaments.find_preset(filament_presets[filament.first], false);
+                    const Preset* filament_preset = filaments.find_preset(extruders_filaments[filament.first].get_selected_preset_name(), false);
                     if (filament_preset) {
                         double filament_weight;
                         if (ps.filament_stats.size() == 1)
@@ -2405,8 +2399,8 @@ void Plater::check_selected_presets_visibility(PrinterTechnology loaded_printer_
     PresetBundle* preset_bundle = wxGetApp().preset_bundle;
     if (loaded_printer_technology == ptFFF) {
         update_selected_preset_visibility(preset_bundle->prints, names);
-        for (const std::string& filament : preset_bundle->filament_presets) {
-            Preset* preset = preset_bundle->filaments.find_preset(filament);
+        for (const auto& extruder_filaments : preset_bundle->extruders_filaments) {
+            Preset* preset = preset_bundle->filaments.find_preset(extruder_filaments.get_selected_preset_name());
             if (preset && !preset->is_visible) {
                 preset->is_visible = true;
                 names.emplace_back(preset->name);
@@ -4032,19 +4026,25 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
     //!     combo->GetStringSelection().ToUTF8().data());
 
     std::string preset_name = wxGetApp().preset_bundle->get_preset_name_by_alias(preset_type, 
-        Preset::remove_suffix_modified(combo->GetString(selection).ToUTF8().data()));
-
-    if (preset_type == Preset::TYPE_FILAMENT) {
-        wxGetApp().preset_bundle->set_filament_preset(idx, preset_name);
-    }
+        Preset::remove_suffix_modified(into_u8(combo->GetString(selection))), idx);
 
     std::string last_selected_ph_printer_name = combo->get_selected_ph_printer_name();
 
     bool select_preset = !combo->selection_is_changed_according_to_physical_printers();
     // TODO: ?
-    if (preset_type == Preset::TYPE_FILAMENT && sidebar->is_multifilament()) {
-        // Only update the plater UI for the 2nd and other filaments.
-        combo->update();
+    if (preset_type == Preset::TYPE_FILAMENT) {
+        wxGetApp().preset_bundle->set_filament_preset(idx, preset_name);
+
+        TabFilament* tab = dynamic_cast<TabFilament*>(wxGetApp().get_tab(Preset::TYPE_FILAMENT));
+        if (tab && combo->get_extruder_idx() == tab->get_active_extruder() && !tab->select_preset(preset_name)) {
+            // revert previously selection
+            const std::string& old_name = wxGetApp().preset_bundle->filaments.get_edited_preset().name;
+            wxGetApp().preset_bundle->set_filament_preset(idx, old_name);
+            combo->update();
+        }
+        else
+            // Synchronize config.ini with the current selections.
+            wxGetApp().preset_bundle->export_selections(*wxGetApp().app_config);
     }
     else if (select_preset) {
         wxWindowUpdateLocker noUpdates(sidebar->presets_panel());
@@ -4094,8 +4094,10 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
             // If RELOAD_SLA_SUPPORT_POINTS, then the SLA gizmo is updated (reload_scene calls update_gizmos_data)
             if (view3D->is_dragging())
                 delayed_scene_refresh = true;
-            else
+            else {
+                view3D->get_canvas3d()->enable_sla_view_type_detection();
                 this->update_sla_scene();
+            }
             break;
         default: break;
         }
@@ -6897,6 +6899,8 @@ void Plater::on_extruders_change(size_t num_extruders)
     if (num_extruders == choices.size())
         return;
 
+    dynamic_cast<TabFilament*>(wxGetApp().get_tab(Preset::TYPE_FILAMENT))->update_extruder_combobox();
+
     wxWindowUpdateLocker noUpdates_scrolled_panel(&sidebar()/*.scrolled_panel()*/);
 
     size_t i = choices.size();
@@ -6923,16 +6927,16 @@ bool Plater::update_filament_colors_in_full_config()
     // There is a case, when we use filament_color instead of extruder_color (when extruder_color == "").
     // Thus plater config option "filament_colour" should be filled with filament_presets values.
     // Otherwise, on 3dScene will be used last edited filament color for all volumes with extruder_color == "".
-    const std::vector<std::string> filament_presets = wxGetApp().preset_bundle->filament_presets;
-    if (filament_presets.size() == 1 || !p->config->has("filament_colour"))
+    const auto& extruders_filaments = wxGetApp().preset_bundle->extruders_filaments;
+    if (extruders_filaments.size() == 1 || !p->config->has("filament_colour"))
         return false;
 
     const PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
     std::vector<std::string> filament_colors;
-    filament_colors.reserve(filament_presets.size());
+    filament_colors.reserve(extruders_filaments.size());
 
-    for (const std::string& filament_preset : filament_presets)
-        filament_colors.push_back(filaments.find_preset(filament_preset, true)->config.opt_string("filament_colour", (unsigned)0));
+    for (const auto& extr_filaments : extruders_filaments)
+        filament_colors.push_back(filaments.find_preset(extr_filaments.get_selected_preset_name(), true)->config.opt_string("filament_colour", (unsigned)0));
 
     p->config->option<ConfigOptionStrings>("filament_colour")->values = filament_colors;
     return true;
@@ -6957,10 +6961,12 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
         
         p->config->set_key_value(opt_key, config.option(opt_key)->clone());
         if (opt_key == "printer_technology") {
-            this->set_printer_technology(config.opt_enum<PrinterTechnology>(opt_key));
+            const PrinterTechnology printer_technology = config.opt_enum<PrinterTechnology>(opt_key);
+            this->set_printer_technology(printer_technology);
             p->sidebar->show_sliced_info_sizer(false);
             p->reset_gcode_toolpaths();
             p->view3D->get_canvas3d()->reset_sequential_print_clearance();
+            p->view3D->get_canvas3d()->set_sla_view_type(GLCanvas3D::ESLAViewType::Original);
         }
         else if (opt_key == "bed_shape" || opt_key == "bed_custom_texture" || opt_key == "bed_custom_model") {
             bed_shape_changed = true;
@@ -7025,16 +7031,17 @@ void Plater::force_filament_colors_update()
 {
     bool update_scheduled = false;
     DynamicPrintConfig* config = p->config;
-    const std::vector<std::string> filament_presets = wxGetApp().preset_bundle->filament_presets;
-    if (filament_presets.size() > 1 && 
-        p->config->option<ConfigOptionStrings>("filament_colour")->values.size() == filament_presets.size())
+
+    const auto& extruders_filaments = wxGetApp().preset_bundle->extruders_filaments;
+    if (extruders_filaments.size() > 1 && 
+        p->config->option<ConfigOptionStrings>("filament_colour")->values.size() == extruders_filaments.size())
     {
         const PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
         std::vector<std::string> filament_colors;
-        filament_colors.reserve(filament_presets.size());
+        filament_colors.reserve(extruders_filaments.size());
 
-        for (const std::string& filament_preset : filament_presets)
-            filament_colors.push_back(filaments.find_preset(filament_preset, true)->config.opt_string("filament_colour", (unsigned)0));
+        for (const auto& extr_filaments : extruders_filaments)
+            filament_colors.push_back(extr_filaments.get_selected_preset()->config.opt_string("filament_colour", (unsigned)0));
 
         if (config->option<ConfigOptionStrings>("filament_colour")->values != filament_colors) {
             config->option<ConfigOptionStrings>("filament_colour")->values = filament_colors;
@@ -7049,6 +7056,20 @@ void Plater::force_filament_colors_update()
 
     if (p->main_frame->is_loaded())
         this->p->schedule_background_process();
+}
+
+void Plater::force_filament_cb_update()
+{
+    // Update visibility for templates presets according to app_config
+    PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
+    AppConfig& config = *wxGetApp().app_config;
+    for (Preset& preset : filaments)
+        preset.set_visible_from_appconfig(config);
+    wxGetApp().preset_bundle->update_compatible(PresetSelectCompatibleType::Never, PresetSelectCompatibleType::OnlyIfWasCompatible);
+
+    // Update preset comboboxes on sidebar and filaments tab
+    p->sidebar->update_presets(Preset::TYPE_FILAMENT);
+    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->select_preset(wxGetApp().preset_bundle->filaments.get_selected_preset_name());
 }
 
 void Plater::force_print_bed_update()

@@ -2097,6 +2097,14 @@ bool ModelObject::has_solid_mesh() const
     return false;
 }
 
+bool ModelObject::has_negative_volume_mesh() const
+{
+    for (const ModelVolume* volume : volumes)
+        if (volume->is_negative_volume())
+            return true;
+    return false;
+}
+
 void ModelVolume::set_material_id(t_model_material_id material_id)
 {
     m_material_id = material_id;

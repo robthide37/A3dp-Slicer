@@ -5,6 +5,7 @@
 #include "SL1.hpp"
 #include "SL1_SVG.hpp"
 #include "AnycubicSLA.hpp"
+#include "I18N.hpp"
 
 #include "SLAArchiveFormatRegistry.hpp"
 

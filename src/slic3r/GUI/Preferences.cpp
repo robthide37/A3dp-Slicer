@@ -694,8 +694,6 @@ void PreferencesDialog::accept(wxEvent&)
 #endif // __linux__
 	}
 
-	bool update_filament_sidebar = (m_values.find("no_templates") != m_values.end());
-
 	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled", "font_size" };
 
 	for (const std::string& option : options_to_recreate_GUI) {
@@ -761,12 +759,12 @@ void PreferencesDialog::accept(wxEvent&)
 		wxGetApp().force_menu_update();
 #endif //_MSW_DARK_MODE
 #endif // _WIN32
-	
+
+	if (m_values.find("no_templates") != m_values.end())
+		wxGetApp().plater()->force_filament_cb_update();
+
 	wxGetApp().update_ui_from_settings();
 	clear_cache();
-
-	if (update_filament_sidebar)
-		wxGetApp().plater()->sidebar().update_presets(Preset::Type::TYPE_FILAMENT);
 }
 
 void PreferencesDialog::revert(wxEvent&)

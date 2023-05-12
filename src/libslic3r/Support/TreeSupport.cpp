@@ -2249,6 +2249,7 @@ static void increase_areas_one_layer(
                 // But as branches connecting with the model that are to small have to be culled, the bottom most point has to be not set.
                 // A point can be set on the top most tip layer (maybe more if it should not move for a few layers).
                 parent.state.result_on_layer_reset();
+                parent.state.to_model_gracious = false;
 #ifdef TREE_SUPPORTS_TRACK_LOST
                 parent.state.verylost = true;
 #endif // TREE_SUPPORTS_TRACK_LOST
@@ -4410,7 +4411,10 @@ static void draw_branches(
                                 // Don't propagate further than 1.5 * bottom radius.
                                 //LayerIndex                      layers_propagate_max = 2 * bottom_radius / config.layer_height;
                                 LayerIndex                      layers_propagate_max = 5 * bottom_radius / config.layer_height;
-                                LayerIndex                      layer_bottommost = std::max(0, layer_begin - layers_propagate_max);
+                                LayerIndex                      layer_bottommost = branch.path.front()->state.verylost ? 
+                                    // If the tree bottom is hanging in the air, bring it down to some surface.
+                                    0 : 
+                                    std::max(0, layer_begin - layers_propagate_max);
                                 // Only propagate until the rest area is smaller than this threshold.
                                 double                          support_area_stop = 0.2 * M_PI * sqr(double(bottom_radius));
                                 // Only propagate until the rest area is smaller than this threshold.

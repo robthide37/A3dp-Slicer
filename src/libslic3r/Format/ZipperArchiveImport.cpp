@@ -83,8 +83,15 @@ ZipperArchive read_zipper_archive(const std::string &zipfname,
                             }))
                 continue;
 
-            if (name == CONFIG_FNAME)  { arch.config = read_ini(entry, zip); continue; }
-            if (name == PROFILE_FNAME) { arch.profile = read_ini(entry, zip); continue; }
+            if (name == CONFIG_FNAME)  {
+                arch.config = read_ini(entry, zip);
+                continue;
+            }
+
+            if (name == PROFILE_FNAME) {
+                arch.profile = read_ini(entry, zip);
+                continue;
+            }
 
             auto it = std::lower_bound(
                 arch.entries.begin(), arch.entries.end(),

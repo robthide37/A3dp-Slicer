@@ -308,6 +308,7 @@ public:
     bool update_filament_colors_in_full_config();
     void on_config_change(const DynamicPrintConfig &config);
     void force_filament_colors_update();
+    void force_filament_cb_update();
     void force_print_bed_update();
     // On activating the parent window.
     void on_activate();

@@ -75,9 +75,9 @@ std::string PresetHints::maximum_volumetric_flow_description(const PresetBundle 
 {
     // Find out, to which nozzle index is the current filament profile assigned.
     int idx_extruder  = 0;
-	int num_extruders = (int)preset_bundle.filament_presets.size();
+    int num_extruders = (int)preset_bundle.extruders_filaments.size();
     for (; idx_extruder < num_extruders; ++ idx_extruder)
-        if (preset_bundle.filament_presets[idx_extruder] == preset_bundle.filaments.get_selected_preset_name())
+        if (preset_bundle.extruders_filaments[idx_extruder].get_selected_preset_name() == preset_bundle.filaments.get_selected_preset_name())
             break;
     if (idx_extruder == num_extruders)
         // The current filament preset is not active for any extruder.

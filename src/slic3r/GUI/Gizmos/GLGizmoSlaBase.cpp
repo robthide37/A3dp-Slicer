@@ -20,8 +20,15 @@ GLGizmoSlaBase::GLGizmoSlaBase(GLCanvas3D& parent, const std::string& icon_filen
 void GLGizmoSlaBase::reslice_until_step(SLAPrintObjectStep step, bool postpone_error_messages)
 {
     wxGetApp().CallAfter([this, step, postpone_error_messages]() {
-        wxGetApp().plater()->reslice_SLA_until_step(step, *m_c->selection_info()->model_object(), postpone_error_messages);
-        });
+        if (m_c->selection_info())
+            wxGetApp().plater()->reslice_SLA_until_step(step, *m_c->selection_info()->model_object(), postpone_error_messages);
+        else {
+            const Selection& selection = m_parent.get_selection();
+            const int object_idx = selection.get_object_idx();
+            if (object_idx >= 0 && !selection.is_wipe_tower())
+                wxGetApp().plater()->reslice_SLA_until_step(step, *wxGetApp().plater()->model().objects[object_idx], postpone_error_messages);
+        }
+    });
 }
 
 CommonGizmosDataID GLGizmoSlaBase::on_get_requirements() const
