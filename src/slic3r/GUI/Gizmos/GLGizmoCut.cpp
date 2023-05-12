@@ -2540,23 +2540,24 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         ModelObjectPtrs cut_object_ptrs;
         if (cut_by_contour) {
             // apply cut attributes for object
-            cut_mo->apply_cut_attributes(ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepUpper | 
-                                         only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
+            if (m_keep_upper && m_keep_lower)
+                cut_mo->apply_cut_attributes(ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepUpper | 
+                                             only_if(create_dowels_as_separate_object, ModelObjectCutAttribute::CreateDowels));
 
             // Clone the object to duplicate instances, materials etc.
             ModelObject* upper{ nullptr };
-            cut_mo->clone_for_cut(&upper);
+            if (m_keep_upper) cut_mo->clone_for_cut(&upper);
             ModelObject* lower{ nullptr };
-            cut_mo->clone_for_cut(&lower);
+            if (m_keep_lower) cut_mo->clone_for_cut(&lower);
 
             auto add_cut_objects = [this, &instance_idx, &cut_matrix](ModelObjectPtrs& cut_objects, ModelObject* upper, ModelObject* lower, bool invalidate_cut = true) {
-                if (!upper->volumes.empty()) {
+                if (upper && !upper->volumes.empty()) {
                     ModelObject::reset_instance_transformation(upper, instance_idx, cut_matrix, m_place_on_cut_upper, m_rotate_upper);
                     if (invalidate_cut)
                         upper->invalidate_cut();
                     cut_objects.push_back(upper);
                 }
-                if (!lower->volumes.empty()) {
+                if (lower && !lower->volumes.empty()) {
                     ModelObject::reset_instance_transformation(lower, instance_idx, cut_matrix, m_place_on_cut_lower, m_place_on_cut_lower || m_rotate_lower);
                     if (invalidate_cut)
                         lower->invalidate_cut();
@@ -2565,8 +2566,10 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
             };
 
             const size_t cut_parts_cnt = m_part_selection.parts().size();
-            for (size_t id = 0; id < cut_parts_cnt; ++id)
-                (m_part_selection.parts()[id].selected ? upper : lower)->add_volume(*(cut_mo->volumes[id]));
+            for (size_t id = 0; id < cut_parts_cnt; ++id) {
+                if (ModelObject* obj = (m_part_selection.parts()[id].selected ? upper : lower))
+                    obj->add_volume(*(cut_mo->volumes[id]));
+            }
 
             ModelVolumePtrs& volumes = cut_mo->volumes;
             if (volumes.size() == cut_parts_cnt)
