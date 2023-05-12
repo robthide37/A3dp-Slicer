@@ -1192,13 +1192,6 @@ void ObjectList::key_event(wxKeyEvent& event)
 
 void ObjectList::OnBeginDrag(wxDataViewEvent &event)
 {
-    if (m_is_editing_started)
-        m_is_editing_started = false;
-#ifdef __WXGTK__
-    const auto renderer = dynamic_cast<BitmapTextRenderer*>(GetColumn(colName)->GetRenderer());
-    renderer->FinishEditing();
-#endif
-
     const wxDataViewItem item(event.GetItem());
 
     const bool mult_sel = multiple_selection();
@@ -1232,11 +1225,18 @@ void ObjectList::OnBeginDrag(wxDataViewEvent &event)
                                         m_objects_model->GetInstanceIdByItem(item), 
                             type);
 
+    /* Under MSW or OSX, DnD moves an item to the place of another selected item
+    * But under GTK, DnD moves an item between another two items.
+    * And as a result - call EVT_CHANGE_SELECTION to unselect all items.
+    * To prevent such behavior use m_prevent_list_events
+    **/
+    m_prevent_list_events = true;//it's needed for GTK
+
     /* Under GTK, DnD requires to the wxTextDataObject been initialized with some valid value,
      * so set some nonempty string
      */
     wxTextDataObject* obj = new wxTextDataObject;
-    obj->SetText(mult_sel ? "SomeText" : m_objects_model->GetItemName(item));//it's needed for GTK
+    obj->SetText("Some text");//it's needed for GTK
 
     event.SetDataObject(obj);
     event.SetDragFlags(wxDrag_DefaultMove); // allows both copy and move;
@@ -1299,8 +1299,11 @@ bool ObjectList::can_drop(const wxDataViewItem& item) const
 void ObjectList::OnDropPossible(wxDataViewEvent &event)
 {
     const wxDataViewItem& item = event.GetItem();
-    if (!can_drop(item))
+
+    if (!can_drop(item)) {
         event.Veto();
+        m_prevent_list_events = false;
+    }
 }
 
 void ObjectList::OnDrop(wxDataViewEvent &event)
@@ -1313,13 +1316,6 @@ void ObjectList::OnDrop(wxDataViewEvent &event)
         m_dragged_data.clear();
         return;
     }
-
-    /* Under MSW or OSX, DnD moves an item to the place of another selected item
-    * But under GTK, DnD moves an item between another two items.
-    * And as a result - call EVT_CHANGE_SELECTION to unselect all items.
-    * To prevent such behavior use m_prevent_list_events
-    **/
-    m_prevent_list_events = true;//it's needed for GTK
 
     if (m_dragged_data.type() == itInstance)
     {
@@ -4823,9 +4819,6 @@ void ObjectList::sys_color_changed()
 
 void ObjectList::ItemValueChanged(wxDataViewEvent &event)
 {
-    if (!m_is_editing_started)
-        return;
-
     if (event.GetColumn() == colName)
         update_name_in_model(event.GetItem());
     else if (event.GetColumn() == colExtruder) {
@@ -4848,9 +4841,6 @@ void ObjectList::OnEditingStarted(wxDataViewEvent &event)
 
 void ObjectList::OnEditingDone(wxDataViewEvent &event)
 {
-    if (!m_is_editing_started)
-        return;
-
     m_is_editing_started = false;
     if (event.GetColumn() != colName)
         return;
