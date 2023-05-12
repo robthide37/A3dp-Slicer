@@ -467,18 +467,28 @@ public:
     void invalidate_cut();
     // delete volumes which are marked as connector for this object
     void delete_connectors();
-    void synchronize_model_after_cut();
-    void apply_cut_attributes(ModelObjectCutAttributes attributes);
     void clone_for_cut(ModelObject **obj);
+
+    void apply_cut_attributes(ModelObjectCutAttributes attributes);
+private:
+    // FIXME: These functions would best not be here at all. It might make sense to separate the
+    // cut-related methods elsewhere. Same holds for cut_connectors data member, which is currently
+    // just a temporary variable used by cut gizmo only.
+    void synchronize_model_after_cut();
+    
     void process_connector_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
                                ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower,
-                               std::vector<ModelObject*>& dowels, Vec3d& local_dowels_displace);
+                               std::vector<ModelObject*>& dowels);
     void process_modifier_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& inverse_cut_matrix,
                               ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower);
     void process_volume_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
                             ModelObjectCutAttributes attributes, TriangleMesh& upper_mesh, TriangleMesh& lower_mesh);
     void process_solid_part_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
-                                ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower, Vec3d& local_displace);
+                                ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower);
+public:
+    static void reset_instance_transformation(ModelObject* object, size_t src_instance_idx, const Transform3d& cut_matrix,
+                                              bool place_on_cut = false, bool flip = false);
+
     ModelObjectPtrs cut(size_t instance, const Transform3d&cut_matrix, ModelObjectCutAttributes attributes);
     void split(ModelObjectPtrs*new_objects);
     void merge();
@@ -1391,8 +1401,6 @@ bool model_has_parameter_modifiers_in_objects(const Model& model);
 // If the model has multi-part objects, then it is currently not supported by the SLA mode.
 // Either the model cannot be loaded, or a SLA printer has to be activated.
 bool model_has_multi_part_objects(const Model &model);
-// If the model has objects with cut connectrs, then it is currently not supported by the SLA mode.
-bool model_has_connectors(const Model& model);
 // If the model has advanced features, then it cannot be processed in simple mode.
 bool model_has_advanced_features(const Model &model);
 

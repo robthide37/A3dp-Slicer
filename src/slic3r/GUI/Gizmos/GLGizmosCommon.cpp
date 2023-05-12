@@ -370,33 +370,71 @@ void ObjectClipper::on_release()
 
 }
 
-void ObjectClipper::render_cut() const
+void ObjectClipper::render_cut(const std::vector<size_t>* ignore_idxs) const
 {
     if (m_clp_ratio == 0.)
         return;
     const SelectionInfo* sel_info = get_pool()->selection_info();
     const Geometry::Transformation inst_trafo = sel_info->model_object()->instances[sel_info->get_active_instance()]->get_transformation();
+    
+    std::vector<size_t> ignore_idxs_local = ignore_idxs ? *ignore_idxs : std::vector<size_t>();
 
     for (auto& clipper : m_clippers) {
-      Geometry::Transformation trafo = inst_trafo * clipper.second;
-      trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
-      clipper.first->set_plane(*m_clp);
-      clipper.first->set_transformation(trafo);
-      clipper.first->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));
-      clipper.first->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f });
-      clipper.first->render_contour({ 1.f, 1.f, 1.f, 1.f });
+        Geometry::Transformation trafo = inst_trafo * clipper.second;
+        trafo.set_offset(trafo.get_offset() + Vec3d(0., 0., sel_info->get_sla_shift()));
+        clipper.first->set_plane(*m_clp);
+        clipper.first->set_transformation(trafo);
+        clipper.first->set_limiting_plane(ClippingPlane(Vec3d::UnitZ(), -SINKING_Z_THRESHOLD));      
+        clipper.first->render_cut({ 1.0f, 0.37f, 0.0f, 1.0f }, &ignore_idxs_local);
+        clipper.first->render_contour({ 1.f, 1.f, 1.f, 1.f },  &ignore_idxs_local);
+  
+        // Now update the ignore idxs. Find the first element belonging to the next clipper,
+        // and remove everything before it and decrement everything by current number of contours.
+        const int num_of_contours = clipper.first->get_number_of_contours();
+        ignore_idxs_local.erase(ignore_idxs_local.begin(), std::find_if(ignore_idxs_local.begin(), ignore_idxs_local.end(), [num_of_contours](size_t idx) { return idx >= num_of_contours; } ));
+        for (size_t& idx : ignore_idxs_local)
+            idx -= num_of_contours;
     }
 }
 
-bool ObjectClipper::is_projection_inside_cut(const Vec3d& point) const
+
+int ObjectClipper::get_number_of_contours() const
 {
-    return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [point](const auto& cl) { return cl.first->is_projection_inside_cut(point); });
+    int sum = 0;
+    for (const auto& [clipper, trafo] : m_clippers)
+        sum += clipper->get_number_of_contours();
+    return sum;
+}
+
+int ObjectClipper::is_projection_inside_cut(const Vec3d& point) const
+{
+    if (m_clp_ratio == 0.)
+        return -1;
+    int idx_offset = 0;
+    for (const auto& [clipper, trafo] : m_clippers) {
+        if (int idx = clipper->is_projection_inside_cut(point); idx != -1)
+            return idx_offset + idx;
+        idx_offset += clipper->get_number_of_contours();
+    }
+    return -1;
 }
 
 bool ObjectClipper::has_valid_contour() const
 {
     return m_clp_ratio != 0. && std::any_of(m_clippers.begin(), m_clippers.end(), [](const auto& cl) { return cl.first->has_valid_contour(); });
 }
+
+std::vector<Vec3d> ObjectClipper::point_per_contour() const
+{
+    std::vector<Vec3d> pts;
+
+    for (const auto& clipper : m_clippers) {
+        const std::vector<Vec3d> pts_clipper = clipper.first->point_per_contour();
+        pts.insert(pts.end(), pts_clipper.begin(), pts_clipper.end());;
+    }
+    return pts;
+}
+
 
 void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal)
 {
@@ -436,16 +474,6 @@ void ObjectClipper::set_behavior(bool hide_clipped, bool fill_cut, double contou
         clipper.first->set_behaviour(fill_cut, contour_width);
 }
 
-void ObjectClipper::pass_mouse_click(const Vec3d& pt)
-{
-    for (auto& clipper : m_clippers)
-        clipper.first->pass_mouse_click(pt);
-}
-
-std::vector<Vec3d> ObjectClipper::get_disabled_contours() const
-{
-    return std::vector<Vec3d>();
-}
 
 void SupportsClipper::on_update()
 {

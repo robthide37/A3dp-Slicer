@@ -6266,7 +6266,11 @@ void Plater::cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_mat
     wxBusyCursor wait;
 
     const auto new_objects = object->cut(instance_idx, cut_matrix, attributes);
+    cut(obj_idx, new_objects);
+}
 
+void Plater::cut(size_t obj_idx, const ModelObjectPtrs& new_objects)
+{
     model().delete_object(obj_idx);
     sidebar().obj_list()->delete_object_from_list(obj_idx);
 
@@ -6284,6 +6288,8 @@ void Plater::cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_mat
     size_t last_id = p->model.objects.size() - 1;
     for (size_t i = 0; i < new_objects.size(); ++i)
         selection.add_object((unsigned int)(last_id - i), i == 0);
+
+    arrange();
 }
 
 void Plater::export_gcode(bool prefer_removable)
