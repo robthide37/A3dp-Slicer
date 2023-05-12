@@ -1849,7 +1849,7 @@ struct Plater::priv
     void suppress_snapshots()   { m_prevent_snapshots++; }
     void allow_snapshots()      { m_prevent_snapshots--; }
 
-    void process_validation_warning(const std::string& warning) const;
+    void process_validation_warning(const std::vector<std::string>& warning) const;
 
     bool background_processing_enabled() const { return this->get_config_bool("background_processing"); }
     void update_print_volume_state();
@@ -3198,12 +3198,12 @@ void Plater::priv::update_print_volume_state()
     this->q->model().update_print_volume_state(this->bed.build_volume());
 }
 
-void Plater::priv::process_validation_warning(const std::string& warning) const
+void Plater::priv::process_validation_warning(const std::vector<std::string>& warnings) const
 {
-    if (warning.empty())
+    if (warnings.empty())
         notification_manager->close_notification_of_type(NotificationType::ValidateWarning);
     else {
-        std::string text = warning;
+        std::string text = warnings.front();
         std::string hypertext = "";
         std::function<bool(wxEvtHandler*)> action_fn = [](wxEvtHandler*){ return false; };
 
@@ -3279,8 +3279,8 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 		// The delayed error message is no more valid.
 		delayed_error_message.clear();
 		// The state of the Print changed, and it is non-zero. Let's validate it and give the user feedback on errors.
-        std::string warning;
-        std::string err = background_process.validate(&warning);
+        std::vector<std::string> warnings;
+        std::string err = background_process.validate(&warnings);
         if (err.empty()) {
 			notification_manager->set_all_slicing_errors_gray(true);
             notification_manager->close_notification_of_type(NotificationType::ValidateError);
@@ -3289,7 +3289,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 
             // Pass a warning from validation and either show a notification,
             // or hide the old one.
-            process_validation_warning(warning);
+            process_validation_warning(warnings);
             if (printer_technology == ptFFF) {
                 GLCanvas3D* canvas = view3D->get_canvas3d();
                 canvas->reset_sequential_print_clearance();
@@ -3328,8 +3328,8 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
                     canvas->request_extra_frame();
                 }
             }
-            std::string warning;
-            std::string err = background_process.validate(&warning);
+            std::vector<std::string> warnings;
+            std::string err = background_process.validate(&warnings);
             if (!err.empty())
                 return return_state;
         }
@@ -3342,7 +3342,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 	//actualizate warnings
 	if (invalidated != Print::APPLY_STATUS_UNCHANGED || background_process.empty()) {
         if (background_process.empty())
-            process_validation_warning(std::string());
+            process_validation_warning(std::vector<std::string>());
 		actualize_slicing_warnings(*this->background_process.current_print());
         actualize_object_warnings(*this->background_process.current_print());
 		show_warning_dialog = false;

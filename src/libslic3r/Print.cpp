@@ -468,7 +468,7 @@ static inline bool sequential_print_vertical_clearance_valid(const Print &print)
 boost::regex regex_g92e0 { "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
 
 // Precondition: Print::validate() requires the Print::apply() to be called its invocation.
-std::string Print::validate(std::string* warning) const
+std::string Print::validate(std::vector<std::string>* warnings) const
 {
     std::vector<unsigned int> extruders = this->extruders();
 
@@ -691,12 +691,12 @@ std::string Print::validate(std::string* warning) const
 
             // Do we have custom support data that would not be used?
             // Notify the user in that case.
-            if (! object->has_support() && warning) {
+            if (! object->has_support() && warnings) {
                 for (const ModelVolume* mv : object->model_object()->volumes) {
                     bool has_enforcers = mv->is_support_enforcer() || 
                         (mv->is_model_part() && mv->supported_facets.has_facets(*mv, EnforcerBlockerType::ENFORCER));
                     if (has_enforcers) {
-                        *warning = "_SUPPORTS_OFF";
+                        warnings->emplace_back("_SUPPORTS_OFF");
                         break;
                     }
                 }
