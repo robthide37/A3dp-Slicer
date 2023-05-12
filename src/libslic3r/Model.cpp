@@ -1595,6 +1595,8 @@ void ModelObject::reset_instance_transformation(ModelObject* object, size_t src_
     for (size_t i = 0; i < object->instances.size(); ++i) {
         auto& obj_instance = object->instances[i];
         const double rot_z = obj_instance->get_rotation().z();
+        
+        obj_instance->set_transformation(Transformation(obj_instance->get_transformation().get_matrix_no_scaling_factor()));
 
         Vec3d rotation = Vec3d::Zero();
         if (!flip && !place_on_cut) {

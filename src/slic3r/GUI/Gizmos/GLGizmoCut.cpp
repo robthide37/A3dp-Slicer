@@ -250,7 +250,8 @@ std::string GLGizmoCut3D::get_tooltip() const
 
     if (!m_dragging && m_hover_id == CutPlane)
         return _u8L("Click to flip the cut plane\n"
-                    "Drag to move the cut plane");
+                    "Drag to move the cut plane\n"
+                    "Right-click a part to assign it to the other side");
 
     if (tooltip.empty() && (m_hover_id == X || m_hover_id == Y)) {
         std::string axis = m_hover_id == X ? "X" : "Y";
@@ -351,7 +352,7 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
         return true;
     }
     else if (mouse_event.RightDown()) {
-        if (! m_connectors_editing) {
+        if (! m_connectors_editing && mouse_event.GetModifiers() == wxMOD_NONE) {
             // Check the internal part raycasters.
             if (! m_part_selection.valid())
                 process_contours();
@@ -1868,6 +1869,7 @@ void GLGizmoCut3D::reset_cut_plane()
     m_ar_plane_center  = m_plane_center;
 
     reset_cut_by_contours();
+    m_parent.request_extra_frame();
 }
 
 void GLGizmoCut3D::invalidate_cut_plane()
@@ -2074,7 +2076,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGuiWrapper::text(_L("Cut result") + ": ");
         add_vertical_scaled_interval(0.5f);
 
-        m_imgui->disabled_begin(has_connectors || m_keep_as_parts || m_part_selection.valid());
+        m_imgui->disabled_begin(has_connectors || m_keep_as_parts);
             render_part_name("A", m_keep_upper, m_imgui->to_ImU32(UPPER_PART_COLOR));
             ImGui::SameLine(h_shift + ImGui::GetCurrentWindow()->WindowPadding.x);
             render_part_name("B", m_keep_lower, m_imgui->to_ImU32(LOWER_PART_COLOR));
@@ -2090,7 +2092,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
         add_vertical_scaled_interval(0.75f);
 
-        m_imgui->disabled_begin(has_connectors);
+        m_imgui->disabled_begin(has_connectors || m_part_selection.valid());
             ImGuiWrapper::text(_L("Cut into") + ":");
 
             if (m_part_selection.valid())
@@ -2693,6 +2695,7 @@ void GLGizmoCut3D::reset_connectors()
     m_c->selection_info()->model_object()->cut_connectors.clear();
     update_raycasters_for_picking();
     clear_selection();
+    check_and_update_connectors_state();
 }
 
 void GLGizmoCut3D::init_connector_shapes()
