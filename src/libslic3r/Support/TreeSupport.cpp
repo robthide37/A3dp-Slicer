@@ -4415,10 +4415,10 @@ static void draw_branches(
                                     // If the tree bottom is hanging in the air, bring it down to some surface.
                                     0 : 
                                     std::max(0, layer_begin - layers_propagate_max);
-                                // Only propagate until the rest area is smaller than this threshold.
-                                double                          support_area_stop = 0.2 * M_PI * sqr(double(bottom_radius));
-                                // Only propagate until the rest area is smaller than this threshold.
-                                double                          support_area_min = 0.1 * M_PI * sqr(double(config.min_radius));
+                                double                          support_area_min_radius = M_PI * sqr(double(config.branch_radius));
+                                double                          support_area_stop = std::max(0.2 * M_PI * sqr(double(bottom_radius)), 0.5 * support_area_min_radius);
+                                 // Only propagate until the rest area is smaller than this threshold.
+                                double                          support_area_min = 0.1 * support_area_min_radius;
                                 for (LayerIndex layer_idx = layer_begin - 1; layer_idx >= layer_bottommost; -- layer_idx) {
                                     rest_support = diff_clipped(rest_support.empty() ? slices.front() : rest_support, volumes.getCollision(0, layer_idx, false));
                                     double rest_support_area = area(rest_support);
