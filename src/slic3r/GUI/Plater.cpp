@@ -3294,29 +3294,43 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             // or hide the old one.
             process_validation_warning(warning);
             if (printer_technology == ptFFF) {
-                view3D->get_canvas3d()->reset_sequential_print_clearance();
-                view3D->get_canvas3d()->set_as_dirty();
-                view3D->get_canvas3d()->request_extra_frame();
+                GLCanvas3D* canvas = view3D->get_canvas3d();
+                if (canvas->is_sequential_print_clearance_evaluating()) {
+                    canvas->reset_sequential_print_clearance();
+                    canvas->set_as_dirty();
+                    canvas->request_extra_frame();
+                }
             }
         }
         else {
-			// The print is not valid.
-			// Show error as notification.
+            // The print is not valid.
+            // Show error as notification.
             notification_manager->push_validate_error_notification(err);
             return_state |= UPDATE_BACKGROUND_PROCESS_INVALID;
             if (printer_technology == ptFFF) {
-                const Print* print = background_process.fff_print();
-                Polygons polygons;
-                if (print->config().complete_objects)
-                    Print::sequential_print_horizontal_clearance_valid(*print, &polygons);
-                view3D->get_canvas3d()->set_sequential_print_clearance_visible(true);
-                view3D->get_canvas3d()->set_sequential_print_clearance_render_fill(true);
-                view3D->get_canvas3d()->set_sequential_print_clearance_polygons(polygons);
+                GLCanvas3D* canvas = view3D->get_canvas3d();
+                if (canvas->is_sequential_print_clearance_empty() || canvas->is_sequential_print_clearance_evaluating()) {
+                    GLCanvas3D::ContoursList contours;
+                    contours.contours = background_process.fff_print()->get_sequential_print_clearance_contours();
+                    canvas->set_sequential_print_clearance_contours(contours, true);
+                }
             }
         }
     }
     else {
         if (invalidated == Print::APPLY_STATUS_UNCHANGED && !background_process.empty()) {
+            if (printer_technology == ptFFF) {
+                // Object manipulation with gizmos may end up in a null transformation.
+                // In this case, we need to trigger the completion of the sequential print clearance contours evaluation 
+                GLCanvas3D* canvas = view3D->get_canvas3d();
+                if (canvas->is_sequential_print_clearance_evaluating()) {
+                    GLCanvas3D::ContoursList contours;
+                    contours.contours = background_process.fff_print()->get_sequential_print_clearance_contours();
+                    canvas->set_sequential_print_clearance_contours(contours, true);
+                    canvas->set_as_dirty();
+                    canvas->request_extra_frame();
+                }
+            }
             std::string warning;
             std::string err = background_process.validate(&warning);
             if (!err.empty())
@@ -4418,7 +4432,6 @@ void Plater::priv::on_update_geometry(Vec3dsEvent<2>&)
 
 void Plater::priv::on_3dcanvas_mouse_dragging_started(SimpleEvent&)
 {
-    view3D->get_canvas3d()->reset_sequential_print_clearance();
 }
 
 // Update the scene from the background processing,

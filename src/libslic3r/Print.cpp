@@ -469,11 +469,13 @@ std::string Print::validate(std::string* warning) const
         return _u8L("The supplied settings will cause an empty print.");
 
     if (m_config.complete_objects) {
-    	if (! sequential_print_horizontal_clearance_valid(*this))
-            return _u8L("Some objects are too close; your extruder will collide with them.");
-        if (! sequential_print_vertical_clearance_valid(*this))
-	        return _u8L("Some objects are too tall and cannot be printed without extruder collisions.");
+      if (!sequential_print_horizontal_clearance_valid(*this, const_cast<Polygons*>(&m_sequential_print_clearance_contours)))
+          return _u8L("Some objects are too close; your extruder will collide with them.");
+      if (!sequential_print_vertical_clearance_valid(*this))
+          return _u8L("Some objects are too tall and cannot be printed without extruder collisions.");
     }
+    else
+        const_cast<Polygons*>(&m_sequential_print_clearance_contours)->clear();
 
     if (m_config.avoid_crossing_perimeters && m_config.avoid_crossing_curled_overhangs) {
         return _u8L("Avoid crossing perimeters option and avoid crossing curled overhangs option cannot be both enabled together.");

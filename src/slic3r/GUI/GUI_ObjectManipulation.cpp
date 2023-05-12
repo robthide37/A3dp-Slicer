@@ -859,13 +859,13 @@ wxString ObjectManipulation::coordinate_type_str(ECoordinatesType type)
 #if ENABLE_OBJECT_MANIPULATION_DEBUG
 void ObjectManipulation::render_debug_window()
 {
-  ImGuiWrapper& imgui = *wxGetApp().imgui();
-//  ImGui::SetNextWindowCollapsed(true, ImGuiCond_Once);
-  imgui.begin(std::string("ObjectManipulation"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
-  imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Coordinates type");
-  ImGui::SameLine();
-  imgui.text(coordinate_type_str(m_coordinates_type));
-  imgui.end();
+    ImGuiWrapper& imgui = *wxGetApp().imgui();
+//   ImGui::SetNextWindowCollapsed(true, ImGuiCond_Once);
+    imgui.begin(std::string("ObjectManipulation"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize);
+    imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Coordinates type");
+    ImGui::SameLine();
+    imgui.text(coordinate_type_str(m_coordinates_type));
+    imgui.end();
 }
 #endif // ENABLE_OBJECT_MANIPULATION_DEBUG
 
