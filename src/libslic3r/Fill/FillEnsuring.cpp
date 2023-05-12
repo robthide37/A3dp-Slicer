@@ -28,7 +28,7 @@ namespace Slic3r {
 ThickPolylines make_fill_polylines(
     const Fill *fill, const Surface *surface, const FillParams &params, bool stop_vibrations, bool fill_gaps, bool connect_extrusions)
 {
-    assert(fill->print_config != nullptr && fill->print_object_config != nullptr && fill->print_region_config != nullptr);
+    assert(fill->print_config != nullptr && fill->print_object_config != nullptr);
 
     auto rotate_thick_polylines = [](ThickPolylines &tpolylines, double cos_angle, double sin_angle) {
         for (ThickPolyline &tp : tpolylines) {
