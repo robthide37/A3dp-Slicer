@@ -306,7 +306,7 @@ std::vector<SurfaceFill> group_fills(const Layer &layer)
 		}
     }
 
-    // Detect narrow internal solid infill area and use ipEnsuring pattern instead.
+    // Use ipEnsuring pattern for all internal Solids.
     {
         for (size_t surface_fill_id = 0; surface_fill_id < surface_fills.size(); ++surface_fill_id)
             if (SurfaceFill &fill = surface_fills[surface_fill_id]; fill.surface.surface_type == stInternalSolid) {
