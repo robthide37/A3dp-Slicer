@@ -1539,7 +1539,10 @@ void Selection::erase()
         ensure_not_below_bed();
     }
 
-    wxGetApp().plater()->canvas3D()->set_sequential_clearance_as_evaluating();
+    GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
+    canvas->set_sequential_clearance_as_evaluating();
+    canvas->set_as_dirty();
+    canvas->request_extra_frame();
 }
 
 void Selection::render(float scale_factor)
