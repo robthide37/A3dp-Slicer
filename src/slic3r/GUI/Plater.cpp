@@ -3057,8 +3057,10 @@ bool Plater::priv::delete_object_from_model(size_t obj_idx)
         sidebar->obj_list()->invalidate_cut_info_for_object(obj_idx);
 
     model.delete_object(obj_idx);
+
     update();
     object_list_changed();
+
     return true;
 }
 
@@ -3255,7 +3257,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
     if (view3D->is_layers_editing_enabled())
         view3D->get_wxglcanvas()->Refresh();
 
-    if (background_process.empty())
+    if (invalidated == Print::APPLY_STATUS_CHANGED || background_process.empty())
         view3D->get_canvas3d()->reset_sequential_print_clearance();
 
     if (invalidated == Print::APPLY_STATUS_INVALIDATED) {
@@ -3295,11 +3297,9 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
             process_validation_warning(warning);
             if (printer_technology == ptFFF) {
                 GLCanvas3D* canvas = view3D->get_canvas3d();
-                if (canvas->is_sequential_print_clearance_evaluating()) {
-                    canvas->reset_sequential_print_clearance();
-                    canvas->set_as_dirty();
-                    canvas->request_extra_frame();
-                }
+                canvas->reset_sequential_print_clearance();
+                canvas->set_as_dirty();
+                canvas->request_extra_frame();
             }
         }
         else {
@@ -3313,6 +3313,8 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
                     GLCanvas3D::ContoursList contours;
                     contours.contours = background_process.fff_print()->get_sequential_print_clearance_contours();
                     canvas->set_sequential_print_clearance_contours(contours, true);
+                    canvas->set_as_dirty();
+                    canvas->request_extra_frame();
                 }
             }
         }

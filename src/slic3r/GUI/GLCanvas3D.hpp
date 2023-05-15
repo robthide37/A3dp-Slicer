@@ -987,6 +987,7 @@ public:
     }
 
     void update_sequential_clearance(bool force_contours_generation);
+    void set_sequential_clearance_as_evaluating() { m_sequential_print_clearance.m_evaluating = true; }
 
     const Print* fff_print() const;
     const SLAPrint* sla_print() const;

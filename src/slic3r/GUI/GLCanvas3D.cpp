@@ -966,7 +966,8 @@ void GLCanvas3D::SequentialPrintClearance::render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-    m_fill.render();
+    if (!m_evaluating)
+        m_fill.render();
 
 #if ENABLE_GL_CORE_PROFILE
     if (OpenGLManager::get_gl_info().is_core_profile()) {
@@ -990,7 +991,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
     for (const auto& [id, trafo] : m_instances) {
         shader->set_uniform("view_model_matrix", camera.get_view_matrix() * trafo);
         assert(id < m_contours.size());
-        m_contours[id].set_color(m_fill.is_initialized() ? FILL_COLOR : m_evaluating ? NO_FILL_EVALUATING_COLOR : NO_FILL_COLOR);
+        m_contours[id].set_color((!m_evaluating && m_fill.is_initialized()) ? FILL_COLOR : m_evaluating ? NO_FILL_EVALUATING_COLOR : NO_FILL_COLOR);
         m_contours[id].render();
     }
 
