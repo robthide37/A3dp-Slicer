@@ -1584,6 +1584,15 @@ bool GLCanvas3D::check_volumes_outside_state(const Slic3r::BuildVolume& build_vo
         }
     }
 
+    for (unsigned int vol_idx = 0; vol_idx < m_volumes.volumes.size(); ++vol_idx) {
+        if (std::find(volumes_idxs.begin(), volumes_idxs.end(), vol_idx) == volumes_idxs.end()) {
+            if (!m_volumes.volumes[vol_idx]->is_outside) {
+                contained_min_one = true;
+                break;
+            }
+        }
+    }
+
     if (out_state != nullptr)
         *out_state = overall_state;
 
