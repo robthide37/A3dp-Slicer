@@ -472,6 +472,17 @@ std::string Print::validate(std::vector<std::string>* warnings) const
 {
     std::vector<unsigned int> extruders = this->extruders();
 
+    if (warnings) {
+        for (size_t a=0; a<extruders.size(); ++a)
+            for (size_t b=a+1; b<extruders.size(); ++b)
+                if (std::abs(m_config.bed_temperature.get_at(extruders[a]) - m_config.bed_temperature.get_at(extruders[b])) > 15
+                 || std::abs(m_config.first_layer_bed_temperature.get_at(extruders[a]) - m_config.first_layer_bed_temperature.get_at(extruders[b])) > 15) {
+                    warnings->emplace_back("_BED_TEMPS_DIFFER");
+                    goto DONE;
+                }
+        DONE:;
+    }
+
     if (m_objects.empty())
         return _u8L("All objects are outside of the print volume.");
 

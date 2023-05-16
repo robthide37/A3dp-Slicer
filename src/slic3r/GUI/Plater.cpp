@@ -3202,8 +3202,8 @@ void Plater::priv::process_validation_warning(const std::vector<std::string>& wa
 {
     if (warnings.empty())
         notification_manager->close_notification_of_type(NotificationType::ValidateWarning);
-    else {
-        std::string text = warnings.front();
+
+    for (std::string text :  warnings) {
         std::string hypertext = "";
         std::function<bool(wxEvtHandler*)> action_fn = [](wxEvtHandler*){ return false; };
 
@@ -3222,6 +3222,8 @@ void Plater::priv::process_validation_warning(const std::vector<std::string>& wa
                 return true;
             };
         }
+        if (text == "_BED_TEMPS_DIFFER")
+            text = _u8L("Bed temperatures for the used filaments differ significantly.");
 
         notification_manager->push_notification(
             NotificationType::ValidateWarning,
