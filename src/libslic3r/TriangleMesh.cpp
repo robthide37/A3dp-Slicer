@@ -26,6 +26,8 @@
 #include <boost/nowide/cstdio.hpp>
 #include <boost/predef/other/endian.h>
 
+#include <tbb/concurrent_vector.h>
+
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
@@ -871,11 +873,38 @@ void its_collect_mesh_projection_points_above(const indexed_triangle_set &its, c
 }
 
 template<typename TransformVertex>
-Polygon its_convex_hull_2d_above(const indexed_triangle_set &its, const TransformVertex &transform_fn, const float z)
+Polygon its_convex_hull_2d_above(const indexed_triangle_set& its, const TransformVertex& transform_fn, const float z)
 {
-    Points all_pts;
-    its_collect_mesh_projection_points_above(its, transform_fn, z, all_pts);
-    return Geometry::convex_hull(std::move(all_pts));
+    auto collect_mesh_projection_points_above = [&](const tbb::blocked_range<size_t>& range) {
+        Points pts;
+        pts.reserve(range.size() * 4); // there can be up to 4 vertices per triangle
+        for (size_t i = range.begin(); i < range.end(); ++i) {
+            const stl_triangle_vertex_indices& tri = its.indices[i];
+            const Vec3f tri_pts[3] = { transform_fn(its.vertices[tri(0)]), transform_fn(its.vertices[tri(1)]), transform_fn(its.vertices[tri(2)]) };
+            int iprev = 2;
+            for (int iedge = 0; iedge < 3; ++iedge) {
+                const Vec3f& p1 = tri_pts[iprev];
+                const Vec3f& p2 = tri_pts[iedge];
+                if ((p1.z() < z && p2.z() > z) || (p2.z() < z && p1.z() > z)) {
+                    // Edge crosses the z plane. Calculate intersection point with the plane.
+                    const float t = (z - p1.z()) / (p2.z() - p1.z());
+                    pts.emplace_back(scaled<coord_t>(p1.x() + (p2.x() - p1.x()) * t), scaled<coord_t>(p1.y() + (p2.y() - p1.y()) * t));
+                }
+                if (p2.z() >= z)
+                    pts.emplace_back(scaled<coord_t>(p2.x()), scaled<coord_t>(p2.y()));
+                iprev = iedge;
+            }
+        }
+        return Geometry::convex_hull(std::move(pts));
+    };
+
+    tbb::concurrent_vector<Polygon> chs;
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, its.indices.size()), [&](const tbb::blocked_range<size_t>& range) {
+        chs.push_back(collect_mesh_projection_points_above(range));
+    });
+
+    const Polygons polygons(chs.begin(), chs.end());
+    return Geometry::convex_hull(polygons);
 }
 
 Polygon its_convex_hull_2d_above(const indexed_triangle_set &its, const Matrix3f &m, const float z)
