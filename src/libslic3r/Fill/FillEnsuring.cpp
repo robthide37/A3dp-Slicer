@@ -278,7 +278,7 @@ ThickPolylines make_fill_polylines(
             }
         }
 
-        reconstructed_area                     = closing(reconstructed_area, float(SCALED_EPSILON), float(SCALED_EPSILON));
+        reconstructed_area                     = union_safety_offset(reconstructed_area);
         ExPolygons gaps_for_additional_filling = diff_ex(filled_area, reconstructed_area);
         if (fill->overlap != 0) {
             gaps_for_additional_filling = offset_ex(gaps_for_additional_filling, scaled<float>(fill->overlap));
