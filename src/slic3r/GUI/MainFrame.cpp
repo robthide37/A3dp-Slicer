@@ -1155,14 +1155,14 @@ static const wxString sep = " - ";
 static const wxString sep_space = "";
 #endif
 
-static void append_about_menu_item(wxMenu* target_menu)
+static void append_about_menu_item(wxMenu* target_menu, int insert_pos = wxNOT_FOUND)
 {
     if (wxGetApp().is_editor())
         append_menu_item(target_menu, wxID_ANY, wxString::Format(_L("&About %s"), SLIC3R_APP_NAME), _L("Show about dialog"),
-            [](wxCommandEvent&) { Slic3r::GUI::about(); });
+            [](wxCommandEvent&) { Slic3r::GUI::about(); }, nullptr, nullptr, []() {return true; }, nullptr, insert_pos);
     else
         append_menu_item(target_menu, wxID_ANY, wxString::Format(_L("&About %s"), GCODEVIEWER_APP_NAME), _L("Show about dialog"),
-            [](wxCommandEvent&) { Slic3r::GUI::about(); });
+            [](wxCommandEvent&) { Slic3r::GUI::about(); }, nullptr, nullptr, []() {return true; }, nullptr, insert_pos);
 }
 
 #ifdef __APPLE__
@@ -1170,6 +1170,8 @@ static void init_macos_application_menu(wxMenuBar* menu_bar, MainFrame* main_fra
 {
     wxMenu* apple_menu = menu_bar->OSXGetAppleMenu();
     if (apple_menu != nullptr) {
+        append_about_menu_item(apple_menu, 0);
+
         // This fixes a bug on macOS where the quit command doesn't emit window close events.
         // wx bug: https://trac.wxwidgets.org/ticket/18328
         apple_menu->Bind(wxEVT_MENU, [main_frame](wxCommandEvent&) { main_frame->Close(); }, wxID_EXIT);
@@ -1211,7 +1213,9 @@ static wxMenu* generate_help_menu()
         [](wxCommandEvent&) { Slic3r::GUI::desktop_open_datadir_folder(); });
     append_menu_item(helpMenu, wxID_ANY, _L("Report an I&ssue"), wxString::Format(_L("Report an issue on %s"), SLIC3R_APP_NAME),
         [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/slic3r/issues/new", nullptr, false); });
+#ifndef __APPLE__
     append_about_menu_item(helpMenu);
+#endif // __APPLE__
     append_menu_item(helpMenu, wxID_ANY, _L("Show Tip of the Day")
 #if 0//debug
         + "\tCtrl+Shift+T"
