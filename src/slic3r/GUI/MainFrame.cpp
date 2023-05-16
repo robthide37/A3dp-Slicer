@@ -1165,6 +1165,18 @@ static void append_about_menu_item(wxMenu* target_menu)
             [](wxCommandEvent&) { Slic3r::GUI::about(); });
 }
 
+#ifdef __APPLE__
+static void init_macos_application_menu(wxMenuBar* menu_bar, MainFrame* main_frame)
+{
+    wxMenu* apple_menu = menu_bar->OSXGetAppleMenu();
+    if (apple_menu != nullptr) {
+        // This fixes a bug on macOS where the quit command doesn't emit window close events.
+        // wx bug: https://trac.wxwidgets.org/ticket/18328
+        apple_menu->Bind(wxEVT_MENU, [main_frame](wxCommandEvent&) { main_frame->Close(); }, wxID_EXIT);
+    }
+}
+#endif // __APPLE__
+
 static wxMenu* generate_help_menu()
 {
     wxMenu* helpMenu = new wxMenu();
@@ -1599,14 +1611,7 @@ void MainFrame::init_menubar_as_editor()
 #endif
 
 #ifdef __APPLE__
-    // This fixes a bug on Mac OS where the quit command doesn't emit window close events
-    // wx bug: https://trac.wxwidgets.org/ticket/18328
-    wxMenu* apple_menu = m_menubar->OSXGetAppleMenu();
-    if (apple_menu != nullptr) {
-        apple_menu->Bind(wxEVT_MENU, [this](wxCommandEvent &) {
-            Close();
-        }, wxID_EXIT);
-    }
+    init_macos_application_menu(m_menubar, this);
 #endif // __APPLE__
 
     if (plater()->printer_technology() == ptSLA)
@@ -1698,14 +1703,7 @@ void MainFrame::init_menubar_as_gcodeviewer()
     SetMenuBar(m_menubar);
 
 #ifdef __APPLE__
-    // This fixes a bug on Mac OS where the quit command doesn't emit window close events
-    // wx bug: https://trac.wxwidgets.org/ticket/18328
-    wxMenu* apple_menu = m_menubar->OSXGetAppleMenu();
-    if (apple_menu != nullptr) {
-        apple_menu->Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-            Close();
-            }, wxID_EXIT);
-    }
+    init_macos_application_menu(m_menubar, this);
 #endif // __APPLE__
 }
 
