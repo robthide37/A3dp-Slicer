@@ -1908,8 +1908,14 @@ PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &b
         samples[index] = create_sample(bbs[index], is_reverse);
 
     // calc transformation for letters on the Left side from center
-    shapes_x_cursor = 0;
-    cursor = slice.start; // copy    
+    if (first_right_index < bbs.size()) {
+        shapes_x_cursor = bbs[first_right_index].center().x();
+        cursor          = samples[first_right_index];
+    }else{
+        // only left side exists
+        shapes_x_cursor = 0;
+        cursor = slice.start; // copy    
+    }
     is_reverse = false;
     for (size_t index_plus_one = first_right_index; index_plus_one > 0; --index_plus_one) {
         size_t index = index_plus_one - 1;
