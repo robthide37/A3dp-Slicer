@@ -332,23 +332,26 @@ public:
 
 private:
     // Caching polygons for a range of layers.
-    struct LayerPolygonCache {
-        std::vector<Polygons> polygons;
-        LayerIndex            idx_begin;
-        LayerIndex            idx_end;
-
+    class LayerPolygonCache {
+    public:
         void allocate(LayerIndex aidx_begin, LayerIndex aidx_end) {
-            this->idx_begin = aidx_begin;
-            this->idx_end = aidx_end;
-            this->polygons.assign(aidx_end - aidx_begin, {});
+            m_idx_begin = aidx_begin;
+            m_idx_end = aidx_end;
+            m_polygons.assign(aidx_end - aidx_begin, {});
         }
 
-        LayerIndex begin() const { return idx_begin; }
-        LayerIndex end()   const { return idx_end; }
-        size_t     size()  const { return polygons.size(); }
+        LayerIndex begin() const { return m_idx_begin; }
+        LayerIndex end()   const { return m_idx_end; }
+        size_t     size()  const { return m_polygons.size(); }
 
-        bool      has(LayerIndex idx) const { return idx >= idx_begin && idx < idx_end; }
-        Polygons& operator[](LayerIndex idx) { return polygons[idx + idx_begin]; }
+        bool      has(LayerIndex idx) const { return idx >= m_idx_begin && idx < m_idx_end; }
+        Polygons& operator[](LayerIndex idx) { assert(idx >= m_idx_begin && idx < m_idx_end); return m_polygons[idx - m_idx_begin]; }
+        std::vector<Polygons>& polygons_mutable() { return m_polygons; }
+
+    private:
+        std::vector<Polygons> m_polygons;
+        LayerIndex            m_idx_begin;
+        LayerIndex            m_idx_end;
     };
 
     /*!
@@ -388,9 +391,9 @@ private:
         }
         void insert(LayerPolygonCache &&in, coord_t radius) {
             std::lock_guard<std::mutex> guard(m_mutex);
-            LayerIndex i = in.idx_begin;
+            LayerIndex i = in.begin();
             allocate_layers(i + LayerIndex(in.size()));
-            for (auto &d : in.polygons)
+            for (auto &d : in.polygons_mutable())
                 m_data[i ++].emplace(radius, std::move(d));
         }
         /*!

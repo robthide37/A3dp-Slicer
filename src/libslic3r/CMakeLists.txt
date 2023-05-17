@@ -22,8 +22,9 @@ set(SLIC3R_SOURCES
     AABBTreeLines.hpp
     AABBMesh.hpp
     AABBMesh.cpp
-    Algorithm/RegionExpansion.cpp
+    Algorithm/PathSorting.hpp
     Algorithm/RegionExpansion.hpp
+    Algorithm/RegionExpansion.cpp
     AnyPtr.hpp
     BoundingBox.cpp
     BoundingBox.hpp
@@ -131,6 +132,8 @@ set(SLIC3R_SOURCES
     Format/AnycubicSLA.cpp
     Format/STEP.hpp
     Format/STEP.cpp
+    Format/SLAArchiveFormatRegistry.hpp
+    Format/SLAArchiveFormatRegistry.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp

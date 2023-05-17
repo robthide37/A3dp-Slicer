@@ -925,8 +925,8 @@ void GUI_App::init_app_config()
 	// Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
 
 //  SetAppName(SLIC3R_APP_KEY);
-	SetAppName(SLIC3R_APP_KEY "-alpha");
-//  SetAppName(SLIC3R_APP_KEY "-beta");
+//	SetAppName(SLIC3R_APP_KEY "-alpha");
+    SetAppName(SLIC3R_APP_KEY "-beta");
 
 
 //	SetAppDisplayName(SLIC3R_APP_NAME);
@@ -3023,22 +3023,6 @@ bool GUI_App::may_switch_to_SLA_preset(const wxString& caption)
             caption);
         return false;
     }
-/*
-    if (model_has_multi_part_objects(model())) {
-        show_info(nullptr,
-            _L("It's impossible to print multi-part object(s) with SLA technology.") + "\n\n" +
-            _L("Please check your object list before preset changing."),
-            caption);
-        return false;
-    }
-    if (model_has_connectors(model())) {
-        show_info(nullptr,
-            _L("SLA technology doesn't support cut with connectors") + "\n\n" +
-            _L("Please check your object list before preset changing."),
-            caption);
-        return false;
-    }
-*/
     return true;
 }
 
@@ -3056,6 +3040,13 @@ bool GUI_App::run_wizard(ConfigWizard::RunReason reason, ConfigWizard::StartPage
 
     auto wizard = new ConfigWizard(mainframe);
     const bool res = wizard->run(reason, start_page);
+
+    // !!! Deallocate memory after close ConfigWizard.
+    // Note, that mainframe is a parent of ConfigWizard.
+    // So, wizard will be destroyed only during destroying of mainframe
+    // To avoid this state the wizard have to be disconnected from mainframe and Destroyed explicitly
+    mainframe->RemoveChild(wizard);
+    wizard->Destroy();
 
     if (res) {
         load_current_presets();

@@ -173,7 +173,8 @@ void GLGizmosManager::reset_all_states()
     const EType current = get_current_type();
     if (current != Undefined)
         // close any open gizmo
-        open_gizmo(current);
+        if (!open_gizmo(current))
+            return;
 
     activate_gizmo(Undefined);
     m_hover = Undefined;
@@ -977,6 +978,9 @@ bool GLGizmosManager::activate_gizmo(EType type)
         m_current = Undefined;
         return false; // gizmo refused to be turned on.
     }
+
+    if (m_parent.current_printer_technology() == ptSLA)
+        m_parent.set_sla_view_type(GLCanvas3D::ESLAViewType::Original);
 
     new_gizmo.register_raycasters_for_picking();
 

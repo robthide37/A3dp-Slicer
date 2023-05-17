@@ -17,6 +17,7 @@
 
 
 #include <GL/glew.h>
+#include <algorithm>
 
 
 namespace Slic3r::GUI {
@@ -521,6 +522,13 @@ void GLGizmoFdmSupports::auto_generate()
     }
 
     ModelObject *mo = m_c->selection_info()->model_object();
+    bool printable  = std::any_of(mo->instances.begin(), mo->instances.end(), [](const ModelInstance *p) { return p->is_printable(); });
+    if (!printable) {
+        MessageDialog dlg(GUI::wxGetApp().plater(), _L("Automatic painting requires printable object."), _L("Warning"), wxOK);
+        dlg.ShowModal();
+        return;
+    }
+
     bool not_painted = std::all_of(mo->volumes.begin(), mo->volumes.end(), [](const ModelVolume* vol){
         return vol->type() != ModelVolumeType::MODEL_PART || vol->supported_facets.empty();
     });

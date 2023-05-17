@@ -36,6 +36,8 @@
 #define ENABLE_MATRICES_DEBUG 0
 // Shows an imgui dialog containing data from class ObjectManipulation
 #define ENABLE_OBJECT_MANIPULATION_DEBUG 0
+// Shows an imgui dialog containing data for class GLCanvas3D::SLAView
+#define ENABLE_SLA_VIEW_DEBUG_WINDOW 0
 
 
 // Enable rendering of objects using environment map

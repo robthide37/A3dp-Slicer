@@ -2249,6 +2249,7 @@ static void increase_areas_one_layer(
                 // But as branches connecting with the model that are to small have to be culled, the bottom most point has to be not set.
                 // A point can be set on the top most tip layer (maybe more if it should not move for a few layers).
                 parent.state.result_on_layer_reset();
+                parent.state.to_model_gracious = false;
 #ifdef TREE_SUPPORTS_TRACK_LOST
                 parent.state.verylost = true;
 #endif // TREE_SUPPORTS_TRACK_LOST
@@ -4410,11 +4411,14 @@ static void draw_branches(
                                 // Don't propagate further than 1.5 * bottom radius.
                                 //LayerIndex                      layers_propagate_max = 2 * bottom_radius / config.layer_height;
                                 LayerIndex                      layers_propagate_max = 5 * bottom_radius / config.layer_height;
-                                LayerIndex                      layer_bottommost = std::max(0, layer_begin - layers_propagate_max);
-                                // Only propagate until the rest area is smaller than this threshold.
-                                double                          support_area_stop = 0.2 * M_PI * sqr(double(bottom_radius));
-                                // Only propagate until the rest area is smaller than this threshold.
-                                double                          support_area_min = 0.1 * M_PI * sqr(double(config.min_radius));
+                                LayerIndex                      layer_bottommost = branch.path.front()->state.verylost ? 
+                                    // If the tree bottom is hanging in the air, bring it down to some surface.
+                                    0 : 
+                                    std::max(0, layer_begin - layers_propagate_max);
+                                double                          support_area_min_radius = M_PI * sqr(double(config.branch_radius));
+                                double                          support_area_stop = std::max(0.2 * M_PI * sqr(double(bottom_radius)), 0.5 * support_area_min_radius);
+                                 // Only propagate until the rest area is smaller than this threshold.
+                                double                          support_area_min = 0.1 * support_area_min_radius;
                                 for (LayerIndex layer_idx = layer_begin - 1; layer_idx >= layer_bottommost; -- layer_idx) {
                                     rest_support = diff_clipped(rest_support.empty() ? slices.front() : rest_support, volumes.getCollision(0, layer_idx, false));
                                     double rest_support_area = area(rest_support);
@@ -4558,7 +4562,7 @@ static void draw_branches(
             }
 
             // Subtract top contact layer polygons from support base.
-            SupportGeneratorLayer *top_contact_layer = top_contacts[layer_idx];
+            SupportGeneratorLayer *top_contact_layer = top_contacts.empty() ? nullptr : top_contacts[layer_idx];
             if (top_contact_layer && ! top_contact_layer->polygons.empty() && ! base_layer_polygons.empty()) {
                 base_layer_polygons = diff(base_layer_polygons, top_contact_layer->polygons);
                 if (! bottom_contact_polygons.empty())
@@ -4645,6 +4649,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         // ### Precalculate avoidances, collision etc.
         size_t num_support_layers = precalculate(print, overhangs, processing.first, processing.second, volumes, throw_on_cancel);
         bool   has_support = num_support_layers > 0;
+        bool   has_raft    = config.raft_layers.size() > 0;
         num_support_layers = std::max(num_support_layers, config.raft_layers.size());
 
         SupportParameters            support_params(print_object);
@@ -4657,13 +4662,13 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         SupportGeneratorLayersPtr    interface_layers;
         SupportGeneratorLayersPtr    base_interface_layers;
         SupportGeneratorLayersPtr    intermediate_layers(num_support_layers, nullptr);
-        if (support_params.has_top_contacts)
+        if (support_params.has_top_contacts || has_raft)
             top_contacts.assign(num_support_layers, nullptr);
         if (support_params.has_bottom_contacts)
             bottom_contacts.assign(num_support_layers, nullptr);
-        if (support_params.has_interfaces())
+        if (support_params.has_interfaces() || has_raft)
             interface_layers.assign(num_support_layers, nullptr);
-        if (support_params.has_base_interfaces())
+        if (support_params.has_base_interfaces() || has_raft)
             base_interface_layers.assign(num_support_layers, nullptr);
 
         InterfacePlacer              interface_placer{

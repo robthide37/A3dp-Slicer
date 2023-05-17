@@ -87,6 +87,8 @@ void GLGizmoSlaSupports::data_changed(bool is_serializing)
             register_point_raycasters_for_picking();
         else
             update_point_raycasters_for_picking_transform();
+
+        m_c->instances_hider()->set_hide_full_scene(true);
     }
 
 //    m_parent.toggle_model_objects_visibility(false);
@@ -399,7 +401,7 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
         }
 
         if (action ==  SLAGizmoEventType::DiscardChanges) {
-            ask_about_changes_call_after([this](){ editing_mode_apply_changes(); },
+            ask_about_changes([this](){ editing_mode_apply_changes(); },
                                          [this](){ editing_mode_discard_changes(); });
             return true;
         }
@@ -816,39 +818,36 @@ std::string GLGizmoSlaSupports::on_get_name() const
     return _u8L("SLA Support Points");
 }
 
-void GLGizmoSlaSupports::ask_about_changes_call_after(std::function<void()> on_yes, std::function<void()> on_no)
+bool GLGizmoSlaSupports::ask_about_changes(std::function<void()> on_yes, std::function<void()> on_no)
 {
-    wxGetApp().CallAfter([on_yes, on_no]() {
-        // Following is called through CallAfter, because otherwise there was a problem
-        // on OSX with the wxMessageDialog being shown several times when clicked into.
-        MessageDialog dlg(GUI::wxGetApp().mainframe, _L("Do you want to save your manually "
-            "edited support points?") + "\n",_L("Save support points?"), wxICON_QUESTION | wxYES | wxNO | wxCANCEL );
-        int ret = dlg.ShowModal();
-            if (ret == wxID_YES)
-                on_yes();
-            else if (ret == wxID_NO)
-                on_no();
-    });
-}
+    MessageDialog dlg(GUI::wxGetApp().mainframe, _L("Do you want to save your manually edited support points?") + "\n",
+                      _L("Save support points?"), wxICON_QUESTION | wxYES | wxNO | wxCANCEL );
 
+    const int ret = dlg.ShowModal();
+    if (ret == wxID_YES)
+        on_yes();
+    else if (ret == wxID_NO)
+        on_no();
+    else
+        return false;
+
+    return true;
+}
 
 void GLGizmoSlaSupports::on_set_state()
 {
-    if (m_state == m_old_state)
-        return;
-
-    if (m_state == On && m_old_state != On) { // the gizmo was just turned on
+    if (m_state == On) { // the gizmo was just turned on
         // Set default head diameter from config.
         const DynamicPrintConfig& cfg = wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
         m_new_point_head_diameter = static_cast<const ConfigOptionFloat*>(cfg.option("support_head_front_diameter"))->value;
     }
-    if (m_state == Off && m_old_state != Off) { // the gizmo was just turned Off
-        bool will_ask = m_editing_mode && unsaved_changes() && on_is_activable();
-        if (will_ask) {
-            ask_about_changes_call_after([this](){ editing_mode_apply_changes(); },
-                                         [this](){ editing_mode_discard_changes(); });
-            // refuse to be turned off so the gizmo is active when the CallAfter is executed
-            m_state = m_old_state;
+    else {
+        if (m_editing_mode && unsaved_changes() && on_is_activable()) {
+            if (!ask_about_changes([this]() { editing_mode_apply_changes(); },
+                [this]() { editing_mode_discard_changes(); })) {
+                m_state = On;
+                return;
+            }
         }
         else {
             // we are actually shutting down
@@ -856,15 +855,11 @@ void GLGizmoSlaSupports::on_set_state()
             m_old_mo_id = -1;
         }
 
-        if (m_state == Off) {
-            m_c->instances_hider()->set_hide_full_scene(false);
-            m_c->selection_info()->set_use_shift(false); // see top of on_render for details
-        }
+        m_c->instances_hider()->set_hide_full_scene(false);
+        m_c->selection_info()->set_use_shift(false); // see top of on_render for details
+
     }
-    m_old_state = m_state;
 }
-
-
 
 void GLGizmoSlaSupports::on_start_dragging()
 {

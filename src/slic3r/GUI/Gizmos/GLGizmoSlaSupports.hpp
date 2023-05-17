@@ -110,7 +110,6 @@ private:
 
     bool m_wait_for_up_event = false;
     bool m_selection_empty = true;
-    EState m_old_state = Off; // to be able to see that the gizmo has just been closed (see on_set_state)
 
     std::vector<const ConfigOption*> get_config_options(const std::vector<std::string>& keys) const;
     bool is_mesh_point_clipped(const Vec3d& point) const;
@@ -131,7 +130,9 @@ private:
     void auto_generate();
     void switch_to_editing_mode();
     void disable_editing_mode();
-    void ask_about_changes_call_after(std::function<void()> on_yes, std::function<void()> on_no);
+
+    // return false if Cancel was selected
+    bool ask_about_changes(std::function<void()> on_yes, std::function<void()> on_no);
 
 protected:
     void on_set_state() override;

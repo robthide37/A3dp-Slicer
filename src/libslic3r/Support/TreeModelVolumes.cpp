@@ -497,7 +497,7 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
     const bool                  calculate_placable = m_support_rests_on_model && radius == 0;
     LayerPolygonCache           data_placeable;
     if (calculate_placable)
-        data_placeable.allocate(data.idx_begin, data.idx_end);
+        data_placeable.allocate(data.begin(), data.end());
 
     for (size_t outline_idx : layer_outline_indices)
         if (const std::vector<Polygons> &outlines = m_layer_outlines[outline_idx].second; ! outlines.empty()) {
@@ -517,9 +517,9 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
             // 1) Calculate offsets of collision areas in parallel.
             LayerPolygonCache collision_areas_offsetted;
             collision_areas_offsetted.allocate(
-                std::max<LayerIndex>(0, data.idx_begin - z_distance_bottom_layers),
-                std::min<LayerIndex>(outlines.size(), data.idx_end + z_distance_top_layers));
-            tbb::parallel_for(tbb::blocked_range<LayerIndex>(collision_areas_offsetted.idx_begin, collision_areas_offsetted.idx_end),
+                std::max<LayerIndex>(0, data.begin() - z_distance_bottom_layers),
+                std::min<LayerIndex>(outlines.size(), data.end() + z_distance_top_layers));
+            tbb::parallel_for(tbb::blocked_range<LayerIndex>(collision_areas_offsetted.begin(), collision_areas_offsetted.end()),
                 [&outlines, &machine_border = std::as_const(m_machine_border), offset_value = radius + xy_distance, &collision_areas_offsetted, &throw_on_cancel]
                 (const tbb::blocked_range<LayerIndex> &range) {
                 for (LayerIndex layer_idx = range.begin(); layer_idx != range.end(); ++ layer_idx) {
@@ -536,7 +536,7 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
 
             // 2) Sum over top / bottom ranges.
             const bool processing_last_mesh = outline_idx == layer_outline_indices.size();
-            tbb::parallel_for(tbb::blocked_range<LayerIndex>(data.idx_begin, data.idx_end),
+            tbb::parallel_for(tbb::blocked_range<LayerIndex>(data.begin(), data.end()),
                 [&collision_areas_offsetted, &outlines, &machine_border = m_machine_border, &anti_overhang = m_anti_overhang, radius, 
                     xy_distance, z_distance_bottom_layers, z_distance_top_layers, min_resolution = m_min_resolution, &data, processing_last_mesh, &throw_on_cancel]
                 (const tbb::blocked_range<LayerIndex>& range) {
@@ -600,7 +600,7 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
             // 3) Optionally calculate placables.
             if (calculate_placable) {
                 // Now calculate the placable areas.
-                tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(z_distance_bottom_layers + 1, data.idx_begin), data.idx_end),
+                tbb::parallel_for(tbb::blocked_range<LayerIndex>(std::max(z_distance_bottom_layers + 1, data.begin()), data.end()),
                     [&collision_areas_offsetted, &outlines, &anti_overhang = m_anti_overhang, processing_last_mesh,
                      min_resolution = m_min_resolution, z_distance_bottom_layers, xy_distance, &data_placeable, &throw_on_cancel]
                 (const tbb::blocked_range<LayerIndex>& range) {

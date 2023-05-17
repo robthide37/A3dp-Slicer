@@ -611,10 +611,28 @@ void GLVolumeCollection::load_object_auxiliary(
         if (convex_hull.has_value())
             v.set_convex_hull(*convex_hull);
         v.is_modifier = false;
-        v.shader_outside_printer_detection_enabled = (step == slaposSupportTree);
+        v.shader_outside_printer_detection_enabled = (step == slaposSupportTree || step == slaposDrillHoles);
         v.set_instance_transformation(model_instance.get_transformation());
     };
  
+    if (milestone == SLAPrintObjectStep::slaposDrillHoles) {
+        if (print_object->get_parts_to_slice().size() > 1) {
+            // Get the mesh.
+            TriangleMesh backend_mesh;
+            std::shared_ptr<const indexed_triangle_set> preview_mesh_ptr = print_object->get_mesh_to_print();
+            if (preview_mesh_ptr != nullptr)
+                backend_mesh = TriangleMesh(*preview_mesh_ptr);
+            if (!backend_mesh.empty()) {
+                backend_mesh.transform(mesh_trafo_inv);
+                TriangleMesh convex_hull = backend_mesh.convex_hull_3d();
+                for (const std::pair<size_t, size_t>& instance_idx : instances) {
+                    const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
+                    add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposDrillHoles, backend_mesh, GLVolume::MODEL_COLOR[0], convex_hull);
+                }
+            }
+        }
+    }
+
     // Get the support mesh.
     if (milestone == SLAPrintObjectStep::slaposSupportTree) {
         TriangleMesh supports_mesh = print_object->support_mesh();
@@ -622,8 +640,8 @@ void GLVolumeCollection::load_object_auxiliary(
             supports_mesh.transform(mesh_trafo_inv);
             TriangleMesh convex_hull = supports_mesh.convex_hull_3d();
             for (const std::pair<size_t, size_t>& instance_idx : instances) {
-              const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
-              add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposSupportTree, supports_mesh, GLVolume::SLA_SUPPORT_COLOR, convex_hull);
+                const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
+                add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposSupportTree, supports_mesh, GLVolume::SLA_SUPPORT_COLOR, convex_hull);
             }
         }
     }
@@ -922,7 +940,7 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
     }
 
     for (GLVolume* volume : volumes) {
-        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower || volume->volume_idx() < 0)
+        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower || volume->is_sla_pad() || volume->is_sla_support())
             continue;
 
         int extruder_id = volume->extruder_id - 1;
