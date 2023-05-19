@@ -159,7 +159,7 @@ BundleMap BundleMap::load()
                     idx_path = fs::path(cache_dir / (id + ".idx"));
                 }
                 if (!boost::filesystem::exists(idx_path)) {
-                    BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to missing index %1%.", id, idx_path.string());
+                    BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to missing index %2%.", id, idx_path.string());
                     continue;
                 }
                 Slic3r::GUI::Config::Index index;
@@ -167,7 +167,7 @@ BundleMap BundleMap::load()
                     index.load(idx_path);
                 }
                 catch (const std::exception& /* err */) {
-                    BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to invalid index %1%.", id, idx_path.string());
+                    BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to invalid index %2%.", id, idx_path.string());
                     continue;
                 }
                 const auto recommended_it = index.recommended();

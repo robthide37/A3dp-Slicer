@@ -2186,6 +2186,7 @@ void PrintObject::bridge_over_infill()
                 Polygon &new_poly = expanded_bridged_area.emplace_back(std::move(traced_poly.lows));
                 new_poly.points.insert(new_poly.points.end(), traced_poly.highs.rbegin(), traced_poly.highs.rend());
             }
+            expanded_bridged_area = union_safety_offset(expanded_bridged_area);
         }
 
         polygons_rotate(expanded_bridged_area, -aligning_angle);

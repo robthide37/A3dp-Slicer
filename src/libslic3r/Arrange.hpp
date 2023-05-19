@@ -1,9 +1,9 @@
 #ifndef ARRANGE_HPP
 #define ARRANGE_HPP
 
-#include "ExPolygon.hpp"
-
 #include <boost/variant.hpp>
+
+#include <libslic3r/ExPolygon.hpp>
 #include <libslic3r/BoundingBox.hpp>
 
 namespace Slic3r {

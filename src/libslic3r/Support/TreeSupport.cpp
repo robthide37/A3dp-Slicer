@@ -4649,6 +4649,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         // ### Precalculate avoidances, collision etc.
         size_t num_support_layers = precalculate(print, overhangs, processing.first, processing.second, volumes, throw_on_cancel);
         bool   has_support = num_support_layers > 0;
+        bool   has_raft    = config.raft_layers.size() > 0;
         num_support_layers = std::max(num_support_layers, config.raft_layers.size());
 
         SupportParameters            support_params(print_object);
@@ -4661,13 +4662,13 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         SupportGeneratorLayersPtr    interface_layers;
         SupportGeneratorLayersPtr    base_interface_layers;
         SupportGeneratorLayersPtr    intermediate_layers(num_support_layers, nullptr);
-        if (support_params.has_top_contacts)
+        if (support_params.has_top_contacts || has_raft)
             top_contacts.assign(num_support_layers, nullptr);
         if (support_params.has_bottom_contacts)
             bottom_contacts.assign(num_support_layers, nullptr);
-        if (support_params.has_interfaces())
+        if (support_params.has_interfaces() || has_raft)
             interface_layers.assign(num_support_layers, nullptr);
-        if (support_params.has_base_interfaces())
+        if (support_params.has_base_interfaces() || has_raft)
             base_interface_layers.assign(num_support_layers, nullptr);
 
         InterfacePlacer              interface_placer{

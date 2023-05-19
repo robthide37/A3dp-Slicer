@@ -1411,27 +1411,25 @@ void Sidebar::update_sliced_info_sizer()
                 new_label = _L("Used Filament (g)");
                 info_text = wxString::Format("%.2f", ps.total_weight);
 
-                const auto& extruders_filaments = wxGetApp().preset_bundle->extruders_filaments;
-                const PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
-
                 if (ps.filament_stats.size() > 1)
                     new_label += ":";
 
-                for (auto filament : ps.filament_stats) {
-                    const Preset* filament_preset = filaments.find_preset(extruders_filaments[filament.first].get_selected_preset_name(), false);
-                    if (filament_preset) {
+                const auto& extruders_filaments = wxGetApp().preset_bundle->extruders_filaments;
+                for (const auto& [filament_id, filament_vol] : ps.filament_stats) {
+                    assert(filament_id < extruders_filaments.size());
+                    if (const Preset* preset = extruders_filaments[filament_id].get_selected_preset()) {
                         double filament_weight;
                         if (ps.filament_stats.size() == 1)
                             filament_weight = ps.total_weight;
                         else {
-                            double filament_density = filament_preset->config.opt_float("filament_density", 0);
-                            filament_weight = filament.second * filament_density/* *2.4052f*/ * 0.001; // assumes 1.75mm filament diameter;
+                            double filament_density = preset->config.opt_float("filament_density", 0);
+                            filament_weight = filament_vol * filament_density/* *2.4052f*/ * 0.001; // assumes 1.75mm filament diameter;
 
-                            new_label += "\n    - " + format_wxstr(_L("Filament at extruder %1%"), filament.first + 1);
+                            new_label += "\n    - " + format_wxstr(_L("Filament at extruder %1%"), filament_id + 1);
                             info_text += wxString::Format("\n%.2f", filament_weight);
                         }
 
-                        double spool_weight = filament_preset->config.opt_float("filament_spool_weight", 0);
+                        double spool_weight = preset->config.opt_float("filament_spool_weight", 0);
                         if (spool_weight != 0.0) {
                             new_label += "\n      " + _L("(including spool)");
                             info_text += wxString::Format(" (%.2f)\n", filament_weight + spool_weight);
