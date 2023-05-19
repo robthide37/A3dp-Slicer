@@ -10,8 +10,8 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
-"n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
 "X-Generator: Poedit 3.2.2\n"
 
 #: src/slic3r/GUI/AboutDialog.cpp:46 src/slic3r/GUI/AboutDialog.cpp:304
@@ -13699,11 +13699,10 @@ msgid ""
 "maximum allowed speed at layer \"disable_fan_first_layers\" + 1."
 msgstr ""
 "Швидкість вентилятора буде збільшена лінійно з нуля на шарі "
-"\"disable_fan_first_layers\" до максимальної на шарі "
-"\"full_fan_speed_layer\". \"full_fan_speed_layer\" буде проігноровано, якщо "
-"нижче \"disable_fan_first_layers\", і в цьому випадку вентилятор буде "
-"працювати з максимально дозволеною швидкістю на рівні "
-"\"disable_fan_first_layers\" + 1."
+"\"disable_fan_first_layers\" до максимальної на шарі \"full_fan_speed_layer"
+"\". \"full_fan_speed_layer\" буде проігноровано, якщо нижче "
+"\"disable_fan_first_layers\", і в цьому випадку вентилятор буде працювати з "
+"максимально дозволеною швидкістю на рівні \"disable_fan_first_layers\" + 1."
 
 #: src/libslic3r/PrintConfig.cpp:1343
 msgid "Fuzzy skin type."
@@ -17257,9 +17256,8 @@ msgstr ""
 #: resources/data/hints.ini: [hint:Hiding sidebar]
 msgid ""
 "Hiding sidebar\n"
-"Did you know that you can hide the right sidebar using the shortcut "
-"<b>Shift+Tab</b>? You can also enable the icon for this from "
-"the<a>Preferences</a>."
+"Did you know that you can hide the right sidebar using the shortcut <b>Shift"
+"+Tab</b>? You can also enable the icon for this from the<a>Preferences</a>."
 msgstr ""
 
 #: resources/data/hints.ini: [hint:Perspective camera]
