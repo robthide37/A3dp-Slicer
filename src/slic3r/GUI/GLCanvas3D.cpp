@@ -1508,15 +1508,15 @@ void GLCanvas3D::reset_volumes()
     _set_warning_notification(EWarning::ObjectOutside, false);
 }
 
-ModelInstanceEPrintVolumeState GLCanvas3D::check_volumes_outside_state() const
+ModelInstanceEPrintVolumeState GLCanvas3D::check_volumes_outside_state(bool selection_only) const
 {
     ModelInstanceEPrintVolumeState state = ModelInstanceEPrintVolumeState::ModelInstancePVS_Inside;
     if (m_initialized && !m_volumes.empty())
-        check_volumes_outside_state(m_bed.build_volume(), &state);
+        check_volumes_outside_state(m_bed.build_volume(), &state, selection_only);
     return state;
 }
 
-bool GLCanvas3D::check_volumes_outside_state(const Slic3r::BuildVolume& build_volume, ModelInstanceEPrintVolumeState* out_state) const
+bool GLCanvas3D::check_volumes_outside_state(const Slic3r::BuildVolume& build_volume, ModelInstanceEPrintVolumeState* out_state, bool selection_only) const
 {
     auto                volume_below = [](GLVolume& volume) -> bool
     { return volume.object_idx() != -1 && volume.volume_idx() != -1 && volume.is_below_printbed(); };
@@ -1530,9 +1530,9 @@ bool GLCanvas3D::check_volumes_outside_state(const Slic3r::BuildVolume& build_vo
     auto                volume_convex_mesh = [this, volume_sinking](GLVolume& volume) -> const TriangleMesh&
     { return volume_sinking(volume) ? m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh() : *volume.convex_hull(); };
 
-    auto volumes_to_process_idxs = [this]() {
+    auto volumes_to_process_idxs = [this, selection_only]() {
         std::vector<unsigned int> ret;
-        if (m_selection.is_empty()) {
+        if (!selection_only || m_selection.is_empty()) {
             ret = std::vector<unsigned int>(m_volumes.volumes.size());
             std::iota(ret.begin(), ret.end(), 0);
         }
@@ -2603,7 +2603,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     // checks for geometry outside the print volume to render it accordingly
     if (!m_volumes.empty()) {
         ModelInstanceEPrintVolumeState state;
-        const bool contained_min_one = check_volumes_outside_state(m_bed.build_volume(), &state);
+        const bool contained_min_one = check_volumes_outside_state(m_bed.build_volume(), &state, !force_full_scene_refresh);
         const bool partlyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Partly_Outside);
         const bool fullyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Fully_Outside);
 
