@@ -1002,8 +1002,8 @@ msgid ""
 "will be able to use button with %1% logo to open models in this %1%. The "
 "model will be downloaded into folder you choose bellow."
 msgstr ""
-"Etkinleştirilirse, %s www.printables.com'daki özel URL'den başlamak üzere "
-"kaydolur. Logolu %s düğmesini bu %s de modelleri açmak için "
+"Etkinleştirilirse, %1% www.printables.com'daki özel URL'den başlamak üzere "
+"kaydolur. Logolu %1% düğmesini bu %1% de modelleri açmak için "
 "kullanabileceksiniz. Model, aşağıda seçtiğiniz klasöre indirilecektir."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1472
@@ -1978,9 +1978,9 @@ msgid ""
 "Select YES if you want to change this value to %1%%%, \n"
 "or NO if you are sure that %1% %2% is a correct value."
 msgstr ""
-"%s%% yerine %s %s mı demek istiyorsun?\n"
-"Bu değeri %s%% olarak değiştirmek istiyorsanız Evet'i, \n"
-"veya %s %s doğru bir değer olduğundan eminseniz HAYIR'ı seçin."
+"%1%%% yerine %1% %2% mı demek istiyorsun?\n"
+"Bu değeri %1%%% olarak değiştirmek istiyorsanız Evet'i, \n"
+"veya %1% %2% doğru bir değer olduğundan eminseniz HAYIR'ı seçin."
 
 #: src/slic3r/GUI/Field.cpp:402
 #, boost-format
@@ -3252,7 +3252,7 @@ msgstr "font(.ttf, .ttc) ile dosya ekleme"
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2003
 #, boost-format
 msgid "Font \"%1%\" can't be selected."
-msgstr "Fontlar arasından seçim yapmak için iletişim kutusunu açın."
+msgstr "Fontlar \"%1%\" arasından seçim yapmak için iletişim kutusunu açın."
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2077
 msgid "Operation"
@@ -4230,7 +4230,7 @@ msgstr "İşlem %1% / 100"
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:541
 #, boost-format
 msgid "Simplify %1%"
-msgstr "Sadeleştir"
+msgstr "Sadeleştir %1%"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:542
 msgid ""
@@ -5039,14 +5039,14 @@ msgstr "Uygulama güncelleştirmesini denetleme başarısız oldu."
 #: src/slic3r/GUI/GUI_App.cpp:3373
 #, boost-format
 msgid "You are currently running the latest released version %1%."
-msgstr "Yeni sürüm mevcut değildir. En son sürüm %1%."
+msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:3376
 #, boost-format
 msgid ""
 "There are no new released versions online. The latest release version is %1%."
-msgstr ""
-"Yeni sürümün indirilmesi zaten devam ediyor. Devam etmek istiyor musunuz?"
+msgstr "Yeni sürüm mevcut değildir. En son sürüm %1%."
+""
 
 #: src/slic3r/GUI/GUI_App.cpp:3437
 #, boost-format
@@ -5055,7 +5055,7 @@ msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:3447
 msgid "Downloading of the new version is in progress. Do you want to continue?"
-msgstr ""
+msgstr "Yeni sürümün indirilmesi zaten devam ediyor. Devam etmek istiyor musunuz?"
 
 #: src/slic3r/GUI/GUI_App.cpp:3465
 msgid ""
@@ -6013,7 +6013,7 @@ msgstr "Boyut [Dünya]"
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:251
 #, boost-format
 msgid "Mirror along %1% axis"
-msgstr "Boyunca aynala"
+msgstr "Boyunca aynala %1% axis"
 
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:272
 msgid "Set Mirror"
@@ -11841,20 +11841,20 @@ msgstr "Bulunan depolar:"
 #: src/slic3r/Utils/OctoPrint.cpp:757
 #, boost-format
 msgid "%1% : read only"
-msgstr "salt okunur"
+msgstr "%1% : salt okunur"
 
 #. TRN %1% = storage path
 #: src/slic3r/Utils/OctoPrint.cpp:759
 #, boost-format
 msgid "%1% : no free space"
-msgstr "boş alan yok"
+msgstr "%1% : boş alan yok"
 
 #. TRN %1% = host
 #: src/slic3r/Utils/OctoPrint.cpp:763
 #, boost-format
 msgid "Upload has failed. There is no suitable storage found at %1%."
 msgstr ""
-"Yükleme başarısız oldu. %1%.%2%de uygun bir depolama alanı bulunmamaktadır. "
+"Yükleme başarısız oldu. %1% de uygun bir depolama alanı bulunmamaktadır. "
 
 #: src/slic3r/Utils/OctoPrint.cpp:1122
 msgid "Connection to Prusa Connect works correctly."
@@ -12344,9 +12344,6 @@ msgid ""
 "While the object %1% itself fits the build volume, its last layer exceeds "
 "the maximum build volume height."
 msgstr ""
-"Baskı, izin verilen maksimum yükseklikten daha uzundur. Modelinizin boyutunu "
-"küçültmek veya geçerli yazdırma ayarlarını değiştirip yeniden denemek "
-"isteyebilirsiniz."
 
 #: src/libslic3r/Print.cpp:525
 msgid ""
@@ -12573,7 +12570,7 @@ msgstr "ince kırılgan bölüm"
 #: src/libslic3r/Print.cpp:1213
 #, boost-format
 msgid "%1%, %2%"
-msgstr "Yazdırma kararlılığı sorunları algılandı"
+msgstr ""
 
 #: src/libslic3r/Print.cpp:1312
 msgid "Consider enabling supports."
@@ -12589,7 +12586,7 @@ msgstr "ve"
 msgid ""
 "Detected print stability issues:\n"
 "%1%"
-msgstr "Kenar (Brim)"
+msgstr ""
 
 #: src/libslic3r/SLA/Pad.cpp:530
 msgid "Pad brim size is too small for the current configuration."
