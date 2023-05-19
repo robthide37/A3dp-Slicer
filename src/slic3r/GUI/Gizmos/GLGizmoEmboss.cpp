@@ -447,7 +447,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             if (gl_volume == nullptr || !m_style_manager.is_active_font())
                 return res;
 
-            m_style_manager.get_style().prop.angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
+            m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
         }
 
         volume_transformation_changing();
@@ -559,7 +559,7 @@ void GLGizmoEmboss::volume_transformation_changing()
     }
     const FontProp &prop = m_volume->text_configuration->style.prop;
     if (prop.per_glyph)
-        init_text_lines();
+        init_text_lines(m_text_lines.get_lines().size());
 }
 
 void GLGizmoEmboss::volume_transformation_changed()
@@ -571,7 +571,7 @@ void GLGizmoEmboss::volume_transformation_changed()
 
     const FontProp &prop = m_volume->text_configuration->style.prop;
     if (prop.per_glyph)
-        init_text_lines();
+        init_text_lines(m_text_lines.get_lines().size());
 
     // Update surface by new position
     if (prop.use_surface || prop.per_glyph)
@@ -1047,7 +1047,7 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
     return styles;
 }
 
-void GLGizmoEmboss::init_text_lines(){
+void GLGizmoEmboss::init_text_lines(unsigned count_lines){
     assert(m_style_manager.is_active_font());
     if (!m_style_manager.is_active_font())
         return;
@@ -1067,7 +1067,7 @@ void GLGizmoEmboss::init_text_lines(){
     const FontFile &ff = *ff_ptr;
 
     double line_height = TextLinesModel::calc_line_height(ff, fp); 
-    m_text_lines.init(m_parent.get_selection(), line_height);
+    m_text_lines.init(m_parent.get_selection(), line_height, count_lines);
 }
 
 void GLGizmoEmboss::set_volume_by_selection()
@@ -1306,6 +1306,9 @@ bool GLGizmoEmboss::process()
     if (use_surface && is_object) 
         use_surface = false;
     
+    assert(!data.text_configuration.style.prop.per_glyph ||
+        get_count_lines(m_text) == m_text_lines.get_lines().size());
+
     if (use_surface) {
         // Model to cut surface from.
         SurfaceVolumeData::ModelSources sources = create_volume_sources(m_volume);
@@ -1540,6 +1543,12 @@ void GLGizmoEmboss::draw_text_input()
     ImVec2 input_size(m_gui_cfg->text_size.x, m_gui_cfg->text_size.y + extra_height);
     const ImGuiInputTextFlags flags = ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_AutoSelectAll;
     if (ImGui::InputTextMultiline("##Text", &m_text, input_size, flags)) {
+        if (m_style_manager.get_font_prop().per_glyph) {
+            unsigned count_lines = get_count_lines(m_text);
+            if (count_lines != m_text_lines.get_lines().size()) 
+                // Necesarry to initialize count by given number (differ from stored in volume at the moment)
+                init_text_lines(count_lines);         
+        }
         process();
         range_text = create_range_text_prep();
     }
@@ -2801,7 +2810,7 @@ bool GLGizmoEmboss::rev_checkbox(const std::string &name,
 }
 
 bool GLGizmoEmboss::set_height() {
-    float &value = m_style_manager.get_style().prop.size_in_mm;
+    float &value = m_style_manager.get_font_prop().size_in_mm;
 
     // size can't be zero or negative
     priv::Limits::apply(value, priv::limits.size_in_mm);
@@ -2829,7 +2838,7 @@ bool GLGizmoEmboss::set_height() {
 
 void GLGizmoEmboss::draw_height(bool use_inch)
 {
-    float &value = m_style_manager.get_style().prop.size_in_mm;
+    float &value = m_style_manager.get_font_prop().size_in_mm;
     const EmbossStyle* stored_style = m_style_manager.get_stored_style();
     const float *stored = (stored_style != nullptr)? &stored_style->prop.size_in_mm : nullptr;
     const char *size_format = use_inch ? "%.2f in" : "%.1f mm";
@@ -2842,7 +2851,7 @@ void GLGizmoEmboss::draw_height(bool use_inch)
 
 bool GLGizmoEmboss::set_depth()
 {
-    float &value = m_style_manager.get_style().prop.emboss;
+    float &value = m_style_manager.get_font_prop().emboss;
 
     // size can't be zero or negative
     priv::Limits::apply(value, priv::limits.emboss);
@@ -2853,7 +2862,7 @@ bool GLGizmoEmboss::set_depth()
 
 void GLGizmoEmboss::draw_depth(bool use_inch)
 {
-    float &value = m_style_manager.get_style().prop.emboss;
+    float &value = m_style_manager.get_font_prop().emboss;
     const EmbossStyle* stored_style = m_style_manager.get_stored_style();
     const float *stored = ((stored_style)? &stored_style->prop.emboss : nullptr);
     const std::string  revert_emboss_depth = _u8L("Revert embossed depth.");
@@ -2971,7 +2980,7 @@ void GLGizmoEmboss::draw_advanced()
         return;
     }
 
-    FontProp &font_prop = m_style_manager.get_style().prop;
+    FontProp &font_prop = m_style_manager.get_font_prop();
     const auto  &cn = m_style_manager.get_font_prop().collection_number;
     unsigned int font_index = (cn.has_value()) ? *cn : 0;
     const auto  &font_info  = ff.font_file->infos[font_index];
@@ -3210,7 +3219,7 @@ void GLGizmoEmboss::draw_advanced()
     if (ImGui::Button(_u8L("Set text to face camera").c_str())) {
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam  = wxGetApp().plater()->get_camera();
-        bool use_surface = m_style_manager.get_style().prop.use_surface;
+        bool use_surface = m_style_manager.get_font_prop().use_surface;
         if (priv::apply_camera_dir(cam, m_parent, m_keep_up) && use_surface)
             process();
     } else if (ImGui::IsItemHovered()) {
@@ -3239,24 +3248,24 @@ void GLGizmoEmboss::draw_advanced()
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
     if (ImGui::SliderFloat("##base_line_y_offset", &m_text_lines.offset, -10.f, 10.f, "%f mm")) {
-        init_text_lines();
+        init_text_lines(m_text_lines.get_lines().size());
         process();
     } else if (ImGui::IsItemHovered()) 
         ImGui::SetTooltip("%s", _u8L("Move base line (up/down) for allign letters").c_str());
 
     // order must match align enum
-    const char* align_names[] = {
-        "start_first_line",
-        "center_left",
-        "center_right",
-        "center_center",
-        "top_left",
-        "top_right",
-        "top_center",
-        "bottom_left",
-        "bottom_right",
-        "bottom_center"
-    };
+    const char* align_names[] = {"first_line_left",
+                                  "first_line_right",
+                                  "first_line_center",
+                                  "center_left",
+                                  "center_right",
+                                  "center_center",
+                                  "top_left",
+                                  "top_right",
+                                  "top_center",
+                                  "bottom_left",
+                                  "bottom_right",
+                                  "bottom_center"};
     int selected_align = static_cast<int>(font_prop.align);
     if (ImGui::Combo("align", &selected_align, align_names, IM_ARRAYSIZE(align_names))) {
         font_prop.align = static_cast<FontProp::Align>(selected_align);
@@ -3359,7 +3368,7 @@ bool GLGizmoEmboss::choose_font_by_wxdialog()
     const auto&ff = m_style_manager.get_font_file_with_cache();
     if (WxFontUtils::is_italic(wx_font) &&
         !Emboss::is_italic(*ff.font_file, font_collection)) {
-        m_style_manager.get_style().prop.skew = 0.2;
+        m_style_manager.get_font_prop().skew = 0.2;
     }
     return true;
 }
@@ -3428,7 +3437,7 @@ bool GLGizmoEmboss::choose_svg_file()
 
     BoundingBox bb;
     for (const auto &p : polys) bb.merge(p.contour.points);
-    const FontProp &fp = m_style_manager.get_style().prop;
+    const FontProp &fp = m_style_manager.get_font_prop();
     float scale   = fp.size_in_mm / std::max(bb.max.x(), bb.max.y());
     auto  project = std::make_unique<ProjectScale>(
         std::make_unique<ProjectZ>(fp.emboss / scale), scale);

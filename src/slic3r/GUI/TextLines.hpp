@@ -20,7 +20,8 @@ public:
     /// <param name="selection">Must be selected text volume</param>
     /// <param name="line_height">Height of text line with spacing [in mm]</param>
     /// <param name="line_offset">Offset of base line from center [in mm]</param>
-    void init(const Selection &selection, double line_height);
+    /// <param name="count_lines">[Optional] Count lines when not set it is calculated from vodel volume text</param>
+    void init(const Selection &selection, double line_height, unsigned count_lines = 0);
     void render(const Transform3d &text_world);
 
     bool is_init() const { return m_model.is_initialized(); }

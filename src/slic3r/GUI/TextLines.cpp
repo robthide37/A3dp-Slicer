@@ -251,7 +251,7 @@ GLModel::Geometry create_geometry(const TextLines &lines)
 }
 } // namespace
 
-void TextLinesModel::init(const Selection &selection, double line_height)
+void TextLinesModel::init(const Selection &selection, double line_height, unsigned count_lines)
 {
     const GLVolume *gl_volume_ptr = selection.get_first_volume();
     if (gl_volume_ptr == nullptr)
@@ -268,13 +268,15 @@ void TextLinesModel::init(const Selection &selection, double line_height)
         return;
     const ModelVolume &mv = *mv_ptr;
 
-    const std::optional<TextConfiguration> tc_opt = mv.text_configuration;
-    if (!tc_opt.has_value())
-        return;
-
-    unsigned count_lines = Emboss::get_count_lines(tc_opt->text);
-    if (count_lines == 0)
-        return;
+    // calculate count lines when not set
+    if (count_lines == 0) {
+        const std::optional<TextConfiguration> tc_opt = mv.text_configuration;
+        if (!tc_opt.has_value())
+            return;
+        count_lines = Emboss::get_count_lines(tc_opt->text);
+        if (count_lines == 0)
+            return;
+    }
     
     double first_line_center = offset + (count_lines / 2) * line_height - ((count_lines % 2 == 0) ? line_height / 2. : 0.);
     std::vector<float> line_centers(count_lines);

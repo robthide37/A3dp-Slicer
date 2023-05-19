@@ -64,7 +64,9 @@ struct FontProp
     bool per_glyph;
 
     enum class Align {
-        start_first_line, // it depends on position of zero for first letter
+        first_line_left, // it depends on position of zero for first letter (no shape move)
+        first_line_right, // use Y zero same as first letter
+        first_line_center, // use Y zero same as first letter
         center_left,
         center_right,
         center_center,
@@ -77,7 +79,7 @@ struct FontProp
     };
     // change pivot of text
     // When not set, center is used and is not stored
-    Align align = Align::center_center;
+    Align align = Align::first_line_center;
 
     //////
     // Duplicit data to wxFontDescriptor

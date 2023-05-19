@@ -441,15 +441,6 @@ namespace Emboss
     double calculate_angle(int32_t distance, PolygonPoint polygon_point, const Polygon &polygon);
     std::vector<double> calculate_angles(int32_t distance, const PolygonPoints& polygon_points, const Polygon &polygon);
 
-    /// <summary>
-    /// Align expolygons by type
-    /// </summary>
-    /// <param name="type">Type of alignement</param>
-    /// <param name="shape">shapes to align</param>
-    /// <param name="bb">extents of shape</param>
-    void align_shape(FontProp::Align type, ExPolygons& shape, BoundingBox* bb = nullptr);
-    void align_shape(FontProp::Align type, std::vector<ExPolygons> &shape, BoundingBox *bb = nullptr);
-
 } // namespace Emboss
 } // namespace Slic3r
 #endif // slic3r_Emboss_hpp_

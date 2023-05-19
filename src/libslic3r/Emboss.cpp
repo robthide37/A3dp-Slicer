@@ -1271,30 +1271,28 @@ const int CANCEL_CHECK = 10;
 
 ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache, const char *text, const FontProp &font_prop, const std::function<bool()>& was_canceled)
 {
-    assert(font_with_cache.has_value());
-    const FontFile& font = *font_with_cache.font_file;
-    unsigned int font_index = font_prop.collection_number.value_or(0);
-    if (!priv::is_valid(font, font_index)) return {};
-
-    unsigned counter = 0;
-    Point cursor(0, 0);
+    std::wstring text_w = boost::nowide::widen(text);
+    std::vector<ExPolygons> vshapes = text2vshapes(font_with_cache, text_w, font_prop, was_canceled);
+    // unify to one expolygon
     ExPolygons result;
-    fontinfo_opt font_info_cache;   
-    std::wstring ws = boost::nowide::widen(text);
-    for (wchar_t wc: ws){
-        if (++counter == CANCEL_CHECK) {
-            counter = 0;
-            if (was_canceled())
-                return {};
-        }
-        ExPolygons expolygons = letter2shapes(wc, cursor, font_with_cache, font_prop, font_info_cache);
-        if (expolygons.empty())
+    for (ExPolygons &shapes : vshapes) {
+        if (shapes.empty())
             continue;
-        expolygons_append(result, std::move(expolygons));
+        expolygons_append(result, std::move(shapes));
     }
     result = Slic3r::union_ex(result);
     heal_shape(result);
     return result;
+}
+
+namespace {
+/// <summary>
+/// Align expolygons by type
+/// </summary>
+/// <param name="type">Type of alignement</param>
+/// <param name="shape">shapes to align</param>
+/// <param name="text">Same size as shape for align per line(detect of end line - '\n')</param>
+void align_shape(FontProp::Align type, std::vector<ExPolygons> &shape, const std::wstring &text);
 }
 
 std::vector<ExPolygons> Emboss::text2vshapes(FontFileWithCache &font_with_cache, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled){
@@ -1307,8 +1305,8 @@ std::vector<ExPolygons> Emboss::text2vshapes(FontFileWithCache &font_with_cache,
     unsigned counter = 0;
     Point cursor(0, 0);
 
-    std::vector<ExPolygons> result;
     fontinfo_opt font_info_cache;  
+    std::vector<ExPolygons> result;
     result.reserve(text.size());
     for (wchar_t letter : text) {
         if (++counter == CANCEL_CHECK) {
@@ -1318,6 +1316,8 @@ std::vector<ExPolygons> Emboss::text2vshapes(FontFileWithCache &font_with_cache,
         }
         result.emplace_back(letter2shapes(letter, cursor, font_with_cache, font_prop, font_info_cache));
     }
+
+    align_shape(font_prop.align, result, text);
     return result;
 }
 
@@ -1326,26 +1326,27 @@ unsigned Emboss::get_count_lines(const std::wstring& ws)
 {
     if (ws.empty())
         return 0;
-    unsigned prev_count = 0;
-    for (wchar_t wc : ws)
-        if (wc == '\n')
-            ++prev_count;
-        else
-            break;
-    
-    unsigned post_count = 0;
-    for (wchar_t wc : boost::adaptors::reverse(ws))
-        if (wc == '\n')
-            ++post_count;
-        else
-            break;
 
     unsigned count = 1;
     for (wchar_t wc : ws)
         if (wc == '\n')
             ++count;
+    return count;
 
-    return count - prev_count - post_count;
+    // unsigned prev_count = 0;
+    // for (wchar_t wc : ws)
+    //     if (wc == '\n')
+    //         ++prev_count;
+    //     else
+    //         break;
+    //
+    // unsigned post_count = 0;
+    // for (wchar_t wc : boost::adaptors::reverse(ws))
+    //     if (wc == '\n')
+    //         ++post_count;
+    //     else
+    //         break;
+    //return count - prev_count - post_count;
 }
 
 unsigned Emboss::get_count_lines(const std::string &text)
@@ -1875,11 +1876,12 @@ PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &b
     // find BB in center of line
     size_t first_right_index = 0;
     for (const BoundingBox &bb : bbs)
-        if (bb.min.x() >= 0) {
-            break;
-        } else {
+        if (!bb.defined) // white char do not have bb
+            continue;
+        else if (bb.min.x() < 0)
             ++first_right_index;
-        }
+        else 
+            break;
 
     PolygonPoints samples(bbs.size());
     int32_t shapes_x_cursor = 0;
@@ -1925,71 +1927,76 @@ PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &b
 }
 
 namespace {
-Point get_align_offset(FontProp::Align type, const BoundingBox &bb)
-{
-    Point offset;
+int32_t get_align_y_offset(FontProp::Align type, const BoundingBox &bb){
     switch (type) {
-    // case Slic3r::FontProp::Align::start_first_line: break;
+    case Slic3r::FontProp::Align::first_line_left:
+    case Slic3r::FontProp::Align::first_line_right:
+    case Slic3r::FontProp::Align::first_line_center: break; // No change
     case Slic3r::FontProp::Align::center_left:
     case Slic3r::FontProp::Align::center_right:
-    case Slic3r::FontProp::Align::center_center: offset.y() = bb.center().y(); break;
+    case Slic3r::FontProp::Align::center_center: return -bb.center().y();
     case Slic3r::FontProp::Align::top_left:
     case Slic3r::FontProp::Align::top_right:
-    case Slic3r::FontProp::Align::top_center: offset.y() = bb.min.y(); break;
+    case Slic3r::FontProp::Align::top_center: return -bb.max.y(); break; // direction of Y in 2d is from top to bottom
     case Slic3r::FontProp::Align::bottom_left:
     case Slic3r::FontProp::Align::bottom_right:
-    case Slic3r::FontProp::Align::bottom_center: offset.y() = bb.max.y(); break;
+    case Slic3r::FontProp::Align::bottom_center: return -bb.min.y(); // direction of Y in 2d is from top to bottom
     default: break;
     }
-
+    return 0;
+}
+int32_t get_align_x_offset(FontProp::Align type, const BoundingBox &shape_bb, const BoundingBox &line_bb)
+{
     switch (type) {
-    // case Slic3r::FontProp::Align::start_first_line: break;
+    case Slic3r::FontProp::Align::first_line_center:
     case Slic3r::FontProp::Align::center_center:
     case Slic3r::FontProp::Align::top_center:
-    case Slic3r::FontProp::Align::bottom_center: offset.x() = bb.center().x(); break;
+    case Slic3r::FontProp::Align::bottom_center: return -shape_bb.center().x() + (shape_bb.size().x() - line_bb.size().x())/2;
+    case Slic3r::FontProp::Align::first_line_left: break; // special case do not use offset
     case Slic3r::FontProp::Align::center_left:
     case Slic3r::FontProp::Align::top_left:
-    case Slic3r::FontProp::Align::bottom_left: offset.x() = bb.min.x(); break;
+    case Slic3r::FontProp::Align::bottom_left: return -shape_bb.min.x();
+    case Slic3r::FontProp::Align::first_line_right:
     case Slic3r::FontProp::Align::center_right:
     case Slic3r::FontProp::Align::top_right:
-    case Slic3r::FontProp::Align::bottom_right: offset.x() = bb.max.x(); break;
+    case Slic3r::FontProp::Align::bottom_right: return -shape_bb.max.x() + (shape_bb.size().x() - line_bb.size().x());
     default: break;
     }
-    return -offset;
-}
-} // namespace
-
-void Emboss::align_shape(FontProp::Align type, ExPolygons &shape, BoundingBox *bb)
-{
-    if (type == FontProp::Align::start_first_line)
-        return; // no alignement
-
-    BoundingBox shape_bb_data;
-    BoundingBox &shape_bb = (bb != nullptr) ? *bb : shape_bb_data;
-    if (!shape_bb.defined)
-        shape_bb = get_extents(shape);
-
-    Point offset = get_align_offset(type, shape_bb);
-    for (ExPolygon &s : shape)
-        s.translate(offset);
+    return 0;
 }
 
-void Emboss::align_shape(FontProp::Align type, std::vector<ExPolygons> &shapes, BoundingBox *bb)
+void align_shape(FontProp::Align type, std::vector<ExPolygons> &shapes, const std::wstring &text)
 {
-    if (type == FontProp::Align::start_first_line)
+    if (type == FontProp::Align::first_line_left)
         return; // no alignement
 
-    BoundingBox  shape_bb_data;
-    BoundingBox &shape_bb = (bb != nullptr) ? *bb : shape_bb_data;
-    if (!shape_bb.defined)
-        for (const ExPolygons& shape: shapes)
-            shape_bb.merge(get_extents(shape));
+    BoundingBox shape_bb;
+    for (const ExPolygons& shape: shapes)
+        shape_bb.merge(get_extents(shape));
 
-    Point offset = get_align_offset(type, shape_bb);
-    for (ExPolygons &shape : shapes)
+    auto get_line_bb = [&](size_t j) {
+        BoundingBox line_bb;
+        for (; j < text.length() && text[j] != '\n'; ++j)
+            line_bb.merge(get_extents(shapes[j]));
+        return line_bb;
+    };
+
+    Point offset(
+        get_align_x_offset(type, shape_bb, get_line_bb(0)), 
+        get_align_y_offset(type, shape_bb));
+    assert(shapes.size() == text.length());
+    for (size_t i = 0; i < shapes.size(); ++i) {
+        wchar_t letter    = text[i];
+        if (letter == '\n'){
+            offset.x() = get_align_x_offset(type, shape_bb, get_line_bb(i+1));
+            continue;
+        }
+        ExPolygons &shape = shapes[i];
         for (ExPolygon &s : shape)
             s.translate(offset);
+    }
 }
+} // namespace
 
 #ifdef REMOVE_SPIKES
 #include <Geometry.hpp>

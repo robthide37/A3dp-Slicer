@@ -362,10 +362,15 @@ bool priv::check(const DataBase &input, bool check_fontfile, bool use_surface)
     res &= !input.text_configuration.text.empty();
     assert(!input.volume_name.empty());
     res &= !input.volume_name.empty();
-    assert(input.text_configuration.style.prop.use_surface == use_surface);
-    res &= input.text_configuration.style.prop.use_surface == use_surface;
-    assert(input.text_configuration.style.prop.per_glyph == !input.text_lines.empty());
-    res &= input.text_configuration.style.prop.per_glyph == !input.text_lines.empty();
+    const FontProp& prop = input.text_configuration.style.prop;
+    assert(prop.use_surface == use_surface);
+    res &= prop.use_surface == use_surface;
+    assert(prop.per_glyph == !input.text_lines.empty());
+    res &= prop.per_glyph == !input.text_lines.empty();
+    if (prop.per_glyph) {
+        assert(get_count_lines(input.text_configuration.text) == input.text_lines.size());
+        res &= get_count_lines(input.text_configuration.text) == input.text_lines.size();
+    }
     return res; 
 }
 bool priv::check(const DataCreateVolume &input, bool is_main_thread) {
@@ -432,7 +437,6 @@ ExPolygons priv::create_shape(DataBase &input, Fnc was_canceled) {
     if (shapes.empty())
         return {};
 
-    align_shape(input.text_configuration.style.prop.align, shapes);
     return shapes;
 }
 
@@ -452,7 +456,6 @@ std::vector<ExPolygons> priv::create_shapes(DataBase &input, Fnc was_canceled) {
     if (shapes.empty())
         return {};
 
-    align_shape(prop.align, shapes);
     if (was_canceled())
         return {};
 
@@ -591,8 +594,8 @@ TriangleMesh priv::try_create_mesh(DataBase &input, Fnc was_canceled)
 {
     if (!input.text_lines.empty()) {
         TriangleMesh tm = create_mesh_per_glyph(input, was_canceled);
-        if (!tm.empty())
-            return tm;
+        if (was_canceled()) return {};
+        if (!tm.empty()) return tm;
     }
 
     ExPolygons shapes = priv::create_shape(input, was_canceled);
