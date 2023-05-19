@@ -882,14 +882,20 @@ namespace client
                 }
             }
             if (opt == nullptr)
-                ctx->throw_exception("Variable does not exist", IteratorRange(opt_key.begin(), opt_key.end()));
-            if (opt->is_scalar())
+                ctx->throw_exception("Variable does not exist", opt_key);
+            if (opt->is_scalar()) {
+                if (opt->is_nil())
+                    ctx->throw_exception("Trying to reference an undefined (nil) optional variable", opt_key);
                 output = opt->serialize();
-            else {
+            } else {
                 const ConfigOptionVectorBase *vec = static_cast<const ConfigOptionVectorBase*>(opt);
                 if (vec->empty())
                     ctx->throw_exception("Indexing an empty vector variable", opt_key);
-                output = vec->vserialize()[(idx >= vec->size()) ? 0 : idx];
+                if (idx >= vec->size())
+                    idx = 0;
+                if (vec->is_nil(idx))
+                    ctx->throw_exception("Trying to reference an undefined (nil) element of vector of optional values", opt_key);
+                output = vec->vserialize()[idx];
             }
         }
 
@@ -917,7 +923,7 @@ namespace client
                 ctx->throw_exception("Trying to index a scalar variable", opt_key);
             const ConfigOptionVectorBase *vec = static_cast<const ConfigOptionVectorBase*>(opt);
             if (vec->empty())
-                ctx->throw_exception("Indexing an empty vector variable", IteratorRange(opt_key.begin(), opt_key.end()));
+                ctx->throw_exception("Indexing an empty vector variable", opt_key);
             const ConfigOption *opt_index = ctx->resolve_symbol(std::string(opt_vector_index.begin(), opt_vector_index.end()));
             if (opt_index == nullptr)
                 ctx->throw_exception("Variable does not exist", opt_key);
@@ -926,7 +932,11 @@ namespace client
 			int idx = opt_index->getInt();
 			if (idx < 0)
                 ctx->throw_exception("Negative vector index", opt_key);
-			output = vec->vserialize()[(idx >= (int)vec->size()) ? 0 : idx];
+            if (idx >= (int)vec->size())
+                idx = 0;
+            if (vec->is_nil(idx))
+                ctx->throw_exception("Trying to reference an undefined (nil) element of vector of optional values", opt_key);
+			output = vec->vserialize()[idx];
         }
 
         static void resolve_variable(
@@ -975,6 +985,9 @@ namespace client
                 return;
 
             assert(opt.opt->is_scalar());
+
+            if (opt.opt->is_nil())
+                ctx->throw_exception("Trying to reference an undefined (nil) optional variable", opt.it_range);
 
             switch (opt.opt->type()) {
             case coFloat:   output.set_d(opt.opt->getFloat());   break;
@@ -1041,6 +1054,8 @@ namespace client
             if (vec->empty())
                 ctx->throw_exception("Indexing an empty vector variable", opt.it_range);
             size_t idx = (opt.index < 0) ? 0 : (opt.index >= int(vec->size())) ? 0 : size_t(opt.index);
+            if (vec->is_nil(idx))
+                ctx->throw_exception("Trying to reference an undefined (nil) element of vector of optional values", opt.it_range);
             switch (opt.opt->type()) {
             case coFloats:   output.set_d(static_cast<const ConfigOptionFloats*>(opt.opt)->values[idx]); break;
             case coInts:     output.set_i(static_cast<const ConfigOptionInts*>(opt.opt)->values[idx]); break;
@@ -1434,6 +1449,8 @@ namespace client
             assert(lhs.opt->is_vector());
             if (rhs.has_index() || ! rhs.opt->is_vector())
                 ctx->throw_exception("Cannot assign scalar to a vector", lhs.it_range);
+            if (rhs.opt->is_nil())
+                ctx->throw_exception("Some elements of the right hand side vector variable of optional values are undefined (nil)", rhs.it_range);
             if (lhs.opt->type() != rhs.opt->type()) {
                 // Vector types are not compatible.
                 switch (lhs.opt->type()) {
@@ -1470,6 +1487,8 @@ namespace client
                 if (rhs.has_index() || ! rhs.opt->is_vector())
                     // Stop parsing, let the other rules resolve this case.
                     return false;
+                if (rhs.opt->is_nil())
+                    ctx->throw_exception("Some elements of the right hand side vector variable of optional values are undefined (nil)", rhs.it_range);
                 // Clone the vector variable.
                 std::unique_ptr<ConfigOption> opt_new;
                 if (one_of(rhs.opt->type(), { coFloats, coInts, coStrings, coBools }))

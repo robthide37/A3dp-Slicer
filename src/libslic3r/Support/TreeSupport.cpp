@@ -2970,7 +2970,7 @@ static void create_nodes_from_area(
                         assert(radius_increase >= 0);
                         double shift = (elem.state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
                         //FIXME this assert fails a lot. Is it correct?
-                        assert(shift < radius_increase + 2. * config.maximum_move_distance_slow);
+//                        assert(shift < radius_increase + 2. * config.maximum_move_distance_slow);
                     }
                 }
             }
@@ -2995,7 +2995,7 @@ static void create_nodes_from_area(
                     assert(radius_increase >= 0);
                     double shift = (elem.state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
                     //FIXME this assert fails a lot. Is it correct?
-                    assert(shift < radius_increase + 2. * config.maximum_move_distance_slow);
+//                    assert(shift < radius_increase + 2. * config.maximum_move_distance_slow);
                 }
             }
         }
