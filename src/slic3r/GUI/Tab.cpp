@@ -5154,8 +5154,7 @@ void TabSLAPrint::build()
     optgroup->append_single_option_line("support_tree_type");
     optgroup->append_single_option_line("support_enforcers_only");
     
-    build_sla_support_params({{"", "Default"}, {"branching", "Branching"}}, page);
-
+    build_sla_support_params({{"", L("Default")}, {"branching", L("Branching")}}, page);
 
     optgroup = page->new_optgroup(L("Automatic generation"));
     optgroup->append_single_option_line("support_points_density_relative");
