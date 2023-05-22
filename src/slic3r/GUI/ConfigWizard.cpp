@@ -153,15 +153,22 @@ BundleMap BundleMap::load()
                 if (res.find(id) != res.end()) { continue; }
 
                 // Fresh index should be in archive_dir, otherwise look for it in cache 
+                // Then if not in archive or cache - it could be 3rd party profile that user just copied to vendor folder (both ini and cache)
+                
                 fs::path idx_path (archive_dir / (id + ".idx"));
                 if (!boost::filesystem::exists(idx_path)) {
-                    BOOST_LOG_TRIVIAL(warning) << format("Missing index %1% when loading bundle %2%.", idx_path.string(), id);
+                    BOOST_LOG_TRIVIAL(error) << format("Missing index %1% when loading bundle %2%. Going to search for it in cache folder.", idx_path.string(), id);
                     idx_path = fs::path(cache_dir / (id + ".idx"));
+                }
+                if (!boost::filesystem::exists(idx_path)) {
+                    BOOST_LOG_TRIVIAL(error) << format("Missing index %1% when loading bundle %2%. Going to search for it in vendor folder. Is it a 3rd party profile?", idx_path.string(), id);
+                    idx_path = fs::path(vendor_dir / (id + ".idx"));
                 }
                 if (!boost::filesystem::exists(idx_path)) {
                     BOOST_LOG_TRIVIAL(error) << format("Could not load bundle %1% due to missing index %2%.", id, idx_path.string());
                     continue;
                 }
+
                 Slic3r::GUI::Config::Index index;
                 try {
                     index.load(idx_path);
