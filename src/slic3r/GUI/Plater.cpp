@@ -1702,6 +1702,7 @@ struct Plater::priv
     static const std::regex pattern_zip_amf;
     static const std::regex pattern_any_amf;
     static const std::regex pattern_prusa;
+    static const std::regex pattern_zip;
 
     priv(Plater *q, MainFrame *main_frame);
     ~priv();
@@ -2003,6 +2004,7 @@ const std::regex Plater::priv::pattern_3mf(".*3mf", std::regex::icase);
 const std::regex Plater::priv::pattern_zip_amf(".*[.]zip[.]amf", std::regex::icase);
 const std::regex Plater::priv::pattern_any_amf(".*[.](amf|amf[.]xml|zip[.]amf)", std::regex::icase);
 const std::regex Plater::priv::pattern_prusa(".*prusa", std::regex::icase);
+const std::regex Plater::priv::pattern_zip(".*zip", std::regex::icase);
 
 Plater::priv::priv(Plater *q, MainFrame *main_frame)
     : q(q)
@@ -2428,7 +2430,7 @@ void Plater::check_selected_presets_visibility(PrinterTechnology loaded_printer_
 
 std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, bool load_model, bool load_config, bool imperial_units/* = false*/)
 {
-    if (input_files.empty()) { return std::vector<size_t>(); }
+     if (input_files.empty()) { return std::vector<size_t>(); }
 
     auto *nozzle_dmrs = config->opt<ConfigOptionFloats>("nozzle_diameter");
 
@@ -2489,7 +2491,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             progress_dlg->Fit();
         }
 
-        const bool type_3mf = std::regex_match(path.string(), pattern_3mf);
+        const bool type_3mf = std::regex_match(path.string(), pattern_3mf) || std::regex_match(path.string(), pattern_zip);
         const bool type_zip_amf = !type_3mf && std::regex_match(path.string(), pattern_zip_amf);
         const bool type_any_amf = !type_3mf && std::regex_match(path.string(), pattern_any_amf);
         const bool type_prusa = std::regex_match(path.string(), pattern_prusa);
@@ -5925,7 +5927,13 @@ bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*
     // searches for project files
     for (std::vector<fs::path>::const_reverse_iterator it = paths.rbegin(); it != paths.rend(); ++it) {
         std::string filename = (*it).filename().string();
-        if (boost::algorithm::iends_with(filename, ".3mf") || boost::algorithm::iends_with(filename, ".amf")) {
+
+        bool handle_as_project = (boost::algorithm::iends_with(filename, ".3mf") || boost::algorithm::iends_with(filename, ".amf"));
+        if (boost::algorithm::iends_with(filename, ".zip") && is_project_3mf(it->string())) {
+            BOOST_LOG_TRIVIAL(warning) << "File with .zip extension is 3mf project, opening as it would have .3mf extension: " << *it;
+            handle_as_project = true;
+        }
+        if (handle_as_project) {
             ProjectDropDialog::LoadType load_type = ProjectDropDialog::LoadType::Unknown;
             {
                 if ((boost::algorithm::iends_with(filename, ".3mf") && !is_project_3mf(it->string())) ||
