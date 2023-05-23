@@ -1,7 +1,9 @@
 #ifndef slic3r_SupportCommon_hpp_
 #define slic3r_SupportCommon_hpp_
 
+#include "../Layer.hpp"
 #include "../Polygon.hpp"
+#include "../Print.hpp"
 #include "SupportLayer.hpp"
 #include "SupportParameters.hpp"
 
