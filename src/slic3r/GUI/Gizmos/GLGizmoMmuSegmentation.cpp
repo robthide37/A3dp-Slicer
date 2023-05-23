@@ -71,7 +71,7 @@ static std::vector<std::string> get_extruders_names()
     std::vector<std::string> extruders_out;
     extruders_out.reserve(extruders_count);
     for (size_t extruder_idx = 1; extruder_idx <= extruders_count; ++extruder_idx)
-        extruders_out.emplace_back("Extruder " + std::to_string(extruder_idx));
+        extruders_out.emplace_back(_u8L("Extruder") + " " + std::to_string(extruder_idx));
 
     return extruders_out;
 }
@@ -334,7 +334,8 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
 
     const ColorRGBA& select_first_color = m_modified_extruders_colors[m_first_selected_extruder_idx];
     ImVec4           first_color        = ImGuiWrapper::to_ImVec4(select_first_color);
-    if (ImGui::ColorEdit4("First color##color_picker", (float*)&first_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+    const std::string first_label       = into_u8(m_desc.at("first_color")) + "##color_picker";
+    if (ImGui::ColorEdit4(first_label.c_str(), (float*)&first_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
         m_modified_extruders_colors[m_first_selected_extruder_idx] = ImGuiWrapper::from_ImVec4(first_color);
 
     ImGui::AlignTextToFramePadding();
@@ -346,7 +347,8 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
 
     const ColorRGBA& select_second_color = m_modified_extruders_colors[m_second_selected_extruder_idx];
     ImVec4           second_color        = ImGuiWrapper::to_ImVec4(select_second_color);
-    if (ImGui::ColorEdit4("Second color##color_picker", (float*)&second_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
+    const std::string second_label       = into_u8(m_desc.at("second_color")) + "##color_picker";
+    if (ImGui::ColorEdit4(second_label.c_str(), (float*)&second_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel))
         m_modified_extruders_colors[m_second_selected_extruder_idx] = ImGuiWrapper::from_ImVec4(second_color);
 
     const float max_tooltip_width = ImGui::GetFontSize() * 20.0f;
