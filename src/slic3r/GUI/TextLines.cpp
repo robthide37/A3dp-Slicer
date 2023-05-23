@@ -253,6 +253,9 @@ GLModel::Geometry create_geometry(const TextLines &lines)
 
 void TextLinesModel::init(const Selection &selection, double line_height, unsigned count_lines)
 {
+    m_model.reset();
+    m_lines.clear();    
+
     const GLVolume *gl_volume_ptr = selection.get_first_volume();
     if (gl_volume_ptr == nullptr)
         return;
@@ -267,6 +270,8 @@ void TextLinesModel::init(const Selection &selection, double line_height, unsign
     if (mv_ptr == nullptr)
         return;
     const ModelVolume &mv = *mv_ptr;
+    if (mv.is_the_only_one_part())
+        return;
 
     // calculate count lines when not set
     if (count_lines == 0) {
@@ -317,7 +322,6 @@ void TextLinesModel::init(const Selection &selection, double line_height, unsign
     for (size_t i = 0; i < count_lines; ++i)
         m_lines[i].y = line_centers[i];
 
-    m_model.reset();
     //*
     GLModel::Geometry geometry = create_geometry(m_lines);
     if (geometry.vertices_count() == 0 || geometry.indices_count() == 0)

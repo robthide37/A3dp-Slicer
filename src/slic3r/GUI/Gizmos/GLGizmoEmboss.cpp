@@ -146,9 +146,15 @@ namespace priv {
 /// </summary>
 /// <param name="text">Text to emboss</param>
 /// <param name="style_manager">Keep actual selected style</param>
+/// <param name="text_lines">Needed when transform per glyph</param>
+/// <param name="selection">Needed for transform per glyph</param>
 /// <param name="cancel">Cancel for previous job</param>
 /// <returns>Base data for emboss text</returns>
-static DataBase create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>> &cancel);
+static DataBase create_emboss_data_base(const std::string                  &text,
+                                        StyleManager                       &style_manager,
+                                        TextLinesModel                     &text_lines,
+                                        const Selection                    &selection,
+                                        std::shared_ptr<std::atomic<bool>> &cancel);
 
 /// <summary>
 /// Start job for add new volume to object with given transformation
@@ -242,13 +248,17 @@ static bool apply_camera_dir(const Camera &camera, GLCanvas3D &canvas, bool keep
 
 } // namespace priv
 
+namespace {
+void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines=0);
+}
+
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
 {
     if (!init_create(volume_type))
         return;
 
     const GLVolume *gl_volume = get_first_hovered_gl_volume(m_parent);
-    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
+    DataBase emboss_data    = priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_job_cancel);
     bool is_simple_mode = wxGetApp().get_mode() == comSimple;
     if (gl_volume != nullptr && !is_simple_mode) {
         // Try to cast ray into scene and find object for add volume
@@ -275,7 +285,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 
     Size s = m_parent.get_canvas_size();
     Vec2d screen_center(s.get_width() / 2., s.get_height() / 2.);
-    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
+    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_job_cancel);
     const ModelObjectPtrs &objects = selection.get_model()->objects;
     bool is_simple_mode = wxGetApp().get_mode() == comSimple;
     // No selected object so create new object
@@ -559,7 +569,7 @@ void GLGizmoEmboss::volume_transformation_changing()
     }
     const FontProp &prop = m_volume->text_configuration->style.prop;
     if (prop.per_glyph)
-        init_text_lines(m_text_lines.get_lines().size());
+        init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, m_text_lines.get_lines().size());
 }
 
 void GLGizmoEmboss::volume_transformation_changed()
@@ -571,7 +581,7 @@ void GLGizmoEmboss::volume_transformation_changed()
 
     const FontProp &prop = m_volume->text_configuration->style.prop;
     if (prop.per_glyph)
-        init_text_lines(m_text_lines.get_lines().size());
+        init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, m_text_lines.get_lines().size());
 
     // Update surface by new position
     if (prop.use_surface || prop.per_glyph)
@@ -1047,11 +1057,13 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
     return styles;
 }
 
-void GLGizmoEmboss::init_text_lines(unsigned count_lines){
-    assert(m_style_manager.is_active_font());
-    if (!m_style_manager.is_active_font())
+namespace {
+void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines)
+{
+    assert(style_manager.is_active_font());
+    if (!style_manager.is_active_font())
         return;
-    const auto& ffc = m_style_manager.get_font_file_with_cache();
+    const auto &ffc = style_manager.get_font_file_with_cache();
     assert(ffc.has_value());
     if (!ffc.has_value())
         return;
@@ -1060,14 +1072,12 @@ void GLGizmoEmboss::init_text_lines(unsigned count_lines){
     if (ff_ptr == nullptr)
         return;
 
-    if (m_volume->is_the_only_one_part())
-        return;
-
-    const FontProp& fp = m_style_manager.get_font_prop();
+    const FontProp &fp = style_manager.get_font_prop();
     const FontFile &ff = *ff_ptr;
 
-    double line_height = TextLinesModel::calc_line_height(ff, fp); 
-    m_text_lines.init(m_parent.get_selection(), line_height, count_lines);
+    double line_height = TextLinesModel::calc_line_height(ff, fp);
+    text_lines.init(selection, line_height, count_lines);
+}
 }
 
 void GLGizmoEmboss::set_volume_by_selection()
@@ -1209,7 +1219,7 @@ void GLGizmoEmboss::set_volume_by_selection()
     m_volume_id = volume->id();
         
     if (tc.style.prop.per_glyph)
-        init_text_lines();
+        init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager);
 
     // Calculate current angle of up vector
     assert(m_style_manager.is_active_font());
@@ -1292,12 +1302,8 @@ bool GLGizmoEmboss::process()
     // exist loaded font file?
     if (!m_style_manager.is_active_font()) return false;
     
-    DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager, m_job_cancel), m_volume->id()};
-    if (data.text_configuration.style.prop.per_glyph){
-        if (!m_text_lines.is_init())
-            init_text_lines();
-        data.text_lines = m_text_lines.get_lines(); // copy
-    }
+    DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_job_cancel),
+                    m_volume->id()};
     std::unique_ptr<Job> job = nullptr;
 
     // check cutting from source mesh
@@ -1547,7 +1553,7 @@ void GLGizmoEmboss::draw_text_input()
             unsigned count_lines = get_count_lines(m_text);
             if (count_lines != m_text_lines.get_lines().size()) 
                 // Necesarry to initialize count by given number (differ from stored in volume at the moment)
-                init_text_lines(count_lines);         
+                init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, count_lines);         
         }
         process();
         range_text = create_range_text_prep();
@@ -3231,7 +3237,7 @@ void GLGizmoEmboss::draw_advanced()
     if (ImGui::Checkbox("##PerGlyph", per_glyph)) {
         if (*per_glyph) {
             if (!m_text_lines.is_init())
-                init_text_lines();
+                init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager);
         }
         process();
     } else if (ImGui::IsItemHovered()) {
@@ -3240,7 +3246,7 @@ void GLGizmoEmboss::draw_advanced()
         } else {
             ImGui::SetTooltip("%s", _u8L("Set position and orientation of projection per Glyph.").c_str());
             if (!m_text_lines.is_init())
-                init_text_lines();
+                init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager);
         }
     } else if (!*per_glyph && m_text_lines.is_init())
         m_text_lines.reset();
@@ -3248,24 +3254,24 @@ void GLGizmoEmboss::draw_advanced()
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
     if (ImGui::SliderFloat("##base_line_y_offset", &m_text_lines.offset, -10.f, 10.f, "%f mm")) {
-        init_text_lines(m_text_lines.get_lines().size());
+        init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, m_text_lines.get_lines().size());
         process();
     } else if (ImGui::IsItemHovered()) 
         ImGui::SetTooltip("%s", _u8L("Move base line (up/down) for allign letters").c_str());
 
     // order must match align enum
-    const char* align_names[] = {"first_line_left",
+    const char* align_names[] = { "first_line_center",
+                                  "first_line_left",
                                   "first_line_right",
-                                  "first_line_center",
+                                  "center_center",
                                   "center_left",
                                   "center_right",
-                                  "center_center",
-                                  "top_left",
-                                  "top_right",
                                   "top_center",
+                                  "top_left",
+                                  "top_right",         
+                                  "bottom_center",
                                   "bottom_left",
-                                  "bottom_right",
-                                  "bottom_center"};
+                                  "bottom_right"};
     int selected_align = static_cast<int>(font_prop.align);
     if (ImGui::Combo("align", &selected_align, align_names, IM_ARRAYSIZE(align_names))) {
         font_prop.align = static_cast<FontProp::Align>(selected_align);
@@ -3542,7 +3548,7 @@ bool priv::draw_button(const IconManager::VIcons &icons, IconType type, bool dis
 // priv namespace implementation
 ///////////////
 
-DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &style_manager, std::shared_ptr<std::atomic<bool>>& cancel)
+DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &style_manager, TextLinesModel& text_lines, const Selection& selection, std::shared_ptr<std::atomic<bool>>& cancel)
 {
     // create volume_name
     std::string volume_name = text; // copy
@@ -3565,6 +3571,12 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &st
     assert(es.path.compare(WxFontUtils::store_wxFont(style_manager.get_wx_font())) == 0);
     TextConfiguration tc{es, text};
 
+    if (es.prop.per_glyph) {
+        if (!text_lines.is_init())
+            init_text_lines(text_lines, selection, style_manager);
+    } else
+        text_lines.reset();
+    
     // Cancel previous Job, when it is in process
     // worker.cancel(); --> Use less in this case I want cancel only previous EmbossJob no other jobs
     // Cancel only EmbossUpdateJob no others
@@ -3572,7 +3584,7 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &st
         cancel->store(true);
     // create new shared ptr to cancel new job
     cancel = std::make_shared<std::atomic<bool>>(false);
-    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), tc, volume_name, cancel};
+    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), tc, volume_name, cancel, text_lines.get_lines()};
 }
 
 void priv::start_create_object_job(DataBase &emboss_data, const Vec2d &coor)

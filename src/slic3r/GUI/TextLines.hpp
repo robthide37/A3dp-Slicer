@@ -25,7 +25,7 @@ public:
     void render(const Transform3d &text_world);
 
     bool is_init() const { return m_model.is_initialized(); }
-    void reset() { m_model.reset(); }
+    void reset() { m_model.reset(); m_lines.clear(); }
     const Slic3r::Emboss::TextLines &get_lines() const { return m_lines; }
     static double calc_line_height(const Slic3r::Emboss::FontFile& ff, const FontProp& fp);
 private:

@@ -63,20 +63,23 @@ struct FontProp
     // Distiguish projection per glyph
     bool per_glyph;
 
+    // Enumerate type of allowed text align 
     enum class Align {
+        // NOTE: default value must be zero - 3mf store
+        first_line_center = 0, // use Y zero same as first letter
         first_line_left, // it depends on position of zero for first letter (no shape move)
         first_line_right, // use Y zero same as first letter
-        first_line_center, // use Y zero same as first letter
+        center_center,
         center_left,
         center_right,
-        center_center,
+        top_center,
         top_left,
         top_right,
-        top_center,
+        bottom_center,
         bottom_left,
-        bottom_right,
-        bottom_center
+        bottom_right
     };
+
     // change pivot of text
     // When not set, center is used and is not stored
     Align align = Align::first_line_center;
@@ -110,6 +113,8 @@ struct FontProp
             char_gap == other.char_gap && 
             line_gap == other.line_gap &&
             use_surface == other.use_surface &&
+            per_glyph == other.per_glyph &&
+            align == other.align &&
             is_approx(emboss, other.emboss) &&
             is_approx(size_in_mm, other.size_in_mm) && 
             is_approx(boldness, other.boldness) &&
@@ -121,7 +126,7 @@ struct FontProp
     // undo / redo stack recovery
     template<class Archive> void save(Archive &ar) const
     {
-        ar(emboss, use_surface, size_in_mm);
+        ar(emboss, use_surface, size_in_mm, per_glyph, align);
         cereal::save(ar, char_gap);
         cereal::save(ar, line_gap);
         cereal::save(ar, boldness);
@@ -136,7 +141,7 @@ struct FontProp
     }
     template<class Archive> void load(Archive &ar)
     {
-        ar(emboss, use_surface, size_in_mm);
+        ar(emboss, use_surface, size_in_mm, per_glyph, align);
         cereal::load(ar, char_gap);
         cereal::load(ar, line_gap);
         cereal::load(ar, boldness);
