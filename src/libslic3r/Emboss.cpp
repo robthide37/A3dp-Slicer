@@ -1289,7 +1289,7 @@ namespace {
 /// <summary>
 /// Align expolygons by type
 /// </summary>
-/// <param name="type">Type of alignement</param>
+/// <param name="type">Type of alignment</param>
 /// <param name="shape">shapes to align</param>
 /// <param name="text">Same size as shape for align per line(detect of end line - '\n')</param>
 void align_shape(FontProp::Align type, std::vector<ExPolygons> &shape, const std::wstring &text);
@@ -1968,7 +1968,7 @@ int32_t get_align_x_offset(FontProp::Align type, const BoundingBox &shape_bb, co
 void align_shape(FontProp::Align type, std::vector<ExPolygons> &shapes, const std::wstring &text)
 {
     if (type == FontProp::Align::first_line_left)
-        return; // no alignement
+        return; // no alignment
 
     BoundingBox shape_bb;
     for (const ExPolygons& shape: shapes)

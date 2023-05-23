@@ -138,9 +138,6 @@ void CreateVolumeJob::process(Ctl &ctl) {
     if (!priv::check(m_input)) throw std::runtime_error("Bad input data for EmbossCreateVolumeJob.");
     auto was_canceled = [&ctl]()->bool { return ctl.was_canceled(); };
     m_result = priv::create_mesh(m_input, was_canceled, ctl);
-    // center result
-    Vec3f c = m_result.bounding_box().center().cast<float>();
-    if (!c.isApprox(Vec3f::Zero())) m_result.translate(-c);
 }
 
 void CreateVolumeJob::finalize(bool canceled, std::exception_ptr &eptr) {
