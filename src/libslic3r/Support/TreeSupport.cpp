@@ -1034,7 +1034,7 @@ void finalize_raft_contact(
             if (! first_layer_move_bounds.empty()) {
                 const double eps = 0.1;
                 // All tips supporting this layer are expected to have the same radius.
-                double       radius = config.getRadius(first_layer_move_bounds.front().state);
+                double       radius = support_element_radius(config, first_layer_move_bounds.front());
                 // Connect the tips with the following closing radius.
                 double       closing_distance = radius;
                 Polygon      circle = make_circle(radius + closing_distance, eps);
@@ -1563,7 +1563,7 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
     Polygons check_layer_data;
     if (settings.increase_radius)
         current_elem.effective_radius_height += 1;
-    coord_t radius = getCollisionRadius(config, current_elem);
+    coord_t radius = support_element_collision_radius(config, current_elem);
 
     if (settings.move) {
         increased = relevant_offset;
@@ -1573,7 +1573,7 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
                 (std::min(config.z_distance_top_layers, config.z_distance_bottom_layers) > 0 ? config.min_feature_size : 0);
             // The difference to ensure that the result not only conforms to wall_restriction, but collision/avoidance is done later.
             // The higher last_safe_step_movement_distance comes exactly from the fact that the collision will be subtracted later.
-            increased = safe_offset_inc(increased, overspeed, volumes.getWallRestriction(getCollisionRadius(config, parent.state), layer_idx, parent.state.use_min_xy_dist), 
+            increased = safe_offset_inc(increased, overspeed, volumes.getWallRestriction(support_element_collision_radius(config, parent.state), layer_idx, parent.state.use_min_xy_dist), 
                 safe_movement_distance, safe_movement_distance + radius, 1);
         }
         if (settings.no_error && settings.move)
@@ -1629,8 +1629,8 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
         };
         coord_t ceil_radius_before = volumes.ceilRadius(radius, settings.use_min_distance);
 
-        if (getCollisionRadius(config, current_elem) < config.increase_radius_until_radius && getCollisionRadius(config, current_elem) < getRadius(config, current_elem)) {
-            coord_t target_radius = std::min(getRadius(config, current_elem), config.increase_radius_until_radius);
+        if (support_element_collision_radius(config, current_elem) < config.increase_radius_until_radius && support_element_collision_radius(config, current_elem) < support_element_radius(config, current_elem)) {
+            coord_t target_radius = std::min(support_element_radius(config, current_elem), config.increase_radius_until_radius);
             coord_t current_ceil_radius = volumes.getRadiusNextCeil(radius, settings.use_min_distance);
 
             while (current_ceil_radius < target_radius && validWithRadius(volumes.getRadiusNextCeil(current_ceil_radius + 1, settings.use_min_distance)))
@@ -1638,24 +1638,24 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
             size_t resulting_eff_dtt = current_elem.effective_radius_height;
             while (resulting_eff_dtt + 1 < current_elem.distance_to_top && 
                 config.getRadius(resulting_eff_dtt + 1, current_elem.elephant_foot_increases) <= current_ceil_radius && 
-                config.getRadius(resulting_eff_dtt + 1, current_elem.elephant_foot_increases) <= getRadius(config, current_elem))
+                config.getRadius(resulting_eff_dtt + 1, current_elem.elephant_foot_increases) <= support_element_radius(config, current_elem))
                 ++ resulting_eff_dtt;
             current_elem.effective_radius_height = resulting_eff_dtt;
         }
-        radius = getCollisionRadius(config, current_elem);
+        radius = support_element_collision_radius(config, current_elem);
 
         const coord_t foot_radius_increase = std::max(config.bp_radius_increase_per_layer - config.branch_radius_increase_per_layer, 0.0);
         // Is nearly all of the time 1, but sometimes an increase of 1 could cause the radius to become bigger than recommendedMinRadius, 
         // which could cause the radius to become bigger than precalculated.
-        double planned_foot_increase = std::min(1.0, double(config.recommendedMinRadius(layer_idx - 1) - getRadius(config, current_elem)) / foot_radius_increase);
+        double planned_foot_increase = std::min(1.0, double(config.recommendedMinRadius(layer_idx - 1) - support_element_radius(config, current_elem)) / foot_radius_increase);
 //FIXME
         bool increase_bp_foot = planned_foot_increase > 0 && current_elem.to_buildplate;
 //        bool increase_bp_foot = false;
 
-        if (increase_bp_foot && getRadius(config, current_elem) >= config.branch_radius && getRadius(config, current_elem) >= config.increase_radius_until_radius)
+        if (increase_bp_foot && support_element_radius(config, current_elem) >= config.branch_radius && support_element_radius(config, current_elem) >= config.increase_radius_until_radius)
             if (validWithRadius(config.getRadius(current_elem.effective_radius_height, current_elem.elephant_foot_increases + planned_foot_increase))) {
                 current_elem.elephant_foot_increases += planned_foot_increase;
-                radius = getCollisionRadius(config, current_elem);
+                radius = support_element_collision_radius(config, current_elem);
             }
 
         if (ceil_radius_before != volumes.ceilRadius(radius, settings.use_min_distance)) {
@@ -1670,7 +1670,7 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
             check_layer_data = current_elem.to_buildplate ? to_bp_data : to_model_data;
             if (area(check_layer_data) < tiny_area_threshold) {
                 BOOST_LOG_TRIVIAL(error) << "Lost area by doing catch up from " << ceil_radius_before << " to radius " << 
-                    volumes.ceilRadius(getCollisionRadius(config, current_elem), settings.use_min_distance);
+                    volumes.ceilRadius(support_element_collision_radius(config, current_elem), settings.use_min_distance);
                 tree_supports_show_error("Area lost catching up radius. May not cause visible malformation."sv, true);
             }
         }
@@ -1757,7 +1757,7 @@ static void increase_areas_one_layer(
             SupportElementState      elem           = SupportElementState::propagate_down(parent.state);
             const Polygons          &wall_restriction = 
                 // Abstract representation of the model outline. If an influence area would move through it, it could teleport through a wall.
-                volumes.getWallRestriction(getCollisionRadius(config, parent.state), layer_idx, parent.state.use_min_xy_dist);
+                volumes.getWallRestriction(support_element_collision_radius(config, parent.state), layer_idx, parent.state.use_min_xy_dist);
 
 #ifdef TREESUPPORT_DEBUG_SVG
             SVG::export_expolygons(debug_out_path("treesupport-increase_areas_one_layer-%d-%ld.svg", layer_idx, int(merging_area_idx)),
@@ -1766,7 +1766,7 @@ static void increase_areas_one_layer(
 #endif // TREESUPPORT_DEBUG_SVG
 
             Polygons to_bp_data, to_model_data;
-            coord_t radius = getCollisionRadius(config, elem);
+            coord_t radius = support_element_collision_radius(config, elem);
 
             // When the radius increases, the outer "support wall" of the branch will have been moved farther away from the center (as this is the definition of radius).
             // As it is not specified that the support_tree_angle has to be one of the center of the branch, it is here seen as the smaller angle of the outer wall of the branch, to the outer wall of the same branch one layer above.
@@ -1775,9 +1775,9 @@ static void increase_areas_one_layer(
 
             coord_t extra_speed = 5; // The extra speed is added to both movement distances. Also move 5 microns faster than allowed to avoid rounding errors, this may cause issues at VERY VERY small layer heights.
             coord_t extra_slow_speed = 0; // Only added to the slow movement distance.
-            const coord_t ceiled_parent_radius = volumes.ceilRadius(getCollisionRadius(config, parent.state), parent.state.use_min_xy_dist);
+            const coord_t ceiled_parent_radius = volumes.ceilRadius(support_element_collision_radius(config, parent.state), parent.state.use_min_xy_dist);
             coord_t projected_radius_increased = config.getRadius(parent.state.effective_radius_height + 1, parent.state.elephant_foot_increases);
-            coord_t projected_radius_delta = projected_radius_increased - getCollisionRadius(config, parent.state);
+            coord_t projected_radius_delta = projected_radius_increased - support_element_collision_radius(config, parent.state);
 
             // When z distance is more than one layer up and down the Collision used to calculate the wall restriction will always include the wall (and not just the xy_min_distance) of the layer above and below like this (d = blocked area because of z distance):
             /*
@@ -1933,7 +1933,7 @@ static void increase_areas_one_layer(
                              "Radius: " << radius << " at layer: " << layer_idx - 1 << " NextTarget: " << elem.layer_idx << " Distance to top: " << elem.distance_to_top <<
                              " Elephant foot increases " << elem.elephant_foot_increases << " use_min_xy_dist " << elem.use_min_xy_dist << " to buildplate " << elem.to_buildplate << 
                              " gracious " << elem.to_model_gracious << " safe " << elem.can_use_safe_radius << " until move " << elem.dont_move_until << " \n "
-                             "Parent " << &parent << ": Radius: " << getCollisionRadius(config, parent.state) << " at layer: " << layer_idx << " NextTarget: " << parent.state.layer_idx <<
+                             "Parent " << &parent << ": Radius: " << support_element_collision_radius(config, parent.state) << " at layer: " << layer_idx << " NextTarget: " << parent.state.layer_idx <<
                              " Distance to top: " << parent.state.distance_to_top << " Elephant foot increases " << parent.state.elephant_foot_increases << "  use_min_xy_dist " << parent.state.use_min_xy_dist <<
                              " to buildplate " << parent.state.to_buildplate << " gracious " << parent.state.to_model_gracious << " safe " << parent.state.can_use_safe_radius << " until move " << parent.state.dont_move_until;
                     tree_supports_show_error("Potentially lost branch!"sv, true);
@@ -1947,7 +1947,7 @@ static void increase_areas_one_layer(
 
                 if (result) {
                     elem = *result;
-                    radius = getCollisionRadius(config, elem);
+                    radius = support_element_collision_radius(config, elem);
                     elem.last_area_increase = settings;
                     add = true;
                     // do not merge if the branch should not move or the priority has to be to get farther away from the model.
@@ -2033,7 +2033,7 @@ static void increase_areas_one_layer(
 
     out.elephant_foot_increases = 0;
     if (config.bp_radius_increase_per_layer > 0) {
-        coord_t foot_increase_radius = std::abs(std::max(getCollisionRadius(config, second), getCollisionRadius(config, first)) - getCollisionRadius(config, out));
+        coord_t foot_increase_radius = std::abs(std::max(support_element_collision_radius(config, second), support_element_collision_radius(config, first)) - support_element_collision_radius(config, out));
         // elephant_foot_increases has to be recalculated, as when a smaller tree with a larger elephant_foot_increases merge with a larger branch 
         // the elephant_foot_increases may have to be lower as otherwise the radius suddenly increases. This results often in a non integer value.
         out.elephant_foot_increases = foot_increase_radius / (config.bp_radius_increase_per_layer - config.branch_radius_increase_per_layer);
@@ -2065,10 +2065,10 @@ static bool merge_influence_areas_two_elements(
     if (merging_gracious_and_non_gracious || merging_min_and_regular_xy)
         return false;
 
-    const bool dst_radius_bigger = getCollisionRadius(config, dst.state) > getCollisionRadius(config, src.state);
+    const bool dst_radius_bigger = support_element_collision_radius(config, dst.state) > support_element_collision_radius(config, src.state);
     const SupportElementMerging &smaller_rad = dst_radius_bigger ? src : dst;
     const SupportElementMerging &bigger_rad  = dst_radius_bigger ? dst : src;
-    const coord_t real_radius_delta = std::abs(getRadius(config, bigger_rad.state) - getRadius(config, smaller_rad.state));
+    const coord_t real_radius_delta = std::abs(support_element_radius(config, bigger_rad.state) - support_element_radius(config, smaller_rad.state));
     {
         // Testing intersection of bounding boxes.
         // Expand the smaller radius branch bounding box to match the lambda intersect_small_with_bigger() below.
@@ -2090,8 +2090,8 @@ static bool merge_influence_areas_two_elements(
         if (dst.state.to_buildplate != src.state.to_buildplate) {
             // Merging a "to build plate" branch with a "to model" branch.
             // Don't allow merging a thick "to build plate" branch into a thinner "to model" branch.
-            const coord_t rdst = getRadius(config, dst.state);
-            const coord_t rsrc = getRadius(config, src.state);
+            const coord_t rdst = support_element_radius(config, dst.state);
+            const coord_t rsrc = support_element_radius(config, src.state);
             if (dst.state.to_buildplate) {
                 if (rsrc < rdst)
                     increased_to_model_radius = src.state.increased_to_model_radius + rdst - rsrc;
@@ -2125,7 +2125,7 @@ static bool merge_influence_areas_two_elements(
     // If this area has any intersections with the influence area of the larger collision radius, a branch (of the larger collision radius) placed in this intersection, has already engulfed the branch of the smaller collision radius.
     // Because of this a merge may happen even if the influence areas (that represent possible center points of branches) do not intersect yet.
     // Remember that collision radius <= real radius as otherwise this assumption would be false.
-    const coord_t   smaller_collision_radius    = getCollisionRadius(config, smaller_rad.state);
+    const coord_t   smaller_collision_radius    = support_element_collision_radius(config, smaller_rad.state);
     const Polygons &collision                   = volumes.getCollision(smaller_collision_radius, layer_idx - 1, use_min_radius);
     auto            intersect_small_with_bigger = [real_radius_delta, smaller_collision_radius, &collision, &config](const Polygons &small, const Polygons &bigger) {
         return intersection(
@@ -2563,7 +2563,7 @@ static void set_to_model_contact_to_model_gracious(
     {
         SupportElement *elem = &first_elem;
         for (LayerIndex layer_check = elem->state.layer_idx;
-            ! intersection(elem->influence_area, volumes.getPlaceableAreas(getCollisionRadius(config, elem->state), layer_check, throw_on_cancel)).empty();
+            ! intersection(elem->influence_area, volumes.getPlaceableAreas(support_element_collision_radius(config, elem->state), layer_check, throw_on_cancel)).empty();
             elem = &move_bounds[++ layer_check][elem->parents.front()]) {
             assert(elem->state.layer_idx == layer_check);
             assert(! elem->state.deleted);
@@ -2724,7 +2724,7 @@ static void create_nodes_from_area(
                     assert(! parent.state.deleted);
                     assert(elem.state.result_on_layer_is_set() == parent.state.result_on_layer_is_set());
                     if (elem.state.result_on_layer_is_set()) {
-                        double radius_increase = getRadius(config, elem.state) - getRadius(config, parent.state);
+                        double radius_increase = support_element_radius(config, elem) - support_element_radius(config, parent);
                         assert(radius_increase >= 0);
                         double shift = (elem.state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
                         //FIXME this assert fails a lot. Is it correct?
@@ -2749,7 +2749,7 @@ static void create_nodes_from_area(
                 assert(! parent.state.deleted);
                 assert(elem.state.result_on_layer_is_set() == parent.state.result_on_layer_is_set());
                 if (elem.state.result_on_layer_is_set()) {
-                    double radius_increase = getRadius(config, elem.state) - getRadius(config, parent.state);
+                    double radius_increase = support_element_radius(config, elem) - support_element_radius(config, parent);
                     assert(radius_increase >= 0);
                     double shift = (elem.state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
                     //FIXME this assert fails a lot. Is it correct?
@@ -2802,7 +2802,7 @@ static void generate_branch_areas(
         for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
             DrawArea             &draw_area  = linear_data[idx];
             const LayerIndex      layer_idx  = draw_area.element->state.layer_idx;
-            const coord_t         radius     = getRadius(config, *draw_area.element);
+            const coord_t         radius     = support_element_radius(config, *draw_area.element);
             bool                  parent_uses_min = false;
 
             // Calculate multiple ovalized circles, to connect with every parent and child. Also generate regular circle for the current layer. Merge all these into one area.
@@ -2817,7 +2817,7 @@ static void generate_branch_areas(
                     const SupportElement &parent = (*layer_above)[parent_idx];
                     const Point movement = parent.state.result_on_layer - draw_area.element->state.result_on_layer;
                     //FIXME why max(..., config.support_line_width)?
-                    movement_directions.emplace_back(movement, std::max(getRadius(config, parent), config.support_line_width));
+                    movement_directions.emplace_back(movement, std::max(support_element_radius(config, parent), config.support_line_width));
                     parent_uses_min |= parent.state.use_min_xy_dist;
                 }
             }
@@ -2861,7 +2861,7 @@ static void generate_branch_areas(
             Polygons   polygons = generateArea(0, max_speed);
             const bool fast_relative_movement = max_speed > radius * 0.75;
 
-            if (fast_relative_movement || getRadius(config, *draw_area.element) - getCollisionRadius(config, draw_area.element->state) > config.support_line_width) {
+            if (fast_relative_movement || support_element_radius(config, *draw_area.element) - support_element_collision_radius(config, draw_area.element->state) > config.support_line_width) {
                 // Simulate the path the nozzle will take on the outermost wall.
                 // If multiple parts exist, the outer line will not go all around the support part potentially causing support material to be printed mid air.
                 ExPolygons nozzle_path = offset_ex(polygons, - config.support_line_width / 2);
@@ -2939,9 +2939,10 @@ static void smooth_branch_areas(
                 for (int32_t parent_idx : draw_area.element->parents) {
                     const SupportElement &parent = layer_above[parent_idx];
                     assert(parent.state.layer_idx == layer_idx + 1);
-                    if (getRadius(config, parent.state) != getCollisionRadius(config, parent.state)) {
+                    if (support_element_radius(config, parent) != support_element_collision_radius(config, parent)) {
                         do_something = true;
-                        max_outer_wall_distance = std::max(max_outer_wall_distance, (draw_area.element->state.result_on_layer - parent.state.result_on_layer).cast<double>().norm() - (getRadius(config, *draw_area.element) - getRadius(config, parent)));
+                        max_outer_wall_distance = std::max(max_outer_wall_distance, 
+                            (draw_area.element->state.result_on_layer - parent.state.result_on_layer).cast<double>().norm() - (support_element_radius(config, *draw_area.element) - support_element_radius(config, parent)));
                     }
                 }
                 max_outer_wall_distance += max_radius_change_per_layer; // As this change is a bit larger than what usually appears, lost radius can be slowly reclaimed over the layers.
@@ -2953,12 +2954,12 @@ static void smooth_branch_areas(
 #ifndef NDEBUG
                         assert(parent.state.layer_idx == layer_idx + 1);
                         assert(contains(linear_data[processing_base_above + parent_idx].polygons, parent.state.result_on_layer));
-                        double radius_increase = getRadius(config, draw_area.element->state) - getRadius(config, parent.state);
+                        double radius_increase = support_element_radius(config, *draw_area.element) - support_element_radius(config, parent);
                         assert(radius_increase >= 0);
                         double shift = (draw_area.element->state.result_on_layer - parent.state.result_on_layer).cast<double>().norm();
                         assert(shift < radius_increase + 2. * config.maximum_move_distance_slow);
 #endif // NDEBUG
-                        if (getRadius(config, parent.state) != getCollisionRadius(config, parent.state)) {
+                        if (support_element_radius(config, parent) != support_element_collision_radius(config, parent)) {
                             // No other element on this layer than the current one may be connected to &parent,
                             // thus it is safe to update parent's DrawArea directly.
                             Polygons &dst = linear_data[processing_base_above + parent_idx].polygons;
@@ -3011,7 +3012,7 @@ static void smooth_branch_areas(
                         for (Point& p : outer)
                             p += direction;
                     append(max_allowed_area, std::move(result));
-                    do_something = do_something || parent.state.marked || getCollisionRadius(config, parent.state) != getRadius(config, parent.state);
+                    do_something = do_something || parent.state.marked || support_element_collision_radius(config, parent) != support_element_radius(config, parent);
                 }
                 if (do_something) {
                     // Trim the current drawing areas with max_allowed_area.
@@ -3498,7 +3499,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
                     append(polys, area.influence_area);
                 if (auto begin = move_bounds[layer_idx].begin(); begin != move_bounds[layer_idx].end())
                     SVG::export_expolygons(debug_out_path("treesupport-initial_areas-%d.svg", layer_idx),
-                        { { { union_ex(volumes.getWallRestriction(getCollisionRadius(config, begin->state), layer_idx, begin->state.use_min_xy_dist)) },
+                        { { { union_ex(volumes.getWallRestriction(support_element_collision_radius(config, begin->state), layer_idx, begin->state.use_min_xy_dist)) },
                             { "wall_restricrictions", "gray", 0.5f } },
                           { { union_ex(polys) }, { "parent", "red",  "black", "", scaled<coord_t>(0.1f), 0.5f } } });
             }

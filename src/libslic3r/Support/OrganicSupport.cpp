@@ -187,7 +187,7 @@ static std::pair<float, float> extrude_branch(
         if (ipath == 1) {
             nprev = v1;
             // Extrude the bottom half sphere.
-            float radius     = unscaled<float>(getRadius(config, prev.state));
+            float radius     = unscaled<float>(support_element_radius(config, prev));
             float angle_step = 2. * acos(1. - eps / radius);
             auto  nsteps     = int(ceil(M_PI / (2. * angle_step)));
             angle_step       = M_PI / (2. * nsteps);
@@ -210,7 +210,7 @@ static std::pair<float, float> extrude_branch(
             // End of the tube.
             ncurrent = v1;
             // Extrude the top half sphere.
-            float radius = unscaled<float>(getRadius(config, current.state));
+            float radius = unscaled<float>(support_element_radius(config, current));
             float angle_step = 2. * acos(1. - eps / radius);
             auto  nsteps = int(ceil(M_PI / (2. * angle_step)));
             angle_step = M_PI / (2. * nsteps);
@@ -234,7 +234,7 @@ static std::pair<float, float> extrude_branch(
             p3 = to_3d(unscaled<double>(next.state.result_on_layer), layer_z(slicing_params, config, next.state.layer_idx));
             v2 = (p3 - p2).normalized();
             ncurrent = (v1 + v2).normalized();
-            float radius = unscaled<float>(getRadius(config, current.state));
+            float radius = unscaled<float>(support_element_radius(config, current));
             std::pair<int, int> strip = discretize_circle(p2.cast<float>(), ncurrent.cast<float>(), radius, eps, result.vertices);
             triangulate_strip(result, prev_strip.first, prev_strip.second, strip.first, strip.second);
             prev_strip = strip;
@@ -242,7 +242,7 @@ static std::pair<float, float> extrude_branch(
 //            its_write_obj(result, fname);
         }
 #if 0
-        if (circles_intersect(p1, nprev, settings.getRadius(prev), p2, ncurrent, settings.getRadius(current))) {
+        if (circles_intersect(p1, nprev, support_element_radius(settings, prev), p2, ncurrent, support_element_radius(settings, current))) {
             // Cannot connect previous and current slice using a simple zig-zag triangulation,
             // because the two circles intersect.
 
@@ -287,7 +287,7 @@ static void organic_smooth_branches_avoid_collisions(
             layer_collision_cache.resize(num_layers, {});
         }
         auto& l = layer_collision_cache[layer_idx];
-        l.min_element_radius = std::min(l.min_element_radius, getRadius(config, element.first->state));
+        l.min_element_radius = std::min(l.min_element_radius, support_element_radius(config, *element.first));
     }
 
     throw_on_cancel();
@@ -341,7 +341,7 @@ static void organic_smooth_branches_avoid_collisions(
             link_down,
             // locked
             element.parents.empty() || (link_down == -1 && element.state.layer_idx > 0),
-            unscaled<float>(getRadius(config, element.state)),
+            unscaled<float>(support_element_radius(config, element)),
             // 3D position
             to_3d(unscaled<float>(element.state.result_on_layer), float(layer_z(slicing_params, config, element.state.layer_idx)))
         });
@@ -437,7 +437,7 @@ static void organic_smooth_branches_avoid_collisions(
                     }
                     if (collision_sphere.element_below_id != -1) {
                         const size_t offset_below = linear_data_layers[collision_sphere.element.state.layer_idx - 1];
-                        const double w = weight; //  config.getRadius(move_bounds[element.state.layer_idx - 1][below].state);
+                        const double w = weight; //  support_element_radius(config, move_bounds[element.state.layer_idx - 1][below]);
                         avg += w * to_2d(collision_spheres[offset_below + collision_sphere.element_below_id].prev_position.cast<double>());
                         weight += w;
                     }
@@ -512,7 +512,7 @@ static void organic_smooth_branches_avoid_collisions(
                 Vec3d v{ projections[i].x() - pts[i].x(), projections[i].y() - pts[i].y(), projections[i].z() - pts[i].z() };
                 double depth = v.norm();
                 assert(std::abs(distances[i] - depth) < EPSILON);
-                double radius = unscaled<double>(config.getRadius(element.state)) * scale;
+                double radius = unscaled<double>(support_element_radius(config, element)) * scale;
                 if (depth < radius) {
                     // Collision detected to be removed.
                     ++ num_moved;
@@ -534,7 +534,7 @@ static void organic_smooth_branches_avoid_collisions(
                 const size_t           offset_above = linear_data_layers[element.state.layer_idx + 1];
                 double weight = 0.;
                 for (auto iparent : element.parents) {
-                    double w = config.getRadius(above[iparent].state);
+                    double w = support_element_radius(config, above[iparent]);
                     avg.x() += w * prev[offset_above + iparent].x();
                     avg.y() += w * prev[offset_above + iparent].y();
                     weight += w;
@@ -542,7 +542,7 @@ static void organic_smooth_branches_avoid_collisions(
                 size_t cnt = element.parents.size();
                 if (below != -1) {
                     const size_t offset_below = linear_data_layers[element.state.layer_idx - 1];
-                    const double w = weight; //  config.getRadius(move_bounds[element.state.layer_idx - 1][below].state);
+                    const double w = weight; //  support_element_radius(config, move_bounds[element.state.layer_idx - 1][below]);
                     avg.x() += w * prev[offset_below + below].x();
                     avg.y() += w * prev[offset_below + below].y();
                     ++ cnt;
@@ -805,7 +805,7 @@ void organic_draw_branches(
                                 };
                                 std::vector<BottomExtraSlice>   bottom_extra_slices;
                                 Polygons                        rest_support;
-                                coord_t                         bottom_radius = getRadius(config, branch.path.front()->state);
+                                coord_t                         bottom_radius = support_element_radius(config, *branch.path.front());
                                 // Don't propagate further than 1.5 * bottom radius.
                                 //LayerIndex                      layers_propagate_max = 2 * bottom_radius / config.layer_height;
                                 LayerIndex                      layers_propagate_max = 5 * bottom_radius / config.layer_height;

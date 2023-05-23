@@ -238,7 +238,7 @@ struct SupportElementState : public SupportElementStateBits
  * \param elem[in] The Element.
  * \return The radius the element has.
  */
-[[nodiscard]] inline coord_t getRadius(const TreeSupportSettings &settings, const SupportElementState &elem)
+[[nodiscard]] inline coord_t support_element_radius(const TreeSupportSettings &settings, const SupportElementState &elem)
 { 
     return settings.getRadius(getEffectiveDTT(settings, elem), elem.elephant_foot_increases);
 }
@@ -248,7 +248,7 @@ struct SupportElementState : public SupportElementStateBits
  * \param elem[in] The Element.
  * \return The collision radius the element has.
  */
-[[nodiscard]] inline coord_t getCollisionRadius(const TreeSupportSettings &settings, const SupportElementState &elem)
+[[nodiscard]] inline coord_t support_element_collision_radius(const TreeSupportSettings &settings, const SupportElementState &elem)
 {
     return settings.getRadius(elem.effective_radius_height, elem.elephant_foot_increases);
 }
@@ -285,9 +285,14 @@ struct SupportElement
 
 using SupportElements = std::deque<SupportElement>;
 
-[[nodiscard]] inline coord_t getRadius(const TreeSupportSettings &settings, const SupportElement &elem)
+[[nodiscard]] inline coord_t support_element_radius(const TreeSupportSettings &settings, const SupportElement &elem)
 {
-    return getRadius(settings, elem.state);
+    return support_element_radius(settings, elem.state);
+}
+
+[[nodiscard]] inline coord_t support_element_collision_radius(const TreeSupportSettings &settings, const SupportElement &elem)
+{
+    return support_element_collision_radius(settings, elem.state);
 }
 
 } // namespace FFFTreeSupport
