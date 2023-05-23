@@ -926,24 +926,26 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
     cfg.input_offset = style.WindowPadding.x + cfg.indent + max_text_width + space;
 
     tr.use_surface  = _u8L("Use surface");
+    tr.per_glyph    = _u8L("Per glyph orientation");
+    tr.alignment   = _u8L("Alignment");
     tr.char_gap     = _u8L("Char gap");
     tr.line_gap     = _u8L("Line gap");
     tr.boldness     = _u8L("Boldness");
     tr.skew_ration  = _u8L("Skew ratio");
     tr.from_surface = _u8L("From surface");
     tr.rotation     = _u8L("Rotation");
-    tr.keep_up      = "Keep Rotation";
     tr.collection   = _u8L("Collection");
 
     float max_advanced_text_width = std::max({
         ImGui::CalcTextSize(tr.use_surface.c_str()).x,
+        ImGui::CalcTextSize(tr.per_glyph.c_str()).x,
+        ImGui::CalcTextSize(tr.alignment.c_str()).x,
         ImGui::CalcTextSize(tr.char_gap.c_str()).x,
         ImGui::CalcTextSize(tr.line_gap.c_str()).x,
         ImGui::CalcTextSize(tr.boldness.c_str()).x,
         ImGui::CalcTextSize(tr.skew_ration.c_str()).x,
         ImGui::CalcTextSize(tr.from_surface.c_str()).x,
         ImGui::CalcTextSize(tr.rotation.c_str()).x + cfg.icon_width + 2*space,
-        ImGui::CalcTextSize(tr.keep_up.c_str()).x,
         ImGui::CalcTextSize(tr.collection.c_str()).x });
     cfg.advanced_input_offset = max_advanced_text_width
         + 3 * space + cfg.indent;
@@ -969,9 +971,9 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
         + 2 * (cfg.icon_width + space);
     cfg.minimal_window_size = ImVec2(window_width, window_height);
 
-    // 8 = useSurface, charGap, lineGap, bold, italic, surfDist, rotation, textFaceToCamera
+    // 8 = useSurface, per glyph, charGap, lineGap, bold, italic, surfDist, rotation, textFaceToCamera
     // 4 = 1px for fix each edit image of drag float 
-    float advance_height = input_height * 8 + 8;
+    float advance_height = input_height * 10 + 9;
     cfg.minimal_window_size_with_advance =
         ImVec2(cfg.minimal_window_size.x,
                cfg.minimal_window_size.y + advance_height);
@@ -2729,13 +2731,16 @@ bool GLGizmoEmboss::revertible(const std::string &name,
 
     bool result = draw();
     // render revert changes button
-    if (changed) {        
-        ImGui::SameLine(undo_offset);
+    if (changed) {
+        ImGuiWindow *window = ImGui::GetCurrentWindow();
+        float prev_x = window->DC.CursorPosPrevLine.x;
+        ImGui::SameLine(undo_offset); // change cursor postion
         if (draw_button(m_icons, IconType::undo)) {
             value = *default_value;
             return true;
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", undo_tooltip.c_str());
+        window->DC.CursorPosPrevLine.x = prev_x; // set back previous position
     }
     return result;
 }
@@ -3014,10 +3019,10 @@ void GLGizmoEmboss::draw_advanced()
     const EmbossStyle *stored_style = nullptr;
     if (m_style_manager.exist_stored_style())
         stored_style = m_style_manager.get_stored_style();
-
-    bool can_use_surface = (m_volume==nullptr)? false :
-                        (font_prop.use_surface)? true : // already used surface must have option to uncheck
-        (m_volume->get_object()->volumes.size() > 1);
+    
+    bool is_the_only_one_part = m_volume->is_the_only_one_part();
+    bool can_use_surface = (font_prop.use_surface)? true : // already used surface must have option to uncheck
+                            !is_the_only_one_part;
     m_imgui->disabled_begin(!can_use_surface);
     const bool *def_use_surface = stored_style ?
         &stored_style->prop.use_surface : nullptr;
@@ -3034,6 +3039,65 @@ void GLGizmoEmboss::draw_advanced()
         process();
     }
     m_imgui->disabled_end(); // !can_use_surface
+
+    bool &per_glyph = font_prop.per_glyph;
+    bool can_use_per_glyph = (per_glyph) ? true : // already used surface must have option to uncheck
+                            !is_the_only_one_part;
+    m_imgui->disabled_begin(!can_use_per_glyph);
+    const bool *def_per_glyph = stored_style ? &stored_style->prop.per_glyph : nullptr;
+    if (rev_checkbox(tr.per_glyph, per_glyph, def_per_glyph,
+        _u8L("Revert Transformation per glyph."))) {
+        process();
+    } else if (ImGui::IsItemHovered()) {
+        if (per_glyph) {
+            ImGui::SetTooltip("%s", _u8L("Set global orientation for whole text.").c_str());
+        } else {
+            ImGui::SetTooltip("%s", _u8L("Set position and orientation per Glyph.").c_str());
+            if (!m_text_lines.is_init())
+                init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager);
+        }
+    } else if (!per_glyph && m_text_lines.is_init())
+        m_text_lines.reset();
+    m_imgui->disabled_end(); // !can_use_per_glyph
+
+    m_imgui->disabled_begin(!per_glyph); 
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(m_gui_cfg->input_width);
+    if (m_imgui->slider_float("##base_line_y_offset", &m_text_lines.offset, -10.f, 10.f, "%f mm")) {
+        init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, m_text_lines.get_lines().size());
+        process();
+    } else if (ImGui::IsItemHovered()) 
+        ImGui::SetTooltip("%s", _u8L("Move base line (up/down) for allign letters").c_str());
+    m_imgui->disabled_end(); // !per_glyph
+        
+    int selected_align = static_cast<int>(font_prop.align);
+    int def_align_data = !stored_style ? 0 : static_cast<int>(stored_style->prop.align);
+    int * def_align = stored_style ? &def_align_data : nullptr;
+    float undo_offset = ImGui::GetStyle().FramePadding.x;
+    auto draw = [&selected_align, gui_cfg = m_gui_cfg]() {
+        // order must match align enum
+        const char* align_names[] = { "first_line_center",
+                                      "first_line_left",
+                                      "first_line_right",
+                                      "center_center",
+                                      "center_left",
+                                      "center_right",
+                                      "top_center",
+                                      "top_left",
+                                      "top_right",         
+                                      "bottom_center",
+                                      "bottom_left",
+                                      "bottom_right"};
+        ImGui::SameLine(gui_cfg->advanced_input_offset);
+        ImGui::SetNextItemWidth(gui_cfg->input_width);
+        return ImGui::Combo("##text_alignment", &selected_align, align_names, IM_ARRAYSIZE(align_names));
+    };
+    if (revertible(tr.alignment, selected_align, def_align, _u8L("Revert alignment."), undo_offset, draw)){
+        font_prop.align = static_cast<FontProp::Align>(selected_align);
+        // TODO: move with text in finalize to not change position
+        process();
+    }
+
     // TRN EmbossGizmo: font units
     std::string units = _u8L("points");
     std::string units_fmt = "%.0f " + units;
@@ -3230,53 +3294,6 @@ void GLGizmoEmboss::draw_advanced()
             process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
-    }
-
-    ImGui::SameLine();
-    bool *per_glyph = &font_prop.per_glyph;
-    if (ImGui::Checkbox("##PerGlyph", per_glyph)) {
-        if (*per_glyph) {
-            if (!m_text_lines.is_init())
-                init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager);
-        }
-        process();
-    } else if (ImGui::IsItemHovered()) {
-        if (*per_glyph) {
-            ImGui::SetTooltip("%s", _u8L("Set global orientation for whole text.").c_str());
-        } else {
-            ImGui::SetTooltip("%s", _u8L("Set position and orientation of projection per Glyph.").c_str());
-            if (!m_text_lines.is_init())
-                init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager);
-        }
-    } else if (!*per_glyph && m_text_lines.is_init())
-        m_text_lines.reset();
-
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::SliderFloat("##base_line_y_offset", &m_text_lines.offset, -10.f, 10.f, "%f mm")) {
-        init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, m_text_lines.get_lines().size());
-        process();
-    } else if (ImGui::IsItemHovered()) 
-        ImGui::SetTooltip("%s", _u8L("Move base line (up/down) for allign letters").c_str());
-
-    // order must match align enum
-    const char* align_names[] = { "first_line_center",
-                                  "first_line_left",
-                                  "first_line_right",
-                                  "center_center",
-                                  "center_left",
-                                  "center_right",
-                                  "top_center",
-                                  "top_left",
-                                  "top_right",         
-                                  "bottom_center",
-                                  "bottom_left",
-                                  "bottom_right"};
-    int selected_align = static_cast<int>(font_prop.align);
-    if (ImGui::Combo("align", &selected_align, align_names, IM_ARRAYSIZE(align_names))) {
-        font_prop.align = static_cast<FontProp::Align>(selected_align);
-        // TODO: move with text in finalize to not change position
-        process();
     }
 
 #ifdef ALLOW_DEBUG_MODE

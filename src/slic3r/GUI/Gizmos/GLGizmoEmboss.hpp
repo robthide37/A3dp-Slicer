@@ -209,16 +209,17 @@ private:
             std::string font;
             std::string height;
             std::string depth;
-            std::string use_surface;
 
             // advanced
+            std::string use_surface;
+            std::string per_glyph;
+            std::string alignment;
             std::string char_gap;
             std::string line_gap;
             std::string boldness;
             std::string skew_ration;
             std::string from_surface;
             std::string rotation;
-            std::string keep_up;
             std::string collection;
         };
         Translations translations;
