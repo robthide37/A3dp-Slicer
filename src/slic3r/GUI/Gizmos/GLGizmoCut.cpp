@@ -179,8 +179,8 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     : GLGizmoBase(parent, icon_filename, sprite_id)
     , m_connectors_group_id (GrabberID::Count)
     , m_connector_type (CutConnectorType::Plug)
-    , m_connector_style (size_t(CutConnectorStyle::Prism))
-    , m_connector_shape_id (size_t(CutConnectorShape::Circle))
+    , m_connector_style (int(CutConnectorStyle::Prism))
+    , m_connector_shape_id (int(CutConnectorShape::Circle))
 {
 //    m_modes = { _u8L("Planar"), _u8L("Grid")
 //              , _u8L("Radial"), _u8L("Modular")
@@ -465,41 +465,10 @@ void GLGizmoCut3D::set_center(const Vec3d& center, bool update_tbb /*=false*/)
     update_clipper();
 }
 
-bool GLGizmoCut3D::render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx)
+bool GLGizmoCut3D::render_combo(const std::string& label, const std::vector<std::string>& lines, int& selection_idx)
 {
     ImGui::AlignTextToFramePadding();
-    m_imgui->text(label);
-    ImGui::SameLine(m_label_width);
-    ImGui::PushItemWidth(m_control_width);
-    
-    size_t selection_out = selection_idx;
-    // It is necessary to use BeginGroup(). Otherwise, when using SameLine() is called, then other items will be drawn inside the combobox.
-    ImGui::BeginGroup();
-    ImVec2 combo_pos = ImGui::GetCursorScreenPos();
-    if (ImGui::BeginCombo(("##"+label).c_str(), "")) {
-        for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
-            ImGui::PushID(int(line_idx));
-            if (ImGui::Selectable("", line_idx == selection_idx))
-                selection_out = line_idx;
-
-            ImGui::SameLine();
-            ImGui::Text("%s", lines[line_idx].c_str());
-            ImGui::PopID();
-        }
-
-        ImGui::EndCombo();
-    }
-
-    ImVec2      backup_pos = ImGui::GetCursorScreenPos();
-    ImGuiStyle& style = ImGui::GetStyle();
-
-    ImGui::SetCursorScreenPos(ImVec2(combo_pos.x + style.FramePadding.x, combo_pos.y + style.FramePadding.y));
-    ImGui::Text("%s", selection_out < lines.size() ? lines[selection_out].c_str() : UndefLabel.c_str());
-    ImGui::SetCursorScreenPos(backup_pos);
-    ImGui::EndGroup();
-
-    bool is_changed = selection_idx != selection_out;
-    selection_idx = selection_out;
+    const bool is_changed = m_imgui->combo(label, lines, selection_idx, 0, m_label_width, m_control_width);
 
     if (is_changed)
         update_connector_shape();
@@ -1803,7 +1772,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
 
     m_imgui->disabled_begin(m_connector_type == CutConnectorType::Dowel);
     if (type_changed && m_connector_type == CutConnectorType::Dowel) {
-        m_connector_style = size_t(CutConnectorStyle::Prism);
+        m_connector_style = int(CutConnectorStyle::Prism);
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
     }
     if (render_combo(m_labels_map["Style"], m_connector_styles, m_connector_style))
@@ -1813,7 +1782,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     if (render_combo(m_labels_map["Shape"], m_connector_shapes, m_connector_shape_id))
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id); });
 
-    if (render_slider_double_input(m_labels_map["Depth ratio"], m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
+    if (render_slider_double_input(m_labels_map["Depth"], m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
         apply_selected_connectors([this, &connectors](size_t idx) {
             if (m_connector_depth_ratio > 0)
                 connectors[idx].height           = m_connector_depth_ratio;
@@ -2136,10 +2105,10 @@ void GLGizmoCut3D::validate_connector_settings()
 
     if (m_connector_type == CutConnectorType::Undef)
         m_connector_type = CutConnectorType::Plug;
-    if (m_connector_style == size_t(CutConnectorStyle::Undef))
-        m_connector_style = size_t(CutConnectorStyle::Prism);
-    if (m_connector_shape_id == size_t(CutConnectorShape::Undef))
-        m_connector_shape_id = size_t(CutConnectorShape::Circle);
+    if (m_connector_style == int(CutConnectorStyle::Undef))
+        m_connector_style = int(CutConnectorStyle::Prism);
+    if (m_connector_shape_id == int(CutConnectorShape::Undef))
+        m_connector_shape_id = int(CutConnectorShape::Circle);
 }
 
 void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
@@ -2197,8 +2166,8 @@ void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
         m_connector_size                    = 2.f * radius;
         m_connector_size_tolerance          = 2.f * radius_tolerance;
         m_connector_type                    = type;
-        m_connector_style                   = size_t(style);
-        m_connector_shape_id                = size_t(shape);
+        m_connector_style                   = int(style);
+        m_connector_shape_id                = int(shape);
     }
 
     if (m_label_width == 0.f) {

@@ -288,8 +288,12 @@ set(SLIC3R_SOURCES
     Support/SupportMaterial.hpp
     Support/SupportParameters.cpp
     Support/SupportParameters.hpp
+    Support/OrganicSupport.cpp
+    Support/OrganicSupport.hpp
     Support/TreeSupport.cpp
     Support/TreeSupport.hpp
+    Support/TreeSupportCommon.cpp
+    Support/TreeSupportCommon.hpp
     Support/TreeModelVolumes.cpp
     Support/TreeModelVolumes.hpp
     SupportSpotsGenerator.cpp

@@ -3580,7 +3580,7 @@ void GCodeViewer::render_legend(float& legend_height)
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, { 0.2f, 0.2f, 0.2f, 0.8f });
-    imgui.combo("", { _u8L("Feature type"),
+    imgui.combo(std::string(), { _u8L("Feature type"),
                       _u8L("Height (mm)"),
                       _u8L("Width (mm)"),
                       _u8L("Speed (mm/s)"),
