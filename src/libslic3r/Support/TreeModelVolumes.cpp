@@ -7,7 +7,7 @@
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "TreeModelVolumes.hpp"
-#include "TreeSupport.hpp"
+#include "TreeSupportCommon.hpp"
 
 #include "../BuildVolume.hpp"
 #include "../ClipperUtils.hpp"

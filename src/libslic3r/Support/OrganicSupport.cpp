@@ -1,13 +1,12 @@
 #include "OrganicSupport.hpp"
+#include "SupportCommon.hpp"
 
-#include "AABBTreeLines.hpp"
-#include "ClipperUtils.hpp"
-#include "Polygon.hpp"
-#include "Polyline.hpp"
-#include "MutablePolygon.hpp"
-#include "TriangleMeshSlicer.hpp"
-
-#include "Support/SupportCommon.hpp"
+#include "../AABBTreeLines.hpp"
+#include "../ClipperUtils.hpp"
+#include "../Polygon.hpp"
+#include "../Polyline.hpp"
+#include "../MutablePolygon.hpp"
+#include "../TriangleMeshSlicer.hpp"
 
 #include <cassert>
 
@@ -17,7 +16,7 @@
 
 #ifndef TREE_SUPPORT_ORGANIC_NUDGE_NEW
     // Old version using OpenVDB, works but it is extremely slow for complex meshes.
-    #include "OpenVDBUtilsLegacy.hpp"
+    #include "../OpenVDBUtilsLegacy.hpp"
     #include <openvdb/tools/VolumeToSpheres.h>
 #endif // TREE_SUPPORT_ORGANIC_NUDGE_NEW
 

@@ -7,23 +7,21 @@
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include "TreeSupport.hpp"
-#include "AABBTreeIndirect.hpp"
-#include "AABBTreeLines.hpp"
-#include "BuildVolume.hpp"
-#include "ClipperUtils.hpp"
-#include "EdgeGrid.hpp"
-#include "Fill/Fill.hpp"
-#include "Layer.hpp"
-#include "Print.hpp"
-#include "MultiPoint.hpp"
-#include "Polygon.hpp"
-#include "Polyline.hpp"
-#include "MutablePolygon.hpp"
-#include "TriangleMeshSlicer.hpp"
+#include "TreeSupportCommon.hpp"
+#include "SupportCommon.hpp"
+#include "OrganicSupport.hpp"
 
-#include "Support/SupportCommon.hpp"
-#include "Support/TreeSupportCommon.hpp"
-#include "Support/OrganicSupport.hpp"
+#include "../AABBTreeIndirect.hpp"
+#include "../BuildVolume.hpp"
+#include "../ClipperUtils.hpp"
+#include "../EdgeGrid.hpp"
+#include "../Fill/Fill.hpp"
+#include "../Layer.hpp"
+#include "../Print.hpp"
+#include "../MultiPoint.hpp"
+#include "../Polygon.hpp"
+#include "../Polyline.hpp"
+#include "../MutablePolygon.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -35,7 +33,6 @@
 
 #include <boost/log/trivial.hpp>
 
-#include <tbb/global_control.h>
 #include <tbb/parallel_for.h>
 
 // #define TREESUPPORT_DEBUG_SVG
