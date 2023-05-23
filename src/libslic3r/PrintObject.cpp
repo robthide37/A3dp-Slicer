@@ -2595,7 +2595,7 @@ bool PrintObject::update_layer_height_profile(const ModelObject &model_object, c
 
     if (layer_height_profile.empty()) {
         // use the constructor because the assignement is crashing on ASAN OsX
-        layer_height_profile = std::vector<coordf_t>(model_object.layer_height_profile.get());
+        layer_height_profile = model_object.layer_height_profile.get();
 //        layer_height_profile = model_object.layer_height_profile;
         // The layer height returned is sampled with high density for the UI layer height painting
         // and smoothing tool to work.

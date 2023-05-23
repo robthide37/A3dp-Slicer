@@ -132,6 +132,9 @@ void GLCanvas3D::LayersEditing::set_config(const DynamicPrintConfig* config)
     delete m_slicing_parameters;
     m_slicing_parameters = nullptr;
     m_layers_texture.valid = false;
+
+    m_layer_height_profile.clear();
+    m_layer_height_profile_modified = false;
 }
 
 void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
@@ -141,6 +144,7 @@ void GLCanvas3D::LayersEditing::select_object(const Model &model, int object_id)
     // Changing maximum height of an object will invalidate the layer heigth editing profile.
     // m_model_object->bounding_box() is cached, therefore it is cheap even if this method is called frequently.
     const float new_max_z = (model_object_new == nullptr) ? 0.0f : static_cast<float>(model_object_new->max_z());
+
     if (m_model_object != model_object_new || this->last_object_id != object_id || m_object_max_z != new_max_z ||
         (model_object_new != nullptr && m_model_object->id() != model_object_new->id())) {
         m_layer_height_profile.clear();
@@ -543,10 +547,10 @@ void GLCanvas3D::LayersEditing::render_volumes(const GLCanvas3D& canvas, const G
 
 void GLCanvas3D::LayersEditing::adjust_layer_height_profile()
 {
-	this->update_slicing_parameters();
-	PrintObject::update_layer_height_profile(*m_model_object, *m_slicing_parameters, m_layer_height_profile);
-	Slic3r::adjust_layer_height_profile(*m_slicing_parameters, m_layer_height_profile, this->last_z, this->strength, this->band_width, this->last_action);
-	m_layer_height_profile_modified = true;
+    this->update_slicing_parameters();
+    PrintObject::update_layer_height_profile(*m_model_object, *m_slicing_parameters, m_layer_height_profile);
+    Slic3r::adjust_layer_height_profile(*m_slicing_parameters, m_layer_height_profile, this->last_z, this->strength, this->band_width, this->last_action);
+    m_layer_height_profile_modified = true;
     m_layers_texture.valid = false;
 }
 
@@ -581,14 +585,15 @@ void GLCanvas3D::LayersEditing::smooth_layer_height_profile(GLCanvas3D& canvas, 
 
 void GLCanvas3D::LayersEditing::generate_layer_height_texture()
 {
-	this->update_slicing_parameters();
-	// Always try to update the layer height profile.
+    this->update_slicing_parameters();
+    // Always try to update the layer height profile.
     bool update = ! m_layers_texture.valid;
     if (PrintObject::update_layer_height_profile(*m_model_object, *m_slicing_parameters, m_layer_height_profile)) {
         // Initialized to the default value.
         m_layer_height_profile_modified = false;
         update = true;
     }
+
     // Update if the layer height profile was changed, or when the texture is not valid.
     if (! update && ! m_layers_texture.data.empty() && m_layers_texture.cells > 0)
         // Texture is valid, don't update.
@@ -615,8 +620,8 @@ void GLCanvas3D::LayersEditing::accept_changes(GLCanvas3D& canvas)
         if (m_layer_height_profile_modified) {
             wxGetApp().plater()->take_snapshot(_L("Variable layer height - Manual edit"));
             const_cast<ModelObject*>(m_model_object)->layer_height_profile.set(m_layer_height_profile);
-            canvas.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
             wxGetApp().obj_list()->update_info_items(last_object_id);
+            wxGetApp().plater()->schedule_background_process();
         }
     }
     m_layer_height_profile_modified = false;
