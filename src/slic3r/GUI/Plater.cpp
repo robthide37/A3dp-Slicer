@@ -4039,11 +4039,11 @@ void Plater::priv::on_select_preset(wxCommandEvent &evt)
             // revert previously selection
             const std::string& old_name = wxGetApp().preset_bundle->filaments.get_edited_preset().name;
             wxGetApp().preset_bundle->set_filament_preset(idx, old_name);
-            combo->update();
         }
         else
             // Synchronize config.ini with the current selections.
             wxGetApp().preset_bundle->export_selections(*wxGetApp().app_config);
+        combo->update();
     }
     else if (select_preset) {
         wxWindowUpdateLocker noUpdates(sidebar->presets_panel());
