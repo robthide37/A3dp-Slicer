@@ -4346,6 +4346,14 @@ void DynamicPrintConfig::normalize_fdm()
         }
     }
 
+    if (this->has("wipe_tower_extruder")) {
+        // If invalid, replace with 0.
+        int extruder = this->opt<ConfigOptionInt>("wipe_tower_extruder")->value;
+        int num_extruders = this->opt<ConfigOptionFloats>("nozzle_diameter")->size();
+        if (extruder < 0 || extruder > num_extruders)
+            this->option("wipe_tower_extruder")->setInt(0);
+    }
+
     if (!this->has("solid_infill_extruder") && this->has("infill_extruder"))
         this->option("solid_infill_extruder", true)->setInt(this->option("infill_extruder")->getInt());
 
