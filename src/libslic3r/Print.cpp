@@ -329,6 +329,15 @@ std::vector<unsigned int> Print::extruders() const
     std::vector<unsigned int> extruders = this->object_extruders();
     append(extruders, this->support_material_extruders());
     sort_remove_duplicates(extruders);
+
+    // The wipe tower extruder can also be set. When the wipe tower is enabled and it will be generated,
+    // append its extruder into the list too.
+    if (has_wipe_tower() && config().wipe_tower_extruder != 0 && extruders.size() > 1) {
+        assert(config().wipe_tower_extruder > 0 && config().wipe_tower_extruder < int(config().nozzle_diameter.size()));
+        extruders.emplace_back(config().wipe_tower_extruder - 1); // the config value is 1-based
+        sort_remove_duplicates(extruders);
+    }
+
     return extruders;
 }
 
