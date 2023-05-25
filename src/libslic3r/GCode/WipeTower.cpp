@@ -1366,7 +1366,7 @@ std::vector<std::vector<float>> WipeTower::extract_wipe_volumes(const PrintConfi
     // Also include filament_minimal_purge_on_wipe_tower. This is needed for the preview.
     for (unsigned int i = 0; i<number_of_extruders; ++i)
         for (unsigned int j = 0; j<number_of_extruders; ++j)
-            wipe_volumes[i][j] = std::max(wipe_volumes[i][j], config.filament_minimal_purge_on_wipe_tower.get_at(j));
+            wipe_volumes[i][j] = std::max<float>(wipe_volumes[i][j], config.filament_minimal_purge_on_wipe_tower.get_at(j));
 
     return wipe_volumes;
 }
