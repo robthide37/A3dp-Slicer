@@ -1229,7 +1229,7 @@ void Print::alert_when_supports_needed()
             }
 
             std::string translated_list = expansion_rule;
-            for (int i = 0; i < translated_elements.size() - 1; i++) {
+            for (int i = 0; i < int(translated_elements.size()) - 1; ++ i) {
                 auto first_elem = translated_list.find("%1%");
                 assert(first_elem != translated_list.npos);
                 translated_list.replace(first_elem, 3, translated_elements[i]);
@@ -1237,7 +1237,7 @@ void Print::alert_when_supports_needed()
                 // expand the translated list by another application of the same rule
                 auto second_elem = translated_list.find("%2%");
                 assert(second_elem != translated_list.npos);
-                if (i < translated_elements.size() - 2) {
+                if (i < int(translated_elements.size()) - 2) {
                     translated_list.replace(second_elem, 3, expansion_rule);
                 } else {
                     translated_list.replace(second_elem, 3, translated_elements[i + 1]);
