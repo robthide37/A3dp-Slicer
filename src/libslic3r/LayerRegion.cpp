@@ -376,7 +376,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
 
     // Expand the top / bottom / bridge surfaces into the shell thickness solid infills.
     double     layer_thickness;
-    ExPolygons shells = union_ex(fill_surfaces_extract_expolygons(m_fill_surfaces.surfaces, {stInternalSolid, stTop}, layer_thickness));
+    ExPolygons shells = union_ex(fill_surfaces_extract_expolygons(m_fill_surfaces.surfaces, {stInternalSolid}, layer_thickness));
 
     SurfaceCollection bridges;
     {
