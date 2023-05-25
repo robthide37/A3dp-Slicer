@@ -84,8 +84,8 @@ TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings &mes
       layer_height(mesh_group_settings.layer_height),
       branch_radius(mesh_group_settings.support_tree_branch_diameter / 2),
       min_radius(mesh_group_settings.support_tree_tip_diameter / 2), // The actual radius is 50 microns larger as the resulting branches will be increased by 50 microns to avoid rounding errors effectively increasing the xydistance
-      maximum_move_distance((angle < M_PI / 2.) ? (coord_t)(tan(angle) * layer_height) : std::numeric_limits<coord_t>::max()),
-      maximum_move_distance_slow((angle_slow < M_PI / 2.) ? (coord_t)(tan(angle_slow) * layer_height) : std::numeric_limits<coord_t>::max()),
+      maximum_move_distance((mesh_group_settings.support_tree_angle < M_PI / 2.) ? (coord_t)(tan(mesh_group_settings.support_tree_angle) * layer_height) : std::numeric_limits<coord_t>::max()),
+      maximum_move_distance_slow((mesh_group_settings.support_tree_angle_slow < M_PI / 2.) ? (coord_t)(tan(mesh_group_settings.support_tree_angle_slow) * layer_height) : std::numeric_limits<coord_t>::max()),
       support_bottom_layers(mesh_group_settings.support_bottom_enable ? (mesh_group_settings.support_bottom_height + layer_height / 2) / layer_height : 0),
       tip_layers(std::max((branch_radius - min_radius) / (support_line_width / 3), branch_radius / layer_height)), // Ensure lines always stack nicely even if layer height is large
       branch_radius_increase_per_layer(tan(mesh_group_settings.support_tree_branch_diameter_angle) * layer_height),
@@ -155,7 +155,7 @@ TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings &mes
             // Layers between the raft contacts and bottom of the object.
             auto nsteps = int(ceil(dist_to_go / slicing_params.max_suport_layer_height));
             double step = dist_to_go / nsteps;
-            for (size_t i = 0; i < nsteps; ++ i) {
+            for (int i = 0; i < nsteps; ++ i) {
                 z += step;
                 this->raft_layers.emplace_back(z);
             }
