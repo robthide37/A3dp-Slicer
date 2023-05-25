@@ -619,23 +619,35 @@ public:
         return ret;
     }
 
+    struct ContoursList
+    {
+        // list of unique contours
+        Polygons contours;
+        // if defined: list of transforms to apply to contours
+        std::optional<std::vector<std::pair<size_t, Transform3d>>> trafos;
+
+        bool empty() const { return contours.empty(); }
+    };
+
 private:
     void load_arrange_settings();
 
     class SequentialPrintClearance
     {
         GLModel m_fill;
-        GLModel m_perimeter;
-        bool m_render_fill{ true };
-        bool m_visible{ false };
+        // list of unique contours
+        std::vector<GLModel> m_contours;
+        // list of transforms used to render the contours
+        std::vector<std::pair<size_t, Transform3d>> m_instances;
+        bool m_evaluating{ false };
 
-        std::vector<Pointf3s> m_hull_2d_cache;
+        std::vector<std::pair<Pointf3s, Transform3d>> m_hulls_2d_cache;
 
     public:
-        void set_polygons(const Polygons& polygons);
-        void set_render_fill(bool render_fill) { m_render_fill = render_fill; }
-        void set_visible(bool visible) { m_visible = visible; }
+        void set_contours(const ContoursList& contours, bool generate_fill);
+        void update_instances_trafos(const std::vector<Transform3d>& trafos);
         void render();
+        bool empty() const { return m_contours.empty(); }
 
         friend class GLCanvas3D;
     };
@@ -725,7 +737,10 @@ public:
     unsigned int get_volumes_count() const;
     const GLVolumeCollection& get_volumes() const { return m_volumes; }
     void reset_volumes();
-    ModelInstanceEPrintVolumeState check_volumes_outside_state() const;
+    ModelInstanceEPrintVolumeState check_volumes_outside_state(bool selection_only = true) const;
+    // returns true if all the volumes are completely contained in the print volume
+    // returns the containment state in the given out_state, if non-null
+    bool check_volumes_outside_state(const Slic3r::BuildVolume& build_volume, ModelInstanceEPrintVolumeState* out_state, bool selection_only = true) const;
 
     void init_gcode_viewer() { m_gcode_viewer.init(); }
     void reset_gcode_toolpaths() { m_gcode_viewer.reset(); }
@@ -959,24 +974,24 @@ public:
     }
 
     void reset_sequential_print_clearance() {
-        m_sequential_print_clearance.set_visible(false);
-        m_sequential_print_clearance.set_render_fill(false);
-        m_sequential_print_clearance.set_polygons(Polygons());
+        m_sequential_print_clearance.m_evaluating = false;
+        m_sequential_print_clearance.set_contours(ContoursList(), false);
     }
 
-    void set_sequential_print_clearance_visible(bool visible) {
-        m_sequential_print_clearance.set_visible(visible);
+    void set_sequential_print_clearance_contours(const ContoursList& contours, bool generate_fill) {
+        m_sequential_print_clearance.set_contours(contours, generate_fill);
     }
 
-    void set_sequential_print_clearance_render_fill(bool render_fill) {
-        m_sequential_print_clearance.set_render_fill(render_fill);
+    bool is_sequential_print_clearance_empty() const {
+        return m_sequential_print_clearance.empty();
     }
 
-    void set_sequential_print_clearance_polygons(const Polygons& polygons) {
-        m_sequential_print_clearance.set_polygons(polygons);
+    bool is_sequential_print_clearance_evaluating() const {
+        return m_sequential_print_clearance.m_evaluating;
     }
 
-    void update_sequential_clearance();
+    void update_sequential_clearance(bool force_contours_generation);
+    void set_sequential_clearance_as_evaluating() { m_sequential_print_clearance.m_evaluating = true; }
 
     const Print* fff_print() const;
     const SLAPrint* sla_print() const;

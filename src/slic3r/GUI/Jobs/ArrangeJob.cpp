@@ -355,7 +355,7 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
         ap.apply();
     }
 
-    m_plater->update();
+    m_plater->update((unsigned int)Plater::UpdateParams::FORCE_FULL_SCREEN_REFRESH);
     wxGetApp().obj_manipul()->set_dirty();
 
     if (!m_unarranged.empty()) {
