@@ -26,6 +26,434 @@ namespace Slic3r
 namespace FFFTreeSupport
 {
 
+// Single slice through a single branch or trough a number of branches.
+struct Slice
+{
+    // All polygons collected for this slice.
+    Polygons polygons;
+    // All bottom contacts collected for this slice.
+    Polygons bottom_contacts;
+    // How many branches were merged in this slice? Used to decide whether ClipperLib union is needed.
+    size_t   num_branches{ 0 };
+};
+
+struct Element
+{
+    // Current position of the centerline including the Z coordinate, unscaled.
+    Vec3f                   position;
+    float                   radius;
+
+    // Index of this layer, including the raft layers.
+    LayerIndex              layer_idx;
+
+    // Limits where the centerline could be placed at the current layer Z.
+    Polygons                influence_area;
+
+    // Locked node should not be moved. Locked nodes are at the top of an object or at the tips of branches.
+    bool                    locked;
+
+    // Previous position, for Laplacian smoothing, unscaled.
+    Vec3f                   prev_position;
+
+    // For sphere tracing and other collision detection optimizations.
+    Vec3f                   last_collision;
+    double                  last_collision_depth;
+
+    struct CollisionSphere {
+        // Minimum Z for which the sphere collision will be evaluated.
+        // Limited by the minimum sloping angle and by the bottom of the tree.
+        float                   min_z{ -std::numeric_limits<float>::max() };
+        // Maximum Z for which the sphere collision will be evaluated.
+        // Limited by the minimum sloping angle and by the tip of the current branch.
+        float                   max_z{ std::numeric_limits<float>::max() };
+        // Span of layers to test collision of this sphere against.
+        uint32_t                layer_begin;
+        uint32_t                layer_end;
+    };
+
+    CollisionSphere         collision_sphere;
+};
+
+struct Branch;
+
+struct Bifurcation
+{
+    Branch     *branch;
+    double      area;
+};
+
+// Single branch of a tree.
+struct Branch
+{
+    std::vector<Element>    path;
+
+    using Bifurcations =
+#ifdef NDEBUG
+        // To reduce memory allocation in release mode.
+        boost::container::small_vector<Bifurcation, 4>;
+#else // NDEBUG
+        // To ease debugging.
+        std::vector<Bifurcation>;
+#endif // NDEBUG
+
+    Bifurcations            up;
+    Bifurcation             down;
+
+    // How many of the thick up branches are considered continuation of the trunk?
+    // These will be smoothed out together.
+    size_t                  num_up_trunk;
+
+    bool has_root() const { return this->down.branch == nullptr; }
+    bool has_tip()  const { return this->up.empty(); }
+};
+
+struct Tree
+{
+    // Branches: Store of all branches.
+    // The first branch is the root of the tree.
+    Slic3r::deque<Branch>   branches;
+
+    Branch&         root()       { return branches.front(); }
+    const Branch&   root() const { return branches.front(); }
+
+    // Result of slicing the branches.
+    std::vector<Slice>      slices;
+    // First layer index of the first slice in the vector above.
+    LayerIndex              first_layer_id{ -1 };
+};
+
+using Forest = std::vector<Tree>;
+using Trees  = std::vector<Tree>;
+
+Element to_tree_element(const TreeSupportSettings &config, const SlicingParameters &slicing_params, SupportElement &element, bool is_root)
+{
+    Element out;
+    out.position        = to_3d(unscaled<float>(element.state.result_on_layer), float(layer_z(slicing_params, config, element.state.layer_idx)));
+    out.radius          = support_element_radius(config, element);
+    out.layer_idx       = element.state.layer_idx;
+    out.influence_area  = std::move(element.influence_area);
+    out.locked          = (is_root && element.state.layer_idx > 0) || element.state.locked();
+    return out;
+}
+
+// Convert move bounds into a forest of trees, each tree made of a graph of branches and bifurcation points.
+// Destroys move_bounds.
+Forest make_forest(const TreeSupportSettings &config, const SlicingParameters &slicing_params, std::vector<SupportElements> &&move_bounds)
+{
+    struct TreeVisitor {
+        void visit_recursive(std::vector<SupportElements> &move_bounds, SupportElement &start_element, Branch *parent_branch, Tree &out) const {
+            assert(! start_element.state.marked && ! start_element.parents.empty());
+            // Collect elements up to a bifurcation above.
+            start_element.state.marked = true;
+            // For each branch bifurcating from this point:
+            SupportElements &layer       = move_bounds[start_element.state.layer_idx];
+            SupportElements &layer_above = move_bounds[start_element.state.layer_idx + 1];
+            for (size_t parent_idx = 0; parent_idx < start_element.parents.size(); ++ parent_idx) {
+                Branch branch;
+                if (parent_branch)
+                    // Duplicate the last element of the trunk below.
+                    // If this branch has a smaller diameter than the trunk below, its centerline will not be aligned with the centerline of the trunk.
+                    branch.path.emplace_back(parent_branch->path.back());
+                branch.path.emplace_back(to_tree_element(config, slicing_params, start_element, parent_branch == nullptr));
+                // Traverse each branch until it branches again.
+                SupportElement &first_parent = layer_above[start_element.parents[parent_idx]];
+                assert(! first_parent.state.marked);
+                assert(branch.path.back().layer_idx + 1 == first_parent.state.layer_idx);
+                branch.path.emplace_back(to_tree_element(config, slicing_params, first_parent, false));
+                if (first_parent.parents.size() < 2)
+                    first_parent.state.marked = true;
+                SupportElement *next_branch = nullptr;
+                if (first_parent.parents.size() == 1) {
+                    for (SupportElement *parent = &first_parent;;) {
+                        assert(parent->state.marked);
+                        SupportElement &next_parent = move_bounds[parent->state.layer_idx + 1][parent->parents.front()];
+                        assert(! next_parent.state.marked);
+                        assert(branch.path.back().layer_idx + 1 == next_parent.state.layer_idx);
+                        branch.path.emplace_back(to_tree_element(config, slicing_params, next_parent, false));
+                        if (next_parent.parents.size() > 1) {
+                            // Branching point was reached.
+                            next_branch = &next_parent;
+                            break;
+                        }
+                        next_parent.state.marked = true;
+                        if (next_parent.parents.size() == 0)
+                            // Tip is reached.
+                            break;
+                        parent = &next_parent;
+                    }
+                } else if (first_parent.parents.size() > 1)
+                    // Branching point was reached.
+                    next_branch = &first_parent;
+                assert(branch.path.size() >= 2);
+                assert(next_branch == nullptr || ! next_branch->state.marked);
+                out.branches.emplace_back(std::move(branch));
+                Branch *pbranch = &out.branches.back();
+                if (parent_branch) {
+                    parent_branch->up.push_back({ pbranch });
+                    pbranch->down = { parent_branch };
+                }
+                if (next_branch)
+                    this->visit_recursive(move_bounds, *next_branch, pbranch, out);
+            }
+
+            if (parent_branch) {
+                // Update initial radii of thin branches merging with a trunk.
+                auto it_up_max_r = std::max_element(parent_branch->up.begin(), parent_branch->up.end(), 
+                    [](const Bifurcation &l, const Bifurcation &r){ return l.branch->path[1].radius < r.branch->path[1].radius; });
+                const float r1               = it_up_max_r->branch->path[1].radius;
+                const float radius_increment = unscaled<float>(config.branch_radius_increase_per_layer);
+                for (auto it = parent_branch->up.begin(); it != parent_branch->up.end(); ++ it)
+                    if (it != it_up_max_r) {
+                        Element &el  = it->branch->path.front();
+                        Element &el2 = it->branch->path[1];
+                        if (! is_approx(r1, el2.radius))
+                            el.radius = std::min(el.radius, el2.radius + radius_increment);
+                    }
+                // Sort children of parent_branch by decreasing radius.
+                std::sort(parent_branch->up.begin(), parent_branch->up.end(), 
+                    [](const Bifurcation &l, const Bifurcation &r){ return l.branch->path.front().radius > r.branch->path.front().radius; });
+                // Update number of branches to be considered a continuation of the trunk during smoothing.
+                {
+                    const float r_trunk = 0.75 * it_up_max_r->branch->path.front().radius;
+                    parent_branch->num_up_trunk = 0;
+                    for (const Bifurcation& up : parent_branch->up)
+                        if (up.branch->path.front().radius < r_trunk)
+                            break;
+                        else
+                            ++ parent_branch->num_up_trunk;
+                }
+            }
+        }
+
+        const TreeSupportSettings &config;
+        const SlicingParameters   &slicing_params;
+    };
+
+    TreeVisitor visitor{ config, slicing_params };
+
+    for (SupportElements &elements : move_bounds)
+        for (SupportElement &el : elements)
+            el.state.marked = false;
+
+    Trees trees;
+    for (LayerIndex layer_idx = 0; layer_idx + 1 < LayerIndex(move_bounds.size()); ++ layer_idx) {
+        for (SupportElement &start_element : move_bounds[layer_idx]) {
+            if (! start_element.state.marked && ! start_element.parents.empty()) {
+#if 0
+                {
+                    // Verify that this node is a root, such that there is no element in the layer below
+                    // that points to it.
+                    int ielement = &start_element - move_bounds.data();
+                    int found = 0;
+                    if (layer_idx > 0) {
+                        for (auto &el : move_bounds[layer_idx - 1]) {
+                            for (auto iparent : el.parents)
+                                if (iparent == ielement)
+                                    ++ found;
+                        }
+                        if (found != 0)
+                            printf("Found: %d\n", found);
+                    }
+                }
+#endif
+                trees.push_back({});
+                visitor.visit_recursive(move_bounds, start_element, nullptr, trees.back());
+                assert(! trees.back().branches.empty());
+                assert(! trees.back().branches.front().path.empty());
+#if 0
+                // Debugging: Only build trees with specific properties.
+                if (start_element.state.lost) {
+                }
+                else if (start_element.state.verylost) {
+                }
+                else
+                    trees.pop_back();
+#endif
+            }
+        }
+    }
+
+#if 1
+    move_bounds.clear();
+#else
+    for (SupportElements &elements : move_bounds)
+        for (SupportElement &el : elements)
+            el.state.marked = false;
+#endif
+
+    return trees;
+}
+
+// Move bounds were propagated top to bottom. At each joint of branches the move bounds were reduced significantly.
+// Now reflect the reduction of tree space by propagating the reduction of tree centerline space
+// bottom-up starting with the bottom-most joint.
+void trim_influence_areas_bottom_up(Forest &forest, const float dxy_dlayer)
+{
+    struct Trimmer {
+        static void trim_recursive(Branch &branch, const float delta_r, const float dxy_dlayer) {
+            assert(delta_r >= 0);
+            if (delta_r > 0)
+                branch.path.front().influence_area = offset(branch.path.front().influence_area, delta_r);
+            for (size_t i = 1; i < branch.path.size(); ++ i)
+                branch.path[i].influence_area = intersection(branch.path[i].influence_area, offset(branch.path[i - 1].influence_area, dxy_dlayer));
+            const float r0 = branch.path.back().radius;
+            for (Bifurcation &up : branch.up) {
+                up.branch->path.front().influence_area = branch.path.back().influence_area;
+                trim_recursive(*up.branch, r0 - up.branch->path.front().radius, dxy_dlayer);
+            }
+        }
+    };
+
+    for (Tree &tree : forest) {
+        Branch      &root = tree.root();
+        const float  r0   = root.path.back().radius;
+        for (Bifurcation &up : root.up)
+            Trimmer::trim_recursive(*up.branch, r0 - up.branch->path.front().radius, dxy_dlayer);
+    }
+}
+
+// Straighten up and smooth centerlines inside their influence areas.
+void smooth_trees_inside_influence_areas(Branch &root, bool is_root)
+{
+    // Smooth the subtree:
+    //
+    // Apply laplacian and bilaplacian smoothing inside a branch,
+    // apply laplacian smoothing only at a bifurcation point.
+    //
+    // Applying a bilaplacian smoothing inside a branch should ensure curvature of the brach to be lower
+    // than the radius at each particular point of the centerline, 
+    // while omitting bilaplacian smoothing at bifurcation points will create sharp bifurcations.
+    // Sharp bifurcations have a smaller volume, but just a tiny bit larger surfaces than smooth bifurcations
+    // where each continuation of the trunk satifies the path radius > centerline element radius.
+    const size_t num_iterations = 100;
+    struct StackElement {
+        Branch &branch;
+        size_t  idx_up;
+    };
+    std::vector<StackElement> stack;
+
+    auto adjust_position = [](Element &el, Vec2f new_pos) {
+        Point new_pos_scaled = scaled<coord_t>(new_pos);
+        if (! contains(el.influence_area, new_pos_scaled)) {
+            int64_t min_dist = std::numeric_limits<int64_t>::max();
+            Point   min_proj_scaled;
+            for (const Polygon& polygon : el.influence_area) {
+                Point proj_scaled = polygon.point_projection(new_pos_scaled);
+                if (int64_t dist = (proj_scaled - new_pos_scaled).cast<int64_t>().squaredNorm(); dist < min_dist) {
+                    min_dist = dist;
+                    min_proj_scaled = proj_scaled;
+                }
+            }
+            new_pos = unscaled<float>(min_proj_scaled);
+        }
+        el.position.head<2>() = new_pos;
+    };
+
+    for (size_t iter = 0; iter < num_iterations; ++ iter) {
+        // 1) Back-up the current positions.
+        stack.push_back({ root, 0 });
+        while (! stack.empty()) {
+            StackElement &state = stack.back();
+            if (state.idx_up == state.branch.num_up_trunk) {
+                // Process this path.
+                for (auto &el : state.branch.path)
+                    el.prev_position = el.position;
+                stack.pop_back();
+            } else {
+                // Open another up node of this branch.
+                stack.push_back({ *state.branch.up[state.idx_up].branch, 0 });
+                ++ state.idx_up;
+            }
+        }
+        // 2) Calculate new position.
+        stack.push_back({ root, 0 });
+        while (! stack.empty()) {
+            StackElement &state = stack.back();
+            if (state.idx_up == state.branch.num_up_trunk) {
+                // Process this path.
+                for (size_t i = 1; i + 1 < state.branch.path.size(); ++ i)
+                    if (auto &el = state.branch.path[i]; ! el.locked) {
+                        // Laplacian smoothing with 0.5 weight.
+                        const Vec3f &p0 = state.branch.path[i - 1].prev_position;
+                        const Vec3f &p1 = el.prev_position;
+                        const Vec3f &p2 = state.branch.path[i + 1].prev_position;
+                        adjust_position(el, 0.5 * p1.head<2>() + 0.25 * (p0.head<2>() + p2.head<2>()));
+#if 0
+                        // Only apply bilaplacian smoothing if the current curvature is smaller than el.radius.
+                        // Interpolate p0, p1, p2 with a circle.
+                        // First project p0, p1, p2 into a common plane.
+                        const Vec3f n = (p1 - p0).cross(p2 - p1);
+                        const Vec3f y = Vec3f(n.y(), n.x(), 0).normalized();
+                        const Vec2f q0{ p0.z(), p0.dot(y) };
+                        const Vec2f q1{ p1.z(), p1.dot(y) };
+                        const Vec2f q2{ p2.z(), p2.dot(y) };
+                        // Interpolate q0, q1, q2 with a circle, calculate its radius.
+                        Vec2f b = q1 - q0;
+                        Vec2f c = q2 - q0;
+                        float lb = b.squaredNorm();
+                        float lc = c.squaredNorm();
+                        if (float d = b.x() * c.y() - b.y() * c.x(); std::abs(d) > EPSILON) {
+                            Vec2f v = lc * b - lb * c;
+                            float r2 = 0.25f * v.squaredNorm() / sqr(d);
+                            if (r2 )
+                        }
+#endif
+                    }
+                {
+                    // Laplacian smoothing with 0.5 weight, branching point.
+                    const Vec3f &p0 = state.branch.path[state.branch.path.size() - 2].prev_position;
+                    const Vec3f &p1 = state.branch.path.back().prev_position;
+                    float weight = 0;
+                    Vec2f new_pos = Vec2f::Zero();
+                    for (size_t i = 0; i < state.branch.num_up_trunk; ++i) {
+                        const Element &el = state.branch.up[i].branch->path.front();
+                        new_pos += el.prev_position.head<2>();
+                        weight  += el.radius;
+                    }
+                    {
+                        const Element &el = state.branch.path[state.branch.path.size() - 2];
+                        new_pos += el.prev_position.head<2>();
+                        weight *= 2.f;
+                    }
+                    adjust_position(state.branch.path.back(), 0.5f * state.branch.path.back().prev_position.head<2>() + 0.5f * weight * new_pos);
+                }
+                stack.pop_back();
+            } else {
+                // Open another up node of this branch.
+                stack.push_back({ *state.branch.up[state.idx_up].branch, 0 });
+                ++ state.idx_up;
+            }
+        }
+    }
+    // Also smoothen start of the path.
+    if (Element &first = root.path.front(); ! first.locked) {
+        Element &second = root.path[1];
+        Vec2f new_pos = 0.75f * first.prev_position.head<2>() + 0.25f * second.prev_position.head<2>();
+        if (is_root)
+            // Let the root of the tree float inside its influence area.
+            adjust_position(first, new_pos);
+        else {
+            // Keep the start of a thin branch inside the trunk.
+            const Element &trunk = root.down.branch->path.back();
+            const float    rdif  = trunk.radius - root.path.front().radius;
+            assert(rdif >= 0);
+            Vec2f          vdif  = new_pos - trunk.prev_position.head<2>();
+            float          ldif  = vdif.squaredNorm();
+            if (ldif > sqr(rdif))
+                // Clamp new position.
+                new_pos = trunk.prev_position.head<2>() + vdif * rdif / sqrt(ldif);
+            first.position.head<2>() = new_pos;
+        }
+    }
+}
+
+void smooth_trees_inside_influence_areas(Forest &forest)
+{
+    // Parallel for!
+    for (Tree &tree : forest)
+        smooth_trees_inside_influence_areas(tree.root(), true);
+}
+
 // Test whether two circles, each on its own plane in 3D intersect.
 // Circles are considered intersecting, if the lowest point on one circle is below the other circle's plane.
 // Assumption: The two planes are oriented the same way.
