@@ -2354,13 +2354,23 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         size_t last = path_id;
 
         // check adjacent paths
-        while (first > 0 && path.sub_paths.front().first.position.isApprox(buffer.paths[first - 1].sub_paths.back().last.position)) {
+        while (first > 0) {
+            const Path& ref_path = buffer.paths[first - 1];
+            if (!path.sub_paths.front().first.position.isApprox(ref_path.sub_paths.back().last.position) ||
+                path.role != ref_path.role)
+                break;
+
+            path.sub_paths.front().first = ref_path.sub_paths.front().first;
             --first;
-            path.sub_paths.front().first = buffer.paths[first].sub_paths.front().first;
         }
-        while (last < buffer.paths.size() - 1 && path.sub_paths.back().last.position.isApprox(buffer.paths[last + 1].sub_paths.front().first.position)) {
+        while (last < buffer.paths.size() - 1) {
+            const Path& ref_path = buffer.paths[last + 1];
+            if (!path.sub_paths.back().last.position.isApprox(ref_path.sub_paths.front().first.position) ||
+                path.role != ref_path.role)
+                break;
+
+            path.sub_paths.back().last = ref_path.sub_paths.back().last;
             ++last;
-            path.sub_paths.back().last = buffer.paths[last].sub_paths.back().last;
         }
 
         const size_t min_s_id = m_layers.get_range_at(min_id).first;
@@ -3570,7 +3580,7 @@ void GCodeViewer::render_legend(float& legend_height)
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, { 0.2f, 0.2f, 0.2f, 0.8f });
-    imgui.combo("", { _u8L("Feature type"),
+    imgui.combo(std::string(), { _u8L("Feature type"),
                       _u8L("Height (mm)"),
                       _u8L("Width (mm)"),
                       _u8L("Speed (mm/s)"),
@@ -3951,7 +3961,7 @@ void GCodeViewer::render_legend(float& legend_height)
       const auto custom_it = std::find(m_roles.begin(), m_roles.end(), GCodeExtrusionRole::Custom);
       if (custom_it != m_roles.end()) {
           const bool custom_visible = is_visible(GCodeExtrusionRole::Custom);
-          const wxString btn_text = custom_visible ? _u8L("Hide Custom GCode") : _u8L("Show Custom GCode");
+          const wxString btn_text = custom_visible ? _u8L("Hide Custom G-code") : _u8L("Show Custom G-code");
           ImGui::Separator();
           if (imgui.button(btn_text, ImVec2(-1.0f, 0.0f), true)) {
               m_extrusions.role_visibility_flags = custom_visible ? m_extrusions.role_visibility_flags & ~(1 << int(GCodeExtrusionRole::Custom)) :

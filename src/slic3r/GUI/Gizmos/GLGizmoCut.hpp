@@ -149,6 +149,7 @@ class GLGizmoCut3D : public GLGizmoBase
             GLModel glmodel;
             MeshRaycaster raycaster;
             bool selected;
+            bool is_modifier;
         };
 
         void render(const Vec3d* normal, GLModel& sphere_model);
@@ -199,10 +200,10 @@ class GLGizmoCut3D : public GLGizmoBase
     CutConnectorType m_connector_type;
 
     std::vector<std::string> m_connector_styles;
-    size_t m_connector_style;
+    int m_connector_style;
 
     std::vector<std::string> m_connector_shapes;
-    size_t m_connector_shape_id;
+    int m_connector_shape_id;
 
     std::vector<std::string> m_axis_names;
 
@@ -301,7 +302,7 @@ protected:
 
 private:
     void set_center(const Vec3d& center, bool update_tbb = false);
-    bool render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx);
+    bool render_combo(const std::string& label, const std::vector<std::string>& lines, int& selection_idx);
     bool render_double_input(const std::string& label, double& value_in);
     bool render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in);
     void render_move_center_input(int axis);

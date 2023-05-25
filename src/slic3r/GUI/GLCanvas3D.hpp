@@ -193,6 +193,7 @@ class GLCanvas3D
             Unknown,
             Editing,
             Completed,
+            Paused,
             Num_States
         };
 

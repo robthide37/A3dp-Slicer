@@ -22,6 +22,7 @@ namespace GUI {
 static const ColorRGBA GRABBER_COLOR = ColorRGBA::YELLOW();
 static const ColorRGBA UPPER_PART_COLOR = ColorRGBA::CYAN();
 static const ColorRGBA LOWER_PART_COLOR = ColorRGBA::MAGENTA();
+static const ColorRGBA MODIFIER_COLOR   = ColorRGBA(0.75f, 0.75f, 0.75f, 0.5f);
 
 // connector colors
 static const ColorRGBA PLAG_COLOR           = ColorRGBA::YELLOW();
@@ -179,8 +180,8 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     : GLGizmoBase(parent, icon_filename, sprite_id)
     , m_connectors_group_id (GrabberID::Count)
     , m_connector_type (CutConnectorType::Plug)
-    , m_connector_style (size_t(CutConnectorStyle::Prism))
-    , m_connector_shape_id (size_t(CutConnectorShape::Circle))
+    , m_connector_style (int(CutConnectorStyle::Prism))
+    , m_connector_shape_id (int(CutConnectorShape::Circle))
 {
 //    m_modes = { _u8L("Planar"), _u8L("Grid")
 //              , _u8L("Radial"), _u8L("Modular")
@@ -465,41 +466,10 @@ void GLGizmoCut3D::set_center(const Vec3d& center, bool update_tbb /*=false*/)
     update_clipper();
 }
 
-bool GLGizmoCut3D::render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx)
+bool GLGizmoCut3D::render_combo(const std::string& label, const std::vector<std::string>& lines, int& selection_idx)
 {
     ImGui::AlignTextToFramePadding();
-    m_imgui->text(label);
-    ImGui::SameLine(m_label_width);
-    ImGui::PushItemWidth(m_control_width);
-    
-    size_t selection_out = selection_idx;
-    // It is necessary to use BeginGroup(). Otherwise, when using SameLine() is called, then other items will be drawn inside the combobox.
-    ImGui::BeginGroup();
-    ImVec2 combo_pos = ImGui::GetCursorScreenPos();
-    if (ImGui::BeginCombo(("##"+label).c_str(), "")) {
-        for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
-            ImGui::PushID(int(line_idx));
-            if (ImGui::Selectable("", line_idx == selection_idx))
-                selection_out = line_idx;
-
-            ImGui::SameLine();
-            ImGui::Text("%s", lines[line_idx].c_str());
-            ImGui::PopID();
-        }
-
-        ImGui::EndCombo();
-    }
-
-    ImVec2      backup_pos = ImGui::GetCursorScreenPos();
-    ImGuiStyle& style = ImGui::GetStyle();
-
-    ImGui::SetCursorScreenPos(ImVec2(combo_pos.x + style.FramePadding.x, combo_pos.y + style.FramePadding.y));
-    ImGui::Text("%s", selection_out < lines.size() ? lines[selection_out].c_str() : UndefLabel.c_str());
-    ImGui::SetCursorScreenPos(backup_pos);
-    ImGui::EndGroup();
-
-    bool is_changed = selection_idx != selection_out;
-    selection_idx = selection_out;
+    const bool is_changed = m_imgui->combo(label, lines, selection_idx, 0, m_label_width, m_control_width);
 
     if (is_changed)
         update_connector_shape();
@@ -1436,7 +1406,7 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transfor
     m_parts.clear();
     for (const ModelVolume* volume : volumes) {
         assert(volume != nullptr);
-        m_parts.emplace_back(Part{GLModel(), MeshRaycaster(volume->mesh()), true});
+        m_parts.emplace_back(Part{GLModel(), MeshRaycaster(volume->mesh()), true, !volume->is_model_part()});
         m_parts.back().glmodel.set_color({ 0.f, 0.f, 1.f, 1.f });
         m_parts.back().glmodel.init_from(volume->mesh());
 
@@ -1515,13 +1485,19 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal, GLModel& sphere_mo
         const bool is_looking_forward = normal && camera.get_dir_forward().dot(*normal) < 0.05;
 
         for (size_t id=0; id<m_parts.size(); ++id) {
-            if (normal && (( is_looking_forward &&  m_parts[id].selected) ||
-                           (!is_looking_forward && !m_parts[id].selected)   ) )
+            if (!m_parts[id].is_modifier && normal && ((is_looking_forward && m_parts[id].selected) ||
+                                                      (!is_looking_forward && !m_parts[id].selected)   ) )
                 continue;
             const Vec3d volume_offset = model_object()->volumes[id]->get_offset();
             shader->set_uniform("view_model_matrix", view_inst_matrix * translation_transform(volume_offset));
-            m_parts[id].glmodel.set_color(m_parts[id].selected ? UPPER_PART_COLOR : LOWER_PART_COLOR);
+            if (m_parts[id].is_modifier) {
+                glsafe(::glEnable(GL_BLEND));
+                glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+            }
+            m_parts[id].glmodel.set_color(m_parts[id].is_modifier ? MODIFIER_COLOR : (m_parts[id].selected ? UPPER_PART_COLOR : LOWER_PART_COLOR));
             m_parts[id].glmodel.render();
+            if (m_parts[id].is_modifier)
+                glsafe(::glDisable(GL_BLEND));
         }
 
         shader->stop_using();
@@ -1582,7 +1558,7 @@ bool GLGizmoCut3D::PartSelection::is_one_object() const
     if (m_parts.size() < 2)
         return true;
     return std::all_of(m_parts.begin(), m_parts.end(), [this](const Part& part) {
-        return part.selected == m_parts.front().selected;
+        return part.is_modifier || part.selected == m_parts.front().selected;
     });
 }
 
@@ -1803,7 +1779,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
 
     m_imgui->disabled_begin(m_connector_type == CutConnectorType::Dowel);
     if (type_changed && m_connector_type == CutConnectorType::Dowel) {
-        m_connector_style = size_t(CutConnectorStyle::Prism);
+        m_connector_style = int(CutConnectorStyle::Prism);
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
     }
     if (render_combo(m_labels_map["Style"], m_connector_styles, m_connector_style))
@@ -1813,7 +1789,7 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     if (render_combo(m_labels_map["Shape"], m_connector_shapes, m_connector_shape_id))
         apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id); });
 
-    if (render_slider_double_input(m_labels_map["Depth ratio"], m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
+    if (render_slider_double_input(m_labels_map["Depth"], m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
         apply_selected_connectors([this, &connectors](size_t idx) {
             if (m_connector_depth_ratio > 0)
                 connectors[idx].height           = m_connector_depth_ratio;
@@ -2136,10 +2112,10 @@ void GLGizmoCut3D::validate_connector_settings()
 
     if (m_connector_type == CutConnectorType::Undef)
         m_connector_type = CutConnectorType::Plug;
-    if (m_connector_style == size_t(CutConnectorStyle::Undef))
-        m_connector_style = size_t(CutConnectorStyle::Prism);
-    if (m_connector_shape_id == size_t(CutConnectorShape::Undef))
-        m_connector_shape_id = size_t(CutConnectorShape::Circle);
+    if (m_connector_style == int(CutConnectorStyle::Undef))
+        m_connector_style = int(CutConnectorStyle::Prism);
+    if (m_connector_shape_id == int(CutConnectorShape::Undef))
+        m_connector_shape_id = int(CutConnectorShape::Circle);
 }
 
 void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
@@ -2197,8 +2173,8 @@ void GLGizmoCut3D::init_input_window_data(CutConnectors &connectors)
         m_connector_size                    = 2.f * radius;
         m_connector_size_tolerance          = 2.f * radius_tolerance;
         m_connector_type                    = type;
-        m_connector_style                   = size_t(style);
-        m_connector_shape_id                = size_t(shape);
+        m_connector_style                   = int(style);
+        m_connector_shape_id                = int(shape);
     }
 
     if (m_label_width == 0.f) {
@@ -2566,29 +2542,66 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
             };
 
             const size_t cut_parts_cnt = m_part_selection.parts().size();
+            bool has_modifiers = false;
+
+            // Distribute SolidParts to the Upper/Lower object
             for (size_t id = 0; id < cut_parts_cnt; ++id) {
-                if (ModelObject* obj = (m_part_selection.parts()[id].selected ? upper : lower))
+                if (m_part_selection.parts()[id].is_modifier)
+                    has_modifiers = true; // modifiers will be added later to the related parts
+                else if (ModelObject* obj = (m_part_selection.parts()[id].selected ? upper : lower))
                     obj->add_volume(*(cut_mo->volumes[id]));
             }
 
+            if (has_modifiers) {
+                // Distribute Modifiers to the Upper/Lower object
+                auto upper_bb = upper ? upper->instance_bounding_box(instance_idx) : BoundingBoxf3();
+                auto lower_bb = lower ? lower->instance_bounding_box(instance_idx) : BoundingBoxf3();
+                const Transform3d inst_matrix = cut_mo->instances[instance_idx]->get_transformation().get_matrix();
+
+                for (size_t id = 0; id < cut_parts_cnt; ++id)
+                    if (m_part_selection.parts()[id].is_modifier) {
+                        ModelVolume* vol = cut_mo->volumes[id];
+                        auto bb = vol->mesh().transformed_bounding_box(inst_matrix * vol->get_matrix());
+                        // Don't add modifiers which are not intersecting with solid parts
+                        if (upper_bb.intersects(bb))
+                            upper->add_volume(*vol);
+                        if (lower_bb.intersects(bb))
+                            lower->add_volume(*vol);
+                    }
+            }
+
             ModelVolumePtrs& volumes = cut_mo->volumes;
-            if (volumes.size() == cut_parts_cnt)
+            if (volumes.size() == cut_parts_cnt) {
+                // Means that object is cut without connectors
+
+                // Just add Upper and Lower objects to cut_object_ptrs and invalidate any cut information
                 add_cut_objects(cut_object_ptrs, upper, lower);
+            }
             else if (volumes.size() > cut_parts_cnt) {
+                // Means that object is cut with connectors
+
+                // All volumes are distributed to Upper / Lower object,
+                // So we don’t need them anymore
                 for (size_t id = 0; id < cut_parts_cnt; id++)
                     delete *(volumes.begin() + id);
                 volumes.erase(volumes.begin(), volumes.begin() + cut_parts_cnt);
 
+                // Perform cut just to get connectors
                 const ModelObjectPtrs cut_connectors_obj = cut_mo->cut(instance_idx, get_cut_matrix(selection), attributes);
                 assert(create_dowels_as_separate_object ? cut_connectors_obj.size() >= 3 : cut_connectors_obj.size() == 2);
 
+                // Connectors from upper object
                 for (const ModelVolume* volume : cut_connectors_obj[0]->volumes)
                      upper->add_volume(*volume, volume->type());
+
+                // Connectors from lower object
                 for (const ModelVolume* volume : cut_connectors_obj[1]->volumes)
                      lower->add_volume(*volume, volume->type());
 
+                // Add Upper and Lower objects to cut_object_ptrs with saved cut information
                 add_cut_objects(cut_object_ptrs, upper, lower, false);
 
+                // Add Dowel-connectors as separate objects to cut_object_ptrs
                 if (cut_connectors_obj.size() >= 3)
                     for (size_t id = 2; id < cut_connectors_obj.size(); id++)
                         cut_object_ptrs.push_back(cut_connectors_obj[id]);
@@ -2598,8 +2611,9 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
             {
                 for (ModelObject* mo : cut_object_ptrs) {
                     TriangleMesh mesh;
+                    // Merge all SolidPart but not Connectors
                     for (const ModelVolume* mv : mo->volumes) {
-                        if (mv->is_model_part()) {
+                        if (mv->is_model_part() && !mv->is_cut_connector()) {
                             TriangleMesh m = mv->mesh();
                             m.transform(mv->get_matrix());
                             mesh.merge(m);
@@ -2607,9 +2621,13 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                     }
                     if (! mesh.empty()) {
                         ModelVolume* new_volume = mo->add_volume(mesh);
-                        for (int i=int(mo->volumes.size())-2; i>=0; --i)
-                            if (mo->volumes[i]->type() == ModelVolumeType::MODEL_PART)
+                        new_volume->name = mo->name;
+                        // Delete all merged SolidPart but not Connectors
+                        for (int i=int(mo->volumes.size())-2; i>=0; --i) {
+                            const ModelVolume* mv = mo->volumes[i];
+                            if (mv->is_model_part() && !mv->is_cut_connector())
                                 mo->delete_volume(i);
+                        }
                     }
                 }
             }

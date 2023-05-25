@@ -6067,36 +6067,36 @@ void Plater::remove_selected()
     p->view3D->delete_selected();
 }
 
-void Plater::increase_instances(size_t num, int obj_idx, std::optional<Selection::ObjectIdxsToInstanceIdxsMap> selection_map)
+void Plater::increase_instances(size_t num, int obj_idx, int inst_idx)
 {
     if (! can_increase_instances()) { return; }
 
     Plater::TakeSnapshot snapshot(this, _L("Increase Instances"));
 
-    if (obj_idx < 0)
-        obj_idx = p->get_selected_object_idx();
-
     if (obj_idx < 0) {
-        if (const auto obj_idxs = get_selection().get_object_idxs(); !obj_idxs.empty()) {
-            // we need a copy made here because the selection changes at every call of increase_instances()
-            const Selection::ObjectIdxsToInstanceIdxsMap content = selection_map.has_value() ? *selection_map : p->get_selection().get_content();
-            for (const size_t obj_id : obj_idxs) {
-                increase_instances(1, int(obj_id), content);
+        obj_idx = p->get_selected_object_idx();
+        if (obj_idx < 0) {
+            // It's a case of increasing per 1 instance, when multiple objects are selected
+            if (const auto obj_idxs = get_selection().get_object_idxs(); !obj_idxs.empty()) {
+                // we need a copy made here because the selection changes at every call of increase_instances()
+                const Selection::ObjectIdxsToInstanceIdxsMap content = p->get_selection().get_content();
+                for (const size_t& obj_id : obj_idxs) {
+                    if (auto obj_it = content.find(int(obj_id)); obj_it != content.end())
+                        increase_instances(1, int(obj_id), *obj_it->second.rbegin());
+                }
             }
+            return;
         }
-        return;
     }
+    assert(obj_idx >= 0);
 
     ModelObject* model_object = p->model.objects[obj_idx];
-    int inst_idx = -1;
-    if (selection_map.has_value()) {
-        auto obj_it = selection_map->find(obj_idx);
-        if (obj_it != selection_map->end() && obj_it->second.size() == 1)
-            inst_idx = *obj_it->second.begin();
-    }
-    else
-        inst_idx = p->get_selected_instance_idx();
 
+    if (inst_idx < 0 && get_selected_object_idx() >= 0) {
+        inst_idx = get_selection().get_instance_idx();
+        if (0 > inst_idx || inst_idx >= int(model_object->instances.size()))
+            inst_idx = -1;
+    }
     ModelInstance* model_instance = (inst_idx >= 0) ? model_object->instances[inst_idx] : model_object->instances.back();
 
     bool was_one_instance = model_object->instances.size()==1;
@@ -6108,7 +6108,6 @@ void Plater::increase_instances(size_t num, int obj_idx, std::optional<Selection
         Geometry::Transformation trafo = model_instance->get_transformation();
         trafo.set_offset(offset_vec);
         model_object->add_instance(trafo);
-//        p->print.get_object(obj_idx)->add_copy(Slic3r::to_2d(offset_vec));
     }
 
     if (p->get_config_bool("autocenter"))
@@ -6192,11 +6191,16 @@ void Plater::set_number_of_copies()
         return;
     TakeSnapshot snapshot(this, wxString::Format(_L("Set numbers of copies to %d"), num));
 
-    for (const auto obj_idx : obj_idxs) {
+    // we need a copy made here because the selection changes at every call of increase_instances()
+    Selection::ObjectIdxsToInstanceIdxsMap content = p->get_selection().get_content();
+
+    for (const auto& obj_idx : obj_idxs) {
         ModelObject* model_object = p->model.objects[obj_idx];
         const int diff = num - (int)model_object->instances.size();
-        if (diff > 0)
-            increase_instances(diff, int(obj_idx));
+        if (diff > 0) {
+            if (auto obj_it = content.find(int(obj_idx)); obj_it != content.end())
+                increase_instances(diff, int(obj_idx), *obj_it->second.rbegin());
+        }
         else if (diff < 0)
             decrease_instances(-diff, int(obj_idx));
     }

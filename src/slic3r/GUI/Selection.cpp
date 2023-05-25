@@ -1598,6 +1598,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     shader->start_using();
 
     glsafe(::glEnable(GL_DEPTH_TEST));
+    glsafe(::glDisable(GL_CULL_FACE));
 
     const Transform3d base_matrix = Geometry::translation_transform(get_bounding_box().center());
     Transform3d orient_matrix = Transform3d::Identity();
@@ -1608,15 +1609,15 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     if (!boost::starts_with(sidebar_field, "layer")) {
         shader->set_uniform("emission_factor", 0.05f);
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
-          orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
-          axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
+            orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
+            axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
         }
         else if (is_single_volume_or_modifier()) {
             if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
                 if (wxGetApp().obj_manipul()->is_local_coordinates()) {
                     const GLVolume* v = (*m_volumes)[*m_list.begin()];
-                    orient_matrix = v->get_instance_transformation().get_rotation_matrix() * v->get_volume_transformation().get_rotation_matrix();
-                    axes_center = (*m_volumes)[*m_list.begin()]->world_matrix().translation();
+                    orient_matrix = get_bounding_box_in_current_reference_system().second;
+                    orient_matrix.translation() = Vec3d::Zero();
                 }
                 else {
                     orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
@@ -1650,6 +1651,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
             m_axes.render(Geometry::translation_transform(axes_center) * orient_matrix, 0.25f);
     }
 
+    glsafe(::glEnable(GL_CULL_FACE));
     shader->stop_using();
 }
 

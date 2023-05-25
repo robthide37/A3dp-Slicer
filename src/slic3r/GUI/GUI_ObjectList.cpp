@@ -955,7 +955,7 @@ void ObjectList::list_manipulation(const wxPoint& mouse_pos, bool evt_context_me
 
     if (!item) {
         if (col == nullptr) {
-            if (wxOSX && !multiple_selection())
+            if (wxOSX)
                 UnselectAll();
             else if (!evt_context_menu) 
                 // Case, when last item was deleted and under GTK was called wxEVT_DATAVIEW_SELECTION_CHANGED,
@@ -972,11 +972,17 @@ void ObjectList::list_manipulation(const wxPoint& mouse_pos, bool evt_context_me
     if (wxOSX && item && col) {
         wxDataViewItemArray sels;
         GetSelections(sels);
-        UnselectAll();
-        if (sels.Count() > 1)
-            SetSelections(sels);
-        else
+        bool is_selection_changed = true;
+        for (const auto& sel_item : sels)
+            if (sel_item == item) {
+                // item is one oth the already selected items, so resection is no needed
+                is_selection_changed = false;
+                break;
+            }
+        if (is_selection_changed) {
+            UnselectAll();
             Select(item);
+        }
     }
 
     if (col != nullptr) 
@@ -1795,7 +1801,7 @@ void ObjectList::load_shape_object(const std::string& type_name)
     // Create mesh
     BoundingBoxf3 bb;
     TriangleMesh mesh = create_mesh(type_name, bb);
-    load_mesh_object(mesh, _u8L("Shape") + "-" + type_name);
+    load_mesh_object(mesh, _u8L("Shape") + "-" + into_u8(_(type_name)));
     if (!m_objects->empty())
         m_objects->back()->volumes.front()->source.is_from_builtin_objects = true;
     wxGetApp().mainframe->update_title();
@@ -2064,7 +2070,7 @@ bool ObjectList::del_from_cut_object(bool is_cut_connector, bool is_model_part/*
     InfoDialog dialog(wxGetApp().plater(), title,
                       _L("This action will break a cut information.\n"
                          "After that PrusaSlicer can't guarantee model consistency.") + "\n\n" +
-                      _L("To manipulate with solid parts or negative volumes you have to invalidate cut information first." + msg_end ),
+                      _L("To manipulate with solid parts or negative volumes you have to invalidate cut information first.") + msg_end,
                       false, buttons_style | wxCANCEL_DEFAULT | wxICON_WARNING);
 
     dialog.SetButtonLabel(wxID_YES, _L("Invalidate cut info"));
