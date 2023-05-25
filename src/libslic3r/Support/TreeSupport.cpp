@@ -3472,6 +3472,17 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         if (support_params.has_base_interfaces() || has_raft)
             base_interface_layers.assign(num_support_layers, nullptr);
 
+        auto remove_undefined_layers = [&bottom_contacts, &top_contacts, &interface_layers, &base_interface_layers, &intermediate_layers]() {
+            auto doit = [](SupportGeneratorLayersPtr& layers) {
+                layers.erase(std::remove_if(layers.begin(), layers.end(), [](const SupportGeneratorLayer* ptr) { return ptr == nullptr; }), layers.end());
+            };
+            doit(bottom_contacts);
+            doit(top_contacts);
+            doit(interface_layers);
+            doit(base_interface_layers);
+            doit(intermediate_layers);
+        };
+
         InterfacePlacer              interface_placer{
             print_object.slicing_parameters(), support_params, config,
             // Outputs
@@ -3523,14 +3534,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
                     throw_on_cancel);
             }
 
-            auto remove_undefined_layers = [](SupportGeneratorLayersPtr& layers) {
-                layers.erase(std::remove_if(layers.begin(), layers.end(), [](const SupportGeneratorLayer* ptr) { return ptr == nullptr; }), layers.end());
-            };
-            remove_undefined_layers(bottom_contacts);
-            remove_undefined_layers(top_contacts);
-            remove_undefined_layers(interface_layers);
-            remove_undefined_layers(base_interface_layers);
-            remove_undefined_layers(intermediate_layers);
+            remove_undefined_layers();
 
             std::tie(interface_layers, base_interface_layers) = generate_interface_layers(print_object.config(), support_params,
                 bottom_contacts, top_contacts, interface_layers, base_interface_layers, intermediate_layers, layer_storage);
@@ -3553,7 +3557,9 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
     //            BOOST_LOG_TRIVIAL(error) << "Why ask questions when you already know the answer twice.\n (This is not a real bug, please dont report it.)";
             
             move_bounds.clear();
-        } else if (generate_raft_contact(print_object, config, interface_placer) < 0)
+        } else if (generate_raft_contact(print_object, config, interface_placer) >= 0) {
+            remove_undefined_layers();
+        } else
             // No raft.
             continue;
 
