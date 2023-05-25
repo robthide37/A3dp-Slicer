@@ -680,7 +680,7 @@ static inline void tree_supports_generate_paths(
             ClipperLib_Z::Path *closest_contour = nullptr;
             Vec2d               closest_point;
             int                 closest_point_idx = -1;
-            double              closest_point_t;
+            double              closest_point_t = 0.;
             double              d2min = std::numeric_limits<double>::max();
             Vec2d               seam_pt = pl.back().cast<double>();
             for (ClipperLib_Z::Path &path : anchor_candidates)

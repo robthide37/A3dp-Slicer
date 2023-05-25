@@ -1177,7 +1177,7 @@ void sample_overhang_area(
     }
 
     assert(dtt_roof <= layer_idx);
-    if (int(dtt_roof) >= layer_idx && large_horizontal_roof)
+    if (dtt_roof >= layer_idx && large_horizontal_roof)
         // Reached buildplate when generating contact, interface and base interface layers.
         interface_placer.add_roof_build_plate(std::move(overhang_area), dtt_roof);
     else {
@@ -1284,7 +1284,7 @@ static void generate_initial_areas(
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, raw_overhangs.size()),
         [&volumes, &config, &raw_overhangs, &mesh_group_settings,
-         min_xy_dist, force_tip_to_roof, roof_enabled, num_support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
+         min_xy_dist, roof_enabled, num_support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length,
          &rich_interface_placer, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
         for (size_t raw_overhang_idx = range.begin(); raw_overhang_idx < range.end(); ++ raw_overhang_idx) {
             size_t           layer_idx    = raw_overhangs[raw_overhang_idx].first;

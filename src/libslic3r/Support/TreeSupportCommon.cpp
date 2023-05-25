@@ -78,9 +78,7 @@ TreeSupportMeshGroupSettings::TreeSupportMeshGroupSettings(const PrintObject &pr
 }
 
 TreeSupportSettings::TreeSupportSettings(const TreeSupportMeshGroupSettings &mesh_group_settings, const SlicingParameters &slicing_params)
-    : angle(mesh_group_settings.support_tree_angle),
-      angle_slow(mesh_group_settings.support_tree_angle_slow),
-      support_line_width(mesh_group_settings.support_line_width),
+    : support_line_width(mesh_group_settings.support_line_width),
       layer_height(mesh_group_settings.layer_height),
       branch_radius(mesh_group_settings.support_tree_branch_diameter / 2),
       min_radius(mesh_group_settings.support_tree_tip_diameter / 2), // The actual radius is 50 microns larger as the resulting branches will be increased by 50 microns to avoid rounding errors effectively increasing the xydistance

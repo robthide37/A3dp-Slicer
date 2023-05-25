@@ -443,8 +443,6 @@ public:
 #endif
 
 private:
-    double angle;
-    double angle_slow;
 //    std::vector<coord_t> known_z;
 };
 

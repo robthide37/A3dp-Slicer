@@ -146,7 +146,7 @@ Forest make_forest(const TreeSupportSettings &config, const SlicingParameters &s
             // Collect elements up to a bifurcation above.
             start_element.state.marked = true;
             // For each branch bifurcating from this point:
-            SupportElements &layer       = move_bounds[start_element.state.layer_idx];
+//            SupportElements &layer       = move_bounds[start_element.state.layer_idx];
             SupportElements &layer_above = move_bounds[start_element.state.layer_idx + 1];
             for (size_t parent_idx = 0; parent_idx < start_element.parents.size(); ++ parent_idx) {
                 Branch branch;
@@ -401,8 +401,6 @@ void smooth_trees_inside_influence_areas(Branch &root, bool is_root)
                     }
                 {
                     // Laplacian smoothing with 0.5 weight, branching point.
-                    const Vec3f &p0 = state.branch.path[state.branch.path.size() - 2].prev_position;
-                    const Vec3f &p1 = state.branch.path.back().prev_position;
                     float weight = 0;
                     Vec2f new_pos = Vec2f::Zero();
                     for (size_t i = 0; i < state.branch.num_up_trunk; ++i) {
@@ -454,6 +452,7 @@ void smooth_trees_inside_influence_areas(Forest &forest)
         smooth_trees_inside_influence_areas(tree.root(), true);
 }
 
+#if 0
 // Test whether two circles, each on its own plane in 3D intersect.
 // Circles are considered intersecting, if the lowest point on one circle is below the other circle's plane.
 // Assumption: The two planes are oriented the same way.
@@ -474,6 +473,7 @@ static bool circles_intersect(
     assert(n1.dot(p2) >= n1.dot(lowest_point2));
     return n1.dot(lowest_point2) <= 0;
 }
+#endif
 
 template<bool flip_normals>
 void triangulate_fan(indexed_triangle_set &its, int ifan, int ibegin, int iend)
@@ -602,7 +602,8 @@ static std::pair<float, float> extrude_branch(
 //    char fname[2048];
 //    static int irun = 0;
 
-    float zmin, zmax;
+    float zmin = 0;
+    float zmax = 0;
 
     for (size_t ipath = 1; ipath < path.size(); ++ ipath) {
         const SupportElement &prev    = *path[ipath - 1];
@@ -854,7 +855,7 @@ static void organic_smooth_branches_avoid_collisions(
                     }
                     // Laplacian smoothing
                     Vec2d avg{ 0, 0 };
-                    const SupportElements &above = move_bounds[collision_sphere.element.state.layer_idx + 1];
+                    //const SupportElements &above = move_bounds[collision_sphere.element.state.layer_idx + 1];
                     const size_t           offset_above = linear_data_layers[collision_sphere.element.state.layer_idx + 1];
                     double weight = 0.;
                     for (auto iparent : collision_sphere.element.parents) {
@@ -1027,7 +1028,7 @@ void organic_draw_branches(
         std::vector<std::pair<SupportElement*, int>> map_downwards_new;
         linear_data_layers.emplace_back(0);
         for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
-            SupportElements *layer_above = layer_idx + 1 < move_bounds.size() ? &move_bounds[layer_idx + 1] : nullptr;
+            SupportElements *layer_above = layer_idx + 1 < LayerIndex(move_bounds.size()) ? &move_bounds[layer_idx + 1] : nullptr;
             map_downwards_new.clear();
             std::sort(map_downwards_old.begin(), map_downwards_old.end(), [](auto& l, auto& r) { return l.first < r.first;  });
             SupportElements &layer = move_bounds[layer_idx];
@@ -1103,7 +1104,7 @@ void organic_draw_branches(
             // Collect elements up to a bifurcation above.
             start_element.state.marked = true;
             // For each branch bifurcating from this point:
-            SupportElements &layer       = move_bounds[start_element.state.layer_idx];
+            //SupportElements &layer       = move_bounds[start_element.state.layer_idx];
             SupportElements &layer_above = move_bounds[start_element.state.layer_idx + 1];
             bool root = out.branches.empty();
             for (size_t parent_idx = 0; parent_idx < start_element.parents.size(); ++ parent_idx) {
@@ -1244,7 +1245,7 @@ void organic_draw_branches(
                                 double                          support_area_min_radius = M_PI * sqr(double(config.branch_radius));
                                 double                          support_area_stop = std::max(0.2 * M_PI * sqr(double(bottom_radius)), 0.5 * support_area_min_radius);
                                  // Only propagate until the rest area is smaller than this threshold.
-                                double                          support_area_min = 0.1 * support_area_min_radius;
+                                //double                          support_area_min = 0.1 * support_area_min_radius;
                                 for (LayerIndex layer_idx = layer_begin - 1; layer_idx >= layer_bottommost; -- layer_idx) {
                                     rest_support = diff_clipped(rest_support.empty() ? slices.front() : rest_support, volumes.getCollision(0, layer_idx, false));
                                     double rest_support_area = area(rest_support);
@@ -1323,11 +1324,11 @@ void organic_draw_branches(
                                 Slice &dst = tree.slices[i - new_begin];
                                 if (++ dst.num_branches > 1) {
                                     append(dst.polygons, std::move(src));
-                                    if (j < bottom_contacts.size())
+                                    if (j < int(bottom_contacts.size()))
                                         append(dst.bottom_contacts, std::move(bottom_contacts[j]));
                                 } else {
                                     dst.polygons = std::move(std::move(src));
-                                    if (j < bottom_contacts.size())
+                                    if (j < int(bottom_contacts.size()))
                                         dst.bottom_contacts = std::move(bottom_contacts[j]);
                                 }
                             }
