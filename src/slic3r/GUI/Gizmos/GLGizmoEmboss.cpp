@@ -148,12 +148,14 @@ namespace priv {
 /// <param name="style_manager">Keep actual selected style</param>
 /// <param name="text_lines">Needed when transform per glyph</param>
 /// <param name="selection">Needed for transform per glyph</param>
+/// <param name="type">Define type of volume - side of surface(in / out)</param>
 /// <param name="cancel">Cancel for previous job</param>
 /// <returns>Base data for emboss text</returns>
 static DataBase create_emboss_data_base(const std::string                  &text,
                                         StyleManager                       &style_manager,
                                         TextLinesModel                     &text_lines,
                                         const Selection                    &selection,
+                                        ModelVolumeType type,
                                         std::shared_ptr<std::atomic<bool>> &cancel);
 
 /// <summary>
@@ -176,6 +178,8 @@ static void start_create_volume_job(const ModelObject *object,
 /// <param name="screen_coor">Mouse position which define position</param>
 /// <param name="gl_volume">Volume to find surface for create</param>
 /// <param name="raycaster">Ability to ray cast to model</param>
+/// <param name="text_lines">Per glyph transformation</param>
+/// <param name="style_manager">Line height need font file/param>
 /// <param name="canvas">Contain already used scene RayCasters</param>
 /// <returns>True when start creation, False when there is no hit surface by screen coor</returns>
 static bool start_create_volume_on_surface_job(DataBase         &emboss_data,
@@ -183,6 +187,8 @@ static bool start_create_volume_on_surface_job(DataBase         &emboss_data,
                                                const Vec2d      &screen_coor,
                                                const GLVolume   *gl_volume,
                                                RaycastManager   &raycaster,
+                                               TextLinesModel &text_lines,
+                                               /*const */ StyleManager &style_manager,
                                                GLCanvas3D       &canvas);
 
 /// <summary>
@@ -249,7 +255,29 @@ static bool apply_camera_dir(const Camera &camera, GLCanvas3D &canvas, bool keep
 } // namespace priv
 
 namespace {
+// for existing volume which is selected(could init different(to volume text) lines count when edit text)
 void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines=0);
+// before text volume is created
+void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_tr, const ModelObject& mo, /* const*/ StyleManager &style_manager)
+{
+    // prepare volumes to slice
+    ModelVolumePtrs volumes;
+    volumes.reserve(mo.volumes.size());
+    for (ModelVolume *volume : mo.volumes) {
+        // only part could be surface for volumes
+        if (!volume->is_model_part())
+            continue;
+        volumes.push_back(volume);
+    }
+
+    double line_height = style_manager.get_line_height();
+    if (line_height < 0)
+        return;
+
+    FontProp::Align align = style_manager.get_font_prop().align;
+    unsigned count_lines = 1;
+    text_lines.init(new_text_tr, volumes, align, line_height, count_lines);
+}
 }
 
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
@@ -258,11 +286,11 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
         return;
 
     const GLVolume *gl_volume = get_first_hovered_gl_volume(m_parent);
-    DataBase emboss_data    = priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_job_cancel);
+    DataBase emboss_data    = priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), volume_type, m_job_cancel);
     bool is_simple_mode = wxGetApp().get_mode() == comSimple;
     if (gl_volume != nullptr && !is_simple_mode) {
         // Try to cast ray into scene and find object for add volume
-        if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager, m_parent)) {
+        if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, mouse_pos, gl_volume, m_raycast_manager, m_text_lines, m_style_manager, m_parent)) {
             // When model is broken. It could appear that hit miss the object.
             // So add part near by in simmilar manner as right panel do
             create_volume(volume_type);
@@ -285,7 +313,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
 
     Size s = m_parent.get_canvas_size();
     Vec2d screen_center(s.get_width() / 2., s.get_height() / 2.);
-    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_job_cancel);
+    DataBase emboss_data = priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), volume_type, m_job_cancel);
     const ModelObjectPtrs &objects = selection.get_model()->objects;
     bool is_simple_mode = wxGetApp().get_mode() == comSimple;
     // No selected object so create new object
@@ -303,7 +331,7 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
     priv::find_closest_volume(selection, screen_center, camera, objects, &coor, &vol);
     if (vol == nullptr) {
         priv::start_create_object_job(emboss_data, screen_center);
-    } else if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager, m_parent)) {
+    } else if (!priv::start_create_volume_on_surface_job(emboss_data, volume_type, coor, vol, m_raycast_manager, m_text_lines, m_style_manager, m_parent)) {
         // in centroid of convex hull is not hit with object
         // soo create transfomation on border of object
         
@@ -321,7 +349,11 @@ void GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
             - instance_bb.size().y() / 2 - prop.size_in_mm / 2, // under
             prop.emboss / 2 - instance_bb.size().z() / 2 // lay on bed
         );
-        Transform3d volume_trmat = tr * Eigen::Translation3d(offset_tr);
+        Transform3d volume_trmat = tr * Eigen::Translation3d(offset_tr);                
+        if (prop.per_glyph) {
+            init_new_text_line(m_text_lines, volume_trmat, *obj, m_style_manager);
+            emboss_data.text_lines = m_text_lines.get_lines();
+        }
         priv::start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
     }
 }
@@ -1062,24 +1094,63 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
 namespace {
 void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines)
 {
-    assert(style_manager.is_active_font());
-    if (!style_manager.is_active_font())
+    double line_height = style_manager.get_line_height();
+    if (line_height < 0)
         return;
-    const auto &ffc = style_manager.get_font_file_with_cache();
-    assert(ffc.has_value());
-    if (!ffc.has_value())
+    
+    const GLVolume *gl_volume_ptr = selection.get_first_volume();
+    if (gl_volume_ptr == nullptr)
         return;
-    const auto &ff_ptr = ffc.font_file;
-    assert(ff_ptr != nullptr);
-    if (ff_ptr == nullptr)
+    const GLVolume        &gl_volume = *gl_volume_ptr;
+    const ModelObjectPtrs &objects   = selection.get_model()->objects;
+    const ModelObject     *mo_ptr    = get_model_object(gl_volume, objects);
+    if (mo_ptr == nullptr)
+        return;
+    const ModelObject &mo = *mo_ptr;
+
+    const ModelVolume *mv_ptr = get_model_volume(gl_volume, objects);
+    if (mv_ptr == nullptr)
+        return;
+    const ModelVolume &mv = *mv_ptr;
+    if (mv.is_the_only_one_part())
         return;
 
+    const std::optional<TextConfiguration> &tc_opt = mv.text_configuration;
+    if (!tc_opt.has_value())
+        return;
+    const TextConfiguration &tc = *tc_opt;
+
+    // calculate count lines when not set
+    if (count_lines == 0) {
+        count_lines = get_count_lines(tc.text);
+        if (count_lines == 0)
+            return;
+    }
+
+    // prepare volumes to slice
+    ModelVolumePtrs volumes;
+    volumes.reserve(mo.volumes.size());
+    for (ModelVolume *volume : mo.volumes) {
+        // only part could be surface for volumes
+        if (!volume->is_model_part())
+            continue;
+
+        // is selected volume
+        if (mv.id() == volume->id())
+            continue;
+
+        volumes.push_back(volume);
+    }
+
+    // For interactivity during drag over surface it must be from gl_volume not volume.
+    const Transform3d &mv_trafo = gl_volume.get_volume_transformation().get_matrix();
     const FontProp &fp = style_manager.get_font_prop();
-    const FontFile &ff = *ff_ptr;
-
-    double line_height = TextLinesModel::calc_line_height(ff, fp);
-    text_lines.init(selection, line_height, count_lines);
+    text_lines.init(mv_trafo, volumes, fp.align, line_height, count_lines);
 }
+}
+
+void GLGizmoEmboss::reinit_text_lines(unsigned count_lines) {    
+    init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, count_lines);
 }
 
 void GLGizmoEmboss::set_volume_by_selection()
@@ -1221,7 +1292,7 @@ void GLGizmoEmboss::set_volume_by_selection()
     m_volume_id = volume->id();
         
     if (tc.style.prop.per_glyph)
-        init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager);
+        reinit_text_lines();
 
     // Calculate current angle of up vector
     assert(m_style_manager.is_active_font());
@@ -1304,7 +1375,7 @@ bool GLGizmoEmboss::process()
     // exist loaded font file?
     if (!m_style_manager.is_active_font()) return false;
     
-    DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_job_cancel),
+    DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_volume->type(), m_job_cancel),
                     m_volume->id()};
     std::unique_ptr<Job> job = nullptr;
 
@@ -1338,7 +1409,7 @@ bool GLGizmoEmboss::process()
         // check that there is not unexpected volume type
         assert(is_outside || m_volume->is_negative_volume() ||
                m_volume->is_modifier());
-        UpdateSurfaceVolumeData surface_data{std::move(data), {text_tr, is_outside, std::move(sources)}};
+        UpdateSurfaceVolumeData surface_data{std::move(data), {text_tr, std::move(sources)}};
         job = std::make_unique<UpdateSurfaceVolumeJob>(std::move(surface_data));                  
     } else {
         job = std::make_unique<UpdateJob>(std::move(data));
@@ -1555,7 +1626,7 @@ void GLGizmoEmboss::draw_text_input()
             unsigned count_lines = get_count_lines(m_text);
             if (count_lines != m_text_lines.get_lines().size()) 
                 // Necesarry to initialize count by given number (differ from stored in volume at the moment)
-                init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, count_lines);         
+                reinit_text_lines(count_lines);         
         }
         process();
         range_text = create_range_text_prep();
@@ -1982,6 +2053,8 @@ void GLGizmoEmboss::draw_font_list_line()
 
     if (exist_change) {
         m_style_manager.clear_glyphs_cache();
+        if (m_style_manager.get_font_prop().per_glyph)
+            reinit_text_lines(m_text_lines.get_lines().size());
         process();
     }
 }
@@ -2206,7 +2279,8 @@ void GLGizmoEmboss::draw_model_type()
         m_volume->set_type(*new_type);
 
          // Update volume position when switch from part or into part
-        if (m_volume->text_configuration->style.prop.use_surface) {
+        const FontProp& prop = m_volume->text_configuration->style.prop;
+        if (prop.use_surface || prop.per_glyph) {
             // move inside
             bool is_volume_move_inside  = (type == part);
             bool is_volume_move_outside = (*new_type == part);
@@ -2835,6 +2909,9 @@ bool GLGizmoEmboss::set_height() {
     if (is_approx(value, m_volume->text_configuration->style.prop.size_in_mm))
         return false;
     
+    if (m_style_manager.get_font_prop().per_glyph)
+        reinit_text_lines(m_text_lines.get_lines().size());
+
 #ifdef USE_PIXEL_SIZE_IN_WX_FONT
     // store font size into path serialization
     const wxFont &wx_font = m_style_manager.get_wx_font();
@@ -3047,6 +3124,8 @@ void GLGizmoEmboss::draw_advanced()
     const bool *def_per_glyph = stored_style ? &stored_style->prop.per_glyph : nullptr;
     if (rev_checkbox(tr.per_glyph, per_glyph, def_per_glyph,
         _u8L("Revert Transformation per glyph."))) {
+        if (per_glyph && !m_text_lines.is_init())
+            reinit_text_lines();
         process();
     } else if (ImGui::IsItemHovered()) {
         if (per_glyph) {
@@ -3054,7 +3133,7 @@ void GLGizmoEmboss::draw_advanced()
         } else {
             ImGui::SetTooltip("%s", _u8L("Set position and orientation per Glyph.").c_str());
             if (!m_text_lines.is_init())
-                init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager);
+                reinit_text_lines();
         }
     } else if (!per_glyph && m_text_lines.is_init())
         m_text_lines.reset();
@@ -3064,10 +3143,10 @@ void GLGizmoEmboss::draw_advanced()
     ImGui::SameLine();
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
     if (m_imgui->slider_float("##base_line_y_offset", &m_text_lines.offset, -10.f, 10.f, "%f mm")) {
-        init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, m_text_lines.get_lines().size());
+        reinit_text_lines(m_text_lines.get_lines().size());
         process();
     } else if (ImGui::IsItemHovered()) 
-        ImGui::SetTooltip("%s", _u8L("Move base line (up/down) for allign letters").c_str());
+        ImGui::SetTooltip("TEST PURPOSE ONLY\nMove base line (up/down) for allign letters");
     m_imgui->disabled_end(); // !per_glyph
         
     int selected_align = static_cast<int>(font_prop.align);
@@ -3094,6 +3173,8 @@ void GLGizmoEmboss::draw_advanced()
     };
     if (revertible(tr.alignment, selected_align, def_align, _u8L("Revert alignment."), undo_offset, draw)){
         font_prop.align = static_cast<FontProp::Align>(selected_align);
+        if (font_prop.per_glyph)
+            reinit_text_lines(m_text_lines.get_lines().size());
         // TODO: move with text in finalize to not change position
         process();
     }
@@ -3132,6 +3213,8 @@ void GLGizmoEmboss::draw_advanced()
             m_volume->text_configuration->style.prop.line_gap != font_prop.line_gap) {        
             // line gap is planed to be stored inside of imgui font atlas
             m_style_manager.clear_imgui_font();
+            if (font_prop.per_glyph)
+                reinit_text_lines(m_text_lines.get_lines().size());
             exist_change = true;
         }
     }
@@ -3198,9 +3281,13 @@ void GLGizmoEmboss::draw_advanced()
     }
 
     if (is_moved){
-        m_volume->text_configuration->style.prop.distance = font_prop.distance;        
-        float act_distance = font_prop.distance.has_value() ? *font_prop.distance : .0f;
-        do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
+        if (font_prop.per_glyph){
+            process();
+        } else {
+            m_volume->text_configuration->style.prop.distance = font_prop.distance;        
+            float act_distance = font_prop.distance.has_value() ? *font_prop.distance : .0f;
+            do_translate(Vec3d::UnitZ() * (act_distance - prev_distance));
+        }
     }
     m_imgui->disabled_end();
 
@@ -3234,8 +3321,11 @@ void GLGizmoEmboss::draw_advanced()
         if (m_style_manager.is_active_font() && gl_volume != nullptr) 
             m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), priv::up_limit);
         
+        if (font_prop.per_glyph)
+            reinit_text_lines(m_text_lines.get_lines().size());
+
         // recalculate for surface cut
-        if (font_prop.use_surface) 
+        if (font_prop.use_surface || font_prop.per_glyph) 
             process();
     }
 
@@ -3283,14 +3373,19 @@ void GLGizmoEmboss::draw_advanced()
 
     if (exist_change) {
         m_style_manager.clear_glyphs_cache();
+        if (m_style_manager.get_font_prop().per_glyph)
+            reinit_text_lines();
+        else
+            m_text_lines.reset();
         process();
     }
 
     if (ImGui::Button(_u8L("Set text to face camera").c_str())) {
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam  = wxGetApp().plater()->get_camera();
-        bool use_surface = m_style_manager.get_font_prop().use_surface;
-        if (priv::apply_camera_dir(cam, m_parent, m_keep_up) && use_surface)
+        const FontProp &prop = m_style_manager.get_font_prop();
+        if (priv::apply_camera_dir(cam, m_parent, m_keep_up) && 
+            prop.use_surface || prop.per_glyph)
             process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
@@ -3565,7 +3660,12 @@ bool priv::draw_button(const IconManager::VIcons &icons, IconType type, bool dis
 // priv namespace implementation
 ///////////////
 
-DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &style_manager, TextLinesModel& text_lines, const Selection& selection, std::shared_ptr<std::atomic<bool>>& cancel)
+DataBase priv::create_emboss_data_base(const std::string                  &text,
+                                       StyleManager                       &style_manager,
+                                       TextLinesModel                     &text_lines,
+                                       const Selection                    &selection,
+                                       ModelVolumeType                     type,
+                                       std::shared_ptr<std::atomic<bool>> &cancel)
 {
     // create volume_name
     std::string volume_name = text; // copy
@@ -3594,6 +3694,8 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &st
     } else
         text_lines.reset();
     
+    bool is_outside = (type == ModelVolumeType::MODEL_PART);
+
     // Cancel previous Job, when it is in process
     // worker.cancel(); --> Use less in this case I want cancel only previous EmbossJob no other jobs
     // Cancel only EmbossUpdateJob no others
@@ -3601,7 +3703,7 @@ DataBase priv::create_emboss_data_base(const std::string &text, StyleManager &st
         cancel->store(true);
     // create new shared ptr to cancel new job
     cancel = std::make_shared<std::atomic<bool>>(false);
-    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), tc, volume_name, cancel, text_lines.get_lines()};
+    return Slic3r::GUI::Emboss::DataBase{style_manager.get_font_file_with_cache(), tc, volume_name, is_outside, cancel, text_lines.get_lines()};
 }
 
 void priv::start_create_object_job(DataBase &emboss_data, const Vec2d &coor)
@@ -3639,10 +3741,7 @@ void priv::start_create_volume_job(const ModelObject *object,
         if (sources.empty()) {
             use_surface = false;
         } else {
-            bool is_outside = volume_type == ModelVolumeType::MODEL_PART;
-            // check that there is not unexpected volume type
-            assert(is_outside || volume_type == ModelVolumeType::NEGATIVE_VOLUME || volume_type == ModelVolumeType::PARAMETER_MODIFIER);
-            SurfaceVolumeData sfvd{volume_trmat, is_outside, std::move(sources)};
+            SurfaceVolumeData sfvd{volume_trmat, std::move(sources)};
             CreateSurfaceVolumeData surface_data{std::move(emboss_data), std::move(sfvd), volume_type, object->id()};
             job = std::make_unique<CreateSurfaceVolumeJob>(std::move(surface_data));
         }
@@ -3658,8 +3757,14 @@ void priv::start_create_volume_job(const ModelObject *object,
     queue_job(worker, std::move(job));
 }
 
-bool priv::start_create_volume_on_surface_job(
-    DataBase &emboss_data, ModelVolumeType volume_type, const Vec2d &screen_coor, const GLVolume *gl_volume, RaycastManager &raycaster, GLCanvas3D& canvas)
+bool priv::start_create_volume_on_surface_job(DataBase       &emboss_data,
+                                              ModelVolumeType volume_type,
+                                              const Vec2d    &screen_coor,
+                                              const GLVolume *gl_volume,
+                                              RaycastManager &raycaster,
+                                              TextLinesModel &text_lines,
+                                              StyleManager   &style_manager,
+                                              GLCanvas3D     &canvas)
 {
     assert(gl_volume != nullptr);
     if (gl_volume == nullptr) return false;
@@ -3670,12 +3775,14 @@ bool priv::start_create_volume_on_surface_job(
 
     int object_idx = gl_volume->object_idx();
     if (object_idx < 0 || static_cast<size_t>(object_idx) >= objects.size()) return false;
-    ModelObject *obj = objects[object_idx];
-    size_t vol_id = obj->volumes[gl_volume->volume_idx()]->id().id;
+    const ModelObject *obj_ptr = objects[object_idx];
+    if (obj_ptr == nullptr) return false;
+    const ModelObject &obj = *obj_ptr;
+    size_t vol_id = obj.volumes[gl_volume->volume_idx()]->id().id;
     auto cond = RaycastManager::AllowVolumes({vol_id});
 
     RaycastManager::Meshes meshes = create_meshes(canvas, cond);
-    raycaster.actualize(*obj, &cond, &meshes);
+    raycaster.actualize(obj, &cond, &meshes);
 
     const Camera &camera = plater->get_camera();
     std::optional<RaycastManager::Hit> hit = ray_from_camera(raycaster, screen_coor, camera, &cond);
@@ -3691,8 +3798,13 @@ bool priv::start_create_volume_on_surface_job(
     const FontProp &font_prop = emboss_data.text_configuration.style.prop;
     apply_transformation(font_prop, surface_trmat);
     Transform3d instance = gl_volume->get_instance_transformation().get_matrix();
-    Transform3d volume_trmat = instance.inverse() * surface_trmat;  
-    start_create_volume_job(obj, volume_trmat, emboss_data, volume_type);
+    Transform3d volume_trmat = instance.inverse() * surface_trmat; 
+
+    if (font_prop.per_glyph){
+        init_new_text_line(text_lines, volume_trmat, obj, style_manager);
+        emboss_data.text_lines = text_lines.get_lines();
+    }
+    start_create_volume_job(obj_ptr, volume_trmat, emboss_data, volume_type);
     return true;
 }
 

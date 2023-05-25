@@ -29,6 +29,11 @@ struct DataBase
     // new volume name created from text
     std::string volume_name;
 
+    // Define projection move
+    // True (raised) .. move outside from surface
+    // False (engraved).. move into object
+    bool is_outside;
+
     // flag that job is canceled
     // for time after process.
     std::shared_ptr<std::atomic<bool>> cancel;
@@ -157,11 +162,6 @@ struct SurfaceVolumeData
 {
     // Transformation of text volume inside of object
     Transform3d text_tr;
-
-    // Define projection move
-    // True (raised) .. move outside from surface
-    // False (engraved).. move into object
-    bool is_outside;
 
     struct ModelSource
     {

@@ -282,6 +282,25 @@ void StyleManager::clear_glyphs_cache()
 
 void StyleManager::clear_imgui_font() { m_style_cache.atlas.Clear(); }
 
+#include "slic3r/GUI/TextLines.hpp"
+double StyleManager::get_line_height()
+{
+    assert(is_active_font());
+    if (!is_active_font())
+        return -1;
+    const auto &ffc = get_font_file_with_cache();
+    assert(ffc.has_value());
+    if (!ffc.has_value())
+        return -1;
+    const auto &ff_ptr = ffc.font_file;
+    assert(ff_ptr != nullptr);
+    if (ff_ptr == nullptr)
+        return -1;
+    const FontProp &fp = get_font_prop();
+    const FontFile &ff = *ff_ptr;
+    return TextLinesModel::calc_line_height(ff, fp);
+}
+
 ImFont *StyleManager::get_imgui_font()
 {
     if (!is_active_font()) return nullptr;

@@ -7,27 +7,35 @@
 #include <libslic3r/Emboss.hpp>
 #include "slic3r/GUI/GLModel.hpp"
 
+namespace Slic3r {
+class ModelVolume;
+typedef std::vector<ModelVolume *> ModelVolumePtrs;
+}
+
 namespace Slic3r::GUI {
-class Selection;
 class TextLinesModel
 {
 public:
     // line offset in y direction (up/down)
     float offset = 0;
+
     /// <summary>
     /// Initialize model and lines
     /// </summary>
-    /// <param name="selection">Must be selected text volume</param>
-    /// <param name="line_height">Height of text line with spacing [in mm]</param>
-    /// <param name="line_offset">Offset of base line from center [in mm]</param>
-    /// <param name="count_lines">[Optional] Count lines when not set it is calculated from vodel volume text</param>
-    void init(const Selection &selection, double line_height, unsigned count_lines = 0);
+    /// <param name="text_tr">Transformation of text volume inside object (aka inside of instance)</param>
+    /// <param name="volumes_to_slice">Vector of volumes to be sliced</param>
+    /// <param name="align">Vertical (Y) align of the text</param>
+    /// <param name="line_height">Distance between lines [in mm]</param>
+    /// <param name="count_lines">Count lines(slices over volumes)</param>
+    void init(const Transform3d &text_tr, const ModelVolumePtrs& volumes_to_slice, FontProp::Align align, double line_height, unsigned count_lines);
+
     void render(const Transform3d &text_world);
 
     bool is_init() const { return m_model.is_initialized(); }
     void reset() { m_model.reset(); m_lines.clear(); }
     const Slic3r::Emboss::TextLines &get_lines() const { return m_lines; }
-    static double calc_line_height(const Slic3r::Emboss::FontFile& ff, const FontProp& fp);
+
+    static double calc_line_height(const Slic3r::Emboss::FontFile& ff, const FontProp& fp); // return lineheight in mm
 private:
     Slic3r::Emboss::TextLines m_lines;
 

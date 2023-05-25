@@ -251,62 +251,24 @@ GLModel::Geometry create_geometry(const TextLines &lines)
 }
 } // namespace
 
-void TextLinesModel::init(const Selection &selection, double line_height, unsigned count_lines)
+void TextLinesModel::init(const Transform3d &text_tr, const ModelVolumePtrs &volumes_to_slice, FontProp::Align align, double line_height, unsigned count_lines)
 {
     m_model.reset();
-    m_lines.clear();    
+    m_lines.clear();  
 
-    const GLVolume *gl_volume_ptr = selection.get_first_volume();
-    if (gl_volume_ptr == nullptr)
-        return;
-    const GLVolume        &gl_volume = *gl_volume_ptr;
-    const ModelObjectPtrs &objects   = selection.get_model()->objects;
-    const ModelObject     *mo_ptr    = get_model_object(gl_volume, objects);
-    if (mo_ptr == nullptr)
-        return;
-    const ModelObject &mo = *mo_ptr;
-
-    const ModelVolume *mv_ptr = get_model_volume(gl_volume, objects);
-    if (mv_ptr == nullptr)
-        return;
-    const ModelVolume &mv = *mv_ptr;
-    if (mv.is_the_only_one_part())
-        return;
-
-    // calculate count lines when not set
-    if (count_lines == 0) {
-        const std::optional<TextConfiguration> tc_opt = mv.text_configuration;
-        if (!tc_opt.has_value())
-            return;
-        count_lines = Emboss::get_count_lines(tc_opt->text);
-        if (count_lines == 0)
-            return;
-    }
-    
     double first_line_center = offset + (count_lines / 2) * line_height - ((count_lines % 2 == 0) ? line_height / 2. : 0.);
     std::vector<float> line_centers(count_lines);
     for (size_t i = 0; i < count_lines; ++i)
         line_centers[i] = static_cast<float>(first_line_center - i * line_height);
 
-    const Transform3d &mv_trafo = gl_volume.get_volume_transformation().get_matrix();
-
     // contour transformation
-    Transform3d c_trafo = mv_trafo * get_rotation();
+    Transform3d c_trafo = text_tr * get_rotation();
     Transform3d c_trafo_inv = c_trafo.inverse();
 
     std::vector<Polygons> line_contours(count_lines);
-    for (const ModelVolume *volume : mo.volumes) {
-        // only part could be surface for volumes
-        if (!volume->is_model_part())
-            continue;
-
-        // is selected volume
-        if (mv.id() == volume->id())
-            continue;
-
+    for (const ModelVolume *volume : volumes_to_slice) {
         MeshSlicingParams slicing_params;
         slicing_params.trafo = c_trafo_inv * volume->get_matrix();
-
         for (size_t i = 0; i < count_lines; ++i) {
             const Polygons polys = Slic3r::slice_mesh(volume->mesh().its, line_centers[i], slicing_params);
             if (polys.empty())
@@ -328,6 +290,7 @@ void TextLinesModel::init(const Selection &selection, double line_height, unsign
         return;
     m_model.init_from(std::move(geometry));
     /*/
+    // slower solution
     ColorRGBA color(.7f, .7f, .7f, .7f); // Transparent Gray
     m_model.set_color(color);
     m_model.init_from(create_its(m_lines));

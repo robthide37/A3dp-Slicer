@@ -29,6 +29,9 @@ namespace priv{
 // create sure that emboss object is bigger than source object [in mm]
 constexpr float safe_extension = 1.0f;
 
+// Offset of clossed side to model
+constexpr float SAFE_SURFACE_OFFSET = 0.015f; // [in mm]
+
 /// <summary>
 /// Assert check of inputs data
 /// </summary>
@@ -513,7 +516,6 @@ template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc w
     double shape_scale = get_shape_scale(prop, *font.font_file);
     double projec_scale = shape_scale / SHAPE_SCALE;
     double depth        = prop.emboss / projec_scale;
-    auto   projectZ = std::make_unique<ProjectZ>(depth);
     auto   scale_tr = Eigen::Scaling(projec_scale); 
     
     // half of font em size for direction of letter emboss
@@ -534,16 +536,20 @@ template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc w
                 continue;
 
             Vec2d to_zero_vec = letter_bb.center().cast<double>() * shape_scale; // [in mm]
-            auto  to_zero     = Eigen::Translation<double, 3>(-to_zero_vec.x(), 0., 0.);
+            float surface_offset = input.is_outside ? -priv::SAFE_SURFACE_OFFSET : (-prop.emboss + priv::SAFE_SURFACE_OFFSET);
+            if (prop.distance.has_value())
+                surface_offset += *prop.distance;
+
+            Eigen::Translation<double, 3> to_zero(-to_zero_vec.x(), 0., static_cast<double>(surface_offset));
 
             const double &angle = angles[i];
-            auto rotate = Eigen::AngleAxisd(angle + M_PI_2, Vec3d::UnitY());
+            Eigen::AngleAxisd rotate(angle + M_PI_2, Vec3d::UnitY());
 
             const PolygonPoint &sample = samples[i];
             Vec2d offset_vec = unscale(sample.point); // [in mm]
-            auto offset_tr = Eigen::Translation<double, 3>(offset_vec.x(), 0., -offset_vec.y());
-
+            Eigen::Translation<double, 3> offset_tr(offset_vec.x(), 0., -offset_vec.y());
             Transform3d tr = offset_tr * rotate * to_zero * scale_tr;
+
             const ExPolygons &letter_shape = shapes[s_i_offset + i];
             assert(get_extents(letter_shape) == letter_bb);
             auto projectZ = std::make_unique<ProjectZ>(depth);
@@ -883,11 +889,9 @@ OrthoProject priv::create_projection_for_cut(
 OrthoProject3d priv::create_emboss_projection(
     bool is_outside, float emboss, Transform3d tr, SurfaceCut &cut)
 {
-    // Offset of clossed side to model
-    const float surface_offset = 0.015f; // [in mm]
     float 
-        front_move = (is_outside) ? emboss : surface_offset,
-        back_move  = -((is_outside) ? surface_offset : emboss);    
+        front_move = (is_outside) ? emboss : SAFE_SURFACE_OFFSET,
+        back_move  = -((is_outside) ? SAFE_SURFACE_OFFSET : emboss);    
     its_transform(cut, tr.pretranslate(Vec3d(0., 0., front_move)));    
     Vec3d from_front_to_back(0., 0., back_move - front_move);
     return OrthoProject3d(from_front_to_back);
@@ -895,7 +899,7 @@ OrthoProject3d priv::create_emboss_projection(
 
 namespace {
 
-indexed_triangle_set cut_surface_to_its(const ExPolygons &shapes, const Transform3d& tr,const SurfaceVolumeData::ModelSources &sources, bool is_outside, DataBase& input, std::function<bool()> was_canceled) {
+indexed_triangle_set cut_surface_to_its(const ExPolygons &shapes, const Transform3d& tr,const SurfaceVolumeData::ModelSources &sources, DataBase& input, std::function<bool()> was_canceled) {
     assert(!sources.empty());
     BoundingBox bb = get_extents(shapes);
     const FontFile &ff = *input.font_file.font_file;    
@@ -985,7 +989,7 @@ indexed_triangle_set cut_surface_to_its(const ExPolygons &shapes, const Transfor
     if (was_canceled()) return {};
 
     // !! Projection needs to transform cut
-    OrthoProject3d projection = priv::create_emboss_projection(is_outside, fp.emboss, emboss_tr, cut);
+    OrthoProject3d projection = priv::create_emboss_projection(input.is_outside, fp.emboss, emboss_tr, cut);
     return cut2model(cut, projection);
 }
 
@@ -1041,7 +1045,7 @@ TriangleMesh cut_per_glyph_surface(DataBase &input1, const SurfaceVolumeData &in
 
             Transform3d modify = offset_tr * rotate;
             Transform3d tr = input2.text_tr * modify;
-            indexed_triangle_set glyph_its = cut_surface_to_its(glyph_shape, tr, input2.sources, input2.is_outside, input1, was_canceled);
+            indexed_triangle_set glyph_its = cut_surface_to_its(glyph_shape, tr, input2.sources, input1, was_canceled);
             // move letter in volume on the right position
             its_transform(glyph_its, modify);
 
@@ -1074,7 +1078,7 @@ TriangleMesh priv::cut_surface(DataBase& input1, const SurfaceVolumeData& input2
     if (shapes.empty())
         throw JobException(_u8L("Font doesn't have any shape for given text.").c_str());
 
-    indexed_triangle_set its = cut_surface_to_its(shapes, input2.text_tr, input2.sources, input2.is_outside, input1, was_canceled);
+    indexed_triangle_set its = cut_surface_to_its(shapes, input2.text_tr, input2.sources, input1, was_canceled);
     if (was_canceled()) return {};    
     if (its.empty()) 
         throw JobException(_u8L("There is no valid surface for text projection.").c_str());    
