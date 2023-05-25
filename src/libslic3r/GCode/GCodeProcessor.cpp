@@ -3909,7 +3909,7 @@ void GCodeProcessor::post_process()
             std::stringstream ss(cmd.substr(1));
             int tool_number = -1;
             ss >> tool_number;
-            if (tool_number != -1)
+            if (tool_number != -1) {
                 if (tool_number < 0 || (int)m_extruder_temps_config.size() <= tool_number) {
                     // found an invalid value, clamp it to a valid one
                     tool_number = std::clamp<int>(0, m_extruder_temps_config.size() - 1, tool_number);
@@ -3944,6 +3944,7 @@ void GCodeProcessor::post_process()
                         }
                         return line;
                     });
+            }
         }
     };
 

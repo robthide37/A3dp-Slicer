@@ -743,7 +743,7 @@ ExtrusionPaths sort_extra_perimeters(const ExtrusionPaths& extra_perims, int ind
     }
 
     std::vector<bool> processed(extra_perims.size(), false);
-    for (size_t path_idx = 0; path_idx < index_of_first_unanchored; path_idx++) {
+    for (int path_idx = 0; path_idx < index_of_first_unanchored; path_idx++) {
         processed[path_idx] = true;
     }
 
