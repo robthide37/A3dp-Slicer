@@ -4614,7 +4614,6 @@ void GLCanvas3D::update_sequential_clearance(bool force_contours_generation)
             }
 
             new_hull_2d.reserve(hull_2d.points.size());
-            const Transform3d inv_trafo = trafo.get_matrix().inverse();
             for (const Point& p : hull_2d.points) {
                 new_hull_2d.emplace_back(Vec3d(unscale<double>(p.x()), unscale<double>(p.y()), 0.0));
             }
