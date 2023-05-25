@@ -3575,9 +3575,6 @@ void GCodeViewer::render_legend(float& legend_height)
     int old_view_type = static_cast<int>(get_view_type());
     int view_type = old_view_type;
 
-    if (!m_legend_resizer.dirty)
-        ImGui::SetNextItemWidth(-1.0f);
-
     ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, { 0.2f, 0.2f, 0.2f, 0.8f });
     imgui.combo(std::string(), { _u8L("Feature type"),
@@ -3590,7 +3587,7 @@ void GCodeViewer::render_legend(float& legend_height)
                       _u8L("Layer time (linear)"),
                       _u8L("Layer time (logarithmic)"),
                       _u8L("Tool"),
-                      _u8L("Color Print") }, view_type, ImGuiComboFlags_HeightLargest);
+                      _u8L("Color Print") }, view_type, ImGuiComboFlags_HeightLargest, 0.0f, -1.0f);
     ImGui::PopStyleColor(2);
    
     if (old_view_type != view_type) {
