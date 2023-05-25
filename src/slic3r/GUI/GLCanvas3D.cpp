@@ -1303,7 +1303,7 @@ void GLCanvas3D::SLAView::render_switch_button()
     imgui.begin(std::string("SLAViewSwitch"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
     const float icon_size = 1.5 * ImGui::GetTextLineHeight();
     if (imgui.draw_radio_button(_u8L("SLA view"), 1.5f * icon_size, true,
-        [this, &imgui, sel_instance](ImGuiWindow& window, const ImVec2& pos, float size) {
+        [&imgui, sel_instance](ImGuiWindow& window, const ImVec2& pos, float size) {
             const wchar_t icon_id = (sel_instance->second == ESLAViewType::Original) ? ImGui::SlaViewProcessed : ImGui::SlaViewOriginal;
             imgui.draw_icon(window, pos, size, icon_id);
         })) {

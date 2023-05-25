@@ -7041,7 +7041,6 @@ void Plater::force_filament_colors_update()
     if (extruders_filaments.size() > 1 && 
         p->config->option<ConfigOptionStrings>("filament_colour")->values.size() == extruders_filaments.size())
     {
-        const PresetCollection& filaments = wxGetApp().preset_bundle->filaments;
         std::vector<std::string> filament_colors;
         filament_colors.reserve(extruders_filaments.size());
 

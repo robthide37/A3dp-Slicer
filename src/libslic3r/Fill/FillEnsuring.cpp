@@ -106,15 +106,15 @@ ThickPolylines make_fill_polylines(
         coord_t length_filter     = scale_(4);
         size_t  skips_allowed     = 2;
         size_t  min_removal_conut = 5;
-        for (int section_idx = 0; section_idx < polygon_sections.size(); section_idx++) {
-            for (int line_idx = 0; line_idx < polygon_sections[section_idx].size(); line_idx++) {
+        for (int section_idx = 0; section_idx < int(polygon_sections.size()); ++ section_idx) {
+            for (int line_idx = 0; line_idx < int(polygon_sections[section_idx].size()); ++ line_idx) {
                 if (const Line &line = polygon_sections[section_idx][line_idx]; line.a != line.b && line.length() < length_filter) {
                     std::set<std::pair<int, int>> to_remove{{section_idx, line_idx}};
                     std::vector<Node>             to_visit{{section_idx, line_idx}};
 
                     bool initial_touches_long_lines = false;
                     if (section_idx > 0) {
-                        for (int prev_line_idx = 0; prev_line_idx < polygon_sections[section_idx - 1].size(); prev_line_idx++) {
+                        for (int prev_line_idx = 0; prev_line_idx < int(polygon_sections[section_idx - 1].size()); ++ prev_line_idx) {
                             if (const Line &nl = polygon_sections[section_idx - 1][prev_line_idx];
                                 nl.a != nl.b && segments_overlap(line.a.y(), line.b.y(), nl.a.y(), nl.b.y())) {
                                 initial_touches_long_lines = true;
@@ -127,7 +127,7 @@ ThickPolylines make_fill_polylines(
                         const Line &curr_l = polygon_sections[curr.section_idx][curr.line_idx];
                         if (curr.neighbours_explored) {
                             bool is_valid_for_removal = (curr_l.length() < length_filter) &&
-                                                        ((int(to_remove.size()) - curr.skips_taken > min_removal_conut) ||
+                                                        ((int(to_remove.size()) - curr.skips_taken > int(min_removal_conut)) ||
                                                          (curr.neighbours.empty() && !initial_touches_long_lines));
                             if (!is_valid_for_removal) {
                                 for (const auto &n : curr.neighbours) {
@@ -144,9 +144,9 @@ ThickPolylines make_fill_polylines(
                         } else {
                             to_visit.back().neighbours_explored = true;
                             int  curr_index                     = to_visit.size() - 1;
-                            bool can_use_skip                   = curr_l.length() <= length_filter && curr.skips_taken < skips_allowed;
-                            if (curr.section_idx + 1 < polygon_sections.size()) {
-                                for (int lidx = 0; lidx < polygon_sections[curr.section_idx + 1].size(); lidx++) {
+                            bool can_use_skip                   = curr_l.length() <= length_filter && curr.skips_taken < int(skips_allowed);
+                            if (curr.section_idx + 1 < int(polygon_sections.size())) {
+                                for (int lidx = 0; lidx < int(polygon_sections[curr.section_idx + 1].size()); ++ lidx) {
                                     if (const Line &nl = polygon_sections[curr.section_idx + 1][lidx];
                                         nl.a != nl.b && segments_overlap(curr_l.a.y(), curr_l.b.y(), nl.a.y(), nl.b.y()) &&
                                         (nl.length() < length_filter || can_use_skip)) {

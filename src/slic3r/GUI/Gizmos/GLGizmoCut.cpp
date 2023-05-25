@@ -502,7 +502,7 @@ bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& v
     constexpr float UndefMinVal = -0.1f;
     const float f_mm_to_in = static_cast<float>(ObjectManipulation::mm_to_in);
 
-    auto render_slider = [this, UndefMinVal, f_mm_to_in]
+    auto render_slider = [this, f_mm_to_in]
                          (const std::string& label, float& val, float def_val, float max_val, const wxString& tooltip) {
         float min_val = val < 0.f ? UndefMinVal : def_val;
         float value = val;
@@ -1575,7 +1575,7 @@ void GLGizmoCut3D::PartSelection::toggle_selection(const Vec2d& mouse_pos)
     std::vector<std::pair<size_t, double>> hits_id_and_sqdist;
 
     for (size_t id=0; id<m_parts.size(); ++id) {
-        const Vec3d volume_offset = model_object()->volumes[id]->get_offset();
+//        const Vec3d volume_offset = model_object()->volumes[id]->get_offset();
         Transform3d tr = translation_transform(model_object()->instances[m_instance_idx]->get_offset()) * translation_transform(model_object()->volumes[id]->get_offset());
         if (m_parts[id].raycaster.unproject_on_mesh(mouse_pos, tr, camera, pos, normal)) {
             hits_id_and_sqdist.emplace_back(id, (camera_pos - tr*(pos.cast<double>())).squaredNorm());
