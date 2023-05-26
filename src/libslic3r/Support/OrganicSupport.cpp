@@ -1170,7 +1170,7 @@ void organic_draw_branches(
                 TreeVisitor::visit_recursive(move_bounds, start_element, trees.back());
                 assert(!trees.back().branches.empty());
                 //FIXME debugging
-#if 1
+#if 0
                 if (start_element.state.lost) {
                 }
                 else if (start_element.state.verylost) {
