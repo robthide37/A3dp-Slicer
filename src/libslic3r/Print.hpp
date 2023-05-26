@@ -442,7 +442,7 @@ struct FakeWipeTower
         plate_origin = o;
     }
 
-    void set_pos(const Vec2f& p) { pos = p; }
+    void set_pos_and_rotation(const Vec2f& p, float rotation) { pos = p; rotation_angle = rotation; }
 
     std::vector<ExtrusionPaths> getFakeExtrusionPathsFromWipeTower() const
     {

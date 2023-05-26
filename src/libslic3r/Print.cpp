@@ -966,7 +966,7 @@ void Print::process()
 
     std::optional<const FakeWipeTower*> wipe_tower_opt = {};
     if (this->has_wipe_tower()) {
-        m_fake_wipe_tower.set_pos({ m_config.wipe_tower_x, m_config.wipe_tower_y });
+        m_fake_wipe_tower.set_pos_and_rotation({ m_config.wipe_tower_x, m_config.wipe_tower_y }, m_config.wipe_tower_rotation_angle);
         wipe_tower_opt = std::make_optional<const FakeWipeTower*>(&m_fake_wipe_tower);
     }
     auto conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(m_objects, wipe_tower_opt);
