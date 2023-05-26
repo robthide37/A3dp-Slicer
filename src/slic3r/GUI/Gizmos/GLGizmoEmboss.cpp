@@ -1096,11 +1096,11 @@ bool get_line_height_offset(/* const*/ StyleManager &style_manager, double &line
     const FontProp &fp = style_manager.get_font_prop();
     const FontFile &ff = *ff_ptr;
 
-    double half_ascent_shape_size = ff.infos[fp.collection_number.value_or(0)].ascent / 2.;
+    double third_ascent_shape_size = ff.infos[fp.collection_number.value_or(0)].ascent / 3.;
     int    line_height_shape_size = get_line_height(ff, fp); // In shape size
 
     double scale = get_shape_scale(fp, ff);
-    line_offset_mm = half_ascent_shape_size * scale / SHAPE_SCALE;
+    line_offset_mm = third_ascent_shape_size * scale / SHAPE_SCALE;
     line_height_mm = line_height_shape_size * scale;
 
     if (line_height_mm < 0)
