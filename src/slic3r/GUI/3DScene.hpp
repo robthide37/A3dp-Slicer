@@ -450,9 +450,6 @@ public:
     void set_show_sinking_contours(bool show) { m_show_sinking_contours = show; }
     void set_show_non_manifold_edges(bool show) { m_show_non_manifold_edges = show; }
 
-    // returns true if all the volumes are completely contained in the print volume
-    // returns the containment state in the given out_state, if non-null
-    bool check_outside_state(const Slic3r::BuildVolume& build_volume, ModelInstanceEPrintVolumeState* out_state) const;
     void reset_outside_state();
 
     void update_colors_by_extruder(const DynamicPrintConfig* config);

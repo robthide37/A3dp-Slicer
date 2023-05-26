@@ -582,7 +582,7 @@ static ExtrusionEntityCollection traverse_extrusions(const PerimeterGenerator::P
                     }
 
                     // Prefer non-overhang point as a starting point.
-                    for (const std::pair<Point, PointInfo> pt : point_occurrence)
+                    for (const std::pair<Point, PointInfo> &pt : point_occurrence)
                         if (pt.second.occurrence == 1) {
                             start_point = pt.first;
                             if (!pt.second.is_overhang) {
@@ -743,7 +743,7 @@ ExtrusionPaths sort_extra_perimeters(const ExtrusionPaths& extra_perims, int ind
     }
 
     std::vector<bool> processed(extra_perims.size(), false);
-    for (size_t path_idx = 0; path_idx < index_of_first_unanchored; path_idx++) {
+    for (int path_idx = 0; path_idx < index_of_first_unanchored; path_idx++) {
         processed[path_idx] = true;
     }
 

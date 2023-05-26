@@ -469,11 +469,13 @@ std::string Print::validate(std::string* warning) const
         return _u8L("The supplied settings will cause an empty print.");
 
     if (m_config.complete_objects) {
-    	if (! sequential_print_horizontal_clearance_valid(*this))
+        if (!sequential_print_horizontal_clearance_valid(*this, const_cast<Polygons*>(&m_sequential_print_clearance_contours)))
             return _u8L("Some objects are too close; your extruder will collide with them.");
-        if (! sequential_print_vertical_clearance_valid(*this))
-	        return _u8L("Some objects are too tall and cannot be printed without extruder collisions.");
+        if (!sequential_print_vertical_clearance_valid(*this))
+            return _u8L("Some objects are too tall and cannot be printed without extruder collisions.");
     }
+    else
+        const_cast<Polygons*>(&m_sequential_print_clearance_contours)->clear();
 
     if (m_config.avoid_crossing_perimeters && m_config.avoid_crossing_curled_overhangs) {
         return _u8L("Avoid crossing perimeters option and avoid crossing curled overhangs option cannot be both enabled together.");
@@ -1227,7 +1229,7 @@ void Print::alert_when_supports_needed()
             }
 
             std::string translated_list = expansion_rule;
-            for (int i = 0; i < translated_elements.size() - 1; i++) {
+            for (int i = 0; i < int(translated_elements.size()) - 1; ++ i) {
                 auto first_elem = translated_list.find("%1%");
                 assert(first_elem != translated_list.npos);
                 translated_list.replace(first_elem, 3, translated_elements[i]);
@@ -1235,7 +1237,7 @@ void Print::alert_when_supports_needed()
                 // expand the translated list by another application of the same rule
                 auto second_elem = translated_list.find("%2%");
                 assert(second_elem != translated_list.npos);
-                if (i < translated_elements.size() - 2) {
+                if (i < int(translated_elements.size()) - 2) {
                     translated_list.replace(second_elem, 3, expansion_rule);
                 } else {
                     translated_list.replace(second_elem, 3, translated_elements[i + 1]);

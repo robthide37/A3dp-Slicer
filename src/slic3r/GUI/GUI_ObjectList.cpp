@@ -926,8 +926,8 @@ void ObjectList::OnContextMenu(wxDataViewEvent& evt)
     // Do not show the context menu if the user pressed the right mouse button on the 3D scene and released it on the objects list
     GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
     bool evt_context_menu = (canvas != nullptr) ? !canvas->is_mouse_dragging() : true;
-    if (!evt_context_menu)
-        canvas->mouse_up_cleanup();
+//    if (!evt_context_menu)
+//        canvas->mouse_up_cleanup();
 
     list_manipulation(mouse_pos, evt_context_menu);
 }
@@ -4016,8 +4016,10 @@ void ObjectList::update_selections_on_canvas()
         selection.add_volumes(mode, volume_idxs, single_selection);
     }
 
-    wxGetApp().plater()->canvas3D()->update_gizmos_on_off_state();
-    wxGetApp().plater()->canvas3D()->render();
+    GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
+    canvas->update_gizmos_on_off_state();
+    canvas->check_volumes_outside_state();
+    canvas->render();
 }
 
 void ObjectList::select_item(const wxDataViewItem& item)

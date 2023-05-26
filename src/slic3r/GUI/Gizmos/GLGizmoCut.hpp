@@ -149,6 +149,7 @@ class GLGizmoCut3D : public GLGizmoBase
             GLModel glmodel;
             MeshRaycaster raycaster;
             bool selected;
+            bool is_modifier;
         };
 
         void render(const Vec3d* normal, GLModel& sphere_model);

@@ -2983,7 +2983,7 @@ void TabPrinter::build_extruder_pages(size_t n_before_extruders)
                 update();
             });
 
-            auto has_changes = [this, extruder_idx]() {
+            auto has_changes = [this]() {
                 auto dirty_options = m_presets->current_dirty_options(true);
 #if 1
                 dirty_options.erase(std::remove_if(dirty_options.begin(), dirty_options.end(), 

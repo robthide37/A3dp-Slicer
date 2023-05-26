@@ -1558,6 +1558,11 @@ void Selection::erase()
         wxGetApp().obj_list()->delete_from_model_and_list(items);
         ensure_not_below_bed();
     }
+
+    GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
+    canvas->set_sequential_clearance_as_evaluating();
+    canvas->set_as_dirty();
+    canvas->request_extra_frame();
 }
 
 void Selection::render(float scale_factor)
@@ -1630,7 +1635,6 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
         else if (is_single_volume_or_modifier()) {
             if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
                 if (wxGetApp().obj_manipul()->is_local_coordinates()) {
-                    const GLVolume* v = (*m_volumes)[*m_list.begin()];
                     orient_matrix = get_bounding_box_in_current_reference_system().second;
                     orient_matrix.translation() = Vec3d::Zero();
                 }

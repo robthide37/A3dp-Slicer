@@ -298,7 +298,7 @@ std::pair<SupportGeneratorLayersPtr, SupportGeneratorLayersPtr> generate_interfa
             else {
                 SupportGeneratorLayersPtr out(in1.size() + in2.size(), nullptr);
                 std::merge(in1.begin(), in1.end(), in2.begin(), in2.end(), out.begin(), [](auto* l, auto* r) { return l->print_z < r->print_z; });
-                return std::move(out);
+                return out;
             }
         };
         interface_layers      = merge_remove_empty(interface_layers,      top_interface_layers);
@@ -664,7 +664,7 @@ static inline void tree_supports_generate_paths(
         // Draw the perimeters.
         Polylines polylines;
         polylines.reserve(expoly.holes.size() + 1);
-        for (size_t idx_loop = 0; idx_loop < expoly.num_contours(); ++ idx_loop) {
+        for (int idx_loop = 0; idx_loop < int(expoly.num_contours()); ++ idx_loop) {
             // Open the loop with a seam.
             const Polygon &loop = expoly.contour_or_hole(idx_loop);
             Polyline pl(loop.points);
@@ -680,11 +680,11 @@ static inline void tree_supports_generate_paths(
             ClipperLib_Z::Path *closest_contour = nullptr;
             Vec2d               closest_point;
             int                 closest_point_idx = -1;
-            double              closest_point_t;
+            double              closest_point_t = 0.;
             double              d2min = std::numeric_limits<double>::max();
             Vec2d               seam_pt = pl.back().cast<double>();
             for (ClipperLib_Z::Path &path : anchor_candidates)
-                for (int i = 0; i < path.size(); ++ i) {
+                for (int i = 0; i < int(path.size()); ++ i) {
                     int j = next_idx_modulo(i, path);
                     if (path[i].z() == idx_loop || path[j].z() == idx_loop) {
                         Vec2d pi(path[i].x(), path[i].y());

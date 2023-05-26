@@ -20,7 +20,7 @@
 
 namespace Slic3r {
 
-static constexpr const float NarrowInfillAreaThresholdMM = 3.f;
+//static constexpr const float NarrowInfillAreaThresholdMM = 3.f;
 
 struct SurfaceFillParams
 {

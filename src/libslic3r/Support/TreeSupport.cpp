@@ -211,7 +211,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
     //FIXME this is a fudge constant!
     auto                     enforcer_overhang_offset = scaled<double>(config.support_tree_tip_diameter.value);
 
-    size_t num_overhang_layers = support_auto ? num_object_layers : std::max(size_t(support_enforce_layers), enforcers_layers.size());
+    size_t num_overhang_layers = support_auto ? num_object_layers : std::min(num_object_layers, std::max(size_t(support_enforce_layers), enforcers_layers.size()));
     tbb::parallel_for(tbb::blocked_range<LayerIndex>(1, num_overhang_layers),
         [&print_object, &config, &print_config, &enforcers_layers, &blockers_layers, 
          support_auto, support_enforce_layers, support_threshold_auto, tan_threshold, enforcer_overhang_offset, num_raft_layers, &throw_on_cancel, &out]
@@ -387,6 +387,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
     return result;
 }
 
+#if 0
 /*!
  * \brief Converts lines in internal format into a Polygons object representing these lines.
  *
@@ -405,6 +406,7 @@ static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_me
     validate_range(result);
     return result;
 }
+#endif
 
 /*!
  * \brief Evaluates if a point has to be added now. Required for a split_lines call in generate_initial_areas().
@@ -788,7 +790,7 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
         else
             do_final_difference = true;
     }
-    if (steps + (distance < last_step_offset_without_check || distance % step_size != 0) < min_amount_offset && min_amount_offset > 1) {
+    if (steps + (distance < last_step_offset_without_check || (distance % step_size) != 0) < int(min_amount_offset) && min_amount_offset > 1) {
         // yes one can add a bool as the standard specifies that a result from compare operators has to be 0 or 1
         // reduce the stepsize to ensure it is offset the required amount of times
         step_size = distance / min_amount_offset;
@@ -1175,7 +1177,7 @@ void sample_overhang_area(
     }
 
     assert(dtt_roof <= layer_idx);
-    if (int(dtt_roof) >= layer_idx && large_horizontal_roof)
+    if (dtt_roof >= layer_idx && large_horizontal_roof)
         // Reached buildplate when generating contact, interface and base interface layers.
         interface_placer.add_roof_build_plate(std::move(overhang_area), dtt_roof);
     else {
@@ -1282,7 +1284,7 @@ static void generate_initial_areas(
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, raw_overhangs.size()),
         [&volumes, &config, &raw_overhangs, &mesh_group_settings,
-         min_xy_dist, force_tip_to_roof, roof_enabled, num_support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length, max_overhang_insert_lag,
+         min_xy_dist, roof_enabled, num_support_roof_layers, extra_outset, circle_length_to_half_linewidth_change, connect_length,
          &rich_interface_placer, &throw_on_cancel](const tbb::blocked_range<size_t> &range) {
         for (size_t raw_overhang_idx = range.begin(); raw_overhang_idx < range.end(); ++ raw_overhang_idx) {
             size_t           layer_idx    = raw_overhangs[raw_overhang_idx].first;
@@ -2611,13 +2613,13 @@ static void remove_deleted_elements(std::vector<SupportElements> &move_bounds)
                     std::iota(map_current.begin(), map_current.end(), 0);
                 }
                 // Delete all "deleted" elements from the end of the layer vector.
-                while (i < layer.size() && layer.back().state.deleted) {
+                while (i < int32_t(layer.size()) && layer.back().state.deleted) {
                     layer.pop_back();
                     // Mark as deleted in the map.
                     map_current[layer.size()] = -1;
                 }
                 assert(i == layer.size() || i + 1 < layer.size());
-                if (i + 1 < layer.size()) {
+                if (i + 1 < int32_t(layer.size())) {
                     element = std::move(layer.back());
                     layer.pop_back();                    
                     // Mark the current element as deleted.
@@ -2667,7 +2669,7 @@ static void create_nodes_from_area(
 
     for (LayerIndex layer_idx = 1; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
         auto &layer       = move_bounds[layer_idx];
-        auto *layer_above = layer_idx + 1 < move_bounds.size() ? &move_bounds[layer_idx + 1] : nullptr;
+        auto *layer_above = layer_idx + 1 < LayerIndex(move_bounds.size()) ? &move_bounds[layer_idx + 1] : nullptr;
         if (layer_above)
             for (SupportElement &elem : *layer_above)
                 elem.state.marked = false;
@@ -2809,7 +2811,7 @@ static void generate_branch_areas(
                     const Point movement = draw_area.child_element->state.result_on_layer - draw_area.element->state.result_on_layer;
                     movement_directions.emplace_back(movement, radius);
                 }
-                const SupportElements *layer_above = layer_idx + 1 < move_bounds.size() ? &move_bounds[layer_idx + 1] : nullptr;
+                const SupportElements *layer_above = layer_idx + 1 < LayerIndex(move_bounds.size()) ? &move_bounds[layer_idx + 1] : nullptr;
                 for (int32_t parent_idx : draw_area.element->parents) {
                     const SupportElement &parent = (*layer_above)[parent_idx];
                     const Point movement = parent.state.result_on_layer - draw_area.element->state.result_on_layer;
@@ -3255,7 +3257,7 @@ static void draw_areas(
         std::vector<std::pair<SupportElement*, SupportElement*>> map_downwards_old;
         std::vector<std::pair<SupportElement*, SupportElement*>> map_downwards_new;
         for (LayerIndex layer_idx = 0; layer_idx < LayerIndex(move_bounds.size()); ++ layer_idx) {
-            SupportElements *layer_above = layer_idx + 1 < move_bounds.size() ? &move_bounds[layer_idx + 1] : nullptr;
+            SupportElements *layer_above = layer_idx + 1 < LayerIndex(move_bounds.size()) ? &move_bounds[layer_idx + 1] : nullptr;
             map_downwards_new.clear();
             linear_data_layers.emplace_back(linear_data.size());
             std::sort(map_downwards_old.begin(), map_downwards_old.end(), [](auto &l, auto &r) { return l.first < r.first;  });
@@ -3472,6 +3474,17 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
         if (support_params.has_base_interfaces() || has_raft)
             base_interface_layers.assign(num_support_layers, nullptr);
 
+        auto remove_undefined_layers = [&bottom_contacts, &top_contacts, &interface_layers, &base_interface_layers, &intermediate_layers]() {
+            auto doit = [](SupportGeneratorLayersPtr& layers) {
+                layers.erase(std::remove_if(layers.begin(), layers.end(), [](const SupportGeneratorLayer* ptr) { return ptr == nullptr; }), layers.end());
+            };
+            doit(bottom_contacts);
+            doit(top_contacts);
+            doit(interface_layers);
+            doit(base_interface_layers);
+            doit(intermediate_layers);
+        };
+
         InterfacePlacer              interface_placer{
             print_object.slicing_parameters(), support_params, config,
             // Outputs
@@ -3523,14 +3536,7 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
                     throw_on_cancel);
             }
 
-            auto remove_undefined_layers = [](SupportGeneratorLayersPtr& layers) {
-                layers.erase(std::remove_if(layers.begin(), layers.end(), [](const SupportGeneratorLayer* ptr) { return ptr == nullptr; }), layers.end());
-            };
-            remove_undefined_layers(bottom_contacts);
-            remove_undefined_layers(top_contacts);
-            remove_undefined_layers(interface_layers);
-            remove_undefined_layers(base_interface_layers);
-            remove_undefined_layers(intermediate_layers);
+            remove_undefined_layers();
 
             std::tie(interface_layers, base_interface_layers) = generate_interface_layers(print_object.config(), support_params,
                 bottom_contacts, top_contacts, interface_layers, base_interface_layers, intermediate_layers, layer_storage);
@@ -3553,7 +3559,9 @@ static void generate_support_areas(Print &print, const BuildVolume &build_volume
     //            BOOST_LOG_TRIVIAL(error) << "Why ask questions when you already know the answer twice.\n (This is not a real bug, please dont report it.)";
             
             move_bounds.clear();
-        } else if (generate_raft_contact(print_object, config, interface_placer) < 0)
+        } else if (generate_raft_contact(print_object, config, interface_placer) >= 0) {
+            remove_undefined_layers();
+        } else
             // No raft.
             continue;
 

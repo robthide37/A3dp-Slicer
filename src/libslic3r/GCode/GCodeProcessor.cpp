@@ -3909,7 +3909,7 @@ void GCodeProcessor::post_process()
             std::stringstream ss(cmd.substr(1));
             int tool_number = -1;
             ss >> tool_number;
-            if (tool_number != -1)
+            if (tool_number != -1) {
                 if (tool_number < 0 || (int)m_extruder_temps_config.size() <= tool_number) {
                     // found an invalid value, clamp it to a valid one
                     tool_number = std::clamp<int>(0, m_extruder_temps_config.size() - 1, tool_number);
@@ -3922,28 +3922,29 @@ void GCodeProcessor::post_process()
                     if (m_print != nullptr)
                         m_print->active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL, warning);
                 }
-                export_lines.insert_lines(backtrace, cmd,
-                    // line inserter
-                    [tool_number, this](unsigned int id, float time, float time_diff) {
-                        int temperature = int( m_layer_id != 1 ? m_extruder_temps_config[tool_number] : m_extruder_temps_first_layer_config[tool_number]);
-                        const std::string out = "M104 T" + std::to_string(tool_number) + " P" + std::to_string(int(std::round(time_diff))) + " S" + std::to_string(temperature) + "\n";
-                        return out;
-                    },
-                    // line replacer
-                    [this, tool_number](const std::string& line) {
-                        if (GCodeReader::GCodeLine::cmd_is(line, "M104")) {
-                            GCodeReader::GCodeLine gline;
-                            GCodeReader reader;
-                            reader.parse_line(line, [&gline](GCodeReader& reader, const GCodeReader::GCodeLine& l) { gline = l; });
+            }
+            export_lines.insert_lines(backtrace, cmd,
+                // line inserter
+                [tool_number, this](unsigned int id, float time, float time_diff) {
+                    int temperature = int( m_layer_id != 1 ? m_extruder_temps_config[tool_number] : m_extruder_temps_first_layer_config[tool_number]);
+                    const std::string out = "M104 T" + std::to_string(tool_number) + " P" + std::to_string(int(std::round(time_diff))) + " S" + std::to_string(temperature) + "\n";
+                    return out;
+                },
+                // line replacer
+                [this, tool_number](const std::string& line) {
+                    if (GCodeReader::GCodeLine::cmd_is(line, "M104")) {
+                        GCodeReader::GCodeLine gline;
+                        GCodeReader reader;
+                        reader.parse_line(line, [&gline](GCodeReader& reader, const GCodeReader::GCodeLine& l) { gline = l; });
 
-                            float val;
-                            if (gline.has_value('T', val) && gline.raw().find("cooldown") != std::string::npos && m_is_XL_printer) {
-                                if (static_cast<int>(val) == tool_number)
-                                    return std::string("; removed M104\n");
-                            }
+                        float val;
+                        if (gline.has_value('T', val) && gline.raw().find("cooldown") != std::string::npos && m_is_XL_printer) {
+                            if (static_cast<int>(val) == tool_number)
+                                return std::string("; removed M104\n");
                         }
-                        return line;
-                    });
+                    }
+                    return line;
+                });
         }
     };
 

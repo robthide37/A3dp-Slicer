@@ -3575,9 +3575,6 @@ void GCodeViewer::render_legend(float& legend_height)
     int old_view_type = static_cast<int>(get_view_type());
     int view_type = old_view_type;
 
-    if (!m_legend_resizer.dirty)
-        ImGui::SetNextItemWidth(-1.0f);
-
     ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, { 0.2f, 0.2f, 0.2f, 0.8f });
     imgui.combo(std::string(), { _u8L("Feature type"),
@@ -3590,7 +3587,7 @@ void GCodeViewer::render_legend(float& legend_height)
                       _u8L("Layer time (linear)"),
                       _u8L("Layer time (logarithmic)"),
                       _u8L("Tool"),
-                      _u8L("Color Print") }, view_type, ImGuiComboFlags_HeightLargest);
+                      _u8L("Color Print") }, view_type, ImGuiComboFlags_HeightLargest, 0.0f, -1.0f);
     ImGui::PopStyleColor(2);
    
     if (old_view_type != view_type) {
@@ -3961,7 +3958,7 @@ void GCodeViewer::render_legend(float& legend_height)
       const auto custom_it = std::find(m_roles.begin(), m_roles.end(), GCodeExtrusionRole::Custom);
       if (custom_it != m_roles.end()) {
           const bool custom_visible = is_visible(GCodeExtrusionRole::Custom);
-          const wxString btn_text = custom_visible ? _u8L("Hide Custom GCode") : _u8L("Show Custom GCode");
+          const wxString btn_text = custom_visible ? _u8L("Hide Custom G-code") : _u8L("Show Custom G-code");
           ImGui::Separator();
           if (imgui.button(btn_text, ImVec2(-1.0f, 0.0f), true)) {
               m_extrusions.role_visibility_flags = custom_visible ? m_extrusions.role_visibility_flags & ~(1 << int(GCodeExtrusionRole::Custom)) :

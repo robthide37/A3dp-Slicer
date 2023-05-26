@@ -84,16 +84,16 @@ void Layer::make_slices()
     co.MiterLimit = scaled<double>(3.);
 // Use the default zero edge merging distance. For this kind of safety offset the accuracy of normal direction is not important.
 //    co.ShortestEdgeLength = delta * ClipperOffsetShortestEdgeFactor;
-    static constexpr const double accept_area_threshold_ccw = sqr(scaled<double>(0.1 * delta));
+//    static constexpr const double accept_area_threshold_ccw = sqr(scaled<double>(0.1 * delta));
     // Such a small hole should not survive the shrinkage, it should grow over 
-    static constexpr const double accept_area_threshold_cw  = sqr(scaled<double>(0.2 * delta));
+//    static constexpr const double accept_area_threshold_cw  = sqr(scaled<double>(0.2 * delta));
 
     for (const ExPolygon &expoly : expolygons) {
         contours.clear();
         co.Clear();
         co.AddPath(expoly.contour.points, ClipperLib::jtMiter, ClipperLib::etClosedPolygon);
         co.Execute(contours, - delta);
-        size_t num_prev = out.size();
+//        size_t num_prev = out.size();
         if (! contours.empty()) {
             holes.clear();
             for (const Polygon &hole : expoly.holes) {
@@ -447,7 +447,7 @@ static void connect_layer_slices(
             for (int i = int(other_layer.lslices_ex.size()) - 1; i >= 0; -- i)
                 if (contour_aabb.overlap(other_layer.lslices_ex[i].bbox))
                     // it is potentially slow, but should be executed rarely
-                    if (Polygons overlap = intersection(contour_poly, other_layer.lslices[i]); ! overlap.empty())
+                    if (Polygons overlap = intersection(contour_poly, other_layer.lslices[i]); ! overlap.empty()) {
                         if (other_has_duplicates) {
                             // Find the contour with the largest overlap. It is expected that the other overlap will be very small.
                             double a = area(overlap);
@@ -460,6 +460,7 @@ static void connect_layer_slices(
                             i_largest = i;
                             break;
                         }
+                    }
             assert(i_largest >= 0);
             return i_largest;
         }
@@ -500,10 +501,10 @@ static void connect_layer_slices(
 #endif // NDEBUG
 
     // Scatter the links, but don't sort them yet.
-    for (int32_t islice = 0; islice < below.lslices_ex.size(); ++ islice)
+    for (int32_t islice = 0; islice < int32_t(below.lslices_ex.size()); ++ islice)
         for (LayerSlice::Link &link : below.lslices_ex[islice].overlaps_above)
             above.lslices_ex[link.slice_idx].overlaps_below.push_back({ islice, link.area });
-    for (int32_t islice = 0; islice < above.lslices_ex.size(); ++ islice)
+    for (int32_t islice = 0; islice < int32_t(above.lslices_ex.size()); ++ islice)
         for (LayerSlice::Link &link : above.lslices_ex[islice].overlaps_below)
             below.lslices_ex[link.slice_idx].overlaps_above.push_back({ islice, link.area });
     // Sort the links.
@@ -935,7 +936,7 @@ void Layer::sort_perimeters_into_islands(
                 island.fill_region_id = LayerIsland::fill_region_composite_id;
                 for (uint32_t fill_idx : fill_range) {
                     if (const int fill_regon_id = map_expolygon_to_region_and_fill[fill_idx].region_id; 
-                        fill_regon_id == -1 || (island.fill_region_id != LayerIsland::fill_region_composite_id && island.fill_region_id != fill_regon_id)) {
+                        fill_regon_id == -1 || (island.fill_region_id != LayerIsland::fill_region_composite_id && int(island.fill_region_id) != fill_regon_id)) {
                         island.fill_region_id = LayerIsland::fill_region_composite_id;
                         break;
                     } else

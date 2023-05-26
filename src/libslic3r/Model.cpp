@@ -23,6 +23,8 @@
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/iostream.hpp>
 
+#include <tbb/concurrent_vector.h>
+
 #include "SVG.hpp"
 #include <Eigen/Dense>
 #include "GCodeWriter.hpp"
@@ -1055,12 +1057,18 @@ BoundingBoxf3 ModelObject::instance_bounding_box(size_t instance_idx, bool dont_
 // This method is used by the auto arrange function.
 Polygon ModelObject::convex_hull_2d(const Transform3d& trafo_instance) const
 {
-    Points pts;
-    for (const ModelVolume* v : volumes) {
-        if (v->is_model_part())
-            append(pts, its_convex_hull_2d_above(v->mesh().its, (trafo_instance * v->get_matrix()).cast<float>(), 0.0f).points);
-    }
-    return Geometry::convex_hull(std::move(pts));
+    tbb::concurrent_vector<Polygon> chs;
+    chs.reserve(volumes.size());
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, volumes.size()), [&](const tbb::blocked_range<size_t>& range) {
+        for (size_t i = range.begin(); i < range.end(); ++i) {
+            const ModelVolume* v = volumes[i];
+            chs.emplace_back(its_convex_hull_2d_above(v->mesh().its, (trafo_instance * v->get_matrix()).cast<float>(), 0.0f));
+        }
+    });
+
+    Polygons polygons;
+    polygons.assign(chs.begin(), chs.end());
+    return Geometry::convex_hull(polygons);
 }
 
 void ModelObject::center_around_origin(bool include_modifiers)

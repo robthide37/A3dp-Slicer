@@ -2275,11 +2275,11 @@ msgid "Filament"
 msgstr "耗材"
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3954
-msgid "Hide Custom GCode"
+msgid "Hide Custom G-code"
 msgstr ""
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3954
-msgid "Show Custom GCode"
+msgid "Show Custom G-code"
 msgstr ""
 
 #: src/slic3r/GUI/GCodeViewer.cpp:3967

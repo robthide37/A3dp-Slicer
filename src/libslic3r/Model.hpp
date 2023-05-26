@@ -188,7 +188,7 @@ public:
     void assign(const LayerHeightProfile &rhs) { if (! this->timestamp_matches(rhs)) { m_data = rhs.m_data; this->copy_timestamp(rhs); } }
     void assign(LayerHeightProfile &&rhs) { if (! this->timestamp_matches(rhs)) { m_data = std::move(rhs.m_data); this->copy_timestamp(rhs); } }
 
-    std::vector<coordf_t> get() const throw() { return m_data; }
+    const std::vector<coordf_t>& get() const throw() { return m_data; }
     bool                  empty() const throw() { return m_data.empty(); }
     void                  set(const std::vector<coordf_t> &data) { if (m_data != data) { m_data = data; this->touch(); } }
     void                  set(std::vector<coordf_t> &&data) { if (m_data != data) { m_data = std::move(data); this->touch(); } }
