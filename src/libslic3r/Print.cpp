@@ -1526,6 +1526,10 @@ void Print::_make_wipe_tower()
 
     m_wipe_tower_data.used_filament = wipe_tower.get_used_filament();
     m_wipe_tower_data.number_of_toolchanges = wipe_tower.get_number_of_toolchanges();
+    const Vec3d origin = Vec3d::Zero();
+    m_fake_wipe_tower.set_fake_extrusion_data(wipe_tower.position(), wipe_tower.width(), wipe_tower.get_wipe_tower_height(), config().first_layer_height, m_wipe_tower_data.depth,
+                                              m_wipe_tower_data.brim_width, config().wipe_tower_rotation_angle, {scale_(origin.x()), scale_(origin.y())});
+
 }
 
 // Generate a recommended G-code output file name based on the format template, default extension, and template parameters

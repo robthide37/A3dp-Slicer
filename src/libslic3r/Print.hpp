@@ -427,9 +427,10 @@ struct FakeWipeTower
     float layer_height;
     float depth;
     float brim_width;
+    float rotation_angle;
     Vec2d plate_origin;
 
-    void set_fake_extrusion_data(const Vec2f& p, float w, float h, float lh, float d, float bd, const Vec2d& o)
+    void set_fake_extrusion_data(const Vec2f& p, float w, float h, float lh, float d, float bd, float ra, const Vec2d& o)
     {
         pos = p;
         width = w;
@@ -437,6 +438,7 @@ struct FakeWipeTower
         layer_height = lh;
         depth = d;
         brim_width = bd;
+        rotation_angle = ra;
         plate_origin = o;
     }
 
@@ -449,15 +451,36 @@ struct FakeWipeTower
         int   d = scale_(depth);
         int   w = scale_(width);
         int   bd = scale_(brim_width);
-        Point minCorner = { scale_(pos.x()), scale_(pos.y()) };
-        Point maxCorner = { minCorner.x() + w, minCorner.y() + d };
+        Point minCorner = { -bd, -bd };
+        Point maxCorner = { minCorner.x() + w + bd, minCorner.y() + d + bd };
 
         std::vector<ExtrusionPaths> paths;
         for (float hh = 0.f; hh < h; hh += lh) {
             ExtrusionPath path(ExtrusionRole::WipeTower, 0.0, 0.0, lh);
             path.polyline = { minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner };
             paths.push_back({ path });
+
+            // We added the border, now add several parallel lines so we can detect an object that is fully inside the tower.
+            // For now, simply use fixed spacing of 3mm.
+            for (coord_t y=minCorner.y()+scale_(3.); y<maxCorner.y(); y+=scale_(3.)) {
+                path.polyline = { {minCorner.x(), y}, {maxCorner.x(), y} };
+                paths.push_back({ path });
+            }
+
+            if (hh == 0.f) {
+                minCorner = minCorner + Point(bd, bd);
+                maxCorner = maxCorner - Point(bd, bd);
+            }
         }
+
+        // Rotate and translate the tower into the final position.
+        for (ExtrusionPaths& ps : paths) {
+            for (ExtrusionPath& p : ps) {
+                p.polyline.rotate(Geometry::deg2rad(rotation_angle));
+                p.polyline.translate(scale_(pos.x()), scale_(pos.y()));
+            }
+        }
+
         return paths;
     }
 };
