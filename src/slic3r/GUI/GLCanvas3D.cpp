@@ -2559,17 +2559,19 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             // Height of a print (Show at least a slab).
             const double height = height_real < 0.f ? std::max(m_model->max_z(), 10.0) : height_real;
 
-#if ENABLE_OPENGL_ES
-            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
-                x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
-                bw, &m_wipe_tower_mesh);
-#else
-            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
-                x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
-                bw);
-#endif // ENABLE_OPENGL_ES
-            if (volume_idx_wipe_tower_old != -1)
-                map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
+            if (depth != 0.) {
+    #if ENABLE_OPENGL_ES
+                int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                    x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
+                    bw, &m_wipe_tower_mesh);
+    #else
+                int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                    x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
+                    bw);
+    #endif // ENABLE_OPENGL_ES
+                if (volume_idx_wipe_tower_old != -1)
+                    map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
+            }
         }
     }
 
