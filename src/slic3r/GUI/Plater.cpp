@@ -1370,7 +1370,7 @@ void Sidebar::update_sliced_info_sizer()
             }
             p->sliced_info->SetTextAndShow(siCost, str_total_cost, "Cost");
 
-            wxString t_est = std::isnan(ps.estimated_print_time) ? "N/A" : get_time_dhms(float(ps.estimated_print_time));
+            wxString t_est = std::isnan(ps.estimated_print_time) ? "N/A" : from_u8(short_time_ui(get_time_dhms(float(ps.estimated_print_time))));
             p->sliced_info->SetTextAndShow(siEstimatedTime, t_est, _L("Estimated printing time") + ":");
 
             p->plater->get_notification_manager()->set_slicing_complete_print_time(_u8L("Estimated printing time") + ": " + boost::nowide::narrow(t_est), p->plater->is_sidebar_collapsed());
@@ -1459,14 +1459,14 @@ void Sidebar::update_sliced_info_sizer()
                 new_label = _L("Estimated printing time") + ":";
                 if (ps.estimated_normal_print_time != "N/A") {
                     new_label += format_wxstr("\n   - %1%", _L("normal mode"));
-                    info_text += format_wxstr("\n%1%", short_time(ps.estimated_normal_print_time));
+                    info_text += format_wxstr("\n%1%", short_time_ui(ps.estimated_normal_print_time));
 
                     p->plater->get_notification_manager()->set_slicing_complete_print_time(_u8L("Estimated printing time") + ": " + ps.estimated_normal_print_time, p->plater->is_sidebar_collapsed());
 
                 }
                 if (ps.estimated_silent_print_time != "N/A") {
                     new_label += format_wxstr("\n   - %1%", _L("stealth mode"));
-                    info_text += format_wxstr("\n%1%", short_time(ps.estimated_silent_print_time));
+                    info_text += format_wxstr("\n%1%", short_time_ui(ps.estimated_silent_print_time));
                 }
                 p->sliced_info->SetTextAndShow(siEstimatedTime, info_text, new_label);
             }
