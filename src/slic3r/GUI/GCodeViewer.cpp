@@ -9,6 +9,8 @@
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/PresetBundle.hpp"
 
+#include "slic3r/GUI/format.hpp"
+
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 #include "Plater.hpp"
