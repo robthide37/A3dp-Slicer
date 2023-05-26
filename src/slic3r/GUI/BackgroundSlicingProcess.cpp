@@ -549,10 +549,10 @@ bool BackgroundSlicingProcess::empty() const
 	return m_print->empty();
 }
 
-std::string BackgroundSlicingProcess::validate(std::string* warning)
+std::string BackgroundSlicingProcess::validate(std::vector<std::string>* warnings)
 {
 	assert(m_print != nullptr);
-    return m_print->validate(warning);
+    return m_print->validate(warnings);
 }
 
 // Apply config over the print. Returns false, if the new config values caused any of the already

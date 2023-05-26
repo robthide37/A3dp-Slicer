@@ -820,6 +820,8 @@ void PlaterPresetComboBox::update()
             // Extruder color is not defined.
             extruder_color.clear();
         selected_filament_preset = extruder_filaments.get_selected_preset();
+        if (selected_filament_preset->is_dirty)
+            selected_filament_preset = &m_preset_bundle->filaments.get_edited_preset();
         assert(selected_filament_preset);
     }
 

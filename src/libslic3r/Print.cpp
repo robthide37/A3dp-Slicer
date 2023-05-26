@@ -208,6 +208,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "wipe_tower_bridging"
             || opt_key == "wipe_tower_extra_spacing"
             || opt_key == "wipe_tower_no_sparse_layers"
+            || opt_key == "wipe_tower_extruder"
             || opt_key == "wiping_volumes_matrix"
             || opt_key == "parking_pos_retraction"
             || opt_key == "cooling_tube_retraction"
@@ -328,6 +329,15 @@ std::vector<unsigned int> Print::extruders() const
     std::vector<unsigned int> extruders = this->object_extruders();
     append(extruders, this->support_material_extruders());
     sort_remove_duplicates(extruders);
+
+    // The wipe tower extruder can also be set. When the wipe tower is enabled and it will be generated,
+    // append its extruder into the list too.
+    if (has_wipe_tower() && config().wipe_tower_extruder != 0 && extruders.size() > 1) {
+        assert(config().wipe_tower_extruder > 0 && config().wipe_tower_extruder < int(config().nozzle_diameter.size()));
+        extruders.emplace_back(config().wipe_tower_extruder - 1); // the config value is 1-based
+        sort_remove_duplicates(extruders);
+    }
+
     return extruders;
 }
 
@@ -458,9 +468,20 @@ static inline bool sequential_print_vertical_clearance_valid(const Print &print)
 boost::regex regex_g92e0 { "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
 
 // Precondition: Print::validate() requires the Print::apply() to be called its invocation.
-std::string Print::validate(std::string* warning) const
+std::string Print::validate(std::vector<std::string>* warnings) const
 {
     std::vector<unsigned int> extruders = this->extruders();
+
+    if (warnings) {
+        for (size_t a=0; a<extruders.size(); ++a)
+            for (size_t b=a+1; b<extruders.size(); ++b)
+                if (std::abs(m_config.bed_temperature.get_at(extruders[a]) - m_config.bed_temperature.get_at(extruders[b])) > 15
+                 || std::abs(m_config.first_layer_bed_temperature.get_at(extruders[a]) - m_config.first_layer_bed_temperature.get_at(extruders[b])) > 15) {
+                    warnings->emplace_back("_BED_TEMPS_DIFFER");
+                    goto DONE;
+                }
+        DONE:;
+    }
 
     if (m_objects.empty())
         return _u8L("All objects are outside of the print volume.");
@@ -681,12 +702,12 @@ std::string Print::validate(std::string* warning) const
 
             // Do we have custom support data that would not be used?
             // Notify the user in that case.
-            if (! object->has_support() && warning) {
+            if (! object->has_support() && warnings) {
                 for (const ModelVolume* mv : object->model_object()->volumes) {
                     bool has_enforcers = mv->is_support_enforcer() || 
                         (mv->is_model_part() && mv->supported_facets.has_facets(*mv, EnforcerBlockerType::ENFORCER));
                     if (has_enforcers) {
-                        *warning = "_SUPPORTS_OFF";
+                        warnings->emplace_back("_SUPPORTS_OFF");
                         break;
                     }
                 }
