@@ -247,10 +247,6 @@ void UpdateJob::process(Ctl &ctl)
     if (was_canceled()) return;
     if (m_result.its.empty())
         throw priv::JobException("Created text volume is empty. Change text or font.");
-
-    // center triangle mesh
-    //Vec3d shift = m_result.bounding_box().center();
-    //m_result.translate(-shift.cast<float>());    
 }
 
 void UpdateJob::finalize(bool canceled, std::exception_ptr &eptr)

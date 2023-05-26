@@ -3063,39 +3063,6 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     m_parent.do_rotate(snapshot_name);
 }
 
-namespace{
-bool is_left(    FontProp::Align align){ return align == FontProp::Align::bottom_left   || align == FontProp::Align::center_left   || align == FontProp::Align::top_left; }
-bool is_center_h(FontProp::Align align){ return align == FontProp::Align::bottom_center || align == FontProp::Align::center_center || align == FontProp::Align::top_center; }
-bool is_right(   FontProp::Align align){ return align == FontProp::Align::bottom_right  || align == FontProp::Align::center_right  || align == FontProp::Align::top_right; }
-bool is_top(     FontProp::Align align){ return align == FontProp::Align::top_left      || align == FontProp::Align::top_center    || align == FontProp::Align::top_right; }
-bool is_center_v(FontProp::Align align){ return align == FontProp::Align::center_left   || align == FontProp::Align::center_center || align == FontProp::Align::center_right; }
-bool is_bottom(  FontProp::Align align){ return align == FontProp::Align::bottom_left   || align == FontProp::Align::bottom_center || align == FontProp::Align::bottom_right; }
-void to_left(FontProp::Align &align){
-    align = (align == FontProp::Align::bottom_right || align == FontProp::Align::bottom_center) ? FontProp::Align::bottom_left :
-            (align == FontProp::Align::center_right || align == FontProp::Align::center_center) ? FontProp::Align::center_left :
-                                                                                                  FontProp::Align::top_left;}
-void to_center_h(FontProp::Align &align){
-    align = (align == FontProp::Align::bottom_right || align == FontProp::Align::bottom_left) ? FontProp::Align::bottom_center :
-            (align == FontProp::Align::center_right || align == FontProp::Align::center_left) ? FontProp::Align::center_center :
-                                                                                                  FontProp::Align::top_center;}
-void to_right(FontProp::Align &align){
-    align = (align == FontProp::Align::bottom_left || align == FontProp::Align::bottom_center) ? FontProp::Align::bottom_right :
-            (align == FontProp::Align::center_left || align == FontProp::Align::center_center) ? FontProp::Align::center_right :
-                                                                                                  FontProp::Align::top_right;}
-void to_top(FontProp::Align &align){
-    align = (align == FontProp::Align::bottom_left || align == FontProp::Align::center_left) ? FontProp::Align::top_left :
-            (align == FontProp::Align::bottom_right || align == FontProp::Align::center_right) ? FontProp::Align::top_right :
-                                                                                                  FontProp::Align::top_center;}
-void to_center_v(FontProp::Align &align){
-    align = (align == FontProp::Align::bottom_left || align == FontProp::Align::top_left) ? FontProp::Align::center_left :
-            (align == FontProp::Align::bottom_right || align == FontProp::Align::top_right) ? FontProp::Align::center_right :
-                                                                                                  FontProp::Align::center_center;}
-void to_bottom(FontProp::Align &align){
-    align = (align == FontProp::Align::top_left || align == FontProp::Align::center_left) ? FontProp::Align::bottom_left :
-            (align == FontProp::Align::top_right || align == FontProp::Align::center_right) ? FontProp::Align::bottom_right :
-                                                                                                  FontProp::Align::bottom_center;}
-}
-
 void GLGizmoEmboss::draw_advanced()
 {
     const auto &ff = m_style_manager.get_font_file_with_cache();
@@ -3186,51 +3153,37 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::SetTooltip("TEST PURPOSE ONLY\nMove base line (up/down) for allign letters");
     m_imgui->disabled_end(); // !per_glyph
         
-    const FontProp::Align * def_align = stored_style ? &stored_style->prop.align : nullptr;
-    float undo_offset = ImGui::GetStyle().FramePadding.x;
-    //auto draw = [&selected_align, gui_cfg = m_gui_cfg]() {
-    //    // order must match align enum
-    //    const char* align_names[] = { "first_line_center",
-    //                                  "first_line_left",
-    //                                  "first_line_right",
-    //                                  "center_center",
-    //                                  "center_left",
-    //                                  "center_right",
-    //                                  "top_center",
-    //                                  "top_left",
-    //                                  "top_right",         
-    //                                  "bottom_center",
-    //                                  "bottom_left",
-    //                                  "bottom_right"};
-    //    ImGui::SameLine(gui_cfg->advanced_input_offset);
-    //    ImGui::SetNextItemWidth(gui_cfg->input_width);
-    //    return ImGui::Combo("##text_alignment", &selected_align, align_names, IM_ARRAYSIZE(align_names));
-    //};
-
     auto draw_align = [&align = font_prop.align, gui_cfg = m_gui_cfg, &icons = m_icons]() {
         bool is_change = false;
         ImGui::SameLine(gui_cfg->advanced_input_offset);
-        if (is_left(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_horizontal_left, IconState::hovered));
-        else if (draw_button(icons, IconType::align_horizontal_left)) { to_left(align); is_change = true; }
+        if (align.first==FontProp::HorizontalAlign::left) draw(get_icon(icons, IconType::align_horizontal_left, IconState::hovered));
+        else if (draw_button(icons, IconType::align_horizontal_left)) { align.first=FontProp::HorizontalAlign::left; is_change = true; }
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set left alignment").c_str());
         ImGui::SameLine();
-        if (is_center_h(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_horizontal_center, IconState::hovered));
-        else if (draw_button(icons, IconType::align_horizontal_center)) { to_center_h(align); is_change = true; }
+        if (align.first==FontProp::HorizontalAlign::center) draw(get_icon(icons, IconType::align_horizontal_center, IconState::hovered));
+        else if (draw_button(icons, IconType::align_horizontal_center)) { align.first=FontProp::HorizontalAlign::center; is_change = true; }
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set horizont center alignment").c_str());
         ImGui::SameLine();
-        if (is_right(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_horizontal_right, IconState::hovered));
-        else if (draw_button(icons, IconType::align_horizontal_right)) { to_right(align); is_change = true; }
+        if (align.first==FontProp::HorizontalAlign::right) draw(get_icon(icons, IconType::align_horizontal_right, IconState::hovered));
+        else if (draw_button(icons, IconType::align_horizontal_right)) { align.first=FontProp::HorizontalAlign::right; is_change = true; }
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set right alignment").c_str());
 
         ImGui::SameLine();
-        if (is_top(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_vertical_top, IconState::hovered));
-        else if (draw_button(icons, IconType::align_vertical_top)) { to_top(align); is_change = true; }
+        if (align.second==FontProp::VerticalAlign::top) draw(get_icon(icons, IconType::align_vertical_top, IconState::hovered));
+        else if (draw_button(icons, IconType::align_vertical_top)) { align.second=FontProp::VerticalAlign::top; is_change = true; }
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set top alignment").c_str());
         ImGui::SameLine();
-        if (is_center_v(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_vertical_center, IconState::hovered));
-        else if (draw_button(icons, IconType::align_vertical_center)) { to_center_v(align); is_change = true; }
+        if (align.second==FontProp::VerticalAlign::center) draw(get_icon(icons, IconType::align_vertical_center, IconState::hovered));
+        else if (draw_button(icons, IconType::align_vertical_center)) { align.second=FontProp::VerticalAlign::center; is_change = true; }
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set vertical center alignment").c_str());
         ImGui::SameLine();
-        if (is_bottom(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_vertical_bottom, IconState::hovered));
-        else if (draw_button(icons, IconType::align_vertical_bottom)) { to_bottom(align); is_change = true; }
+        if (align.second==FontProp::VerticalAlign::bottom) draw(get_icon(icons, IconType::align_vertical_bottom, IconState::hovered));
+        else if (draw_button(icons, IconType::align_vertical_bottom)) { align.second=FontProp::VerticalAlign::bottom; is_change = true; }
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set bottom alignment").c_str());
         return is_change;
     };
-
+    const FontProp::Align * def_align = stored_style ? &stored_style->prop.align : nullptr;
+    float undo_offset = ImGui::GetStyle().FramePadding.x;
     if (revertible(tr.alignment, font_prop.align, def_align, _u8L("Revert alignment."), undo_offset, draw_align)) {
         if (font_prop.per_glyph)
             reinit_text_lines(m_text_lines.get_lines().size());

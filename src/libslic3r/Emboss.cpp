@@ -1287,12 +1287,14 @@ ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache, const char *t
 
 namespace {
 /// <summary>
-/// Align expolygons by type
+/// Align shape against pivot
 /// </summary>
-/// <param name="type">Type of alignment</param>
-/// <param name="shape">shapes to align</param>
-/// <param name="text">Same size as shape for align per line(detect of end line - '\n')</param>
-void align_shape(FontProp::Align type, std::vector<ExPolygons> &shape, const std::wstring &text);
+/// <param name="type">Horizontal and vertical alignment</param>
+/// <param name="shapes">Shapes to align
+/// Prerequisities: shapes are aligned left top</param>
+/// <param name="text">To detect end of lines</param>
+/// <param name="line_height">Height of line for align[in font points]</param>
+void align_shape(FontProp::Align type, std::vector<ExPolygons> &shape, const std::wstring &text, int line_height);
 }
 
 std::vector<ExPolygons> Emboss::text2vshapes(FontFileWithCache &font_with_cache, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled){
@@ -1317,7 +1319,7 @@ std::vector<ExPolygons> Emboss::text2vshapes(FontFileWithCache &font_with_cache,
         result.emplace_back(letter2shapes(letter, cursor, font_with_cache, font_prop, font_info_cache));
     }
 
-    align_shape(font_prop.align, result, text);
+    align_shape(font_prop.align, result, text, get_line_height(font, font_prop));
     return result;
 }
 
@@ -1927,47 +1929,37 @@ PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &b
 }
 
 namespace {
-int32_t get_align_y_offset(FontProp::Align type, const BoundingBox &bb){
-    switch (type) {
-    case Slic3r::FontProp::Align::first_line_left:
-    case Slic3r::FontProp::Align::first_line_right:
-    case Slic3r::FontProp::Align::first_line_center: break; // No change
-    case Slic3r::FontProp::Align::center_left:
-    case Slic3r::FontProp::Align::center_right:
-    case Slic3r::FontProp::Align::center_center: return -bb.center().y();
-    case Slic3r::FontProp::Align::top_left:
-    case Slic3r::FontProp::Align::top_right:
-    case Slic3r::FontProp::Align::top_center: return -bb.max.y(); break; // direction of Y in 2d is from top to bottom
-    case Slic3r::FontProp::Align::bottom_left:
-    case Slic3r::FontProp::Align::bottom_right:
-    case Slic3r::FontProp::Align::bottom_center: return -bb.min.y(); // direction of Y in 2d is from top to bottom
-    default: break;
+int32_t get_align_y_offset(FontProp::VerticalAlign align, int count_lines, int line_height)
+{
+    // direction of Y in 2d is from top to bottom
+    // zero is on base line of first line
+    switch (align) {
+    case FontProp::VerticalAlign::center:        
+        return ((count_lines-1) / 2) * line_height 
+                 + ((count_lines % 2 == 0) ? (line_height / 2) : 0);
+    case FontProp::VerticalAlign::bottom:        
+        return (count_lines-1) * line_height;
+    case FontProp::VerticalAlign::top: // no change
+    default: 
+        break;
     }
     return 0;
 }
-int32_t get_align_x_offset(FontProp::Align type, const BoundingBox &shape_bb, const BoundingBox &line_bb)
+int32_t get_align_x_offset(FontProp::HorizontalAlign align, const BoundingBox &shape_bb, const BoundingBox &line_bb)
 {
-    switch (type) {
-    case Slic3r::FontProp::Align::first_line_center:
-    case Slic3r::FontProp::Align::center_center:
-    case Slic3r::FontProp::Align::top_center:
-    case Slic3r::FontProp::Align::bottom_center: return -shape_bb.center().x() + (shape_bb.size().x() - line_bb.size().x())/2;
-    case Slic3r::FontProp::Align::first_line_left: break; // special case do not use offset
-    case Slic3r::FontProp::Align::center_left:
-    case Slic3r::FontProp::Align::top_left:
-    case Slic3r::FontProp::Align::bottom_left: return -shape_bb.min.x();
-    case Slic3r::FontProp::Align::first_line_right:
-    case Slic3r::FontProp::Align::center_right:
-    case Slic3r::FontProp::Align::top_right:
-    case Slic3r::FontProp::Align::bottom_right: return -shape_bb.max.x() + (shape_bb.size().x() - line_bb.size().x());
+    switch (align) {
+    case FontProp::HorizontalAlign::right: return -shape_bb.max.x() + (shape_bb.size().x() - line_bb.size().x());
+    case FontProp::HorizontalAlign::center: return -shape_bb.center().x() + (shape_bb.size().x() - line_bb.size().x()) / 2;
+    case FontProp::HorizontalAlign::left: // no change
     default: break;
     }
     return 0;
 }
 
-void align_shape(FontProp::Align type, std::vector<ExPolygons> &shapes, const std::wstring &text)
+void align_shape(FontProp::Align type, std::vector<ExPolygons> &shapes, const std::wstring &text, int line_height)
 {
-    if (type == FontProp::Align::first_line_left)
+    constexpr FontProp::Align no_change(FontProp::HorizontalAlign::left, FontProp::VerticalAlign::top);
+    if (type == no_change)
         return; // no alignment
 
     BoundingBox shape_bb;
@@ -1982,13 +1974,13 @@ void align_shape(FontProp::Align type, std::vector<ExPolygons> &shapes, const st
     };
 
     Point offset(
-        get_align_x_offset(type, shape_bb, get_line_bb(0)), 
-        get_align_y_offset(type, shape_bb));
+        get_align_x_offset(type.first, shape_bb, get_line_bb(0)), 
+        get_align_y_offset(type.second, get_count_lines(text), line_height));
     assert(shapes.size() == text.length());
     for (size_t i = 0; i < shapes.size(); ++i) {
-        wchar_t letter    = text[i];
+        wchar_t letter = text[i];
         if (letter == '\n'){
-            offset.x() = get_align_x_offset(type, shape_bb, get_line_bb(i+1));
+            offset.x() = get_align_x_offset(type.first, shape_bb, get_line_bb(i+1));
             continue;
         }
         ExPolygons &shape = shapes[i];

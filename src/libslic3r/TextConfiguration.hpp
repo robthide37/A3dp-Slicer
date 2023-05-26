@@ -63,27 +63,14 @@ struct FontProp
     // Distiguish projection per glyph
     bool per_glyph;
 
-    // Enumerate type of allowed text align 
-    enum class Align {
-        // NOTE: default value must be zero - 3mf store
-        first_line_center = 0, // use Y zero same as first letter
-        first_line_left, // it depends on position of zero for first letter (no shape move)
-        first_line_right, // use Y zero same as first letter
-        center_center,
-        center_left,
-        center_right,
-        top_center,
-        top_left,
-        top_right,
-        bottom_center,
-        bottom_left,
-        bottom_right
-    };
-
+    // NOTE: way of serialize to 3mf force that zero must be default value
+    enum class HorizontalAlign { left = 0, center, right };
+    enum class VerticalAlign { top = 0, center, bottom };
+    using Align = std::pair<HorizontalAlign, VerticalAlign>;
     // change pivot of text
     // When not set, center is used and is not stored
-    Align align = Align::first_line_center;
-
+    Align align = Align(HorizontalAlign::left, VerticalAlign::top);
+    
     //////
     // Duplicit data to wxFontDescriptor
     // used for store/load .3mf file
@@ -126,7 +113,7 @@ struct FontProp
     // undo / redo stack recovery
     template<class Archive> void save(Archive &ar) const
     {
-        ar(emboss, use_surface, size_in_mm, per_glyph, align);
+        ar(emboss, use_surface, size_in_mm, per_glyph, align.first, align.second);
         cereal::save(ar, char_gap);
         cereal::save(ar, line_gap);
         cereal::save(ar, boldness);
@@ -141,7 +128,7 @@ struct FontProp
     }
     template<class Archive> void load(Archive &ar)
     {
-        ar(emboss, use_surface, size_in_mm, per_glyph, align);
+        ar(emboss, use_surface, size_in_mm, per_glyph, align.first, align.second);
         cereal::load(ar, char_gap);
         cereal::load(ar, line_gap);
         cereal::load(ar, boldness);
