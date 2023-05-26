@@ -469,13 +469,7 @@ public:
     void delete_connectors();
     void clone_for_cut(ModelObject **obj);
 
-    void apply_cut_attributes(ModelObjectCutAttributes attributes);
 private:
-    // FIXME: These functions would best not be here at all. It might make sense to separate the
-    // cut-related methods elsewhere. Same holds for cut_connectors data member, which is currently
-    // just a temporary variable used by cut gizmo only.
-    void synchronize_model_after_cut();
-    
     void process_connector_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
                                ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower,
                                std::vector<ModelObject*>& dowels);
