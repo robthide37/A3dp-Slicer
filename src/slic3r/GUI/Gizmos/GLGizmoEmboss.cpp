@@ -233,6 +233,12 @@ enum class IconType : unsigned {
     lock_bold,
     unlock,
     unlock_bold,
+    align_horizontal_left,
+    align_horizontal_center,
+    align_horizontal_right,
+    align_vertical_top,
+    align_vertical_center,
+    align_vertical_bottom,
     // automatic calc of icon's count
     _count
 };
@@ -2278,14 +2284,12 @@ void GLGizmoEmboss::draw_model_type()
         Plater::TakeSnapshot snapshot(plater, _L("Change Text Type"), UndoRedo::SnapshotType::GizmoAction);
         m_volume->set_type(*new_type);
 
-         // Update volume position when switch from part or into part
-        const FontProp& prop = m_volume->text_configuration->style.prop;
-        if (prop.use_surface || prop.per_glyph) {
-            // move inside
-            bool is_volume_move_inside  = (type == part);
-            bool is_volume_move_outside = (*new_type == part);
-            if (is_volume_move_inside || is_volume_move_outside) process();
-        }
+        // move inside
+        bool is_volume_move_inside  = (type == part);
+        bool is_volume_move_outside = (*new_type == part);
+         // Update volume position when switch (from part) or (into part)
+        if ((is_volume_move_inside || is_volume_move_outside))
+            process();
 
         // inspiration in ObjectList::change_part_type()
         // how to view correct side panel with objects
@@ -3059,6 +3063,39 @@ void GLGizmoEmboss::do_rotate(float relative_z_angle)
     m_parent.do_rotate(snapshot_name);
 }
 
+namespace{
+bool is_left(    FontProp::Align align){ return align == FontProp::Align::bottom_left   || align == FontProp::Align::center_left   || align == FontProp::Align::top_left; }
+bool is_center_h(FontProp::Align align){ return align == FontProp::Align::bottom_center || align == FontProp::Align::center_center || align == FontProp::Align::top_center; }
+bool is_right(   FontProp::Align align){ return align == FontProp::Align::bottom_right  || align == FontProp::Align::center_right  || align == FontProp::Align::top_right; }
+bool is_top(     FontProp::Align align){ return align == FontProp::Align::top_left      || align == FontProp::Align::top_center    || align == FontProp::Align::top_right; }
+bool is_center_v(FontProp::Align align){ return align == FontProp::Align::center_left   || align == FontProp::Align::center_center || align == FontProp::Align::center_right; }
+bool is_bottom(  FontProp::Align align){ return align == FontProp::Align::bottom_left   || align == FontProp::Align::bottom_center || align == FontProp::Align::bottom_right; }
+void to_left(FontProp::Align &align){
+    align = (align == FontProp::Align::bottom_right || align == FontProp::Align::bottom_center) ? FontProp::Align::bottom_left :
+            (align == FontProp::Align::center_right || align == FontProp::Align::center_center) ? FontProp::Align::center_left :
+                                                                                                  FontProp::Align::top_left;}
+void to_center_h(FontProp::Align &align){
+    align = (align == FontProp::Align::bottom_right || align == FontProp::Align::bottom_left) ? FontProp::Align::bottom_center :
+            (align == FontProp::Align::center_right || align == FontProp::Align::center_left) ? FontProp::Align::center_center :
+                                                                                                  FontProp::Align::top_center;}
+void to_right(FontProp::Align &align){
+    align = (align == FontProp::Align::bottom_left || align == FontProp::Align::bottom_center) ? FontProp::Align::bottom_right :
+            (align == FontProp::Align::center_left || align == FontProp::Align::center_center) ? FontProp::Align::center_right :
+                                                                                                  FontProp::Align::top_right;}
+void to_top(FontProp::Align &align){
+    align = (align == FontProp::Align::bottom_left || align == FontProp::Align::center_left) ? FontProp::Align::top_left :
+            (align == FontProp::Align::bottom_right || align == FontProp::Align::center_right) ? FontProp::Align::top_right :
+                                                                                                  FontProp::Align::top_center;}
+void to_center_v(FontProp::Align &align){
+    align = (align == FontProp::Align::bottom_left || align == FontProp::Align::top_left) ? FontProp::Align::center_left :
+            (align == FontProp::Align::bottom_right || align == FontProp::Align::top_right) ? FontProp::Align::center_right :
+                                                                                                  FontProp::Align::center_center;}
+void to_bottom(FontProp::Align &align){
+    align = (align == FontProp::Align::top_left || align == FontProp::Align::center_left) ? FontProp::Align::bottom_left :
+            (align == FontProp::Align::top_right || align == FontProp::Align::center_right) ? FontProp::Align::bottom_right :
+                                                                                                  FontProp::Align::bottom_center;}
+}
+
 void GLGizmoEmboss::draw_advanced()
 {
     const auto &ff = m_style_manager.get_font_file_with_cache();
@@ -3149,36 +3186,58 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::SetTooltip("TEST PURPOSE ONLY\nMove base line (up/down) for allign letters");
     m_imgui->disabled_end(); // !per_glyph
         
-    int selected_align = static_cast<int>(font_prop.align);
-    int def_align_data = !stored_style ? 0 : static_cast<int>(stored_style->prop.align);
-    int * def_align = stored_style ? &def_align_data : nullptr;
+    const FontProp::Align * def_align = stored_style ? &stored_style->prop.align : nullptr;
     float undo_offset = ImGui::GetStyle().FramePadding.x;
-    auto draw = [&selected_align, gui_cfg = m_gui_cfg]() {
-        // order must match align enum
-        const char* align_names[] = { "first_line_center",
-                                      "first_line_left",
-                                      "first_line_right",
-                                      "center_center",
-                                      "center_left",
-                                      "center_right",
-                                      "top_center",
-                                      "top_left",
-                                      "top_right",         
-                                      "bottom_center",
-                                      "bottom_left",
-                                      "bottom_right"};
+    //auto draw = [&selected_align, gui_cfg = m_gui_cfg]() {
+    //    // order must match align enum
+    //    const char* align_names[] = { "first_line_center",
+    //                                  "first_line_left",
+    //                                  "first_line_right",
+    //                                  "center_center",
+    //                                  "center_left",
+    //                                  "center_right",
+    //                                  "top_center",
+    //                                  "top_left",
+    //                                  "top_right",         
+    //                                  "bottom_center",
+    //                                  "bottom_left",
+    //                                  "bottom_right"};
+    //    ImGui::SameLine(gui_cfg->advanced_input_offset);
+    //    ImGui::SetNextItemWidth(gui_cfg->input_width);
+    //    return ImGui::Combo("##text_alignment", &selected_align, align_names, IM_ARRAYSIZE(align_names));
+    //};
+
+    auto draw_align = [&align = font_prop.align, gui_cfg = m_gui_cfg, &icons = m_icons]() {
+        bool is_change = false;
         ImGui::SameLine(gui_cfg->advanced_input_offset);
-        ImGui::SetNextItemWidth(gui_cfg->input_width);
-        return ImGui::Combo("##text_alignment", &selected_align, align_names, IM_ARRAYSIZE(align_names));
+        if (is_left(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_horizontal_left, IconState::hovered));
+        else if (draw_button(icons, IconType::align_horizontal_left)) { to_left(align); is_change = true; }
+        ImGui::SameLine();
+        if (is_center_h(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_horizontal_center, IconState::hovered));
+        else if (draw_button(icons, IconType::align_horizontal_center)) { to_center_h(align); is_change = true; }
+        ImGui::SameLine();
+        if (is_right(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_horizontal_right, IconState::hovered));
+        else if (draw_button(icons, IconType::align_horizontal_right)) { to_right(align); is_change = true; }
+
+        ImGui::SameLine();
+        if (is_top(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_vertical_top, IconState::hovered));
+        else if (draw_button(icons, IconType::align_vertical_top)) { to_top(align); is_change = true; }
+        ImGui::SameLine();
+        if (is_center_v(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_vertical_center, IconState::hovered));
+        else if (draw_button(icons, IconType::align_vertical_center)) { to_center_v(align); is_change = true; }
+        ImGui::SameLine();
+        if (is_bottom(align)) Slic3r::GUI::draw(get_icon(icons, IconType::align_vertical_bottom, IconState::hovered));
+        else if (draw_button(icons, IconType::align_vertical_bottom)) { to_bottom(align); is_change = true; }
+        return is_change;
     };
-    if (revertible(tr.alignment, selected_align, def_align, _u8L("Revert alignment."), undo_offset, draw)){
-        font_prop.align = static_cast<FontProp::Align>(selected_align);
+
+    if (revertible(tr.alignment, font_prop.align, def_align, _u8L("Revert alignment."), undo_offset, draw_align)) {
         if (font_prop.per_glyph)
             reinit_text_lines(m_text_lines.get_lines().size());
         // TODO: move with text in finalize to not change position
         process();
     }
-
+    
     // TRN EmbossGizmo: font units
     std::string units = _u8L("points");
     std::string units_fmt = "%.0f " + units;
@@ -3634,7 +3693,13 @@ void GLGizmoEmboss::init_icons()
         "lock_closed.svg",  // lock,
         "lock_closed_f.svg",// lock_bold,
         "lock_open.svg",    // unlock,
-        "lock_open_f.svg"   // unlock_bold,
+        "lock_open_f.svg",  // unlock_bold,
+        "align_horizontal_left.svg", 
+        "align_horizontal_center.svg",
+        "align_horizontal_right.svg",
+        "align_vertical_top.svg",
+        "align_vertical_center.svg",
+        "align_vertical_bottom.svg"
     };
     assert(filenames.size() == static_cast<size_t>(IconType::_count));
     std::string path = resources_dir() + "/icons/";

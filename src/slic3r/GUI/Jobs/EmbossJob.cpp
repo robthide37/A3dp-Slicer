@@ -610,9 +610,10 @@ TriangleMesh priv::try_create_mesh(DataBase &input, Fnc was_canceled)
     // NOTE: SHAPE_SCALE is applied in ProjectZ
     double scale = get_shape_scale(prop, ff) / SHAPE_SCALE;
     double depth = prop.emboss / scale;    
-    auto projectZ = std::make_unique<ProjectZ>(depth);
-    //auto scaled = std::make_unique<ProjectScale>(std::move(projectZ), scale);
-    ProjectTransform project(std::move(projectZ), Eigen::Translation<double, 3>(0., 0., -prop.emboss / 2) * Eigen::Scaling(scale));
+    auto projectZ = std::make_unique<ProjectZ>(depth);    
+    float offset = input.is_outside ? -SAFE_SURFACE_OFFSET : (SAFE_SURFACE_OFFSET - prop.emboss);
+    Transform3d tr = Eigen::Translation<double, 3>(0., 0.,static_cast<double>(offset)) * Eigen::Scaling(scale);
+    ProjectTransform project(std::move(projectZ), tr);
     if (was_canceled()) return {};
     return TriangleMesh(polygons2model(shapes, project));
 }
