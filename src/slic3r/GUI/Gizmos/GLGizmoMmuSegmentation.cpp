@@ -336,7 +336,10 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
     ImVec4           first_color        = ImGuiWrapper::to_ImVec4(select_first_color);
     const std::string first_label       = into_u8(m_desc.at("first_color")) + "##color_picker";
     if (ImGui::ColorEdit4(first_label.c_str(), (float*)&first_color, ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel,
-        _u8L("Current").c_str(), _u8L("Original").c_str()))
+        // TRN Means "current color"
+        _u8L("Current").c_str(),
+        // TRN Means "original color"
+        _u8L("Original").c_str()))
         m_modified_extruders_colors[m_first_selected_extruder_idx] = ImGuiWrapper::from_ImVec4(first_color);
 
     ImGui::AlignTextToFramePadding();

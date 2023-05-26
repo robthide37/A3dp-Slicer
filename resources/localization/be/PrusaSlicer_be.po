@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-05-18 15:00+0200\n"
+"POT-Creation-Date: 2023-05-26 13:11+0200\n"
 "PO-Revision-Date: 2023-01-23 10:02+0300\n"
 "Last-Translator: Дзмітры К <dzmitry@lidacity.by>\n"
 "Language-Team: \n"
@@ -209,7 +209,7 @@ msgstr ""
 "Планаванне загрузкі на `%1%`. Глядзіце Вокны -> Чарга Загрузкі на Вузел Друку"
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:31
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:223 src/slic3r/GUI/Plater.cpp:222
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:224 src/slic3r/GUI/Plater.cpp:222
 #: src/slic3r/GUI/Tab.cpp:2874
 msgid "Size"
 msgstr "Памер"
@@ -235,15 +235,15 @@ msgid ""
 msgstr ""
 "Адлегласць да кропкі пачатка каардынат. Адлік ад левага пярэдняга кута стала."
 
-#: src/slic3r/GUI/BedShapeDialog.cpp:64 src/slic3r/GUI/ConfigWizard.cpp:329
-#: src/slic3r/GUI/ConfigWizard.cpp:1838 src/slic3r/GUI/ConfigWizard.cpp:1874
-#: src/slic3r/GUI/ConfigWizard.cpp:1888
+#: src/slic3r/GUI/BedShapeDialog.cpp:64 src/slic3r/GUI/ConfigWizard.cpp:336
+#: src/slic3r/GUI/ConfigWizard.cpp:1845 src/slic3r/GUI/ConfigWizard.cpp:1881
+#: src/slic3r/GUI/ConfigWizard.cpp:1895
 #: src/slic3r/GUI/ExtruderSequenceDialog.cpp:100
-#: src/slic3r/GUI/GCodeViewer.cpp:3452 src/slic3r/GUI/GCodeViewer.cpp:3458
-#: src/slic3r/GUI/GCodeViewer.cpp:3466 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:234
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:524
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:544
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1850
+#: src/slic3r/GUI/GCodeViewer.cpp:3462 src/slic3r/GUI/GCodeViewer.cpp:3468
+#: src/slic3r/GUI/GCodeViewer.cpp:3476 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:235
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:494
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:514
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1826
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1210
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1976
 #: src/slic3r/GUI/GUI_ObjectLayers.cpp:145
@@ -309,17 +309,18 @@ msgstr "Прастакутны"
 msgid "Circular"
 msgstr "Круглы"
 
-#: src/slic3r/GUI/BedShapeDialog.cpp:81
+#: src/slic3r/GUI/BedShapeDialog.cpp:81 src/libslic3r/ExtrusionRole.cpp:51
+#: src/libslic3r/ExtrusionRole.cpp:85
 msgid "Custom"
 msgstr "Карыстальніцкі"
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:104 src/slic3r/GUI/BedShapeDialog.cpp:182
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:221
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1798
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:222
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1804
 msgid "Shape"
 msgstr "Фігура"
 
-#: src/slic3r/GUI/BedShapeDialog.cpp:131 src/slic3r/GUI/ConfigWizard.cpp:1773
+#: src/slic3r/GUI/BedShapeDialog.cpp:131 src/slic3r/GUI/ConfigWizard.cpp:1780
 msgid "Bed Shape"
 msgstr "Фігура і памеры стала"
 
@@ -327,7 +328,7 @@ msgstr "Фігура і памеры стала"
 msgid "Load shape from STL..."
 msgstr "Загрузка формы стала з STL файла..."
 
-#: src/slic3r/GUI/BedShapeDialog.cpp:252 src/slic3r/GUI/GCodeViewer.cpp:3917
+#: src/slic3r/GUI/BedShapeDialog.cpp:252 src/slic3r/GUI/GCodeViewer.cpp:3924
 #: src/slic3r/GUI/MainFrame.cpp:2241
 msgid "Settings"
 msgstr "Налады"
@@ -565,7 +566,7 @@ msgstr "Сінхранізаваць пласты падтрымкі, каб у�
 msgid "Wipe Tower"
 msgstr "Вежа выцірання"
 
-#: src/slic3r/GUI/ConfigManipulation.cpp:138 src/libslic3r/Print.cpp:674
+#: src/slic3r/GUI/ConfigManipulation.cpp:138 src/libslic3r/Print.cpp:676
 msgid ""
 "The Wipe Tower currently supports the non-soluble supports only if they are "
 "printed with the current extruder without triggering a tool change. (both "
@@ -653,6 +654,7 @@ msgstr "Карыстальнік"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:30
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:855
+#: src/libslic3r/ExtrusionRole.cpp:37
 msgid "Unknown"
 msgstr "Невядома"
 
@@ -677,7 +679,7 @@ msgid "SLA print"
 msgstr "Профіль SLA друку"
 
 #: src/slic3r/GUI/ConfigSnapshotDialog.cpp:69
-#: src/slic3r/GUI/ConfigWizard.cpp:835 src/slic3r/GUI/GUI.cpp:331
+#: src/slic3r/GUI/ConfigWizard.cpp:842 src/slic3r/GUI/GUI.cpp:331
 #: src/slic3r/GUI/Plater.cpp:854 src/libslic3r/Preset.cpp:1488
 msgid "SLA material"
 msgstr "Профіль SLA матэрыяла"
@@ -723,30 +725,30 @@ msgstr "Актываваць"
 msgid "Configuration Snapshots"
 msgstr "Рэзервовая копія наладкі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:329
+#: src/slic3r/GUI/ConfigWizard.cpp:336
 msgid "nozzle"
 msgstr "фарсунка"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:333
+#: src/slic3r/GUI/ConfigWizard.cpp:340
 msgid "Alternate nozzles:"
 msgstr "Альтэрнатыўныя фарсункі:"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:397
+#: src/slic3r/GUI/ConfigWizard.cpp:404
 msgid "All standard"
 msgstr "Усе стандартныя"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:397
+#: src/slic3r/GUI/ConfigWizard.cpp:404
 msgid "Standard"
 msgstr "Стандартныя"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:398 src/slic3r/GUI/ConfigWizard.cpp:719
+#: src/slic3r/GUI/ConfigWizard.cpp:405 src/slic3r/GUI/ConfigWizard.cpp:726
 #: src/slic3r/GUI/FileArchiveDialog.cpp:264
 #: src/slic3r/GUI/FileArchiveDialog.cpp:286 src/slic3r/GUI/Preferences.cpp:527
 #: src/slic3r/GUI/Tab.cpp:4245 src/slic3r/GUI/UnsavedChangesDialog.cpp:1164
 msgid "All"
 msgstr "Усе"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:399 src/slic3r/GUI/ConfigWizard.cpp:720
+#: src/slic3r/GUI/ConfigWizard.cpp:406 src/slic3r/GUI/ConfigWizard.cpp:727
 #: src/slic3r/GUI/DoubleSlider.cpp:2099
 #: src/slic3r/GUI/FileArchiveDialog.cpp:268
 #: src/slic3r/GUI/FileArchiveDialog.cpp:286
@@ -756,21 +758,21 @@ msgstr "Усе"
 msgid "None"
 msgstr "Адключана"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:551
+#: src/slic3r/GUI/ConfigWizard.cpp:558
 #, c-format, boost-format
 msgid "Welcome to the %s Configuration Assistant"
 msgstr "Вітаем вас у Памочніку наладкі %s"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:553
+#: src/slic3r/GUI/ConfigWizard.cpp:560
 #, c-format, boost-format
 msgid "Welcome to the %s Configuration Wizard"
 msgstr "Вітаем вас у Майстры наладкі %s"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:555
+#: src/slic3r/GUI/ConfigWizard.cpp:562
 msgid "Welcome"
 msgstr "Вітаем"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:557
+#: src/slic3r/GUI/ConfigWizard.cpp:564
 #, c-format, boost-format
 msgid ""
 "Hello, welcome to %s! This %s helps you with the initial configuration; just "
@@ -779,13 +781,13 @@ msgstr ""
 "Прывітанне, вітаем вас у %s! Гэты %s дапаможа вам з пачатковай наладкай; "
 "усяго некалькі налад, і вы будзеце гатовы да друку."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:562
+#: src/slic3r/GUI/ConfigWizard.cpp:569
 msgid "Remove user profiles (a snapshot will be taken beforehand)"
 msgstr ""
 "Выдаліць профіль карыстальніка (першапачаткова будзе зроблены рэзервовая "
 "копія)"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:565
+#: src/slic3r/GUI/ConfigWizard.cpp:572
 msgid ""
 "Perform desktop integration (Sets this binary to be searchable by the "
 "system)."
@@ -793,51 +795,51 @@ msgstr ""
 "Выканаць інтэграцыю з працоўным сталом (робіць гэты дваічны файл даступным "
 "для пошука сістэмай)."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:617
+#: src/slic3r/GUI/ConfigWizard.cpp:624
 #, c-format, boost-format
 msgid "%s Family"
 msgstr "Сямейства друкарак %s"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:708
+#: src/slic3r/GUI/ConfigWizard.cpp:715
 msgid "Printer:"
 msgstr "Друкарка:"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:710
+#: src/slic3r/GUI/ConfigWizard.cpp:717
 msgid "Vendor:"
 msgstr "Вытворца:"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:711
+#: src/slic3r/GUI/ConfigWizard.cpp:718
 msgid "Profile:"
 msgstr "Профіль:"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:788 src/slic3r/GUI/ConfigWizard.cpp:979
-#: src/slic3r/GUI/ConfigWizard.cpp:1065 src/slic3r/GUI/ConfigWizard.cpp:1204
+#: src/slic3r/GUI/ConfigWizard.cpp:795 src/slic3r/GUI/ConfigWizard.cpp:986
+#: src/slic3r/GUI/ConfigWizard.cpp:1072 src/slic3r/GUI/ConfigWizard.cpp:1211
 msgid "(All)"
 msgstr "(Усе)"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:792 src/slic3r/GUI/ConfigWizard.cpp:1206
+#: src/slic3r/GUI/ConfigWizard.cpp:799 src/slic3r/GUI/ConfigWizard.cpp:1213
 msgid "(Templates)"
 msgstr ""
 
 #. TRN ConfigWizard: Materials : "%1%" = "Filaments"/"SLA materials"
-#: src/slic3r/GUI/ConfigWizard.cpp:828
+#: src/slic3r/GUI/ConfigWizard.cpp:835
 #, boost-format
 msgid ""
 "%1% visible for <b>(\"Template\")</b> printer are universal profiles "
 "available for all printers. These might not be compatible with your printer."
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:828 src/slic3r/GUI/ConfigWizard.cpp:831
-#: src/slic3r/GUI/ConfigWizard.cpp:2452 src/slic3r/GUI/ConfigWizard.cpp:3406
+#: src/slic3r/GUI/ConfigWizard.cpp:835 src/slic3r/GUI/ConfigWizard.cpp:838
+#: src/slic3r/GUI/ConfigWizard.cpp:2459 src/slic3r/GUI/ConfigWizard.cpp:3413
 msgid "Filaments"
 msgstr "Філамент"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:828 src/slic3r/GUI/ConfigWizard.cpp:831
+#: src/slic3r/GUI/ConfigWizard.cpp:835 src/slic3r/GUI/ConfigWizard.cpp:838
 msgid "SLA materials"
 msgstr "SLA матэрыялы"
 
 #. TRN ConfigWizard: Materials : "%1%" = "Filaments"/"SLA materials"
-#: src/slic3r/GUI/ConfigWizard.cpp:831
+#: src/slic3r/GUI/ConfigWizard.cpp:838
 #, boost-format
 msgid ""
 "%1% marked with <b>*</b> are <b>not</b> compatible with some installed "
@@ -847,30 +849,30 @@ msgstr ""
 "ўсталяванымі друкаркамі."
 
 #. TRN ConfigWizard: Materials : "%1%" = "filament"/"SLA material"
-#: src/slic3r/GUI/ConfigWizard.cpp:835
+#: src/slic3r/GUI/ConfigWizard.cpp:842
 #, boost-format
 msgid "All installed printers are compatible with the selected %1%."
 msgstr "Усе ўсталяваныя друкаркі сумяшчальны з абраным %1%."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:835 src/libslic3r/Preset.cpp:1486
+#: src/slic3r/GUI/ConfigWizard.cpp:842 src/libslic3r/Preset.cpp:1486
 msgid "filament"
 msgstr "філамент"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:859
+#: src/slic3r/GUI/ConfigWizard.cpp:866
 msgid ""
 "Only the following installed printers are compatible with the selected "
 "filaments"
 msgstr ""
 "Толькі наступныя ўсталяваныя друкаркі, якія сумяшчальныя з абраным філаментам"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:860
+#: src/slic3r/GUI/ConfigWizard.cpp:867
 msgid ""
 "Only the following installed printers are compatible with the selected SLA "
 "materials"
 msgstr ""
 "Толькі наступныя ўсталяваныя друкаркі сумяшчальны з абраным SLA матэрыялам"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1254
+#: src/slic3r/GUI/ConfigWizard.cpp:1261
 msgid ""
 "You have selected template filament. Please note that these filaments are "
 "available for all printers but are NOT certain to be compatible with your "
@@ -878,8 +880,8 @@ msgid ""
 "(This message won't be displayed again.)"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1255 src/slic3r/GUI/ConfigWizard.cpp:2762
-#: src/slic3r/GUI/ConfigWizard.cpp:2902 src/slic3r/GUI/DoubleSlider.cpp:2591
+#: src/slic3r/GUI/ConfigWizard.cpp:1262 src/slic3r/GUI/ConfigWizard.cpp:2769
+#: src/slic3r/GUI/ConfigWizard.cpp:2909 src/slic3r/GUI/DoubleSlider.cpp:2591
 #: src/slic3r/GUI/DoubleSlider.cpp:2612 src/slic3r/GUI/GUI.cpp:245
 #: src/slic3r/GUI/GUI_App.cpp:3447 src/slic3r/GUI/UpdateDialogs.cpp:204
 #: src/slic3r/GUI/UpdateDialogs.cpp:212 src/slic3r/GUI/UpdateDialogs.cpp:217
@@ -888,35 +890,35 @@ msgstr ""
 msgid "Notice"
 msgstr "Заўвага"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1303
+#: src/slic3r/GUI/ConfigWizard.cpp:1310
 msgid "Custom Printer Setup"
 msgstr "Налады Карыстальніцкай Друкаркі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1303
+#: src/slic3r/GUI/ConfigWizard.cpp:1310
 msgid "Custom Printer"
 msgstr "Карыстальніцкая Друкарка"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1305
+#: src/slic3r/GUI/ConfigWizard.cpp:1312
 msgid "Define a custom printer profile"
 msgstr "Задаць імя профіля карыстальніцкай друкаркі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1306
+#: src/slic3r/GUI/ConfigWizard.cpp:1313
 msgid "Custom profile name:"
 msgstr "Імя карыстальніцкага профіля:"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1323
+#: src/slic3r/GUI/ConfigWizard.cpp:1330
 msgid "Automatic updates"
 msgstr "Аўтаматычнае абнаўленне"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1323
+#: src/slic3r/GUI/ConfigWizard.cpp:1330
 msgid "Updates"
 msgstr "Абнаўленне"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1331
+#: src/slic3r/GUI/ConfigWizard.cpp:1338
 msgid "Check for application updates"
 msgstr "Праверка наяўнасці абнаўленняў"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1335
+#: src/slic3r/GUI/ConfigWizard.cpp:1342
 #, c-format, boost-format
 msgid ""
 "If enabled, %s checks for new application versions online. When a new "
@@ -929,11 +931,11 @@ msgstr ""
 "ў час працы праграмы). Гэта толькі паведамленне, аўтаматычная ўсталёўка не "
 "выконваецца."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1341 src/slic3r/GUI/Preferences.cpp:288
+#: src/slic3r/GUI/ConfigWizard.cpp:1348 src/slic3r/GUI/Preferences.cpp:288
 msgid "Update built-in Presets automatically"
 msgstr "Абнаўляць убудаваныя Профілі аўтаматычна"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1345
+#: src/slic3r/GUI/ConfigWizard.cpp:1352
 #, c-format, boost-format
 msgid ""
 "If enabled, %s downloads updates of built-in system presets in the "
@@ -946,7 +948,7 @@ msgstr ""
 "каталог. Калі новыя профілі становяцца даступнымі, яны прапануюцца пры "
 "запуске праграмы."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1348
+#: src/slic3r/GUI/ConfigWizard.cpp:1355
 msgid ""
 "Updates are never applied without user's consent and never overwrite user's "
 "customized settings."
@@ -954,40 +956,40 @@ msgstr ""
 "Абнаўвленні ніколі не прымяняюцца без згоды карыстальніка і ніколі не "
 "перазапісваюць карыстальніцкія налады."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1353
+#: src/slic3r/GUI/ConfigWizard.cpp:1360
 msgid ""
 "Additionally a backup snapshot of the whole configuration is created before "
 "an update is applied."
 msgstr "Дадаткова, перад абнаўленнем, ствараецца рэзервовая копія наладкі."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1402 src/slic3r/GUI/Preferences.cpp:1119
+#: src/slic3r/GUI/ConfigWizard.cpp:1409 src/slic3r/GUI/Preferences.cpp:1119
 msgid "Download path"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1407 src/slic3r/GUI/FirmwareDialog.cpp:815
+#: src/slic3r/GUI/ConfigWizard.cpp:1414 src/slic3r/GUI/FirmwareDialog.cpp:815
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:300
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:375
 msgid "Browse"
 msgstr "Агляд"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1412
+#: src/slic3r/GUI/ConfigWizard.cpp:1419
 msgid "Choose folder"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1450
+#: src/slic3r/GUI/ConfigWizard.cpp:1457
 msgid "Downloads from URL"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1450
+#: src/slic3r/GUI/ConfigWizard.cpp:1457
 msgid "Downloads"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1458
+#: src/slic3r/GUI/ConfigWizard.cpp:1465
 msgid "Allow built-in downloader"
 msgstr ""
 
 #. TRN ConfigWizard : Downloader : %1% = "PrusaSlicer"
-#: src/slic3r/GUI/ConfigWizard.cpp:1465
+#: src/slic3r/GUI/ConfigWizard.cpp:1472
 #, boost-format
 msgid ""
 "If enabled, %1% registers to start on custom URL on www.printables.com. You "
@@ -995,28 +997,28 @@ msgid ""
 "model will be downloaded into folder you choose bellow."
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1472
+#: src/slic3r/GUI/ConfigWizard.cpp:1479
 msgid ""
 "On Linux systems the process of registration also creates desktop "
 "integration files for this version of application."
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1499
+#: src/slic3r/GUI/ConfigWizard.cpp:1506
 msgid "Chosen directory for downloads does not exist."
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1586 src/slic3r/GUI/GUI_Factories.cpp:818
-#: src/slic3r/GUI/Plater.cpp:3738
+#: src/slic3r/GUI/ConfigWizard.cpp:1593 src/slic3r/GUI/GUI_Factories.cpp:818
+#: src/slic3r/GUI/Plater.cpp:3751
 msgid "Reload from disk"
 msgstr "Перазагрузіць з дыска"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1589
+#: src/slic3r/GUI/ConfigWizard.cpp:1596
 msgid ""
 "Export full pathnames of models and parts sources into 3mf and amf files"
 msgstr ""
 "Пры экспарце ў 3mf і amf трэба захоўваць поўныя шляхі да зыходных файлаў"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1593
+#: src/slic3r/GUI/ConfigWizard.cpp:1600
 msgid ""
 "If enabled, allows the Reload from disk command to automatically find and "
 "load the files when invoked.\n"
@@ -1028,23 +1030,23 @@ msgstr ""
 "У адваротным выпаку, будзе прапанавана абрать кожны файл з дапамогай "
 "дыялогавага акна адчынення файла."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1602
+#: src/slic3r/GUI/ConfigWizard.cpp:1609
 msgid "Files association"
 msgstr "Асацыяцыя файлаў"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1604 src/slic3r/GUI/Preferences.cpp:274
+#: src/slic3r/GUI/ConfigWizard.cpp:1611 src/slic3r/GUI/Preferences.cpp:274
 msgid "Associate .3mf files to PrusaSlicer"
 msgstr "Асацыяваць файлы .3mf з PrusaSlicer"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1605 src/slic3r/GUI/Preferences.cpp:279
+#: src/slic3r/GUI/ConfigWizard.cpp:1612 src/slic3r/GUI/Preferences.cpp:279
 msgid "Associate .stl files to PrusaSlicer"
 msgstr "Асацыяваць файлы .stl з PrusaSlicer"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1615
+#: src/slic3r/GUI/ConfigWizard.cpp:1622
 msgid "View mode"
 msgstr "Рэжым прагляду"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1617
+#: src/slic3r/GUI/ConfigWizard.cpp:1624
 msgid ""
 "PrusaSlicer's user interfaces comes in three variants:\n"
 "Simple, Advanced, and Expert.\n"
@@ -1058,97 +1060,97 @@ msgstr ""
 "Два іншых прапануюць больш дакладную пашыраную наладку. Яны падыходзяць для "
 "прасунутых і вопытных карыстальнікаў."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1622
+#: src/slic3r/GUI/ConfigWizard.cpp:1629
 msgid "Simple mode"
 msgstr "Просты"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1623
+#: src/slic3r/GUI/ConfigWizard.cpp:1630
 msgid "Advanced mode"
 msgstr "Пашыраны"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1624
+#: src/slic3r/GUI/ConfigWizard.cpp:1631
 msgid "Expert mode"
 msgstr "Прасунуты"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1637
+#: src/slic3r/GUI/ConfigWizard.cpp:1644
 msgid "The size of the object can be specified in inches"
 msgstr "Памер мадэлі можа быць паказаны ў цалях"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1638
+#: src/slic3r/GUI/ConfigWizard.cpp:1645
 msgid "Use inches"
 msgstr "Ужываць цалі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1658
+#: src/slic3r/GUI/ConfigWizard.cpp:1665
 msgid "Other Vendors"
 msgstr "Іншыя вытворцы"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1662
+#: src/slic3r/GUI/ConfigWizard.cpp:1669
 #, c-format, boost-format
 msgid "Pick another vendor supported by %s"
 msgstr "Абраць іншага вытворцу, які падтрымлівае %s"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1695
+#: src/slic3r/GUI/ConfigWizard.cpp:1702
 msgid "Firmware Type"
 msgstr "Тып прашыўкі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1695 src/slic3r/GUI/Tab.cpp:2473
+#: src/slic3r/GUI/ConfigWizard.cpp:1702 src/slic3r/GUI/Tab.cpp:2473
 msgid "Firmware"
 msgstr "Прашыўка"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1699
+#: src/slic3r/GUI/ConfigWizard.cpp:1706
 msgid "Choose the type of firmware used by your printer."
 msgstr "Абраць тып прашыўкі вашай друкаркі."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1748 src/slic3r/GUI/ConfigWizard.cpp:1820
-#: src/slic3r/GUI/ConfigWizard.cpp:1825 src/slic3r/GUI/ConfigWizard.cpp:1830
+#: src/slic3r/GUI/ConfigWizard.cpp:1755 src/slic3r/GUI/ConfigWizard.cpp:1827
+#: src/slic3r/GUI/ConfigWizard.cpp:1832 src/slic3r/GUI/ConfigWizard.cpp:1837
 #: src/slic3r/GUI/Field.cpp:258 src/slic3r/GUI/Field.cpp:328
 #: src/slic3r/GUI/Field.cpp:1585 src/slic3r/GUI/GUI_ObjectLayers.cpp:435
 msgid "Invalid numeric input."
 msgstr "Памылковае лікавае значэнне."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1773
+#: src/slic3r/GUI/ConfigWizard.cpp:1780
 msgid "Bed Shape and Size"
 msgstr "Форма і памер стала"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1776
+#: src/slic3r/GUI/ConfigWizard.cpp:1783
 msgid "Set the shape of your printer's bed."
 msgstr "Ужыць форму і памеры вашаго стала."
 
 #. TRN ConfigWizard : Size of possible print, related on printer size
-#: src/slic3r/GUI/ConfigWizard.cpp:1797
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1858
+#: src/slic3r/GUI/ConfigWizard.cpp:1804
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1834
 msgid "Build Volume"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1800
+#: src/slic3r/GUI/ConfigWizard.cpp:1807
 msgid "Set the printer height."
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1837 src/libslic3r/PrintConfig.cpp:305
+#: src/slic3r/GUI/ConfigWizard.cpp:1844 src/libslic3r/PrintConfig.cpp:305
 msgid "Max print height"
 msgstr "Найбольшая вышыня друку"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1855
+#: src/slic3r/GUI/ConfigWizard.cpp:1862
 msgid "Filament and Nozzle Diameters"
 msgstr "Дыяметр філамента і фарсункі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1855
+#: src/slic3r/GUI/ConfigWizard.cpp:1862
 msgid "Print Diameters"
 msgstr "Дыаметры Друку"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1870
+#: src/slic3r/GUI/ConfigWizard.cpp:1877
 msgid "Enter the diameter of your printer's hot end nozzle."
 msgstr "Увядзіце дыяметр фарсункі друкаркі."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1873
+#: src/slic3r/GUI/ConfigWizard.cpp:1880
 msgid "Nozzle Diameter"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1883
+#: src/slic3r/GUI/ConfigWizard.cpp:1890
 msgid "Enter the diameter of your filament."
 msgstr "Увядзіце дыяметр філамента."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1884
+#: src/slic3r/GUI/ConfigWizard.cpp:1891
 msgid ""
 "Good precision is required, so use a caliper and do multiple measurements "
 "along the filament, then compute the average."
@@ -1156,45 +1158,45 @@ msgstr ""
 "Патрабуецца добрая дакладнасць, таму зрабіце штангенцыркулем некалькі "
 "вымярэнняў уздоўж філамента, потым вылічыце сярэдняе значэнне."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1887
+#: src/slic3r/GUI/ConfigWizard.cpp:1894
 msgid "Filament Diameter"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1945
+#: src/slic3r/GUI/ConfigWizard.cpp:1952
 msgid "Nozzle and Bed Temperatures"
 msgstr "Тэмпературы Фарсункі і Стала"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1945
+#: src/slic3r/GUI/ConfigWizard.cpp:1952
 msgid "Temperatures"
 msgstr "Тэмпература"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1961
+#: src/slic3r/GUI/ConfigWizard.cpp:1968
 msgid "Enter the temperature needed for extruding your filament."
 msgstr "Увядзіце тэмпературу, якая неабходна для выдушвання філамента."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1962
+#: src/slic3r/GUI/ConfigWizard.cpp:1969
 msgid "A rule of thumb is 160 to 230 °C for PLA, and 215 to 250 °C for ABS."
 msgstr "Звычайна тэмпература 160-230°C для PLA, 215-250°C для ABS."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1965
+#: src/slic3r/GUI/ConfigWizard.cpp:1972
 msgid "Extrusion Temperature:"
 msgstr "Тэмпература Выдушвання:"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1966 src/slic3r/GUI/ConfigWizard.cpp:1980
+#: src/slic3r/GUI/ConfigWizard.cpp:1973 src/slic3r/GUI/ConfigWizard.cpp:1987
 #: src/libslic3r/PrintConfig.cpp:435 src/libslic3r/PrintConfig.cpp:1269
 #: src/libslic3r/PrintConfig.cpp:1324 src/libslic3r/PrintConfig.cpp:2986
 #: src/libslic3r/PrintConfig.cpp:3763
 msgid "°C"
 msgstr "°C"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1975
+#: src/slic3r/GUI/ConfigWizard.cpp:1982
 msgid ""
 "Enter the bed temperature needed for getting your filament to stick to your "
 "heated bed."
 msgstr ""
 "Увядзіце тэмпературу, неабходную для таго, каб філамент прыляпіўся да стала."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1976
+#: src/slic3r/GUI/ConfigWizard.cpp:1983
 msgid ""
 "A rule of thumb is 60 °C for PLA and 110 °C for ABS. Leave zero if you have "
 "no heated bed."
@@ -1202,25 +1204,25 @@ msgstr ""
 "Звычайна тэмпература 60°C для PLA і 60°C для ABS. Калі стол не падаграецца, "
 "азначце 0."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1979
+#: src/slic3r/GUI/ConfigWizard.cpp:1986
 msgid "Bed Temperature"
 msgstr ""
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2452 src/slic3r/GUI/ConfigWizard.cpp:3409
+#: src/slic3r/GUI/ConfigWizard.cpp:2459 src/slic3r/GUI/ConfigWizard.cpp:3416
 msgid "SLA Materials"
 msgstr "SLA матэрыялы"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2506
+#: src/slic3r/GUI/ConfigWizard.cpp:2513
 msgid "FFF Technology Printers"
 msgstr ""
 "Дукаркі, якія друкуюць па тэхналогіі метадам наплаўлення філамента (FFF)"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2511
+#: src/slic3r/GUI/ConfigWizard.cpp:2518
 msgid "SLA Technology Printers"
 msgstr ""
 "Дукаркі, якія друкуюць па тэхналогіі масачнай ВК-стэрэолітаграфіі (SLA)"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2760
+#: src/slic3r/GUI/ConfigWizard.cpp:2767
 #, boost-format
 msgid ""
 "Following printer profiles has no default filament: %1%Please select one "
@@ -1229,7 +1231,7 @@ msgstr ""
 "У наступных профілях друкаркі адсутнічае першапачатковы філамент: %1%. Калі "
 "ласка, абярыце яго."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2761
+#: src/slic3r/GUI/ConfigWizard.cpp:2768
 #, boost-format
 msgid ""
 "Following printer profiles has no default material: %1%Please select one "
@@ -1238,31 +1240,31 @@ msgstr ""
 "У наступных профілях друкаркі адсутнічае першапачатковы матэрыял: %1%. Калі "
 "ласка, абярыце яго."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2925
+#: src/slic3r/GUI/ConfigWizard.cpp:2932
 msgid "The following FFF printer models have no filament selected:"
 msgstr "У наступных мадэлях друкарак FFF не абраны філамент:"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2929
+#: src/slic3r/GUI/ConfigWizard.cpp:2936
 msgid "Do you want to select default filaments for these FFF printer models?"
 msgstr "Абраць першапачатковы філамент FFF для гэтых модэляў друкарак?"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2943
+#: src/slic3r/GUI/ConfigWizard.cpp:2950
 msgid "The following SLA printer models have no materials selected:"
 msgstr "У натсупных мадэлях друкарах SLA не абраны матэрыял:"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2947
+#: src/slic3r/GUI/ConfigWizard.cpp:2954
 msgid "Do you want to select default SLA materials for these printer models?"
 msgstr "Абраць першапачатковы матэрыял SLA для гэтых мадэляў друкарак?"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:2989
+#: src/slic3r/GUI/ConfigWizard.cpp:2996
 msgid "Configuration is edited in ConfigWizard"
 msgstr "Змены наладкі з дапамогай Мастра наладкі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3042
+#: src/slic3r/GUI/ConfigWizard.cpp:3049
 msgid "All user presets will be deleted."
 msgstr "Усе карыстальніцкія профілі будуць выдаленыя."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3079
+#: src/slic3r/GUI/ConfigWizard.cpp:3086
 msgid "A new vendor was installed and one of its printers will be activated"
 msgid_plural ""
 "New vendors were installed and one of theirs printers will be activated"
@@ -1270,60 +1272,60 @@ msgstr[0] "Новы вытворца ўсталяваны, і адна з дру
 msgstr[1] "Новыя вытворцы ўсталаваныя, і адна з друкарак будзе актывавана"
 msgstr[2] "Новыя вытворцы ўсталяваныя, і адна з друкарак будзе актывавана"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3111
+#: src/slic3r/GUI/ConfigWizard.cpp:3118
 msgid "Do you want to continue changing the configuration?"
 msgstr "Ці жадаеце вы працягнуць мяняць наладкі?"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3178
+#: src/slic3r/GUI/ConfigWizard.cpp:3185
 msgid "A new Printer was installed and it will be activated."
 msgstr "Новая друкарка ўсталявана і будзе актывавана."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3183
+#: src/slic3r/GUI/ConfigWizard.cpp:3190
 msgid "Some Printers were uninstalled."
 msgstr "Было выдалена некалькі друкарак."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3204
+#: src/slic3r/GUI/ConfigWizard.cpp:3211
 msgid "A new filament was installed and it will be activated."
 msgstr "Новы філамент усталяваны і будзе актываваны."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3205
+#: src/slic3r/GUI/ConfigWizard.cpp:3212
 msgid "A new SLA material was installed and it will be activated."
 msgstr "Новы матэрыял SLA усталяваны і будзе актываваны."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3218
+#: src/slic3r/GUI/ConfigWizard.cpp:3225
 msgid "Some filaments were uninstalled."
 msgstr "Некаторыя філаменты былы выдаленыя."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3218
+#: src/slic3r/GUI/ConfigWizard.cpp:3225
 msgid "Some SLA materials were uninstalled."
 msgstr "Некаторыя матэрыялы SLA былі выдаленыя."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3262
+#: src/slic3r/GUI/ConfigWizard.cpp:3269
 msgid "Custom printer was installed and it will be activated."
 msgstr "Карыстальніцкая друкарка ўсталявана і будзе актывавана."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3352
+#: src/slic3r/GUI/ConfigWizard.cpp:3359
 msgid "Select all standard printers"
 msgstr "Абраць усе стандартныя друкаркі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3355
+#: src/slic3r/GUI/ConfigWizard.cpp:3362
 msgid "< &Back"
 msgstr "< &Папярэдні"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3356
+#: src/slic3r/GUI/ConfigWizard.cpp:3363
 msgid "&Next >"
 msgstr "&Наступны >"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3357
+#: src/slic3r/GUI/ConfigWizard.cpp:3364
 msgid "&Finish"
 msgstr "&Скончыць"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3358
+#: src/slic3r/GUI/ConfigWizard.cpp:3365
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:657
 #: src/slic3r/GUI/FileArchiveDialog.cpp:277
 #: src/slic3r/GUI/FileArchiveDialog.cpp:286
 #: src/slic3r/GUI/FirmwareDialog.cpp:153
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1841
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1817
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2180
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2269
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:66
@@ -1335,44 +1337,44 @@ msgstr "&Скончыць"
 msgid "Cancel"
 msgstr "Адмена"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3378
+#: src/slic3r/GUI/ConfigWizard.cpp:3385
 msgid "Prusa FFF Technology Printers"
 msgstr ""
 "Друкаркі Prusa, якія друкуюць па тэхналогіі метадам наплаўлення філамента "
 "(FFF)"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3386
+#: src/slic3r/GUI/ConfigWizard.cpp:3393
 msgid "Prusa MSLA Technology Printers"
 msgstr ""
 "Друкаркі Prusa, якія друкуюць па тэхналогіі масачнай ВК-стэрэалітаграфіі "
 "(MSLA)"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3406
+#: src/slic3r/GUI/ConfigWizard.cpp:3413
 msgid "Filament Profiles Selection"
 msgstr "Выбар профіляў філаменту"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3406 src/slic3r/GUI/ConfigWizard.cpp:3409
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4361
+#: src/slic3r/GUI/ConfigWizard.cpp:3413 src/slic3r/GUI/ConfigWizard.cpp:3416
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4369
 msgid "Type:"
 msgstr "Тып:"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3409
+#: src/slic3r/GUI/ConfigWizard.cpp:3416
 msgid "SLA Material Profiles Selection"
 msgstr "Выбар профіляў матэрыялу SLA"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3532
+#: src/slic3r/GUI/ConfigWizard.cpp:3539
 msgid "Configuration Assistant"
 msgstr "Памочнік наладкі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3533
+#: src/slic3r/GUI/ConfigWizard.cpp:3540
 msgid "Configuration &Assistant"
 msgstr "&Памочнік наладкі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3535
+#: src/slic3r/GUI/ConfigWizard.cpp:3542
 msgid "Configuration Wizard"
 msgstr "Майстар наладкі"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:3536
+#: src/slic3r/GUI/ConfigWizard.cpp:3543
 msgid "Configuration &Wizard"
 msgstr "&Майстар наладкі"
 
@@ -1445,7 +1447,7 @@ msgid "Perform"
 msgstr "Выканаць"
 
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:653
-#: src/slic3r/GUI/GLCanvas3D.cpp:5305 src/slic3r/GUI/KBShortcutsDialog.cpp:106
+#: src/slic3r/GUI/GLCanvas3D.cpp:5506 src/slic3r/GUI/KBShortcutsDialog.cpp:106
 #: src/slic3r/GUI/MainFrame.cpp:1426
 msgid "Undo"
 msgstr "Адкаціць"
@@ -1453,6 +1455,27 @@ msgstr "Адкаціць"
 #: src/slic3r/GUI/DoubleSlider.cpp:109
 msgid "Place bearings in slots and resume printing"
 msgstr "Змясціце ў пасадкавае месца неабходную дэталь, і аднавіце друк"
+
+#: src/slic3r/GUI/DoubleSlider.cpp:711 src/libslic3r/Utils.cpp:1015
+#, boost-format
+msgid "%1%d"
+msgstr ""
+
+#: src/slic3r/GUI/DoubleSlider.cpp:712 src/libslic3r/Utils.cpp:1016
+#, boost-format
+msgid "%1%h"
+msgstr ""
+
+#. TRN "m" means "minutes"
+#: src/slic3r/GUI/DoubleSlider.cpp:713 src/libslic3r/Utils.cpp:1018
+#, boost-format
+msgid "%1%m"
+msgstr ""
+
+#: src/slic3r/GUI/DoubleSlider.cpp:714 src/libslic3r/Utils.cpp:1026
+#, boost-format
+msgid "%1%s"
+msgstr ""
 
 #: src/slic3r/GUI/DoubleSlider.cpp:1448
 msgid "One layer mode"
@@ -1870,10 +1893,10 @@ msgid "Can't create file at %1%"
 msgstr ""
 
 #: src/slic3r/GUI/ExtraRenderers.cpp:323 src/slic3r/GUI/GUI_ObjectList.cpp:582
-#: src/slic3r/GUI/GUI_ObjectList.cpp:594 src/slic3r/GUI/GUI_ObjectList.cpp:1058
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2125
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3025
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4895
+#: src/slic3r/GUI/GUI_ObjectList.cpp:594 src/slic3r/GUI/GUI_ObjectList.cpp:1064
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2131
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3031
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4903
 #: src/slic3r/GUI/ObjectDataViewModel.cpp:259 src/libslic3r/PrintConfig.cpp:892
 msgid "default"
 msgstr "першапачаткова"
@@ -2146,7 +2169,7 @@ msgid "Add one or more custom shapes"
 msgstr "Дадаць адну ці некалькі карыстальніцкіх фігур"
 
 #: src/slic3r/GUI/GalleryDialog.cpp:115 src/slic3r/GUI/GalleryDialog.cpp:528
-#: src/slic3r/GUI/GLCanvas3D.cpp:5106 src/slic3r/GUI/GUI_Factories.cpp:460
+#: src/slic3r/GUI/GLCanvas3D.cpp:5307 src/slic3r/GUI/GUI_Factories.cpp:460
 #: src/slic3r/GUI/Tab.cpp:4160
 msgid "Delete"
 msgstr "Выдаліць"
@@ -2217,638 +2240,14 @@ msgstr "Стварэнне буфера вяршыняў"
 msgid "Generating index buffers"
 msgstr "Стварэнне буфераў індэкса"
 
-#: src/slic3r/GUI/GCodeViewer.cpp:3274
-msgid "Click to hide"
-msgstr "Націсніце, каб схаваць"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3274
-msgid "Click to show"
-msgstr "Націсніце, каб адлюстраваць"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3452
-msgid "up to"
-msgstr "да"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3458
-msgid "above"
-msgstr "пасля"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3466
-msgid "from"
-msgstr "з"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3466
-msgid "to"
-msgstr "да"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3516 src/slic3r/GUI/GCodeViewer.cpp:3517
-#: src/slic3r/GUI/GCodeViewer.cpp:3595
-msgid "Percentage"
-msgstr "Адсотак"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3527 src/slic3r/GUI/GCodeViewer.cpp:3573
-msgid "Feature type"
-msgstr "Тыпы лініяў"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3527 src/slic3r/GUI/GCodeViewer.cpp:3595
-#: src/slic3r/GUI/RammingChart.cpp:90
-msgid "Time"
-msgstr "Час"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3574
-msgid "Height (mm)"
-msgstr "Вышыня (мм)"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3575
-msgid "Width (mm)"
-msgstr "Шырыня (мм)"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3576
-msgid "Speed (mm/s)"
-msgstr "Хуткасць (мм/с)"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3577
-msgid "Fan speed (%)"
-msgstr "Хуткасць вентылятара (%)"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3578
-msgid "Temperature (°C)"
-msgstr "Тэмпература (°C)"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3579
-msgid "Volumetric flow rate (mm³/s)"
-msgstr "Аб'ёмны выдатак (мм³/с)"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3580
-msgid "Layer time (linear)"
-msgstr ""
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3581
-msgid "Layer time (logarithmic)"
-msgstr ""
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3582
-msgid "Tool"
-msgstr "Інструмент"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3583
-msgid "Color Print"
-msgstr "Колер друку"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3595 src/slic3r/GUI/GCodeViewer.cpp:3597
-#: src/slic3r/GUI/GCodeViewer.cpp:3863
-msgid "Used filament"
-msgstr "Ужыта філамента"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3626 src/slic3r/GUI/GCodeViewer.cpp:4073
-#: src/libslic3r/PrintConfig.cpp:1470 src/libslic3r/PrintConfig.cpp:3080
-msgid "Travel"
-msgstr "Хуткасць руху па XY"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3643 src/slic3r/GUI/GCodeViewer.cpp:3688
-#: src/slic3r/GUI/GCodeViewer.cpp:3692 src/slic3r/GUI/GUI_ObjectList.cpp:349
-#: src/slic3r/GUI/Tab.cpp:1959 src/slic3r/GUI/wxExtensions.cpp:510
-#: src/libslic3r/PrintConfig.cpp:886
-msgid "Extruder"
-msgstr "Экструдар"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3665
-msgid "Default color"
-msgstr "Першапачатковы колер"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3688
-msgid "default color"
-msgstr "першапачатковы колер"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3788 src/slic3r/GUI/GCodeViewer.cpp:3844
-msgid "Color change"
-msgstr "Змена колеру"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3807 src/slic3r/GUI/GCodeViewer.cpp:3842
-msgid "Print"
-msgstr "Друк"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3843 src/slic3r/GUI/GCodeViewer.cpp:3877
-msgid "Pause"
-msgstr "Прыпынак"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3860 src/slic3r/GUI/GCodeViewer.cpp:3863
-msgid "Event"
-msgstr "Падзея"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3860 src/slic3r/GUI/GCodeViewer.cpp:3863
-msgid "Remaining time"
-msgstr "Дакладны час друку"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3860 src/slic3r/GUI/GCodeViewer.cpp:3863
-msgid "Duration"
-msgstr "Працягласць"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3931 src/slic3r/GUI/GUI.cpp:332
-#: src/slic3r/GUI/Plater.cpp:855 src/libslic3r/PrintConfig.cpp:332
-msgid "Printer"
-msgstr "Друкарка"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3934 src/slic3r/GUI/GUI.cpp:328
-#: src/slic3r/GUI/Plater.cpp:851
-msgid "Print settings"
-msgstr "Налады друку"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3939 src/slic3r/GUI/GUI.cpp:330
-#: src/slic3r/GUI/Plater.cpp:852 src/slic3r/GUI/Tab.cpp:1998
-#: src/slic3r/GUI/Tab.cpp:1999
-msgid "Filament"
-msgstr "Філамент"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3954
-msgid "Hide Custom G-code"
-msgstr ""
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3954
-msgid "Show Custom G-code"
-msgstr ""
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3967
-msgid "Estimated printing times"
-msgstr "Разлічаны час друку"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3986
-msgid "Normal mode"
-msgstr "Звычайны рэжым"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3987
-msgid "Stealth mode"
-msgstr "Ціхі рэжым"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:3996 src/libslic3r/PrintConfig.cpp:1247
-#: src/libslic3r/PrintConfig.cpp:1265 src/libslic3r/PrintConfig.cpp:1275
-#: src/libslic3r/PrintConfig.cpp:1320
-msgid "First layer"
-msgstr "Першы пласт"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4000
-msgid "Total"
-msgstr "Агульнае"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4019
-msgid "Show stealth mode"
-msgstr "Адлюстраваць ў ціхім рэжыме"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4023
-msgid "Show normal mode"
-msgstr "Адлюстраваць у звычайным рэжыме"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4077
-msgid "Wipe"
-msgstr "Выціранне"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4081
-msgid "Retractions"
-msgstr "Адвод"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4085
-msgid "Deretractions"
-msgstr "Пастаўка"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4089
-msgid "Seams"
-msgstr "Шво"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4093
-msgid "Tool changes"
-msgstr "Змена інструмента"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4097
-msgid "Color changes"
-msgstr "Змены колераў"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4101
-msgid "Print pauses"
-msgstr "Прыпынкі друку"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4105
-msgid "Custom G-codes"
-msgstr "Карыстальніцкі G-код"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4109
-msgid "Center of gravity"
-msgstr ""
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4114
-msgid "Shells"
-msgstr "Абалонка"
-
-#: src/slic3r/GUI/GCodeViewer.cpp:4119
-msgid "Tool marker"
-msgstr "Птушка інструмента"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:185 src/slic3r/GUI/GLCanvas3D.cpp:5252
-#: src/slic3r/GUI/ObjectDataViewModel.cpp:71
-msgid "Variable layer height"
-msgstr "Пераменная вышыня пластоў"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:187
-msgid "Left mouse button:"
-msgstr "<b>Левая кнопка мышы</b>:"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:189
-msgid "Add detail"
-msgstr "Павялічыць дэтальнасць"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:191
-msgid "Right mouse button:"
-msgstr "<b>Правая кнопка мышы</b>:"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:193
-msgid "Remove detail"
-msgstr "Паменьшыць дэтальнасць"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:195
-msgid "Shift + Left mouse button:"
-msgstr "<b>Shift + Левая кнопка мышы</b>:"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:197
-msgid "Reset to base"
-msgstr "Скід да звычайнай вышыні пласта"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:199
-msgid "Shift + Right mouse button:"
-msgstr "<b>Shift + Правая кнопка мышы</b>:"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:201
-msgid "Smoothing"
-msgstr "Згладжванне"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:203
-msgid "Mouse wheel:"
-msgstr "<b>Кола мышы</b>:"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:205
-msgid "Increase/decrease edit area"
-msgstr "Павялічыць/паменьшыць вобласць змены"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:208
-msgid "Adaptive"
-msgstr "Адаптыўвная"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:214
-msgid "Quality / Speed"
-msgstr "Якасць / Хуткасць"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:217
-msgid "Higher print quality versus higher print speed."
-msgstr "Высокая якасць друку альбо высокая хуткасць друку."
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:228
-msgid "Smooth"
-msgstr "Згладзіць"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:234 src/libslic3r/PrintConfig.cpp:906
-msgid "Radius"
-msgstr "Радыус"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:246
-msgid "Keep min"
-msgstr "Трымаць найменьшыя"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:255 src/slic3r/GUI/GLCanvas3D.cpp:4677
-msgid "Reset"
-msgstr "Скід"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:616
-msgid "Variable layer height - Manual edit"
-msgstr "Пераменная вышыня пластоў - Ручная змена"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:731
-msgid "Seq."
-msgstr "Чарга друку."
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:1242
-msgid "SLA view"
-msgstr ""
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:1261
-msgid "Show as processed"
-msgstr ""
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:1262
-msgid "Show as original"
-msgstr ""
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:1612
-msgid "Variable layer height - Reset"
-msgstr "Пераменная вышыня пластоў - Скід"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:1620
-msgid "Variable layer height - Adaptive"
-msgstr "Пераменная вышыня пластоў - Адаптыўная"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:1628
-msgid "Variable layer height - Smooth all"
-msgstr "Пераменная вышыня пластоў - Згладзіць усе"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:2085
-msgid "Mirror Object"
-msgstr "Люстраваць Мадэль"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:2981 src/slic3r/GUI/Gizmos/GLGizmoMove.cpp:91
-msgid "Gizmo-Move"
-msgstr "Штуковіна-Рухі"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:3073
-#: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp:583
-msgid "Gizmo-Rotate"
-msgstr "Штуковіна-Вярчэнне"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:3717
-msgid "Move Object"
-msgstr "Рух Мадэлі"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:3966
-#: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp:33
-msgid "Gizmo-Place on Face"
-msgstr "Штуковіна-Паверхня на Стол"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4340 src/slic3r/GUI/GLCanvas3D.cpp:5212
-msgid "Switch to Settings"
-msgstr "Пераключэнне налады"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4341 src/slic3r/GUI/GLCanvas3D.cpp:5212
-msgid "Print Settings Tab"
-msgstr "Налады друку"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4342 src/slic3r/GUI/GLCanvas3D.cpp:5213
-msgid "Filament Settings Tab"
-msgstr "Налады філаменту"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4342 src/slic3r/GUI/GLCanvas3D.cpp:5213
-msgid "Material Settings Tab"
-msgstr "Налады матэрыялу"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4343 src/slic3r/GUI/GLCanvas3D.cpp:5214
-msgid "Printer Settings Tab"
-msgstr "Налады друкаркі"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4516
-msgid "Undo History"
-msgstr "Гісторыя Адкатаў"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4516
-msgid "Redo History"
-msgstr "Гісторыя Зрабіць нанова"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4536
-#, c-format, boost-format
-msgid "Undo %1$d Action"
-msgid_plural "Undo %1$d Actions"
-msgstr[0] "Адкаціць %1$d дзею"
-msgstr[1] "Адкаціць %1$d дзеі"
-msgstr[2] "Адкаціць %1$d дзеяў"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4536
-#, c-format, boost-format
-msgid "Redo %1$d Action"
-msgid_plural "Redo %1$d Actions"
-msgstr[0] "Зрабіць нанова %1$d дзею"
-msgstr[1] "Зрабіць нанова %1$d дзеі"
-msgstr[2] "Зрабіць нанова %1$d дзеяў"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4555 src/slic3r/GUI/GLCanvas3D.cpp:5230
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:115 src/slic3r/GUI/Search.cpp:482
-msgid "Search"
-msgstr "Пошук"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4569 src/slic3r/GUI/GLCanvas3D.cpp:4577
-#: src/slic3r/GUI/Search.cpp:488
-msgid "Enter a search term"
-msgstr "Увясці пошукавы запыт"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4609
-msgid "Arrange options"
-msgstr "Налады ўпарадкавання"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4644
-#, boost-format
-msgid "Press %1%left mouse button to enter the exact value"
-msgstr "Націсніце %1% <b>левую кнопку мышы</b> для ўводу дакладнага значэння"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4646
-msgid "Spacing"
-msgstr "Адлегласць"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4653
-msgid "Spacing from bed"
-msgstr ""
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4660
-msgid "Enable rotations (slow)"
-msgstr "Дазволіць вярчэнне (запавольванне)"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4669
-msgid "Alignment"
-msgstr "Выраўнаванне"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4669 src/libslic3r/PrintConfig.cpp:4761
-msgid "Center"
-msgstr "Па центры"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4669
-msgid "Rear left"
-msgstr ""
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4669
-msgid "Front left"
-msgstr ""
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4669
-msgid "Front right"
-msgstr ""
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4669
-msgid "Rear right"
-msgstr ""
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4669 src/libslic3r/PrintConfig.cpp:2305
-msgid "Random"
-msgstr "Выпадкова"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:4696 src/slic3r/GUI/GLCanvas3D.cpp:5124
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:141 src/slic3r/GUI/Plater.cpp:7175
-msgid "Arrange"
-msgstr "Упарадкаваць"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5098
-msgid "Add..."
-msgstr "Дадаць..."
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5115 src/slic3r/GUI/KBShortcutsDialog.cpp:105
-#: src/slic3r/GUI/Plater.cpp:6044 src/slic3r/GUI/Tab.cpp:4570
-msgid "Delete all"
-msgstr "Выдаліць усе"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5124 src/slic3r/GUI/KBShortcutsDialog.cpp:142
-msgid "Arrange selection"
-msgstr "Упарадкаваць абраныя"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5124
-msgid "Click right mouse button to show arrangement options"
-msgstr ""
-"Пстрыкніце <b>правую кнопку мышы</b>, каб адлюстраваць налады ўпарадкавання"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5144
-msgid "Copy"
-msgstr "Капіраваць"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5153
-msgid "Paste"
-msgstr "Уставіць"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5165 src/slic3r/GUI/GUI_Factories.cpp:1246
-#: src/slic3r/GUI/GUI_Factories.cpp:1270 src/slic3r/GUI/GUI_Factories.cpp:1281
-msgid "Add instance"
-msgstr "Дадаць асобнік"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5176 src/slic3r/GUI/GUI_Factories.cpp:1249
-msgid "Remove instance"
-msgstr "Выдаліць асобнік"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5189
-msgid "Split to objects"
-msgstr "Падзяліць на мадэлі"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5199
-msgid "Split to parts"
-msgstr "Падзяліць на часткі"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5305 src/slic3r/GUI/GLCanvas3D.cpp:5342
-msgid "Click right mouse button to open/close History"
-msgstr ""
-"Псктрыкнуць <b>правую кнопку мышы</b>, каб адлюстраваць/схаваць Гісторы дзей"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5327
-#, boost-format
-msgid "Next Undo action: %1%"
-msgstr "Наступная дзея Адкату: %1%"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5342 src/slic3r/GUI/KBShortcutsDialog.cpp:107
-#: src/slic3r/GUI/MainFrame.cpp:1429
-msgid "Redo"
-msgstr "Зрабіць нанова"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:5363
-#, boost-format
-msgid "Next Redo action: %1%"
-msgstr "Наступная дзея Зрабіць нанова: %1%"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:7251
-msgid "An object outside the print area was detected."
-msgstr "Знойдзена мадэль па-за межамі вобласці друку."
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:7252
-msgid "A toolpath outside the print area was detected."
-msgstr "Выяўлена траекторыя руху інструмента за межамі вобласці друку."
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:7253
-msgid "SLA supports outside the print area were detected."
-msgstr "Выяўлены SLA падтрымкі за межамі вобласці друку."
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:7254
-msgid "Some objects are not visible during editing."
-msgstr "Некаторыя мадэлі не бачныя падчас змены."
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:7256
-msgid ""
-"An object outside the print area was detected.\n"
-"Resolve the current problem to continue slicing."
-msgstr ""
-"Выяўлена мадэль за межамі вобласці друку. \n"
-"Ухіліце бягучую праблему, каб працягнуць нарэзку."
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:7331
-msgid "Selection-Add from rectangle"
-msgstr "Абраць-Дадаць з прамавугольніка"
-
-#: src/slic3r/GUI/GLCanvas3D.cpp:7346
-msgid "Selection-Remove from rectangle"
-msgstr "Абраць-Выдаліць з прамавугольніка"
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:189
-msgid "Auto"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:189
-msgid "Manual"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:192
-msgid "Plug"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:193
-msgid "Dowel"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:201
-msgid "Prism"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:201
-msgid "Frustum"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:205
-msgid "Triangle"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:205
-msgid "Square"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:205
-msgid "Hexagon"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:205
-#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:61
-#: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:66
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:117
-#: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp:42
-msgid "Circle"
-msgstr "Круг"
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:212
-msgid "Keep orientation"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:213
-msgid "Place on cut"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:214
-msgid "Flip upside down"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:218
-msgid "Connectors"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:219
-msgid "Type"
-msgstr "Тып"
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:220 src/libslic3r/PrintConfig.cpp:2836
-msgid "Style"
-msgstr "Стыль"
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:222
-#: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:875
-msgid "Depth"
-msgstr ""
-
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:234
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:524
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:544
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1850
+#: src/slic3r/GUI/GCodeViewer.cpp:3276 src/libslic3r/PrintConfig.cpp:1171
+msgid "g"
+msgstr "г"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3277 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:235
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:494
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:514
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1826
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1210
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1976
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:309
@@ -2858,26 +2257,660 @@ msgstr ""
 msgid "in"
 msgstr "цаля"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:237
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2046
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4147
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4339
+#: src/slic3r/GUI/GCodeViewer.cpp:3278
+msgctxt "Metre"
+msgid "m"
+msgstr ""
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3289
+msgid "Click to hide"
+msgstr "Націсніце, каб схаваць"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3289
+msgid "Click to show"
+msgstr "Націсніце, каб адлюстраваць"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3462
+msgid "up to"
+msgstr "да"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3468
+msgid "above"
+msgstr "пасля"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3476
+msgid "from"
+msgstr "з"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3476
+msgid "to"
+msgstr "да"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3526 src/slic3r/GUI/GCodeViewer.cpp:3527
+#: src/slic3r/GUI/GCodeViewer.cpp:3602
+msgid "Percentage"
+msgstr "Адсотак"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3537 src/slic3r/GUI/GCodeViewer.cpp:3580
+msgid "Feature type"
+msgstr "Тыпы лініяў"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3537 src/slic3r/GUI/GCodeViewer.cpp:3602
+#: src/slic3r/GUI/RammingChart.cpp:90
+msgid "Time"
+msgstr "Час"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3581
+msgid "Height (mm)"
+msgstr "Вышыня (мм)"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3582
+msgid "Width (mm)"
+msgstr "Шырыня (мм)"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3583
+msgid "Speed (mm/s)"
+msgstr "Хуткасць (мм/с)"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3584
+msgid "Fan speed (%)"
+msgstr "Хуткасць вентылятара (%)"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3585
+msgid "Temperature (°C)"
+msgstr "Тэмпература (°C)"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3586
+msgid "Volumetric flow rate (mm³/s)"
+msgstr "Аб'ёмны выдатак (мм³/с)"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3587
+msgid "Layer time (linear)"
+msgstr ""
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3588
+msgid "Layer time (logarithmic)"
+msgstr ""
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3589
+msgid "Tool"
+msgstr "Інструмент"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3590
+msgid "Color Print"
+msgstr "Колер друку"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3602 src/slic3r/GUI/GCodeViewer.cpp:3604
+#: src/slic3r/GUI/GCodeViewer.cpp:3870
+msgid "Used filament"
+msgstr "Ужыта філамента"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3633 src/slic3r/GUI/GCodeViewer.cpp:4080
+#: src/libslic3r/PrintConfig.cpp:1470 src/libslic3r/PrintConfig.cpp:3080
+msgid "Travel"
+msgstr "Хуткасць руху па XY"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3650 src/slic3r/GUI/GCodeViewer.cpp:3695
+#: src/slic3r/GUI/GCodeViewer.cpp:3699
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:74
+#: src/slic3r/GUI/GUI_ObjectList.cpp:349 src/slic3r/GUI/Tab.cpp:1959
+#: src/slic3r/GUI/wxExtensions.cpp:510 src/libslic3r/PrintConfig.cpp:886
+msgid "Extruder"
+msgstr "Экструдар"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3672
+msgid "Default color"
+msgstr "Першапачатковы колер"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3695
+msgid "default color"
+msgstr "першапачатковы колер"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3795 src/slic3r/GUI/GCodeViewer.cpp:3851
+msgid "Color change"
+msgstr "Змена колеру"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3814 src/slic3r/GUI/GCodeViewer.cpp:3849
+msgid "Print"
+msgstr "Друк"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3850 src/slic3r/GUI/GCodeViewer.cpp:3884
+msgid "Pause"
+msgstr "Прыпынак"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3867 src/slic3r/GUI/GCodeViewer.cpp:3870
+msgid "Event"
+msgstr "Падзея"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3867 src/slic3r/GUI/GCodeViewer.cpp:3870
+msgid "Remaining time"
+msgstr "Дакладны час друку"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3867 src/slic3r/GUI/GCodeViewer.cpp:3870
+msgid "Duration"
+msgstr "Працягласць"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3938 src/slic3r/GUI/GUI.cpp:332
+#: src/slic3r/GUI/Plater.cpp:855 src/libslic3r/PrintConfig.cpp:332
+msgid "Printer"
+msgstr "Друкарка"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3941 src/slic3r/GUI/GUI.cpp:328
+#: src/slic3r/GUI/Plater.cpp:851
+msgid "Print settings"
+msgstr "Налады друку"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3946 src/slic3r/GUI/GUI.cpp:330
+#: src/slic3r/GUI/Plater.cpp:852 src/slic3r/GUI/Tab.cpp:1998
+#: src/slic3r/GUI/Tab.cpp:1999
+msgid "Filament"
+msgstr "Філамент"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3961
+msgid "Hide Custom G-code"
+msgstr ""
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3961
+msgid "Show Custom G-code"
+msgstr ""
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3974
+msgid "Estimated printing times"
+msgstr "Разлічаны час друку"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3993
+msgid "Normal mode"
+msgstr "Звычайны рэжым"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3994
+msgid "Stealth mode"
+msgstr "Ціхі рэжым"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4003 src/libslic3r/PrintConfig.cpp:1247
+#: src/libslic3r/PrintConfig.cpp:1265 src/libslic3r/PrintConfig.cpp:1275
+#: src/libslic3r/PrintConfig.cpp:1320
+msgid "First layer"
+msgstr "Першы пласт"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4007
+msgid "Total"
+msgstr "Агульнае"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4026
+msgid "Show stealth mode"
+msgstr "Адлюстраваць ў ціхім рэжыме"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4030
+msgid "Show normal mode"
+msgstr "Адлюстраваць у звычайным рэжыме"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4084
+msgid "Wipe"
+msgstr "Выціранне"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4088
+msgid "Retractions"
+msgstr "Адвод"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4092
+msgid "Deretractions"
+msgstr "Пастаўка"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4096
+msgid "Seams"
+msgstr "Шво"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4100
+msgid "Tool changes"
+msgstr "Змена інструмента"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4104
+msgid "Color changes"
+msgstr "Змены колераў"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4108
+msgid "Print pauses"
+msgstr "Прыпынкі друку"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4112
+msgid "Custom G-codes"
+msgstr "Карыстальніцкі G-код"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4116
+msgid "Center of gravity"
+msgstr ""
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4121
+msgid "Shells"
+msgstr "Абалонка"
+
+#: src/slic3r/GUI/GCodeViewer.cpp:4126
+msgid "Tool marker"
+msgstr "Птушка інструмента"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:189 src/slic3r/GUI/GLCanvas3D.cpp:5453
+#: src/slic3r/GUI/ObjectDataViewModel.cpp:71
+msgid "Variable layer height"
+msgstr "Пераменная вышыня пластоў"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:191
+msgid "Left mouse button:"
+msgstr "<b>Левая кнопка мышы</b>:"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:193
+msgid "Add detail"
+msgstr "Павялічыць дэтальнасць"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:195
+msgid "Right mouse button:"
+msgstr "<b>Правая кнопка мышы</b>:"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:197
+msgid "Remove detail"
+msgstr "Паменьшыць дэтальнасць"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:199
+msgid "Shift + Left mouse button:"
+msgstr "<b>Shift + Левая кнопка мышы</b>:"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:201
+msgid "Reset to base"
+msgstr "Скід да звычайнай вышыні пласта"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:203
+msgid "Shift + Right mouse button:"
+msgstr "<b>Shift + Правая кнопка мышы</b>:"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:205
+msgid "Smoothing"
+msgstr "Згладжванне"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:207
+msgid "Mouse wheel:"
+msgstr "<b>Кола мышы</b>:"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:209
+msgid "Increase/decrease edit area"
+msgstr "Павялічыць/паменьшыць вобласць змены"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:212
+msgid "Adaptive"
+msgstr "Адаптыўвная"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:218
+msgid "Quality / Speed"
+msgstr "Якасць / Хуткасць"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:221
+msgid "Higher print quality versus higher print speed."
+msgstr "Высокая якасць друку альбо высокая хуткасць друку."
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:232
+msgid "Smooth"
+msgstr "Згладзіць"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:238 src/libslic3r/PrintConfig.cpp:906
+msgid "Radius"
+msgstr "Радыус"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:250
+msgid "Keep min"
+msgstr "Трымаць найменьшыя"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:259 src/slic3r/GUI/GLCanvas3D.cpp:4878
+msgid "Reset"
+msgstr "Скід"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:621
+msgid "Variable layer height - Manual edit"
+msgstr "Пераменная вышыня пластоў - Ручная змена"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:736
+msgid "Seq."
+msgstr "Чарга друку."
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:1305
+msgid "SLA view"
+msgstr ""
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:1324
+msgid "Show as processed"
+msgstr ""
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:1325
+msgid "Show as original"
+msgstr ""
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:1758
+msgid "Variable layer height - Reset"
+msgstr "Пераменная вышыня пластоў - Скід"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:1766
+msgid "Variable layer height - Adaptive"
+msgstr "Пераменная вышыня пластоў - Адаптыўная"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:1774
+msgid "Variable layer height - Smooth all"
+msgstr "Пераменная вышыня пластоў - Згладзіць усе"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:2231
+msgid "Mirror Object"
+msgstr "Люстраваць Мадэль"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:3127 src/slic3r/GUI/Gizmos/GLGizmoMove.cpp:78
+msgid "Gizmo-Move"
+msgstr "Штуковіна-Рухі"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:3219
+#: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp:583
+msgid "Gizmo-Rotate"
+msgstr "Штуковіна-Вярчэнне"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:3861
+msgid "Move Object"
+msgstr "Рух Мадэлі"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4113
+#: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp:33
+msgid "Gizmo-Place on Face"
+msgstr "Штуковіна-Паверхня на Стол"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4497 src/slic3r/GUI/GLCanvas3D.cpp:5413
+msgid "Switch to Settings"
+msgstr "Пераключэнне налады"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4498 src/slic3r/GUI/GLCanvas3D.cpp:5413
+msgid "Print Settings Tab"
+msgstr "Налады друку"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4499 src/slic3r/GUI/GLCanvas3D.cpp:5414
+msgid "Filament Settings Tab"
+msgstr "Налады філаменту"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4499 src/slic3r/GUI/GLCanvas3D.cpp:5414
+msgid "Material Settings Tab"
+msgstr "Налады матэрыялу"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4500 src/slic3r/GUI/GLCanvas3D.cpp:5415
+msgid "Printer Settings Tab"
+msgstr "Налады друкаркі"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4717
+msgid "Undo History"
+msgstr "Гісторыя Адкатаў"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4717
+msgid "Redo History"
+msgstr "Гісторыя Зрабіць нанова"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4737
+#, c-format, boost-format
+msgid "Undo %1$d Action"
+msgid_plural "Undo %1$d Actions"
+msgstr[0] "Адкаціць %1$d дзею"
+msgstr[1] "Адкаціць %1$d дзеі"
+msgstr[2] "Адкаціць %1$d дзеяў"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4737
+#, c-format, boost-format
+msgid "Redo %1$d Action"
+msgid_plural "Redo %1$d Actions"
+msgstr[0] "Зрабіць нанова %1$d дзею"
+msgstr[1] "Зрабіць нанова %1$d дзеі"
+msgstr[2] "Зрабіць нанова %1$d дзеяў"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4756 src/slic3r/GUI/GLCanvas3D.cpp:5431
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:115 src/slic3r/GUI/Search.cpp:482
+msgid "Search"
+msgstr "Пошук"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4770 src/slic3r/GUI/GLCanvas3D.cpp:4778
+#: src/slic3r/GUI/Search.cpp:488
+msgid "Enter a search term"
+msgstr "Увясці пошукавы запыт"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4810
+msgid "Arrange options"
+msgstr "Налады ўпарадкавання"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4845
+#, boost-format
+msgid "Press %1%left mouse button to enter the exact value"
+msgstr "Націсніце %1% <b>левую кнопку мышы</b> для ўводу дакладнага значэння"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4847
+msgid "Spacing"
+msgstr "Адлегласць"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4854
+msgid "Spacing from bed"
+msgstr ""
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4861
+msgid "Enable rotations (slow)"
+msgstr "Дазволіць вярчэнне (запавольванне)"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4870
+msgid "Alignment"
+msgstr "Выраўнаванне"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4870 src/libslic3r/PrintConfig.cpp:4761
+msgid "Center"
+msgstr "Па центры"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4870
+msgid "Rear left"
+msgstr ""
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4870
+msgid "Front left"
+msgstr ""
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4870
+msgid "Front right"
+msgstr ""
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4870
+msgid "Rear right"
+msgstr ""
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4870 src/libslic3r/PrintConfig.cpp:2305
+msgid "Random"
+msgstr "Выпадкова"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:4897 src/slic3r/GUI/GLCanvas3D.cpp:5325
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:141 src/slic3r/GUI/Plater.cpp:7196
+msgid "Arrange"
+msgstr "Упарадкаваць"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5299
+msgid "Add..."
+msgstr "Дадаць..."
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5316 src/slic3r/GUI/KBShortcutsDialog.cpp:105
+#: src/slic3r/GUI/Plater.cpp:6062 src/slic3r/GUI/Tab.cpp:4570
+msgid "Delete all"
+msgstr "Выдаліць усе"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5325 src/slic3r/GUI/KBShortcutsDialog.cpp:142
+msgid "Arrange selection"
+msgstr "Упарадкаваць абраныя"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5325
+msgid "Click right mouse button to show arrangement options"
+msgstr ""
+"Пстрыкніце <b>правую кнопку мышы</b>, каб адлюстраваць налады ўпарадкавання"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5345
+msgid "Copy"
+msgstr "Капіраваць"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5354
+msgid "Paste"
+msgstr "Уставіць"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5366 src/slic3r/GUI/GUI_Factories.cpp:1246
+#: src/slic3r/GUI/GUI_Factories.cpp:1270 src/slic3r/GUI/GUI_Factories.cpp:1281
+msgid "Add instance"
+msgstr "Дадаць асобнік"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5377 src/slic3r/GUI/GUI_Factories.cpp:1249
+msgid "Remove instance"
+msgstr "Выдаліць асобнік"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5390
+msgid "Split to objects"
+msgstr "Падзяліць на мадэлі"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5400
+msgid "Split to parts"
+msgstr "Падзяліць на часткі"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5506 src/slic3r/GUI/GLCanvas3D.cpp:5543
+msgid "Click right mouse button to open/close History"
+msgstr ""
+"Псктрыкнуць <b>правую кнопку мышы</b>, каб адлюстраваць/схаваць Гісторы дзей"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5528
+#, boost-format
+msgid "Next Undo action: %1%"
+msgstr "Наступная дзея Адкату: %1%"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5543 src/slic3r/GUI/KBShortcutsDialog.cpp:107
+#: src/slic3r/GUI/MainFrame.cpp:1429
+msgid "Redo"
+msgstr "Зрабіць нанова"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:5564
+#, boost-format
+msgid "Next Redo action: %1%"
+msgstr "Наступная дзея Зрабіць нанова: %1%"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:7459
+msgid "An object outside the print area was detected."
+msgstr "Знойдзена мадэль па-за межамі вобласці друку."
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:7460
+msgid "A toolpath outside the print area was detected."
+msgstr "Выяўлена траекторыя руху інструмента за межамі вобласці друку."
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:7461
+msgid "SLA supports outside the print area were detected."
+msgstr "Выяўлены SLA падтрымкі за межамі вобласці друку."
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:7462
+msgid "Some objects are not visible during editing."
+msgstr "Некаторыя мадэлі не бачныя падчас змены."
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:7464
+msgid ""
+"An object outside the print area was detected.\n"
+"Resolve the current problem to continue slicing."
+msgstr ""
+"Выяўлена мадэль за межамі вобласці друку. \n"
+"Ухіліце бягучую праблему, каб працягнуць нарэзку."
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:7539
+msgid "Selection-Add from rectangle"
+msgstr "Абраць-Дадаць з прамавугольніка"
+
+#: src/slic3r/GUI/GLCanvas3D.cpp:7554
+msgid "Selection-Remove from rectangle"
+msgstr "Абраць-Выдаліць з прамавугольніка"
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:190
+msgid "Auto"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:190
+msgid "Manual"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:193
+msgid "Plug"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:194
+msgid "Dowel"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:202
+msgid "Prism"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:202
+msgid "Frustum"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:206
+msgid "Triangle"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:206
+msgid "Square"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:206
+msgid "Hexagon"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:206
+#: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:61
+#: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:66
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:117
+#: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp:42
+msgid "Circle"
+msgstr "Круг"
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:213
+msgid "Keep orientation"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:214
+msgid "Place on cut"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:215
+msgid "Flip upside down"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:219
+msgid "Connectors"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:220
+msgid "Type"
+msgstr "Тып"
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:221 src/libslic3r/PrintConfig.cpp:2836
+msgid "Style"
+msgstr "Стыль"
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:223
+#: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:875
+msgid "Depth"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:238
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2022
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4155
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4347
 msgid "Part"
 msgstr "Частка"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:237
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2046
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:238
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2022
 msgid "Object"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:252
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:253
 msgid ""
 "Click to flip the cut plane\n"
 "Drag to move the cut plane\n"
 "Right-click a part to assign it to the other side"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:258 src/libslic3r/PrintConfig.cpp:495
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:259 src/libslic3r/PrintConfig.cpp:495
 #: src/libslic3r/PrintConfig.cpp:1189 src/libslic3r/PrintConfig.cpp:2324
 #: src/libslic3r/PrintConfig.cpp:2334 src/libslic3r/PrintConfig.cpp:2633
 #: src/libslic3r/PrintConfig.cpp:2867 src/libslic3r/PrintConfig.cpp:2887
@@ -2888,143 +2921,143 @@ msgstr ""
 msgid "°"
 msgstr "°"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:382
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:587
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1235
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:383
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:557
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1205
 msgid "Move cut plane"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:560
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:530
 msgid "Value"
 msgstr "Значэнне"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:565
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:535
 msgid "Tolerance"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:853
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:856
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:857
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:823
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:826
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:827
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1265
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1268
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1269
 msgid "Left click"
 msgstr "<b>Левая кнопка мышы</b>"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:853
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2803
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:823
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2821
 msgid "Add connector"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:854
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:824
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1266
 msgid "Right click"
 msgstr "<b>Правая кнопка мышы</b>"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:854
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:824
 msgid "Remove connector"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:855
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:825
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1267
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1270
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1271
 msgid "Drag"
 msgstr "Перацягнуць мышшу"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:855
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1219
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:825
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1189
 msgid "Move connector"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:856
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:826
 msgid "Add connector to selection"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:857
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:827
 msgid "Remove connector from selection"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:858
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:828
 msgid "Select all connectors"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:882 src/libslic3r/PrintConfig.cpp:4739
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:852 src/libslic3r/PrintConfig.cpp:4739
 msgid "Cut"
 msgstr "Рэзаць"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1230
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1200
 msgid "Rotate cut plane"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1789
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1765
 msgid "Remove connectors"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1834
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1810
 msgid "Confirm connectors"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1903
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1942
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1879
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1918
 msgid "Flip cut plane"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1986
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1962
 msgid "Hold SHIFT key to draw a cut line"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1992
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1968
 msgid "Cut position"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2001
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1977
 msgid "Reset cutting plane"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2013
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1989
 msgid "Edit connectors"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2013
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1989
 msgid "Add connectors"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2020
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1996
 msgid "Reset cut"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2021
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1997
 msgid "Reset cutting plane and remove connectors"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2076
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2052
 msgid "Cut result"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2096
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2072
 msgid "Cut into"
 msgstr ""
 
 #. TRN CutGizmo: RadioButton Cut into ...
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2103
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2079
 msgid "Objects"
 msgstr ""
 
 #. TRN CutGizmo: RadioButton Cut into ...
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2107
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2083
 msgid "Parts"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2121
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2097
 msgid "Perform cut"
 msgstr "Выканаць разрэз"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2219
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2195
 msgid "Invalid connectors detected"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2221
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2197
 #, c-format, boost-format
 msgid "%1$d connector is out of cut contour"
 msgid_plural "%1$d connectors are out of cut contour"
@@ -3032,7 +3065,7 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2224
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2200
 #, c-format, boost-format
 msgid "%1$d connector is out of object"
 msgid_plural "%1$d connectors are out of object"
@@ -3040,43 +3073,43 @@ msgstr[0] ""
 msgstr[1] ""
 msgstr[2] ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2227
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2203
 msgid "Some connectors are overlapped"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2231
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2207
 msgid "Select at least one object to keep after cutting."
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2233
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2209
 msgid "Cut plane is placed out of object"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2470
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2446
 msgid "Connector"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2511
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2487
 msgid "Cut by Plane"
 msgstr "Разрэзаць па плоскасці"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2778
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2796
 msgid "Cut by line"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2829
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2847
 msgid "Delete connector"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:295
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:296
 msgid "Entering Cut gizmo"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:296
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:297
 msgid "Leaving Cut gizmo"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:297
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:298
 msgid "Cut gizmo editing"
 msgstr ""
 
@@ -3169,7 +3202,7 @@ msgstr "Першапачатковы шрыфт"
 #: src/slic3r/GUI/GUI_Factories.cpp:138 src/slic3r/GUI/Tab.cpp:1444
 #: src/slic3r/GUI/Tab.cpp:1479 src/slic3r/GUI/Tab.cpp:1619
 #: src/slic3r/GUI/Tab.cpp:1623 src/slic3r/GUI/Tab.cpp:2069
-#: src/slic3r/GUI/Tab.cpp:2537 src/slic3r/GUI/Tab.cpp:5189
+#: src/slic3r/GUI/Tab.cpp:2537 src/slic3r/GUI/Tab.cpp:5188
 #: src/libslic3r/PrintConfig.cpp:273 src/libslic3r/PrintConfig.cpp:511
 #: src/libslic3r/PrintConfig.cpp:1491 src/libslic3r/PrintConfig.cpp:1573
 #: src/libslic3r/PrintConfig.cpp:1620 src/libslic3r/PrintConfig.cpp:2582
@@ -3220,7 +3253,7 @@ msgid "No symbol"
 msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:1775
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1602 src/slic3r/GUI/Plater.cpp:2447
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1608 src/slic3r/GUI/Plater.cpp:2444
 msgid "Loading"
 msgstr "Загрузка"
 
@@ -3257,7 +3290,7 @@ msgid "Click to change text into object part."
 msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2098
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4329
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4337
 msgid "You can't change a type of the last solid part of the object."
 msgstr "Вы не можаце змяніць тып апошняй суцэльнай часткі мадэлі."
 
@@ -3271,7 +3304,7 @@ msgid "Click to change part type into negative volume."
 msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2111
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4346
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4354
 msgid "Modifier"
 msgstr "Мадыфікатар"
 
@@ -3675,12 +3708,12 @@ msgstr ""
 "толькі папярэдне абранымі межамі, калі ўключана налада \"%1%\"."
 
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:232
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:371
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:378
 msgid "Paints facets according to the chosen painting brush."
 msgstr "Фарбуе межы ў адпаведнасці з абраным пэндзалем."
 
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:240
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:384
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:391
 msgid ""
 "Paints neighboring facets whose relative angle is less or equal to set angle."
 msgstr ""
@@ -3692,26 +3725,26 @@ msgid "Allows painting only on facets selected by: \"%1%\""
 msgstr "Дазваляе маляваць на абраных гранях, калі ўжываць: \"%1%\""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:259
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:412
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:419
 #: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp:141
 msgid "Paints all facets inside, regardless of their orientation."
 msgstr "Фарбуе ўсе межы ўнутры, незалежна ад іх накірунку."
 
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:268
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:421
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:428
 #: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp:149
 msgid "Ignores facets facing away from the camera."
 msgstr "Ігнаруе межы, якія звернутыя ў бок камеры."
 
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:277
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:430
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:437
 msgid "Paints only one facet."
 msgstr "Фарбуе толькі адну мяжу."
 
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:285
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:300
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:438
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:455
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:445
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:462
 #: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp:129
 msgid "Alt + Mouse wheel"
 msgstr "<b>Alt + Кола мышы</b>"
@@ -3721,13 +3754,13 @@ msgid "Splits bigger facets into smaller ones while the object is painted."
 msgstr "Падчас фарбоўкі мадэлі разбівае вялікія межы на больш дробныя."
 
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:323
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:476
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:483
 #: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp:167
 msgid "Ctrl + Mouse wheel"
 msgstr "<b>Ctrl + Кола мышы</b>"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:328
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:481
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:488
 #: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp:172
 msgid "Reset selection"
 msgstr "Зкід абранага"
@@ -4028,7 +4061,7 @@ msgid "Second color"
 msgstr "Другі колер"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:115
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:642
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:649
 msgid "Remove painted color"
 msgstr "Выдаленне фарбаванага ўчастку"
 
@@ -4040,15 +4073,27 @@ msgstr "Ачысціць усё"
 msgid "Bucket fill"
 msgstr "Заліўка"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:397
+#. TRN Means "current color"
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:340
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:356
+msgid "Current"
+msgstr ""
+
+#. TRN Means "original color"
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:342
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:356
+msgid "Original"
+msgstr ""
+
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:404
 msgid "Paints neighboring facets that have the same color."
 msgstr "Фарбуе суседнія межы, якія маюць аднолькавы колер."
 
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:443
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:450
 msgid "Split bigger facets into smaller ones while the object is painted."
 msgstr "Падчас фарбоўкі мадэлі разбівае вялікія межы на больш дробныя."
 
-#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:645
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:652
 #, boost-format
 msgid "Painted using: Extruder %1%"
 msgstr "Фарбуе з дапамогай экструдара %1%"
@@ -4611,7 +4656,7 @@ msgstr ""
 "Ці жадаеце вы працягнуць?"
 
 #: src/slic3r/GUI/GUI_App.cpp:1191 src/slic3r/GUI/GUI_App.cpp:3288
-#: src/slic3r/GUI/Plater.cpp:1729 src/slic3r/GUI/UnsavedChangesDialog.cpp:920
+#: src/slic3r/GUI/Plater.cpp:1730 src/slic3r/GUI/UnsavedChangesDialog.cpp:920
 msgid "Remember my choice"
 msgstr "Памятаць мой выбар"
 
@@ -4929,7 +4974,7 @@ msgid ""
 msgstr ""
 
 #: src/slic3r/GUI/GUI_App.cpp:3022 src/slic3r/GUI/Jobs/SLAImportJob.cpp:149
-#: src/slic3r/GUI/Plater.cpp:2530
+#: src/slic3r/GUI/Plater.cpp:2527
 msgid "Please check your object list before preset changing."
 msgstr "Калі ласка, праверце спіс мадэляў перад зменамі профіля."
 
@@ -4967,7 +5012,7 @@ msgstr "PrusaSlicer: Адчыніць спасылак"
 msgid "Suppress to open hyperlink in browser"
 msgstr "Забараніць адкрыццё спасылак у Інтэрнэт-аглядальніку"
 
-#: src/slic3r/GUI/GUI_App.cpp:3294 src/slic3r/GUI/Plater.cpp:1735
+#: src/slic3r/GUI/GUI_App.cpp:3294 src/slic3r/GUI/Plater.cpp:1736
 msgid "PrusaSlicer will remember your choice."
 msgstr "PrusaSlicer запомніць ваш выбар."
 
@@ -4975,7 +5020,7 @@ msgstr "PrusaSlicer запомніць ваш выбар."
 msgid "You will not be asked about it again on hyperlinks hovering."
 msgstr "Больш не пытаць пра гэта пры навядзенні курсора на гіперспасылкі."
 
-#: src/slic3r/GUI/GUI_App.cpp:3296 src/slic3r/GUI/Plater.cpp:1739
+#: src/slic3r/GUI/GUI_App.cpp:3296 src/slic3r/GUI/Plater.cpp:1740
 #, boost-format
 msgid ""
 "Visit \"Preferences\" and check \"%1%\"\n"
@@ -4984,7 +5029,7 @@ msgstr ""
 "Перайдзіце ў \"Перавагі\" і адзначце \"%1%\",\n"
 "каб змяніць вашвыбар."
 
-#: src/slic3r/GUI/GUI_App.cpp:3298 src/slic3r/GUI/Plater.cpp:1741
+#: src/slic3r/GUI/GUI_App.cpp:3298 src/slic3r/GUI/Plater.cpp:1742
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:937
 msgid "PrusaSlicer: Don't ask me again"
 msgstr "PrusaSlicer: Не пытаць зноў"
@@ -5043,6 +5088,7 @@ msgstr "Пласты і перыметры"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:56 src/slic3r/GUI/GUI_Factories.cpp:131
 #: src/slic3r/GUI/Tab.cpp:1501 src/slic3r/GUI/Tab.cpp:1503
+#: src/libslic3r/ExtrusionRole.cpp:48 src/libslic3r/ExtrusionRole.cpp:79
 #: src/libslic3r/PrintConfig.cpp:771 src/libslic3r/PrintConfig.cpp:2133
 #: src/libslic3r/PrintConfig.cpp:2142 src/libslic3r/PrintConfig.cpp:2151
 #: src/libslic3r/PrintConfig.cpp:2161 src/libslic3r/PrintConfig.cpp:2170
@@ -5075,6 +5121,7 @@ msgid "Pad and Support"
 msgstr "Падкладка і Падтрымка"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:129 src/slic3r/GUI/Tab.cpp:1467
+#: src/libslic3r/ExtrusionRole.cpp:44 src/libslic3r/ExtrusionRole.cpp:71
 #: src/libslic3r/PrintConfig.cpp:1627 src/libslic3r/PrintConfig.cpp:1633
 #: src/libslic3r/PrintConfig.cpp:1645 src/libslic3r/PrintConfig.cpp:1655
 #: src/libslic3r/PrintConfig.cpp:1663 src/libslic3r/PrintConfig.cpp:1665
@@ -5136,8 +5183,8 @@ msgid "Supports"
 msgstr "Падтрымка"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:141 src/slic3r/GUI/Plater.cpp:592
-#: src/slic3r/GUI/Tab.cpp:5164 src/slic3r/GUI/Tab.cpp:5165
-#: src/slic3r/GUI/Tab.cpp:5230 src/libslic3r/PrintConfig.cpp:3962
+#: src/slic3r/GUI/Tab.cpp:5163 src/slic3r/GUI/Tab.cpp:5164
+#: src/slic3r/GUI/Tab.cpp:5229 src/libslic3r/PrintConfig.cpp:3962
 #: src/libslic3r/PrintConfig.cpp:3969 src/libslic3r/PrintConfig.cpp:3983
 #: src/libslic3r/PrintConfig.cpp:3994 src/libslic3r/PrintConfig.cpp:4004
 #: src/libslic3r/PrintConfig.cpp:4026 src/libslic3r/PrintConfig.cpp:4037
@@ -5147,8 +5194,8 @@ msgstr "Падтрымка"
 msgid "Pad"
 msgstr "Падкладка"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:142 src/slic3r/GUI/Tab.cpp:5182
-#: src/slic3r/GUI/Tab.cpp:5183 src/libslic3r/SLA/Hollowing.cpp:82
+#: src/slic3r/GUI/GUI_Factories.cpp:142 src/slic3r/GUI/Tab.cpp:5181
+#: src/slic3r/GUI/Tab.cpp:5182 src/libslic3r/SLA/Hollowing.cpp:82
 #: src/libslic3r/SLA/Hollowing.cpp:87 src/libslic3r/SLA/Hollowing.cpp:102
 #: src/libslic3r/SLA/Hollowing.cpp:111 src/libslic3r/PrintConfig.cpp:4090
 #: src/libslic3r/PrintConfig.cpp:4097 src/libslic3r/PrintConfig.cpp:4107
@@ -5253,8 +5300,8 @@ msgstr "Ужыць як Падзеленая мадэль"
 msgid "Printable"
 msgstr "Для друку"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:763 src/slic3r/GUI/GUI_ObjectList.cpp:2070
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2582
+#: src/slic3r/GUI/GUI_Factories.cpp:763 src/slic3r/GUI/GUI_ObjectList.cpp:2076
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2588
 msgid "Invalidate cut info"
 msgstr ""
 
@@ -5274,7 +5321,7 @@ msgstr ""
 msgid "Reload the selected volumes from disk"
 msgstr "Перазагрузіць абраныя аб'ёмы з дыска"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:825 src/slic3r/GUI/Plater.cpp:3608
+#: src/slic3r/GUI/GUI_Factories.cpp:825 src/slic3r/GUI/Plater.cpp:3621
 msgid "Replace with STL"
 msgstr "Замяніць STL"
 
@@ -5286,9 +5333,10 @@ msgstr "Замяніць абраны аб'ём новым STL"
 msgid "Set extruder for selected items"
 msgstr "Ужыць экструдар для абраных частак"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:870 src/slic3r/Utils/Repetier.cpp:145
-#: src/slic3r/Utils/Repetier.cpp:226 src/libslic3r/PrintConfig.cpp:736
-#: src/libslic3r/PrintConfig.cpp:2810 src/libslic3r/PrintConfig.cpp:3927
+#: src/slic3r/GUI/GUI_Factories.cpp:870 src/slic3r/GUI/Tab.cpp:5157
+#: src/slic3r/Utils/Repetier.cpp:145 src/slic3r/Utils/Repetier.cpp:226
+#: src/libslic3r/PrintConfig.cpp:736 src/libslic3r/PrintConfig.cpp:2810
+#: src/libslic3r/PrintConfig.cpp:3927
 msgid "Default"
 msgstr "Першапачаткова"
 
@@ -5300,23 +5348,23 @@ msgstr "Маштабаваць да вобласці друку"
 msgid "Scale the selected object to fit the print volume"
 msgstr "Маштабаваць абраную мадэль да вобласці друку"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:929 src/slic3r/GUI/Plater.cpp:6225
+#: src/slic3r/GUI/GUI_Factories.cpp:929 src/slic3r/GUI/Plater.cpp:6247
 msgid "Convert from imperial units"
 msgstr "Пераўтварыць памер з англійскай сістэмы мер"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:930 src/slic3r/GUI/Plater.cpp:6226
+#: src/slic3r/GUI/GUI_Factories.cpp:930 src/slic3r/GUI/Plater.cpp:6248
 msgid "Revert conversion from imperial units"
 msgstr "Адмяніць пераўтварэнне памера з англійскай сістэмы мер"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:931 src/slic3r/GUI/Plater.cpp:6227
+#: src/slic3r/GUI/GUI_Factories.cpp:931 src/slic3r/GUI/Plater.cpp:6249
 msgid "Convert from meters"
 msgstr "Пераўтварыць памер з метрычнай сістэмы мер"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:932 src/slic3r/GUI/Plater.cpp:6227
+#: src/slic3r/GUI/GUI_Factories.cpp:932 src/slic3r/GUI/Plater.cpp:6249
 msgid "Revert conversion from meters"
 msgstr "Адмяніць пераўтварэнне памера з метрычнай сістэмы мер"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:953 src/slic3r/GUI/GUI_ObjectList.cpp:2290
+#: src/slic3r/GUI/GUI_Factories.cpp:953 src/slic3r/GUI/GUI_ObjectList.cpp:2296
 #: src/libslic3r/PrintConfig.cpp:4784
 msgid "Merge"
 msgstr "Аб'яднаць"
@@ -5365,7 +5413,7 @@ msgstr ""
 msgid "Ability to change text, font, size, ..."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_Factories.cpp:1030 src/slic3r/GUI/GUI_ObjectList.cpp:1793
+#: src/slic3r/GUI/GUI_Factories.cpp:1030 src/slic3r/GUI/GUI_ObjectList.cpp:1799
 msgid "Add Shape"
 msgstr "Дадаць фігуру"
 
@@ -5553,243 +5601,243 @@ msgstr "Пераназваць Мадэлі"
 msgid "Rename Sub-object"
 msgstr "Пераназваць Суб-мадэль"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1327
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4597
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1333
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4605
 msgid "Instances to Separated Objects"
 msgstr "Асобнікі як Асобная Мадэль"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1333
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1339
 msgid "Volumes in Object reordered"
 msgstr "Аб'ёмы ў Мадэлі пераўпарадкаваны"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1333
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1339
 msgid "Object reordered"
 msgstr "Мадэль пераўпарадкавана"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1383
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1389
 msgid "Add Settings for Layers"
 msgstr "Даданне Наладаў для Пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1384
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1390
 msgid "Add Settings for Sub-object"
 msgstr "Даданне Наладаў для Суб-мадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1385
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1391
 msgid "Add Settings for Object"
 msgstr "Даданне Наладаў для мадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1424
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1430
 msgid "Add Settings Bundle for Height range"
 msgstr "Даданне Пакета Наладаў для дыяпазона Вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1425
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1431
 msgid "Add Settings Bundle for Sub-object"
 msgstr "Даданне Пакета Наладаў для Суб-мадэлт"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1426
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1432
 msgid "Add Settings Bundle for Object"
 msgstr "Даданне Пакета Наладаў для Мадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1506
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1512
 msgid "Load Part"
 msgstr "Загрузка Часткі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1506
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1512
 msgid "Load Modifier"
 msgstr "Загрузіць Мадыфікатар"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1633 src/slic3r/GUI/Plater.cpp:2488
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1639 src/slic3r/GUI/Plater.cpp:2485
 msgid "Loading file"
 msgstr "Загрузка файла"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1641
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1647
 msgid "Error!"
 msgstr "Памылка!"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1731
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1737
 msgid "Add Generic Subobject"
 msgstr "Даданне Агульнай Субмадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1761
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1767
 msgid "Generic"
 msgstr "Агульны"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1826
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1832
 msgid "Add Shape from Gallery"
 msgstr "Даданне фігуры з бібліятэкі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1826
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1832
 msgid "Add Shapes from Gallery"
 msgstr "Даданне фігур з бібліятэкі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1946
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1952
 msgid "Remove paint-on supports"
 msgstr "Выдаленне намаляваных падтрымак"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1953
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1959
 msgid "Remove paint-on seam"
 msgstr "Выдаленне намалаванай шво"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1967
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1973
 msgid "Remove Multi Material painting"
 msgstr "Выдаленне ШматМатэрыяльнй фарбоўкі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1973
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1979
 msgid "Shift objects to bed"
 msgstr "Зрух мадэлі на стале"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:1979
+#: src/slic3r/GUI/GUI_ObjectList.cpp:1985
 msgid "Remove variable layer height"
 msgstr "Выдаленне пераменнай вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2000
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2006
 msgid "Delete Settings"
 msgstr "Выдаленне наладаў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2024
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2030
 msgid "Delete All Instances from Object"
 msgstr "Выдаленне ўсіх асобнікаў з мадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2040
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2046
 msgid "Delete Height Range"
 msgstr "Выдаленне дыяпазона вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2058
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2064
 msgid "Delete connector from object which is a part of cut"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2059
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2065
 msgid "Delete solid part from object which is a part of cut"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2060
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2066
 msgid "Delete negative volume from object which is a part of cut"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2062
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2068
 msgid ""
 "To save cut information you can delete all connectors from all related "
 "objects."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2065
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2071
 msgid ""
 "This action will break a cut information.\n"
 "After that PrusaSlicer can't guarantee model consistency."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2067
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2073
 msgid ""
 "To manipulate with solid parts or negative volumes you have to invalidate "
 "cut information first."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2072
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2612
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2078
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2618
 msgid "Delete all connectors"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2103
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2109
 msgid "From Object List You can't delete the last solid part from object."
 msgstr ""
 "Вы не можаце выдаліць апошнюю суцэльную частку мадэлі Са Спісу Мадэляў."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2112
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2118
 msgid "Delete Subobject"
 msgstr "Выдаленне субмадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2138
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2144
 msgid "Last instance of an object cannot be deleted."
 msgstr "Апошні асобнік мадэлі не можа быць выдалены."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2142
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2148
 msgid "Instance cannot be deleted from cut object."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2146
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2152
 msgid "Delete Instance"
 msgstr "Выдаленне асобніка"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2170
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2176
 msgid ""
 "The selected object couldn't be split because it contains only one part."
 msgstr ""
 "Абраную мадэль не атрымалася падзяліць, так як яна складаецца з адной часткі."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2174
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2180
 msgid "Split to Parts"
 msgstr "Падзяленне на часткі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2177 src/slic3r/GUI/Plater.cpp:3141
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2183 src/slic3r/GUI/Plater.cpp:3140
 msgid ""
 "Custom supports, seams and multimaterial painting were removed after "
 "splitting the object."
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2297
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2303
 msgid "Merged"
 msgstr "Аб'яднаныя"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2392
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2398
 msgid "Merge all parts to the one single object"
 msgstr "Ад'яднаць ўсі часткі ў адну адзіную мадэль"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2424
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2430
 msgid "Add Layers"
 msgstr "Даданне Пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2697
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2703
 msgid "Cut Connectors information"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2707
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2772
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2713
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2778
 msgid "Object manipulation"
 msgstr "Маніпуляванне мадэлямі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2717
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2723
 msgid "Group manipulation"
 msgstr "Групавое маніпуляванне"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2808
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2814
 msgid "Object Settings to modify"
 msgstr "Налады мадэлі для зменаў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2812
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2818
 msgid "Part Settings to modify"
 msgstr "Налады частак для зменаў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2817
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2823
 msgid "Layer range Settings to modify"
 msgstr "Налады дыяпазона Пластоў для змены"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2823
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2829
 msgid "Part manipulation"
 msgstr "Маніпуляванне частак"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2831
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2837
 msgid "Instance manipulation"
 msgstr "Маніпуляванне асобнікамі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2839
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2845
 msgid "Height ranges"
 msgstr "Дыяпазон вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2839
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2845
 msgid "Settings for height range"
 msgstr "Налады для дыяпазона вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3375
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3381
 msgid "Delete Selected"
 msgstr "Выдаленне абранага"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3453
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3481
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3501
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3459
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3487
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3507
 msgid "Add Height Range"
 msgstr "Дадаць дыяпазон вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3547
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3553
 msgid ""
 "Cannot insert a new layer range after the current layer range.\n"
 "The next layer range is too thin to be split to two\n"
@@ -5800,7 +5848,7 @@ msgstr ""
 "пласта\n"
 "без парушэння найменьшай вышыні пласта."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3551
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3557
 msgid ""
 "Cannot insert a new layer range between the current and the next layer "
 "range.\n"
@@ -5812,7 +5860,7 @@ msgstr ""
 "Прагал паміж бягучым і наступным дыяпазонамі пластоў\n"
 "найменьш, чым дапушчальная вышыня пласта."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3556
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3562
 msgid ""
 "Cannot insert a new layer range after the current layer range.\n"
 "Current layer range overlaps with the next layer range."
@@ -5820,82 +5868,82 @@ msgstr ""
 "Немагчыма ўставіць новы дыяпазон пластоў пасля бягучага дыяпазона пластоў.\n"
 "Дыяпазон бягучага пласта перакрываецца з дыяпазонам наступнага пласта."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3615
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3621
 msgid "Edit Height Range"
 msgstr "Змена дыяпазона вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3997
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4003
 msgid "Selection-Remove from list"
 msgstr "Выбар-Выдаленне з спіса"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4009
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4015
 msgid "Selection-Add from list"
 msgstr "Выбар-Даданне з спіса"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4146
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4154
 msgid "Object or Instance"
 msgstr "Мадэль альбо Асобнік"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4147
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4155
 msgid "Layer"
 msgstr "Пласты"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4149
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4157
 msgid "Unsupported selection"
 msgstr "Непадтрыманы выбар"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4150
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4158
 #, c-format, boost-format
 msgid "You started your selection with %s Item."
 msgstr "Вы пачалі свой выбар з элемента %s."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4151
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4159
 #, c-format, boost-format
 msgid "In this mode you can select only other %s Items%s"
 msgstr "У гэтым рэжыме можна абраць только іншы %s Элемент %s"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4154
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4162
 msgid "of a current Object"
 msgstr "бягучай Мадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4159
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4234 src/slic3r/GUI/Plater.cpp:199
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4167
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4242 src/slic3r/GUI/Plater.cpp:199
 msgid "Info"
 msgstr "Даведка"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4339
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4347
 msgid "Negative Volume"
 msgstr "Аб'ём для Выключэння"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4351
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4359
 msgid "Support Blocker"
 msgstr "Блокоўшчык Падтрымкі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4351
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4359
 msgid "Support Enforcer"
 msgstr "Прымусовая Падтрымка"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4361
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4369
 msgid "Select type of part"
 msgstr "Выбар тыпа часткі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4367
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4375
 msgid "Change Part Type"
 msgstr "Змена Тыпа Часткі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4627
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4635
 msgid "Enter new name"
 msgstr "Увядзіце новае імя"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4627
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4635
 msgid "Renaming"
 msgstr "Пераназваць"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4689
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4697
 msgid "Repairing model"
 msgstr "Аднаўленне мадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4699
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4707
 msgid ""
 "Custom supports, seams and multimaterial painting were removed after "
 "repairing the mesh."
@@ -5903,57 +5951,57 @@ msgstr ""
 "Пасле аднаўлення сеткі былі выдаленыя карыстальніцкія падтрымкі, шво і "
 "шматматэрыяльная афарбоўка."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4719
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4727
 msgid "Fix through NetFabb"
 msgstr "Рэмонт мадэлі сервісам Netfabb"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4722
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4730
 msgid "Fixing through NetFabb"
 msgstr "Рэмонт мадэлі сервісам Netfabb"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4752
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4760
 msgid "The following model was repaired successfully"
 msgid_plural "The following models were repaired successfully"
 msgstr[0] "Наступная мадэль паспяхова адноўлена"
 msgstr[1] "Наступныя мадэлі паспяхова адноўленыя"
 msgstr[2] "Наступных мадэляў паспяхова адноўлена"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4758
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4766
 msgid "Folowing model repair failed"
 msgid_plural "Folowing models repair failed"
 msgstr[0] "Не атрымалася аднавіць мадэль"
 msgstr[1] "Не атрымалася аднавіць мадэлі"
 msgstr[2] "Не атрымалася аднавіць мадэляў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4763
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4771
 msgid "Repairing was canceled"
 msgstr "Аднаўленне было адменена"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4880
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4888
 msgid "Change Extruders"
 msgstr "Змена экструдараў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:5006
+#: src/slic3r/GUI/GUI_ObjectList.cpp:5014
 msgid "Set Printable group"
 msgstr "Ужыць групу \"Для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:5006
+#: src/slic3r/GUI/GUI_ObjectList.cpp:5014
 msgid "Set Unprintable group"
 msgstr "Ужыць групу \"Не для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:5008
+#: src/slic3r/GUI/GUI_ObjectList.cpp:5016
 msgid "Set Printable"
 msgstr "Ужыць \"Для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:5008
+#: src/slic3r/GUI/GUI_ObjectList.cpp:5016
 msgid "Set Unprintable"
 msgstr "Ужыць \"Не для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:5009
+#: src/slic3r/GUI/GUI_ObjectList.cpp:5017
 msgid "Set Printable Instance"
 msgstr "Ужыць \"Асобнік для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:5009
+#: src/slic3r/GUI/GUI_ObjectList.cpp:5017
 msgid "Set Unprintable Instance"
 msgstr "Ужыць \"Асобнік не для друку\""
 
@@ -6121,15 +6169,15 @@ msgstr "Адчыніць Дакументацыю ў Інтэрнэт-агляд
 msgid "Edit"
 msgstr "Змяніць"
 
-#: src/slic3r/GUI/ImGuiWrapper.cpp:1180 src/slic3r/GUI/Search.cpp:531
+#: src/slic3r/GUI/ImGuiWrapper.cpp:1186 src/slic3r/GUI/Search.cpp:531
 msgid "Use for search"
 msgstr "Ужываць для пошука"
 
-#: src/slic3r/GUI/ImGuiWrapper.cpp:1181 src/slic3r/GUI/Search.cpp:524
+#: src/slic3r/GUI/ImGuiWrapper.cpp:1187 src/slic3r/GUI/Search.cpp:524
 msgid "Category"
 msgstr "Катэгорыя"
 
-#: src/slic3r/GUI/ImGuiWrapper.cpp:1183 src/slic3r/GUI/Search.cpp:526
+#: src/slic3r/GUI/ImGuiWrapper.cpp:1189 src/slic3r/GUI/Search.cpp:526
 msgid "Search in English"
 msgstr "Шукаць на англійскай мове"
 
@@ -6281,13 +6329,13 @@ msgstr ""
 "Імпартаваны SLA архіў не ўтрымлівае аніякіх профіляў. Бягучыя SLA профілі "
 "ўжывалісь у якасці запаснога варыянта."
 
-#: src/slic3r/GUI/Jobs/SLAImportJob.cpp:148 src/slic3r/GUI/Plater.cpp:2529
+#: src/slic3r/GUI/Jobs/SLAImportJob.cpp:148 src/slic3r/GUI/Plater.cpp:2526
 msgid "You cannot load SLA project with a multi-part object on the bed"
 msgstr ""
 "Вы не можаце загрузіць SLA праект з мадэляй, якая складаецца з некалькіх "
 "частак, на стале"
 
-#: src/slic3r/GUI/Jobs/SLAImportJob.cpp:150 src/slic3r/GUI/Plater.cpp:2531
+#: src/slic3r/GUI/Jobs/SLAImportJob.cpp:150 src/slic3r/GUI/Plater.cpp:2528
 msgid "Attention!"
 msgstr "Увага!"
 
@@ -6339,11 +6387,11 @@ msgid "Load Config from ini/amf/3mf/gcode and merge"
 msgstr "Загрузіць наладкі з ini/amf/3mf/g-кода і аб'яднаць"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:96 src/slic3r/GUI/Plater.cpp:951
-#: src/slic3r/GUI/Plater.cpp:7218 src/libslic3r/PrintConfig.cpp:4670
+#: src/slic3r/GUI/Plater.cpp:7239 src/libslic3r/PrintConfig.cpp:4670
 msgid "Export G-code"
 msgstr "Экспарт у G-код"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:97 src/slic3r/GUI/Plater.cpp:7219
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:97 src/slic3r/GUI/Plater.cpp:7240
 msgid "Send G-code"
 msgstr "Адправіць G-код"
 
@@ -6737,7 +6785,7 @@ msgstr ""
 msgid "Show/Hide G-code window"
 msgstr "Адлюстраваць/Схаваць акно G-кода"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:236 src/slic3r/GUI/Plater.cpp:4565
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:236 src/slic3r/GUI/Plater.cpp:4577
 #: src/slic3r/GUI/Tab.cpp:2925
 msgid "Preview"
 msgstr "Папярэдні прагляд"
@@ -6876,8 +6924,8 @@ msgstr "Налады філаменту"
 msgid "Printer Settings"
 msgstr "Налады друкаркі"
 
-#: src/slic3r/GUI/MainFrame.cpp:685 src/slic3r/GUI/Plater.cpp:1721
-#: src/slic3r/GUI/Plater.cpp:2876
+#: src/slic3r/GUI/MainFrame.cpp:685 src/slic3r/GUI/Plater.cpp:1722
+#: src/slic3r/GUI/Plater.cpp:2873
 msgid "Untitled"
 msgstr "Без назвы"
 
@@ -7434,7 +7482,7 @@ msgstr ""
 msgid "&Collapse Sidebar"
 msgstr "&Згарнуць бакавую панэль"
 
-#: src/slic3r/GUI/MainFrame.cpp:1523 src/slic3r/GUI/Plater.cpp:2339
+#: src/slic3r/GUI/MainFrame.cpp:1523 src/slic3r/GUI/Plater.cpp:2336
 msgid "Collapse sidebar"
 msgstr "Згарнуць бакавую панэль"
 
@@ -7527,9 +7575,9 @@ msgstr "G-код"
 msgid "Save ZIP file as:"
 msgstr ""
 
-#: src/slic3r/GUI/MainFrame.cpp:1780 src/slic3r/GUI/Plater.cpp:3369
-#: src/slic3r/GUI/Plater.cpp:6692 src/slic3r/GUI/Tab.cpp:1640
-#: src/slic3r/GUI/Tab.cpp:5190
+#: src/slic3r/GUI/MainFrame.cpp:1780 src/slic3r/GUI/Plater.cpp:3382
+#: src/slic3r/GUI/Plater.cpp:6714 src/slic3r/GUI/Tab.cpp:1640
+#: src/slic3r/GUI/Tab.cpp:5189
 msgid "Slicing"
 msgstr "Нарэзка"
 
@@ -7831,15 +7879,15 @@ msgstr "ПАМЫЛКА:"
 #: src/slic3r/GUI/NotificationManager.cpp:2113
 #: src/slic3r/GUI/NotificationManager.cpp:2140
 #: src/slic3r/GUI/NotificationManager.cpp:2148
-#: src/slic3r/GUI/NotificationManager.cpp:2159 src/slic3r/GUI/Plater.cpp:3230
+#: src/slic3r/GUI/NotificationManager.cpp:2159 src/slic3r/GUI/Plater.cpp:3229
 msgid "WARNING:"
 msgstr "ПАПЯРЭДЖАННЕ:"
 
-#: src/slic3r/GUI/NotificationManager.cpp:2275
+#: src/slic3r/GUI/NotificationManager.cpp:2274
 msgid "Exporting finished."
 msgstr "Экспарт скончаны."
 
-#: src/slic3r/GUI/NotificationManager.cpp:2450
+#: src/slic3r/GUI/NotificationManager.cpp:2449
 #: src/slic3r/GUI/UpdateDialogs.cpp:193
 msgid "Download"
 msgstr ""
@@ -8157,12 +8205,12 @@ msgstr "Пад мадэльлю"
 msgid "Around object"
 msgstr "Вакол мадэлі"
 
-#: src/slic3r/GUI/Plater.cpp:932 src/slic3r/GUI/Plater.cpp:7219
+#: src/slic3r/GUI/Plater.cpp:932 src/slic3r/GUI/Plater.cpp:7240
 msgid "Send to printer"
 msgstr "Адправіць на друкарку"
 
-#: src/slic3r/GUI/Plater.cpp:952 src/slic3r/GUI/Plater.cpp:3369
-#: src/slic3r/GUI/Plater.cpp:6695
+#: src/slic3r/GUI/Plater.cpp:952 src/slic3r/GUI/Plater.cpp:3382
+#: src/slic3r/GUI/Plater.cpp:6717
 msgid "Slice now"
 msgstr "Нарэзаць зараз"
 
@@ -8231,25 +8279,25 @@ msgstr "звычайны рэжым"
 msgid "stealth mode"
 msgstr "ціхі рэжым"
 
-#: src/slic3r/GUI/Plater.cpp:1727
+#: src/slic3r/GUI/Plater.cpp:1728
 #, boost-format
 msgid "Do you want to save the changes to \"%1%\"?"
 msgstr "Ці жадаеце вы захаваць змены ў \"%1%\"?"
 
-#: src/slic3r/GUI/Plater.cpp:1728 src/slic3r/GUI/UnsavedChangesDialog.cpp:907
+#: src/slic3r/GUI/Plater.cpp:1729 src/slic3r/GUI/UnsavedChangesDialog.cpp:907
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1604
 msgid "Save"
 msgstr "Захаваць"
 
-#: src/slic3r/GUI/Plater.cpp:1728 src/slic3r/GUI/UnsavedChangesDialog.cpp:901
+#: src/slic3r/GUI/Plater.cpp:1729 src/slic3r/GUI/UnsavedChangesDialog.cpp:901
 msgid "Discard"
 msgstr "Адмовіцца"
 
-#: src/slic3r/GUI/Plater.cpp:1733 src/slic3r/GUI/Preferences.cpp:331
+#: src/slic3r/GUI/Plater.cpp:1734 src/slic3r/GUI/Preferences.cpp:331
 msgid "Ask for unsaved changes in project"
 msgstr "Спытаць пра незахаваныя змены ў праекце"
 
-#: src/slic3r/GUI/Plater.cpp:1736
+#: src/slic3r/GUI/Plater.cpp:1737
 msgid ""
 "You will not be asked about it again, when: \n"
 "- Closing PrusaSlicer,\n"
@@ -8259,7 +8307,7 @@ msgstr ""
 "- Зачыняецца PrusaSlicer,\n"
 "- Загрузка ці стварэнне новага праекту"
 
-#: src/slic3r/GUI/Plater.cpp:2206
+#: src/slic3r/GUI/Plater.cpp:2203
 #, c-format, boost-format
 msgid ""
 "Successfully unmounted. The device %s(%s) can now be safely removed from the "
@@ -8268,20 +8316,20 @@ msgstr ""
 "Размантавана паспяхова. Зарад прыладу %s(%s) можна бяспечна выняць з "
 "кампутара."
 
-#: src/slic3r/GUI/Plater.cpp:2212
+#: src/slic3r/GUI/Plater.cpp:2209
 #, c-format, boost-format
 msgid "Ejecting of device %s(%s) has failed."
 msgstr "Не атрымалася выняць прыладу %s(%s)."
 
-#: src/slic3r/GUI/Plater.cpp:2231 src/slic3r/GUI/Plater.cpp:5198
+#: src/slic3r/GUI/Plater.cpp:2228 src/slic3r/GUI/Plater.cpp:5210
 msgid "New Project"
 msgstr "Новы праект"
 
-#: src/slic3r/GUI/Plater.cpp:2338
+#: src/slic3r/GUI/Plater.cpp:2335
 msgid "Expand sidebar"
 msgstr "Разгарнуць бакавую панэль"
 
-#: src/slic3r/GUI/Plater.cpp:2420
+#: src/slic3r/GUI/Plater.cpp:2417
 msgid ""
 "The preset below was temporarily installed on the active instance of "
 "PrusaSlicer"
@@ -8298,12 +8346,12 @@ msgstr[2] ""
 "Прыведзеныя ніжэй профілі былі часова ўсталяваны на актыўным асобніку "
 "PrusaSlicer"
 
-#: src/slic3r/GUI/Plater.cpp:2577
+#: src/slic3r/GUI/Plater.cpp:2574
 #, boost-format
 msgid "Failed loading file \"%1%\" due to an invalid configuration."
 msgstr "Не атрымалася загрузіць файл \"%1%\" з-за недапушчальнай наладкі."
 
-#: src/slic3r/GUI/Plater.cpp:2597
+#: src/slic3r/GUI/Plater.cpp:2594
 #, c-format, boost-format
 msgid ""
 "Object size from file %s appears to be zero.\n"
@@ -8321,11 +8369,11 @@ msgstr[2] ""
 "Здаецца, што ў мадэлях з файла %s нулявы памер.\n"
 "Яны былі выдаленыя з мадэлі"
 
-#: src/slic3r/GUI/Plater.cpp:2601
+#: src/slic3r/GUI/Plater.cpp:2598
 msgid "The size of the object is zero"
 msgstr "Памер мадэлі роўны нулю"
 
-#: src/slic3r/GUI/Plater.cpp:2614
+#: src/slic3r/GUI/Plater.cpp:2611
 #, c-format, boost-format
 msgid ""
 "The dimensions of the object from file %s seem to be defined in meters.\n"
@@ -8348,15 +8396,15 @@ msgstr[2] ""
 "Унутранай адзінкай вымярэння PrusaSlicer з'яўляюцца міліметры. Пералічыць "
 "памеры мадэлі?"
 
-#: src/slic3r/GUI/Plater.cpp:2618 src/slic3r/GUI/Plater.cpp:2640
+#: src/slic3r/GUI/Plater.cpp:2615 src/slic3r/GUI/Plater.cpp:2637
 msgid "The object is too small"
 msgstr "Мадэль занадта малая"
 
-#: src/slic3r/GUI/Plater.cpp:2619 src/slic3r/GUI/Plater.cpp:2641
+#: src/slic3r/GUI/Plater.cpp:2616 src/slic3r/GUI/Plater.cpp:2638
 msgid "Apply to all the remaining small objects being loaded."
 msgstr "Ужыць да ўсіх загружаемым дробным мадэлям."
 
-#: src/slic3r/GUI/Plater.cpp:2636
+#: src/slic3r/GUI/Plater.cpp:2633
 #, c-format, boost-format
 msgid ""
 "The dimensions of the object from file %s seem to be defined in inches.\n"
@@ -8379,7 +8427,7 @@ msgstr[2] ""
 "Унутранай адзінкай вымярэння PrusaSlicer з'яўляюцца цалі. Пералічыць памеры "
 "мадэлі?"
 
-#: src/slic3r/GUI/Plater.cpp:2653
+#: src/slic3r/GUI/Plater.cpp:2650
 msgid ""
 "This file contains several objects positioned at multiple heights.\n"
 "Instead of considering them as multiple objects, should \n"
@@ -8390,11 +8438,11 @@ msgstr ""
 "частак,\n"
 "замест такго, каб разглядаць іх як некалькі мадэляў?"
 
-#: src/slic3r/GUI/Plater.cpp:2656 src/slic3r/GUI/Plater.cpp:2708
+#: src/slic3r/GUI/Plater.cpp:2653 src/slic3r/GUI/Plater.cpp:2705
 msgid "Multi-part object detected"
 msgstr "Знойдзена мадэль, якая складаецца з некалькіх частак"
 
-#: src/slic3r/GUI/Plater.cpp:2663
+#: src/slic3r/GUI/Plater.cpp:2660
 msgid ""
 "This file cannot be loaded in a simple mode. Do you want to switch to an "
 "advanced mode?"
@@ -8402,11 +8450,11 @@ msgstr ""
 "Гэты файл не можы быць загружаны ў звычайным рэжыме. Ці жадаеце вы перайсці "
 "ў пашыраным рэжым?"
 
-#: src/slic3r/GUI/Plater.cpp:2664
+#: src/slic3r/GUI/Plater.cpp:2661
 msgid "Detected advanced data"
 msgstr "Знойдзены пашыраныя дадзеныя"
 
-#: src/slic3r/GUI/Plater.cpp:2705
+#: src/slic3r/GUI/Plater.cpp:2702
 msgid ""
 "Multiple objects were loaded for a multi-material printer.\n"
 "Instead of considering them as multiple objects, should I consider\n"
@@ -8416,7 +8464,7 @@ msgstr ""
 "Замест таго, каб разглядаць іх як некалькі мадэляў, ці патрэбна разглядаць\n"
 "гэты файл як адзіная мадэль, якая складаецца з некалькіх частак?"
 
-#: src/slic3r/GUI/Plater.cpp:2824
+#: src/slic3r/GUI/Plater.cpp:2821
 msgid ""
 "Your object appears to be too large, so it was automatically scaled down to "
 "fit your print bed."
@@ -8424,57 +8472,57 @@ msgstr ""
 "Вашая мадэль занадта вялікая, таму яна была аўтаматычна паменьшана, каб "
 "адпавядаць памеру вашага стала."
 
-#: src/slic3r/GUI/Plater.cpp:2825
+#: src/slic3r/GUI/Plater.cpp:2822
 msgid "Object too large?"
 msgstr "Мадэль занадта вялікая?"
 
-#: src/slic3r/GUI/Plater.cpp:2905
+#: src/slic3r/GUI/Plater.cpp:2902
 msgid "Export STL file:"
 msgstr "Экспарт у STL файл:"
 
-#: src/slic3r/GUI/Plater.cpp:2912
+#: src/slic3r/GUI/Plater.cpp:2909
 msgid "Export AMF file:"
 msgstr "Экспарт у AMF файл:"
 
-#: src/slic3r/GUI/Plater.cpp:2918
+#: src/slic3r/GUI/Plater.cpp:2915
 msgid "Save file as:"
 msgstr "Захаваць файл як:"
 
-#: src/slic3r/GUI/Plater.cpp:2924
+#: src/slic3r/GUI/Plater.cpp:2921
 msgid "Export OBJ file:"
 msgstr "Экспарт у OBJ файл:"
 
-#: src/slic3r/GUI/Plater.cpp:3038
+#: src/slic3r/GUI/Plater.cpp:3035
 msgid "Delete object which is a part of cut object"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:3039
+#: src/slic3r/GUI/Plater.cpp:3036
 msgid "You try to delete an object which is a part of a cut object."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:3040
+#: src/slic3r/GUI/Plater.cpp:3037
 msgid ""
 "This action will break a cut information.\n"
 "After that PrusaSlicer can't guarantee model consistency"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:3043
+#: src/slic3r/GUI/Plater.cpp:3040
 msgid "Delete object"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:3048
+#: src/slic3r/GUI/Plater.cpp:3045
 msgid "Delete Object"
 msgstr "Выдаленне мадэлі"
 
-#: src/slic3r/GUI/Plater.cpp:3065
+#: src/slic3r/GUI/Plater.cpp:3064
 msgid "Delete All Objects"
 msgstr "Выдаленне ўсіх мадэляў"
 
-#: src/slic3r/GUI/Plater.cpp:3094
+#: src/slic3r/GUI/Plater.cpp:3093
 msgid "Reset Project"
 msgstr "Скінуць праект"
 
-#: src/slic3r/GUI/Plater.cpp:3149
+#: src/slic3r/GUI/Plater.cpp:3148
 msgid ""
 "The selected object couldn't be split because it contains only one solid "
 "part."
@@ -8482,15 +8530,15 @@ msgstr ""
 "Абраную мадэль не атрымалася падзяліць, так як яна складаецца з адной "
 "суцэльнай часткі."
 
-#: src/slic3r/GUI/Plater.cpp:3156
+#: src/slic3r/GUI/Plater.cpp:3155
 msgid "All non-solid parts (modifiers) were deleted"
 msgstr "Усе несуцэльныя мадыфікатары былі выдалены"
 
-#: src/slic3r/GUI/Plater.cpp:3158
+#: src/slic3r/GUI/Plater.cpp:3157
 msgid "Split to Objects"
 msgstr "Падзяліць на мадэлі"
 
-#: src/slic3r/GUI/Plater.cpp:3212
+#: src/slic3r/GUI/Plater.cpp:3211
 msgid ""
 "An object has custom support enforcers which will not be used because "
 "supports are disabled."
@@ -8498,92 +8546,92 @@ msgstr ""
 "Мадэль мае карыстальніцкія прымусовыя падтрымкі, якія не будуць ужывацца, "
 "так як падтрымкі адключаныя."
 
-#: src/slic3r/GUI/Plater.cpp:3214
+#: src/slic3r/GUI/Plater.cpp:3213
 msgid "Enable supports for enforcers only"
 msgstr "Дазволіць толькі прымусовую падтрымку"
 
-#: src/slic3r/GUI/Plater.cpp:3349 src/slic3r/GUI/Plater.cpp:4245
+#: src/slic3r/GUI/Plater.cpp:3362 src/slic3r/GUI/Plater.cpp:4258
 msgid "Invalid data"
 msgstr "Памылковыя дадзеныя"
 
-#: src/slic3r/GUI/Plater.cpp:3420
+#: src/slic3r/GUI/Plater.cpp:3433
 msgid "Another export job is currently running."
 msgstr "Ужо цягнецца іншы працэс экспарту."
 
-#: src/slic3r/GUI/Plater.cpp:3506
+#: src/slic3r/GUI/Plater.cpp:3519
 msgid "Replace from:"
 msgstr "Замяніць з:"
 
-#: src/slic3r/GUI/Plater.cpp:3524
+#: src/slic3r/GUI/Plater.cpp:3537
 msgid "Unable to replace with more than one volume"
 msgstr "Не атрымалася замяніць больш чым адным аб'ёмам"
 
-#: src/slic3r/GUI/Plater.cpp:3524 src/slic3r/GUI/Plater.cpp:3603
+#: src/slic3r/GUI/Plater.cpp:3537 src/slic3r/GUI/Plater.cpp:3616
 msgid "Error during replace"
 msgstr "Памылка пры замене"
 
-#: src/slic3r/GUI/Plater.cpp:3595
+#: src/slic3r/GUI/Plater.cpp:3608
 msgid "Select the new file"
 msgstr "Абраць новы файл"
 
-#: src/slic3r/GUI/Plater.cpp:3603
+#: src/slic3r/GUI/Plater.cpp:3616
 msgid "File for the replace wasn't selected"
 msgstr "Файл для замены не быў абраны"
 
-#: src/slic3r/GUI/Plater.cpp:3690
+#: src/slic3r/GUI/Plater.cpp:3703
 msgid "Please select the file to reload"
 msgstr "Калі ласка, абярыце файл для перазагрузкі"
 
-#: src/slic3r/GUI/Plater.cpp:3721 src/slic3r/GUI/Plater.cpp:5354
-#: src/slic3r/GUI/Plater.cpp:5364
+#: src/slic3r/GUI/Plater.cpp:3734 src/slic3r/GUI/Plater.cpp:5366
+#: src/slic3r/GUI/Plater.cpp:5376
 msgid "The selected file"
 msgstr "У абраным файле"
 
-#: src/slic3r/GUI/Plater.cpp:3722
+#: src/slic3r/GUI/Plater.cpp:3735
 msgid "differs from the original file"
 msgstr "адрозніваецца ад зыходнага файлу"
 
-#: src/slic3r/GUI/Plater.cpp:3722
+#: src/slic3r/GUI/Plater.cpp:3735
 msgid "Do you want to replace it"
 msgstr "Ці жадаеце вы замяніць яго"
 
-#: src/slic3r/GUI/Plater.cpp:3742 src/slic3r/GUI/Plater.cpp:3748
+#: src/slic3r/GUI/Plater.cpp:3755 src/slic3r/GUI/Plater.cpp:3761
 msgid "Reload from:"
 msgstr "Перазагрузка з:"
 
-#: src/slic3r/GUI/Plater.cpp:3863
+#: src/slic3r/GUI/Plater.cpp:3876
 msgid "Unable to reload:"
 msgstr "Не атрымалася перазагрузіць:"
 
-#: src/slic3r/GUI/Plater.cpp:3868
+#: src/slic3r/GUI/Plater.cpp:3881
 msgid "Error during reload"
 msgstr "Памылка ў час перазагрузкі"
 
-#: src/slic3r/GUI/Plater.cpp:3886
+#: src/slic3r/GUI/Plater.cpp:3899
 msgid "Reload all from disk"
 msgstr "Перазагрузіць усё з дыску"
 
-#: src/slic3r/GUI/Plater.cpp:4198
+#: src/slic3r/GUI/Plater.cpp:4211
 msgid "There are active warnings concerning sliced models:"
 msgstr "Маюцца актыўныя папярэджанні аб нарэзаных мадэлях:"
 
-#: src/slic3r/GUI/Plater.cpp:4209
+#: src/slic3r/GUI/Plater.cpp:4222
 msgid "generated warnings"
 msgstr "выклікала папярэджанне"
 
-#: src/slic3r/GUI/Plater.cpp:4254
+#: src/slic3r/GUI/Plater.cpp:4267
 msgid "Slicing Cancelled."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:4557
+#: src/slic3r/GUI/Plater.cpp:4569
 msgid "3D editor view"
 msgstr "Выгляд 3D-змены"
 
-#: src/slic3r/GUI/Plater.cpp:4979
+#: src/slic3r/GUI/Plater.cpp:4991
 msgid "Undo / Redo is processing"
 msgstr "Адкаціць / Зрабіць нанова ў час апрацоўкі"
 
-#: src/slic3r/GUI/Plater.cpp:4981
+#: src/slic3r/GUI/Plater.cpp:4993
 #, boost-format
 msgid ""
 "Switching the printer technology from %1% to %2%.\n"
@@ -8594,20 +8642,20 @@ msgstr ""
 "Некаторыя профілі %1% былі зменены і будуць згубленыя пасля пераключэння "
 "тэхналогіі друку."
 
-#: src/slic3r/GUI/Plater.cpp:5183
+#: src/slic3r/GUI/Plater.cpp:5195
 msgid "Creating a new project while the current project is modified."
 msgstr "Стварэнне новага праекту пры змене ў бягучым праекце."
 
-#: src/slic3r/GUI/Plater.cpp:5186
+#: src/slic3r/GUI/Plater.cpp:5198
 msgid "Creating a new project while some presets are modified."
 msgstr "Стварэнне новага праекту пры змене некаторых наладак."
 
-#: src/slic3r/GUI/Plater.cpp:5187
+#: src/slic3r/GUI/Plater.cpp:5199
 msgid "You can keep presets modifications to the new project or discard them"
 msgstr ""
 "Магчыма трымаць змены профіляў у новым праекце альбо адмовіцца ад зменаў"
 
-#: src/slic3r/GUI/Plater.cpp:5188
+#: src/slic3r/GUI/Plater.cpp:5200
 msgid ""
 "You can keep presets modifications to the new project, discard them or save "
 "changes as new presets.\n"
@@ -8617,187 +8665,187 @@ msgstr ""
 "як новыя профілі.\n"
 "Заўвага: Калі змены захаваць, то новы праект іх не захавае"
 
-#: src/slic3r/GUI/Plater.cpp:5193
+#: src/slic3r/GUI/Plater.cpp:5205
 msgid "Creating a new project"
 msgstr "Стварэнне новага праекту"
 
-#: src/slic3r/GUI/Plater.cpp:5227
+#: src/slic3r/GUI/Plater.cpp:5239
 msgid "Load Project"
 msgstr "Загрузка Праекту"
 
-#: src/slic3r/GUI/Plater.cpp:5257
+#: src/slic3r/GUI/Plater.cpp:5269
 msgid "Import Object"
 msgstr "Імпарт Мадэлі"
 
-#: src/slic3r/GUI/Plater.cpp:5261
+#: src/slic3r/GUI/Plater.cpp:5273
 msgid "Import Objects"
 msgstr "Імпарт Мадэляў"
 
-#: src/slic3r/GUI/Plater.cpp:5290
+#: src/slic3r/GUI/Plater.cpp:5302
 msgid "Import SLA archive"
 msgstr "Загрузіць SLA архіў"
 
-#: src/slic3r/GUI/Plater.cpp:5354 src/slic3r/GUI/Plater.cpp:5364
+#: src/slic3r/GUI/Plater.cpp:5366 src/slic3r/GUI/Plater.cpp:5376
 msgid "does not contain valid gcode."
 msgstr "утрымлівае недапушчальныя G-коды."
 
-#: src/slic3r/GUI/Plater.cpp:5355 src/slic3r/GUI/Plater.cpp:5365
+#: src/slic3r/GUI/Plater.cpp:5367 src/slic3r/GUI/Plater.cpp:5377
 msgid "Error while loading .gcode file"
 msgstr "Памылка пры загрузцы .gcode файла"
 
-#: src/slic3r/GUI/Plater.cpp:5432
+#: src/slic3r/GUI/Plater.cpp:5444
 #, boost-format
 msgid "%1% - Multiple projects file"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5442
+#: src/slic3r/GUI/Plater.cpp:5454
 msgid "There are several files being loaded, including Project files."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5442 src/slic3r/GUI/Plater.cpp:5445
+#: src/slic3r/GUI/Plater.cpp:5454 src/slic3r/GUI/Plater.cpp:5457
 msgid "Select an action to apply to all files."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5445
+#: src/slic3r/GUI/Plater.cpp:5457
 msgid "There are several files being loaded."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5447 src/slic3r/GUI/Plater.cpp:5843
+#: src/slic3r/GUI/Plater.cpp:5459 src/slic3r/GUI/Plater.cpp:5855
 msgid "Action"
 msgstr "Дзея"
 
-#: src/slic3r/GUI/Plater.cpp:5468
+#: src/slic3r/GUI/Plater.cpp:5480
 msgid "Import 3D models"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5481
+#: src/slic3r/GUI/Plater.cpp:5493
 msgid "Start a new instance of PrusaSlicer"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5495
+#: src/slic3r/GUI/Plater.cpp:5507
 msgid "Select one to load as project"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5506
+#: src/slic3r/GUI/Plater.cpp:5518
 msgid "Select only one file to load the configuration."
 msgstr ""
 
 #. TRN %1% is archive path
-#: src/slic3r/GUI/Plater.cpp:5553
+#: src/slic3r/GUI/Plater.cpp:5565
 #, boost-format
 msgid "Loading of a ZIP archive on path %1% has failed."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5612
+#: src/slic3r/GUI/Plater.cpp:5624
 #, boost-format
 msgid "Failed to unzip file to %1%: %2% "
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5622
+#: src/slic3r/GUI/Plater.cpp:5634
 #, boost-format
 msgid "Failed to find unzipped file at %1%. Unzipping of file has failed."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5822
+#: src/slic3r/GUI/Plater.cpp:5834
 msgid "Load project file"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5831
+#: src/slic3r/GUI/Plater.cpp:5843
 msgid "Open as project"
 msgstr "Адчыніць як праект"
 
-#: src/slic3r/GUI/Plater.cpp:5832
+#: src/slic3r/GUI/Plater.cpp:5844
 msgid "Import 3D models only"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5833
+#: src/slic3r/GUI/Plater.cpp:5845
 msgid "Import config only"
 msgstr "Імпартаваць толькі наладкі"
 
-#: src/slic3r/GUI/Plater.cpp:5835
+#: src/slic3r/GUI/Plater.cpp:5847
 msgid "Start new PrusaSlicer instance"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5838
+#: src/slic3r/GUI/Plater.cpp:5850
 msgid "Select an action to apply to the file"
 msgstr "Абраць дзею для ўжывання да файла"
 
-#: src/slic3r/GUI/Plater.cpp:5859
+#: src/slic3r/GUI/Plater.cpp:5871
 msgid "Don't show again"
 msgstr "Больш не адлюстроўваць"
 
-#: src/slic3r/GUI/Plater.cpp:5900
+#: src/slic3r/GUI/Plater.cpp:5912
 msgid "You can open only one .gcode file at a time."
 msgstr "Магчыма адчыніць адначасова толькі адзін .gcode файл."
 
-#: src/slic3r/GUI/Plater.cpp:5901
+#: src/slic3r/GUI/Plater.cpp:5913
 msgid "Drag and drop G-code file"
 msgstr "Перацягніце G-код файл"
 
-#: src/slic3r/GUI/Plater.cpp:5989
+#: src/slic3r/GUI/Plater.cpp:6007
 msgid "Load File"
 msgstr "Загрузіць файл"
 
-#: src/slic3r/GUI/Plater.cpp:5994
+#: src/slic3r/GUI/Plater.cpp:6012
 msgid "Load Files"
 msgstr "Загрузіць файлы"
 
-#: src/slic3r/GUI/Plater.cpp:6044
+#: src/slic3r/GUI/Plater.cpp:6062
 msgid "All objects will be removed, continue?"
 msgstr "Усе мадэлі будуць выдаленыя, працягнуць?"
 
-#: src/slic3r/GUI/Plater.cpp:6055
+#: src/slic3r/GUI/Plater.cpp:6073
 msgid "Delete Selected Objects"
 msgstr "Выдаленне абраных мадэляў"
 
-#: src/slic3r/GUI/Plater.cpp:6064
+#: src/slic3r/GUI/Plater.cpp:6082
 msgid "Increase Instances"
 msgstr "Даданне Асобнікаў"
 
-#: src/slic3r/GUI/Plater.cpp:6121
+#: src/slic3r/GUI/Plater.cpp:6138
 msgid "Decrease Instances"
 msgstr "Выдаленне Асобнікаў"
 
-#: src/slic3r/GUI/Plater.cpp:6179
+#: src/slic3r/GUI/Plater.cpp:6196
 msgid "Enter the number of copies:"
 msgstr "Увядзіце колькасць копіяў:"
 
-#: src/slic3r/GUI/Plater.cpp:6180
+#: src/slic3r/GUI/Plater.cpp:6197
 msgid "Copies of the selected object"
 msgstr "Колькасць копіяў абранай мадэлі"
 
-#: src/slic3r/GUI/Plater.cpp:6183
+#: src/slic3r/GUI/Plater.cpp:6200
 #, c-format, boost-format
 msgid "Set numbers of copies to %d"
 msgstr "Ужыць колькасць копіяў: %d"
 
-#: src/slic3r/GUI/Plater.cpp:6199
+#: src/slic3r/GUI/Plater.cpp:6221
 msgid "Fill bed"
 msgstr "Запаўніць стол копіямі"
 
-#: src/slic3r/GUI/Plater.cpp:6341
+#: src/slic3r/GUI/Plater.cpp:6363
 msgid "Save G-code file as:"
 msgstr "Захаваць файл G-кода як:"
 
-#: src/slic3r/GUI/Plater.cpp:6341
+#: src/slic3r/GUI/Plater.cpp:6363
 msgid "Save SL1 / SL1S file as:"
 msgstr "Захаваць SL1 / SL1S файл як:"
 
-#: src/slic3r/GUI/Plater.cpp:6354
+#: src/slic3r/GUI/Plater.cpp:6376
 msgid "The provided file name is not valid."
 msgstr "Названае імя файла недапушчальнае."
 
-#: src/slic3r/GUI/Plater.cpp:6355
+#: src/slic3r/GUI/Plater.cpp:6377
 msgid "The following characters are not allowed by a FAT file system:"
 msgstr "Файлавая сістэма FAT не дазваляе наступныя сімвалы:"
 
-#: src/slic3r/GUI/Plater.cpp:6415
+#: src/slic3r/GUI/Plater.cpp:6437
 msgid ""
 "Unable to perform boolean operation on model meshes. Only positive parts "
 "will be exported."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:6569
+#: src/slic3r/GUI/Plater.cpp:6591
 msgid ""
 "The plater is empty.\n"
 "Do you want to save the project?"
@@ -8805,23 +8853,23 @@ msgstr ""
 "На стале нічога няма.\n"
 "Ці жадаеце вы захаваць праект?"
 
-#: src/slic3r/GUI/Plater.cpp:6569
+#: src/slic3r/GUI/Plater.cpp:6591
 msgid "Save project"
 msgstr "Захаванне праекту"
 
-#: src/slic3r/GUI/Plater.cpp:6804
+#: src/slic3r/GUI/Plater.cpp:6826
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:6804 src/slic3r/GUI/PrintHostDialogs.cpp:132
+#: src/slic3r/GUI/Plater.cpp:6826 src/slic3r/GUI/PrintHostDialogs.cpp:132
 msgid "Upload and Print"
 msgstr "Загрузіць і Надрукаваць"
 
-#: src/slic3r/GUI/Plater.cpp:7218
+#: src/slic3r/GUI/Plater.cpp:7239
 msgid "Export"
 msgstr "Экспарт"
 
-#: src/slic3r/GUI/Plater.cpp:7363
+#: src/slic3r/GUI/Plater.cpp:7384
 msgid "Paste From Clipboard"
 msgstr "Устаўка з Буферу абмена"
 
@@ -10216,7 +10264,7 @@ msgstr "Невыразная абалонка (эксперыментальна)
 msgid "Reducing printing time"
 msgstr "Скарачэнне часу друку"
 
-#: src/slic3r/GUI/Tab.cpp:1489
+#: src/slic3r/GUI/Tab.cpp:1489 src/libslic3r/ExtrusionRole.cpp:77
 msgid "Skirt"
 msgstr "Спадніца"
 
@@ -10268,7 +10316,8 @@ msgstr "Некалькі экструдараў"
 msgid "Ooze prevention"
 msgstr "Прадухіленне цечы матэрыяла"
 
-#: src/slic3r/GUI/Tab.cpp:1606
+#: src/slic3r/GUI/Tab.cpp:1606 src/libslic3r/ExtrusionRole.cpp:50
+#: src/libslic3r/ExtrusionRole.cpp:83
 msgid "Wipe tower"
 msgstr "Вежа выцірання"
 
@@ -10288,7 +10337,7 @@ msgstr "Паток"
 msgid "Arachne perimeter generator"
 msgstr ""
 
-#: src/slic3r/GUI/Tab.cpp:1656 src/slic3r/GUI/Tab.cpp:5194
+#: src/slic3r/GUI/Tab.cpp:1656 src/slic3r/GUI/Tab.cpp:5193
 msgid "Output options"
 msgstr "Выходныя налады"
 
@@ -10300,7 +10349,7 @@ msgstr "Паслядоўны друк"
 msgid "Extruder clearance"
 msgstr "Зазор экструдара"
 
-#: src/slic3r/GUI/Tab.cpp:1664 src/slic3r/GUI/Tab.cpp:5195
+#: src/slic3r/GUI/Tab.cpp:1664 src/slic3r/GUI/Tab.cpp:5194
 msgid "Output file"
 msgstr "Выходны файл"
 
@@ -10319,13 +10368,13 @@ msgstr "Заўвагі"
 
 #: src/slic3r/GUI/Tab.cpp:1702 src/slic3r/GUI/Tab.cpp:2156
 #: src/slic3r/GUI/Tab.cpp:2643 src/slic3r/GUI/Tab.cpp:2721
-#: src/slic3r/GUI/Tab.cpp:5034 src/slic3r/GUI/Tab.cpp:5200
+#: src/slic3r/GUI/Tab.cpp:5034 src/slic3r/GUI/Tab.cpp:5199
 msgid "Dependencies"
 msgstr "Залежнасці"
 
 #: src/slic3r/GUI/Tab.cpp:1703 src/slic3r/GUI/Tab.cpp:2157
 #: src/slic3r/GUI/Tab.cpp:2644 src/slic3r/GUI/Tab.cpp:2722
-#: src/slic3r/GUI/Tab.cpp:5035 src/slic3r/GUI/Tab.cpp:5201
+#: src/slic3r/GUI/Tab.cpp:5035 src/slic3r/GUI/Tab.cpp:5200
 msgid "Profile dependencies"
 msgstr "Залежнасці профіля"
 
@@ -10999,11 +11048,15 @@ msgstr "Цела падтрымкі"
 msgid "Connection of the support sticks and junctions"
 msgstr "Злучэнне падтрымак стрыжняў і злучэнняў"
 
-#: src/slic3r/GUI/Tab.cpp:5160
+#: src/slic3r/GUI/Tab.cpp:5157
+msgid "Branching"
+msgstr ""
+
+#: src/slic3r/GUI/Tab.cpp:5159
 msgid "Automatic generation"
 msgstr "Аўтаматычнае стварэнне"
 
-#: src/slic3r/GUI/Tab.cpp:5228
+#: src/slic3r/GUI/Tab.cpp:5227
 #, boost-format
 msgid ""
 "\"%1%\" is disabled because \"%2%\" is on in \"%3%\" category.\n"
@@ -11012,11 +11065,11 @@ msgstr ""
 "\"%1%\" адключана, так як \"%2%\" знаходзіцца ў катэгорыі \"%3%\".\n"
 "Каб уключыць \"%1%\", калі ласка адключыце \"%2%\"."
 
-#: src/slic3r/GUI/Tab.cpp:5230 src/libslic3r/PrintConfig.cpp:3571
+#: src/slic3r/GUI/Tab.cpp:5229 src/libslic3r/PrintConfig.cpp:3571
 msgid "Object elevation"
 msgstr "Вышыня ўзвышша мадэлі"
 
-#: src/slic3r/GUI/Tab.cpp:5230 src/libslic3r/PrintConfig.cpp:4036
+#: src/slic3r/GUI/Tab.cpp:5229 src/libslic3r/PrintConfig.cpp:4036
 msgid "Pad around object"
 msgstr "Падкладка вакол мадэлі"
 
@@ -12061,6 +12114,52 @@ msgstr ""
 "Мадэль(-і) знаходзяцца занадта блізка да вобласці падрыхтоўкі экструдара. "
 "Пераканайцеся, што сутыкненняў няма."
 
+#: src/libslic3r/ExtrusionRole.cpp:38 src/libslic3r/ExtrusionRole.cpp:59
+msgid "Perimeter"
+msgstr ""
+
+#: src/libslic3r/ExtrusionRole.cpp:39 src/libslic3r/ExtrusionRole.cpp:61
+msgid "External perimeter"
+msgstr ""
+
+#: src/libslic3r/ExtrusionRole.cpp:40 src/libslic3r/ExtrusionRole.cpp:63
+msgid "Overhang perimeter"
+msgstr ""
+
+#: src/libslic3r/ExtrusionRole.cpp:41 src/libslic3r/ExtrusionRole.cpp:65
+msgid "Internal infill"
+msgstr ""
+
+#: src/libslic3r/ExtrusionRole.cpp:42 src/libslic3r/ExtrusionRole.cpp:67
+#: src/libslic3r/PrintConfig.cpp:1452 src/libslic3r/PrintConfig.cpp:2432
+#: src/libslic3r/PrintConfig.cpp:2444
+msgid "Solid infill"
+msgstr "Суцэльнае запаўненне"
+
+#: src/libslic3r/ExtrusionRole.cpp:43 src/libslic3r/ExtrusionRole.cpp:69
+#: src/libslic3r/PrintConfig.cpp:1461 src/libslic3r/PrintConfig.cpp:3033
+#: src/libslic3r/PrintConfig.cpp:3046
+msgid "Top solid infill"
+msgstr "Верхні суцэльны пласт"
+
+#: src/libslic3r/ExtrusionRole.cpp:45 src/libslic3r/ExtrusionRole.cpp:73
+msgid "Bridge infill"
+msgstr ""
+
+#: src/libslic3r/ExtrusionRole.cpp:46 src/libslic3r/ExtrusionRole.cpp:75
+#: src/libslic3r/PrintConfig.cpp:1380
+msgid "Gap fill"
+msgstr "Запаўненне прагалаў"
+
+#: src/libslic3r/ExtrusionRole.cpp:47 src/libslic3r/ExtrusionRole.cpp:77
+msgid "Skirt/Brim"
+msgstr ""
+
+#: src/libslic3r/ExtrusionRole.cpp:49 src/libslic3r/ExtrusionRole.cpp:81
+#: src/libslic3r/PrintConfig.cpp:2781
+msgid "Support material interface"
+msgstr "Злучны пласт падтрымкі"
+
 #: src/libslic3r/Flow.cpp:58
 #, boost-format
 msgid ""
@@ -12273,13 +12372,13 @@ msgstr ""
 "Некаторыя мадэлі занадта высокія, і не могуць быць надрукаваныя без "
 "сутыкнення з экстрударам."
 
-#: src/libslic3r/Print.cpp:479
+#: src/libslic3r/Print.cpp:481
 msgid ""
 "Avoid crossing perimeters option and avoid crossing curled overhangs option "
 "cannot be both enabled together."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:488
+#: src/libslic3r/Print.cpp:490
 msgid ""
 "Only a single object may be printed at a time in Spiral Vase mode. Either "
 "remove all but the last object, or enable sequential mode by "
@@ -12289,7 +12388,7 @@ msgstr ""
 "Альбо выдаліце ўсе мадэлі на стале акрамя апошняй, ці ўключыце паслядоўны "
 "друк з дапамогай \"complete_objects\"."
 
-#: src/libslic3r/Print.cpp:492
+#: src/libslic3r/Print.cpp:494
 msgid ""
 "The Spiral Vase option can only be used when printing single material "
 "objects."
@@ -12297,35 +12396,35 @@ msgstr ""
 "Рэжым \"Спіральная ваза\" можа ўжывацца толькі пры друку адзінкавым "
 "матэрыялам."
 
-#: src/libslic3r/Print.cpp:496
+#: src/libslic3r/Print.cpp:498
 msgid ""
 "Machine limits cannot be emitted to G-Code when Klipper firmware flavor is "
 "used. Change the value of machine_limits_usage."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:523
+#: src/libslic3r/Print.cpp:525
 #, boost-format
 msgid "The object %1% exceeds the maximum build volume height."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:524
+#: src/libslic3r/Print.cpp:526
 #, boost-format
 msgid ""
 "While the object %1% itself fits the build volume, its last layer exceeds "
 "the maximum build volume height."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:525
+#: src/libslic3r/Print.cpp:527
 msgid ""
 "You might want to reduce the size of your model or change current print "
 "settings and retry."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:541
+#: src/libslic3r/Print.cpp:543
 msgid "Variable layer height is not supported with Organic supports."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:554
+#: src/libslic3r/Print.cpp:556
 msgid ""
 "The wipe tower is only supported if all extruders have the same nozzle "
 "diameter and use filaments of the same diameter."
@@ -12333,13 +12432,13 @@ msgstr ""
 "Вежа выцірання ўжываецца толькі калі ўсе экструдары маюць аднолькавы дыяметр "
 "фарсункі і ўжываецца філамент аднолькавага дыяметра."
 
-#: src/libslic3r/Print.cpp:561
+#: src/libslic3r/Print.cpp:563
 msgid ""
 "The Wipe Tower is currently only supported for the Marlin, Klipper, RepRap/"
 "Sprinter, RepRapFirmware and Repetier G-code flavors."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:563
+#: src/libslic3r/Print.cpp:565
 msgid ""
 "The Wipe Tower is currently only supported with the relative extruder "
 "addressing (use_relative_e_distances=1)."
@@ -12347,20 +12446,20 @@ msgstr ""
 "У бягучы час для Вежы выцірання падтрымліваецца толькі адносная адрасацыя "
 "экструдара (use_relative_e_distances=1)."
 
-#: src/libslic3r/Print.cpp:565
+#: src/libslic3r/Print.cpp:567
 msgid ""
 "Ooze prevention is only supported with the wipe tower when "
 "'single_extruder_multi_material' is off."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:567
+#: src/libslic3r/Print.cpp:569
 msgid ""
 "The Wipe Tower currently does not support volumetric E (use_volumetric_e=0)."
 msgstr ""
 "У бягучы час Вежа выцірання не падтрымлівае аб'ёмныя значэнні эсктрурада E "
 "(use_volumetric_e=0)"
 
-#: src/libslic3r/Print.cpp:569
+#: src/libslic3r/Print.cpp:571
 msgid ""
 "The Wipe Tower is currently not supported for multimaterial sequential "
 "prints."
@@ -12368,7 +12467,7 @@ msgstr ""
 "У бягучы час Вежа выцірання не падтрымлівае паслядоўны друк для "
 "шматматэрыяльных друкарак."
 
-#: src/libslic3r/Print.cpp:579
+#: src/libslic3r/Print.cpp:581
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they have equal "
 "layer heights"
@@ -12376,7 +12475,7 @@ msgstr ""
 "Вежа выцірання прымяняецца для некалькіх мадэляў толькі ў тым выпадку, калі "
 "яны маюць аднолькавую вышыню пласта"
 
-#: src/libslic3r/Print.cpp:581
+#: src/libslic3r/Print.cpp:583
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are printed "
 "over an equal number of raft layers"
@@ -12384,7 +12483,7 @@ msgstr ""
 "Вежа выцірання прымяняецца для некалькіх мадэляў толькі ў тым выпадку, калі "
 "яны маюць аднолькавую колькасць пластоў падтрымкі"
 
-#: src/libslic3r/Print.cpp:584
+#: src/libslic3r/Print.cpp:586
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are printed "
 "with the same support_material_contact_distance"
@@ -12393,7 +12492,7 @@ msgstr ""
 "яны друкуюцца з аднолькавымі support_material_contact_distance (адлегласць "
 "ад падтрымкі да мадэлі па вертыкалі)"
 
-#: src/libslic3r/Print.cpp:586
+#: src/libslic3r/Print.cpp:588
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are sliced "
 "equally."
@@ -12401,7 +12500,7 @@ msgstr ""
 "Вежа выцірання падтрымліваецца толькі для некалькіх мадэляў, калі яны "
 "нарэзаныя аднолькава."
 
-#: src/libslic3r/Print.cpp:611
+#: src/libslic3r/Print.cpp:613
 msgid ""
 "The Wipe tower is only supported if all objects have the same variable layer "
 "height"
@@ -12409,25 +12508,25 @@ msgstr ""
 "Вежа выцірання арымяняецца толькі ў тым выпадку, калі ўсе мадэлі маюць "
 "аднолькавую пераменную вышыню пласта"
 
-#: src/libslic3r/Print.cpp:635
+#: src/libslic3r/Print.cpp:637
 msgid ""
 "One or more object were assigned an extruder that the printer does not have."
 msgstr ""
 "Для аднаго ці некалькіх мадэляў быў прызначаны экструдар, які ў друкарцы "
 "адсутнічае."
 
-#: src/libslic3r/Print.cpp:648
+#: src/libslic3r/Print.cpp:650
 #, boost-format
 msgid "%1%=%2% mm is too low to be printable at a layer height %3% mm"
 msgstr ""
 "Значэнне налады %1%=%2% мм занадта малы для друку пры вышыні пласта %3% мм"
 
-#: src/libslic3r/Print.cpp:651
+#: src/libslic3r/Print.cpp:653
 #, boost-format
 msgid "Excessive %1%=%2% mm to be printable with a nozzle diameter %3% mm"
 msgstr "Перавышэнне %1%=%2% мм для друку з дыяметрам фарсункі %3% мм"
 
-#: src/libslic3r/Print.cpp:662
+#: src/libslic3r/Print.cpp:664
 msgid ""
 "Printing with multiple extruders of differing nozzle diameters. If support "
 "is to be printed with the current extruder (support_material_extruder == 0 "
@@ -12439,7 +12538,7 @@ msgstr ""
 "0 ці support_material_interface_extruder == 0), усе фарсункі павінны мець "
 "аднолькавы дыяметр."
 
-#: src/libslic3r/Print.cpp:670
+#: src/libslic3r/Print.cpp:672
 msgid ""
 "For the Wipe Tower to work with the soluble supports, the support layers "
 "need to be synchronized with the object layers."
@@ -12447,15 +12546,15 @@ msgstr ""
 "Для таго, каб Вежа выцірання працавала з растваральнай падтрымкай, пласты "
 "падтрымкі павінны быць сінхранізаваныя з пластамі мадэлі."
 
-#: src/libslic3r/Print.cpp:710
+#: src/libslic3r/Print.cpp:712
 msgid "First layer height can't be greater than nozzle diameter"
 msgstr "Вышыня першага пласта не можа быць больш чым дыяметр фарсункі"
 
-#: src/libslic3r/Print.cpp:715
+#: src/libslic3r/Print.cpp:717
 msgid "Layer height can't be greater than nozzle diameter"
 msgstr "Вышыня пласта не можа быць больш чым дыяметр фарсункі"
 
-#: src/libslic3r/Print.cpp:736
+#: src/libslic3r/Print.cpp:738
 msgid ""
 "Relative extruder addressing requires resetting the extruder position at "
 "each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to "
@@ -12465,7 +12564,7 @@ msgstr ""
 "экструдара патрабуе скіду становішча экструдара на кожным пласце. У "
 "layer_code дадайце \"G92 E0\"."
 
-#: src/libslic3r/Print.cpp:738
+#: src/libslic3r/Print.cpp:740
 msgid ""
 "\"G92 E0\" was found in before_layer_gcode, which is incompatible with "
 "absolute extruder addressing."
@@ -12473,7 +12572,7 @@ msgstr ""
 "Быў знойдзены \"G92 E0\" у before_layer_gcode, які несумяшчальны з "
 "абсалютным адрасаваннем экструдара."
 
-#: src/libslic3r/Print.cpp:740
+#: src/libslic3r/Print.cpp:742
 msgid ""
 "\"G92 E0\" was found in layer_gcode, which is incompatible with absolute "
 "extruder addressing."
@@ -12481,75 +12580,75 @@ msgstr ""
 "Быў знойдзены \"G92 E0\" у layer_gcode, які несумяшчальны з абсалютным "
 "адрасаваннем экструдара."
 
-#: src/libslic3r/Print.cpp:909
+#: src/libslic3r/Print.cpp:911
 msgid "Generating skirt and brim"
 msgstr "Стварэнне спадніцы і аблямоўкі"
 
-#: src/libslic3r/Print.cpp:957
+#: src/libslic3r/Print.cpp:959
 msgid "Exporting G-code"
 msgstr "Экспарт у G-код"
 
-#: src/libslic3r/Print.cpp:961
+#: src/libslic3r/Print.cpp:963
 msgid "Generating G-code"
 msgstr "Стварэнне G-кода"
 
-#: src/libslic3r/Print.cpp:1181
+#: src/libslic3r/Print.cpp:1183
 msgid "Alert if supports needed"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the model has long bridging extrusions which may print badly
-#: src/libslic3r/Print.cpp:1187
+#: src/libslic3r/Print.cpp:1189
 msgid "Long bridging extrusions"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes bridge anchors/turns in the air, which will definitely print badly
-#: src/libslic3r/Print.cpp:1189
+#: src/libslic3r/Print.cpp:1191
 msgid "Floating bridge anchors"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the print has large overhang area which will print badly or not print at all.
-#: src/libslic3r/Print.cpp:1193
+#: src/libslic3r/Print.cpp:1195
 msgid "Collapsing overhang"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes extrusions that are not supported enough and come out curled or loose.
-#: src/libslic3r/Print.cpp:1196
+#: src/libslic3r/Print.cpp:1198
 msgid "Loose extrusions"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the print has low bed adhesion and may became loose.
-#: src/libslic3r/Print.cpp:1200
+#: src/libslic3r/Print.cpp:1202
 msgid "Low bed adhesion"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the object has part that is not connected to the bed and will not print at all without supports.
-#: src/libslic3r/Print.cpp:1202
+#: src/libslic3r/Print.cpp:1204
 msgid "Floating object part"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the object has thin part that may brake during printing
-#: src/libslic3r/Print.cpp:1204
+#: src/libslic3r/Print.cpp:1206
 msgid "Thin fragile part"
 msgstr ""
 
 #. TRN this translation rule is used to translate lists of uknown size on single line. The first argument is element of the list,
 #. the second argument may be element or rest of the list. For most languages, this does not need translation, but some use different
 #. separator than comma and some use blank space in front of the separator.
-#: src/libslic3r/Print.cpp:1213
+#: src/libslic3r/Print.cpp:1215
 #, boost-format
 msgid "%1%, %2%"
 msgstr ""
 
-#: src/libslic3r/Print.cpp:1312
+#: src/libslic3r/Print.cpp:1314
 msgid "Consider enabling supports."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:1314
+#: src/libslic3r/Print.cpp:1316
 msgid "Also consider enabling brim."
 msgstr ""
 
 #. TRN Alert message for detected print issues. first argument is a list of detected issues.
-#: src/libslic3r/Print.cpp:1318
+#: src/libslic3r/Print.cpp:1320
 #, boost-format
 msgid ""
 "Detected print stability issues:\n"
@@ -13869,10 +13968,6 @@ msgstr ""
 "філамента з шпулькай,каб высветліць, ці дастаткова колькасці філамента на "
 "шпульцы для завяршэння друку."
 
-#: src/libslic3r/PrintConfig.cpp:1171
-msgid "g"
-msgstr "г"
-
 #: src/libslic3r/PrintConfig.cpp:1180 src/libslic3r/PrintConfig.cpp:3890
 msgid "(Unknown)"
 msgstr "(Невядома)"
@@ -14117,10 +14212,6 @@ msgstr ""
 "Дазваляе запаўняць прагалы паміж перыметрамі, і ўнутранымі перыметрамі і "
 "запаўненем."
 
-#: src/libslic3r/PrintConfig.cpp:1380
-msgid "Gap fill"
-msgstr "Запаўненне прагалаў"
-
 #: src/libslic3r/PrintConfig.cpp:1382
 msgid ""
 "Speed for filling small gaps using short zigzag moves. Keep this reasonably "
@@ -14213,21 +14304,11 @@ msgstr ""
 "Паскарэнне, якое друкарка будзе ўжываць для запаўнення. Ужыць 0, каб "
 "адключыць кіраванне паскарэнняў для запаўнення."
 
-#: src/libslic3r/PrintConfig.cpp:1452 src/libslic3r/PrintConfig.cpp:2432
-#: src/libslic3r/PrintConfig.cpp:2444
-msgid "Solid infill"
-msgstr "Суцэльнае запаўненне"
-
 #: src/libslic3r/PrintConfig.cpp:1453
 msgid ""
 "This is the acceleration your printer will use for solid infill. Set zero to "
 "use the value for infill."
 msgstr ""
-
-#: src/libslic3r/PrintConfig.cpp:1461 src/libslic3r/PrintConfig.cpp:3033
-#: src/libslic3r/PrintConfig.cpp:3046
-msgid "Top solid infill"
-msgstr "Верхні суцэльны пласт"
 
 #: src/libslic3r/PrintConfig.cpp:1462
 msgid ""
@@ -15865,10 +15946,6 @@ msgid "Spacing between interface lines. Set zero to get a solid interface."
 msgstr ""
 "Адлегласць паміж лініямі злучнай падтрымкі. Ужыць 0каб атрымаць суцэльны "
 "пласт."
-
-#: src/libslic3r/PrintConfig.cpp:2781
-msgid "Support material interface"
-msgstr "Злучны пласт падтрымкі"
 
 #: src/libslic3r/PrintConfig.cpp:2783
 msgid ""

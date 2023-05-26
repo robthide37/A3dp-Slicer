@@ -3311,11 +3311,9 @@ void GCodeViewer::render_legend(float& legend_height)
                 ::sprintf(buf, "%.1f%%", 100.0f * percent);
                 ImGui::TextUnformatted((percent > 0.0f) ? buf : "");
                 ImGui::SameLine(offsets[2]);
-                ::sprintf(buf, "%.2f %s", used_filament_m, (imperial_units ? inches : metres).c_str());
-                imgui.text(buf);
+                imgui.text(format("%1$.2f %2%", used_filament_m, (imperial_units ? inches : metres)));
                 ImGui::SameLine(offsets[3]);
-                ::sprintf(buf, "%.2f %s", used_filament_g, grams.c_str());
-                imgui.text(buf);
+                imgui.text(format("%1$.2f %2%", used_filament_g, grams));
             }
         }
         else {
@@ -3335,13 +3333,10 @@ void GCodeViewer::render_legend(float& legend_height)
                 ImGui::TextUnformatted((percent > 0.0f) ? buf : "");
             }
             else if (used_filament_m > 0.0) {
-                char buf[64];
                 ImGui::SameLine(offsets[0]);
-                ::sprintf(buf, "%.2f %s", used_filament_m, (imperial_units ? inches : metres).c_str());
-                imgui.text(buf);
+                imgui.text(format("%1$.2f %2%", used_filament_m, (imperial_units ? inches : metres)));
                 ImGui::SameLine(offsets[1]);
-                ::sprintf(buf, "%.2f %s", used_filament_g, grams.c_str());
-                imgui.text(buf);
+                imgui.text(format("%1$.2f %2%", used_filament_g, grams));
             }
         }
 
