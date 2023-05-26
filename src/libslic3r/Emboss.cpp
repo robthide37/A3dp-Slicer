@@ -1929,22 +1929,22 @@ PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &b
 }
 
 namespace {
-int32_t get_align_y_offset(FontProp::VerticalAlign align, int count_lines, int line_height)
+template<typename T> T get_align_y_offset(FontProp::VerticalAlign align, unsigned count_lines, T line_height)
 {
+    if (count_lines == 0)
+        return 0;
+
     // direction of Y in 2d is from top to bottom
     // zero is on base line of first line
     switch (align) {
-    case FontProp::VerticalAlign::center:        
-        return ((count_lines-1) / 2) * line_height 
-                 + ((count_lines % 2 == 0) ? (line_height / 2) : 0);
-    case FontProp::VerticalAlign::bottom:        
-        return (count_lines-1) * line_height;
+    case FontProp::VerticalAlign::center: return ((count_lines - 1) / 2) * line_height + ((count_lines % 2 == 0) ? (line_height / 2) : 0);
+    case FontProp::VerticalAlign::bottom: return (count_lines - 1) * line_height;
     case FontProp::VerticalAlign::top: // no change
-    default: 
-        break;
+    default: break;
     }
     return 0;
 }
+
 int32_t get_align_x_offset(FontProp::HorizontalAlign align, const BoundingBox &shape_bb, const BoundingBox &line_bb)
 {
     switch (align) {
@@ -1989,6 +1989,10 @@ void align_shape(FontProp::Align type, std::vector<ExPolygons> &shapes, const st
     }
 }
 } // namespace
+
+double Emboss::get_align_y_offset(FontProp::VerticalAlign align, unsigned count_lines, double line_height){
+    return ::get_align_y_offset<double>(align, count_lines, line_height);
+}
 
 #ifdef REMOVE_SPIKES
 #include <Geometry.hpp>

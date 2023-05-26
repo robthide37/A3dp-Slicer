@@ -237,6 +237,16 @@ namespace Emboss
     int get_line_height(const FontFile &font, const FontProp &prop);
 
     /// <summary>
+    /// Calculate Vertical align
+    /// </summary>
+    /// <typeparam name="T">double for mm</typeparam>
+    /// <param name="align">type</param>
+    /// <param name="count_lines"></param>
+    /// <param name="line_height"></param>
+    /// <returns>In same unit as line height</returns>
+    double get_align_y_offset(FontProp::VerticalAlign align, unsigned count_lines, double line_height);
+
+    /// <summary>
     /// Project spatial point
     /// </summary>
     class IProject3d

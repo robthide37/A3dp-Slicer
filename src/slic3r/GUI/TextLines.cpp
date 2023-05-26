@@ -251,12 +251,17 @@ GLModel::Geometry create_geometry(const TextLines &lines)
 }
 } // namespace
 
-void TextLinesModel::init(const Transform3d &text_tr, const ModelVolumePtrs &volumes_to_slice, FontProp::Align align, double line_height, unsigned count_lines)
+void TextLinesModel::init(const Transform3d      &text_tr,
+                          const ModelVolumePtrs  &volumes_to_slice,
+                          FontProp::VerticalAlign align,
+                          double                  line_height,
+                          double                  offset,
+                          unsigned                count_lines)
 {
     m_model.reset();
     m_lines.clear();  
 
-    double first_line_center = offset + (count_lines / 2) * line_height - ((count_lines % 2 == 0) ? line_height / 2. : 0.);
+    double first_line_center = offset + this->offset + get_align_y_offset(align, count_lines, line_height);    
     std::vector<float> line_centers(count_lines);
     for (size_t i = 0; i < count_lines; ++i)
         line_centers[i] = static_cast<float>(first_line_center - i * line_height);

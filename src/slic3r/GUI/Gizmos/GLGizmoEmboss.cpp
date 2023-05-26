@@ -264,26 +264,7 @@ namespace {
 // for existing volume which is selected(could init different(to volume text) lines count when edit text)
 void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines=0);
 // before text volume is created
-void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_tr, const ModelObject& mo, /* const*/ StyleManager &style_manager)
-{
-    // prepare volumes to slice
-    ModelVolumePtrs volumes;
-    volumes.reserve(mo.volumes.size());
-    for (ModelVolume *volume : mo.volumes) {
-        // only part could be surface for volumes
-        if (!volume->is_model_part())
-            continue;
-        volumes.push_back(volume);
-    }
-
-    double line_height = style_manager.get_line_height();
-    if (line_height < 0)
-        return;
-
-    FontProp::Align align = style_manager.get_font_prop().align;
-    unsigned count_lines = 1;
-    text_lines.init(new_text_tr, volumes, align, line_height, count_lines);
-}
+void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_tr, const ModelObject& mo, /* const*/ StyleManager &style_manager);
 }
 
 void GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mouse_pos)
@@ -1098,12 +1079,42 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
 }
 
 namespace {
-void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines)
+
+bool get_line_height_offset(/* const*/ StyleManager &style_manager, double &line_height_mm, double &line_offset_mm)
 {
-    double line_height = style_manager.get_line_height();
-    if (line_height < 0)
-        return;
-    
+    assert(style_manager.is_active_font());
+    if (!style_manager.is_active_font())
+        return false;
+    const auto &ffc = style_manager.get_font_file_with_cache();
+    assert(ffc.has_value());
+    if (!ffc.has_value())
+        return false;
+    const auto &ff_ptr = ffc.font_file;
+    assert(ff_ptr != nullptr);
+    if (ff_ptr == nullptr)
+        return false;
+    const FontProp &fp = style_manager.get_font_prop();
+    const FontFile &ff = *ff_ptr;
+
+    double half_ascent_shape_size = ff.infos[fp.collection_number.value_or(0)].ascent / 2.;
+    int    line_height_shape_size = get_line_height(ff, fp); // In shape size
+
+    double scale = get_shape_scale(fp, ff);
+    line_offset_mm = half_ascent_shape_size * scale / SHAPE_SCALE;
+    line_height_mm = line_height_shape_size * scale;
+
+    if (line_height_mm < 0)
+        return false;
+
+    // fix for bad filled ascent in font file
+    if (line_offset_mm <= 0)
+        line_offset_mm = line_height_mm / 3;
+
+    return true;
+}
+
+void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines)
+{    
     const GLVolume *gl_volume_ptr = selection.get_first_volume();
     if (gl_volume_ptr == nullptr)
         return;
@@ -1149,10 +1160,35 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
     }
 
     // For interactivity during drag over surface it must be from gl_volume not volume.
-    const Transform3d &mv_trafo = gl_volume.get_volume_transformation().get_matrix();
-    const FontProp &fp = style_manager.get_font_prop();
-    text_lines.init(mv_trafo, volumes, fp.align, line_height, count_lines);
+    const Transform3d &mv_trafo = gl_volume.get_volume_transformation().get_matrix();    
+    FontProp::VerticalAlign align = style_manager.get_font_prop().align.second;
+    double line_height_mm, line_offset_mm;
+    if (!get_line_height_offset(style_manager, line_height_mm, line_offset_mm))
+        return;
+
+    text_lines.init(mv_trafo, volumes, align, line_height_mm, line_offset_mm, count_lines);
 }
+
+void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_tr, const ModelObject& mo, /* const*/ StyleManager &style_manager)
+{
+    // prepare volumes to slice
+    ModelVolumePtrs volumes;
+    volumes.reserve(mo.volumes.size());
+    for (ModelVolume *volume : mo.volumes) {
+        // only part could be surface for volumes
+        if (!volume->is_model_part())
+            continue;
+        volumes.push_back(volume);
+    }
+
+    FontProp::VerticalAlign align = style_manager.get_font_prop().align.second;
+    double line_height_mm, line_offset_mm;
+    if (!get_line_height_offset(style_manager, line_height_mm, line_offset_mm))
+        return;
+    unsigned count_lines = 1;
+    text_lines.init(new_text_tr, volumes, align, line_height_mm, line_offset_mm, count_lines);
+}
+
 }
 
 void GLGizmoEmboss::reinit_text_lines(unsigned count_lines) {    
@@ -1617,6 +1653,8 @@ void GLGizmoEmboss::draw_text_input()
             append_warning(_u8L("Too tall, diminished font height inside text input."));
         if (imgui_size < StyleManager::min_imgui_font_size)
             append_warning(_u8L("Too small, enlarged font height inside text input."));
+        if (prop.align.first == FontProp::HorizontalAlign::center || prop.align.first == FontProp::HorizontalAlign::right)
+            append_warning(_u8L("Text doesn't show current horizontal alignment."));
     }
     
     // flag for extend font ranges if neccessary

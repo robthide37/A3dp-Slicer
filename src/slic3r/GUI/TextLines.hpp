@@ -26,8 +26,9 @@ public:
     /// <param name="volumes_to_slice">Vector of volumes to be sliced</param>
     /// <param name="align">Vertical (Y) align of the text</param>
     /// <param name="line_height">Distance between lines [in mm]</param>
+    /// <param name="line_height">Offset from baseline [in mm]</param>
     /// <param name="count_lines">Count lines(slices over volumes)</param>
-    void init(const Transform3d &text_tr, const ModelVolumePtrs& volumes_to_slice, FontProp::Align align, double line_height, unsigned count_lines);
+    void init(const Transform3d &text_tr, const ModelVolumePtrs& volumes_to_slice, FontProp::VerticalAlign align, double line_height, double offset, unsigned count_lines);
 
     void render(const Transform3d &text_world);
 
