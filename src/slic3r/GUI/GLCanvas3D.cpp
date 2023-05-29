@@ -2554,6 +2554,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
             const Print *print = m_process->fff_print();
             const float depth = print->wipe_tower_data(extruders_count).depth;
+            const std::vector<std::pair<float, float>> z_and_depth_pairs = print->wipe_tower_data(extruders_count).z_and_depth_pairs;
             const float height_real = print->wipe_tower_data(extruders_count).height; // -1.f = unknown
 
             // Height of a print (Show at least a slab).
@@ -2562,11 +2563,11 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             if (depth != 0.) {
     #if ENABLE_OPENGL_ES
                 int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
-                    x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
+                    x, y, w, depth, z_and_depth_pairs, (float)height, ca, a, !print->is_step_done(psWipeTower),
                     bw, &m_wipe_tower_mesh);
     #else
                 int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
-                    x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
+                    x, y, w, depth, z_and_depth_pairs, (float)height, ca, a, !print->is_step_done(psWipeTower),
                     bw);
     #endif // ENABLE_OPENGL_ES
                 if (volume_idx_wipe_tower_old != -1)

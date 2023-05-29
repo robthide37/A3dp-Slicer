@@ -426,17 +426,19 @@ struct FakeWipeTower
     float height;
     float layer_height;
     float depth;
+    std::vector<std::pair<float, float>> z_and_depth_pairs;
     float brim_width;
     float rotation_angle;
     Vec2d plate_origin;
 
-    void set_fake_extrusion_data(const Vec2f& p, float w, float h, float lh, float d, float bd, float ra, const Vec2d& o)
+    void set_fake_extrusion_data(const Vec2f& p, float w, float h, float lh, float d, const std::vector<std::pair<float, float>>& zad, float bd, float ra, const Vec2d& o)
     {
         pos = p;
         width = w;
         height = h;
         layer_height = lh;
         depth = d;
+        z_and_depth_pairs = zad;
         brim_width = bd;
         rotation_angle = ra;
         plate_origin = o;
@@ -444,45 +446,7 @@ struct FakeWipeTower
 
     void set_pos_and_rotation(const Vec2f& p, float rotation) { pos = p; rotation_angle = rotation; }
 
-    std::vector<ExtrusionPaths> getFakeExtrusionPathsFromWipeTower() const
-    {
-        float h = height;
-        float lh = layer_height;
-        int   d = scale_(depth);
-        int   w = scale_(width);
-        int   bd = scale_(brim_width);
-        Point minCorner = { -bd, -bd };
-        Point maxCorner = { minCorner.x() + w + bd, minCorner.y() + d + bd };
-
-        std::vector<ExtrusionPaths> paths;
-        for (float hh = 0.f; hh < h; hh += lh) {
-            ExtrusionPath path(ExtrusionRole::WipeTower, 0.0, 0.0, lh);
-            path.polyline = { minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner };
-            paths.push_back({ path });
-
-            // We added the border, now add several parallel lines so we can detect an object that is fully inside the tower.
-            // For now, simply use fixed spacing of 3mm.
-            for (coord_t y=minCorner.y()+scale_(3.); y<maxCorner.y(); y+=scale_(3.)) {
-                path.polyline = { {minCorner.x(), y}, {maxCorner.x(), y} };
-                paths.push_back({ path });
-            }
-
-            if (hh == 0.f) {
-                minCorner = minCorner + Point(bd, bd);
-                maxCorner = maxCorner - Point(bd, bd);
-            }
-        }
-
-        // Rotate and translate the tower into the final position.
-        for (ExtrusionPaths& ps : paths) {
-            for (ExtrusionPath& p : ps) {
-                p.polyline.rotate(Geometry::deg2rad(rotation_angle));
-                p.polyline.translate(scale_(pos.x()), scale_(pos.y()));
-            }
-        }
-
-        return paths;
-    }
+    std::vector<ExtrusionPaths> getFakeExtrusionPathsFromWipeTower() const;
 };
 
 struct WipeTowerData
@@ -500,6 +464,7 @@ struct WipeTowerData
 
     // Depth of the wipe tower to pass to GLCanvas3D for exact bounding box:
     float                                                 depth;
+    std::vector<std::pair<float, float>>                  z_and_depth_pairs;
     float                                                 brim_width;
     float                                                 height;
 

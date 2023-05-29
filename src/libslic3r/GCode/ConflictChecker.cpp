@@ -210,11 +210,11 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectP
 
     LinesBucketQueue conflictQueue;
     if (wtdptr.has_value()) { // wipe tower at 0 by default
-        auto wtpaths = (*wtdptr)->getFakeExtrusionPathsFromWipeTower();
+        std::vector<ExtrusionPaths> wtpaths = (*wtdptr)->getFakeExtrusionPathsFromWipeTower();
         conflictQueue.emplace_back_bucket(std::move(wtpaths), *wtdptr, Points{Point((*wtdptr)->plate_origin)});
     }
     for (PrintObject *obj : objs) {
-        auto layers = getAllLayersExtrusionPathsFromObject(obj);
+        std::pair<std::vector<ExtrusionPaths>, std::vector<ExtrusionPaths>> layers = getAllLayersExtrusionPathsFromObject(obj);
 
         Points instances_shifts;
         for (const PrintInstance& inst : obj->instances())
