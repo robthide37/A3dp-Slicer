@@ -2306,38 +2306,18 @@ void ObjectList::merge(bool to_multipart_object)
         for (int obj_idx : obj_idxs) {
             ModelObject* object = (*m_objects)[obj_idx];
 
-            const Geometry::Transformation& transformation = object->instances[0]->get_transformation();
-            const Vec3d scale     = transformation.get_scaling_factor();
-            const Vec3d mirror    = transformation.get_mirror();
-            const Vec3d rotation  = transformation.get_rotation();
-
             if (object->id() == (*m_objects)[obj_idxs.front()]->id()) {
                 new_object->add_instance();
                 new_object->instances[0]->printable = false;
             }
             new_object->instances[0]->printable |= object->instances[0]->printable;
 
-            const Transform3d& volume_offset_correction = transformation.get_matrix();
+            const Transform3d new_inst_trafo = new_object->instances[0]->get_matrix().inverse() * object->instances[0]->get_matrix();
 
             // merge volumes
             for (const ModelVolume* volume : object->volumes) {
                 ModelVolume* new_volume = new_object->add_volume(*volume);
-
-                //set rotation
-                const Vec3d vol_rot = new_volume->get_rotation() + rotation;
-                new_volume->set_rotation(vol_rot);
-
-                // set scale
-                const Vec3d vol_sc_fact = new_volume->get_scaling_factor().cwiseProduct(scale);
-                new_volume->set_scaling_factor(vol_sc_fact);
-
-                // set mirror
-                const Vec3d vol_mirror = new_volume->get_mirror().cwiseProduct(mirror);
-                new_volume->set_mirror(vol_mirror);
-
-                // set offset
-                const Vec3d vol_offset = volume_offset_correction* new_volume->get_offset();
-                new_volume->set_offset(vol_offset);
+                new_volume->set_transformation(new_inst_trafo * new_volume->get_matrix());
             }
             new_object->sort_volumes(wxGetApp().app_config->get_bool("order_volumes"));
 
