@@ -644,8 +644,14 @@ void GLGizmoEmboss::on_render() {
     const GLVolume *gl_volume_ptr = m_parent.get_selection().get_first_volume();
     if (gl_volume_ptr == nullptr) return;
 
-    if (m_text_lines.is_init())
-        m_text_lines.render(gl_volume_ptr->world_matrix());
+    if (m_text_lines.is_init()) {
+        const Transform3d& tr = gl_volume_ptr->world_matrix();
+        const auto &fix = m_volume->text_configuration->fix_3mf_tr;
+        if (fix.has_value()) 
+            m_text_lines.render(tr * fix->inverse());
+        else 
+            m_text_lines.render(tr);
+    }
 
     bool is_surface_dragging = m_surface_drag.has_value();
     bool is_parent_dragging = m_parent.is_mouse_dragging();
@@ -1160,7 +1166,9 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
     }
 
     // For interactivity during drag over surface it must be from gl_volume not volume.
-    const Transform3d &mv_trafo = gl_volume.get_volume_transformation().get_matrix();    
+    Transform3d mv_trafo = gl_volume.get_volume_transformation().get_matrix();
+    if (tc.fix_3mf_tr.has_value())
+        mv_trafo = mv_trafo * (tc.fix_3mf_tr->inverse());
     FontProp::VerticalAlign align = style_manager.get_font_prop().align.second;
     double line_height_mm, line_offset_mm;
     if (!get_line_height_offset(style_manager, line_height_mm, line_offset_mm))
