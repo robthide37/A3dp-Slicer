@@ -1488,8 +1488,7 @@ void GLGizmoCut3D::PartSelection::render(const Vec3d* normal, GLModel& sphere_mo
             if (!m_parts[id].is_modifier && normal && ((is_looking_forward && m_parts[id].selected) ||
                                                       (!is_looking_forward && !m_parts[id].selected)   ) )
                 continue;
-            const Vec3d volume_offset = model_object()->volumes[id]->get_offset();
-            shader->set_uniform("view_model_matrix", view_inst_matrix * translation_transform(volume_offset));
+            shader->set_uniform("view_model_matrix", view_inst_matrix * model_object()->volumes[id]->get_matrix());
             if (m_parts[id].is_modifier) {
                 glsafe(::glEnable(GL_BLEND));
                 glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
