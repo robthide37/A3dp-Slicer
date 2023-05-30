@@ -1528,7 +1528,7 @@ void Print::_make_wipe_tower()
     m_wipe_tower_data.number_of_toolchanges = wipe_tower.get_number_of_toolchanges();
     const Vec3d origin = Vec3d::Zero();
     m_fake_wipe_tower.set_fake_extrusion_data(wipe_tower.position(), wipe_tower.width(), wipe_tower.get_wipe_tower_height(), config().first_layer_height, m_wipe_tower_data.depth,
-                                              m_wipe_tower_data.z_and_depth_pairs, m_wipe_tower_data.brim_width, config().wipe_tower_rotation_angle, {scale_(origin.x()), scale_(origin.y())});
+                                              m_wipe_tower_data.z_and_depth_pairs, m_wipe_tower_data.brim_width, config().wipe_tower_rotation_angle, config().wipe_tower_cone_angle, {scale_(origin.x()), scale_(origin.y())});
 
 }
 
@@ -1607,6 +1607,8 @@ std::string PrintStatistics::finalize_output_path(const std::string &path_in) co
         Point minCorner = { -bd, -bd };
         Point maxCorner = { minCorner.x() + w + bd, minCorner.y() + d + bd };
 
+        const auto [cone_base_R, cone_scale_x] = WipeTower::get_wipe_tower_cone_base(width, height, depth, cone_angle);
+
         std::vector<ExtrusionPaths> paths;
         for (float hh = 0.f; hh < h; hh += lh) {
             
@@ -1630,9 +1632,30 @@ std::string PrintStatistics::finalize_output_path(const std::string &path_in) co
             // For now, simply use fixed spacing of 3mm.
             for (coord_t y=minCorner.y()+scale_(3.); y<maxCorner.y(); y+=scale_(3.)) {
                 path.polyline = { {minCorner.x(), y}, {maxCorner.x(), y} };
-                paths.back().push_back(path);
+                paths.back().emplace_back(path);
             }
 
+            // And of course the stabilization cone and its base...
+            if (cone_base_R > 0.) {
+                path.polyline.clear();
+                double r = cone_base_R * (1 - hh/height);
+                for (double alpha=0; alpha<2.01*M_PI; alpha+=2*M_PI/20.)
+                    path.polyline.points.emplace_back(Point::new_scale(width/2. + r * std::cos(alpha)/cone_scale_x, depth/2. + r * std::sin(alpha)));
+                paths.back().emplace_back(path);
+                if (hh == 0.f) { // Cone brim.
+                    for (float bw=brim_width; bw>0.f; bw-=3.f) {
+                        path.polyline.clear();
+                        for (double alpha=0; alpha<2.01*M_PI; alpha+=2*M_PI/20.) // see load_wipe_tower_preview, where the same is a bit clearer
+                            path.polyline.points.emplace_back(Point::new_scale(
+                                width/2. + cone_base_R * std::cos(alpha)/cone_scale_x * (1. + cone_scale_x*bw/cone_base_R),
+                                depth/2. + cone_base_R * std::sin(alpha) * (1. + bw/cone_base_R))
+                            );
+                        paths.back().emplace_back(path);
+                    }
+                }
+            }
+
+            // Only the first layer has brim.
             if (hh == 0.f) {
                 minCorner = minCorner + Point(bd, bd);
                 maxCorner = maxCorner - Point(bd, bd);

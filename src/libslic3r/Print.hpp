@@ -429,9 +429,10 @@ struct FakeWipeTower
     std::vector<std::pair<float, float>> z_and_depth_pairs;
     float brim_width;
     float rotation_angle;
+    float cone_angle;
     Vec2d plate_origin;
 
-    void set_fake_extrusion_data(const Vec2f& p, float w, float h, float lh, float d, const std::vector<std::pair<float, float>>& zad, float bd, float ra, const Vec2d& o)
+    void set_fake_extrusion_data(const Vec2f& p, float w, float h, float lh, float d, const std::vector<std::pair<float, float>>& zad, float bd, float ra, float ca, const Vec2d& o)
     {
         pos = p;
         width = w;
@@ -441,6 +442,7 @@ struct FakeWipeTower
         z_and_depth_pairs = zad;
         brim_width = bd;
         rotation_angle = ra;
+        cone_angle = ca;
         plate_origin = o;
     }
 
