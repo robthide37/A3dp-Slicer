@@ -2611,7 +2611,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
                 // Perform cut just to get connectors
                 const ModelObjectPtrs cut_connectors_obj = cut_mo->cut(instance_idx, get_cut_matrix(selection), attributes);
-                assert(create_dowels_as_separate_object ? cut_connectors_obj.size() >= 3 : cut_connectors_obj.size() == 2);
+                assert(dowels_count > 0 ? cut_connectors_obj.size() >= 3 : cut_connectors_obj.size() == 2);
 
                 // Connectors from upper object
                 for (const ModelVolume* volume : cut_connectors_obj[0]->volumes)
