@@ -213,6 +213,8 @@ protected:
 	ScalableBitmap 		   *m_bmp_non_system;
 	// Bitmaps to be shown on the "Undo user changes" button next to each input field.
 	ScalableBitmap 			m_bmp_value_revert;
+	// Bitmaps to be shown on the "Undo user changes" button next to each input field.
+	ScalableBitmap 			m_bmp_edit_value;
     
     std::vector<ScalableButton*>	m_scaled_buttons = {};    
     std::vector<ScalableBitmap*>	m_scaled_bitmaps = {};    
@@ -386,6 +388,7 @@ public:
 	const std::map<wxString, std::string>& get_category_icon_map() { return m_category_icon; }
 
 	static bool validate_custom_gcode(const wxString& title, const std::string& gcode);
+    void        edit_custom_gcode(const t_config_option_key &opt_key);
 	bool        validate_custom_gcodes();
     bool        validate_custom_gcodes_was_shown{ false };
 

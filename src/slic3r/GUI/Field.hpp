@@ -95,6 +95,30 @@ class UndoValueUIManager
 
 	UndoValueUI m_undo_ui;
 
+	struct EditValueUI {
+		// Bitmap and Tooltip text for m_Edit_btn. The wxButton will be updated only if the new wxBitmap pointer differs from the currently rendered one.
+		const ScalableBitmap*	bitmap{ nullptr };
+		wxString				tooltip { wxEmptyString };
+
+		bool 	set_bitmap(const ScalableBitmap* bmp) {
+			if (bitmap != bmp) {
+				bitmap = bmp;
+				return true;
+			}
+			return false;
+		}
+
+		bool 	set_tooltip(const wxString& tip) {
+			if (tooltip != tip) {
+				tooltip = tip;
+				return true;
+			}
+			return false;
+		}
+	};
+
+	EditValueUI m_edit_ui;
+
 public:
 	UndoValueUIManager() {}
 	~UndoValueUIManager() {}
@@ -105,6 +129,9 @@ public:
 	bool 	set_undo_tooltip(const wxString* tip)				{ return m_undo_ui.set_undo_tooltip(tip); }
 	bool 	set_undo_to_sys_tooltip(const wxString* tip)		{ return m_undo_ui.set_undo_to_sys_tooltip(tip); }	
 
+	bool 	set_edit_bitmap(const ScalableBitmap* bmp)			{ return m_edit_ui.set_bitmap(bmp); }
+	bool 	set_edit_tooltip(const wxString& tip)				{ return m_edit_ui.set_tooltip(tip); }
+
 	// ui items used for revert line value
 	bool					has_undo_ui()			const { return m_undo_ui.undo_bitmap != nullptr; }
 	const wxBitmapBundle&	undo_bitmap()			const { return m_undo_ui.undo_bitmap->bmp(); }
@@ -112,8 +139,17 @@ public:
 	const wxBitmapBundle&	undo_to_sys_bitmap()	const { return m_undo_ui.undo_to_sys_bitmap->bmp(); }
 	const wxString*			undo_to_sys_tooltip()	const { return m_undo_ui.undo_to_sys_tooltip; }
 	const wxColour*			label_color()			const { return m_undo_ui.label_color; }
+
+	// Extentions
+
+	// Search blinker
 	const bool				blink()					const { return m_undo_ui.blink; }
 	bool*					get_blink_ptr()				  { return &m_undo_ui.blink; }
+
+	// Edit field button
+	bool					has_edit_ui()			const { return !m_edit_ui.tooltip.IsEmpty(); }
+	const wxBitmapBundle*	edit_bitmap()			const { return &m_edit_ui.bitmap->bmp(); }
+	const wxString*			edit_tooltip()			const { return &m_edit_ui.tooltip; }
 };
 
 
@@ -147,6 +183,8 @@ public:
 	void			on_back_to_initial_value();
     /// Call the attached m_back_to_sys_value method. 
 	void			on_back_to_sys_value();
+    /// Call the attached m_fn_edit_value method. 
+	void			on_edit_value();
 
 public:
     /// parent wx item, opportunity to refactor (probably not necessary - data duplication)
@@ -161,6 +199,9 @@ public:
 	/// Function object to store callback passed in from owning object.
 	t_back_to_init	m_back_to_initial_value{ nullptr };
 	t_back_to_init	m_back_to_sys_value{ nullptr };
+
+	/// Callback function to edit field value 
+	t_back_to_init	m_fn_edit_value{ nullptr };
 
 	// This is used to avoid recursive invocation of the field change/update by wxWidgets.
     bool			m_disable_change_event {false};
