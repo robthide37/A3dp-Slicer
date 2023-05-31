@@ -192,6 +192,7 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/BoostThreadWorker.cpp
     GUI/Jobs/UIThreadWorker.hpp
     GUI/Jobs/BusyCursorJob.hpp
+    GUI/Jobs/CancellableJob.hpp
     GUI/Jobs/PlaterWorker.hpp
     GUI/Jobs/ArrangeJob.hpp
     GUI/Jobs/ArrangeJob.cpp
