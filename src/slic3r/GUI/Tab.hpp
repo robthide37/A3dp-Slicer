@@ -388,9 +388,10 @@ public:
 	const std::map<wxString, std::string>& get_category_icon_map() { return m_category_icon; }
 
 	static bool validate_custom_gcode(const wxString& title, const std::string& gcode);
-    void        edit_custom_gcode(const t_config_option_key &opt_key);
 	bool        validate_custom_gcodes();
     bool        validate_custom_gcodes_was_shown{ false };
+
+    virtual void edit_custom_gcode(const t_config_option_key &opt_key);
 
 protected:
 	void			create_line_with_widget(ConfigOptionsGroup* optgroup, const std::string& opt_key, const std::string& path, widget_t widget);
@@ -474,6 +475,8 @@ public:
     bool        set_active_extruder(int new_selected_extruder);
     void        update_extruder_combobox();
     int         get_active_extruder() const { return m_active_extruder; }
+
+	void		edit_custom_gcode(const t_config_option_key& opt_key) override;
 
 protected:
     bool        select_preset_by_name(const std::string& name_w_suffix, bool force) override;
