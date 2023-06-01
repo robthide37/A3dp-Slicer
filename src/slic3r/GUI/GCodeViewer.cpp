@@ -799,6 +799,9 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
             short_time(get_time_dhms(time)) == short_time(get_time_dhms(m_print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time)))
             m_time_estimate_mode = PrintEstimatedStatistics::ETimeMode::Normal;
     }
+
+    m_conflict_result = gcode_result.conflict_result;
+    if (m_conflict_result.has_value()) { m_conflict_result->layer = m_layers.get_l_at(m_conflict_result->_height); }
 }
 
 void GCodeViewer::refresh(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
@@ -2257,9 +2260,10 @@ void GCodeViewer::load_shells(const Print& print)
         if (extruders_count > 1 && config.wipe_tower && !config.complete_objects) {
             const WipeTowerData& wipe_tower_data = print.wipe_tower_data(extruders_count);
             const float depth = wipe_tower_data.depth;
+            const std::vector<std::pair<float, float>> z_and_depth_pairs = print.wipe_tower_data(extruders_count).z_and_depth_pairs;
             const float brim_width = wipe_tower_data.brim_width;
             if (depth != 0.)
-                m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, max_z, config.wipe_tower_cone_angle, config.wipe_tower_rotation_angle,
+                m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, z_and_depth_pairs, max_z, config.wipe_tower_cone_angle, config.wipe_tower_rotation_angle,
                     !print.is_step_done(psWipeTower), brim_width);
         }
     }

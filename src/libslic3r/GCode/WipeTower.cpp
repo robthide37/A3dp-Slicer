@@ -1563,4 +1563,19 @@ void WipeTower::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &
 	}
 }
 
+
+
+std::vector<std::pair<float, float>> WipeTower::get_z_and_depth_pairs() const
+{
+    std::vector<std::pair<float, float>> out = {{0.f, m_wipe_tower_depth}};
+    for (const WipeTowerInfo& wti : m_plan) {
+        assert(wti.depth < wti.depth + WT_EPSILON);
+        if (wti.depth < out.back().second - WT_EPSILON)
+            out.emplace_back(wti.z, wti.depth);
+    }
+    if (out.back().first < m_wipe_tower_height - WT_EPSILON)
+        out.emplace_back(m_wipe_tower_height, 0.f);
+    return out;
+}
+
 } // namespace Slic3r
