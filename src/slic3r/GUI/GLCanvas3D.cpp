@@ -1162,6 +1162,10 @@ static bool object_contains_negative_volumes(const Model& model, int obj_id) {
     return (0 <= obj_id && obj_id < (int)model.objects.size()) ? model.objects[obj_id]->has_negative_volume_mesh() : false;
 }
 
+static bool object_has_sla_drain_holes(const Model& model, int obj_id) {
+    return (0 <= obj_id && obj_id < (int)model.objects.size()) ? model.objects[obj_id]->has_sla_drain_holes() : false;
+}
+
 void GLCanvas3D::SLAView::detect_type_from_volumes(const GLVolumePtrs& volumes)
 {
     for (auto& [id, type] : m_instances_cache) {
@@ -1170,7 +1174,8 @@ void GLCanvas3D::SLAView::detect_type_from_volumes(const GLVolumePtrs& volumes)
 
     for (const GLVolume* v : volumes) {
         if (v->volume_idx() == -(int)slaposDrillHoles) {
-            if (object_contains_negative_volumes(*m_parent.get_model(), v->composite_id.object_id)) {
+            if (object_contains_negative_volumes(*m_parent.get_model(), v->composite_id.object_id) ||
+                object_has_sla_drain_holes(*m_parent.get_model(), v->composite_id.object_id)) {
                 const InstancesCacheItem* instance = find_instance_item(v->composite_id);
                 assert(instance != nullptr);
                 set_type(instance->first, ESLAViewType::Processed);
@@ -4684,6 +4689,13 @@ std::pair<SlicingParameters, const std::vector<double>> GLCanvas3D::get_layers_h
     std::pair<SlicingParameters, const std::vector<double>> ret = m_layers_editing.get_layers_height_data();
     m_layers_editing.select_object(*m_model, -1);
     return ret;
+}
+
+void GLCanvas3D::detect_sla_view_type()
+{
+    m_sla_view.detect_type_from_volumes(m_volumes.volumes);
+    m_sla_view.update_volumes_visibility(m_volumes.volumes);
+    m_dirty = true;
 }
 
 void GLCanvas3D::set_sla_view_type(ESLAViewType type)

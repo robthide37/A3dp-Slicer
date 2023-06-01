@@ -509,6 +509,8 @@ public:
     bool has_solid_mesh() const;
     // Detect if object has at least one negative volume mash
     bool has_negative_volume_mesh() const;
+    // Detect if object has at least one sla drain hole
+    bool has_sla_drain_holes() const { return !sla_drain_holes.empty(); }
     bool is_cut() const { return cut_id.id().valid(); }
     bool has_connectors() const;
 
