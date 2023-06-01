@@ -2014,7 +2014,7 @@ msgstr ""
 msgid "Status:"
 msgstr "Tila:"
 
-#: ../src/common/prntbase.cpp:272
+#: src/slic3r/GUI/FirmwareDialog.cpp:831
 msgid "Ready"
 msgstr "Valmis"
 
@@ -2022,11 +2022,11 @@ msgstr "Valmis"
 msgid "Advanced: Output log"
 msgstr ""
 
-#: ../src/generic/dbgrptg.cpp:97 ../src/generic/progdlgg.cpp:759
-#: ../src/richtext/richtextstyledlg.cpp:277
-#: ../src/richtext/richtextsymboldlg.cpp:476 ../src/common/stockitem.cpp:148
-#: ../src/msw/progdlg.cpp:170 ../src/msw/progdlg.cpp:679
-#: ../src/html/helpdlg.cpp:90
+#: src/slic3r/GUI/FirmwareDialog.cpp:862
+#: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:356
+#: src/slic3r/GUI/Mouse3DController.cpp:543
+#: src/slic3r/GUI/PrintHostDialogs.cpp:313
+#: src/slic3r/GUI/SendSystemInfoDialog.cpp:125
 msgid "Close"
 msgstr "Sulje"
 
@@ -2052,8 +2052,7 @@ msgstr "Muotogalleria"
 msgid "Select shape from the gallery"
 msgstr "Valitse muoto galleriasta"
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/common/stockitem.cpp:140 ../src/common/accelcmn.cpp:81
+#: src/slic3r/GUI/GalleryDialog.cpp:114 src/slic3r/GUI/Tab.cpp:4564
 msgid "Add"
 msgstr "Lisää"
 
@@ -2061,9 +2060,9 @@ msgstr "Lisää"
 msgid "Add one or more custom shapes"
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../src/richtext/richtextbuffer.cpp:8221 ../src/common/stockitem.cpp:152
-#: ../src/common/accelcmn.cpp:50 ../src/stc/stc_i18n.cpp:20
+#: src/slic3r/GUI/GalleryDialog.cpp:115 src/slic3r/GUI/GalleryDialog.cpp:528
+#: src/slic3r/GUI/GLCanvas3D.cpp:5307 src/slic3r/GUI/GUI_Factories.cpp:460
+#: src/slic3r/GUI/Tab.cpp:4160
 msgid "Delete"
 msgstr "Poista"
 
@@ -2075,9 +2074,9 @@ msgstr ""
 msgid "Add to bed"
 msgstr ""
 
-#: ../include/wx/msgdlg.h:278 ../src/richtext/richtextstyledlg.cpp:297
-#: ../src/common/stockitem.cpp:178 ../src/msw/msgdlg.cpp:454
-#: ../src/msw/msgdlg.cpp:747 ../src/gtk1/fontdlg.cpp:138
+#: src/slic3r/GUI/GalleryDialog.cpp:142
+#: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2178
+#: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2265
 msgid "OK"
 msgstr "OK"
 
@@ -2546,8 +2545,8 @@ msgid_plural "Redo %1$d Actions"
 msgstr[0] ""
 msgstr[1] ""
 
-#: ../src/generic/srchctlg.cpp:56 ../src/html/helpwnd.cpp:535
-#: ../src/html/helpwnd.cpp:550
+#: src/slic3r/GUI/GLCanvas3D.cpp:4756 src/slic3r/GUI/GLCanvas3D.cpp:5431
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:115 src/slic3r/GUI/Search.cpp:482
 msgid "Search"
 msgstr "Etsi"
 
@@ -2577,7 +2576,7 @@ msgstr ""
 msgid "Enable rotations (slow)"
 msgstr ""
 
-#: ../src/richtext/richtextsizepage.cpp:266
+#: src/slic3r/GUI/GLCanvas3D.cpp:4870
 msgid "Alignment"
 msgstr "Tasaus"
 
@@ -2765,8 +2764,7 @@ msgstr ""
 msgid "Type"
 msgstr "Tyyppi"
 
-#. TRANSLATORS: Label of font style
-#: ../src/richtext/richtextformatdlg.cpp:339 ../src/propgrid/advprops.cpp:680
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:221 src/libslic3r/PrintConfig.cpp:2836
 msgid "Style"
 msgstr "Tyyli"
 
@@ -2866,7 +2864,7 @@ msgstr ""
 msgid "Select all connectors"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:151 ../src/stc/stc_i18n.cpp:17
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:852 src/libslic3r/PrintConfig.cpp:4739
 msgid "Cut"
 msgstr "Leikkaa"
 
@@ -3007,8 +3005,7 @@ msgstr ""
 msgid "Text-Rotate"
 msgstr ""
 
-#: ../src/richtext/richtextformatdlg.cpp:344 ../src/osx/carbon/fontdlg.cpp:287
-#: ../src/common/stockitem.cpp:194
+#: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:873
 msgid "Font"
 msgstr "Kirjasin"
 
@@ -3144,7 +3141,9 @@ msgstr "Ladataan"
 msgid "Queue"
 msgstr "Jono"
 
-#: ../src/common/stockitem.cpp:141
+#: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:1881
+#: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp:676
+#: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:365
 msgid "Apply"
 msgstr "Käytä"
 
@@ -3872,7 +3871,8 @@ msgstr ""
 msgid "Length"
 msgstr ""
 
-#: ../src/motif/filedlg.cpp:220
+#: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:2005
+#: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:2007
 msgid "Selection"
 msgstr "Valinta"
 
@@ -4061,13 +4061,9 @@ msgstr ""
 msgid "Simplification is currently only allowed when a single part is selected"
 msgstr ""
 
-#: ../src/generic/filedlgg.cpp:357 ../src/generic/dirctrlg.cpp:570
-#: ../src/generic/dirctrlg.cpp:588 ../src/generic/dirctrlg.cpp:599
-#: ../src/generic/dirdlgg.cpp:323 ../src/generic/filectrlg.cpp:642
-#: ../src/generic/filectrlg.cpp:756 ../src/generic/filectrlg.cpp:770
-#: ../src/generic/filectrlg.cpp:786 ../src/generic/filectrlg.cpp:1368
-#: ../src/generic/filectrlg.cpp:1399 ../src/gtk/filedlg.cpp:74
-#: ../src/gtk1/fontdlg.cpp:74
+#: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:191
+#: src/slic3r/GUI/MainFrame.cpp:1246 src/slic3r/GUI/MainFrame.cpp:1717
+#: src/slic3r/GUI/PrintHostDialogs.cpp:425
 msgid "Error"
 msgstr "Virhe"
 
@@ -4644,7 +4640,7 @@ msgstr ""
 msgid "Check for new version of application"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:181
+#: src/slic3r/GUI/GUI_App.cpp:2406
 msgid "&Preferences"
 msgstr "&Asetukset"
 
@@ -5280,7 +5276,8 @@ msgstr ""
 msgid "Add layer range"
 msgstr ""
 
-#: ../src/generic/filectrlg.cpp:424
+#: src/slic3r/GUI/GUI_ObjectList.cpp:334
+#: src/slic3r/GUI/GUI_ObjectManipulation.cpp:142
 msgid "Name"
 msgstr "Nimi"
 
@@ -5674,7 +5671,8 @@ msgstr ""
 msgid "of a current Object"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:167
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4167
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4242 src/slic3r/GUI/Plater.cpp:199
 msgid "Info"
 msgstr "Tiedot"
 
@@ -5928,7 +5926,7 @@ msgstr ""
 msgid "Open Documentation in web browser."
 msgstr ""
 
-#: ../src/common/stockitem.cpp:154
+#: src/slic3r/GUI/ImGuiWrapper.cpp:680
 msgid "Edit"
 msgstr "Muokkaa"
 
@@ -6718,7 +6716,7 @@ msgstr ""
 msgid "&About %s"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:257
+#: src/slic3r/GUI/MainFrame.cpp:1172 src/slic3r/GUI/MainFrame.cpp:1175
 msgid "Show about dialog"
 msgstr "Näytä tietoja-valintaikkuna"
 
@@ -6753,7 +6751,8 @@ msgstr ""
 msgid "Top View"
 msgstr ""
 
-#: ../src/richtext/richtextsizepage.cpp:288 ../src/common/stockitem.cpp:144
+#. TRN Main menu: View->Bottom
+#: src/slic3r/GUI/MainFrame.cpp:1205
 msgid "Bottom"
 msgstr "Alaosa"
 
@@ -6777,16 +6776,7 @@ msgstr ""
 msgid "Rear View"
 msgstr ""
 
-#. TRANSLATORS: Keystroke for manipulating a tree control
-#. TRANSLATORS: Name of keyboard key
-#: ../src/generic/datavgen.cpp:6146
-#: ../src/richtext/richtextliststylepage.cpp:249
-#: ../src/richtext/richtextliststylepage.cpp:252
-#: ../src/richtext/richtextliststylepage.cpp:253
-#: ../src/richtext/richtextbulletspage.cpp:186
-#: ../src/richtext/richtextbulletspage.cpp:189
-#: ../src/richtext/richtextbulletspage.cpp:190
-#: ../src/richtext/richtextsizepage.cpp:249 ../src/common/accelcmn.cpp:61
+#: src/slic3r/GUI/MainFrame.cpp:1211
 msgid "Left"
 msgstr "Vasen"
 
@@ -6794,12 +6784,7 @@ msgstr "Vasen"
 msgid "Left View"
 msgstr ""
 
-#. TRANSLATORS: Keystroke for manipulating a tree control
-#. TRANSLATORS: Name of keyboard key
-#: ../src/generic/datavgen.cpp:6149
-#: ../src/richtext/richtextliststylepage.cpp:251
-#: ../src/richtext/richtextbulletspage.cpp:188
-#: ../src/richtext/richtextsizepage.cpp:250 ../src/common/accelcmn.cpp:62
+#: src/slic3r/GUI/MainFrame.cpp:1213
 msgid "Right"
 msgstr "Oikealle"
 
@@ -7047,7 +7032,7 @@ msgstr ""
 msgid "Exit %s"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:156
+#: src/slic3r/GUI/MainFrame.cpp:1394 src/slic3r/GUI/MainFrame.cpp:1632
 msgid "&Quit"
 msgstr "&Poistu"
 
@@ -7088,20 +7073,15 @@ msgstr ""
 msgid "Deletes all objects"
 msgstr ""
 
-#: ../src/richtext/richtextctrl.cpp:329 ../src/osx/textctrl_osx.cpp:573
-#: ../src/common/stockitem.cpp:203 ../src/common/cmdproc.cpp:271
-#: ../src/msw/textctrl.cpp:2504
+#: src/slic3r/GUI/MainFrame.cpp:1425
 msgid "&Undo"
 msgstr "&Kumoa"
 
-#: ../src/richtext/richtextctrl.cpp:330 ../src/osx/textctrl_osx.cpp:574
-#: ../src/common/stockitem.cpp:185 ../src/common/cmdproc.cpp:293
-#: ../src/common/cmdproc.cpp:300 ../src/msw/textctrl.cpp:2505
+#: src/slic3r/GUI/MainFrame.cpp:1428
 msgid "&Redo"
 msgstr "&Toista"
 
-#: ../src/richtext/richtextctrl.cpp:333 ../src/osx/textctrl_osx.cpp:577
-#: ../src/common/stockitem.cpp:150 ../src/msw/textctrl.cpp:2508
+#: src/slic3r/GUI/MainFrame.cpp:1433
 msgid "&Copy"
 msgstr "K&opioi"
 
@@ -7109,8 +7089,7 @@ msgstr "K&opioi"
 msgid "Copy selection to clipboard"
 msgstr ""
 
-#: ../src/richtext/richtextctrl.cpp:334 ../src/osx/textctrl_osx.cpp:578
-#: ../src/common/stockitem.cpp:180 ../src/msw/textctrl.cpp:2509
+#: src/slic3r/GUI/MainFrame.cpp:1436
 msgid "&Paste"
 msgstr "L&iitä"
 
@@ -7236,18 +7215,15 @@ msgstr ""
 msgid "Fullscreen"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:157
+#: src/slic3r/GUI/MainFrame.cpp:1544 src/slic3r/GUI/MainFrame.cpp:1651
 msgid "&File"
 msgstr "&Tiedosto"
 
-#: ../src/common/stockitem.cpp:154
+#: src/slic3r/GUI/MainFrame.cpp:1545
 msgid "&Edit"
 msgstr "&Muokkaa"
 
-#: ../src/aui/tabmdi.cpp:311 ../src/aui/tabmdi.cpp:327
-#: ../src/aui/tabmdi.cpp:329 ../src/generic/mdig.cpp:294
-#: ../src/generic/mdig.cpp:310 ../src/generic/mdig.cpp:314
-#: ../src/msw/mdi.cpp:78
+#: src/slic3r/GUI/MainFrame.cpp:1546
 msgid "&Window"
 msgstr "&Ikkuna"
 
@@ -7255,9 +7231,7 @@ msgstr "&Ikkuna"
 msgid "&View"
 msgstr ""
 
-#: ../src/generic/wizard.cpp:441 ../src/richtext/richtextstyledlg.cpp:303
-#: ../src/richtext/richtextsymboldlg.cpp:479 ../src/osx/menu_osx.cpp:734
-#: ../src/common/stockitem.cpp:163
+#: src/slic3r/GUI/MainFrame.cpp:1550 src/slic3r/GUI/MainFrame.cpp:1655
 msgid "&Help"
 msgstr "&Ohje"
 
@@ -7988,7 +7962,8 @@ msgstr ""
 msgid "Do you want to save the changes to \"%1%\"?"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:190 ../src/common/sizer.cpp:2797
+#: src/slic3r/GUI/Plater.cpp:1729 src/slic3r/GUI/UnsavedChangesDialog.cpp:907
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:1604
 msgid "Save"
 msgstr "Tallenna"
 
@@ -9495,7 +9470,8 @@ msgstr ""
 msgid "Stealth"
 msgstr ""
 
-#: ../src/generic/fontdlgg.cpp:328 ../src/generic/fontdlgg.cpp:331
+#: src/slic3r/GUI/Search.cpp:97 src/slic3r/GUI/Search.cpp:391
+#: src/slic3r/GUI/Tab.cpp:2816
 msgid "Normal"
 msgstr "Tavallinen"
 
@@ -10298,7 +10274,7 @@ msgstr ""
 msgid "Set"
 msgstr ""
 
-#: ../src/common/stockitem.cpp:158 ../src/html/helpwnd.cpp:490
+#: src/slic3r/GUI/Tab.cpp:4367
 msgid "Find"
 msgstr "Etsi"
 
@@ -10314,7 +10290,7 @@ msgstr ""
 msgid "Case insensitive"
 msgstr ""
 
-#: ../src/generic/fdrepdlg.cpp:144
+#: src/slic3r/GUI/Tab.cpp:4465
 msgid "Whole word"
 msgstr "Vain kokonaiset sanat"
 
@@ -10704,7 +10680,7 @@ msgstr ""
 msgid "Undef group"
 msgstr ""
 
-#: ../src/generic/filectrlg.cpp:427
+#: src/slic3r/GUI/UnsavedChangesDialog.cpp:2022
 msgid "Modified"
 msgstr "Muokattu"
 
@@ -14498,8 +14474,7 @@ msgid ""
 "close all holes in the model."
 msgstr ""
 
-#: ../src/richtext/richtextfontpage.cpp:350
-#: ../src/richtext/richtextfontpage.cpp:354
+#: src/libslic3r/PrintConfig.cpp:2595
 msgid "Regular"
 msgstr "Tavallinen"
 
@@ -15506,11 +15481,11 @@ msgid ""
 "images will be rotated by 90 degrees."
 msgstr ""
 
-#: ../src/generic/prntdlgg.cpp:613 ../src/generic/prntdlgg.cpp:868
+#: src/libslic3r/PrintConfig.cpp:3633
 msgid "Landscape"
 msgstr "Vaakasuunta"
 
-#: ../src/generic/prntdlgg.cpp:612 ../src/generic/prntdlgg.cpp:867
+#: src/libslic3r/PrintConfig.cpp:3634
 msgid "Portrait"
 msgstr "Pystysuunta"
 
@@ -16007,10 +15982,7 @@ msgid ""
 "value."
 msgstr ""
 
-#. TRANSLATORS: Name of keyboard key
-#: ../include/wx/msgdlg.h:280 ../src/osx/button_osx.cpp:39
-#: ../src/common/stockitem.cpp:163 ../src/common/accelcmn.cpp:80
-#: ../src/html/helpdlg.cpp:66 ../src/html/helpfrm.cpp:111
+#: src/libslic3r/PrintConfig.cpp:4702
 msgid "Help"
 msgstr "Ohje"
 

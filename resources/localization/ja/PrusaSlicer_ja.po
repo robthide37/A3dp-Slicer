@@ -3073,6 +3073,12 @@ msgstr ""
 "CURLの初期化に失敗しました。 PrusaSlicerはネットワーク接続を確立できなくなり"
 "ます。 詳細については、ログを参照してください。"
 
+#. TRN Means "current color"
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:340
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:356
+msgid "Current"
+msgstr "現在"
+
 #: src/slic3r/GUI/wxExtensions.cpp:629
 #, c-format, boost-format
 msgid "Current mode is %s"
@@ -9948,6 +9954,12 @@ msgstr "テキストの向きをカメラ側にする。"
 msgid "Origin"
 msgstr "原点"
 
+#. TRN Means "original color"
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:342
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:356
+msgid "Original"
+msgstr "オリジナル"
+
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:860
 msgid "Original value"
 msgstr "オリジナルの値"
@@ -10677,7 +10689,7 @@ msgstr ""
 "後処理スクリプトは、Gコードファイルを%2%変更する予定ですが、Gコードファイルが"
 "削除され、新しい名前で保存されている可能性があります。\n"
 "後処理スクリプトを調整してGコードを変更し、オプションで後処理されたGコード"
-"ファイルの名前を変更する方法についてマニュアルを参照してください。"
+"ファイルの名前を変更する方法についてマニュアルを参照してください。\n"
 
 #: src/slic3r/GUI/Tab.cpp:1683 src/libslic3r/PrintConfig.cpp:2080
 msgid "Post-processing scripts"
