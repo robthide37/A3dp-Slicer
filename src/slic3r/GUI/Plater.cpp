@@ -1,4 +1,5 @@
 #include "Plater.hpp"
+#include "slic3r/GUI/Jobs/UIThreadWorker.hpp"
 
 #include <cstddef>
 #include <algorithm>
@@ -1793,6 +1794,8 @@ struct Plater::priv
 
     bool init_view_toolbar();
     bool init_collapse_toolbar();
+
+    void set_preview_layers_slider_values_range(int bottom, int top);
 
     void update_preview_moves_slider();
     void enable_preview_moves_slider(bool enable);
@@ -4632,6 +4635,11 @@ bool Plater::priv::init_collapse_toolbar()
     return true;
 }
 
+void Plater::priv::set_preview_layers_slider_values_range(int bottom, int top)
+{
+    preview->set_layers_slider_values_range(bottom, top);
+}
+
 void Plater::priv::update_preview_moves_slider()
 {
     preview->update_moves_slider();
@@ -6311,7 +6319,9 @@ void Plater::cut(size_t obj_idx, const ModelObjectPtrs& new_objects)
     for (size_t i = 0; i < new_objects.size(); ++i)
         selection.add_object((unsigned int)(last_id - i), i == 0);
 
-    arrange();
+    UIThreadWorker w;
+    replace_job(w, std::make_unique<ArrangeJob>(ArrangeJob::SelectionOnly));
+    w.process_events();
 }
 
 void Plater::export_gcode(bool prefer_removable)
@@ -7196,7 +7206,11 @@ void Plater::arrange()
     if (p->can_arrange()) {
         auto &w = get_ui_job_worker();
         p->take_snapshot(_L("Arrange"));
-        replace_job(w, std::make_unique<ArrangeJob>());
+
+        auto mode = wxGetKeyState(WXK_SHIFT) ? ArrangeJob::SelectionOnly :
+                                               ArrangeJob::Full;
+
+        replace_job(w, std::make_unique<ArrangeJob>(mode));
     }
 }
 
@@ -7504,6 +7518,11 @@ const GLToolbar& Plater::get_collapse_toolbar() const
 GLToolbar& Plater::get_collapse_toolbar()
 {
     return p->collapse_toolbar;
+}
+
+void Plater::set_preview_layers_slider_values_range(int bottom, int top)
+{
+    p->set_preview_layers_slider_values_range(bottom, top);
 }
 
 void Plater::update_preview_moves_slider()

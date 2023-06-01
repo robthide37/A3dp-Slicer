@@ -2554,22 +2554,25 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
             const Print *print = m_process->fff_print();
             const float depth = print->wipe_tower_data(extruders_count).depth;
+            const std::vector<std::pair<float, float>> z_and_depth_pairs = print->wipe_tower_data(extruders_count).z_and_depth_pairs;
             const float height_real = print->wipe_tower_data(extruders_count).height; // -1.f = unknown
 
             // Height of a print (Show at least a slab).
             const double height = height_real < 0.f ? std::max(m_model->max_z(), 10.0) : height_real;
 
-#if ENABLE_OPENGL_ES
-            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
-                x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
-                bw, &m_wipe_tower_mesh);
-#else
-            int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
-                x, y, w, depth, (float)height, ca, a, !print->is_step_done(psWipeTower),
-                bw);
-#endif // ENABLE_OPENGL_ES
-            if (volume_idx_wipe_tower_old != -1)
-                map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
+            if (depth != 0.) {
+    #if ENABLE_OPENGL_ES
+                int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                    x, y, w, depth, z_and_depth_pairs, (float)height, ca, a, !print->is_step_done(psWipeTower),
+                    bw, &m_wipe_tower_mesh);
+    #else
+                int volume_idx_wipe_tower_new = m_volumes.load_wipe_tower_preview(
+                    x, y, w, depth, z_and_depth_pairs, (float)height, ca, a, !print->is_step_done(psWipeTower),
+                    bw);
+    #endif // ENABLE_OPENGL_ES
+                if (volume_idx_wipe_tower_old != -1)
+                    map_glvolume_old_to_new[volume_idx_wipe_tower_old] = volume_idx_wipe_tower_new;
+            }
         }
     }
 
@@ -2691,6 +2694,7 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, co
     if (wxGetApp().is_editor()) {
         m_gcode_viewer.update_shells_color_by_extruder(m_config);
         _set_warning_notification_if_needed(EWarning::ToolpathOutside);
+        _set_warning_notification_if_needed(EWarning::GCodeConflict);
     }
 
     m_gcode_viewer.refresh(gcode_result, str_tool_colors);
@@ -7439,8 +7443,12 @@ void GLCanvas3D::_set_warning_notification_if_needed(EWarning warning)
     }
     else {
         if (wxGetApp().is_editor()) {
-            if (current_printer_technology() != ptSLA)
-                show = m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
+            if (current_printer_technology() != ptSLA) {
+                if (warning == EWarning::ToolpathOutside)
+                    show = m_gcode_viewer.has_data() && !m_gcode_viewer.is_contained_in_bed();
+                else if (warning == EWarning::GCodeConflict)
+                    show = m_gcode_viewer.has_data() && m_gcode_viewer.is_contained_in_bed() && m_gcode_viewer.get_conflict_result().has_value();
+            }
         }
     }
 
@@ -7466,8 +7474,53 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
             "Resolve the current problem to continue slicing.");
         error = ErrorType::PLATER_ERROR;
         break;
+    case EWarning::GCodeConflict: {
+        const ConflictResultOpt& conflict_result = m_gcode_viewer.get_conflict_result();
+        if (!conflict_result.has_value()) { break; }
+        std::string objName1 = conflict_result->_objName1;
+        std::string objName2 = conflict_result->_objName2;
+        double      height = conflict_result->_height;
+        int         layer = conflict_result->layer;
+        text = (boost::format(_u8L("Conflicts of gcode paths have been found at layer %d, z = %.2lf mm. Please separate the conflicted objects farther (%s <-> %s).")) % layer %
+            height % objName1 % objName2).str();
+        error = ErrorType::SLICING_ERROR;
+        break;
+    }
     }
     auto& notification_manager = *wxGetApp().plater()->get_notification_manager();
+
+    const ConflictResultOpt& conflict_result = m_gcode_viewer.get_conflict_result();
+    if (warning == EWarning::GCodeConflict) {
+        if (conflict_result.has_value()) {
+            const PrintObject* obj2 = reinterpret_cast<const PrintObject*>(conflict_result->_obj2);
+            auto     mo = obj2->model_object();
+            ObjectID id = mo->id();
+            int layer_id = conflict_result->layer;
+            auto     action_fn = [id, layer_id](wxEvtHandler*) {
+                auto& objects = wxGetApp().model().objects;
+                auto  iter = id.id ? std::find_if(objects.begin(), objects.end(), [id](auto o) { return o->id() == id; }) : objects.end();
+                if (iter != objects.end()) {
+                    const unsigned int obj_idx = std::distance(objects.begin(), iter);
+                    wxGetApp().CallAfter([obj_idx, layer_id]() {
+                        wxGetApp().plater()->set_preview_layers_slider_values_range(0, layer_id - 1);
+                        wxGetApp().plater()->select_view_3D("3D");
+                        wxGetApp().plater()->canvas3D()->get_selection().add_object(obj_idx, true);
+                        wxGetApp().obj_list()->update_selections();
+                    });
+                }
+                return false;
+            };
+            auto hypertext = _u8L("Jump to");
+            hypertext += std::string(" [") + mo->name + "]";
+            notification_manager.push_notification(NotificationType::SlicingError, NotificationManager::NotificationLevel::ErrorNotificationLevel,
+                _u8L("ERROR:") + "\n" + text, hypertext, action_fn);
+        }
+        else
+            notification_manager.close_slicing_error_notification(text);
+
+        return;
+    }
+
     switch (error)
     {
     case PLATER_WARNING:
