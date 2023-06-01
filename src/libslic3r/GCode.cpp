@@ -2450,7 +2450,7 @@ void GCode::process_layer_single_object(
         int extruder_override_id = is_anything_overridden ? layer_tools.wiping_extrusions().get_extruder_override(eec, instance_id) : -1;
         return print_wipe_extrusions ?
             extruder_override_id == int(extruder_id) :
-            extruder_override_id < 0 && extruder_id == correct_extruder_id;
+            extruder_override_id < 0 && int(extruder_id) == correct_extruder_id;
     };
 
     ExtrusionEntitiesPtr temp_fill_extrusions;

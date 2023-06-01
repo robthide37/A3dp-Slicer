@@ -6099,7 +6099,7 @@ void Plater::increase_instances(size_t num, int obj_idx, int inst_idx)
             if (const auto obj_idxs = get_selection().get_object_idxs(); !obj_idxs.empty()) {
                 // we need a copy made here because the selection changes at every call of increase_instances()
                 const Selection::ObjectIdxsToInstanceIdxsMap content = p->get_selection().get_content();
-                for (const size_t& obj_id : obj_idxs) {
+                for (const unsigned int obj_id : obj_idxs) {
                     if (auto obj_it = content.find(int(obj_id)); obj_it != content.end())
                         increase_instances(1, int(obj_id), *obj_it->second.rbegin());
                 }
