@@ -5301,8 +5301,9 @@ void Plater::import_zip_archive()
    if (input_file.empty())
        return;
 
-   fs::path path = into_path(input_file);
-   preview_zip_archive(path);
+   wxArrayString arr;
+   arr.Add(input_file);
+   load_files(arr, false);
 }
 
 void Plater::import_sl1_archive()
