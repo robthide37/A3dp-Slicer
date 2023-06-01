@@ -1,7 +1,5 @@
-diff --git a/OpenEXR/IlmImf/ImfDwaCompressor.cpp b/OpenEXR/IlmImf/ImfDwaCompressor.cpp
-index 59d1d5d1..585a3e65 100644
---- a/OpenEXR/IlmImf/ImfDwaCompressor.cpp
-+++ b/OpenEXR/IlmImf/ImfDwaCompressor.cpp
+--- ../OpenEXR-orig/OpenEXR/IlmImf/ImfDwaCompressor.cpp	2021-02-12 17:56:19.000000000 +0100
++++ ./OpenEXR/IlmImf/ImfDwaCompressor.cpp	2023-06-01 13:21:32.666695400 +0200
 @@ -159,6 +159,7 @@
  #include <limits>
  
@@ -10,10 +8,8 @@ index 59d1d5d1..585a3e65 100644
  
  
  // Windows specific addition to prevent the indirect import of the redefined min/max macros
-diff --git a/OpenEXR/IlmImf/ImfHuf.cpp b/OpenEXR/IlmImf/ImfHuf.cpp
-index 271849b7..165fac58 100644
---- a/OpenEXR/IlmImf/ImfHuf.cpp
-+++ b/OpenEXR/IlmImf/ImfHuf.cpp
+--- ../OpenEXR-orig/OpenEXR/IlmImf/ImfHuf.cpp	2021-02-12 17:56:19.000000000 +0100
++++ ./OpenEXR/IlmImf/ImfHuf.cpp	2023-06-01 13:21:53.018583400 +0200
 @@ -53,6 +53,7 @@
  #include <cstring>
  #include <cassert>
@@ -22,10 +18,8 @@ index 271849b7..165fac58 100644
  
  
  using namespace std;
-diff --git a/OpenEXR/IlmImf/ImfMisc.cpp b/OpenEXR/IlmImf/ImfMisc.cpp
-index d2c84787..4b487940 100644
---- a/OpenEXR/IlmImf/ImfMisc.cpp
-+++ b/OpenEXR/IlmImf/ImfMisc.cpp
+--- ../OpenEXR-orig/OpenEXR/IlmImf/ImfMisc.cpp	2021-02-12 17:56:19.000000000 +0100
++++ ./OpenEXR/IlmImf/ImfMisc.cpp	2023-06-01 13:22:15.777480000 +0200
 @@ -40,6 +40,7 @@
  //
  //-----------------------------------------------------------------------------
