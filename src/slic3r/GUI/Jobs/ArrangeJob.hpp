@@ -24,6 +24,7 @@ class ArrangeJob : public Job
     coord_t m_min_bed_inset = 0.;
 
     Plater *m_plater;
+    bool m_selection_only = false;
 
     // clear m_selected and m_unselected, reserve space for next usage
     void clear_input();
@@ -39,11 +40,13 @@ class ArrangeJob : public Job
 
 public:
 
+    enum Mode { Full, SelectionOnly };
+
     void prepare();
 
     void process(Ctl &ctl) override;
 
-    ArrangeJob();
+    ArrangeJob(Mode mode = Full);
 
     int status_range() const
     {

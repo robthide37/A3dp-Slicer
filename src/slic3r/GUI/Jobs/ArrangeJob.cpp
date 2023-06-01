@@ -243,7 +243,7 @@ coord_t get_skirt_offset(const Plater* plater) {
 
 void ArrangeJob::prepare()
 {
-    wxGetKeyState(WXK_SHIFT) ? prepare_selected() : prepare_all();
+    m_selection_only ? prepare_selected() : prepare_all();
 
     coord_t min_offset = 0;
     for (auto &ap : m_selected) {
@@ -307,7 +307,10 @@ void ArrangeJob::process(Ctl &ctl)
                                       _u8L("Arranging done."));
 }
 
-ArrangeJob::ArrangeJob() : m_plater{wxGetApp().plater()} {}
+ArrangeJob::ArrangeJob(Mode mode)
+    : m_plater{wxGetApp().plater()},
+      m_selection_only{mode == Mode::SelectionOnly}
+{}
 
 static std::string concat_strings(const std::set<std::string> &strings,
                                   const std::string &delim = "\n")
