@@ -8,10 +8,10 @@
 #include "Geometry/ConvexHull.hpp"
 #include "I18N.hpp"
 #include "ShortestPath.hpp"
-#include "SupportMaterial.hpp"
 #include "Thread.hpp"
 #include "GCode.hpp"
 #include "GCode/WipeTower.hpp"
+#include "GCode/ConflictChecker.hpp"
 #include "Utils.hpp"
 #include "BuildVolume.hpp"
 #include "format.hpp"
@@ -26,7 +26,6 @@
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/regex.hpp>
-
 
 namespace Slic3r {
 
@@ -209,6 +208,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
             || opt_key == "wipe_tower_bridging"
             || opt_key == "wipe_tower_extra_spacing"
             || opt_key == "wipe_tower_no_sparse_layers"
+            || opt_key == "wipe_tower_extruder"
             || opt_key == "wiping_volumes_matrix"
             || opt_key == "parking_pos_retraction"
             || opt_key == "cooling_tube_retraction"
@@ -329,6 +329,15 @@ std::vector<unsigned int> Print::extruders() const
     std::vector<unsigned int> extruders = this->object_extruders();
     append(extruders, this->support_material_extruders());
     sort_remove_duplicates(extruders);
+
+    // The wipe tower extruder can also be set. When the wipe tower is enabled and it will be generated,
+    // append its extruder into the list too.
+    if (has_wipe_tower() && config().wipe_tower_extruder != 0 && extruders.size() > 1) {
+        assert(config().wipe_tower_extruder > 0 && config().wipe_tower_extruder < int(config().nozzle_diameter.size()));
+        extruders.emplace_back(config().wipe_tower_extruder - 1); // the config value is 1-based
+        sort_remove_duplicates(extruders);
+    }
+
     return extruders;
 }
 
@@ -459,9 +468,20 @@ static inline bool sequential_print_vertical_clearance_valid(const Print &print)
 boost::regex regex_g92e0 { "^[ \\t]*[gG]92[ \\t]*[eE](0(\\.0*)?|\\.0+)[ \\t]*(;.*)?$" };
 
 // Precondition: Print::validate() requires the Print::apply() to be called its invocation.
-std::string Print::validate(std::string* warning) const
+std::string Print::validate(std::vector<std::string>* warnings) const
 {
     std::vector<unsigned int> extruders = this->extruders();
+
+    if (warnings) {
+        for (size_t a=0; a<extruders.size(); ++a)
+            for (size_t b=a+1; b<extruders.size(); ++b)
+                if (std::abs(m_config.bed_temperature.get_at(extruders[a]) - m_config.bed_temperature.get_at(extruders[b])) > 15
+                 || std::abs(m_config.first_layer_bed_temperature.get_at(extruders[a]) - m_config.first_layer_bed_temperature.get_at(extruders[b])) > 15) {
+                    warnings->emplace_back("_BED_TEMPS_DIFFER");
+                    goto DONE;
+                }
+        DONE:;
+    }
 
     if (m_objects.empty())
         return _u8L("All objects are outside of the print volume.");
@@ -470,11 +490,13 @@ std::string Print::validate(std::string* warning) const
         return _u8L("The supplied settings will cause an empty print.");
 
     if (m_config.complete_objects) {
-    	if (! sequential_print_horizontal_clearance_valid(*this))
+        if (!sequential_print_horizontal_clearance_valid(*this, const_cast<Polygons*>(&m_sequential_print_clearance_contours)))
             return _u8L("Some objects are too close; your extruder will collide with them.");
-        if (! sequential_print_vertical_clearance_valid(*this))
-	        return _u8L("Some objects are too tall and cannot be printed without extruder collisions.");
+        if (!sequential_print_vertical_clearance_valid(*this))
+            return _u8L("Some objects are too tall and cannot be printed without extruder collisions.");
     }
+    else
+        const_cast<Polygons*>(&m_sequential_print_clearance_contours)->clear();
 
     if (m_config.avoid_crossing_perimeters && m_config.avoid_crossing_curled_overhangs) {
         return _u8L("Avoid crossing perimeters option and avoid crossing curled overhangs option cannot be both enabled together.");
@@ -680,12 +702,12 @@ std::string Print::validate(std::string* warning) const
 
             // Do we have custom support data that would not be used?
             // Notify the user in that case.
-            if (! object->has_support() && warning) {
+            if (! object->has_support() && warnings) {
                 for (const ModelVolume* mv : object->model_object()->volumes) {
                     bool has_enforcers = mv->is_support_enforcer() || 
                         (mv->is_model_part() && mv->supported_facets.has_facets(*mv, EnforcerBlockerType::ENFORCER));
                     if (has_enforcers) {
-                        *warning = "_SUPPORTS_OFF";
+                        warnings->emplace_back("_SUPPORTS_OFF");
                         break;
                     }
                 }
@@ -880,7 +902,6 @@ void Print::process()
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
     for (PrintObject *obj : m_objects)
         obj->make_perimeters();
-    this->set_status(70, _u8L("Infilling layers"));
     for (PrintObject *obj : m_objects)
         obj->infill();
     for (PrintObject *obj : m_objects)
@@ -941,6 +962,18 @@ void Print::process()
         this->finalize_first_layer_convex_hull();
         this->set_done(psSkirtBrim);
     }
+
+    std::optional<const FakeWipeTower*> wipe_tower_opt = {};
+    if (this->has_wipe_tower()) {
+        m_fake_wipe_tower.set_pos_and_rotation({ m_config.wipe_tower_x, m_config.wipe_tower_y }, m_config.wipe_tower_rotation_angle);
+        wipe_tower_opt = std::make_optional<const FakeWipeTower*>(&m_fake_wipe_tower);
+    }
+    auto conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(m_objects, wipe_tower_opt);
+
+    m_conflict_result = conflictRes;
+    if (conflictRes.has_value())
+        BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%") % conflictRes->_objName1 % conflictRes->_objName2;
+
     BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
 }
 
@@ -966,6 +999,10 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     // Create GCode on heap, it has quite a lot of data.
     std::unique_ptr<GCode> gcode(new GCode);
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
+
+    if (m_conflict_result.has_value())
+        result->conflict_result = *m_conflict_result;
+
     return path.c_str();
 }
 
@@ -1132,9 +1169,9 @@ Polygons Print::first_layer_islands() const
     return islands;
 }
 
-std::vector<Point> Print::first_layer_wipe_tower_corners() const
+Points Print::first_layer_wipe_tower_corners() const
 {
-    std::vector<Point> pts_scaled;
+    Points pts_scaled;
 
     if (has_wipe_tower() && ! m_wipe_tower_data.tool_changes.empty()) {
         double width = m_config.wipe_tower_width + 2*m_wipe_tower_data.brim_width;
@@ -1229,7 +1266,7 @@ void Print::alert_when_supports_needed()
             }
 
             std::string translated_list = expansion_rule;
-            for (int i = 0; i < translated_elements.size() - 1; i++) {
+            for (int i = 0; i < int(translated_elements.size()) - 1; ++ i) {
                 auto first_elem = translated_list.find("%1%");
                 assert(first_elem != translated_list.npos);
                 translated_list.replace(first_elem, 3, translated_elements[i]);
@@ -1237,7 +1274,7 @@ void Print::alert_when_supports_needed()
                 // expand the translated list by another application of the same rule
                 auto second_elem = translated_list.find("%2%");
                 assert(second_elem != translated_list.npos);
-                if (i < translated_elements.size() - 2) {
+                if (i < int(translated_elements.size()) - 2) {
                     translated_list.replace(second_elem, 3, expansion_rule);
                 } else {
                     translated_list.replace(second_elem, 3, translated_elements[i + 1]);
@@ -1464,6 +1501,7 @@ void Print::_make_wipe_tower()
     m_wipe_tower_data.tool_changes.reserve(m_wipe_tower_data.tool_ordering.layer_tools().size());
     wipe_tower.generate(m_wipe_tower_data.tool_changes);
     m_wipe_tower_data.depth = wipe_tower.get_depth();
+    m_wipe_tower_data.z_and_depth_pairs = wipe_tower.get_z_and_depth_pairs();
     m_wipe_tower_data.brim_width = wipe_tower.get_brim_width();
     m_wipe_tower_data.height = wipe_tower.get_wipe_tower_height();
 
@@ -1488,6 +1526,10 @@ void Print::_make_wipe_tower()
 
     m_wipe_tower_data.used_filament = wipe_tower.get_used_filament();
     m_wipe_tower_data.number_of_toolchanges = wipe_tower.get_number_of_toolchanges();
+    const Vec3d origin = Vec3d::Zero();
+    m_fake_wipe_tower.set_fake_extrusion_data(wipe_tower.position(), wipe_tower.width(), wipe_tower.get_wipe_tower_height(), config().first_layer_height, m_wipe_tower_data.depth,
+                                              m_wipe_tower_data.z_and_depth_pairs, m_wipe_tower_data.brim_width, config().wipe_tower_rotation_angle, config().wipe_tower_cone_angle, {scale_(origin.x()), scale_(origin.y())});
+
 }
 
 // Generate a recommended G-code output file name based on the format template, default extension, and template parameters
@@ -1554,5 +1596,81 @@ std::string PrintStatistics::finalize_output_path(const std::string &path_in) co
     }
     return final_path;
 }
+
+    std::vector<ExtrusionPaths> FakeWipeTower::getFakeExtrusionPathsFromWipeTower() const
+    {
+        float h = height;
+        float lh = layer_height;
+        int   d = scale_(depth);
+        int   w = scale_(width);
+        int   bd = scale_(brim_width);
+        Point minCorner = { -bd, -bd };
+        Point maxCorner = { minCorner.x() + w + bd, minCorner.y() + d + bd };
+
+        const auto [cone_base_R, cone_scale_x] = WipeTower::get_wipe_tower_cone_base(width, height, depth, cone_angle);
+
+        std::vector<ExtrusionPaths> paths;
+        for (float hh = 0.f; hh < h; hh += lh) {
+            
+            if (hh != 0.f) {
+                // The wipe tower may be getting smaller. Find the depth for this layer.
+                size_t i = 0;
+                for (i=0; i<z_and_depth_pairs.size()-1; ++i)
+                    if (hh >= z_and_depth_pairs[i].first && hh < z_and_depth_pairs[i+1].first)
+                        break;
+                d = scale_(z_and_depth_pairs[i].second);
+                minCorner = {0.f, -d/2 + scale_(z_and_depth_pairs.front().second/2.f)};
+                maxCorner = { minCorner.x() + w, minCorner.y() + d };
+            }
+
+
+            ExtrusionPath path(ExtrusionRole::WipeTower, 0.0, 0.0, lh);
+            path.polyline = { minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner };
+            paths.push_back({ path });
+
+            // We added the border, now add several parallel lines so we can detect an object that is fully inside the tower.
+            // For now, simply use fixed spacing of 3mm.
+            for (coord_t y=minCorner.y()+scale_(3.); y<maxCorner.y(); y+=scale_(3.)) {
+                path.polyline = { {minCorner.x(), y}, {maxCorner.x(), y} };
+                paths.back().emplace_back(path);
+            }
+
+            // And of course the stabilization cone and its base...
+            if (cone_base_R > 0.) {
+                path.polyline.clear();
+                double r = cone_base_R * (1 - hh/height);
+                for (double alpha=0; alpha<2.01*M_PI; alpha+=2*M_PI/20.)
+                    path.polyline.points.emplace_back(Point::new_scale(width/2. + r * std::cos(alpha)/cone_scale_x, depth/2. + r * std::sin(alpha)));
+                paths.back().emplace_back(path);
+                if (hh == 0.f) { // Cone brim.
+                    for (float bw=brim_width; bw>0.f; bw-=3.f) {
+                        path.polyline.clear();
+                        for (double alpha=0; alpha<2.01*M_PI; alpha+=2*M_PI/20.) // see load_wipe_tower_preview, where the same is a bit clearer
+                            path.polyline.points.emplace_back(Point::new_scale(
+                                width/2. + cone_base_R * std::cos(alpha)/cone_scale_x * (1. + cone_scale_x*bw/cone_base_R),
+                                depth/2. + cone_base_R * std::sin(alpha) * (1. + bw/cone_base_R))
+                            );
+                        paths.back().emplace_back(path);
+                    }
+                }
+            }
+
+            // Only the first layer has brim.
+            if (hh == 0.f) {
+                minCorner = minCorner + Point(bd, bd);
+                maxCorner = maxCorner - Point(bd, bd);
+            }
+        }
+
+        // Rotate and translate the tower into the final position.
+        for (ExtrusionPaths& ps : paths) {
+            for (ExtrusionPath& p : ps) {
+                p.polyline.rotate(Geometry::deg2rad(rotation_angle));
+                p.polyline.translate(scale_(pos.x()), scale_(pos.y()));
+            }
+        }
+
+        return paths;
+    }
 
 } // namespace Slic3r

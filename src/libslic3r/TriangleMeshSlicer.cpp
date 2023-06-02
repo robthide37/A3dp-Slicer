@@ -10,11 +10,15 @@
 #include <deque>
 #include <queue>
 #include <mutex>
+#include <new>
 #include <utility>
 
 #include <boost/log/trivial.hpp>
 
 #include <tbb/parallel_for.h>
+#include <tbb/scalable_allocator.h>
+
+#include <ankerl/unordered_dense.h>
 
 #ifndef NDEBUG
 //    #define EXPENSIVE_DEBUG_CHECKS
@@ -31,6 +35,13 @@
 #include <assert.h>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/lock_guard.hpp>
+
+#if defined(__cpp_lib_hardware_interference_size) && ! defined(__APPLE__)
+    using std::hardware_destructive_interference_size;
+#else
+    // 64 bytes on x86-64 │ L1_CACHE_BYTES │ L1_CACHE_SHIFT │ __cacheline_aligned │ ...
+    constexpr std::size_t hardware_destructive_interference_size = 64;
+#endif
 
 // #define SLIC3R_DEBUG_SLICE_PROCESSING
 
@@ -139,7 +150,7 @@ public:
 #endif
 };
 
-using IntersectionLines = std::vector<IntersectionLine>;
+using IntersectionLines = std::vector<IntersectionLine, tbb::scalable_allocator<IntersectionLine>>;
 
 enum class FacetSliceType {
     NoSlice = 0,
@@ -351,6 +362,21 @@ inline FacetSliceType slice_facet(
     return FacetSliceType::NoSlice;
 }
 
+class LinesMutexes {
+public:
+    std::mutex& operator()(size_t slice_id) {
+        ankerl::unordered_dense::hash<size_t> hash;
+        return m_mutexes[hash(slice_id) % m_mutexes.size()].mutex;
+    }
+
+private:
+    struct CacheLineAlignedMutex
+    {
+        alignas(hardware_destructive_interference_size) std::mutex mutex;
+    };
+    std::array<CacheLineAlignedMutex, 64> m_mutexes;
+};
+
 template<typename TransformVertex>
 void slice_facet_at_zs(
     // Scaled or unscaled vertices. transform_vertex_fn may scale zs.
@@ -361,7 +387,7 @@ void slice_facet_at_zs(
     // Scaled or unscaled zs. If vertices have their zs scaled or transform_vertex_fn scales them, then zs have to be scaled as well.
     const std::vector<float>                         &zs,
     std::vector<IntersectionLines>                   &lines,
-    std::array<std::mutex, 64>                       &lines_mutex)
+    LinesMutexes                                     &lines_mutex)
 {
     stl_vertex vertices[3] { transform_vertex_fn(mesh_vertices[indices(0)]), transform_vertex_fn(mesh_vertices[indices(1)]), transform_vertex_fn(mesh_vertices[indices(2)]) };
 
@@ -380,7 +406,7 @@ void slice_facet_at_zs(
         if (min_z != max_z && slice_facet(*it, vertices, indices, edge_ids, idx_vertex_lowest, false, il) == FacetSliceType::Slicing) {
             assert(il.edge_type != IntersectionLine::FacetEdgeType::Horizontal);
             size_t slice_id = it - zs.begin();
-            boost::lock_guard<std::mutex> l(lines_mutex[slice_id % lines_mutex.size()]);
+            boost::lock_guard<std::mutex> l(lines_mutex(slice_id));
             lines[slice_id].emplace_back(il);
         }
     }
@@ -395,8 +421,8 @@ static inline std::vector<IntersectionLines> slice_make_lines(
     const std::vector<float>                        &zs,
     const ThrowOnCancel                              throw_on_cancel_fn)
 {
-    std::vector<IntersectionLines>  lines(zs.size(), IntersectionLines());
-    std::array<std::mutex, 64>      lines_mutex;
+    std::vector<IntersectionLines>  lines(zs.size(), IntersectionLines{});
+    LinesMutexes                    lines_mutex;
     tbb::parallel_for(
         tbb::blocked_range<int>(0, int(indices.size())),
         [&vertices, &transform_vertex_fn, &indices, &face_edge_ids, &zs, &lines, &lines_mutex, throw_on_cancel_fn](const tbb::blocked_range<int> &range) {
@@ -475,7 +501,7 @@ void slice_facet_with_slabs(
     const int                                         num_edges,
     const std::vector<float>                         &zs,
     SlabLines                                        &lines,
-    std::array<std::mutex, 64>                       &lines_mutex)
+    LinesMutexes                                     &lines_mutex)
 {
     const stl_triangle_vertex_indices &indices = mesh_triangles[facet_idx];
     stl_vertex vertices[3] { mesh_vertices[indices(0)], mesh_vertices[indices(1)], mesh_vertices[indices(2)] };
@@ -494,7 +520,7 @@ void slice_facet_with_slabs(
     auto emit_slab_edge = [&lines, &lines_mutex](IntersectionLine il, size_t slab_id, bool reverse) {
         if (reverse)
             il.reverse();
-        boost::lock_guard<std::mutex> l(lines_mutex[(slab_id + lines_mutex.size() / 2) % lines_mutex.size()]);
+        boost::lock_guard<std::mutex> l(lines_mutex(slab_id));
         lines.between_slices[slab_id].emplace_back(il);
     };
 
@@ -530,7 +556,7 @@ void slice_facet_with_slabs(
                         };
                         // Don't flip the FacetEdgeType::Top edge, it will be flipped when chaining.
                         // if (! ProjectionFromTop) il.reverse();
-                        boost::lock_guard<std::mutex> l(lines_mutex[line_id % lines_mutex.size()]);
+                        boost::lock_guard<std::mutex> l(lines_mutex(line_id));
                         lines.at_slice[line_id].emplace_back(il);
                     }
         } else {
@@ -649,7 +675,7 @@ void slice_facet_with_slabs(
                     if (! ProjectionFromTop)
                         il.reverse();
                     size_t line_id = it - zs.begin();
-                    boost::lock_guard<std::mutex> l(lines_mutex[line_id % lines_mutex.size()]);
+                    boost::lock_guard<std::mutex> l(lines_mutex(line_id));
                     lines.at_slice[line_id].emplace_back(il);
                 }
             }
@@ -804,8 +830,8 @@ inline std::pair<SlabLines, SlabLines> slice_slabs_make_lines(
     std::pair<SlabLines, SlabLines> out;
     SlabLines   &lines_top      = out.first;
     SlabLines   &lines_bottom   = out.second;
-    std::array<std::mutex, 64> lines_mutex_top;
-    std::array<std::mutex, 64> lines_mutex_bottom;
+    LinesMutexes lines_mutex_top;
+    LinesMutexes lines_mutex_bottom;
 
     if (top) {
         lines_top.at_slice.assign(zs.size(), IntersectionLines());
@@ -1540,7 +1566,7 @@ static std::vector<Polygons> make_slab_loops(
 }
 
 // Used to cut the mesh into two halves.
-static ExPolygons make_expolygons_simple(std::vector<IntersectionLine> &lines)
+static ExPolygons make_expolygons_simple(IntersectionLines &lines)
 {
     ExPolygons slices;
     Polygons holes;

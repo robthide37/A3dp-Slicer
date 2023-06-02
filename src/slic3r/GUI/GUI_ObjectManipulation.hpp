@@ -165,6 +165,11 @@ private:
 
     std::vector<ManipulationEditor*>    m_editors;
 
+    // parameters for enabling/disabling of editors
+    bool m_is_enabled                   { true };
+    bool m_is_enabled_size_and_scale    { true };
+
+
 public:
     ObjectManipulation(wxWindow* parent);
     ~ObjectManipulation() {}
@@ -212,6 +217,9 @@ public:
     ManipulationEditor* get_focused_editor() { return m_focused_editor; }
 
     static wxString coordinate_type_str(ECoordinatesType type);
+
+    bool is_enabled()               const { return m_is_enabled; }
+    bool is_enabled_size_and_scale()const { return m_is_enabled_size_and_scale; }
 
 #if ENABLE_OBJECT_MANIPULATION_DEBUG
     void render_debug_window();

@@ -4,44 +4,14 @@
 #include <string>
 
 #include "SLAArchiveWriter.hpp"
+#include "SLAArchiveFormatRegistry.hpp"
 
 #include "libslic3r/PrintConfig.hpp"
 
-#define ANYCUBIC_SLA_FORMAT_VERSION_1     1
-#define ANYCUBIC_SLA_FORMAT_VERSION_515 515
-#define ANYCUBIC_SLA_FORMAT_VERSION_516 516
-#define ANYCUBIC_SLA_FORMAT_VERSION_517 517
-
-#define ANYCUBIC_SLA_FORMAT_VERSIONED(FILEFORMAT, NAME, VERSION) \
-    { FILEFORMAT, { FILEFORMAT, [] (const auto &cfg) { return std::make_unique<AnycubicSLAArchive>(cfg, VERSION); } } }
-
-#define ANYCUBIC_SLA_FORMAT(FILEFORMAT, NAME) \
-    ANYCUBIC_SLA_FORMAT_VERSIONED(FILEFORMAT, NAME, ANYCUBIC_SLA_FORMAT_VERSION_1)
-
-/**
-    // Supports only ANYCUBIC_SLA_VERSION_1
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pws", "Photon / Photon S", ANYCUBIC_SLA_VERSION_1),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pw0", "Photon Zero", ANYCUBIC_SLA_VERSION_1),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pwx", "Photon X", ANYCUBIC_SLA_VERSION_1),
-
-    // Supports ANYCUBIC_SLA_VERSION_1 and ANYCUBIC_SLA_VERSION_515
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pwmo", "Photon Mono", ANYCUBIC_SLA_VERSION_1),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pwms", "Photon Mono SE", ANYCUBIC_SLA_VERSION_1),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("dlp", "Photon Ultra", ANYCUBIC_SLA_VERSION_1),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pwmx", "Photon Mono X", ANYCUBIC_SLA_VERSION_1),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pmsq", "Photon Mono SQ", ANYCUBIC_SLA_VERSION_1),
-
-    // Supports ANYCUBIC_SLA_VERSION_515 and ANYCUBIC_SLA_VERSION_516
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pwma", "Photon Mono 4K", ANYCUBIC_SLA_VERSION_515),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pm3",  "Photon M3", ANYCUBIC_SLA_VERSION_515),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pm3m", "Photon M3 Max", ANYCUBIC_SLA_VERSION_515),
-
-    // Supports NYCUBIC_SLA_VERSION_515 and ANYCUBIC_SLA_VERSION_516 and ANYCUBIC_SLA_VERSION_517
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pwmb", "Photon Mono X 6K / Photon M3 Plus", ANYCUBIC_SLA_VERSION_515),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("dl2p", "Photon Photon D2", ANYCUBIC_SLA_VERSION_515),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pmx2", "Photon Mono X2", ANYCUBIC_SLA_VERSION_515),
-    ANYCUBIC_SLA_FORMAT_VERSIONED("pm3r", "Photon M3 Premium", ANYCUBIC_SLA_VERSION_515),
-*/
+constexpr uint16_t ANYCUBIC_SLA_FORMAT_VERSION_1 = 1;
+constexpr uint16_t ANYCUBIC_SLA_FORMAT_VERSION_515 = 515;
+constexpr uint16_t ANYCUBIC_SLA_FORMAT_VERSION_516 = 516;
+constexpr uint16_t ANYCUBIC_SLA_FORMAT_VERSION_517 = 517;
 
 namespace Slic3r {
 
@@ -75,6 +45,21 @@ public:
                       const std::string    &projectname = "") override;
 };
 
+inline Slic3r::ArchiveEntry anycubic_sla_format_versioned(const char *fileformat, const char *desc, uint16_t version)
+{
+    Slic3r::ArchiveEntry entry(fileformat);
+
+    entry.desc = desc;
+    entry.ext  = fileformat;
+    entry.wrfactoryfn = [version] (const auto &cfg) { return std::make_unique<AnycubicSLAArchive>(cfg, version); };
+
+    return entry;
+}
+
+inline Slic3r::ArchiveEntry anycubic_sla_format(const char *fileformat, const char *desc)
+{
+    return anycubic_sla_format_versioned(fileformat, desc, ANYCUBIC_SLA_FORMAT_VERSION_1);
+}
 
 } // namespace Slic3r::sla
 

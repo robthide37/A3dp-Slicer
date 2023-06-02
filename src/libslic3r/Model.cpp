@@ -23,6 +23,8 @@
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/iostream.hpp>
 
+#include <tbb/concurrent_vector.h>
+
 #include "SVG.hpp"
 #include <Eigen/Dense>
 #include "GCodeWriter.hpp"
@@ -119,7 +121,7 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
         result = load_step(input_file.c_str(), &model);
     else if (boost::algorithm::iends_with(input_file, ".amf") || boost::algorithm::iends_with(input_file, ".amf.xml"))
         result = load_amf(input_file.c_str(), config, config_substitutions, &model, options & LoadAttribute::CheckVersion);
-    else if (boost::algorithm::iends_with(input_file, ".3mf"))
+    else if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
         //FIXME options & LoadAttribute::CheckVersion ? 
         result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, false);
     else
@@ -153,7 +155,7 @@ Model Model::read_from_archive(const std::string& input_file, DynamicPrintConfig
     Model model;
 
     bool result = false;
-    if (boost::algorithm::iends_with(input_file, ".3mf"))
+    if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
         result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, options & LoadAttribute::CheckVersion);
     else if (boost::algorithm::iends_with(input_file, ".zip.amf"))
         result = load_amf(input_file.c_str(), config, config_substitutions, &model, options & LoadAttribute::CheckVersion);
@@ -1055,12 +1057,18 @@ BoundingBoxf3 ModelObject::instance_bounding_box(size_t instance_idx, bool dont_
 // This method is used by the auto arrange function.
 Polygon ModelObject::convex_hull_2d(const Transform3d& trafo_instance) const
 {
-    Points pts;
-    for (const ModelVolume* v : volumes) {
-        if (v->is_model_part())
-            append(pts, its_convex_hull_2d_above(v->mesh().its, (trafo_instance * v->get_matrix()).cast<float>(), 0.0f).points);
-    }
-    return Geometry::convex_hull(std::move(pts));
+    tbb::concurrent_vector<Polygon> chs;
+    chs.reserve(volumes.size());
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, volumes.size()), [&](const tbb::blocked_range<size_t>& range) {
+        for (size_t i = range.begin(); i < range.end(); ++i) {
+            const ModelVolume* v = volumes[i];
+            chs.emplace_back(its_convex_hull_2d_above(v->mesh().its, (trafo_instance * v->get_matrix()).cast<float>(), 0.0f));
+        }
+    });
+
+    Polygons polygons;
+    polygons.assign(chs.begin(), chs.end());
+    return Geometry::convex_hull(polygons);
 }
 
 void ModelObject::center_around_origin(bool include_modifiers)
@@ -1345,40 +1353,10 @@ void ModelObject::delete_connectors()
     }
 }
 
-void ModelObject::synchronize_model_after_cut()
-{
-    for (ModelObject* obj : m_model->objects) {
-        if (obj == this || obj->cut_id.is_equal(this->cut_id))
-            continue;
-        if (obj->is_cut() && obj->cut_id.has_same_id(this->cut_id))
-            obj->cut_id.copy(this->cut_id);
-    }
-}
-
-void ModelObject::apply_cut_attributes(ModelObjectCutAttributes attributes)
-{
-    // we don't save cut information, if result will not contains all parts of initial object
-    if (!attributes.has(ModelObjectCutAttribute::KeepUpper) || 
-        !attributes.has(ModelObjectCutAttribute::KeepLower) || 
-        attributes.has(ModelObjectCutAttribute::InvalidateCutInfo))
-        return;
-
-    if (cut_id.id().invalid())
-        cut_id.init();
-    {
-        int cut_obj_cnt = -1;
-        if (attributes.has(ModelObjectCutAttribute::KeepUpper))     cut_obj_cnt++;
-        if (attributes.has(ModelObjectCutAttribute::KeepLower))     cut_obj_cnt++;
-        if (attributes.has(ModelObjectCutAttribute::CreateDowels))  cut_obj_cnt++;
-        if (cut_obj_cnt > 0)
-            cut_id.increase_check_sum(size_t(cut_obj_cnt));
-    }
-}
-
 void ModelObject::clone_for_cut(ModelObject** obj)
 {
     (*obj) = ModelObject::new_clone(*this);
-    (*obj)->set_model(nullptr);
+    (*obj)->set_model(this->get_model());
     (*obj)->sla_support_points.clear();
     (*obj)->sla_drain_holes.clear();
     (*obj)->sla_points_status = sla::PointsStatus::NoPoints;
@@ -1461,7 +1439,7 @@ static void add_cut_volume(TriangleMesh& mesh, ModelObject* object, const ModelV
 
 void ModelObject::process_connector_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix, 
                                         ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower,
-                                        std::vector<ModelObject*>& dowels, Vec3d& local_dowels_displace)
+                                        std::vector<ModelObject*>& dowels)
 {
     assert(volume->cut_info.is_connector);
     volume->cut_info.set_processed();
@@ -1496,9 +1474,6 @@ void ModelObject::process_connector_cut(ModelVolume* volume, const Transform3d& 
             // But discard rotation and Z-offset for this volume
             vol->set_rotation(Vec3d::Zero());
             vol->set_offset(Z, 0.0);
-
-            // Compute the displacement (in instance coordinates) to be applied to place the dowels
-            local_dowels_displace = lower->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(1.0, 1.0, 0.0));
 
             dowels.push_back(dowel);
         }
@@ -1565,9 +1540,8 @@ void ModelObject::process_volume_cut(ModelVolume* volume, const Transform3d& ins
     if (attributes.has(ModelObjectCutAttribute::KeepLower))
         lower_mesh = TriangleMesh(lower_its);
 }
-
 void ModelObject::process_solid_part_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
-                                       ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower, Vec3d& local_displace)
+                                       ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower)
 {
     // Perform cut
     TriangleMesh upper_mesh, lower_mesh;
@@ -1584,31 +1558,12 @@ void ModelObject::process_solid_part_cut(ModelVolume* volume, const Transform3d&
     if (attributes.has(ModelObjectCutAttribute::KeepUpper))
         add_cut_volume(upper_mesh, upper, volume, cut_matrix);
 
-    if (attributes.has(ModelObjectCutAttribute::KeepLower) && !lower_mesh.empty()) {
+    if (attributes.has(ModelObjectCutAttribute::KeepLower) && !lower_mesh.empty())
         add_cut_volume(lower_mesh, lower, volume, cut_matrix);
-
-        // Compute the displacement (in instance coordinates) to be applied to place the upper parts
-        // The upper part displacement is set to half of the lower part bounding box
-        // this is done in hope at least a part of the upper part will always be visible and draggable
-        local_displace = lower->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(-0.5, -0.5, 0.0));
-    }
 }
 
-static void invalidate_translations(ModelObject* object, const ModelInstance* src_instance)
-{
-    if (!object->origin_translation.isApprox(Vec3d::Zero()) && src_instance->get_offset().isApprox(Vec3d::Zero())) {
-        object->center_around_origin();
-        object->translate_instances(-object->origin_translation);
-        object->origin_translation = Vec3d::Zero();
-    }
-    else {
-        object->invalidate_bounding_box();
-        object->center_around_origin();
-    }
-}
-
-static void reset_instance_transformation(ModelObject* object, size_t src_instance_idx, const Transform3d& cut_matrix, 
-                                          bool place_on_cut = false, bool flip = false, Vec3d local_displace = Vec3d::Zero())
+void ModelObject::reset_instance_transformation(ModelObject* object, size_t src_instance_idx, const Transform3d& cut_matrix,
+                                                bool place_on_cut/* = false*/, bool flip/* = false*/)
 {
     using namespace Geometry;
 
@@ -1616,14 +1571,9 @@ static void reset_instance_transformation(ModelObject* object, size_t src_instan
 
     for (size_t i = 0; i < object->instances.size(); ++i) {
         auto& obj_instance = object->instances[i];
-        const Vec3d offset = obj_instance->get_offset();
         const double rot_z = obj_instance->get_rotation().z();
-
-        obj_instance->set_transformation(Transformation());
-
-        const Vec3d displace = local_displace.isApprox(Vec3d::Zero()) ? Vec3d::Zero() :
-                               rotation_transform(obj_instance->get_rotation()) * local_displace;
-        obj_instance->set_offset(offset + displace);
+        
+        obj_instance->set_transformation(Transformation(obj_instance->get_transformation().get_matrix_no_scaling_factor()));
 
         Vec3d rotation = Vec3d::Zero();
         if (!flip && !place_on_cut) {
@@ -1655,9 +1605,6 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
 
     BOOST_LOG_TRIVIAL(trace) << "ModelObject::cut - start";
 
-    // apply cut attributes for object
-    apply_cut_attributes(attributes);
-
     // Clone the object to duplicate instances, materials etc.
     ModelObject* upper{ nullptr };
     if (attributes.has(ModelObjectCutAttribute::KeepUpper))
@@ -1681,10 +1628,6 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
     const Transformation cut_transformation = Transformation(cut_matrix);
     const Transform3d inverse_cut_matrix    = cut_transformation.get_rotation_matrix().inverse() * translation_transform(-1. * cut_transformation.get_offset());
 
-    // Displacement (in instance coordinates) to be applied to place the upper parts
-    Vec3d local_displace = Vec3d::Zero();
-    Vec3d local_dowels_displace = Vec3d::Zero();
-
     for (ModelVolume* volume : volumes) {
         volume->reset_extra_facets();
 
@@ -1692,10 +1635,10 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
             if (volume->cut_info.is_processed)
                 process_modifier_cut(volume, instance_matrix, inverse_cut_matrix, attributes, upper, lower);
             else
-                process_connector_cut(volume, instance_matrix, cut_matrix, attributes, upper, lower, dowels, local_dowels_displace);
+                process_connector_cut(volume, instance_matrix, cut_matrix, attributes, upper, lower, dowels);
         }
         else if (!volume->mesh().empty())
-            process_solid_part_cut(volume, instance_matrix, cut_matrix, attributes, upper, lower, local_displace);
+            process_solid_part_cut(volume, instance_matrix, cut_matrix, attributes, upper, lower);
     }
 
     // Post-process cut parts
@@ -1708,31 +1651,22 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
     }
     else {
         if (attributes.has(ModelObjectCutAttribute::KeepUpper) && !upper->volumes.empty()) {
-            invalidate_translations(upper, instances[instance]);
-
             reset_instance_transformation(upper, instance, cut_matrix,
                 attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper),
-                attributes.has(ModelObjectCutAttribute::FlipUpper),
-                local_displace);
+                attributes.has(ModelObjectCutAttribute::FlipUpper));
             res.push_back(upper);
         }
 
         if (attributes.has(ModelObjectCutAttribute::KeepLower) && !lower->volumes.empty()) {
-            invalidate_translations(lower, instances[instance]);
-
             reset_instance_transformation(lower, instance, cut_matrix,
                 attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),
-                attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) ? true : attributes.has(ModelObjectCutAttribute::FlipLower));
+                attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) || attributes.has(ModelObjectCutAttribute::FlipLower));
             res.push_back(lower);
         }
 
         if (attributes.has(ModelObjectCutAttribute::CreateDowels) && !dowels.empty()) {
             for (auto dowel : dowels) {
-                invalidate_translations(dowel, instances[instance]);
-
-                reset_instance_transformation(dowel, instance, Transform3d::Identity(), false, false, local_dowels_displace);
-
-                local_dowels_displace += dowel->full_raw_mesh_bounding_box().size().cwiseProduct(Vec3d(-1.5, -1.5, 0.0));
+                reset_instance_transformation(dowel, instance, Transform3d::Identity());
                 dowel->name += "-Dowel-" + dowel->volumes[0]->name;
                 res.push_back(dowel);
             }
@@ -1740,8 +1674,6 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
     }
 
     BOOST_LOG_TRIVIAL(trace) << "ModelObject::cut - end";
-
-    synchronize_model_after_cut();
 
     return res;
 }
@@ -2097,6 +2029,14 @@ bool ModelObject::has_solid_mesh() const
     return false;
 }
 
+bool ModelObject::has_negative_volume_mesh() const
+{
+    for (const ModelVolume* volume : volumes)
+        if (volume->is_negative_volume())
+            return true;
+    return false;
+}
+
 void ModelVolume::set_material_id(t_model_material_id material_id)
 {
     m_material_id = material_id;
@@ -2405,12 +2345,8 @@ void ModelInstance::transform_polygon(Polygon* polygon) const
 arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
 {
 //    static const double SIMPLIFY_TOLERANCE_MM = 0.1;
-    
-    Vec3d rotation = get_rotation();
-    rotation.z()   = 0.;
-    Transform3d trafo_instance = Geometry::assemble_transform(get_offset().z() * Vec3d::UnitZ(), rotation, get_scaling_factor(), get_mirror());
 
-    Polygon p = get_object()->convex_hull_2d(trafo_instance);
+    Polygon p = get_object()->convex_hull_2d(this->get_matrix());
 
 //    if (!p.points.empty()) {
 //        Polygons pp{p};
@@ -2420,10 +2356,22 @@ arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
    
     arrangement::ArrangePolygon ret;
     ret.poly.contour = std::move(p);
-    ret.translation  = Vec2crd{scaled(get_offset(X)), scaled(get_offset(Y))};
-    ret.rotation     = get_rotation(Z);
+    ret.translation  = Vec2crd::Zero();
+    ret.rotation     = 0.;
 
     return ret;
+}
+
+void ModelInstance::apply_arrange_result(const Vec2d &offs, double rotation)
+{
+    // write the transformation data into the model instance
+    auto trafo = get_transformation().get_matrix();
+    auto tr = Transform3d::Identity();
+    tr.translate(to_3d(unscaled(offs), 0.));
+    trafo = tr * Eigen::AngleAxisd(rotation, Vec3d::UnitZ()) * trafo;
+    m_transformation.set_matrix(trafo);
+
+    this->object->invalidate_bounding_box();
 }
 
 indexed_triangle_set FacetsAnnotation::get_facets(const ModelVolume& mv, EnforcerBlockerType type) const
@@ -2650,14 +2598,6 @@ bool model_has_multi_part_objects(const Model &model)
     for (const ModelObject *model_object : model.objects)
     	if (model_object->volumes.size() != 1 || ! model_object->volumes.front()->is_model_part())
     		return true;
-    return false;
-}
-
-bool model_has_connectors(const Model &model)
-{
-    for (const ModelObject *model_object : model.objects)
-        if (!model_object->cut_connectors.empty())
-            return true;
     return false;
 }
 

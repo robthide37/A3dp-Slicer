@@ -20,6 +20,8 @@ class Selection;
 
 enum class SLAGizmoEventType : unsigned char;
 
+namespace CommonGizmosDataObjects { class ObjectClipper; }
+
 class GLGizmoCut3D : public GLGizmoBase
 {
     enum GrabberID {
@@ -133,8 +135,45 @@ class GLGizmoCut3D : public GLGizmoBase
 
     GLSelectionRectangle m_selection_rectangle;
 
-    bool m_has_invalid_connector{ false };
+    std::vector<size_t> m_invalid_connectors_idxs;
     bool m_was_cut_plane_dragged { false };
+    bool m_was_contour_selected { false };
+
+    class PartSelection {
+    public:
+        PartSelection() = default;
+        PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc);
+        ~PartSelection() { m_model.clear_objects(); }
+
+        struct Part {
+            GLModel glmodel;
+            MeshRaycaster raycaster;
+            bool selected;
+            bool is_modifier;
+        };
+
+        void render(const Vec3d* normal, GLModel& sphere_model);
+        void toggle_selection(const Vec2d& mouse_pos);
+        void turn_over_selection();
+        ModelObject* model_object() { return m_model.objects.front(); }
+        bool valid() const { return m_valid; }
+        bool is_one_object() const;
+        const std::vector<Part>& parts() const { return m_parts; }
+        const std::vector<size_t>* get_ignored_contours_ptr() const { return (valid() ? &m_ignored_contours : nullptr); }
+
+    private:
+        Model m_model;
+        int m_instance_idx;
+        std::vector<Part> m_parts;
+        bool m_valid = false;
+        std::vector<std::pair<std::vector<size_t>, std::vector<size_t>>> m_contour_to_parts; // for each contour, there is a vector of parts above and a vector of parts below
+        std::vector<size_t> m_ignored_contours; // contour that should not be rendered (the parts on both sides will both be parts of the same object)
+
+        std::vector<Vec3d> m_contour_points;         // Debugging
+        std::vector<std::vector<Vec3d>> m_debug_pts; // Debugging
+    };
+
+    PartSelection m_part_selection;
 
     bool                                        m_show_shortcuts{ false };
     std::vector<std::pair<wxString, wxString>>  m_shortcuts;
@@ -161,10 +200,10 @@ class GLGizmoCut3D : public GLGizmoBase
     CutConnectorType m_connector_type;
 
     std::vector<std::string> m_connector_styles;
-    size_t m_connector_style;
+    int m_connector_style;
 
     std::vector<std::string> m_connector_shapes;
-    size_t m_connector_shape_id;
+    int m_connector_shape_id;
 
     std::vector<std::string> m_axis_names;
 
@@ -176,7 +215,7 @@ public:
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
     std::string get_tooltip() const override;
-    bool unproject_on_cut_plane(const Vec2d& mouse_pos, Vec3d& pos, Vec3d& pos_world);
+    bool unproject_on_cut_plane(const Vec2d& mouse_pos, Vec3d& pos, Vec3d& pos_world, bool respect_disabled_contour = true);
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
     bool is_in_editing_mode() const override { return m_connectors_editing; }
@@ -229,6 +268,8 @@ protected:
     void reset_cut_plane();
     void set_connectors_editing(bool connectors_editing);
     void flip_cut_plane();
+    void process_contours();
+    void reset_cut_by_contours();
     void render_flip_plane_button(bool disable_pred = false);
     void add_vertical_scaled_interval(float interval);
     void add_horizontal_scaled_interval(float interval);
@@ -257,10 +298,11 @@ protected:
     std::string get_action_snapshot_name() const override   { return _u8L("Cut gizmo editing"); }
 
     void data_changed(bool is_serializing) override; 
+    Transform3d get_cut_matrix(const Selection& selection);
 
 private:
     void set_center(const Vec3d& center, bool update_tbb = false);
-    bool render_combo(const std::string& label, const std::vector<std::string>& lines, size_t& selection_idx);
+    bool render_combo(const std::string& label, const std::vector<std::string>& lines, int& selection_idx);
     bool render_double_input(const std::string& label, double& value_in);
     bool render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in);
     void render_move_center_input(int axis);
@@ -273,12 +315,12 @@ private:
 
     bool can_perform_cut() const;
     bool has_valid_contour() const;
-    void apply_connectors_in_model(ModelObject* mo, bool &create_dowels_as_separate_object);
+    void apply_connectors_in_model(ModelObject* mo, int &dowels_count);
     bool cut_line_processing() const;
     void discard_cut_line_processing();
 
     void render_cut_plane();
-    void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
+    static void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
     void render_line(GLModel& line_model, const ColorRGBA& color, Transform3d view_model_matrix, float width);
     void render_rotation_snapping(GrabberID axis, const ColorRGBA& color);
     void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix);
@@ -296,6 +338,7 @@ private:
     void update_connector_shape();
     void validate_connector_settings();
     bool process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position);
+    void check_and_update_connectors_state();
 };
 
 } // namespace GUI

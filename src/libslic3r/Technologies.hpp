@@ -36,6 +36,8 @@
 #define ENABLE_MATRICES_DEBUG 0
 // Shows an imgui dialog containing data from class ObjectManipulation
 #define ENABLE_OBJECT_MANIPULATION_DEBUG 0
+// Shows an imgui dialog containing data for class GLCanvas3D::SLAView
+#define ENABLE_SLA_VIEW_DEBUG_WINDOW 0
 
 
 // Enable rendering of objects using environment map
@@ -58,8 +60,6 @@
 
 // Enable alternative version of file_wildcards()
 #define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_6_0_ALPHA1)
-// Enable gcode postprocess modified to allow for backward insertion of new lines
-#define ENABLE_GCODE_POSTPROCESS_BACKTRACE (1 && ENABLE_2_6_0_ALPHA1)
 
 
 #endif // _prusaslicer_technologies_h_

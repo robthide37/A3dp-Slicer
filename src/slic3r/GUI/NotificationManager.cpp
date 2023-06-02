@@ -2218,7 +2218,6 @@ void NotificationManager::push_version_notification(NotificationType type, Notif
 
 	for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
 		// NoNewReleaseAvailable must not show if alfa / beta is on.
-		NotificationType nttype = notification->get_type();
 		if (type == NotificationType::NoNewReleaseAvailable
 			&& (notification->get_type() == NotificationType::NewAlphaAvailable 
 				|| notification->get_type() == NotificationType::NewBetaAvailable)) {

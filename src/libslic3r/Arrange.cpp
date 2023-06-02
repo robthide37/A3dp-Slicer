@@ -750,7 +750,7 @@ void arrange(ArrangePolygons &items,
         d += corr;
 
         for (auto &itm : items)
-            if (itm.bed_idx == bedidx)
+            if (itm.bed_idx == int(bedidx))
                 itm.translation += d;
     }
 }

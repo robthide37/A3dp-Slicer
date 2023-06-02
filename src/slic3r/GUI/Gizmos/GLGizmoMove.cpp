@@ -67,23 +67,10 @@ bool GLGizmoMove3D::on_is_activable() const
 void GLGizmoMove3D::on_start_dragging()
 {
     assert(m_hover_id != -1);
-
     m_displacement = Vec3d::Zero();
-    const Selection& selection = m_parent.get_selection();
-    const ECoordinatesType coordinates_type = wxGetApp().obj_manipul()->get_coordinates_type();
-    if (coordinates_type == ECoordinatesType::World)
-        m_starting_drag_position = m_center + m_grabbers[m_hover_id].center;
-    else if (coordinates_type == ECoordinatesType::Local && selection.is_single_volume_or_modifier()) {
-        const GLVolume& v = *selection.get_first_volume();
-        m_starting_drag_position = m_center + v.get_instance_transformation().get_rotation_matrix() * v.get_volume_transformation().get_rotation_matrix() * m_grabbers[m_hover_id].center;
-    }
-    else {
-        const GLVolume& v = *selection.get_first_volume();
-        m_starting_drag_position = m_center + v.get_instance_transformation().get_rotation_matrix() * m_grabbers[m_hover_id].center;
-    }
+    m_starting_drag_position = m_grabbers[m_hover_id].matrix * m_grabbers[m_hover_id].center;
     m_starting_box_center = m_center;
-    m_starting_box_bottom_center = m_center;
-    m_starting_box_bottom_center.z() = m_bounding_box.min.z();
+    m_starting_box_bottom_center = Vec3d(m_center.x(), m_center.y(), m_bounding_box.min.z());
 }
 
 void GLGizmoMove3D::on_stop_dragging()
@@ -122,7 +109,8 @@ void GLGizmoMove3D::on_render()
     const auto& [box, box_trafo] = selection.get_bounding_box_in_current_reference_system();
     m_bounding_box = box;
     m_center = box_trafo.translation();
-    const Transform3d base_matrix = local_transform(m_parent.get_selection());
+    const Transform3d base_matrix = box_trafo;
+
     for (int i = 0; i < 3; ++i) {
         m_grabbers[i].matrix = base_matrix;
     }
@@ -230,10 +218,12 @@ void GLGizmoMove3D::on_render()
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.1f);
+            glsafe(::glDisable(GL_CULL_FACE));
             // draw grabber
             const Vec3d box_size = m_bounding_box.size();
             const float mean_size = (float)((box_size.x() + box_size.y() + box_size.z()) / 3.0);
             m_grabbers[m_hover_id].render(true, mean_size);
+            glsafe(::glEnable(GL_CULL_FACE));
             shader->stop_using();
         }
     }

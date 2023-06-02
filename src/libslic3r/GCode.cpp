@@ -836,6 +836,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     path_tmp += ".tmp";
 
     m_processor.initialize(path_tmp);
+    m_processor.set_print(print);
     GCodeOutputStream file(boost::nowide::fopen(path_tmp.c_str(), "wb"), m_processor);
     if (! file.is_open())
         throw Slic3r::RuntimeError(std::string("G-code export to ") + path + " failed.\nCannot open the file for writing.\n");
@@ -900,6 +901,7 @@ namespace DoExport {
         silent_time_estimator_enabled = (config.gcode_flavor == gcfMarlinLegacy || config.gcode_flavor == gcfMarlinFirmware)
                                         && config.silent_mode;
         processor.reset();
+        processor.initialize_result_moves();
         processor.apply_config(config);
         processor.enable_stealth_time_estimator(silent_time_estimator_enabled);
     }
@@ -2449,7 +2451,7 @@ void GCode::process_layer_single_object(
         int extruder_override_id = is_anything_overridden ? layer_tools.wiping_extrusions().get_extruder_override(eec, instance_id) : -1;
         return print_wipe_extrusions ?
             extruder_override_id == int(extruder_id) :
-            extruder_override_id < 0 && extruder_id == correct_extruder_id;
+            extruder_override_id < 0 && int(extruder_id) == correct_extruder_id;
     };
 
     ExtrusionEntitiesPtr temp_fill_extrusions;
@@ -3035,7 +3037,7 @@ std::string GCode::_extrude(const ExtrusionPath &path, const std::string_view de
                                                       EXTRUDER_CONFIG(filament_max_volumetric_speed) / path.mm3_per_mm);
         }
 
-        new_points = m_extrusion_quality_estimator.estimate_extrusion_quality(path, overhangs_with_speeds, overhang_w_fan_speeds,
+        new_points = m_extrusion_quality_estimator.estimate_speed_from_extrusion_quality(path, overhangs_with_speeds, overhang_w_fan_speeds,
                                                                               m_writer.extruder()->id(), external_perim_reference_speed,
                                                                               speed);
         variable_speed_or_fan_speed = std::any_of(new_points.begin(), new_points.end(),

@@ -858,6 +858,43 @@ std::pair<BoundingBoxf3, Transform3d> Selection::get_bounding_box_in_reference_s
     return { out_box, out_trafo.get_matrix_no_scaling_factor() };
 }
 
+BoundingBoxf Selection::get_screen_space_bounding_box()
+{
+    BoundingBoxf ss_box;
+    if (!is_empty()) {
+        const auto& [box, box_trafo] = get_bounding_box_in_current_reference_system();
+
+        // vertices
+        std::vector<Vec3d> vertices = {
+            { box.min.x(), box.min.y(), box.min.z() },
+            { box.max.x(), box.min.y(), box.min.z() },
+            { box.max.x(), box.max.y(), box.min.z() },
+            { box.min.x(), box.max.y(), box.min.z() },
+            { box.min.x(), box.min.y(), box.max.z() },
+            { box.max.x(), box.min.y(), box.max.z() },
+            { box.max.x(), box.max.y(), box.max.z() },
+            { box.min.x(), box.max.y(), box.max.z() }
+        };
+
+        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Matrix4d projection_view_matrix = camera.get_projection_matrix().matrix() * camera.get_view_matrix().matrix();
+        const std::array<int, 4>& viewport = camera.get_viewport();
+
+        const double half_w = 0.5 * double(viewport[2]);
+        const double h = double(viewport[3]);
+        const double half_h = 0.5 * h;
+        for (const Vec3d& v : vertices) {
+            const Vec3d world = box_trafo * v;
+            const Vec4d clip = projection_view_matrix * Vec4d(world.x(), world.y(), world.z(), 1.0);
+            const Vec3d ndc = Vec3d(clip.x(), clip.y(), clip.z()) / clip.w();
+            const Vec2d ss = Vec2d(half_w * ndc.x() + double(viewport[0]) + half_w, h - (half_h * ndc.y() + double(viewport[1]) + half_h));
+            ss_box.merge(ss);
+        }
+    }
+
+    return ss_box;
+}
+
 void Selection::setup_cache()
 {
     if (!m_valid)
@@ -1501,6 +1538,11 @@ void Selection::erase()
         wxGetApp().obj_list()->delete_from_model_and_list(items);
         ensure_not_below_bed();
     }
+
+    GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
+    canvas->set_sequential_clearance_as_evaluating();
+    canvas->set_as_dirty();
+    canvas->request_extra_frame();
 }
 
 void Selection::render(float scale_factor)
@@ -1556,6 +1598,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     shader->start_using();
 
     glsafe(::glEnable(GL_DEPTH_TEST));
+    glsafe(::glDisable(GL_CULL_FACE));
 
     const Transform3d base_matrix = Geometry::translation_transform(get_bounding_box().center());
     Transform3d orient_matrix = Transform3d::Identity();
@@ -1566,15 +1609,14 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
     if (!boost::starts_with(sidebar_field, "layer")) {
         shader->set_uniform("emission_factor", 0.05f);
         if (is_single_full_instance() && !wxGetApp().obj_manipul()->is_world_coordinates()) {
-          orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
-          axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
+            orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
+            axes_center = (*m_volumes)[*m_list.begin()]->get_instance_offset();
         }
         else if (is_single_volume_or_modifier()) {
             if (!wxGetApp().obj_manipul()->is_world_coordinates()) {
                 if (wxGetApp().obj_manipul()->is_local_coordinates()) {
-                    const GLVolume* v = (*m_volumes)[*m_list.begin()];
-                    orient_matrix = v->get_instance_transformation().get_rotation_matrix() * v->get_volume_transformation().get_rotation_matrix();
-                    axes_center = (*m_volumes)[*m_list.begin()]->world_matrix().translation();
+                    orient_matrix = get_bounding_box_in_current_reference_system().second;
+                    orient_matrix.translation() = Vec3d::Zero();
                 }
                 else {
                     orient_matrix = (*m_volumes)[*m_list.begin()]->get_instance_transformation().get_rotation_matrix();
@@ -1608,6 +1650,7 @@ void Selection::render_sidebar_hints(const std::string& sidebar_field)
             m_axes.render(Geometry::translation_transform(axes_center) * orient_matrix, 0.25f);
     }
 
+    glsafe(::glEnable(GL_CULL_FACE));
     shader->stop_using();
 }
 
@@ -1717,8 +1760,7 @@ std::vector<unsigned int> Selection::get_volume_idxs_from_volume(unsigned int ob
 {
     std::vector<unsigned int> idxs;
 
-    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i)
-    {
+    for (unsigned int i = 0; i < (unsigned int)m_volumes->size(); ++i) {
         const GLVolume* v = (*m_volumes)[i];
         if (v->object_idx() == (int)object_idx && v->volume_idx() == (int)volume_idx) {
             if ((int)instance_idx != -1 && v->instance_idx() == (int)instance_idx)

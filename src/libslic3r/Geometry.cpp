@@ -52,15 +52,15 @@ template bool contains(const ExPolygons &vector, const Point &point);
 
 void simplify_polygons(const Polygons &polygons, double tolerance, Polygons* retval)
 {
-    Polygons pp;
-    for (Polygons::const_iterator it = polygons.begin(); it != polygons.end(); ++it) {
-        Polygon p = *it;
-        p.points.push_back(p.points.front());
-        p.points = MultiPoint::_douglas_peucker(p.points, tolerance);
-        p.points.pop_back();
-        pp.push_back(p);
+    Polygons simplified_raw;
+    for (const Polygon &source_polygon : polygons) {
+        Points simplified = MultiPoint::douglas_peucker(to_polyline(source_polygon).points, tolerance);
+        if (simplified.size() > 3) {
+            simplified.pop_back();
+            simplified_raw.push_back(Polygon{ std::move(simplified) });
+        }
     }
-    *retval = Slic3r::simplify_polygons(pp);
+    *retval = Slic3r::simplify_polygons(simplified_raw);
 }
 
 double linint(double value, double oldmin, double oldmax, double newmin, double newmax)

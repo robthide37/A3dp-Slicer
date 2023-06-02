@@ -104,6 +104,8 @@ static const std::map<const wchar_t, std::string> font_icons_large = {
     {ImGui::PauseHoverButton        , "notification_pause_hover"        },
     {ImGui::OpenButton              , "notification_open"               },
     {ImGui::OpenHoverButton         , "notification_open_hover"         },
+    {ImGui::SlaViewOriginal         , "sla_view_original"               },
+    {ImGui::SlaViewProcessed        , "sla_view_processed"              },
 };
 
 static const std::map<const wchar_t, std::string> font_icons_extra_large = {
@@ -460,7 +462,7 @@ bool ImGuiWrapper::button(const wxString &label, const wxString& tooltip)
 
     if (!tooltip.IsEmpty() && ImGui::IsItemHovered()) {
         auto tooltip_utf8 = into_u8(tooltip);
-        ImGui::SetTooltip(tooltip_utf8.c_str());
+        ImGui::SetTooltip(tooltip_utf8.c_str(), nullptr);
     }
 
     return ret;
@@ -488,6 +490,18 @@ bool ImGuiWrapper::radio_button(const wxString &label, bool active)
 {
     auto label_utf8 = into_u8(label);
     return ImGui::RadioButton(label_utf8.c_str(), active);
+}
+
+void ImGuiWrapper::draw_icon(ImGuiWindow& window, const ImVec2& pos, float size, wchar_t icon_id)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    const ImTextureID tex_id = io.Fonts->TexID;
+    const float tex_w = static_cast<float>(io.Fonts->TexWidth);
+    const float tex_h = static_cast<float>(io.Fonts->TexHeight);
+    const ImFontAtlas::CustomRect* const rect = GetTextureCustomRect(icon_id);
+    const ImVec2 uv0 = { static_cast<float>(rect->X) / tex_w, static_cast<float>(rect->Y) / tex_h };
+    const ImVec2 uv1 = { static_cast<float>(rect->X + rect->Width) / tex_w, static_cast<float>(rect->Y + rect->Height) / tex_h };
+    window.DrawList->AddImage(tex_id, pos, { pos.x + size, pos.y + size }, uv0, uv1, ImGuiWrapper::to_ImU32({ 1.0f, 1.0f, 1.0f, 1.0f }));
 }
 
 bool ImGuiWrapper::draw_radio_button(const std::string& name, float size, bool active,
@@ -760,27 +774,33 @@ bool ImGuiWrapper::image_button(const wchar_t icon, const wxString& tooltip)
     return res;
 }
 
-bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags)
+bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags/* = 0*/, float label_width/* = 0.0f*/, float item_width/* = 0.0f*/)
+{
+    return combo(into_u8(label), options, selection, flags, label_width, item_width);
+}
+
+bool ImGuiWrapper::combo(const std::string& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags/* = 0*/, float label_width/* = 0.0f*/, float item_width/* = 0.0f*/)
 {
     // this is to force the label to the left of the widget:
     if (!label.empty()) {
         text(label);
-        ImGui::SameLine();
+        ImGui::SameLine(label_width);
     }
+    ImGui::PushItemWidth(item_width);
 
     int selection_out = selection;
     bool res = false;
 
     const char *selection_str = selection < int(options.size()) && selection >= 0 ? options[selection].c_str() : "";
-    if (ImGui::BeginCombo("", selection_str, flags)) {
+    if (ImGui::BeginCombo(("##" + label).c_str(), selection_str, flags)) {
         for (int i = 0; i < (int)options.size(); i++) {
             if (ImGui::Selectable(options[i].c_str(), i == selection)) {
                 selection_out = i;
+                res = true;
             }
         }
 
         ImGui::EndCombo();
-        res = true;
     }
 
     selection = selection_out;
@@ -1661,6 +1681,8 @@ void ImGuiWrapper::init_font(bool compress)
 	ImVector<ImWchar> ranges;
     ImFontGlyphRangesBuilder builder;
 	builder.AddRanges(m_glyph_ranges);
+
+    builder.AddChar(ImWchar(0x2026)); // …
 
     if (m_font_cjk) {
         // This is a temporary fix of https://github.com/prusa3d/PrusaSlicer/issues/8171. The translation

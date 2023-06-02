@@ -480,11 +480,11 @@ int GLVolumeCollection::load_object_volume(
 
 #if ENABLE_OPENGL_ES
 int GLVolumeCollection::load_wipe_tower_preview(
-    float pos_x, float pos_y, float width, float depth, float height, float cone_angle,
+    float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle,
     float rotation_angle, bool size_unknown, float brim_width, TriangleMesh* out_mesh)
 #else
 int GLVolumeCollection::load_wipe_tower_preview(
-    float pos_x, float pos_y, float width, float depth, float height, float cone_angle,
+    float pos_x, float pos_y, float width, float depth, const std::vector<std::pair<float, float>>& z_and_depth_pairs, float height, float cone_angle,
     float rotation_angle, bool size_unknown, float brim_width)
 #endif // ENABLE_OPENGL_ES
 {
@@ -534,8 +534,13 @@ int GLVolumeCollection::load_wipe_tower_preview(
 
         mesh.scale(Vec3f(width / (n * min_width), 1.f, height)); // Scaling to proper width
     }
-    else
-        mesh = make_cube(width, depth, height);
+    else {
+        for (size_t i=1; i<z_and_depth_pairs.size(); ++i) {
+            TriangleMesh m = make_cube(width, z_and_depth_pairs[i-1].second, z_and_depth_pairs[i].first-z_and_depth_pairs[i-1].first);
+            m.translate(0.f, -z_and_depth_pairs[i-1].second/2.f + z_and_depth_pairs[0].second/2.f, z_and_depth_pairs[i-1].first);
+            mesh.merge(m);
+        }
+    }
 
     // We'll make another mesh to show the brim (fixed layer height):
     TriangleMesh brim_mesh = make_cube(width + 2.f * brim_width, depth + 2.f * brim_width, 0.2f);
@@ -593,7 +598,7 @@ void GLVolumeCollection::load_object_auxiliary(
         return;
     const Transform3d mesh_trafo_inv = print_object->trafo().inverse();
 
-    auto add_volume = [this, &instances, timestamp](int obj_idx, int inst_idx, const ModelInstance& model_instance, SLAPrintObjectStep step,
+    auto add_volume = [this, timestamp](int obj_idx, int inst_idx, const ModelInstance& model_instance, SLAPrintObjectStep step,
         const TriangleMesh& mesh, const ColorRGBA& color, std::optional<const TriangleMesh> convex_hull = std::nullopt) {
         if (mesh.empty())
             return;
@@ -611,10 +616,28 @@ void GLVolumeCollection::load_object_auxiliary(
         if (convex_hull.has_value())
             v.set_convex_hull(*convex_hull);
         v.is_modifier = false;
-        v.shader_outside_printer_detection_enabled = (step == slaposSupportTree);
+        v.shader_outside_printer_detection_enabled = (step == slaposSupportTree || step == slaposDrillHoles);
         v.set_instance_transformation(model_instance.get_transformation());
     };
  
+    if (milestone == SLAPrintObjectStep::slaposDrillHoles) {
+        if (print_object->get_parts_to_slice().size() > 1) {
+            // Get the mesh.
+            TriangleMesh backend_mesh;
+            std::shared_ptr<const indexed_triangle_set> preview_mesh_ptr = print_object->get_mesh_to_print();
+            if (preview_mesh_ptr != nullptr)
+                backend_mesh = TriangleMesh(*preview_mesh_ptr);
+            if (!backend_mesh.empty()) {
+                backend_mesh.transform(mesh_trafo_inv);
+                TriangleMesh convex_hull = backend_mesh.convex_hull_3d();
+                for (const std::pair<size_t, size_t>& instance_idx : instances) {
+                    const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
+                    add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposDrillHoles, backend_mesh, GLVolume::MODEL_COLOR[0], convex_hull);
+                }
+            }
+        }
+    }
+
     // Get the support mesh.
     if (milestone == SLAPrintObjectStep::slaposSupportTree) {
         TriangleMesh supports_mesh = print_object->support_mesh();
@@ -622,8 +645,8 @@ void GLVolumeCollection::load_object_auxiliary(
             supports_mesh.transform(mesh_trafo_inv);
             TriangleMesh convex_hull = supports_mesh.convex_hull_3d();
             for (const std::pair<size_t, size_t>& instance_idx : instances) {
-              const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
-              add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposSupportTree, supports_mesh, GLVolume::SLA_SUPPORT_COLOR, convex_hull);
+                const ModelInstance& model_instance = *print_object->model_object()->instances[instance_idx.first];
+                add_volume(obj_idx, (int)instance_idx.first, model_instance, slaposSupportTree, supports_mesh, GLVolume::SLA_SUPPORT_COLOR, convex_hull);
             }
         }
     }
@@ -815,64 +838,6 @@ void GLVolumeCollection::render(GLVolumeCollection::ERenderType type, bool disab
     }
 }
 
-bool GLVolumeCollection::check_outside_state(const BuildVolume &build_volume, ModelInstanceEPrintVolumeState *out_state) const
-{
-    const Model&        model              = GUI::wxGetApp().plater()->model();
-    auto                volume_below       = [](GLVolume& volume) -> bool
-        { return volume.object_idx() != -1 && volume.volume_idx() != -1 && volume.is_below_printbed(); };
-    // Volume is partially below the print bed, thus a pre-calculated convex hull cannot be used.
-    auto                volume_sinking     = [](GLVolume& volume) -> bool
-        { return volume.object_idx() != -1 && volume.volume_idx() != -1 && volume.is_sinking(); };
-    // Cached bounding box of a volume above the print bed.
-    auto                volume_bbox        = [volume_sinking](GLVolume& volume) -> BoundingBoxf3 
-        { return volume_sinking(volume) ? volume.transformed_non_sinking_bounding_box() : volume.transformed_convex_hull_bounding_box(); };
-    // Cached 3D convex hull of a volume above the print bed.
-    auto                volume_convex_mesh = [volume_sinking, &model](GLVolume& volume) -> const TriangleMesh&
-        { return volume_sinking(volume) ? model.objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh() : *volume.convex_hull(); };
-
-    ModelInstanceEPrintVolumeState overall_state = ModelInstancePVS_Inside;
-    bool contained_min_one = false;
-
-    for (GLVolume* volume : this->volumes)
-        if (! volume->is_modifier && (volume->shader_outside_printer_detection_enabled || (! volume->is_wipe_tower && volume->composite_id.volume_id >= 0))) {
-            BuildVolume::ObjectState state;
-            if (volume_below(*volume))
-                state = BuildVolume::ObjectState::Below;
-            else {
-                switch (build_volume.type()) {
-                case BuildVolume::Type::Rectangle:
-                //FIXME this test does not evaluate collision of a build volume bounding box with non-convex objects.
-                    state = build_volume.volume_state_bbox(volume_bbox(*volume));
-                    break;
-                case BuildVolume::Type::Circle:
-                case BuildVolume::Type::Convex:
-                //FIXME doing test on convex hull until we learn to do test on non-convex polygons efficiently.
-                case BuildVolume::Type::Custom:
-                    state = build_volume.object_state(volume_convex_mesh(*volume).its, volume->world_matrix().cast<float>(), volume_sinking(*volume));
-                    break;
-                default:
-                    // Ignore, don't produce any collision.
-                    state = BuildVolume::ObjectState::Inside;
-                    break;
-                }
-                assert(state != BuildVolume::ObjectState::Below);
-            }
-            volume->is_outside = state != BuildVolume::ObjectState::Inside;
-            if (volume->printable) {
-                if (overall_state == ModelInstancePVS_Inside && volume->is_outside)
-                    overall_state = ModelInstancePVS_Fully_Outside;
-                if (overall_state == ModelInstancePVS_Fully_Outside && volume->is_outside && state == BuildVolume::ObjectState::Colliding)
-                    overall_state = ModelInstancePVS_Partly_Outside;
-                contained_min_one |= !volume->is_outside;
-            }
-        }
-
-    if (out_state != nullptr)
-        *out_state = overall_state;
-
-    return contained_min_one;
-}
-
 void GLVolumeCollection::reset_outside_state()
 {
     for (GLVolume* volume : this->volumes) {
@@ -922,7 +887,7 @@ void GLVolumeCollection::update_colors_by_extruder(const DynamicPrintConfig* con
     }
 
     for (GLVolume* volume : volumes) {
-        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower || volume->volume_idx() < 0)
+        if (volume == nullptr || volume->is_modifier || volume->is_wipe_tower || volume->is_sla_pad() || volume->is_sla_support())
             continue;
 
         int extruder_id = volume->extruder_id - 1;

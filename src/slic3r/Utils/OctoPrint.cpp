@@ -32,6 +32,37 @@ namespace pt = boost::property_tree;
 namespace Slic3r {
 
 namespace {
+std::string get_host_from_url(const std::string& url_in)
+{
+    std::string url = url_in;
+    // add http:// if there is no scheme
+    size_t double_slash = url.find("//");
+    if (double_slash == std::string::npos)
+        url = "http://" + url;
+    std::string out = url;
+    CURLU* hurl = curl_url();
+    if (hurl) {
+        // Parse the input URL.
+        CURLUcode rc = curl_url_set(hurl, CURLUPART_URL, url.c_str(), 0);
+        if (rc == CURLUE_OK) {
+            // Replace the address.
+            char* host;
+            rc = curl_url_get(hurl, CURLUPART_HOST, &host, 0);
+            if (rc == CURLUE_OK) {
+                out = host;
+                curl_free(host);
+            }
+            else
+                BOOST_LOG_TRIVIAL(error) << "OctoPrint get_host_from_url: failed to get host form URL " << url;
+        }
+        else
+            BOOST_LOG_TRIVIAL(error) << "OctoPrint get_host_from_url: failed to parse URL " << url;
+        curl_url_cleanup(hurl);
+    }
+    else
+        BOOST_LOG_TRIVIAL(error) << "OctoPrint get_host_from_url: failed to allocate curl_url";
+    return out;
+}
 #ifdef WIN32
     // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
 std::string substitute_host(const std::string& orig_addr, std::string sub_addr)
@@ -96,38 +127,6 @@ std::string substitute_host(const std::string& orig_addr, std::string sub_addr)
     return out;
 #endif
 }
-
-std::string get_host_from_url(const std::string& url_in)
-{
-    std::string url = url_in;
-    // add http:// if there is no scheme
-    size_t double_slash = url.find("//");
-    if (double_slash == std::string::npos)
-        url = "http://" + url;
-    std::string out = url;
-    CURLU* hurl = curl_url();
-    if (hurl) {
-        // Parse the input URL.
-        CURLUcode rc = curl_url_set(hurl, CURLUPART_URL, url.c_str(), 0);
-        if (rc == CURLUE_OK) {
-            // Replace the address.
-            char* host;
-            rc = curl_url_get(hurl, CURLUPART_HOST, &host, 0);
-            if (rc == CURLUE_OK) {
-                out = host;
-                curl_free(host);
-            }
-            else
-                BOOST_LOG_TRIVIAL(error) << "OctoPrint get_host_from_url: failed to get host form URL " << url;
-        }
-        else
-            BOOST_LOG_TRIVIAL(error) << "OctoPrint get_host_from_url: failed to parse URL " << url;
-        curl_url_cleanup(hurl);
-    }
-    else
-        BOOST_LOG_TRIVIAL(error) << "OctoPrint get_host_from_url: failed to allocate curl_url";
-    return out;
-}
 #endif // WIN32
 std::string escape_string(const std::string& unescaped)
 {
@@ -170,7 +169,7 @@ const char* OctoPrint::get_name() const { return "OctoPrint"; }
 bool OctoPrint::test_with_resolved_ip(wxString &msg) const
 {
     // Since the request is performed synchronously here,
-   // it is ok to refer to `msg` from within the closure
+    // it is ok to refer to `msg` from within the closure
     const char* name = get_name();
     bool res = true;
     // Msg contains ip string.
@@ -179,7 +178,15 @@ bool OctoPrint::test_with_resolved_ip(wxString &msg) const
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get version at: %2%") % name % url;
 
+    std::string host = get_host_from_url(m_host);
     auto http = Http::get(url);//std::move(url));
+    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
+    // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
+    // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy is used (issue #9734).
+    // Also when allow_ip_resolve = 0, this is not needed, but it should not break anything if it stays.
+    // https://www.rfc-editor.org/rfc/rfc7230#section-5.4
+    http.header("Host", host);
     set_auth(http);
     http
         .on_error([&](std::string body, std::string error, unsigned status) {
@@ -228,7 +235,7 @@ bool OctoPrint::test(wxString& msg) const
     auto url = make_url("api/version");
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get version at: %2%") % name % url;
-
+    // Here we do not have to add custom "Host" header - the url contains host filled by user and libCurl will set the header by itself.
     auto http = Http::get(std::move(url));
     set_auth(http);
     http.on_error([&](std::string body, std::string error, unsigned status) {
@@ -339,7 +346,7 @@ bool OctoPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Erro
         return true;
     } else {
         // There are multiple addresses - user needs to choose which to use.
-        size_t selected_index = resolved_addr.size();
+        size_t selected_index = resolved_addr.size(); 
         IPListDialog dialog(nullptr, boost::nowide::widen(m_host), resolved_addr, selected_index);
         if (dialog.ShowModal() == wxID_OK && selected_index < resolved_addr.size()) {    
             return upload_inner_with_resolved_ip(std::move(upload_data), prorgess_fn, error_fn, info_fn, resolved_addr[selected_index]);
@@ -378,7 +385,14 @@ bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload upload_data, Progr
         % upload_parent_path.string()
         % (upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false");
 
+    std::string host = get_host_from_url(m_host);
     auto http = Http::post(url);//std::move(url));
+    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
+    // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
+    // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy is used (issue #9734).
+    // https://www.rfc-editor.org/rfc/rfc7230#section-5.4
+    http.header("Host", host);
     set_auth(http);
     http.form_add("print", upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
         .form_add("path", upload_parent_path.string())      // XXX: slashes on windows ???
@@ -456,7 +470,15 @@ bool OctoPrint::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn p
         % upload_parent_path.string()
         % (upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false");
 
+    std::string host = get_host_from_url(m_host);
     auto http = Http::post(std::move(url));
+    // "Host" header is necessary here. In the workaround above (two mDNS..) we have got IP address from test connection and subsituted it into "url" variable.
+    // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
+    // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
+    // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy is used (issue #9734).
+    // Also when allow_ip_resolve = 0, this is not needed, but it should not break anything if it stays.
+    // https://www.rfc-editor.org/rfc/rfc7230#section-5.4
+    http.header("Host", host);
     set_auth(http);
     http.form_add("print", upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
         .form_add("path", upload_parent_path.string())      // XXX: slashes on windows ???
@@ -779,7 +801,7 @@ bool PrusaLink::test_with_method_check(wxString& msg, bool& use_put) const
     auto url = make_url("api/version");
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get version at: %2%") % name % url;
-
+    // Here we do not have to add custom "Host" header - the url contains host filled by user and libCurl will set the header by itself.
     auto http = Http::get(std::move(url));
     set_auth(http);
     http.on_error([&](std::string body, std::string error, unsigned status) {
@@ -852,7 +874,15 @@ bool PrusaLink::test_with_resolved_ip_and_method_check(wxString& msg, bool& use_
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get version at: %2%") % name % url;
 
+    std::string host = get_host_from_url(m_host);
     auto http = Http::get(url);//std::move(url));
+    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
+    // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
+    // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy is used (issue #9734).
+    // Also when allow_ip_resolve = 0, this is not needed, but it should not break anything if it stays.
+    // https://www.rfc-editor.org/rfc/rfc7230#section-5.4
+    http.header("Host", host);
     set_auth(http);
     http
         .on_error([&](std::string body, std::string error, unsigned status) {
@@ -1006,13 +1036,18 @@ bool PrusaLink::put_inner(PrintHostUpload upload_data, std::string url, const st
     bool res = true;
     // Percent escape all filenames in on path and add it to the url. This is different from POST.
     url += "/" + escape_path_by_element(upload_data.upload_path);
-
+    std::string host = get_host_from_url(m_host);
     Http http = Http::put(std::move(url));
+    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
+    // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
+    // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy is used (issue #9734).
+    // https://www.rfc-editor.org/rfc/rfc7230#section-5.4
+    http.header("Host", host);
     set_auth(http);
     // This is ugly, but works. There was an error at PrusaLink side that accepts any string at Print-After-Upload as true, thus False was also triggering print after upload.
     if (upload_data.post_action == PrintHostPostUploadAction::StartPrint)
         http.header("Print-After-Upload", "?1");
-
     http.set_put_body(upload_data.source_path)
         .header("Content-Type", "text/x.gcode")
         .header("Overwrite", "?1")
@@ -1048,7 +1083,15 @@ bool PrusaLink::post_inner(PrintHostUpload upload_data, std::string url, const s
     bool res = true;
     const auto upload_filename = upload_data.upload_path.filename();
     const auto upload_parent_path = upload_data.upload_path.parent_path();
+    std::string host = get_host_from_url(m_host);
+
     Http http = Http::post(std::move(url));
+    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
+    // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
+    // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy is used (issue #9734).
+    // https://www.rfc-editor.org/rfc/rfc7230#section-5.4
+    http.header("Host", host);
     set_auth(http);
     set_http_post_header_args(http, upload_data.post_action);
     http.form_add("path", upload_parent_path.string())      // XXX: slashes on windows ???

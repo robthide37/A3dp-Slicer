@@ -419,9 +419,12 @@ bool OpenGLManager::init_gl()
         // There is no an easy way to detect the driver version without using Win32 API because the strings returned by OpenGL
         // have no standardized format, only some of them contain the driver version.
         // Until we do not know that driver will be fixed (if ever) we force the use of power of two textures on all cards
-        // containing the string 'Radeon' in the string returned by glGetString(GL_RENDERER)
+        // 1) containing the string 'Radeon' in the string returned by glGetString(GL_RENDERER)
+        // 2) containing the string 'Custom' in the string returned by glGetString(GL_RENDERER)
         const auto& gl_info = OpenGLManager::get_gl_info();
-        if (boost::contains(gl_info.get_vendor(), "ATI Technologies Inc.") && boost::contains(gl_info.get_renderer(), "Radeon"))
+        if (boost::contains(gl_info.get_vendor(), "ATI Technologies Inc.") &&
+           (boost::contains(gl_info.get_renderer(), "Radeon") ||
+            boost::contains(gl_info.get_renderer(), "Custom")))
             s_force_power_of_two_textures = true;
 #endif // _WIN32
     }

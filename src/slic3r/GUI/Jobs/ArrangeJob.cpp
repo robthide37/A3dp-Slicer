@@ -183,7 +183,8 @@ static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
 
         trafo_instance = trafo_instance * po.trafo().cast<float>().inverse();
 
-        auto polys = reserve_vector<Polygon>(3);
+        Polygons polys;
+        polys.reserve(3);
         auto zlvl = -po.get_elevation();
 
         if (omesh) {
@@ -231,8 +232,10 @@ coord_t get_skirt_offset(const Plater* plater) {
     // Try to subtract the skirt from the bed shape so we don't arrange outside of it.
     if (plater->printer_technology() == ptFFF && plater->fff_print().has_skirt()) {
         const auto& print = plater->fff_print();
-        skirt_inset = print.config().skirts.value * print.skirt_flow().width() +
-                                  print.config().skirt_distance.value;
+        if (!print.objects().empty()) {
+            skirt_inset = print.config().skirts.value * print.skirt_flow().width() +
+                          print.config().skirt_distance.value;
+        }
     }
 
     return scaled(skirt_inset);
@@ -240,7 +243,7 @@ coord_t get_skirt_offset(const Plater* plater) {
 
 void ArrangeJob::prepare()
 {
-    wxGetKeyState(WXK_SHIFT) ? prepare_selected() : prepare_all();
+    m_selection_only ? prepare_selected() : prepare_all();
 
     coord_t min_offset = 0;
     for (auto &ap : m_selected) {
@@ -304,7 +307,10 @@ void ArrangeJob::process(Ctl &ctl)
                                       _u8L("Arranging done."));
 }
 
-ArrangeJob::ArrangeJob() : m_plater{wxGetApp().plater()} {}
+ArrangeJob::ArrangeJob(Mode mode)
+    : m_plater{wxGetApp().plater()},
+      m_selection_only{mode == Mode::SelectionOnly}
+{}
 
 static std::string concat_strings(const std::set<std::string> &strings,
                                   const std::string &delim = "\n")
@@ -352,7 +358,7 @@ void ArrangeJob::finalize(bool canceled, std::exception_ptr &eptr) {
         ap.apply();
     }
 
-    m_plater->update();
+    m_plater->update((unsigned int)Plater::UpdateParams::FORCE_FULL_SCREEN_REFRESH);
     wxGetApp().obj_manipul()->set_dirty();
 
     if (!m_unarranged.empty()) {

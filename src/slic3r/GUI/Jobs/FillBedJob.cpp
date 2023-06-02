@@ -25,7 +25,8 @@ void FillBedJob::prepare()
         return;
 
     ModelObject *model_object = m_plater->model().objects[m_object_idx];
-    if (model_object->instances.empty()) return;
+    if (model_object->instances.empty())
+        return;
 
     m_selected.reserve(model_object->instances.size());
     for (ModelInstance *inst : model_object->instances)
@@ -37,7 +38,8 @@ void FillBedJob::prepare()
             m_selected.emplace_back(ap);
         }
 
-    if (m_selected.empty()) return;
+    if (m_selected.empty())
+        return;
 
     m_bedpts = get_bed_shape(*m_plater->config());
 
@@ -85,9 +87,11 @@ void FillBedJob::prepare()
         ArrangePolygon ap = template_ap;
         ap.poly = m_selected.front().poly;
         ap.bed_idx = arrangement::UNARRANGED;
-        ap.setter = [this, mi](const ArrangePolygon &p) {
+        auto m = mi->get_transformation();
+        ap.setter = [this, mi, m](const ArrangePolygon &p) {
             ModelObject *mo = m_plater->model().objects[m_object_idx];
             ModelInstance *inst = mo->add_instance(*mi);
+            inst->set_transformation(m);
             inst->apply_arrange_result(p.translation.cast<double>(), p.rotation);
         };
         m_selected.emplace_back(ap);
@@ -166,10 +170,12 @@ void FillBedJob::finalize(bool canceled, std::exception_ptr &eptr)
     if (canceled || eptr)
         return;
 
-    if (m_object_idx == -1) return;
+    if (m_object_idx == -1)
+        return;
 
     ModelObject *model_object = m_plater->model().objects[m_object_idx];
-    if (model_object->instances.empty()) return;
+    if (model_object->instances.empty())
+        return;
 
     size_t inst_cnt = model_object->instances.size();
 
@@ -188,7 +194,8 @@ void FillBedJob::finalize(bool canceled, std::exception_ptr &eptr)
         m_plater->update();
 
         // FIXME: somebody explain why this is needed for increase_object_instances
-        if (inst_cnt == 1) added_cnt++;
+        if (inst_cnt == 1)
+            added_cnt++;
 
         m_plater->sidebar()
             .obj_list()->increase_object_instances(m_object_idx, size_t(added_cnt));

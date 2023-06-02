@@ -10,6 +10,7 @@
 #include "SVG.hpp"
 #include "Algorithm/RegionExpansion.hpp"
 
+#include <algorithm>
 #include <string>
 #include <map>
 
@@ -143,12 +144,12 @@ void LayerRegion::make_perimeters(
 #if 1
 
 // Extract surfaces of given type from surfaces, extract fill (layer) thickness of one of the surfaces.
-static ExPolygons fill_surfaces_extract_expolygons(Surfaces &surfaces, SurfaceType surface_type, double &thickness)
+static ExPolygons fill_surfaces_extract_expolygons(Surfaces &surfaces, std::initializer_list<SurfaceType> surface_types, double &thickness)
 {
     size_t cnt = 0;
     for (const Surface &surface : surfaces)
-        if (surface.surface_type == surface_type) {
-            ++ cnt;
+        if (std::find(surface_types.begin(), surface_types.end(), surface.surface_type) != surface_types.end()) {
+            ++cnt;
             thickness = surface.thickness;
         }
     if (cnt == 0)
@@ -157,7 +158,7 @@ static ExPolygons fill_surfaces_extract_expolygons(Surfaces &surfaces, SurfaceTy
     ExPolygons out;
     out.reserve(cnt);
     for (Surface &surface : surfaces)
-        if (surface.surface_type == surface_type)
+        if (std::find(surface_types.begin(), surface_types.end(), surface.surface_type) != surface_types.end())
             out.emplace_back(std::move(surface.expolygon));
     return out;
 }
@@ -173,7 +174,7 @@ Surfaces expand_bridges_detect_orientations(
     using namespace Slic3r::Algorithm;
 
     double thickness;
-    ExPolygons bridges_ex = fill_surfaces_extract_expolygons(surfaces, stBottomBridge, thickness);
+    ExPolygons bridges_ex = fill_surfaces_extract_expolygons(surfaces, {stBottomBridge}, thickness);
     if (bridges_ex.empty())
         return {};
 
@@ -230,10 +231,13 @@ Surfaces expand_bridges_detect_orientations(
                         bboxes[it - it_begin].overlap(bboxes[it2 - it_begin]) &&
                         // One may ignore holes, they are irrelevant for intersection test.
                         ! intersection(it->expolygon.contour, it2->expolygon.contour).empty()) {
-                        // The two bridge regions intersect. Give them the same group id.
+                        // The two bridge regions intersect. Give them the same (lower) group id.
                         uint32_t id  = group_id(it->src_id);
                         uint32_t id2 = group_id(it2->src_id);
-                        bridges[it->src_id].group_id = bridges[it2->src_id].group_id = std::min(id, id2);
+                        if (id < id2)
+                            bridges[id2].group_id = id;
+                        else
+                            bridges[id].group_id = id2;
                     }
             }
         }
@@ -326,7 +330,7 @@ static Surfaces expand_merge_surfaces(
     const double                                bridge_angle = -1.)
 {
     double thickness;
-    ExPolygons src = fill_surfaces_extract_expolygons(surfaces, surface_type, thickness);
+    ExPolygons src = fill_surfaces_extract_expolygons(surfaces, {surface_type}, thickness);
     if (src.empty())
         return {};
 
@@ -372,7 +376,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
 
     // Expand the top / bottom / bridge surfaces into the shell thickness solid infills.
     double     layer_thickness;
-    ExPolygons shells = union_ex(fill_surfaces_extract_expolygons(m_fill_surfaces.surfaces, stInternalSolid, layer_thickness));
+    ExPolygons shells = union_ex(fill_surfaces_extract_expolygons(m_fill_surfaces.surfaces, {stInternalSolid}, layer_thickness));
 
     SurfaceCollection bridges;
     {
