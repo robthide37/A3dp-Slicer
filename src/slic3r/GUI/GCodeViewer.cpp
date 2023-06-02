@@ -2150,6 +2150,7 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
     // layers zs / roles / extruder ids -> extract from result
     size_t last_travel_s_id = 0;
+    size_t first_travel_s_id = 0;
     seams_count = 0;
     for (size_t i = 0; i < m_moves_count; ++i) {
         const GCodeProcessorResult::MoveVertex& move = gcode_result.moves[i];
@@ -2163,8 +2164,10 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 // layers zs
                 const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
                 const double z = static_cast<double>(move.position.z());
-                if (last_z == nullptr || z < *last_z - EPSILON || *last_z + EPSILON < z)
-                    m_layers.append(z, { last_travel_s_id, move_id });
+                if (last_z == nullptr || z < *last_z - EPSILON || *last_z + EPSILON < z) {
+                    const size_t start_it = (m_layers.empty() && first_travel_s_id != 0) ? first_travel_s_id : last_travel_s_id;
+                    m_layers.append(z, { start_it, move_id });
+                }
                 else
                     m_layers.get_ranges().back().last = move_id;
             }
@@ -2177,7 +2180,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         else if (move.type == EMoveType::Travel) {
             if (move_id - last_travel_s_id > 1 && !m_layers.empty())
                 m_layers.get_ranges().back().last = move_id;
-
+            else if (m_layers.empty() && first_travel_s_id == 0)
+                first_travel_s_id = move_id;
             last_travel_s_id = move_id;
         }
     }
@@ -2433,8 +2437,10 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
             for (size_t i = 0; i < buffer.paths.size(); ++i) {
                 const Path& path = buffer.paths[i];
                 if (path.type == EMoveType::Travel) {
-                    if (!is_travel_in_layers_range(i, m_layers_z_range[0], m_layers_z_range[1]))
-                        continue;
+                    if (path.sub_paths.front().first.s_id > m_layers_z_range[0]) {
+                        if (!is_travel_in_layers_range(i, m_layers_z_range[0], m_layers_z_range[1]))
+                            continue;
+                    }
                 }
                 else if (!is_in_layers_range(path, m_layers_z_range[0], m_layers_z_range[1]))
                     continue;

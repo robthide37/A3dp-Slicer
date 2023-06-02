@@ -3141,6 +3141,12 @@ msgstr ""
 "Niepowodzenie inicjalizacji CURL. PrusaSlicer nie będzie w stanie nawiązać "
 "połączenia przez sieć. Szczegóły w logach."
 
+#. TRN Means "current color"
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:340
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:356
+msgid "Current"
+msgstr "Obecny"
+
 #: src/slic3r/GUI/wxExtensions.cpp:629
 #, c-format, boost-format
 msgid "Current mode is %s"
@@ -10118,6 +10124,12 @@ msgstr "Skieruj tekst w stronę kamery."
 #: src/slic3r/GUI/BedShapeDialog.cpp:32
 msgid "Origin"
 msgstr "Punkt zerowy"
+
+#. TRN Means "original color"
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:342
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:356
+msgid "Original"
+msgstr "Oryginalny"
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:860
 msgid "Original value"

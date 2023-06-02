@@ -183,6 +183,16 @@ msgid "%1%=%2% mm is too low to be printable at a layer height %3% mm"
 msgstr ""
 "%1%=%2% mm è troppo basso per essere un altezza layer stampabile %3% mm"
 
+#: src/slic3r/GUI/DoubleSlider.cpp:711 src/libslic3r/Utils.cpp:1015
+#, boost-format
+msgid "%1%d"
+msgstr "%1%g"
+
+#: src/slic3r/GUI/DoubleSlider.cpp:712 src/libslic3r/Utils.cpp:1016
+#, boost-format
+msgid "%1%h"
+msgstr "%1%h"
+
 #: src/slic3r/GUI/Tab.cpp:5227
 #, boost-format
 msgid ""
@@ -195,6 +205,12 @@ msgstr ""
 #: src/libslic3r/PrintConfig.cpp:2736 src/libslic3r/PrintConfig.cpp:2754
 msgid "1 (light)"
 msgstr "1 (leggero)"
+
+#. TRN "m" means "minutes"
+#: src/slic3r/GUI/DoubleSlider.cpp:713 src/libslic3r/Utils.cpp:1018
+#, boost-format
+msgid "%1%m"
+msgstr "%1%m"
 
 #. TRN ConfigWizard: Materials : "%1%" = "Filaments"/"SLA materials"
 #: src/slic3r/GUI/ConfigWizard.cpp:838
@@ -232,6 +248,11 @@ msgstr "%1% Preset"
 #, boost-format
 msgid "%1% : read only"
 msgstr "%1% : sola lettura"
+
+#: src/slic3r/GUI/DoubleSlider.cpp:714 src/libslic3r/Utils.cpp:1026
+#, boost-format
+msgid "%1%s"
+msgstr "%1%s"
 
 #. TRN ConfigWizard: Materials : "%1%" = "Filaments"/"SLA materials"
 #: src/slic3r/GUI/ConfigWizard.cpp:835
@@ -1716,6 +1737,10 @@ msgstr ""
 "diametro verranno stampate con pareti doppie per garantire la stabilità. "
 "Imposta questo valore a zero per non avere pareti doppie."
 
+#: src/slic3r/GUI/Tab.cpp:5157
+msgid "Branching"
+msgstr "Ramificazione"
+
 #. TRN One of the "Support tree type"s on SLAPrintSettings : Supports
 #: src/libslic3r/PrintConfig.cpp:3929
 msgid "Branching (experimental)"
@@ -1733,6 +1758,10 @@ msgstr "Bridge"
 #: src/libslic3r/PrintConfig.cpp:510
 msgid "Bridge flow ratio"
 msgstr "Rapporto flusso Bridge"
+
+#: src/libslic3r/ExtrusionRole.cpp:45 src/libslic3r/ExtrusionRole.cpp:73
+msgid "Bridge infill"
+msgstr "Riempimento Bridge"
 
 #: src/libslic3r/PrintConfig.cpp:522
 msgid "Bridges"
@@ -3093,6 +3122,12 @@ msgid ""
 msgstr ""
 "CURL init non riuscito. PrusaSlicer non sarà in grado di stabilire "
 "connessioni di rete. Vedere i log per ulteriori dettagli."
+
+#. TRN Means "current color"
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:340
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:356
+msgid "Current"
+msgstr "Attuale"
 
 #: src/slic3r/GUI/wxExtensions.cpp:629
 #, c-format, boost-format
@@ -5011,6 +5046,10 @@ msgstr "Esposizione"
 #: src/libslic3r/PrintConfig.cpp:3821 src/libslic3r/PrintConfig.cpp:3822
 msgid "Exposure time"
 msgstr "Tempo di esposizione"
+
+#: src/libslic3r/ExtrusionRole.cpp:39 src/libslic3r/ExtrusionRole.cpp:61
+msgid "External perimeter"
+msgstr "Perimetro esterno"
 
 #: src/slic3r/GUI/PresetHints.cpp:170
 msgid "external perimeters"
@@ -7382,6 +7421,10 @@ msgstr "errore interno"
 msgid "Internal error: %1%"
 msgstr "Errore interno: %1%"
 
+#: src/libslic3r/ExtrusionRole.cpp:41 src/libslic3r/ExtrusionRole.cpp:65
+msgid "Internal infill"
+msgstr "Riempimento interno"
+
 #: src/libslic3r/GCode.cpp:825
 msgid "In the custom G-code were found reserved keywords:"
 msgstr "Nel G-code personalizzato sono state trovate parole chiave riservate:"
@@ -8537,6 +8580,11 @@ msgstr "Messaggio"
 #, boost-format
 msgid "Message for pause print on current layer (%1% mm)."
 msgstr "Messaggio per pausa stampa al corrente layer (%1% mm)."
+
+#: src/slic3r/GUI/GCodeViewer.cpp:3278
+msgctxt "Metre"
+msgid "m"
+msgstr "m"
 
 #: src/libslic3r/PrintConfig.cpp:1897 src/libslic3r/PrintConfig.cpp:1906
 msgid "Min"
@@ -10079,6 +10127,12 @@ msgstr "Orienta il testo verso di te."
 msgid "Origin"
 msgstr "Origine"
 
+#. TRN Means "original color"
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:342
+#: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp:356
+msgid "Original"
+msgstr "Originale"
+
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:860
 msgid "Original value"
 msgstr "Valore originale"
@@ -10138,6 +10192,10 @@ msgstr "Pareti esterne"
 #: src/slic3r/GUI/BackgroundSlicingProcess.cpp:285
 msgid "Overflow"
 msgstr "Overflow"
+
+#: src/libslic3r/ExtrusionRole.cpp:40 src/libslic3r/ExtrusionRole.cpp:63
+msgid "Overhang perimeter"
+msgstr "Perimetro sporgente"
 
 #. TRN FilamentSettings : "Dynamic fan speeds"
 #: src/libslic3r/PrintConfig.cpp:587
@@ -10569,6 +10627,10 @@ msgid ""
 msgstr ""
 "Esecuzione dell'integrazione del downloader desktop non riuscita - "
 "Impossibile trovare l'eseguibile."
+
+#: src/libslic3r/ExtrusionRole.cpp:38 src/libslic3r/ExtrusionRole.cpp:59
+msgid "Perimeter"
+msgstr "Perimetro"
 
 #: src/libslic3r/PrintConfig.cpp:3312
 msgid "Perimeter distribution count"
@@ -13753,6 +13815,10 @@ msgstr "Skirt"
 #: src/libslic3r/PrintConfig.cpp:653
 msgid "Skirt and brim"
 msgstr "Skirt e brim"
+
+#: src/libslic3r/ExtrusionRole.cpp:47 src/libslic3r/ExtrusionRole.cpp:77
+msgid "Skirt/Brim"
+msgstr "Skirt/Brim"
 
 #: src/libslic3r/PrintConfig.cpp:2350
 msgid "Skirt height"

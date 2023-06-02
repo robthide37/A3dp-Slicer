@@ -4295,7 +4295,7 @@ msgstr "Pontok minimális távolsága"
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:43
 #: src/libslic3r/PrintConfig.cpp:3945
 msgid "Support points density"
-msgstr "Támadztó pontok sűrűsége"
+msgstr "Támasztó pontok sűrűsége"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:44
 #: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp:1279
