@@ -2782,16 +2782,36 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     };
 
     auto internal_only_g1_line = [](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate, const std::optional<float>& extrusion) {
-        std::string ret = (boost::format("G1 X%1% Y%2%") % target[X] % target[Y]).str();
-        if (has_z)
-            ret += (boost::format(" Z%1%") % target[Z]).str();
+        enum class EAttributes : unsigned char
+        {
+            None = 0,
+            Z = 1,
+            E = 2,
+            F = 4,
+            ZE = Z | E,
+            ZF = Z | F,
+            EF = E | F,
+            ZEF = Z | E | F
+        };
+
+        unsigned char attributes = has_z ? (unsigned char)EAttributes::Z : (unsigned char)EAttributes::None;
         if (feedrate.has_value())
-            ret += (boost::format(" F%1%") % *feedrate).str();
+            attributes |= (unsigned char)EAttributes::F;
         if (extrusion.has_value())
-            ret += (boost::format(" E%1%") % target[E]).str();
+            attributes |= (unsigned char)EAttributes::E;
 
-        ret += (boost::format(" ;%1%\n") % INTERNAL_G2G3_TAG).str();
-
+        std::string ret;
+        switch ((EAttributes)attributes)
+        {
+        case EAttributes::Z:   { ret = string_printf("G1 X%f Y%f Z%f ;%s\n", target[X], target[Y], target[Z], INTERNAL_G2G3_TAG.c_str()); break; }
+        case EAttributes::E:   { ret = string_printf("G1 X%f Y%f E%f ;%s\n", target[X], target[Y], target[E], INTERNAL_G2G3_TAG.c_str()); break; }
+        case EAttributes::F:   { ret = string_printf("G1 X%f Y%f F%f ;%s\n", target[X], target[Y], *feedrate, INTERNAL_G2G3_TAG.c_str()); break; }
+        case EAttributes::ZE:  { ret = string_printf("G1 X%f Y%f Z%f E%f ;%s\n", target[X], target[Y], target[Z], target[E], INTERNAL_G2G3_TAG.c_str()); break; }
+        case EAttributes::ZF:  { ret = string_printf("G1 X%f Y%f Z%f F%f ;%s\n", target[X], target[Y], target[Z], *feedrate, INTERNAL_G2G3_TAG.c_str()); break; }
+        case EAttributes::EF:  { ret = string_printf("G1 X%f Y%f E%f F%f ;%s\n", target[X], target[Y], target[E], *feedrate, INTERNAL_G2G3_TAG.c_str()); break; }
+        case EAttributes::ZEF: { ret = string_printf("G1 X%f Y%f Z%f E%f F%f ;%s\n", target[X], target[Y], target[Z], target[E], *feedrate, INTERNAL_G2G3_TAG.c_str()); break; }
+        default:               { ret = string_printf("G1 X%f Y%f ;%s\n", target[X], target[Y], INTERNAL_G2G3_TAG.c_str()); break; }
+        }
         return ret;
     };
 
