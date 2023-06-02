@@ -360,12 +360,19 @@ void GLGizmoEmboss::on_shortcut_key() {
     }
 }
 
+namespace{
+// verify correct volume type for creation of text
+bool check(ModelVolumeType volume_type) {
+    return volume_type == ModelVolumeType::MODEL_PART ||
+           volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
+           volume_type == ModelVolumeType::PARAMETER_MODIFIER;
+}
+}
+
 bool GLGizmoEmboss::init_create(ModelVolumeType volume_type)
 {
     // check valid volume type
-    if (volume_type != ModelVolumeType::MODEL_PART &&
-        volume_type != ModelVolumeType::NEGATIVE_VOLUME &&
-        volume_type != ModelVolumeType::PARAMETER_MODIFIER){    
+    if (!check(volume_type)){    
         BOOST_LOG_TRIVIAL(error) << "Can't create embossed volume with this type: " << (int) volume_type;
         return false;
     }
@@ -1420,7 +1427,7 @@ bool GLGizmoEmboss::process()
     if (m_volume == nullptr) return false;
 
     // without text there is nothing to emboss
-    if (m_text.empty()) return false;
+    if (priv::is_text_empty(m_text)) return false;
 
     // exist loaded font file?
     if (!m_style_manager.is_active_font()) return false;
@@ -1441,7 +1448,8 @@ bool GLGizmoEmboss::process()
     if (use_surface) {
         // Model to cut surface from.
         SurfaceVolumeData::ModelSources sources = create_volume_sources(m_volume);
-        if (sources.empty()) return false;
+        if (sources.empty()) 
+            return false;
 
         Transform3d text_tr = m_volume->get_matrix();
         auto& fix_3mf = m_volume->text_configuration->fix_3mf_tr;
@@ -1455,10 +1463,12 @@ bool GLGizmoEmboss::process()
                 text_tr *= Eigen::Translation<double, 3>(*offset);
         }
 
-        bool is_outside = m_volume->is_model_part();
         // check that there is not unexpected volume type
-        assert(is_outside || m_volume->is_negative_volume() ||
-               m_volume->is_modifier());
+        bool is_valid_type = check(m_volume->type());
+        assert(is_valid_type);
+        if (!is_valid_type)
+            return false;
+
         UpdateSurfaceVolumeData surface_data{std::move(data), {text_tr, std::move(sources)}};
         job = std::make_unique<UpdateSurfaceVolumeJob>(std::move(surface_data));                  
     } else {
@@ -3443,7 +3453,7 @@ void GLGizmoEmboss::draw_advanced()
         const Camera &cam  = wxGetApp().plater()->get_camera();
         const FontProp &prop = m_style_manager.get_font_prop();
         if (priv::apply_camera_dir(cam, m_parent, m_keep_up) && 
-            prop.use_surface || prop.per_glyph)
+            (prop.use_surface || prop.per_glyph))
             process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
