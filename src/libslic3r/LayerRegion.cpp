@@ -1,4 +1,5 @@
 #include "ExPolygon.hpp"
+#include "Flow.hpp"
 #include "Layer.hpp"
 #include "BridgeDetector.hpp"
 #include "ClipperUtils.hpp"
@@ -169,7 +170,8 @@ static ExPolygons fill_surfaces_extract_expolygons(Surfaces &surfaces, std::init
 Surfaces expand_bridges_detect_orientations(
     Surfaces                                    &surfaces,
     ExPolygons                                  &shells,
-    const Algorithm::RegionExpansionParameters  &expansion_params)
+    const Algorithm::RegionExpansionParameters  &expansion_params,
+    const float                                 closing_diameter)
 {
     using namespace Slic3r::Algorithm;
 
@@ -309,8 +311,13 @@ Surfaces expand_bridges_detect_orientations(
                     }
                 //FIXME try to be smart and pick the best bridging angle for all?
                 templ.bridge_angle = bridges[bridge_id].angle;
+                //NOTE: The current regularization of the shells can create small unasigned regions in the object (E.G. benchy)
+                // without the following closing operation, those regions will stay unfilled and cause small holes in the expanded surface.
+                // look for narrow_ensure_vertical_wall_thickness_region_radius filter.
+                ExPolygons final = closing_ex(acc, closing_diameter);
                 // without safety offset, artifacts are generated (GH #2494)
-                for (ExPolygon &ex : union_safety_offset_ex(acc))
+                // union_safety_offset_ex(acc)
+                for (ExPolygon &ex : final)
                     out.emplace_back(templ, std::move(ex));
             }
     }
@@ -327,6 +334,7 @@ static Surfaces expand_merge_surfaces(
     SurfaceType                                 surface_type,
     ExPolygons                                 &shells,
     const Algorithm::RegionExpansionParameters &params,
+    const float                                 closing_diameter,
     const double                                bridge_angle = -1.)
 {
     double thickness;
@@ -335,6 +343,10 @@ static Surfaces expand_merge_surfaces(
         return {};
 
     std::vector<ExPolygon> expanded = expand_merge_expolygons(std::move(src), shells, params);
+    //NOTE: The current regularization of the shells can create small unasigned regions in the object (E.G. benchy)
+    // without the following closing operation, those regions will stay unfilled and cause small holes in the expanded surface.
+    // look for narrow_ensure_vertical_wall_thickness_region_radius filter.
+    expanded = closing_ex(expanded, closing_diameter);
     // Trim the shells by the expanded expolygons.
     shells = diff_ex(shells, expanded);
 
@@ -373,6 +385,7 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
     static constexpr const float    expansion_step          = scaled<float>(0.1);
     // Don't take more than max_nr_steps for small expansion_step.
     static constexpr const size_t   max_nr_expansion_steps  = 5;
+    const float closing_diameter = 0.65f * 1.05 * this->flow(frSolidInfill).scaled_spacing();
 
     // Expand the top / bottom / bridge surfaces into the shell thickness solid infills.
     double     layer_thickness;
@@ -384,8 +397,8 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
         const double custom_angle = this->region().config().bridge_angle.value;
         const auto   params = Algorithm::RegionExpansionParameters::build(expansion_bottom_bridge, expansion_step, max_nr_expansion_steps);
         bridges.surfaces = custom_angle > 0 ?
-            expand_merge_surfaces(m_fill_surfaces.surfaces, stBottomBridge, shells, params, Geometry::deg2rad(custom_angle)) :
-            expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, params);
+            expand_merge_surfaces(m_fill_surfaces.surfaces, stBottomBridge, shells, params, closing_diameter, Geometry::deg2rad(custom_angle)) :
+            expand_bridges_detect_orientations(m_fill_surfaces.surfaces, shells, params, closing_diameter);
         BOOST_LOG_TRIVIAL(trace) << "Processing external surface, detecting bridges - done";
 #if 0
         {
@@ -396,9 +409,9 @@ void LayerRegion::process_external_surfaces(const Layer *lower_layer, const Poly
     }
 
     Surfaces    bottoms = expand_merge_surfaces(m_fill_surfaces.surfaces, stBottom, shells,
-        Algorithm::RegionExpansionParameters::build(expansion_bottom, expansion_step, max_nr_expansion_steps));
+        Algorithm::RegionExpansionParameters::build(expansion_bottom, expansion_step, max_nr_expansion_steps), closing_diameter);
     Surfaces    tops    = expand_merge_surfaces(m_fill_surfaces.surfaces, stTop, shells,
-        Algorithm::RegionExpansionParameters::build(expansion_top, expansion_step, max_nr_expansion_steps));
+        Algorithm::RegionExpansionParameters::build(expansion_top, expansion_step, max_nr_expansion_steps), closing_diameter);
 
     m_fill_surfaces.remove_types({ stBottomBridge, stBottom, stTop, stInternalSolid });
     reserve_more(m_fill_surfaces.surfaces, shells.size() + bridges.size() + bottoms.size() + tops.size());
