@@ -5091,7 +5091,7 @@ msgstr "Äußere Perimeter"
 
 #: src/libslic3r/PrintConfig.cpp:861
 msgid "External perimeters first"
-msgstr "Aüßere Perimeter zuerst drucken"
+msgstr "Äußere Perimeter zuerst drucken"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:294
 msgid "Extra high"
