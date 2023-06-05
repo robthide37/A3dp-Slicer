@@ -1420,6 +1420,10 @@ static inline void execute_job(std::shared_ptr<Job> j)
 } // namespace priv
 #endif
 
+namespace priv {
+static bool is_text_empty(const std::string &text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
+} // namespace priv
+
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
@@ -1486,10 +1490,6 @@ bool GLGizmoEmboss::process()
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();
     return true;
-}
-
-namespace priv {
-static bool is_text_empty(const std::string &text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
 }
 
 void GLGizmoEmboss::close()
