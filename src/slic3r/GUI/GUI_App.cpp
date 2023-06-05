@@ -1658,7 +1658,8 @@ void GUI_App::UpdateDVCDarkUI(wxDataViewCtrl* dvc, bool highlited/* = false*/)
 #ifdef _WIN32
     UpdateDarkUI(dvc, highlited ? dark_mode() : false);
 #ifdef _MSW_DARK_MODE
-    dvc->RefreshHeaderDarkMode(&m_normal_font);
+    if (!dvc->HasFlag(wxDV_NO_HEADER))
+        dvc->RefreshHeaderDarkMode(&m_normal_font);
 #endif //_MSW_DARK_MODE
     if (dvc->HasFlag(wxDV_ROW_LINES))
         dvc->SetAlternateRowColour(m_color_highlight_default);
