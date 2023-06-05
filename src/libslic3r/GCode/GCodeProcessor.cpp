@@ -2696,7 +2696,7 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         double delta_z() const { return end.z() - start.z(); }
 
         double length() const { return angle * start_radius(); }
-        double travel_length() const { return std::sqrt(sqr(length() + sqr(delta_z()))); }
+        double travel_length() const { return std::sqrt(sqr(length()) + sqr(delta_z())); }
         double start_radius() const { return (start - center).norm(); }
         double end_radius() const { return (end - center).norm(); }
 
@@ -2821,17 +2821,16 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     // https://github.com/prusa3d/Prusa-Firmware/blob/MK3/Firmware/motion_control.cpp
 
     // segments count
-    static const double MM_PER_ARC_SEGMENT = 0.5;
-    const size_t segments = std::ceil(travel_length / MM_PER_ARC_SEGMENT);
-    assert(segments >= 1);
+    static const double MM_PER_ARC_SEGMENT = 1.0;
+    const size_t segments = std::max<size_t>(std::floor(travel_length / MM_PER_ARC_SEGMENT), 1);
 
-    const double theta_per_segment = arc.angle / double(segments);
-    const double z_per_segment = arc.delta_z() / double(segments);
-    const double extruder_per_segment = (extrusion.has_value()) ? *extrusion / double(segments) : 0.0;
+    const double inv_segment = 1.0 / double(segments);
+    const double theta_per_segment = arc.angle  * inv_segment;
+    const double z_per_segment = arc.delta_z() * inv_segment;
+    const double extruder_per_segment = (extrusion.has_value()) ? *extrusion * inv_segment : 0.0;
 
-    const double sq_theta_per_segment = sqr(theta_per_segment);
-    const double cos_T = 1.0 - 0.5 * sq_theta_per_segment; // Small angle approximation
-    const double sin_T = theta_per_segment - sq_theta_per_segment * theta_per_segment / 6.0; // Small angle approximation
+    const double cos_T = 1.0 - 0.5 * sqr(theta_per_segment); // Small angle approximation
+    const double sin_T = theta_per_segment;
 
     AxisCoords prev_target = m_start_position;
     AxisCoords arc_target;
@@ -2848,23 +2847,24 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
 
     std::string gcode;
 
-    size_t n_arc_correction = N_ARC_CORRECTION;
+    size_t count = 0;
 
     for (size_t i = 1; i < segments; ++i) {
-        if (n_arc_correction-- == 0) {
-            // Calculate the actual position for r_axis_x and r_axis_y
-            const double cos_Ti = ::cos((double)i * theta_per_segment);
-            const double sin_Ti = ::sin((double)i * theta_per_segment);
-            curr_rel_arc_start.x() = -double(rel_center.x()) * cos_Ti + double(rel_center.y()) * sin_Ti;
-            curr_rel_arc_start.y() = -double(rel_center.x()) * sin_Ti - double(rel_center.y()) * cos_Ti;
-            // reset n_arc_correction
-            n_arc_correction = N_ARC_CORRECTION;
-        }
-        else {
-            // Calculate X and Y using the small angle approximation
+        if (count < N_ARC_CORRECTION) {
+            // Apply vector rotation matrix 
             const float r_axisi = curr_rel_arc_start.x() * sin_T + curr_rel_arc_start.y() * cos_T;
             curr_rel_arc_start.x() = curr_rel_arc_start.x() * cos_T - curr_rel_arc_start.y() * sin_T;
             curr_rel_arc_start.y() = r_axisi;
+            ++count;
+        }
+        else {
+            // Arc correction to radius vector. Computed only every N_ARC_CORRECTION increments.
+            // Compute exact location by applying transformation matrix from initial radius vector(=-offset).
+            const double cos_Ti = ::cos(i * theta_per_segment);
+            const double sin_Ti = ::sin(i * theta_per_segment);
+            curr_rel_arc_start.x() = -double(rel_center.x()) * cos_Ti + double(rel_center.y()) * sin_Ti;
+            curr_rel_arc_start.y() = -double(rel_center.x()) * sin_Ti - double(rel_center.y()) * cos_Ti;
+            count = 0;
         }
 
         // Update arc_target location
@@ -2873,15 +2873,12 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         arc_target[Z] += z_per_segment;
         arc_target[E] += extruder_per_segment;
 
-        gcode += internal_only_g1_line(adjust_target(arc_target, prev_target), z_per_segment != 0.0, feedrate, extrusion);
+        gcode += internal_only_g1_line(adjust_target(arc_target, prev_target), z_per_segment != 0.0, (i == 1) ? feedrate : std::nullopt, extrusion);
         prev_target = arc_target;
-
-        // feedrate is constant, we do not need to repeat it
-        feedrate.reset();
     }
 
     // Ensure last segment arrives at target location.
-    gcode += internal_only_g1_line(adjust_target(end_position, prev_target), arc.delta_z() != 0.0, feedrate, extrusion);
+    gcode += internal_only_g1_line(adjust_target(end_position, prev_target), arc.delta_z() != 0.0, (segments == 1) ? feedrate : std::nullopt, extrusion);
 
     // process fake gcode lines
     GCodeReader parser;
