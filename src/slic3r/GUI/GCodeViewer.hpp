@@ -838,6 +838,9 @@ public:
     bool is_legend_enabled() const { return m_legend_enabled; }
     void enable_legend(bool enable) { m_legend_enabled = enable; }
 
+    bool are_shells_visible() const { return m_shells.visible; }
+    void set_shells_visible(bool visible) { m_shells.visible = visible; }
+
     void export_toolpaths_to_obj(const char* filename) const;
 
     void toggle_gcode_window_visibility() { m_sequential_view.gcode_window.toggle_visibility(); }
@@ -849,9 +852,10 @@ public:
 
     const ConflictResultOpt& get_conflict_result() const { return m_conflict_result; }
 
+    void load_shells(const Print& print);
+
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);
-    void load_shells(const Print& print);
     void render_toolpaths();
     void render_shells();
     void render_legend(float& legend_height);

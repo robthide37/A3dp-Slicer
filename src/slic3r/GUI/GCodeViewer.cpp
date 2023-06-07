@@ -747,9 +747,7 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     m_filament_diameters = gcode_result.filament_diameters;
     m_filament_densities = gcode_result.filament_densities;
 
-    if (wxGetApp().is_editor())
-        load_shells(print);
-    else {
+    if (!wxGetApp().is_editor()) {
         Pointfs bed_shape;
         std::string texture;
         std::string model;
@@ -903,7 +901,6 @@ void GCodeViewer::reset()
     m_filament_diameters = std::vector<float>();
     m_filament_densities = std::vector<float>();
     m_extrusions.reset_ranges();
-    m_shells.volumes.clear();
     m_layers.reset();
     m_layers_z_range = { 0, 0 };
     m_roles = std::vector<GCodeExtrusionRole>();
@@ -927,12 +924,13 @@ void GCodeViewer::render()
     m_statistics.total_instances_gpu_size = 0;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
+    glsafe(::glEnable(GL_DEPTH_TEST));
+    render_shells();
+
     if (m_roles.empty())
         return;
 
-    glsafe(::glEnable(GL_DEPTH_TEST));
     render_toolpaths();
-    render_shells();
     float legend_height = 0.0f;
     if (!m_layers.empty()) {
         render_legend(legend_height);
@@ -2226,6 +2224,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
 
 void GCodeViewer::load_shells(const Print& print)
 {
+    m_shells.volumes.clear();
+
     if (print.objects().empty())
         // no shells, return
         return;

@@ -509,6 +509,7 @@ private:
     TriangleMesh m_wipe_tower_mesh;
 #endif // ENABLE_OPENGL_ES
     GCodeViewer m_gcode_viewer;
+    bool m_gcode_viewer_shells_visible{ true };
 
     RenderTimer m_render_timer;
 
@@ -829,6 +830,7 @@ public:
 
     void reload_scene(bool refresh_immediately, bool force_full_scene_refresh = false);
 
+    void load_gcode_shells();
     void load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors);
     void refresh_gcode_preview_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last);
     void set_gcode_view_preview_type(GCodeViewer::EViewType type) { return m_gcode_viewer.set_view_type(type); }

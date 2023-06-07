@@ -1913,7 +1913,7 @@ void GLCanvas3D::render()
     _render_bed_axes();
     if (is_looking_downward)
         _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), false);
-    if (!m_main_toolbar.is_enabled())
+    if (!m_main_toolbar.is_enabled() && current_printer_technology() != ptSLA)
         _render_gcode();
     _render_objects(GLVolumeCollection::ERenderType::Transparent);
 
@@ -2637,12 +2637,19 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     m_dirty = true;
 }
 
+void GLCanvas3D::load_gcode_shells()
+{
+    m_gcode_viewer_shells_visible = m_gcode_viewer.are_shells_visible();
+    m_gcode_viewer.load_shells(*this->fff_print());
+    m_gcode_viewer.update_shells_color_by_extruder(m_config);
+    m_gcode_viewer.set_shells_visible(true);
+}
+
 void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
 {
     m_gcode_viewer.load(gcode_result, *this->fff_print());
 
     if (wxGetApp().is_editor()) {
-        m_gcode_viewer.update_shells_color_by_extruder(m_config);
         _set_warning_notification_if_needed(EWarning::ToolpathOutside);
         _set_warning_notification_if_needed(EWarning::GCodeConflict);
     }
@@ -2690,6 +2697,7 @@ void GLCanvas3D::load_preview(const std::vector<std::string>& str_tool_colors, c
     for (const PrintObject* object : print->objects())
         _load_print_object_toolpaths(*object, build_volume, str_tool_colors, color_print_values);
 
+    m_gcode_viewer.set_shells_visible(m_gcode_viewer_shells_visible);
     _set_warning_notification_if_needed(EWarning::ToolpathOutside);
 }
 
