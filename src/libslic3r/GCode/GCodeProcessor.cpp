@@ -2356,27 +2356,57 @@ void GCodeProcessor::process_G0(const GCodeReader::GCodeLine& line)
 
 void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 {
+    std::array<std::optional<double>, 4> g1_axes = { std::nullopt, std::nullopt, std::nullopt, std::nullopt };
+    if (line.has_x()) g1_axes[X] = (double)line.x();
+    if (line.has_y()) g1_axes[Y] = (double)line.y();
+    if (line.has_z()) g1_axes[Z] = (double)line.z();
+    if (line.has_e()) g1_axes[E] = (double)line.e();
+    std::optional<double> g1_feedrate = std::nullopt;
+    if (line.has_f()) g1_feedrate = (double)line.f();
+    std::optional<std::string> g1_cmt = std::nullopt;
+    if (!line.comment().empty()) g1_cmt = line.comment();
+
+    process_G1(g1_axes, g1_feedrate, g1_cmt);
+}
+
+void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes, std::optional<double> feedrate, std::optional<std::string> cmt)
+{
     const float filament_diameter = (static_cast<size_t>(m_extruder_id) < m_result.filament_diameters.size()) ? m_result.filament_diameters[m_extruder_id] : m_result.filament_diameters.back();
     const float filament_radius = 0.5f * filament_diameter;
     const float area_filament_cross_section = static_cast<float>(M_PI) * sqr(filament_radius);
 
     auto move_type = [this](const AxisCoords& delta_pos) {
-        EMoveType type = EMoveType::Noop;
-
         if (m_wiping)
-            type = EMoveType::Wipe;
+            return EMoveType::Wipe;
         else if (delta_pos[E] < 0.0f)
-            type = (delta_pos[X] != 0.0f || delta_pos[Y] != 0.0f || delta_pos[Z] != 0.0f) ? EMoveType::Travel : EMoveType::Retract;
+            return (delta_pos[X] != 0.0f || delta_pos[Y] != 0.0f || delta_pos[Z] != 0.0f) ? EMoveType::Travel : EMoveType::Retract;
         else if (delta_pos[E] > 0.0f) {
             if (delta_pos[X] == 0.0f && delta_pos[Y] == 0.0f)
-                type = (delta_pos[Z] == 0.0f) ? EMoveType::Unretract : EMoveType::Travel;
+                return (delta_pos[Z] == 0.0f) ? EMoveType::Unretract : EMoveType::Travel;
             else if (delta_pos[X] != 0.0f || delta_pos[Y] != 0.0f)
-                type = EMoveType::Extrude;
-        } 
+                return EMoveType::Extrude;
+        }
         else if (delta_pos[X] != 0.0f || delta_pos[Y] != 0.0f || delta_pos[Z] != 0.0f)
-            type = EMoveType::Travel;
+            return EMoveType::Travel;
 
-        return type;
+        return EMoveType::Noop;
+    };
+
+    auto extract_absolute_position_on_axis = [&](Axis axis, std::optional<double> value, double area_filament_cross_section)
+    {
+        if (value.has_value()) {
+            bool is_relative = (m_global_positioning_type == EPositioningType::Relative);
+            if (axis == E)
+                is_relative |= (m_e_local_positioning_type == EPositioningType::Relative);
+
+            const double lengthsScaleFactor = (m_units == EUnits::Inches) ? double(INCHES_TO_MM) : 1.0;
+            double ret = *value * lengthsScaleFactor;
+            if (axis == E && m_use_volumetric_e)
+                ret /= area_filament_cross_section;
+            return is_relative ? m_start_position[axis] + ret : m_origin[axis] + ret;
+        }
+        else
+            return m_start_position[axis];
     };
 
     ++m_g1_line_id;
@@ -2386,27 +2416,26 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
     // updates axes positions from line
     for (unsigned char a = X; a <= E; ++a) {
-        m_end_position[a] = extract_absolute_position_on_axis((Axis)a, line, double(area_filament_cross_section));
+        m_end_position[a] = extract_absolute_position_on_axis((Axis)a, axes[a], double(area_filament_cross_section));
     }
 
     // updates feedrate from line, if present
-    if (line.has_f())
-        m_feedrate = m_feed_multiply.current * line.f() * MMMIN_TO_MMSEC;
+    if (feedrate.has_value())
+        m_feedrate = m_feed_multiply.current * (*feedrate) * MMMIN_TO_MMSEC;
 
-     // calculates movement deltas
-     AxisCoords delta_pos;
+    // calculates movement deltas
+    AxisCoords delta_pos;
     for (unsigned char a = X; a <= E; ++a)
-         delta_pos[a] = m_end_position[a] - m_start_position[a];
- 
+        delta_pos[a] = m_end_position[a] - m_start_position[a];
+
     if (std::all_of(delta_pos.begin(), delta_pos.end(), [](double d) { return d == 0.; }))
-         return;
-    
+        return;
+
     const float volume_extruded_filament = area_filament_cross_section * delta_pos[E];
 
     if (volume_extruded_filament != 0.)
-        m_used_filaments.increase_caches(volume_extruded_filament,
-            m_extruder_id, area_filament_cross_section * m_parking_position,
-            area_filament_cross_section * m_extra_loading_move);
+        m_used_filaments.increase_caches(volume_extruded_filament, m_extruder_id, area_filament_cross_section * m_parking_position,
+                                        area_filament_cross_section * m_extra_loading_move);
 
     const EMoveType type = move_type(delta_pos);
     if (type == EMoveType::Extrude) {
@@ -2423,7 +2452,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             m_height = m_forced_height;
         else if (m_layer_id == 0)
             m_height = m_first_layer_height + m_z_offset;
-        else if (line.comment() != INTERNAL_G2G3_TAG){
+        else if (!cmt.has_value() || *cmt != INTERNAL_G2G3_TAG) {
             if (m_end_position[Z] > m_extruded_last_z + EPSILON && delta_pos[Z] == 0.0)
                 m_height = m_end_position[Z] - m_extruded_last_z;
         }
@@ -2434,7 +2463,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         if (m_end_position[Z] == 0.0f || (m_extrusion_role == GCodeExtrusionRole::Custom && m_layer_id == 0))
             m_end_position[Z] = m_height;
 
-        if (line.comment() != INTERNAL_G2G3_TAG)
+        if (!cmt.has_value() || *cmt != INTERNAL_G2G3_TAG)
             m_extruded_last_z = m_end_position[Z];
         m_options_z_corrector.update(m_height);
 
@@ -2467,7 +2496,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
     // time estimate section
     auto move_length = [](const AxisCoords& delta_pos) {
-        float sq_xyz_length = sqr(delta_pos[X]) + sqr(delta_pos[Y]) + sqr(delta_pos[Z]);
+        const float sq_xyz_length = sqr(delta_pos[X]) + sqr(delta_pos[Y]) + sqr(delta_pos[Z]);
         return (sq_xyz_length > 0.0f) ? std::sqrt(sq_xyz_length) : std::abs(delta_pos[E]);
     };
 
@@ -2488,8 +2517,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         TimeMachine::State& prev = machine.prev;
         std::vector<TimeBlock>& blocks = machine.blocks;
 
-        curr.feedrate = (delta_pos[E] == 0.0f) ?
-            minimum_travel_feedrate(static_cast<PrintEstimatedStatistics::ETimeMode>(i), m_feedrate) :
+        curr.feedrate = (delta_pos[E] == 0.0f) ? minimum_travel_feedrate(static_cast<PrintEstimatedStatistics::ETimeMode>(i), m_feedrate) :
             minimum_feedrate(static_cast<PrintEstimatedStatistics::ETimeMode>(i), m_feedrate);
 
         TimeBlock block;
@@ -2524,11 +2552,9 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         }
 
         // calculates block acceleration
-        float acceleration = 
-            (type == EMoveType::Travel) ? get_travel_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i)) :
-            (is_extrusion_only_move(delta_pos) ?
-                get_retract_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i)) :
-                get_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i)));
+        float acceleration = (type == EMoveType::Travel) ? get_travel_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i)) :
+            (is_extrusion_only_move(delta_pos) ? get_retract_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i)) :
+            get_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i)));
 
         for (unsigned char a = X; a <= E; ++a) {
             const float axis_max_acceleration = get_axis_max_acceleration(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
@@ -2554,8 +2580,8 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
         // calculates block entry feedrate
         float vmax_junction = curr.safe_feedrate;
         if (!blocks.empty() && prev.feedrate > PREVIOUS_FEEDRATE_THRESHOLD) {
-            bool prev_speed_larger = prev.feedrate > block.feedrate_profile.cruise;
-            float smaller_speed_factor = prev_speed_larger ? (block.feedrate_profile.cruise / prev.feedrate) : (prev.feedrate / block.feedrate_profile.cruise);
+            const bool prev_speed_larger = prev.feedrate > block.feedrate_profile.cruise;
+            const float smaller_speed_factor = prev_speed_larger ? (block.feedrate_profile.cruise / prev.feedrate) : (prev.feedrate / block.feedrate_profile.cruise);
             // Pick the smaller of the nominal speeds. Higher speed shall not be achieved at the junction during coasting.
             vmax_junction = prev_speed_larger ? block.feedrate_profile.cruise : prev.feedrate;
 
@@ -2577,18 +2603,18 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
                 // Calculate the jerk depending on whether the axis is coasting in the same direction or reversing a direction.
                 const float jerk =
-                    (v_exit > v_entry) ?
-                    ((v_entry > 0.0f || v_exit < 0.0f) ?
-                        // coasting
-                        (v_exit - v_entry) :
-                        // axis reversal
-                        std::max(v_exit, -v_entry)) :
-                    // v_exit <= v_entry
-                    ((v_entry < 0.0f || v_exit > 0.0f) ?
-                        // coasting
-                        (v_entry - v_exit) :
-                        // axis reversal
-                        std::max(-v_exit, v_entry));
+                  (v_exit > v_entry) ?
+                  ((v_entry > 0.0f || v_exit < 0.0f) ?
+                    // coasting
+                    (v_exit - v_entry) :
+                    // axis reversal
+                    std::max(v_exit, -v_entry)) :
+                  // v_exit <= v_entry
+                  ((v_entry < 0.0f || v_exit > 0.0f) ?
+                    // coasting
+                    (v_entry - v_exit) :
+                    // axis reversal
+                    std::max(-v_exit, v_entry));
 
                 const float axis_max_jerk = get_axis_max_jerk(static_cast<PrintEstimatedStatistics::ETimeMode>(i), static_cast<Axis>(a));
                 if (jerk > axis_max_jerk) {
@@ -2667,7 +2693,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     }
 
     // store move
-    store_move_vertex(type, line.comment() == INTERNAL_G2G3_TAG);
+    store_move_vertex(type, cmt.has_value() && *cmt == INTERNAL_G2G3_TAG);
 }
 
 void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise)
@@ -2781,38 +2807,18 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         return ret;
     };
 
-    auto internal_only_g1_line = [](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate, const std::optional<float>& extrusion) {
-        enum class EAttributes : unsigned char
-        {
-            None = 0,
-            Z = 1,
-            E = 2,
-            F = 4,
-            ZE = Z | E,
-            ZF = Z | F,
-            EF = E | F,
-            ZEF = Z | E | F
-        };
-
-        unsigned char attributes = has_z ? (unsigned char)EAttributes::Z : (unsigned char)EAttributes::None;
+    auto internal_only_g1_line = [this](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate, const std::optional<float>& extrusion) {
+        std::array<std::optional<double>, 4> g1_axes = { target[X], target[Y], std::nullopt, std::nullopt };
+        std::optional<double> g1_feedrate = std::nullopt;
+        if (has_z)
+            g1_axes[Z] = target[Z];
         if (feedrate.has_value())
-            attributes |= (unsigned char)EAttributes::F;
+            g1_feedrate = (double)*feedrate;
         if (extrusion.has_value())
-            attributes |= (unsigned char)EAttributes::E;
+            g1_axes[E] = target[E];
+        std::optional<std::string> g1_cmt = INTERNAL_G2G3_TAG;
 
-        std::string ret;
-        switch ((EAttributes)attributes)
-        {
-        case EAttributes::Z:   { ret = string_printf("G1 X%f Y%f Z%f ;%s\n", target[X], target[Y], target[Z], INTERNAL_G2G3_TAG.c_str()); break; }
-        case EAttributes::E:   { ret = string_printf("G1 X%f Y%f E%f ;%s\n", target[X], target[Y], target[E], INTERNAL_G2G3_TAG.c_str()); break; }
-        case EAttributes::F:   { ret = string_printf("G1 X%f Y%f F%f ;%s\n", target[X], target[Y], *feedrate, INTERNAL_G2G3_TAG.c_str()); break; }
-        case EAttributes::ZE:  { ret = string_printf("G1 X%f Y%f Z%f E%f ;%s\n", target[X], target[Y], target[Z], target[E], INTERNAL_G2G3_TAG.c_str()); break; }
-        case EAttributes::ZF:  { ret = string_printf("G1 X%f Y%f Z%f F%f ;%s\n", target[X], target[Y], target[Z], *feedrate, INTERNAL_G2G3_TAG.c_str()); break; }
-        case EAttributes::EF:  { ret = string_printf("G1 X%f Y%f E%f F%f ;%s\n", target[X], target[Y], target[E], *feedrate, INTERNAL_G2G3_TAG.c_str()); break; }
-        case EAttributes::ZEF: { ret = string_printf("G1 X%f Y%f Z%f E%f F%f ;%s\n", target[X], target[Y], target[Z], target[E], *feedrate, INTERNAL_G2G3_TAG.c_str()); break; }
-        default:               { ret = string_printf("G1 X%f Y%f ;%s\n", target[X], target[Y], INTERNAL_G2G3_TAG.c_str()); break; }
-        }
-        return ret;
+        process_G1(g1_axes, g1_feedrate, g1_cmt);
     };
 
     // calculate arc segments
@@ -2842,11 +2848,7 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     arc_target[E] = m_start_position[E];
 
     static const size_t N_ARC_CORRECTION = 25;
-
     Vec3d curr_rel_arc_start = arc.relative_start();
-
-    std::string gcode;
-
     size_t count = 0;
 
     for (size_t i = 1; i < segments; ++i) {
@@ -2873,20 +2875,14 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         arc_target[Z] += z_per_segment;
         arc_target[E] += extruder_per_segment;
 
-        gcode += internal_only_g1_line(adjust_target(arc_target, prev_target), z_per_segment != 0.0, (i == 1) ? feedrate : std::nullopt, extrusion);
+        m_start_position = m_end_position; // this is required because we are skipping the call to process_gcode_line()
+        internal_only_g1_line(adjust_target(arc_target, prev_target), z_per_segment != 0.0, (i == 1) ? feedrate : std::nullopt, extrusion);
         prev_target = arc_target;
     }
 
     // Ensure last segment arrives at target location.
-    gcode += internal_only_g1_line(adjust_target(end_position, prev_target), arc.delta_z() != 0.0, (segments == 1) ? feedrate : std::nullopt, extrusion);
-
-    // process fake gcode lines
-    GCodeReader parser;
-    parser.parse_buffer(gcode, [this](GCodeReader&, const GCodeReader::GCodeLine& line) {
-        // force all lines to share the same id
-        --m_line_id;
-        process_gcode_line(line, false);
-        });
+    m_start_position = m_end_position; // this is required because we are skipping the call to process_gcode_line()
+    internal_only_g1_line(adjust_target(end_position, prev_target), arc.delta_z() != 0.0, (segments == 1) ? feedrate : std::nullopt, extrusion);
 }
 
 void GCodeProcessor::process_G10(const GCodeReader::GCodeLine& line)
