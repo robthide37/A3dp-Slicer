@@ -6477,7 +6477,7 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
 
         const SLAPrintObject *object = this->p->sla_print.get_print_object_by_model_object_id(mo.id());
 
-        if (auto m = object->get_mesh_to_print(); !m || m->empty())
+        if (!object || !object->get_mesh_to_print() || object->get_mesh_to_print()->empty())
             mesh = mesh_to_export_fff(mo, instance_id);
         else {
             const Transform3d mesh_trafo_inv = object->trafo().inverse();
