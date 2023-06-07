@@ -11,7 +11,7 @@
 
 #include "slic3r/GUI/Jobs/EmbossJob.hpp" // Emboss::DataBase
 #include "slic3r/GUI/Camera.hpp"
-
+#include "slic3r/GUI/TextLines.hpp"
 #include "Job.hpp"
 
 // forward declarations
@@ -42,13 +42,43 @@ public:
     DataBase(DataBase &&) = default;
     virtual ~DataBase() = default;
 
+    // Define projection move
+    // True (raised) .. move outside from surface
+    // False (engraved).. move into object
+    bool is_outside;
+
+    // flag that job is canceled
+    // for time after process.
+    std::shared_ptr<std::atomic<bool>> cancel;
+
+    // Define per letter projection on one text line
+    // [optional] It is not used when empty
+    Slic3r::Emboss::TextLines text_lines;
+
     /// <summary>
     /// Create shape
     /// e.g. Text extract glyphs from font
     /// Not 'const' function because it could modify shape
     /// </summary>
-    virtual EmbossShape &create_shape() { return shape; };
+    virtual EmbossShape& create_shape() { return shape; };
+};
 
+/// <summary>
+/// Hold neccessary data to create ModelVolume in job
+/// Volume is created on the surface of existing volume in object.
+/// NOTE: EmbossDataBase::font_file doesn't have to be valid !!!
+/// </summary>
+struct DataCreateVolume : public DataBase
+{
+    // define embossed volume type
+    ModelVolumeType volume_type;
+
+    // parent ModelObject index where to create volume
+    ObjectID object_id;
+
+    // new created volume transformation
+    Transform3d trmat;
+};
     /// <summary>
     /// Write data how to reconstruct shape to volume
     /// </summary>
@@ -120,11 +150,6 @@ struct SurfaceVolumeData
 {
     // Transformation of volume inside of object
     Transform3d transform;
-
-    // Define projection move
-    // True (raised) .. move outside from surface
-    // False (engraved).. move into object
-    bool is_outside;
 
     struct ModelSource
     {

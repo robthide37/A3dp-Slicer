@@ -5,6 +5,8 @@
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/IconManager.hpp"
 #include "slic3r/GUI/SurfaceDrag.hpp"
+#include "slic3r/GUI/I18N.hpp" // TODO: not needed
+#include "slic3r/GUI/TextLines.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "slic3r/Utils/EmbossStyleManager.hpp"
 
@@ -80,6 +82,9 @@ protected:
     std::string get_action_snapshot_name() const override;
 
 private:
+    void volume_transformation_changing();
+    void volume_transformation_changed();
+
     static EmbossStyles create_default_styles();
     // localized default text
     bool init_create(ModelVolumeType volume_type);
@@ -188,6 +193,10 @@ private:
 
     // cancel for previous update of volume to cancel finalize part
     std::shared_ptr<std::atomic<bool>> m_job_cancel = nullptr;
+
+    // Keep information about curvature of text line around surface
+    TextLinesModel m_text_lines;
+    void reinit_text_lines(unsigned count_lines=0);
 
     // Rotation gizmo
     GLGizmoRotate m_rotate_gizmo;

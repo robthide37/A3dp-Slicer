@@ -161,6 +161,9 @@ static constexpr const char *LINE_GAP_ATTR    = "line_gap";
 static constexpr const char *LINE_HEIGHT_ATTR = "line_height";
 static constexpr const char *BOLDNESS_ATTR    = "boldness";
 static constexpr const char *SKEW_ATTR        = "skew";
+static constexpr const char *PER_GLYPH_ATTR   = "per_glyph";
+static constexpr const char *HORIZONTAL_ALIGN_ATTR  = "horizontal";
+static constexpr const char *VERTICAL_ALIGN_ATTR    = "vertical";
 static constexpr const char *COLLECTION_NUMBER_ATTR = "collection";
 
 static constexpr const char *FONT_FAMILY_ATTR    = "family";
@@ -3565,6 +3568,10 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
         stream << BOLDNESS_ATTR << "=\"" << *fp.boldness << "\" ";
     if (fp.skew.has_value())
         stream << SKEW_ATTR << "=\"" << *fp.skew << "\" ";
+    if (fp.per_glyph)
+        stream << PER_GLYPH_ATTR << "=\"" << 1 << "\" ";
+    stream << HORIZONTAL_ALIGN_ATTR << "=\"" << static_cast<int>(fp.align.first) << "\" ";
+    stream << VERTICAL_ALIGN_ATTR << "=\"" << static_cast<int>(fp.align.second) << "\" ";    
     if (fp.collection_number.has_value())
         stream << COLLECTION_NUMBER_ATTR << "=\"" << *fp.collection_number << "\" ";
     // font descriptor
@@ -3593,7 +3600,17 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     float skew = get_attribute_value_float(attributes, num_attributes, SKEW_ATTR);
     if (std::fabs(skew) > std::numeric_limits<float>::epsilon())
         fp.skew = skew;
-    
+    int use_surface = get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR);
+    if (use_surface == 1) fp.use_surface = true;
+    int per_glyph = get_attribute_value_int(attributes, num_attributes, PER_GLYPH_ATTR);
+    if (per_glyph == 1) fp.per_glyph = true;
+
+    int horizontal = get_attribute_value_int(attributes, num_attributes, HORIZONTAL_ALIGN_ATTR);
+    int vertical = get_attribute_value_int(attributes, num_attributes, VERTICAL_ALIGN_ATTR);
+    fp.align  = FontProp::Align(
+        static_cast<FontProp::HorizontalAlign>(horizontal),
+        static_cast<FontProp::VerticalAlign>(vertical));
+
     int collection_number = get_attribute_value_int(attributes, num_attributes, COLLECTION_NUMBER_ATTR);
     if (collection_number > 0) fp.collection_number = static_cast<unsigned int>(collection_number);
 

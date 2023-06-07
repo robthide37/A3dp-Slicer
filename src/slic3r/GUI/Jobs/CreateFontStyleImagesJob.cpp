@@ -33,10 +33,11 @@ void CreateFontStyleImagesJob::process(Ctl &ctl)
     std::vector<double> scales(m_input.styles.size());
     m_images = std::vector<StyleManager::StyleImage>(m_input.styles.size());
 
+    auto was_canceled = []() { return false; };
     for (auto &item : m_input.styles) {
         size_t index = &item - &m_input.styles.front();
         ExPolygons &shapes = name_shapes[index];
-        shapes = text2shapes(item.font, m_input.text.c_str(), item.prop);
+        shapes = text2shapes(item.font, m_input.text.c_str(), item.prop, was_canceled);
 
         // create image description
         StyleManager::StyleImage &image = m_images[index];
