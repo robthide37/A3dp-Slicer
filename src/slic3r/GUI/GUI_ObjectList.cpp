@@ -1685,6 +1685,8 @@ void ObjectList::load_modifier(const wxArrayString& input_files, ModelObject& mo
             const Vec3d offset = Vec3d(instance_bb.max.x(), instance_bb.min.y(), instance_bb.min.z()) + 0.5 * mesh_bb.size() - instance_offset;
             new_volume->set_offset(inv_inst_transform * offset);
         }
+        else
+            new_volume->set_offset(new_volume->source.mesh_offset - model_object.volumes.front()->source.mesh_offset);
 
         added_volumes.push_back(new_volume);
     }

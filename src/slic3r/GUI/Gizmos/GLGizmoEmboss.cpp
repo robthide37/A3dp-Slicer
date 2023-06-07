@@ -1323,6 +1323,10 @@ namespace {
 bool is_text_empty(std::string_view text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
 } // namespace
 
+namespace priv {
+static bool is_text_empty(const std::string &text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
+} // namespace priv
+
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
