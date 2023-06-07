@@ -340,6 +340,6 @@ void TextLinesModel::render(const Transform3d &text_world)
 double TextLinesModel::calc_line_height(const Slic3r::Emboss::FontFile &ff, const FontProp &fp)
 {
     int line_height = Emboss::get_line_height(ff, fp); // In shape size
-    double scale = Emboss::get_shape_scale(fp, ff);
+    double scale = Emboss::get_text_shape_scale(fp, ff);
     return line_height * scale;
 }

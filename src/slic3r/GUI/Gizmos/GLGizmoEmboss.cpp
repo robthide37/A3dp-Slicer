@@ -345,7 +345,7 @@ bool GLGizmoEmboss::create_volume(ModelVolumeType volume_type, const Vec2d& mous
         return false;
 
     // NOTE: change style manager - be carefull with order changes
-    DataBasePtr base = create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
+    DataBasePtr base = create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), volume_type, m_job_cancel);
     CreateVolumeParams input = create_input(m_parent, m_style_manager.get_style(), m_raycast_manager, volume_type);
     return start_create_volume(input, std::move(base), mouse_pos);
 }
@@ -357,7 +357,7 @@ bool GLGizmoEmboss::create_volume(ModelVolumeType volume_type)
         return false;
 
     // NOTE: change style manager - be carefull with order changes
-    DataBasePtr base = create_emboss_data_base(m_text, m_style_manager, m_job_cancel);
+    DataBasePtr base = create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), volume_type, m_job_cancel);
     CreateVolumeParams input = create_input(m_parent, m_style_manager.get_style(), m_raycast_manager, volume_type);
     return start_create_volume_without_position(input, std::move(base));
 }
@@ -1043,9 +1043,6 @@ std::optional<wxString> get_installed_face_name(const std::optional<std::string>
     }
     return {}; // not installed    
 }
-} // namespace
-
-namespace {
 
 bool get_line_height_offset(/* const*/ StyleManager &style_manager, double &line_height_mm, double &line_offset_mm)
 {
@@ -1066,8 +1063,8 @@ bool get_line_height_offset(/* const*/ StyleManager &style_manager, double &line
     double third_ascent_shape_size = ff.infos[fp.collection_number.value_or(0)].ascent / 3.;
     int    line_height_shape_size = get_line_height(ff, fp); // In shape size
 
-    double scale = get_shape_scale(fp, ff);
-    line_offset_mm = third_ascent_shape_size * scale / SHAPE_SCALE;
+    double scale   = get_text_shape_scale(fp, ff);
+    line_offset_mm = third_ascent_shape_size * scale / 0.001; // TODO:fix constatnt SHAPE_SCALE
     line_height_mm = line_height_shape_size * scale;
 
     if (line_height_mm < 0)
@@ -1279,7 +1276,7 @@ void GLGizmoEmboss::set_volume_by_selection()
     // Calculate current angle of up vector
     assert(m_style_manager.is_active_font());
     if (m_style_manager.is_active_font()) 
-        m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), priv::up_limit);    
+        m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), up_limit);    
 
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();    
@@ -1322,6 +1319,10 @@ void GLGizmoEmboss::calculate_scale() {
         m_style_manager.clear_imgui_font();
 }
 
+namespace {
+bool is_text_empty(std::string_view text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
+} // namespace
+
 bool GLGizmoEmboss::process()
 {
     // no volume is selected -> selection from right panel
@@ -1329,27 +1330,26 @@ bool GLGizmoEmboss::process()
     if (m_volume == nullptr) return false;
 
     // without text there is nothing to emboss
-    if (priv::is_text_empty(m_text)) return false;
+    if (is_text_empty(m_text)) return false;
 
     // exist loaded font file?
     if (!m_style_manager.is_active_font()) return false;
     
-    DataUpdate data{priv::create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_volume->type(), m_job_cancel),
+    DataUpdate data{create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_volume->type(), m_job_cancel),
                     m_volume->id()};
     std::unique_ptr<Job> job = nullptr;
 
     // check cutting from source mesh
-    bool &use_surface = data.text_configuration.style.prop.use_surface;
-    bool  is_object   = m_volume->get_object()->volumes.size() == 1;
-    if (use_surface && is_object) 
+    bool &use_surface = data.base->shape.projection.use_surface;
+    if (use_surface && m_volume->is_the_only_one_part()) 
         use_surface = false;
     
-    assert(!data.text_configuration.style.prop.per_glyph ||
-        get_count_lines(m_text) == m_text_lines.get_lines().size());
+    assert(data.base->text_lines.empty() || 
+           data.base->text_lines.size() == get_count_lines(m_text));
 
     if (use_surface) {
         // Model to cut surface from.
-        SurfaceVolumeData::ModelSources sources = create_volume_sources(m_volume);
+        SurfaceVolumeData::ModelSources sources = create_volume_sources(*m_volume);
         if (sources.empty()) 
             return false;
 
@@ -1382,16 +1382,12 @@ bool GLGizmoEmboss::process()
     queue_job(worker, std::move(job));
 #else 
     // Run Job on main thread (blocking) - ONLY DEBUG
-    priv::execute_job(std::move(job));
+    execute_job(std::move(job));
 #endif // EXECUTE_PROCESS_ON_MAIN_THREAD
 
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();
     return true;
-}
-
-namespace {
-bool is_text_empty(std::string_view text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
 }
 
 void GLGizmoEmboss::close()
@@ -1506,7 +1502,7 @@ void GLGizmoEmboss::draw_window()
     ImGui::SameLine();
     if (ImGui::Checkbox("##ALLOW_OPEN_NEAR_VOLUME", &m_allow_open_near_volume)) {
         if (m_allow_open_near_volume)
-            m_set_window_offset = priv::calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
+            m_set_window_offset = calc_fine_position(m_parent.get_selection(), get_minimal_window_size(), m_parent.get_canvas_size());
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", ((m_allow_open_near_volume) ? 
             "Fix settings position":
@@ -2598,17 +2594,6 @@ void GLGizmoEmboss::draw_height(bool use_inch)
             process();
 }
 
-bool GLGizmoEmboss::set_depth()
-{
-    float &value = m_style_manager.get_font_prop().emboss;
-
-    // size can't be zero or negative
-    priv::Limits::apply(value, priv::limits.emboss);
-
-    // only different value need process
-    return !is_approx(value, m_volume->text_configuration->style.prop.emboss);
-}
-
 void GLGizmoEmboss::draw_depth(bool use_inch)
 {
     double &value = m_style_manager.get_style().projection.depth;
@@ -2745,6 +2730,7 @@ void GLGizmoEmboss::draw_advanced()
     }
     m_imgui->disabled_end(); // !can_use_surface
 
+    FontProp& font_prop = m_style_manager.get_font_prop();
     bool &per_glyph = font_prop.per_glyph;
     bool can_use_per_glyph = (per_glyph) ? true : // already used surface must have option to uncheck
                             !is_the_only_one_part;
@@ -2777,9 +2763,9 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::SetTooltip("TEST PURPOSE ONLY\nMove base line (up/down) for allign letters");
     m_imgui->disabled_end(); // !per_glyph
         
-    auto draw_align = [&align = font_prop.align, gui_cfg = m_gui_cfg, &icons = m_icons]() {
+    auto draw_align = [&align = font_prop.align, input_offset = m_gui_cfg->advanced_input_offset, &icons = m_icons]() {
         bool is_change = false;
-        ImGui::SameLine(gui_cfg->advanced_input_offset);
+        ImGui::SameLine(input_offset);
         if (align.first==FontProp::HorizontalAlign::left) draw(get_icon(icons, IconType::align_horizontal_left, IconState::hovered));
         else if (draw_button(icons, IconType::align_horizontal_left)) { align.first=FontProp::HorizontalAlign::left; is_change = true; }
         else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set left alignment").c_str());
@@ -3013,7 +2999,7 @@ void GLGizmoEmboss::draw_advanced()
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam = wxGetApp().plater()->get_camera();
         if (face_selected_volume_to_camera(cam, m_parent) && 
-            (use_surface || prop.per_glyph))
+            (use_surface || m_style_manager.get_font_prop().per_glyph))
             process();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
@@ -3149,7 +3135,7 @@ bool GLGizmoEmboss::choose_true_type_file()
     // use first valid font
     for (auto &input_file : input_files) {
         std::string path = std::string(input_file.c_str());
-        std::string name = priv::get_file_name(path);
+        std::string name = get_file_name(path);
         //make_unique_name(name, m_font_list);
         const FontProp& prop = m_style_manager.get_font_prop();
         EmbossStyle style{ name, path, EmbossStyle::Type::file_path, prop };
@@ -3306,14 +3292,16 @@ TextDataBase::TextDataBase(DataBase               &&parent,
 
 EmbossShape &TextDataBase::create_shape()
 {
-    if (!shape.shapes.empty())
+    if (!shape.shapes_with_ids.empty())
         return shape;
 
     // create shape by configuration
     const char *text = m_text_configuration.text.c_str();
+    std::wstring text_w = boost::nowide::widen(text);
     const FontProp &fp = m_text_configuration.style.prop;
     auto was_canceled = [&c = cancel](){ return c->load(); };
-    shape.shapes = text2shapes(m_font_file, text, fp, was_canceled);
+
+    shape.shapes_with_ids = text2vshapes(m_font_file, text_w, fp, was_canceled);
     return shape;
 }
 
@@ -3370,7 +3358,7 @@ std::unique_ptr<DataBase> create_emboss_data_base(const std::string             
     assert(style_manager.get_wx_font().IsOk());
     assert(style.path.compare(WxFontUtils::store_wxFont(style_manager.get_wx_font())) == 0);
 
-    if (es.prop.per_glyph) {
+    if (style.prop.per_glyph) {
         if (!text_lines.is_init())
             init_text_lines(text_lines, selection, style_manager);
     } else
@@ -3386,9 +3374,12 @@ std::unique_ptr<DataBase> create_emboss_data_base(const std::string             
     // create new shared ptr to cancel new job
     cancel = std::make_shared<std::atomic<bool>>(false);
     DataBase base(volume_name, cancel);
+    base.is_outside = is_outside;
+    base.text_lines = text_lines.get_lines();
+
     FontFileWithCache &font = style_manager.get_font_file_with_cache();
     TextConfiguration tc{static_cast<EmbossStyle>(style), text};
-    return std::make_unique<TextDataBase>(std::move(base), font, std::move(tc), style.projection, is_outside, text_lines.get_lines());
+    return std::make_unique<TextDataBase>(std::move(base), font, std::move(tc), style.projection);
 }
 
 CreateVolumeParams create_input(GLCanvas3D &canvas, const StyleManager::Style &style, RaycastManager& raycaster, ModelVolumeType volume_type)
@@ -3696,6 +3687,8 @@ GuiCfg create_gui_configuration()
     cfg.input_offset = style.WindowPadding.x + cfg.indent + max_text_width + space;
 
     tr.use_surface  = _u8L("Use surface");
+    tr.per_glyph    = _u8L("Per glyph orientation");
+    tr.alignment    = _u8L("Alignment");
     tr.char_gap     = _u8L("Char gap");
     tr.line_gap     = _u8L("Line gap");
     tr.boldness     = _u8L("Boldness");
@@ -3707,6 +3700,8 @@ GuiCfg create_gui_configuration()
 
     float max_advanced_text_width = std::max({
         ImGui::CalcTextSize(tr.use_surface.c_str()).x,
+        ImGui::CalcTextSize(tr.per_glyph.c_str()).x,
+        ImGui::CalcTextSize(tr.alignment.c_str()).x,
         ImGui::CalcTextSize(tr.char_gap.c_str()).x,
         ImGui::CalcTextSize(tr.line_gap.c_str()).x,
         ImGui::CalcTextSize(tr.boldness.c_str()).x,
@@ -3742,7 +3737,7 @@ GuiCfg create_gui_configuration()
 
     // 9 = useSurface, charGap, lineGap, bold, italic, surfDist, rotation, keepUp, textFaceToCamera
     // 4 = 1px for fix each edit image of drag float 
-    float advance_height = input_height * 8 + 8;
+    float advance_height = input_height * 10 + 9;
     cfg.minimal_window_size_with_advance =
         ImVec2(cfg.minimal_window_size.x,
                cfg.minimal_window_size.y + advance_height);

@@ -4,14 +4,14 @@
 #include <atomic>
 #include <memory>
 #include <string>
-#include "libslic3r/Emboss.hpp"
-#include "libslic3r/EmbossShape.hpp"
+#include <libslic3r/Emboss.hpp>
+#include <libslic3r/EmbossShape.hpp> // ExPolygonsWithIds
 #include "libslic3r/Point.hpp" // Transform3d
 #include "libslic3r/ObjectID.hpp"
 
-#include "slic3r/GUI/Jobs/EmbossJob.hpp" // Emboss::DataBase
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/TextLines.hpp"
+
 #include "Job.hpp"
 
 // forward declarations
@@ -36,24 +36,12 @@ namespace Slic3r::GUI::Emboss {
 class DataBase
 {
 public:
-    DataBase(const std::string& volume_name, std::shared_ptr<std::atomic<bool>> cancel) : volume_name(volume_name), cancel(std::move(cancel)) {}
+    DataBase(const std::string& volume_name, std::shared_ptr<std::atomic<bool>> cancel) 
+        : volume_name(volume_name), cancel(std::move(cancel)) {}
     DataBase(const std::string& volume_name, std::shared_ptr<std::atomic<bool>> cancel, EmbossShape&& shape)
         : volume_name(volume_name), cancel(std::move(cancel)), shape(std::move(shape)){}
     DataBase(DataBase &&) = default;
     virtual ~DataBase() = default;
-
-    // Define projection move
-    // True (raised) .. move outside from surface
-    // False (engraved).. move into object
-    bool is_outside;
-
-    // flag that job is canceled
-    // for time after process.
-    std::shared_ptr<std::atomic<bool>> cancel;
-
-    // Define per letter projection on one text line
-    // [optional] It is not used when empty
-    Slic3r::Emboss::TextLines text_lines;
 
     /// <summary>
     /// Create shape
@@ -61,6 +49,31 @@ public:
     /// Not 'const' function because it could modify shape
     /// </summary>
     virtual EmbossShape& create_shape() { return shape; };
+
+    /// <summary>
+    /// Write data how to reconstruct shape to volume
+    /// </summary>
+    /// <param name="volume">Data object for store emboss params</param>
+    virtual void write(ModelVolume &volume) const;
+
+    // Define projection move
+    // True (raised) .. move outside from surface
+    // False (engraved).. move into object
+    bool is_outside;
+
+    // Define per letter projection on one text line
+    // [optional] It is not used when empty
+    Slic3r::Emboss::TextLines text_lines;
+        
+    // new volume name
+    std::string volume_name;
+
+    // flag that job is canceled
+    // for time after process.
+    std::shared_ptr<std::atomic<bool>> cancel;
+
+    // shape to emboss
+    EmbossShape shape;
 };
 
 /// <summary>
@@ -78,22 +91,6 @@ struct DataCreateVolume : public DataBase
 
     // new created volume transformation
     Transform3d trmat;
-};
-    /// <summary>
-    /// Write data how to reconstruct shape to volume
-    /// </summary>
-    /// <param name="volume">Data object for store emboss params</param>
-    virtual void write(ModelVolume &volume) const;
-        
-    // new volume name
-    std::string volume_name;
-
-    // flag that job is canceled
-    // for time after process.
-    std::shared_ptr<std::atomic<bool>> cancel;
-
-    // shape to emboss
-    EmbossShape shape;
 };
 using DataBasePtr = std::unique_ptr<DataBase>;
 

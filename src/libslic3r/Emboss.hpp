@@ -8,6 +8,7 @@
 #include <admesh/stl.h> // indexed_triangle_set
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
+#include "EmbossShape.hpp" // ExPolygonsWithIds
 #include "BoundingBox.hpp"
 #include "TextConfiguration.hpp"
 
@@ -148,12 +149,14 @@ namespace Emboss
     /// <param name="font_prop">User defined property of the font</param>
     /// <param name="was_canceled">Way to interupt processing</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    ExPolygons              text2shapes (FontFileWithCache &font, const char *text,         const FontProp &font_prop, const std::function<bool()> &was_canceled = []() {return false;});
-    std::vector<ExPolygons> text2vshapes(FontFileWithCache &font, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled = []() {return false;});
+    ExPolygons        text2shapes (FontFileWithCache &font, const char *text,         const FontProp &font_prop, const std::function<bool()> &was_canceled = []() {return false;});
+    ExPolygonsWithIds text2vshapes(FontFileWithCache &font, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled = []() {return false;});
 
+    const unsigned ENTER_UNICODE = static_cast<unsigned>('\n');
     /// Sum of character '\n'
     unsigned get_count_lines(const std::wstring &ws);
     unsigned get_count_lines(const std::string &text);
+    unsigned get_count_lines(const ExPolygonsWithIds &shape);
 
     /// <summary>
     /// Fix duplicit points and self intersections in polygons.
@@ -448,5 +451,8 @@ namespace Emboss
     std::vector<double> calculate_angles(int32_t distance, const PolygonPoints& polygon_points, const Polygon &polygon);
 
 } // namespace Emboss
+
+
+ExPolygons union_ex(const ExPolygonsWithIds &shapes);
 } // namespace Slic3r
 #endif // slic3r_Emboss_hpp_

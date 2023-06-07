@@ -483,7 +483,7 @@ void GLGizmoSVG::reset_volume()
 
     m_volume = nullptr;
     m_volume_id.id = 0;
-    m_volume_shape.shapes.clear();
+    m_volume_shape.shapes_with_ids.clear();
 }
 
 void GLGizmoSVG::calculate_scale() {
@@ -562,7 +562,7 @@ void GLGizmoSVG::draw_window()
     ImGui::Unindent(m_gui_cfg->icon_width);
 
     if (ImGui::Button("change file")) {
-        m_volume_shape.shapes = select_shape().shapes;
+        m_volume_shape.shapes_with_ids = select_shape().shapes_with_ids;
         // TODO: use setted scale
         process();
     }
@@ -597,6 +597,16 @@ void GLGizmoSVG::draw_depth()
         ImGui::SetTooltip("%s", _u8L("Size in emboss direction.").c_str());
 }
 
+namespace Slic3r {
+BoundingBox get_extents(const ExPolygonsWithIds &expoly_ids)
+{
+    BoundingBox result;
+    for (const ExPolygonsWithId &expoly_id : expoly_ids)
+        result.merge(get_extents(expoly_id.expoly));
+    return result;
+}
+} // namespace Slic3r
+
 void GLGizmoSVG::draw_size() 
 {
     ImGuiWrapper::text(m_gui_cfg->translations.size);
@@ -610,7 +620,7 @@ void GLGizmoSVG::draw_size()
     ImGui::SetNextItemWidth(input_width);
 
     // TODO: cache it
-    BoundingBox bb = get_extents(m_volume_shape.shapes);
+    BoundingBox bb = get_extents(m_volume_shape.shapes_with_ids);
     Point size = bb.size();
 
     const char *size_format = (use_inch) ? "%.2f in" : "%.1f mm";
@@ -992,6 +1002,7 @@ ExPolygons default_shape()
     std::string file  = Slic3r::resources_dir() + "/icons/question.svg";
     NSVGimage  *image = nsvgParseFromFile(file.c_str(), "px", 96.0f);
     ExPolygons  shape = to_expolygons(image);
+    assert(!shape.empty());
     nsvgDelete(image);
     return shape;
 }
@@ -1018,11 +1029,14 @@ EmbossShape select_shape()
     int max_level = 10;
     float scale = static_cast<float>(1 / shape.scale);
     bool is_y_negative = true;
-    shape.shapes = to_expolygons(image, tesselation_tolerance, max_level, scale, is_y_negative);
+    ExPolygons expoly = to_expolygons(image, tesselation_tolerance, max_level, scale, is_y_negative);
 
     // Must contain some shapes !!!
-    if (shape.shapes.empty())
-        shape.shapes = default_shape();
+    if (expoly.empty())
+        expoly = default_shape();
+
+    unsigned id = 0;
+    shape.shapes_with_ids = {{id, expoly}};
 
     return shape;
 }
@@ -1031,7 +1045,7 @@ DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel)
 {
     EmbossShape shape = select_shape();
 
-    if (shape.shapes.empty())
+    if (shape.shapes_with_ids.empty())
         // canceled selection of SVG file
         return nullptr;
 

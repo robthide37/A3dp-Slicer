@@ -531,7 +531,7 @@ TEST_CASE("UndoRedo TextConfiguration serialization", "[Emboss]")
 TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
 {
     EmbossShape emboss;
-    emboss.shapes       = {{{0, 0}, {10, 0}, {10, 10}, {0, 10}}, {{5, 5}, {6, 5}, {6, 6}, {5, 6}}};
+    emboss.shapes_with_ids = {{0, {{{0, 0}, {10, 0}, {10, 10}, {0, 10}}, {{5, 5}, {6, 5}, {6, 6}, {5, 6}}}}};
     emboss.scale = 2.;
     emboss.projection.depth       = 5.;
     emboss.projection.use_surface = true;
@@ -551,7 +551,7 @@ TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
         cereal::BinaryInputArchive iarchive(ss); // Create an input archive
         iarchive(emboss_loaded);
     }
-    CHECK(emboss.shapes == emboss_loaded.shapes);
+    CHECK(emboss.shapes_with_ids.front().expoly == emboss_loaded.shapes_with_ids.front().expoly);
     CHECK(emboss.scale == emboss_loaded.scale);
     CHECK(emboss.projection.depth == emboss_loaded.projection.depth);
     CHECK(emboss.projection.use_surface == emboss_loaded.projection.use_surface);

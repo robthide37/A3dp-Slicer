@@ -3681,7 +3681,9 @@ Transform3d create_fix(const std::optional<Transform3d> &prev, const ModelVolume
     return *prev * fix_trmat;
 }
 
-std::string to_string(const ExPolygons& expolygons){
+std::string to_string(const ExPolygonsWithIds &shapes)
+{
+    // TODO: Need to implement
     return {};
 }
 
@@ -3692,7 +3694,7 @@ void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume 
     stream << SVG_FILE_PATH_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(es.svg_file_path) << "\" ";
     stream << SHAPE_SCALE_ATTR << "=\"" << es.scale << "\" ";
 
-    std::string expolygons_str = to_string(es.shapes); // cereal serialize expolygons 
+    std::string expolygons_str = to_string(es.shapes_with_ids); // cereal serialize expolygons 
     stream << SHAPE_EXPOLYS_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(expolygons_str) << "\" ";
 
     // projection
@@ -3710,7 +3712,7 @@ void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume 
 }
 
 std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned int num_attributes) {
-    ExPolygons shapes;
+    
     double scale = get_attribute_value_float(attributes, num_attributes, SHAPE_SCALE_ATTR);
 
     EmbossProjection projection;
@@ -3725,7 +3727,8 @@ std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned i
         fix_tr_mat = get_transform_from_3mf_specs_string(fix_tr_mat_str);
     }
     std::string file_path = get_attribute_value_string(attributes, num_attributes, SVG_FILE_PATH_ATTR);
-    return EmbossShape{std::move(shapes), scale, std::move(projection), std::move(fix_tr_mat), std::move(file_path)};
+    ExPolygonsWithIds shapes; // TODO: need to implement 
+    return EmbossShape{shapes, scale, std::move(projection), std::move(fix_tr_mat), std::move(file_path)};
 }
 
 

@@ -5,6 +5,7 @@
 #include <optional>
 #include <cereal/cereal.hpp>
 #include <cereal/types/string.hpp>
+#include <cereal/types/vector.hpp>
 #include <cereal/types/optional.hpp>
 #include <cereal/archives/binary.hpp>
 #include "Point.hpp" // Transform3d
@@ -46,13 +47,28 @@ struct EmbossProjection
     template<class Archive> void serialize(Archive &ar) { ar(depth, use_surface); }
 };
 
+// Help structure to identify expolygons grups
+// e.g. emboss -> per glyph -> identify character
+struct ExPolygonsWithId
+{ 
+    // Identificator for shape
+    // In text it separate letters and the name is unicode value of letter
+    // Is svg it is id of path
+    unsigned id;
+
+    // shape defined by integer point contain only lines
+    // Curves are converted to sequence of lines
+    ExPolygons expoly;
+};
+using ExPolygonsWithIds = std::vector<ExPolygonsWithId>;
+
 /// <summary>
 /// Contain plane shape information to be able emboss it and edit it
 /// </summary>
 struct EmbossShape 
 {
-    // shape defined by integer point consist only by lines not curves
-    ExPolygons shapes;
+    // shapes to to emboss separately over surface
+    ExPolygonsWithIds shapes_with_ids;
 
     // scale of shape, multiplier to get 3d point in mm from integer shape
     double scale = 1.;
@@ -74,16 +90,21 @@ struct EmbossShape
     // undo / redo stack recovery
     template<class Archive> void save(Archive &ar) const
     {
-        ar(shapes, scale, projection, svg_file_path);
+        ar(shapes_with_ids, scale, projection, svg_file_path);
         cereal::save(ar, fix_3mf_tr);
     }
     template<class Archive> void load(Archive &ar)
     {
-        ar(shapes, scale, projection, svg_file_path);
+        ar(shapes_with_ids, scale, projection, svg_file_path);
         cereal::load(ar, fix_3mf_tr);
     }
 };
 
 } // namespace Slic3r
+
+// Serialization through the Cereal library
+namespace cereal {
+template<class Archive> void serialize(Archive &ar, Slic3r::ExPolygonsWithId &o) { ar(o.id, o.expoly); }
+}; // namespace cereal
 
 #endif // slic3r_EmbossShape_hpp_
