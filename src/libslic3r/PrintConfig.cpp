@@ -4214,6 +4214,9 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
         else if (value == "marlinfirmware")
             // the "new" marlin firmware flavor used to be called "marlinfirmware" for some time during PrusaSlicer 2.4.0-alpha development.
             value = "marlin2";
+    } else if (opt_key == "host_type" && value == "mainsail") {
+        // the "mainsail" key (introduced in 2.6.0-alpha6) was renamed to "moonraker" (in 2.6.0-rc1).
+        value = "moonraker";
     } else if (opt_key == "fill_density" && value.find("%") == std::string::npos) {
         try {
             // fill_density was turned into a percent value
