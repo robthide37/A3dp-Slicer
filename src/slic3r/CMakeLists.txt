@@ -251,8 +251,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/Http.hpp
     Utils/FixModelByWin10.cpp
     Utils/FixModelByWin10.hpp
-    Utils/Mainsail.cpp
-    Utils/Mainsail.hpp
+    Utils/Moonraker.cpp
+    Utils/Moonraker.hpp
     Utils/OctoPrint.cpp
     Utils/OctoPrint.hpp
     Utils/Duet.cpp
