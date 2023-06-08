@@ -1065,6 +1065,9 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
                 apply_config_superslicer(filename);
             else if (m_producer == EProducer::KissSlicer)
                 apply_config_kissslicer(filename);
+
+            if (m_result.extruders_count == 0)
+                m_result.extruders_count = MIN_EXTRUDERS_COUNT;
         }
     }
 
