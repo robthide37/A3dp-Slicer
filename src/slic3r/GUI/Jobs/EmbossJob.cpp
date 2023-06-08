@@ -835,9 +835,8 @@ template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc w
     size_t count_lines = input.text_lines.size();
     std::vector<BoundingBoxes> bbs = create_line_bounds(shape.shapes_with_ids, count_lines);
         
-    double projec_scale = shape.scale / 0.001; // SHAPE_SCALE;
-    double depth        = shape.projection.depth / projec_scale;
-    auto   scale_tr = Eigen::Scaling(projec_scale); 
+    double depth = shape.projection.depth / shape.scale;
+    auto scale_tr = Eigen::Scaling(shape.scale); 
     
     // half of font em size for direction of letter emboss
     // double  em_2_mm      = prop.size_in_mm / 2.; // TODO: fix it
