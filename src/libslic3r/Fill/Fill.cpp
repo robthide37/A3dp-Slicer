@@ -653,11 +653,8 @@ Polylines Layer::generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Oc
         f->print_config        = &this->object()->print()->config();
         f->print_object_config = &this->object()->config();
 
-        if (surface_fill.params.pattern == ipLightning) {
-            auto *lf            = dynamic_cast<FillLightning::Filler *>(f.get());
-            lf->generator       = lightning_generator;
-            lf->num_raft_layers = this->object()->slicing_parameters().raft_layers();
-        }
+        if (surface_fill.params.pattern == ipLightning)
+            dynamic_cast<FillLightning::Filler *>(f.get())->generator = lightning_generator;
 
         // calculate flow spacing for infill pattern generation
         double link_max_length = 0.;
