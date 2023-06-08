@@ -2281,14 +2281,7 @@ bool GUI_App::load_language(wxString language, bool initial)
     }
 #endif
 
-#ifdef __APPLE__
-    // ysFIXME after fix for wxWidgets issue (https://github.com/wxWidgets/wxWidgets/issues/23209)
-    // Workaround for wxLANGUAGE_CHINESE(...) languages => Allow to continue even if wxLocale is not available.
-    // Because of translation will works fine, just locales will set to EN 
-    if (! wxLocale::IsAvailable(language_info->Language) && language_info->CanonicalName.BeforeFirst('_') != "zh" ) {
-#else
     if (! wxLocale::IsAvailable(language_info->Language)) {
-#endif
     	// Loading the language dictionary failed.
     	wxString message = "Switching PrusaSlicer to language " + language_info->CanonicalName + " failed.";
 #if !defined(_WIN32) && !defined(__APPLE__)
