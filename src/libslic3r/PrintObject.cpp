@@ -981,11 +981,12 @@ void PrintObject::detect_surfaces_type()
                             surface_type_bottom_other);
 #else
                         // Any surface lying on the void is a true bottom bridge (an overhang)
-                        ExPolygons true_bridge = diff_ex(layerm->slices().surfaces, lower_layer->lslices, ApplySafetyOffset::Yes);
-                        // expand the bridges by one extrusion width, to ensure reasonable anchoring whenever possible
-                        true_bridge = intersection_ex(layerm->slices().surfaces,
-                                                      offset_ex(true_bridge, layerm->bridging_flow(frSolidInfill).scaled_spacing()));
-                        surfaces_append(bottom, true_bridge, surface_type_bottom_other);
+                        surfaces_append(
+                            bottom,
+                            opening_ex(
+                                diff_ex(layerm->slices().surfaces, lower_layer->lslices, ApplySafetyOffset::Yes),
+                                offset),
+                            surface_type_bottom_other);
                         // if user requested internal shells, we need to identify surfaces
                         // lying on other slices not belonging to this region
                         if (interface_shells) {
