@@ -960,6 +960,8 @@ bool GLGizmosManager::activate_gizmo(EType type)
     if (type == Undefined) { 
         // it is deactivation of gizmo
         m_current = Undefined;
+        if (m_parent.current_printer_technology() == ptSLA)
+            m_parent.detect_sla_view_type();
         return true;
     }
 

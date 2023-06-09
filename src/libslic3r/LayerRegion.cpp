@@ -276,7 +276,7 @@ Surfaces expand_bridges_detect_orientations(
             for (; it_bridge_anchor != bridge_anchors.end() && it_bridge_anchor->src == bridge_id; ++ it_bridge_anchor) {
                 if (last_anchor_id != int(it_bridge_anchor->boundary)) {
                     last_anchor_id = int(it_bridge_anchor->boundary);
-                    append(anchor_areas, to_polygons(last_anchor_id < int32_t(shells.size()) ? shells[last_anchor_id] : sparse[last_anchor_id]));
+                    append(anchor_areas, to_polygons(last_anchor_id < int32_t(shells.size()) ? shells[last_anchor_id] : sparse[last_anchor_id - int32_t(shells.size())]));
                 }
 //                if (Points &polyline = it_bridge_anchor->path; polyline.size() >= 2) {
 //                    reserve_more_power_of_2(lines, polyline.size() - 1);
