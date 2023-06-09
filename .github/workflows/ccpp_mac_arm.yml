@@ -3,7 +3,7 @@ name: C/C++ dev arm macos
 on:
   push:
     branches:
-      - A3dp-Slicer
+      - A3DP-Branch
       - Nigthly
       - nightly_dev
       - nightly_master
