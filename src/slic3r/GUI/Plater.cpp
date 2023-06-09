@@ -6377,9 +6377,11 @@ void Plater::export_gcode(bool prefer_removable)
             start_dir,
             from_path(default_output_file.filename()),
 #if ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
-            GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : FT_SL1),
+            printer_technology() == ptFFF ?  GUI::file_wildcards(FT_GCODE) :
+                                             GUI::sla_wildcards(p->sla_print.printer_config().sla_archive_format.value.c_str()),
 #else
-            GUI::file_wildcards((printer_technology() == ptFFF) ? FT_GCODE : FT_SL1, ext),
+            printer_technology() == ptFFF ? GUI::file_wildcards(FT_GCODE, ext) :
+                                            GUI::sla_wildcards(p->sla_print.printer_config().sla_archive_format.value.c_str()),
 #endif // ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
             wxFD_SAVE | wxFD_OVERWRITE_PROMPT
         );

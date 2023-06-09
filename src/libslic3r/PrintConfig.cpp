@@ -1983,7 +1983,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("You can use all configuration options as variables inside this template. "
                    "For example: [layer_height], [fill_density] etc. You can also use [timestamp], "
                    "[year], [month], [day], [hour], [minute], [second], [version], [input_filename], "
-                   "[input_filename_base].");
+                   "[input_filename_base], [default_output_extension].");
     def->full_width = true;
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionString("[input_filename_base].gcode"));
