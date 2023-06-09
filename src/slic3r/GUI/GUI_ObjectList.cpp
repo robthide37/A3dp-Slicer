@@ -4382,8 +4382,8 @@ void ObjectList::update_and_show_object_settings_item()
     const wxDataViewItem item = GetSelection();
     if (!item) return;
 
+    // To get object item use GetTopParent(item). This function guarantees return of item with itObject type
     const wxDataViewItem obj_item = m_objects_model->GetTopParent(item);
-    assert(m_objects_model->GetItemType(obj_item) == ItemType::itObject);
     select_item([this, obj_item](){ return add_settings_item(obj_item, &get_item_config(obj_item).get()); });
 }
 
