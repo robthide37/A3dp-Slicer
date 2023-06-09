@@ -3,7 +3,7 @@ name: C/C++ dev ubuntu-GTK3
 on:
   push:
     branches:
-      - A3dp-Slicer
+      - A3DP-Branch
       - nightly_dev
       - nightly_master
       - debug_ubuntu
