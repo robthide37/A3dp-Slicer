@@ -57,13 +57,18 @@ public:
     virtual void write(ModelVolume &volume) const;
 
     // Define projection move
-    // True (raised) .. move outside from surface
-    // False (engraved).. move into object
-    bool is_outside;
+    // True (raised) .. move outside from surface (MODEL_PART)    
+    // False (engraved).. move into object (NEGATIVE_VOLUME)
+    bool is_outside = true;
 
     // Define per letter projection on one text line
     // [optional] It is not used when empty
-    Slic3r::Emboss::TextLines text_lines;
+    Slic3r::Emboss::TextLines text_lines = {};
+
+    // [optional] Define distance for surface
+    // It is used only for flat surface (not cutted)
+    // Position of Zero(not set value) differ for MODEL_PART and NEGATIVE_VOLUME
+    std::optional<float> from_surface;
         
     // new volume name
     std::string volume_name;

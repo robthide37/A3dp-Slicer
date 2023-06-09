@@ -6,6 +6,7 @@
 #include "GLGizmoBase.hpp"
 #include "GLGizmoRotate.hpp"
 #include "slic3r/GUI/SurfaceDrag.hpp"
+#include "slic3r/GUI/GLTexture.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
 
 #include <optional>
@@ -20,13 +21,20 @@
 #include <GL/glew.h>
 
 namespace Slic3r{
-    //class AppConfig;
-    class GLVolume;
-    class ModelVolume;
-    enum class ModelVolumeType : int;
+//class AppConfig;
+class GLVolume;
+class ModelVolume;
+enum class ModelVolumeType : int;
 }
 
 namespace Slic3r::GUI {
+
+struct Texture{
+    unsigned id{0};
+    unsigned width{0};
+    unsigned height{0};
+};
+
 class GLGizmoSVG : public GLGizmoBase
 {
 public:
@@ -151,10 +159,13 @@ private:
     std::optional<float> m_scale_depth;
     void calculate_scale();
 
+    // keep SVG data rendered on GPU
+
+    Texture m_texture;
+
     // only temporary solution
     static const std::string M_ICON_FILENAME;
 };
-
 } // namespace Slic3r::GUI
 
 #endif // slic3r_GLGizmoSVG_hpp_

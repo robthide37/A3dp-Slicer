@@ -678,7 +678,7 @@ void GLGizmoEmboss::on_render() {
 
     if (m_text_lines.is_init()) {
         const Transform3d& tr = gl_volume_ptr->world_matrix();
-        const auto &fix = m_volume->text_configuration->fix_3mf_tr;
+        const auto &fix = m_volume->emboss_shape->fix_3mf_tr;
         if (fix.has_value()) 
             m_text_lines.render(tr * fix->inverse());
         else 
@@ -1096,6 +1096,11 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
     if (mv.is_the_only_one_part())
         return;
 
+    const std::optional<EmbossShape> &es_opt = mv.emboss_shape;
+    if (!es_opt.has_value())
+        return;
+    const EmbossShape &es = *es_opt;
+
     const std::optional<TextConfiguration> &tc_opt = mv.text_configuration;
     if (!tc_opt.has_value())
         return;
@@ -1125,8 +1130,8 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
 
     // For interactivity during drag over surface it must be from gl_volume not volume.
     Transform3d mv_trafo = gl_volume.get_volume_transformation().get_matrix();
-    if (tc.fix_3mf_tr.has_value())
-        mv_trafo = mv_trafo * (tc.fix_3mf_tr->inverse());
+    if (es.fix_3mf_tr.has_value())
+        mv_trafo = mv_trafo * (es.fix_3mf_tr->inverse());
     FontProp::VerticalAlign align = style_manager.get_font_prop().align.second;
     double line_height_mm, line_offset_mm;
     if (!get_line_height_offset(style_manager, line_height_mm, line_offset_mm))
@@ -1357,13 +1362,18 @@ bool GLGizmoEmboss::process()
         if (sources.empty()) 
             return false;
 
+        const std::optional<EmbossShape> &es_opt = m_volume->emboss_shape;
+        if (!es_opt.has_value())
+            return false;
+        const EmbossShape &es = *es_opt;
+
         Transform3d text_tr = m_volume->get_matrix();
-        auto& fix_3mf = m_volume->text_configuration->fix_3mf_tr;
+        auto& fix_3mf = es.fix_3mf_tr;
         if (fix_3mf.has_value())
             text_tr = text_tr * fix_3mf->inverse();
 
         // when it is new applying of use surface than move origin onto surfaca
-        if (!m_volume->text_configuration->style.prop.use_surface) {
+        if (!es.projection.use_surface) {
             auto offset = calc_surface_offset(m_parent.get_selection(), m_raycast_manager);
             if (offset.has_value())
                 text_tr *= Eigen::Translation<double, 3>(*offset);
@@ -3377,9 +3387,11 @@ std::unique_ptr<DataBase> create_emboss_data_base(const std::string             
         cancel->store(true);
     // create new shared ptr to cancel new job
     cancel = std::make_shared<std::atomic<bool>>(false);
+
     DataBase base(volume_name, cancel);
     base.is_outside = is_outside;
     base.text_lines = text_lines.get_lines();
+    base.from_surface = style.distance;
 
     FontFileWithCache &font = style_manager.get_font_file_with_cache();
     TextConfiguration tc{static_cast<EmbossStyle>(style), text};

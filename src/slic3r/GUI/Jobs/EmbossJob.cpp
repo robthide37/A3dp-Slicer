@@ -859,9 +859,8 @@ template<typename Fnc> TriangleMesh create_mesh_per_glyph(DataBase &input, Fnc w
             Vec2d to_zero_vec = letter_bb.center().cast<double>() * shape.scale; // [in mm]
             float surface_offset = input.is_outside ? -SAFE_SURFACE_OFFSET : (-shape.projection.depth + SAFE_SURFACE_OFFSET);
             
-            // TODO: fix it
-            //if (prop.distance.has_value())
-            //    surface_offset += *prop.distance;
+            if (input.from_surface.has_value())
+                surface_offset += *input.from_surface;
 
             Eigen::Translation<double, 3> to_zero(-to_zero_vec.x(), 0., static_cast<double>(surface_offset));
 
@@ -931,6 +930,8 @@ TriangleMesh try_create_mesh(DataBase &input, const Fnc& was_canceled)
     double depth = input.shape.projection.depth / scale;    
     auto projectZ = std::make_unique<ProjectZ>(depth);    
     float offset = input.is_outside ? -SAFE_SURFACE_OFFSET : (SAFE_SURFACE_OFFSET - input.shape.projection.depth);
+    if (input.from_surface.has_value())
+        offset += *input.from_surface;
     Transform3d tr = Eigen::Translation<double, 3>(0., 0.,static_cast<double>(offset)) * Eigen::Scaling(scale);
     ProjectTransform project(std::move(projectZ), tr);
     if (was_canceled()) return {};

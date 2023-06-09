@@ -147,6 +147,16 @@ GuiCfg create_gui_configuration();
 // use private definition
 struct GLGizmoSVG::GuiCfg: public ::GuiCfg{};
 
+namespace Slic3r {
+BoundingBox get_extents(const ExPolygonsWithIds &expoly_ids)
+{
+    BoundingBox result;
+    for (const ExPolygonsWithId &expoly_id : expoly_ids)
+        result.merge(get_extents(expoly_id.expoly));
+    return result;
+}
+} // namespace Slic3r
+
 bool GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos)
 {
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
@@ -433,6 +443,79 @@ void GLGizmoSVG::on_stop_dragging()
 }
 void GLGizmoSVG::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
 
+#include "slic3r/GUI/BitmapCache.hpp"
+#include "nanosvg/nanosvgrast.h"
+namespace{
+bool init_texture(Texture &texture, const ModelVolume &mv) {
+    if (!mv.emboss_shape.has_value())
+        return false;
+
+    const EmbossShape &es = *mv.emboss_shape;
+    const std::string &filepath = es.svg_file_path;
+    if (filepath.empty())
+        return false;
+    
+    unsigned max_size_px = 256;
+    // inspired by:
+    // GLTexture::load_from_svg_file(filepath, false, false, false, max_size_px);
+    NSVGimage *image = BitmapCache::nsvgParseFromFileWithReplace(filepath.c_str(), "px", 96.0f, {});
+    if (image == nullptr)
+        return false;
+    ScopeGuard sg_image([image]() { nsvgDelete(image); });
+
+    // NOTE: Can not use es.shape --> it is aligned and one need offset in svg
+    ExPolygons shape = to_expolygons(image);
+    if (shape.empty())
+        return false;
+
+    BoundingBox bb = get_extents(shape);
+    Point bb_size = bb.size();
+    double bb_width = bb_size.x();  // [in mm]
+    double bb_height = bb_size.y(); // [in mm]
+
+    bool is_widder = bb_size.x() > bb_size.y();
+    float scale = 0.f;
+    if (is_widder){
+        scale = static_cast<float>(max_size_px / bb_width);
+        texture.width  = max_size_px;
+        texture.height = static_cast<unsigned>(std::ceil(bb_height * scale));
+    } else {
+        scale = static_cast<float>(max_size_px / bb_height);
+        texture.width  = static_cast<unsigned>(std::ceil(bb_width * scale));
+        texture.height = max_size_px;
+    }
+    const int n_pixels = texture.width * texture.height;
+    if (n_pixels <= 0)
+        return false;
+
+    NSVGrasterizer* rast = nsvgCreateRasterizer();
+    if (rast == nullptr)
+        return false;    
+    ScopeGuard sg_rast([rast]() { nsvgDeleteRasterizer(rast); });
+
+    int channels_count = 4;
+    std::vector<unsigned char> data(n_pixels * channels_count, 0);
+    float tx = static_cast<float>(-bb.min.x() * scale);
+    float ty = static_cast<float>(bb.max.y() * scale); // Reverse direction of y
+    int stride = texture.width * channels_count;
+    nsvgRasterizeXY(rast, image, tx, ty, scale, scale, data.data(), texture.width, texture.height, stride);
+
+    // sends data to gpu
+    glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+    glsafe(::glGenTextures(1, &texture.id));
+    glsafe(::glBindTexture(GL_TEXTURE_2D, texture.id));
+    glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei) texture.width, (GLsizei) texture.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void *) data.data()));
+        
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
+    glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+
+    GLuint NO_TEXTURE_ID = 0;
+    glsafe(::glBindTexture(GL_TEXTURE_2D, NO_TEXTURE_ID));
+    return true;
+}
+} 
+
 void GLGizmoSVG::set_volume_by_selection()
 {
     const Selection &selection = m_parent.get_selection();
@@ -471,7 +554,7 @@ void GLGizmoSVG::set_volume_by_selection()
     // Calculate current angle of up vector
     m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
     m_distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
-
+    init_texture(m_texture, *m_volume);
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();
 }
@@ -484,6 +567,9 @@ void GLGizmoSVG::reset_volume()
     m_volume = nullptr;
     m_volume_id.id = 0;
     m_volume_shape.shapes_with_ids.clear();
+
+    if (m_texture.id != 0)
+        glsafe(::glDeleteTextures(1, &m_texture.id));
 }
 
 void GLGizmoSVG::calculate_scale() {
@@ -553,10 +639,17 @@ void GLGizmoSVG::draw_window()
     if (m_volume->emboss_shape.has_value())
         ImGui::Text("SVG file path is %s", m_volume->emboss_shape->svg_file_path.c_str());
 
+    if (m_texture.id != 0) {
+        ImTextureID id = (void *) static_cast<intptr_t>(m_texture.id);
+        ImVec2 s(m_texture.width, m_texture.height);
+        ImGui::Image(id, s);
+    }
+
     ImGui::Indent(m_gui_cfg->icon_width);
     draw_depth();
     draw_size();
     draw_use_surface();
+
     draw_distance();
     draw_rotation();
     ImGui::Unindent(m_gui_cfg->icon_width);
@@ -596,16 +689,6 @@ void GLGizmoSVG::draw_depth()
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Size in emboss direction.").c_str());
 }
-
-namespace Slic3r {
-BoundingBox get_extents(const ExPolygonsWithIds &expoly_ids)
-{
-    BoundingBox result;
-    for (const ExPolygonsWithId &expoly_id : expoly_ids)
-        result.merge(get_extents(expoly_id.expoly));
-    return result;
-}
-} // namespace Slic3r
 
 void GLGizmoSVG::draw_size() 
 {
@@ -859,7 +942,7 @@ void GLGizmoSVG::draw_model_type()
         m_volume->set_type(*new_type);
 
          // Update volume position when switch from part or into part
-        if (m_volume->text_configuration->style.prop.use_surface) {
+        if (m_volume->emboss_shape->projection.use_surface) {
             // move inside
             bool is_volume_move_inside  = (type == part);
             bool is_volume_move_outside = (*new_type == part);
