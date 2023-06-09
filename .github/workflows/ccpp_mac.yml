@@ -3,7 +3,7 @@ name: C/C++ dev macos
 on:
   push:
     branches:
-      - Nigthly
+      - A3dp-Slicer
       - nightly_dev
       - nightly_master
       - debug_macos
