@@ -6,7 +6,7 @@ on:
       - Nigthly
       - nightly_dev
       - nightly_master
-      - debug_win
+      - A3dp-Slicer
       - dev
 
 jobs:
