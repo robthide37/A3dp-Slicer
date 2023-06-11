@@ -18,6 +18,7 @@ jobs:
     - uses: actions/checkout@v3
     - name: build deps & slicer
       run: git update-index --chmod=+x ./BuildMacOS.sh
+    - name: build deps & slicer2
       run: ./BuildMacOS.sh
     - name: copy zstd
       run: cp /usr/local/opt/zstd/lib/libzstd.1.dylib ./build/pack/${{ github.event.repository.name }}/${{ github.event.repository.name }}.app/Contents/MacOS/libzstd.1.dylib
