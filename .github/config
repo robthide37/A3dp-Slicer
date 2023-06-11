@@ -1,0 +1,3 @@
+[remote "prusa"]
+	url = https://github.com/prusa3d/PrusaSlicer.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
