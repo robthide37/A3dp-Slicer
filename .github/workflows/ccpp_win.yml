@@ -16,9 +16,16 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: ilammy/msvc-dev-cmd@v1
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
     - name: mkdir in deps
       run: mkdir deps/build
     - name: cmake and make deps
+    
       working-directory: ./deps/build
       run: |
         cmake .. -G "Visual Studio 16 2019" -A x64
