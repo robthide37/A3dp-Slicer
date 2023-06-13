@@ -1296,8 +1296,12 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         this->placeholder_parser().set("first_layer_print_min",  new ConfigOptionFloats({ bbox.min.x(), bbox.min.y() }));
         this->placeholder_parser().set("first_layer_print_max",  new ConfigOptionFloats({ bbox.max.x(), bbox.max.y() }));
         this->placeholder_parser().set("first_layer_print_size", new ConfigOptionFloats({ bbox.size().x(), bbox.size().y() }));
-
-        std::vector<unsigned char> is_extruder_used(print.config().nozzle_diameter.size(), 0);
+        this->placeholder_parser().set("num_extruders", int(print.config().nozzle_diameter.values.size()));
+        // PlaceholderParser currently substitues non-existent vector values with the zero'th value, which is harmful in the case of "is_extruder_used[]"
+        // as Slicer may lie about availability of such non-existent extruder.
+        // We rather sacrifice 256B of memory before we change the behavior of the PlaceholderParser, which should really only fill in the non-existent
+        // vector elements for filament parameters.
+        std::vector<unsigned char> is_extruder_used(std::max(size_t(255), print.config().nozzle_diameter.size()), 0);
         for (unsigned int extruder_id : tool_ordering.all_extruders())
             is_extruder_used[extruder_id] = true;
         this->placeholder_parser().set("is_extruder_used", new ConfigOptionBools(is_extruder_used));

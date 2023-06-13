@@ -17011,7 +17011,7 @@ msgstr "Přenést vybraná nastavení do nově zvoleného přednastavení."
 
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1626
 msgid "Transfer values from left to right"
-msgstr "Přenést hodnoty zprava doleva"
+msgstr "Přenést hodnoty zleva doprava"
 
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:678
 msgid "Translate"

@@ -2267,6 +2267,14 @@ void TabFilament::msw_rescale()
     Tab::msw_rescale();
 }
 
+void TabFilament::sys_color_changed()
+{
+    m_extruders_cb->Clear();
+    update_extruder_combobox();
+
+    Tab::sys_color_changed();
+}
+
 void TabFilament::load_current_preset()
 {
     assert(m_active_extruder >= 0 && m_active_extruder < m_preset_bundle->extruders_filaments.size());
