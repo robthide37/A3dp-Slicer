@@ -166,14 +166,7 @@ static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
         auto omesh = po.get_mesh_to_print();
         auto &smesh = po.support_mesh();
 
-        Vec3d rotation = inst.get_rotation();
-        rotation.z()   = 0.;
-        Transform3f trafo_instance =
-            Geometry::assemble_transform(inst.get_offset().z() * Vec3d::UnitZ(),
-                                         rotation,
-                                         inst.get_scaling_factor(),
-                                         inst.get_mirror()).cast<float>();
-
+        Transform3f trafo_instance = inst.get_matrix().cast<float>();
         trafo_instance = trafo_instance * po.trafo().cast<float>().inverse();
 
         Polygons polys;
@@ -182,8 +175,6 @@ static void update_arrangepoly_slaprint(arrangement::ArrangePolygon &ret,
 
         if (omesh) {
             polys.emplace_back(its_convex_hull_2d_above(*omesh, trafo_instance, zlvl));
-            ret.poly.contour = polys.back();
-            ret.poly.holes = {};
         }
 
         polys.emplace_back(its_convex_hull_2d_above(smesh.its, trafo_instance, zlvl));
@@ -236,7 +227,8 @@ coord_t get_skirt_offset(const Plater* plater) {
 
 void ArrangeJob::prepare()
 {
-    m_selection_only ? prepare_selected() : prepare_all();
+    m_selection_only ? prepare_selected() :
+                       prepare_all();
 
     coord_t min_offset = 0;
     for (auto &ap : m_selected) {
@@ -443,7 +435,6 @@ void assign_logical_beds(std::vector<arrangement::ArrangePolygon> &items,
                          const arrangement::ArrangeBed &bed,
                          double stride)
 {
-
     // The strides have to be removed from the fixed items. For the
     // arrangeable (selected) items bed_idx is ignored and the
     // translation is irrelevant.
