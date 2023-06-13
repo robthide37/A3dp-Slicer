@@ -518,6 +518,7 @@ WipeTower::ToolChangeResult WipeTower::construct_tcr(WipeTowerWriter& writer,
 
 WipeTower::WipeTower(const PrintConfig& config, const PrintRegionConfig& default_region_config, const std::vector<std::vector<float>>& wiping_matrix, size_t initial_tool) :
     m_semm(config.single_extruder_multi_material.value),
+    m_ramming(true), // TESTING ONLY
     m_wipe_tower_pos(config.wipe_tower_x, config.wipe_tower_y),
     m_wipe_tower_width(float(config.wipe_tower_width)),
     m_wipe_tower_rotation_angle(float(config.wipe_tower_rotation_angle)),
@@ -557,8 +558,10 @@ WipeTower::WipeTower(const PrintConfig& config, const PrintRegionConfig& default
         m_cooling_tube_length     = float(config.cooling_tube_length);
         m_parking_pos_retraction  = float(config.parking_pos_retraction);
         m_extra_loading_move      = float(config.extra_loading_move);
-        m_set_extruder_trimpot    = config.high_current_on_filament_swap;
     }
+    if (m_ramming)
+        m_set_extruder_trimpot    = config.high_current_on_filament_swap;
+
     // Calculate where the priming lines should be - very naive test not detecting parallelograms etc.
     const std::vector<Vec2d>& bed_points = config.bed_shape.values;
     BoundingBoxf bb(bed_points);
@@ -617,7 +620,7 @@ void WipeTower::set_extruder(size_t idx, const PrintConfig& config)
 
     m_perimeter_width = nozzle_diameter * Width_To_Nozzle_Ratio; // all extruders are now assumed to have the same diameter
 
-    if (m_semm) {
+    if (m_ramming) {
         std::istringstream stream{config.filament_ramming_parameters.get_at(idx)};
         float speed = 0.f;
         stream >> m_filpar[idx].ramming_line_width_multiplicator >> m_filpar[idx].ramming_step_multiplicator;
@@ -839,12 +842,12 @@ void WipeTower::toolchange_Unload(
 	float remaining = xr - xl ;							// keeps track of distance to the next turnaround
 	float e_done = 0;									// measures E move done from each segment   
 
-    if (m_semm)
+    if (m_ramming)
         writer.travel(ramming_start_pos); // move to starting position
     else
         writer.set_position(ramming_start_pos);
     // if the ending point of the ram would end up in mid air, align it with the end of the wipe tower:
-    if (m_semm && (m_layer_info > m_plan.begin() && m_layer_info < m_plan.end() && (m_layer_info-1!=m_plan.begin() || !m_adhesion ))) {
+    if (m_ramming && (m_layer_info > m_plan.begin() && m_layer_info < m_plan.end() && (m_layer_info-1!=m_plan.begin() || !m_adhesion ))) {
 
         // this is y of the center of previous sparse infill border
         float sparse_beginning_y = 0.f;
@@ -876,7 +879,7 @@ void WipeTower::toolchange_Unload(
     writer.disable_linear_advance();
 
     // now the ramming itself:
-    while (m_semm && i < m_filpar[m_current_tool].ramming_speed.size())
+    while (m_ramming && i < m_filpar[m_current_tool].ramming_speed.size())
     {
         const float x = volume_to_length(m_filpar[m_current_tool].ramming_speed[i] * 0.25f, line_width, m_layer_height);
         const float e = m_filpar[m_current_tool].ramming_speed[i] * 0.25f / filament_area(); // transform volume per sec to E move;
@@ -953,7 +956,7 @@ void WipeTower::toolchange_Unload(
     // this is to align ramming and future wiping extrusions, so the future y-steps can be uniform from the start:
     // the perimeter_width will later be subtracted, it is there to not load while moving over just extruded material
     Vec2f pos = Vec2f(end_of_ramming.x(), end_of_ramming.y() + (y_step/m_extra_spacing-m_perimeter_width) / 2.f + m_perimeter_width);
-    if (m_semm)
+    if (m_ramming)
         writer.travel(pos, 2400.f);
     else
         writer.set_position(pos);
