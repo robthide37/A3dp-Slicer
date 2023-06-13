@@ -7525,6 +7525,7 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
                     wxGetApp().CallAfter([obj_idx, layer_id]() {
                         wxGetApp().plater()->set_preview_layers_slider_values_range(0, layer_id - 1);
                         wxGetApp().plater()->select_view_3D("3D");
+                        wxGetApp().plater()->canvas3D()->reset_all_gizmos();
                         wxGetApp().plater()->canvas3D()->get_selection().add_object(obj_idx, true);
                         wxGetApp().obj_list()->update_selections();
                     });
