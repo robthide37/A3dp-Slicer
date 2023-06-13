@@ -56,6 +56,15 @@ public:
     bool create_volume(ModelVolumeType volume_type); // first open file dialog
 
     /// <summary>
+    /// Create volume from already selected svg file
+    /// </summary>
+    /// <param name="svg_file">File path</param>
+    /// <param name="volume_type">Object part / Negative volume / Modifier</param>
+    /// <param name="mouse_pos">Position on screen where to create volume</param>
+    /// <returns>True on succesfull start creation otherwise False</returns>
+    bool create_volume(std::string_view svg_file, ModelVolumeType volume_type = ModelVolumeType::MODEL_PART, const Vec2d &mouse_pos = Vec2d(nan, nan));
+
+    /// <summary>
     /// Check whether volume is object containing only emboss volume
     /// </summary>
     /// <param name="volume">Pointer to volume</param>

@@ -68,15 +68,17 @@ std::string choose_svg_file();
 /// Let user to choose file with (S)calable (V)ector (G)raphics - SVG.
 /// Than let select contour
 /// </summary>
+/// <param name="filepath">SVG file path</param>
 /// <returns>EmbossShape to create</returns>
-EmbossShape select_shape();
+EmbossShape select_shape(std::string_view filepath = "");
 
 /// <summary>
 /// Create new embos data
 /// </summary>
 /// <param name="cancel">Cancel for previous job</param>
+/// <param name="filepath">SVG file path</param>
 /// <returns>Base data for emboss SVG</returns>
-DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel);
+DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel, std::string_view filepath = "");
 
 /// <summary>
 /// Create symbol '?' as default shape
@@ -169,6 +171,13 @@ bool GLGizmoSVG::create_volume(ModelVolumeType volume_type)
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
     DataBasePtr base = create_emboss_data_base(m_job_cancel);
     return start_create_volume_without_position(input, std::move(base));
+}
+
+bool GLGizmoSVG::create_volume(std::string_view svg_file, ModelVolumeType volume_type, const Vec2d &mouse_pos)
+{
+    CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
+    DataBasePtr base = create_emboss_data_base(m_job_cancel, svg_file);
+    return start_create_volume(input, std::move(base), mouse_pos);
 }
 
 bool GLGizmoSVG::is_svg(const ModelVolume &volume) {
@@ -656,6 +665,7 @@ void GLGizmoSVG::draw_window()
 
     if (ImGui::Button("change file")) {
         m_volume_shape.shapes_with_ids = select_shape().shapes_with_ids;
+        init_texture(m_texture, *m_volume);
         // TODO: use setted scale
         process();
     }
@@ -1090,15 +1100,26 @@ ExPolygons default_shape()
     return shape;
 }
 
-EmbossShape select_shape()
+namespace {
+void translate(ExPolygons &expolys, const Point &p) {
+    for (ExPolygon &expoly : expolys)
+        expoly.translate(p);
+}
+}
+
+EmbossShape select_shape(std::string_view filepath)
 {
     EmbossShape shape;
     shape.projection.depth       = 10.;
     shape.projection.use_surface = false;
 
-    shape.svg_file_path = choose_svg_file();
-    if (shape.svg_file_path.empty())
-        return {};
+    if (filepath.empty()) {
+        shape.svg_file_path = choose_svg_file();
+        if (shape.svg_file_path.empty())
+            return {};
+    } else {
+        shape.svg_file_path = filepath; // copy
+    }
 
     const char *unit_mm{"mm"};
     // common used DPI is 96 or 72
@@ -1113,10 +1134,15 @@ EmbossShape select_shape()
     float scale = static_cast<float>(1 / shape.scale);
     bool is_y_negative = true;
     ExPolygons expoly = to_expolygons(image, tesselation_tolerance, max_level, scale, is_y_negative);
-
+    
     // Must contain some shapes !!!
     if (expoly.empty())
         expoly = default_shape();
+
+    // SVG is used as centered
+    // Do not disturb user by settings of pivot position
+    BoundingBox bb = get_extents(expoly);
+    translate(expoly, -bb.center());
 
     unsigned id = 0;
     shape.shapes_with_ids = {{id, expoly}};
@@ -1124,9 +1150,9 @@ EmbossShape select_shape()
     return shape;
 }
 
-DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel)
+DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel, std::string_view filepath)
 {
-    EmbossShape shape = select_shape();
+    EmbossShape shape = select_shape(filepath);
 
     if (shape.shapes_with_ids.empty())
         // canceled selection of SVG file
