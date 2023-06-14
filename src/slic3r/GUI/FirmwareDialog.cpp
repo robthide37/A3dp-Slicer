@@ -845,7 +845,7 @@ FirmwareDialog::FirmwareDialog(wxWindow *parent) :
 	grid->Add(port_sizer, 0, wxEXPAND);
 
 	grid->Add(label_progress, 0, wxALIGN_CENTER_VERTICAL);
-	grid->Add(p->progressbar, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
+	grid->Add(p->progressbar, 1, wxEXPAND);
 
 	grid->Add(label_status, 0, wxALIGN_CENTER_VERTICAL);
 	grid->Add(p->txt_status, 0, wxEXPAND);

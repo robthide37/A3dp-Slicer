@@ -357,7 +357,7 @@ WipingPanel::WipingPanel(wxWindow* parent, const std::vector<float>& matrix, con
         hsizer->AddSpacer(10);
         hsizer->Add(new wxStaticText(m_page_simple, wxID_ANY, wxString(_(L("Tool #"))) << i + 1 << ": "), 0, wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL);
 
-        gridsizer_simple->Add(hsizer, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
+        gridsizer_simple->Add(hsizer, 1, wxEXPAND);
         gridsizer_simple->Add(m_old.back(),0);
         gridsizer_simple->Add(m_new.back(),0);
 	}
