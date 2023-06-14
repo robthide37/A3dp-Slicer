@@ -467,6 +467,9 @@ void Tab::OnActivate()
     else {
         // on first OnActivate call show top sizer
         m_top_hsizer->ShowItems(true);
+        // update visibility of action buttons
+        update_btns_enabling();
+        // update visibility of active extruder
         if (TabFilament* tab = dynamic_cast<TabFilament*>(this))
             tab->update_extruder_combobox();
         Layout();
