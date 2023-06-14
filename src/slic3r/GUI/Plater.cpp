@@ -4099,16 +4099,21 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
             }
         }
         if (templ_cnt > 0) {
-            const std::string message_notif = GUI::format("%1%\n%2%\n%3%"
+            const std::string message_notif = GUI::format("%1%\n%2%\n%3%\n\n%4% "
                 , _L_PLURAL("You are using template filament preset.", "You are using template filament presets.", templ_cnt)
                 , _u8L("Please note that template presets are not customized for specific printer and should only be used as a starting point for creating your own user presets.")
-                , names);
+                , names
+                ,_u8L("More info at"));
             // warning dialog proccessing cuts text at first '/n' - pass the text without new lines (and without filament names).
-            const std::string message_dial = GUI::format("%1% %2%"
+            const std::string message_dial = GUI::format("%1% %2% %3%"
                 , _L_PLURAL("You are using template filament preset.", "You are using template filament presets.", templ_cnt)
-                , _u8L("Please note that template presets are not customized for specific printer and should only be used as a starting point for creating your own user presets."));
+                , _u8L("Please note that template presets are not customized for specific printer and should only be used as a starting point for creating your own user presets.")
+                , "<a href=https://help.prusa3d.com/article/template-filaments_467599>https://help.prusa3d.com/</a>"
+            );
             BOOST_LOG_TRIVIAL(warning) << message_notif;
-            notification_manager->push_slicing_warning_notification(message_notif, false, 0, 0);
+            notification_manager->push_slicing_warning_notification(message_notif, false, 0, 0, "https://help.prusa3d.com/", 
+                [](wxEvtHandler* evnthndlr) { wxGetApp().open_browser_with_warning_dialog("https://help.prusa3d.com/article/template-filaments_467599"); return false; }
+                );
             add_warning({ PrintStateBase::WarningLevel::CRITICAL, true, message_dial, 0}, 0);
         }
     }
@@ -4248,9 +4253,9 @@ bool Plater::priv::warnings_dialog()
 		else
 			text += it.first.message;
 	}
-	//text += "\n\nDo you still wish to export?";
-	//wxMessageDialog msg_wingow(this->q, from_u8(text), wxString(SLIC3R_APP_NAME " ") + _L("generated warnings"), wxOK);
-	MessageDialog msg_wingow(this->q, from_u8(text), wxString(SLIC3R_APP_NAME " ") + _L("generated warnings"), wxOK);
+	//MessageDialog msg_wingow(this->q, from_u8(text), wxString(SLIC3R_APP_NAME " ") + _L("generated warnings"), wxOK);
+    // Changed ti InfoDialog so it can show hyperlinks
+    InfoDialog msg_wingow(this->q, wxString(SLIC3R_APP_NAME " ") + _L("generated warnings"), from_u8(text), wxOK);
 	const auto res = msg_wingow.ShowModal();
 	return res == wxID_OK;
 
