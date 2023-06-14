@@ -605,6 +605,7 @@ wxString sla_wildcards(const char *formatid)
     if (entry) {
         FileWildcards wc;
         std::string tr_title = I18N::translate_utf8(entry->desc);
+        // TRN %s = type of file
         tr_title = GUI::format(_u8L("%s files"), tr_title);
         wc.title = tr_title;
 

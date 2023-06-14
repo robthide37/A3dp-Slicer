@@ -6678,7 +6678,7 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
     else {
         // Failure
 //        p->statusbar()->set_status_text(format_wxstr(_L("Error exporting 3MF file %s"), path));
-        const wxString what = GUI::format_wxstr(_L("%1%: %2%"),_L("Unable to save file") , path_u8);
+        const wxString what = GUI::format_wxstr("%1%: %2%", _L("Unable to save file") , path_u8);
         show_error(this, what);
     }
     return ret;
