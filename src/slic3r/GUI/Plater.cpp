@@ -7133,7 +7133,9 @@ void Plater::force_filament_cb_update()
 
     // Update preset comboboxes on sidebar and filaments tab
     p->sidebar->update_presets(Preset::TYPE_FILAMENT);
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->select_preset(wxGetApp().preset_bundle->filaments.get_selected_preset_name());
+
+    TabFilament* tab = dynamic_cast<TabFilament*>(wxGetApp().get_tab(Preset::TYPE_FILAMENT));
+    tab->select_preset(wxGetApp().preset_bundle->extruders_filaments[tab->get_active_extruder()].get_selected_preset_name());
 }
 
 void Plater::force_print_bed_update()
