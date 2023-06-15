@@ -3605,14 +3605,16 @@ void GCodeProcessor::post_process()
                 auto rev_it = m_lines.rbegin() + rev_it_dist;
                 auto start_rev_it = rev_it;
 
+                std::string curr_cmd = GCodeReader::GCodeLine::extract_cmd(rev_it->line);
                 // backtrace into the cache to find the place where to insert the line
-                while (rev_it != m_lines.rend() && rev_it->time > time_threshold_i && GCodeReader::GCodeLine::extract_cmd(rev_it->line) != cmd) {
+                while (rev_it != m_lines.rend() && rev_it->time > time_threshold_i && curr_cmd != cmd && curr_cmd != "G28" && curr_cmd != "G29") {
                     rev_it->line = line_replacer(rev_it->line);
                     ++rev_it;
+                    curr_cmd = GCodeReader::GCodeLine::extract_cmd(rev_it->line);
                 }
 
-                // we met the previous evenience of cmd. stop inserting lines
-                if (rev_it != m_lines.rend() && GCodeReader::GCodeLine::extract_cmd(rev_it->line) == cmd)
+                // we met the previous evenience of cmd, or a G28/G29 command. stop inserting lines
+                if (rev_it != m_lines.rend() && (curr_cmd == cmd || curr_cmd == "G28" || curr_cmd == "G29"))
                     break;
 
                 // insert the line for the current step

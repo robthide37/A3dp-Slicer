@@ -173,8 +173,7 @@ void GLGizmosManager::reset_all_states()
     const EType current = get_current_type();
     if (current != Undefined)
         // close any open gizmo
-        if (!open_gizmo(current))
-            return;
+        open_gizmo(current);
 
     activate_gizmo(Undefined);
     m_hover = Undefined;

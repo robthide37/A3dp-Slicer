@@ -312,7 +312,7 @@ namespace Slic3r {
         std::string gcode_out;
         std::string line;
         Vec2f pos = tcr.start_pos;
-        Vec2f transformed_pos = pos;
+        Vec2f transformed_pos = Eigen::Rotation2Df(angle) * pos + translation;
         Vec2f old_pos(-1000.1f, -1000.1f);
 
         while (gcode_str) {

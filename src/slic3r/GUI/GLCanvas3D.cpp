@@ -7493,8 +7493,9 @@ void GLCanvas3D::_set_warning_notification(EWarning warning, bool state)
         std::string objName2 = conflict_result->_objName2;
         double      height = conflict_result->_height;
         int         layer = conflict_result->layer;
-        text = (boost::format(_u8L("Conflicts of gcode paths have been found at layer %d, z = %.2lf mm. Please separate the conflicted objects farther (%s <-> %s).")) % layer %
-            height % objName1 % objName2).str();
+        // TRN %3% is name of Object1, %4% is name of Object2
+        text = format(_u8L("Conflicts in G-code paths have been detected at layer %1%, z=%2$.2f mm. Please reposition the conflicting objects (%3% <-> %4%) further apart."), 
+                      layer, height, objName1, objName2);
         error = ErrorType::SLICING_ERROR;
         break;
     }
