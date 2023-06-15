@@ -193,8 +193,7 @@ private:
 
         // maximal size of face name image
         Vec2i face_name_size             = Vec2i(100, 0);
-        float face_name_max_width        = 100.f;
-        float face_name_texture_offset_x = 105.f;
+        float face_name_texture_offset_x = 0.f;
 
         // maximal texture generate jobs running at once
         unsigned int max_count_opened_font_files = 10;

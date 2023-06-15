@@ -941,6 +941,8 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
     int max_style_image_height = 1.5 * input_height;
     cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
     cfg.face_name_size.y() = line_height_with_spacing;
+    cfg.face_name_size.x() = cfg.input_width;
+    cfg.face_name_texture_offset_x = cfg.input_width + space;
     return cfg;
 }
 
@@ -1979,7 +1981,7 @@ void GLGizmoEmboss::draw_font_list()
         }
 
         if (!m_face_names.has_truncated_names)
-            init_truncated_names(m_face_names, m_gui_cfg->face_name_max_width);
+            init_truncated_names(m_face_names, m_gui_cfg->input_width);
         
         if (m_face_names.texture_id == 0) 
             init_font_name_texture();
