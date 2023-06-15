@@ -4254,8 +4254,8 @@ bool Plater::priv::warnings_dialog()
 			text += it.first.message;
 	}
 	//MessageDialog msg_wingow(this->q, from_u8(text), wxString(SLIC3R_APP_NAME " ") + _L("generated warnings"), wxOK);
-    // Changed ti InfoDialog so it can show hyperlinks
-    InfoDialog msg_wingow(this->q, wxString(SLIC3R_APP_NAME " ") + _L("generated warnings"), from_u8(text), wxOK);
+    // Changed to InfoDialog so it can show hyperlinks
+    InfoDialog msg_wingow(this->q, format_wxstr("%1% %2%", SLIC3R_APP_NAME, _L("generated warnings")), from_u8(text), true);
 	const auto res = msg_wingow.ShowModal();
 	return res == wxID_OK;
 
