@@ -13,6 +13,7 @@ namespace Slic3r {
 
 enum class CutConnectorType : int;
 class ModelVolume;
+class GLShaderProgram;
 struct CutConnectorAttributes;
 
 namespace GUI {
@@ -180,7 +181,8 @@ class GLGizmoCut3D : public GLGizmoBase
 
     enum class CutMode {
         cutPlanar
-        , cutGrig
+        , cutTongueAndGroove
+        //, cutGrig
         //,cutRadial
         //,cutModular
     };
@@ -190,7 +192,7 @@ class GLGizmoCut3D : public GLGizmoBase
         , Manual
     };
 
-//    std::vector<std::string> m_modes;
+    std::vector<std::string> m_modes;
     size_t m_mode{ size_t(CutMode::cutPlanar) };
 
     std::vector<std::string> m_connector_modes;
@@ -301,8 +303,9 @@ protected:
     Transform3d get_cut_matrix(const Selection& selection);
 
 private:
-    void set_center(const Vec3d& center, bool update_tbb = false);
-    bool render_combo(const std::string& label, const std::vector<std::string>& lines, int& selection_idx);
+    void set_center(const Vec3d&center, bool update_tbb = false);
+    bool render_cut_mode_combo();
+    bool render_combo(const std::string&label, const std::vector<std::string>&lines, int&selection_idx);
     bool render_double_input(const std::string& label, double& value_in);
     bool render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in);
     void render_move_center_input(int axis);
@@ -319,6 +322,7 @@ private:
     bool cut_line_processing() const;
     void discard_cut_line_processing();
 
+    void render_cut_plate_for_tongue_and_groove(GLShaderProgram* shader);
     void render_cut_plane();
     static void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
     void render_line(GLModel& line_model, const ColorRGBA& color, Transform3d view_model_matrix, float width);

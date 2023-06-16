@@ -183,9 +183,10 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     , m_connector_style (int(CutConnectorStyle::Prism))
     , m_connector_shape_id (int(CutConnectorShape::Circle))
 {
-//    m_modes = { _u8L("Planar"), _u8L("Grid")
+    m_mode = size_t(CutMode::cutTongueAndGroove);
+    m_modes = { _u8L("Planar"), _u8L("Tongue and Groove")//, _u8L("Grid")
 //              , _u8L("Radial"), _u8L("Modular")
-//    };
+    };
 
     m_connector_modes = { _u8L("Auto"), _u8L("Manual") };
 
@@ -466,6 +467,18 @@ void GLGizmoCut3D::set_center(const Vec3d& center, bool update_tbb /*=false*/)
     update_clipper();
 }
 
+bool GLGizmoCut3D::render_cut_mode_combo()
+{
+    ImGui::AlignTextToFramePadding();
+    int selection_idx = int(m_mode);
+    const bool is_changed = m_imgui->combo(_u8L("Mode"), m_modes, selection_idx, 0, m_label_width, m_control_width);
+
+    if (is_changed)
+        m_mode = size_t(selection_idx);
+
+    return is_changed;
+}
+
 bool GLGizmoCut3D::render_combo(const std::string& label, const std::vector<std::string>& lines, int& selection_idx)
 {
     ImGui::AlignTextToFramePadding();
@@ -606,6 +619,71 @@ bool GLGizmoCut3D::render_reset_button(const std::string& label_id, const std::s
     return revert;
 }
 
+static double get_grabber_mean_size(const BoundingBoxf3& bb)
+{
+    return (bb.size().x() + bb.size().y() + bb.size().z()) / 30.;
+}
+
+void GLGizmoCut3D::render_cut_plate_for_tongue_and_groove(GLShaderProgram* shader)
+{
+    const Camera &    camera    = wxGetApp().plater()->get_camera();
+    const Transform3d cp_matrix = translation_transform(m_plane_center) * m_rotation_m;
+    ColorRGBA         cp_clr    = m_plane.model.get_color();
+    // input values
+    const double groove_depth = 2;
+    const double groove_width = 6;
+
+    // values for calculaton
+    const double groove_half_depth = 0.5 * groove_depth;
+    const double groove_half_width = 0.5 * groove_width;
+
+    const float       cp_radius = m_cut_plane_radius_koef * (float)m_radius;
+    const float       cp_length = 1.5f * cp_radius;
+    const float       cp_width  = 0.02f * (float)get_grabber_mean_size(m_bounding_box);
+    const double      h_shift   = 0.25 * (double)cp_radius + groove_half_width;
+
+    GLModel model;
+    model.init_from(its_make_prism(0.5f * cp_radius, cp_length, cp_width));
+    model.set_color(cp_clr);
+
+    // upper halfs of cut_plane
+
+    Transform3d view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * Vec3d(-h_shift, 0, groove_half_depth)) * cp_matrix;
+    shader->set_uniform("view_model_matrix", view_model_matrix_);
+    model.render();
+
+    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * Vec3d(h_shift, 0, groove_half_depth)) * cp_matrix;
+    shader->set_uniform("view_model_matrix", view_model_matrix_);
+    model.render();
+
+    // lower part of cut_plane
+
+    model.reset();
+    model.init_from(its_make_prism(groove_width + 2*groove_depth, cp_length, cp_width));
+    cp_clr.a(cp_clr.a() + 0.1f);
+    model.set_color(cp_clr);
+
+    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (-groove_half_depth * Vec3d::UnitZ())) * cp_matrix;
+    shader->set_uniform("view_model_matrix", view_model_matrix_);
+    model.render();
+
+    // side parts of cut_plane
+
+    model.reset();
+    model.init_from(its_make_prism(sqrt(2* groove_depth* groove_depth), cp_length, cp_width));
+
+    const double h_side_shift = groove_half_width + groove_half_depth;
+    const double angle = 0.25 * PI;
+
+    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (-h_side_shift * Vec3d::UnitX())) * cp_matrix * rotation_transform(-angle * Vec3d::UnitY());
+    shader->set_uniform("view_model_matrix", view_model_matrix_);
+    model.render();
+
+    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (h_side_shift * Vec3d::UnitX())) * cp_matrix * rotation_transform(angle * Vec3d::UnitY());
+    shader->set_uniform("view_model_matrix", view_model_matrix_);
+    model.render();
+}
+
 void GLGizmoCut3D::render_cut_plane()
 {
     if (cut_line_processing())
@@ -623,9 +701,7 @@ void GLGizmoCut3D::render_cut_plane()
     shader->start_using();
 
     const Camera& camera = wxGetApp().plater()->get_camera();
-    const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
 
-    shader->set_uniform("view_model_matrix", view_model_matrix);
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
     if (can_perform_cut() && has_valid_contour()) {
@@ -636,17 +712,19 @@ void GLGizmoCut3D::render_cut_plane()
     }
     else
         m_plane.model.set_color({ 1.0f, 0.8f, 0.8f, 0.5f });
-    m_plane.model.render();
+
+    if (m_mode == size_t(CutMode::cutPlanar)) {
+        const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
+        shader->set_uniform("view_model_matrix", view_model_matrix);
+        m_plane.model.render();
+    }
+    else if (m_mode == size_t(CutMode::cutTongueAndGroove))
+        render_cut_plate_for_tongue_and_groove(shader);
 
     glsafe(::glEnable(GL_CULL_FACE));
     glsafe(::glDisable(GL_BLEND));
 
     shader->stop_using();
-}
-
-static double get_grabber_mean_size(const BoundingBoxf3& bb)
-{
-    return (bb.size().x() + bb.size().y() + bb.size().z()) / 30.;
 }
 
 static double get_half_size(double size)
@@ -1951,9 +2029,11 @@ void GLGizmoCut3D::render_color_marker(float size, const ImU32& color)
 void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 {
     // WIP : cut plane mode
-    // render_combo(_u8L("Mode"), m_modes, m_mode);
+    render_cut_mode_combo();
 
-    if (m_mode == size_t(CutMode::cutPlanar)) {
+//    if (m_mode == size_t(CutMode::cutPlanar)) {
+    CutMode mode = CutMode(m_mode);
+    if (mode == CutMode::cutPlanar || mode == CutMode::cutTongueAndGroove) {
         ImGui::AlignTextToFramePadding();
         ImGuiWrapper::text(wxString(ImGui::InfoMarkerSmall));
         ImGui::SameLine();
@@ -1968,7 +2048,6 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGui::SameLine();
         render_move_center_input(Z);
         ImGui::SameLine();
-
         const bool has_connectors = !connectors.empty();
 
         const bool is_cut_plane_init = m_rotation_m.isApprox(Transform3d::Identity()) && m_bb_center.isApprox(m_plane_center);
@@ -1982,6 +2061,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
 //        render_flip_plane_button();
 
+        if (mode == CutMode::cutPlanar) {
         add_vertical_scaled_interval(0.75f);
 
         m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower || m_keep_as_parts || (m_part_selection.valid() && m_part_selection.is_one_object()));
@@ -1999,6 +2079,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
                 reset_connectors();
             }
         m_imgui->disabled_end();
+        }
 
         ImGui::Separator();
 
