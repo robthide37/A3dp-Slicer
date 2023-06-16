@@ -4099,10 +4099,10 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
             }
         }
         if (templ_cnt > 0) {
-            const std::string message_notif = GUI::format("%1%\n%2%\n%3%\n\n%4% "
+            const std::string message_notif = GUI::format("%1%\n%2%\n\n%3%\n\n%4% "
                 , _L_PLURAL("You are using template filament preset.", "You are using template filament presets.", templ_cnt)
-                , _u8L("Please note that template presets are not customized for specific printer and should only be used as a starting point for creating your own user presets.")
                 , names
+                , _u8L("Please note that template presets are not customized for specific printer and should only be used as a starting point for creating your own user presets.")
                 ,_u8L("More info at"));
             // warning dialog proccessing cuts text at first '/n' - pass the text without new lines (and without filament names).
             const std::string message_dial = GUI::format("%1% %2% %3%"
