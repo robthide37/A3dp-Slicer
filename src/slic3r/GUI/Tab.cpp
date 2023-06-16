@@ -2145,6 +2145,12 @@ void TabFilament::build()
         });
 
 
+        optgroup = page->new_optgroup(L("Toolchange parameters with multi extruder MM printers"));
+        optgroup->append_single_option_line("filament_multitool_ramming");
+        optgroup->append_single_option_line("filament_multitool_ramming_volume");
+        optgroup->append_single_option_line("filament_multitool_ramming_flow");
+
+
     add_filament_overrides_page();
 
 
@@ -2245,6 +2251,13 @@ void TabFilament::toggle_options()
         for (int i = 0; i < 4; i++) {
         toggle_option("overhang_fan_speed_"+std::to_string(i),dynamic_fan_speeds);
         }
+    }
+
+    if (m_active_page->title() == "Advanced")
+    {
+        bool multitool_ramming = m_config->opt_bool("filament_multitool_ramming", 0);
+        toggle_option("filament_multitool_ramming_volume", multitool_ramming);
+        toggle_option("filament_multitool_ramming_flow", multitool_ramming);
     }
 
     if (m_active_page->title() == "Filament Overrides")

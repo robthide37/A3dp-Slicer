@@ -1103,6 +1103,28 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloats { 0. });
 
+    def = this->add("filament_multitool_ramming", coBools);
+    def->label = L("Enable ramming for multitool setups");
+    def->tooltip = L("Perform ramming when using multitool printer (i.e. when the 'Single Extruder Multimaterial' in Printer Settings is unchecked).");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBools { false });
+
+    def = this->add("filament_multitool_ramming_volume", coFloats);
+    def->label = L("Multitool ramming volume");
+    def->tooltip = L("");
+    def->sidetext = L("mm³");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloats { 0. });
+
+    def = this->add("filament_multitool_ramming_flow", coFloats);
+    def->label = L("Multitool ramming flow");
+    def->tooltip = L("");
+    def->sidetext = L("mm³/s");
+    def->min = 0;
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloats { 0. });
+
     def = this->add("filament_diameter", coFloats);
     def->label = L("Diameter");
     def->tooltip = L("Enter your filament diameter here. Good precision is required, so use a caliper "

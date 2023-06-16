@@ -241,6 +241,7 @@ public:
         std::vector<float>  ramming_speed;
         float               nozzle_diameter;
         float               filament_area;
+		bool			    multitool_ramming;
     };
 
 private:
@@ -258,7 +259,6 @@ private:
 
 
 	bool   m_semm               = true; // Are we using a single extruder multimaterial printer?
-	bool   m_ramming            = true; // Do we want to perform ramming?
     Vec2f  m_wipe_tower_pos; 			// Left front corner of the wipe tower in mm.
 	float  m_wipe_tower_width; 			// Width of the wipe tower.
 	float  m_wipe_tower_depth 	= 0.f; 	// Depth of the wipe tower
