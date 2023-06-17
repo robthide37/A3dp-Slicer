@@ -470,11 +470,19 @@ static std::vector<std::string> s_Preset_print_options {
         "avoid_crossing_not_first_layer",
         "thin_perimeters", "thin_perimeters_all",
         "overhangs_speed",
+        "overhangs_speed_enforce",
         "overhangs_width",
         "overhangs_width_speed", 
         "overhangs_reverse",
         "overhangs_reverse_threshold",
         "seam_position",
+        "seam_angle_cost",
+        "seam_notch_all",
+        "seam_notch_angle",
+        "seam_notch_inner",
+        "seam_notch_outer",
+        "seam_travel_cost",
+        "seam_visibility",
         // external_perimeters
         "external_perimeters_first",
         "external_perimeters_vase",
@@ -612,6 +620,7 @@ static std::vector<std::string> s_Preset_print_options {
         "notes", 
         "print_custom_variables",
         "complete_objects",
+        "parallel_objects_step",
         "complete_objects_one_skirt",
         "complete_objects_sort",
         "extruder_clearance_radius", 
@@ -662,6 +671,7 @@ static std::vector<std::string> s_Preset_print_options {
         "threads",
         // wipe tower
         "wipe_tower", "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_bridging",
+        "wipe_tower_speed", "wipe_tower_wipe_starting_speed",
         "wipe_tower_brim_width",
         "mmu_segmented_region_max_width",
         "single_extruder_multi_material_priming", 
@@ -672,8 +682,6 @@ static std::vector<std::string> s_Preset_print_options {
         "exact_last_layer_height",
         "perimeter_loop",
         "perimeter_loop_seam",
-        "seam_angle_cost",
-        "seam_travel_cost",
         "infill_connection", "infill_connection_solid", "infill_connection_top", "infill_connection_bottom", "infill_connection_bridge",
         "first_layer_infill_speed",
         // thin wall
@@ -793,6 +801,8 @@ static std::vector<std::string> s_Preset_machine_limits_options {
 };
 
 static std::vector<std::string> s_Preset_printer_options {
+	"arc_fitting",
+    "arc_fitting_tolerance",
     "printer_technology",
     "bed_shape", "bed_custom_texture", "bed_custom_model", "z_offset", "init_z_rotate",
     "fan_kickstart",

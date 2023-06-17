@@ -2124,6 +2124,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                     option.opt.tooltip = (params[i].substr(8, params[i].size() - 8));
                     boost::replace_all(option.opt.tooltip, "\\n", "\n");
                     boost::replace_all(option.opt.tooltip, "\\t", "\t");
+                    boost::replace_all(option.opt.tooltip, "\\.", ":");
+                    boost::replace_all(option.opt.tooltip, "\\£", "$");
                     need_to_notified_search = true;
                 }
                 else if (boost::starts_with(params[i], "max_literal$"))
@@ -3348,6 +3350,10 @@ void TabPrinter::toggle_options()
     bool have_remaining_times = m_config->opt_bool("remaining_times");
     field = get_field("remaining_times_type");
     if (field) field->toggle(have_remaining_times);
+	
+    bool have_arc_fitting = m_config->opt_bool("arc_fitting");
+    field = get_field("arc_fitting_tolerance");
+    if (field) field->toggle(have_arc_fitting);
 
     auto flavor = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
     bool is_marlin_flavor = flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware;

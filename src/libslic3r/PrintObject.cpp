@@ -549,7 +549,7 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
         // prerequisites
         this->prepare_infill();
 
-        m_print->set_status(40, L("Infilling layers"));
+        m_print->set_status(35, L("Infilling layers"));
         m_print->set_status(0, L("Infilling layer %s / %s"), { std::to_string(0), std::to_string(m_layers.size()) }, PrintBase::SlicingStatus::SECONDARY_STATE);
         if (this->set_started(posInfill)) {
             auto [adaptive_fill_octree, support_fill_octree] = this->prepare_adaptive_infill_data();
@@ -628,6 +628,74 @@ std::vector<std::reference_wrapper<const PrintRegion>> PrintObject::all_regions(
 #endif
             }
             this->set_done(posSupportMaterial);
+        }
+    }
+
+    void PrintObject::simplify_extrusion_path()
+    {
+        if (this->set_started(posSimplifyPath)) {
+            const PrintConfig& print_config = this->print()->config();
+            const bool spiral_mode = print_config.spiral_vase;
+            const bool enable_arc_fitting = print_config.arc_fitting && !spiral_mode;
+
+            m_print->set_status(0, L("Optimizing layer %s / %s"), { std::to_string(0), std::to_string(m_layers.size()) }, PrintBase::SlicingStatus::SECONDARY_STATE);
+            BOOST_LOG_TRIVIAL(debug) << "Simplify extrusion path of object in parallel - start";
+            //BBS: infill and walls
+            std::atomic<int> atomic_count{ 0 };
+            tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, m_layers.size()),
+                [this, &atomic_count](const tbb::blocked_range<size_t>& range) {
+                    for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                        m_print->throw_if_canceled();
+                        m_layers[layer_idx]->simplify_extrusion_path();
+                        int nb_layers_done = (++atomic_count);
+                        m_print->set_status(int((nb_layers_done * 100) / m_layers.size()), L("Optimizing layer %s / %s"), { std::to_string(nb_layers_done), std::to_string(m_layers.size()) }, PrintBase::SlicingStatus::SECONDARY_STATE);
+                    }
+                }
+            );
+            //also simplify object skirt & brim
+            if (enable_arc_fitting) {
+                coordf_t scaled_resolution = scale_d(print_config.resolution.value);
+                if (scaled_resolution == 0) scaled_resolution = enable_arc_fitting ? SCALED_EPSILON * 2 : SCALED_EPSILON;
+                const ConfigOptionFloatOrPercent& arc_fitting_tolerance = print_config.arc_fitting_tolerance;
+
+                GetPathsVisitor visitor;
+                this->m_skirt.visit(visitor);
+                this->m_brim.visit(visitor);
+                tbb::parallel_for(
+                    tbb::blocked_range<size_t>(0, visitor.paths.size() + visitor.paths3D.size()),
+                    [this, &visitor, scaled_resolution, &arc_fitting_tolerance](const tbb::blocked_range<size_t>& range) {
+                        size_t path_idx = range.begin();
+                        for (; path_idx < range.end() && path_idx < visitor.paths.size(); ++path_idx) {
+                            visitor.paths[path_idx]->simplify(scaled_resolution, true, arc_fitting_tolerance.get_abs_value(visitor.paths[path_idx]->width));
+                        }
+                        for (; path_idx < range.end() && path_idx - visitor.paths.size() < visitor.paths3D.size(); ++path_idx) {
+                            visitor.paths3D[path_idx - visitor.paths.size()]->simplify(scaled_resolution, true, arc_fitting_tolerance.get_abs_value(visitor.paths3D[path_idx - visitor.paths.size()]->width));
+                        }
+                    }
+                );
+            }
+            m_print->throw_if_canceled();
+            BOOST_LOG_TRIVIAL(debug) << "Simplify extrusion path of object in parallel - end";
+
+            //BBS: share same progress
+            BOOST_LOG_TRIVIAL(debug) << "Simplify extrusion path of support in parallel - start";
+            m_print->set_status(0, L("Optimizing support layer %s / %s"), { std::to_string(0), std::to_string(m_layers.size()) }, PrintBase::SlicingStatus::SECONDARY_STATE);
+            atomic_count.store(0);
+            tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, m_support_layers.size()),
+                [this, &atomic_count](const tbb::blocked_range<size_t>& range) {
+                    for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                        m_print->throw_if_canceled();
+                        m_support_layers[layer_idx]->simplify_support_extrusion_path();
+                        int nb_layers_done = (++atomic_count);
+                        m_print->set_status(int((nb_layers_done * 100) / m_layers.size()), L("Optimizing layer %s / %s"), { std::to_string(nb_layers_done), std::to_string(m_layers.size()) }, PrintBase::SlicingStatus::SECONDARY_STATE);
+                    }
+                }
+            );
+            m_print->throw_if_canceled();
+            BOOST_LOG_TRIVIAL(debug) << "Simplify extrusion path of support in parallel - end";
+            this->set_done(posSimplifyPath);
         }
     }
 
@@ -897,6 +965,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "infill_connection_solid"
                 || opt_key == "infill_connection_top"
                 || opt_key == "seam_gap"
+                || opt_key == "seam_gap_external"
                 || opt_key == "top_infill_extrusion_spacing"
                 || opt_key == "top_infill_extrusion_width" ) {
                 steps.emplace_back(posInfill);
@@ -980,12 +1049,18 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "gap_fill_speed"
                 || opt_key == "infill_speed"
                 || opt_key == "overhangs_speed"
+                || opt_key == "overhangs_speed_enforce"
                 || opt_key == "perimeter_speed"
                 || opt_key == "seam_position"
                 || opt_key == "seam_preferred_direction"
                 || opt_key == "seam_preferred_direction_jitter"
                 || opt_key == "seam_angle_cost"
+                || opt_key == "seam_notch_all"
+                || opt_key == "seam_notch_angle"
+                || opt_key == "seam_notch_inner"
+                || opt_key == "seam_notch_outer"
                 || opt_key == "seam_travel_cost"
+                || opt_key == "seam_visibility"
                 || opt_key == "small_perimeter_speed"
                 || opt_key == "small_perimeter_min_length"
                 || opt_key == "small_perimeter_max_length"
@@ -1032,20 +1107,20 @@ bool PrintObject::invalidate_state_by_config_options(
 
         // propagate to dependent steps
         if (step == posPerimeters) {
-            invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning });
-        invalidated |= m_print->invalidate_steps({ psSkirtBrim });
+            invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning, posSimplifyPath });
+            invalidated |= m_print->invalidate_steps({ psSkirtBrim });
         } else if (step == posPrepareInfill) {
-            invalidated |= this->invalidate_steps({ posInfill, posIroning });
+            invalidated |= this->invalidate_steps({ posInfill, posIroning, posSimplifyPath });
         } else if (step == posInfill) {
-            invalidated |= this->invalidate_steps({ posIroning });
-        invalidated |= m_print->invalidate_steps({ psSkirtBrim });
+            invalidated |= this->invalidate_steps({ posIroning, posSimplifyPath });
+            invalidated |= m_print->invalidate_steps({ psSkirtBrim });
         } else if (step == posSlice) {
-            invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportMaterial });
-        invalidated |= m_print->invalidate_steps({ psSkirtBrim });
-        m_slicing_params->valid = false;
+            invalidated |= this->invalidate_steps({ posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportMaterial, posSimplifyPath });
+            invalidated |= m_print->invalidate_steps({ psSkirtBrim });
+            m_slicing_params->valid = false;
         } else if (step == posSupportMaterial) {
-        invalidated |= m_print->invalidate_steps({ psSkirtBrim });
-        m_slicing_params->valid = false;
+            invalidated |= m_print->invalidate_steps({ psSkirtBrim });
+            m_slicing_params->valid = false;
         }
 
         // Wipe tower depends on the ordering of extruders, which in turn depends on everything.

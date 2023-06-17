@@ -352,7 +352,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { "thin_walls_min_width", "thin_walls_overlap", "thin_walls_merge" })
         toggle_field(el, have_thin_wall && config->opt_bool("thin_walls"));
 
-    for (auto el : { "seam_angle_cost", "seam_travel_cost" })
+    for (auto el : { "seam_angle_cost", "seam_travel_cost", "seam_visibility" })
         toggle_field(el, have_perimeters && config->option<ConfigOptionEnum<SeamPosition>>("seam_position")->value == SeamPosition::spCost);
 
     toggle_field("perimeter_loop_seam", config->opt_bool("perimeter_loop"));
@@ -510,13 +510,15 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { /*"extruder_clearance_radius", "extruder_clearance_height",*/ "complete_objects_one_skirt",
         "complete_objects_sort"})
         toggle_field(el, have_sequential_printing);
+    toggle_field("parallel_objects_step", !have_sequential_printing);
 
     bool have_ooze_prevention = config->opt_bool("ooze_prevention");
     toggle_field("standby_temperature_delta", have_ooze_prevention);
 
     bool have_wipe_tower = config->opt_bool("wipe_tower");
     for (auto el : { "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_brim_width",
-                     "wipe_tower_bridging", "wipe_tower_brim", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming" })
+                     "wipe_tower_bridging", "wipe_tower_brim", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming",
+                     "wipe_tower_speed", "wipe_tower_wipe_starting_speed" })
         toggle_field(el, have_wipe_tower);
 
     bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");

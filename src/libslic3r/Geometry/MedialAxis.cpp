@@ -3043,15 +3043,18 @@ MedialAxis::build(ThickPolylines& polylines_out)
 
 }
 
-ExtrusionMultiPath variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance) {
-    return ExtrusionMultiPath(unsafe_variable_width(polyline, role, flow, resolution_internal, tolerance));
+ExtrusionMultiPath variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance, bool can_reverse) {
+    ExtrusionMultiPath temp(unsafe_variable_width(polyline, role, flow, resolution_internal, tolerance));
+    //can reverse the whole multipath, but not each individual path inside.
+    temp.set_can_reverse(can_reverse);
+    return temp;
 }
 ExtrusionPaths
 unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, const coord_t tolerance)
 {
 
     ExtrusionPaths paths;
-    ExtrusionPath path(role);
+    ExtrusionPath path(role, false);
     ThickLines lines = polyline.thicklines();
     Flow current_flow = flow;
 
@@ -3172,7 +3175,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
             wanted_width = unscaled(line.a_width) * 0.35 + 1.3 * Flow::rounded_rectangle_extrusion_width_from_spacing(0.f, flow.height(), 1.f);
         }
 
-        if (path.polyline.points.empty()) {
+        if (path.polyline.empty()) {
             if (wanted_width != current_flow.width()) {
                 current_flow = current_flow.with_width((float)wanted_width);
             }
@@ -3193,7 +3196,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
             } else {
                 // we need to initialize a new line
                 paths.push_back(path);
-                path = ExtrusionPath(role);
+                path = ExtrusionPath(role, false);
                 if (wanted_width != current_flow.width()) {
                     current_flow = current_flow.with_width(wanted_width);
                 }
@@ -3207,7 +3210,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
                 path.height = current_flow.height();
             }
         }
-        assert(path.polyline.points.size() > 2 || path.first_point() != path.last_point());
+        assert(path.polyline.size() > 2 || path.first_point() != path.last_point());
     }
     if (path.polyline.is_valid())
         paths.push_back(path);
@@ -3216,7 +3219,7 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
 }
 
 ExtrusionEntitiesPtr
-    thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal)
+    thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, bool can_reverse)
 {
     assert(resolution_internal > SCALED_EPSILON);
 
@@ -3226,13 +3229,13 @@ ExtrusionEntitiesPtr
     const coord_t tolerance = flow.scaled_width() / 10;//scale_(0.05);
     ExtrusionEntitiesPtr coll;
     for (const ThickPolyline& p : polylines) {
-        ExtrusionMultiPath multi_paths = variable_width(p, role, flow, resolution_internal, tolerance);
+        ExtrusionMultiPath multi_paths = variable_width(p, role, flow, resolution_internal, tolerance, can_reverse);
         // Append paths to collection.
         if (!multi_paths.empty()) {
 #if _DEBUG
             for (auto it = std::next(multi_paths.paths.begin()); it != multi_paths.paths.end(); ++it) {
-                assert(it->polyline.points.size() >= 2);
-                assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
+                assert(it->polyline.size() >= 2);
+                assert(std::prev(it)->polyline.back() == it->polyline.front());
             }
 #endif
             if (multi_paths.paths.front().first_point().coincides_with_epsilon(multi_paths.paths.back().last_point())) {

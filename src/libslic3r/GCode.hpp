@@ -307,6 +307,8 @@ private:
     void            split_at_seam_pos(ExtrusionLoop &loop, bool was_clockwise);
     template <typename THING = ExtrusionEntity> // can be templated safely because private
     void            add_wipe_points(const std::vector<THING>& paths);
+    void            seam_notch(const ExtrusionLoop& original_loop, ExtrusionPaths& building_paths,
+        ExtrusionPaths& notch_extrusion_start, ExtrusionPaths& notch_extrusion_end, bool is_hole_loop, bool is_full_loop_ccw);
 
     // Extruding multiple objects with soluble / non-soluble / combined supports
     // on a multi-material printer, trying to minimize tool switches.
@@ -399,7 +401,7 @@ private:
     Vec2d                               m_origin;
     FullPrintConfig                     m_config;
     // scaled G-code resolution
-    double                              m_scaled_gcode_resolution;
+    coordf_t                            m_scaled_gcode_resolution;
     GCodeWriter                         m_writer;
     PlaceholderParser                   m_placeholder_parser;
     // For random number generator etc.
@@ -497,6 +499,8 @@ private:
     std::unique_ptr<FanMover> m_fan_mover;
 
     std::string _extrude(const ExtrusionPath &path, const std::string &description, double speed = -1);
+    void _extrude_line(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment);
+    void _extrude_line_cut_corner(std::string& gcode_str, const Line& line, const double e_per_mm, const std::string& comment, Point& last_pos, const double path_width);
     std::string _before_extrude(const ExtrusionPath &path, const std::string &description, double speed = -1);
     double_t    _compute_speed_mm_per_sec(const ExtrusionPath& path, double speed = -1);
     std::string _after_extrude(const ExtrusionPath &path);

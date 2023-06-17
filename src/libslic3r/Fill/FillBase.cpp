@@ -210,7 +210,8 @@ void Fill::fill_surface_extrusion(const Surface *surface, const FillParams &para
                     { thick_polyline },
                     good_role,
                     used_flow,
-                    used_flow.scaled_width() / 8);
+                    used_flow.scaled_width() / 8,
+                    true);
                 // compute the path of the nozzle -> extruded volume
                 for (const ExtrusionEntity* entity : entities) {
                     extruded_volume += entity->total_volume();
@@ -354,7 +355,7 @@ Fill::do_gap_fill(const ExPolygons& gapfill_areas, const FillParams& params, Ext
         }
 #endif
 
-        ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines_gapfill, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")));
+        ExtrusionEntitiesPtr gap_fill_entities = Geometry::thin_variable_width(polylines_gapfill, erGapFill, params.flow, scale_t(params.config->get_computed_value("resolution_internal")), true);
         ////set role if needed
         //if (params.role != erSolidInfill) {
         //    ExtrusionSetRole set_good_role(params.role);

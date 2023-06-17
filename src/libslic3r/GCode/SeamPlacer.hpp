@@ -48,12 +48,13 @@ enum class EnforcedBlockedSeamPoint {
     Blocked = 0,
     Neutral = 1,
     Enforced = 2,
+    Sphere = 3,
 };
 
 // struct representing single perimeter loop
 struct Perimeter {
     size_t start_index{};
-    size_t end_index{}; //inclusive!
+    size_t end_index{}; //exclusive
     size_t seam_index{};
     float flow_width{};
 
@@ -142,10 +143,11 @@ public:
     // When searching for seam clusters for alignment:
     // following value describes, how much worse score can point have and still be picked into seam cluster instead of original seam point on the same layer
     static constexpr float seam_align_score_tolerance = 0.3f;
-    // seam_align_tolerable_dist_factor - how far to search for seam from current position, final dist is seam_align_tolerable_dist_factor * flow_width
-    static constexpr float seam_align_tolerable_dist_factor = 4.0f;
+    // seam_align_tolerable_dist_factor - how far to search for seam from current position, final dist is seam_align_tolerable_dist_factor * nozzle_size * flow_width
+    static constexpr float seam_align_tolerable_dist_factor = 10.0f;
     // minimum number of seams needed in cluster to make alignment happen
     static constexpr size_t seam_align_minimum_string_seams = 6;
+    static constexpr size_t seam_extremly_align_minimum_string_seams = 3;
     // millimeters covered by spline; determines number of splines for the given string
     static constexpr size_t seam_align_mm_per_segment = 4.0f;
 
@@ -157,7 +159,7 @@ public:
 
     void init(const Print &print, std::function<void(void)> throw_if_canceled_func);
 
-    void place_seam(const Layer *layer, ExtrusionLoop &loop, bool external_first, const Point &last_pos) const;
+    void place_seam(const Layer *layer, ExtrusionLoop &loop, const uint16_t print_object_instance_idx, const Point &last_pos) const;
 
 private:
     void gather_seam_candidates(const PrintObject *po, const SeamPlacerImpl::GlobalModelInfo &global_model_info,
@@ -168,13 +170,13 @@ private:
     void calculate_overhangs_and_layer_embedding(const PrintObject *po);
     void align_seam_points(const PrintObject *po, const SeamPlacerImpl::SeamComparator &comparator);
     std::vector<std::pair<size_t, size_t>> find_seam_string(const PrintObject *po,
-            std::pair<size_t, size_t> start_seam,
-            const SeamPlacerImpl::SeamComparator &comparator) const;
+    std::pair<size_t, size_t> start_seam,
+    const SeamPlacerImpl::SeamComparator &comparator) const;
     std::optional<std::pair<size_t, size_t>> find_next_seam_in_layer(
-            const std::vector<PrintObjectSeamData::LayerSeams> &layers,
-            const Vec3f& projected_position,
-            const size_t layer_idx, const float max_distance,
-            const SeamPlacerImpl::SeamComparator &comparator) const;
+    const std::vector<PrintObjectSeamData::LayerSeams> &layers,
+    const Vec3f& projected_position,
+    const size_t layer_idx, const float max_distance,
+    const SeamPlacerImpl::SeamComparator &comparator) const;
 };
 
 } // namespace Slic3r
