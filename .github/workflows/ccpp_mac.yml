@@ -3,7 +3,7 @@ name: C/C++ dev macos
 on:
   push:
     branches:
-      - main
+      - Main
       - nightly_dev
       - nightly_master
       - debug_macos
