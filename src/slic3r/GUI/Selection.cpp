@@ -952,7 +952,7 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
             }
             else {
                 Vec3d relative_disp = displacement;
-                if (transformation_type.instance())
+                if (transformation_type.world() && transformation_type.instance())
                     relative_disp = volume_data.get_instance_scale_matrix().inverse() * relative_disp;
 
                 transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(relative_disp), m_cache.dragging_center);
