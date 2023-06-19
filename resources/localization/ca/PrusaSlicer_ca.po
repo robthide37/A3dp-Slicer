@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-06-14 16:03+0200\n"
-"PO-Revision-Date: 2023-05-27 14:17+0200\n"
+"PO-Revision-Date: 2023-06-16 20:01+0200\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "Language: ca\n"
@@ -2857,10 +2857,13 @@ msgid ""
 "Conflicts in G-code paths have been detected at layer %1%, z=%2$.2f mm. "
 "Please reposition the conflicting objects (%3% <-> %4%) further apart."
 msgstr ""
+"S'han detectat conflictes en les trajectòries del codi G a la capa %1%, z ="
+"%2$.2f mm. Si us plau, reposicioneu els objectes conflictius (%3% <-> %4%) "
+"més separats."
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:7526
 msgid "Jump to"
-msgstr "Vés a"
+msgstr "Anar a"
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:7529
 #: src/slic3r/GUI/NotificationManager.cpp:2101
@@ -4635,7 +4638,7 @@ msgstr "Inicia l'aplicació"
 #: src/slic3r/GUI/GUI_App.cpp:609
 #, c-format, boost-format
 msgid "%s files"
-msgstr ""
+msgstr "%s fitxers"
 
 #: src/slic3r/GUI/GUI_App.cpp:772
 #, c-format, boost-format
@@ -8183,7 +8186,7 @@ msgstr ""
 
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:667
 msgid "Unexpected character"
-msgstr ""
+msgstr "Caracter inesperat"
 
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:668
 #: src/slic3r/GUI/SavePresetDialog.cpp:169
@@ -8661,6 +8664,8 @@ msgstr "Habilitar suports només per als reforçadors"
 #: src/slic3r/GUI/Plater.cpp:3229
 msgid "Bed temperatures for the used filaments differ significantly."
 msgstr ""
+"Les temperatures del llit per als filaments utilitzats difereixen "
+"significativament."
 
 #: src/slic3r/GUI/Plater.cpp:3367 src/slic3r/GUI/Plater.cpp:4294
 msgid "Invalid data"
@@ -8726,8 +8731,8 @@ msgstr "Torna a carregar-ho tot des del disc"
 #: src/slic3r/GUI/Plater.cpp:4103 src/slic3r/GUI/Plater.cpp:4109
 msgid "You are using template filament preset."
 msgid_plural "You are using template filament presets."
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Esteu utilitzant plantilla de filament predefinit."
+msgstr[1] "Esteu utilitzant plantilles de filament predefinits."
 
 #: src/slic3r/GUI/Plater.cpp:4104 src/slic3r/GUI/Plater.cpp:4110
 msgid ""
@@ -8735,10 +8740,13 @@ msgid ""
 "and should only be used as a starting point for creating your own user "
 "presets."
 msgstr ""
+"Tingueu en compte que els valors predefinits de plantilles no es "
+"personalitzen per a impressores específiques i només s'han d'utilitzar com a "
+"punt de partida per crear els vostres propis valors predefinits d'usuari."
 
 #: src/slic3r/GUI/Plater.cpp:4106
 msgid "More info at"
-msgstr ""
+msgstr "Més informació a"
 
 #: src/slic3r/GUI/Plater.cpp:4247
 msgid "There are active warnings concerning sliced models:"
@@ -8996,7 +9004,7 @@ msgstr "Desar projecte"
 
 #: src/slic3r/GUI/Plater.cpp:6681
 msgid "Unable to save file"
-msgstr ""
+msgstr "No es pot desar el fitxer"
 
 #: src/slic3r/GUI/Plater.cpp:6875
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
@@ -9629,7 +9637,7 @@ msgstr "Canvia el color de l'extrusora"
 
 #: src/slic3r/GUI/PresetComboBoxes.cpp:787
 msgid "Show/Hide template presets"
-msgstr ""
+msgstr "Mostrar/Amagar predefinicions de plantilles"
 
 #: src/slic3r/GUI/PresetComboBoxes.cpp:795 src/slic3r/GUI/Tab.cpp:3520
 msgid "Edit physical printer"
@@ -15239,8 +15247,10 @@ msgid ""
 "[input_filename], [input_filename_base], [default_output_extension]."
 msgstr ""
 "Podeu utilitzar totes les opcions de configuració com a variables dins "
-"d'aquesta mostra. Per exemple, [layer_height], [fill_density] etc. "
-"[input_filename_base], [default_output_extension]."
+"d'aquesta plantilla. Per exemple: [layer_height], [fill_density], etc. També "
+"podeu utilitzar [marca de temps], [any], [mes], [dia], [hora], [minut], "
+"[segon], [versió], [input_filename], [input_filename_base], "
+"[default_output_extension]."
 
 #: src/libslic3r/PrintConfig.cpp:1992
 msgid "Detect bridging perimeters"
@@ -16874,13 +16884,15 @@ msgstr "Distància màxima entre suports a les seccions amb farciment lleuger."
 
 #: src/libslic3r/PrintConfig.cpp:3239
 msgid "Wipe tower extruder"
-msgstr ""
+msgstr "Extrusor de la Torre de Neteja"
 
 #: src/libslic3r/PrintConfig.cpp:3241
 msgid ""
 "The extruder to use when printing perimeter of the wipe tower. Set to 0 to "
 "use the one that is available (non-soluble would be preferred)."
 msgstr ""
+"L'extrusora a usar per imprimir el perímetre de la Torre de Neteja. Establiu "
+"0 per utilitzar el que estigui disponible (seria preferible no soluble)."
 
 #: src/libslic3r/PrintConfig.cpp:3260
 msgid "XY Size Compensation"
@@ -21443,11 +21455,6 @@ msgid "Error: "
 msgstr "Error: "
 
 #. TRANSLATORS: Name of keyboard key
-#: ../src/common/accelcmn.cpp:69
-msgid "Esc"
-msgstr "Esc"
-
-#. TRANSLATORS: Name of keyboard key
 #: ../src/common/accelcmn.cpp:70
 msgid "Escape"
 msgstr "Escapada"
@@ -23440,11 +23447,6 @@ msgstr "Nom nou"
 #: ../src/common/prntbase.cpp:1567 ../src/html/helpwnd.cpp:665
 msgid "Next page"
 msgstr "Pàgina següent"
-
-#: ../include/wx/msgdlg.h:277 ../src/common/stockitem.cpp:177
-#: ../src/motif/msgdlg.cpp:196
-msgid "No"
-msgstr "No"
 
 #. TRANSLATORS: System cursor name
 #: ../src/propgrid/advprops.cpp:1764
@@ -26157,11 +26159,6 @@ msgstr "XPM: dades de la imatge truncades a la línia %d!"
 #: ../src/propgrid/advprops.cpp:1610
 msgid "Yellow"
 msgstr "Groc"
-
-#: ../include/wx/msgdlg.h:276 ../src/common/stockitem.cpp:206
-#: ../src/motif/msgdlg.cpp:196
-msgid "Yes"
-msgstr "Sí"
 
 #: ../src/osx/carbon/overlay.cpp:155
 msgid "You cannot Clear an overlay that is not inited"
