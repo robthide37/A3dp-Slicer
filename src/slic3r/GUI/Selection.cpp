@@ -32,19 +32,6 @@ static const Slic3r::ColorRGBA TRANSPARENT_PLANE_COLOR = { 0.8f, 0.8f, 0.8f, 0.5
 namespace Slic3r {
 namespace GUI {
 
-Selection::VolumeCache::TransformCache::TransformCache(const Geometry::Transformation& transform)
-    : position(transform.get_offset())
-    , rotation(transform.get_rotation())
-    , scaling_factor(transform.get_scaling_factor())
-    , mirror(transform.get_mirror())
-    , full_matrix(transform.get_matrix())
-    , transform(transform)
-    , rotation_matrix(transform.get_rotation_matrix())
-    , scale_matrix(transform.get_scaling_factor_matrix())
-    , mirror_matrix(transform.get_mirror_matrix())
-{
-}
-
 Selection::VolumeCache::VolumeCache(const Geometry::Transformation& volume_transform, const Geometry::Transformation& instance_transform)
     : m_volume(volume_transform)
     , m_instance(instance_transform)
@@ -953,7 +940,7 @@ void Selection::translate(const Vec3d& displacement, TransformationType transfor
             else {
                 Vec3d relative_disp = displacement;
                 if (transformation_type.world() && transformation_type.instance())
-                    relative_disp = volume_data.get_instance_scale_matrix().inverse() * relative_disp;
+                    relative_disp = volume_data.get_instance_transform().get_scaling_factor_matrix().inverse() * relative_disp;
 
                 transform_volume_relative(v, volume_data, transformation_type, Geometry::translation_transform(relative_disp), m_cache.dragging_center);
             }
