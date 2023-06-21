@@ -96,6 +96,8 @@ static GLModel::Geometry init_plane_data(const indexed_triangle_set& its, const 
 {
     GLModel::Geometry init_data;
     init_data.format = { GUI::GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
+    init_data.reserve_indices(3 * triangle_indices.size());
+    init_data.reserve_vertices(3 * triangle_indices.size());
     unsigned int i = 0;
     for (int idx : triangle_indices) {
         const Vec3f& v0 = its.vertices[its.indices[idx][0]];
@@ -1036,10 +1038,10 @@ void GLGizmoMeasure::update_if_needed()
 {
     auto update_plane_models_cache = [this](const indexed_triangle_set& its) {
         m_plane_models_cache.clear();
+        m_plane_models_cache.resize(m_measuring->get_num_of_planes(), GLModel());
         for (int idx = 0; idx < m_measuring->get_num_of_planes(); ++idx) {
-            m_plane_models_cache.emplace_back(GLModel());
             GLModel::Geometry init_data = init_plane_data(its, m_measuring->get_plane_triangle_indices(idx));
-            m_plane_models_cache.back().init_from(std::move(init_data));
+            m_plane_models_cache[idx].init_from(std::move(init_data));
         }
     };
 

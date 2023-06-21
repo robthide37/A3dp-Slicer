@@ -190,6 +190,7 @@ void MeasuringImpl::update_planes()
                 //const Halfedge_index he_orig = he;
                 m_planes[plane_id].borders.emplace_back();
                 std::vector<Vec3d>& last_border = m_planes[plane_id].borders.back();
+                last_border.reserve(4);
                 last_border.emplace_back(sm.point(sm.source(he)).cast<double>());
                 //Vertex_index target = sm.target(he);
                 const Halfedge_index he_start = he;
