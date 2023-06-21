@@ -629,21 +629,24 @@ void GLGizmoCut3D::render_cut_plate_for_tongue_and_groove(GLShaderProgram* shade
     const Camera &    camera    = wxGetApp().plater()->get_camera();
     const Transform3d cp_matrix = translation_transform(m_plane_center) * m_rotation_m;
     ColorRGBA         cp_clr    = m_plane.model.get_color();
-    // input values
-    const double groove_depth = 2;
-    const double groove_width = 6;
 
     // values for calculaton
-    const double groove_half_depth = 0.5 * groove_depth;
-    const double groove_half_width = 0.5 * groove_width;
+    const double groove_half_depth = 0.5 * double(m_groove_depth);
+    const double groove_half_width = 0.5 * double(m_groove_width);
 
-    const float       cp_radius = m_cut_plane_radius_koef * (float)m_radius;
-    const float       cp_length = 1.5f * cp_radius;
-    const float       cp_width  = 0.02f * (float)get_grabber_mean_size(m_bounding_box);
-    const double      h_shift   = 0.25 * (double)cp_radius + groove_half_width;
+    const double cp_radius      = 1.5 * m_radius;
+
+    const double cp_half_width  = 0.5 * cp_radius;
+    const float  cp_length      = 1.5f * float(cp_radius);
+    const float  cp_height      = 0.02f * (float)get_grabber_mean_size(m_bounding_box);
+
+    const double h_shift        = 0.5 * cp_half_width + groove_half_width;
+
+    const float  side_width     = is_approx(m_groove_angle, 0.f) ? m_groove_depth : (m_groove_depth / sin(m_groove_angle));
+    const float  flaps_width    = 2.f * side_width * cos(m_groove_angle);
 
     GLModel model;
-    model.init_from(its_make_prism(0.5f * cp_radius, cp_length, cp_width));
+    model.init_from(its_make_prism(float(cp_half_width), cp_length, cp_height));
     model.set_color(cp_clr);
 
     // upper halfs of cut_plane
@@ -659,7 +662,7 @@ void GLGizmoCut3D::render_cut_plate_for_tongue_and_groove(GLShaderProgram* shade
     // lower part of cut_plane
 
     model.reset();
-    model.init_from(its_make_prism(groove_width + 2*groove_depth, cp_length, cp_width));
+    model.init_from(its_make_prism(m_groove_width + flaps_width, cp_length, cp_height));
     cp_clr.a(cp_clr.a() + 0.1f);
     model.set_color(cp_clr);
 
@@ -670,16 +673,16 @@ void GLGizmoCut3D::render_cut_plate_for_tongue_and_groove(GLShaderProgram* shade
     // side parts of cut_plane
 
     model.reset();
-    model.init_from(its_make_prism(sqrt(2* groove_depth* groove_depth), cp_length, cp_width));
 
-    const double h_side_shift = groove_half_width + groove_half_depth;
-    const double angle = 0.25 * PI;
+    model.init_from(its_make_prism(float(side_width), cp_length, cp_height));
 
-    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (-h_side_shift * Vec3d::UnitX())) * cp_matrix * rotation_transform(-angle * Vec3d::UnitY());
+    const double h_side_shift = groove_half_width + 0.25 * double(flaps_width);
+
+    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (-h_side_shift * Vec3d::UnitX())) * cp_matrix * rotation_transform(-m_groove_angle * Vec3d::UnitY());
     shader->set_uniform("view_model_matrix", view_model_matrix_);
     model.render();
 
-    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (h_side_shift * Vec3d::UnitX())) * cp_matrix * rotation_transform(angle * Vec3d::UnitY());
+    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (h_side_shift * Vec3d::UnitX())) * cp_matrix * rotation_transform(m_groove_angle * Vec3d::UnitY());
     shader->set_uniform("view_model_matrix", view_model_matrix_);
     model.render();
 }
@@ -1383,6 +1386,11 @@ void GLGizmoCut3D::update_bb()
         m_snap_fine_in_radius     = m_grabber_connection_len * 0.85;
         m_snap_fine_out_radius    = m_grabber_connection_len * 1.15;
 
+        // input params for cut with tongue and groove
+        m_groove_depth = m_groove_depth_init = 0.5f * float(get_grabber_mean_size(m_bounding_box));
+        m_groove_width = m_groove_width_init = 4.0f * m_groove_depth;
+        m_groove_angle = m_groove_angle_init = 0.25f * float(PI);
+
         m_plane.reset();
         m_cone.reset();
         m_sphere.reset();
@@ -2026,11 +2034,47 @@ void GLGizmoCut3D::render_color_marker(float size, const ImU32& color)
     ImGuiWrapper::text(" ");
 }
 
+void GLGizmoCut3D::render_groove_input(const std::string& label, float& in_val, const float& init_val, float& in_tolerance, bool is_angle /*=false*/)
+{
+    bool is_changed{false};
+
+    if (is_angle) {
+        ImGuiWrapper::text(label);
+
+        ImGui::SameLine(m_label_width);
+        ImGui::PushItemWidth(m_control_width * 0.7f);
+
+        float val = rad2deg(in_val);
+        const float old_val = val;
+
+        const std::string format = "%.0f " + _u8L("°");
+        m_imgui->slider_float(("##groove_" + label).c_str(), &val, 30.f, 120.f, format.c_str(), 1.f, true, from_u8(label));
+
+        if (!is_approx(old_val, val)) {
+            in_val = deg2rad(val);
+            is_changed = true;
+        }
+    }
+    else if (render_slider_double_input(label, in_val, in_tolerance))
+        is_changed = true;
+
+    ImGui::SameLine();
+
+    m_imgui->disabled_begin(is_approx(in_val, init_val));
+        const std::string act_name = _u8L("Reset");
+        if (render_reset_button(("##groove_" + label + act_name).c_str(), act_name)) {
+            in_val = init_val;
+            in_tolerance = 0.1f;
+            is_changed = true;
+        }
+    m_imgui->disabled_end();
+
+    //if (is_changed)
+    //    Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
+};
+
 void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 {
-    // WIP : cut plane mode
-    render_cut_mode_combo();
-
 //    if (m_mode == size_t(CutMode::cutPlanar)) {
     CutMode mode = CutMode(m_mode);
     if (mode == CutMode::cutPlanar || mode == CutMode::cutTongueAndGroove) {
@@ -2040,6 +2084,9 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT,
                               get_wraped_wxString(_L("Hold SHIFT key to draw a cut line"), 40));
         ImGui::Separator();
+
+        // WIP : cut plane mode
+        render_cut_mode_combo();
 
         render_build_size();
 
@@ -2062,23 +2109,31 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 //        render_flip_plane_button();
 
         if (mode == CutMode::cutPlanar) {
-        add_vertical_scaled_interval(0.75f);
+            add_vertical_scaled_interval(0.75f);
 
-        m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower || m_keep_as_parts || (m_part_selection.valid() && m_part_selection.is_one_object()));
-            if (m_imgui->button(has_connectors ? _L("Edit connectors") : _L("Add connectors")))
-                set_connectors_editing(true);
-        m_imgui->disabled_end();
+            m_imgui->disabled_begin(!m_keep_upper || !m_keep_lower || m_keep_as_parts || (m_part_selection.valid() && m_part_selection.is_one_object()));
+                if (m_imgui->button(has_connectors ? _L("Edit connectors") : _L("Add connectors")))
+                    set_connectors_editing(true);
+            m_imgui->disabled_end();
 
-        ImGui::SameLine(1.5f * m_control_width);
+            ImGui::SameLine(1.5f * m_control_width);
 
-        m_imgui->disabled_begin(is_cut_plane_init && !has_connectors);
-            act_name = _L("Reset cut");
-            if (m_imgui->button(act_name, _L("Reset cutting plane and remove connectors"))) {
-                Plater::TakeSnapshot snapshot(wxGetApp().plater(), act_name, UndoRedo::SnapshotType::GizmoAction);
-                reset_cut_plane();
-                reset_connectors();
-            }
-        m_imgui->disabled_end();
+            m_imgui->disabled_begin(is_cut_plane_init && !has_connectors);
+                act_name = _L("Reset cut");
+                if (m_imgui->button(act_name, _L("Reset cutting plane and remove connectors"))) {
+                    Plater::TakeSnapshot snapshot(wxGetApp().plater(), act_name, UndoRedo::SnapshotType::GizmoAction);
+                    reset_cut_plane();
+                    reset_connectors();
+                }
+            m_imgui->disabled_end();
+        }
+        else if (mode == CutMode::cutTongueAndGroove) {
+            ImGui::Separator();
+            ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Groove") + ": ");
+
+            render_groove_input(_u8L("Depth"), m_groove_depth, m_groove_depth_init, m_groove_depth_tolerance);
+            render_groove_input(_u8L("Width"), m_groove_width, m_groove_width_init, m_groove_width_tolerance);
+            render_groove_input(_u8L("Angle"), m_groove_angle, m_groove_angle_init, m_groove_width_tolerance, true);
         }
 
         ImGui::Separator();
@@ -2496,6 +2551,11 @@ bool GLGizmoCut3D::can_perform_cut() const
     if (m_part_selection.valid())
         return ! m_part_selection.is_one_object();
 
+    if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
+        const float flaps_width = -2.f * m_groove_depth / tan(m_groove_angle);
+        return flaps_width < m_groove_width;
+    }
+
     return true;// has_valid_contour();
 }
 
@@ -2835,7 +2895,7 @@ void GLGizmoCut3D::init_connector_shapes()
                 continue;
             for (const CutConnectorShape& shape : {CutConnectorShape::Circle, CutConnectorShape::Hexagon, CutConnectorShape::Square, CutConnectorShape::Triangle}) {
                 const CutConnectorAttributes attribs = { type, style, shape };
-                const indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);
+                indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);
                 m_shapes[attribs].model.init_from(its);
                 m_shapes[attribs].mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
             }

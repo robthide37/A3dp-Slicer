@@ -112,6 +112,16 @@ class GLGizmoCut3D : public GLGizmoBase
     bool m_rotate_upper{ false };
     bool m_rotate_lower{ false };
 
+    // Input params for cut with tongue and groove
+    float m_groove_depth;
+    float m_groove_width;
+    float m_groove_angle;
+    float m_groove_depth_init;
+    float m_groove_width_init;
+    float m_groove_angle_init;
+    float m_groove_depth_tolerance{ 0.1f };
+    float m_groove_width_tolerance{ 0.1f };
+
     bool m_hide_cut_plane{ false };
     bool m_connectors_editing{ false };
     bool m_cut_plane_as_circle{ false };
@@ -277,6 +287,7 @@ protected:
     void add_horizontal_scaled_interval(float interval);
     void add_horizontal_shift(float shift);
     void render_color_marker(float size, const ImU32& color);
+    void render_groove_input(const std::string &label, float &in_val, const float &init_val, float &in_tolerance, bool is_angle = false);
     void render_cut_plane_input_window(CutConnectors &connectors);
     void init_input_window_data(CutConnectors &connectors);
     void render_input_window_warning() const;
