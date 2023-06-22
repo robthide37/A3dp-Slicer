@@ -14,6 +14,8 @@
 
 #include <GL/glew.h>
 
+#include <tbb/parallel_for.h>
+
 #include <wx/clipbrd.h>
 
 namespace Slic3r {
@@ -650,7 +652,7 @@ void GLGizmoMeasure::on_render()
                     const auto [idx, normal, point] = m_curr_feature->get_plane();
                     if (m_last_plane_idx != idx) {
                         m_last_plane_idx = idx;
-                        const indexed_triangle_set& its = m_measuring->get_mesh().its;
+                        const indexed_triangle_set& its = m_measuring->get_its();
                         const std::vector<int>& plane_triangles = m_measuring->get_plane_triangle_indices(idx);
                         GLModel::Geometry init_data = init_plane_data(its, plane_triangles);
                         m_plane.reset();
@@ -1039,10 +1041,18 @@ void GLGizmoMeasure::update_if_needed()
     auto update_plane_models_cache = [this](const indexed_triangle_set& its) {
         m_plane_models_cache.clear();
         m_plane_models_cache.resize(m_measuring->get_num_of_planes(), GLModel());
-        for (int idx = 0; idx < m_measuring->get_num_of_planes(); ++idx) {
-            GLModel::Geometry init_data = init_plane_data(its, m_measuring->get_plane_triangle_indices(idx));
-            m_plane_models_cache[idx].init_from(std::move(init_data));
-        }
+
+        auto& plane_models_cache = m_plane_models_cache;
+        const auto& measuring = m_measuring;
+
+        //for (int idx = 0; idx < m_measuring->get_num_of_planes(); ++idx) {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, m_measuring->get_num_of_planes()),
+        [&plane_models_cache, &measuring, &its](const tbb::blocked_range<size_t>& range) {
+            for (size_t idx = range.begin(); idx != range.end(); ++idx) {
+                GLModel::Geometry init_data = init_plane_data(its, measuring->get_plane_triangle_indices(idx));
+                plane_models_cache[idx].init_from(std::move(init_data));
+            }
+        });
     };
 
     auto do_update = [this, update_plane_models_cache](const std::vector<VolumeCacheItem>& volumes_cache, const Selection& selection) {
@@ -1061,8 +1071,8 @@ void GLGizmoMeasure::update_if_needed()
         }
 
         m_measuring.reset(new Measure::Measuring(composite_mesh.its));
-        update_plane_models_cache(m_measuring->get_mesh().its);
-        m_raycaster.reset(new MeshRaycaster(std::make_shared<const TriangleMesh>(m_measuring->get_mesh())));
+        update_plane_models_cache(m_measuring->get_its());
+        m_raycaster.reset(new MeshRaycaster(std::make_shared<const TriangleMesh>(composite_mesh)));
         m_volumes_cache = volumes_cache;
     };
 
