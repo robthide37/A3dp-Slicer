@@ -341,6 +341,8 @@ private:
     void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix);
     void render_cut_plane_grabbers();
     void render_cut_line();
+    ModelObjectPtrs perform_cut_by_contour(ModelObject* cut_mo, const ModelObjectCutAttributes& attributes, int dowels_count);
+    ModelObjectPtrs perform_cut_with_groove(ModelObject* cut_mo, const ModelObjectCutAttributes& attributes);
     void perform_cut(const Selection&selection);
     void set_center_pos(const Vec3d&center_pos, bool update_tbb = false);
     void update_bb();
