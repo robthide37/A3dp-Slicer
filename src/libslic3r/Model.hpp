@@ -239,6 +239,7 @@ enum class CutConnectorShape : int {
     , Square
     , Hexagon
     , Circle
+    , Rivet
     , Undef
     //,D-shape
 };
@@ -480,7 +481,7 @@ private:
     void process_solid_part_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
                                 ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower);
 public:
-    static void reset_instance_transformation(ModelObject* object, size_t src_instance_idx, const Transform3d& cut_matrix,
+    static void reset_instance_transformation(ModelObject* object, size_t src_instance_idx, const Transform3d& cut_matrix = Transform3d::Identity(),
                                               bool place_on_cut = false, bool flip = false);
 
     ModelObjectPtrs cut(size_t instance, const Transform3d&cut_matrix, ModelObjectCutAttributes attributes);
@@ -777,6 +778,7 @@ public:
     // It contains information about connetors
     struct CutInfo
     {
+        bool                is_from_upper{ true };
         bool                is_connector{ false };
         bool                is_processed{ true };
         CutConnectorType    connector_type{ CutConnectorType::Plug };
@@ -794,12 +796,16 @@ public:
 
         void set_processed() { is_processed = true; }
         void invalidate()    { is_connector = false; }
+        void reset_from_upper() { is_from_upper = true; }
 
         template<class Archive> inline void serialize(Archive& ar) {
             ar(is_connector, is_processed, connector_type, radius_tolerance, height_tolerance);
         }
     };
     CutInfo             cut_info;
+
+    bool                is_from_upper() const    { return cut_info.is_from_upper; }
+    void                reset_from_upper()       { cut_info.reset_from_upper(); }
 
     bool                is_cut_connector() const { return cut_info.is_processed && cut_info.is_connector; }
     void                invalidate_cut_info()    { cut_info.invalidate(); }

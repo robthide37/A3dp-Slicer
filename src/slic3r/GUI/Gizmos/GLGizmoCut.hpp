@@ -138,7 +138,6 @@ class GLGizmoCut3D : public GLGizmoBase
 
     float m_contour_width{ 0.4f };
     float m_cut_plane_radius_koef{ 1.5f };
-    bool  m_is_contour_changed{ false };
     float m_shortcut_label_width{ -1.f };
 
     mutable std::vector<bool> m_selected; // which pins are currently selected
@@ -154,6 +153,7 @@ class GLGizmoCut3D : public GLGizmoBase
     public:
         PartSelection() = default;
         PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc);
+        PartSelection(const ModelObject* mo, int instance_idx_in);
         ~PartSelection() { m_model.clear_objects(); }
 
         struct Part {
@@ -342,7 +342,7 @@ private:
     void render_cut_plane_grabbers();
     void render_cut_line();
     ModelObjectPtrs perform_cut_by_contour(ModelObject* cut_mo, const ModelObjectCutAttributes& attributes, int dowels_count);
-    ModelObjectPtrs perform_cut_with_groove(ModelObject* cut_mo, const ModelObjectCutAttributes& attributes);
+    ModelObjectPtrs perform_cut_with_groove(ModelObject* cut_mo, bool keep_as_parts = false);
     void perform_cut(const Selection&selection);
     void set_center_pos(const Vec3d&center_pos, bool update_tbb = false);
     void update_bb();
