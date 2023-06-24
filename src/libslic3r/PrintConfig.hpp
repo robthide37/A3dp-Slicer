@@ -998,6 +998,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              extrusion_multiplier))
     ((ConfigOptionBool,                fan_percentage))
     ((ConfigOptionFloat,               fan_kickstart))
+    ((ConfigOptionStrings,             fan_name))
     ((ConfigOptionBool,                fan_speedup_overhangs))
     ((ConfigOptionFloat,               fan_speedup_time))
     ((ConfigOptionFloats,              filament_cost))

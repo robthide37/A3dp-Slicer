@@ -11,12 +11,13 @@
 namespace Slic3r {
 
 class GCodeWriter {
+protected:
+    GCodeConfig m_config;
+    // override from region
+    const PrintRegionConfig* m_region_config = nullptr;
 public:
     static std::string PausePrintCode;
-    GCodeConfig config;
     bool multiple_extruders;
-    // override from region
-    const PrintRegionConfig* config_region = nullptr;
     
     GCodeWriter() : 
         multiple_extruders(false), m_extrusion_axis("E"), m_tool(nullptr),
@@ -30,8 +31,10 @@ public:
 
     // Returns empty string for gcfNoExtrusion.
     std::string         extrusion_axis() const { return m_extrusion_axis; }
-    void                apply_print_config(const PrintConfig &print_config);
+    void                apply_print_config(const PrintConfig& print_config);
+    const GCodeConfig&  gcode_config() const { return m_config; }
     void                apply_print_region_config(const PrintRegionConfig& print_region_config);
+    const PrintRegionConfig* print_region_config() const { return m_region_config; }
     // Extruders are expected to be sorted in an increasing order.
     void                set_extruders(std::vector<uint16_t> extruder_ids);
     const std::vector<Extruder>& extruders() const { return m_extruders; }
@@ -85,7 +88,7 @@ public:
     Vec3d       get_unlifted_position() const { return m_pos - Vec3d{0, 0, m_extra_lift + m_lifted}; }
 
     // To be called by the CoolingBuffer from another thread.
-    static std::string set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, uint8_t speed, uint8_t tool_fan_offset, bool is_fan_percentage);
+    static std::string set_fan(const GCodeConfig& config, uint16_t extruder_idx, uint8_t speed);
     // To be called by the main thread. It always emits the G-code, it does remember the previous state to be able to reset after the wipe tower (but remove that when the wipe tower will be extrusions and not string).
     // Keeping the state is left to the CoolingBuffer, which runs asynchronously on another thread.
     std::string set_fan(uint8_t speed, uint16_t default_tool = 0);
@@ -104,7 +107,7 @@ private:
     uint32_t        m_current_acceleration;
     uint32_t        m_current_travel_acceleration;
     double          m_current_speed;
-    uint8_t         m_last_fan_speed;
+    uint8_t         m_last_fan_speed; // note: it's not something you should be using. It's only for the not-static set_fan/get_fan for gcode modification in a single thread post-processing thing.
     int16_t         m_last_temperature;
     int16_t         m_last_temperature_with_offset;
     int16_t         m_last_bed_temperature;

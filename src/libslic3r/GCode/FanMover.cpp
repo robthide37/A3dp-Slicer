@@ -213,7 +213,11 @@ void FanMover::_remove_slow_fan(int16_t min_speed, float past_sec) {
 
 std::string FanMover::_set_fan(int16_t speed) {
     const Tool* tool = m_writer.get_tool(m_currrent_extruder < 20 ? m_currrent_extruder : 0);
-    return GCodeWriter::set_fan(m_writer.config.gcode_flavor.value, m_writer.config.gcode_comments.value, speed, tool ? tool->fan_offset() : 0, m_writer.config.fan_percentage.value);
+	if(!tool){
+		BOOST_LOG_TRIVIAL(error) << "Error: FanMover trying to set fan without any tool.\n";
+		m_currrent_extruder = 0;
+	}
+    return GCodeWriter::set_fan(m_writer.gcode_config(), m_currrent_extruder, speed);
 }
 
 
@@ -242,7 +246,7 @@ void FanMover::_process_T(const std::string_view command)
     if (command.length() > 1) {
         int eid = 0;
         if (!parse_number(command.substr(1), eid) || eid < 0 || eid > 255) {
-            GCodeFlavor flavor = m_writer.config.gcode_flavor;
+            GCodeFlavor flavor = m_writer.gcode_config().gcode_flavor;
             // Specific to the MMU2 V2 (see https://www.help.prusa3d.com/en/article/prusa-specific-g-codes_112173):
             if ((flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware) && (command == "Tx" || command == "Tc" || command == "T?"))
                 return;
@@ -287,9 +291,9 @@ void FanMover::_process_gcode_line(GCodeReader& reader, const GCodeReader::GCode
         }
         case 'M':
         {
-            fan_speed = get_fan_speed(line.raw(), m_writer.config.gcode_flavor);
+            fan_speed = get_fan_speed(line.raw(), m_writer.gcode_config().gcode_flavor);
             if (fan_speed >= 0) {
-                const auto fan_baseline = (m_writer.config.fan_percentage.value ? 100.0 : 255.0);
+                const auto fan_baseline = (m_writer.gcode_config().fan_percentage.value ? 100.0 : 255.0);
                 fan_speed = 100 * fan_speed / fan_baseline;
                 //speed change: stop kickstart reverting if any
                 m_current_kickstart.time = -1;

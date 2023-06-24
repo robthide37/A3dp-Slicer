@@ -1814,14 +1814,22 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Enable fan if layer print time is below");
     def->category = OptionCategory::cooling;
     def->tooltip = L("If layer print time is estimated below this number of seconds, fan will be enabled "
-                "and its speed will be calculated by interpolating the default and maximum speeds."
-                "\nSet zero to disable.");
+        "and its speed will be calculated by interpolating the default and maximum speeds."
+        "\nSet zero to disable.");
     def->sidetext = L("approximate seconds");
     def->min = 0;
     def->max = 1000;
     def->mode = comExpert | comPrusa;
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionFloats { 60 });
+    def->set_default_value(new ConfigOptionFloats{ 60 });
+
+    def = this->add("fan_name", coStrings);
+    def->label = L("Fan configuration name");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("If this field is not empty, the gcode will use this name for this extruder fan, instead of the generic one (only klipper firmware support it right now).");
+    def->mode = comExpert | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionStrings{ "" });
 
     def = this->add("filament_colour", coStrings);
     def->label = L("Color");
@@ -6430,6 +6438,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "extruder_temperature_offset",
         "default_filament_profile",
         "deretract_speed",
+        "fan_name",
         "max_layer_height",
         "min_layer_height",
         "nozzle_diameter",
@@ -7761,6 +7770,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "extruder_temperature_offset",
 "extrusion_spacing",
 "fan_kickstart",
+"fan_name",
 "fan_percentage",
 "fan_speedup_overhangs",
 "fan_speedup_time",
