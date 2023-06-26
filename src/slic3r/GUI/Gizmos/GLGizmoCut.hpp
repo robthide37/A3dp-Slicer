@@ -104,6 +104,8 @@ class GLGizmoCut3D : public GLGizmoBase
         } 
     } m_info_stats;
 
+    bool m_invalid_groove{ false };
+
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
     bool m_keep_as_parts{ false };
