@@ -71,8 +71,8 @@ struct LayerResult {
     static LayerResult make_nop_layer_result() { return {"", std::numeric_limits<coord_t>::max(), false, false, true}; }
 };
 
+#define GET_CUSTOM_GCODE_PLACEHOLDERS 0
 class GCodeGenerator {
-#define GET_CUSTOM_GCODE_PLACEHOLDERS 1
 
 public:        
     GCodeGenerator() : 
