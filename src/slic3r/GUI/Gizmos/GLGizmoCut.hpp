@@ -30,6 +30,7 @@ class GLGizmoCut3D : public GLGizmoBase
         Y,
         Z,
         CutPlane,
+        CutPlaneZRotation,
         Count,
     };
 
@@ -340,7 +341,7 @@ private:
     static void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
     void render_line(GLModel& line_model, const ColorRGBA& color, Transform3d view_model_matrix, float width);
     void render_rotation_snapping(GrabberID axis, const ColorRGBA& color);
-    void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix);
+    void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix, double line_len_koef = 1.0);
     void render_cut_plane_grabbers();
     void render_cut_line();
     ModelObjectPtrs perform_cut_by_contour(ModelObject* cut_mo, const ModelObjectCutAttributes& attributes, int dowels_count);
