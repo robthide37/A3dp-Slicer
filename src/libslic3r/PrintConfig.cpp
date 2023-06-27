@@ -1621,6 +1621,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0.));
 
+    def = this->add("mmu_segmented_region_interlocking_depth", coFloat);
+    def->label = L("Maximum interlocking depth of a segmented region");
+    def->tooltip = L("Maximum interlocking depth of a segmented region. Zero disables this feature.");
+    def->sidetext = L("mm (zero to disable)");
+    def->min = 0;
+    def->category = L("Advanced");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionFloat(0.));
+
     def = this->add("ironing", coBool);
     def->label = L("Enable ironing");
     def->tooltip = L("Enable ironing of the top layers with the hot print head for smooth surface");
