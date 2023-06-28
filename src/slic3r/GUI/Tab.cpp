@@ -1903,6 +1903,13 @@ void TabFilament::add_filament_overrides_page()
                                         "filament_retract_before_wipe"
                                      })
         create_line_with_near_label_widget(optgroup, opt_key, extruder_idx);
+
+    optgroup = page->new_optgroup(L("Retraction when tool is disabled"));
+    for (const std::string opt_key : {  "filament_retract_length_toolchange",
+                                        "filament_retract_restart_extra_toolchange"
+                                     })
+        create_line_with_near_label_widget(optgroup, opt_key, extruder_idx);
+
 }
 
 void TabFilament::update_filament_overrides_page()
@@ -1911,7 +1918,7 @@ void TabFilament::update_filament_overrides_page()
         return;
     Page* page = m_active_page;
 
-    const auto og_it = std::find_if(page->m_optgroups.begin(), page->m_optgroups.end(), [](const ConfigOptionsGroupShp og) { return og->title == "Retraction"; });
+    auto og_it = std::find_if(page->m_optgroups.begin(), page->m_optgroups.end(), [](const ConfigOptionsGroupShp og) { return og->title == "Retraction"; });
     if (og_it == page->m_optgroups.end())
         return;
     ConfigOptionsGroupShp optgroup = *og_it;
@@ -1939,6 +1946,16 @@ void TabFilament::update_filament_overrides_page()
         bool is_checked = opt_key=="filament_retract_length" ? true : have_retract_length;
         update_line_with_near_label_widget(optgroup, opt_key, extruder_idx, is_checked);
     }
+
+    og_it = std::find_if(page->m_optgroups.begin(), page->m_optgroups.end(), [](const ConfigOptionsGroupShp og) { return og->title == "Retraction when tool is disabled"; });
+    if (og_it == page->m_optgroups.end())
+        return;
+    optgroup = *og_it;
+
+    for (const std::string& opt_key : {"filament_retract_length_toolchange", "filament_retract_restart_extra_toolchange"})
+        update_line_with_near_label_widget(optgroup, opt_key, extruder_idx);
+
+
 }
 
 void TabFilament::create_extruder_combobox()
