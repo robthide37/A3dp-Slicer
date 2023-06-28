@@ -35,6 +35,9 @@ static const ColorRGBA CONNECTOR_DEF_COLOR  = ColorRGBA(1.0f, 1.0f, 1.0f, 0.5f);
 static const ColorRGBA CONNECTOR_ERR_COLOR  = ColorRGBA(1.0f, 0.3f, 0.3f, 0.5f);
 static const ColorRGBA HOVERED_ERR_COLOR    = ColorRGBA(1.0f, 0.3f, 0.3f, 1.0f);
 
+static const ColorRGBA CUT_PLANE_DEF_COLOR  = ColorRGBA(0.9f, 0.9f, 0.9f, 0.5f);
+static const ColorRGBA CUT_PLANE_ERR_COLOR  = ColorRGBA(1.0f, 0.8f, 0.8f, 0.5f);
+
 const unsigned int AngleResolution = 64;
 const unsigned int ScaleStepsCount = 72;
 const float ScaleStepRad = 2.0f * float(PI) / ScaleStepsCount;
@@ -476,8 +479,17 @@ bool GLGizmoCut3D::render_cut_mode_combo()
     int selection_idx = int(m_mode);
     const bool is_changed = m_imgui->combo(_u8L("Mode"), m_modes, selection_idx, 0, m_label_width, m_control_width);
 
-    if (is_changed)
+    if (is_changed) {
         m_mode = size_t(selection_idx);
+
+        apply_color_clip_plane_colors();
+        if (auto oc = m_c->object_clipper()) {
+            m_contour_width = CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.f : 0.4f;
+            oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
+        }
+        if (m_part_selection.valid())
+            reset_cut_by_contours();
+    }
 
     return is_changed;
 }
@@ -710,14 +722,7 @@ void GLGizmoCut3D::render_cut_plane()
 
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
-    if (can_perform_cut() && has_valid_contour()) {
-        if (m_hover_id == CutPlane)
-            m_plane.model.set_color({ 0.9f, 0.9f, 0.9f, 0.5f });
-        else
-            m_plane.model.set_color({ 0.8f, 0.8f, 0.8f, 0.5f });
-    }
-    else
-        m_plane.model.set_color({ 1.0f, 0.8f, 0.8f, 0.5f });
+    m_plane.model.set_color(can_perform_cut() && has_valid_contour() ? CUT_PLANE_DEF_COLOR : CUT_PLANE_ERR_COLOR);
 
     if (m_mode == size_t(CutMode::cutPlanar)) {
         const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
@@ -964,11 +969,19 @@ std::string GLGizmoCut3D::on_get_name() const
     return _u8L("Cut");
 }
 
+void GLGizmoCut3D::apply_color_clip_plane_colors()
+{
+    if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
+        m_parent.set_color_clip_plane_colors({ CUT_PLANE_DEF_COLOR , CUT_PLANE_DEF_COLOR });
+    else
+        m_parent.set_color_clip_plane_colors({ UPPER_PART_COLOR , LOWER_PART_COLOR });
+}
+
 void GLGizmoCut3D::on_set_state()
 {
     if (m_state == On) {
         m_parent.set_use_color_clip_plane(true);
-        m_parent.set_color_clip_plane_colors({ UPPER_PART_COLOR , LOWER_PART_COLOR });
+        apply_color_clip_plane_colors();
 
         update_bb();
         m_connectors_editing = !m_selected.empty();
@@ -1777,12 +1790,8 @@ void GLGizmoCut3D::on_render()
     {
         if (!m_part_selection.valid())
             process_contours();
-
-        m_contour_width = 0.f;
         //check_and_update_connectors_state();
     }
-    else
-        m_contour_width = .4f;
 
     update_clipper();
 
@@ -2053,6 +2062,8 @@ void GLGizmoCut3D::flip_cut_plane()
 void GLGizmoCut3D::reset_cut_by_contours()
 {
     m_part_selection = PartSelection();
+    if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
+        return;
 
     const Selection& selection = m_parent.get_selection();
     const ModelObjectPtrs& model_objects = selection.get_model()->objects;
@@ -2071,11 +2082,9 @@ void GLGizmoCut3D::process_contours()
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
         cut_objects = perform_cut_with_groove(model_objects[object_idx], true);
         if (cut_objects.empty() || m_invalid_groove) {
-            m_parent.set_color_clip_plane_colors({ CONNECTOR_DEF_COLOR , CONNECTOR_DEF_COLOR });
+            m_parent.toggle_model_objects_visibility(true, model_objects[selection.get_object_idx()], selection.get_instance_idx());
             return;
         }
-        else
-            m_parent.set_color_clip_plane_colors({ UPPER_PART_COLOR , LOWER_PART_COLOR });
     }
 
     reset_cut_by_contours();
@@ -2185,7 +2194,8 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGui::Separator();
 
         // WIP : cut plane mode
-        render_cut_mode_combo();
+        if (render_cut_mode_combo())
+            mode = CutMode(m_mode);
 
         render_build_size();
 

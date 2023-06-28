@@ -336,6 +336,7 @@ private:
     bool cut_line_processing() const;
     void discard_cut_line_processing();
 
+    void apply_color_clip_plane_colors();
     void render_cut_plate_for_tongue_and_groove(GLShaderProgram* shader);
     void render_cut_plane();
     static void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
