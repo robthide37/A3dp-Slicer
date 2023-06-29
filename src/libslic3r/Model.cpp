@@ -1645,7 +1645,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
     // Post-process cut parts
 
     ModelObjectPtrs res;
-    if (upper->volumes.empty())
+    if (attributes.has(ModelObjectCutAttribute::KeepAsParts) && upper->volumes.empty())
         return res;
 
     if (attributes.has(ModelObjectCutAttribute::KeepAsParts) && !upper->volumes.empty()) {

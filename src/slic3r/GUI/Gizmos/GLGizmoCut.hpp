@@ -31,6 +31,7 @@ class GLGizmoCut3D : public GLGizmoBase
         Z,
         CutPlane,
         CutPlaneZRotation,
+        CutPlaneXMove,
         Count,
     };
 
@@ -124,6 +125,7 @@ class GLGizmoCut3D : public GLGizmoBase
     float m_groove_angle_init;
     float m_groove_depth_tolerance{ 0.1f };
     float m_groove_width_tolerance{ 0.1f };
+    bool  m_optimaze_groove_rendering{ false };
 
     bool m_hide_cut_plane{ false };
     bool m_connectors_editing{ false };
@@ -264,8 +266,8 @@ protected:
     bool               on_is_activable() const override;
     bool               on_is_selectable() const override;
     Vec3d              mouse_position_in_local_plane(GrabberID axis, const Linef3&mouse_ray) const;
-    void               dragging_grabber_z(const GLGizmoBase::UpdateData &data);
-    void               dragging_grabber_xy(const GLGizmoBase::UpdateData &data);
+    void               dragging_grabber_move(const GLGizmoBase::UpdateData &data);
+    void               dragging_grabber_rotation(const GLGizmoBase::UpdateData &data);
     void               dragging_connector(const GLGizmoBase::UpdateData &data);
     void               on_dragging(const UpdateData&data) override;
     void               on_start_dragging() override;
@@ -360,6 +362,8 @@ private:
     void validate_connector_settings();
     bool process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position);
     void check_and_update_connectors_state();
+
+    void toggle_model_objects_visibility();
 };
 
 } // namespace GUI
