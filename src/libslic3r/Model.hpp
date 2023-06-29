@@ -224,6 +224,7 @@ private:
 enum class CutConnectorType : int {
     Plug
     , Dowel
+    , Rivet
     , Undef
 };
 

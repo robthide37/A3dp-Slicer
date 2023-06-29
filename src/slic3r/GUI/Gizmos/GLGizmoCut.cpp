@@ -186,8 +186,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     , m_connector_style (int(CutConnectorStyle::Prism))
     , m_connector_shape_id (int(CutConnectorShape::Circle))
 {
-    m_mode = size_t(CutMode::cutTongueAndGroove);
-    m_contour_width = .0f;
+    m_connector_type = CutConnectorType::Rivet;
 
     m_modes = { _u8L("Planar"), _u8L("Tongue and Groove")//, _u8L("Grid")
 //              , _u8L("Radial"), _u8L("Modular")
@@ -197,7 +196,8 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
 
     std::map<const wchar_t, std::string> connetor_types = {
         {ImGui::PlugMarker , _u8L("Plug")  }, 
-        {ImGui::DowelMarker, _u8L("Dowel") },
+        {ImGui::DowelMarker, _u8L("Dowel") }, 
+        {ImGui::RivetMarker, _u8L("Rivet") },
     };
     for (auto connector : connetor_types) {
         std::string type_label = " " + connector.second + " ";
@@ -1986,20 +1986,27 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
     m_imgui->text(m_labels_map["Type"]);
     bool type_changed = render_connect_type_radio_button(CutConnectorType::Plug);
     type_changed     |= render_connect_type_radio_button(CutConnectorType::Dowel);
+    type_changed     |= render_connect_type_radio_button(CutConnectorType::Rivet);
     if (type_changed)
         apply_selected_connectors([this, &connectors] (size_t idx) { connectors[idx].attribs.type = CutConnectorType(m_connector_type); });
 
-    m_imgui->disabled_begin(m_connector_type == CutConnectorType::Dowel);
-    if (type_changed && m_connector_type == CutConnectorType::Dowel) {
-        m_connector_style = int(CutConnectorStyle::Prism);
-        apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
-    }
-    if (render_combo(m_labels_map["Style"], m_connector_styles, m_connector_style))
-        apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
+    m_imgui->disabled_begin(m_connector_type != CutConnectorType::Plug);
+        if (type_changed && m_connector_type == CutConnectorType::Dowel) {
+            m_connector_style = int(CutConnectorStyle::Prism);
+            apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
+        }
+        if (render_combo(m_labels_map["Style"], m_connector_styles, m_connector_style))
+            apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.style = CutConnectorStyle(m_connector_style); });
     m_imgui->disabled_end();
 
-    if (render_combo(m_labels_map["Shape"], m_connector_shapes, m_connector_shape_id))
-        apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id); });
+    m_imgui->disabled_begin(m_connector_type == CutConnectorType::Rivet);
+        if (type_changed && m_connector_type == CutConnectorType::Rivet) {
+            m_connector_shape_id = int(CutConnectorShape::Circle);
+            apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id); });
+        }
+        if (render_combo(m_labels_map["Shape"], m_connector_shapes, m_connector_shape_id))
+            apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id); });
+    m_imgui->disabled_end();
 
     if (render_slider_double_input(m_labels_map["Depth"], m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
         apply_selected_connectors([this, &connectors](size_t idx) {
@@ -3232,11 +3239,13 @@ void GLGizmoCut3D::reset_connectors()
 
 void GLGizmoCut3D::init_connector_shapes()
 {
-    for (const CutConnectorType& type : {CutConnectorType::Dowel, CutConnectorType::Plug})
+    for (const CutConnectorType& type : {CutConnectorType::Dowel, CutConnectorType::Plug, CutConnectorType::Rivet})
         for (const CutConnectorStyle& style : {CutConnectorStyle::Frustum, CutConnectorStyle::Prism}) {
             if (type == CutConnectorType::Dowel && style == CutConnectorStyle::Frustum)
                 continue;
             for (const CutConnectorShape& shape : {CutConnectorShape::Circle, CutConnectorShape::Hexagon, CutConnectorShape::Square, CutConnectorShape::Triangle}) {
+                if (type == CutConnectorType::Rivet && shape != CutConnectorShape::Circle)
+                    continue;
                 const CutConnectorAttributes attribs = { type, style, shape };
                 indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);
                 m_shapes[attribs].model.init_from(its);

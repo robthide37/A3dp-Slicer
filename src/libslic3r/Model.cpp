@@ -1302,7 +1302,9 @@ indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes conn
         break;
     }
 
-    if (connector_attributes.style == CutConnectorStyle::Prism)
+    if (connector_attributes.type == CutConnectorType::Rivet)
+        connector_mesh = its_make_rivet(1.0, 1.0, (2 * PI / /*sectorCount*/10));
+    else if (connector_attributes.style == CutConnectorStyle::Prism)
         connector_mesh = its_make_cylinder(1.0, 1.0, (2 * PI / sectorCount));
     else if (connector_attributes.type == CutConnectorType::Plug)
         connector_mesh = its_make_frustum(1.0, 1.0, (2 * PI / sectorCount));
