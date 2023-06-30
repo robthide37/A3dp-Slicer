@@ -1815,7 +1815,7 @@ void GLGizmoEmboss::draw_font_list()
         }
 
         if (!m_face_names->has_truncated_names)
-            init_truncated_names(*m_face_names, m_gui_cfg->face_name_max_width);
+            init_truncated_names(*m_face_names, m_gui_cfg->input_width);
         
         if (m_face_names->texture_id == 0) 
             init_font_name_texture();

@@ -644,13 +644,7 @@ PlaterPresetComboBox::PlaterPresetComboBox(wxWindow *parent, Preset::Type preset
 
     edit_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent)
     {
-        // In a case of a physical printer, for its editing open PhysicalPrinterDialog
-        if (m_type == Preset::TYPE_PRINTER
-#ifdef __linux__
-            // To edit extruder color from the sidebar
-            || m_type == Preset::TYPE_FILAMENT
-#endif //__linux__
-            )
+        if (m_type == Preset::TYPE_PRINTER || m_type == Preset::TYPE_FILAMENT)
             show_edit_menu();
         else
             switch_to_tab();
@@ -784,15 +778,18 @@ void PlaterPresetComboBox::show_edit_menu()
     append_menu_item(menu, wxID_ANY, _L("Edit preset"), "",
         [this](wxCommandEvent&) { this->switch_to_tab(); }, "cog", menu, []() { return true; }, wxGetApp().plater());
 
-#ifdef __linux__
-    // To edit extruder color from the sidebar
     if (m_type == Preset::TYPE_FILAMENT) {
+#ifdef __linux__
+        // To edit extruder color from the sidebar
         append_menu_item(menu, wxID_ANY, _L("Change extruder color"), "",
             [this](wxCommandEvent&) { this->change_extruder_color(); }, "funnel", menu, []() { return true; }, wxGetApp().plater());
+#endif //__linux__
+        append_menu_item(menu, wxID_ANY, _L("Show/Hide template presets"), "",
+            [this](wxCommandEvent&) { wxGetApp().open_preferences("no_templates", "General"); }, "spool", menu, []() { return true; }, wxGetApp().plater());
+
         wxGetApp().plater()->PopupMenu(menu);
         return;
     }
-#endif //__linux__
 
     if (this->is_selected_physical_printer()) {
         append_menu_item(menu, wxID_ANY, _L("Edit physical printer"), "",
