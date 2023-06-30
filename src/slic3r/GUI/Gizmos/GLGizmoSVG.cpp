@@ -112,6 +112,20 @@ std::string volume_name(const EmbossShape& shape);
 /// <returns>Params</returns>
 CreateVolumeParams create_input(GLCanvas3D &canvas, RaycastManager &raycaster, ModelVolumeType volume_type);
 
+enum class IconType : unsigned {
+    reset_value,
+    reset_value_hover,
+    lock,
+    lock_hover,
+    unlock,
+    unlock_hover,
+    // automatic calc of icon's count
+    _count
+};
+
+const IconManager::Icon &get_icon(const IconManager::Icons &icons, IconType type) { 
+    return *icons[static_cast<unsigned>(type)]; }
+
 // This configs holds GUI layout size given by translated texts.
 // etc. When language changes, GUI is recreated and this class constructed again,
 // so the change takes effect. (info by GLGizmoFdmSupports.hpp)
@@ -120,6 +134,9 @@ struct GuiCfg
     // Detect invalid config values when change monitor DPI
     double screen_scale;
     float  main_toolbar_height;
+
+    // Define bigger size(width or height)
+    unsigned texture_max_size_px = 64;
 
     // Zero means it is calculated in init function
     ImVec2 minimal_window_size = ImVec2(0, 0);
@@ -337,6 +354,55 @@ void GLGizmoSVG::on_unregister_raycasters_for_picking(){
     m_rotate_gizmo.unregister_raycasters_for_picking();
 }
 
+namespace{
+IconManager::Icons init_icons(IconManager &mng, const GuiCfg &cfg)
+{ 
+    mng.release();
+    
+    ImVec2 size(cfg.icon_width, cfg.icon_width);
+    // icon order has to match the enum IconType
+    IconManager::InitTypes init_types{
+        {"undo.svg",         size, IconManager::RasterType::white_only_data}, // undo           
+        {"undo.svg",         size, IconManager::RasterType::color},           // undo_hovered
+        {"lock_closed.svg",  size, IconManager::RasterType::white_only_data}, // lock,
+        {"lock_closed_f.svg",size, IconManager::RasterType::white_only_data}, // lock_hovered,
+        {"lock_open.svg",    size, IconManager::RasterType::white_only_data}, // unlock,
+        {"lock_open_f.svg",  size, IconManager::RasterType::white_only_data}  // unlock_hovered
+    };
+
+    assert(init_types.size() == static_cast<size_t>(IconType::_count));
+    std::string path = resources_dir() + "/icons/";
+    for (IconManager::InitType &init_type : init_types)
+        init_type.filepath = path + init_type.filepath;
+
+    return mng.init(init_types);
+
+    //IconManager::VIcons vicons = mng.init(init_types);
+    //
+    //// flatten icons
+    //IconManager::Icons  icons;
+    //icons.reserve(vicons.size());
+    //for (IconManager::Icons &i : vicons)
+    //    icons.push_back(i.front());
+    //return icons;
+}
+
+bool reset_button(const IconManager::Icons &icons)
+{
+    float reset_offset = ImGui::GetStyle().FramePadding.x;
+    ImGui::SameLine(reset_offset);
+
+    // from GLGizmoCut
+    //std::string label_id = "neco";
+    //std::string btn_label;
+    //btn_label += ImGui::RevertButton;
+    //return ImGui::Button((btn_label + "##" + label_id).c_str());
+
+    return clickable(get_icon(icons, IconType::reset_value), get_icon(icons, IconType::reset_value_hover));
+}
+
+} // namespace 
+
 void GLGizmoSVG::on_render_input_window(float x, float y, float bottom_limit)
 {
     set_volume_by_selection();
@@ -358,6 +424,8 @@ void GLGizmoSVG::on_render_input_window(float x, float y, float bottom_limit)
 
         // set position near toolbar
         m_set_window_offset = ImVec2(-1.f, -1.f);
+
+        m_icons = init_icons(m_icon_manager, *m_gui_cfg); // need regeneration when change resolution(move between monitors)
     }
 
     const ImVec2 &min_window_size = m_gui_cfg->minimal_window_size;
@@ -399,8 +467,8 @@ void GLGizmoSVG::on_render_input_window(float x, float y, float bottom_limit)
     }
 
     ImGui::End();
-    if (!is_opened)
-        close();
+    //if (!is_opened)
+    //    close();
 }
 
 void GLGizmoSVG::on_set_state()
@@ -455,7 +523,8 @@ void GLGizmoSVG::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(d
 #include "slic3r/GUI/BitmapCache.hpp"
 #include "nanosvg/nanosvgrast.h"
 namespace{
-bool init_texture(Texture &texture, const ModelVolume &mv) {
+bool init_texture(Texture &texture, const ModelVolume &mv, unsigned max_size_px)
+{
     if (!mv.emboss_shape.has_value())
         return false;
 
@@ -464,7 +533,6 @@ bool init_texture(Texture &texture, const ModelVolume &mv) {
     if (filepath.empty())
         return false;
     
-    unsigned max_size_px = 256;
     // inspired by:
     // GLTexture::load_from_svg_file(filepath, false, false, false, max_size_px);
     NSVGimage *image = BitmapCache::nsvgParseFromFileWithReplace(filepath.c_str(), "px", 96.0f, {});
@@ -563,7 +631,7 @@ void GLGizmoSVG::set_volume_by_selection()
     // Calculate current angle of up vector
     m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
     m_distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
-    init_texture(m_texture, *m_volume);
+
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();
 }
@@ -644,15 +712,9 @@ void GLGizmoSVG::draw_window()
         ImGui::Text("Not valid state please report reproduction steps on github");
         return;
     }
+    draw_preview();
 
-    if (m_volume->emboss_shape.has_value())
-        ImGui::Text("SVG file path is %s", m_volume->emboss_shape->svg_file_path.c_str());
-
-    if (m_texture.id != 0) {
-        ImTextureID id = (void *) static_cast<intptr_t>(m_texture.id);
-        ImVec2 s(m_texture.width, m_texture.height);
-        ImGui::Image(id, s);
-    }
+    ImGui::Separator();
 
     ImGui::Indent(m_gui_cfg->icon_width);
     draw_depth();
@@ -661,18 +723,45 @@ void GLGizmoSVG::draw_window()
 
     draw_distance();
     draw_rotation();
-    ImGui::Unindent(m_gui_cfg->icon_width);
-
-    if (ImGui::Button("change file")) {
-        m_volume_shape.shapes_with_ids = select_shape().shapes_with_ids;
-        init_texture(m_texture, *m_volume);
-        // TODO: use setted scale
-        process();
-    }
+    ImGui::Unindent(m_gui_cfg->icon_width);  
 
     if (!m_volume->is_the_only_one_part()) {
         ImGui::Separator();
         draw_model_type();
+    }
+}
+
+void GLGizmoSVG::draw_preview(){
+
+    if (m_volume->emboss_shape.has_value())
+        ImGui::Text("SVG file path is %s", m_volume->emboss_shape->svg_file_path.c_str());
+
+    if (m_texture.id == 0)
+        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
+    
+    if (m_texture.id != 0) {
+        ImTextureID id = (void *) static_cast<intptr_t>(m_texture.id);
+        ImVec2      s(m_texture.width, m_texture.height);
+        ImGui::Image(id, s);
+    }    
+
+    ImGui::SameLine();
+    if (ImGui::Button("change file")) {
+        m_volume_shape.shapes_with_ids = select_shape().shapes_with_ids;
+        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
+        process();
+    } 
+
+    // Re-Load button
+    bool can_reload = !m_volume_shape.svg_file_path.empty();
+    if (can_reload) {
+        ImGui::SameLine();
+        if (clickable(get_icon(m_icons, IconType::reset_value), get_icon(m_icons, IconType::reset_value_hover))) {
+            m_volume_shape.shapes_with_ids = select_shape(m_volume_shape.svg_file_path).shapes_with_ids;
+            init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
+            process();
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Re-load SVG file from disk.").c_str());
     }
 }
 
@@ -746,16 +835,13 @@ void GLGizmoSVG::draw_size()
         ImGui::SetTooltip("%s", _u8L("Height of SVG.").c_str());
 
     bool can_reset = !is_approx(m_volume_shape.scale, DEFAULT_SCALE);
-    m_imgui->disabled_begin(!can_reset);
-    ScopeGuard sc([imgui = m_imgui]() { imgui->disabled_end(); });
-
-    float reset_offset = ImGui::GetStyle().FramePadding.x;
-    ImGui::SameLine(reset_offset);
-    if (ImGui::Button("R##size_reset")) {
-        m_volume_shape.scale = DEFAULT_SCALE;
-        process();
-    } else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Reset scale to loaded one from the SVG").c_str());
+    if (can_reset) {
+        if (reset_button(m_icons)) {
+            m_volume_shape.scale = DEFAULT_SCALE;
+            process();
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Reset scale to loaded one from the SVG").c_str());
+    }
 }
 
 void GLGizmoSVG::draw_use_surface() 
@@ -810,16 +896,14 @@ void GLGizmoSVG::draw_distance()
             is_moved = true;
     }
 
-    m_imgui->disabled_begin(!m_distance.has_value() && allowe_surface_distance);
-    ScopeGuard sg2([imgui = m_imgui]() { imgui->disabled_end(); });
-
-    float reset_offset = ImGui::GetStyle().FramePadding.x;
-    ImGui::SameLine(reset_offset);
-    if (ImGui::Button("R##distance_reset")){
-        m_distance.reset();
-        is_moved = true;
-    } else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Reset distance to zero value").c_str());
+    bool can_reset = m_distance.has_value();
+    if (can_reset) {
+        if (reset_button(m_icons)) {
+            m_distance.reset();
+            is_moved = true;
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Reset distance to zero value").c_str());
+    }
 
     if (is_moved)
         do_local_z_move(m_parent, m_distance.value_or(.0f) - prev_distance);
@@ -837,7 +921,7 @@ void GLGizmoSVG::draw_rotation()
     // minus create clock-wise roation from CCW
     float angle = m_angle.value_or(0.f);
     float angle_deg = static_cast<float>(-angle * 180 / M_PI);
-    if (m_imgui->slider_float("##angle", &angle_deg, limits.angle.min, limits.angle.max, u8"%.2f DEG", 1.f, false, _L("Rotate text Clock-wise."))){
+    if (m_imgui->slider_float("##angle", &angle_deg, limits.angle.min, limits.angle.max, u8"%.2f °", 1.f, false, _L("Rotate text Clock-wise."))){
         // convert back to radians and CCW
         double angle_rad = -angle_deg * M_PI / 180.0;
         Geometry::to_range_pi_pi(angle_rad);                
@@ -854,45 +938,32 @@ void GLGizmoSVG::draw_rotation()
             process();
     }
 
-    if (!m_volume->is_the_only_one_part()) {
-        // Keep up - lock button icon
-        ImGui::SameLine(m_gui_cfg->lock_offset);
-        ImGui::Checkbox("##Lock_up_vector", &m_keep_up);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", (m_keep_up ? 
-                _u8L("Unlock the rotation when moving volume along the object's surface.") :
-                _u8L("Lock the rotation when moving volume along the object's surface."))
-                .c_str());
+    // Reset button
+    if (m_angle.has_value()) {
+        if (reset_button(m_icons)) {
+            do_local_z_rotate(m_parent, -(*m_angle));
+            m_angle.reset();
+
+            // recalculate for surface cut
+            if (m_volume->emboss_shape->projection.use_surface)
+                process();
+        } else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Reset rotation to zero value").c_str());
     }
 
-    // Reset button
-    m_imgui->disabled_begin(!m_angle.has_value());
-    ScopeGuard sg([imgui = m_imgui]() { imgui->disabled_end(); });
-
-    float reset_offset = ImGui::GetStyle().FramePadding.x;
-    ImGui::SameLine(reset_offset);
-    if (ImGui::Button("R##angle_reset")) {
-        do_local_z_rotate(m_parent, -(*m_angle));
-        m_angle.reset();
-
-        // recalculate for surface cut
-        if (m_volume->emboss_shape->projection.use_surface)
-            process();
-    } else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Reset rotation to zero value").c_str());
-
     // Keep up - lock button icon
-    //ImGui::SameLine(m_gui_cfg->lock_offset);
-    //const IconManager::Icon &icon = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::activable);
-    //const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_up ? IconType::lock_bold : IconType::unlock_bold, IconState::activable);
-    //const IconManager::Icon &icon_disable = get_icon(m_icons, m_keep_up ? IconType::lock : IconType::unlock, IconState::disabled);
-    //if (button(icon, icon_hover, icon_disable))
-    //    m_keep_up = !m_keep_up;    
-    //if (ImGui::IsItemHovered())
-    //    ImGui::SetTooltip("%s", (m_keep_up?
-    //        _u8L("Unlock the text's rotation when moving text along the object's surface."):
-    //        _u8L("Lock the text's rotation when moving text along the object's surface.")
-    //    ).c_str());
+    if (!m_volume->is_the_only_one_part()) {
+        ImGui::SameLine(m_gui_cfg->lock_offset);
+        const IconManager::Icon &icon = get_icon(m_icons,m_keep_up ? IconType::lock : IconType::unlock);
+        const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_up ? IconType::lock_hover : IconType::unlock_hover);
+        if (button(icon, icon_hover, icon))
+            m_keep_up = !m_keep_up;    
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", (m_keep_up?
+                _u8L("Free angle when dragging above the object's surface."):
+                _u8L("Keep same rotation angle when dragging above the object's surface.")
+            ).c_str());
+    }
 }
 
 void GLGizmoSVG::draw_model_type()

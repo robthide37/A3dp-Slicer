@@ -8,6 +8,7 @@
 #include "slic3r/GUI/SurfaceDrag.hpp"
 #include "slic3r/GUI/GLTexture.hpp"
 #include "slic3r/Utils/RaycastManager.hpp"
+#include "slic3r/GUI/IconManager.hpp"
 
 #include <optional>
 #include <memory>
@@ -115,6 +116,7 @@ private:
     bool process();
     void close();
     void draw_window();
+    void draw_preview();
     void draw_depth();
     void draw_size();
     void draw_use_surface();
@@ -171,6 +173,9 @@ private:
     // keep SVG data rendered on GPU
 
     Texture m_texture;
+
+    IconManager m_icon_manager;
+    IconManager::Icons m_icons;
 
     // only temporary solution
     static const std::string M_ICON_FILENAME;
