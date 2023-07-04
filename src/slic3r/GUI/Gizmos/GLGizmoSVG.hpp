@@ -157,6 +157,7 @@ private:
     // When true keep up vector otherwise relative rotation
     bool m_keep_up = true;
 
+
     bool m_keep_ratio = true;
         
     // setted only when wanted to use - not all the time
@@ -171,8 +172,9 @@ private:
     void calculate_scale();
 
     // keep SVG data rendered on GPU
-
     Texture m_texture;
+
+    std::string m_filename_preview;
 
     IconManager m_icon_manager;
     IconManager::Icons m_icons;

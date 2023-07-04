@@ -344,6 +344,7 @@ void priv::draw_transparent_icon(const IconManager::Icon &icon)
     draw(icon_px);
 }
 
+#include "imgui/imgui_internal.h" //ImGuiWindow
 namespace Slic3r::GUI {
 
 void draw(const IconManager::Icon &icon, const ImVec2 &size, const ImVec4 &tint_col, const ImVec4 &border_col)
@@ -364,7 +365,10 @@ void draw(const IconManager::Icon &icon, const ImVec2 &size, const ImVec4 &tint_
 bool clickable(const IconManager::Icon &icon, const IconManager::Icon &icon_hover)
 {
     // check of hover
-    float cursor_x = ImGui::GetCursorPosX();
+    ImGuiWindow *window = ImGui::GetCurrentWindow();
+    float cursor_x = ImGui::GetCursorPosX()
+        - window->DC.GroupOffset.x 
+        - window->DC.ColumnsOffset.x;
     priv::draw_transparent_icon(icon);
     ImGui::SameLine(cursor_x);
     if (ImGui::IsItemHovered()) {

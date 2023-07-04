@@ -365,9 +365,9 @@ IconManager::Icons init_icons(IconManager &mng, const GuiCfg &cfg)
         {"undo.svg",         size, IconManager::RasterType::white_only_data}, // undo           
         {"undo.svg",         size, IconManager::RasterType::color},           // undo_hovered
         {"lock_closed.svg",  size, IconManager::RasterType::white_only_data}, // lock,
-        {"lock_closed_f.svg",size, IconManager::RasterType::white_only_data}, // lock_hovered,
+        {"lock_open_f.svg",  size, IconManager::RasterType::white_only_data}, // lock_hovered
         {"lock_open.svg",    size, IconManager::RasterType::white_only_data}, // unlock,
-        {"lock_open_f.svg",  size, IconManager::RasterType::white_only_data}  // unlock_hovered
+        {"lock_closed_f.svg",size, IconManager::RasterType::white_only_data}  // unlock_hovered,
     };
 
     assert(init_types.size() == static_cast<size_t>(IconType::_count));
@@ -624,6 +624,8 @@ void GLGizmoSVG::set_volume_by_selection()
         m_job_cancel = nullptr;
     }
 
+    reset_volume(); // clear cached data
+
     m_volume = volume;
     m_volume_id = volume->id();
     m_volume_shape = *volume->emboss_shape; // copy
@@ -644,9 +646,12 @@ void GLGizmoSVG::reset_volume()
     m_volume = nullptr;
     m_volume_id.id = 0;
     m_volume_shape.shapes_with_ids.clear();
+    m_filename_preview.clear();
 
-    if (m_texture.id != 0)
+    if (m_texture.id != 0) {
         glsafe(::glDeleteTextures(1, &m_texture.id));
+        m_texture.id = 0;
+    }
 }
 
 void GLGizmoSVG::calculate_scale() {
@@ -697,6 +702,7 @@ bool GLGizmoSVG::process()
 
 void GLGizmoSVG::close()
 {
+    reset_volume();
     // close gizmo == open it again
     auto& mng = m_parent.get_gizmos_manager();
     if (mng.get_current_type() == GLGizmosManager::Svg)
@@ -732,37 +738,71 @@ void GLGizmoSVG::draw_window()
 }
 
 void GLGizmoSVG::draw_preview(){
+    assert(m_volume->emboss_shape.has_value());
+    if (!m_volume->emboss_shape.has_value()) {
+        ImGui::Text("No embossed file");
+        return;
+    }
 
-    if (m_volume->emboss_shape.has_value())
-        ImGui::Text("SVG file path is %s", m_volume->emboss_shape->svg_file_path.c_str());
-
+    // init texture when not initialized yet.
+    // drag&drop is out of rendering scope so texture must be created on this place
     if (m_texture.id == 0)
-        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
-    
+        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);    
+
     if (m_texture.id != 0) {
         ImTextureID id = (void *) static_cast<intptr_t>(m_texture.id);
         ImVec2      s(m_texture.width, m_texture.height);
         ImGui::Image(id, s);
-    }    
+    }
+
+    if (m_filename_preview.empty()){
+        // create filename preview
+        m_filename_preview = get_file_name(m_volume->emboss_shape->svg_file_path);
+        m_filename_preview = ImGuiWrapper::trunc(m_filename_preview, m_gui_cfg->input_width);
+    }
 
     ImGui::SameLine();
-    if (ImGui::Button("change file")) {
-        m_volume_shape.shapes_with_ids = select_shape().shapes_with_ids;
-        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
-        process();
-    } 
+    ImGui::BeginGroup();
+
+    // Remove space between filename and gray suffix ".svg"
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+
+    ImGui::Text("%s", m_filename_preview.c_str());
+    bool is_hovered = ImGui::IsItemHovered();
+    ImGui::SameLine();
+    m_imgui->text_colored(ImGuiWrapper::COL_GREY_LIGHT, ".svg");
+    ImGui::PopStyleVar(); // ImGuiStyleVar_ItemSpacing 
+
+    is_hovered |= ImGui::IsItemHovered();
+    if (is_hovered) {
+        std::string tooltip = GUI::format(_L("SVG file path is \"%1%\" "), m_volume->emboss_shape->svg_file_path);
+        ImGui::SetTooltip("%s", tooltip.c_str());
+    }
+
 
     // Re-Load button
     bool can_reload = !m_volume_shape.svg_file_path.empty();
     if (can_reload) {
         ImGui::SameLine();
         if (clickable(get_icon(m_icons, IconType::reset_value), get_icon(m_icons, IconType::reset_value_hover))) {
-            m_volume_shape.shapes_with_ids = select_shape(m_volume_shape.svg_file_path).shapes_with_ids;
-            init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
-            process();
+            if (!boost::filesystem::exists(m_volume_shape.svg_file_path)) {
+                m_volume_shape.svg_file_path.clear();
+            } else {
+                m_volume_shape.shapes_with_ids = select_shape(m_volume_shape.svg_file_path).shapes_with_ids;
+                init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
+                process();
+            }
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Re-load SVG file from disk.").c_str());
     }
+
+    if (ImGui::Button(_u8L("Change file").c_str())) {
+        m_volume_shape.shapes_with_ids = select_shape().shapes_with_ids;
+        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
+        process();
+    }
+
+    ImGui::EndGroup();
 }
 
 void GLGizmoSVG::draw_depth()
@@ -794,46 +834,78 @@ void GLGizmoSVG::draw_size()
     ImGuiWrapper::text(m_gui_cfg->translations.size);
 
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
-    float space         = m_gui_cfg->icon_width / 2;
-    float input_width = m_gui_cfg->input_width / 2 - space / 2;
-    float second_offset = m_gui_cfg->input_offset + input_width + space;
-
-    ImGui::SameLine(m_gui_cfg->input_offset);
-    ImGui::SetNextItemWidth(input_width);
-
+    
     // TODO: cache it
     BoundingBox bb = get_extents(m_volume_shape.shapes_with_ids);
     Point size = bb.size();
 
-    const char *size_format = (use_inch) ? "%.2f in" : "%.1f mm";
-    double step = -1.0;
-    double fast_step = -1.0;
     double width = size.x() * m_volume_shape.scale;    
-    if (use_inch) width *= ObjectManipulation::mm_to_in;
-
-    ImGuiInputTextFlags flags = 0;
-
-    if (ImGui::InputDouble("##width", &width, step, fast_step, size_format, flags)) {
-        if (use_inch) width *= ObjectManipulation::in_to_mm;
-        m_volume_shape.scale = width / size.x();
-        process();
-    }
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Width of SVG.").c_str());
-    
-    ImGui::SameLine(second_offset);
-    ImGui::SetNextItemWidth(input_width);
-
+    if (use_inch) width *= ObjectManipulation::mm_to_in;    
     double height = size.y() * m_volume_shape.scale;
     if (use_inch) height *= ObjectManipulation::mm_to_in;
-    if (ImGui::InputDouble("##height", &height, step, fast_step, size_format, flags)) {
-        if (use_inch) height *= ObjectManipulation::in_to_mm;
-        m_volume_shape.scale = height / size.y();
-        process();
-    }
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Height of SVG.").c_str());
 
+    if (m_keep_ratio) {
+        std::stringstream ss;
+        ss << std::setprecision(2) << width << " x " << height << " " << (use_inch ? "in" : "mm");
+
+        ImGui::SameLine(m_gui_cfg->input_offset);
+        ImGui::SetNextItemWidth(m_gui_cfg->input_width);
+
+        float width_f = width;
+        if (m_imgui->slider_float("##width_size_slider", &width_f, 5.f, 100.f, ss.str().c_str())) {
+            if (use_inch)
+                width_f *= ObjectManipulation::in_to_mm;
+            m_volume_shape.scale = width_f / size.x();
+            process();
+        }
+    } else {
+        ImGuiInputTextFlags flags = 0;
+
+        float space         = m_gui_cfg->icon_width / 2;
+        float input_width   = m_gui_cfg->input_width / 2 - space / 2;
+        float second_offset = m_gui_cfg->input_offset + input_width + space;
+
+        const char *size_format = (use_inch) ? "%.2f in" : "%.1f mm";
+        double step = -1.0;
+        double fast_step = -1.0;
+
+        ImGui::SameLine(m_gui_cfg->input_offset);
+        ImGui::SetNextItemWidth(input_width);
+        if (ImGui::InputDouble("##width", &width, step, fast_step, size_format, flags)) {
+            if (use_inch)
+                width *= ObjectManipulation::in_to_mm;
+            m_volume_shape.scale = width / size.x();
+            process();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Width of SVG.").c_str());
+
+        ImGui::SameLine(second_offset);
+        ImGui::SetNextItemWidth(input_width);
+        if (ImGui::InputDouble("##height", &height, step, fast_step, size_format, flags)) {
+            if (use_inch)
+                height *= ObjectManipulation::in_to_mm;
+            m_volume_shape.scale = height / size.y();
+            process();
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", _u8L("Height of SVG.").c_str());    
+    }
+
+    // Lock on ratio m_keep_ratio
+    ImGui::SameLine(m_gui_cfg->lock_offset);
+    const IconManager::Icon &icon       = get_icon(m_icons, m_keep_ratio ? IconType::lock : IconType::unlock);
+    const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_ratio ? IconType::lock_hover : IconType::unlock_hover);
+    if (button(icon, icon_hover, icon))
+        m_keep_ratio = !m_keep_ratio;    
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", (m_keep_ratio ?
+            _u8L("Free set of width and height value."):
+            _u8L("Keep same ratio of width to height.")
+        ).c_str());
+    
+
+    // reset button
     bool can_reset = !is_approx(m_volume_shape.scale, DEFAULT_SCALE);
     if (can_reset) {
         if (reset_button(m_icons)) {
@@ -1186,16 +1258,21 @@ EmbossShape select_shape(std::string_view filepath)
 
     if (filepath.empty()) {
         shape.svg_file_path = choose_svg_file();
-        if (shape.svg_file_path.empty())
+        if (shape.svg_file_path.empty())            
             return {};
     } else {
         shape.svg_file_path = filepath; // copy
     }
 
+    if (!boost::filesystem::exists(shape.svg_file_path) || 
+        !boost::algorithm::iends_with(shape.svg_file_path, ".svg"))
+        return {};
+
     const char *unit_mm{"mm"};
     // common used DPI is 96 or 72
     float dpi = 96.0f;
     NSVGimage *image = nsvgParseFromFile(shape.svg_file_path.c_str(), unit_mm, dpi);
+    if (image == nullptr) return {};
     ScopeGuard sg([image]() { nsvgDelete(image); });
 
     shape.scale = DEFAULT_SCALE; // loaded in mm
