@@ -7,7 +7,7 @@ on:
       - nightly_dev
       - nightly_master
       - debug_win
-      - dev
+      - supermerrill-Main
 
 jobs:
   build_dep:

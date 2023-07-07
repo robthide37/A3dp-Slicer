@@ -547,6 +547,7 @@ namespace Slic3r {
         float m_forced_width; // mm
         float m_forced_height; // mm
         float m_mm3_per_mm;
+        float m_fan_baseline; // 100, 255 or 1 (max value of fan speeed in gcode
         float m_fan_speed; // percentage
 #if ENABLE_Z_OFFSET_CORRECTION
         float m_z_offset; // mm
@@ -758,6 +759,7 @@ namespace Slic3r {
         void process_T(const std::string_view command);
         void process_T(uint16_t command);
         void process_klipper_ACTIVATE_EXTRUDER(const GCodeReader::GCodeLine& line);
+        void process_klipper_SET_FAN_SPEED(const GCodeReader::GCodeLine& line);
 
         void store_move_vertex(EMoveType type);
 

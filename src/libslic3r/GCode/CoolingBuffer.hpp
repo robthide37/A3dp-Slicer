@@ -55,6 +55,7 @@ private:
     // the PrintConfig slice of FullPrintConfig is constant, thus no thread synchronization is required.
     const PrintConfig          &m_config;
     uint16_t                    m_current_extruder;
+    uint16_t                    m_previous_extruder;
 
     //saved previous unslowed layer 
     std::map<size_t, float> saved_layer_time_support;

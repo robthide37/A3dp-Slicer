@@ -190,16 +190,16 @@ std::string Wipe::wipe(GCode& gcodegen, bool toolchange)
 
     /*  Reduce feedrate a bit; travel speed is often too high to move on existing material.
         Too fast = ripping of existing material; too slow = short wipe path, thus more blob.  */
-    double wipe_speed = gcodegen.writer().config.get_computed_value("travel_speed") * 0.8;
-    if(gcodegen.writer().tool_is_extruder() && gcodegen.writer().config.wipe_speed.get_at(gcodegen.writer().tool()->id()) > 0)
-        wipe_speed = gcodegen.writer().config.wipe_speed.get_at(gcodegen.writer().tool()->id());
+    double wipe_speed = gcodegen.writer().gcode_config().get_computed_value("travel_speed") * 0.8;
+    if(gcodegen.writer().tool_is_extruder() && gcodegen.writer().gcode_config().wipe_speed.get_at(gcodegen.writer().tool()->id()) > 0)
+        wipe_speed = gcodegen.writer().gcode_config().wipe_speed.get_at(gcodegen.writer().tool()->id());
 
     // get the retraction length
     double length = gcodegen.writer().tool()->retract_length();
     if (toolchange) {
         length = gcodegen.writer().tool()->retract_length_toolchange();
-    } else if (gcodegen.writer().config_region && gcodegen.writer().config_region->print_retract_length.value >= 0) {
-        length = gcodegen.writer().config_region->print_retract_length.value;
+    } else if (gcodegen.writer().print_region_config() && gcodegen.writer().print_region_config()->print_retract_length.value >= 0) {
+        length = gcodegen.writer().print_region_config()->print_retract_length.value;
     }
     // Shorten the retraction length by the amount already retracted before wipe.
     length *= (1. - gcodegen.writer().tool()->retract_before_wipe());
@@ -6166,6 +6166,11 @@ std::string GCode::set_extruder(uint16_t extruder_id, double print_z, bool no_to
         m_placeholder_parser.set("current_extruder", extruder_id);
 
         std::string gcode;
+
+        if (m_enable_cooling_markers) {
+            gcode += ";_BEFORE_TOOLCHANGE " + std::to_string(extruder_id) + "\n";
+        }
+
         // Append the filament start G-code.
         const std::string &start_filament_gcode = m_config.start_filament_gcode.get_at(extruder_id);
         if (! start_filament_gcode.empty()) {
@@ -6179,8 +6184,9 @@ std::string GCode::set_extruder(uint16_t extruder_id, double print_z, bool no_to
             check_add_eol(gcode);
         }
         if (!no_toolchange) {
-            gcode+=toolchange(extruder_id, print_z);
+            gcode += toolchange(extruder_id, print_z);
         }else m_writer.toolchange(extruder_id);
+
         return gcode;
     }
 
@@ -6189,6 +6195,10 @@ std::string GCode::set_extruder(uint16_t extruder_id, double print_z, bool no_to
 
     // Always reset the extrusion path, even if the tool change retract is set to zero.
     m_wipe.reset_path();
+
+    if (m_enable_cooling_markers) {
+        gcode += ";_BEFORE_TOOLCHANGE " + std::to_string(extruder_id) + "\n";
+    }
 
     if (m_writer.tool() != nullptr) {
         // Process the custom end_filament_gcode. set_extruder() is only called if there is no wipe tower

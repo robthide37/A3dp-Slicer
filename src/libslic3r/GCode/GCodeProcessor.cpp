@@ -885,6 +885,8 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
         m_extruder_names[i] = config.tool_name.get_at(i);
     }
 
+    m_fan_baseline = (config.fan_percentage ? 100.0 : 255.0);
+
     m_extruder_colors.resize(extruders_count);
     m_result.filament_diameters.resize(extruders_count);
     m_result.filament_densities.resize(extruders_count);
@@ -1635,7 +1637,7 @@ void GCodeProcessor::process_klipper_ACTIVATE_EXTRUDER(const GCodeReader::GCodeL
     //check the config
     std::string raw_value = get_klipper_param(" EXTRUDER", line.raw());
     auto it = std::find(m_extruder_names.begin(), m_extruder_names.end(), raw_value);
-    if ( it != m_extruder_names.end()) {
+    if (it != m_extruder_names.end()) {
         process_T(uint16_t(it - m_extruder_names.begin()));
         return;
     }
@@ -1647,6 +1649,17 @@ void GCodeProcessor::process_klipper_ACTIVATE_EXTRUDER(const GCodeReader::GCodeL
     if (trsf.empty())
         trsf = "0";
     process_T(uint16_t(std::stoi(trsf)));
+}
+
+void GCodeProcessor::process_klipper_SET_FAN_SPEED(const GCodeReader::GCodeLine& line) {
+    uint8_t extruder_id = 0;
+    //check the config
+    std::string fan_name = get_klipper_param(" FAN", line.raw());
+    std::string fan_speed_raw = get_klipper_param(" SPEED", line.raw());
+    char* pend = nullptr;
+    double new_fan_speed = strtod(fan_speed_raw.c_str(), &pend);
+    // speed is stored between 0 and 1
+    m_fan_speed = 100.0f * new_fan_speed;
 }
 
 void GCodeProcessor::apply_config_simplify3d(const std::string& filename)
@@ -1767,6 +1780,8 @@ void GCodeProcessor::process_gcode_line(const GCodeReader::GCodeLine& line, bool
                 set_extruder_temp(0.0f);
             else if (cmd_up == "ACTIVATE_EXTRUDER")
                 process_klipper_ACTIVATE_EXTRUDER(line);
+            else if (cmd_up == "SET_FAN_SPEED")
+                process_klipper_SET_FAN_SPEED(line);
         }
         catch (...) {
             BOOST_LOG_TRIVIAL(error) << "GCodeProcessor failed to parse the klipper command '" << line.raw() << "'.";
@@ -3251,9 +3266,10 @@ void GCodeProcessor::process_M106(const GCodeReader::GCodeLine& line)
 {
     if (!line.has('P')) {
         // The absence of P means the print cooling fan, so ignore anything else.
+        // merill /\ doubt, or gcodewriter is a bit strange
         float new_fan_speed;
         if (line.has_value('S', new_fan_speed))
-            m_fan_speed = (100.0f / 255.0f) * new_fan_speed;
+            m_fan_speed = (100.0f / m_fan_baseline) * new_fan_speed;
         else
             m_fan_speed = 100.0f;
     }
