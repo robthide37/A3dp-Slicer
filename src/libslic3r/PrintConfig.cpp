@@ -8274,7 +8274,7 @@ void DynamicPrintConfig::normalize_fdm()
         {
             this->opt<ConfigOptionInt>("top_solid_layers", true)->value = 0;
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
-            this->opt<ConfigOptionEnum<PerimeterGeneratorType>>("perimeter_generator", true)->value = PerimeterGeneratorType::Classic; 
+            this->opt<ConfigOptionEnumGeneric>("perimeter_generator", true)->value = (int)PerimeterGeneratorType::Classic;
             this->opt<ConfigOptionBool>("support_material", true)->value = false;
             this->opt<ConfigOptionInt>("solid_over_perimeters")->value = 0;
             this->opt<ConfigOptionInt>("support_material_enforce_layers")->value = 0;
