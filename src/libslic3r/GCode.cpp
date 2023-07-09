@@ -5619,12 +5619,18 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
 
     // compute speed here to be able to know it for travel_deceleration_use_target
     speed = _compute_speed_mm_per_sec(path, speed);
-        
+
+    if (travel_pa >= 0) {
+        m_writer.set_pressure_advance(travel_pa);
+    } else {
+        m_writer.set_pressure_advance(pa);
+    }
+
+    //travel
     if (m_config.travel_deceleration_use_target){
         if (travel_acceleration <= acceleration || travel_acceleration == 0 || acceleration == 0) {
             m_writer.set_travel_acceleration((uint32_t)floor(acceleration + 0.5));
             m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
-            m_writer.set_pa(pa);
             // go to first point of extrusion path (stop at midpoint to let us set the decel speed)
             if (!m_last_pos_defined || m_last_pos != path.first_point()) {
                 Polyline polyline = this->travel_to(gcode, path.first_point(), path.role());
@@ -5674,7 +5680,6 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                 if (cant_use_deceleration) {
                     m_writer.set_travel_acceleration((uint32_t)floor(acceleration + 0.5));
                     m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
-                    m_writer.set_pa(pa);
                     this->write_travel_to(gcode, poly_start, "move to first " + description + " point (minimum acceleration)");
                 } else {
                     // if length is enough, it's not the hack for first move, and the travel accel is different than the normal accel
@@ -5703,14 +5708,10 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         }
                         gcode += "; acceleration to travel\n";
                         m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
-                        if (travel_pa >= 0) {
-                            m_writer.set_pa(travel_pa);
-                        }
                         this->write_travel_to(gcode, poly_start, "move to first " + description + " point (acceleration)");
                         //travel acceleration should be already set at startup via special gcode, and so it's automatically used by G0.
                         gcode += "; decel to extrusion\n";
                         m_writer.set_travel_acceleration((uint32_t)floor(acceleration + 0.5));
-                        m_writer.set_pa(pa);
                         this->write_travel_to(gcode, poly_end, "move to first " + description + " point (deceleration)");
                         // restore travel accel and ensure the new extrusion accel is set
                         m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
@@ -5719,22 +5720,16 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                 }
             } else {
                 m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
-                m_writer.set_pa(pa);
             }
         }
     } else {
         if (!m_last_pos_defined || m_last_pos != path.first_point()) {
             m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
-            if (travel_pa >= 0) {
-                m_writer.set_pa(travel_pa);
-            }
             Polyline polyline = this->travel_to(gcode, path.first_point(), path.role());
             this->write_travel_to(gcode, polyline, "move to first " + description + " point");
             m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
-            m_writer.set_pa(pa);
         } else {
             m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));
-            m_writer.set_pa(pa);
         }
     }
 
@@ -5755,6 +5750,9 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
         gcode += unlift;
     }
     gcode += m_writer.unretract();
+
+    //set pa after unretraction (do nothing if it isn't changed)
+    m_writer.set_pressure_advance(pa);
 
     // extrude arc or line
     if (path.role() != m_last_extrusion_role && !m_config.feature_gcode.value.empty()) {

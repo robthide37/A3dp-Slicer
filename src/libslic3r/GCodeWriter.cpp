@@ -245,8 +245,23 @@ std::string GCodeWriter::set_bed_temperature(uint32_t temperature, bool wait)
 }
 
 
-void GCodeWriter::set_pa(double pa) {
+void GCodeWriter::set_pressure_advance(double pa) {
     m_current_pressure_advance = pa;
+}
+
+void GCodeWriter::write_pressure_advance(std::ostringstream& gcode) {
+    if (m_current_pressure_advance != m_last_pressure_advance) {
+        m_last_pressure_advance = m_current_pressure_advance;
+        if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy) || FLAVOR_IS(gcfLerdge)) {
+            gcode << "M900 K" << m_current_pressure_advance;
+        } else if (FLAVOR_IS(gcfRepRap)) {
+            gcode << "M572 D" << this->tool()->id() << " S" << m_current_pressure_advance;
+        } else if (FLAVOR_IS(gcfKlipper)) {
+            gcode << "SET_PRESSURE_ADVANCE ADVANCE=" << m_current_pressure_advance;
+        }
+        gcode << "\n";
+
+    }
 }
 
 void GCodeWriter::set_acceleration(uint32_t acceleration)
@@ -299,18 +314,7 @@ std::string GCodeWriter::write_acceleration(){
         if (this->m_config.gcode_comments) gcode << " ; adjust acceleration";
         gcode << "\n";
     }
-    if (m_current_pressure_advance != m_last_pressure_advance) {
-        m_last_pressure_advance = m_current_pressure_advance;
-        if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy) || FLAVOR_IS(gcfLerdge)) {
-            gcode << "M900 K" << m_current_pressure_advance;
-        } else if (FLAVOR_IS(gcfRepRap)) {
-            gcode << "M572 D" << this->tool()->id() << " S" << m_current_pressure_advance;
-        } else if (FLAVOR_IS(gcfKlipper)) {
-            gcode << "SET_PRESSURE_ADVANCE ADVANCE=" << m_current_pressure_advance;
-        }
-        gcode << "\n";
-
-    }
+    write_pressure_advance(gcode);
     return gcode.str();
 }
 
@@ -674,6 +678,9 @@ std::string GCodeWriter::_retract(double length, double restart_extra, double re
     assert(dE >= 0);
     assert(dE < 10000000);
     if (dE != 0) {
+        // write pa if it's set for retraction
+        write_pressure_advance(gcode);
+        //write retract gcode
         if (this->m_config.use_firmware_retraction) {
             if (FLAVOR_IS(gcfMachinekit))
                 gcode << "G22 ; retract\n";
@@ -710,6 +717,9 @@ std::string GCodeWriter::unretract()
     assert(dE >= 0);
     assert(dE < 10000000);
     if (dE != 0) {
+        // write pa if it's set for retraction
+        write_pressure_advance(gcode);
+        //write unretract gcode
         if (this->m_config.use_firmware_retraction) {
             gcode << (FLAVOR_IS(gcfMachinekit) ? "G23 ; unretract\n" : "G11 ; unretract\n");
             gcode << this->reset_e();

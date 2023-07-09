@@ -4367,7 +4367,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("filament_travel_pa", coFloatsOrPercents);
     def->label = L("travel");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for travel sections, may help retraction experimental."
+    def->tooltip = L("Pressure advance for travel sections, may help retraction and unretraction."
             " Can be a % over default pa."
             "\nSet -1 to let the previous pa continue in the travel.");
     def->mode = comExpert | comSuSi;

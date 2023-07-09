@@ -53,7 +53,9 @@ public:
     std::string postamble() const;
     std::string set_temperature(int16_t temperature, bool wait = false, int tool = -1);
     std::string set_bed_temperature(uint32_t temperature, bool wait = false);
-    void        set_pa(double pa);
+    void        set_pressure_advance(double pa);
+    // write the pressure advance if needed on gcode string
+    void        write_pressure_advance(std::ostringstream& gcode);
     void        set_acceleration(uint32_t acceleration);
     void        set_travel_acceleration(uint32_t acceleration);
     uint32_t    get_acceleration() const;
