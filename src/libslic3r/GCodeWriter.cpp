@@ -32,6 +32,10 @@ namespace Slic3r {
 
 std::string GCodeWriter::PausePrintCode = "M601";
 
+void GCodeWriter::reset() {
+    *this = GCodeWriter{};
+}
+
 void GCodeWriter::apply_print_config(const PrintConfig &print_config)
 {
     this->m_config.apply(print_config, true);
@@ -295,7 +299,7 @@ std::string GCodeWriter::write_acceleration(){
         if (this->m_config.gcode_comments) gcode << " ; adjust acceleration";
         gcode << "\n";
     }
-    if (m_current_pressure_advance != m_last_pressure_advance && m_current_pressure_advance != 0) {
+    if (m_current_pressure_advance != m_last_pressure_advance) {
         m_last_pressure_advance = m_current_pressure_advance;
         if (FLAVOR_IS(gcfMarlinFirmware) || FLAVOR_IS(gcfMarlinLegacy) || FLAVOR_IS(gcfLerdge)) {
             gcode << "M900 K" << m_current_pressure_advance;

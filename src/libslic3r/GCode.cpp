@@ -1287,6 +1287,8 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 {
     PROFILE_FUNC();
 
+    // reset gcode writer to clear any leftover from previous run.
+    m_writer.reset();
     //apply print config to m_config and m_writer, so we don't have to use print.config() instead
     // (and mostly to make m_writer.preamble() works)
     this->apply_print_config(print.config());
@@ -5607,6 +5609,12 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
         } else if (this->object_layer_over_raft() && m_config.filament_first_layer_pa_over_raft.get_at(m_writer.tool()->id()).value > 0) {
             pa = m_config.filament_first_layer_pa_over_raft.get_abs_value(m_writer.tool()->id(), pa);
         }
+        if (pa < 0) {
+            pa = 0;
+        }
+    } else {
+        pa = 0;
+        travel_pa = -1;
     }
 
     // compute speed here to be able to know it for travel_deceleration_use_target
@@ -5695,7 +5703,9 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                         }
                         gcode += "; acceleration to travel\n";
                         m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
-                        m_writer.set_pa(travel_pa);
+                        if (travel_pa >= 0) {
+                            m_writer.set_pa(travel_pa);
+                        }
                         this->write_travel_to(gcode, poly_start, "move to first " + description + " point (acceleration)");
                         //travel acceleration should be already set at startup via special gcode, and so it's automatically used by G0.
                         gcode += "; decel to extrusion\n";
@@ -5715,7 +5725,9 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
     } else {
         if (!m_last_pos_defined || m_last_pos != path.first_point()) {
             m_writer.set_travel_acceleration((uint32_t)floor(travel_acceleration + 0.5));
-            m_writer.set_pa(travel_pa);
+            if (travel_pa >= 0) {
+                m_writer.set_pa(travel_pa);
+            }
             Polyline polyline = this->travel_to(gcode, path.first_point(), path.role());
             this->write_travel_to(gcode, polyline, "move to first " + description + " point");
             m_writer.set_acceleration((uint32_t)floor(acceleration + 0.5));

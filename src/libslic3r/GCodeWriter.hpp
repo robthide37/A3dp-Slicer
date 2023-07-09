@@ -24,8 +24,11 @@ public:
         m_single_extruder_multi_material(false),
         m_last_acceleration(0), m_current_acceleration(0), m_current_speed(0),
         m_last_bed_temperature(0), m_last_bed_temperature_reached(true), 
-        m_lifted(0)
+        m_lifted(0),
+        m_current_pressure_advance(0), m_last_pressure_advance(0)
         {}
+    void                reset();
+
     Tool*               tool()             { return m_tool; }
     const Tool*         tool()     const   { return m_tool; }
 

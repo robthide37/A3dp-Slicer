@@ -4175,7 +4175,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("default");
     def->category = OptionCategory::filament;
     def->tooltip = L("Default linear/pressure advance. This is only activated for marlin, klipper and reprap firmware. For the other ones, you have to add it yourself in the gcode."
-        "Note that the meaning of this value differ for each firmware, so if you set it, it means that this profile may be incompatible with some.");
+        "Note that the meaning of this value differ for each firmware, so if you set it, it means that this profile may be incompatible with some."
+        "\nSet 0 to deactivate.");
     def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloats{ 0. });
@@ -4327,11 +4328,13 @@ void PrintConfigDef::init_fff_params()
     def = this->add("filament_travel_pa", coFloatsOrPercents);
     def->label = L("travel");
     def->category = OptionCategory::filament;
-    def->tooltip = L("Pressure advance for travel sections, may help retraction experimental. Can be a % over default pa");
+    def->tooltip = L("Pressure advance for travel sections, may help retraction experimental."
+            " Can be a % over default pa."
+            "\nSet -1 to let the previous pa continue in the travel.");
     def->mode = comExpert | comSuSi;
     def->ratio_over = "filament_default_pa";
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{100,true} });
+    def->set_default_value(new ConfigOptionFloatsOrPercents{ FloatOrPercent{-1,false} });
 
     def = this->add("raft_contact_distance", coFloat);
     def->label = L("Raft contact Z distance");
