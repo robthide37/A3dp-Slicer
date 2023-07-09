@@ -17,12 +17,12 @@ jobs:
     - name: build deps & slicer
       run: ./BuildMacOS.sh -i
     - name: Upload artifact
-      uses: actions/upload-artifact@v1.0.0
+      uses: actions/upload-artifact@v3
       with:
         name: rc_macos.tar
-        path: build/Slic3r.tar
+        path: build/${{ github.event.repository.name }}.tar
     - name: Upload artifact
-      uses: actions/upload-artifact@v1.0.0
+      uses: actions/upload-artifact@v3
       with:
         name: rc_macos.dmg
-        path: build/Slic3r.dmg
+        path: build/${{ github.event.repository.name }}.dmg
