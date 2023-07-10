@@ -1303,7 +1303,7 @@ indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes conn
     }
 
     if (connector_attributes.type == CutConnectorType::Rivet)
-        connector_mesh = its_make_rivet(1.0, 1.0, (2 * PI / /*sectorCount*/10));
+        connector_mesh = its_make_rivet(1.0, 1.0);
     else if (connector_attributes.style == CutConnectorStyle::Prism)
         connector_mesh = its_make_cylinder(1.0, 1.0, (2 * PI / sectorCount));
     else if (connector_attributes.type == CutConnectorType::Plug)
@@ -1415,7 +1415,8 @@ void ModelVolume::apply_tolerance()
         rot_norm.normalize();
 
     double z_offset = 0.5 * static_cast<double>(cut_info.height_tolerance);
-    if (cut_info.connector_type == CutConnectorType::Plug)
+    if (cut_info.connector_type == CutConnectorType::Plug || 
+        cut_info.connector_type == CutConnectorType::Rivet)
         z_offset -= 0.05; // add small Z offset to better preview
 
     set_offset(get_offset() + rot_norm * z_offset);
@@ -1452,7 +1453,20 @@ void ModelObject::process_connector_cut(ModelVolume* volume, const Transform3d& 
     // This transformation is already there
     if (volume->cut_info.connector_type != CutConnectorType::Dowel) {
         if (attributes.has(ModelObjectCutAttribute::KeepUpper)) {
-            ModelVolume* vol = upper->add_volume(*volume);
+            ModelVolume* vol = nullptr;
+            if (volume->cut_info.connector_type == CutConnectorType::Rivet) {
+                TriangleMesh mesh = TriangleMesh(its_make_cylinder(1.0, 1.0, PI / 180.));
+
+                vol = upper->add_volume(std::move(mesh));
+                vol->set_transformation(volume->get_transformation());
+                vol->set_type(ModelVolumeType::NEGATIVE_VOLUME);
+
+                vol->cut_info = volume->cut_info;
+                vol->name = volume->name;
+            }
+            else
+                vol = upper->add_volume(*volume);
+
             vol->set_transformation(volume_matrix);
             vol->apply_tolerance();
         }
