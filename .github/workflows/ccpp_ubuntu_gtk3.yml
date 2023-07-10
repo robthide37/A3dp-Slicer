@@ -8,10 +8,14 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
 
     steps:
     - uses: actions/checkout@v3
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v1.13
+      with:
+        cmake-version: '3.16.x'
     - name: update submodule profiles
       working-directory: ./resources/profiles
       run: git submodule update --init

@@ -66,6 +66,7 @@ then
     echo -n -e "Updating linux ...\n"
     hwclock -s
     apt update
+	apt install g++ m4
     if [[ -z "$FOUND_GTK3" ]]
     then
         echo -e "\nInstalling: libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
