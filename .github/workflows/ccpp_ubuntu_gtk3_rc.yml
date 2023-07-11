@@ -30,7 +30,7 @@ jobs:
     - name: update apt
       run: sudo apt update
     - name: install gtk3 glew
-      run: sudo apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev
+      run: sudo apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev gettext
     - name: build deps & slicer
       run: ./BuildLinux.sh -ds
     - name: make .pot
