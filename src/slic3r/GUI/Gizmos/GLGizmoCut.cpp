@@ -523,7 +523,7 @@ bool GLGizmoCut3D::render_double_input(const std::string& label, double& value_i
     return !is_approx(old_val, value);
 }
 
-bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in)
+bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in, float max_val/* = -0.1f*/, float max_tolerance/* = -0.1f*/)
 {
     constexpr float UndefMinVal = -0.1f;
     const float f_mm_to_in = static_cast<float>(ObjectManipulation::mm_to_in);
@@ -547,18 +547,22 @@ bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& v
 
     const BoundingBoxf3 bbox = m_bounding_box;
     const float mean_size = float((bbox.size().x() + bbox.size().y() + bbox.size().z()) / 9.0) * (m_imperial_units ? f_mm_to_in : 1.f);
+    const float max_v = max_val > 0.f ? /*std::min(max_val, mean_size)*/max_val : mean_size;
 
     ImGuiWrapper::text(label);
 
     ImGui::SameLine(m_label_width);
     ImGui::PushItemWidth(m_control_width * 0.7f);
 
-    const bool is_value_changed = render_slider("##" + label, value_in, 1.f, mean_size, _L("Value"));
+//    const bool is_value_changed = render_slider("##" + label, value_in, 1.f, mean_size, _L("Value"));
+    const bool is_value_changed = render_slider("##" + label, value_in, 1.f, max_v, _L("Value"));
     
     ImGui::SameLine();
     ImGui::PushItemWidth(m_control_width * 0.45f);
 
-    const bool is_tolerance_changed = render_slider("##tolerance_" + label, tolerance_in, 0.f, 0.5f * mean_size, _L("Tolerance"));
+//    const bool is_tolerance_changed = render_slider("##tolerance_" + label, tolerance_in, 0.f, 0.5f * mean_size, _L("Tolerance"));
+    const float max_tolerance_v = max_tolerance > 0.f ? std::min(max_tolerance, 0.5f * mean_size) : 0.5f *  mean_size;
+    const bool is_tolerance_changed = render_slider("##tolerance_" + label, tolerance_in, 0.f, max_tolerance_v, _L("Tolerance"));
 
     return is_value_changed || is_tolerance_changed;
 }
@@ -1490,7 +1494,7 @@ void GLGizmoCut3D::update_bb()
         // input params for cut with tongue and groove
         m_groove_depth = m_groove_depth_init = 0.5f * float(get_grabber_mean_size(m_bounding_box));
         m_groove_width = m_groove_width_init = 4.0f * m_groove_depth;
-        m_groove_angle = m_groove_angle_init = 0.25f * float(PI);
+        m_groove_angle = m_groove_angle_init = float(PI) / 3.f;// 0.25f * float(PI);
 
         m_plane.reset();
         m_cone.reset();
@@ -2201,7 +2205,7 @@ void GLGizmoCut3D::render_groove_input(const std::string& label, float& in_val, 
             is_changed = true;
         }
     }
-    else if (render_slider_double_input(label, in_val, in_tolerance))
+    else if (render_slider_double_input(label, in_val, in_tolerance, -0.1f, 2.0))
         is_changed = true;
 
     ImGui::SameLine();

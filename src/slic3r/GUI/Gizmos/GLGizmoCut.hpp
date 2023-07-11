@@ -323,7 +323,7 @@ private:
     bool render_cut_mode_combo();
     bool render_combo(const std::string&label, const std::vector<std::string>&lines, int&selection_idx);
     bool render_double_input(const std::string& label, double& value_in);
-    bool render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in);
+    bool render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in, float max_val = -0.1f, float max_tolerance = -0.1f);
     void render_move_center_input(int axis);
     void render_connect_mode_radio_button(CutConnectorMode mode);
     bool render_reset_button(const std::string& label_id, const std::string& tooltip) const;
