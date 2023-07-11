@@ -480,6 +480,7 @@ bool GLGizmoCut3D::render_cut_mode_combo()
 
     if (is_changed) {
         m_mode = size_t(selection_idx);
+        update_raycasters_for_picking();
 
         apply_color_clip_plane_colors();
         if (auto oc = m_c->object_clipper()) {
@@ -2205,7 +2206,7 @@ void GLGizmoCut3D::render_groove_input(const std::string& label, float& in_val, 
             is_changed = true;
         }
     }
-    else if (render_slider_double_input(label, in_val, in_tolerance, -0.1f, 2.0))
+    else if (render_slider_double_input(label, in_val, in_tolerance, -0.1f, std::min(0.3f*in_val, 1.5f)))
         is_changed = true;
 
     ImGui::SameLine();

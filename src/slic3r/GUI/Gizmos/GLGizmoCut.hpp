@@ -125,7 +125,7 @@ class GLGizmoCut3D : public GLGizmoBase
     float m_groove_angle_init;
     float m_groove_depth_tolerance{ 0.1f };
     float m_groove_width_tolerance{ 0.1f };
-    bool  m_optimaze_groove_rendering{ false };
+    bool  m_optimaze_groove_rendering{ true };
 
     bool m_hide_cut_plane{ false };
     bool m_connectors_editing{ false };
