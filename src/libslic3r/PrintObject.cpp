@@ -813,6 +813,8 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "overhangs_width"
                 || opt_key == "overhangs_reverse"
                 || opt_key == "overhangs_reverse_threshold"
+                || opt_key == "overhangs_speed_enforce"
+                || opt_key == "perimeter_extrusion_change_odd_layers"
                 || opt_key == "perimeter_extrusion_spacing"
                 || opt_key == "perimeter_extrusion_width"
                 || opt_key == "infill_overlap"
@@ -824,6 +826,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "external_perimeters_first"
                 || opt_key == "external_perimeters_hole"
                 || opt_key == "external_perimeters_nothole"
+                || opt_key == "external_perimeter_extrusion_change_odd_layers"
                 || opt_key == "external_perimeter_extrusion_spacing"
                 || opt_key == "external_perimeter_extrusion_width"
                 || opt_key == "external_perimeters_vase"
@@ -931,6 +934,7 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "ensure_vertical_shell_thickness"
                 || opt_key == "interface_shells"
                 || opt_key == "infill_extruder"
+                || opt_key == "infill_extrusion_change_odd_layers"
                 || opt_key == "infill_extrusion_spacing"
                 || opt_key == "infill_extrusion_width"
                 || opt_key == "infill_every_layers"
@@ -1003,11 +1007,14 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "filament_max_overlap"
                 || opt_key == "perimeters"
                 || opt_key == "perimeter_overlap"
+                || opt_key == "solid_infill_extrusion_change_odd_layers"
                 || opt_key == "solid_infill_extrusion_spacing"
                 || opt_key == "solid_infill_extrusion_width") {
                 steps.emplace_back(posPerimeters);
                 steps.emplace_back(posPrepareInfill);
-        } else if (opt_key == "solid_infill_extrusion_width") {
+        } else if (opt_key == "solid_infill_extrusion_change_odd_layers"
+            || opt_key == "solid_infill_extrusion_spacing"
+            || opt_key == "solid_infill_extrusion_width") {
             // This value is used for calculating perimeter - infill overlap, thus perimeters need to be recalculated.
             steps.emplace_back(posPerimeters);
             steps.emplace_back(posPrepareInfill);
@@ -1049,7 +1056,6 @@ bool PrintObject::invalidate_state_by_config_options(
                 || opt_key == "gap_fill_speed"
                 || opt_key == "infill_speed"
                 || opt_key == "overhangs_speed"
-                || opt_key == "overhangs_speed_enforce"
                 || opt_key == "perimeter_speed"
                 || opt_key == "seam_position"
                 || opt_key == "seam_preferred_direction"

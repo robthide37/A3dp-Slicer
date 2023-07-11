@@ -28,6 +28,7 @@ extern coordf_t check_z_step(const coordf_t val,const coordf_t z_step);
 // Parameters to guide object slicing and support generation.
 // The slicing parameters account for a raft and whether the 1st object layer is printed with a normal or a bridging flow
 // (using a normal flow over a soluble support, using a bridging flow over a non-soluble support).
+//TOSO: only use coordf_t for scaled coordinates.
 struct SlicingParameters
 {
     SlicingParameters() = default;
@@ -65,7 +66,7 @@ struct SlicingParameters
 	// or by the variable layer thickness table.
     coordf_t    layer_height { 0 };
     // Minimum / maximum layer height, to be used for the automatic adaptive layer height algorithm,
-    // or by an interactive layer height editor.
+    // or by an interactive layer height editor. (unscaled)
     coordf_t    min_layer_height { 0 };
     coordf_t    max_layer_height { 0 };
     coordf_t    max_suport_layer_height { 0 };
@@ -143,9 +144,19 @@ extern std::vector<coordf_t> layer_height_profile_from_ranges(
     const SlicingParameters     &slicing_params,
     const t_layer_config_ranges &layer_config_ranges);
 
+struct HeightProfileAdaptiveParams
+{
+    float adaptive_quality;
+    float min_adaptive_layer_height;
+    float max_adaptive_layer_height;
+
+    HeightProfileAdaptiveParams() : adaptive_quality(0.5f), min_adaptive_layer_height(-1.f), max_adaptive_layer_height(-1.f) {} // -1 -> not initialized
+    HeightProfileAdaptiveParams(float adaptive_quality, float min_adaptive_layer_height, float max_adaptive_layer_height) : adaptive_quality(adaptive_quality), max_adaptive_layer_height(max_adaptive_layer_height), min_adaptive_layer_height(min_adaptive_layer_height) {}
+};
+
 extern std::vector<double> layer_height_profile_adaptive(
     const SlicingParameters& slicing_params,
-    const ModelObject& object, float quality_factor);
+    const ModelObject& object, const HeightProfileAdaptiveParams& adaptative_params);
 
 struct HeightProfileSmoothingParams
 {

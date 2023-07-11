@@ -2415,7 +2415,7 @@ static void fuzzy_paths(ExtrusionPaths& paths, coordf_t fuzzy_skin_thickness, co
 }
 
 ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
-    const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls, int count_since_overhang /*= 0*/) const
+    const PerimeterGeneratorLoops &loops, ThickPolylines &thin_walls, int count_since_overhang /*= -1*/) const
 {
     // loops is an arrayref of ::Loop objects
     // turn each one into an ExtrusionLoop object
@@ -2532,7 +2532,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
                         break;
                     }
                 }
-                if (has_overhang || this->config->overhangs_speed_enforce.value > count_since_overhang) {
+                if (has_overhang || ( count_since_overhang>=0 && this->config->overhangs_speed_enforce.value > count_since_overhang)) {
                     //enforce
                     for (ExtrusionPath& path : eloop->paths) {
                         if (path.role() == erPerimeter || path.role() == erExternalPerimeter) {
@@ -2543,7 +2543,7 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_loops(
 
             }
             assert(thin_walls.empty());
-            ExtrusionEntityCollection children = this->_traverse_loops(loop.children, thin_walls, has_overhang ? 1 : (count_since_overhang+1));
+            ExtrusionEntityCollection children = this->_traverse_loops(loop.children, thin_walls, has_overhang ? 1 : count_since_overhang < 0 ? -1 : (count_since_overhang+1));
             coll_out.set_entities().reserve(coll_out.entities().size() + children.entities().size() + 1);
             coll[idx.first] = nullptr;
             if (loop.is_contour) {
@@ -2667,6 +2667,25 @@ ExtrusionEntityCollection PerimeterGenerator::_traverse_extrusions(std::vector<P
             double fuzzy_skin_thickness = config->fuzzy_skin_thickness.get_abs_value(nozle_diameter);
             double fuzzy_skin_point_dist = config->fuzzy_skin_point_dist.get_abs_value(nozle_diameter);
            fuzzy_paths(paths, scale_d(fuzzy_skin_thickness), scale_d(fuzzy_skin_point_dist));
+        }
+
+        //set to overhang speed if any chunk is overhang
+        bool has_overhang = false;
+        if (this->config->overhangs_speed_enforce.value > 0) {
+            for (const ExtrusionPath& path : paths) {
+                if (path.role() == erOverhangPerimeter) {
+                    has_overhang = true;
+                    break;
+                }
+            }
+            if (has_overhang) {
+                //enforce
+                for (ExtrusionPath& path : paths) {
+                    if (path.role() == erPerimeter || path.role() == erExternalPerimeter) {
+                        path.set_role(erOverhangPerimeter);
+                    }
+                }
+            }
         }
 
         // Append paths to collection.

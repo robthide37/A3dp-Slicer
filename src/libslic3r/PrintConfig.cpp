@@ -1065,6 +1065,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comSimpleAE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
 
+    def = this->add("parallel_objects_step", coFloat);
+    def->label = L("Parallel printing step");
+    def->category = OptionCategory::output;
+    def->tooltip = L("When multiple objects are present, instead of jumping form one to another at each layer"
+        " the printer will continue to print the current object layers up to this height before moving to the next object."
+        " (first layers will be still printed one by one)."
+        "\nThis feature also use the same extruder clearance radius field as 'complete individual objects' (complete_objects)"
+        ", but you can modify them to instead reflect the clerance of the nozzle, if this field reflect the z-clearance of it."
+        "\nThis field is exclusive with 'complete individual objects' (complete_objects). Set to 0 to deactivate.");
+    def->sidetext = L("mm");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(0));
+
     def = this->add("complete_objects_one_skirt", coBool);
     def->label = L("Allow only one skirt loop");
     def->category = OptionCategory::output;
@@ -1481,6 +1494,19 @@ void PrintConfigDef::init_fff_params()
     def->can_phony = true;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false, true));
+
+    def = this->add("external_perimeter_extrusion_change_odd_layers", coFloatOrPercent);
+    def->label = L("External perimeters");
+    def->full_label = L("External perimeters spacing change on odd layers");
+    def->category = OptionCategory::width;
+    def->tooltip = L("Change width on every odd layer for better overlap with adjacent layers and getting stringer shells. "
+                     "Try values about +/- 0.1 with different sign for external and internal perimeters."
+                     "\nThis could be combined with extra permeters on odd layers."
+                     "\nWorks as absolute spacing or a % of the spacing."
+                     "\nset 0 to disable");
+    def->sidetext = L("mm or %");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(false, 0));
 
     def = this->add("external_perimeter_cut_corners", coPercent);
     def->label = L("Cutting corners");
@@ -3052,6 +3078,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false, true));
 
+    def = this->add("infill_extrusion_change_odd_layers", coFloatOrPercent);
+    def->label = L("Infill");
+    def->full_label = L("Infill spacing change on odd layers");
+    def->category = OptionCategory::width;
+    def->tooltip = L("Change width on every odd layer for better overlap with adjacent layers and getting stringer shells. "
+                     "Try values about +/- 0.1 with different sign."
+                     "\nThis could be combined with extra permeters on odd layers."
+                     "\nWorks as absolute spacing or a % of the spacing."
+                     "\nset 0 to disable");
+    def->sidetext = L("mm of %");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(false, 0));
+
     def = this->add("infill_extrusion_spacing", coFloatOrPercent);
     def->label = L("Infill");
     def->full_label = L("Infill spacing");
@@ -3828,8 +3867,8 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::speed;
     def->tooltip = L("Set the speed of the full perimeters to the overhang speed, and also the next one(s) if any."
                 "\nSet to 0 to disable."
-                "\nSet to 1 to set the overhang speed to the full periemter if there is any overhang detected in the periemter."
-                "\nSet to more than 1 to also set the overhang speed to the next perimeter(s)."
+                "\nSet to 1 to set the overhang speed to the full perimeter if there is any overhang detected inside it."
+                "\nSet to more than 1 to also set the overhang speed to the next perimeter(s) (only in classic mode)."
                 );
     def->sidetext = L("perimeters");
     def->min = 0;
@@ -4000,6 +4039,19 @@ void PrintConfigDef::init_fff_params()
     def->can_phony = true;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(100, true, false));
+
+    def = this->add("perimeter_extrusion_change_odd_layers", coFloatOrPercent);
+    def->label = L("Perimeters");
+    def->full_label = L("Perimeters spacing change on odd layers");
+    def->category = OptionCategory::width;
+    def->tooltip = L("Change width on every odd layer for better overlap with adjacent layers and getting stringer shells. "
+                     "Try values about +/- 0.1 with different sign for external and internal perimeters."
+                     "\nThis could be combined with extra permeters on odd layers."
+                     "\nWorks as absolute spacing or a % of the spacing."
+                     "\nset 0 to disable");
+    def->sidetext = L("mm or %");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(false, 0));
 
     def = this->add("perimeter_loop", coBool);
     def->label = L("Perimeters loop");
@@ -4779,6 +4831,19 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false, true));
 
+    def = this->add("solid_infill_extrusion_change_odd_layers", coFloatOrPercent);
+    def->label = L("Infill");
+    def->full_label = L("Solid infill spacing change on odd layers");
+    def->category = OptionCategory::width;
+    def->tooltip = L("Change width on every odd layer for better overlap with adjacent layers and getting stringer shells. "
+        "Try values about +/- 0.1 with different sign."
+        "\nThis could be combined with extra permeters on odd layers."
+        "\nWorks as absolute spacing or a % of the spacing."
+        "\nset 0 to disable");
+    def->sidetext = L("mm or %");
+    def->mode = comExpert | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(false, 0));
+
     def = this->add("solid_infill_extrusion_spacing", coFloatOrPercent);
     def->label = L("Solid spacing");
     def->full_label = L("Solid infill spacing");
@@ -5532,7 +5597,6 @@ void PrintConfigDef::init_fff_params()
     def->min = 0;
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(100, true));
-
     def = this->add("threads", coInt);
     def->label = L("Threads");
     def->tooltip = L("Threads are used to parallelize long-running tasks. Optimal threads number "
@@ -5848,6 +5912,26 @@ void PrintConfigDef::init_fff_params()
                    "Extrude the excess material into the wipe tower.");
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("wipe_tower_speed", coFloat);
+    def->label = L("Wipe Tower Speed");
+    def->category = OptionCategory::speed;
+    def->tooltip = L("Printing speed of the wipe tower. Capped by filament_max_volumetric_speed (if set)."
+        "\nIf set to zero, a value of 80mm/s is used.");
+    def->sidetext = L("mm/s");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(80.));
+
+    def = this->add("wipe_tower_wipe_starting_speed", coFloatOrPercent);
+    def->label = L("Wipe tower starting speed");
+    def->category = OptionCategory::speed;
+    def->tooltip = L("Start of the wiping speed ramp up (for wipe tower)."
+        "\nCan be a % of the 'Wipe tower speed'."
+        "\nSet to 0 to disable.");
+    def->sidetext = L("mm/s or %");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloatOrPercent(33, true));
+
 
     def = this->add("wiping_volumes_extruders", coFloats);
     def->label = L("Purging volumes - load/unload volumes");
@@ -7966,7 +8050,7 @@ double min_object_distance(const ConfigBase *config, double ref_height /* = 0*/)
     double base_dist = 0;
     //std::cout << "START min_object_distance =>" << base_dist << "\n";
     const ConfigOptionBool* co_opt = config->option<ConfigOptionBool>("complete_objects");
-    if (co_opt && co_opt->value) {
+    if (config->option("parallel_objects_step")->getFloat() > 0 || co_opt && co_opt->value) {
         double skirt_dist = 0;
         try {
             std::vector<double> vals = dynamic_cast<const ConfigOptionFloats*>(config->option("nozzle_diameter"))->values;
@@ -8070,7 +8154,7 @@ void DynamicPrintConfig::normalize_fdm()
         {
             this->opt<ConfigOptionInt>("top_solid_layers", true)->value = 0;
             this->opt<ConfigOptionPercent>("fill_density", true)->value = 0;
-            this->opt<ConfigOptionEnum<PerimeterGeneratorType>>("perimeter_generator", true)->value = PerimeterGeneratorType::Classic; 
+            this->opt<ConfigOptionEnumGeneric>("perimeter_generator", true)->value = (int)PerimeterGeneratorType::Classic;
             this->opt<ConfigOptionBool>("support_material", true)->value = false;
             this->opt<ConfigOptionInt>("solid_over_perimeters")->value = 0;
             this->opt<ConfigOptionInt>("support_material_enforce_layers")->value = 0;

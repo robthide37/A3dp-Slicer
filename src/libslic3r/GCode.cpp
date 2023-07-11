@@ -1405,16 +1405,16 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     const double       first_layer_height   = print.get_first_layer_height();
     for (size_t region_id = 0; region_id < print.num_print_regions(); ++ region_id) {
         const PrintRegion &region = print.get_print_region(region_id);
-        file.write_format("; external perimeters extrusion width = %.2fmm\n", region.flow(*first_object, frExternalPerimeter, layer_height).width());
-        file.write_format("; perimeters extrusion width = %.2fmm\n",          region.flow(*first_object, frPerimeter,         layer_height).width());
-        file.write_format("; infill extrusion width = %.2fmm\n",              region.flow(*first_object, frInfill,            layer_height).width());
-        file.write_format("; solid infill extrusion width = %.2fmm\n",        region.flow(*first_object, frSolidInfill,       layer_height).width());
-        file.write_format("; top infill extrusion width = %.2fmm\n",          region.flow(*first_object, frTopSolidInfill,    layer_height).width());
+        file.write_format("; external perimeters extrusion width = %.2fmm\n", region.flow(*first_object, frExternalPerimeter, layer_height, 0).width());
+        file.write_format("; perimeters extrusion width = %.2fmm\n",          region.flow(*first_object, frPerimeter,         layer_height, 0).width());
+        file.write_format("; infill extrusion width = %.2fmm\n",              region.flow(*first_object, frInfill,            layer_height, 0).width());
+        file.write_format("; solid infill extrusion width = %.2fmm\n",        region.flow(*first_object, frSolidInfill,       layer_height, 0).width());
+        file.write_format("; top infill extrusion width = %.2fmm\n",          region.flow(*first_object, frTopSolidInfill,    layer_height, 0).width());
 //TODO add others
         if (print.has_support_material())
             file.write_format("; support material extrusion width = %.2fmm\n", support_material_flow(first_object).width());
         if (first_object->config().first_layer_extrusion_width.value > 0)
-            file.write_format("; first layer extrusion width = %.2fmm\n",   region.flow(*first_object, frPerimeter, first_layer_height, true).width());
+            file.write_format("; first layer extrusion width = %.2fmm\n",   region.flow(*first_object, frPerimeter, first_layer_height, 0).width());
         file.write_format("\n");
     }
     BoundingBoxf3 global_bounding_box;
@@ -1806,12 +1806,12 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         this->_print_first_layer_bed_temperature(file, print, start_all_gcode, initial_extruder_id, true);
 
     // Do all objects for each layer.
-    if (initial_extruder_id != (uint16_t)-1)
+    if (initial_extruder_id != (uint16_t)-1) {
         if (print.config().complete_objects.value) {
             size_t finished_objects = 0;
-            const PrintObject *prev_object = (*print_object_instance_sequential_active)->print_object;
-            for (; print_object_instance_sequential_active != print_object_instances_ordering.end(); ++ print_object_instance_sequential_active) {
-                const PrintObject &object = *(*print_object_instance_sequential_active)->print_object;
+            const PrintObject* prev_object = (*print_object_instance_sequential_active)->print_object;
+            for (; print_object_instance_sequential_active != print_object_instances_ordering.end(); ++print_object_instance_sequential_active) {
+                const PrintObject& object = *(*print_object_instance_sequential_active)->print_object;
                 if (&object != prev_object || tool_ordering.first_extruder() != final_extruder_id) {
                     tool_ordering = ToolOrdering(object, final_extruder_id);
                     uint16_t new_extruder_id = tool_ordering.first_extruder();
@@ -1819,7 +1819,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
                         // Skip this object.
                         continue;
                     initial_extruder_id = new_extruder_id;
-                    final_extruder_id   = tool_ordering.last_extruder();
+                    final_extruder_id = tool_ordering.last_extruder();
                     assert(final_extruder_id != (uint16_t)-1);
                 }
                 print.throw_if_canceled();
@@ -1860,7 +1860,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
                 // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
                 // and export G-code into file.
                 this->process_layers(print, print.m_print_statistics, tool_ordering, collect_layers_to_print(object), *print_object_instance_sequential_active - object.instances().data(), file);
-                ++ finished_objects;
+                ++finished_objects;
                 // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
                 // Reset it when starting another object from 1st layer.
                 m_second_layer_things_done = false;
@@ -1868,60 +1868,120 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
             }
             set_extra_lift(m_last_layer_z, prev_object->layers().back()->id(), print.config(), m_writer, initial_extruder_id /* osef, it's only for the lift_min */);
         } else {
-            // Sort layers by Z.
-            // All extrusion moves with the same top layer height are extruded uninterrupted.
-            std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> layers_to_print = collect_layers_to_print(print);
-            // Prusa Multi-Material wipe tower.
-            if (has_wipe_tower && ! layers_to_print.empty()) {
-                m_wipe_tower.reset(new WipeTowerIntegration(print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get()));
-                file.write(m_writer.travel_to_z(first_layer_height + m_config.z_offset.value, "Move to the first layer height"));
-                if (print.config().single_extruder_multi_material_priming) {
-                    file.write(m_wipe_tower->prime(*this));
-                    // Verify, whether the print overaps the priming extrusions.
-                    BoundingBoxf bbox_print(get_print_extrusions_extents(print));
-                    coordf_t twolayers_printz = ((layers_to_print.size() == 1) ? layers_to_print.front() : layers_to_print[1]).first + EPSILON;
-                    for (const PrintObject *print_object : print.objects())
-                        bbox_print.merge(get_print_object_extrusions_extents(*print_object, twolayers_printz));
-                    bbox_print.merge(get_wipe_tower_extrusions_extents(print, twolayers_printz));
-                    BoundingBoxf bbox_prime(get_wipe_tower_priming_extrusions_extents(print));
-                    bbox_prime.offset(0.5f);
-                    bool overlap = bbox_prime.overlap(bbox_print);
+            /////////////////////////////////////////////// begin parallel_objects_step
+            if (print.config().parallel_objects_step > 0 && !has_wipe_tower) {
 
-                    if (print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware) {
-                        file.write(this->retract());
-                        file.write("M300 S800 P500\n"); // Beep for 500ms, tone 800Hz.
-                        if (overlap) {
-                            // Wait for the user to remove the priming extrusions.
-                            file.write("M1 Remove priming towers and click button.\n");
-                        } else {
-                            // Just wait for a bit to let the user check, that the priming succeeded.
-                            //TODO Add a message explaining what the printer is waiting for. This needs a firmware fix.
-                            file.write("M1 S10\n");
-                        }
-                    } else {
-                        // This is not Marlin, M1 command is probably not supported.
-                        // (See https://github.com/prusa3d/PrusaSlicer/issues/5441.)
-                        if (overlap) {
-                            print.active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
-                                _(L("Your print is very close to the priming regions. "
-                                  "Make sure there is no collision.")));
-                        } else {
-                            // Just continue printing, no action necessary.
+                float range = print.config().parallel_objects_step + EPSILON;
+                print_object_instances_ordering = sort_object_instances_by_model_order(print);
+                std::vector<const PrintInstance*>::const_iterator prev_object = print_object_instances_ordering.begin();
+
+                bool first_layer = true;
+            proceed_layers:
+
+                for (coordf_t Rstart = 0, Rend = range;; Rstart += range, Rend += range) {
+                    bool is_layers = false;
+                    print_object_instance_sequential_active = print_object_instances_ordering.begin();
+
+                    for (size_t i = 0; i < print.objects().size(); ++i, ++print_object_instance_sequential_active) {
+                        std::vector<LayerToPrint> object_layers = collect_layers_to_print(*print.objects()[i]);
+                        std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> layers_to_print_range;
+
+                        int layer_num = 0;
+                        for (const LayerToPrint& ltp : object_layers) {
+                            layer_num++;
+                            if (!first_layer && layer_num == 1)
+                                continue;
+
+                            if (ltp.print_z() >= Rstart && ltp.print_z() < Rend) {
+                                std::pair<coordf_t, std::vector<LayerToPrint>> merged;
+                                merged.first = ltp.print_z();
+                                merged.second.emplace_back(ltp);
+                                layers_to_print_range.emplace_back(merged);
+                                if (first_layer)
+                                    break;
+                            }
                         }
 
+                        if (!layers_to_print_range.empty())
+                        {
+                            if (print_object_instance_sequential_active != prev_object) {
+                                this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
+                                std::string gcode;
+                                //go to origin of the next object (it's 0,0 because we shifted the origin to it)
+                                Polyline polyline = this->travel_to(gcode, Point(0, 0), erNone);
+                                this->write_travel_to(gcode, polyline, "move to origin position for next object");
+                                file.write(gcode);
+                            }
+                            this->process_layers(print, print.m_print_statistics, tool_ordering, print_object_instances_ordering, layers_to_print_range, file);
+                            prev_object = print_object_instance_sequential_active;
+                            is_layers = true;
+                        }
+                    }
+                    if (first_layer) {
+                        first_layer = false;
+                        goto proceed_layers;
+                    }
+                    if (!is_layers) {
+                        break;
                     }
                 }
-                print.throw_if_canceled();
-            }
-            // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
-            // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
-            // and export G-code into file.
-            this->process_layers(print, print.m_print_statistics, tool_ordering, print_object_instances_ordering, layers_to_print, file);
-            if (m_wipe_tower)
-                // Purge the extruder, pull out the active filament.
-                file.write(m_wipe_tower->finalize(*this));
-        }
+                /////////////////////////////////////////////// end parallel_objects_step
+            } else {
+                // Sort layers by Z.
+                // All extrusion moves with the same top layer height are extruded uninterrupted.
+                std::vector<std::pair<coordf_t, std::vector<LayerToPrint>>> layers_to_print = collect_layers_to_print(print);
+                // Prusa Multi-Material wipe tower.
+                if (has_wipe_tower && !layers_to_print.empty()) {
+                    m_wipe_tower.reset(new WipeTowerIntegration(print.config(), *print.wipe_tower_data().priming.get(), print.wipe_tower_data().tool_changes, *print.wipe_tower_data().final_purge.get()));
+                    file.write(m_writer.travel_to_z(first_layer_height + m_config.z_offset.value, "Move to the first layer height"));
+                    if (print.config().single_extruder_multi_material_priming) {
+                        file.write(m_wipe_tower->prime(*this));
+                        // Verify, whether the print overaps the priming extrusions.
+                        BoundingBoxf bbox_print(get_print_extrusions_extents(print));
+                        coordf_t twolayers_printz = ((layers_to_print.size() == 1) ? layers_to_print.front() : layers_to_print[1]).first + EPSILON;
+                        for (const PrintObject* print_object : print.objects())
+                            bbox_print.merge(get_print_object_extrusions_extents(*print_object, twolayers_printz));
+                        bbox_print.merge(get_wipe_tower_extrusions_extents(print, twolayers_printz));
+                        BoundingBoxf bbox_prime(get_wipe_tower_priming_extrusions_extents(print));
+                        bbox_prime.offset(0.5f);
+                        bool overlap = bbox_prime.overlap(bbox_print);
 
+                        if (print.config().gcode_flavor.value == gcfMarlinLegacy || print.config().gcode_flavor.value == gcfMarlinFirmware) {
+                            file.write(this->retract());
+                            file.write("M300 S800 P500\n"); // Beep for 500ms, tone 800Hz.
+                            if (overlap) {
+                                // Wait for the user to remove the priming extrusions.
+                                file.write("M1 Remove priming towers and click button.\n");
+                            } else {
+                                // Just wait for a bit to let the user check, that the priming succeeded.
+                                //TODO Add a message explaining what the printer is waiting for. This needs a firmware fix.
+                                file.write("M1 S10\n");
+                            }
+                        } else {
+                            // This is not Marlin, M1 command is probably not supported.
+                            // (See https://github.com/prusa3d/PrusaSlicer/issues/5441.)
+                            if (overlap) {
+                                print.active_step_add_warning(PrintStateBase::WarningLevel::CRITICAL,
+                                    _(L("Your print is very close to the priming regions. "
+                                        "Make sure there is no collision.")));
+                            } else {
+                                // Just continue printing, no action necessary.
+                            }
+
+                        }
+                    }
+                    print.throw_if_canceled();
+                }
+                // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
+                // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
+                // and export G-code into file.
+                this->process_layers(print, print.m_print_statistics, tool_ordering, print_object_instances_ordering, layers_to_print, file);
+                if (m_wipe_tower)
+                    // Purge the extruder, pull out the active filament.
+                    file.write(m_wipe_tower->finalize(*this));
+            }
+        }
+    }
     // Write end commands to file.
     file.write(this->retract());
     //if needed, write the gcode_label_objects_end
@@ -4276,7 +4336,7 @@ std::string GCode::extrude_loop(const ExtrusionLoop &original_loop, const std::s
     ExtrusionPaths& building_paths = loop_to_seam.paths;
     //direction is now set, make the path unreversable
     for (ExtrusionPath& path : building_paths) {
-        assert(!path.can_reverse() || path.role() == erGapFill);
+        //assert(!path.can_reverse() || !is_perimeter(path.role())); //just ensure the perimeter have their direction enforced.
         path.set_can_reverse(false);
     }
     if (m_enable_loop_clipping && m_writer.tool_is_extruder()) {
@@ -5221,7 +5281,7 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
             double max_ratio = m_config.gap_fill_flow_match_perimeter.get_abs_value(1.);
             if (max_ratio > 0 && m_region) {
                 //compute intended perimeter flow
-                Flow fl = m_region->flow(*m_layer->object(), FlowRole::frPerimeter, m_layer->height, m_layer->id() == 0);
+                Flow fl = m_region->flow(*m_layer->object(), FlowRole::frPerimeter, m_layer->height, m_layer->id());
                 double max_vol_speed = fl.mm3_per_mm() * max_ratio * m_config.get_computed_value("perimeter_speed");
                 double current_vol_speed = path.mm3_per_mm * speed;
                 if (max_vol_speed < current_vol_speed) {
@@ -5813,7 +5873,8 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
 
 void GCode::write_travel_to(std::string &gcode, const Polyline& travel, std::string comment)
 {
-    if (travel.size() > 4) {
+    if (travel.size() > 4)
+    {
         //ensure that you won't overload the firmware.
         // travel are  strait lines, but with avoid_crossing_perimeters, there can be many points. Reduce speed instead of deleting points, as it's already optimised as much as possible, even if it can be a bit more => TODO?)
         // we are using a window of 10 moves.

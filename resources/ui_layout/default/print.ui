@@ -331,6 +331,8 @@ group:label_width$8:sidetext_width$7:Speed for print moves
 	line:Other speed
 		setting:width$4:thin_walls_speed
 		setting:width$4:ironing_speed
+		setting:wipe_tower_speed
+		setting:wipe_tower_wipe_starting_speed
 group:Speed for non-print moves
 	line:Travel speed
 		setting:label$xy:travel_speed
@@ -397,18 +399,22 @@ group:Extrusion width
 	line:perimeter
 		setting:sidetext_width$10:label$width:perimeter_extrusion_width
 		setting:sidetext_width$10:label_width$15:label$spacing:perimeter_extrusion_spacing
+        setting:sidetext_width$10:label_width$15:label$odd layers:perimeter_extrusion_change_odd_layers
 	end_line
 	line:external perimeter
 		setting:sidetext_width$10:label$width:external_perimeter_extrusion_width
 		setting:sidetext_width$10:label_width$15:label$width&spacing combo:external_perimeter_extrusion_spacing
+		setting:sidetext_width$10:label_width$15:label$odd layers:external_perimeter_extrusion_change_odd_layers
 	end_line
 	line:infill
 		setting:sidetext_width$10:label$width:infill_extrusion_width
 		setting:sidetext_width$10:label_width$15:label$spacing:infill_extrusion_spacing
+		setting:sidetext_width$10:label_width$15:label$odd layers:infill_extrusion_change_odd_layers
 	end_line
 	line:solid infill
 		setting:sidetext_width$10:label$width:solid_infill_extrusion_width
 		setting:sidetext_width$10:label_width$15:label$spacing:solid_infill_extrusion_spacing
+		setting:sidetext_width$10:label_width$15:label$odd layers:solid_infill_extrusion_change_odd_layers
 	end_line
 	line:top infill
 		setting:sidetext_width$10:label$width:top_infill_extrusion_width
@@ -476,6 +482,7 @@ group:Plater
 	setting:duplicate_distance
 group:Sequential printing
 	setting:tags$Advanced$Expert$Prusa:complete_objects
+	setting:parallel_objects_step
 	setting:complete_objects_one_skirt
 	setting:complete_objects_sort
 	line:Extruder clearance (mm)

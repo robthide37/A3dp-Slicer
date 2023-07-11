@@ -296,6 +296,8 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver& /* ne
             || opt_key == "wipe_tower_brim_width"
             || opt_key == "wipe_tower_bridging"
             || opt_key == "wipe_tower_no_sparse_layers"
+            || opt_key == "wipe_tower_speed"
+            || opt_key == "wipe_tower_wipe_starting_speed"
             || opt_key == "wiping_volumes_matrix"
             || opt_key == "parking_pos_retraction"
             || opt_key == "cooling_tube_retraction"
@@ -649,10 +651,10 @@ std::pair<PrintBase::PrintValidationError, std::string> Print::validate(std::str
     if (extruders.empty())
         return { PrintBase::PrintValidationError::pveNoPrint, L("The supplied settings will cause an empty print.") };
 
-    if (m_config.complete_objects) {
+    if (m_config.complete_objects || m_config.parallel_objects_step > 0) {
     	if (! sequential_print_horizontal_clearance_valid(*this))
             return { PrintBase::PrintValidationError::pveWrongPosition, L("Some objects are too close; your extruder will collide with them.") };
-        if (! sequential_print_vertical_clearance_valid(*this))
+        if (m_config.complete_objects && ! sequential_print_vertical_clearance_valid(*this))
             return { PrintBase::PrintValidationError::pveWrongPosition,L("Some objects are too tall and cannot be printed without extruder collisions.") };
     }
 

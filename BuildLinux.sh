@@ -66,13 +66,14 @@ then
     echo -n -e "Updating linux ...\n"
     hwclock -s
     apt update
+	apt install g++ m4
     if [[ -z "$FOUND_GTK3" ]]
     then
         echo -e "\nInstalling: libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
-        apt install libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git
+        apt install libgtk2.0-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext
     else
         echo -e "\nFind libgtk-3, installing: libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git\n"
-        apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git
+        apt install libgtk-3-dev libglew-dev libudev-dev libdbus-1-dev cmake git gettext
     fi
     # for ubuntu 22.04:
     ubu_version="$(cat /etc/issue)" 

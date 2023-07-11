@@ -246,7 +246,7 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas) const
     
     ImGui::Separator();
     if (imgui.button(_L("Adaptive")))
-        wxPostEvent((wxEvtHandler*)canvas.get_wxglcanvas(), Event<float>(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, m_adaptive_quality));
+        wxPostEvent((wxEvtHandler*)canvas.get_wxglcanvas(), HeightProfileAdaptiveEvent(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, m_adaptive_params));
 
     ImGui::SameLine();
     float text_align = ImGui::GetCursorPosX();
@@ -261,8 +261,84 @@ void GLCanvas3D::LayersEditing::render_overlay(const GLCanvas3D& canvas) const
     ImGui::SameLine();
     float widget_align = ImGui::GetCursorPosX();
     ImGui::PushItemWidth(imgui.get_style_scaling() * 120.0f);
-    m_adaptive_quality = std::clamp(m_adaptive_quality, 0.0f, 1.f);
-    imgui.slider_float("", &m_adaptive_quality, 0.0f, 1.f, "%.2f");
+    m_adaptive_params.adaptive_quality = std::clamp(m_adaptive_params.adaptive_quality, 0.0f, 1.f);
+    imgui.slider_float("##adaptive_quality", &m_adaptive_params.adaptive_quality, 0.0f, 1.f, "%.2f");
+
+    //min/max height for Adaptive min/max height
+    float min_height = 0.f;
+    float max_height = 1000.f;
+    PrinterTechnology printer_technology = canvas.current_printer_technology();
+    float z_step = 0;
+    if ((printer_technology & ptFFF) == 1) {
+        z_step = m_config->opt_float("z_step");
+        const ConfigOptionFloatsOrPercents* extruders_min_height = dynamic_cast<const ConfigOptionFloatsOrPercents*>(m_config->option("min_layer_height"));
+        const ConfigOptionFloatsOrPercents* extruders_max_height = dynamic_cast<const ConfigOptionFloatsOrPercents*>(m_config->option("max_layer_height"));
+        const ConfigOptionFloats* nozzle_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("nozzle_diameter"));
+        min_height = std::numeric_limits<float>::max();
+        max_height = 0.f;
+        assert(extruders_min_height->values.size() == extruders_max_height->values.size());
+        assert(extruders_min_height->values.size() == nozzle_diameter->values.size());
+        for (size_t idx_extruder = 0; idx_extruder < extruders_min_height->values.size(); ++idx_extruder) {
+            min_height = std::min(min_height, float(extruders_min_height->get_abs_value(idx_extruder, nozzle_diameter->getFloat(idx_extruder))));
+            max_height = std::max(max_height, float(extruders_max_height->get_abs_value(idx_extruder, nozzle_diameter->getFloat(idx_extruder))));
+        }
+        min_height = check_z_step(min_height, z_step);
+        max_height = check_z_step(max_height, z_step);
+        if (m_adaptive_params.min_adaptive_layer_height < 0) {
+            m_adaptive_params.min_adaptive_layer_height = min_height;
+            m_adaptive_params.max_adaptive_layer_height = max_height;
+        }
+    } else {
+        const ConfigOptionFloat* layer_height_ptr = dynamic_cast<const ConfigOptionFloat*>(m_config->option("layer_height"));
+        double layer_height = layer_height_ptr ? layer_height_ptr->value : 0.2;
+        max_height = layer_height * 10;
+        if (m_adaptive_params.min_adaptive_layer_height < 0) {
+            m_adaptive_params.min_adaptive_layer_height = layer_height / 4;
+            m_adaptive_params.max_adaptive_layer_height = layer_height * 4;
+        }
+    }
+
+    ImGui::SetCursorPosX(text_align);
+    ImGui::AlignTextToFramePadding();
+    imgui.text(_L("Min height"));
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(_L("Minimum layer height. Limit for better quality/layer adhesion.").ToUTF8());
+        ImGui::EndTooltip();
+    }
+
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(widget_align);
+    ImGui::PushItemWidth(imgui.get_style_scaling() * 120.0f);
+    if (imgui.slider_float("##min_adaptive_layer_height", &m_adaptive_params.min_adaptive_layer_height, min_height, max_height, "%.4f")) {
+        if (z_step) {
+            m_adaptive_params.min_adaptive_layer_height = check_z_step(m_adaptive_params.min_adaptive_layer_height, z_step);
+            m_adaptive_params.min_adaptive_layer_height = std::clamp(m_adaptive_params.min_adaptive_layer_height, min_height, max_height);
+        } else {
+            m_adaptive_params.min_adaptive_layer_height = std::max(m_adaptive_params.min_adaptive_layer_height, min_height);
+        }
+        m_adaptive_params.max_adaptive_layer_height = std::max(m_adaptive_params.max_adaptive_layer_height, m_adaptive_params.min_adaptive_layer_height);
+    }
+
+    ImGui::SetCursorPosX(text_align);
+    ImGui::AlignTextToFramePadding();
+    imgui.text(_L("Max height"));
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(_L("Maximum layer height. Limit for better quality/layer adhesion.").ToUTF8());
+        ImGui::EndTooltip();
+    }
+
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(widget_align);
+    ImGui::PushItemWidth(imgui.get_style_scaling() * 120.0f);
+    if (imgui.slider_float("##max_adaptive_layer_height", &m_adaptive_params.max_adaptive_layer_height, min_height, max_height, "%.4f")) {
+        if (z_step) {
+            m_adaptive_params.max_adaptive_layer_height = check_z_step(m_adaptive_params.max_adaptive_layer_height, z_step);
+            m_adaptive_params.max_adaptive_layer_height = std::clamp(m_adaptive_params.max_adaptive_layer_height, min_height, max_height);
+        }
+        m_adaptive_params.min_adaptive_layer_height = std::min(m_adaptive_params.max_adaptive_layer_height, m_adaptive_params.min_adaptive_layer_height);
+    }
 
     ImGui::Separator();
     if (imgui.button(_L("Smooth")))
@@ -508,10 +584,10 @@ void GLCanvas3D::LayersEditing::reset_layer_height_profile(GLCanvas3D& canvas)
     wxGetApp().obj_list()->update_info_items(last_object_id);
 }
 
-void GLCanvas3D::LayersEditing::adaptive_layer_height_profile(GLCanvas3D& canvas, float quality_factor)
+void GLCanvas3D::LayersEditing::adaptive_layer_height_profile(GLCanvas3D& canvas, const HeightProfileAdaptiveParams& adaptative_params)
 {
     this->update_slicing_parameters();
-    m_layer_height_profile = layer_height_profile_adaptive(*m_slicing_parameters, *m_model_object, quality_factor);
+    m_layer_height_profile = layer_height_profile_adaptive(*m_slicing_parameters, *m_model_object, adaptative_params);
     const_cast<ModelObject*>(m_model_object)->layer_height_profile.set(m_layer_height_profile);
     m_layers_texture.valid = false;
     canvas.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
@@ -905,7 +981,7 @@ wxDEFINE_EVENT(EVT_GLCANVAS_UNDO, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_REDO, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_COLLAPSE_SIDEBAR, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_RESET_LAYER_HEIGHT_PROFILE, SimpleEvent);
-wxDEFINE_EVENT(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, Event<float>);
+wxDEFINE_EVENT(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, HeightProfileAdaptiveEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_SMOOTH_LAYER_HEIGHT_PROFILE, HeightProfileSmoothEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_RELOAD_FROM_DISK, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_RENDER_TIMER, wxTimerEvent/*RenderTimerEvent*/);
@@ -1336,10 +1412,10 @@ void GLCanvas3D::reset_layer_height_profile()
     }
 }
 
-void GLCanvas3D::adaptive_layer_height_profile(float quality_factor)
+void GLCanvas3D::adaptive_layer_height_profile(const HeightProfileAdaptiveParams& adaptive_params)
 {
     wxGetApp().plater()->take_snapshot(_L("Variable layer height - Adaptive"));
-    m_layers_editing.adaptive_layer_height_profile(*this, quality_factor);
+    m_layers_editing.adaptive_layer_height_profile(*this, adaptive_params);
     m_layers_editing.state = LayersEditing::Completed;
     m_dirty = true;
 }
@@ -3078,7 +3154,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         m_mouse.set_start_position_3D_as_invalid();
         m_mouse.position = pos.cast<double>();
 
-        if (evt.Dragging() && current_printer_technology() == ptFFF && fff_print()->config().complete_objects) {
+        if (evt.Dragging() && current_printer_technology() == ptFFF && (fff_print()->config().complete_objects || fff_print()->config().parallel_objects_step > 0)) {
             switch (m_gizmos.get_current_type())
             {
             case GLGizmosManager::EType::Move:
@@ -3277,7 +3353,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
             }
 
             m_selection.translate(cur_pos - m_mouse.drag.start_position_3D);
-            if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects)
+            if (current_printer_technology() == ptFFF && (fff_print()->config().complete_objects || fff_print()->config().parallel_objects_step > 0))
                 update_sequential_clearance();
             wxGetApp().obj_manipul()->set_dirty();
             m_dirty = true;
@@ -3905,7 +3981,7 @@ void GLCanvas3D::mouse_up_cleanup()
 
 void GLCanvas3D::update_sequential_clearance()
 {
-    if (current_printer_technology() != ptFFF || !fff_print()->config().complete_objects)
+    if (current_printer_technology() != ptFFF || (!fff_print()->config().complete_objects && fff_print()->config().parallel_objects_step == 0))
         return;
 
     if (m_layers_editing.is_enabled() || m_gizmos.is_dragging())

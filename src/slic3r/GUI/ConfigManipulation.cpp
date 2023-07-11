@@ -322,7 +322,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 {
     bool have_perimeters = config->opt_int("perimeters") > 0;
     for (auto el : { "ensure_vertical_shell_thickness", "external_perimeter_speed", "extra_perimeters", "extra_perimeters_odd_layers",
-        "external_perimeters_first", "external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing",
+        "external_perimeters_first", "external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing","external_perimeter_extrusion_change_odd_layers",
         "overhangs","perimeter_speed",
         "seam_position", "small_perimeter_speed", "small_perimeter_min_length", " small_perimeter_max_length", "spiral_vase",
         "perimeter_generator"})
@@ -338,13 +338,15 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
        toggle_field(el, have_arachne);
 
 
-    for (auto el : {"perimeter_loop", "only_one_perimeter_top", "extra_perimeters_overhangs", "no_perimeter_unsupported_algo",
+    for (auto el : {"perimeter_loop", "extra_perimeters_overhangs", "no_perimeter_unsupported_algo",
         "thin_perimeters", "overhangs_reverse", "perimeter_round_corners"})
         toggle_field(el, have_perimeters && !have_arachne);
 
+    toggle_field("only_one_perimeter_top", have_perimeters); // with arachne, it will only do it for the last layer
     toggle_field("only_one_perimeter_first_layer", config->opt_int("perimeters") > 1);
     toggle_field("overhangs_width", config->option<ConfigOptionFloatOrPercent>("overhangs_width_speed")->value > 0);
     toggle_field("overhangs_reverse_threshold", have_perimeters && config->opt_bool("overhangs_reverse"));
+    toggle_field("overhangs_speed_enforce", have_perimeters && !config->opt_bool("perimeter_loop"));
     toggle_field("min_width_top_surface", have_perimeters && config->opt_bool("only_one_perimeter_top") && !have_arachne);
     toggle_field("thin_perimeters_all", have_perimeters && config->option("thin_perimeters")->getFloat() != 0 && !have_arachne);
     bool have_thin_wall = !have_arachne && have_perimeters;
@@ -396,12 +398,12 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     bool has_solid_infill 		 = has_top_solid_infill || has_bottom_solid_infill || (have_infill && (config->opt_int("solid_infill_every_layers") > 0 || config->opt_float("solid_infill_below_area") > 0));
     // solid_infill_extruder uses the same logic as in Print::extruders()
     for (auto el : { "top_fill_pattern", "bottom_fill_pattern", "solid_fill_pattern", "enforce_full_fill_volume", "external_infill_margin", "bridged_infill_margin",
-        "solid_infill_extruder", "solid_infill_extrusion_width", "solid_infill_extrusion_spacing", "solid_infill_speed" })
+        "solid_infill_extruder", "solid_infill_extrusion_width", "solid_nfill_extrusion_change_odd_layers", "solid_infill_extrusion_spacing", "solid_infill_speed" })
         toggle_field(el, has_solid_infill);
 
     toggle_field("infill_first", (has_solid_infill || have_infill));
 
-    for (auto el : { "fill_angle", "fill_angle_increment", "bridge_angle", "infill_extrusion_width", "infill_extrusion_spacing",
+    for (auto el : { "fill_angle", "fill_angle_increment", "bridge_angle", "infill_extrusion_width", "infill_extrusion_spacing", "infill_extrusion_change_odd_layers",
                     "infill_speed" })
         toggle_field(el, have_infill || has_solid_infill);
 
@@ -475,6 +477,7 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     toggle_field("perimeter_extrusion_width", have_perimeters || have_brim);
     toggle_field("perimeter_extrusion_spacing", have_perimeters || have_brim);
+    toggle_field("perimeter_extrusion_change_odd_layers", have_perimeters || have_brim);
     toggle_field("skirt_extrusion_width", have_skirt);
     toggle_field("support_material_extruder", have_support_material || have_skirt);
     toggle_field("support_material_speed", have_support_material || have_skirt || have_brim);
@@ -510,13 +513,15 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     for (auto el : { /*"extruder_clearance_radius", "extruder_clearance_height",*/ "complete_objects_one_skirt",
         "complete_objects_sort"})
         toggle_field(el, have_sequential_printing);
+    toggle_field("parallel_objects_step", !have_sequential_printing);
 
     bool have_ooze_prevention = config->opt_bool("ooze_prevention");
     toggle_field("standby_temperature_delta", have_ooze_prevention);
 
     bool have_wipe_tower = config->opt_bool("wipe_tower");
     for (auto el : { "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_brim_width",
-                     "wipe_tower_bridging", "wipe_tower_brim", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming" })
+                     "wipe_tower_bridging", "wipe_tower_brim", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming",
+                     "wipe_tower_speed", "wipe_tower_wipe_starting_speed" })
         toggle_field(el, have_wipe_tower);
 
     bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");
