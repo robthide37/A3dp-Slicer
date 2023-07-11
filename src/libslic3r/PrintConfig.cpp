@@ -3867,8 +3867,8 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::speed;
     def->tooltip = L("Set the speed of the full perimeters to the overhang speed, and also the next one(s) if any."
                 "\nSet to 0 to disable."
-                "\nSet to 1 to set the overhang speed to the full periemter if there is any overhang detected in the periemter."
-                "\nSet to more than 1 to also set the overhang speed to the next perimeter(s)."
+                "\nSet to 1 to set the overhang speed to the full perimeter if there is any overhang detected inside it."
+                "\nSet to more than 1 to also set the overhang speed to the next perimeter(s) (only in classic mode)."
                 );
     def->sidetext = L("perimeters");
     def->min = 0;
