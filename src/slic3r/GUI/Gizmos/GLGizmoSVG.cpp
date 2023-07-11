@@ -219,6 +219,16 @@ bool GLGizmoSVG::is_svg_object(const ModelVolume &volume) {
     return true;
 }
 
+namespace {
+TransformationType get_transformation_type(const Selection &selection)
+{
+    assert(selection.is_single_full_object() || selection.is_single_volume());
+    return selection.is_single_volume() ? 
+        TransformationType::Local_Relative_Joint :
+        TransformationType::Instance_Relative_Joint; // object
+}
+} // namespace
+
 bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
     if (mouse_event.Moving()) return false;
@@ -233,9 +243,8 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         angle -= PI / 2; // Grabber is upward
 
         // temporary rotation
-        const TransformationType transformation_type = m_parent.get_selection().is_single_text() ?
-          TransformationType::Local_Relative_Joint : TransformationType::World_Relative_Joint;
-        m_parent.get_selection().rotate(Vec3d(0., 0., angle), transformation_type);
+        Selection &selection = m_parent.get_selection();
+        selection.rotate(Vec3d(0., 0., angle), get_transformation_type(selection));
 
         angle += *m_rotate_start_angle;
         // move to range <-M_PI, M_PI>
