@@ -64,6 +64,7 @@ void subdata(unsigned char *data, size_t data_stride, const std::vector<unsigned
 
 IconManager::Icons IconManager::init(const InitTypes &input) 
 {
+    assert(!input.empty());
     if (input.empty())
         return {};
 
@@ -149,9 +150,10 @@ IconManager::Icons IconManager::init(const InitTypes &input)
         const InitType &i = input[j];
         if (i.filepath.empty())
             continue; // no file path only reservation of space for texture
-
+        assert(boost::filesystem::exists(i.filepath));
         if (!boost::filesystem::exists(i.filepath))
             continue;
+        assert(boost::algorithm::iends_with(i.filepath, ".svg"));
         if (!boost::algorithm::iends_with(i.filepath, ".svg"))
             continue;
 
@@ -209,6 +211,10 @@ IconManager::Icons IconManager::init(const InitTypes &input)
 
 std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string> &file_paths, const ImVec2 &size, RasterType type)
 {
+    assert(!file_paths.empty());
+    assert(size.x >= 1);
+    assert(size.x < 256*16);
+
     // TODO: remove in future
     if (!m_icons.empty()) {
         // not first initialization

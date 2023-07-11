@@ -116,12 +116,13 @@ private:
     bool process();
     void close();
     void draw_window();
-    void draw_preview();
+    bool draw_preview();
     void draw_depth();
     void draw_size();
     void draw_use_surface();
     void draw_distance();
     void draw_rotation();
+    void draw_reflection();
     void draw_model_type();
 
     // process mouse event

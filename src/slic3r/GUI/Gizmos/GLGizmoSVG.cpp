@@ -119,6 +119,10 @@ enum class IconType : unsigned {
     lock_hover,
     unlock,
     unlock_hover,
+    reflection_x,
+    reflection_x_hover,
+    reflection_y,
+    reflection_y_hover,
     // automatic calc of icon's count
     _count
 };
@@ -156,6 +160,7 @@ struct GuiCfg
         std::string use_surface;
         std::string rotation;
         std::string distance; // from surface
+        std::string reflection;
     };
     Translations translations;
 };
@@ -180,6 +185,7 @@ bool GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_p
 {
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
     DataBasePtr base = create_emboss_data_base(m_job_cancel);
+    base->is_outside = volume_type == ModelVolumeType::MODEL_PART;
     return start_create_volume(input, std::move(base), mouse_pos);
 }
 
@@ -187,6 +193,7 @@ bool GLGizmoSVG::create_volume(ModelVolumeType volume_type)
 {
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
     DataBasePtr base = create_emboss_data_base(m_job_cancel);
+    base->is_outside = volume_type == ModelVolumeType::MODEL_PART;
     return start_create_volume_without_position(input, std::move(base));
 }
 
@@ -194,6 +201,7 @@ bool GLGizmoSVG::create_volume(std::string_view svg_file, ModelVolumeType volume
 {
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
     DataBasePtr base = create_emboss_data_base(m_job_cancel, svg_file);
+    base->is_outside = volume_type == ModelVolumeType::MODEL_PART;
     return start_create_volume(input, std::move(base), mouse_pos);
 }
 
@@ -364,10 +372,14 @@ IconManager::Icons init_icons(IconManager &mng, const GuiCfg &cfg)
     IconManager::InitTypes init_types{
         {"undo.svg",         size, IconManager::RasterType::white_only_data}, // undo           
         {"undo.svg",         size, IconManager::RasterType::color},           // undo_hovered
-        {"lock_closed.svg",  size, IconManager::RasterType::white_only_data}, // lock,
+        {"lock_closed.svg",  size, IconManager::RasterType::white_only_data}, // lock
         {"lock_open_f.svg",  size, IconManager::RasterType::white_only_data}, // lock_hovered
-        {"lock_open.svg",    size, IconManager::RasterType::white_only_data}, // unlock,
-        {"lock_closed_f.svg",size, IconManager::RasterType::white_only_data}  // unlock_hovered,
+        {"lock_open.svg",    size, IconManager::RasterType::white_only_data}, // unlock
+        {"lock_closed_f.svg",size, IconManager::RasterType::white_only_data}, // unlock_hovered
+        {"reflection_x.svg", size, IconManager::RasterType::white_only_data}, // reflection_x
+        {"reflection_x.svg", size, IconManager::RasterType::color},           // reflection_x_hovered
+        {"reflection_y.svg", size, IconManager::RasterType::white_only_data}, // reflection_y
+        {"reflection_y.svg", size, IconManager::RasterType::color},           // reflection_y_hovered
     };
 
     assert(init_types.size() == static_cast<size_t>(IconType::_count));
@@ -696,6 +708,7 @@ bool GLGizmoSVG::process()
 
     EmbossShape shape = m_volume_shape; // copy
     auto base = std::make_unique<DataBase>(m_volume->name, m_job_cancel, std::move(shape));
+    base->is_outside = m_volume->type() == ModelVolumeType::MODEL_PART;
     DataUpdate data{std::move(base), m_volume_id};
     return start_update_volume(std::move(data), *m_volume, m_parent.get_selection(), m_raycast_manager);    
 }
@@ -718,7 +731,8 @@ void GLGizmoSVG::draw_window()
         ImGui::Text("Not valid state please report reproduction steps on github");
         return;
     }
-    draw_preview();
+    if(!draw_preview())
+        return;
 
     ImGui::Separator();
 
@@ -729,6 +743,15 @@ void GLGizmoSVG::draw_window()
 
     draw_distance();
     draw_rotation();
+    draw_reflection();
+
+    if (ImGui::Button(_u8L("Face the camera").c_str())) {
+        const Camera &cam = wxGetApp().plater()->get_camera();
+        if (face_selected_volume_to_camera(cam, m_parent) && 
+            m_volume->emboss_shape->projection.use_surface)
+            process();
+    }
+
     ImGui::Unindent(m_gui_cfg->icon_width);  
 
     if (!m_volume->is_the_only_one_part()) {
@@ -737,11 +760,11 @@ void GLGizmoSVG::draw_window()
     }
 }
 
-void GLGizmoSVG::draw_preview(){
+bool GLGizmoSVG::draw_preview(){
     assert(m_volume->emboss_shape.has_value());
     if (!m_volume->emboss_shape.has_value()) {
         ImGui::Text("No embossed file");
-        return;
+        return false;
     }
 
     // init texture when not initialized yet.
@@ -763,6 +786,7 @@ void GLGizmoSVG::draw_preview(){
 
     ImGui::SameLine();
     ImGui::BeginGroup();
+    ScopeGuard sg_group([]() { ImGui::EndGroup(); });
 
     // Remove space between filename and gray suffix ".svg"
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
@@ -778,7 +802,6 @@ void GLGizmoSVG::draw_preview(){
         std::string tooltip = GUI::format(_L("SVG file path is \"%1%\" "), m_volume->emboss_shape->svg_file_path);
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
-
 
     // Re-Load button
     bool can_reload = !m_volume_shape.svg_file_path.empty();
@@ -802,7 +825,15 @@ void GLGizmoSVG::draw_preview(){
         process();
     }
 
-    ImGui::EndGroup();
+    ImGui::SameLine();
+    if (ImGui::Button(_u8L("Bake").c_str())) {
+        m_volume->emboss_shape.reset();
+        close();
+        return false;
+    } else if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", _u8L("Remove connection to source file to take care about copyright").c_str());
+    }
+    return true;
 }
 
 void GLGizmoSVG::draw_depth()
@@ -893,16 +924,16 @@ void GLGizmoSVG::draw_size()
     }
 
     // Lock on ratio m_keep_ratio
-    ImGui::SameLine(m_gui_cfg->lock_offset);
-    const IconManager::Icon &icon       = get_icon(m_icons, m_keep_ratio ? IconType::lock : IconType::unlock);
-    const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_ratio ? IconType::lock_hover : IconType::unlock_hover);
-    if (button(icon, icon_hover, icon))
-        m_keep_ratio = !m_keep_ratio;    
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", (m_keep_ratio ?
-            _u8L("Free set of width and height value."):
-            _u8L("Keep same ratio of width to height.")
-        ).c_str());
+    //ImGui::SameLine(m_gui_cfg->lock_offset);
+    //const IconManager::Icon &icon       = get_icon(m_icons, m_keep_ratio ? IconType::lock : IconType::unlock);
+    //const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_ratio ? IconType::lock_hover : IconType::unlock_hover);
+    //if (button(icon, icon_hover, icon))
+    //    m_keep_ratio = !m_keep_ratio;    
+    //if (ImGui::IsItemHovered())
+    //    ImGui::SetTooltip("%s", (m_keep_ratio ?
+    //        _u8L("Free set of width and height value."):
+    //        _u8L("Keep same ratio of width to height.")
+    //    ).c_str());
     
 
     // reset button
@@ -1038,11 +1069,40 @@ void GLGizmoSVG::draw_rotation()
     }
 }
 
+void GLGizmoSVG::draw_reflection()
+{
+    ImGui::Text("%s", m_gui_cfg->translations.reflection.c_str());
+    ImGui::SameLine(m_gui_cfg->input_offset);
+    Axis axis = Axis::UNKNOWN_AXIS;
+    if(clickable(get_icon(m_icons, IconType::reflection_x), get_icon(m_icons, IconType::reflection_x_hover))){
+        axis = Axis::X;
+    } else if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", _u8L("Reflect by 2d Y axis").c_str());
+    }
+
+    ImGui::SameLine();
+    if (clickable(get_icon(m_icons, IconType::reflection_y), get_icon(m_icons, IconType::reflection_y_hover))) {
+        axis = Axis::Y;
+    } else if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", _u8L("Reflect by 2d X axis").c_str());
+    }
+
+    if (axis != Axis::UNKNOWN_AXIS){
+        Selection &selection = m_parent.get_selection();
+        selection.setup_cache();
+        selection.mirror(axis, TransformationType::Local);
+        m_parent.do_mirror(L("Set Mirror"));
+        wxGetApp().obj_manipul()->UpdateAndShow(true);
+
+        if (m_volume_shape.projection.use_surface)
+            process();
+    }
+}
+
 void GLGizmoSVG::draw_model_type()
 {
-    assert(m_volume != nullptr);
-    bool is_last_solid_part = is_svg_object(*m_volume);
-    std::string title = _u8L("Type");
+    bool is_last_solid_part = m_volume->is_the_only_one_part();
+    std::string title = _u8L("Operation");
     if (is_last_solid_part) {
         ImVec4 color{.5f, .5f, .5f, 1.f};
         m_imgui->text_colored(color, title.c_str());
@@ -1056,29 +1116,25 @@ void GLGizmoSVG::draw_model_type()
     ModelVolumeType part = ModelVolumeType::MODEL_PART;
     ModelVolumeType type = m_volume->type();
 
-    if (ImGui::RadioButton(_u8L("Added").c_str(), type == part))
+    //TRN EmbossOperation
+    if (ImGui::RadioButton(_u8L("Join").c_str(), type == part))
         new_type = part;
     else if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", _u8L("Change to object's part.").c_str());
+        ImGui::SetTooltip("%s", _u8L("Click to change text into object part.").c_str());
     ImGui::SameLine();
 
     std::string last_solid_part_hint = _u8L("You can't change a type of the last solid part of the object.");
-    if (ImGui::RadioButton(_u8L("Subtracted").c_str(), type == negative))
+    if (ImGui::RadioButton(_CTX_utf8(L_CONTEXT("Cut", "EmbossOperation"), "EmbossOperation").c_str(), type == negative))
         new_type = negative;
     else if (ImGui::IsItemHovered()) {
         if (is_last_solid_part)
             ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
         else if (type != negative)
-            ImGui::SetTooltip("%s", _u8L("Change to negative volume.").c_str());
+            ImGui::SetTooltip("%s", _u8L("Click to change part type into negative volume.").c_str());
     }
 
-    GUI_App &app = wxGetApp();
-    Plater  *plater = app.plater();
-    // SLA printers do not use modifiers
-    bool is_sla = plater->printer_technology() == ptSLA;
-    // In simple mode are not modifiers ?!?
-    bool is_simple = app.get_mode() == ConfigOptionMode::comSimple;
-    if (!is_sla && !is_simple) {
+    // In simple mode are not modifiers
+    if (wxGetApp().plater()->printer_technology() != ptSLA && wxGetApp().get_mode() != ConfigOptionMode::comSimple) {
         ImGui::SameLine();
         if (ImGui::RadioButton(_u8L("Modifier").c_str(), type == modifier))
             new_type = modifier;
@@ -1086,21 +1142,21 @@ void GLGizmoSVG::draw_model_type()
             if (is_last_solid_part)
                 ImGui::SetTooltip("%s", last_solid_part_hint.c_str());
             else if (type != modifier)
-                ImGui::SetTooltip("%s", _u8L("Change to modifier.").c_str());
+                ImGui::SetTooltip("%s", _u8L("Click to change part type into modifier.").c_str());
         }
     }
 
     if (m_volume != nullptr && new_type.has_value() && !is_last_solid_part) {
-        Plater::TakeSnapshot snapshot(plater, _L("Change Text Type"), UndoRedo::SnapshotType::GizmoAction);
+        GUI_App &app    = wxGetApp();
+        Plater * plater = app.plater();
+        Plater::TakeSnapshot snapshot(plater, _L("Change SVG Type"), UndoRedo::SnapshotType::GizmoAction);
         m_volume->set_type(*new_type);
 
-         // Update volume position when switch from part or into part
-        if (m_volume->emboss_shape->projection.use_surface) {
-            // move inside
-            bool is_volume_move_inside  = (type == part);
-            bool is_volume_move_outside = (*new_type == part);
-            if (is_volume_move_inside || is_volume_move_outside) process();
-        }
+        bool is_volume_move_inside  = (type == part);
+        bool is_volume_move_outside = (*new_type == part);
+         // Update volume position when switch (from part) or (into part)
+        if ((is_volume_move_inside || is_volume_move_outside))
+            process();
 
         // inspiration in ObjectList::change_part_type()
         // how to view correct side panel with objects
@@ -1175,22 +1231,24 @@ GuiCfg create_gui_configuration() {
 
     float space = line_height_with_spacing - line_height;
 
-    cfg.icon_width  = line_height;
+    cfg.icon_width = std::floor(line_height/8)*8;
 
     GuiCfg::Translations &tr = cfg.translations;
 
     float lock_width = cfg.icon_width + 3 * space;
     tr.depth       = _u8L("Depth");
-    tr.size        = _u8L("Width/Height");
+    tr.size        = _u8L("Width / Height");
     tr.use_surface = _u8L("Use surface");
     tr.distance    = _u8L("From surface");
     tr.rotation    = _u8L("Rotation");
+    tr.reflection  = _u8L("Reflection");
     float max_tr_width = std::max({
         ImGui::CalcTextSize(tr.depth.c_str()).x,
-        ImGui::CalcTextSize(tr.size.c_str()).x + lock_width,
+        ImGui::CalcTextSize(tr.size.c_str()).x,
         ImGui::CalcTextSize(tr.use_surface.c_str()).x,
         ImGui::CalcTextSize(tr.distance.c_str()).x,
-        ImGui::CalcTextSize(tr.rotation.c_str()).x + lock_width
+        ImGui::CalcTextSize(tr.rotation.c_str()).x + lock_width,
+        ImGui::CalcTextSize(tr.reflection.c_str()).x,
     });
 
     const ImGuiStyle &style = ImGui::GetStyle();
@@ -1233,21 +1291,35 @@ std::string choose_svg_file()
     return path;
 }
 
-ExPolygons default_shape()
-{
-    std::string file  = Slic3r::resources_dir() + "/icons/question.svg";
-    NSVGimage  *image = nsvgParseFromFile(file.c_str(), "px", 96.0f);
-    ExPolygons  shape = to_expolygons(image);
-    assert(!shape.empty());
-    nsvgDelete(image);
-    return shape;
-}
-
-namespace {
 void translate(ExPolygons &expolys, const Point &p) {
     for (ExPolygon &expoly : expolys)
         expoly.translate(p);
 }
+
+NSVGimage *parse_from_file(const char *filepath){
+    const char *unit_mm{"mm"};
+    // common used DPI is 96 or 72
+    float dpi = 96.0f;
+    return nsvgParseFromFile(filepath, unit_mm, dpi);
+}
+
+ExPolygons default_shape()
+{
+    std::string file = Slic3r::resources_dir() + "/icons/question.svg";
+    assert(boost::filesystem::exists(file));
+    NSVGimage *image = parse_from_file(file.c_str());
+    assert(image != nullptr);
+    
+    // tesselation tolerance
+    float tol = 1e-2f;
+    int max_level = 10;
+    float scale = static_cast<float>(2. / DEFAULT_SCALE);
+    bool is_y_negative = true;
+    ExPolygons shape = to_expolygons(image, tol, max_level, scale, is_y_negative);
+    assert(!shape.empty());
+
+    nsvgDelete(image);
+    return shape;
 }
 
 EmbossShape select_shape(std::string_view filepath)
@@ -1268,10 +1340,7 @@ EmbossShape select_shape(std::string_view filepath)
         !boost::algorithm::iends_with(shape.svg_file_path, ".svg"))
         return {};
 
-    const char *unit_mm{"mm"};
-    // common used DPI is 96 or 72
-    float dpi = 96.0f;
-    NSVGimage *image = nsvgParseFromFile(shape.svg_file_path.c_str(), unit_mm, dpi);
+    NSVGimage *image = parse_from_file(shape.svg_file_path.c_str());
     if (image == nullptr) return {};
     ScopeGuard sg([image]() { nsvgDelete(image); });
 
