@@ -719,8 +719,7 @@ bool check(const DataCreateVolume &input, bool is_main_thread)
     assert(input.base != nullptr);
     bool res = input.base != nullptr;
     res &= check(*input.base, check_fontfile);
-    assert(input.volume_type != ModelVolumeType::INVALID);
-    res &= input.volume_type != ModelVolumeType::INVALID;
+    res &= is_valid(input.volume_type);
     res &= check(input.gizmo);
     assert(!input.base->shape.projection.use_surface);
     res &= !input.base->shape.projection.use_surface;
@@ -1401,7 +1400,12 @@ bool finalize(bool canceled, std::exception_ptr &eptr, const DataBase &input)
 
 bool is_valid(ModelVolumeType volume_type)
 {
-    if (volume_type == ModelVolumeType::MODEL_PART || volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
+    assert(volume_type != ModelVolumeType::INVALID);
+    assert(volume_type == ModelVolumeType::MODEL_PART || 
+           volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
+           volume_type == ModelVolumeType::PARAMETER_MODIFIER);
+    if (volume_type == ModelVolumeType::MODEL_PART || 
+        volume_type == ModelVolumeType::NEGATIVE_VOLUME ||
         volume_type == ModelVolumeType::PARAMETER_MODIFIER)
         return true;
 
@@ -1424,9 +1428,6 @@ bool start_create_volume_job(Worker                           &worker,
         if (sources.empty() || !volume_tr.has_value()) {
             use_surface = false;
         } else {
-            bool is_outside = volume_type == ModelVolumeType::MODEL_PART;
-            // check that there is not unexpected volume type
-            assert(is_outside || volume_type == ModelVolumeType::NEGATIVE_VOLUME || volume_type == ModelVolumeType::PARAMETER_MODIFIER);
             SurfaceVolumeData sfvd{*volume_tr, std::move(sources)};
             CreateSurfaceVolumeData surface_data{std::move(sfvd), std::move(data), volume_type, object.id(), gizmo};
             job = std::make_unique<CreateSurfaceVolumeJob>(std::move(surface_data));

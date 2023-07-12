@@ -202,6 +202,10 @@ bool GLGizmoSVG::create_volume(std::string_view svg_file, ModelVolumeType volume
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
     DataBasePtr base = create_emboss_data_base(m_job_cancel, svg_file);
     base->is_outside = volume_type == ModelVolumeType::MODEL_PART;
+    // is not a number || is infinity
+    if (mouse_pos.x() != mouse_pos.x() ||
+        mouse_pos.y() != mouse_pos.y())
+        return start_create_volume_without_position(input, std::move(base));
     return start_create_volume(input, std::move(base), mouse_pos);
 }
 
