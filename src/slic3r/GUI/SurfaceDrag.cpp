@@ -56,57 +56,9 @@ bool dragging(const Vec2d                 &mouse_pos,
               GLCanvas3D                  &canvas,
               const RaycastManager        &raycast_manager,
               const std::optional<double> &up_limit);
-
-std::vector<size_t> collect_allowed_volumes_id(const ModelVolumePtrs &volumes, const ObjectID &selected_volume_id);
 }
 
 namespace Slic3r::GUI {
-    
-/// <summary>
-/// Calculate offset from mouse position to center of text
-/// </summary>
-/// <param name="screen_coor">Position on screen[in Px] e.g. mouse position</param>
-/// <param name="volume">Selected volume(text)</param>
-/// <param name="camera">Actual position and view direction of camera</param>
-/// <returns>Offset in screen coordinate</returns>
-static Vec2d calc_screen_offset_to_volume_center(const Vec2d &screen_coor, const ModelVolume &volume, const Camera &camera)
-{
-    const Transform3d &volume_tr = volume.get_matrix();
-    assert(volume.emboss_shape.has_value());
-
-    auto calc_offset = [&screen_coor, &volume_tr, &camera, &volume](const Transform3d &instrance_tr) -> Vec2d {
-        Transform3d to_world = instrance_tr * volume_tr;
-
-        // Use fix of .3mf loaded tranformation when exist        
-        if (std::optional<Transform3d> fix = volume.emboss_shape->fix_3mf_tr;
-            fix.has_value())
-            to_world = to_world * (*fix);
-        // zero point of volume in world coordinate system
-        Vec3d volume_center = to_world.translation();
-        // screen coordinate of volume center
-        Vec2i coor = CameraUtils::project(camera, volume_center);
-        return coor.cast<double>() - screen_coor;
-    };
-
-    auto object = volume.get_object();
-    assert(!object->instances.empty());
-    // Speed up for one instance
-    if (object->instances.size() == 1)
-        return calc_offset(object->instances.front()->get_matrix());
-
-    Vec2d  nearest_offset;
-    double nearest_offset_size = std::numeric_limits<double>::max();
-    for (const ModelInstance *instance : object->instances) {
-        Vec2d  offset      = calc_offset(instance->get_matrix());
-        double offset_size = offset.norm();
-        if (nearest_offset_size < offset_size)
-            continue;
-        nearest_offset_size = offset_size;
-        nearest_offset      = offset;
-    }
-    return nearest_offset;
-}
-
  // Calculate scale in world for check in debug
 [[maybe_unused]] static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
 {

@@ -973,40 +973,6 @@ TriangleMesh create_default_mesh()
     return triangle_mesh;
 }
 
-void update_volume_name(const ModelVolume &volume, const ObjectList *obj_list)
-{
-    if (obj_list == nullptr)
-        return;
-
-    const std::vector<ModelObject *>* objects = obj_list->objects();
-    if (objects == nullptr)
-        return;
-
-    int object_idx = -1;
-    int volume_idx = -1;
-    for (size_t oi = 0; oi < objects->size(); ++oi) {
-        const ModelObject *mo = objects->at(oi);
-        if (mo == nullptr)
-            continue;
-        if (volume.get_object()->id() != mo->id())
-            continue;
-        const ModelVolumePtrs& volumes = mo->volumes;
-        for (size_t vi = 0; vi < volumes.size(); ++vi) {
-            const ModelVolume *mv = volumes[vi];
-            if (mv == nullptr)
-                continue;
-            if (mv->id() == volume.id()){
-                object_idx = static_cast<int>(oi);
-                volume_idx = static_cast<int>(vi);
-                break;
-            }
-        }
-        if (volume_idx > 0)
-            break;
-    }
-    obj_list->update_name_in_list(object_idx, volume_idx);
-}
-
 void update_name_in_list(const ObjectList& object_list, const ModelVolume& volume)
 {
     const ModelObjectPtrs *objects_ptr = object_list.objects();
