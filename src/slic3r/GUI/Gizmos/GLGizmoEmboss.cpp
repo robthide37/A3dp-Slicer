@@ -116,26 +116,6 @@ CreateVolumeParams create_input(GLCanvas3D &canvas, const StyleManager::Style &s
 /// </summary>
 ImVec2 calc_fine_position(const Selection &selection, const ImVec2 &windows_size, const Size &canvas_size);
 
-/// <summary>
-/// Data for emboss job to create shape
-/// </summary>
-/// <param name="emboss_data">Define params of text</param>
-/// <param name="volume_type">Emboss / engrave</param>
-/// <param name="screen_coor">Mouse position which define position</param>
-/// <param name="gl_volume">Volume to find surface for create</param>
-/// <param name="raycaster">Ability to ray cast to model</param>
-/// <param name="text_lines">Per glyph transformation</param>
-/// <param name="style_manager">Line height need font file/param>
-/// <param name="canvas">Contain already used scene RayCasters</param>
-/// <returns>True when start creation, False when there is no hit surface by screen coor</returns>
-static bool start_create_volume_on_surface_job(DataBase         &emboss_data,
-                                               ModelVolumeType   volume_type,
-                                               const Vec2d      &screen_coor,
-                                               const GLVolume   *gl_volume,
-                                               RaycastManager   &raycaster,
-                                               TextLinesModel &text_lines,
-                                               /*const */ StyleManager &style_manager,
-                                               GLCanvas3D       &canvas);
 struct TextDataBase : public DataBase
 {
     TextDataBase(DataBase &&parent, const FontFileWithCache &font_file, 
@@ -186,14 +166,6 @@ const IconManager::Icon &get_icon(const IconManager::VIcons& icons, IconType typ
 // short call of Slic3r::GUI::button
 bool draw_button(const IconManager::VIcons& icons, IconType type, bool disable = false);
 
-/// <summary>
-/// Apply camera direction for emboss direction
-/// </summary>
-/// <param name="camera">Define view vector</param>
-/// <param name="canvas">Containe Selected Model to modify</param>
-/// <param name="keep_up">Keep same up vector</param>
-/// <returns>True when apply change otherwise false</returns>
-static bool apply_camera_dir(const Camera &camera, GLCanvas3D &canvas, bool keep_up);
 struct FaceName
 {
     wxString    wx_name;
@@ -318,8 +290,6 @@ GuiCfg create_gui_configuration();
 void draw_font_preview(FaceName &face, const std::string &text, Facenames &faces, const GuiCfg &cfg, bool is_visible);
 // for existing volume which is selected(could init different(to volume text) lines count when edit text)
 void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines=0);
-// before text volume is created
-void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_tr, const ModelObject& mo, /* const*/ StyleManager &style_manager);
 } // namespace priv
 
 // use private definition
@@ -1139,27 +1109,6 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
 
     text_lines.init(mv_trafo, volumes, align, line_height_mm, line_offset_mm, count_lines);
 }
-
-void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_tr, const ModelObject& mo, /* const*/ StyleManager &style_manager)
-{
-    // prepare volumes to slice
-    ModelVolumePtrs volumes;
-    volumes.reserve(mo.volumes.size());
-    for (ModelVolume *volume : mo.volumes) {
-        // only part could be surface for volumes
-        if (!volume->is_model_part())
-            continue;
-        volumes.push_back(volume);
-    }
-
-    FontProp::VerticalAlign align = style_manager.get_font_prop().align.second;
-    double line_height_mm, line_offset_mm;
-    if (!get_line_height_offset(style_manager, line_height_mm, line_offset_mm))
-        return;
-    unsigned count_lines = 1;
-    text_lines.init(new_text_tr, volumes, align, line_height_mm, line_offset_mm, count_lines);
-}
-
 }
 
 void GLGizmoEmboss::reinit_text_lines(unsigned count_lines) {    
@@ -1327,10 +1276,6 @@ void GLGizmoEmboss::calculate_scale() {
 namespace {
 bool is_text_empty(std::string_view text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
 } // namespace
-
-namespace priv {
-static bool is_text_empty(const std::string &text) { return text.empty() || text.find_first_not_of(" \n\t\r") == std::string::npos; }
-} // namespace priv
 
 bool GLGizmoEmboss::process()
 {
@@ -3767,52 +3712,6 @@ GuiCfg create_gui_configuration()
     cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
     cfg.face_name_size.y() = line_height_with_spacing;
     return cfg;
-}
-
-bool apply_camera_dir(const Camera& camera, GLCanvas3D& canvas, bool keep_up) {
-    const Vec3d& cam_dir = camera.get_dir_forward();
-
-    Selection& sel = canvas.get_selection();
-    if (sel.is_empty()) return false;
-
-    // camera direction transformed into volume coordinate system    
-    Transform3d to_world = world_matrix_fixed(sel);
-    Vec3d cam_dir_tr = to_world.inverse().linear() * cam_dir;
-    cam_dir_tr.normalize();
-
-    Vec3d emboss_dir(0., 0., -1.);
-
-    // check wether cam_dir is already used
-    if (is_approx(cam_dir_tr, emboss_dir)) return false;
-
-    assert(sel.get_volume_idxs().size() == 1);
-    GLVolume* gl_volume = sel.get_volume(*sel.get_volume_idxs().begin());
-
-    Transform3d vol_rot;
-    Transform3d vol_tr = gl_volume->get_volume_transformation().get_matrix();
-    // check whether cam_dir is opposit to emboss dir
-    if (is_approx(cam_dir_tr, -emboss_dir)) {
-        // rotate 180 DEG by y
-        vol_rot = Eigen::AngleAxis(M_PI_2, Vec3d(0., 1., 0.));
-    }
-    else {
-        // calc params for rotation
-        Vec3d axe = emboss_dir.cross(cam_dir_tr);
-        axe.normalize();
-        double angle = std::acos(emboss_dir.dot(cam_dir_tr));
-        vol_rot = Eigen::AngleAxis(angle, axe);
-    }
-
-    Vec3d offset = vol_tr * Vec3d::Zero();
-    Vec3d offset_inv = vol_rot.inverse() * offset;
-    Transform3d res = vol_tr *
-        Eigen::Translation<double, 3>(-offset) *
-        vol_rot *
-        Eigen::Translation<double, 3>(offset_inv);
-    //Transform3d res = vol_tr * vol_rot;
-    gl_volume->set_volume_transformation(Geometry::Transformation(res));
-    get_model_volume(*gl_volume, sel.get_model()->objects)->set_transformation(res);
-    return true;
 }
 } // namespace
 
