@@ -470,15 +470,19 @@ void ToolOrdering::fill_wipe_tower_partitions(const PrintConfig &config, coordf_
 bool ToolOrdering::insert_wipe_tower_extruder()
 {
     // In case that wipe_tower_extruder is set to non-zero, we must make sure that the extruder will be in the list.
-    // The list is 1-based, as is the config value !
     bool changed = false;
     if (m_print_config_ptr->wipe_tower_extruder != 0) {
         for (LayerTools& lt : m_layer_tools) {
             if (lt.wipe_tower_partitions > 0) {
-                lt.extruders.emplace_back(m_print_config_ptr->wipe_tower_extruder);
+                lt.extruders.emplace_back(m_print_config_ptr->wipe_tower_extruder - 1);
                 sort_remove_duplicates(lt.extruders);
                 changed = true;
             }
+        }
+        // Now convert the 0-based list to 1-based again.
+        for (LayerTools& lt : m_layer_tools) {
+            for (auto& extruder : lt.extruders)
+                    ++extruder;
         }
     }
     return changed;
