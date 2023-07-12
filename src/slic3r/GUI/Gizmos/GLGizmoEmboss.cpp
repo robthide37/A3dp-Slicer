@@ -959,7 +959,7 @@ GLGizmoEmboss::GuiCfg GLGizmoEmboss::create_gui_configuration()
 
     tr.use_surface  = _u8L("Use surface");
     tr.per_glyph    = _u8L("Per glyph orientation");
-    tr.alignment   = _u8L("Alignment");
+    tr.alignment    = _u8L("Alignment");
     tr.char_gap     = _u8L("Char gap");
     tr.line_gap     = _u8L("Line gap");
     tr.boldness     = _u8L("Boldness");
