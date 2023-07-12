@@ -1262,7 +1262,7 @@ indexed_triangle_set its_make_frustum_dowel(double radius, double h, int sectorC
     return mesh;
 }
 
-indexed_triangle_set its_make_rivet(double r, double h, float space_proportion)
+indexed_triangle_set its_make_snap(double r, double h, float space_proportion, float bulge_proportion)
 {
     const float radius = (float)r;
     const float height = (float)h;
@@ -1272,7 +1272,7 @@ indexed_triangle_set its_make_rivet(double r, double h, float space_proportion)
     const float space_len = space_proportion * radius;
 
     const float b_len = radius;
-    const float m_len = (1 + 0.5f*space_proportion) * radius;
+    const float m_len = (1 + bulge_proportion) * radius;
     const float t_len = 0.5f * radius;
 
     const float b_height = 0.f;
@@ -1351,7 +1351,7 @@ indexed_triangle_set its_make_rivet(double r, double h, float space_proportion)
         }
 
         // add d side vertices and facets
-        while (b_angle_start < b_angle_stop) {
+        while (!is_approx(b_angle_start, b_angle_stop)) {
             b_angle_start += b_angle_step;
             t_angle_start += t_angle_step;
 

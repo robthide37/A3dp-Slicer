@@ -230,7 +230,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
         {"Size"         , _u8L("Size")},
     };
 
-    update_connector_shape();
+//    update_connector_shape();
 }
 
 std::string GLGizmoCut3D::get_tooltip() const
@@ -498,8 +498,8 @@ bool GLGizmoCut3D::render_combo(const std::string& label, const std::vector<std:
     ImGui::AlignTextToFramePadding();
     const bool is_changed = m_imgui->combo(label, lines, selection_idx, 0, m_label_width, m_control_width);
 
-    if (is_changed)
-        update_connector_shape();
+    //if (is_changed)
+    //    update_connector_shape();
 
     return is_changed;
 }
@@ -524,7 +524,7 @@ bool GLGizmoCut3D::render_double_input(const std::string& label, double& value_i
     return !is_approx(old_val, value);
 }
 
-bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in, float max_val/* = -0.1f*/, float max_tolerance/* = -0.1f*/)
+bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in, float min_val/* = -0.1f*/, float max_tolerance/* = -0.1f*/)
 {
     constexpr float UndefMinVal = -0.1f;
     const float f_mm_to_in = static_cast<float>(ObjectManipulation::mm_to_in);
@@ -548,7 +548,7 @@ bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& v
 
     const BoundingBoxf3 bbox = m_bounding_box;
     const float mean_size = float((bbox.size().x() + bbox.size().y() + bbox.size().z()) / 9.0) * (m_imperial_units ? f_mm_to_in : 1.f);
-    const float max_v = max_val > 0.f ? /*std::min(max_val, mean_size)*/max_val : mean_size;
+    const float min_v = min_val > 0.f ? /*std::min(max_val, mean_size)*/min_val : 1.f;
 
     ImGuiWrapper::text(label);
 
@@ -556,7 +556,7 @@ bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& v
     ImGui::PushItemWidth(m_control_width * 0.7f);
 
 //    const bool is_value_changed = render_slider("##" + label, value_in, 1.f, mean_size, _L("Value"));
-    const bool is_value_changed = render_slider("##" + label, value_in, 1.f, max_v, _L("Value"));
+    const bool is_value_changed = render_slider("##" + label, value_in, min_v, mean_size, _L("Value"));
     
     ImGui::SameLine();
     ImGui::PushItemWidth(m_control_width * 0.45f);
@@ -599,7 +599,7 @@ bool GLGizmoCut3D::render_connect_type_radio_button(CutConnectorType type)
     ImGui::PushItemWidth(m_control_width);
     if (ImGui::RadioButton(m_connector_types[size_t(type)].c_str(), m_connector_type == type)) {
         m_connector_type = type;
-        update_connector_shape();
+//        update_connector_shape();
         return true;
     }
     return false;
@@ -2013,7 +2013,8 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
             apply_selected_connectors([this, &connectors](size_t idx) { connectors[idx].attribs.shape = CutConnectorShape(m_connector_shape_id); });
     m_imgui->disabled_end();
 
-    if (render_slider_double_input(m_labels_map["Depth"], m_connector_depth_ratio, m_connector_depth_ratio_tolerance))
+    const float depth_min_value = m_connector_type == CutConnectorType::Rivet ? m_connector_size : -0.1f;
+    if (render_slider_double_input(m_labels_map["Depth"], m_connector_depth_ratio, m_connector_depth_ratio_tolerance, depth_min_value))
         apply_selected_connectors([this, &connectors](size_t idx) {
             if (m_connector_depth_ratio > 0)
                 connectors[idx].height           = m_connector_depth_ratio;
@@ -2028,6 +2029,45 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
             if (m_connector_size_tolerance >= 0)
                 connectors[idx].radius_tolerance = 0.5f * m_connector_size_tolerance;
         });
+
+    if (m_connector_type == CutConnectorType::Rivet) {
+
+        const std::string format = "%.0f %%";
+
+        bool is_changed = false;
+        {
+            const std::string label = _u8L("Bulge");
+            ImGuiWrapper::text(label);
+
+            ImGui::SameLine(m_label_width);
+            ImGui::PushItemWidth(m_control_width * 0.7f);
+
+            float val = m_snap_bulge_proportion *100.f;
+            if (m_imgui->slider_float(("##snap_" + label).c_str(), &val, 5.f, 100.f * m_snap_space_proportion, format.c_str(), 1.f, true, _u8L("Bulge proportion related to radius"))) {
+                m_snap_bulge_proportion = val * 0.01f;
+                is_changed = true;
+            }
+        }
+
+        {
+            const std::string label = _u8L("Space");
+            ImGuiWrapper::text(label);
+
+            ImGui::SameLine(m_label_width);
+            ImGui::PushItemWidth(m_control_width * 0.7f);
+
+            float val = m_snap_space_proportion *100.f;
+            if (m_imgui->slider_float(("##snap_" + label).c_str(), &val, 10.f, 50.f, format.c_str(), 1.f, true, _u8L("Space proportion related to radius"))) {
+                m_snap_space_proportion = val * 0.01f;
+                is_changed = true;
+            }
+        }
+
+        if (is_changed) {
+            update_connector_shape();
+            update_raycasters_for_picking();
+        }
+    }
 
     ImGui::Separator();
 
@@ -2224,7 +2264,7 @@ void GLGizmoCut3D::render_groove_input(const std::string& label, float& in_val, 
         reset_cut_by_contours();
         //    Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
     }
-};
+}
 
 void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 {
@@ -2758,7 +2798,7 @@ void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, int &dowels_count)
                 connector.pos += m_cut_normal * 0.5 * double(connector.height);
             }
         }
-        mo->apply_cut_connectors(_u8L("Connector"));
+        apply_cut_connectors(mo, _u8L("Connector"));
     }
 }
 
@@ -3252,7 +3292,7 @@ void GLGizmoCut3D::init_connector_shapes()
                 if (type == CutConnectorType::Rivet && shape != CutConnectorShape::Circle)
                     continue;
                 const CutConnectorAttributes attribs = { type, style, shape };
-                indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);
+                indexed_triangle_set its = get_connector_mesh(attribs);
                 m_shapes[attribs].model.init_from(its);
                 m_shapes[attribs].mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
             }
@@ -3263,9 +3303,18 @@ void GLGizmoCut3D::update_connector_shape()
 {
     CutConnectorAttributes attribs = { m_connector_type, CutConnectorStyle(m_connector_style), CutConnectorShape(m_connector_shape_id) };
 
-    const indexed_triangle_set its = ModelObject::get_connector_mesh(attribs);
-    m_connector_mesh.clear();
-    m_connector_mesh = TriangleMesh(its);
+    if (m_connector_type == CutConnectorType::Rivet) {
+        indexed_triangle_set its = get_connector_mesh(attribs);
+        m_shapes[attribs].reset();
+        m_shapes[attribs].model.init_from(its);
+        m_shapes[attribs].mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
+
+        //const indexed_triangle_set its = get_connector_mesh(attribs);
+        //m_connector_mesh.clear();
+        //m_connector_mesh = TriangleMesh(its);
+    }
+
+
 }
 
 bool GLGizmoCut3D::cut_line_processing() const
@@ -3520,6 +3569,70 @@ void GLGizmoCut3D::data_changed(bool is_serializing)
     if (auto oc = m_c->object_clipper())
         oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
 }
+
+
+
+
+indexed_triangle_set GLGizmoCut3D::get_connector_mesh(CutConnectorAttributes connector_attributes)
+{
+    indexed_triangle_set connector_mesh;
+
+    int   sectorCount{ 1 };
+    switch (CutConnectorShape(connector_attributes.shape)) {
+    case CutConnectorShape::Triangle:
+        sectorCount = 3;
+        break;
+    case CutConnectorShape::Square:
+        sectorCount = 4;
+        break;
+    case CutConnectorShape::Circle:
+        sectorCount = 360;
+        break;
+    case CutConnectorShape::Hexagon:
+        sectorCount = 6;
+        break;
+    default:
+        break;
+    }
+
+    if (connector_attributes.type == CutConnectorType::Rivet)
+        connector_mesh = its_make_snap(1.0, 1.0, m_snap_space_proportion, m_snap_bulge_proportion);
+    else if (connector_attributes.style == CutConnectorStyle::Prism)
+        connector_mesh = its_make_cylinder(1.0, 1.0, (2 * PI / sectorCount));
+    else if (connector_attributes.type == CutConnectorType::Plug)
+        connector_mesh = its_make_frustum(1.0, 1.0, (2 * PI / sectorCount));
+    else
+        connector_mesh = its_make_frustum_dowel(1.0, 1.0, sectorCount);
+
+    return connector_mesh;
+}
+
+void GLGizmoCut3D::apply_cut_connectors(ModelObject* mo, const std::string& connector_name)
+{
+    if (mo->cut_connectors.empty())
+        return;
+
+    using namespace Geometry;
+
+    size_t connector_id = mo->cut_id.connectors_cnt();
+    for (const CutConnector& connector : mo->cut_connectors) {
+        TriangleMesh mesh = TriangleMesh(get_connector_mesh(connector.attribs));
+        // Mesh will be centered when loading.
+        ModelVolume* new_volume = mo->add_volume(std::move(mesh), ModelVolumeType::NEGATIVE_VOLUME);
+
+        // Transform the new modifier to be aligned inside the instance
+        new_volume->set_transformation(translation_transform(connector.pos) * connector.rotation_m *
+            scale_transform(Vec3f(connector.radius, connector.radius, connector.height).cast<double>()));
+
+        new_volume->cut_info = { connector.attribs.type, connector.radius_tolerance, connector.height_tolerance };
+        new_volume->name = connector_name + "-" + std::to_string(++connector_id);
+    }
+    mo->cut_id.increase_connectors_cnt(mo->cut_connectors.size());
+
+    // delete all connectors
+    mo->cut_connectors.clear();
+}
+
 
 
 } // namespace GUI

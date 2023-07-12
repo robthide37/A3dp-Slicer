@@ -1280,66 +1280,6 @@ bool ModelObject::has_connectors() const
     return false;
 }
 
-indexed_triangle_set ModelObject::get_connector_mesh(CutConnectorAttributes connector_attributes)
-{
-    indexed_triangle_set connector_mesh;
-
-    int   sectorCount {1};
-    switch (CutConnectorShape(connector_attributes.shape)) {
-    case CutConnectorShape::Triangle:
-        sectorCount = 3;
-        break;
-    case CutConnectorShape::Square:
-        sectorCount = 4;
-        break;
-    case CutConnectorShape::Circle:
-        sectorCount = 360;
-        break;
-    case CutConnectorShape::Hexagon:
-        sectorCount = 6;
-        break;
-    default:
-        break;
-    }
-
-    if (connector_attributes.type == CutConnectorType::Rivet)
-        connector_mesh = its_make_rivet(1.0, 1.0);
-    else if (connector_attributes.style == CutConnectorStyle::Prism)
-        connector_mesh = its_make_cylinder(1.0, 1.0, (2 * PI / sectorCount));
-    else if (connector_attributes.type == CutConnectorType::Plug)
-        connector_mesh = its_make_frustum(1.0, 1.0, (2 * PI / sectorCount));
-    else
-        connector_mesh = its_make_frustum_dowel(1.0, 1.0, sectorCount);
-
-    return connector_mesh;
-}
-
-void ModelObject::apply_cut_connectors(const std::string& new_name)
-{
-    if (cut_connectors.empty())
-        return;
-
-    using namespace Geometry;
-
-    size_t connector_id = cut_id.connectors_cnt();
-    for (const CutConnector& connector : cut_connectors) {
-        TriangleMesh mesh = TriangleMesh(get_connector_mesh(connector.attribs));
-        // Mesh will be centered when loading.
-        ModelVolume* new_volume = add_volume(std::move(mesh), ModelVolumeType::NEGATIVE_VOLUME);
-
-        // Transform the new modifier to be aligned inside the instance
-        new_volume->set_transformation(translation_transform(connector.pos) * connector.rotation_m *
-                                       scale_transform(Vec3f(connector.radius, connector.radius, connector.height).cast<double>()));
-
-        new_volume->cut_info = { connector.attribs.type, connector.radius_tolerance, connector.height_tolerance };
-        new_volume->name = new_name + "-" + std::to_string(++connector_id);
-    }
-    cut_id.increase_connectors_cnt(cut_connectors.size());
-
-    // delete all connectors
-    cut_connectors.clear();
-}
-
 void ModelObject::invalidate_cut()
 {
     this->cut_id.invalidate();

@@ -127,6 +127,10 @@ class GLGizmoCut3D : public GLGizmoBase
     float m_groove_width_tolerance{ 0.1f };
     bool  m_optimaze_groove_rendering{ true };
 
+    // Input params for cut with snaps
+    float m_snap_bulge_proportion{ 0.15f };
+    float m_snap_space_proportion{ 0.3f };
+
     bool m_hide_cut_plane{ false };
     bool m_connectors_editing{ false };
     bool m_cut_plane_as_circle{ false };
@@ -323,7 +327,7 @@ private:
     bool render_cut_mode_combo();
     bool render_combo(const std::string&label, const std::vector<std::string>&lines, int&selection_idx);
     bool render_double_input(const std::string& label, double& value_in);
-    bool render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in, float max_val = -0.1f, float max_tolerance = -0.1f);
+    bool render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in, float min_val = -0.1f, float max_tolerance = -0.1f);
     void render_move_center_input(int axis);
     void render_connect_mode_radio_button(CutConnectorMode mode);
     bool render_reset_button(const std::string& label_id, const std::string& tooltip) const;
@@ -364,6 +368,9 @@ private:
     void check_and_update_connectors_state();
 
     void toggle_model_objects_visibility();
+
+    indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);
+    void apply_cut_connectors(ModelObject* mo, const std::string& connector_name);
 };
 
 } // namespace GUI
