@@ -162,10 +162,10 @@ inline const Vec3d get_base(unsigned index, const Transform3d &transform) { retu
 inline const Vec3d get_x_base(const Transform3d &transform) { return get_base(0, transform); }
 inline const Vec3d get_y_base(const Transform3d &transform) { return get_base(1, transform); }
 inline const Vec3d get_z_base(const Transform3d &transform) { return get_base(2, transform); }
-inline const Vec3d &get_base(unsigned index, const Transform3d::LinearPart &transform) { return transform.col(index); }
-inline const Vec3d &get_x_base(const Transform3d::LinearPart &transform) { return get_base(0, transform); }
-inline const Vec3d &get_y_base(const Transform3d::LinearPart &transform) { return get_base(1, transform); }
-inline const Vec3d &get_z_base(const Transform3d::LinearPart &transform) { return get_base(2, transform); }
+inline const Vec3d get_base(unsigned index, const Transform3d::LinearPart &transform) { return transform.col(index); }
+inline const Vec3d get_x_base(const Transform3d::LinearPart &transform) { return get_base(0, transform); }
+inline const Vec3d get_y_base(const Transform3d::LinearPart &transform) { return get_base(1, transform); }
+inline const Vec3d get_z_base(const Transform3d::LinearPart &transform) { return get_base(2, transform); }
 
 template<int N, class T> using Vec = Eigen::Matrix<T,  N, 1, Eigen::DontAlign, N, 1>;
 
