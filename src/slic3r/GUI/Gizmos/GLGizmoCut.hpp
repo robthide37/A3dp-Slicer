@@ -119,9 +119,11 @@ class GLGizmoCut3D : public GLGizmoBase
     // Input params for cut with tongue and groove
     float m_groove_depth;
     float m_groove_width;
+    float m_groove_flaps_angle;
     float m_groove_angle;
     float m_groove_depth_init;
     float m_groove_width_init;
+    float m_groove_flaps_angle_init;
     float m_groove_angle_init;
     float m_groove_depth_tolerance{ 0.1f };
     float m_groove_width_tolerance{ 0.1f };
@@ -296,7 +298,8 @@ protected:
     void add_horizontal_scaled_interval(float interval);
     void add_horizontal_shift(float shift);
     void render_color_marker(float size, const ImU32& color);
-    void render_groove_input(const std::string &label, float &in_val, const float &init_val, float &in_tolerance, bool is_angle = false);
+    void render_groove_float_input(const std::string &label, float &in_val, const float &init_val, float &in_tolerance);
+    void render_groove_angle_input(const std::string &label, float &in_val, const float &init_val, float min_val, float max_val);
     void render_cut_plane_input_window(CutConnectors &connectors);
     void init_input_window_data(CutConnectors &connectors);
     void render_input_window_warning() const;
@@ -368,6 +371,10 @@ private:
     void check_and_update_connectors_state();
 
     void toggle_model_objects_visibility();
+
+    indexed_triangle_set its_make_upper_groove_plane();
+    indexed_triangle_set its_make_lower_groove_plane(float flaps_width);
+    indexed_triangle_set its_make_sides_groove_plane(float flaps_width);
 
     indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);
     void apply_cut_connectors(ModelObject* mo, const std::string& connector_name);

@@ -642,6 +642,225 @@ static double get_grabber_mean_size(const BoundingBoxf3& bb)
     return (bb.size().x() + bb.size().y() + bb.size().z()) / 30.;
 }
 
+indexed_triangle_set GLGizmoCut3D::its_make_upper_groove_plane()
+{
+    const float ghw = 0.5f * m_groove_width;     // groove half width
+    const float cpr = 1.5f * float(m_radius);     // cut plane radius
+
+    const float cpl = 1.5f * cpr; // cut plane length
+    const float cph = 0.02f * (float)get_grabber_mean_size(m_bounding_box);   // cut plane height
+
+    // We need two upward facing triangles
+    float x = 0.5f * cpr, y = 0.5f * cpl;
+
+    const float proj = y * tan(m_groove_angle);
+    const float extension_x = ghw + proj;
+
+    // upper cut plane is simple
+
+    if (is_approx(ghw, proj)) {
+
+        return {
+            {
+                // roof
+                {0,1,6}, {6,1,2}, {2,3,5}, {5,3,4},
+                // sides
+                {0,7,8}, {0,8,1}, {1,8,9}, {1,9,2}, {2,9,10}, {2,10,3}, {3,10,11}, {3,11,4},
+                {4,11,12}, {4,12,5}, {5, 12,13}, {5,13,6}, {6,13,7}, {6, 7,0},
+                // bottom
+                {7,13,8}, {8,13,9}, {10,9,12}, {10,12,4}
+            }, 
+            {
+                // roof vertices
+                {-x, -y, cph}, {-extension_x, -y, cph}, {0.f, y, cph}, {extension_x, -y, cph}, {x, -y, cph}, {x, y, cph}, {-x, y, cph},
+                // bottom vertices
+                {-x, -y, 0.f}, {-extension_x, -y, 0.f}, {0.f, y, 0.f}, {extension_x, -y, 0.f}, {x, -y, 0.f}, {x, y, 0.f}, {-x, y, 0.f},
+            }
+        };
+    }
+
+    if (ghw < proj) {
+
+        const float cross_pt_y = ghw / tan(m_groove_angle);
+        return {
+            {
+                // roof
+                {0,1,6}, {1,2,6}, {2,5,6}, {2,3,5}, {3,4,5},
+                // sides
+                {0,7,8}, {0,8,1}, {1,8,9}, {1,9,2}, {2,9,10}, {2,10,3}, {3,10,11}, {3,11,4},
+                {4,11,12}, {4,12,5}, {5,12,13}, {5,13,6}, {6,13,7}, {6,7,0},
+                // bottom
+                {7,13,8}, {8,13,9}, {9,13,12}, {9,12,10}, {10,12, 11}
+            }, 
+            {
+                // roof vertices
+                {-x, -y, cph}, {-extension_x, -y, cph}, {0.f, cross_pt_y, cph}, {extension_x, -y, cph}, {x, -y, cph}, {x, y, cph}, {-x, y, cph},
+                // bottom vertices
+                {-x, -y, 0.f}, {-extension_x, -y, 0.f}, {0.f, cross_pt_y, 0.f}, {extension_x, -y, 0.f}, {x, -y, 0.f}, {x, y, 0.f}, {-x, y, 0.f}
+            }
+        };
+    }
+    
+    // upper cut plane contains 2 sub planes
+
+    const float narrowing_x = ghw - proj;
+    return {
+            {
+            // roof
+            {0,1,3}, {3,1,2}, {7,4,6}, {6,4,5},
+            // sides
+            {0,8,9}, {0,9,1}, {1,9,10}, {1,10,2}, {2,10,11}, {2,11,3}, {3,11,8}, {3,8,0},
+            {4,12,13}, {4,13,5}, {5,13,14}, {5,14,6}, {6,14,15}, {6,15,7}, {7,15,12}, {7,12,4},
+            // bottom
+            {9,8,11}, {9,11,10}, {12,15,14}, {12,14,13}
+        },
+        {
+            // roof vertices
+            {-x, -y, cph}, {-extension_x, -y, cph}, {-narrowing_x, y, cph}, {-x, y, cph}, {extension_x, -y, cph}, {x, -y, cph}, {x, y, cph}, {narrowing_x, y, cph},
+            // bottom vertices
+            {-x, -y, 0.f}, {-extension_x, -y, 0.f}, {-narrowing_x, y, 0.f}, {-x, y, 0.f}, {extension_x, -y, 0.f}, {x, -y, 0.f}, {x, y, 0.f}, {narrowing_x, y, 0.f},
+        }
+    };
+}
+
+indexed_triangle_set GLGizmoCut3D::its_make_lower_groove_plane(float flaps_width)
+{
+    const float ghw = 0.5f * (m_groove_width + flaps_width);     // groove half width
+    const float cpr = 1.5f * float(m_radius);     // cut plane radius
+
+    const float cpl = 1.5f * cpr; // cut plane length
+    const float cph = 0.02f * (float)get_grabber_mean_size(m_bounding_box);   // cut plane height
+
+    // We need two upward facing triangles
+    float x = 0.5f * cpr, y = 0.5f * cpl;
+
+    const float proj = y * tan(m_groove_angle);
+    const float extension_x = ghw + proj;
+
+    // upper cut plane is trapezium
+
+    if (ghw > proj) {
+
+        const float narrowing_x = ghw - proj;
+        return {
+                {
+                // roof
+                {0,3,1}, {1,3,2},
+                // sides
+                {0,4,7}, {0,7,3}, {3,7,6}, {3,6,2}, {2,6,5}, {2,5,1}, {1,5,4}, {1,4,0},
+                // bottom
+                {4,5,7}, {7,5,6}
+            },
+            {
+                // roof vertices
+                {-extension_x, -y, cph}, {-narrowing_x, y, cph}, {narrowing_x, y, cph}, {extension_x, -y, cph},
+                // bottom vertices
+                {-extension_x, -y, 0.f}, {-narrowing_x, y, 0.f}, {narrowing_x, y, 0.f}, {extension_x, -y, 0.f}
+            }
+        };
+    }
+
+    // upper cut plane is triangle
+
+    const float cross_pt_y = ghw / tan(m_groove_angle);
+    return {
+        {
+            // roof
+            {0,2,1},
+            // sides
+            {0,3,5}, {0,5,2}, {2,5,4}, {2,4,1}, {1,4,3}, {0,1,3},
+            // bottom
+            {3,4,5}
+        },
+        {
+            // roof vertices
+            {-extension_x, -y, cph}, {0.f, cross_pt_y, cph}, {extension_x, -y, cph},
+            // bottom vertices
+            {-extension_x, -y, 0.f}, {0.f, cross_pt_y, 0.f}, {extension_x, -y, 0.f}
+        }
+    };
+}
+
+indexed_triangle_set GLGizmoCut3D::its_make_sides_groove_plane(float flaps_width)
+{
+    const float ghw_upper = 0.5f * (m_groove_width);     // groove half width
+    const float ghw_lower = 0.5f * (m_groove_width + flaps_width);     // groove half width
+    const float cpr = 1.5f * float(m_radius);     // cut plane radius
+
+    const float cpl = 1.5f * cpr; // cut plane length
+    const float cph = 0.02f * (float)get_grabber_mean_size(m_bounding_box);   // cut plane height
+
+    const float ghd = 0.5f * m_groove_depth; // groove half depth
+
+
+    // We need two upward facing triangles
+    float x = 0.5f * cpr, y = 0.5f * cpl;
+    float z_upper = ghd;
+    float z_lower = -ghd;
+
+    const float proj = y * tan(m_groove_angle);
+
+    const float extension_upper_x = ghw_upper + proj;
+    const float extension_lower_x = ghw_lower + proj;
+
+    const float narrowing_upper_x = ghw_upper - proj;
+    const float narrowing_lower_x = ghw_lower - proj;
+
+    // groove is open
+
+    if (ghw_upper > proj && ghw_lower > proj) {
+        return {
+            {
+                {1,0,2}, {2,0,3}, {5,4,7}, {5,7,6},
+                {0,1,2}, {3,0,2}, {4,5,7}, {7,5,6}
+            },
+            {
+                // left vertices
+                {-extension_lower_x, -y, z_lower}, {-extension_upper_x, -y, z_upper}, {-narrowing_upper_x, y, z_upper}, {-narrowing_lower_x, y, z_lower}, 
+                // right vertices
+                {narrowing_lower_x, y, z_lower}, {narrowing_upper_x, y, z_upper}, {extension_upper_x, -y, z_upper}, {extension_lower_x, -y, z_lower}
+            }
+        };
+    }
+
+    const float cross_pt_upper_y = ghw_upper / tan(m_groove_angle);
+
+    // groove is closed
+
+    if (ghw_upper < proj && ghw_lower < proj) {
+        const float cross_pt_lower_y = ghw_lower / tan(m_groove_angle);
+
+        return {
+            {
+                {1,0,3}, {1,3,4}, {1,4,5}, {1,5,2},
+                {0,1,3}, {3,1,4}, {4,1,5}, {5,1,2}
+            },
+            {
+                // roof vertices
+                {-extension_upper_x, -y, z_upper}, {0.f, cross_pt_upper_y, z_upper}, {extension_upper_x, -y, z_upper},
+                // bottom vertices
+                {-extension_lower_x, -y, z_lower}, {0.f, cross_pt_lower_y, z_lower}, {extension_lower_x, -y, z_lower}
+            }
+        };
+
+    }
+
+    // groove is closed from the roof
+
+    return {
+        {
+            {1,0,3}, {1,3,4}, {1,5,6}, {1,6,2},
+            {0,1,3}, {3,1,4}, {5,1,6}, {6,1,2}
+        },
+        {
+            // roof vertices
+            {-extension_upper_x, -y, z_upper}, {0.f, cross_pt_upper_y, z_upper}, {extension_upper_x, -y, z_upper},
+            // bottom vertices
+            {-extension_lower_x, -y, z_lower}, {-narrowing_lower_x, y, z_lower}, {narrowing_lower_x, y, z_lower}, {extension_lower_x, -y, z_lower} 
+        }
+    };
+}
+
 void GLGizmoCut3D::render_cut_plate_for_tongue_and_groove(GLShaderProgram* shader)
 {
     const Camera &    camera    = wxGetApp().plater()->get_camera();
@@ -650,37 +869,25 @@ void GLGizmoCut3D::render_cut_plate_for_tongue_and_groove(GLShaderProgram* shade
 
     // values for calculaton
     const double groove_half_depth = 0.5 * double(m_groove_depth);
-    const double groove_half_width = 0.5 * double(m_groove_width);
 
-    const double cp_radius      = 1.5 * m_radius;
-
-    const double cp_half_width  = 0.5 * cp_radius;
-    const float  cp_length      = 1.5f * float(cp_radius);
-    const float  cp_height      = 0.02f * (float)get_grabber_mean_size(m_bounding_box);
-
-    const double h_shift        = 0.5 * cp_half_width + groove_half_width;
-
-    const float  side_width     = is_approx(m_groove_angle, 0.f) ? m_groove_depth : (m_groove_depth / sin(m_groove_angle));
-    const float  flaps_width    = 2.f * side_width * cos(m_groove_angle);
+    const float  side_width     = is_approx(m_groove_flaps_angle, 0.f) ? m_groove_depth : (m_groove_depth / sin(m_groove_flaps_angle));
+    const float  flaps_width    = 2.f * side_width * cos(m_groove_flaps_angle);
 
     GLModel model;
-    model.init_from(its_make_prism(float(cp_half_width), cp_length, cp_height));
+
+    // upper cut_plane
+
+    model.init_from(its_make_upper_groove_plane());
     model.set_color(cp_clr);
 
-    // upper halfs of cut_plane
-
-    Transform3d view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * Vec3d(-h_shift, 0, groove_half_depth)) * cp_matrix;
-    shader->set_uniform("view_model_matrix", view_model_matrix_);
-    model.render();
-
-    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * Vec3d(h_shift, 0, groove_half_depth)) * cp_matrix;
+    Transform3d view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (groove_half_depth * Vec3d::UnitZ())) * cp_matrix;
     shader->set_uniform("view_model_matrix", view_model_matrix_);
     model.render();
 
     // lower part of cut_plane
 
     model.reset();
-    model.init_from(its_make_prism(m_groove_width + flaps_width, cp_length, cp_height));
+    model.init_from(its_make_lower_groove_plane(flaps_width));
     cp_clr.a(cp_clr.a() + 0.1f);
     model.set_color(cp_clr);
 
@@ -691,16 +898,9 @@ void GLGizmoCut3D::render_cut_plate_for_tongue_and_groove(GLShaderProgram* shade
     // side parts of cut_plane
 
     model.reset();
+    model.init_from(its_make_sides_groove_plane(flaps_width));
 
-    model.init_from(its_make_prism(float(side_width), cp_length, cp_height));
-
-    const double h_side_shift = groove_half_width + 0.25 * double(flaps_width);
-
-    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (-h_side_shift * Vec3d::UnitX())) * cp_matrix * rotation_transform(-m_groove_angle * Vec3d::UnitY());
-    shader->set_uniform("view_model_matrix", view_model_matrix_);
-    model.render();
-
-    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (h_side_shift * Vec3d::UnitX())) * cp_matrix * rotation_transform(m_groove_angle * Vec3d::UnitY());
+    view_model_matrix_ = camera.get_view_matrix() * cp_matrix;
     shader->set_uniform("view_model_matrix", view_model_matrix_);
     model.render();
 }
@@ -1495,8 +1695,8 @@ void GLGizmoCut3D::update_bb()
         // input params for cut with tongue and groove
         m_groove_depth = m_groove_depth_init = 0.5f * float(get_grabber_mean_size(m_bounding_box));
         m_groove_width = m_groove_width_init = 4.0f * m_groove_depth;
-        m_groove_angle = m_groove_angle_init = float(PI) / 3.f;// 0.25f * float(PI);
-
+        m_groove_flaps_angle = m_groove_flaps_angle_init = float(PI) / 3.f;// 0.25f * float(PI);
+        m_groove_angle = m_groove_angle_init = 0.f;
         m_plane.reset();
         m_cone.reset();
         m_sphere.reset();
@@ -2145,6 +2345,9 @@ void GLGizmoCut3D::flip_cut_plane()
 
     update_clipper();
     m_part_selection.turn_over_selection();
+
+    if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
+        reset_cut_by_contours();
 }
 
 void GLGizmoCut3D::reset_cut_by_contours()
@@ -2225,28 +2428,11 @@ void GLGizmoCut3D::render_color_marker(float size, const ImU32& color)
     ImGuiWrapper::text(" ");
 }
 
-void GLGizmoCut3D::render_groove_input(const std::string& label, float& in_val, const float& init_val, float& in_tolerance, bool is_angle /*=false*/)
+void GLGizmoCut3D::render_groove_float_input(const std::string& label, float& in_val, const float& init_val, float& in_tolerance)
 {
     bool is_changed{false};
 
-    if (is_angle) {
-        ImGuiWrapper::text(label);
-
-        ImGui::SameLine(m_label_width);
-        ImGui::PushItemWidth(m_control_width * 0.7f);
-
-        float val = rad2deg(in_val);
-        const float old_val = val;
-
-        const std::string format = "%.0f " + _u8L("°");
-        m_imgui->slider_float(("##groove_" + label).c_str(), &val, 30.f, 120.f, format.c_str(), 1.f, true, from_u8(label));
-
-        if (!is_approx(old_val, val)) {
-            in_val = deg2rad(val);
-            is_changed = true;
-        }
-    }
-    else if (render_slider_double_input(label, in_val, in_tolerance, -0.1f, std::min(0.3f*in_val, 1.5f)))
+    if (render_slider_double_input(label, in_val, in_tolerance, -0.1f, std::min(0.3f*in_val, 1.5f)))
         is_changed = true;
 
     ImGui::SameLine();
@@ -2265,6 +2451,43 @@ void GLGizmoCut3D::render_groove_input(const std::string& label, float& in_val, 
         //    Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
     }
 }
+
+void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in_val, const float& init_val, float min_val, float max_val)
+{
+    bool is_changed{ false };
+
+    ImGuiWrapper::text(label);
+
+    ImGui::SameLine(m_label_width);
+    ImGui::PushItemWidth(m_control_width * 0.7f);
+
+    float val = rad2deg(in_val);
+    const float old_val = val;
+
+    const std::string format = "%.0f " + _u8L("°");
+    m_imgui->slider_float(("##groove_" + label).c_str(), &val, min_val, max_val, format.c_str(), 1.f, true, from_u8(label));
+
+    if (!is_approx(old_val, val)) {
+        in_val = deg2rad(val);
+        is_changed = true;
+    }
+
+    ImGui::SameLine();
+
+    m_imgui->disabled_begin(is_approx(in_val, init_val));
+    const std::string act_name = _u8L("Reset");
+    if (render_reset_button(("##groove_" + label + act_name).c_str(), act_name)) {
+        in_val = init_val;
+        is_changed = true;
+    }
+    m_imgui->disabled_end();
+
+    if (is_changed) {
+        reset_cut_by_contours();
+        //    Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
+    }
+}
+
 
 void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 {
@@ -2324,9 +2547,10 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         else if (mode == CutMode::cutTongueAndGroove) {
             ImGui::Separator();
             ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Groove") + ": ");
-            render_groove_input(_u8L("Depth"), m_groove_depth, m_groove_depth_init, m_groove_depth_tolerance);
-            render_groove_input(_u8L("Width"), m_groove_width, m_groove_width_init, m_groove_width_tolerance);
-            render_groove_input(_u8L("Angle"), m_groove_angle, m_groove_angle_init, m_groove_width_tolerance, true);
+            render_groove_float_input(_u8L("Depth"), m_groove_depth, m_groove_depth_init, m_groove_depth_tolerance);
+            render_groove_float_input(_u8L("Width"), m_groove_width, m_groove_width_init, m_groove_width_tolerance);
+            render_groove_angle_input(_u8L("Flaps Angle"), m_groove_flaps_angle, m_groove_flaps_angle_init, 30.f, 120.f);
+            render_groove_angle_input(_u8L("Groove Angle"), m_groove_angle, m_groove_angle_init, 0.f, 15.f);
 
             m_imgui->checkbox(_L("Optimize rendering"), m_optimaze_groove_rendering);
         }
@@ -2764,7 +2988,7 @@ bool GLGizmoCut3D::can_perform_cut() const
         return false;
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
-        const float flaps_width = -2.f * m_groove_depth / tan(m_groove_angle);
+        const float flaps_width = -2.f * m_groove_depth / tan(m_groove_flaps_angle);
         return flaps_width < m_groove_width && !m_invalid_groove;
     }
 
@@ -3042,11 +3266,11 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
 
     // cut middle part with 2 angles and add parts to related upper/lower objects
 
-    const double h_side_shift = 0.5 * double(m_groove_width + m_groove_depth / tan(m_groove_angle));
+    const double h_side_shift = 0.5 * double(m_groove_width + m_groove_depth / tan(m_groove_flaps_angle));
 
     // cut by angle1 plane
     {
-        const Transform3d cut_matrix_angle1 = translation_transform(m_rotation_m * (-h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(-m_groove_angle * Vec3d::UnitY());
+        const Transform3d cut_matrix_angle1 = translation_transform(m_rotation_m * (-h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, -m_groove_flaps_angle, -m_groove_angle));
 
         if (!cut(tmp_object, cut_matrix_angle1, ModelObjectCutAttribute::KeepLower, cut_part_ptrs))
             return cut_object_ptrs;
@@ -3055,7 +3279,7 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
 
     // cut by angle2 plane
     {
-        const Transform3d cut_matrix_angle2 = translation_transform(m_rotation_m * (h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(m_groove_angle * Vec3d::UnitY());
+        const Transform3d cut_matrix_angle2 = translation_transform(m_rotation_m * (h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, m_groove_flaps_angle, m_groove_angle));
 
         if (!cut(tmp_object, cut_matrix_angle2, ModelObjectCutAttribute::KeepLower, cut_part_ptrs))
             return cut_object_ptrs;
@@ -3072,11 +3296,11 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
 
         const double h_side_shift_tolerance = h_side_shift - 0.5 * double(m_groove_width_tolerance);
 
-        const Transform3d cut_matrix_angle1_tolerance = translation_transform(m_rotation_m * (-h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(-m_groove_angle * Vec3d::UnitY());
+        const Transform3d cut_matrix_angle1_tolerance = translation_transform(m_rotation_m * (-h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, -m_groove_flaps_angle, -m_groove_angle));
         if (!cut(tmp_object, cut_matrix_angle1_tolerance, ModelObjectCutAttribute::KeepLower, cut_part_ptrs))
             return cut_object_ptrs;
 
-        const Transform3d cut_matrix_angle2_tolerance = translation_transform(m_rotation_m * (h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(m_groove_angle * Vec3d::UnitY());
+        const Transform3d cut_matrix_angle2_tolerance = translation_transform(m_rotation_m * (h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, m_groove_flaps_angle, m_groove_angle));
         if (!cut(tmp_object, cut_matrix_angle2_tolerance, ModelObjectCutAttribute::KeepUpper, cut_part_ptrs))
             return cut_object_ptrs;
     }
@@ -3376,6 +3600,9 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
 
             m_angle_arc.reset();
             discard_cut_line_processing();
+
+            if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
+                reset_cut_by_contours();
         }
         else if (action == SLAGizmoEventType::Moving)
             this->set_dirty();
