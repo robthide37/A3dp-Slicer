@@ -1,4 +1,4 @@
-ANYONE WHO HAS INTEREST IN HELPING I WILL COMPENSATE FRO TIME WHILE STILL KEEPING OPEN SOURCE . PLEASE REACHOUT FOR DETAILS
+Releases are available here https://github.com/robthide37/A3dp-Slicer/tags
 
 ### So, what's this A3dp-Slicer?
 
