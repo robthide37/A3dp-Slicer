@@ -2226,9 +2226,15 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
     if (paths.size() > 2) {
         double min_length = this->perimeter_flow.scaled_width() * 2;
         double ok_length = this->perimeter_flow.scaled_width() * 20;
-
+#ifdef _DEBUG
+        for (int i = 1; i < paths.size(); i++) {
+            assert(paths[i - 1].last_point() == paths[i].first_point());
+        }
+#endif
         foreach(paths, [min_length, ok_length](ExtrusionPath& prev, ExtrusionPath& curr, ExtrusionPath& next) {
+            assert(prev.last_point() == curr.first_point());
             if (curr.length() < min_length) {
+                // if too small, merge it with prev or next, whatever is best.
                 float diff_height = std::abs(prev.height - curr.height) - std::abs(next.height - curr.height);
                 //have to choose the rigth path
                 if (diff_height < 0 || (diff_height == 0 && prev.length() > next.length())) {
@@ -2243,16 +2249,25 @@ ExtrusionPaths PerimeterGenerator::create_overhangs(const ClipperLib_Z::Path& ar
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
                 }
+                assert(prev.last_point() == next.first_point());
                 return true;
             } else if (((int)curr.height) % 2 == 1 && curr.length() > ok_length) {
+                // not too small, and we are still undecided (%2==1) of the type of this section
+                // so choose to add it to the prev, or next, or keep it in limbo until another foreach.
                 curr.height++;
                 if (prev.height == curr.height) {
+                    //merge to prev
                     prev.polyline.append(curr.polyline);
+                    return true;
                 } else if (next.height == curr.height) {
+                    //merge to next
                     curr.polyline.append(next.polyline);
                     next.polyline.swap(curr.polyline);
+                    return true;
+                } else {
+                    //keep it in limbo
+                    return false;
                 }
-                return true;
             }
             return false;
             });
