@@ -114,7 +114,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
             }
             new_points.push_back(next);
         }
-        points = new_points;
+        points = std::move(new_points);
     }
 
     if (max_line_length > 0) {
@@ -140,7 +140,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
             }
             new_points.push_back(points.back());
         }
-        points = new_points;
+        points = std::move(new_points);
     }
 
     std::vector<float> angles_for_curvature(points.size());
@@ -241,7 +241,8 @@ public:
     }
 
     std::vector<ProcessedPoint> estimate_speed_from_extrusion_quality(
-        const ExtrusionPath                                          &path,
+        const Points                                                 &path,
+        const ExtrusionFlow                                          &flow,
         const std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_w_speeds,
         const std::vector<std::pair<int, ConfigOptionInts>>           overhangs_w_fan_speeds,
         size_t                                                        extruder_id,
@@ -251,7 +252,7 @@ public:
         float                  speed_base = ext_perimeter_speed > 0 ? ext_perimeter_speed : original_speed;
         std::map<float, float> speed_sections;
         for (size_t i = 0; i < overhangs_w_speeds.size(); i++) {
-            float distance           = path.width * (1.0 - (overhangs_w_speeds[i].first / 100.0));
+            float distance           = flow.width * (1.0 - (overhangs_w_speeds[i].first / 100.0));
             float speed              = overhangs_w_speeds[i].second.percent ? (speed_base * overhangs_w_speeds[i].second.value / 100.0) :
                                                                               overhangs_w_speeds[i].second.value;
             if (speed < EPSILON) speed = speed_base;
@@ -260,13 +261,13 @@ public:
 
         std::map<float, float> fan_speed_sections;
         for (size_t i = 0; i < overhangs_w_fan_speeds.size(); i++) {
-            float distance           = path.width * (1.0 - (overhangs_w_fan_speeds[i].first / 100.0));
+            float distance           = flow.width * (1.0 - (overhangs_w_fan_speeds[i].first / 100.0));
             float fan_speed            = overhangs_w_fan_speeds[i].second.get_at(extruder_id);
             fan_speed_sections[distance] = fan_speed;
         }
 
         std::vector<ExtendedPoint> extended_points =
-            estimate_points_properties<true, true, true, true>(path.polyline.points, prev_layer_boundaries[current_object], path.width);
+            estimate_points_properties<true, true, true, true>(path, prev_layer_boundaries[current_object], flow.width);
 
         std::vector<ProcessedPoint> processed_points;
         processed_points.reserve(extended_points.size());
@@ -276,7 +277,7 @@ public:
 
             // The following code artifically increases the distance to provide slowdown for extrusions that are over curled lines
             float artificial_distance_to_curled_lines = 0.0;
-            const double dist_limit = 10.0 * path.width;
+            const double dist_limit = 10.0 * flow.width;
             {
                 Vec2d middle = 0.5 * (curr.position + next.position);
                 auto line_indices = prev_curled_extrusions[current_object].all_lines_in_radius(Point::new_scale(middle), scale_(dist_limit));
@@ -314,9 +315,9 @@ public:
                     for (size_t idx : line_indices) {
                         const CurledLine &line                 = prev_curled_extrusions[current_object].get_line(idx);
                         float             distance_from_curled = unscaled(line_alg::distance_to(line, Point::new_scale(middle)));
-                        float             dist                 = path.width * (1.0 - (distance_from_curled / dist_limit)) *
+                        float             dist                 = flow.width * (1.0 - (distance_from_curled / dist_limit)) *
                                      (1.0 - (distance_from_curled / dist_limit)) *
-                                     (line.curled_height / (path.height * 10.0f)); // max_curled_height_factor from SupportSpotGenerator
+                                     (line.curled_height / (flow.height * 10.0f)); // max_curled_height_factor from SupportSpotGenerator
                         artificial_distance_to_curled_lines = std::max(artificial_distance_to_curled_lines, dist);
                     }
                 }

@@ -144,6 +144,8 @@ set(SLIC3R_SOURCES
     GCode/CoolingBuffer.hpp
     GCode/FindReplace.cpp
     GCode/FindReplace.hpp
+    GCode/GCodeWriter.cpp
+    GCode/GCodeWriter.hpp
     GCode/PostProcessor.cpp
     GCode/PostProcessor.hpp
     GCode/PressureEqualizer.cpp
@@ -156,10 +158,16 @@ set(SLIC3R_SOURCES
     GCode/SpiralVase.hpp
     GCode/SeamPlacer.cpp
     GCode/SeamPlacer.hpp
+    GCode/SmoothPath.cpp
+    GCode/SmoothPath.hpp
     GCode/ToolOrdering.cpp
     GCode/ToolOrdering.hpp
+    GCode/Wipe.cpp
+    GCode/Wipe.hpp
     GCode/WipeTower.cpp
     GCode/WipeTower.hpp
+    GCode/WipeTowerIntegration.cpp
+    GCode/WipeTowerIntegration.hpp
     GCode/GCodeProcessor.cpp
     GCode/GCodeProcessor.hpp
     GCode/AvoidCrossingPerimeters.cpp
@@ -170,10 +178,10 @@ set(SLIC3R_SOURCES
     GCodeReader.hpp
     # GCodeSender.cpp
     # GCodeSender.hpp
-    GCodeWriter.cpp
-    GCodeWriter.hpp
     Geometry.cpp
     Geometry.hpp
+    Geometry/ArcWelder.cpp
+    Geometry/ArcWelder.hpp
     Geometry/Bicubic.hpp
     Geometry/Circle.cpp
     Geometry/Circle.hpp

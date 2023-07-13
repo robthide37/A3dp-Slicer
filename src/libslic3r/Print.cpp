@@ -997,7 +997,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     this->set_status(90, message);
 
     // Create GCode on heap, it has quite a lot of data.
-    std::unique_ptr<GCode> gcode(new GCode);
+    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator);
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
 
     if (m_conflict_result.has_value())
@@ -1113,13 +1113,15 @@ void Print::_make_skirt()
         }
         // Extrude the skirt loop.
         ExtrusionLoop eloop(elrSkirt);
-        eloop.paths.emplace_back(ExtrusionPath(
-            ExtrusionPath(
+        eloop.paths.emplace_back(
+            ExtrusionAttributes{
                 ExtrusionRole::Skirt,
-                (float)mm3_per_mm,         // this will be overridden at G-code export time
-                flow.width(),
-				(float)first_layer_height  // this will be overridden at G-code export time
-            )));
+                ExtrusionFlow{
+                    float(mm3_per_mm),        // this will be overridden at G-code export time
+                    flow.width(),
+                    float(first_layer_height) // this will be overridden at G-code export time
+                }
+            });
         eloop.paths.back().polyline = loop.split_at_first_point();
         m_skirt.append(eloop);
         if (m_config.min_skirt_length.value > 0) {
@@ -1625,8 +1627,8 @@ std::string PrintStatistics::finalize_output_path(const std::string &path_in) co
             }
 
 
-            ExtrusionPath path(ExtrusionRole::WipeTower, 0.0, 0.0, lh);
-            path.polyline = { minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner };
+            ExtrusionPath path({ minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner },
+                ExtrusionAttributes{ ExtrusionRole::WipeTower, ExtrusionFlow{ 0.0, 0.0, lh } });
             paths.push_back({ path });
 
             // We added the border, now add several parallel lines so we can detect an object that is fully inside the tower.

@@ -65,7 +65,7 @@ struct Circle {
     Vector center;
     Scalar radius;
 
-    Circle() {}
+    Circle() = default;
     Circle(const Vector &center, const Scalar radius) : center(center), radius(radius) {}
     Circle(const Vector &a, const Vector &b) : center(Scalar(0.5) * (a + b)) { radius = (a - center).norm(); }
     Circle(const Vector &a, const Vector &b, const Vector &c, const Scalar epsilon) { *this = CircleSq(a, b, c, epsilon); }

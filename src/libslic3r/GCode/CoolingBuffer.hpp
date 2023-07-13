@@ -7,7 +7,7 @@
 
 namespace Slic3r {
 
-class GCode;
+class GCodeGenerator;
 class Layer;
 struct PerExtruderAdjustments;
 
@@ -22,7 +22,7 @@ struct PerExtruderAdjustments;
 //
 class CoolingBuffer {
 public:
-    CoolingBuffer(GCode &gcodegen);
+    CoolingBuffer(GCodeGenerator &gcodegen);
     void        reset(const Vec3d &position);
     void        set_current_extruder(unsigned int extruder_id) { m_current_extruder = extruder_id; }
     std::string process_layer(std::string &&gcode, size_t layer_id, bool flush);
@@ -51,7 +51,7 @@ private:
     // Highest of m_extruder_ids plus 1.
     unsigned int                m_num_extruders { 0 };
     const std::string           m_toolchange_prefix;
-    // Referencs GCode::m_config, which is FullPrintConfig. While the PrintObjectConfig slice of FullPrintConfig is being modified,
+    // Referencs GCodeGenerator::m_config, which is FullPrintConfig. While the PrintObjectConfig slice of FullPrintConfig is being modified,
     // the PrintConfig slice of FullPrintConfig is constant, thus no thread synchronization is required.
     const PrintConfig          &m_config;
     unsigned int                m_current_extruder;

@@ -1,5 +1,5 @@
-#ifndef WipeTower_
-#define WipeTower_
+#ifndef slic3r_GCode_WipeTower_hpp_
+#define slic3r_GCode_WipeTower_hpp_
 
 #include <cmath>
 #include <string>
@@ -403,4 +403,4 @@ private:
 
 } // namespace Slic3r
 
-#endif // WipeTowerPrusaMM_hpp_ 
+#endif // slic3r_GCode_WipeTower_hpp_ 

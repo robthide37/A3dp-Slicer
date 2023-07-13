@@ -43,7 +43,7 @@ public:
     void raise()
     {
         if (valid()) {
-            if (_piles[_curPileIdx].empty() == false) { _curHeight += _piles[_curPileIdx].front().height; }
+            if (_piles[_curPileIdx].empty() == false) { _curHeight += _piles[_curPileIdx].front().height(); }
             _curPileIdx++;
         }
     }

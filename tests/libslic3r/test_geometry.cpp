@@ -84,16 +84,16 @@ TEST_CASE("Line::perpendicular_to", "[Geometry]") {
 TEST_CASE("Polygon::contains works properly", "[Geometry]"){
    // this test was failing on Windows (GH #1950)
     Slic3r::Polygon polygon(Points({
-        Point(207802834,-57084522),
-        Point(196528149,-37556190),
-        Point(173626821,-25420928),
-        Point(171285751,-21366123),
-        Point(118673592,-21366123),
-        Point(116332562,-25420928),
-        Point(93431208,-37556191),
-        Point(82156517,-57084523),
-        Point(129714478,-84542120),
-        Point(160244873,-84542120)
+        {207802834,-57084522},
+        {196528149,-37556190},
+        {173626821,-25420928},
+        {171285751,-21366123},
+        {118673592,-21366123},
+        {116332562,-25420928},
+        {93431208,-37556191},
+        {82156517,-57084523},
+        {129714478,-84542120},
+        {160244873,-84542120}
     }));
     Point point(95706562, -57294774);
     REQUIRE(polygon.contains(point));
@@ -310,6 +310,7 @@ SCENARIO("Path chaining", "[Geometry]") {
 	GIVEN("A path") {
 		Points points = { Point(26,26),Point(52,26),Point(0,26),Point(26,52),Point(26,0),Point(0,52),Point(52,52),Point(52,0) };
 		THEN("Chained with no diagonals (thus 26 units long)") {
+            // if chain_points() works correctly, these points should be joined with no diagonal paths
 			std::vector<Points::size_type> indices = chain_points(points);
 			for (Points::size_type i = 0; i + 1 < indices.size(); ++ i) {
 				double dist = (points.at(indices.at(i)).cast<double>() - points.at(indices.at(i+1)).cast<double>()).norm();

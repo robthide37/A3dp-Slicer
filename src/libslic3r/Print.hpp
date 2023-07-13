@@ -29,7 +29,7 @@
 
 namespace Slic3r {
 
-class GCode;
+class GCodeGenerator;
 class Layer;
 class ModelObject;
 class Print;
@@ -697,7 +697,7 @@ private:
     Polygons m_sequential_print_clearance_contours;
 
     // To allow GCode to set the Print's GCodeExport step status.
-    friend class GCode;
+    friend class GCodeGenerator;
     // To allow GCodeProcessor to emit warnings.
     friend class GCodeProcessor;
     // Allow PrintObject to access m_mutex and m_cancel_callback.
