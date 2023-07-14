@@ -384,9 +384,13 @@ std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std:
     return w.string();
 }
 
-std::string GCodeWriter::extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, double dE, const bool ccw, const std::string_view comment)
+std::string GCodeWriter::extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, double dE, const std::string_view comment)
 {
-    assert(dE > 0);
+    assert(dE != 0);
+    assert(std::abs(point.x()) < 1200.);
+    assert(std::abs(point.y()) < 1200.);
+    assert(std::abs(ij.x()) < 1200.);
+    assert(std::abs(ij.y()) < 1200.);
     m_pos.head<2>() = point.head<2>();
 
     GCodeG2G3Formatter w(ccw);
@@ -397,9 +401,12 @@ std::string GCodeWriter::extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &i
     return w.string();
 }
 
-std::string GCodeWriter::extrude_to_xy_G2G3R(const Vec2d &point, const double radius, double dE, const bool ccw, const std::string_view comment)
+std::string GCodeWriter::extrude_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, double dE, const std::string_view comment)
 {
-    assert(dE > 0);
+    assert(dE != 0);
+    assert(std::abs(point.x()) < 1200.);
+    assert(std::abs(point.y()) < 1200.);
+    assert(std::abs(radius) < 1800.);
     m_pos.head<2>() = point.head<2>();
 
     GCodeG2G3Formatter w(ccw);

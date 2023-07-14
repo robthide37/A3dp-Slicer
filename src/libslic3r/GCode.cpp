@@ -1263,7 +1263,7 @@ void GCodeGenerator::process_layers(
     size_t layer_to_print_idx = 0;
     const GCode::SmoothPathCache::InterpolationParameters interpolation_params {
         scaled<double>(print.config().gcode_resolution.value),
-        print.config().arc_fitting && ! print.config().spiral_vase ? 
+        print.config().arc_fitting != ArcFittingType::Disabled && ! print.config().spiral_vase ? 
             Geometry::ArcWelder::default_arc_length_percent_tolerance :
             0
     };
@@ -1362,7 +1362,7 @@ void GCodeGenerator::process_layers(
     size_t layer_to_print_idx = 0;
     const GCode::SmoothPathCache::InterpolationParameters interpolation_params {
         scaled<double>(print.config().gcode_resolution.value),
-        print.config().arc_fitting && ! print.config().spiral_vase ?
+        print.config().arc_fitting != ArcFittingType::Disabled && ! print.config().spiral_vase ?
             Geometry::ArcWelder::default_arc_length_percent_tolerance :
             0
     };
@@ -2828,6 +2828,7 @@ std::string GCodeGenerator::_extrude(
         Vec2d prev = this->point_to_gcode_quantized(path.front().point);
         auto  it   = path.begin();
         auto  end  = path.end();
+        const bool emit_radius = m_config.arc_fitting == ArcFittingType::EmitRadius;
         for (++ it; it != end; ++ it) {
             Vec2d p = this->point_to_gcode_quantized(it->point);
             if (it->radius == 0) {
@@ -2837,12 +2838,25 @@ std::string GCodeGenerator::_extrude(
                 gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
             } else {
                 // Extrude an arc.
-                double radius = GCodeFormatter::quantize_xyzf(it->radius);
-                Vec2f  center = Geometry::ArcWelder::arc_center(prev.cast<float>(), p.cast<float>(), float(radius), it->ccw());
-                float  angle  = Geometry::ArcWelder::arc_angle(prev.cast<float>(), p.cast<float>(), float(radius));
+                assert(m_config.arc_fitting == ArcFittingType::EmitCenter ||
+                       m_config.arc_fitting == ArcFittingType::EmitRadius);
+                double radius = unscaled<double>(it->radius);
+                if (emit_radius)
+                    // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
+                    radius = GCodeFormatter::quantize_xyzf(radius);
+                Vec2d  ij;
+                if (! emit_radius) {
+                    // Calculate quantized IJ circle center offset.
+                    Vec2d center_raw = Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), it->ccw()) - prev;
+                    ij = Vec2d{ GCodeFormatter::quantize_xyzf(center_raw.x()), GCodeFormatter::quantize_xyzf(center_raw.y()) };
+                }
+                double angle = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
                 const double line_length = angle * std::abs(radius);
                 path_length += line_length;
-                gcode += m_writer.extrude_to_xy_G2G3R(p, radius, it->ccw(), e_per_mm * line_length, comment);
+                const double dE = e_per_mm * line_length;
+                gcode += emit_radius ?
+                    m_writer.extrude_to_xy_G2G3R(p, radius, it->ccw(), dE, comment) :
+                    m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE, comment);
             }
             prev = p;
         }

@@ -386,6 +386,14 @@ Path fit_path(const Points &src, double tolerance, double fit_circle_percent_tol
             out.erase(douglas_peucker_in_place(out.begin() + begin_pl_idx, out.end(), tolerance), out.end());
     }
 
+#if 0
+    // Verify that all the source points are at tolerance distance from the interpolated path.
+    for (const Point &p : src) {
+        PathSegmentProjection proj = point_to_path_projection(out, p);
+        assert(proj.distance2 < sqr(tolerance + SCALED_EPSILON));
+    }
+#endif
+
     return out;
 }
 

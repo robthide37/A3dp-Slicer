@@ -76,6 +76,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
 {
     std::string     gcode;
     const Extruder &extruder = *gcodegen.writer().extruder();
+    static constexpr const std::string_view wipe_retract_comment = "wipe and retract"sv;
 
     // Remaining quantized retraction length.
     if (double retract_length = extruder.retract_to_go(toolchange ? extruder.retract_length_toolchange() : extruder.retract_length()); 
@@ -103,14 +104,16 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                 dE   = retract_length;
                 done = true;
             }
-            gcode += gcodegen.writer().extrude_to_xy(p, -dE, "wipe and retract"sv);
+            gcode += gcodegen.writer().extrude_to_xy(p, -dE, wipe_retract_comment);
             retract_length -= dE;
             return done;
         };
-        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e](const Vec2d &prev, Vec2d &p, float radius_in, const bool ccw) {
-            double radius = GCodeFormatter::quantize_xyzf(radius_in);
-            Vec2f  center = Geometry::ArcWelder::arc_center(prev.cast<float>(), p.cast<float>(), float(radius), ccw);
-            float  angle  = Geometry::ArcWelder::arc_angle(prev.cast<float>(), p.cast<float>(), float(radius));
+        const bool emit_radius = gcodegen.config().arc_fitting == ArcFittingType::EmitRadius;
+        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, emit_radius](const Vec2d &prev, Vec2d &p, double radius_in, const bool ccw) {
+            // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
+            double radius = emit_radius ? GCodeFormatter::quantize_xyzf(radius_in) : radius_in;
+            Vec2d  center = Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), ccw);
+            float  angle  = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
             double segment_length = angle * std::abs(radius);
             double dE = GCodeFormatter::quantize_e(xy_to_e * segment_length);
             bool   done = false;
@@ -121,7 +124,13 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                 dE   = retract_length;
                 done = true;
             }
-            gcode += gcodegen.writer().extrude_to_xy_G2G3R(p, radius, ccw, -dE, "wipe and retract"sv);
+            if (emit_radius) {
+                gcode += gcodegen.writer().extrude_to_xy_G2G3R(p, radius, ccw, -dE, wipe_retract_comment);
+            } else {
+                // Calculate quantized IJ circle center offset.
+                Vec2d ij{ GCodeFormatter::quantize_xyzf(center.x() - prev.x()), GCodeFormatter::quantize_xyzf(center.y() - prev.y()) };
+                gcode += gcodegen.writer().extrude_to_xy_G2G3IJ(p, ij, ccw, -dE, wipe_retract_comment);
+            }
             retract_length -= dE;
             return done;
         };
@@ -144,7 +153,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                     start_wipe();
                     if (it->linear() ?
                         wipe_linear(prev, p) :
-                        wipe_arc(prev, p, it->radius, it->ccw()))
+                        wipe_arc(prev, p, unscaled<double>(it->radius), it->ccw()))
                         break;
                     prev = p;
                 }

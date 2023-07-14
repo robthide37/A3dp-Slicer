@@ -54,7 +54,10 @@ inline Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> arc_cente
     auto  v  = end_pos - start_pos;
     Float q2 = v.squaredNorm();
     assert(q2 > 0);
-    Float t = sqrt(sqr(radius) / q2 - Float(.25f));
+    Float t2 = sqr(radius) / q2 - Float(.25f);
+    // If the start_pos and end_pos are nearly antipodal, t2 may become slightly negative.
+    // In that case return a centroid of start_point & end_point.
+    Float t = t2 > 0 ? sqrt(t2) : Float(0);
     auto mid = Float(0.5) * (start_pos + end_pos);
     Vector vp{ -v.y() * t, v.x() * t };
     return (radius > Float(0)) == is_ccw ? (mid + vp).eval() : (mid - vp).eval();
