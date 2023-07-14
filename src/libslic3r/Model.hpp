@@ -224,7 +224,7 @@ private:
 enum class CutConnectorType : int {
     Plug
     , Dowel
-    , Rivet
+    , Snap
     , Undef
 };
 
@@ -240,7 +240,6 @@ enum class CutConnectorShape : int {
     , Square
     , Hexagon
     , Circle
-    , Rivet
     , Undef
     //,D-shape
 };
