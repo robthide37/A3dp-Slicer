@@ -235,6 +235,11 @@ class GLGizmoCut3D : public GLGizmoBase
 
     std::map<std::string, std::string> m_labels_map;
 
+    // Debug values
+    bool m_use_TAG_mesh {true};
+    bool m_use_TAG_mesh_full {true};
+    // 
+
 public:
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
@@ -376,6 +381,7 @@ private:
     indexed_triangle_set its_make_upper_groove_plane();
     indexed_triangle_set its_make_lower_groove_plane(float flaps_width);
     indexed_triangle_set its_make_sides_groove_plane(float flaps_width);
+    indexed_triangle_set its_make_groove_plane();
 
     indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);
     void apply_cut_connectors(ModelObject* mo, const std::string& connector_name);
