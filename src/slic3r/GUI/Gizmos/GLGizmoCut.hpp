@@ -32,6 +32,7 @@ class GLGizmoCut3D : public GLGizmoBase
         CutPlane,
         CutPlaneZRotation,
         CutPlaneXMove,
+        CutPlaneYMove,
         Count,
     };
 

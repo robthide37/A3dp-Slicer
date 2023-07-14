@@ -1116,6 +1116,8 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
             }
         }
 
+        const double grabber_x_shift = 0.2 * m_grabber_connection_len;
+
         // render CutPlaneXMove grabber
 
         if (no_xy_grabber_hovered || m_hover_id == CutPlaneXMove)
@@ -1123,16 +1125,31 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
             size = 0.5 * (m_dragging ? get_dragging_half_size(mean_size) : get_half_size(mean_size));
             color = m_hover_id == CutPlaneXMove ? ColorRGBA::RED() : m_plane.model.get_color();
 
-            const double grabber_shift = 0.2 * m_grabber_connection_len;
-
-            render_model(m_sphere.model, color, view_matrix * translation_transform(grabber_shift * Vec3d::UnitX()) * scale_transform(size));
+            render_model(m_sphere.model, color, view_matrix * translation_transform(grabber_x_shift * Vec3d::UnitX()) * scale_transform(size));
 
             const Vec3d cone_scale = Vec3d(0.75 * size, 0.75 * size, 1.8 * size);
 
-            Vec3d offset = Vec3d(1.25 * size + grabber_shift, 0.0, 0.0);
+            Vec3d offset = Vec3d(1.25 * size + grabber_x_shift, 0.0, 0.0);
             render_model(m_cone.model, color, view_matrix * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitY()) * scale_transform(cone_scale));
-            offset = Vec3d(-1.25 * size + grabber_shift, 0.0, 0.0);
+            offset = Vec3d(-1.25 * size + grabber_x_shift, 0.0, 0.0);
             render_model(m_cone.model, color, view_matrix * translation_transform(offset) * rotation_transform(-0.5 * PI * Vec3d::UnitY()) * scale_transform(cone_scale));
+        }
+
+        // render CutPlaneYMove grabber
+
+        if (m_groove_angle > 0.0f && (no_xy_grabber_hovered || m_hover_id == CutPlaneYMove))
+        {
+            size = 0.5 * (m_dragging ? get_dragging_half_size(mean_size) : get_half_size(mean_size));
+            color = m_hover_id == CutPlaneYMove ? ColorRGBA::GREEN() : m_plane.model.get_color();
+
+            render_model(m_sphere.model, color, view_matrix * translation_transform(grabber_x_shift * Vec3d::UnitX()) * scale_transform(size));
+
+            const Vec3d cone_scale = Vec3d(0.75 * size, 0.75 * size, 1.8 * size);
+
+            Vec3d offset = Vec3d( grabber_x_shift, 1.25 * size, 0.0);
+            render_model(m_cone.model, color, view_matrix * translation_transform(offset) * rotation_transform(-0.5 * PI * Vec3d::UnitX()) * scale_transform(cone_scale));
+            offset = Vec3d(grabber_x_shift, -1.25 * size, 0.0);
+            render_model(m_cone.model, color, view_matrix * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitX()) * scale_transform(cone_scale));
         }
     }
 }
@@ -1267,9 +1284,11 @@ void GLGizmoCut3D::on_register_raycasters_for_picking()
             m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CutPlaneZRotation, *m_cone.mesh_raycaster, Transform3d::Identity()));
             m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CutPlaneZRotation, *m_cone.mesh_raycaster, Transform3d::Identity()));
 
-            m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CutPlaneXMove, *m_sphere.mesh_raycaster, Transform3d::Identity()));
             m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CutPlaneXMove, *m_cone.mesh_raycaster, Transform3d::Identity()));
             m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CutPlaneXMove, *m_cone.mesh_raycaster, Transform3d::Identity()));
+
+            m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CutPlaneYMove, *m_cone.mesh_raycaster, Transform3d::Identity()));
+            m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CutPlaneYMove, *m_cone.mesh_raycaster, Transform3d::Identity()));
         }
     }
 
@@ -1368,23 +1387,39 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
 
         if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
 
-            double grabber_shift = -1.75 * m_grabber_connection_len;
+            double grabber_x_shift = -1.75 * m_grabber_connection_len;
 
-            m_raycasters[id++]->set_transform(trafo * translation_transform(grabber_shift * Vec3d::UnitY()) * scale_transform(size));
+            m_raycasters[id++]->set_transform(trafo * translation_transform(grabber_x_shift * Vec3d::UnitY()) * scale_transform(size));
 
-            offset = Vec3d(1.25 * size, grabber_shift, 0.0);
+            offset = Vec3d(1.25 * size, grabber_x_shift, 0.0);
             m_raycasters[id++]->set_transform(trafo * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitY()) * scale_transform(scale));
-            offset = Vec3d(-1.25 * size, grabber_shift, 0.0);
+            offset = Vec3d(-1.25 * size, grabber_x_shift, 0.0);
             m_raycasters[id++]->set_transform(trafo * translation_transform(offset) * rotation_transform(-0.5 * PI * Vec3d::UnitY()) * scale_transform(scale));
 
-            grabber_shift = 0.2 * m_grabber_connection_len;
+            // set grabbers to un-hovered size
 
-            m_raycasters[id++]->set_transform(trafo * translation_transform(grabber_shift * Vec3d::UnitX()) * scale_transform(size));
+            const double def_size  = size * 0.5;
+            scale = Vec3d(0.75 * def_size, 0.75 * def_size, 1.8 * def_size);
 
-            offset = Vec3d(1.25 * size + grabber_shift, 0.0, 0.0);
+            const double offset_shift = def_size * 0.25;
+            grabber_x_shift = 0.2 * m_grabber_connection_len;
+
+            offset = Vec3d(offset_shift + grabber_x_shift, 0.0, 0.0);
             m_raycasters[id++]->set_transform(trafo * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitY()) * scale_transform(scale));
-            offset = Vec3d(-1.25 * size + grabber_shift, 0.0, 0.0);
+            offset = Vec3d(-offset_shift + grabber_x_shift, 0.0, 0.0);
             m_raycasters[id++]->set_transform(trafo * translation_transform(offset) * rotation_transform(-0.5 * PI * Vec3d::UnitY()) * scale_transform(scale));
+
+            if (m_groove_angle > 0.0f) {
+                offset = Vec3d(grabber_x_shift, offset_shift, 0.0);
+                m_raycasters[id++]->set_transform(trafo * translation_transform(offset) * rotation_transform(-0.5 * PI * Vec3d::UnitX()) * scale_transform(scale));
+                offset = Vec3d(grabber_x_shift, -offset_shift, 0.0);
+                m_raycasters[id++]->set_transform(trafo * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitX()) * scale_transform(scale));
+            }
+            else {
+                // discard transformation for CutPlaneYMove grabbers
+                m_raycasters[id++]->set_transform(Transform3d::Identity());
+                m_raycasters[id++]->set_transform(Transform3d::Identity());
+            }
         }
     }
 }
@@ -1454,11 +1489,12 @@ Vec3d GLGizmoCut3D::mouse_position_in_local_plane(GrabberID axis, const Linef3& 
 void GLGizmoCut3D::dragging_grabber_move(const GLGizmoBase::UpdateData &data)
 {
     const Vec3d grabber_init_pos        = m_hover_id == CutPlaneXMove ? 0.2 * m_grabber_connection_len * Vec3d::UnitX():
+                                          m_hover_id == CutPlaneYMove ? 0.0 * Vec3d::UnitY() :
                                          (m_hover_id == CutPlane ? 0. : m_grabber_connection_len) * Vec3d::UnitZ();
     const Vec3d starting_drag_position  = translation_transform(m_plane_center) * m_rotation_m * grabber_init_pos;
     double      projection              = 0.0;
 
-    Vec3d starting_vec = m_rotation_m * (m_hover_id == CutPlaneXMove ? Vec3d::UnitX() : Vec3d::UnitZ());
+    Vec3d starting_vec = m_rotation_m * (m_hover_id == CutPlaneXMove ? Vec3d::UnitX() : m_hover_id == CutPlaneYMove ? Vec3d::UnitY() : Vec3d::UnitZ());
     if (starting_vec.norm() != 0.0) {
         const Vec3d mouse_dir = data.mouse_ray.unit_vector();
         // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
@@ -1553,7 +1589,7 @@ void GLGizmoCut3D::on_dragging(const UpdateData& data)
 {
     if (m_hover_id < 0)
         return;
-    if (m_hover_id == Z || m_hover_id == CutPlane || m_hover_id == CutPlaneXMove)
+    if (m_hover_id == Z || m_hover_id == CutPlane || m_hover_id == CutPlaneXMove || m_hover_id == CutPlaneYMove)
         dragging_grabber_move(data);
     else if (m_hover_id == X || m_hover_id == Y || m_hover_id == CutPlaneZRotation)
         dragging_grabber_rotation(data);
@@ -1583,7 +1619,7 @@ void GLGizmoCut3D::on_stop_dragging()
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Rotate cut plane"), UndoRedo::SnapshotType::GizmoAction);
         m_start_dragging_m = m_rotation_m;
     }
-    else if (m_hover_id == Z || m_hover_id == CutPlane || m_hover_id == CutPlaneXMove) {
+    else if (m_hover_id == Z || m_hover_id == CutPlane || m_hover_id == CutPlaneXMove|| m_hover_id == CutPlaneYMove) {
         if (m_was_cut_plane_dragged)
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Move cut plane"), UndoRedo::SnapshotType::GizmoAction);
         m_ar_plane_center = m_plane_center;
@@ -3006,6 +3042,8 @@ bool GLGizmoCut3D::has_valid_contour() const
 
 void GLGizmoCut3D::apply_connectors_in_model(ModelObject* mo, int &dowels_count)
 {
+    if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
+        return;
     if (m_connector_mode == CutConnectorMode::Manual) {
         clear_selection();
 
