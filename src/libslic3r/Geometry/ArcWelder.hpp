@@ -97,6 +97,10 @@ inline typename Derived::Scalar arc_length(
     return arc_angle(start_pos, end_pos, radius) * std::abs(radius);
 }
 
+// Discretize arc given the radius, orientation and maximum deviation from the arc.
+// Returned polygon starts with p1, ends with p2 and it is discretized to guarantee the maximum deviation.
+Points arc_discretize(const Point &p1, const Point &p2, const double radius, const bool ccw, const double deviation);
+
 // 1.2m diameter, maximum given by coord_t
 static constexpr const double default_scaled_max_radius = scaled<double>(600.);
 // 0.05mm

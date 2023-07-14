@@ -196,6 +196,41 @@ TEST_CASE("Offseting a line generates a polygon correctly", "[Geometry]"){
     REQUIRE(area.area() == Slic3r::Polygon(Points({Point(10,5),Point(20,5),Point(20,15),Point(10,15)})).area());
 }
 
+SCENARIO("Circle Fit, 3 points", "[Geometry]") {
+    WHEN("Three points make a circle") {
+        double s1 = scaled<double>(1.);
+        THEN("circle_center(): A center point { 0, 0 } is returned") {
+            Vec2d center = Geometry::circle_center(Vec2d{ s1, 0. }, Vec2d{ 0, s1 }, Vec2d{ -s1, 0. }, SCALED_EPSILON);
+            REQUIRE(is_approx(center, Vec2d(0, 0)));
+        }
+        THEN("circle_center(): A center point { 0, 0 } is returned for points in reverse") {
+            Vec2d center = Geometry::circle_center(Vec2d{ -s1, 0. }, Vec2d{ 0, s1 }, Vec2d{ s1, 0. }, SCALED_EPSILON);
+            REQUIRE(is_approx(center, Vec2d(0, 0)));
+        }
+        THEN("try_circle_center(): A center point { 0, 0 } is returned") {
+            std::optional<Vec2d> center = Geometry::try_circle_center(Vec2d{ s1, 0. }, Vec2d{ 0, s1 }, Vec2d{ -s1, 0. }, SCALED_EPSILON);
+            REQUIRE(center);
+            REQUIRE(is_approx(*center, Vec2d(0, 0)));
+        }
+        THEN("try_circle_center(): A center point { 0, 0 } is returned for points in reverse") {
+            std::optional<Vec2d> center = Geometry::try_circle_center(Vec2d{ -s1, 0. }, Vec2d{ 0, s1 }, Vec2d{ s1, 0. }, SCALED_EPSILON);
+            REQUIRE(center);
+            REQUIRE(is_approx(*center, Vec2d(0, 0)));
+        }
+    }
+    WHEN("Three points are collinear") {
+        double s1 = scaled<double>(1.);
+        THEN("circle_center(): A center point { 2, 0 } is returned") {
+            Vec2d center = Geometry::circle_center(Vec2d{ s1, 0. }, Vec2d{ 2. * s1, 0. }, Vec2d{ 3. * s1, 0. }, SCALED_EPSILON);
+            REQUIRE(is_approx(center, Vec2d(2. * s1, 0)));
+        }
+        THEN("try_circle_center(): Fails for collinear points") {
+            std::optional<Vec2d> center = Geometry::try_circle_center(Vec2d{ s1, 0. }, Vec2d{ 2. * s1, 0. }, Vec2d{ 3. * s1, 0. }, SCALED_EPSILON);
+            REQUIRE(! center);
+        }
+    }
+}
+
 SCENARIO("Circle Fit, TaubinFit with Newton's method", "[Geometry]") {
     GIVEN("A vector of Vec2ds arranged in a half-circle with approximately the same distance R from some point") {
         Vec2d expected_center(-6, 0);

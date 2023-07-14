@@ -26,6 +26,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ArcWelder.hpp"
+#include "Circle.hpp"
 
 #include "../MultiPoint.hpp"
 #include "../Polygon.hpp"
@@ -36,11 +37,25 @@
 
 namespace Slic3r { namespace Geometry { namespace ArcWelder {
 
-// Area of a parallelogram of two vectors to be considered collinear.
-static constexpr const double  Parallel_area_threshold = 0.0001;
-static constexpr const auto    Parallel_area_threshold_scaled = int64_t(Parallel_area_threshold / sqr(SCALING_FACTOR));
-// FIXME do we want to use EPSILON here?
-static constexpr const double  epsilon = 0.000005;
+Points arc_discretize(const Point &p1, const Point &p2, const double radius, const bool ccw, const double deviation)
+{
+    Vec2d  center = arc_center(p1.cast<double>(), p2.cast<double>(), radius, ccw);
+    double angle  = arc_angle(p1.cast<double>(), p2.cast<double>(), radius);
+
+    double r           = std::abs(radius);
+    double angle_step  = 2. * acos((r - deviation) / r);
+    size_t num_steps   = size_t(ceil(angle / angle_step));
+
+    Points out;
+    out.reserve(num_steps + 1);
+    out.emplace_back(p1);
+    if (! ccw)
+        angle_step *= -1.;
+    for (size_t i = 1; i < num_steps; ++ i)
+        out.emplace_back(p1.rotated(angle_step * i, center.cast<coord_t>()));
+    out.emplace_back(p2);
+    return out;
+}
 
 struct Circle
 {
@@ -50,37 +65,26 @@ struct Circle
 
 // Interpolate three points with a circle.
 // Returns false if the three points are collinear or if the radius is bigger than maximum allowed radius.
-//FIXME unit test!
 static std::optional<Circle> try_create_circle(const Point &p1, const Point &p2, const Point &p3, const double max_radius)
 {
-    // Use area of triangle to judge whether three points are considered collinear.
-    Vec2i64 v2 = (p2 - p1).cast<int64_t>();
-    Vec2i64 v3 = (p3 - p2).cast<int64_t>();
-    if (std::abs(cross2(v2, v3)) <= Parallel_area_threshold_scaled)
-        return {};
-
-    int64_t det = cross2(p2.cast<int64_t>(), p3.cast<int64_t>()) - cross2(p1.cast<int64_t>(), v3);
-    if (std::abs(det) < int64_t(SCALED_EPSILON))
-        return {};
-
-    Point center = ((1. / 2.0 * double(det)) *
-        (double(p1.cast<int64_t>().squaredNorm()) * perp(v3).cast<double>() + 
-         double(p2.cast<int64_t>().squaredNorm()) * perp(p1 - p3).cast<double>() + 
-         double(p3.cast<int64_t>().squaredNorm()) * perp(v2).cast<double>())).cast<coord_t>();
-    double r = sqrt(double((center - p1).squaredNorm()));
-    return r > max_radius ? std::make_optional<Circle>() : std::make_optional<Circle>({ center, r });
+    if (auto center = Slic3r::Geometry::try_circle_center(p1.cast<double>(), p2.cast<double>(), p3.cast<double>(), SCALED_EPSILON); center) {
+        Point c = center->cast<coord_t>();
+        if (double r = sqrt(double((c - p1).cast<int64_t>().squaredNorm())); r <= max_radius)
+            return std::make_optional<Circle>({ c, float(r) });
+    }
+    return {};
 }
 
 // Returns a closest point on the segment.
 // Returns false if the closest point is not inside the segment, but at its boundary.
 static bool foot_pt_on_segment(const Point &p1, const Point &p2, const Point &c, Point &out)
 {
-    Vec2i64 v21   = (p2 - p1).cast<int64_t>();
-    int64_t denom = v21.squaredNorm();
-    if (denom > epsilon) {
-        if (double t = double((c - p1).cast<int64_t>().dot(v21)) / double(denom);
-            t >= epsilon && t < 1. - epsilon) {
-            out = p1 + (t * v21.cast<double>()).cast<coord_t>();
+    Vec2i64 v21 = (p2 - p1).cast<int64_t>();
+    int64_t l2  = v21.squaredNorm();
+    if (l2 > int64_t(SCALED_EPSILON)) {
+        if (int64_t t = (c - p1).cast<int64_t>().dot(v21);
+            t >= int64_t(SCALED_EPSILON) && t < l2 - int64_t(SCALED_EPSILON)) {
+            out = p1 + ((double(t) / double(l2)) * v21.cast<double>()).cast<coord_t>();
             return true;
         }
     }
@@ -91,16 +95,19 @@ static bool foot_pt_on_segment(const Point &p1, const Point &p2, const Point &c,
 static inline bool circle_approximation_sufficient(const Circle &circle, const Points::const_iterator begin, const Points::const_iterator end, const double tolerance)
 {
     // The circle was calculated from the 1st and last point of the point sequence, thus the fitting of those points does not need to be evaluated.
-    assert(std::abs((*begin - circle.center).cast<double>().norm() - circle.radius) < epsilon);
-    assert(std::abs((*std::prev(end) - circle.center).cast<double>().norm() - circle.radius) < epsilon);
+    assert(std::abs((*begin - circle.center).cast<double>().norm() - circle.radius) < SCALED_EPSILON);
+    assert(std::abs((*std::prev(end) - circle.center).cast<double>().norm() - circle.radius) < SCALED_EPSILON);
     assert(end - begin >= 3);
 
-    for (auto it = begin; std::next(it) != end; ++ it) {
-        if (it != begin) {
-            if (double distance_from_center = (*it - circle.center).cast<double>().norm();
-                std::abs(distance_from_center - circle.radius) > tolerance)
-                return false;
-        }
+    // Test the 1st point.
+    if (double distance_from_center = (*begin - circle.center).cast<double>().norm();
+        std::abs(distance_from_center - circle.radius) > tolerance)
+        return false;
+
+    for (auto it = std::next(begin); std::next(it) != end; ++ it) {
+        if (double distance_from_center = (*it - circle.center).cast<double>().norm();
+            std::abs(distance_from_center - circle.radius) > tolerance)
+            return false;
         Point closest_point;
         if (foot_pt_on_segment(*it, *std::next(it), circle.center, closest_point)) {
             if (double distance_from_center = (closest_point - circle.center).cast<double>().norm();
@@ -114,8 +121,8 @@ static inline bool circle_approximation_sufficient(const Circle &circle, const P
 static inline bool get_deviation_sum_squared(const Circle &circle, const Points::const_iterator begin, const Points::const_iterator end, const double tolerance, double &total_deviation)
 {
     // The circle was calculated from the 1st and last point of the point sequence, thus the fitting of those points does not need to be evaluated.
-    assert(std::abs((*begin - circle.center).cast<double>().norm() - circle.radius) < epsilon);
-    assert(std::abs((*std::prev(end) - circle.center).cast<double>().norm() - circle.radius) < epsilon);
+    assert(std::abs((*begin - circle.center).cast<double>().norm() - circle.radius) < SCALED_EPSILON);
+    assert(std::abs((*std::prev(end) - circle.center).cast<double>().norm() - circle.radius) < SCALED_EPSILON);
     assert(end - begin >= 3);
 
     total_deviation = 0;
@@ -146,18 +153,19 @@ static std::optional<Circle> try_create_circle(const Points::const_iterator begi
     size_t size = end - begin;
     if (size == 3) {
         out = try_create_circle(*begin, *std::next(begin), *std::prev(end), max_radius);
-        if (! circle_approximation_sufficient(*out, begin, end, tolerance))
+        if (out && ! circle_approximation_sufficient(*out, begin, end, tolerance))
             out.reset();
     } else {
+#if 0
         size_t ipivot = size / 2;
         // Take a center difference of points at the center of the path.
         //FIXME does it really help? For short arches, the linear interpolation may be 
         Point pivot = (size % 2 == 0) ? (*(begin + ipivot) + *(begin + ipivot - 1)) / 2 :
             (*(begin + ipivot - 1) + *(begin + ipivot + 1)) / 2;
         if (std::optional<Circle> circle = try_create_circle(*begin, pivot, *std::prev(end), max_radius);
-            circle_approximation_sufficient(*circle, begin, end, tolerance))
+            circle && circle_approximation_sufficient(*circle, begin, end, tolerance))
             return circle;
-
+#endif
         // Find the circle with the least deviation, if one exists.
         double least_deviation;
         double current_deviation;
@@ -335,19 +343,24 @@ Path fit_path(const Points &src, double tolerance, double fit_circle_percent_tol
         out.erase(douglas_peucker_in_place(out.begin(), out.end(), tolerance), out.end());
     } else {
         // Perform simplification & fitting.
+        // Index of the start of a last polyline, which has not yet been decimated.
         int begin_pl_idx = 0;
-        for (auto begin = src.begin(); begin < src.end();) {
-            // Minimum 3 points required for circle fitting.
-            auto end = begin + 3;
+        out.push_back({ src.front(), 0.f });
+        for (auto it = std::next(src.begin()); it != src.end();) {
+            // Minimum 2 additional points required for circle fitting.
+            auto begin = std::prev(it);
+            auto end   = std::next(it);
+            assert(end <= src.end());
             std::optional<Arc> arc;
-            while (end <= src.end()) {
+            while (end != src.end()) {
+                auto next_end = std::next(end);
                 if (std::optional<Arc> this_arc = ArcWelder::Arc::try_create_arc(
-                                                        begin, end,
+                                                        begin, next_end,
                                                         ArcWelder::default_scaled_max_radius,
                                                         tolerance, fit_circle_percent_tolerance);
                     this_arc) {
                     arc = this_arc;
-                    ++ end;
+                    end = next_end;
                 } else
                     break;
             }
@@ -355,13 +368,22 @@ Path fit_path(const Points &src, double tolerance, double fit_circle_percent_tol
                 // If there is a trailing polyline, decimate it first before saving a new arc.
                 if (out.size() - begin_pl_idx > 2)
                     out.erase(douglas_peucker_in_place(out.begin() + begin_pl_idx, out.end(), tolerance), out.end());
-                // Save the end of the last circle segment, which may become the first point of a possible future polyline.
+                // Save the index of an end of the new circle segment, which may become the first point of a possible future polyline.
                 begin_pl_idx = int(out.size());
-                -- end;
-                out.push_back({ arc->end_point, float(arc->direction == Orientation::CCW ? arc->radius : - arc->radius) });
-            } else
-                out.push_back({ arc->end_point, 0.f });
+                // This will be the next point to try to add.
+                it = end;
+                // Add the new arc.
+                assert(*begin == arc->start_point);
+                assert(*std::prev(it) == arc->end_point);
+                out.push_back({ arc->end_point, float(arc->radius), arc->direction });
+            } else {
+                // Arc is not valid, append a linear segment.
+                out.push_back({ *it ++ });
+            }
         }
+        if (out.size() - begin_pl_idx > 2)
+            // Do the final polyline decimation.
+            out.erase(douglas_peucker_in_place(out.begin() + begin_pl_idx, out.end(), tolerance), out.end());
     }
 
     return out;
