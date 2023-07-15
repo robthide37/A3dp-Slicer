@@ -184,41 +184,11 @@ static std::optional<Circle> try_create_circle(const Points::const_iterator begi
 // ported from ArcWelderLib/ArcWelder/segmented/shape.h class "arc"
 class Arc {
 public:
-
-    Arc() {}
-#if 0
-    Arc(Point center, double radius, Point start, Point end, Orientation dir) :
-        center(center),
-        radius(radius),
-        start_point(start),
-        end_point(end),
-        direction(dir) {
-        if (radius == 0.0 ||
-            start_point == center ||
-            end_point == center ||
-            start_point == end_point) {
-            is_arc = false;
-            return;
-        }
-        is_arc = true;
-    }
-#endif
-
-    Point  center;
-    double radius { 0 };
-    bool   is_arc { false };
     Point  start_point{ 0, 0 };
     Point  end_point{ 0, 0 };
+    Point  center;
+    double radius { 0 };
     Orientation direction { Orientation::Unknown };
-
-    static std::optional<Arc> try_create_arc(
-        const Points::const_iterator begin,
-        const Points::const_iterator end,
-        double max_radius = default_scaled_max_radius,
-        double tolerance = default_scaled_resolution,
-        double path_tolerance_percent = default_arc_length_percent_tolerance);
-
-    bool is_valid() const { return is_arc; }
 };
 
 static inline int sign(const int64_t i)
@@ -274,25 +244,24 @@ static inline std::optional<Arc> try_create_arc_impl(
     const double approximate_length             = length(begin, end);
     assert(approximate_length > 0);
     const double arc_length_difference_relative = (arc_length - approximate_length) / approximate_length;
-    if (std::fabs(arc_length_difference_relative) >= path_tolerance_percent)
-        return {};
 
-    Arc out;
-    out.is_arc            = true;
-    out.direction         = arc_dir > 0 ? Orientation::CCW : Orientation::CW;
-    out.center            = circle.center;
-    out.radius            = circle.radius;
-    out.start_point       = *begin;
-    out.end_point         = *std::prev(end);
-    return std::make_optional<Arc>(out);
+    return std::fabs(arc_length_difference_relative) >= path_tolerance_percent ? 
+        std::make_optional<Arc>() :
+        std::make_optional<Arc>(Arc{
+            *begin,
+            *std::prev(end),
+            circle.center,
+            circle.radius,
+            arc_dir > 0 ? Orientation::CCW : Orientation::CW
+        });
 }
 
-std::optional<Arc> Arc::try_create_arc(
+static inline std::optional<Arc> try_create_arc(
     const Points::const_iterator begin,
     const Points::const_iterator end,
-    double                       max_radius,
-    double                       tolerance,
-    double                       path_tolerance_percent)
+    double                       max_radius             = default_scaled_max_radius,
+    double                       tolerance              = default_scaled_resolution,
+    double                       path_tolerance_percent = default_arc_length_percent_tolerance)
 {
     std::optional<Circle> circle = try_create_circle(begin, end, max_radius, tolerance);
     if (! circle)
@@ -354,7 +323,7 @@ Path fit_path(const Points &src, double tolerance, double fit_circle_percent_tol
             std::optional<Arc> arc;
             while (end != src.end()) {
                 auto next_end = std::next(end);
-                if (std::optional<Arc> this_arc = ArcWelder::Arc::try_create_arc(
+                if (std::optional<Arc> this_arc = try_create_arc(
                                                         begin, next_end,
                                                         ArcWelder::default_scaled_max_radius,
                                                         tolerance, fit_circle_percent_tolerance);
@@ -432,20 +401,24 @@ double clip_end(Path &path, double distance)
             Vec2d  v    = (path.back().point - last.point).cast<double>();
             double lsqr = v.squaredNorm();
             if (lsqr > sqr(distance)) {
-                path.push_back({ last.point + (v * (distance / sqrt(lsqr))).cast<coord_t>(), 0.f, Orientation::CCW });
+                path.push_back({ last.point + (v * (distance / sqrt(lsqr))).cast<coord_t>() });
+                // Length to go is zero.
                 return 0;
             }
             distance -= sqrt(lsqr);
         } else {
             // Circular segment
-            float angle = arc_angle(path.back().point.cast<float>(), last.point.cast<float>(), last.radius);
-            double len = std::abs(last.radius) * angle;
+            double angle = arc_angle(path.back().point.cast<double>(), last.point.cast<double>(), last.radius);
+            double len   = std::abs(last.radius) * angle;
             if (len > distance) {
                 // Rotate the segment end point in reverse towards the start point.
-                path.push_back({ 
-                    last.point.rotated(- angle * (distance / len), 
-                        arc_center(path.back().point.cast<float>(), last.point.cast<float>(), last.radius, last.ccw()).cast<coord_t>()),
+                if (last.ccw())
+                    angle *= -1.;
+                path.push_back({
+                    last.point.rotated(angle * (distance / len),
+                        arc_center(path.back().point.cast<double>(), last.point.cast<double>(), double(last.radius), last.ccw()).cast<coord_t>()),
                     last.radius, last.orientation });
+                // Length to go is zero.
                 return 0;
             }
             distance -= len;
@@ -460,11 +433,13 @@ double clip_end(Path &path, double distance)
 PathSegmentProjection point_to_path_projection(const Path &path, const Point &point, double search_radius2)
 {
     assert(path.size() != 1);
+    // initialized to "invalid" state.
     PathSegmentProjection out;
     out.distance2 = search_radius2;
     if (path.size() < 2 || path.front().point == point) {
         // First point is the closest point.
         if (path.empty()) {
+            // No closest point available.
         } else if (const Point p0 = path.front().point; p0 == point) {
             out.segment_id = 0;
             out.point      = p0;
@@ -475,12 +450,16 @@ PathSegmentProjection point_to_path_projection(const Path &path, const Point &po
             out.distance2  = d2;
         }
     } else {
+        assert(path.size() >= 2);
+        // min_point_it will contain an end point of a segment with a closest projection found
+        // or path.cbegin() if no such closest projection closer than search_radius2 was found.
         auto  min_point_it = path.cbegin();
         Point prev         = path.front().point;
-        for (auto it = path.cbegin() + 1; it != path.cend(); ++ it) {
+        for (auto it = std::next(path.cbegin()); it != path.cend(); ++ it) {
             if (it->linear()) {
                 // Linear segment
                 Point proj;
+                // distance_to_squared() will possibly return the start or end point of a line segment.
                 if (double d2 = line_alg::distance_to_squared(Line(prev, it->point), point, &proj); d2 < out.distance2) {
                     out.point     = proj;
                     out.distance2 = d2;
@@ -488,24 +467,25 @@ PathSegmentProjection point_to_path_projection(const Path &path, const Point &po
                 }
             } else {
                 // Circular arc
-                Vec2i64 center = arc_center(prev.cast<float>(), it->point.cast<float>(), it->radius, it->ccw()).cast<int64_t>();
+                Vec2i64 center = arc_center(prev.cast<double>(), it->point.cast<double>(), double(it->radius), it->ccw()).cast<int64_t>();
                 // Test whether point is inside the wedge.
                 Vec2i64 v1 = prev.cast<int64_t>() - center;
                 Vec2i64 v2 = it->point.cast<int64_t>() - center;
                 Vec2i64 vp = point.cast<int64_t>() - center;
-                bool inside = it->radius > 0 ?
-                    // Smaller (convex) wedge.
-                    (it->ccw() ?
-                        cross2(v1, vp) > 0 && cross2(vp, v2) > 0 :
-                        cross2(v1, vp) < 0 && cross2(vp, v2) < 0) :
-                    // Larger (concave) wedge.
-                    (it->ccw() ?
-                        cross2(v2, vp) < 0 || cross2(vp, v1) < 0 :
-                        cross2(v2, vp) > 0 || cross2(vp, v1) > 0);
-                if (inside) {
+                if (inside_arc_wedge_vectors(v1, v2, it->radius > 0, it->ccw(), vp)) {
                     // Distance of the radii.
-                    if (double d2 = sqr(std::abs(it->radius) - sqrt(double(v1.squaredNorm()))); d2 < out.distance2) {
+                    const auto r = double(std::abs(it->radius));
+                    const auto rtest = sqrt(double(vp.squaredNorm()));
+                    if (double d2 = sqr(rtest - r); d2 < out.distance2) {
+                        if (rtest > SCALED_EPSILON)
+                            // Project vp to the arc.
+                            out.point = center.cast<coord_t>() + (vp.cast<double>() * (r / rtest)).cast<coord_t>();
+                        else
+                            // Test point is very close to the center of the radius. Any point of the arc is the closest.
+                            // Pick the start.
+                            out.point = prev;
                         out.distance2 = d2;
+                        out.center = center.cast<coord_t>();
                         min_point_it  = it;
                     }
                 } else {
@@ -521,44 +501,89 @@ PathSegmentProjection point_to_path_projection(const Path &path, const Point &po
         }
         if (! path.back().linear()) {
             // Calculate distance to the end point.
-            if (double d2 = (path.back().point - point).cast<double>().norm(); d2 < out.distance2) {
+            if (double d2 = (path.back().point - point).cast<double>().squaredNorm(); d2 < out.distance2) {
                 out.point     = path.back().point;
                 out.distance2 = d2;
                 min_point_it  = std::prev(path.end());
             }
         }
-        out.segment_id = min_point_it - path.begin();
+        // If a new closes point was found, it is closer than search_radius2.
+        assert((min_point_it == path.cbegin()) == (out.distance2 == search_radius2));
+        // Output is not valid yet.
+        assert(! out.valid());
+        if (min_point_it != path.cbegin()) {
+            // Make it valid by setting the segment.
+            out.segment_id = std::prev(min_point_it) - path.begin();
+            assert(out.valid());
+        }
     }
 
+    assert(! out.valid() || (out.segment_id >= 0 && out.segment_id < path.size()));
     return out;
 }
 
-std::pair<Path, Path> split_at(const Path &path, PathSegmentProjection proj, const double min_segment_length)
+std::pair<Path, Path> split_at(const Path &path, const PathSegmentProjection &proj, const double min_segment_length)
 {
+    assert(proj.valid());
+    assert(! proj.valid() || (proj.segment_id >= 0 && proj.segment_id < path.size()));
     std::pair<Path, Path> out;
-    if (proj.segment_id == 0 && proj.point == path.front().point)
-        out.second = path;
-    else if (proj.segment_id + 1 == path.size() || (proj.segment_id + 2 == path.size() && proj.point == path.back().point))
+    if (! proj.valid() || proj.segment_id + 1 == path.size() || (proj.segment_id + 2 == path.size() && proj.point == path.back().point))
         out.first = path;
+    else if (proj.segment_id == 0 && proj.point == path.front().point)
+        out.second = path;
     else {
+        // Path will likely be split to two pieces.
+        assert(proj.valid() && proj.segment_id >= 0 && proj.segment_id + 1 < path.size());
         const Segment &start = path[proj.segment_id];
         const Segment &end   = path[proj.segment_id + 1];
         bool           split_segment = true;
-        if (int64_t d = (proj.point - start.point).cast<int64_t>().squaredNorm(); d < sqr(min_segment_length)) {
+        int            split_segment_id = proj.segment_id;
+        if (int64_t d2 = (proj.point - start.point).cast<int64_t>().squaredNorm(); d2 < sqr(min_segment_length)) {
             split_segment = false;
-        } else if (int64_t d = (proj.point - end.point).cast<int64_t>().squaredNorm(); d < sqr(min_segment_length)) {
-            ++ proj.segment_id;
+            int64_t d22 = (proj.point - end.point).cast<int64_t>().squaredNorm();
+            if (d22 < d2)
+                // Split at the end of the segment.
+                ++ split_segment_id;
+        } else if (int64_t d2 = (proj.point - end.point).cast<int64_t>().squaredNorm(); d2 < sqr(min_segment_length)) {
+            ++ split_segment_id;
             split_segment = false;
         }
         if (split_segment) {
-            out.first.assign(path.begin(), path.begin() + proj.segment_id + 2);
-            out.second.assign(path.begin() + proj.segment_id, path.end());
+            out.first.assign(path.begin(), path.begin() + split_segment_id + 2);
+            out.second.assign(path.begin() + split_segment_id, path.end());
+            assert(out.first[out.first.size() - 2] == start);
+            assert(out.first.back() == end);
+            assert(out.second.front() == start);
+            assert(out.second[1] == end);
+            assert(out.first.size() + out.second.size() == path.size() + 2);
+            assert(out.first.back().radius == out.second[1].radius);
             out.first.back().point = proj.point;
             out.second.front().point = proj.point;
+            if (end.radius < 0) {
+                // A large arc (> PI) was split.
+                // At least one of the two arches that were created by splitting the original arch will become smaller.
+                // Make the radii of those arches that became < PI positive.
+                // In case of a projection onto an arc, proj.center should be filled in and valid.
+                auto vstart = (start.point - proj.center).cast<int64_t>();
+                auto vend   = (end.point - proj.center).cast<int64_t>();
+                auto vproj  = (proj.point - proj.center).cast<int64_t>();
+                if (bool first_arc_minor = (cross2(vstart, vproj) > 0) == end.ccw())
+                    // Make the radius of a minor arc positive.
+                    out.first.back().radius *= -1.f;
+                if (bool second_arc_minor = (cross2(vproj, vend) > 0) == end.ccw())
+                    // Make the radius of a minor arc positive.
+                    out.second[1].radius *= -1.f;
+            }
         } else {
-            out.first.assign(path.begin(), path.begin() + proj.segment_id + 1);
-            out.second.assign(path.begin() + proj.segment_id, path.end());
+            // Split at the start of proj.segment_id.
+            out.first.assign(path.begin(), path.begin() + split_segment_id + 1);
+            out.second.assign(path.begin() + split_segment_id, path.end());
+            assert(out.first.size() + out.second.size() == path.size() + 1);
+            assert(out.first.back() == (split_segment_id == proj.segment_id ? start : end));
+            assert(out.second.front() == (split_segment_id == proj.segment_id ? start : end));
         }
+        assert(out.first.size() > 1);
+        assert(out.second.size() > 1);
         out.second.front().radius = 0;
     }
 

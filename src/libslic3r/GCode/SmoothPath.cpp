@@ -9,36 +9,19 @@ namespace Slic3r::GCode {
 double length(const SmoothPath &path)
 {
     double l = 0;
-    for (const SmoothPathElement &el : path) {
-        auto it  = el.path.begin();
-        auto end = el.path.end();
-        Point prev_point = it->point;
-        for (++ it; it != end; ++ it) {
-            Point point = it->point;
-            l += it->linear() ? 
-                (point - prev_point).cast<double>().norm() :
-                Geometry::ArcWelder::arc_length(prev_point.cast<float>(), point.cast<float>(), it->radius);
-            prev_point = point;
-        }
-    }
+    for (const SmoothPathElement &el : path)
+        l += Geometry::ArcWelder::path_length<double>(el.path);
     return l;
 }
 
 // Returns true if the smooth path is longer than a threshold.
 bool longer_than(const SmoothPath &path, double length)
 {
-    for (const SmoothPathElement& el : path) {
-        auto it = el.path.begin();
-        auto end = el.path.end();
-        Point prev_point = it->point;
-        for (++it; it != end; ++it) {
-            Point point = it->point;
-            length -= it->linear() ?
-                (point - prev_point).cast<double>().norm() :
-                Geometry::ArcWelder::arc_length(prev_point.cast<float>(), point.cast<float>(), it->radius);
+    for (const SmoothPathElement &el : path) {
+        for (auto it = std::next(el.path.begin()); it != el.path.end(); ++ it) {
+            length -= Geometry::ArcWelder::segment_length<double>(*std::prev(it), *it);
             if (length < 0)
                 return true;
-            prev_point = point;
         }
     }
     return length < 0;
@@ -127,10 +110,14 @@ double clip_end(SmoothPath &path, double distance)
         if (p.empty()) {
             path.pop_back();
         } else {
+            // Trailing path was trimmed and it is valid.
+            assert(path.back().path.size() > 1);
             assert(distance == 0);
+            // Distance to go is zero.
             return 0;
         }
     }
+    // Return distance to go after the whole smooth path was trimmed to zero.
     return distance;
 }
 
@@ -221,12 +208,15 @@ SmoothPath SmoothPathCache::resolve_or_fit_split_with_seam(
     SmoothPath out = this->resolve_or_fit(loop.paths, reverse, resolution);
     assert(! out.empty());
     if (! out.empty()) {
+        // Find a closest point on a vector of smooth paths.
         Geometry::ArcWelder::PathSegmentProjection proj;
         int                                        proj_path = -1;
         for (const SmoothPathElement &el : out)
             if (Geometry::ArcWelder::PathSegmentProjection this_proj = Geometry::ArcWelder::point_to_path_projection(el.path, seam_point, proj.distance2);
-                this_proj.distance2 < proj.distance2) {
+                this_proj.valid()) {
                 // Found a better (closer) projection.
+                assert(this_proj.distance2 < proj.distance2);
+                assert(this_proj.segment_id >= 0 && this_proj.segment_id < el.path.size());
                 proj = this_proj;
                 proj_path = &el - out.data();
             }
@@ -237,7 +227,7 @@ SmoothPath SmoothPathCache::resolve_or_fit_split_with_seam(
             path, proj, seam_point_merge_distance_threshold);
         if (split.second.empty()) {
             std::rotate(out.begin(), out.begin() + proj_path + 1, out.end());
-            out.back().path = std::move(split.first);
+            assert(out.back().path == split.first);
         } else {
             ExtrusionAttributes attr = out[proj_path].path_attributes;
             std::rotate(out.begin(), out.begin() + proj_path, out.end());
