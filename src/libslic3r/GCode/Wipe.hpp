@@ -1,8 +1,9 @@
 #ifndef slic3r_GCode_Wipe_hpp_
 #define slic3r_GCode_Wipe_hpp_
 
-#include "Geometry/ArcWelder.hpp"
 #include "SmoothPath.hpp"
+
+#include "../Geometry/ArcWelder.hpp"
 #include "../Point.hpp"
 #include "../PrintConfig.hpp"
 
