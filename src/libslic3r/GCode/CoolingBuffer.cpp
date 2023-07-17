@@ -451,7 +451,8 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                             Vec2d(current_pos[AxisIdx::X], current_pos[AxisIdx::Y]),
                             Vec2d(new_pos[AxisIdx::X], new_pos[AxisIdx::Y]),
                             double(new_pos[AxisIdx::R])));
-                    }
+                    } else
+                        dxy2 = 0;
                 } else
                     dxy2 = sqr(dif[AxisIdx::X]) + sqr(dif[AxisIdx::Y]);
                 float dxyz2 = dxy2 + sqr(dif[AxisIdx::Z]);

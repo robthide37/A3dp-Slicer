@@ -167,12 +167,12 @@ static std::optional<Circle> try_create_circle(const Points::const_iterator begi
             return circle;
 #endif
         // Find the circle with the least deviation, if one exists.
-        double least_deviation;
+        double least_deviation = std::numeric_limits<double>::max();
         double current_deviation;
         for (auto it = std::next(begin); std::next(it) != end; ++ it)
             if (std::optional<Circle> circle = try_create_circle(*begin, *it, *std::prev(end), max_radius); 
                 circle && get_deviation_sum_squared(*circle, begin, end, tolerance, current_deviation)) {
-                if (! out || current_deviation < least_deviation) {
+                if (current_deviation < least_deviation) {
                     out = circle;
                     least_deviation = current_deviation;
                 }
@@ -631,10 +631,10 @@ std::pair<Path, Path> split_at(const Path &path, const PathSegmentProjection &pr
                 auto vstart = (start.point - proj.center).cast<int64_t>();
                 auto vend   = (end.point - proj.center).cast<int64_t>();
                 auto vproj  = (proj.point - proj.center).cast<int64_t>();
-                if (bool first_arc_minor = (cross2(vstart, vproj) > 0) == end.ccw())
+                if ((cross2(vstart, vproj) > 0) == end.ccw())
                     // Make the radius of a minor arc positive.
                     out.first.back().radius *= -1.f;
-                if (bool second_arc_minor = (cross2(vproj, vend) > 0) == end.ccw())
+                if ((cross2(vproj, vend) > 0) == end.ccw())
                     // Make the radius of a minor arc positive.
                     out.second[1].radius *= -1.f;
             }
