@@ -19,7 +19,6 @@ inline OutputIterator douglas_peucker(InputIterator begin, InputIterator end, Ou
 {
     using InputIteratorCategory = typename std::iterator_traits<InputIterator>::iterator_category;
     static_assert(std::is_base_of_v<std::input_iterator_tag, InputIteratorCategory>);
-    using Point  = typename InputIterator::value_type;
     using Vector = Eigen::Matrix<SquareLengthType, 2, 1, Eigen::DontAlign>;
     if (begin != end) {
         // Supporting in-place reduction and the data type may be generic, thus we are always making a copy of the point value before there is a chance

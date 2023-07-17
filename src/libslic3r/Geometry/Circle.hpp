@@ -11,7 +11,7 @@ namespace Slic3r { namespace Geometry {
 // Circumcenter coordinates, Cartesian coordinates
 // In case the three points are collinear, returns their centroid.
 template<typename Derived, typename Derived2, typename Derived3>
-Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> circle_center(const Derived &a, const Derived2 &bsrc, const Derived3 &csrc, typename typename Derived::Scalar epsilon)
+Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> circle_center(const Derived &a, const Derived2 &bsrc, const Derived3 &csrc, typename Derived::Scalar epsilon)
 {
     static_assert(Derived ::IsVectorAtCompileTime && int(Derived ::SizeAtCompileTime) == 2, "circle_center(): 1st point is not a 2D vector");
     static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "circle_center(): 2nd point is not a 2D vector");
