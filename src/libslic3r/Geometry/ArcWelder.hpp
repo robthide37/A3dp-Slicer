@@ -15,7 +15,7 @@ template<typename Derived, typename Derived2, typename Float>
 inline Eigen::Matrix<Float, 2, 1, Eigen::DontAlign> arc_center(
     const Eigen::MatrixBase<Derived>   &start_pos,
     const Eigen::MatrixBase<Derived2>  &end_pos, 
-    const typename Float                radius,
+    const Float                         radius,
     const bool                          is_ccw)
 {
     static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "arc_center(): first parameter is not a 2D vector");
@@ -71,6 +71,32 @@ inline typename Derived::Scalar arc_length(
     static_assert(std::is_same<typename Derived::Scalar, typename Derived2::Scalar>::value, "arc_length(): Both vectors must be of the same type.");
     assert(radius != 0);
     return arc_angle(start_pos, end_pos, radius) * std::abs(radius);
+}
+
+// Calculate positive length of an arc given two points, center and orientation.
+template<typename Derived, typename Derived2, typename Derived3>
+inline typename Derived::Scalar arc_length(
+    const Eigen::MatrixBase<Derived>   &start_pos,
+    const Eigen::MatrixBase<Derived2>  &end_pos,
+    const Eigen::MatrixBase<Derived3>  &center_pos,
+    const bool                          ccw)
+{
+    static_assert(Derived::IsVectorAtCompileTime && int(Derived::SizeAtCompileTime) == 2, "arc_length(): first parameter is not a 2D vector");
+    static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "arc_length(): second parameter is not a 2D vector");
+    static_assert(Derived3::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "arc_length(): third parameter is not a 2D vector");
+    static_assert(std::is_same<typename Derived::Scalar, typename Derived2::Scalar>::value &&
+                  std::is_same<typename Derived::Scalar, typename Derived3::Scalar>::value, "arc_length(): All third points must be of the same type.");
+    using Float = typename Derived::Scalar;
+    auto  vstart = start_pos - center_pos;
+    auto  vend   = end_pos - center_pos;
+    Float radius = vstart.norm();
+    Float angle  = atan2(double(cross2(vstart, vend)), double(vstart.dot(vend)));
+    if (! ccw)
+        angle *= Float(-1.);
+    if (angle < 0)
+        angle += Float(2. * M_PI);
+    assert(angle >= Float(0.) && angle < Float(2. * M_PI + EPSILON));
+    return angle * radius;
 }
 
 // Test whether a point is inside a wedge of an arc.
