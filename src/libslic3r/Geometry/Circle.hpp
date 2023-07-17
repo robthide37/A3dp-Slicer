@@ -41,7 +41,7 @@ Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign> circle_center(co
 // Circumcenter coordinates, Cartesian coordinates
 // Returns no value if the three points are collinear.
 template<typename Derived, typename Derived2, typename Derived3>
-std::optional<Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign>> try_circle_center(const Derived &a, const Derived2 &bsrc, const Derived3 &csrc, typename typename Derived::Scalar epsilon)
+std::optional<Eigen::Matrix<typename Derived::Scalar, 2, 1, Eigen::DontAlign>> try_circle_center(const Derived &a, const Derived2 &bsrc, const Derived3 &csrc, typename Derived::Scalar epsilon)
 {
     static_assert(Derived ::IsVectorAtCompileTime && int(Derived ::SizeAtCompileTime) == 2, "try_circle_center(): 1st point is not a 2D vector");
     static_assert(Derived2::IsVectorAtCompileTime && int(Derived2::SizeAtCompileTime) == 2, "try_circle_center(): 2nd point is not a 2D vector");
