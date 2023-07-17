@@ -135,7 +135,7 @@ TEST_CASE("arc fitting", "[ArcWelder]") {
         const Point center     = Point::new_scale(1., 1.);
         const float radius     = scaled<float>(1.);
         const float resolution = scaled<float>(0.002);
-        auto test = [center, resolution, radius](const Point &p1, const Point &p2, const float r, const bool ccw) {
+        auto test = [center, resolution](const Point &p1, const Point &p2, const float r, const bool ccw) {
             Points pts = ArcWelder::arc_discretize(p1, p2, r, ccw, resolution);
             ArcWelder::Path path = ArcWelder::fit_path(pts, resolution + SCALED_EPSILON, ArcWelder::default_scaled_resolution);
             REQUIRE(path.size() == 2);
@@ -167,7 +167,7 @@ TEST_CASE("arc fitting", "[ArcWelder]") {
         const Point center2 = Point::new_scale(1., 3.);
         const float radius = scaled<float>(1.);
         const float resolution = scaled<float>(0.002);
-        auto test = [center1, center2, resolution, radius](const Point &p1, const Point &p2, const Point &p3, const float r, const bool ccw) {
+        auto test = [center1, center2, resolution](const Point &p1, const Point &p2, const Point &p3, const float r, const bool ccw) {
             Points pts = ArcWelder::arc_discretize(p1, p2, r, ccw, resolution);
             {
                 Points pts2 = ArcWelder::arc_discretize(p2, p3, - r, ! ccw, resolution);
