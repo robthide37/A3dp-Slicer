@@ -142,7 +142,7 @@ TEST_CASE("arc fitting", "[ArcWelder]") {
             REQUIRE(path.front().point == p1);
             REQUIRE(path.front().radius == 0.f);
             REQUIRE(path.back().point == p2);
-            REQUIRE(path.back().radius == Approx(radius));
+            REQUIRE(path.back().radius == Approx(r));
             REQUIRE(path.back().ccw() == ccw);
         };
         THEN("90 degrees arc, CCW is fitted") {
@@ -179,10 +179,10 @@ TEST_CASE("arc fitting", "[ArcWelder]") {
             REQUIRE(path.front().point == p1);
             REQUIRE(path.front().radius == 0.f);
             REQUIRE(path[1].point == p2);
-            REQUIRE(path[1].radius == Approx(radius));
+            REQUIRE(path[1].radius == Approx(r));
             REQUIRE(path[1].ccw() == ccw);
             REQUIRE(path.back().point == p3);
-            REQUIRE(path.back().radius == Approx(radius));
+            REQUIRE(path.back().radius == Approx(- r));
             REQUIRE(path.back().ccw() == ! ccw);
         };
         THEN("90 degrees arches, CCW are fitted") {

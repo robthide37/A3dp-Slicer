@@ -92,44 +92,66 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             }
         };
         const double xy_to_e    = this->calc_xy_to_e_ratio(gcodegen.writer().config, extruder.id());
-        auto         wipe_linear = [&gcode, &gcodegen, &retract_length, xy_to_e](const Vec2d &prev, Vec2d &p) {
-            double segment_length = (p - prev).norm();
-            // Quantize E axis as it is to be 
+        auto         wipe_linear = [&gcode, &gcodegen, &retract_length, xy_to_e](const Vec2d &prev_quantized, Vec2d &p) {
+            Vec2d  p_quantized = GCodeFormatter::quantize(p);
+            if (p_quantized == prev_quantized) {
+                p = p_quantized;
+                return false;
+            }
+            double segment_length = (p_quantized - prev_quantized).norm();
+            // Quantize E axis as it is to be extruded as a whole segment.
             double dE = GCodeFormatter::quantize_e(xy_to_e * segment_length);
             bool   done = false;
             if (dE > retract_length - EPSILON) {
                 if (dE > retract_length + EPSILON)
                     // Shorten the segment.
-                    p = gcodegen.point_to_gcode_quantized(prev + (p - prev) * (retract_length / dE));
+                    p = GCodeFormatter::quantize(Vec2d(prev_quantized + (p - prev_quantized) * (retract_length / dE)));
+                else
+                    p = p_quantized;
                 dE   = retract_length;
                 done = true;
-            }
+            } else
+                p = p_quantized;
             gcode += gcodegen.writer().extrude_to_xy(p, -dE, wipe_retract_comment);
             retract_length -= dE;
             return done;
         };
         const bool emit_radius = gcodegen.config().arc_fitting == ArcFittingType::EmitRadius;
-        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, emit_radius](const Vec2d &prev, Vec2d &p, double radius_in, const bool ccw) {
+        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, emit_radius](
+            const Vec2d &prev_quantized, Vec2d &p, double radius_in, const bool ccw) {
+            Vec2d  p_quantized = GCodeFormatter::quantize(p);
+            if (p_quantized == prev_quantized) {
+                p = p_quantized;
+                return false;
+            }
             // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
             double radius = emit_radius ? GCodeFormatter::quantize_xyzf(radius_in) : radius_in;
-            Vec2d  center = Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), ccw);
-            float  angle  = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
+            Vec2d  center = Geometry::ArcWelder::arc_center(prev_quantized.cast<double>(), p_quantized.cast<double>(), double(radius), ccw);
+            float  angle  = Geometry::ArcWelder::arc_angle(prev_quantized.cast<double>(), p_quantized.cast<double>(), double(radius));
             double segment_length = angle * std::abs(radius);
             double dE = GCodeFormatter::quantize_e(xy_to_e * segment_length);
             bool   done = false;
             if (dE > retract_length - EPSILON) {
-                if (dE > retract_length + EPSILON)
-                    // Shorten the segment.
-                    p = gcodegen.point_to_gcode_quantized(Point(prev).rotated((ccw ? angle : -angle) * (retract_length / dE), center.cast<coord_t>()));
+                if (dE > retract_length + EPSILON) {
+                    // Shorten the segment. Recalculate the arc from the unquantized end coordinate.
+                    center = Geometry::ArcWelder::arc_center(prev_quantized.cast<double>(), p.cast<double>(), double(radius), ccw);
+                    angle = Geometry::ArcWelder::arc_angle(prev_quantized.cast<double>(), p.cast<double>(), double(radius));
+                    segment_length = angle * std::abs(radius);
+                    dE = xy_to_e * segment_length;
+                    p = GCodeFormatter::quantize(
+                            Vec2d(center + Eigen::Rotation2D((ccw ? angle : -angle) * (retract_length / dE)) * (prev_quantized - center)));
+                } else
+                    p = p_quantized;
                 dE   = retract_length;
                 done = true;
-            }
+            } else
+                p = p_quantized;
             if (emit_radius) {
                 gcode += gcodegen.writer().extrude_to_xy_G2G3R(p, radius, ccw, -dE, wipe_retract_comment);
             } else {
                 // Calculate quantized IJ circle center offset.
-                Vec2d ij{ GCodeFormatter::quantize_xyzf(center.x() - prev.x()), GCodeFormatter::quantize_xyzf(center.y() - prev.y()) };
-                gcode += gcodegen.writer().extrude_to_xy_G2G3IJ(p, ij, ccw, -dE, wipe_retract_comment);
+                gcode += gcodegen.writer().extrude_to_xy_G2G3IJ(
+                    p, GCodeFormatter::quantize(Vec2d(center - prev_quantized)), ccw, -dE, wipe_retract_comment);
             }
             retract_length -= dE;
             return done;
@@ -137,7 +159,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
         // Start with the current position, which may be different from the wipe path start in case of loop clipping.
         Vec2d prev = gcodegen.point_to_gcode_quantized(gcodegen.last_pos());
         auto  it   = this->path().begin();
-        Vec2d p    = gcodegen.point_to_gcode_quantized(it->point + m_offset);
+        Vec2d p    = gcodegen.point_to_gcode(it->point + m_offset);
         ++ it;
         bool done = false;
         if (p != prev) {
@@ -148,7 +170,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             prev = p;
             auto end = this->path().end();
             for (; it != end && ! done; ++ it) {
-                p = gcodegen.point_to_gcode_quantized(it->point + m_offset);
+                p = gcodegen.point_to_gcode(it->point + m_offset);
                 if (p != prev) {
                     start_wipe();
                     if (it->linear() ?
@@ -161,6 +183,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
         }
         if (wiped) {
             // add tag for processor
+            assert(p == GCodeFormatter::quantize(p));
             gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
             gcodegen.set_last_pos(gcodegen.gcode_to_point(p));
         }

@@ -2457,6 +2457,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GC
     gcode += m_writer.set_print_acceleration(fast_round_up<unsigned int>(m_config.default_acceleration.value));
 
     if (m_wipe.enabled()) {
+        // Wipe will hide the seam.
         m_wipe.set_path(std::move(smooth_path), false);
     } else if (loop_src.paths.back().role().is_external_perimeter() && m_layer != nullptr && m_config.perimeters.value > 1) {
         // Only wipe inside if the wipe along the perimeter is disabled.
@@ -2848,7 +2849,7 @@ std::string GCodeGenerator::_extrude(
                 if (! emit_radius) {
                     // Calculate quantized IJ circle center offset.
                     Vec2d center_raw = Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), it->ccw()) - prev;
-                    ij = Vec2d{ GCodeFormatter::quantize_xyzf(center_raw.x()), GCodeFormatter::quantize_xyzf(center_raw.y()) };
+                    ij = GCodeFormatter::quantize(center_raw);
                 }
                 double angle = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
                 const double line_length = angle * std::abs(radius);

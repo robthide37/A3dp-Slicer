@@ -153,6 +153,15 @@ enum class Orientation : unsigned char {
     CW,
 };
 
+// Returns orientation of a polyline with regard to the center.
+// Successive points are expected to take less than a PI angle step.
+// Returns Orientation::Unknown if the orientation with regard to the center 
+// is not monotonous.
+Orientation arc_orientation(
+    const Point                 &center,
+    const Points::const_iterator begin,
+    const Points::const_iterator end);
+
 // Single segment of a smooth path.
 struct Segment
 {

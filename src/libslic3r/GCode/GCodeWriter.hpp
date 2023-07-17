@@ -158,6 +158,10 @@ public:
     static double                                 quantize(double v, size_t ndigits) { return std::round(v * pow_10[ndigits]) * pow_10_inv[ndigits]; }
     static double                                 quantize_xyzf(double v) { return quantize(v, XYZF_EXPORT_DIGITS); }
     static double                                 quantize_e(double v) { return quantize(v, E_EXPORT_DIGITS); }
+    static Vec2d                                  quantize(const Vec2d &pt)
+        { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS) }; }
+    static Vec3d                                  quantize(const Vec3d &pt)
+        { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS), quantize(pt.z(), XYZF_EXPORT_DIGITS) }; }
 
     void emit_axis(const char axis, const double v, size_t digits);
 

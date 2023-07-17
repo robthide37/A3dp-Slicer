@@ -52,7 +52,7 @@ void Point::rotate(double angle, const Point &center)
     double c   = ::cos(angle);
     auto   d   = cur - center.cast<double>();
     this->x() = fast_round_up<coord_t>(center.x() + c * d.x() - s * d.y());
-    this->y() = fast_round_up<coord_t>(center.y() + c * d.y() + s * d.x());
+    this->y() = fast_round_up<coord_t>(center.y() + s * d.x() + c * d.y());
 }
 
 bool has_duplicate_points(Points &&pts)
