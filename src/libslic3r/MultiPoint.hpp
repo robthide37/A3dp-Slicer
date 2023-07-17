@@ -50,18 +50,19 @@ inline OutputIterator douglas_peucker(InputIterator begin, InputIterator end, Ou
                 } else {
                     SquareLengthType max_dist_sq = 0;
                     // Find point furthest from line seg created by (anchor, floater) and note it.
-                    const Vector v = (f - a).cast<SquareLengthType>();
+                    const Vector v = (f - a).template cast<SquareLengthType>();
                     if (const SquareLengthType l2 = v.squaredNorm(); l2 == 0) {
                         // Zero length segment, find the furthest point between anchor and floater.
                         for (auto it = std::next(anchor); it != floater; ++ it)
-                            if (SquareLengthType dist_sq = (point_getter(*it) - a).cast<SquareLengthType>().squaredNorm(); dist_sq > max_dist_sq) {
+                            if (SquareLengthType dist_sq = (point_getter(*it) - a).template cast<SquareLengthType>().squaredNorm(); 
+                                dist_sq > max_dist_sq) {
                                 max_dist_sq  = dist_sq;
                                 furthest = it;
                             }
                     } else {
                         // Find Find the furthest point from the line <anchor, floater>.
                         const double dl2 = double(l2);
-                        const Vec2d  dv  = v.cast<double>();
+                        const Vec2d  dv  = v.template cast<double>();
                         for (auto it = std::next(anchor); it != floater; ++ it) {
                             const auto   p  = point_getter(*it);
                             const Vector va = (p - a).template cast<SquareLengthType>();
@@ -70,11 +71,11 @@ inline OutputIterator douglas_peucker(InputIterator begin, InputIterator end, Ou
                             if (t <= 0) {
                                 dist_sq = va.squaredNorm();
                             } else if (t >= l2) {
-                                dist_sq = (p - f).cast<SquareLengthType>().squaredNorm();
+                                dist_sq = (p - f).template cast<SquareLengthType>().squaredNorm();
                             } else if (double dt = double(t) / dl2; dt <= 0) {
                                 dist_sq = va.squaredNorm();
                             } else if (dt >= 1.) {
-                                dist_sq = (p - f).cast<SquareLengthType>().squaredNorm();
+                                dist_sq = (p - f).template cast<SquareLengthType>().squaredNorm();
                             } else {
                                 const Vector w = (dt * dv).cast<SquareLengthType>();
                                 dist_sq = (w - va).squaredNorm();
