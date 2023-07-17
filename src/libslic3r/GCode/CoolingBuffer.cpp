@@ -430,7 +430,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             }
             if ((line.type & CoolingLine::TYPE_G92) == 0) {
                 // G0, G1, G2, G3. Calculate the duration.
-                assert((line.type & CoolingLine::TYPE_G0) + (line.type & CoolingLine::TYPE_G1) + (line.type & CoolingLine::TYPE_G2G3) == 1);
+                assert((line.type & CoolingLine::TYPE_G0) != 0 + (line.type & CoolingLine::TYPE_G1) != 0 + (line.type & CoolingLine::TYPE_G2G3) != 0 == 1);
                 if (m_config.use_relative_e_distances.value)
                     // Reset extruder accumulator.
                     current_pos[AxisIdx::E] = 0.f;
@@ -444,7 +444,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                         dxy2 = sqr(Geometry::ArcWelder::arc_length(
                             Vec2d(current_pos[AxisIdx::X], current_pos[AxisIdx::Y]),
                             Vec2d(new_pos[AxisIdx::X], new_pos[AxisIdx::Y]),
-                            Vec2d(current_pos[AxisIdx::X] + current_pos[AxisIdx::I], current_pos[AxisIdx::Y] + current_pos[AxisIdx::J]),
+                            Vec2d(current_pos[AxisIdx::X] + new_pos[AxisIdx::I], current_pos[AxisIdx::Y] + new_pos[AxisIdx::J]),
                             line.type & CoolingLine::TYPE_G2G3_CCW));
                     } else if (line.type & CoolingLine::TYPE_G2G3_R) {
                         dxy2 = sqr(Geometry::ArcWelder::arc_length(
