@@ -58,6 +58,7 @@ class GLGizmoCut3D : public GLGizmoBase
     double m_radius{ 0.0 };
     double m_grabber_radius{ 0.0 };
     double m_grabber_connection_len{ 0.0 };
+    Vec3d  m_cut_plane_start_move_pos {Vec3d::Zero()};
 
     double m_snap_coarse_in_radius{ 0.0 };
     double m_snap_coarse_out_radius{ 0.0 };
@@ -244,7 +245,7 @@ public:
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
     std::string get_tooltip() const override;
-    bool unproject_on_cut_plane(const Vec2d& mouse_pos, Vec3d& pos, Vec3d& pos_world, bool respect_disabled_contour = true);
+    bool unproject_on_cut_plane(const Vec2d& mouse_pos, Vec3d& pos, Vec3d& pos_world, bool respect_contours = true);
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
 
     bool is_in_editing_mode() const override { return m_connectors_editing; }

@@ -290,6 +290,14 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
     else if (mouse_event.Moving())
         return false;
 
+    if (m_hover_id >= CutPlane && mouse_event.LeftDown() && !m_connectors_editing) {
+        // before processing of a use_grabbers(), detect start move position as a projection of mouse position to the cut plane
+        Vec3d pos;
+        Vec3d pos_world;
+        if (unproject_on_cut_plane(mouse_pos, pos, pos_world, false))
+            m_cut_plane_start_move_pos = pos_world;
+    }
+
     if (use_grabbers(mouse_event)) {
         if (m_hover_id >= m_connectors_group_id) {
             if (mouse_event.LeftDown() && !mouse_event.CmdDown() && !mouse_event.AltDown())
@@ -304,7 +312,7 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
                 // disable / enable current contour
                 Vec3d pos;
                 Vec3d pos_world;
-                m_was_contour_selected = unproject_on_cut_plane(mouse_pos.cast<double>(), pos, pos_world, false);
+                m_was_contour_selected = unproject_on_cut_plane(mouse_pos.cast<double>(), pos, pos_world);
                 if (m_was_contour_selected) {
                     // Following would inform the clipper about the mouse click, so it can
                     // toggle the respective contour as disabled.
@@ -316,6 +324,14 @@ bool GLGizmoCut3D::on_mouse(const wxMouseEvent &mouse_event)
             }
             else if (mouse_event.LeftUp() && !m_was_cut_plane_dragged && !m_was_contour_selected)
                 flip_cut_plane();
+        }
+
+        if (m_hover_id >= CutPlane && mouse_event.Dragging() && !m_connectors_editing) {
+            // if we continue to dragging a cut plane, than update a start move position as a projection of mouse position to the cut plane after processing of a use_grabbers()
+            Vec3d pos;
+            Vec3d pos_world;
+            if (unproject_on_cut_plane(mouse_pos, pos, pos_world, false))
+                m_cut_plane_start_move_pos = pos_world;
         }
 
         toggle_model_objects_visibility();
@@ -1761,17 +1777,19 @@ Vec3d GLGizmoCut3D::mouse_position_in_local_plane(GrabberID axis, const Linef3& 
 
 void GLGizmoCut3D::dragging_grabber_move(const GLGizmoBase::UpdateData &data)
 {
-    const Vec3d grabber_init_pos        = m_hover_id == CutPlaneXMove ? 0.2 * m_grabber_connection_len * Vec3d::UnitX():
-                                          m_hover_id == CutPlaneYMove ? 0.0 * Vec3d::UnitY() :
-                                         (m_hover_id == CutPlane ? 0. : m_grabber_connection_len) * Vec3d::UnitZ();
-    const Vec3d starting_drag_position  = translation_transform(m_plane_center) * m_rotation_m * grabber_init_pos;
-    double      projection              = 0.0;
+    Vec3d starting_drag_position;
+    if (m_hover_id == Z)
+        starting_drag_position = translation_transform(m_plane_center) * m_rotation_m * (m_grabber_connection_len * Vec3d::UnitZ());
+    else
+        starting_drag_position = m_cut_plane_start_move_pos;
+
+    double projection  = 0.0;
 
     Vec3d starting_vec = m_rotation_m * (m_hover_id == CutPlaneXMove ? Vec3d::UnitX() : m_hover_id == CutPlaneYMove ? Vec3d::UnitY() : Vec3d::UnitZ());
     if (starting_vec.norm() != 0.0) {
         const Vec3d mouse_dir = data.mouse_ray.unit_vector();
-        // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing throught the starting position
-        // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebric form
+        // finds the intersection of the mouse ray with the plane parallel to the camera viewport and passing through the starting position
+        // use ray-plane intersection see i.e. https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection algebraic form
         // in our case plane normal and ray direction are the same (orthogonal view)
         // when moving to perspective camera the negative z unit axis of the camera needs to be transformed in world space and used as plane normal
         const Vec3d inters = data.mouse_ray.a + (starting_drag_position - data.mouse_ray.a).dot(mouse_dir) * mouse_dir;
@@ -3766,7 +3784,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
 // Unprojects the mouse position on the mesh and saves hit point and normal of the facet into pos_and_normal
 // Return false if no intersection was found, true otherwise.
-bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& pos, Vec3d& pos_world, bool respect_disabled_contour/* = true*/)
+bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& pos, Vec3d& pos_world, bool respect_contours/* = true*/)
 {
     const float sla_shift = m_c->selection_info()->get_sla_shift();
 
@@ -3803,6 +3821,7 @@ bool GLGizmoCut3D::unproject_on_cut_plane(const Vec2d& mouse_position, Vec3d& po
         }
     }*/
 
+    if (respect_contours)
     {
         // Do not react to clicks outside a contour (or inside a contour that is ignored)
         int cont_id = m_c->object_clipper()->is_projection_inside_cut(hit);
