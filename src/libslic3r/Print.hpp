@@ -67,7 +67,7 @@ enum PrintStep : unsigned int {
 
 enum PrintObjectStep : unsigned int {
     posSlice, posPerimeters, posPrepareInfill,
-    posInfill, posIroning, posSupportSpotsSearch, posSupportMaterial, posEstimateCurledExtrusions, posCount,
+    posInfill, posIroning, posSupportSpotsSearch, posSupportMaterial, posEstimateCurledExtrusions, posCalculateOverhangingPerimeters, posCount,
 };
 
 // A PrintRegion object represents a group of volumes to print
@@ -376,6 +376,7 @@ private:
     void generate_support_spots();
     void generate_support_material();
     void estimate_curled_extrusions();
+    void calculate_overhanging_perimeters();
 
     void slice_volumes();
     // Has any support (not counting the raft).

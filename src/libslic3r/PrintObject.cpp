@@ -4,6 +4,7 @@
 #include "Exception.hpp"
 #include "Flow.hpp"
 #include "KDTreeIndirect.hpp"
+#include "Line.hpp"
 #include "Point.hpp"
 #include "Polygon.hpp"
 #include "Polyline.hpp"
@@ -530,6 +531,40 @@ void PrintObject::estimate_curled_extrusions()
             BOOST_LOG_TRIVIAL(debug) << "Estimating areas with curled extrusions - end";
         }
         this->set_done(posEstimateCurledExtrusions);
+    }
+}
+
+void PrintObject::calculate_overhanging_perimeters()
+{
+    if (this->set_started(posCalculateOverhangingPerimeters)) {
+        std::unordered_set<const PrintRegion *> regions_with_dynamic_overhangs;
+        for (const PrintRegion *pr : this->print()->m_print_regions) {
+            if (pr->config().enable_dynamic_overhang_speeds.getBool()) {
+                regions_with_dynamic_overhangs.insert(pr);
+            }
+        }
+        if (!regions_with_dynamic_overhangs.empty()) {
+            BOOST_LOG_TRIVIAL(debug) << "Calculating overhanging perimeters - start";
+            m_print->set_status(89, _u8L("Calculating overhanging perimeters"));
+
+            std::unordered_map<size_t, AABBTreeLines::LinesDistancer<CurledLine>> curled_lines;
+            for (const Layer *l : this->layers()) {
+                curled_lines[l->id()] = AABBTreeLines::LinesDistancer<CurledLine>{l->curled_lines};
+            }
+
+            for (Layer *l : this->layers()) {
+                for (const LayerRegion *layer_region : l->regions()) {
+                    if (regions_with_dynamic_overhangs.find(layer_region->m_region) == regions_with_dynamic_overhangs.end()) {
+                        continue;
+                    }
+                    
+                }
+            }
+
+            m_print->throw_if_canceled();
+            BOOST_LOG_TRIVIAL(debug) << "Calculating overhanging perimeters - end";
+        }
+        this->set_done(posCalculateOverhangingPerimeters);
     }
 }
 
