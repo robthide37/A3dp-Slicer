@@ -39,7 +39,6 @@ public:
         double fit_circle_tolerance;
     };
 
-    void interpolate_add(const Polyline                  &pl,  const InterpolationParameters &params);
     void interpolate_add(const ExtrusionPath             &ee,  const InterpolationParameters &params);
     void interpolate_add(const ExtrusionMultiPath        &ee,  const InterpolationParameters &params);
     void interpolate_add(const ExtrusionLoop             &ee,  const InterpolationParameters &params);
@@ -62,6 +61,24 @@ public:
 
 private:
     ankerl::unordered_dense::map<const Polyline*, Geometry::ArcWelder::Path>    m_cache;
+};
+
+// Encapsulates references to global and layer local caches of smooth extrusion paths.
+class SmoothPathCaches final
+{
+public:
+    SmoothPathCaches() = delete;
+    SmoothPathCaches(const SmoothPathCache &global, const SmoothPathCache &layer_local) : 
+        m_global(&global), m_layer_local(&layer_local) {}
+    SmoothPathCaches operator=(const SmoothPathCaches &rhs)
+        { m_global = rhs.m_global; m_layer_local = rhs.m_layer_local; return *this; }
+
+    const SmoothPathCache& global() const { return *m_global; }
+    const SmoothPathCache& layer_local() const { return *m_layer_local; }
+
+private:
+    const SmoothPathCache *m_global;
+    const SmoothPathCache *m_layer_local;
 };
 
 } // namespace GCode

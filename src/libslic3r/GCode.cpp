@@ -798,6 +798,20 @@ std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Pri
     return instances;
 }
 
+static inline GCode::SmoothPathCache smooth_path_interpolate_global(const Print& print)
+{
+    const GCode::SmoothPathCache::InterpolationParameters interpolation_params {
+        scaled<double>(print.config().gcode_resolution.value),
+        print.config().arc_fitting != ArcFittingType::Disabled && ! print.config().spiral_vase ? 
+            Geometry::ArcWelder::default_arc_length_percent_tolerance :
+            0
+    };
+    GCode::SmoothPathCache out;
+    out.interpolate_add(print.skirt(), interpolation_params);
+    out.interpolate_add(print.brim(), interpolation_params);
+    return out;
+}
+
 void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
     // modifies m_silent_time_estimator_enabled
@@ -1058,6 +1072,8 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         file.write(this->set_extruder(initial_extruder_id, 0.));
     }
 
+    GCode::SmoothPathCache smooth_path_cache_global = smooth_path_interpolate_global(print);
+
     // Do all objects for each layer.
     if (print.config().complete_objects.value) {
         size_t finished_objects = 0;
@@ -1102,7 +1118,9 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
             // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
             // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
             // and export G-code into file.
-            this->process_layers(print, tool_ordering, collect_layers_to_print(object), *print_object_instance_sequential_active - object.instances().data(), file);
+            this->process_layers(print, tool_ordering, collect_layers_to_print(object),
+                *print_object_instance_sequential_active - object.instances().data(), 
+                smooth_path_cache_global, file);
             ++ finished_objects;
             // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
             // Reset it when starting another object from 1st layer.
@@ -1158,7 +1176,8 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
         // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
         // and export G-code into file.
-        this->process_layers(print, tool_ordering, print_object_instances_ordering, layers_to_print, file);
+        this->process_layers(print, tool_ordering, print_object_instances_ordering, layers_to_print, 
+            smooth_path_cache_global, file);
         if (m_wipe_tower)
             // Purge the extruder, pull out the active filament.
             file.write(m_wipe_tower->finalize(*this));
@@ -1258,6 +1277,7 @@ void GCodeGenerator::process_layers(
     const ToolOrdering                                                  &tool_ordering,
     const std::vector<const PrintInstance*>                             &print_object_instances_ordering,
     const std::vector<std::pair<coordf_t, ObjectsLayerToPrint>>         &layers_to_print,
+    const GCode::SmoothPathCache                                        &smooth_path_cache_global,
     GCodeOutputStream                                                   &output_stream)
 {
     size_t layer_to_print_idx = 0;
@@ -1268,7 +1288,7 @@ void GCodeGenerator::process_layers(
             0
     };
     const auto smooth_path_interpolator = tbb::make_filter<void, std::pair<size_t, GCode::SmoothPathCache>>(slic3r_tbb_filtermode::serial_in_order,
-        [this, &print, &layers_to_print, &layer_to_print_idx, interpolation_params](tbb::flow_control &fc) -> std::pair<size_t, GCode::SmoothPathCache> {
+        [this, &print, &layers_to_print, &layer_to_print_idx, &interpolation_params](tbb::flow_control &fc) -> std::pair<size_t, GCode::SmoothPathCache> {
             if (layer_to_print_idx >= layers_to_print.size()) {
                 if ((!m_pressure_equalizer && layer_to_print_idx == layers_to_print.size()) || (m_pressure_equalizer && layer_to_print_idx == (layers_to_print.size() + 1))) {
                     fc.stop();
@@ -1288,7 +1308,8 @@ void GCodeGenerator::process_layers(
             }
         });
     const auto generator = tbb::make_filter<std::pair<size_t, GCode::SmoothPathCache>, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [this, &print, &tool_ordering, &print_object_instances_ordering, &layers_to_print](std::pair<size_t, GCode::SmoothPathCache> in) -> LayerResult {
+        [this, &print, &tool_ordering, &print_object_instances_ordering, &layers_to_print, &smooth_path_cache_global](
+            std::pair<size_t, GCode::SmoothPathCache> in) -> LayerResult {
             size_t layer_to_print_idx = in.first;
             if (layer_to_print_idx == layers_to_print.size()) {
                 // Pressure equalizer need insert empty input. Because it returns one layer back.
@@ -1300,7 +1321,9 @@ void GCodeGenerator::process_layers(
                 if (m_wipe_tower && layer_tools.has_wipe_tower)
                     m_wipe_tower->next_layer();
                 print.throw_if_canceled();
-                return this->process_layer(print, layer.second, layer_tools, &in.second, &layer == &layers_to_print.back(), &print_object_instances_ordering, size_t(-1));
+                return this->process_layer(print, layer.second, layer_tools, 
+                    GCode::SmoothPathCaches{ smooth_path_cache_global, in.second }, 
+                    &layer == &layers_to_print.back(), &print_object_instances_ordering, size_t(-1));
             }
         });
     // The pipeline is variable: The vase mode filter is optional.
@@ -1357,6 +1380,7 @@ void GCodeGenerator::process_layers(
     const ToolOrdering                      &tool_ordering,
     ObjectsLayerToPrint                      layers_to_print,
     const size_t                             single_object_idx,
+    const GCode::SmoothPathCache            &smooth_path_cache_global,
     GCodeOutputStream                       &output_stream)
 {
     size_t layer_to_print_idx = 0;
@@ -1386,7 +1410,7 @@ void GCodeGenerator::process_layers(
             }
         });
     const auto generator = tbb::make_filter<std::pair<size_t, GCode::SmoothPathCache>, LayerResult>(slic3r_tbb_filtermode::serial_in_order,
-        [this, &print, &tool_ordering, &layers_to_print, single_object_idx](std::pair<size_t, GCode::SmoothPathCache> in) -> LayerResult {
+        [this, &print, &tool_ordering, &layers_to_print, &smooth_path_cache_global, single_object_idx](std::pair<size_t, GCode::SmoothPathCache> in) -> LayerResult {
             size_t layer_to_print_idx = in.first;
             if (layer_to_print_idx == layers_to_print.size()) {
                 // Pressure equalizer need insert empty input. Because it returns one layer back.
@@ -1395,7 +1419,9 @@ void GCodeGenerator::process_layers(
             } else {
                 ObjectLayerToPrint &layer = layers_to_print[layer_to_print_idx];
                 print.throw_if_canceled();
-                return this->process_layer(print, { std::move(layer) }, tool_ordering.tools_for_layer(layer.print_z()), &in.second, &layer == &layers_to_print.back(), nullptr, single_object_idx);
+                return this->process_layer(print, { std::move(layer) }, tool_ordering.tools_for_layer(layer.print_z()), 
+                    GCode::SmoothPathCaches{ smooth_path_cache_global, in.second }, 
+                    &layer == &layers_to_print.back(), nullptr, single_object_idx);
             }
         });
     // The pipeline is variable: The vase mode filter is optional.
@@ -1877,7 +1903,7 @@ LayerResult GCodeGenerator::process_layer(
     // Set of object & print layers of the same PrintObject and with the same print_z.
     const ObjectsLayerToPrint           	&layers,
     const LayerTools        		        &layer_tools,
-    const GCode::SmoothPathCache                   *smooth_path_cache,
+    const GCode::SmoothPathCaches           &smooth_path_caches,
     const bool                               last_layer,
     // Pairs of PrintObject index and its instance index.
     const std::vector<const PrintInstance*> *ordering,
@@ -2044,13 +2070,11 @@ LayerResult GCodeGenerator::process_layer(
             double mm3_per_mm = layer_skirt_flow.mm3_per_mm();
             for (size_t i = loops.first; i < loops.second; ++i) {
                 // Adjust flow according to this layer's layer height.
-                const ExtrusionLoop src = *dynamic_cast<const ExtrusionLoop*>(print.skirt().entities[i]);
-                ExtrusionLoop loop(src.loop_role());
-                loop.paths.reserve(src.paths.size());
-                for (const ExtrusionPath &path : src.paths)
-                    loop.paths.emplace_back(path.polyline, ExtrusionAttributes{ path.role(), ExtrusionFlow{ mm3_per_mm, path.width(), layer_skirt_flow.height() } });
                 //FIXME using the support_material_speed of the 1st object printed.
-                gcode += this->extrude_loop(loop, smooth_path_cache, "skirt"sv, m_config.support_material_speed.value);
+                gcode += this->extrude_skirt(dynamic_cast<const ExtrusionLoop&>(*print.skirt().entities[i]),
+                    // Override of skirt extrusion parameters. extrude_skirt() will fill in the extrusion width.
+                    ExtrusionFlow{ mm3_per_mm, 0., layer_skirt_flow.height() },
+                    smooth_path_caches.global(), "skirt"sv, m_config.support_material_speed.value);
             }
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point if this is the first layer (but don't in next layers).
@@ -2063,7 +2087,7 @@ LayerResult GCodeGenerator::process_layer(
             this->set_origin(0., 0.);
             m_avoid_crossing_perimeters.use_external_mp();
             for (const ExtrusionEntity *ee : print.brim().entities)
-                gcode += this->extrude_entity({ *ee, false }, smooth_path_cache, "brim"sv, m_config.support_material_speed.value);
+                gcode += this->extrude_entity({ *ee, false }, smooth_path_caches.global(), "brim"sv, m_config.support_material_speed.value);
             m_brim_done = true;
             m_avoid_crossing_perimeters.use_external_mp(false);
             // Allow a straight travel move to the first object point.
@@ -2080,7 +2104,7 @@ LayerResult GCodeGenerator::process_layer(
             for (const InstanceToPrint &instance : instances_to_print)
                 this->process_layer_single_object(
                     gcode, extruder_id, instance,
-                    layers[instance.object_layer_to_print_id], layer_tools, smooth_path_cache,
+                    layers[instance.object_layer_to_print_id], layer_tools, smooth_path_caches.layer_local(),
                     is_anything_overridden, true /* print_wipe_extrusions */);
             if (gcode_size_old < gcode.size())
                 gcode+="; PURGING FINISHED\n";
@@ -2089,7 +2113,7 @@ LayerResult GCodeGenerator::process_layer(
         for (const InstanceToPrint &instance : instances_to_print)
             this->process_layer_single_object(
                 gcode, extruder_id, instance,
-                layers[instance.object_layer_to_print_id], layer_tools, smooth_path_cache,
+                layers[instance.object_layer_to_print_id], layer_tools, smooth_path_caches.layer_local(),
                 is_anything_overridden, false /* print_wipe_extrusions */);
     }
 
@@ -2119,7 +2143,7 @@ void GCodeGenerator::process_layer_single_object(
     // Container for extruder overrides (when wiping into object or infill).
     const LayerTools         &layer_tools,
     // Optional smooth path interpolating extrusion polylines.
-    const GCode::SmoothPathCache    *smooth_path_cache,
+    const GCode::SmoothPathCache &smooth_path_cache,
     // Is any extrusion possibly marked as wiping extrusion?
     const bool                is_anything_overridden, 
     // Round 1 (wiping into object or infill) or round 2 (normal extrusions).
@@ -2413,7 +2437,19 @@ std::string GCodeGenerator::change_layer(coordf_t print_z)
     return gcode;
 }
 
-std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GCode::SmoothPathCache *smooth_path_cache, const std::string_view description, double speed)
+#ifndef NDEBUG
+static inline bool validate_smooth_path(const GCode::SmoothPath &smooth_path, bool loop)
+{
+    for (auto it = std::next(smooth_path.begin()); it != smooth_path.end(); ++ it) {
+        assert(it->path.size() >= 2);
+        assert(std::prev(it)->path.back().point == it->path.front().point);
+    }
+    assert(! loop || smooth_path.front().path.front().point == smooth_path.back().path.back().point);
+    return true;
+}
+#endif //NDEBUG
+
+std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed)
 {
     // Extrude all loops CCW.
     bool  is_hole = loop_src.is_clockwise();
@@ -2424,7 +2460,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GC
     }
     // Because the G-code export has 1um resolution, don't generate segments shorter than 1.5 microns,
     // thus empty path segments will not be produced by G-code export.
-    GCode::SmoothPath smooth_path = smooth_path_cache->resolve_or_fit_split_with_seam(
+    GCode::SmoothPath smooth_path = smooth_path_cache.resolve_or_fit_split_with_seam(
         loop_src, is_hole, m_scaled_resolution, seam_point, scaled<double>(0.0015));
 
     // Clip the path to avoid the extruder to get exactly on the first point of the loop;
@@ -2436,13 +2472,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GC
     if (smooth_path.empty())
         return {};
 
-#ifndef NDEBUG
-    for (auto it = std::next(smooth_path.begin()); it != smooth_path.end(); ++ it) {
-        assert(it->path.size() >= 2);
-        assert(std::prev(it)->path.back().point == it->path.front().point);
-    }
-    assert(m_enable_loop_clipping || smooth_path.front().path.front().point == smooth_path.back().path.back().point);
-#endif //NDEBUG
+    assert(validate_smooth_path(smooth_path, ! m_enable_loop_clipping));
 
     // Apply the small perimeter speed.
     if (loop_src.paths.front().role().is_perimeter() && loop_src.length() <= SMALL_PERIMETER_LENGTH && speed == -1)
@@ -2470,7 +2500,45 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GC
     return gcode;
 }
 
-std::string GCodeGenerator::extrude_multi_path(const ExtrusionMultiPath &multipath, bool reverse, const GCode::SmoothPathCache *smooth_path_cache, const std::string_view description, double speed)
+std::string GCodeGenerator::extrude_skirt(
+    const ExtrusionLoop &loop_src, const ExtrusionFlow &extrusion_flow_override,
+    const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed)
+{
+    assert(loop_src.is_counter_clockwise());
+    GCode::SmoothPath smooth_path = smooth_path_cache.resolve_or_fit_split_with_seam(
+        loop_src, false, m_scaled_resolution, this->last_pos(), scaled<double>(0.0015));
+
+    // Clip the path to avoid the extruder to get exactly on the first point of the loop;
+    // if polyline was shorter than the clipping distance we'd get a null polyline, so
+    // we discard it in that case.
+    if (m_enable_loop_clipping)
+        clip_end(smooth_path, scale_(EXTRUDER_CONFIG(nozzle_diameter)) * LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER);
+
+    if (smooth_path.empty())
+        return {};
+
+    assert(validate_smooth_path(smooth_path, ! m_enable_loop_clipping));
+
+    // Extrude along the smooth path.
+    std::string gcode;
+    for (GCode::SmoothPathElement &el : smooth_path) {
+        // Override extrusion parameters.
+        el.path_attributes.mm3_per_mm = extrusion_flow_override.mm3_per_mm;
+        el.path_attributes.height = extrusion_flow_override.height;
+        gcode += this->_extrude(el.path_attributes, el.path, description, speed);
+    }
+
+    // reset acceleration
+    gcode += m_writer.set_print_acceleration(fast_round_up<unsigned int>(m_config.default_acceleration.value));
+
+    if (m_wipe.enabled())
+        // Wipe will hide the seam.
+        m_wipe.set_path(std::move(smooth_path), false);
+
+    return gcode;
+}
+
+std::string GCodeGenerator::extrude_multi_path(const ExtrusionMultiPath &multipath, bool reverse, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed)
 {
 #ifndef NDEBUG
     for (auto it = std::next(multipath.paths.begin()); it != multipath.paths.end(); ++ it) {
@@ -2478,7 +2546,7 @@ std::string GCodeGenerator::extrude_multi_path(const ExtrusionMultiPath &multipa
         assert(std::prev(it)->polyline.last_point() == it->polyline.first_point());
     }
 #endif // NDEBUG
-    GCode::SmoothPath smooth_path = smooth_path_cache->resolve_or_fit(multipath, reverse, m_scaled_resolution);
+    GCode::SmoothPath smooth_path = smooth_path_cache.resolve_or_fit(multipath, reverse, m_scaled_resolution);
 
     // extrude along the path
     std::string gcode;
@@ -2490,7 +2558,7 @@ std::string GCodeGenerator::extrude_multi_path(const ExtrusionMultiPath &multipa
     return gcode;
 }
 
-std::string GCodeGenerator::extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache *smooth_path_cache, const std::string_view description, double speed)
+std::string GCodeGenerator::extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed)
 {
     if (const ExtrusionPath *path = dynamic_cast<const ExtrusionPath*>(&entity.extrusion_entity()))
         return this->extrude_path(*path, entity.flipped(), smooth_path_cache, description, speed);
@@ -2503,9 +2571,9 @@ std::string GCodeGenerator::extrude_entity(const ExtrusionEntityReference &entit
     return {};
 }
 
-std::string GCodeGenerator::extrude_path(const ExtrusionPath &path, bool reverse, const GCode::SmoothPathCache *smooth_path_cache, std::string_view description, double speed)
+std::string GCodeGenerator::extrude_path(const ExtrusionPath &path, bool reverse, const GCode::SmoothPathCache &smooth_path_cache, std::string_view description, double speed)
 {
-    Geometry::ArcWelder::Path smooth_path = smooth_path_cache->resolve_or_fit(path, reverse, m_scaled_resolution);
+    Geometry::ArcWelder::Path smooth_path = smooth_path_cache.resolve_or_fit(path, reverse, m_scaled_resolution);
     std::string gcode = this->_extrude(path.attributes(), smooth_path, description, speed);
     Geometry::ArcWelder::reverse(smooth_path);
     m_wipe.set_path(std::move(smooth_path));
@@ -2514,7 +2582,7 @@ std::string GCodeGenerator::extrude_path(const ExtrusionPath &path, bool reverse
     return gcode;
 }
 
-std::string GCodeGenerator::extrude_support(const ExtrusionEntityReferences &support_fills, const GCode::SmoothPathCache *smooth_path_cache)
+std::string GCodeGenerator::extrude_support(const ExtrusionEntityReferences &support_fills, const GCode::SmoothPathCache &smooth_path_cache)
 {
     static constexpr const auto support_label            = "support material"sv;
     static constexpr const auto support_interface_label  = "support material interface"sv;

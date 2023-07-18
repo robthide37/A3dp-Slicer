@@ -590,6 +590,7 @@ std::pair<Path, Path> split_at(const Path &path, const PathSegmentProjection &pr
 {
     assert(proj.valid());
     assert(! proj.valid() || (proj.segment_id >= 0 && proj.segment_id < path.size()));
+    assert(path.size() > 1);
     std::pair<Path, Path> out;
     if (! proj.valid() || proj.segment_id + 1 == path.size() || (proj.segment_id + 2 == path.size() && proj.point == path.back().point))
         out.first = path;
@@ -637,18 +638,28 @@ std::pair<Path, Path> split_at(const Path &path, const PathSegmentProjection &pr
                 if ((cross2(vproj, vend) > 0) == end.ccw())
                     // Make the radius of a minor arc positive.
                     out.second[1].radius *= -1.f;
+                assert(out.first.size() > 1);
+                assert(out.second.size() > 1);
+                out.second.front().radius = 0;
             }
         } else {
-            // Split at the start of proj.segment_id.
-            out.first.assign(path.begin(), path.begin() + split_segment_id + 1);
-            out.second.assign(path.begin() + split_segment_id, path.end());
-            assert(out.first.size() + out.second.size() == path.size() + 1);
-            assert(out.first.back() == (split_segment_id == proj.segment_id ? start : end));
-            assert(out.second.front() == (split_segment_id == proj.segment_id ? start : end));
+            assert(split_segment_id >= 0 && split_segment_id < path.size());
+            if (split_segment_id + 1 == path.size())
+                out.first = path;
+            else if (split_segment_id == 0)
+                out.second = path;
+            else {
+                // Split at the start of proj.segment_id.
+                out.first.assign(path.begin(), path.begin() + split_segment_id + 1);
+                out.second.assign(path.begin() + split_segment_id, path.end());
+                assert(out.first.size() + out.second.size() == path.size() + 1);
+                assert(out.first.back() == (split_segment_id == proj.segment_id ? start : end));
+                assert(out.second.front() == (split_segment_id == proj.segment_id ? start : end));
+                assert(out.first.size() > 1);
+                assert(out.second.size() > 1);
+                out.second.front().radius = 0;
+            }
         }
-        assert(out.first.size() > 1);
-        assert(out.second.size() > 1);
-        out.second.front().radius = 0;
     }
 
     return out;

@@ -121,26 +121,32 @@ double clip_end(SmoothPath &path, double distance)
     return distance;
 }
 
-void SmoothPathCache::interpolate_add(const Polyline &polyline, const InterpolationParameters &params)
-{
-    m_cache[&polyline] = Slic3r::Geometry::ArcWelder::fit_path(polyline.points, params.tolerance, params.fit_circle_tolerance);
-}
-
 void SmoothPathCache::interpolate_add(const ExtrusionPath &path, const InterpolationParameters &params)
 {
-    this->interpolate_add(path.polyline, params);
+    double tolerance = params.tolerance;
+    if (path.role().is_sparse_infill())
+        // Use 3x lower resolution than the object fine detail for sparse infill.
+        tolerance *= 3.;
+    else if (path.role().is_support())
+        // Use 4x lower resolution than the object fine detail for support.
+        tolerance *= 4.;
+    else if (path.role().is_skirt())
+        // Brim is currently marked as skirt.
+        // Use 4x lower resolution than the object fine detail for skirt & brim.
+        tolerance *= 4.;
+    m_cache[&path.polyline] = Slic3r::Geometry::ArcWelder::fit_path(path.polyline.points, tolerance, params.fit_circle_tolerance);
 }
 
 void SmoothPathCache::interpolate_add(const ExtrusionMultiPath &multi_path, const InterpolationParameters &params)
 {
     for (const ExtrusionPath &path : multi_path.paths)
-        this->interpolate_add(path.polyline, params);
+        this->interpolate_add(path, params);
 }
 
 void SmoothPathCache::interpolate_add(const ExtrusionLoop &loop, const InterpolationParameters &params)
 {
     for (const ExtrusionPath &path : loop.paths)
-        this->interpolate_add(path.polyline, params);
+        this->interpolate_add(path, params);
 }
 
 void SmoothPathCache::interpolate_add(const ExtrusionEntityCollection &eec, const InterpolationParameters &params)
@@ -219,6 +225,9 @@ SmoothPath SmoothPathCache::resolve_or_fit_split_with_seam(
                 assert(this_proj.segment_id >= 0 && this_proj.segment_id < el.path.size());
                 proj = this_proj;
                 proj_path = &el - out.data();
+                if (proj.distance2 == 0)
+                    // There will be no better split point found than one with zero distance.
+                    break;
             }
         assert(proj_path >= 0);
         // Split the path at the closest point.

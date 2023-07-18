@@ -202,7 +202,7 @@ private:
         // Set of object & print layers of the same PrintObject and with the same print_z.
         const ObjectsLayerToPrint       &layers,
         const LayerTools  				&layer_tools,
-        const GCode::SmoothPathCache    *smooth_path_cache,
+        const GCode::SmoothPathCaches   &smooth_path_caches,
         const bool                       last_layer,
 		// Pairs of PrintObject index and its instance index.
 		const std::vector<const PrintInstance*> *ordering,
@@ -217,6 +217,7 @@ private:
         const ToolOrdering                                            &tool_ordering,
         const std::vector<const PrintInstance*>                       &print_object_instances_ordering,
         const std::vector<std::pair<coordf_t, ObjectsLayerToPrint>>   &layers_to_print,
+        const GCode::SmoothPathCache                                  &smooth_path_cache_global,
         GCodeOutputStream                                             &output_stream);
     // Process all layers of a single object instance (sequential mode) with a parallel pipeline:
     // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
@@ -226,6 +227,7 @@ private:
         const ToolOrdering                      &tool_ordering,
         ObjectsLayerToPrint                      layers_to_print,
         const size_t                             single_object_idx,
+        const GCode::SmoothPathCache            &smooth_path_cache_global,
         GCodeOutputStream                       &output_stream);
 
     void            set_last_pos(const Point &pos) { m_last_pos = pos; m_last_pos_defined = true; }
@@ -233,10 +235,13 @@ private:
     void            set_extruders(const std::vector<unsigned int> &extruder_ids);
     std::string     preamble();
     std::string     change_layer(coordf_t print_z);
-    std::string     extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache *smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_loop(const ExtrusionLoop &loop, const GCode::SmoothPathCache *smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_multi_path(const ExtrusionMultiPath &multipath, bool reverse, const GCode::SmoothPathCache *smooth_path_cache, const std::string_view description, double speed = -1.);
-    std::string     extrude_path(const ExtrusionPath &path, bool reverse, const GCode::SmoothPathCache *smooth_path_cache, const std::string_view description, double speed = -1.);
+    std::string     extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
+    std::string     extrude_loop(const ExtrusionLoop &loop, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
+    std::string     extrude_skirt(const ExtrusionLoop &loop_src, const ExtrusionFlow &extrusion_flow_override,
+        const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed);
+
+    std::string     extrude_multi_path(const ExtrusionMultiPath &multipath, bool reverse, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
+    std::string     extrude_path(const ExtrusionPath &path, bool reverse, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
 
     struct InstanceToPrint
     {
@@ -271,13 +276,13 @@ private:
         // Container for extruder overrides (when wiping into object or infill).
         const LayerTools         &layer_tools,
         // Optional smooth path interpolating extrusion polylines.
-        const GCode::SmoothPathCache *smooth_path_cache,
+        const GCode::SmoothPathCache &smooth_path_cache,
         // Is any extrusion possibly marked as wiping extrusion?
         const bool                is_anything_overridden, 
         // Round 1 (wiping into object or infill) or round 2 (normal extrusions).
         const bool                print_wipe_extrusions);
 
-    std::string     extrude_support(const ExtrusionEntityReferences &support_fills, const GCode::SmoothPathCache *smooth_path_cache);
+    std::string     extrude_support(const ExtrusionEntityReferences &support_fills, const GCode::SmoothPathCache &smooth_path_cache);
 
     std::string     travel_to(const Point &point, ExtrusionRole role, std::string comment);
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None);
