@@ -435,10 +435,8 @@ void ArrangeableSlicerModel::for_each_arrangeable_(Self &&self, Fn &&fn)
     InstPos pos;
     for (auto *obj : self.m_model->objects) {
         for (auto *inst : obj->instances) {
-            ArrangeableModelInstance ainst{inst, self.m_vbed_handler.get(),
-                                           self.m_selmask.get(), pos};
+            ArrangeableModelInstance ainst{inst, self.m_vbed_handler.get(), self.m_selmask.get(), pos};
             fn(ainst);
-
             ++pos.inst_idx;
         }
         pos.inst_idx = 0;
@@ -458,9 +456,7 @@ void ArrangeableSlicerModel::visit_arrangeable_(Self &&self, const ObjectID &id,
     auto [inst, pos] = find_instance_by_id(*self.m_model, id);
 
     if (inst) {
-        ArrangeableModelInstance ainst{inst, self.m_vbed_handler.get(),
-                                       self.m_selmask.get(), pos};
-
+        ArrangeableModelInstance ainst{inst, self.m_vbed_handler.get(), self.m_selmask.get(), pos};
         fn(ainst);
     }
 }
@@ -853,6 +849,34 @@ std::unique_ptr<VirtualBedHandler> VirtualBedHandler::create(const ExtendedBed &
 
     return ret;
 }
+
+template<class ArrblSubclass>
+ExPolygons OutlineCachingArrangeable<ArrblSubclass>::full_outline() const
+{
+    auto *entry = m_cache->full_outline(m_arrbl.id());
+    auto [inst, pos] = find_instance_by_id(m_mdl, m_arrbl.id());
+
+    ExPolygons outline;
+
+    if (inst) {
+        Transform3d trafo = inst->get_matrix_no_offset();
+
+        if (!entry) {
+            outline = m_arrbl.full_outline();
+            m_cache->set_full_outline(this->id().id, outline,
+                                      std::any{inst->get_matrix_no_offset()});
+        } else {
+            auto *ctxtrafo = std::any_cast<Transform3d>(&(entry->context));
+            if (ctxtrafo && ctxtrafo->isApprox(trafo))
+                outline = entry->outline;
+        }
+    }
+
+    return outline;
+}
+
+template class OutlineCachingArrangeable<Arrangeable>;
+template class OutlineCachingArrangeable<const Arrangeable>;
 
 }} // namespace Slic3r::arr2
 

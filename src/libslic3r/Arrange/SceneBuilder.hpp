@@ -2,6 +2,8 @@
 #define SCENEBUILDER_HPP
 
 #include "Scene.hpp"
+#include "OutlineCaching.hpp"
+
 #include "Core/ArrangeItemTraits.hpp"
 
 namespace Slic3r {
@@ -168,6 +170,8 @@ struct ArrangeableWipeTowerBase: public Arrangeable
 
 class SceneBuilder;
 
+struct InstPos { size_t obj_idx = 0, inst_idx = 0; };
+
 class ArrangeableSlicerModel: public ArrangeableModel
 {
 protected:
@@ -196,6 +200,9 @@ public:
     void visit_arrangeable(const ObjectID &id, std::function<void(Arrangeable &)>) override;
 
     ObjectID add_arrangeable(const ObjectID &prototype_id) override;
+
+    Model & get_model() { return *m_model; }
+    const Model &get_model() const { return *m_model; }
 };
 
 class SceneBuilder: public SceneBuilderBase<SceneBuilder>
@@ -208,6 +215,7 @@ protected:
 
     AnyPtr<const SLAPrint> m_sla_print;
     AnyPtr<const Print>    m_fff_print;
+    AnyPtr<OutlineCache>   m_outline_cache;
 
     void set_brim_and_skirt();
 
@@ -373,8 +381,6 @@ public:
         transform_instance(*m_mi, transl, rot);
     }
 };
-
-struct InstPos { size_t obj_idx = 0, inst_idx = 0; };
 
 template<class InstPtr, class VBedHPtr>
 class ArrangeableModelInstance : public Arrangeable, VBedPlaceable
@@ -637,6 +643,99 @@ public:
     ObjectID add_arrangeable(const ObjectID &prototype_id) override;
 
     void apply_duplicates();
+};
+
+template<class ArrblSubclass>
+class OutlineCachingArrangeable: public Arrangeable
+{
+    ArrblSubclass &m_arrbl;
+    Model &m_mdl;
+    mutable OutlineCache *m_cache;
+
+public:
+    OutlineCachingArrangeable(ArrblSubclass &arrbl,
+                              Model         &mdl,
+                              OutlineCache  *cache)
+        : m_arrbl{arrbl}, m_mdl{mdl}, m_cache{cache}
+    {}
+
+    ObjectID   id() const             override { return m_arrbl.id(); }
+    ObjectID   geometry_id() const    override { return m_arrbl.geometry_id(); }
+
+    ExPolygons full_outline() const   override;
+    Polygon    convex_outline() const override { return m_arrbl.convex_outline(); }
+
+    ExPolygons full_envelope() const override { return m_arrbl.full_envelope(); }
+    Polygon    convex_envelope() const override { return m_arrbl.convex_envelope(); }
+
+    void transform(const Vec2d &transl, double rot) override
+    {
+        if constexpr (!std::is_const_v<ArrblSubclass>)
+            m_arrbl.transform(transl, rot);
+    }
+
+    bool is_printable() const override { return m_arrbl.is_printable(); }
+    bool is_selected() const override { return m_arrbl.is_selected(); }
+    int  priority() const override { return m_arrbl.priority(); }
+    void imbue_data(AnyWritable &datastore) const override { m_arrbl.imbue_data(datastore); }
+    int get_bed_index() const override { return m_arrbl.get_bed_index(); }
+    bool assign_bed(int bed_idx) override
+    {
+        bool ret = false;
+
+        if constexpr (!std::is_const_v<ArrblSubclass>)
+            ret = m_arrbl.assign_bed(bed_idx);
+
+        return ret;
+    }
+};
+
+extern template class OutlineCachingArrangeable<Arrangeable>;
+extern template class OutlineCachingArrangeable<const Arrangeable>;
+
+class OutlineCachingArrangeableModel: public ArrangeableModel {
+    ArrangeableSlicerModel &m_amodel;
+    mutable AnyPtr<OutlineCache> m_cache;
+
+public:
+    OutlineCachingArrangeableModel(ArrangeableSlicerModel    &amodel,
+                                   AnyPtr<OutlineCache> cache)
+        : m_amodel{amodel}, m_cache{std::move(cache)}
+    {}
+
+    void for_each_arrangeable(std::function<void(Arrangeable &)> fn) override
+    {
+        m_amodel.for_each_arrangeable([this, &fn](Arrangeable &arrbl){
+            OutlineCachingArrangeable oc_arrbl{arrbl, m_amodel.get_model(), m_cache.get()};
+            fn (oc_arrbl);
+        });
+    }
+    void for_each_arrangeable(std::function<void(const Arrangeable&)> fn) const override
+    {
+        m_amodel.for_each_arrangeable([this, &fn](Arrangeable &arrbl){
+            OutlineCachingArrangeable oc_arrbl{arrbl, m_amodel.get_model(), m_cache.get()};
+            fn (oc_arrbl);
+        });
+    }
+    void visit_arrangeable(const ObjectID &id, std::function<void(const Arrangeable &)> fn) const override
+    {
+        m_amodel.visit_arrangeable(id, [this, &fn](Arrangeable &arrbl){
+            OutlineCachingArrangeable oc_arrbl{arrbl, m_amodel.get_model(), m_cache.get()};
+            fn (oc_arrbl);
+        });
+    }
+    void visit_arrangeable(const ObjectID &id, std::function<void(Arrangeable &)> fn) override
+    {
+        m_amodel.visit_arrangeable(id, [this, &fn](Arrangeable &arrbl) {
+            OutlineCachingArrangeable oc_arrbl{arrbl, m_amodel.get_model(), m_cache.get()};
+            fn (oc_arrbl);
+        });
+    }
+
+    ObjectID add_arrangeable(const ObjectID &prototype_id) override
+    {
+        return m_amodel.add_arrangeable(prototype_id);
+    }
 };
 
 } // namespace arr2
