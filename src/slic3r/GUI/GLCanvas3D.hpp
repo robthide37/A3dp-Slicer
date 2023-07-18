@@ -18,6 +18,7 @@
 #include "Camera.hpp"
 #include "SceneRaycaster.hpp"
 #include "GUI_Utils.hpp"
+#include "ArrangeSettingsDialogImgui.hpp"
 
 #include "libslic3r/Slicing.hpp"
 
@@ -466,6 +467,8 @@ public:
         float accuracy           = 0.65f; // Unused currently
         bool  enable_rotation    = false;
         int   alignment          = 0;
+        int   geometry_handling  = 0;
+        int   strategy = 0;
     };
 
     enum class ESLAViewType
@@ -581,44 +584,11 @@ private:
     SLAView m_sla_view;
     bool m_sla_view_type_detection_active{ false };
 
-    ArrangeSettings m_arrange_settings_fff, m_arrange_settings_sla,
-        m_arrange_settings_fff_seq_print;
-
     bool is_arrange_alignment_enabled() const;
 
-    template<class Self>
-    static auto & get_arrange_settings_ref(Self *self) {
-        PrinterTechnology ptech = self->current_printer_technology();
-
-        auto *ptr = &self->m_arrange_settings_fff;
-
-        if (ptech == ptSLA) {
-            ptr = &self->m_arrange_settings_sla;
-        } else if (ptech == ptFFF) {
-            auto co_opt = self->m_config->template option<ConfigOptionBool>("complete_objects");
-            if (co_opt && co_opt->value)
-                ptr = &self->m_arrange_settings_fff_seq_print;
-            else
-                ptr = &self->m_arrange_settings_fff;
-        }
-
-        return *ptr;
-    }
+    ArrangeSettingsDialogImgui m_arrange_settings_dialog;
 
 public:
-    ArrangeSettings get_arrange_settings() const {
-        const ArrangeSettings &settings = get_arrange_settings_ref(this);
-        ArrangeSettings ret = settings;
-        if (&settings == &m_arrange_settings_fff_seq_print) {
-            ret.distance = std::max(ret.distance,
-                                    float(min_object_distance(*m_config)));
-        }
-
-        if (!is_arrange_alignment_enabled())
-            ret.alignment = -1;
-
-        return ret;
-    }
 
     struct ContoursList
     {
@@ -631,7 +601,6 @@ public:
     };
 
 private:
-    void load_arrange_settings();
 
     class SequentialPrintClearance
     {
@@ -754,9 +723,12 @@ public:
     void update_instance_printable_state_for_objects(const std::vector<size_t>& object_idxs);
 
     void set_config(const DynamicPrintConfig* config);
+    const DynamicPrintConfig *config() const { return m_config; }
     void set_process(BackgroundSlicingProcess* process);
     void set_model(Model* model);
     const Model* get_model() const { return m_model; }
+
+    const arr2::ArrangeSettingsView * get_arrange_settings_view() const { return &m_arrange_settings_dialog; }
 
     const Selection& get_selection() const { return m_selection; }
     Selection& get_selection() { return m_selection; }
@@ -919,8 +891,11 @@ public:
         inline const Vec2d& pos() const { return m_pos; }
         inline double rotation() const { return m_rotation; }
         inline const Vec2d bb_size() const { return m_bb.size(); }
+        inline const BoundingBoxf& bounding_box() const { return m_bb; }
         
         void apply_wipe_tower() const;
+
+        static void apply_wipe_tower(Vec2d pos, double rot);
     };
     
     WipeTowerInfo get_wipe_tower_info() const;

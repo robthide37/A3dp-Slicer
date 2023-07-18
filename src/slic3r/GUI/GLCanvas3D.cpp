@@ -35,6 +35,7 @@
 
 #include "slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
+#include "libslic3r/Arrange/ArrangeSettingsDb_AppCfg.hpp"
 
 #if ENABLE_RETINA_GL
 #include "slic3r/Utils/RetinaHelper.hpp"
@@ -1045,94 +1046,6 @@ wxDEFINE_EVENT(EVT_GLCANVAS_GIZMO_HIGHLIGHTER_TIMER, wxTimerEvent);
 
 const double GLCanvas3D::DefaultCameraZoomToBoxMarginFactor = 1.25;
 
-void GLCanvas3D::load_arrange_settings()
-{
-    std::string dist_fff_str =
-        wxGetApp().app_config->get("arrange", "min_object_distance_fff");
-
-    std::string dist_bed_fff_str =
-        wxGetApp().app_config->get("arrange", "min_bed_distance_fff");
-
-    std::string dist_fff_seq_print_str =
-        wxGetApp().app_config->get("arrange", "min_object_distance_fff_seq_print");
-
-    std::string dist_bed_fff_seq_print_str =
-        wxGetApp().app_config->get("arrange", "min_bed_distance_fff_seq_print");
-
-    std::string dist_sla_str =
-        wxGetApp().app_config->get("arrange", "min_object_distance_sla");
-
-    std::string dist_bed_sla_str =
-        wxGetApp().app_config->get("arrange", "min_bed_distance_sla");
-
-    std::string en_rot_fff_str =
-        wxGetApp().app_config->get("arrange", "enable_rotation_fff");
-
-    std::string en_rot_fff_seqp_str =
-        wxGetApp().app_config->get("arrange", "enable_rotation_fff_seq_print");
-
-    std::string en_rot_sla_str =
-        wxGetApp().app_config->get("arrange", "enable_rotation_sla");
-
-//    std::string alignment_fff_str =
-//        wxGetApp().app_config->get("arrange", "alignment_fff");
-
-//    std::string alignment_fff_seqp_str =
-//        wxGetApp().app_config->get("arrange", "alignment_fff_seq_pring");
-
-//    std::string alignment_sla_str =
-//        wxGetApp().app_config->get("arrange", "alignment_sla");
-
-    // Override default alignment and save save/load it to a temporary slot "alignment_xl"
-    std::string alignment_xl_str =
-        wxGetApp().app_config->get("arrange", "alignment_xl");
-
-    if (!dist_fff_str.empty())
-        m_arrange_settings_fff.distance = string_to_float_decimal_point(dist_fff_str);
-
-    if (!dist_bed_fff_str.empty())
-        m_arrange_settings_fff.distance_from_bed = string_to_float_decimal_point(dist_bed_fff_str);
-
-    if (!dist_fff_seq_print_str.empty())
-        m_arrange_settings_fff_seq_print.distance = string_to_float_decimal_point(dist_fff_seq_print_str);
-
-    if (!dist_bed_fff_seq_print_str.empty())
-        m_arrange_settings_fff_seq_print.distance_from_bed = string_to_float_decimal_point(dist_bed_fff_seq_print_str);
-
-    if (!dist_sla_str.empty())
-        m_arrange_settings_sla.distance = string_to_float_decimal_point(dist_sla_str);
-
-    if (!dist_bed_sla_str.empty())
-        m_arrange_settings_sla.distance_from_bed = string_to_float_decimal_point(dist_bed_sla_str);
-
-    if (!en_rot_fff_str.empty())
-        m_arrange_settings_fff.enable_rotation = (en_rot_fff_str == "1" || en_rot_fff_str == "yes");
-
-    if (!en_rot_fff_seqp_str.empty())
-        m_arrange_settings_fff_seq_print.enable_rotation = (en_rot_fff_seqp_str == "1" || en_rot_fff_seqp_str == "yes");
-
-    if (!en_rot_sla_str.empty())
-        m_arrange_settings_sla.enable_rotation = (en_rot_sla_str == "1" || en_rot_sla_str == "yes");
-
-//    if (!alignment_sla_str.empty())
-//        m_arrange_settings_sla.alignment = std::stoi(alignment_sla_str);
-
-//    if (!alignment_fff_str.empty())
-//        m_arrange_settings_fff.alignment = std::stoi(alignment_fff_str);
-
-//    if (!alignment_fff_seqp_str.empty())
-//        m_arrange_settings_fff_seq_print.alignment = std::stoi(alignment_fff_seqp_str);
-
-    // Override default alignment and save save/load it to a temporary slot "alignment_xl"
-    int arr_alignment = static_cast<int>(arrangement::Pivots::BottomLeft);
-    if (!alignment_xl_str.empty())
-        arr_alignment = std::stoi(alignment_xl_str);
-
-    m_arrange_settings_sla.alignment = arr_alignment ;
-    m_arrange_settings_fff.alignment = arr_alignment ;
-    m_arrange_settings_fff_seq_print.alignment = arr_alignment ;
-}
-
 static std::vector<int> processed_objects_idxs(const Model& model, const SLAPrint& sla_print, const GLVolumePtrs& volumes)
 {
     std::vector<int> ret;
@@ -1392,38 +1305,47 @@ bool GLCanvas3D::is_arrange_alignment_enabled() const
     return m_config ? is_XL_printer(*m_config) : false;
 }
 
-GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)
-    : m_canvas(canvas)
-    , m_context(nullptr)
-    , m_bed(bed)
+GLCanvas3D::GLCanvas3D(wxGLCanvas *canvas, Bed3D &bed)
+    : m_canvas(canvas),
+      m_context(nullptr),
+      m_bed(bed)
 #if ENABLE_RETINA_GL
-    , m_retina_helper(nullptr)
+      ,
+      m_retina_helper(nullptr)
 #endif
-    , m_in_render(false)
-    , m_main_toolbar(GLToolbar::Normal, "Main")
-    , m_undoredo_toolbar(GLToolbar::Normal, "Undo_Redo")
-    , m_gizmos(*this)
-    , m_use_clipping_planes(false)
-    , m_sidebar_field("")
-    , m_extra_frame_requested(false)
-    , m_config(nullptr)
-    , m_process(nullptr)
-    , m_model(nullptr)
-    , m_dirty(true)
-    , m_initialized(false)
-    , m_apply_zoom_to_volumes_filter(false)
-    , m_picking_enabled(false)
-    , m_moving_enabled(false)
-    , m_dynamic_background_enabled(false)
-    , m_multisample_allowed(false)
-    , m_moving(false)
-    , m_tab_down(false)
-    , m_cursor_type(Standard)
-    , m_reload_delayed(false)
-    , m_render_sla_auxiliaries(true)
-    , m_labels(*this)
-    , m_slope(m_volumes)
-    , m_sla_view(*this)
+      ,
+      m_in_render(false),
+      m_main_toolbar(GLToolbar::Normal, "Main"),
+      m_undoredo_toolbar(GLToolbar::Normal, "Undo_Redo"),
+      m_gizmos(*this),
+      m_use_clipping_planes(false),
+      m_sidebar_field(""),
+      m_extra_frame_requested(false),
+      m_config(nullptr),
+      m_process(nullptr),
+      m_model(nullptr),
+      m_dirty(true),
+      m_initialized(false),
+      m_apply_zoom_to_volumes_filter(false),
+      m_picking_enabled(false),
+      m_moving_enabled(false),
+      m_dynamic_background_enabled(false),
+      m_multisample_allowed(false),
+      m_moving(false),
+      m_tab_down(false),
+      m_cursor_type(Standard),
+      m_reload_delayed(false),
+      m_render_sla_auxiliaries(true),
+      m_labels(*this),
+      m_slope(m_volumes),
+      m_sla_view(*this),
+      m_arrange_settings_dialog{wxGetApp().imgui(),
+                                std::make_unique<ArrangeSettingsDb_AppCfg>(
+                                    wxGetApp().app_config,
+                                    [this]() { return m_config; },
+                                    [this] {
+                                        return current_printer_technology();
+                                    })}
 {
     if (m_canvas != nullptr) {
         m_timer.SetOwner(m_canvas);
@@ -1433,9 +1355,13 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed)
 #endif // ENABLE_RETINA_GL
     }
 
-    load_arrange_settings();
-
     m_selection.set_volumes(&m_volumes.volumes);
+    m_arrange_settings_dialog.show_xl_align_combo([this](){
+        return this->is_arrange_alignment_enabled();
+    });
+    m_arrange_settings_dialog.on_arrange_btn([]{
+        wxGetApp().plater()->arrange();
+    });
 }
 
 GLCanvas3D::~GLCanvas3D()
@@ -4831,104 +4757,9 @@ bool GLCanvas3D::_render_search_list(float pos_x)
 
 bool GLCanvas3D::_render_arrange_menu(float pos_x)
 {
-    ImGuiWrapper *imgui = wxGetApp().imgui();
+    m_arrange_settings_dialog.render(pos_x, m_main_toolbar.get_height());
 
-    imgui->set_next_window_pos(pos_x, m_main_toolbar.get_height(), ImGuiCond_Always, 0.5f, 0.0f);
-
-    imgui->begin(_L("Arrange options"), ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
-
-    ArrangeSettings settings = get_arrange_settings();
-    ArrangeSettings &settings_out = get_arrange_settings_ref(this);
-
-    auto &appcfg = wxGetApp().app_config;
-    PrinterTechnology ptech = current_printer_technology();
-
-    bool settings_changed = false;
-    float dist_min = 0.f;
-    float dist_bed_min = 0.f;
-    std::string dist_key = "min_object_distance";
-    std::string dist_bed_key = "min_bed_distance";
-    std::string rot_key = "enable_rotation";
-    std::string align_key = "alignment";
-    std::string postfix;
-
-    if (ptech == ptSLA) {
-        postfix      = "_sla";
-    } else if (ptech == ptFFF) {
-        auto co_opt = m_config->option<ConfigOptionBool>("complete_objects");
-        if (co_opt && co_opt->value) {
-            dist_min     = float(min_object_distance(*m_config));
-            postfix      = "_fff_seq_print";
-        } else {
-            dist_min     = 0.f;
-            postfix     = "_fff";
-        }
-    }
-
-    dist_key += postfix;
-    dist_bed_key += postfix;
-    rot_key += postfix;
-    align_key += postfix;
-
-    imgui->text(GUI::format_wxstr(_L("Press %1%left mouse button to enter the exact value"), shortkey_ctrl_prefix()));
-
-    if (imgui->slider_float(_L("Spacing"), &settings.distance, dist_min, 100.0f, "%5.2f") || dist_min > settings.distance) {
-        settings.distance = std::max(dist_min, settings.distance);
-        settings_out.distance = settings.distance;
-        appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
-        settings_changed = true;
-    }
-
-    if (imgui->slider_float(_L("Spacing from bed"), &settings.distance_from_bed, dist_bed_min, 100.0f, "%5.2f") || dist_bed_min > settings.distance_from_bed) {
-        settings.distance_from_bed = std::max(dist_bed_min, settings.distance_from_bed);
-        settings_out.distance_from_bed = settings.distance_from_bed;
-        appcfg->set("arrange", dist_bed_key.c_str(), float_to_string_decimal_point(settings_out.distance_from_bed));
-        settings_changed = true;
-    }
-
-    if (imgui->checkbox(_L("Enable rotations (slow)"), settings.enable_rotation)) {
-        settings_out.enable_rotation = settings.enable_rotation;
-        appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation? "1" : "0");
-        settings_changed = true;
-    }
-
-    Points bed = m_config ? get_bed_shape(*m_config) : Points{};
-
-    if (arrangement::is_box(bed) && settings.alignment >= 0 &&
-        imgui->combo(_L("Alignment"), {_u8L("Center"), _u8L("Rear left"), _u8L("Front left"), _u8L("Front right"), _u8L("Rear right"), _u8L("Random") }, settings.alignment)) {
-        settings_out.alignment = settings.alignment;
-        appcfg->set("arrange", align_key.c_str(), std::to_string(settings_out.alignment));
-        settings_changed = true;
-    }
-
-    ImGui::Separator();
-
-    if (imgui->button(_L("Reset"))) {
-        auto alignment = settings_out.alignment;
-        settings_out = ArrangeSettings{};
-        settings_out.distance = std::max(dist_min, settings_out.distance);
-
-        // Default alignment for XL printers set explicitly:
-        if (is_arrange_alignment_enabled())
-            settings_out.alignment = static_cast<int>(arrangement::Pivots::BottomLeft);
-        else
-            settings_out.alignment = alignment;
-
-        appcfg->set("arrange", dist_key.c_str(), float_to_string_decimal_point(settings_out.distance));
-        appcfg->set("arrange", dist_bed_key.c_str(), float_to_string_decimal_point(settings_out.distance_from_bed));
-        appcfg->set("arrange", rot_key.c_str(), settings_out.enable_rotation? "1" : "0");
-        settings_changed = true;
-    }
-
-    ImGui::SameLine();
-
-    if (imgui->button(_L("Arrange"))) {
-        wxGetApp().plater()->arrange();
-    }
-
-    imgui->end();
-
-    return settings_changed;
+    return true;
 }
 
 #define ENABLE_THUMBNAIL_GENERATOR_DEBUG_OUTPUT 0
@@ -7773,13 +7604,18 @@ const SLAPrint* GLCanvas3D::sla_print() const
     return (m_process == nullptr) ? nullptr : m_process->sla_print();
 }
 
-void GLCanvas3D::WipeTowerInfo::apply_wipe_tower() const
+void GLCanvas3D::WipeTowerInfo::apply_wipe_tower(Vec2d pos, double rot)
 {
     DynamicPrintConfig cfg;
-    cfg.opt<ConfigOptionFloat>("wipe_tower_x", true)->value = m_pos(X);
-    cfg.opt<ConfigOptionFloat>("wipe_tower_y", true)->value = m_pos(Y);
-    cfg.opt<ConfigOptionFloat>("wipe_tower_rotation_angle", true)->value = (180./M_PI) * m_rotation;
+    cfg.opt<ConfigOptionFloat>("wipe_tower_x", true)->value = pos.x();
+    cfg.opt<ConfigOptionFloat>("wipe_tower_y", true)->value = pos.y();
+    cfg.opt<ConfigOptionFloat>("wipe_tower_rotation_angle", true)->value = (180./M_PI) * rot;
     wxGetApp().get_tab(Preset::TYPE_PRINT)->load_config(cfg);
+}
+
+void GLCanvas3D::WipeTowerInfo::apply_wipe_tower() const
+{
+    apply_wipe_tower(m_pos, m_rotation);
 }
 
 void GLCanvas3D::RenderTimer::Notify()
