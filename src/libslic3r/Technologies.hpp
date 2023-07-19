@@ -62,4 +62,13 @@
 #define ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR (1 && ENABLE_2_6_0_ALPHA1)
 
 
+//====================
+// 2.6.1.alpha1 techs
+//====================
+#define ENABLE_2_6_1_ALPHA1 1
+
+// Enable export of binarized gcode
+#define ENABLE_BINARIZED_GCODE (1 && ENABLE_2_6_1_ALPHA1)
+
+
 #endif // _prusaslicer_technologies_h_

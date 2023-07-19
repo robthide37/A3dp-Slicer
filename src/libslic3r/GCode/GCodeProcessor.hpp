@@ -7,6 +7,10 @@
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/CustomGCode.hpp"
 
+#if ENABLE_BINARIZED_GCODE
+#include "GCodeBinarizer.hpp"
+#endif // ENABLE_BINARIZED_GCODE
+
 #include <cstdint>
 #include <array>
 #include <vector>
@@ -525,6 +529,9 @@ namespace Slic3r {
 
     private:
         GCodeReader m_parser;
+#if ENABLE_BINARIZED_GCODE
+        BinaryGCode::Binarizer m_binarizer;
+#endif // ENABLE_BINARIZED_GCODE
 
         EUnits m_units;
         EPositioningType m_global_positioning_type;
@@ -622,6 +629,10 @@ namespace Slic3r {
 
         void apply_config(const PrintConfig& config);
         void set_print(Print* print) { m_print = print; }
+#if ENABLE_BINARIZED_GCODE
+        BinaryGCode::BinaryData& get_binary_data() { return m_binarizer.get_binary_data(); }
+        const BinaryGCode::BinaryData& get_binary_data() const { return m_binarizer.get_binary_data(); }
+#endif // ENABLE_BINARIZED_GCODE
 
         void enable_stealth_time_estimator(bool enabled);
         bool is_stealth_time_estimator_enabled() const {
@@ -663,6 +674,11 @@ namespace Slic3r {
         void apply_config_superslicer(const std::string& filename);
         void apply_config_kissslicer(const std::string& filename);
         void process_gcode_line(const GCodeReader::GCodeLine& line, bool producers_enabled);
+
+#if ENABLE_BINARIZED_GCODE
+        void process_ascii_file(const std::string& filename, std::function<void()> cancel_callback = nullptr);
+        void process_binary_file(const std::string& filename, std::function<void()> cancel_callback = nullptr);
+#endif // ENABLE_BINARIZED_GCODE
 
         // Process tags embedded into comments
         void process_tags(const std::string_view comment, bool producers_enabled);

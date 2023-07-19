@@ -698,6 +698,9 @@ PRINT_CONFIG_CLASS_DEFINE(
     //      i - case insensitive
     //      w - whole word
     ((ConfigOptionStrings,             gcode_substitutions))
+//#if ENABLE_BINARIZED_GCODE
+    ((ConfigOptionBool,                gcode_binary))
+//#endif // ENABLE_BINARIZED_GCODE
     ((ConfigOptionString,              layer_gcode))
     ((ConfigOptionFloat,               max_print_speed))
     ((ConfigOptionFloat,               max_volumetric_speed))

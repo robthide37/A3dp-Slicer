@@ -25,6 +25,10 @@
 #endif
 
 #include <chrono>
+#if ENABLE_BINARIZED_GCODE_DEBUG
+#include <windows.h>
+#include <debugapi.h>
+#endif // ENABLE_BINARIZED_GCODE_DEBUG
 
 static const float DEFAULT_TOOLPATH_WIDTH = 0.4f;
 static const float DEFAULT_TOOLPATH_HEIGHT = 0.2f;
@@ -554,6 +558,10 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
 {
     m_parser.apply_config(config);
 
+#if ENABLE_BINARIZED_GCODE
+    m_binarizer.set_enabled(config.gcode_binary);
+#endif // ENABLE_BINARIZED_GCODE
+
     m_producer = EProducer::PrusaSlicer;
     m_flavor = config.gcode_flavor;
 
@@ -1023,6 +1031,23 @@ static inline const char* remove_eols(const char *begin, const char *end) {
 // Load a G-code into a stand-alone G-code viewer.
 // throws CanceledException through print->throw_if_canceled() (sent by the caller as callback).
 void GCodeProcessor::process_file(const std::string& filename, std::function<void()> cancel_callback)
+#if ENABLE_BINARIZED_GCODE
+{
+    FILE* file = boost::nowide::fopen(filename.c_str(), "rb");
+    if (file == nullptr)
+        throw Slic3r::RuntimeError("Error opening the file: " + filename + "\n");
+
+    const bool is_binary = BinaryGCode::is_valid_binary_gcode(*file);
+    fclose(file);
+
+    if (is_binary)
+        process_binary_file(filename, cancel_callback);
+    else
+        process_ascii_file(filename, cancel_callback);
+}
+
+void GCodeProcessor::process_ascii_file(const std::string& filename, std::function<void()> cancel_callback)
+#endif // ENABLE_BINARIZED_GCODE
 {
     CNumericLocalesSetter locales_setter;
 
@@ -1089,6 +1114,163 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
     // Don't post-process the G-code to update time stamps.
     this->finalize(false);
 }
+
+#if ENABLE_BINARIZED_GCODE
+void GCodeProcessor::process_binary_file(const std::string& filename, std::function<void()> cancel_callback)
+{
+    class ScopedFile
+    {
+    public:
+        explicit ScopedFile(FILE* file) : m_file(file) {}
+        ~ScopedFile() { if (m_file != nullptr) fclose(m_file); }
+    private:
+        FILE* m_file{ nullptr };
+    };
+
+    FILE* file = boost::nowide::fopen(filename.c_str(), "rb");
+    if (file == nullptr)
+        throw Slic3r::RuntimeError("Unable to open file: " + filename + "\n");
+
+    ScopedFile scoped_file(file);
+
+    BinaryGCode::set_checksum_max_cache_size(1024);
+
+    // read file header
+    BinaryGCode::FileHeader file_header;
+    BinaryGCode::EResult res = BinaryGCode::read_header(*file, file_header, &BinaryGCode::VERSION);
+    if (res != BinaryGCode::EResult::Success)
+        throw Slic3r::RuntimeError("File: " + filename + "does not contain a valid binary gcode\n Error: " + BinaryGCode::translate_result(res) + "\n");
+
+    const long first_block_header_position = ftell(file);
+    const bool verify_checksum = true;
+
+    // read file metadata block
+    BinaryGCode::BlockHeader block_header;
+    res = BinaryGCode::read_next_block_header(*file, file_header, block_header, verify_checksum);
+    if (res != BinaryGCode::EResult::Success)
+        throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+    if ((BinaryGCode::EBlockType)block_header.type != BinaryGCode::EBlockType::FileMetadata)
+        throw Slic3r::RuntimeError("Unable to find file metadata block in file: " + filename + "\n");
+    BinaryGCode::FileMetadataBlock file_metadata_block;
+    res = file_metadata_block.read_data(*file, file_header, block_header);
+    if (res != BinaryGCode::EResult::Success)
+        throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+    auto producer_it = std::find_if(file_metadata_block.raw_data.begin(), file_metadata_block.raw_data.end(),
+        [](const std::pair<std::string, std::string>& item) { return item.first == "Producer"; });
+    if (producer_it != file_metadata_block.raw_data.end() && boost::starts_with(producer_it->second, std::string(SLIC3R_APP_NAME)))
+        m_producer = EProducer::PrusaSlicer;
+    else
+        m_producer = EProducer::Unknown;
+
+    // read printer metadata block
+    res = BinaryGCode::read_next_block_header(*file, file_header, block_header, verify_checksum);
+    if (res != BinaryGCode::EResult::Success)
+        throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+    if ((BinaryGCode::EBlockType)block_header.type != BinaryGCode::EBlockType::PrinterMetadata)
+        throw Slic3r::RuntimeError("Unable to find printer metadata block in file: " + filename + "\n");
+    BinaryGCode::PrinterMetadataBlock printer_metadata_block;
+    res = printer_metadata_block.read_data(*file, file_header, block_header);
+    if (res != BinaryGCode::EResult::Success)
+        throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+#if ENABLE_BINARIZED_GCODE_DEBUG
+    OutputDebugStringA("Printer metadata:\n");
+    for (const auto& [key, value] : printer_metadata_block.raw_data) {
+        OutputDebugStringA(key.c_str());
+        OutputDebugStringA("->");
+        OutputDebugStringA(value.c_str());
+        OutputDebugStringA("\n");
+    }
+#endif // ENABLE_BINARIZED_GCODE_DEBUG
+
+    // read thumbnail blocks
+    res = BinaryGCode::read_next_block_header(*file, file_header, block_header, verify_checksum);
+    if (res != BinaryGCode::EResult::Success)
+        throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+
+    while ((BinaryGCode::EBlockType)block_header.type == BinaryGCode::EBlockType::Thumbnail) {
+        BinaryGCode::ThumbnailBlock thumbnail_block;
+        res = thumbnail_block.read_data(*file, file_header, block_header);
+        if (res != BinaryGCode::EResult::Success)
+            throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+      
+#if ENABLE_BINARIZED_GCODE_DEBUG
+        if (thumbnail_block.data.size() > 0) {
+            auto format_filename = [](const std::string& stem, const BinaryGCode::ThumbnailBlock& block) {
+                std::string ret = stem + "_" + std::to_string(block.width) + "x" + std::to_string(block.height);
+                switch ((BinaryGCode::EThumbnailFormat)block.format)
+                {
+                case BinaryGCode::EThumbnailFormat::PNG: { ret += ".png"; break; }
+                case BinaryGCode::EThumbnailFormat::JPG: { ret += ".jpg"; break; }
+                case BinaryGCode::EThumbnailFormat::QOI: { ret += ".qoi"; break; }
+                }
+                return ret;
+            };
+
+            const boost::filesystem::path path(filename);
+            const std::string out_path = path.parent_path().string();
+            const std::string out_filename = out_path + "\\" + format_filename(path.stem().string(), thumbnail_block);
+            FILE* outfile = boost::nowide::fopen(out_filename.c_str(), "wb");
+            if (outfile != nullptr) {
+                fwrite((const void*)thumbnail_block.data.data(), 1, thumbnail_block.data.size(), outfile);
+                fclose(outfile);
+            }
+        }
+#endif // ENABLE_BINARIZED_GCODE_DEBUG
+
+        res = BinaryGCode::read_next_block_header(*file, file_header, block_header, verify_checksum);
+        if (res != BinaryGCode::EResult::Success)
+            throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+    }
+
+    // read slicer metadata block
+    if ((BinaryGCode::EBlockType)block_header.type != BinaryGCode::EBlockType::SlicerMetadata)
+        throw Slic3r::RuntimeError("Unable to find slicer metadata block in file: " + filename + "\n");
+    BinaryGCode::SlicerMetadataBlock slicer_metadata_block;
+    res = slicer_metadata_block.read_data(*file, file_header, block_header);
+    if (res != BinaryGCode::EResult::Success)
+        throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+#if ENABLE_BINARIZED_GCODE_DEBUG
+    OutputDebugStringA("Slicer metadata:\n");
+    for (const auto& [key, value] : slicer_metadata_block.raw_data) {
+        OutputDebugStringA(key.c_str());
+        OutputDebugStringA("->");
+        OutputDebugStringA(value.c_str());
+        OutputDebugStringA("\n");
+    }
+#endif // ENABLE_BINARIZED_GCODE_DEBUG
+    DynamicPrintConfig config;
+    config.apply(FullPrintConfig::defaults());
+    std::string str;
+    for (const auto& [key, value] : slicer_metadata_block.raw_data) {
+        str += key + " = " + value + "\n";
+    }
+    // Silently substitute unknown values by new ones for loading configurations from PrusaSlicer's own G-code.
+    // Showing substitution log or errors may make sense, but we are not really reading many values from the G-code config,
+    // thus a probability of incorrect substitution is low and the G-code viewer is a consumer-only anyways.
+    config.load_from_ini_string(str, ForwardCompatibilitySubstitutionRule::EnableSilent);
+    apply_config(config);
+
+    // read print metadata block
+    res = BinaryGCode::read_next_block_header(*file, file_header, block_header, verify_checksum);
+    if (res != BinaryGCode::EResult::Success)
+        throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+    if ((BinaryGCode::EBlockType)block_header.type != BinaryGCode::EBlockType::PrintMetadata)
+        throw Slic3r::RuntimeError("Unable to find print metadata block in file: " + filename + "\n");
+    BinaryGCode::PrintMetadataBlock print_metadata_block;
+    res = print_metadata_block.read_data(*file, file_header, block_header);
+    if (res != BinaryGCode::EResult::Success)
+        throw Slic3r::RuntimeError("Error while reading file: " + filename + ": " + BinaryGCode::translate_result(res) + "\n");
+#if ENABLE_BINARIZED_GCODE_DEBUG
+    OutputDebugStringA("Print metadata:\n");
+    for (const auto& [key, value] : print_metadata_block.raw_data) {
+        OutputDebugStringA(key.c_str());
+        OutputDebugStringA("->");
+        OutputDebugStringA(value.c_str());
+        OutputDebugStringA("\n");
+    }
+#endif // ENABLE_BINARIZED_GCODE_DEBUG
+}
+#endif // ENABLE_BINARIZED_GCODE
 
 void GCodeProcessor::initialize(const std::string& filename)
 {
@@ -3439,6 +3621,15 @@ void GCodeProcessor::post_process()
         throw Slic3r::RuntimeError(std::string("GCode processor post process export failed.\nCannot open file for writing.\n"));
     }
 
+#if ENABLE_BINARIZED_GCODE
+    if (m_binarizer.is_enabled()) {
+        BinaryGCode::set_checksum_max_cache_size(4096);
+        const BinaryGCode::EResult res = m_binarizer.initialize(*out.f, BinaryGCode::EChecksumType::CRC32);
+        if (res != BinaryGCode::EResult::Success)
+            throw Slic3r::RuntimeError(std::string("Unable to initialize the gcode binarizer.\n"));
+    }
+#endif // ENABLE_BINARIZED_GCODE
+
     auto time_in_minutes = [](float time_in_seconds) {
         assert(time_in_seconds >= 0.f);
         return int((time_in_seconds + 0.5f) / 60.0f);
@@ -3555,13 +3746,26 @@ void GCodeProcessor::post_process()
         size_t m_curr_g1_id{ 0 };
         size_t m_out_file_pos{ 0 };
 
+#if ENABLE_BINARIZED_GCODE
+        BinaryGCode::Binarizer& m_binarizer;
+#endif // ENABLE_BINARIZED_GCODE
+
     public:
+#if ENABLE_BINARIZED_GCODE
+        ExportLines(BinaryGCode::Binarizer& binarizer, EWriteType type, TimeMachine& machine)
+#ifndef NDEBUG
+        : m_statistics(*this), m_binarizer(binarizer), m_write_type(type), m_machine(machine) {}
+#else
+        : m_binarizer(binarizer), m_write_type(type), m_machine(machine) {}
+#endif // NDEBUG
+#else
         ExportLines(EWriteType type, TimeMachine& machine)
 #ifndef NDEBUG
         : m_statistics(*this), m_write_type(type), m_machine(machine) {}
 #else
         : m_write_type(type), m_machine(machine) {}
 #endif // NDEBUG
+#endif // ENABLE_BINARIZED_GCODE
 
         void update(size_t lines_counter, size_t g1_lines_counter) {
             m_gcode_lines_map.push_back({ lines_counter, 0 });
@@ -3707,12 +3911,18 @@ void GCodeProcessor::post_process()
     private:
         void write_to_file(FilePtr& out, const std::string& out_string, GCodeProcessorResult& result, const std::string& out_path) {
             if (!out_string.empty()) {
-                fwrite((const void*)out_string.c_str(), 1, out_string.length(), out.f);
-                if (ferror(out.f)) {
-                    out.close();
-                    boost::nowide::remove(out_path.c_str());
-                    throw Slic3r::RuntimeError(std::string("GCode processor post process export failed.\nIs the disk full?\n"));
+#if ENABLE_BINARIZED_GCODE
+                if (!m_binarizer.is_enabled()) {
+#endif // ENABLE_BINARIZED_GCODE
+                    fwrite((const void*)out_string.c_str(), 1, out_string.length(), out.f);
+                    if (ferror(out.f)) {
+                        out.close();
+                        boost::nowide::remove(out_path.c_str());
+                        throw Slic3r::RuntimeError(std::string("GCode processor post process export failed.\nIs the disk full?\n"));
+                    }
+#if ENABLE_BINARIZED_GCODE
                 }
+#endif // ENABLE_BINARIZED_GCODE
                 for (size_t i = 0; i < out_string.size(); ++i) {
                     if (out_string[i] == '\n')
                         result.lines_ends.emplace_back(m_out_file_pos + i + 1);
@@ -3722,7 +3932,11 @@ void GCodeProcessor::post_process()
         }
     };
 
+#if ENABLE_BINARIZED_GCODE
+    ExportLines export_lines(m_binarizer, m_result.backtrace_enabled ? ExportLines::EWriteType::ByTime : ExportLines::EWriteType::BySize, m_time_processor.machines[0]);
+#else
     ExportLines export_lines(m_result.backtrace_enabled ? ExportLines::EWriteType::ByTime : ExportLines::EWriteType::BySize, m_time_processor.machines[0]);
+#endif // ENABLE_BINARIZED_GCODE
 
     // replace placeholder lines with the proper final value
     // gcode_line is in/out parameter, to reduce expensive memory allocation
@@ -4034,6 +4248,46 @@ void GCodeProcessor::post_process()
     }
 
     export_lines.flush(out, m_result, out_path);
+
+#if ENABLE_BINARIZED_GCODE
+    if (m_binarizer.is_enabled()) {
+        // update print metadata
+        auto update_value = [](std::string& value, const std::vector<double>& values) {
+            char buf[1024];
+            value.clear();
+            for (size_t i = 0; i < values.size(); ++i) {
+                sprintf(buf, i == values.size() - 1 ? " %.2lf" : " %.2lf,", values[i]);
+                value += buf;
+            }
+        };
+
+        // update binary data
+        BinaryGCode::BinaryData& binary_data = m_binarizer.get_binary_data();
+        for (auto& [key, value] : binary_data.print_metadata.raw_data) {
+            if      (key == "filament used [mm]")      update_value(value, filament_mm);
+            else if (key == "filament used [g]")       update_value(value, filament_g);
+            else if (key == "total filament used [g]") update_value(value, { filament_total_g });
+            else if (key == "filament used [cm3]")     update_value(value, filament_cm3);
+            else if (key == "filament cost")           update_value(value, filament_cost);
+            else if (key == "total filament cost")     update_value(value, { filament_total_cost });
+        }
+
+        for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
+            const TimeMachine& machine = m_time_processor.machines[i];
+            PrintEstimatedStatistics::ETimeMode mode = static_cast<PrintEstimatedStatistics::ETimeMode>(i);
+            if (mode == PrintEstimatedStatistics::ETimeMode::Normal || machine.enabled) {
+                char buf[128];
+                sprintf(buf, "(%s mode)", (mode == PrintEstimatedStatistics::ETimeMode::Normal) ? "normal" : "silent");
+                binary_data.print_metadata.raw_data.push_back({ "estimated printing time " + std::string(buf), get_time_dhms(machine.time) });
+                binary_data.print_metadata.raw_data.push_back({ "estimated first layer printing time " + std::string(buf), get_time_dhms(machine.layers_time.empty() ? 0.f : machine.layers_time.front()) });
+            }
+        }
+
+        const BinaryGCode::EResult res = m_binarizer.finalize(*out.f);
+        if (res != BinaryGCode::EResult::Success)
+            throw Slic3r::RuntimeError(std::string("Error while finalizing the gcode binarizer.\n"));
+    }
+#endif // ENABLE_BINARIZED_GCODE
 
     out.close();
     in.close();

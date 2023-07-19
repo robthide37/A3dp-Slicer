@@ -21,6 +21,9 @@
 #include "GCode/GCodeProcessor.hpp"
 #include "EdgeGrid.hpp"
 #include "GCode/ThumbnailData.hpp"
+#if ENABLE_BINARIZED_GCODE
+#include "GCode/GCodeBinarizer.hpp"
+#endif // ENABLE_BINARIZED_GCODE
 
 #include <memory>
 #include <map>
@@ -187,6 +190,10 @@ public:
 
     // append full config to the given string
     static void append_full_config(const Print& print, std::string& str);
+#if ENABLE_BINARIZED_GCODE
+    // translate full config into a list of <key, value> items
+    static void encode_full_config(const Print& print, std::vector<std::pair<std::string, std::string>>& config);
+#endif // ENABLE_BINARIZED_GCODE
 
     // Object and support extrusions of the same PrintObject at the same print_z.
     // public, so that it could be accessed by free helper functions from GCode.cpp
