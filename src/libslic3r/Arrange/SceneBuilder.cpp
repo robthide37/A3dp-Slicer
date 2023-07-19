@@ -632,6 +632,8 @@ ExPolygons ArrangeableSLAPrintObject::full_outline() const
         Polygons ptmp = project_mesh(smesh.its, trafo_instance, [] {});
         std::move(ptmp.begin(), ptmp.end(), std::back_inserter(polys));
         ret = union_ex(polys);
+    } else {
+        ret = m_arrbl->full_outline();
     }
 
     return ret;

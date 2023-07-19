@@ -399,7 +399,7 @@ ArrItem AdvancedItemConverter<ArrItem>::get_arritem(const Arrangeable &arrbl,
     if (infl != 0) {
         outline = offset_ex(outline, infl);
         if (! envelope.empty())
-            envelope = offset_ex(outline, infl);
+            envelope = offset_ex(envelope, infl);
     }
 
     ArrItem ret;
