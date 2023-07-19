@@ -561,7 +561,7 @@ void PrintObject::calculate_overhanging_perimeters()
                         continue;
                     }
                     ExPolygons prev_layer_polygon = l->lower_layer == nullptr ? ExPolygons() : l->lower_layer->lslices;
-                    layer_region->m_perimeters    = calculate_and_split_overhanging_extrusions(layer_region->m_perimeters,
+                    layer_region->m_perimeters    = calculate_and_split_overhanging_extrusions(&layer_region->m_perimeters,
                                                                                                unscaled_polygons_lines[l->id()],
                                                                                                curled_lines[l->id()]);
                 }

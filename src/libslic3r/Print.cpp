@@ -914,6 +914,8 @@ void Print::process()
         obj->generate_support_material();
     for (PrintObject *obj : m_objects)
         obj->estimate_curled_extrusions();
+    for (PrintObject *obj : m_objects)
+        obj->calculate_overhanging_perimeters();
     if (this->set_started(psWipeTower)) {
         m_wipe_tower_data.clear();
         m_tool_ordering.clear();

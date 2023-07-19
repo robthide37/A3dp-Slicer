@@ -218,7 +218,7 @@ ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath   
                                                           const AABBTreeLines::LinesDistancer<Linef>       &unscaled_prev_layer,
                                                           const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
 
-ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const ExtrusionEntityCollection           &ecc,
+ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const ExtrusionEntityCollection           *ecc,
                                                                      const AABBTreeLines::LinesDistancer<Linef> &unscaled_prev_layer,
                                                                      const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
 

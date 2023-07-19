@@ -86,16 +86,17 @@ ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath   
     return result;
 };
 
-ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const ExtrusionEntityCollection            &ecc,
+ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const ExtrusionEntityCollection            *ecc,
                                                                      const AABBTreeLines::LinesDistancer<Linef> &unscaled_prev_layer,
                                                                      const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines)
 {
-    ExtrusionEntityCollection result;
-    result.no_sort = ecc.no_sort;
-    for (const auto *e : ecc.entities) {
-        if (auto *col = static_cast<const ExtrusionEntityCollection *>(e)) {
-            auto new_col = calculate_and_split_overhanging_extrusions(*col, unscaled_prev_layer, prev_layer_curled_lines);
-            result.append(new_col);
+    ExtrusionEntityCollection result{};
+    result.no_sort = ecc->no_sort;
+    for (const auto *e : ecc->entities) {
+        if (e == nullptr) {
+             BOOST_LOG_TRIVIAL(debug) << "perimeters collections contain nullptr entities for some reason";
+        } else if (auto *col = static_cast<const ExtrusionEntityCollection *>(e)) {
+            result.append(calculate_and_split_overhanging_extrusions(col, unscaled_prev_layer, prev_layer_curled_lines));
         } else if (auto *loop = static_cast<const ExtrusionLoop *>(e)) {
             ExtrusionLoop new_loop = *loop;
             new_loop.paths.clear();
