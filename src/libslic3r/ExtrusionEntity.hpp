@@ -8,6 +8,7 @@
 #include "Polyline.hpp"
 
 #include <assert.h>
+#include <optional>
 #include <string_view>
 #include <numeric>
 
@@ -101,6 +102,11 @@ inline bool operator==(const ExtrusionFlow &lhs, const ExtrusionFlow &rhs)
     return lhs.mm3_per_mm == rhs.mm3_per_mm && lhs.width == rhs.width && lhs.height == rhs.height;
 }
 
+struct OverhangAttributes {
+    float max_distance_from_prev_layer;
+    float proximity_to_curled_lines; //value between 0 and 1
+};
+
 struct ExtrusionAttributes : ExtrusionFlow
 {
     ExtrusionAttributes() = default;
@@ -110,6 +116,9 @@ struct ExtrusionAttributes : ExtrusionFlow
 
     // What is the role / purpose of this extrusion?
     ExtrusionRole   role{ ExtrusionRole::None };
+    // OVerhangAttributes are currently computed for perimeters if dynamic overhangs are enabled. 
+    // They are used to control fan and print speed in export.
+    std::optional<OverhangAttributes> overhang_attributes;
 };
 
 inline bool operator==(const ExtrusionAttributes &lhs, const ExtrusionAttributes &rhs)

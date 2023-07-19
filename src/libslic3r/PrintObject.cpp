@@ -3,6 +3,7 @@
 #include "ExPolygon.hpp"
 #include "Exception.hpp"
 #include "Flow.hpp"
+#include "GCode/ExtrusionProcessor.hpp"
 #include "KDTreeIndirect.hpp"
 #include "Line.hpp"
 #include "Point.hpp"
@@ -548,16 +549,21 @@ void PrintObject::calculate_overhanging_perimeters()
             m_print->set_status(89, _u8L("Calculating overhanging perimeters"));
 
             std::unordered_map<size_t, AABBTreeLines::LinesDistancer<CurledLine>> curled_lines;
+            std::unordered_map<size_t, AABBTreeLines::LinesDistancer<Linef>>      unscaled_polygons_lines;
             for (const Layer *l : this->layers()) {
-                curled_lines[l->id()] = AABBTreeLines::LinesDistancer<CurledLine>{l->curled_lines};
+                curled_lines[l->id()]            = AABBTreeLines::LinesDistancer<CurledLine>{l->curled_lines};
+                unscaled_polygons_lines[l->id()] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(l->lslices)};
             }
 
             for (Layer *l : this->layers()) {
-                for (const LayerRegion *layer_region : l->regions()) {
+                for (LayerRegion *layer_region : l->regions()) {
                     if (regions_with_dynamic_overhangs.find(layer_region->m_region) == regions_with_dynamic_overhangs.end()) {
                         continue;
                     }
-                    
+                    ExPolygons prev_layer_polygon = l->lower_layer == nullptr ? ExPolygons() : l->lower_layer->lslices;
+                    layer_region->m_perimeters    = calculate_and_split_overhanging_extrusions(layer_region->m_perimeters,
+                                                                                               unscaled_polygons_lines[l->id()],
+                                                                                               curled_lines[l->id()]);
                 }
             }
 
