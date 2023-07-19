@@ -51,7 +51,7 @@ void duplicate(Model &model,
                const arr2::ArrangeBed &bed,
                const arr2::ArrangeSettingsView &settings)
 {
-    auto vbh = arr2::VirtualBedHandler::create(arr2::to_extended_bed(bed));
+    auto vbh = arr2::VirtualBedHandler::create(bed);
     arr2::DuplicableModel dup_model{&model, std::move(vbh), bounding_box(bed)};
 
     arr2::Scene scene{arr2::BasicSceneBuilder{}

@@ -11,6 +11,14 @@
 
 namespace Slic3r { namespace arr2 {
 
+// This module contains all the necessary high level interfaces for
+// arrangement. No dependency on the rest of libslic3r is intoduced here. (No
+// Model, ModelObject, etc...) except for ObjectID.
+
+
+// An interface that allows to store arbitrary data (std::any) under a specific
+// key in an object implementing the interface. This is later used to pass
+// arbitrary parameters from any arranged object down to the arrangement core.
 class AnyWritable
 {
 public:
@@ -19,48 +27,99 @@ public:
     virtual void write(std::string_view key, std::any d) = 0;
 };
 
+// The interface that captures the objects which are actually moved around.
+// Implementations must provide means to extract the 2D outline that is used
+// by the arrangement core.
 class Arrangeable
 {
 public:
     virtual ~Arrangeable() = default;
 
-    virtual ObjectID   id() const             = 0;
+    // ID is implementation specific, must uniquely identify an Arrangeable
+    // object.
+    virtual ObjectID id() const = 0;
+
+    // This is different than id(), and identifies an underlying group into
+    // which the Arrangeable belongs. Can be used to group arrangeables sharing
+    // the same outline.
     virtual ObjectID   geometry_id() const    = 0;
+
+    // Outline extraction can be a demanding operation, so there is a separate
+    // method the extract the full outline of an object and the convex hull only
+    // It will depend on the arrangement config to choose which one is called.
+    // convex_outline might be considerably faster than calling full_outline()
+    // and then calculating the convex hull from that.
     virtual ExPolygons full_outline() const   = 0;
     virtual Polygon    convex_outline() const = 0;
 
+    // Envelope is the boundary that an arrangeble object might have which
+    // is used when the object is being placed or moved around. Once it is
+    // placed, the outline (convex or full) will be used to determine the
+    // boundaries instead of the envelope. This concept can be used to
+    // implement arranging objects with support structures that can overlap,
+    // but never touch the actual object. In this case, full envelope would
+    // return the silhouette of the object with supports (pad, brim, etc...) and
+    // outline would be the actual object boundary.
     virtual ExPolygons full_envelope() const { return {}; }
     virtual Polygon    convex_envelope() const { return {}; }
 
+    // Write the transformations determined by the arrangement into the object
     virtual void transform(const Vec2d &transl, double rot) = 0;
 
+    // An arrangeable can be printable or unprintable, they should not be on
+    // the same bed. (See arrange tasks)
     virtual bool is_printable() const { return true; }
+
+    // An arrangeable can be selected or not, this will determine if treated
+    // as static objects or movable ones.
     virtual bool is_selected() const { return true; }
+
+    // Determines the order in which the objects are arranged. Higher priority
+    // objects are arranged first.
     virtual int  priority() const { return 0; }
 
+    // Any implementation specific properties can be passed to the arrangement
+    // core by overriding this method. This implies that the specific Arranger
+    // will be able to interpret these properties. An example usage is to mark
+    // special objects (like a wipe tower)
     virtual void imbue_data(AnyWritable &datastore) const {}
+
+    // for convinience to pass an AnyWritable created in the same expression
+    // as the method call
     void imbue_data(AnyWritable &&datastore) const { imbue_data(datastore); }
 
-    // Returns the bed index on which the given ModelInstance is sitting.
+    // An Arrangeable might reside on a logical bed instead of the real one
+    // in case that the arrangement can not fit it onto the real bed. Handling
+    // of logical beds is also implementation specific and are specified with
+    // the next two methods:
+
+    // Returns the bed index on which the given Arrangeable is sitting.
     virtual int get_bed_index() const = 0;
 
-    // Assign the ModelInstance to the given bed index. Note that this
+    // Assign the Arrangeable to the given bed index. Note that this
     // method can return false, indicating that the given bed is not available
-    // to be occupied (e.g. the handler has a limited amount of logical bed)
+    // to be occupied.
     virtual bool assign_bed(int bed_idx) = 0;
 };
 
+// Arrangeable objects are provided by an ArrangeableModel which is also able to
+// create new arrangeables given a prototype id to copy.
 class ArrangeableModel
 {
 public:
     virtual ~ArrangeableModel() = default;
 
+    // Visit all arrangeable in this model and call the provided visitor
     virtual void for_each_arrangeable(std::function<void(Arrangeable &)>) = 0;
     virtual void for_each_arrangeable(std::function<void(const Arrangeable&)>) const = 0;
 
+    // Visit a specific arrangeable identified by it's id
     virtual void visit_arrangeable(const ObjectID &id, std::function<void(const Arrangeable &)>) const = 0;
     virtual void visit_arrangeable(const ObjectID &id, std::function<void(Arrangeable &)>) = 0;
 
+    // Add a new arrangeable which is a copy of the one matching prototype_id
+    // Return the new object id or an invalid id if the new object was not
+    // created.
     virtual ObjectID add_arrangeable(const ObjectID &prototype_id) = 0;
 
     size_t arrangeable_count() const
@@ -72,8 +131,12 @@ public:
     }
 };
 
+// The special bed type used by XL printers
 using XLBed = SegmentedRectangleBed<std::integral_constant<size_t, 4>,
                                     std::integral_constant<size_t, 4>>;
+
+// ExtendedBed is a variant type holding all bed types supported by the
+// arrange core and the additional XLBed
 
 template<class... Args> struct ExtendedBed_
 {
@@ -98,17 +161,16 @@ template<class BedFn> void visit_bed(BedFn &&fn, ExtendedBed &bed)
     boost::apply_visitor(fn, bed);
 }
 
-inline ExtendedBed to_extended_bed(const ArrangeBed &bed)
-{
-    ExtendedBed ret;
-    boost::apply_visitor([&ret](auto &rawbed) { ret = rawbed; }, bed);
-
-    return ret;
-}
-
 class Scene;
 
-// A little CRTP to implement fluent interface returning Subclass references
+// SceneBuilderBase is intended for Scene construction. A simple constructor
+// is not enough here to capture all the possible ways of constructing a Scene.
+// Subclasses of SceneBuilderBase can add more domain specific methods and
+// overloads. An rvalue object of this class is handed over to the Scene
+// constructor which can then establish itself using the provided builder.
+
+// A little CRTP is used to implement fluent interface returning Subclass
+// references.
 template<class Subclass>
 class SceneBuilderBase
 {
@@ -178,10 +240,13 @@ public:
 
 class BasicSceneBuilder: public SceneBuilderBase<BasicSceneBuilder> {};
 
+// The Scene class captures all data needed to do an arrangement.
 class Scene
 {
     template <class Sub> friend class SceneBuilderBase;
 
+    // These fields always need to be initialized to valid objects after
+    // construction of Scene which is ensured by the SceneBuilder
     AnyPtr<ArrangeableModel>                m_amodel;
     AnyPtr<const ArrangeSettingsView>       m_settings;
     ExtendedBed m_bed;
@@ -244,6 +309,10 @@ void SceneBuilderBase<Subclass>::build_scene(Scene &sc) &&
     sc.m_bed = std::move(m_bed);
 }
 
+// Arrange tasks produce an object implementing this interface. The arrange
+// result can be applied to an ArrangeableModel which may or may not succeed.
+// The ArrangeableModel could be in a different state (it's objects may have
+// changed or removed) than it was at the time of arranging.
 class ArrangeResult
 {
 public:
