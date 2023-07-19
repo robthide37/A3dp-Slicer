@@ -141,6 +141,8 @@
 #include "libslic3r/CustomGCode.hpp"
 #include "libslic3r/Platform.hpp"
 
+#include "Widgets/CheckBox.hpp"
+
 using boost::optional;
 namespace fs = boost::filesystem;
 using Slic3r::_3DScene;
@@ -800,7 +802,7 @@ Sidebar::Sidebar(Plater *parent)
     wxGetApp().UpdateDarkUI(this);
     wxGetApp().UpdateDarkUI(p->scrolled);
 #else
-    SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+//    SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
 #endif
 #endif
 
@@ -6112,7 +6114,7 @@ ProjectDropDialog::ProjectDropDialog(const std::string& filename)
     main_sizer->Add(stb_sizer, 1, wxEXPAND | wxRIGHT | wxLEFT, 10);
 
     wxBoxSizer* bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxCheckBox* check = new wxCheckBox(this, wxID_ANY, _L("Don't show again"));
+    ::CheckBox* check = new ::CheckBox(this, _L("Don't show again"));
     check->Bind(wxEVT_CHECKBOX, [](wxCommandEvent& evt) {
         wxGetApp().app_config->set("show_drop_project_dialog", evt.IsChecked() ? "0" : "1");
         });

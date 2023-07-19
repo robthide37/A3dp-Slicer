@@ -24,6 +24,9 @@
 #include "OptionsGroup.hpp"
 #include "libslic3r/Preset.hpp"
 
+#include "Widgets/CheckBox.hpp"
+
+class CheckBox;
 
 namespace Slic3r {
 
@@ -162,8 +165,8 @@ class SearchDialog : public GUI::DPIDialog
     wxTextCtrl*         search_line         { nullptr };
     wxDataViewCtrl*     search_list         { nullptr };
     SearchListModel*    search_list_model   { nullptr };
-    wxCheckBox*         check_category      { nullptr };
-    wxCheckBox*         check_english       { nullptr };
+    CheckBox*           check_category      { nullptr };
+    CheckBox*           check_english       { nullptr };
 
     OptionsSearcher*    searcher            { nullptr };
 

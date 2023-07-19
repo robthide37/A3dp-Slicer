@@ -45,6 +45,8 @@
 #include "PhysicalPrinterDialog.hpp"
 #include "MsgDialog.hpp"
 
+#include "Widgets/ComboBox.hpp"
+
 // A workaround for a set of issues related to text fitting into gtk widgets:
 // See e.g.: https://github.com/prusa3d/PrusaSlicer/issues/4584
 #if defined(__WXGTK20__) || defined(__WXGTK3__)
@@ -437,6 +439,7 @@ void PresetComboBox::update_from_bundle()
 void PresetComboBox::msw_rescale()
 {
     m_em_unit = em_unit(this);
+    ::ComboBox::Rescale();
 }
 
 void PresetComboBox::sys_color_changed()

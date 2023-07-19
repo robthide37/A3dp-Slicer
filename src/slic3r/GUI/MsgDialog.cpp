@@ -27,6 +27,8 @@
 #include "slic3r/GUI/MainFrame.hpp"
 #include "GUI_App.hpp"
 
+#include "Widgets/CheckBox.hpp"
+
 namespace Slic3r {
 namespace GUI {
 
@@ -268,7 +270,7 @@ RichMessageDialog::RichMessageDialog(wxWindow* parent,
 {
     add_msg_content(this, content_sizer, get_wraped_wxString(message));
 
-    m_checkBox = new wxCheckBox(this, wxID_ANY, m_checkBoxText);
+    m_checkBox = new ::CheckBox(this, m_checkBoxText);
     wxGetApp().UpdateDarkUI(m_checkBox);
     m_checkBox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { m_checkBoxValue = m_checkBox->GetValue(); });
 

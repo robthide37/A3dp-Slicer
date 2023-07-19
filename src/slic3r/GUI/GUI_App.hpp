@@ -248,6 +248,7 @@ public:
     const wxFont&   link_font()             { return m_link_font; }
     int             em_unit() const         { return m_em_unit; }
     bool            tabs_as_menu() const;
+    bool            suppress_round_corners() const;
     wxSize          get_min_size() const;
     float           toolbar_icon_scale(const bool is_limited = false) const;
     void            set_auto_toolbar_icon_scale(float scale) const;

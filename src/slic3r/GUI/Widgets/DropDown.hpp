@@ -2,24 +2,29 @@
 #define slic3r_GUI_DropDown_hpp_
 
 #include <wx/stattext.h>
+#include <wx/popupwin.h>
+
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 #include "../wxExtensions.hpp"
 #include "StateHandler.hpp"
 
 #define DD_NO_CHECK_ICON    0x0001
-#define DD_NO_TEXT          0x0002
-#define DD_STYLE_MASK       0x0003
+#define DD_NO_DROP_ICON     0x0002
+#define DD_NO_TEXT          0x0004
+#define DD_STYLE_MASK       0x0008
 
 wxDECLARE_EVENT(EVT_DISMISS, wxCommandEvent);
 
 class DropDown : public wxPopupTransientWindow
 {
     std::vector<wxString> &       texts;
-    std::vector<wxBitmap> &     icons;
+    std::vector<wxBitmapBundle> & icons;
     bool                          need_sync  = false;
     int                         selection = -1;
     int                         hover_item = -1;
 
-    double radius = 0;
+    double radius;
     bool   use_content_width = false;
     bool   align_icon        = false;
     bool   text_off          = false;
@@ -42,17 +47,16 @@ class DropDown : public wxPopupTransientWindow
 
 public:
     DropDown(std::vector<wxString> &texts,
-             std::vector<wxBitmap> &icons);
+             std::vector<wxBitmapBundle> &icons);
     
     DropDown(wxWindow *     parent,
              std::vector<wxString> &texts,
-             std::vector<wxBitmap> &icons,
+             std::vector<wxBitmapBundle> &icons,
              long           style     = 0);
     
     void Create(wxWindow *     parent,
              long           style     = 0);
     
-public:
     void Invalidate(bool clear = false);
 
     int GetSelection() const { return selection; }
@@ -62,7 +66,6 @@ public:
     wxString GetValue() const;
     void     SetValue(const wxString &value);
 
-public:
     void SetCornerRadius(double radius);
 
     void SetBorderColor(StateColor const & color);
@@ -77,10 +80,11 @@ public:
 
     void SetAlignIcon(bool align);
     
-public:
     void Rescale();
 
     bool HasDismissLongTime();
+
+    static void SetTransparentBG(wxDC& dc, wxWindow* win);
     
 protected:
     void OnDismiss() override;

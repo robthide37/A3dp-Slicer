@@ -288,6 +288,7 @@ void OptionsGroup::activate_line(Line& line)
 
     if (!custom_ctrl && m_use_custom_ctrl) {
         custom_ctrl = new OG_CustomCtrl(is_legend_line || !staticbox ? this->parent() : static_cast<wxWindow*>(this->stb), this);
+        wxGetApp().UpdateDarkUI(custom_ctrl);
 		if (is_legend_line)
 			sizer->Add(custom_ctrl, 0, wxEXPAND | wxLEFT, wxOSX ? 0 : 10);
 		else

@@ -4,13 +4,13 @@
 #include "TextInput.hpp"
 #include "DropDown.hpp"
 
-#define CB_NO_DROP_ICON DD_NO_CHECK_ICON
+#define CB_NO_DROP_ICON DD_NO_DROP_ICON
 #define CB_NO_TEXT DD_NO_TEXT
 
 class ComboBox : public wxWindowWithItems<TextInput, wxItemContainer>
 {
     std::vector<wxString>         texts;
-    std::vector<wxBitmap>         icons;
+    std::vector<wxBitmapBundle>   icons;
     std::vector<void *>           datas;
     std::vector<wxClientDataType> types;
 
@@ -32,10 +32,18 @@ public:
 
     virtual bool SetFont(wxFont const & font) override;
 
-public:
-    int Append(const wxString &item, const wxBitmap &bitmap = wxNullBitmap);
+    bool SetBackgroundColour(const wxColour& colour) override;
+    bool SetForegroundColour(const wxColour& colour) override;
 
-    int Append(const wxString &item, const wxBitmap &bitmap, void *clientData);
+    void SetBorderColor(StateColor const& color);
+
+    int Append(const wxString &item, const wxBitmapBundle &bitmap = wxNullBitmap);
+
+    int Append(const wxString &item, const wxBitmapBundle &bitmap, void *clientData);
+
+    int Insert(const wxString& item, const wxBitmapBundle& bitmap, unsigned int pos);
+    int Insert(const wxString& item, const wxBitmapBundle& bitmap,
+        unsigned int pos, void* clientData);
 
     unsigned int GetCount() const override;
 

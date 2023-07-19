@@ -1756,6 +1756,11 @@ bool GUI_App::tabs_as_menu() const
     return app_config->get_bool("tabs_as_menu"); // || dark_mode();
 }
 
+bool GUI_App::suppress_round_corners() const
+{
+    return app_config->get("suppress_round_corners") == "1";
+}
+
 wxSize GUI_App::get_min_size() const
 {
     return wxSize(76*m_em_unit, 49 * m_em_unit);

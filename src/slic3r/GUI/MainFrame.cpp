@@ -732,13 +732,15 @@ void MainFrame::init_tabpanel()
 #ifdef _MSW_DARK_MODE
     if (wxGetApp().tabs_as_menu()) {
         m_tabpanel = new wxSimplebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
-        wxGetApp().UpdateDarkUI(m_tabpanel);
+//        wxGetApp().UpdateDarkUI(m_tabpanel);
     }
     else
         m_tabpanel = new Notebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME, true);
 #else
     m_tabpanel = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
 #endif
+
+    wxGetApp().UpdateDarkUI(m_tabpanel);
 
 #ifndef __WXOSX__ // Don't call SetFont under OSX to avoid name cutting in ObjectList
     m_tabpanel->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -1107,7 +1109,6 @@ void MainFrame::on_sys_color_changed()
     wxGetApp().update_ui_colours_from_appconfig();
 #ifdef __WXMSW__
     wxGetApp().UpdateDarkUI(m_tabpanel);
- //   m_statusbar->update_dark_ui();
 #ifdef _MSW_DARK_MODE
     // update common mode sizer
     if (!wxGetApp().tabs_as_menu())
@@ -2311,7 +2312,7 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
     this->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT));
 #else
     this->SetFont(wxGetApp().normal_font());
-    this->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+//    this->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
 #endif // __WXMSW__
 
     // Load the icon either from the exe, or from the ico file.

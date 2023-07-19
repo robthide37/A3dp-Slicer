@@ -256,6 +256,29 @@ set(SLIC3R_GUI_SOURCES
     GUI/DesktopIntegrationDialog.hpp
     GUI/HintNotification.cpp
     GUI/HintNotification.hpp
+    GUI/Widgets/BitmapToggleButton.cpp
+    GUI/Widgets/BitmapToggleButton.hpp
+    GUI/Widgets/Button.cpp
+    GUI/Widgets/Button.hpp
+    GUI/Widgets/CheckBox.cpp
+    GUI/Widgets/CheckBox.hpp
+    GUI/Widgets/ComboBox.cpp
+    GUI/Widgets/ComboBox.hpp
+    GUI/Widgets/DropDown.cpp
+    GUI/Widgets/DropDown.hpp
+    GUI/Widgets/StateColor.cpp
+    GUI/Widgets/StateColor.hpp
+    GUI/Widgets/StateHandler.cpp
+    GUI/Widgets/StateHandler.hpp
+    GUI/Widgets/StaticBox.cpp
+    GUI/Widgets/StaticBox.hpp
+    GUI/Widgets/SpinInput.cpp
+    GUI/Widgets/SpinInput.hpp
+    GUI/Widgets/SwitchButton.cpp
+    GUI/Widgets/SwitchButton.hpp
+    GUI/Widgets/TextInput.cpp
+    GUI/Widgets/TextInput.hpp
+    GUI/Widgets/UIColors.hpp
     GUI/FileArchiveDialog.cpp
     GUI/FileArchiveDialog.hpp
     GUI/Downloader.cpp

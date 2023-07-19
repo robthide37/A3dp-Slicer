@@ -1,7 +1,15 @@
 #include "DropDown.hpp"
-#include "Label.hpp"
+#include "../GUI_App.hpp"
+#include "../OptionsGroup.hpp"
 
 #include <wx/dcgraph.h>
+#include <wx/dcbuffer.h>
+#include <wx/dcclient.h>
+#include <wx/dcscreen.h>
+#include <wx/dcmemory.h>
+#include <wx/bitmap.h>
+
+#include <wx/display.h>
 
 wxDEFINE_EVENT(EVT_DISMISS, wxCommandEvent);
 
@@ -25,12 +33,13 @@ END_EVENT_TABLE()
  */
 
 DropDown::DropDown(std::vector<wxString> &texts,
-                   std::vector<wxBitmap> &icons)
+                   std::vector<wxBitmapBundle> &icons)
     : texts(texts)
     , icons(icons)
+    , radius(Slic3r::GUI::wxGetApp().suppress_round_corners() ? 0 : 5)
     , state_handler(this)
-    , border_color(0xDBDBDB)
     , text_color(0x363636)
+    , border_color(0xDBDBDB)
     , selector_border_color(std::make_pair(0x00AE42, (int) StateColor::Hovered),
         std::make_pair(*wxWHITE, (int) StateColor::Normal))
     , selector_background_color(std::make_pair(0xEDFAF2, (int) StateColor::Checked),
@@ -40,7 +49,7 @@ DropDown::DropDown(std::vector<wxString> &texts,
 
 DropDown::DropDown(wxWindow *             parent,
                    std::vector<wxString> &texts,
-                   std::vector<wxBitmap> &icons,
+                   std::vector<wxBitmapBundle> &icons,
                    long           style)
     : DropDown(texts, icons)
 {
@@ -51,16 +60,14 @@ void DropDown::Create(wxWindow *     parent,
          long           style)
 {
     wxPopupTransientWindow::Create(parent);
-    SetBackgroundStyle(wxBG_STYLE_PAINT);
-    SetBackgroundColour(*wxWHITE);
+    if (!wxOSX) SetBackgroundStyle(wxBG_STYLE_PAINT);
     state_handler.attach({&border_color, &text_color, &selector_border_color, &selector_background_color});
     state_handler.update_binds();
-    if ((style & DD_NO_CHECK_ICON) == 0)
+    if (!(style & DD_NO_CHECK_ICON))
         check_bitmap = ScalableBitmap(this, "checked", 16);
     text_off = style & DD_NO_TEXT;
 
-    // BBS set default font
-    SetFont(Label::Body_14);
+    SetFont(parent->GetFont());
 #ifdef __WXOSX__
     // wxPopupTransientWindow releases mouse on idle, which may cause various problems,
     //  such as losting mouse move, and dismissing soon on first LEFT_DOWN event.
@@ -99,9 +106,9 @@ void DropDown::SetValue(const wxString &value)
     selection = i == texts.end() ? -1 : std::distance(texts.begin(), i);
 }
 
-void DropDown::SetCornerRadius(double radius)
+void DropDown::SetCornerRadius(double radius_in)
 {
-    this->radius = radius;
+    radius = radius_in;
     paintNow();
 }
 
@@ -179,6 +186,28 @@ void DropDown::paintNow()
     Refresh();
 }
 
+void DropDown::SetTransparentBG(wxDC& dc, wxWindow* win)
+{
+    const wxSize  size       = win->GetSize();
+    const wxPoint screen_pos = win->GetScreenPosition();
+    wxScreenDC    screen_dc;
+
+#ifdef __WXMSW__
+    // Draw screen_dc to dc for transparent background
+    dc.Blit(0, 0, size.x, size.y, &screen_dc, screen_pos.x, screen_pos.y);
+#else
+    // See https://forums.wxwidgets.org/viewtopic.php?f=1&t=49318
+    wxClientDC client_dc(win);
+    client_dc.Blit(0, 0, size.x, size.y, &screen_dc, screen_pos.x, screen_pos.y);
+
+    wxBitmap bmp(size.x, size.y);
+    wxMemoryDC mem_dc(bmp);
+    mem_dc.Blit(0, 0, size.x, size.y, &client_dc, 0, 0);
+    mem_dc.SelectObject(wxNullBitmap);
+    dc.DrawBitmap(bmp, 0, 0);
+#endif //__WXMSW__
+}
+
 /*
  * Here we do the actual rendering. I put it in a separate
  * method so that it can work no matter what type of DC
@@ -188,17 +217,26 @@ void DropDown::render(wxDC &dc)
 {
     if (texts.size() == 0) return;
     int states = state_handler.states();
+
+    const wxSize size = GetSize(); 
+    if (radius > 0. && !wxOSX)
+        SetTransparentBG(dc, this);
+
     dc.SetPen(wxPen(border_color.colorForStates(states)));
     dc.SetBrush(wxBrush(GetBackgroundColour()));
     // if (GetWindowStyle() & wxBORDER_NONE)
     //    dc.SetPen(wxNullPen);
 
+    wxRect rc(0, 0, size.x, size.y);
+    if (wxOSX && dc.GetContentScaleFactor() > 1.0)
+        // On Retina displays all controls are cut on 1px
+        rc.x = rc.y = 1;
+
     // draw background
-    wxSize size = GetSize();
-    if (radius == 0)
-        dc.DrawRectangle(0, 0, size.x, size.y);
+    if (radius == 0.0 || wxOSX)
+        dc.DrawRectangle(rc);
     else
-        dc.DrawRoundedRectangle(0, 0, size.x, size.y, radius);
+        dc.DrawRoundedRectangle(rc, radius);
 
     // draw hover rectangle
     wxRect rcContent = {{0, offset.y}, rowSize};
@@ -233,8 +271,9 @@ void DropDown::render(wxDC &dc)
     }
 
     // draw position bar
-    if (rowSize.y * texts.size() > size.y) {
-        int    height = rowSize.y * texts.size();
+    const int text_size = int(texts.size());
+    if (rowSize.y * text_size > size.y) {
+        int    height = rowSize.y * text_size;
         wxRect rect = {size.x - 6, -offset.y * size.y / height, 4,
                        size.y * size.y / height};
         dc.SetPen(wxPen(border_color.defaultColor()));
@@ -247,13 +286,13 @@ void DropDown::render(wxDC &dc)
     rcContent.x += 5;
     rcContent.width -= 5;
     if (check_bitmap.bmp().IsOk()) {
-        auto szBmp = check_bitmap.GetBmpSize();
+        auto szBmp = check_bitmap.GetSize();
         if (selection >= 0) {
             wxPoint pt = rcContent.GetLeftTop();
             pt.y += (rcContent.height - szBmp.y) / 2;
             pt.y += rowSize.y * selection;
             if (pt.y + szBmp.y > 0 && pt.y < size.y)
-                dc.DrawBitmap(check_bitmap.bmp(), pt);
+                dc.DrawBitmap(check_bitmap.get_bitmap(), pt);
         }
         rcContent.x += szBmp.x + 5;
         rcContent.width -= szBmp.x + 5;
@@ -268,17 +307,26 @@ void DropDown::render(wxDC &dc)
         if (rcContent.y > size.y) break;
         wxPoint pt   = rcContent.GetLeftTop();
         auto &  icon = icons[i];
+        const wxSize pref_icon_sz = get_preferred_size(icon, m_parent);
         if (iconSize.x > 0) {
             if (icon.IsOk()) {
-                pt.y += (rcContent.height - icon.GetSize().y) / 2;
-                dc.DrawBitmap(icon, pt);
+                pt.y += (rcContent.height - pref_icon_sz.y) / 2;
+#ifdef __WXGTK3__
+                dc.DrawBitmap(icon.GetBitmap(pref_icon_sz), pt);
+#else
+                dc.DrawBitmap(icon.GetBitmapFor(m_parent), pt);
+#endif
             }
             pt.x += iconSize.x + 5;
             pt.y = rcContent.y;
         } else if (icon.IsOk()) {
-            pt.y += (rcContent.height - icon.GetSize().y) / 2;
-            dc.DrawBitmap(icon, pt);
-            pt.x += icon.GetWidth() + 5;
+            pt.y += (rcContent.height - pref_icon_sz.y) / 2;
+#ifdef __WXGTK3__
+            dc.DrawBitmap(icon.GetBitmap(pref_icon_sz), pt);
+#else
+            dc.DrawBitmap(icon.GetBitmapFor(m_parent), pt);
+#endif
+            pt.x += pref_icon_sz.GetWidth() + 5;
             pt.y = rcContent.y;
         }
         auto text = texts[i];
@@ -305,7 +353,7 @@ void DropDown::messureSize()
     for (size_t i = 0; i < texts.size(); ++i) {
         wxSize size1 = text_off ? wxSize() : dc.GetMultiLineTextExtent(texts[i]);
         if (icons[i].IsOk()) {
-            wxSize size2 = icons[i].GetSize();
+            wxSize size2 = get_preferred_size(icons[i], m_parent);
             if (size2.x > iconSize.x) iconSize = size2;
             if (!align_icon) {
                 size1.x += size2.x + (text_off ? 0 : 5);
@@ -317,7 +365,7 @@ void DropDown::messureSize()
     wxSize szContent = textSize;
     szContent.x += 10;
     if (check_bitmap.bmp().IsOk()) {
-        auto szBmp = check_bitmap.bmp().GetSize();
+        auto szBmp = check_bitmap.GetSize();
         szContent.x += szBmp.x + 5;
     }
     if (iconSize.x > 0) szContent.x += iconSize.x + (text_off ? 0 : 5);

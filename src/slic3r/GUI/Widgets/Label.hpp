@@ -2,6 +2,7 @@
 #define slic3r_GUI_Label_hpp_
 
 #include <wx/stattext.h>
+#include <wx/dcclient.h>
 
 #define LB_HYPERLINK 0x0001
 

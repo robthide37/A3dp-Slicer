@@ -2,6 +2,7 @@
 #define slic3r_GUI_StateHandler_hpp_
 
 #include <wx/event.h>
+#include <memory>
 
 #include "StateColor.hpp"
 

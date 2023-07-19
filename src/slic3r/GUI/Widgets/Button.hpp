@@ -24,9 +24,9 @@ class Button : public StaticBox
 public:
     Button();
 
-    Button(wxWindow* parent, wxString text, wxString icon = "", long style = 0, int iconSize = 0);
+    Button(wxWindow* parent, wxString text, wxString icon = "", long style = 0, wxSize iconSize = wxSize(16, 16));
 
-    bool Create(wxWindow* parent, wxString text, wxString icon = "", long style = 0, int iconSize = 0);
+    bool Create(wxWindow* parent, wxString text, wxString icon = "", long style = 0, wxSize iconSize = wxSize(16, 16));
 
     void SetLabel(const wxString& label) override;
 

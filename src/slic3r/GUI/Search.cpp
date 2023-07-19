@@ -525,9 +525,9 @@ SearchDialog::SearchDialog(OptionsSearcher* searcher)
 
     wxBoxSizer* check_sizer = new wxBoxSizer(wxHORIZONTAL);
 
-    check_category  = new wxCheckBox(this, wxID_ANY, _L("Category"));
+    check_category  = new ::CheckBox(this, _L("Category"));
     if (GUI::wxGetApp().is_localized())
-        check_english   = new wxCheckBox(this, wxID_ANY, _L("Search in English"));
+        check_english   = new ::CheckBox(this, _L("Search in English"));
 
     wxStdDialogButtonSizer* cancel_btn = this->CreateStdDialogButtonSizer(wxCANCEL);
     GUI::wxGetApp().UpdateDarkUI(static_cast<wxButton*>(this->FindWindowById(wxID_CANCEL, this)));

@@ -1,7 +1,8 @@
 #include "Button.hpp"
-#include "Label.hpp"
 
 #include <wx/dcgraph.h>
+#include <wx/dc.h>
+#include <wx/dcclient.h>
 
 BEGIN_EVENT_TABLE(Button, StaticBox)
 
@@ -36,23 +37,20 @@ Button::Button()
         std::make_pair(*wxBLACK, (int) StateColor::Normal));
 }
 
-Button::Button(wxWindow* parent, wxString text, wxString icon, long style, int iconSize)
+Button::Button(wxWindow* parent, wxString text, wxString icon, long style, wxSize iconSize/* = wxSize(16, 16)*/)
     : Button()
 {
     Create(parent, text, icon, style, iconSize);
 }
 
-bool Button::Create(wxWindow* parent, wxString text, wxString icon, long style, int iconSize)
+bool Button::Create(wxWindow* parent, wxString text, wxString icon, long style, wxSize iconSize/* = wxSize(16, 16)*/)
 {
     StaticBox::Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, style);
     state_handler.attach({&text_color});
     state_handler.update_binds();
-    //BBS set default font
-    SetFont(Label::Body_14);
     wxWindow::SetLabel(text);
     if (!icon.IsEmpty()) {
-        //BBS set button icon default size to 20
-        this->active_icon = ScalableBitmap(this, icon.ToStdString(), iconSize > 0 ? iconSize : 20);
+        this->active_icon = ScalableBitmap(this, icon.ToStdString(), iconSize);
     }
     messureSize();
     return true;
@@ -68,8 +66,7 @@ void Button::SetLabel(const wxString& label)
 void Button::SetIcon(const wxString& icon)
 {
     if (!icon.IsEmpty()) {
-        //BBS set button icon default size to 20
-        this->active_icon = ScalableBitmap(this, icon.ToStdString(), this->active_icon.px_cnt());
+        this->active_icon = ScalableBitmap(this, icon.ToStdString(), this->active_icon.px_size());
     }
     else
     {
@@ -81,8 +78,7 @@ void Button::SetIcon(const wxString& icon)
 void Button::SetInactiveIcon(const wxString &icon)
 {
     if (!icon.IsEmpty()) {
-        // BBS set button icon default size to 20
-        this->inactive_icon = ScalableBitmap(this, icon.ToStdString(), this->active_icon.px_cnt());
+        this->inactive_icon = ScalableBitmap(this, icon.ToStdString(), this->active_icon.px_size());
     } else {
         this->inactive_icon = ScalableBitmap();
     }
@@ -129,12 +125,12 @@ void Button::SetCanFocus(bool canFocus) { this->canFocus = canFocus; }
 
 void Button::Rescale()
 {
-    if (this->active_icon.bmp().IsOk())
+/*    if (this->active_icon.bmp().IsOk())
         this->active_icon.msw_rescale();
 
     if (this->inactive_icon.bmp().IsOk())
         this->inactive_icon.msw_rescale();
-
+*/
     messureSize();
 }
 
@@ -162,6 +158,7 @@ void Button::render(wxDC& dc)
 
     ScalableBitmap icon;
     if (m_selected || ((states & (int)StateColor::State::Hovered) != 0))
+//    if (m_selected || (states & (int)StateColor::State::Hovered))
         icon = active_icon;
     else
         icon = inactive_icon;
@@ -171,7 +168,7 @@ void Button::render(wxDC& dc)
             //BBS norrow size between text and icon
             szContent.x += padding;
         }
-        szIcon = icon.GetBmpSize();
+        szIcon = icon.GetSize();
         szContent.x += szIcon.x;
         if (szIcon.y > szContent.y)
             szContent.y = szIcon.y;
@@ -190,7 +187,7 @@ void Button::render(wxDC& dc)
     wxPoint pt = rcContent.GetLeftTop();
     if (icon.bmp().IsOk()) {
         pt.y += (rcContent.height - szIcon.y) / 2;
-        dc.DrawBitmap(icon.bmp(), pt);
+        dc.DrawBitmap(icon.get_bitmap(), pt);
         //BBS norrow size between text and icon
         pt.x += szIcon.x + padding;
         pt.y = rcContent.y;
@@ -220,7 +217,7 @@ void Button::messureSize()
             //BBS norrow size between text and icon
             szContent.x += 5;
         }
-        wxSize szIcon = this->active_icon.GetBmpSize();
+        wxSize szIcon = this->active_icon.GetSize();
         szContent.x += szIcon.x;
         if (szIcon.y > szContent.y)
             szContent.y = szIcon.y;

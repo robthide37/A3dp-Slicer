@@ -212,7 +212,7 @@ void PreferencesDialog::build()
 #ifdef _WIN32
 	wxGetApp().UpdateDarkUI(this);
 #else
-	SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+	//SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
 #endif
 	const wxFont& font = wxGetApp().normal_font();
 	SetFont(font);
@@ -223,7 +223,7 @@ void PreferencesDialog::build()
 	tabs = new Notebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME | wxNB_DEFAULT);
 #else
     tabs = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL  |wxNB_NOPAGETHEME | wxNB_DEFAULT );
-	tabs->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+//	tabs->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
 #endif
 
 	// Add "General" tab
@@ -527,6 +527,13 @@ void PreferencesDialog::build()
 
 		m_optgroup_gui->append_separator();
 
+		append_bool_option(m_optgroup_gui, "suppress_round_corners",
+			L("Suppress round corners for controls (experimental)"),
+			L("If enabled, Settings Tabs will be placed as menu items. If disabled, old UI will be used."),
+			app_config->get("suppress_round_corners") == "1");
+
+		m_optgroup_gui->append_separator();
+
 		append_bool_option(m_optgroup_gui, "show_hints",
 			L("Show \"Tip of the day\" notification after start"),
 			L("If enabled, useful hints are displayed at startup."),
@@ -706,7 +713,7 @@ void PreferencesDialog::accept(wxEvent&)
 #endif // __linux__
 	}
 
-	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled", "font_size" };
+	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled", "font_size", "suppress_round_corners" };
 
 	for (const std::string& option : options_to_recreate_GUI) {
 		if (m_values.find(option) != m_values.end()) {

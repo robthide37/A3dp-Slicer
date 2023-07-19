@@ -1,23 +1,20 @@
 #include "SwitchButton.hpp"
-#include "Label.hpp"
-#include "StaticBox.hpp"
 
 #include "../wxExtensions.hpp"
-#include "../Utils/MacDarkMode.hpp"
+#include "../../Utils/MacDarkMode.hpp"
 
 #include <wx/dcgraph.h>
+#include <wx/dcmemory.h>
+#include <wx/dcclient.h>
 
-SwitchButton::SwitchButton(wxWindow* parent, wxWindowID id)
-	: wxBitmapToggleButton(parent, id, wxNullBitmap, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxBU_EXACTFIT)
-	, m_on(this, "toggle_on", 16)
-	, m_off(this, "toggle_off", 16)
+SwitchButton::SwitchButton(wxWindow* parent, const wxString& name, wxWindowID id)
+	: BitmapToggleButton(parent, name, id)
+    , m_on(this, "toggle_on", 28, 16)
+	, m_off(this, "toggle_off", 28, 16)
     , text_color(std::pair{*wxWHITE, (int) StateColor::Checked}, std::pair{0x6B6B6B, (int) StateColor::Normal})
 	, track_color(0xD9D9D9)
     , thumb_color(std::pair{0x00AE42, (int) StateColor::Checked}, std::pair{0xD9D9D9, (int) StateColor::Normal})
 {
-	SetBackgroundColour(StaticBox::GetParentBackgroundColor(parent));
-	Bind(wxEVT_TOGGLEBUTTON, [this](auto& e) { update(); e.Skip(); });
-	SetFont(Label::Body_12);
 	Rescale();
 }
 
@@ -52,11 +49,7 @@ void SwitchButton::SetValue(bool value)
 
 void SwitchButton::Rescale()
 {
-	if (labels[0].IsEmpty()) {
-		m_on.msw_rescale();
-		m_off.msw_rescale();
-	}
-	else {
+	if (!labels[0].IsEmpty()) {
 #ifdef __WXOSX__
         auto scale = Slic3r::GUI::mac_max_scaling_factor();
         int BS = (int) scale;
@@ -121,14 +114,23 @@ void SwitchButton::Rescale()
 #ifdef __WXOSX__
             bmp = wxBitmap(bmp.ConvertToImage(), -1, scale);
 #endif
-			(i == 0 ? m_off : m_on).bmp() = bmp;
+			(i == 0 ? m_off : m_on).SetBitmap(bmp);
 		}
 	}
-	SetSize(m_on.GetBmpSize());
+
+	update();
+}
+
+void SwitchButton::SysColorChange()
+{
+	m_on.sys_color_changed();
+	m_off.sys_color_changed();
+
 	update();
 }
 
 void SwitchButton::update()
 {
 	SetBitmap((GetValue() ? m_on : m_off).bmp());
+	update_size();
 }

@@ -11,9 +11,9 @@ class SpinInput : public wxNavigationEnabled<StaticBox>
     wxSize labelSize;
     StateColor   label_color;
     StateColor   text_color;
-    wxTextCtrl * text_ctrl;
-    Button * button_inc;
-    Button * button_dec;
+    wxTextCtrl * text_ctrl{nullptr};
+    Button * button_inc {nullptr};
+    Button * button_dec {nullptr};
     wxTimer timer;
 
     int val;
@@ -59,15 +59,26 @@ public:
 
     virtual bool Enable(bool enable = true) wxOVERRIDE;
 
-    wxTextCtrl * GetTextCtrl() { return text_ctrl; }
+    wxTextCtrl * GetText() { return text_ctrl; }
 
     void SetValue(const wxString &text);
 
     void SetValue (int value);
 
     int GetValue () const;
+    wxString GetTextValue() const;
 
     void SetRange(int min, int max);
+
+    bool SetFont(wxFont const& font) override;
+
+    bool SetBackgroundColour(const wxColour& colour) override;
+    bool SetForegroundColour(const wxColour& colour) override;
+    void SetBorderColor(StateColor const& color);
+
+    int GetMin() const { return this->min; }
+    int GetMax() const { return this->max; }
+    void SetSelection(long from, long to);
 
 protected:
     void DoSetToolTipText(wxString const &tip) override;
@@ -86,6 +97,7 @@ private:
     void keyPressed(wxKeyEvent& event);
     void onTimer(wxTimerEvent &evnet);
     void onTextLostFocus(wxEvent &event);
+    void onText(wxCommandEvent &event);
     void onTextEnter(wxCommandEvent &event);
 
     void sendSpinEvent();
