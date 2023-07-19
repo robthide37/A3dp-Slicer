@@ -23,10 +23,10 @@ Point::coord_type to_coor(float val, float scale) { return static_cast<Point::co
 } // namespace
 
 namespace Slic3r {
-Polygons to_polygons(NSVGimage *image, float tessTol, int max_level, float scale, bool is_y_negative)
+Polygons to_polygons(const NSVGimage &image, float tessTol, int max_level, float scale, bool is_y_negative)
 {
     Polygons polygons;
-    for (NSVGshape *shape = image->shapes; shape != NULL; shape = shape->next) {
+    for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
         if (!(shape->flags & NSVG_FLAGS_VISIBLE))
             continue;
         if (shape->fill.type == NSVG_PAINT_NONE)
@@ -64,8 +64,14 @@ Polygons to_polygons(NSVGimage *image, float tessTol, int max_level, float scale
     return polygons;
 }
 
-ExPolygons to_expolygons(NSVGimage *image, float tessTol, int max_level, float scale, bool is_y_negative){
+ExPolygons to_expolygons(const NSVGimage &image, float tessTol, int max_level, float scale, bool is_y_negative){
     return union_ex(to_polygons(image, tessTol, max_level, scale, is_y_negative));
+}
+
+NSVGimage_ptr nsvgParseFromFile(const std::string &filename, const char *units, float dpi)
+{
+    NSVGimage *image = ::nsvgParseFromFile(filename.c_str(), units, dpi);
+    return {image, ::nsvgDelete};
 }
 
 } // namespace Slic3r

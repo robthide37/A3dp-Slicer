@@ -68,7 +68,7 @@ std::string choose_svg_file();
 /// Let user to choose file with (S)calable (V)ector (G)raphics - SVG.
 /// Than let select contour
 /// </summary>
-/// <param name="filepath">SVG file path</param>
+/// <param name="filepath">SVG file path, when empty promt user to select one</param>
 /// <returns>EmbossShape to create</returns>
 EmbossShape select_shape(std::string_view filepath = "");
 
@@ -79,14 +79,6 @@ EmbossShape select_shape(std::string_view filepath = "");
 /// <param name="filepath">SVG file path</param>
 /// <returns>Base data for emboss SVG</returns>
 DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel, std::string_view filepath = "");
-
-/// <summary>
-/// Create symbol '?' as default shape
-/// without source file
-/// with size 2cm
-/// </summary>
-/// <returns>Default shape to emboss</returns>
-ExPolygons default_shape();
 
 /// <summary>
 /// Separate file name from file path.
@@ -115,6 +107,12 @@ CreateVolumeParams create_input(GLCanvas3D &canvas, RaycastManager &raycaster, M
 enum class IconType : unsigned {
     reset_value,
     reset_value_hover,
+    refresh,
+    refresh_hover,
+    change_file,
+    change_file_hover,
+    bake,
+    bake_hover,
     lock,
     lock_hover,
     unlock,
@@ -126,6 +124,8 @@ enum class IconType : unsigned {
     // automatic calc of icon's count
     _count
 };
+// Do not forgot add loading of file in funtion:
+// IconManager::Icons init_icons(
 
 const IconManager::Icon &get_icon(const IconManager::Icons &icons, IconType type) { 
     return *icons[static_cast<unsigned>(type)]; }
@@ -140,7 +140,7 @@ struct GuiCfg
     float  main_toolbar_height;
 
     // Define bigger size(width or height)
-    unsigned texture_max_size_px = 64;
+    unsigned texture_max_size_px = 256;
 
     // Zero means it is calculated in init function
     ImVec2 minimal_window_size = ImVec2(0, 0);
@@ -385,6 +385,12 @@ IconManager::Icons init_icons(IconManager &mng, const GuiCfg &cfg)
     IconManager::InitTypes init_types{
         {"undo.svg",         size, IconManager::RasterType::white_only_data}, // undo           
         {"undo.svg",         size, IconManager::RasterType::color},           // undo_hovered
+        {"refresh.svg",      size, IconManager::RasterType::white_only_data}, // refresh           
+        {"refresh.svg",      size, IconManager::RasterType::color},           // refresh_hovered
+        {"open.svg",         size, IconManager::RasterType::white_only_data}, // changhe_file
+        {"open.svg",         size, IconManager::RasterType::color},           // changhe_file_hovered
+        {"burn.svg",         size, IconManager::RasterType::white_only_data}, // bake_file
+        {"burn.svg",         size, IconManager::RasterType::color},           // bake_hovered
         {"lock_closed.svg",  size, IconManager::RasterType::white_only_data}, // lock
         {"lock_open_f.svg",  size, IconManager::RasterType::white_only_data}, // lock_hovered
         {"lock_open.svg",    size, IconManager::RasterType::white_only_data}, // unlock
@@ -554,7 +560,7 @@ bool init_texture(Texture &texture, const ModelVolume &mv, unsigned max_size_px)
         return false;
 
     const EmbossShape &es = *mv.emboss_shape;
-    const std::string &filepath = es.svg_file_path;
+    const std::string &filepath = es.svg_file.path;
     if (filepath.empty())
         return false;
     
@@ -566,7 +572,7 @@ bool init_texture(Texture &texture, const ModelVolume &mv, unsigned max_size_px)
     ScopeGuard sg_image([image]() { nsvgDelete(image); });
 
     // NOTE: Can not use es.shape --> it is aligned and one need offset in svg
-    ExPolygons shape = to_expolygons(image);
+    ExPolygons shape = to_expolygons(*image);
     if (shape.empty())
         return false;
 
@@ -793,13 +799,9 @@ bool GLGizmoSVG::draw_preview(){
 
     if (m_filename_preview.empty()){
         // create filename preview
-        m_filename_preview = get_file_name(m_volume->emboss_shape->svg_file_path);
+        m_filename_preview = get_file_name(m_volume->emboss_shape->svg_file.path);
         m_filename_preview = ImGuiWrapper::trunc(m_filename_preview, m_gui_cfg->input_width);
     }
-
-    ImGui::SameLine();
-    ImGui::BeginGroup();
-    ScopeGuard sg_group([]() { ImGui::EndGroup(); });
 
     // Remove space between filename and gray suffix ".svg"
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
@@ -812,19 +814,19 @@ bool GLGizmoSVG::draw_preview(){
 
     is_hovered |= ImGui::IsItemHovered();
     if (is_hovered) {
-        std::string tooltip = GUI::format(_L("SVG file path is \"%1%\" "), m_volume->emboss_shape->svg_file_path);
+        std::string tooltip = GUI::format(_L("SVG file path is \"%1%\" "), m_volume->emboss_shape->svg_file.path);
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
 
     // Re-Load button
-    bool can_reload = !m_volume_shape.svg_file_path.empty();
+    bool can_reload = !m_volume_shape.svg_file.path.empty();
     if (can_reload) {
         ImGui::SameLine();
-        if (clickable(get_icon(m_icons, IconType::reset_value), get_icon(m_icons, IconType::reset_value_hover))) {
-            if (!boost::filesystem::exists(m_volume_shape.svg_file_path)) {
-                m_volume_shape.svg_file_path.clear();
+        if (clickable(get_icon(m_icons, IconType::refresh), get_icon(m_icons, IconType::refresh_hover))) {
+            if (!boost::filesystem::exists(m_volume_shape.svg_file.path)) {
+                m_volume_shape.svg_file.path.clear();
             } else {
-                m_volume_shape.shapes_with_ids = select_shape(m_volume_shape.svg_file_path).shapes_with_ids;
+                m_volume_shape.shapes_with_ids = select_shape(m_volume_shape.svg_file.path).shapes_with_ids;
                 init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
                 process();
             }
@@ -832,19 +834,22 @@ bool GLGizmoSVG::draw_preview(){
             ImGui::SetTooltip("%s", _u8L("Re-load SVG file from disk.").c_str());
     }
 
-    if (ImGui::Button(_u8L("Change file").c_str())) {
+    ImGui::SameLine();
+    if (clickable(get_icon(m_icons, IconType::change_file), get_icon(m_icons, IconType::change_file_hover))) {
         m_volume_shape.shapes_with_ids = select_shape().shapes_with_ids;
         init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
         process();
+    } else if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", _u8L("Change to another .svg file").c_str());
     }
 
     ImGui::SameLine();
-    if (ImGui::Button(_u8L("Bake").c_str())) {
+    if (clickable(get_icon(m_icons, IconType::bake), get_icon(m_icons, IconType::bake_hover))) {
         m_volume->emboss_shape.reset();
         close();
         return false;
     } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", _u8L("Remove connection to source file to take care about copyright").c_str());
+        ImGui::SetTooltip("%s", _u8L("Bake to uneditable part and save copyright of svg").c_str());
     }
     return true;
 }
@@ -1221,7 +1226,7 @@ std::string get_file_name(const std::string &file_path)
 
 std::string volume_name(const EmbossShape &shape)
 {
-    std::string file_name = get_file_name(shape.svg_file_path);
+    std::string file_name = get_file_name(shape.svg_file.path);
     if (!file_name.empty())
         return file_name;
     return "SVG shape";
@@ -1244,7 +1249,7 @@ GuiCfg create_gui_configuration() {
 
     float space = line_height_with_spacing - line_height;
 
-    cfg.icon_width = std::floor(line_height/8)*8;
+    cfg.icon_width = std::max(std::round(line_height/8)*8, 8.f);    
 
     GuiCfg::Translations &tr = cfg.translations;
 
@@ -1271,7 +1276,7 @@ GuiCfg create_gui_configuration() {
     ImVec2 letter_m_size = ImGui::CalcTextSize("M");
     const float count_letter_M_in_input = 12.f;
     cfg.input_width = letter_m_size.x * count_letter_M_in_input;
-
+    cfg.texture_max_size_px = std::round((cfg.input_width + cfg.input_offset + cfg.icon_width +space)/8) * 8;
     return cfg;
 }
 
@@ -1299,40 +1304,25 @@ std::string choose_svg_file()
     if (input_files.size() != 1)
         BOOST_LOG_TRIVIAL(warning) << "SVG file dialog result contain multiple files but only first is used.";
 
-    auto       &input_file = input_files.front();
-    std::string path       = std::string(input_file.c_str());
+    auto &input_file = input_files.front();
+    std::string path = std::string(input_file.c_str());
+
+    if (!boost::filesystem::exists(path)) {
+        BOOST_LOG_TRIVIAL(warning) << "SVG file dialog return invalid path.";
+        return {};
+    }
+
+    if (!boost::algorithm::iends_with(path, ".svg")) {
+        BOOST_LOG_TRIVIAL(warning) << "SVG file dialog return path without '.svg' tail";
+        return {};    
+    }
+
     return path;
 }
 
 void translate(ExPolygons &expolys, const Point &p) {
     for (ExPolygon &expoly : expolys)
         expoly.translate(p);
-}
-
-NSVGimage *parse_from_file(const char *filepath){
-    const char *unit_mm{"mm"};
-    // common used DPI is 96 or 72
-    float dpi = 96.0f;
-    return nsvgParseFromFile(filepath, unit_mm, dpi);
-}
-
-ExPolygons default_shape()
-{
-    std::string file = Slic3r::resources_dir() + "/icons/question.svg";
-    assert(boost::filesystem::exists(file));
-    NSVGimage *image = parse_from_file(file.c_str());
-    assert(image != nullptr);
-    
-    // tesselation tolerance
-    float tol = 1e-2f;
-    int max_level = 10;
-    float scale = static_cast<float>(2. / DEFAULT_SCALE);
-    bool is_y_negative = true;
-    ExPolygons shape = to_expolygons(image, tol, max_level, scale, is_y_negative);
-    assert(!shape.empty());
-
-    nsvgDelete(image);
-    return shape;
 }
 
 EmbossShape select_shape(std::string_view filepath)
@@ -1342,32 +1332,42 @@ EmbossShape select_shape(std::string_view filepath)
     shape.projection.use_surface = false;
 
     if (filepath.empty()) {
-        shape.svg_file_path = choose_svg_file();
-        if (shape.svg_file_path.empty())            
-            return {};
+        // When empty open file dialog
+        shape.svg_file.path = choose_svg_file();
+        if (shape.svg_file.path.empty())            
+            return {}; // file was not selected
     } else {
-        shape.svg_file_path = filepath; // copy
+        shape.svg_file.path = filepath; // copy
+    }
+    
+    if (!boost::filesystem::exists(shape.svg_file.path)) {
+        show_error(nullptr, GUI::format(_u8L("File(%1%) does NOT exists."), shape.svg_file.path));
+        return {};
     }
 
-    if (!boost::filesystem::exists(shape.svg_file_path) || 
-        !boost::algorithm::iends_with(shape.svg_file_path, ".svg"))
+    if (!boost::algorithm::iends_with(shape.svg_file.path, ".svg")){
+        show_error(nullptr, GUI::format(_u8L("File has to end with \".svg\" but you select: %1%"), shape.svg_file.path));
         return {};
+    }
 
-    NSVGimage *image = parse_from_file(shape.svg_file_path.c_str());
-    if (image == nullptr) return {};
-    ScopeGuard sg([image]() { nsvgDelete(image); });
+    shape.svg_file.image = nsvgParseFromFile(shape.svg_file.path);
+    if (shape.svg_file.image.get() == nullptr) {
+        show_error(nullptr, GUI::format(_u8L("Nano SVG parser can't load from file(%1%)."), shape.svg_file.path));
+        return {};
+    }
 
     shape.scale = DEFAULT_SCALE; // loaded in mm
-
     constexpr float tesselation_tolerance = 1e-2f;
     int max_level = 10;
     float scale = static_cast<float>(1 / shape.scale);
     bool is_y_negative = true;
-    ExPolygons expoly = to_expolygons(image, tesselation_tolerance, max_level, scale, is_y_negative);
+    ExPolygons expoly = to_expolygons(*shape.svg_file.image, tesselation_tolerance, max_level, scale, is_y_negative);
     
     // Must contain some shapes !!!
-    if (expoly.empty())
-        expoly = default_shape();
+    if (expoly.empty()) {
+        show_error(nullptr, GUI::format(_u8L("SVG file(%1%) do NOT contain path to be able embossed."), shape.svg_file.path));
+        return {};
+    }
 
     // SVG is used as centered
     // Do not disturb user by settings of pivot position

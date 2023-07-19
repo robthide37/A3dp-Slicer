@@ -3691,7 +3691,7 @@ std::string to_string(const ExPolygonsWithIds &shapes)
 
 void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume &volume) {
     stream << "   <" << SHAPE_TAG << " ";    
-    stream << SVG_FILE_PATH_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(es.svg_file_path) << "\" ";
+    stream << SVG_FILE_PATH_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(es.svg_file.path) << "\" ";
     stream << SHAPE_SCALE_ATTR << "=\"" << es.scale << "\" ";
 
     std::string expolygons_str = to_string(es.shapes_with_ids); // cereal serialize expolygons 

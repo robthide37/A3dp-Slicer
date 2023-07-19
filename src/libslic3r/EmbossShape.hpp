@@ -3,6 +3,7 @@
 
 #include <string>
 #include <optional>
+#include <memory> // unique_ptr
 #include <cereal/cereal.hpp>
 #include <cereal/types/string.hpp>
 #include <cereal/types/vector.hpp>
@@ -11,6 +12,7 @@
 #include "Point.hpp" // Transform3d
 #include "ExPolygon.hpp"
 #include "ExPolygonSerialize.hpp"
+#include "nanosvg/nanosvg.h" // NSVGimage
 
 namespace Slic3r {
 
@@ -83,19 +85,31 @@ struct EmbossShape
     // Stored_Transform3d * fix_3mf_tr = Transform3d_before_store_to_3mf
     std::optional<Slic3r::Transform3d> fix_3mf_tr;
 
-    // file(.svg) path to source of shape
-    // When empty can't reload from disk
-    std::string svg_file_path;
-    
+    struct SvgFile {
+        // File(.svg) path on local computer 
+        // When empty can't reload from disk
+        std::string path;
+
+        // File path into .3mf(.zip)
+        // When empty svg is not stored into .3mf file yet.
+        // and will create dialog to delete private data on save.
+        std::string path_in_3mf;
+
+        // Loaded svg file data.
+        // !!! It is not serialized on undo/redo stack 
+        std::shared_ptr<NSVGimage> image;
+    };    
+    SvgFile svg_file;
+        
     // undo / redo stack recovery
     template<class Archive> void save(Archive &ar) const
     {
-        ar(shapes_with_ids, scale, projection, svg_file_path);
+        ar(shapes_with_ids, scale, projection, svg_file.path, svg_file.path_in_3mf);
         cereal::save(ar, fix_3mf_tr);
     }
     template<class Archive> void load(Archive &ar)
     {
-        ar(shapes_with_ids, scale, projection, svg_file_path);
+        ar(shapes_with_ids, scale, projection, svg_file.path, svg_file.path_in_3mf);
         cereal::load(ar, fix_3mf_tr);
     }
 };

@@ -244,7 +244,7 @@ void scale(Polygons &polygons, double multiplicator) {
 Polygons load_polygons(const std::string &svg_file) {
     std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + svg_file;
     NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
-    Polygons polygons = to_polygons(image);
+    Polygons polygons = to_polygons(*image);
     nsvgDelete(image);
     return polygons;
 }
@@ -289,7 +289,7 @@ TEST_CASE("Heal of points close to line", "[Emboss]")
     std::string file_name = "points_close_to_line.svg";
     std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + file_name;
     NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
-    Polygons polygons = to_polygons(image);
+    Polygons polygons = to_polygons(*image);
     nsvgDelete(image);
     REQUIRE(polygons.size() == 1);
     Polygon polygon = polygons.front();
@@ -536,7 +536,7 @@ TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
     emboss.projection.depth       = 5.;
     emboss.projection.use_surface = true;
     emboss.fix_3mf_tr  = Transform3d::Identity();
-    emboss.svg_file_path = "Everything starts somewhere, though many physicists disagree.\
+    emboss.svg_file.path = "Everything starts somewhere, though many physicists disagree.\
  But people have always been dimly aware of the problem with the start of things.\
  They wonder how the snowplough driver gets to work,\
  or how the makers of dictionaries look up the spelling of words.";

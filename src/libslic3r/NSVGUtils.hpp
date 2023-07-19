@@ -1,6 +1,8 @@
 #ifndef slic3r_NSVGUtils_hpp_
 #define slic3r_NSVGUtils_hpp_
 
+#include <memory>
+#include <string>
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
 #include "nanosvg/nanosvg.h"    // load SVG file
@@ -19,8 +21,11 @@ namespace Slic3r {
 /// NOTE: Every point coor from image(float) is multiplied by scale and rounded to integer</param>
 /// <param name="is_y_negative">Flag is y negative, when true than y coor is multiplied by -1</param>
 /// <returns>Polygons extracted from svg</returns>
-Polygons   to_polygons(NSVGimage *image, float tessTol = 10., int max_level = 10, float scale = 1.f, bool is_y_negative = true);
-ExPolygons to_expolygons(NSVGimage *image, float tessTol = 10., int max_level = 10, float scale = 1.f, bool is_y_negative = true);
+Polygons   to_polygons(const NSVGimage &image, float tessTol = 10., int max_level = 10, float scale = 1.f, bool is_y_negative = true);
+ExPolygons to_expolygons(const NSVGimage &image, float tessTol = 10., int max_level = 10, float scale = 1.f, bool is_y_negative = true);
+
+using NSVGimage_ptr = std::unique_ptr<NSVGimage, void (*)(NSVGimage*)>;
+NSVGimage_ptr nsvgParseFromFile(const std::string& filename, const char *units = "mm", float dpi = 96.0f);
 
 } // namespace Slic3r
 #endif // slic3r_NSVGUtils_hpp_
