@@ -1,6 +1,7 @@
 #include "ExtrusionProcessor.hpp"
+#include <string>
 
-namespace Slic3r {
+namespace Slic3r { namespace ExtrusionProcessor {
 
 ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath                             &path,
                                                           const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
@@ -83,6 +84,8 @@ ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath   
         result.back().polyline.append(Point::new_scale(extended_points[i].position));
     }
 
+    std::cout << "ExtrusionPath " << std::to_string(size_t(&path)) << " split to " << result.size() << " paths";
+
     return result;
 };
 
@@ -126,4 +129,4 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const Extru
     return result;
 };
 
-} // namespace Slic3r
+}} // namespace Slic3r::ExtrusionProcessor

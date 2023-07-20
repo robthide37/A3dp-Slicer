@@ -28,13 +28,13 @@
 #include <utility>
 #include <vector>
 
-namespace Slic3r {
+namespace Slic3r { namespace ExtrusionProcessor {
 
 struct ExtendedPoint
 {
-    Vec2d  position;
-    float  distance;
-    float  curvature;
+    Vec2d position;
+    float distance;
+    float curvature;
 };
 
 template<bool SCALED_INPUT, bool ADD_INTERSECTIONS, bool PREV_LAYER_BOUNDARY_OFFSET, bool SIGNED_DISTANCE, typename POINTS, typename L>
@@ -48,27 +48,30 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
     using AABBScalar = typename AABBTreeLines::LinesDistancer<L>::Scalar;
     if (input_points.empty())
         return {};
-    float              boundary_offset = PREV_LAYER_BOUNDARY_OFFSET ? 0.5 * flow_width : 0.0f;
-    auto maybe_unscale = [](const P &p) { return SCALED_INPUT ? unscaled(p) : p.template cast<double>(); };
+    float boundary_offset = PREV_LAYER_BOUNDARY_OFFSET ? 0.5 * flow_width : 0.0f;
+    auto  maybe_unscale   = [](const P &p) { return SCALED_INPUT ? unscaled(p) : p.template cast<double>(); };
 
     std::vector<ExtendedPoint> points;
     points.reserve(input_points.size() * (ADD_INTERSECTIONS ? 1.5 : 1));
 
     {
         ExtendedPoint start_point{maybe_unscale(input_points.front())};
-        auto [distance, nearest_line, x]    = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(start_point.position.cast<AABBScalar>());
-        start_point.distance                = distance + boundary_offset;
+        auto [distance, nearest_line,
+              x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(start_point.position.cast<AABBScalar>());
+        start_point.distance = distance + boundary_offset;
         points.push_back(start_point);
     }
     for (size_t i = 1; i < input_points.size(); i++) {
         ExtendedPoint next_point{maybe_unscale(input_points[i])};
-        auto [distance, nearest_line, x]   = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(next_point.position.cast<AABBScalar>());
-        next_point.distance                = distance + boundary_offset;
+        auto [distance, nearest_line,
+              x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(next_point.position.cast<AABBScalar>());
+        next_point.distance = distance + boundary_offset;
 
         if (ADD_INTERSECTIONS &&
             ((points.back().distance > boundary_offset + EPSILON) != (next_point.distance > boundary_offset + EPSILON))) {
-            const ExtendedPoint &prev_point = points.back();
-            auto intersections = unscaled_prev_layer.template intersections_with_line<true>(L{prev_point.position.cast<AABBScalar>(), next_point.position.cast<AABBScalar>()});
+            const ExtendedPoint &prev_point    = points.back();
+            auto                 intersections = unscaled_prev_layer.template intersections_with_line<true>(
+                L{prev_point.position.cast<AABBScalar>(), next_point.position.cast<AABBScalar>()});
             for (const auto &intersection : intersections) {
                 ExtendedPoint p{};
                 p.position = intersection.first.template cast<double>();
@@ -81,7 +84,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
 
     if (PREV_LAYER_BOUNDARY_OFFSET && ADD_INTERSECTIONS) {
         std::vector<ExtendedPoint> new_points;
-        new_points.reserve(points.size()*2);
+        new_points.reserve(points.size() * 2);
         new_points.push_back(points.front());
         for (int point_idx = 0; point_idx < int(points.size()) - 1; ++point_idx) {
             const ExtendedPoint &curr = points[point_idx];
@@ -97,19 +100,21 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
                     double t1 = std::max(a0, a1);
 
                     if (t0 < 1.0) {
-                        auto p0                         = curr.position + t0 * (next.position - curr.position);
-                        auto [p0_dist, p0_near_l, p0_x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(p0.cast<AABBScalar>());
+                        auto p0     = curr.position + t0 * (next.position - curr.position);
+                        auto [p0_dist, p0_near_l,
+                              p0_x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(p0.cast<AABBScalar>());
                         ExtendedPoint new_p{};
-                        new_p.position                 = p0;
-                        new_p.distance                 = float(p0_dist + boundary_offset);
+                        new_p.position = p0;
+                        new_p.distance = float(p0_dist + boundary_offset);
                         new_points.push_back(new_p);
                     }
                     if (t1 > 0.0) {
-                        auto p1                         = curr.position + t1 * (next.position - curr.position);
-                        auto [p1_dist, p1_near_l, p1_x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(p1.cast<AABBScalar>());
+                        auto p1     = curr.position + t1 * (next.position - curr.position);
+                        auto [p1_dist, p1_near_l,
+                              p1_x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(p1.cast<AABBScalar>());
                         ExtendedPoint new_p{};
-                        new_p.position                 = p1;
-                        new_p.distance                 = float(p1_dist + boundary_offset);
+                        new_p.position = p1;
+                        new_p.distance = float(p1_dist + boundary_offset);
                         new_points.push_back(new_p);
                     }
                 }
@@ -121,7 +126,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
 
     if (max_line_length > 0) {
         std::vector<ExtendedPoint> new_points;
-        new_points.reserve(points.size()*2);
+        new_points.reserve(points.size() * 2);
         {
             for (size_t i = 0; i + 1 < points.size(); i++) {
                 const ExtendedPoint &curr = points[i];
@@ -135,8 +140,8 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
                     auto [p_dist, p_near_l,
                           p_x] = unscaled_prev_layer.template distance_from_lines_extra<SIGNED_DISTANCE>(pos.cast<AABBScalar>());
                     ExtendedPoint new_p{};
-                    new_p.position                 = pos;
-                    new_p.distance                 = float(p_dist + boundary_offset);
+                    new_p.position = pos;
+                    new_p.distance = float(p_dist + boundary_offset);
                     new_points.push_back(new_p);
                 }
             }
@@ -213,14 +218,14 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
     return points;
 }
 
-
 ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath                             &path,
-                                                          const AABBTreeLines::LinesDistancer<Linef>       &unscaled_prev_layer,
+                                                          const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
                                                           const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
 
-ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const ExtrusionEntityCollection           *ecc,
-                                                                     const AABBTreeLines::LinesDistancer<Linef> &unscaled_prev_layer,
-                                                                     const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
+ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(
+    const ExtrusionEntityCollection                 *ecc,
+    const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
+    const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
 
 struct ProcessedPoint
 {
@@ -364,6 +369,6 @@ public:
     }
 };
 
-} // namespace Slic3r
+}} // namespace Slic3r::ExtrusionProcessor
 
 #endif // slic3r_ExtrusionProcessor_hpp_

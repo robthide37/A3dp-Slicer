@@ -2047,10 +2047,6 @@ LayerResult GCodeGenerator::process_layer(
         }
     }
 
-    for (const ObjectLayerToPrint &layer_to_print : layers) {
-        m_extrusion_quality_estimator.prepare_for_new_layer(layer_to_print.object_layer);
-    }
-
     // Extrude the skirt, brim, support, perimeters, infill ordered by the extruders.
     for (unsigned int extruder_id : layer_tools.extruders)
     {
@@ -2181,8 +2177,6 @@ void GCodeGenerator::process_layer_single_object(
 
     const PrintObject &print_object = print_instance.print_object;
     const Print       &print        = *print_object.print();
-
-    m_extrusion_quality_estimator.set_current_object(&print_object);
 
     if (! print_wipe_extrusions && layer_to_print.support_layer != nullptr)
         if (const SupportLayer &support_layer = *layer_to_print.support_layer; ! support_layer.support_fills.entities.empty()) {
@@ -2781,10 +2775,7 @@ std::string GCodeGenerator::_extrude(
         );
     }
 
-    bool                        variable_speed_or_fan_speed = false;
-    std::vector<ProcessedPoint> new_points{};
-    if ((this->m_config.enable_dynamic_overhang_speeds || this->config().enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())) &&
-        !this->on_first_layer() && path_attr.role.is_perimeter()) {
+    if (path_attr.overhang_attributes.has_value()) {
         std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_with_speeds = {{100, ConfigOptionFloatOrPercent{speed, false}}};
         if (this->m_config.enable_dynamic_overhang_speeds) {
             overhangs_with_speeds = {{0, m_config.overhang_speed_0},
@@ -2807,21 +2798,65 @@ std::string GCodeGenerator::_extrude(
         if (external_perim_reference_speed == 0)
             external_perim_reference_speed = m_volumetric_speed / path_attr.mm3_per_mm;
         if (m_config.max_volumetric_speed.value > 0)
-            external_perim_reference_speed = std::min(external_perim_reference_speed, m_config.max_volumetric_speed.value / path_attr.mm3_per_mm);
+            external_perim_reference_speed = std::min(external_perim_reference_speed,
+                                                      m_config.max_volumetric_speed.value / path_attr.mm3_per_mm);
         if (EXTRUDER_CONFIG(filament_max_volumetric_speed) > 0) {
             external_perim_reference_speed = std::min(external_perim_reference_speed,
                                                       EXTRUDER_CONFIG(filament_max_volumetric_speed) / path_attr.mm3_per_mm);
         }
 
+        ExtrusionProcessor::calculate_overhang_speed();
+
+
         new_points = m_extrusion_quality_estimator.estimate_speed_from_extrusion_quality(
-            //FIXME convert estimate_speed_from_extrusion_quality() to smooth paths or move it before smooth path interpolation.
-            Points{},
-            path_attr, overhangs_with_speeds, overhang_w_fan_speeds,
-            m_writer.extruder()->id(), external_perim_reference_speed,
+            // FIXME convert estimate_speed_from_extrusion_quality() to smooth paths or move it before smooth path interpolation.
+            Points{}, path_attr, overhangs_with_speeds, overhang_w_fan_speeds, m_writer.extruder()->id(), external_perim_reference_speed,
             speed);
         variable_speed_or_fan_speed = std::any_of(new_points.begin(), new_points.end(),
                                                   [speed](const ProcessedPoint &p) { return p.speed != speed || p.fan_speed != 0; });
     }
+
+    // bool                        variable_speed_or_fan_speed = false;
+    // std::vector<ProcessedPoint> new_points{};
+    // if ((this->m_config.enable_dynamic_overhang_speeds || this->config().enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())) &&
+    //     !this->on_first_layer() && path_attr.role.is_perimeter()) {
+    //     std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_with_speeds = {{100, ConfigOptionFloatOrPercent{speed, false}}};
+    //     if (this->m_config.enable_dynamic_overhang_speeds) {
+    //         overhangs_with_speeds = {{0, m_config.overhang_speed_0},
+    //                                  {25, m_config.overhang_speed_1},
+    //                                  {50, m_config.overhang_speed_2},
+    //                                  {75, m_config.overhang_speed_3},
+    //                                  {100, ConfigOptionFloatOrPercent{speed, false}}};
+    //     }
+
+    //     std::vector<std::pair<int, ConfigOptionInts>> overhang_w_fan_speeds = {{100, ConfigOptionInts{0}}};
+    //     if (this->m_config.enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())) {
+    //         overhang_w_fan_speeds = {{0, m_config.overhang_fan_speed_0},
+    //                                  {25, m_config.overhang_fan_speed_1},
+    //                                  {50, m_config.overhang_fan_speed_2},
+    //                                  {75, m_config.overhang_fan_speed_3},
+    //                                  {100, ConfigOptionInts{0}}};
+    //     }
+
+    //     double external_perim_reference_speed = m_config.get_abs_value("external_perimeter_speed");
+    //     if (external_perim_reference_speed == 0)
+    //         external_perim_reference_speed = m_volumetric_speed / path_attr.mm3_per_mm;
+    //     if (m_config.max_volumetric_speed.value > 0)
+    //         external_perim_reference_speed = std::min(external_perim_reference_speed, m_config.max_volumetric_speed.value / path_attr.mm3_per_mm);
+    //     if (EXTRUDER_CONFIG(filament_max_volumetric_speed) > 0) {
+    //         external_perim_reference_speed = std::min(external_perim_reference_speed,
+    //                                                   EXTRUDER_CONFIG(filament_max_volumetric_speed) / path_attr.mm3_per_mm);
+    //     }
+
+    //     new_points = m_extrusion_quality_estimator.estimate_speed_from_extrusion_quality(
+    //         //FIXME convert estimate_speed_from_extrusion_quality() to smooth paths or move it before smooth path interpolation.
+    //         Points{},
+    //         path_attr, overhangs_with_speeds, overhang_w_fan_speeds,
+    //         m_writer.extruder()->id(), external_perim_reference_speed,
+    //         speed);
+    //     variable_speed_or_fan_speed = std::any_of(new_points.begin(), new_points.end(),
+    //                                               [speed](const ProcessedPoint &p) { return p.speed != speed || p.fan_speed != 0; });
+    // }
 
     double F = speed * 60;  // convert mm/sec to mm/min
 

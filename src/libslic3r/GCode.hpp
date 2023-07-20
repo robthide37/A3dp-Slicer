@@ -293,8 +293,6 @@ private:
     // Cache for custom seam enforcers/blockers for each layer.
     SeamPlacer                          m_seam_placer;
 
-    ExtrusionQualityEstimator           m_extrusion_quality_estimator;
-
     /* Origin of print coordinates expressed in unscaled G-code coordinates.
        This affects the input arguments supplied to the extrude*() and travel_to()
        methods. */
