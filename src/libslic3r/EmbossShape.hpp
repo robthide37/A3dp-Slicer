@@ -97,7 +97,7 @@ struct EmbossShape
 
         // Loaded svg file data.
         // !!! It is not serialized on undo/redo stack 
-        std::shared_ptr<NSVGimage> image;
+        std::shared_ptr<NSVGimage> image = nullptr;
     };    
     SvgFile svg_file;
         

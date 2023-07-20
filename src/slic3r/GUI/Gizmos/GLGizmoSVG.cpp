@@ -76,9 +76,10 @@ EmbossShape select_shape(std::string_view filepath = "");
 /// Create new embos data
 /// </summary>
 /// <param name="cancel">Cancel for previous job</param>
+/// <param name="volume_type">To distiquish whether it is outside of model</param>
 /// <param name="filepath">SVG file path</param>
 /// <returns>Base data for emboss SVG</returns>
-DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel, std::string_view filepath = "");
+DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel, ModelVolumeType volume_type, std::string_view filepath = "");
 
 /// <summary>
 /// Separate file name from file path.
@@ -184,24 +185,24 @@ BoundingBox get_extents(const ExPolygonsWithIds &expoly_ids)
 bool GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos)
 {
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
-    DataBasePtr base = create_emboss_data_base(m_job_cancel);
-    base->is_outside = volume_type == ModelVolumeType::MODEL_PART;
+    DataBasePtr base = create_emboss_data_base(m_job_cancel, volume_type);
+    if (!base) return false; // Uninterpretable svg
     return start_create_volume(input, std::move(base), mouse_pos);
 }
 
 bool GLGizmoSVG::create_volume(ModelVolumeType volume_type) 
 {
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
-    DataBasePtr base = create_emboss_data_base(m_job_cancel);
-    base->is_outside = volume_type == ModelVolumeType::MODEL_PART;
+    DataBasePtr base = create_emboss_data_base(m_job_cancel,volume_type);
+    if (!base) return false; // Uninterpretable svg
     return start_create_volume_without_position(input, std::move(base));
 }
 
 bool GLGizmoSVG::create_volume(std::string_view svg_file, ModelVolumeType volume_type, const Vec2d &mouse_pos)
 {
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
-    DataBasePtr base = create_emboss_data_base(m_job_cancel, svg_file);
-    base->is_outside = volume_type == ModelVolumeType::MODEL_PART;
+    DataBasePtr base = create_emboss_data_base(m_job_cancel, volume_type, svg_file);
+    if (!base) return false; // Uninterpretable svg
     // is not a number || is infinity
     if (mouse_pos.x() != mouse_pos.x() ||
         mouse_pos.y() != mouse_pos.y())
@@ -554,22 +555,33 @@ void GLGizmoSVG::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(d
 #include "slic3r/GUI/BitmapCache.hpp"
 #include "nanosvg/nanosvgrast.h"
 namespace{
-bool init_texture(Texture &texture, const ModelVolume &mv, unsigned max_size_px)
+NSVGimage* init_image(EmbossShape::SvgFile &svg_file) {
+    // is already initialized?
+    if (svg_file.image.get() != nullptr)
+        return svg_file.image.get();
+
+    // chech if path is known
+    if (svg_file.path.empty())
+        return nullptr;
+
+    // init svg image
+    svg_file.image = nsvgParseFromFile(svg_file.path);
+    
+    return svg_file.image.get();
+}
+
+bool init_texture(Texture &texture, ModelVolume &mv, unsigned max_size_px)
 {
     if (!mv.emboss_shape.has_value())
         return false;
 
-    const EmbossShape &es = *mv.emboss_shape;
-    const std::string &filepath = es.svg_file.path;
-    if (filepath.empty())
+    EmbossShape &es = *mv.emboss_shape;
+    NSVGimage *image = init_image(es.svg_file);
+    if (image == nullptr)
         return false;
     
     // inspired by:
     // GLTexture::load_from_svg_file(filepath, false, false, false, max_size_px);
-    NSVGimage *image = BitmapCache::nsvgParseFromFileWithReplace(filepath.c_str(), "px", 96.0f, {});
-    if (image == nullptr)
-        return false;
-    ScopeGuard sg_image([image]() { nsvgDelete(image); });
 
     // NOTE: Can not use es.shape --> it is aligned and one need offset in svg
     ExPolygons shape = to_expolygons(*image);
@@ -601,12 +613,19 @@ bool init_texture(Texture &texture, const ModelVolume &mv, unsigned max_size_px)
         return false;    
     ScopeGuard sg_rast([rast]() { nsvgDeleteRasterizer(rast); });
 
-    int channels_count = 4;
+    constexpr int channels_count = 4;
     std::vector<unsigned char> data(n_pixels * channels_count, 0);
     float tx = static_cast<float>(-bb.min.x() * scale);
     float ty = static_cast<float>(bb.max.y() * scale); // Reverse direction of y
     int stride = texture.width * channels_count;
     nsvgRasterizeXY(rast, image, tx, ty, scale, scale, data.data(), texture.width, texture.height, stride);
+
+    // fill by monotone color
+    std::vector<unsigned char> fill_color = {201, 201, 201}; // RGB and keep same alpha
+    for (size_t i = 0; i+2 < data.size(); i += channels_count)
+        if (data[i] != 0 || data[i + 1] != 0 || data[i + 2] != 0)
+            for (size_t j = 0; j < fill_color.size(); j++)
+                data[i + j] = fill_color[j];
 
     // sends data to gpu
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
@@ -1352,7 +1371,7 @@ EmbossShape select_shape(std::string_view filepath)
     }
 
     shape.svg_file.image = nsvgParseFromFile(shape.svg_file.path);
-    if (shape.svg_file.image.get() == nullptr) {
+    if (shape.svg_file.image.get() == NULL) {
         show_error(nullptr, GUI::format(_u8L("Nano SVG parser can't load from file(%1%)."), shape.svg_file.path));
         return {};
     }
@@ -1381,7 +1400,7 @@ EmbossShape select_shape(std::string_view filepath)
     return shape;
 }
 
-DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel, std::string_view filepath)
+DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel, ModelVolumeType volume_type, std::string_view filepath)
 {
     EmbossShape shape = select_shape(filepath);
 
@@ -1399,7 +1418,9 @@ DataBasePtr create_emboss_data_base(std::shared_ptr<std::atomic<bool>> &cancel, 
 
     std::string name = volume_name(shape);
 
-    return std::make_unique<DataBase>(name, cancel /*copy*/, std::move(shape));
+    auto result = std::make_unique<DataBase>(name, cancel /*copy*/, std::move(shape));
+    result->is_outside = volume_type == ModelVolumeType::MODEL_PART;
+    return result;
 }
 } // namespace
 
