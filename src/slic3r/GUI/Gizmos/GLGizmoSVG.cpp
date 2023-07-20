@@ -1108,7 +1108,8 @@ void GLGizmoSVG::draw_reflection()
     if (axis != Axis::UNKNOWN_AXIS){
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
-        selection.mirror(axis, TransformationType::Local);
+        TransformationType type = m_volume->is_the_only_one_part()? TransformationType::Instance : TransformationType::Local;
+        selection.mirror(axis, type);
         m_parent.do_mirror(L("Set Mirror"));
         wxGetApp().obj_manipul()->UpdateAndShow(true);
 
