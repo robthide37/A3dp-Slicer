@@ -997,94 +997,107 @@ namespace DoExport {
     {
         std::string filament_stats_string_out;
 
-  	    print_statistics.clear();
+        print_statistics.clear();
         print_statistics.total_toolchanges = std::max(0, wipe_tower_data.number_of_toolchanges);
         print_statistics.initial_extruder_id = initial_extruder_id;
         std::vector<std::string> filament_types;
-	      if (! extruders.empty()) {
-	        std::pair<std::string, unsigned int> out_filament_used_mm ("; filament used [mm] = ", 0);
-	        std::pair<std::string, unsigned int> out_filament_used_cm3("; filament used [cm3] = ", 0);
-	        std::pair<std::string, unsigned int> out_filament_used_g  ("; filament used [g] = ", 0);
-	        std::pair<std::string, unsigned int> out_filament_cost    ("; filament cost = ", 0);
-	        for (const Extruder &extruder : extruders) {
-              print_statistics.printing_extruders.emplace_back(extruder.id());
-              filament_types.emplace_back(config.filament_type.get_at(extruder.id()));
+        if (! extruders.empty()) {
+#if ENABLE_BINARIZED_GCODE
+            std::pair<std::string, unsigned int> out_filament_used_mm(PrintStatistics::FilamentUsedMmMask + " ", 0);
+            std::pair<std::string, unsigned int> out_filament_used_cm3(PrintStatistics::FilamentUsedCm3Mask + " ", 0);
+            std::pair<std::string, unsigned int> out_filament_used_g(PrintStatistics::FilamentUsedGMask + " ", 0);
+            std::pair<std::string, unsigned int> out_filament_cost(PrintStatistics::FilamentCostMask + " ", 0);
+#else
+            std::pair<std::string, unsigned int> out_filament_used_mm("; filament used [mm] = ", 0);
+            std::pair<std::string, unsigned int> out_filament_used_cm3("; filament used [cm3] = ", 0);
+            std::pair<std::string, unsigned int> out_filament_used_g  ("; filament used [g] = ", 0);
+            std::pair<std::string, unsigned int> out_filament_cost("; filament cost = ", 0);
+#endif // ENABLE_BINARIZED_GCODE
+            for (const Extruder &extruder : extruders) {
+                print_statistics.printing_extruders.emplace_back(extruder.id());
+                filament_types.emplace_back(config.filament_type.get_at(extruder.id()));
 
-	            double used_filament   = extruder.used_filament() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] : 0.f);
-	            double extruded_volume = extruder.extruded_volume() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] * 2.4052f : 0.f); // assumes 1.75mm filament diameter
-	            double filament_weight = extruded_volume * extruder.filament_density() * 0.001;
-	            double filament_cost   = filament_weight * extruder.filament_cost()    * 0.001;
-              auto append = [&extruder](std::pair<std::string, unsigned int> &dst, const char *tmpl, double value) {
-                  assert(is_decimal_separator_point());
-	                while (dst.second < extruder.id()) {
-	                    // Fill in the non-printing extruders with zeros.
-	                    dst.first += (dst.second > 0) ? ", 0" : "0";
-	                    ++ dst.second;
-	                }
-	                if (dst.second > 0)
-	                    dst.first += ", ";
-	                char buf[64];
-                  sprintf(buf, tmpl, value);
-	                dst.first += buf;
-	                ++ dst.second;
-              };
+                double used_filament   = extruder.used_filament() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] : 0.f);
+                double extruded_volume = extruder.extruded_volume() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] * 2.4052f : 0.f); // assumes 1.75mm filament diameter
+                double filament_weight = extruded_volume * extruder.filament_density() * 0.001;
+                double filament_cost   = filament_weight * extruder.filament_cost()    * 0.001;
+                auto append = [&extruder](std::pair<std::string, unsigned int> &dst, const char *tmpl, double value) {
+                    assert(is_decimal_separator_point());
+                    while (dst.second < extruder.id()) {
+                        // Fill in the non-printing extruders with zeros.
+                        dst.first += (dst.second > 0) ? ", 0" : "0";
+                        ++ dst.second;
+                    }
+                    if (dst.second > 0)
+                        dst.first += ", ";
+                    char buf[64];
+                    sprintf(buf, tmpl, value);
+                    dst.first += buf;
+                    ++ dst.second;
+                };
 #if ENABLE_BINARIZED_GCODE
-              if (export_binary_data) {
-                  char buf[128];
-                  sprintf(buf, "%.2lf", used_filament);
-                  binary_data.print_metadata.raw_data.push_back({ "filament used [mm]", std::string(buf) });
-                  sprintf(buf, "%.2lf", extruded_volume * 0.001);
-                  binary_data.print_metadata.raw_data.push_back({ "filament used [cm3]", std::string(buf) });
-              }
-              else {
+                if (export_binary_data) {
+                    char buf[128];
+                    sprintf(buf, "%.2lf", used_filament);
+                    binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedMm, std::string(buf) });
+                    sprintf(buf, "%.2lf", extruded_volume * 0.001);
+                    binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedCm3, std::string(buf) });
+                }
+                else {
 #endif // ENABLE_BINARIZED_GCODE
-	                append(out_filament_used_mm,  "%.2lf", used_filament);
-	                append(out_filament_used_cm3, "%.2lf", extruded_volume * 0.001);
+                    append(out_filament_used_mm,  "%.2lf", used_filament);
+                    append(out_filament_used_cm3, "%.2lf", extruded_volume * 0.001);
 #if ENABLE_BINARIZED_GCODE
-              }
+                }
 #endif // ENABLE_BINARIZED_GCODE
-              if (filament_weight > 0.) {
-	                print_statistics.total_weight = print_statistics.total_weight + filament_weight;
+                if (filament_weight > 0.) {
+                    print_statistics.total_weight = print_statistics.total_weight + filament_weight;
 #if ENABLE_BINARIZED_GCODE
-                  if (export_binary_data) {
-                      char buf[128];
-                      sprintf(buf, "%.2lf", filament_weight);
-                      binary_data.print_metadata.raw_data.push_back({ "filament used [g]", std::string(buf) });
-                  }
-                  else
+                    if (export_binary_data) {
+                        char buf[128];
+                        sprintf(buf, "%.2lf", filament_weight);
+                        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedG, std::string(buf) });
+                    }
+                    else
 #endif // ENABLE_BINARIZED_GCODE
-                      append(out_filament_used_g, "%.2lf", filament_weight);
-                  if (filament_cost > 0.) {
-	                    print_statistics.total_cost = print_statistics.total_cost + filament_cost;
+                        append(out_filament_used_g, "%.2lf", filament_weight);
+                    if (filament_cost > 0.) {
+                        print_statistics.total_cost = print_statistics.total_cost + filament_cost;
 #if ENABLE_BINARIZED_GCODE
-                      if (export_binary_data) {
-                          char buf[128];
-                          sprintf(buf, "%.2lf", filament_cost);
-                          binary_data.print_metadata.raw_data.push_back({ "filament cost", std::string(buf) });
-                      }
-                      else
+                        if (export_binary_data) {
+                            char buf[128];
+                            sprintf(buf, "%.2lf", filament_cost);
+                            binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentCost, std::string(buf) });
+                        }
+                        else
 #endif // ENABLE_BINARIZED_GCODE
-                          append(out_filament_cost, "%.2lf", filament_cost);
-	                }
-	            }
-	            print_statistics.total_used_filament += used_filament;
-	            print_statistics.total_extruded_volume += extruded_volume;
-	            print_statistics.total_wipe_tower_filament += has_wipe_tower ? used_filament - extruder.used_filament() : 0.;
-	            print_statistics.total_wipe_tower_cost += has_wipe_tower ? (extruded_volume - extruder.extruded_volume())* extruder.filament_density() * 0.001 * extruder.filament_cost() * 0.001 : 0.;
-	        }
-	        filament_stats_string_out += out_filament_used_mm.first;
-          filament_stats_string_out += "\n" + out_filament_used_cm3.first;
-          if (out_filament_used_g.second)
-              filament_stats_string_out += "\n" + out_filament_used_g.first;
-          if (out_filament_cost.second)
-              filament_stats_string_out += "\n" + out_filament_cost.first;
-          print_statistics.initial_filament_type = config.filament_type.get_at(initial_extruder_id);
-          std::sort(filament_types.begin(), filament_types.end());
-          print_statistics.printing_filament_types = filament_types.front();
-          for (size_t i = 1; i < filament_types.size(); ++ i) {
-              print_statistics.printing_filament_types += ",";
-              print_statistics.printing_filament_types += filament_types[i];
-          }
+                            append(out_filament_cost, "%.2lf", filament_cost);
+                    }
+                }
+                print_statistics.total_used_filament += used_filament;
+                print_statistics.total_extruded_volume += extruded_volume;
+                print_statistics.total_wipe_tower_filament += has_wipe_tower ? used_filament - extruder.used_filament() : 0.;
+                print_statistics.total_wipe_tower_cost += has_wipe_tower ? (extruded_volume - extruder.extruded_volume())* extruder.filament_density() * 0.001 * extruder.filament_cost() * 0.001 : 0.;
+            }
+#if ENABLE_BINARIZED_GCODE
+            if (!export_binary_data) {
+#endif // ENABLE_BINARIZED_GCODE
+                filament_stats_string_out += out_filament_used_mm.first;
+                filament_stats_string_out += "\n" + out_filament_used_cm3.first;
+                if (out_filament_used_g.second)
+                    filament_stats_string_out += "\n" + out_filament_used_g.first;
+                if (out_filament_cost.second)
+                    filament_stats_string_out += "\n" + out_filament_cost.first;
+#if ENABLE_BINARIZED_GCODE
+            }
+#endif // ENABLE_BINARIZED_GCODE
+            print_statistics.initial_filament_type = config.filament_type.get_at(initial_extruder_id);
+            std::sort(filament_types.begin(), filament_types.end());
+            print_statistics.printing_filament_types = filament_types.front();
+            for (size_t i = 1; i < filament_types.size(); ++ i) {
+                print_statistics.printing_filament_types += ",";
+                print_statistics.printing_filament_types += filament_types[i];
+            }
         }
         return filament_stats_string_out;
     }
@@ -1216,8 +1229,11 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         this->m_avoid_crossing_curled_overhangs.init_bed_shape(get_bed_shape(print.config()));
     }
 
-    // Write information on the generator.
-    file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
+#if ENABLE_BINARIZED_GCODE
+    if (!export_to_binary_gcode)
+#endif // ENABLE_BINARIZED_GCODE
+        // Write information on the generator.
+        file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
 
 #if ENABLE_BINARIZED_GCODE
     // if exporting gcode in ascii format, generate the thumbnails here
@@ -1582,7 +1598,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
     // Get filament stats.
 #if ENABLE_BINARIZED_GCODE
-    file.write(DoExport::update_print_stats_and_format_filament_stats(
+    const std::string filament_stats_string_out = DoExport::update_print_stats_and_format_filament_stats(
         // Const inputs
         has_wipe_tower, print.wipe_tower_data(),
         this->config(),
@@ -1592,15 +1608,18 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         print.m_print_statistics,
         export_to_binary_gcode,
         m_processor.get_binary_data()
-    ));
+    );
+
+    if (!export_to_binary_gcode)
+        file.write(filament_stats_string_out);
 
     if (export_to_binary_gcode) {
         BinaryGCode::BinaryData& binary_data = m_processor.get_binary_data();
         char buf[128];
         sprintf(buf, "%.2lf", print.m_print_statistics.total_weight);
-        binary_data.print_metadata.raw_data.push_back({ "total filament used [g]", std::string(buf) });
+        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::TotalFilamentUsedG, std::string(buf) });
         sprintf(buf, "%.2lf", print.m_print_statistics.total_cost);
-        binary_data.print_metadata.raw_data.push_back({ "total filament cost", std::string(buf) });
+        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::TotalFilamentCost, std::string(buf) });
         if (print.m_print_statistics.total_toolchanges > 0)
             binary_data.print_metadata.raw_data.push_back({ "total toolchanges", std::to_string(print.m_print_statistics.total_toolchanges) });
     }
@@ -1619,8 +1638,13 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         // if exporting gcode in ascii format, statistics export is done here
 #endif // ENABLE_BINARIZED_GCODE
         file.write("\n");
+#if ENABLE_BINARIZED_GCODE
+        file.write_format(PrintStatistics::TotalFilamentUsedGValueMask.c_str(), print.m_print_statistics.total_weight);
+        file.write_format(PrintStatistics::TotalFilamentCostValueMask.c_str(), print.m_print_statistics.total_cost);
+#else
         file.write_format("; total filament used [g] = %.2lf\n", print.m_print_statistics.total_weight);
         file.write_format("; total filament cost = %.2lf\n", print.m_print_statistics.total_cost);
+#endif // ENABLE_BINARIZED_GCODE
         if (print.m_print_statistics.total_toolchanges > 0)
             file.write_format("; total toolchanges = %i\n", print.m_print_statistics.total_toolchanges);
         file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Estimated_Printing_Time_Placeholder).c_str());

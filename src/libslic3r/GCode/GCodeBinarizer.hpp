@@ -29,10 +29,13 @@ enum class EResult : uint16_t
     InvalidBlockType,
     InvalidCompressionType,
     InvalidMetadataEncodingType,
+    InvalidGCodeEncodingType,
     DataCompressionError,
     DataUncompressionError,
     MetadataEncodingError,
     MetadataDecodingError,
+    GCodeEncodingError,
+    GCodeDecodingError,
     BlockNotFound,
     InvalidChecksum,
     InvalidThumbnailFormat,
@@ -195,12 +198,23 @@ struct SlicerMetadataBlock : public BaseMetadataBlock
     EResult read_data(FILE& file, const FileHeader& file_header, const BlockHeader& block_header);
 };
 
-struct GCodeBlock : public BaseMetadataBlock
+enum class EGCodeEncodingType : uint16_t
 {
+    None,
+    MeatPack,
+};
+
+struct GCodeBlock
+{
+    uint16_t encoding_type{ 0 };
+    std::string raw_data;
+
     // write block header and data
     EResult write(FILE& file, ECompressionType compression_type, EChecksumType checksum_type) const;
     // read block data
     EResult read_data(FILE& file, const FileHeader& file_header, const BlockHeader& block_header);
+
+    static size_t get_parameters_size() { return sizeof(encoding_type); }
 };
 
 #if ENABLE_CHECKSUM_BLOCK
@@ -248,16 +262,20 @@ public:
     BinaryData& get_binary_data() { return m_binary_data; }
     const BinaryData& get_binary_data() const { return m_binary_data; }
 
-    EResult initialize(FILE& file, EChecksumType checksum_type);
-    EResult finalize(FILE& file);
+    EResult initialize(FILE& file, EGCodeEncodingType gcode_encoding_type, EChecksumType checksum_type);
+    EResult append_gcode(const std::string& gcode);
+    EResult finalize();
 
 private:
     bool m_enabled{ false };
 
     EChecksumType m_checksum_type{ EChecksumType::None };
     ECompressionType m_compression_type{ ECompressionType::None };
+    EGCodeEncodingType m_gcode_encoding_type{ EGCodeEncodingType::None };
 
+    FILE* m_file{ nullptr };
     BinaryData m_binary_data;
+    std::string m_gcode_cache;
 #if ENABLE_CHECKSUM_BLOCK
     ChecksumBlock m_checksum;
 #endif // ENABLE_CHECKSUM_BLOCK

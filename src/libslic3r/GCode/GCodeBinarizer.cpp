@@ -12,6 +12,7 @@
 namespace BinaryGCode {
 
 static size_t g_checksum_max_cache_size = 65536;
+static const size_t MAX_GCODE_CACHE_SIZE = 65536;
 
 std::string translate_result(BinaryGCode::EResult result)
 {
@@ -26,10 +27,13 @@ std::string translate_result(BinaryGCode::EResult result)
     case BinaryGCode::EResult::InvalidBlockType:            { return "Invalid block type"; }
     case BinaryGCode::EResult::InvalidCompressionType:      { return "Invalid compression type"; }
     case BinaryGCode::EResult::InvalidMetadataEncodingType: { return "Invalid metadata encoding type"; }
+    case BinaryGCode::EResult::InvalidGCodeEncodingType:    { return "Invalid gcode encoding type"; }
     case BinaryGCode::EResult::DataCompressionError:        { return "Data compression error"; }
     case BinaryGCode::EResult::DataUncompressionError:      { return "Data uncompression error"; }
     case BinaryGCode::EResult::MetadataEncodingError:       { return "Data encoding error"; }
     case BinaryGCode::EResult::MetadataDecodingError:       { return "Data decoding error"; }
+    case BinaryGCode::EResult::GCodeEncodingError:          { return "GCode encoding error"; }
+    case BinaryGCode::EResult::GCodeDecodingError:          { return "GCode decoding error"; }
     case BinaryGCode::EResult::BlockNotFound:               { return "Block not found"; }
     case BinaryGCode::EResult::InvalidChecksum:             { return "Invalid checksum"; }
     case BinaryGCode::EResult::InvalidThumbnailFormat:      { return "Invalid thumbnail format"; }
@@ -48,6 +52,7 @@ static uint16_t block_types_count()             { return 1 + (uint16_t)EBlockTyp
 static uint16_t compression_types_count()       { return 1 + (uint16_t)ECompressionType::None; }
 static uint16_t thumbnail_formats_count()       { return 1 + (uint16_t)EThumbnailFormat::QOI; }
 static uint16_t metadata_encoding_types_count() { return 1 + (uint16_t)EMetadataEncodingType::INI; }
+static uint16_t gcode_encoding_types_count()    { return 1 + (uint16_t)EGCodeEncodingType::MeatPack; }
 
 static bool write_to_file(FILE& file, const void* data, size_t data_size)
 {
@@ -61,43 +66,60 @@ static bool read_from_file(FILE& file, void* data, size_t data_size)
     return !ferror(&file);
 }
 
-static bool encode_metadata(const std::vector<std::pair<std::string, std::string>>& data_in, std::vector<uint8_t>& data_out,
+static bool encode_metadata(const std::vector<std::pair<std::string, std::string>>& src, std::vector<uint8_t>& dst,
     EMetadataEncodingType encoding_type)
 {
-    for (const auto& [key, value] : data_in) {
+    for (const auto& [key, value] : src) {
         switch (encoding_type)
         {
         case EMetadataEncodingType::INI:
         {
-            data_out.insert(data_out.end(), key.begin(), key.end());
-            data_out.emplace_back('=');
-            data_out.insert(data_out.end(), value.begin(), value.end());
-            data_out.emplace_back('\n');
+            dst.insert(dst.end(), key.begin(), key.end());
+            dst.emplace_back('=');
+            dst.insert(dst.end(), value.begin(), value.end());
+            dst.emplace_back('\n');
             break;
         }
         }
     }
-
     return true;
 }
 
-static bool decode_metadata(const std::vector<uint8_t>& data_in, std::vector<std::pair<std::string, std::string>>& data_out,
+static bool encode_gcode(const std::string& src, std::vector<uint8_t>& dst, EGCodeEncodingType encoding_type)
+{
+    switch (encoding_type)
+    {
+    case EGCodeEncodingType::None:
+    {
+        dst.insert(dst.end(), src.begin(), src.end());
+        break;
+    }
+    case EGCodeEncodingType::MeatPack:
+    {
+        // TODO
+        break;
+    }
+    }
+    return true;
+}
+
+static bool decode_metadata(const std::vector<uint8_t>& src, std::vector<std::pair<std::string, std::string>>& dst,
     EMetadataEncodingType encoding_type)
 {
     switch (encoding_type)
     {
     case EMetadataEncodingType::INI:
     {
-        auto start_it = data_in.begin();
-        auto end_it = data_in.begin();
-        while (end_it != data_in.end()) {
-            while (end_it != data_in.end() && *end_it != '\n') {
+        auto start_it = src.begin();
+        auto end_it = src.begin();
+        while (end_it != src.end()) {
+            while (end_it != src.end() && *end_it != '\n') {
                 ++end_it;
             }
             const std::string item(start_it, end_it);
             const size_t pos = item.find_first_of('=');
             if (pos != std::string::npos) {
-                data_out.emplace_back(std::make_pair(item.substr(0, pos), item.substr(pos + 1)));
+                dst.emplace_back(std::make_pair(item.substr(0, pos), item.substr(pos + 1)));
                 start_it = ++end_it;
             }
         }
@@ -108,12 +130,30 @@ static bool decode_metadata(const std::vector<uint8_t>& data_in, std::vector<std
     return true;
 }
 
-static bool compress(const std::vector<uint8_t>& data_in, std::vector<uint8_t>& data_out, ECompressionType compression_type)
+static bool decode_gcode(const std::vector<uint8_t>& src, std::string& dst, EGCodeEncodingType encoding_type)
+{
+    switch (encoding_type)
+    {
+    case EGCodeEncodingType::None:
+    {
+        dst.insert(dst.end(), src.begin(), src.end());
+        break;
+    }
+    case EGCodeEncodingType::MeatPack:
+    {
+        // TODO
+        break;
+    }
+    }
+    return true;
+}
+
+static bool compress(const std::vector<uint8_t>& src, std::vector<uint8_t>& data_out, ECompressionType compression_type)
 {
     return true;
 }
 
-static bool uncompress(const std::vector<uint8_t>& data_in, std::vector<uint8_t>& data_out, ECompressionType compression_type)
+static bool uncompress(const std::vector<uint8_t>& src, std::vector<uint8_t>& data_out, ECompressionType compression_type)
 {
     return true;
 }
@@ -357,7 +397,6 @@ EResult BaseMetadataBlock::read_data(FILE& file, const BlockHeader& block_header
     if (!read_from_file(file, (void*)&encoding_type, sizeof(encoding_type)))
         return EResult::ReadError;
     if (encoding_type > metadata_encoding_types_count())
-        // Found invalid metadata encoding type
         return EResult::InvalidMetadataEncodingType;
 
     std::vector<uint8_t> data;
@@ -620,11 +659,99 @@ EResult SlicerMetadataBlock::read_data(FILE& file, const FileHeader& file_header
 
 EResult GCodeBlock::write(FILE& file, ECompressionType compression_type, EChecksumType checksum_type) const
 {
+    if (encoding_type > gcode_encoding_types_count())
+        return EResult::InvalidGCodeEncodingType;
+
+    BlockHeader block_header = { (uint16_t)EBlockType::GCode, (uint16_t)compression_type, (uint32_t)0 };
+    std::vector<uint8_t> out_data;
+    if (!raw_data.empty()) {
+        // process payload encoding
+        std::vector<uint8_t> uncompressed_data;
+        if (!encode_gcode(raw_data, uncompressed_data, (EGCodeEncodingType)encoding_type))
+            return EResult::GCodeEncodingError;
+        // process payload compression
+        block_header.uncompressed_size = (uint32_t)uncompressed_data.size();
+        std::vector<uint8_t> compressed_data;
+        if (compression_type != ECompressionType::None) {
+            if (!compress(uncompressed_data, compressed_data, compression_type))
+                return EResult::DataCompressionError;
+            block_header.compressed_size = (uint32_t)compressed_data.size();
+        }
+        out_data.swap((compression_type == ECompressionType::None) ? uncompressed_data : compressed_data);
+    }
+
+    // write block header
+    EResult res = block_header.write(file);
+    if (res != EResult::Success)
+        // propagate error
+        return res;
+
+    // write block payload
+    if (!write_to_file(file, (const void*)&encoding_type, sizeof(encoding_type)))
+        return EResult::WriteError;
+    if (!out_data.empty()) {
+#if ENABLE_BINARIZED_GCODE_DEBUG
+        const std::string out = "GCodeBlock data size:" + std::to_string(out_data.size()) + "\n";
+        OutputDebugStringA(out.c_str());
+#endif // ENABLE_BINARIZED_GCODE_DEBUG
+        if (!write_to_file(file, (const void*)out_data.data(), out_data.size()))
+            return EResult::WriteError;
+    }
+
+    // write checksum
+    if (checksum_type != EChecksumType::None) {
+        Checksum cs(checksum_type);
+        // update checksum with block header
+        block_header.update_checksum(cs);
+        // update checksum with block payload
+        cs.append(encode((const void*)&encoding_type, sizeof(encoding_type)));
+        if (!out_data.empty())
+            cs.append(out_data);
+        res = cs.write(file);
+        if (res != EResult::Success)
+            // propagate error
+            return res;
+    }
+
     return EResult::Success;
 }
 
 EResult GCodeBlock::read_data(FILE& file, const FileHeader& file_header, const BlockHeader& block_header)
 {
+  const ECompressionType compression_type = (ECompressionType)block_header.compression;
+
+    if (!read_from_file(file, (void*)&encoding_type, sizeof(encoding_type)))
+        return EResult::ReadError;
+    if (encoding_type > gcode_encoding_types_count())
+        return EResult::InvalidGCodeEncodingType;
+
+    std::vector<uint8_t> data;
+    const size_t data_size = (compression_type == ECompressionType::None) ? block_header.uncompressed_size : block_header.compressed_size;
+    if (data_size > 0) {
+        data.resize(data_size);
+        if (!read_from_file(file, (void*)data.data(), data_size))
+            return EResult::ReadError;
+    }
+
+    std::vector<uint8_t> uncompressed_data;
+    if (compression_type != ECompressionType::None) {
+        if (!uncompress(data, uncompressed_data, compression_type))
+            return EResult::DataUncompressionError;
+    }
+
+    if (!decode_gcode((compression_type == ECompressionType::None) ? data : uncompressed_data, raw_data, (EGCodeEncodingType)encoding_type))
+        return EResult::GCodeDecodingError;
+
+    const EChecksumType checksum_type = (EChecksumType)file_header.checksum_type;
+    if (checksum_type != EChecksumType::None) {
+        // read block checksum
+        Checksum cs(checksum_type);
+        const EResult res = cs.read(file);
+        if (res != EResult::Success)
+            // propagate error
+            return res;
+    }
+
     return EResult::Success;
 }
 
@@ -660,60 +787,116 @@ EResult ChecksumBlock::read_data(FILE& file, const BlockHeader& block_header)
 }
 #endif // ENABLE_CHECKSUM_BLOCK
 
-EResult Binarizer::initialize(FILE& file, EChecksumType checksum_type)
+EResult Binarizer::initialize(FILE& file, EGCodeEncodingType gcode_encoding_type, EChecksumType checksum_type)
 {
     if (!m_enabled)
         return EResult::Success;
 
-    // initialize checksum
+    m_file = &file;
+
+    m_gcode_encoding_type = gcode_encoding_type;
     m_checksum_type = checksum_type;
 #if ENABLE_CHECKSUM_BLOCK
+    // initialize checksum
     m_checksum = ChecksumBlock();
 #endif // ENABLE_CHECKSUM_BLOCK
 
     // save header
     FileHeader file_header;
     file_header.checksum_type = (uint16_t)m_checksum_type;
-    EResult res = file_header.write(file);
+    EResult res = file_header.write(*m_file);
     if (res != EResult::Success)
         return res;
 
     // save file metadata block
-    res = m_binary_data.file_metadata.write(file, ECompressionType::None, m_checksum_type);
+    res = m_binary_data.file_metadata.write(*m_file, m_compression_type, m_checksum_type);
     if (res != EResult::Success)
         return res;
 
     // save printer metadata block
-    res = m_binary_data.printer_metadata.write(file, ECompressionType::None, m_checksum_type);
+    res = m_binary_data.printer_metadata.write(*m_file, m_compression_type, m_checksum_type);
     if (res != EResult::Success)
         return res;
 
     // save thumbnail blocks
     for (const ThumbnailBlock& block : m_binary_data.thumbnails) {
-        res = block.write(file, m_checksum_type);
+        res = block.write(*m_file, m_checksum_type);
         if (res != EResult::Success)
             return res;
     }
 
-    // save slicer metadata block
-    res = m_binary_data.slicer_metadata.write(file, ECompressionType::None, m_checksum_type);
+    // save print metadata block
+    res = m_binary_data.print_metadata.write(*m_file, m_compression_type, m_checksum_type);
     if (res != EResult::Success)
         return res;
 
-    // save gcode block
+    // save slicer metadata block
+    res = m_binary_data.slicer_metadata.write(*m_file, m_compression_type, m_checksum_type);
+    if (res != EResult::Success)
+        return res;
 
     return EResult::Success;
 }
 
-EResult Binarizer::finalize(FILE& file)
+static EResult write_gcode_block(FILE& file, const std::string& raw_data, EGCodeEncodingType encoding_type, ECompressionType compression_type,
+    EChecksumType checksum_type)
+{
+    GCodeBlock block;
+    block.encoding_type = (uint16_t)encoding_type;
+    block.raw_data = raw_data;
+    return block.write(file, compression_type, checksum_type);
+}
+
+EResult Binarizer::append_gcode(const std::string& gcode)
+{
+    if (gcode.empty())
+        return EResult::Success;
+
+    assert(m_file != nullptr);
+    if (m_file == nullptr)
+        return EResult::WriteError;
+
+    auto it_begin = gcode.begin();
+    do {
+        const size_t begin_pos = std::distance(gcode.begin(), it_begin);
+        const size_t end_line_pos = gcode.find_first_of('\n', begin_pos);
+        if (end_line_pos == std::string::npos)
+            return EResult::WriteError;
+
+        const size_t line_size = 1 + end_line_pos - begin_pos;
+        if (line_size + m_gcode_cache.length() > MAX_GCODE_CACHE_SIZE) {
+            if (!m_gcode_cache.empty()) {
+                const EResult res = write_gcode_block(*m_file, m_gcode_cache, m_gcode_encoding_type, m_compression_type, m_checksum_type);
+                if (res != EResult::Success)
+                    // propagate error
+                    return res;
+                m_gcode_cache.clear();
+            }
+        }
+
+        if (line_size > MAX_GCODE_CACHE_SIZE)
+            return EResult::WriteError;
+
+        m_gcode_cache.insert(m_gcode_cache.end(), it_begin, it_begin + line_size);
+        it_begin += line_size;
+    }
+    while (it_begin != gcode.end());
+
+    return EResult::Success;
+}
+
+EResult Binarizer::finalize()
 {
     if (!m_enabled)
         return EResult::Success;
 
-    // save print metadata block
-    EResult res = m_binary_data.print_metadata.write(file, ECompressionType::None, m_checksum_type);
-    if (res != EResult::Success)
-        return res;
+    // save gcode cache, if not empty
+    if (!m_gcode_cache.empty()) {
+        const EResult res = write_gcode_block(*m_file, m_gcode_cache, m_gcode_encoding_type, m_compression_type, m_checksum_type);
+        if (res != EResult::Success)
+            // propagate error
+            return res;
+    }
 
 #if ENABLE_CHECKSUM_BLOCK
     if (m_checksum_type != EChecksumType::None) {
