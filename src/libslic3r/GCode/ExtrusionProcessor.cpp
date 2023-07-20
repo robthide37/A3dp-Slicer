@@ -93,11 +93,9 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const Extru
     ExtrusionEntityCollection result{};
     result.no_sort = ecc->no_sort;
     for (const auto *e : ecc->entities) {
-        if (e == nullptr) {
-             BOOST_LOG_TRIVIAL(debug) << "perimeters collections contain nullptr entities for some reason";
-        } else if (auto *col = static_cast<const ExtrusionEntityCollection *>(e)) {
+        if (auto *col = dynamic_cast<const ExtrusionEntityCollection *>(e)) {
             result.append(calculate_and_split_overhanging_extrusions(col, unscaled_prev_layer, prev_layer_curled_lines));
-        } else if (auto *loop = static_cast<const ExtrusionLoop *>(e)) {
+        } else if (auto *loop = dynamic_cast<const ExtrusionLoop *>(e)) {
             ExtrusionLoop new_loop = *loop;
             new_loop.paths.clear();
             for (const ExtrusionPath &p : loop->paths) {
@@ -105,7 +103,7 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const Extru
                 new_loop.paths.insert(new_loop.paths.end(), paths.begin(), paths.end());
             }
             result.append(new_loop);
-        } else if (auto *mp = static_cast<const ExtrusionMultiPath *>(e)) {
+        } else if (auto *mp = dynamic_cast<const ExtrusionMultiPath *>(e)) {
             ExtrusionMultiPath new_mp = *mp;
             new_mp.paths.clear();
             for (const ExtrusionPath &p : mp->paths) {
@@ -113,12 +111,12 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(const Extru
                 new_mp.paths.insert(new_mp.paths.end(), paths.begin(), paths.end());
             }
             result.append(new_mp);
-        } else if (auto *op = static_cast<const ExtrusionPathOriented *>(e)) {
+        } else if (auto *op = dynamic_cast<const ExtrusionPathOriented *>(e)) {
             auto paths = calculate_and_split_overhanging_extrusions(*op, unscaled_prev_layer, prev_layer_curled_lines);
             for (const ExtrusionPath &p : paths) {
                 result.append(ExtrusionPathOriented(p.polyline, p.attributes()));
             }
-        } else if (auto *p = static_cast<const ExtrusionPath *>(e)) {
+        } else if (auto *p = dynamic_cast<const ExtrusionPath *>(e)) {
             auto paths = calculate_and_split_overhanging_extrusions(*p, unscaled_prev_layer, prev_layer_curled_lines);
             result.append(paths);
         } else {
