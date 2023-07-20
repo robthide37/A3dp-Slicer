@@ -554,17 +554,22 @@ void PrintObject::calculate_overhanging_perimeters()
                 curled_lines[l->id()]            = AABBTreeLines::LinesDistancer<CurledLine>{l->curled_lines};
                 unscaled_polygons_lines[l->id()] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(l->lslices)};
             }
+            curled_lines[size_t(-1)] = {};
+            unscaled_polygons_lines[size_t(-1)] = {};
 
             for (Layer *l : this->layers()) {
+                if (l->id() == 0) { // first layer, do not split
+                    continue;
+                }
                 for (LayerRegion *layer_region : l->regions()) {
                     if (regions_with_dynamic_overhangs.find(layer_region->m_region) == regions_with_dynamic_overhangs.end()) {
                         continue;
                     }
-                    ExPolygons prev_layer_polygon = l->lower_layer == nullptr ? ExPolygons() : l->lower_layer->lslices;
+                    size_t prev_layer_id = l->lower_layer ? l->lower_layer->id() : size_t(-1);
                     layer_region->m_perimeters =
                         ExtrusionProcessor::calculate_and_split_overhanging_extrusions(&layer_region->m_perimeters,
-                                                                                       unscaled_polygons_lines[l->id()],
-                                                                                       curled_lines[l->id()]);
+                                                                                       unscaled_polygons_lines[prev_layer_id],
+                                                                                       curled_lines[prev_layer_id]);
                 }
             }
 

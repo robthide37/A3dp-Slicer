@@ -76,8 +76,9 @@ ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath   
     for (size_t i = 1; i < extended_points.size(); i++) {
         result.back().polyline.append(Point::new_scale(extended_points[i].position));
         result.back().overhang_attributes_mutable()->end_distance_from_prev_layer = extended_points[i].distance;
-        if (std::abs(calculated_distances[sequence_start_index].first - calculated_distances[i - 1].first) < path.width() * 0.05 &&
-            std::abs(calculated_distances[sequence_start_index].second - calculated_distances[i - 1].second) < 0.05) {
+
+        if (std::abs(calculated_distances[sequence_start_index].first - calculated_distances[i].first) < path.width() * 0.0001 &&
+            std::abs(calculated_distances[sequence_start_index].second - calculated_distances[i].second) < 0.0001) {
             // do not start new path, the attributes are similar enough
         } else if (i +1 < extended_points.size()) { // do not start new path if this is last point!
             // start new path, parameters differ
@@ -86,6 +87,7 @@ ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath   
             new_attrs.overhang_attributes->proximity_to_curled_lines      = calculated_distances[i].second;
             sequence_start_index                                          = i;
             result.emplace_back(new_attrs);
+            result.back().polyline.append(Point::new_scale(extended_points[i].position));
         }
     }
 
