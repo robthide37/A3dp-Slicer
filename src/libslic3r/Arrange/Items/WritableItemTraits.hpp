@@ -107,6 +107,30 @@ template<class ArrItem> int raise_priority(ArrItem &itm)
     return ret;
 }
 
+template<class ArrItem> int reduce_priority(ArrItem &itm)
+{
+    int ret = get_priority(itm) - 1;
+    set_priority(itm, ret);
+
+    return ret;
+}
+
+template<class It> int lowest_priority(const Range<It> &item_range)
+{
+    auto minp_it = std::min_element(item_range.begin(),
+                                    item_range.end(),
+                                    [](auto &itm1, auto &itm2) {
+                                        return get_priority(itm1) <
+                                               get_priority(itm2);
+                                    });
+
+    int min_priority = 0;
+    if (minp_it != item_range.end())
+        min_priority = get_priority(*minp_it);
+
+    return min_priority;
+}
+
 }} // namespace Slic3r::arr2
 
 #endif // WRITABLEITEMTRAITS_HPP
