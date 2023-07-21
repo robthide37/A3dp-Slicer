@@ -2305,15 +2305,7 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
     if (wxGetApp().is_gcode_viewer())
         return;
 
-#if defined(__WXMSW__)
-    // ys_FIXME! temporary workaround for correct font scaling
-    // Because of from wxWidgets 3.1.3 auto rescaling is implemented for the Fonts,
-    // From the very beginning set dialog font to the wxSYS_DEFAULT_GUI_FONT
-    this->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT));
-#else
-    this->SetFont(wxGetApp().normal_font());
-//    this->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-#endif // __WXMSW__
+//    this->SetFont(wxGetApp().normal_font());
 
     // Load the icon either from the exe, or from the ico file.
 #if _WIN32

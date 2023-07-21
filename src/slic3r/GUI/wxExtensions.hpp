@@ -50,7 +50,7 @@ void enable_menu_item(wxUpdateUIEvent& evt, std::function<bool()> const cb_condi
 class wxDialog;
 
 void    edit_tooltip(wxString& tooltip);
-void    msw_buttons_rescale(wxDialog* dlg, const int em_unit, const std::vector<int>& btn_ids);
+void    msw_buttons_rescale(wxDialog* dlg, const int em_unit, const std::vector<int>& btn_ids, double height_koef = 1.);
 int     em_unit(wxWindow* win);
 int     mode_icon_px_size();
 

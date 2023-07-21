@@ -154,7 +154,14 @@ bool BitmapTextRenderer::Render(wxRect rect, wxDC *dc, int state)
         // workaround for Windows DarkMode : Don't respect to the state & wxDATAVIEW_CELL_SELECTED to avoid update of the text color
         RenderText(m_value.GetText(), xoffset, rect, dc, state & wxDATAVIEW_CELL_SELECTED ? 0 :state);
 #else
+    {
+        wxDataViewCtrl* const view = GetView();
+        if (GetAttr().HasFont())
+            dc->SetFont(GetAttr().GetEffectiveFont(view->GetFont()));
+        else
+            dc->SetFont(view->GetFont());
         RenderText(m_value.GetText(), xoffset, rect, dc, state);
+    }
 #endif
 
     return true;
@@ -165,22 +172,22 @@ wxSize BitmapTextRenderer::GetSize() const
     if (!m_value.GetText().empty())
     {
         wxSize size;
+        wxDataViewCtrl* const view = GetView();
+        wxClientDC dc(view);
+        if (GetAttr().HasFont())
+            dc.SetFont(GetAttr().GetEffectiveFont(view->GetFont()));
+        else
+            dc.SetFont(view->GetFont());
+
 #if defined(SUPPORTS_MARKUP) && defined(wxHAS_GENERIC_DATAVIEWCTRL)
         if (m_markupText)
-        {
-            wxDataViewCtrl* const view = GetView();
-            wxClientDC dc(view);
-            if (GetAttr().HasFont())
-                dc.SetFont(GetAttr().GetEffectiveFont(view->GetFont()));
-
             size = m_markupText->Measure(dc);
-
-            int lines = m_value.GetText().Freq('\n') + 1;
-            size.SetHeight(size.GetHeight() * lines);
-        }
         else
 #endif // SUPPORTS_MARKUP && wxHAS_GENERIC_DATAVIEWCTRL
-            size = GetTextExtent(m_value.GetText());
+            size = dc.GetTextExtent(m_value.GetText());
+
+        int lines = m_value.GetText().Freq('\n') + 1;
+        size.SetHeight(size.GetHeight() * lines);
 
         if (m_value.GetBitmap().IsOk())
             size.x += m_value.GetBitmap().GetWidth() + 4;
