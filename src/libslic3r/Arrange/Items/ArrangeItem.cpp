@@ -13,6 +13,8 @@ namespace Slic3r { namespace arr2 {
 
 const Polygons &DecomposedShape::transformed_outline() const
 {
+    constexpr auto sc = scaled<double>(1.) * scaled<double>(1.);
+
     if (!m_transformed_outline_valid) {
         m_transformed_outline = contours();
         for (Polygon &poly : m_transformed_outline) {
@@ -20,7 +22,6 @@ const Polygons &DecomposedShape::transformed_outline() const
             poly.translate(translation());
         }
 
-        auto sc = scaled<double>(1.) * scaled<double>(1.);
         m_area = std::accumulate(m_transformed_outline.begin(),
                                  m_transformed_outline.end(), 0.,
                                  [sc](double s, const auto &p) {
@@ -86,6 +87,29 @@ const Vec2crd &DecomposedShape::min_vertex(size_t idx) const
     }
 
     return m_mins[idx];
+}
+
+Vec2crd DecomposedShape::centroid() const
+{
+    constexpr double area_sc = scaled<double>(1.) * scaled(1.);
+
+    if (!m_centroid_valid) {
+        double total_area = 0.0;
+        Vec2d cntr = Vec2d::Zero();
+
+        for (const Polygon& poly : transformed_outline()) {
+            double parea = poly.area() / area_sc;
+            Vec2d pcntr = unscaled(poly.centroid());
+            total_area += parea;
+            cntr += pcntr * parea;
+        }
+
+        cntr /= total_area;
+        m_centroid = scaled(cntr);
+        m_centroid_valid = true;
+    }
+
+    return m_centroid;
 }
 
 DecomposedShape decompose(const ExPolygons &shape)

@@ -65,6 +65,8 @@ public:
         // Candidate item bounding box
         auto ibb = envelope_bounding_box(item);
         ibb.translate(transl);
+        auto itmcntr = envelope_centroid(item);
+        itmcntr += transl;
 
         // Calculate the full bounding box of the pile with the candidate item
         auto fullbb = m_pilebb;
@@ -115,7 +117,7 @@ public:
 
         switch (compute_case) {
         case WIPE_TOWER: {
-            score = (unscaled(ibb.center()) - unscaled(active_sink)).squaredNorm();
+            score = (unscaled(itmcntr) - unscaled(active_sink)).squaredNorm();
             break;
         }
         case BIG_ITEM: {
@@ -132,7 +134,7 @@ public:
             auto cc = fullbb.center(); // The gravity center
             dists[0] = (minc - cc).cast<double>().norm();
             dists[1] = (maxc - cc).cast<double>().norm();
-            dists[2] = (ibb.center() - cc).template cast<double>().norm();
+            dists[2] = (itmcntr - cc).template cast<double>().norm();
             dists[3] = (top_left - cc).cast<double>().norm();
             dists[4] = (bottom_right - cc).cast<double>().norm();
 
@@ -191,7 +193,7 @@ public:
             break;
         }
         case LAST_BIG_ITEM: {
-            score = norm((ibb.center() - m_pilebb.center()).template cast<double>().norm());
+            score = norm((itmcntr - m_pilebb.center()).template cast<double>().norm());
             break;
         }
         case SMALL_ITEM: {
@@ -199,7 +201,7 @@ public:
             // already processed bigger items.
             // No need to play around with the anchor points, the center will be
             // just fine for small items
-            score = norm((ibb.center() - bigbb.center()).template cast<double>().norm());
+            score = norm((itmcntr - bigbb.center()).template cast<double>().norm());
             break;
         }
         }

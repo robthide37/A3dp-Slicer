@@ -19,7 +19,7 @@ struct GravityKernel {
     template<class ArrItem>
     double placement_fitness(const ArrItem &itm, const Vec2crd &transl) const
     {
-        Vec2d center = unscaled(envelope_bounding_box(itm).center());
+        Vec2d center = unscaled(envelope_centroid(itm));
 
         center += unscaled(transl);
 

@@ -138,6 +138,16 @@ template<> struct NFPArrangeItemTraits_<SimpleArrangeItem>
     {
         return itm.allowed_rotations();
     }
+
+    static Vec2crd fixed_centroid(const SimpleArrangeItem &itm) noexcept
+    {
+        return itm.shape().centroid();
+    }
+
+    static Vec2crd envelope_centroid(const SimpleArrangeItem &itm) noexcept
+    {
+        return itm.shape().centroid();
+    }
 };
 
 template<> struct IsWritableItem_<SimpleArrangeItem>: public std::true_type {};

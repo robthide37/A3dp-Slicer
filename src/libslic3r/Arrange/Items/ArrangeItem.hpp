@@ -55,6 +55,9 @@ class DecomposedShape
     mutable std::vector<Point> m_mins;
     mutable bool               m_reference_vertex_valid = false;
 
+    mutable Point m_centroid;
+    mutable bool  m_centroid_valid = false;
+
     mutable Polygon m_convex_hull;
     mutable BoundingBox m_bounding_box;
     mutable double  m_area = 0;
@@ -87,6 +90,7 @@ public:
         m_translation               = v;
         m_transformed_outline_valid = false;
         m_reference_vertex_valid    = false;
+        m_centroid_valid            = false;
     }
 
     void rotation(double v)
@@ -94,6 +98,7 @@ public:
         m_rotation                  = v;
         m_transformed_outline_valid = false;
         m_reference_vertex_valid    = false;
+        m_centroid_valid            = false;
     }
 
     const Polygons &transformed_outline() const;
@@ -115,6 +120,8 @@ public:
 
         return m_area;
     }
+
+    Vec2crd centroid() const;
 };
 
 DecomposedShape decompose(const ExPolygons &polys);
@@ -188,6 +195,8 @@ public:
     {
         m_shape.reference_vertex();
         m_envelope->reference_vertex();
+        m_shape.centroid();
+        m_envelope->centroid();
     }
 };
 
@@ -411,6 +420,16 @@ template<> struct NFPArrangeItemTraits_<ArrangeItem> {
         }
 
         return *ret_ptr;
+    }
+
+    static Vec2crd fixed_centroid(const ArrangeItem &itm)
+    {
+        return itm.shape().centroid();
+    }
+
+    static Vec2crd envelope_centroid(const ArrangeItem &itm)
+    {
+        return itm.envelope().centroid();
     }
 };
 

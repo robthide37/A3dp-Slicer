@@ -74,6 +74,16 @@ template<class ArrItem, class En = void> struct NFPArrangeItemTraits_
     {
         return std::array{0.};
     }
+
+    static Vec2crd fixed_centroid(const ArrItem &itm)
+    {
+        return fixed_bounding_box(itm).center();
+    }
+
+    static Vec2crd envelope_centroid(const ArrItem &itm)
+    {
+        return envelope_bounding_box(itm).center();
+    }
 };
 
 template<class T>
@@ -135,6 +145,16 @@ template<class ArrItem> double envelope_area(const ArrItem &itm)
 template<class ArrItem> double fixed_area(const ArrItem &itm)
 {
     return NFPArrangeItemTraits<ArrItem>::fixed_area(itm);
+}
+
+template<class ArrItem> Vec2crd fixed_centroid(const ArrItem &itm)
+{
+    return NFPArrangeItemTraits<ArrItem>::fixed_centroid(itm);
+}
+
+template<class ArrItem> Vec2crd envelope_centroid(const ArrItem &itm)
+{
+    return NFPArrangeItemTraits<ArrItem>::envelope_centroid(itm);
 }
 
 template<class ArrItem>
