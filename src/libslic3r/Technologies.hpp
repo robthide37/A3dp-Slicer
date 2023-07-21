@@ -69,6 +69,7 @@
 
 // Enable export of binarized gcode
 #define ENABLE_BINARIZED_GCODE (1 && ENABLE_2_6_1_ALPHA1)
+#define ENABLE_BINARIZED_GCODE_DEBUG_WINDOW (1 && ENABLE_BINARIZED_GCODE)
 
 
 #endif // _prusaslicer_technologies_h_

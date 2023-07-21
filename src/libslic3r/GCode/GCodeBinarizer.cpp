@@ -12,7 +12,7 @@
 namespace BinaryGCode {
 
 static size_t g_checksum_max_cache_size = 65536;
-static const size_t MAX_GCODE_CACHE_SIZE = 65536;
+static constexpr size_t MAX_GCODE_CACHE_SIZE = 65536;
 
 std::string translate_result(BinaryGCode::EResult result)
 {
@@ -110,17 +110,17 @@ static bool decode_metadata(const std::vector<uint8_t>& src, std::vector<std::pa
     {
     case EMetadataEncodingType::INI:
     {
-        auto start_it = src.begin();
+        auto begin_it = src.begin();
         auto end_it = src.begin();
         while (end_it != src.end()) {
             while (end_it != src.end() && *end_it != '\n') {
                 ++end_it;
             }
-            const std::string item(start_it, end_it);
+            const std::string item(begin_it, end_it);
             const size_t pos = item.find_first_of('=');
             if (pos != std::string::npos) {
                 dst.emplace_back(std::make_pair(item.substr(0, pos), item.substr(pos + 1)));
-                start_it = ++end_it;
+                begin_it = ++end_it;
             }
         }
         break;
@@ -787,15 +787,14 @@ EResult ChecksumBlock::read_data(FILE& file, const BlockHeader& block_header)
 }
 #endif // ENABLE_CHECKSUM_BLOCK
 
-EResult Binarizer::initialize(FILE& file, EGCodeEncodingType gcode_encoding_type, EChecksumType checksum_type)
+EResult Binarizer::initialize(FILE& file, const BinarizerConfig& config)
 {
     if (!m_enabled)
         return EResult::Success;
 
     m_file = &file;
 
-    m_gcode_encoding_type = gcode_encoding_type;
-    m_checksum_type = checksum_type;
+    m_config = config;
 #if ENABLE_CHECKSUM_BLOCK
     // initialize checksum
     m_checksum = ChecksumBlock();
@@ -803,35 +802,35 @@ EResult Binarizer::initialize(FILE& file, EGCodeEncodingType gcode_encoding_type
 
     // save header
     FileHeader file_header;
-    file_header.checksum_type = (uint16_t)m_checksum_type;
+    file_header.checksum_type = (uint16_t)m_config.checksum;
     EResult res = file_header.write(*m_file);
     if (res != EResult::Success)
         return res;
 
     // save file metadata block
-    res = m_binary_data.file_metadata.write(*m_file, m_compression_type, m_checksum_type);
+    res = m_binary_data.file_metadata.write(*m_file, m_config.compression, m_config.checksum);
     if (res != EResult::Success)
         return res;
 
     // save printer metadata block
-    res = m_binary_data.printer_metadata.write(*m_file, m_compression_type, m_checksum_type);
+    res = m_binary_data.printer_metadata.write(*m_file, m_config.compression, m_config.checksum);
     if (res != EResult::Success)
         return res;
 
     // save thumbnail blocks
     for (const ThumbnailBlock& block : m_binary_data.thumbnails) {
-        res = block.write(*m_file, m_checksum_type);
+        res = block.write(*m_file, m_config.checksum);
         if (res != EResult::Success)
             return res;
     }
 
     // save print metadata block
-    res = m_binary_data.print_metadata.write(*m_file, m_compression_type, m_checksum_type);
+    res = m_binary_data.print_metadata.write(*m_file, m_config.compression, m_config.checksum);
     if (res != EResult::Success)
         return res;
 
     // save slicer metadata block
-    res = m_binary_data.slicer_metadata.write(*m_file, m_compression_type, m_checksum_type);
+    res = m_binary_data.slicer_metadata.write(*m_file, m_config.compression, m_config.checksum);
     if (res != EResult::Success)
         return res;
 
@@ -866,7 +865,7 @@ EResult Binarizer::append_gcode(const std::string& gcode)
         const size_t line_size = 1 + end_line_pos - begin_pos;
         if (line_size + m_gcode_cache.length() > MAX_GCODE_CACHE_SIZE) {
             if (!m_gcode_cache.empty()) {
-                const EResult res = write_gcode_block(*m_file, m_gcode_cache, m_gcode_encoding_type, m_compression_type, m_checksum_type);
+                const EResult res = write_gcode_block(*m_file, m_gcode_cache, m_config.gcode_encoding, m_config.compression, m_config.checksum);
                 if (res != EResult::Success)
                     // propagate error
                     return res;
@@ -892,7 +891,7 @@ EResult Binarizer::finalize()
 
     // save gcode cache, if not empty
     if (!m_gcode_cache.empty()) {
-        const EResult res = write_gcode_block(*m_file, m_gcode_cache, m_gcode_encoding_type, m_compression_type, m_checksum_type);
+        const EResult res = write_gcode_block(*m_file, m_gcode_cache, m_config.gcode_encoding, m_config.compression, m_config.checksum);
         if (res != EResult::Success)
             // propagate error
             return res;

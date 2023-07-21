@@ -2048,6 +2048,11 @@ void GLCanvas3D::render()
 #endif // ENABLE_SLA_VIEW_DEBUG_WINDOW
     }
 
+#if ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
+    if (wxGetApp().plater()->is_view3D_shown() && current_printer_technology() != ptSLA && fff_print()->config().gcode_binary)
+        show_binary_gcode_debug_window();
+#endif // ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
+
     std::string tooltip;
 
 	// Negative coordinate means out of the window, likely because the window was deactivated.
@@ -7865,6 +7870,62 @@ void GLCanvas3D::GizmoHighlighter::blink()
     if ((++m_blink_counter) >= 11)
         invalidate();
 }
+
+#if ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
+void GLCanvas3D::show_binary_gcode_debug_window()
+{
+    BinaryGCode::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
+
+    ImGuiWrapper& imgui = *wxGetApp().imgui();
+    imgui.begin(std::string("Binary GCode"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+
+    if (ImGui::BeginTable("BinaryGCodeConfig", 2)) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Compression");
+        ImGui::TableSetColumnIndex(1);
+        const std::vector<std::string> gcode_compressions = { "None" };
+        int compression = (int)binarizer_config.compression;
+        if (imgui.combo(std::string("##1"), gcode_compressions, compression, ImGuiComboFlags_HeightLargest, 0.0f, 100.0f))
+            binarizer_config.compression = (BinaryGCode::ECompressionType)compression;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "GGcode encoding");
+        ImGui::TableSetColumnIndex(1);
+        const std::vector<std::string> gcode_encodings = { "None", "MeatPack" };
+        int gcode_encoding = (int)binarizer_config.gcode_encoding;
+        if (imgui.combo(std::string("##2"), gcode_encodings, gcode_encoding, ImGuiComboFlags_HeightLargest, 0.0f, 100.0f))
+            binarizer_config.gcode_encoding = (BinaryGCode::EGCodeEncodingType)gcode_encoding;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Metadata encoding");
+        ImGui::TableSetColumnIndex(1);
+        const std::vector<std::string> metadata_encodings = { "INI" };
+        int metadata_encoding = (int)binarizer_config.metadata_encoding;
+        if (imgui.combo(std::string("##3"), metadata_encodings, metadata_encoding, ImGuiComboFlags_HeightLargest, 0.0f, 100.0f))
+            binarizer_config.metadata_encoding = (BinaryGCode::EMetadataEncodingType)metadata_encoding;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Checksum type");
+        ImGui::TableSetColumnIndex(1);
+        const std::vector<std::string> checksums = { "None", "CRC32" };
+        int checksum = (int)binarizer_config.checksum;
+        if (imgui.combo(std::string("##4"), checksums, checksum, ImGuiComboFlags_HeightLargest, 0.0f, 100.0f))
+            binarizer_config.checksum = (BinaryGCode::EChecksumType)checksum;
+
+        ImGui::EndTable();
+
+        ImGui::Separator();
+        imgui.text("!!! WARNING !!!");
+        imgui.text("Changing values does NOT invalidate the current slice");
+    }
+
+    imgui.end();
+}
+#endif // ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
 
 const ModelVolume *get_model_volume(const GLVolume &v, const Model &model)
 {

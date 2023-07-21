@@ -252,27 +252,31 @@ struct BinaryData
     }
 };
 
+struct BinarizerConfig
+{
+    ECompressionType compression{ ECompressionType::None };
+    EGCodeEncodingType gcode_encoding{ EGCodeEncodingType::None };
+    EMetadataEncodingType metadata_encoding{ EMetadataEncodingType::INI };
+    EChecksumType checksum{ EChecksumType::None };
+};
+
 class Binarizer
 {
 public:
     bool is_enabled() const { return m_enabled; }
     void set_enabled(bool enable) { m_enabled = enable; }
-    void set_compression_type(ECompressionType type) { m_compression_type = type; }
 
     BinaryData& get_binary_data() { return m_binary_data; }
     const BinaryData& get_binary_data() const { return m_binary_data; }
 
-    EResult initialize(FILE& file, EGCodeEncodingType gcode_encoding_type, EChecksumType checksum_type);
+    EResult initialize(FILE& file, const BinarizerConfig& config);
     EResult append_gcode(const std::string& gcode);
     EResult finalize();
 
 private:
     bool m_enabled{ false };
 
-    EChecksumType m_checksum_type{ EChecksumType::None };
-    ECompressionType m_compression_type{ ECompressionType::None };
-    EGCodeEncodingType m_gcode_encoding_type{ EGCodeEncodingType::None };
-
+    BinarizerConfig m_config;
     FILE* m_file{ nullptr };
     BinaryData m_binary_data;
     std::string m_gcode_cache;

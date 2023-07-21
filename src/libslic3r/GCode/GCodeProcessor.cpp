@@ -69,6 +69,10 @@ const std::vector<std::string> GCodeProcessor::Reserved_Tags = {
 const float GCodeProcessor::Wipe_Width = 0.05f;
 const float GCodeProcessor::Wipe_Height = 0.05f;
 
+#if ENABLE_BINARIZED_GCODE
+BinaryGCode::BinarizerConfig GCodeProcessor::s_binarizer_config{};
+#endif // ENABLE_BINARIZED
+
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
 const std::string GCodeProcessor::Mm3_Per_Mm_Tag = "MM3_PER_MM:";
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
@@ -3716,7 +3720,7 @@ void GCodeProcessor::post_process()
             }
         }
 
-        const BinaryGCode::EResult res = m_binarizer.initialize(*out.f, BinaryGCode::EGCodeEncodingType::None, BinaryGCode::EChecksumType::CRC32);
+        const BinaryGCode::EResult res = m_binarizer.initialize(*out.f, s_binarizer_config);
         if (res != BinaryGCode::EResult::Success)
             throw Slic3r::RuntimeError(std::string("Unable to initialize the gcode binarizer.\n"));
     }
