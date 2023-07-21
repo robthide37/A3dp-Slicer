@@ -77,10 +77,12 @@ ExtrusionPaths calculate_and_split_overhanging_extrusions(const ExtrusionPath   
         result.back().polyline.append(Point::new_scale(extended_points[i].position));
         result.back().overhang_attributes_mutable()->end_distance_from_prev_layer = extended_points[i].distance;
 
-        if (std::abs(calculated_distances[sequence_start_index].first - calculated_distances[i].first) < path.width() * 0.0001 &&
-            std::abs(calculated_distances[sequence_start_index].second - calculated_distances[i].second) < 0.0001) {
+        if (std::abs(calculated_distances[sequence_start_index].first - calculated_distances[i].first) < 0.001 * path.attributes().width &&
+            std::abs(calculated_distances[sequence_start_index].second - calculated_distances[i].second) < 0.001) {
             // do not start new path, the attributes are similar enough
-        } else if (i +1 < extended_points.size()) { // do not start new path if this is last point!
+            // NOTE: a larger tolerance may be applied here. However, it makes the gcode preview much less smooth
+            // (But it has very likely zero impact on the print quality.)
+        } else if (i + 1 < extended_points.size()) { // do not start new path if this is last point!
             // start new path, parameters differ
             new_attrs.overhang_attributes->start_distance_from_prev_layer = calculated_distances[i].first;
             new_attrs.overhang_attributes->end_distance_from_prev_layer   = calculated_distances[i].first;

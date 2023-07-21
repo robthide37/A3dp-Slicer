@@ -538,40 +538,54 @@ void PrintObject::estimate_curled_extrusions()
 void PrintObject::calculate_overhanging_perimeters()
 {
     if (this->set_started(posCalculateOverhangingPerimeters)) {
-        std::unordered_set<const PrintRegion *> regions_with_dynamic_overhangs;
+        BOOST_LOG_TRIVIAL(debug) << "Calculating overhanging perimeters - start";
+        m_print->set_status(89, _u8L("Calculating overhanging perimeters"));
+        std::vector<unsigned int>               extruders;
+        std::unordered_set<const PrintRegion *> regions_with_dynamic_speeds;
         for (const PrintRegion *pr : this->print()->m_print_regions) {
             if (pr->config().enable_dynamic_overhang_speeds.getBool()) {
-                regions_with_dynamic_overhangs.insert(pr);
+                regions_with_dynamic_speeds.insert(pr);
+            }
+            extruders.clear();
+            pr->collect_object_printing_extruders(*this->print(), extruders);
+            auto cfg = this->print()->config();
+            if (std::any_of(extruders.begin(), extruders.end(),
+                            [&cfg](unsigned int extruder_id) { return cfg.enable_dynamic_fan_speeds.get_at(extruder_id); })) {
+                regions_with_dynamic_speeds.insert(pr);
             }
         }
-        if (!regions_with_dynamic_overhangs.empty()) {
-            BOOST_LOG_TRIVIAL(debug) << "Calculating overhanging perimeters - start";
-            m_print->set_status(89, _u8L("Calculating overhanging perimeters"));
 
+        if (!regions_with_dynamic_speeds.empty()) {
             std::unordered_map<size_t, AABBTreeLines::LinesDistancer<CurledLine>> curled_lines;
             std::unordered_map<size_t, AABBTreeLines::LinesDistancer<Linef>>      unscaled_polygons_lines;
             for (const Layer *l : this->layers()) {
                 curled_lines[l->id()]            = AABBTreeLines::LinesDistancer<CurledLine>{l->curled_lines};
                 unscaled_polygons_lines[l->id()] = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(l->lslices)};
             }
-            curled_lines[size_t(-1)] = {};
+            curled_lines[size_t(-1)]            = {};
             unscaled_polygons_lines[size_t(-1)] = {};
 
-            for (Layer *l : this->layers()) {
-                if (l->id() == 0) { // first layer, do not split
-                    continue;
-                }
-                for (LayerRegion *layer_region : l->regions()) {
-                    if (regions_with_dynamic_overhangs.find(layer_region->m_region) == regions_with_dynamic_overhangs.end()) {
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, m_layers.size()), [this, &curled_lines, &unscaled_polygons_lines,
+                                                                               &regions_with_dynamic_speeds](
+                                                                                  const tbb::blocked_range<size_t> &range) {
+                PRINT_OBJECT_TIME_LIMIT_MILLIS(PRINT_OBJECT_TIME_LIMIT_DEFAULT);
+                for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++layer_idx) {
+                    auto l = m_layers[layer_idx];
+                    if (l->id() == 0) { // first layer, do not split
                         continue;
                     }
-                    size_t prev_layer_id = l->lower_layer ? l->lower_layer->id() : size_t(-1);
-                    layer_region->m_perimeters =
-                        ExtrusionProcessor::calculate_and_split_overhanging_extrusions(&layer_region->m_perimeters,
-                                                                                       unscaled_polygons_lines[prev_layer_id],
-                                                                                       curled_lines[prev_layer_id]);
+                    for (LayerRegion *layer_region : l->regions()) {
+                        if (regions_with_dynamic_speeds.find(layer_region->m_region) == regions_with_dynamic_speeds.end()) {
+                            continue;
+                        }
+                        size_t prev_layer_id = l->lower_layer ? l->lower_layer->id() : size_t(-1);
+                        layer_region->m_perimeters =
+                            ExtrusionProcessor::calculate_and_split_overhanging_extrusions(&layer_region->m_perimeters,
+                                                                                           unscaled_polygons_lines[prev_layer_id],
+                                                                                           curled_lines[prev_layer_id]);
+                    }
                 }
-            }
+            });
 
             m_print->throw_if_canceled();
             BOOST_LOG_TRIVIAL(debug) << "Calculating overhanging perimeters - end";
@@ -893,7 +907,7 @@ bool PrintObject::invalidate_step(PrintObjectStep step)
     
     // propagate to dependent steps
     if (step == posPerimeters) {
-		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning,  posSupportSpotsSearch, posEstimateCurledExtrusions });
+		invalidated |= this->invalidate_steps({ posPrepareInfill, posInfill, posIroning,  posSupportSpotsSearch, posEstimateCurledExtrusions, posCalculateOverhangingPerimeters });
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posPrepareInfill) {
         invalidated |= this->invalidate_steps({ posInfill, posIroning, posSupportSpotsSearch});
@@ -902,7 +916,7 @@ bool PrintObject::invalidate_step(PrintObjectStep step)
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
     } else if (step == posSlice) {
         invalidated |= this->invalidate_steps({posPerimeters, posPrepareInfill, posInfill, posIroning, posSupportSpotsSearch,
-                                               posSupportMaterial, posEstimateCurledExtrusions});
+                                               posSupportMaterial, posEstimateCurledExtrusions, posCalculateOverhangingPerimeters});
         invalidated |= m_print->invalidate_steps({ psSkirtBrim });
         m_slicing_params.valid = false;
     } else if (step == posSupportMaterial) {
