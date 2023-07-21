@@ -1036,14 +1036,7 @@ namespace DoExport {
                     ++ dst.second;
                 };
 #if ENABLE_BINARIZED_GCODE
-                if (export_binary_data) {
-                    char buf[128];
-                    sprintf(buf, "%.2lf", used_filament);
-                    binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedMm, std::string(buf) });
-                    sprintf(buf, "%.2lf", extruded_volume * 0.001);
-                    binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedCm3, std::string(buf) });
-                }
-                else {
+                if (!export_binary_data) {
 #endif // ENABLE_BINARIZED_GCODE
                     append(out_filament_used_mm,  "%.2lf", used_filament);
                     append(out_filament_used_cm3, "%.2lf", extruded_volume * 0.001);
@@ -1053,23 +1046,13 @@ namespace DoExport {
                 if (filament_weight > 0.) {
                     print_statistics.total_weight = print_statistics.total_weight + filament_weight;
 #if ENABLE_BINARIZED_GCODE
-                    if (export_binary_data) {
-                        char buf[128];
-                        sprintf(buf, "%.2lf", filament_weight);
-                        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedG, std::string(buf) });
-                    }
-                    else
+                    if (!export_binary_data)
 #endif // ENABLE_BINARIZED_GCODE
                         append(out_filament_used_g, "%.2lf", filament_weight);
                     if (filament_cost > 0.) {
                         print_statistics.total_cost = print_statistics.total_cost + filament_cost;
 #if ENABLE_BINARIZED_GCODE
-                        if (export_binary_data) {
-                            char buf[128];
-                            sprintf(buf, "%.2lf", filament_cost);
-                            binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentCost, std::string(buf) });
-                        }
-                        else
+                        if (!export_binary_data)
 #endif // ENABLE_BINARIZED_GCODE
                             append(out_filament_cost, "%.2lf", filament_cost);
                     }
@@ -1165,11 +1148,27 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         // file data
         binary_data.file_metadata.encoding_type = (uint16_t)BinaryGCode::EMetadataEncodingType::INI;
         binary_data.file_metadata.raw_data.emplace_back("Producer", std::string(SLIC3R_APP_NAME) + " " + std::string(SLIC3R_VERSION));
-        // add here other key/value pairs
 
         // config data
         binary_data.slicer_metadata.encoding_type = (uint16_t)BinaryGCode::EMetadataEncodingType::INI;
         encode_full_config(print, binary_data.slicer_metadata.raw_data);
+
+        // printer data
+        binary_data.printer_metadata.raw_data.emplace_back("printer model" , print.config().printer_model.value); // duplicated into config data
+        std::string filament_types_str;
+        for (size_t i = 0; i < print.config().filament_type.values.size(); ++i) {
+            filament_types_str += print.config().filament_type.values[i];
+            if (i < print.config().filament_type.values.size() - 1)
+                filament_types_str += ", ";
+        }
+        binary_data.printer_metadata.raw_data.emplace_back("filament type", filament_types_str); // duplicated into config data
+        std::string nozzle_diameters_str;
+        char buf[1024];
+        for (size_t i = 0; i < print.config().nozzle_diameter.values.size(); ++i) {
+            sprintf(buf, i < print.config().nozzle_diameter.values.size() - 1 ? "%.2lf, " : "%.2lf", print.config().nozzle_diameter.values[i]);
+            nozzle_diameters_str += buf;
+        }
+        binary_data.printer_metadata.raw_data.emplace_back("nozzle diameter", nozzle_diameters_str); // duplicated into config data
     }
 
     // modifies m_silent_time_estimator_enabled
@@ -1615,11 +1614,6 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
 
     if (export_to_binary_gcode) {
         BinaryGCode::BinaryData& binary_data = m_processor.get_binary_data();
-        char buf[128];
-        sprintf(buf, "%.2lf", print.m_print_statistics.total_weight);
-        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::TotalFilamentUsedG, std::string(buf) });
-        sprintf(buf, "%.2lf", print.m_print_statistics.total_cost);
-        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::TotalFilamentCost, std::string(buf) });
         if (print.m_print_statistics.total_toolchanges > 0)
             binary_data.print_metadata.raw_data.push_back({ "total toolchanges", std::to_string(print.m_print_statistics.total_toolchanges) });
     }

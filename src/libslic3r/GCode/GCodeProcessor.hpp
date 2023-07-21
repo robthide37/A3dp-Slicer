@@ -66,10 +66,10 @@ namespace Slic3r {
             }
         };
 
-        std::vector<double>                                 volumes_per_color_change;
-        std::map<size_t, double>                            volumes_per_extruder;
+        std::vector<double>                                     volumes_per_color_change;
+        std::map<size_t, double>                                volumes_per_extruder;
         std::map<GCodeExtrusionRole, std::pair<double, double>> used_filaments_per_role;
-        std::map<size_t, double>                            cost_per_extruder;
+        std::map<size_t, double>                                cost_per_extruder;
 
         std::array<Mode, static_cast<size_t>(ETimeMode::Count)> modes;
 
@@ -831,7 +831,7 @@ namespace Slic3r {
         // Simulates firmware st_synchronize() call
         void simulate_st_synchronize(float additional_time = 0.0f);
 
-        void update_estimated_times_stats();
+        void update_estimated_statistics();
 
         double extract_absolute_position_on_axis(Axis axis, const GCodeReader::GCodeLine& line, double area_filament_cross_section);
    };

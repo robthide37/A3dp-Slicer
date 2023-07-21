@@ -1354,7 +1354,7 @@ void GCodeProcessor::finalize(bool perform_post_process)
 
     m_used_filaments.process_caches(this);
 
-    update_estimated_times_stats();
+    update_estimated_statistics();
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
     std::cout << "\n";
@@ -3681,25 +3681,27 @@ void GCodeProcessor::post_process()
 
     if (m_binarizer.is_enabled()) {
         // update print metadata
-        auto update_value = [](std::string& value, const std::vector<double>& values) {
+        auto stringify = [](const std::vector<double>& values) {
+            std::string ret;
             char buf[1024];
-            value.clear();
             for (size_t i = 0; i < values.size(); ++i) {
-                sprintf(buf, i == values.size() - 1 ? " %.2lf" : " %.2lf,", values[i]);
-                value += buf;
+                sprintf(buf, i < values.size() - 1 ? "%.2lf, " : "%.2lf", values[i]);
+                ret += buf;
             }
+            return ret;
         };
 
         // update binary data
         BinaryGCode::BinaryData& binary_data = m_binarizer.get_binary_data();
-        for (auto& [key, value] : binary_data.print_metadata.raw_data) {
-            if      (key == PrintStatistics::FilamentUsedMm)     update_value(value, filament_mm);
-            else if (key == PrintStatistics::FilamentUsedG)      update_value(value, filament_g);
-            else if (key == PrintStatistics::TotalFilamentUsedG) update_value(value, { filament_total_g });
-            else if (key == PrintStatistics::FilamentUsedCm3)    update_value(value, filament_cm3);
-            else if (key == PrintStatistics::FilamentCost)       update_value(value, filament_cost);
-            else if (key == PrintStatistics::TotalFilamentCost)  update_value(value, { filament_total_cost });
-        }
+        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedMm, stringify(filament_mm) });
+        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedCm3, stringify(filament_cm3) });
+        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedG, stringify(filament_g) });
+        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentCost, stringify(filament_cost) });
+        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::TotalFilamentUsedG, stringify({ filament_total_g }) });
+        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::TotalFilamentCost, stringify({ filament_total_cost }) });
+
+        binary_data.printer_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedMm, stringify(filament_mm) }); // duplicated into print metadata
+        binary_data.printer_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedG, stringify(filament_g) });   // duplicated into print metadata
 
         for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
             const TimeMachine& machine = m_time_processor.machines[i];
@@ -3709,6 +3711,8 @@ void GCodeProcessor::post_process()
                 sprintf(buf, "(%s mode)", (mode == PrintEstimatedStatistics::ETimeMode::Normal) ? "normal" : "silent");
                 binary_data.print_metadata.raw_data.push_back({ "estimated printing time " + std::string(buf), get_time_dhms(machine.time) });
                 binary_data.print_metadata.raw_data.push_back({ "estimated first layer printing time " + std::string(buf), get_time_dhms(machine.layers_time.empty() ? 0.f : machine.layers_time.front()) });
+
+                binary_data.printer_metadata.raw_data.push_back({ "estimated printing time " + std::string(buf), get_time_dhms(machine.time) });
             }
         }
 
@@ -4596,7 +4600,7 @@ void GCodeProcessor::simulate_st_synchronize(float additional_time)
     }
 }
 
-void GCodeProcessor::update_estimated_times_stats()
+void GCodeProcessor::update_estimated_statistics()
 {
     auto update_mode = [this](PrintEstimatedStatistics::ETimeMode mode) {
         PrintEstimatedStatistics::Mode& data = m_result.print_statistics.modes[static_cast<size_t>(mode)];
