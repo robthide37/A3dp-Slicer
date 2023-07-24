@@ -937,7 +937,8 @@ TEST_CASE("Optimal nfp position search with GravityKernel using RectangleItem an
     }
 }
 
-TEST_CASE("RectangleOverfitPackingStrategy test", "[arrange2]")
+TEMPLATE_TEST_CASE("RectangleOverfitPackingStrategy test", "[arrange2]",
+                   Slic3r::arr2::SimpleArrangeItem, Slic3r::arr2::ArrangeItem)
 {
     using Slic3r::arr2::RectangleOverfitPackingStrategy;
     using Slic3r::arr2::PackStrategyNFP;
@@ -946,7 +947,7 @@ TEST_CASE("RectangleOverfitPackingStrategy test", "[arrange2]")
 
     namespace firstfit = Slic3r::arr2::firstfit;
 
-    using ArrItem = Slic3r::arr2::SimpleArrangeItem;
+    using ArrItem = TestType;
 
     auto frontleft_align_fn = [](const Slic3r::BoundingBox &bedbb,
                                  const Slic3r::BoundingBox &pilebb) {

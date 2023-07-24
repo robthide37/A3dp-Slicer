@@ -141,12 +141,12 @@ template<> struct NFPArrangeItemTraits_<SimpleArrangeItem>
 
     static Vec2crd fixed_centroid(const SimpleArrangeItem &itm) noexcept
     {
-        return itm.shape().centroid();
+        return itm.outline().centroid();
     }
 
     static Vec2crd envelope_centroid(const SimpleArrangeItem &itm) noexcept
     {
-        return itm.shape().centroid();
+        return itm.outline().centroid();
     }
 };
 
