@@ -202,6 +202,7 @@ enum class EGCodeEncodingType : uint16_t
 {
     None,
     MeatPack,
+    MeatPackComments
 };
 
 struct GCodeBlock
@@ -257,7 +258,7 @@ struct BinarizerConfig
     ECompressionType compression{ ECompressionType::None };
     EGCodeEncodingType gcode_encoding{ EGCodeEncodingType::None };
     EMetadataEncodingType metadata_encoding{ EMetadataEncodingType::INI };
-    EChecksumType checksum{ EChecksumType::None };
+    EChecksumType checksum{ EChecksumType::CRC32 };
 };
 
 class Binarizer
