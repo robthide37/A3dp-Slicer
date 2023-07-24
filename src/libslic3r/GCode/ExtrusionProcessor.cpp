@@ -203,6 +203,13 @@ std::pair<float,float> calculate_overhang_speed(const ExtrusionAttributes &attri
     float fan_speed = std::min(interpolate_speed(fan_speed_sections, attributes.overhang_attributes->start_distance_from_prev_layer),
                                interpolate_speed(fan_speed_sections, attributes.overhang_attributes->end_distance_from_prev_layer));
 
+    if (!config.enable_dynamic_overhang_speeds) {
+        final_speed = -1;
+    }
+    if (!config.enable_dynamic_fan_speeds.get_at(extruder_id)) {
+        fan_speed = -1;
+    }
+
     return {final_speed, fan_speed};
 }
 

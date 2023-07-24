@@ -92,12 +92,12 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
             const ExtendedPoint &curr = points[point_idx];
             const ExtendedPoint &next = points[point_idx + 1];
 
-            if ((curr.distance > 0 && curr.distance < boundary_offset + 2.0f) ||
-                (next.distance > 0 && next.distance < boundary_offset + 2.0f)) {
+            if ((curr.distance > -boundary_offset && curr.distance < boundary_offset + 2.0f) ||
+                (next.distance > -boundary_offset && next.distance < boundary_offset + 2.0f)) {
                 double line_len = (next.position - curr.position).norm();
                 if (line_len > 4.0f) {
-                    double a0 = std::clamp((curr.distance + 2 * boundary_offset) / line_len, 0.0, 1.0);
-                    double a1 = std::clamp(1.0f - (next.distance + 2 * boundary_offset) / line_len, 0.0, 1.0);
+                    double a0 = std::clamp((curr.distance + 3 * boundary_offset) / line_len, 0.0, 1.0);
+                    double a1 = std::clamp(1.0f - (next.distance + 3 * boundary_offset) / line_len, 0.0, 1.0);
                     double t0 = std::min(a0, a1);
                     double t1 = std::max(a0, a1);
 

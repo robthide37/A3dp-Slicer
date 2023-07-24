@@ -582,7 +582,7 @@ void PrintObject::calculate_overhanging_perimeters()
                         layer_region->m_perimeters =
                             ExtrusionProcessor::calculate_and_split_overhanging_extrusions(&layer_region->m_perimeters,
                                                                                            unscaled_polygons_lines[prev_layer_id],
-                                                                                           curled_lines[prev_layer_id]);
+                                                                                           curled_lines[l->id()]);
                     }
                 }
             });
