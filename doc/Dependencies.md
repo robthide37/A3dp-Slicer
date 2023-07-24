@@ -1,7 +1,7 @@
 # Dependency report for PrusaSlicer
 ## Possible dynamic linking on Linux
 * zlib: Strict dependency required from the system, linked dynamically. Many other libs depend on zlib.
-* wxWidgets >= 3.1.6
+* wxWidgets >= 3.2
 * libcurl
 * tbb
 * boost

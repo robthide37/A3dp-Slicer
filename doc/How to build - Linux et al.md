@@ -100,6 +100,8 @@ As already mentioned above, dynamic linking of dependencies is possible, but Pru
 
 The list of dependencies can be easily obtained by inspecting the CMake scripts in the `deps/` directory. Some of the dependencies don't have to be as recent as the versions listed - generally versions available on conservative Linux distros such as Debian stable, Ubuntu LTS releases or Fedora are likely sufficient. If you decide to build this way, it is your responsibility to make sure that CMake finds all required dependencies. It is possible to look at your distribution PrusaSlicer package to see how the package maintainers solved the dependency issues.
 
+Note that you may need to use wxGTK with disabled EGL support for PrusaSlicer to work correctly: see [#9774](https://github.com/prusa3d/PrusaSlicer/issues/9774).
+
 ## Miscellaneous
 
 ### Installation
