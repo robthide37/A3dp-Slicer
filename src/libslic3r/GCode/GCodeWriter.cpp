@@ -375,6 +375,9 @@ bool GCodeWriter::will_move_z(double z) const
 
 std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment)
 {
+    assert(dE != 0);
+    assert(std::abs(dE) < 1000.0);
+
     m_pos.head<2>() = point.head<2>();
 
     GCodeG1Formatter w;
@@ -386,6 +389,7 @@ std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std:
 
 std::string GCodeWriter::extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, double dE, const std::string_view comment)
 {
+    assert(std::abs(dE) < 1000.0);
     assert(dE != 0);
     assert(std::abs(point.x()) < 1200.);
     assert(std::abs(point.y()) < 1200.);
@@ -404,6 +408,7 @@ std::string GCodeWriter::extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &i
 std::string GCodeWriter::extrude_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, double dE, const std::string_view comment)
 {
     assert(dE != 0);
+    assert(std::abs(dE) < 1000.0);
     assert(std::abs(point.x()) < 1200.);
     assert(std::abs(point.y()) < 1200.);
     assert(std::abs(radius) < 1800.);
@@ -456,6 +461,9 @@ std::string GCodeWriter::retract_for_toolchange(bool before_wipe)
 
 std::string GCodeWriter::_retract(double length, double restart_extra, const std::string_view comment)
 {
+    assert(std::abs(length) < 1000.0);
+    assert(std::abs(restart_extra) < 1000.0);
+
     /*  If firmware retraction is enabled, we use a fake value of 1
         since we ignore the actual configured retract_length which 
         might be 0, in which case the retraction logic gets skipped. */

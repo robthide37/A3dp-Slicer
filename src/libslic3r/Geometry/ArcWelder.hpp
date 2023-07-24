@@ -52,8 +52,10 @@ inline typename Derived::Scalar arc_angle(
     static_assert(std::is_same<typename Derived::Scalar, typename Derived2::Scalar>::value, "arc_angle(): Both vectors must be of the same type.");
     assert(radius != 0);
     using Float = typename Derived::Scalar;
-    Float a     = Float(2.) * asin(Float(0.5) * (end_pos - start_pos).norm() / radius);
-    return radius > Float(0) ? a : Float(2. * M_PI) + a;
+    Float a = Float(0.5) * (end_pos - start_pos).norm() / radius;
+    return radius > Float(0) ?
+        (a > Float( 1.) ? Float(   M_PI) : Float(2.) * std::asin(a)) :
+        (a < Float(-1.) ? Float( - M_PI) : Float(2. * M_PI) + Float(2.) * std::asin(a));
 }
 
 // Calculate positive length of an arc given two points and a radius.
