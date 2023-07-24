@@ -18,7 +18,7 @@ namespace Slic3r { namespace arr2 {
 
 // An interface that allows to store arbitrary data (std::any) under a specific
 // key in an object implementing the interface. This is later used to pass
-// arbitrary parameters from any arranged object down to the arrangement core.
+// arbitrary parameters from any arrangeable object down to the arrangement core.
 class AnyWritable
 {
 public:

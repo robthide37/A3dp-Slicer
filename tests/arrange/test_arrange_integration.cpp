@@ -659,10 +659,12 @@ TEMPLATE_TEST_CASE("Bed needs to be completely filled with 1cm cubes",
     REQUIRE(task->unselected.empty());
     REQUIRE(result->to_add.size() + result->arranged_items.size() == arr2::model_instance_count(m));
 
-    REQUIRE(
-        std::all_of(task->selected.begin(), task->selected.end(), [](auto &itm) {
-            return arr2::get_bed_index(itm) == 0;
-        }));
+    // All the existing items should be on the physical bed
+    REQUIRE(std::all_of(result->arranged_items.begin(),
+                        result->arranged_items.end(), [](auto &itm) {
+                            return arr2::get_bed_index(itm) == 0;
+                        }));
+
     REQUIRE(
         std::all_of(result->to_add.begin(), result->to_add.end(), [](auto &itm) {
             return arr2::get_bed_index(itm) == 0;
