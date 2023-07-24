@@ -53,12 +53,6 @@ Point to_point(const stbtt__point &point);
 void remove_bad(Polygons &polygons);
 void remove_bad(ExPolygons &expolygons);
 
-// helpr for heal shape
-// Return true when erase otherwise false
-bool remove_same_neighbor(Polygon &points);
-bool remove_same_neighbor(Polygons &polygons);
-bool remove_same_neighbor(ExPolygons &expolygons);
-
 // Try to remove self intersection by subtracting rect 2x2 px
 bool remove_self_intersections(ExPolygons &shape, unsigned max_iteration = 10);
 ExPolygon create_bounding_rect(const ExPolygons &shape);
@@ -276,55 +270,6 @@ void priv::remove_bad(ExPolygons &expolygons) {
          remove_bad(expolygon.holes);
 }
 
-bool priv::remove_same_neighbor(Slic3r::Polygon &polygon)
-{
-    Points &points = polygon.points;
-    if (points.empty()) return false;
-    auto last = std::unique(points.begin(), points.end());
-    
-    // remove first and last neighbor duplication
-    if (const Point& last_point = *(last - 1);
-        last_point == points.front()) {
-         --last;
-    }
-
-    // no duplicits
-    if (last == points.end()) return false;
-
-    points.erase(last, points.end());
-    return true;
-}
-
-bool priv::remove_same_neighbor(Polygons &polygons) {
-    if (polygons.empty()) return false;
-    bool exist = false;
-    for (Polygon& polygon : polygons) 
-        exist |= remove_same_neighbor(polygon);
-    // remove empty polygons
-    polygons.erase(
-        std::remove_if(polygons.begin(), polygons.end(), 
-            [](const Polygon &p) { return p.points.size() <= 2; }),
-        polygons.end());
-    return exist;
-}
-
-bool priv::remove_same_neighbor(ExPolygons &expolygons) {
-    if(expolygons.empty()) return false;
-    bool remove_from_holes = false;
-    bool remove_from_contour = false;
-    for (ExPolygon &expoly : expolygons) {
-        remove_from_contour |= remove_same_neighbor(expoly.contour);
-        remove_from_holes |= remove_same_neighbor(expoly.holes);
-    }
-    // Removing of expolygons without contour
-    if (remove_from_contour)
-        expolygons.erase(
-            std::remove_if(expolygons.begin(), expolygons.end(),
-                [](const ExPolygon &p) { return p.contour.points.size() <=2; }),
-            expolygons.end());
-    return remove_from_holes || remove_from_contour;
-}
-
 Points priv::collect_close_points(const ExPolygons &expolygons, double distance) { 
     if (expolygons.empty()) return {};
     if (distance < 0.) return {};
@@ -380,7 +325,7 @@ bool Emboss::divide_segments_for_close_point(ExPolygons &expolygons, double dist
     if (distance < 0.) return false;
 
     // ExPolygons can't contain same neigbours
-    priv::remove_same_neighbor(expolygons);
+    remove_same_neighbor(expolygons);
 
     // IMPROVE: use int(insted of double) lines and tree
     const ExPolygonsIndices ids(expolygons);
@@ -516,7 +461,7 @@ bool priv::remove_self_intersections(ExPolygons &shape, unsigned max_iteration) 
         shape = Slic3r::diff_ex(shape, holes, ApplySafetyOffset::Yes);
         
         // TODO: find where diff ex could create same neighbor
-        priv::remove_same_neighbor(shape);
+        remove_same_neighbor(shape);
 
         // find new intersections made by diff_ex
         intersections_f = intersection_points(shape);
@@ -598,7 +543,7 @@ bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
     Polygons holes;
     Points intersections;
     while (--max_iteration) {
-        priv::remove_same_neighbor(shape);
+        remove_same_neighbor(shape);
         Pointfs intersections_f = intersection_points(shape);
 
         // convert intersections into Points
@@ -653,7 +598,7 @@ bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
 #else
 bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
 {
-    priv::remove_same_neighbor(shape);
+    remove_same_neighbor(shape);
 
     const float                delta    = 2.f;
     const ClipperLib::JoinType joinType = ClipperLib::JoinType::jtRound;
