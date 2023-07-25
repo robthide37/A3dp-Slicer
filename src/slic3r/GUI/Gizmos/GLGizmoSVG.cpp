@@ -47,9 +47,6 @@ GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
 // Private functions to create emboss volume
 namespace{
 
-// Default scale of SVG image
-static constexpr double DEFAULT_SCALE = 1e-2;
-
 // Variable keep limits for variables
 const struct Limits
 {
@@ -64,13 +61,20 @@ const struct Limits
 /// <returns>File path to svg</returns>
 std::string choose_svg_file();
 
+constexpr double get_tesselation_tolerance(double scale){ 
+    constexpr double tesselation_tolerance_in_mm = .1; //8e-2;
+    constexpr double tesselation_tolerance_scaled = (tesselation_tolerance_in_mm*tesselation_tolerance_in_mm) / SCALING_FACTOR / SCALING_FACTOR;
+    return tesselation_tolerance_scaled / scale / scale;
+}
+ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, double tesselation_tolerance);
+
 /// <summary>
 /// Let user to choose file with (S)calable (V)ector (G)raphics - SVG.
 /// Than let select contour
 /// </summary>
 /// <param name="filepath">SVG file path, when empty promt user to select one</param>
 /// <returns>EmbossShape to create</returns>
-EmbossShape select_shape(std::string_view filepath = "");
+EmbossShape select_shape(std::string_view filepath = "", double tesselation_tolerance_in_mm = get_tesselation_tolerance(1.));
 
 /// <summary>
 /// Create new embos data
@@ -114,6 +118,8 @@ enum class IconType : unsigned {
     change_file_hover,
     bake,
     bake_hover,
+    save,
+    save_hover,
     lock,
     lock_hover,
     unlock,
@@ -392,6 +398,8 @@ IconManager::Icons init_icons(IconManager &mng, const GuiCfg &cfg)
         {"open.svg",         size, IconManager::RasterType::color},           // changhe_file_hovered
         {"burn.svg",         size, IconManager::RasterType::white_only_data}, // bake_file
         {"burn.svg",         size, IconManager::RasterType::color},           // bake_hovered
+        {"save.svg",         size, IconManager::RasterType::white_only_data}, // save
+        {"save.svg",         size, IconManager::RasterType::color},           // save_hovered
         {"lock_closed.svg",  size, IconManager::RasterType::white_only_data}, // lock
         {"lock_open_f.svg",  size, IconManager::RasterType::white_only_data}, // lock_hovered
         {"lock_open.svg",    size, IconManager::RasterType::white_only_data}, // unlock
@@ -566,7 +574,14 @@ NSVGimage* init_image(EmbossShape::SvgFile &svg_file) {
 
     // init svg image
     svg_file.image = nsvgParseFromFile(svg_file.path);
-    
+
+    if (svg_file.image.get() == nullptr)
+        return nullptr;
+
+    // Disable stroke
+    for (NSVGshape *shape = svg_file.image->shapes; shape != NULL; shape = shape->next)
+        shape->stroke.type = 0;
+
     return svg_file.image.get();
 }
 
@@ -584,7 +599,7 @@ bool init_texture(Texture &texture, ModelVolume &mv, unsigned max_size_px)
     // GLTexture::load_from_svg_file(filepath, false, false, false, max_size_px);
 
     // NOTE: Can not use es.shape --> it is aligned and one need offset in svg
-    ExPolygons shape = to_expolygons(*image);
+    Polygons shape = to_polygons(*image);
     if (shape.empty())
         return false;
 
@@ -618,7 +633,7 @@ bool init_texture(Texture &texture, ModelVolume &mv, unsigned max_size_px)
     float tx = static_cast<float>(-bb.min.x() * scale);
     float ty = static_cast<float>(bb.max.y() * scale); // Reverse direction of y
     int stride = texture.width * channels_count;
-    nsvgRasterizeXY(rast, image, tx, ty, scale, scale, data.data(), texture.width, texture.height, stride);
+    nsvgRasterize(rast, image, tx, ty, scale, data.data(), texture.width, texture.height, stride);
 
     // fill by monotone color
     std::vector<unsigned char> fill_color = {201, 201, 201}; // RGB and keep same alpha
@@ -629,6 +644,8 @@ bool init_texture(Texture &texture, ModelVolume &mv, unsigned max_size_px)
 
     // sends data to gpu
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+    if (texture.id != 0)
+        glsafe(::glDeleteTextures(1, &texture.id));
     glsafe(::glGenTextures(1, &texture.id));
     glsafe(::glBindTexture(GL_TEXTURE_2D, texture.id));
     glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei) texture.width, (GLsizei) texture.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void *) data.data()));
@@ -683,11 +700,20 @@ void GLGizmoSVG::set_volume_by_selection()
     // Calculate current angle of up vector
     m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
     m_distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
+    
+    m_shape_bb = get_extents(m_volume_shape.shapes_with_ids);
 
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();
 }
-
+namespace {
+void delete_texture(Texture& texture){
+    if (texture.id != 0) {
+        glsafe(::glDeleteTextures(1, &texture.id));
+        texture.id = 0;
+    }
+}
+}
 void GLGizmoSVG::reset_volume()
 {
     if (m_volume == nullptr)
@@ -697,11 +723,7 @@ void GLGizmoSVG::reset_volume()
     m_volume_id.id = 0;
     m_volume_shape.shapes_with_ids.clear();
     m_filename_preview.clear();
-
-    if (m_texture.id != 0) {
-        glsafe(::glDeleteTextures(1, &m_texture.id));
-        m_texture.id = 0;
-    }
+    delete_texture(m_texture);
 }
 
 void GLGizmoSVG::calculate_scale() {
@@ -721,6 +743,7 @@ void GLGizmoSVG::calculate_scale() {
         return true;
     };
 
+    calc(Vec3d::UnitX(), m_scale_width);
     calc(Vec3d::UnitY(), m_scale_height);
     calc(Vec3d::UnitZ(), m_scale_depth);
 }
@@ -797,7 +820,42 @@ void GLGizmoSVG::draw_window()
         draw_model_type();
     }
 }
+namespace {
+size_t count(const NSVGshape &shape){
+    size_t res = 0;
+    for (const NSVGshape *shape_ptr = &shape; shape_ptr != NULL; shape_ptr = shape_ptr->next)
+        ++res;
+    return res;
+}
 
+void draw(const ExPolygonsWithIds& shapes_with_ids, unsigned max_size)
+{
+    ImVec2 actual_pos = ImGui::GetCursorPos();
+    // draw shapes
+    BoundingBox bb;
+    for (const ExPolygonsWithId &shape : shapes_with_ids)
+        bb.merge(get_extents(shape.expoly));
+
+    Point  bb_size    = bb.size();
+    double scale      = max_size / (double) std::max(bb_size.x(), bb_size.y());
+    ImVec2 win_offset = ImGui::GetWindowPos();
+    Point  offset(win_offset.x + actual_pos.x, win_offset.y + actual_pos.y);
+    offset += bb_size / 2 * scale;
+    auto draw_polygon = [&scale, offset](Slic3r::Polygon p) {
+        p.scale(scale, -scale); // Y mirror
+        p.translate(offset);
+        ImGuiWrapper::draw(p);
+    };
+
+    for (const ExPolygonsWithId &shape : shapes_with_ids) {
+        for (const ExPolygon &expoly : shape.expoly) {
+            draw_polygon(expoly.contour);
+            for (const Slic3r::Polygon &hole : expoly.holes)
+                draw_polygon(hole);
+        }
+    }
+}
+}
 bool GLGizmoSVG::draw_preview(){
     assert(m_volume->emboss_shape.has_value());
     if (!m_volume->emboss_shape.has_value()) {
@@ -808,12 +866,18 @@ bool GLGizmoSVG::draw_preview(){
     // init texture when not initialized yet.
     // drag&drop is out of rendering scope so texture must be created on this place
     if (m_texture.id == 0)
-        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);    
+        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
+
+    ::draw(m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
 
     if (m_texture.id != 0) {
         ImTextureID id = (void *) static_cast<intptr_t>(m_texture.id);
         ImVec2      s(m_texture.width, m_texture.height);
         ImGui::Image(id, s);
+        if(ImGui::IsItemHovered()){
+            size_t count_shapes = count(*m_volume->emboss_shape->svg_file.image->shapes);
+            ImGui::SetTooltip("%d count shapes", count_shapes);
+        }
     }
 
     if (m_filename_preview.empty()){
@@ -837,6 +901,8 @@ bool GLGizmoSVG::draw_preview(){
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
 
+    bool file_changed = false;
+
     // Re-Load button
     bool can_reload = !m_volume_shape.svg_file.path.empty();
     if (can_reload) {
@@ -845,9 +911,7 @@ bool GLGizmoSVG::draw_preview(){
             if (!boost::filesystem::exists(m_volume_shape.svg_file.path)) {
                 m_volume_shape.svg_file.path.clear();
             } else {
-                m_volume_shape.shapes_with_ids = select_shape(m_volume_shape.svg_file.path).shapes_with_ids;
-                init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
-                process();
+                file_changed = true;
             }
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Re-load SVG file from disk.").c_str());
@@ -855,11 +919,22 @@ bool GLGizmoSVG::draw_preview(){
 
     ImGui::SameLine();
     if (clickable(get_icon(m_icons, IconType::change_file), get_icon(m_icons, IconType::change_file_hover))) {
-        m_volume_shape.shapes_with_ids = select_shape().shapes_with_ids;
-        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
-        process();
+        std::string new_path = choose_svg_file();
+        if (!new_path.empty()) {
+            file_changed = true;
+            m_volume_shape.svg_file.path = new_path;
+        }
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Change to another .svg file").c_str());
+    }
+
+    if (file_changed) {
+        double tes_tol = get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)));
+        EmbossShape es = select_shape(m_volume_shape.svg_file.path, tes_tol);
+        m_volume_shape.svg_file.image = es.svg_file.image;
+        m_volume_shape.shapes_with_ids = es.shapes_with_ids;
+        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
+        process();
     }
 
     ImGui::SameLine();
@@ -869,6 +944,13 @@ bool GLGizmoSVG::draw_preview(){
         return false;
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Bake to uneditable part and save copyright of svg").c_str());
+    }
+
+    ImGui::SameLine();
+    if (clickable(get_icon(m_icons, IconType::save), get_icon(m_icons, IconType::save_hover))) {
+        Slic3r::save(*m_volume_shape.svg_file.image, "C:/data/temp/saved.svg");
+    } else if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", _u8L("Save as svg file").c_str());
     }
     return true;
 }
@@ -883,9 +965,16 @@ void GLGizmoSVG::draw_depth()
     double &value = m_volume_shape.projection.depth;
     if (use_inch) {
         const char *size_format = "%.2f in";
-        double value_inch = value * ObjectManipulation::mm_to_in;
+        double value_inch = value * ObjectManipulation::mm_to_in * m_scale_depth.value_or(1.f);
         if (ImGui::InputDouble("##depth", &value_inch, 1., 10., size_format)) {
-            value = value_inch * ObjectManipulation::in_to_mm;
+            value = value_inch * ObjectManipulation::in_to_mm / m_scale_depth.value_or(1.f);
+            process();
+        }
+    } else if (m_scale_depth.has_value()) {
+        const char *size_format = "%.1f mm";
+        double value_mm = value * (*m_scale_depth);
+        if (ImGui::InputDouble("##depth", &value_mm, 1., 10., size_format)) {
+            value = value_mm / (*m_scale_depth);
             process();
         }
     } else {
@@ -903,14 +992,13 @@ void GLGizmoSVG::draw_size()
 
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
     
-    // TODO: cache it
-    BoundingBox bb = get_extents(m_volume_shape.shapes_with_ids);
-    Point size = bb.size();
-
-    double width = size.x() * m_volume_shape.scale;    
+    Point size = m_shape_bb.size();
+    double width = size.x() * m_volume_shape.scale * m_scale_width.value_or(1.f);
     if (use_inch) width *= ObjectManipulation::mm_to_in;    
-    double height = size.y() * m_volume_shape.scale;
+    double height = size.y() * m_volume_shape.scale * m_scale_height.value_or(1.f);
     if (use_inch) height *= ObjectManipulation::mm_to_in;
+
+    std::optional<Vec3d> new_absolute_scale;
 
     if (m_keep_ratio) {
         std::stringstream ss;
@@ -919,12 +1007,15 @@ void GLGizmoSVG::draw_size()
         ImGui::SameLine(m_gui_cfg->input_offset);
         ImGui::SetNextItemWidth(m_gui_cfg->input_width);
 
+        // convert to float for slider
         float width_f = width;
         if (m_imgui->slider_float("##width_size_slider", &width_f, 5.f, 100.f, ss.str().c_str())) {
-            if (use_inch)
-                width_f *= ObjectManipulation::in_to_mm;
-            m_volume_shape.scale = width_f / size.x();
-            process();
+            double width_ratio = width_f / width;
+            if (std::fabs(width_ratio - 1.) > 1e-4) {
+                m_scale_width      = m_scale_width.value_or(1.f) * width_ratio;
+                m_scale_height     = m_scale_height.value_or(1.f) * width_ratio;
+                new_absolute_scale = Vec3d(*m_scale_width, *m_scale_height, 1.);
+            }
         }
     } else {
         ImGuiInputTextFlags flags = 0;
@@ -939,48 +1030,68 @@ void GLGizmoSVG::draw_size()
 
         ImGui::SameLine(m_gui_cfg->input_offset);
         ImGui::SetNextItemWidth(input_width);
+        double prev_width = width;
         if (ImGui::InputDouble("##width", &width, step, fast_step, size_format, flags)) {
-            if (use_inch)
-                width *= ObjectManipulation::in_to_mm;
-            m_volume_shape.scale = width / size.x();
-            process();
+            double width_ratio = width / prev_width;
+            m_scale_width = m_scale_width.value_or(1.f) * width_ratio;
+            new_absolute_scale = Vec3d(*m_scale_width, m_scale_height.value_or(1.f), 1.);
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Width of SVG.").c_str());
+            ImGui::SetTooltip("%s", "Width of SVG.");
 
         ImGui::SameLine(second_offset);
         ImGui::SetNextItemWidth(input_width);
+        double prev_height = height;
         if (ImGui::InputDouble("##height", &height, step, fast_step, size_format, flags)) {
-            if (use_inch)
-                height *= ObjectManipulation::in_to_mm;
-            m_volume_shape.scale = height / size.y();
-            process();
+            double height_ratio = height / prev_height;
+            m_scale_height = m_scale_height.value_or(1.f) * height_ratio;
+            new_absolute_scale  = Vec3d(m_scale_width.value_or(1.f), *m_scale_height, 1.);
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Height of SVG.").c_str());    
+            ImGui::SetTooltip("%s", "Height of SVG.");    
     }
 
     // Lock on ratio m_keep_ratio
-    //ImGui::SameLine(m_gui_cfg->lock_offset);
-    //const IconManager::Icon &icon       = get_icon(m_icons, m_keep_ratio ? IconType::lock : IconType::unlock);
-    //const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_ratio ? IconType::lock_hover : IconType::unlock_hover);
-    //if (button(icon, icon_hover, icon))
-    //    m_keep_ratio = !m_keep_ratio;    
-    //if (ImGui::IsItemHovered())
-    //    ImGui::SetTooltip("%s", (m_keep_ratio ?
-    //        _u8L("Free set of width and height value."):
-    //        _u8L("Keep same ratio of width to height.")
-    //    ).c_str());
+    ImGui::SameLine(m_gui_cfg->lock_offset);
+    const IconManager::Icon &icon       = get_icon(m_icons, m_keep_ratio ? IconType::lock : IconType::unlock);
+    const IconManager::Icon &icon_hover = get_icon(m_icons, m_keep_ratio ? IconType::lock_hover : IconType::unlock_hover);
+    if (button(icon, icon_hover, icon))
+        m_keep_ratio = !m_keep_ratio;    
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", (m_keep_ratio ?
+            _u8L("Free set of width and height value."):
+            _u8L("Keep same ratio of width to height.")
+        ).c_str());
     
 
     // reset button
-    bool can_reset = !is_approx(m_volume_shape.scale, DEFAULT_SCALE);
+    bool can_reset = m_scale_width.has_value() || m_scale_height.has_value() || m_scale_depth.has_value();
     if (can_reset) {
         if (reset_button(m_icons)) {
-            m_volume_shape.scale = DEFAULT_SCALE;
-            process();
+            new_absolute_scale = Vec3d(1., 1., 1.);
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Reset scale to loaded one from the SVG").c_str());
+    }
+
+    if (new_absolute_scale.has_value()){
+        Selection &selection = m_parent.get_selection();
+        selection.setup_cache();
+        TransformationType type = m_volume->is_the_only_one_part() ? 
+            TransformationType::Instance_Absolute_Independent :
+            TransformationType::Local_Absolute_Independent;
+        selection.scale(*new_absolute_scale, type);
+        m_parent.do_scale(L("Resize"));
+        wxGetApp().obj_manipul()->set_dirty();
+        // should be the almost same
+        calculate_scale();
+                
+        NSVGimage *img = m_volume_shape.svg_file.image.get();
+        assert(img != NULL);
+        if (img != NULL){
+            double tes_tol = get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)));
+            m_volume_shape.shapes_with_ids = create_shape_with_ids(*img, tes_tol);
+            process();        
+        }
     }
 }
 
@@ -1275,14 +1386,14 @@ GuiCfg create_gui_configuration() {
 
     float lock_width = cfg.icon_width + 3 * space;
     tr.depth       = _u8L("Depth");
-    tr.size        = _u8L("Width / Height");
+    tr.size        = _u8L("Size");
     tr.use_surface = _u8L("Use surface");
     tr.distance    = _u8L("From surface");
     tr.rotation    = _u8L("Rotation");
     tr.reflection  = _u8L("Reflection");
     float max_tr_width = std::max({
         ImGui::CalcTextSize(tr.depth.c_str()).x,
-        ImGui::CalcTextSize(tr.size.c_str()).x,
+        ImGui::CalcTextSize(tr.size.c_str()).x + lock_width,
         ImGui::CalcTextSize(tr.use_surface.c_str()).x,
         ImGui::CalcTextSize(tr.distance.c_str()).x,
         ImGui::CalcTextSize(tr.rotation.c_str()).x + lock_width,
@@ -1345,7 +1456,24 @@ void translate(ExPolygons &expolys, const Point &p) {
         expoly.translate(p);
 }
 
-EmbossShape select_shape(std::string_view filepath)
+ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, double tesselation_tolerance)
+{
+    int max_level = 10;
+    bool is_y_negative = true;
+    ExPolygons expoly = to_expolygons(image, tesselation_tolerance, max_level, 1.0/SCALING_FACTOR, is_y_negative);
+    if (expoly.empty())
+        return {};
+
+    // SVG is used as centered
+    // Do not disturb user by settings of pivot position
+    BoundingBox bb = get_extents(expoly);
+    translate(expoly, -bb.center());
+
+    unsigned id = 0;
+    return {{id, expoly}};
+}
+
+EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance)
 {
     EmbossShape shape;
     shape.projection.depth       = 10.;
@@ -1370,33 +1498,21 @@ EmbossShape select_shape(std::string_view filepath)
         return {};
     }
 
-    shape.svg_file.image = nsvgParseFromFile(shape.svg_file.path);
+    init_image(shape.svg_file);
     if (shape.svg_file.image.get() == NULL) {
         show_error(nullptr, GUI::format(_u8L("Nano SVG parser can't load from file(%1%)."), shape.svg_file.path));
         return {};
     }
 
-    shape.scale = DEFAULT_SCALE; // loaded in mm
-    constexpr float tesselation_tolerance = 1e-2f;
-    int max_level = 10;
-    float scale = static_cast<float>(1 / shape.scale);
-    bool is_y_negative = true;
-    ExPolygons expoly = to_expolygons(*shape.svg_file.image, tesselation_tolerance, max_level, scale, is_y_negative);
-    
+    // Set default and unchanging scale
+    shape.scale = SCALING_FACTOR;
+    shape.shapes_with_ids = create_shape_with_ids(*shape.svg_file.image, tesselation_tolerance);
+
     // Must contain some shapes !!!
-    if (expoly.empty()) {
+    if (shape.shapes_with_ids.empty()) {
         show_error(nullptr, GUI::format(_u8L("SVG file(%1%) do NOT contain path to be able embossed."), shape.svg_file.path));
         return {};
     }
-
-    // SVG is used as centered
-    // Do not disturb user by settings of pivot position
-    BoundingBox bb = get_extents(expoly);
-    translate(expoly, -bb.center());
-
-    unsigned id = 0;
-    shape.shapes_with_ids = {{id, expoly}};
-
     return shape;
 }
 

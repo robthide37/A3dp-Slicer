@@ -25,7 +25,7 @@ Polygons   to_polygons(const NSVGimage &image, float tessTol = 10., int max_leve
 ExPolygons to_expolygons(const NSVGimage &image, float tessTol = 10., int max_level = 10, float scale = 1.f, bool is_y_negative = true);
 
 using NSVGimage_ptr = std::unique_ptr<NSVGimage, void (*)(NSVGimage*)>;
-NSVGimage_ptr nsvgParseFromFile(const std::string& filename, const char *units = "mm", float dpi = 96.0f);
-
+NSVGimage_ptr nsvgParseFromFile(const std::string &svg_file_path, const char *units = "mm", float dpi = 96.0f);
+bool save(const NSVGimage &image, const std::string &svg_file_path);
 } // namespace Slic3r
 #endif // slic3r_NSVGUtils_hpp_

@@ -158,7 +158,7 @@ private:
     // When true keep up vector otherwise relative rotation
     bool m_keep_up = true;
 
-
+    // Keep size aspect ratio when True.
     bool m_keep_ratio = true;
         
     // setted only when wanted to use - not all the time
@@ -168,12 +168,17 @@ private:
     std::optional<SurfaceDrag> m_surface_drag;
 
     // For volume on scaled objects
+    std::optional<float> m_scale_width;
     std::optional<float> m_scale_height;
     std::optional<float> m_scale_depth;
     void calculate_scale();
 
     // keep SVG data rendered on GPU
     Texture m_texture;
+
+    // bounding box of shape
+    // Note: Scaled mm to int value by m_volume_shape.scale
+    BoundingBox m_shape_bb; 
 
     std::string m_filename_preview;
 

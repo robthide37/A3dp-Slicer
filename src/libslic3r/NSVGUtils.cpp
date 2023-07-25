@@ -32,6 +32,29 @@ NSVGimage_ptr nsvgParseFromFile(const std::string &filename, const char *units, 
     return {image, ::nsvgDelete};
 }
 
+bool save(const NSVGimage &image, const std::string &svg_file_path) 
+{
+    //BoundingBox bb = get_extents(to_polygons(image));
+    FILE * file = boost::nowide::fopen(svg_file_path.c_str(), "w");
+    if (file == NULL)
+        return false;
+
+    fprintf(file, "<svg xmlns=\"http://www.w3.org/2000/svg\">\n");    
+    for (const NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
+        std::string d = "M "; // move on start point
+        for (const NSVGpath *path = shape->paths; path != NULL; path = path->next) {
+            size_t path_size = (path->npts > 1) ? static_cast<size_t>(path->npts - 1) : 0;
+            for (size_t i = 0; i < path_size; i += 3) {
+                const float *p = &path->pts[i * 2];
+                d += std::to_string(p[0]) + "," + std::to_string(p[1]) + " ";
+            }
+        }
+        d += "Z"; // closed path
+        fprintf(file, "   <path fill=\"#D2D2D2\" d=\"%s\" />\n", d.c_str());
+    }
+    fprintf(file, "</svg>\n");
+    fclose(file);
+}
 } // namespace Slic3r
 
 namespace {
@@ -48,6 +71,41 @@ bool is_useable(const NSVGshape &shape)
 
 Point::coord_type to_coor(float val, float scale) { return static_cast<Point::coord_type>(std::round(val * scale)); }
 
+
+
+bool need_flattening(float tessTol, const Vec2f &p1, const Vec2f &p2, const Vec2f &p3, const Vec2f &p4) {
+    // f .. first
+    // s .. second
+    auto det = [](const Vec2f &f, const Vec2f &s) {
+        return std::fabs(f.x() * s.y() - f.y() * s.x()); 
+    };
+
+    Vec2f pd  = (p4 - p1);
+    Vec2f pd2 = (p2 - p4);
+    float d2  = det(pd2, pd);
+    Vec2f pd3 = (p3 - p4);
+    float d3  = det(pd3, pd);
+    float d23 = d2 + d3;
+
+    return (d23 * d23) >= tessTol * pd.squaredNorm();
+}
+
+// see function nsvg__lineTo(NSVGparser* p, float x, float y)
+bool is_line(const float *p, float precision = 1e-4){
+    //Vec2f p1(p[0], p[1]);
+    //Vec2f p2(p[2], p[3]);
+    //Vec2f p3(p[4], p[5]);
+    //Vec2f p4(p[6], p[7]);
+    float dx_3 = (p[6] - p[0]) / 3.f;
+    float dy_3 = (p[7] - p[1]) / 3.f;
+
+    return 
+        is_approx(p[2], p[0] + dx_3, precision) && 
+        is_approx(p[4], p[6] - dx_3, precision) && 
+        is_approx(p[3], p[1] + dy_3, precision) &&
+        is_approx(p[5], p[7] - dy_3, precision);
+}
+
 /// <summary>
 /// Convert cubic curve to lines
 /// Inspired by nanosvgrast.h function nsvgRasterize -> nsvg__flattenShape -> nsvg__flattenCubicBez
@@ -60,26 +118,11 @@ Point::coord_type to_coor(float val, float scale) { return static_cast<Point::co
 /// <param name="p3">Curve point</param>
 /// <param name="p4">Curve point</param>
 /// <param name="level">Actual depth of recursion</param>
-/// <param name="scale">Scale of point - multiplicator
-/// NOTE: increase preccission by number greater than 1.</param>
-void flatten_cubic_bez(Polygon &polygon, float tessTol, const Vec2f& p1, const Vec2f& p2, const Vec2f& p3, const Vec2f& p4, int level, float scale)
+void flatten_cubic_bez(Polygon &polygon, float tessTol, const Vec2f& p1, const Vec2f& p2, const Vec2f& p3, const Vec2f& p4, int level)
 {
-    // f .. first
-    // s .. second
-    auto det = [](const Vec2f &f, const Vec2f &s) {
-        return std::fabs(f.x() * s.y() - f.y() * s.x());
-    };
-
-    Vec2f pd  = p4 - p1;
-    Vec2f pd2 = p2 - p4;
-    float d2  = det(pd2, pd);
-    Vec2f pd3 = p3 - p4;
-    float d3  = det(pd3, pd);
-    float d23 = d2 + d3;
-
-    if ((d23 * d23) < tessTol * pd.squaredNorm()) {
-        Point::coord_type x = to_coor(p4.x(), scale);
-        Point::coord_type y = to_coor(p4.y(), scale);
+    if (!need_flattening(tessTol, p1, p2, p3, p4)) {
+        Point::coord_type x = static_cast<Point::coord_type>(std::round(p4.x()));
+        Point::coord_type y = static_cast<Point::coord_type>(std::round(p4.y()));
         polygon.points.emplace_back(x, y);
         return;
     }
@@ -94,8 +137,8 @@ void flatten_cubic_bez(Polygon &polygon, float tessTol, const Vec2f& p1, const V
     Vec2f p123 = (p12 + p23) * 0.5f;
     Vec2f p234  = (p23 + p34) * 0.5f;
     Vec2f p1234 = (p123 + p234) * 0.5f;
-    flatten_cubic_bez(polygon, tessTol, p1, p12, p123, p1234, level, scale);
-    flatten_cubic_bez(polygon, tessTol, p1234, p234, p34, p4, level, scale);
+    flatten_cubic_bez(polygon, tessTol, p1, p12, p123, p1234, level);
+    flatten_cubic_bez(polygon, tessTol, p1234, p234, p34, p4, level);
 }
 
 Polygons to_polygons(NSVGpath *first_path, float tessTol, int max_level, float scale)
@@ -110,11 +153,18 @@ Polygons to_polygons(NSVGpath *first_path, float tessTol, int max_level, float s
         size_t path_size = (path->npts > 1) ? static_cast<size_t>(path->npts - 1) : 0;
         for (size_t i = 0; i < path_size; i += 3) {
             const float *p = &path->pts[i * 2];
-            Vec2f        p1(p[0], p[1]);
-            Vec2f        p2(p[2], p[3]);
-            Vec2f        p3(p[4], p[5]);
-            Vec2f        p4(p[6], p[7]);
-            flatten_cubic_bez(polygon, tessTol, p1, p2, p3, p4, max_level, scale);
+            if (is_line(p)) {
+                // point p4
+                Point::coord_type x = to_coor(p[6], scale);
+                Point::coord_type y = to_coor(p[7], scale);
+                polygon.points.emplace_back(x, y);
+                continue;
+            }
+            Vec2f p1(p[0], p[1]);
+            Vec2f p2(p[2], p[3]);
+            Vec2f p3(p[4], p[5]);
+            Vec2f p4(p[6], p[7]);
+            flatten_cubic_bez(polygon, tessTol, p1 * scale, p2 * scale, p3 * scale, p4 * scale, max_level);
         }
         if (path->closed && !polygon.empty()) {
             polygons.push_back(polygon);
@@ -123,6 +173,8 @@ Polygons to_polygons(NSVGpath *first_path, float tessTol, int max_level, float s
     }
     if (!polygon.empty())
         polygons.push_back(polygon);
+
+    remove_same_neighbor(polygons);
     return polygons;
 }
 
