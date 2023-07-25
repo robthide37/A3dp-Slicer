@@ -261,6 +261,7 @@ bool pack(Strategy &strategy,
         }
     }
 
+    cancelled = !packed && (cancelled || std::isnan(final_score) || std::isinf(final_score));
     packed = !cancelled;
 
     if (packed) {
