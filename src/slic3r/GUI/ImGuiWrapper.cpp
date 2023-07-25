@@ -665,8 +665,9 @@ bool ImGuiWrapper::slider_float(const char* label, float* v, float v_min, float 
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.4f, 0.4f, 0.4f, 1.0f });
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.4f, 0.4f, 0.4f, 1.0f });
 
+        int frame_padding = style.ItemSpacing.y / 2; // keep same line height for input and slider
         const ImTextureID tex_id = io.Fonts->TexID;
-        if (image_button(tex_id, size, uv0, uv1, -1, ImVec4(0.0, 0.0, 0.0, 0.0), ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags_PressedOnClick)) {
+        if (image_button(tex_id, size, uv0, uv1, frame_padding, ImVec4(0.0, 0.0, 0.0, 0.0), ImVec4(1.0, 1.0, 1.0, 1.0), ImGuiButtonFlags_PressedOnClick)) {
             if (!slider_editing)
                 ImGui::SetKeyboardFocusHere(-1);
             else
