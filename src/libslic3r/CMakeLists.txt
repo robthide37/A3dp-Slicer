@@ -510,6 +510,7 @@ target_link_libraries(libslic3r
     ZLIB::ZLIB
 	JPEG::JPEG
     qoi
+    heatshrink
     )
 
 if (APPLE)

@@ -7880,41 +7880,84 @@ void GLCanvas3D::show_binary_gcode_debug_window()
     imgui.begin(std::string("Binary GCode"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
     if (ImGui::BeginTable("BinaryGCodeConfig", 2)) {
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Compression");
-        ImGui::TableSetColumnIndex(1);
-        const std::vector<std::string> gcode_compressions = { "None" };
-        int compressions_id = (int)binarizer_config.compression;
-        if (imgui.combo(std::string("##1"), gcode_compressions, compressions_id, ImGuiComboFlags_HeightLargest, 0.0f, 200.0f))
-            binarizer_config.compression = (BinaryGCode::ECompressionType)compressions_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "GGcode encoding");
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "File metadata compression");
         ImGui::TableSetColumnIndex(1);
-        const std::vector<std::string> gcode_encodings = { "None", "MeatPack", "MeatPack Comments"};
-        int gcode_encodings_id = (int)binarizer_config.gcode_encoding;
-        if (imgui.combo(std::string("##2"), gcode_encodings, gcode_encodings_id, ImGuiComboFlags_HeightLargest, 0.0f, 200.0f))
-            binarizer_config.gcode_encoding = (BinaryGCode::EGCodeEncodingType)gcode_encodings_id;
+        std::vector<std::string> options = { "None", "heatshrink 11,4", "heatshrink 12,4" };
+        int option_id = (int)binarizer_config.compression.file_metadata;
+        if (imgui.combo(std::string("##file_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.file_metadata = (BinaryGCode::ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Printer metadata compression");
+        ImGui::TableSetColumnIndex(1);
+        option_id = (int)binarizer_config.compression.printer_metadata;
+        if (imgui.combo(std::string("##printer_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.printer_metadata = (BinaryGCode::ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Thumbnail compression");
+        ImGui::TableSetColumnIndex(1);
+        options = { "None" };
+        option_id = (int)binarizer_config.compression.thumbnail;
+        if (imgui.combo(std::string("##thumbnail_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.thumbnail = (BinaryGCode::ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Print metadata compression");
+        ImGui::TableSetColumnIndex(1);
+        options = { "None", "heatshrink 11,4", "heatshrink 12,4" };
+        option_id = (int)binarizer_config.compression.print_metadata;
+        if (imgui.combo(std::string("##print_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.print_metadata = (BinaryGCode::ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Slicer metadata compression");
+        ImGui::TableSetColumnIndex(1);
+        option_id = (int)binarizer_config.compression.slicer_metadata;
+        if (imgui.combo(std::string("##slicer_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.slicer_metadata = (BinaryGCode::ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "GCode compression");
+        ImGui::TableSetColumnIndex(1);
+        option_id = (int)binarizer_config.compression.gcode;
+        if (imgui.combo(std::string("##gcode_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.gcode = (BinaryGCode::ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "GCode encoding");
+        ImGui::TableSetColumnIndex(1);
+        options = { "None", "MeatPack", "MeatPack Comments" };
+        option_id = (int)binarizer_config.gcode_encoding;
+        if (imgui.combo(std::string("##gcode_encoding"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.gcode_encoding = (BinaryGCode::EGCodeEncodingType)option_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Metadata encoding");
         ImGui::TableSetColumnIndex(1);
-        const std::vector<std::string> metadata_encodings = { "INI" };
-        int metadata_encodings_id = (int)binarizer_config.metadata_encoding;
-        if (imgui.combo(std::string("##3"), metadata_encodings, metadata_encodings_id, ImGuiComboFlags_HeightLargest, 0.0f, 200.0f))
-            binarizer_config.metadata_encoding = (BinaryGCode::EMetadataEncodingType)metadata_encodings_id;
+        options = { "INI" };
+        option_id = (int)binarizer_config.metadata_encoding;
+        if (imgui.combo(std::string("##metadata_encoding"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.metadata_encoding = (BinaryGCode::EMetadataEncodingType)option_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
         imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Checksum type");
         ImGui::TableSetColumnIndex(1);
-        const std::vector<std::string> checksums = { "None", "CRC32" };
-        int checksums_id = (int)binarizer_config.checksum;
-        if (imgui.combo(std::string("##4"), checksums, checksums_id, ImGuiComboFlags_HeightLargest, 0.0f, 200.0f))
-            binarizer_config.checksum = (BinaryGCode::EChecksumType)checksums_id;
+        options = { "None", "CRC32" };
+        option_id = (int)binarizer_config.checksum;
+        if (imgui.combo(std::string("##4"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.checksum = (BinaryGCode::EChecksumType)option_id;
 
         ImGui::EndTable();
 

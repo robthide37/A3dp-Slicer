@@ -6,6 +6,11 @@
 #include <debugapi.h>
 #endif // ENABLE_BINARIZED_GCODE_DEBUG
 
+extern "C" {
+#include <heatshrink/heatshrink_encoder.h>
+#include <heatshrink/heatshrink_decoder.h>
+}
+
 #include <algorithm>
 #include <cassert>
 
@@ -111,10 +116,10 @@ public:
             }
             return line;
         };
-        auto is_packable = [this](char c) {
+        auto is_packable = [](char c) {
             return (s_lookup_tables.packable[static_cast<uint8_t>(c)] != 0);
         };
-        auto pack_chars = [this](char low, char high) {
+        auto pack_chars = [](char low, char high) {
             return (((s_lookup_tables.value[static_cast<uint8_t>(high)] & 0xF) << 4) |
                 (s_lookup_tables.value[static_cast<uint8_t>(low)] & 0xF));
         };
@@ -471,7 +476,7 @@ void set_checksum_max_cache_size(size_t size) { g_checksum_max_cache_size = size
 
 static uint16_t checksum_types_count()          { return 1 + (uint16_t)EChecksumType::CRC32; }
 static uint16_t block_types_count()             { return 1 + (uint16_t)EBlockType::Thumbnail; }
-static uint16_t compression_types_count()       { return 1 + (uint16_t)ECompressionType::None; }
+static uint16_t compression_types_count()       { return 1 + (uint16_t)ECompressionType::Heatshrink_12_4; }
 static uint16_t thumbnail_formats_count()       { return 1 + (uint16_t)EThumbnailFormat::QOI; }
 static uint16_t metadata_encoding_types_count() { return 1 + (uint16_t)EMetadataEncodingType::INI; }
 static uint16_t gcode_encoding_types_count()    { return 1 + (uint16_t)EGCodeEncodingType::MeatPackComments; }
@@ -586,13 +591,141 @@ static bool decode_gcode(const std::vector<uint8_t>& src, std::string& dst, EGCo
     return true;
 }
 
-static bool compress(const std::vector<uint8_t>& src, std::vector<uint8_t>& data_out, ECompressionType compression_type)
+static bool compress(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst, ECompressionType compression_type)
 {
+    switch (compression_type)
+    {
+    case ECompressionType::Heatshrink_11_4:
+    case ECompressionType::Heatshrink_12_4:
+    {
+        const uint8_t window_sz = (compression_type == ECompressionType::Heatshrink_11_4) ? 11 : 12;
+        const uint8_t lookahead_sz = 4;
+        heatshrink_encoder* encoder = heatshrink_encoder_alloc(window_sz, lookahead_sz);
+        if (encoder == nullptr)
+            return false;
+
+        // calculate the maximum compressed size (assuming a conservative estimate)
+        const size_t src_size = src.size();
+        const size_t max_compressed_size = src_size + (src_size >> 2);
+        dst.resize(max_compressed_size);
+
+        uint8_t* buf = const_cast<uint8_t*>(src.data());
+        uint8_t* outbuf = dst.data();
+
+        // compress data
+        size_t tosink = src_size;
+        size_t output_size = 0;
+        while (tosink > 0) {
+            size_t sunk = 0;
+            const HSE_sink_res sink_res = heatshrink_encoder_sink(encoder, buf, tosink, &sunk);
+            if (sink_res != HSER_SINK_OK) {
+                heatshrink_encoder_free(encoder);
+                return false;
+            }
+            if (sunk == 0)
+                // all input data processed
+                break;
+
+            tosink -= sunk;
+            buf += sunk;
+
+            size_t polled = 0;
+            const HSE_poll_res poll_res = heatshrink_encoder_poll(encoder, outbuf + output_size, max_compressed_size - output_size, &polled);
+            if (poll_res < 0) {
+                heatshrink_encoder_free(encoder);
+                return false;
+            }
+            output_size += polled;
+        }
+
+        // input data finished
+        const HSE_finish_res finish_res = heatshrink_encoder_finish(encoder);
+        if (finish_res < 0) {
+            heatshrink_encoder_free(encoder);
+            return false;
+        }
+
+        // poll for final output
+        size_t polled = 0;
+        const HSE_poll_res poll_res = heatshrink_encoder_poll(encoder, outbuf + output_size, max_compressed_size - output_size, &polled);
+        if (poll_res < 0) {
+            heatshrink_encoder_free(encoder);
+            return false;
+        }
+        dst.resize(output_size + polled);
+        heatshrink_encoder_free(encoder);
+        break;
+    }
+    case ECompressionType::None:
+    default:
+    {
+        break;
+    }
+    }
+
     return true;
 }
 
-static bool uncompress(const std::vector<uint8_t>& src, std::vector<uint8_t>& data_out, ECompressionType compression_type)
+static bool uncompress(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst, ECompressionType compression_type, size_t uncompressed_size)
 {
+    switch (compression_type)
+    {
+    case ECompressionType::Heatshrink_11_4:
+    case ECompressionType::Heatshrink_12_4:
+    {
+        const uint8_t window_sz = (compression_type == ECompressionType::Heatshrink_11_4) ? 11 : 12;
+        const uint8_t lookahead_sz = 4;
+        const uint16_t input_buffer_size = 2048;
+        heatshrink_decoder* decoder = heatshrink_decoder_alloc(input_buffer_size, window_sz, lookahead_sz);
+        if (decoder == nullptr)
+            return false;
+
+        dst.resize(uncompressed_size);
+
+        uint8_t* buf = const_cast<uint8_t*>(src.data());
+        uint8_t* outbuf = dst.data();
+
+        uint32_t sunk = 0;
+        uint32_t polled = 0;
+
+        const size_t compressed_size = src.size();
+        while (sunk < compressed_size) {
+            size_t count = 0;
+            const HSD_sink_res sink_res = heatshrink_decoder_sink(decoder, &buf[sunk], compressed_size - sunk, &count);
+            if (sink_res < 0) {
+                heatshrink_decoder_free(decoder);
+                return false;
+            }
+
+            sunk += (uint32_t)count;
+
+            HSD_poll_res poll_res;
+            do {
+                poll_res  = heatshrink_decoder_poll(decoder, &outbuf[polled], uncompressed_size - polled, &count);
+                if (poll_res < 0) {
+                    heatshrink_decoder_free(decoder);
+                    return false;
+                }
+                polled += (uint32_t)count;
+            } while (polled < uncompressed_size && poll_res == HSDR_POLL_MORE);
+        }
+
+        const HSD_finish_res finish_res = heatshrink_decoder_finish(decoder);
+        if (finish_res < 0) {
+            heatshrink_decoder_free(decoder);
+            return false;
+        }
+
+        heatshrink_decoder_free(decoder);
+        break;
+    }
+    case ECompressionType::None:
+    default:
+    {
+        break;
+    }
+    }
+
     return true;
 }
 
@@ -847,7 +980,7 @@ EResult BaseMetadataBlock::read_data(FILE& file, const BlockHeader& block_header
 
     std::vector<uint8_t> uncompressed_data;
     if (compression_type != ECompressionType::None) {
-        if (!uncompress(data, uncompressed_data, compression_type))
+        if (!uncompress(data, uncompressed_data, compression_type, block_header.uncompressed_size))
             return EResult::DataUncompressionError;
     }
 
@@ -956,6 +1089,7 @@ EResult ThumbnailBlock::read_data(FILE& file, const FileHeader& file_header, con
         return EResult::InvalidThumbnailHeight;
     if (block_header.uncompressed_size == 0)
         return EResult::InvalidThumbnailDataSize;
+
     data.resize(block_header.uncompressed_size);
     if (!read_from_file(file, (void*)data.data(), block_header.uncompressed_size))
         return EResult::ReadError;
@@ -1173,7 +1307,7 @@ EResult GCodeBlock::read_data(FILE& file, const FileHeader& file_header, const B
 
     std::vector<uint8_t> uncompressed_data;
     if (compression_type != ECompressionType::None) {
-        if (!uncompress(data, uncompressed_data, compression_type))
+        if (!uncompress(data, uncompressed_data, compression_type, block_header.uncompressed_size))
             return EResult::DataUncompressionError;
     }
 
@@ -1246,12 +1380,12 @@ EResult Binarizer::initialize(FILE& file, const BinarizerConfig& config)
         return res;
 
     // save file metadata block
-    res = m_binary_data.file_metadata.write(*m_file, m_config.compression, m_config.checksum);
+    res = m_binary_data.file_metadata.write(*m_file, m_config.compression.file_metadata, m_config.checksum);
     if (res != EResult::Success)
         return res;
 
     // save printer metadata block
-    res = m_binary_data.printer_metadata.write(*m_file, m_config.compression, m_config.checksum);
+    res = m_binary_data.printer_metadata.write(*m_file, m_config.compression.printer_metadata, m_config.checksum);
     if (res != EResult::Success)
         return res;
 
@@ -1263,12 +1397,12 @@ EResult Binarizer::initialize(FILE& file, const BinarizerConfig& config)
     }
 
     // save print metadata block
-    res = m_binary_data.print_metadata.write(*m_file, m_config.compression, m_config.checksum);
+    res = m_binary_data.print_metadata.write(*m_file, m_config.compression.print_metadata, m_config.checksum);
     if (res != EResult::Success)
         return res;
 
     // save slicer metadata block
-    res = m_binary_data.slicer_metadata.write(*m_file, m_config.compression, m_config.checksum);
+    res = m_binary_data.slicer_metadata.write(*m_file, m_config.compression.slicer_metadata, m_config.checksum);
     if (res != EResult::Success)
         return res;
 
@@ -1280,7 +1414,7 @@ static EResult write_gcode_block(FILE& file, const std::string& raw_data, const 
     GCodeBlock block;
     block.encoding_type = (uint16_t)config.gcode_encoding;
     block.raw_data = raw_data;
-    return block.write(file, config.compression, config.checksum);
+    return block.write(file, config.compression.gcode, config.checksum);
 }
 
 EResult Binarizer::append_gcode(const std::string& gcode)

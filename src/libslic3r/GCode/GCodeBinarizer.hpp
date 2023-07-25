@@ -105,6 +105,8 @@ enum class EBlockType : uint16_t
 enum class ECompressionType : uint16_t
 {
     None,
+    Heatshrink_11_4,
+    Heatshrink_12_4,
 };
 
 struct BlockHeader
@@ -255,7 +257,16 @@ struct BinaryData
 
 struct BinarizerConfig
 {
-    ECompressionType compression{ ECompressionType::None };
+    struct Compression
+    {
+        ECompressionType file_metadata{ ECompressionType::None };
+        ECompressionType printer_metadata{ ECompressionType::None };
+        ECompressionType thumbnail{ ECompressionType::None };
+        ECompressionType print_metadata{ ECompressionType::None };
+        ECompressionType slicer_metadata{ ECompressionType::None };
+        ECompressionType gcode{ ECompressionType::None };
+    };
+    Compression compression;
     EGCodeEncodingType gcode_encoding{ EGCodeEncodingType::None };
     EMetadataEncodingType metadata_encoding{ EMetadataEncodingType::INI };
     EChecksumType checksum{ EChecksumType::CRC32 };
