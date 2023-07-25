@@ -216,6 +216,40 @@ inline RectPivots xlpivots_to_rect_pivots(ArrangeSettingsView::XLPivots xlpivot)
     return rectpivot;
 }
 
+template<class It, class Bed>
+void fill_rotations(const Range<It>           &items,
+                    const Bed                 &bed,
+                    const ArrangeSettingsView &settings)
+{
+    if (!settings.is_rotation_enabled())
+        return;
+
+    for (auto &itm : items) {
+        // Use the minimum bounding box rotation as a starting point.
+        auto minbbr = get_min_area_bounding_box_rotation(itm);
+        std::vector<double> rotations =
+            {minbbr,
+             minbbr + PI / 4., minbbr + PI / 2.,
+             minbbr + PI,      minbbr + 3 * PI / 4.};
+
+        // Add the original rotation of the item if minbbr
+        // is not already the original rotation (zero)
+        if (std::abs(minbbr) > 0.)
+            rotations.emplace_back(0.);
+
+        // Also try to find the rotation that fits the item
+        // into a rectangular bed, given that it cannot fit,
+        // and there exists a rotation which can fit.
+        if constexpr (std::is_convertible_v<Bed, RectangleBed>) {
+            double fitbrot = get_fit_into_bed_rotation(itm, bed);
+            if (std::abs(fitbrot) > 0.)
+                rotations.emplace_back(fitbrot);
+        }
+
+        set_allowed_rotations(itm, rotations);
+    }
+}
+
 // An arranger put together to fulfill all the requirements of PrusaSlicer based
 // on the supplied ArrangeSettings
 template<class ArrItem>
@@ -271,23 +305,7 @@ class DefaultArranger: public Arranger<ArrItem> {
         auto & kernel = basekernel;
 #endif
 
-        // Use the minimum bounding box rotation as a starting point.
-        if (m_settings.is_rotation_enabled()) {
-            for (auto &itm : items) {
-                double fit_bed_rot = 0.;
-
-                if constexpr (std::is_convertible_v<Bed, RectangleBed>)
-                    fit_bed_rot = get_fit_into_bed_rotation(itm, bed);
-
-                auto minbbr = get_min_area_bounding_box_rotation(itm);
-                std::vector<double> rotations =
-                    {minbbr, fit_bed_rot,
-                     minbbr + PI / 4., minbbr + PI / 2.,
-                     minbbr + PI,      minbbr + 3 * PI / 4.};
-
-                set_allowed_rotations(itm, rotations);
-            }
-        }
+        fill_rotations(items, bed, m_settings);
 
         bool with_wipe_tower = std::any_of(items.begin(), items.end(),
                                            [](auto &itm) {

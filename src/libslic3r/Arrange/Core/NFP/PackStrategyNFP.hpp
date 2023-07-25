@@ -252,14 +252,12 @@ bool pack(Strategy &strategy,
         if (!nfp.empty()) {
             score = pick_best_spot_on_nfp(item, nfp, bed, strategy);
 
-            cancelled = std::isnan(score) || strategy.stop_condition();
+            cancelled = strategy.stop_condition();
             if (score > final_score) {
                 final_score = score;
                 final_rot   = rot;
                 final_tr    = get_translation(item);
             }
-        } else {
-            cancelled = true;
         }
     }
 
