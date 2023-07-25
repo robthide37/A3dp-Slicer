@@ -813,7 +813,7 @@ void GLGizmoEmboss::on_render_input_window(float x, float y, float bottom_limit)
 
     bool is_opened = true;
     ImGuiWindowFlags flag = ImGuiWindowFlags_NoCollapse;
-    if (ImGui::Begin(on_get_name().c_str(), &is_opened, flag)) {
+    if (ImGui::Begin(get_name().c_str(), &is_opened, flag)) {
         // Need to pop var before draw window
         ImGui::PopStyleVar(); // WindowMinSize
         draw_window();
