@@ -780,7 +780,43 @@ TEST_CASE("Testing a simple arrange on cubes", "[arrange2][integration]")
                         [&bed](auto &item) { return bounding_box(bed).contains(arr2::envelope_bounding_box(item)); }));
 
     REQUIRE(is_collision_free(range(task->printable.selected)));
+}
 
+TEST_CASE("Testing arrangement involving virtual beds", "[arrange2][integration]")
+{
+    using namespace Slic3r;
+
+    Model model = get_example_model_with_arranged_primitives();
+
+    arr2::ArrangeSettings settings;
+    auto bed = arr2::RectangleBed{scaled(250.), scaled(210.)};
+
+    arr2::Scene scene{arr2::SceneBuilder{}
+                          .set_model(model)
+                          .set_arrange_settings(settings)
+                          .set_bed(bed)};
+
+    auto task = arr2::ArrangeTask<arr2::ArrangeItem>::create(scene);
+    task->printable.selected.emplace_back(arr2::ArrangeItem{arr2::to_rectangle(offset(bed, -scaled(1.)))});
+
+    REQUIRE(task->printable.selected.size() == arr2::model_instance_count(model) + 1);
+
+    auto result = task->process_native(arr2::DummyCtl{});
+
+    REQUIRE(result);
+
+    REQUIRE(result->items.size() == task->printable.selected.size());
+
+    REQUIRE(std::all_of(result->items.begin(),
+                        std::prev(result->items.end()),
+                        [](auto &item) { return arr2::get_bed_index(item) == 1; }));
+
+    REQUIRE(arr2::get_bed_index(result->items.back()) == arr2::PhysicalBedId);
+
+    REQUIRE(std::all_of(task->printable.selected.begin(), task->printable.selected.end(),
+                        [&bed](auto &item) { return bounding_box(bed).contains(arr2::envelope_bounding_box(item)); }));
+
+    REQUIRE(is_collision_free(Range{task->printable.selected.begin(), std::prev(task->printable.selected.end())}));
 }
 
 bool settings_eq(const Slic3r::arr2::ArrangeSettingsView &v1,
