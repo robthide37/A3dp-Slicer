@@ -7900,18 +7900,8 @@ void GLCanvas3D::show_binary_gcode_debug_window()
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Thumbnail compression");
-        ImGui::TableSetColumnIndex(1);
-        options = { "None" };
-        option_id = (int)binarizer_config.compression.thumbnail;
-        if (imgui.combo(std::string("##thumbnail_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
-            binarizer_config.compression.thumbnail = (BinaryGCode::ECompressionType)option_id;
-
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
         imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Print metadata compression");
         ImGui::TableSetColumnIndex(1);
-        options = { "None", "heatshrink 11,4", "heatshrink 12,4" };
         option_id = (int)binarizer_config.compression.print_metadata;
         if (imgui.combo(std::string("##print_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
             binarizer_config.compression.print_metadata = (BinaryGCode::ECompressionType)option_id;

@@ -261,7 +261,6 @@ struct BinarizerConfig
     {
         ECompressionType file_metadata{ ECompressionType::None };
         ECompressionType printer_metadata{ ECompressionType::None };
-        ECompressionType thumbnail{ ECompressionType::None };
         ECompressionType print_metadata{ ECompressionType::None };
         ECompressionType slicer_metadata{ ECompressionType::None };
         ECompressionType gcode{ ECompressionType::None };
@@ -299,6 +298,7 @@ private:
 
 //=====================================================================================================================================
 //
+// GCODEVIEWER INTERFACE
 // FIRMWARE INTERFACE
 //  
 //=====================================================================================================================================
