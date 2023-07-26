@@ -96,7 +96,7 @@ void set_arbitrary_data(Itm &itm, const std::string &key, T &&data)
 template<class Itm>
 void set_allowed_rotations(Itm &itm, const std::vector<double> &rotations)
 {
-    WritableItemTraits<Itm>::set_arbitrary_data(itm, "rotations", rotations);
+    WritableItemTraits<Itm>::set_allowed_rotations(itm, rotations);
 }
 
 template<class ArrItem> int raise_priority(ArrItem &itm)

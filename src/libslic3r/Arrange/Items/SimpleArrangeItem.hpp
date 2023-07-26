@@ -7,6 +7,9 @@
 #include "libslic3r/Arrange/Core/NFP/NFP.hpp"
 
 #include "libslic3r/Arrange/Arrange.hpp"
+#include "libslic3r/Arrange/Tasks/ArrangeTask.hpp"
+#include "libslic3r/Arrange/Tasks/FillBedTask.hpp"
+#include "libslic3r/Arrange/Tasks/MultiplySelectionTask.hpp"
 
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
@@ -24,6 +27,7 @@ class SimpleArrangeItem {
     int     m_bed_idx = Unarranged;
 
     std::vector<double> m_allowed_rotations = {0.};
+    ObjectID m_obj_id;
 
 public:
     explicit SimpleArrangeItem(Polygon chull = {}): m_shape{std::move(chull)} {}
@@ -52,6 +56,9 @@ public:
     {
         m_allowed_rotations = std::move(rots);
     }
+
+    void set_object_id(const ObjectID &id) noexcept { m_obj_id = id; }
+    const ObjectID & get_object_id() const noexcept { return m_obj_id; }
 };
 
 template<> struct NFPArrangeItemTraits_<SimpleArrangeItem>
@@ -182,6 +189,29 @@ struct WritableItemTraits_<SimpleArrangeItem> {
         itm.set_allowed_rotations(rotations);
     }
 };
+
+template<> struct ImbueableItemTraits_<SimpleArrangeItem>
+{
+    static void imbue_id(SimpleArrangeItem &itm, const ObjectID &id)
+    {
+        itm.set_object_id(id);
+    }
+
+    static std::optional<ObjectID> retrieve_id(const SimpleArrangeItem &itm)
+    {
+        std::optional<ObjectID> ret;
+        if (itm.get_object_id().valid())
+            ret = itm.get_object_id();
+
+        return ret;
+    }
+};
+
+extern template class  ArrangeableToItemConverter<SimpleArrangeItem>;
+extern template struct ArrangeTask<SimpleArrangeItem>;
+extern template struct FillBedTask<SimpleArrangeItem>;
+extern template struct MultiplySelectionTask<SimpleArrangeItem>;
+extern template class  Arranger<SimpleArrangeItem>;
 
 }} // namespace Slic3r::arr2
 

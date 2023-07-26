@@ -123,7 +123,7 @@ void arrange(SelectionStrategy &&selstrategy,
         d += corr;
 
         for (auto &itm : items)
-            if (itm.bed_idx() == static_cast<int>(bedidx) && !is_wipe_tower(itm))
+            if (get_bed_index(itm) == static_cast<int>(bedidx) && !is_wipe_tower(itm))
                 translate(itm, d);
     }
 }
@@ -386,7 +386,8 @@ ArrItem ConvexItemConverter<ArrItem>::convert(const Arrangeable &arrbl,
     set_priority(ret, arrbl.priority());
 
     imbue_id(ret, arrbl.id());
-    arrbl.imbue_data(AnyWritableDataStore{ret});
+    if constexpr (IsWritableDataStore<ArrItem>)
+        arrbl.imbue_data(AnyWritableDataStore{ret});
 
     return ret;
 }
@@ -401,7 +402,8 @@ ArrItem AdvancedItemConverter<ArrItem>::convert(const Arrangeable &arrbl,
     set_bed_index(ret, bed_index);
     set_priority(ret, arrbl.priority());
     imbue_id(ret, arrbl.id());
-    arrbl.imbue_data(AnyWritableDataStore{ret});
+    if constexpr (IsWritableDataStore<ArrItem>)
+        arrbl.imbue_data(AnyWritableDataStore{ret});
 
     return ret;
 }
