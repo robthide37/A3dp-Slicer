@@ -223,7 +223,7 @@ set(SLIC3R_SOURCES
     Arrange/Items/SimpleArrangeItem.hpp
     Arrange/Items/SimpleArrangeItem.cpp
     Arrange/Items/TrafoOnlyArrangeItem.hpp
-    Arrange/Items/WritableItemTraits.hpp
+    Arrange/Items/MutableItemTraits.hpp
     Arrange/Items/ArbitraryDataStore.hpp
     Arrange/ArrangeSettingsView.hpp
     Arrange/ArrangeSettingsDb_AppCfg.hpp

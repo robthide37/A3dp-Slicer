@@ -4,7 +4,7 @@
 #include "libslic3r/Arrange/Core/ArrangeItemTraits.hpp"
 
 #include "libslic3r/Arrange/Items/ArbitraryDataStore.hpp"
-#include "libslic3r/Arrange/Items/WritableItemTraits.hpp"
+#include "libslic3r/Arrange/Items/MutableItemTraits.hpp"
 
 namespace Slic3r { namespace arr2 {
 
@@ -58,7 +58,7 @@ template<> struct DataStoreTraits_<TrafoOnlyArrangeItem>
     }
 };
 
-template<> struct IsWritableItem_<TrafoOnlyArrangeItem>: public std::true_type {};
+template<> struct IsMutableItem_<TrafoOnlyArrangeItem>: public std::true_type {};
 
 template<> struct WritableDataStoreTraits_<TrafoOnlyArrangeItem>
 {

@@ -364,13 +364,13 @@ TEST_CASE("Static type tests for arrange items", "[arrange2]")
     using namespace Slic3r;
 
     REQUIRE(arr2::IsDataStore<arr2::ArrangeItem>);
-    REQUIRE(arr2::IsWritableItem<arr2::ArrangeItem>);
+    REQUIRE(arr2::IsMutableItem<arr2::ArrangeItem>);
 
     REQUIRE(! arr2::IsDataStore<arr2::SimpleArrangeItem>);
-    REQUIRE(arr2::IsWritableItem<arr2::SimpleArrangeItem>);
+    REQUIRE(arr2::IsMutableItem<arr2::SimpleArrangeItem>);
 
     REQUIRE(arr2::IsDataStore<arr2::TrafoOnlyArrangeItem>);
-    REQUIRE(arr2::IsWritableItem<arr2::TrafoOnlyArrangeItem>);
+    REQUIRE(arr2::IsMutableItem<arr2::TrafoOnlyArrangeItem>);
 }
 
 template<class Bed> Bed init_bed() { return {}; }

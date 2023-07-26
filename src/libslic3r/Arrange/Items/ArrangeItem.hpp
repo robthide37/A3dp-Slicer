@@ -12,7 +12,7 @@
 #include "libslic3r/Arrange/Core/NFP/NFPArrangeItemTraits.hpp"
 #include "libslic3r/Arrange/Core/NFP/NFP.hpp"
 
-#include "libslic3r/Arrange/Items/WritableItemTraits.hpp"
+#include "libslic3r/Arrange/Items/MutableItemTraits.hpp"
 
 #include "libslic3r/Arrange/Arrange.hpp"
 #include "libslic3r/Arrange/Tasks/ArrangeTask.hpp"
@@ -433,10 +433,10 @@ template<> struct NFPArrangeItemTraits_<ArrangeItem> {
     }
 };
 
-template<> struct IsWritableItem_<ArrangeItem>: public std::true_type {};
+template<> struct IsMutableItem_<ArrangeItem>: public std::true_type {};
 
 template<>
-struct WritableItemTraits_<ArrangeItem> {
+struct MutableItemTraits_<ArrangeItem> {
 
     static void set_priority(ArrangeItem &itm, int p) { itm.priority(p); }
     static void set_convex_shape(ArrangeItem &itm, const Polygon &shape)

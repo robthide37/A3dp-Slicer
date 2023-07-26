@@ -2,7 +2,7 @@
 #define ARRANGE2_HPP
 
 #include "Scene.hpp"
-#include "Items/WritableItemTraits.hpp"
+#include "Items/MutableItemTraits.hpp"
 #include "Core/NFP/NFPArrangeItemTraits.hpp"
 
 #include "libslic3r/MinAreaBoundingBox.hpp"

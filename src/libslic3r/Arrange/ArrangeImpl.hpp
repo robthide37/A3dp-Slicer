@@ -13,7 +13,7 @@
 #include "Core/NFP/RectangleOverfitPackingStrategy.hpp"
 #include "Core/Beds.hpp"
 
-#include "Items/WritableItemTraits.hpp"
+#include "Items/MutableItemTraits.hpp"
 
 #include "SegmentedRectangleBed.hpp"
 

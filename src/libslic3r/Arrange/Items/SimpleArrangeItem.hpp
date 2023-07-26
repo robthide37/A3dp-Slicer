@@ -14,7 +14,7 @@
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/Geometry/ConvexHull.hpp"
 
-#include "WritableItemTraits.hpp"
+#include "MutableItemTraits.hpp"
 
 namespace Slic3r { namespace arr2 {
 
@@ -157,10 +157,10 @@ template<> struct NFPArrangeItemTraits_<SimpleArrangeItem>
     }
 };
 
-template<> struct IsWritableItem_<SimpleArrangeItem>: public std::true_type {};
+template<> struct IsMutableItem_<SimpleArrangeItem>: public std::true_type {};
 
 template<>
-struct WritableItemTraits_<SimpleArrangeItem> {
+struct MutableItemTraits_<SimpleArrangeItem> {
 
     static void set_priority(SimpleArrangeItem &itm, int p) { itm.set_priority(p); }
     static void set_convex_shape(SimpleArrangeItem &itm, const Polygon &shape)
