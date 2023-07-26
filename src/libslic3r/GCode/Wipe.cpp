@@ -128,6 +128,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             double radius = emit_radius ? GCodeFormatter::quantize_xyzf(radius_in) : radius_in;
             Vec2d  center = Geometry::ArcWelder::arc_center(prev_quantized.cast<double>(), p_quantized.cast<double>(), double(radius), ccw);
             float  angle  = Geometry::ArcWelder::arc_angle(prev_quantized.cast<double>(), p_quantized.cast<double>(), double(radius));
+            assert(angle > 0);
             double segment_length = angle * std::abs(radius);
             double dE = GCodeFormatter::quantize_e(xy_to_e * segment_length);
             bool   done = false;
@@ -146,6 +147,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                 done = true;
             } else
                 p = p_quantized;
+            assert(dE > 0);
             if (emit_radius) {
                 gcode += gcodegen.writer().extrude_to_xy_G2G3R(p, radius, ccw, -dE, wipe_retract_comment);
             } else {

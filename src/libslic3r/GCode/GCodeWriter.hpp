@@ -181,8 +181,10 @@ public:
     }
 
     void emit_ij(const Vec2d &point) {
-        this->emit_axis('I', point.x(), XYZF_EXPORT_DIGITS);
-        this->emit_axis('J', point.y(), XYZF_EXPORT_DIGITS);
+        if (point.x() != 0)
+            this->emit_axis('I', point.x(), XYZF_EXPORT_DIGITS);
+        if (point.y() != 0)
+            this->emit_axis('J', point.y(), XYZF_EXPORT_DIGITS);
     }
 
     // Positive radius means a smaller arc, 

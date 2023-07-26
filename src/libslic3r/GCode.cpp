@@ -2902,9 +2902,10 @@ std::string GCodeGenerator::_extrude(
             Vec2d p = this->point_to_gcode_quantized(it->point);
             if (it->radius == 0) {
                 // Extrude line segment.
-                const double line_length = (p - prev).norm();
-                path_length += line_length;
-                gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
+                if (const double line_length = (p - prev).norm(); line_length > 0) {
+                    path_length += line_length;
+                    gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
+                }
             } else {
                 // Extrude an arc.
                 assert(m_config.arc_fitting == ArcFittingType::EmitCenter ||
@@ -2920,9 +2921,11 @@ std::string GCodeGenerator::_extrude(
                     ij = GCodeFormatter::quantize(center_raw);
                 }
                 double angle = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
+                assert(angle > 0);
                 const double line_length = angle * std::abs(radius);
                 path_length += line_length;
                 const double dE = e_per_mm * line_length;
+                assert(dE > 0);
                 gcode += emit_radius ?
                     m_writer.extrude_to_xy_G2G3R(p, radius, it->ccw(), dE, comment) :
                     m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE, comment);

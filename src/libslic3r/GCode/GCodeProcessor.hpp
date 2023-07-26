@@ -56,9 +56,13 @@ namespace Slic3r {
                 time = 0.0f;
                 travel_time = 0.0f;
                 custom_gcode_times.clear();
+                custom_gcode_times.shrink_to_fit();
                 moves_times.clear();
+                moves_times.shrink_to_fit();
                 roles_times.clear();
+                roles_times.shrink_to_fit();
                 layers_times.clear();
+                layers_times.shrink_to_fit();
             }
         };
 
@@ -76,6 +80,7 @@ namespace Slic3r {
                 m.reset();
             }
             volumes_per_color_change.clear();
+            volumes_per_color_change.shrink_to_fit();
             volumes_per_extruder.clear();
             used_filaments_per_role.clear();
             cost_per_extruder.clear();
@@ -680,8 +685,12 @@ namespace Slic3r {
         // Move
         void process_G0(const GCodeReader::GCodeLine& line);
         void process_G1(const GCodeReader::GCodeLine& line);
+        enum class G1DiscretizationOrigin {
+            G1,
+            G2G3,
+        };
         void process_G1(const std::array<std::optional<double>, 4>& axes = { std::nullopt, std::nullopt, std::nullopt, std::nullopt },
-            std::optional<double> feedrate = std::nullopt, std::optional<std::string> cmt = std::nullopt);
+            std::optional<double> feedrate = std::nullopt, G1DiscretizationOrigin origin = G1DiscretizationOrigin::G1);
 
         // Arc Move
         void process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise);

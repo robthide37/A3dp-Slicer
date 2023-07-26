@@ -41,10 +41,11 @@ Points arc_discretize(const Point &p1, const Point &p2, const double radius, con
 {
     Vec2d  center = arc_center(p1.cast<double>(), p2.cast<double>(), radius, ccw);
     double angle  = arc_angle(p1.cast<double>(), p2.cast<double>(), radius);
+    assert(angle > 0);
 
     double r           = std::abs(radius);
-    double angle_step  = 2. * acos((r - deviation) / r);
-    size_t num_steps   = size_t(ceil(angle / angle_step));
+    size_t num_steps   = arc_discretization_steps(r, angle, deviation);
+    double angle_step  = angle / num_steps;
 
     Points out;
     out.reserve(num_steps + 1);

@@ -54,8 +54,10 @@ inline typename Derived::Scalar arc_angle(
     using Float = typename Derived::Scalar;
     Float a = Float(0.5) * (end_pos - start_pos).norm() / radius;
     return radius > Float(0) ?
-        (a > Float( 1.) ? Float(   M_PI) : Float(2.) * std::asin(a)) :
-        (a < Float(-1.) ? Float( - M_PI) : Float(2. * M_PI) + Float(2.) * std::asin(a));
+        // acute angle:
+        (a > Float( 1.) ? Float(M_PI) : Float(2.) * std::asin(a)) :
+        // obtuse angle:
+        (a < Float(-1.) ? Float(M_PI) : Float(2. * M_PI) + Float(2.) * std::asin(a));
 }
 
 // Calculate positive length of an arc given two points and a radius.
@@ -162,6 +164,30 @@ inline bool inside_arc_wedge(
     return inside_arc_wedge(start_pt, end_pt,
         arc_center(start_pt, end_pt, radius, ccw), 
         radius > 0, ccw, query_pt);
+}
+
+// Return number of linear segments necessary to interpolate arc of a given positive radius and positive angle to satisfy
+// maximum deviation of an interpolating polyline from an analytic arc.
+template<typename FloatType>
+size_t arc_discretization_steps(const FloatType radius, const FloatType angle, const FloatType deviation)
+{
+    assert(radius > 0);
+    assert(angle > 0);
+    assert(angle <= FloatType(2. * M_PI));
+    assert(deviation > 0);
+
+    FloatType d = radius - deviation;
+    return d < EPSILON ?
+        // Radius smaller than deviation.
+        (   // Acute angle: a single segment interpolates the arc with sufficient accuracy.
+            angle < M_PI || 
+            // Obtuse angle: Test whether the furthest point (center) of an arc is closer than deviation to the center of a line segment.
+            radius * (FloatType(1.) + cos(M_PI - FloatType(.5) * angle)) < deviation ?
+            // Single segment is sufficient
+            1 :
+            // Two segments are necessary, the middle point is at the center of the arc.
+            2) :
+        size_t(ceil(angle / (2. * acos(d / radius))));
 }
 
 // Discretize arc given the radius, orientation and maximum deviation from the arc.

@@ -274,6 +274,12 @@ std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string_view
 
 std::string GCodeWriter::travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment)
 {
+    assert(std::abs(point.x()) < 1200.);
+    assert(std::abs(point.y()) < 1200.);
+    assert(std::abs(ij.x()) < 1200.);
+    assert(std::abs(ij.y()) < 1200.);
+    assert(std::abs(ij.x()) >= 0.001 || std::abs(ij.y()) >= 0.001);
+ 
     m_pos.head<2>() = point.head<2>();
 
     GCodeG2G3Formatter w(ccw);
@@ -285,6 +291,11 @@ std::string GCodeWriter::travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij
 
 std::string GCodeWriter::travel_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, const std::string_view comment)
 {
+    assert(std::abs(point.x()) < 1200.);
+    assert(std::abs(point.y()) < 1200.);
+    assert(std::abs(radius) >= 0.001);
+    assert(std::abs(radius) < 1800.);
+
     m_pos.head<2>() = point.head<2>();
 
     GCodeG2G3Formatter w(ccw);
@@ -395,6 +406,8 @@ std::string GCodeWriter::extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &i
     assert(std::abs(point.y()) < 1200.);
     assert(std::abs(ij.x()) < 1200.);
     assert(std::abs(ij.y()) < 1200.);
+    assert(std::abs(ij.x()) >= 0.001 || std::abs(ij.y()) >= 0.001);
+
     m_pos.head<2>() = point.head<2>();
 
     GCodeG2G3Formatter w(ccw);
@@ -411,7 +424,9 @@ std::string GCodeWriter::extrude_to_xy_G2G3R(const Vec2d &point, const double ra
     assert(std::abs(dE) < 1000.0);
     assert(std::abs(point.x()) < 1200.);
     assert(std::abs(point.y()) < 1200.);
+    assert(std::abs(radius) >= 0.001);
     assert(std::abs(radius) < 1800.);
+
     m_pos.head<2>() = point.head<2>();
 
     GCodeG2G3Formatter w(ccw);
