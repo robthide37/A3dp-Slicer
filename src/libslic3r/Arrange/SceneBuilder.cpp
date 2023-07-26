@@ -852,34 +852,6 @@ std::unique_ptr<VirtualBedHandler> VirtualBedHandler::create(const ExtendedBed &
     return ret;
 }
 
-template<class ArrblSubclass>
-ExPolygons OutlineCachingArrangeable<ArrblSubclass>::full_outline() const
-{
-    auto *entry = m_cache->full_outline(m_arrbl.id());
-    auto [inst, pos] = find_instance_by_id(m_mdl, m_arrbl.id());
-
-    ExPolygons outline;
-
-    if (inst) {
-        Transform3d trafo = inst->get_matrix_no_offset();
-
-        if (!entry) {
-            outline = m_arrbl.full_outline();
-            m_cache->set_full_outline(this->id().id, outline,
-                                      std::any{inst->get_matrix_no_offset()});
-        } else {
-            auto *ctxtrafo = std::any_cast<Transform3d>(&(entry->context));
-            if (ctxtrafo && ctxtrafo->isApprox(trafo))
-                outline = entry->outline;
-        }
-    }
-
-    return outline;
-}
-
-template class OutlineCachingArrangeable<Arrangeable>;
-template class OutlineCachingArrangeable<const Arrangeable>;
-
 }} // namespace Slic3r::arr2
 
 #endif // SCENEBUILDER_CPP

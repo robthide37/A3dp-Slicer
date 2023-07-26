@@ -232,8 +232,6 @@ set(SLIC3R_SOURCES
     Arrange/Scene.cpp
     Arrange/SceneBuilder.hpp
     Arrange/SceneBuilder.cpp
-    Arrange/OutlineCaching.hpp
-    Arrange/OutlineCaching.cpp
     Arrange/Tasks/ArrangeTask.hpp
     Arrange/Tasks/ArrangeTaskImpl.hpp
     Arrange/Tasks/FillBedTask.hpp
