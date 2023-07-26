@@ -7885,7 +7885,7 @@ void GLCanvas3D::show_binary_gcode_debug_window()
         ImGui::TableSetColumnIndex(0);
         imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "File metadata compression");
         ImGui::TableSetColumnIndex(1);
-        std::vector<std::string> options = { "None", "heatshrink 11,4", "heatshrink 12,4" };
+        std::vector<std::string> options = { "None", "Deflate", "heatshrink 11,4", "heatshrink 12,4" };
         int option_id = (int)binarizer_config.compression.file_metadata;
         if (imgui.combo(std::string("##file_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
             binarizer_config.compression.file_metadata = (BinaryGCode::ECompressionType)option_id;

@@ -5431,17 +5431,6 @@ void Plater::reload_gcode_from_disk()
 }
 
 #if ENABLE_BINARIZED_GCODE
-static bool is_valid_binary_gcode(const wxString& filename)
-{
-    FILE* file = boost::nowide::fopen(into_u8(filename).c_str(), "rb");
-    if (file == nullptr)
-        return false;
-
-    const bool ret = BinaryGCode::is_valid_binary_gcode(*file);
-    fclose(file);
-    return ret;
-}
-
 void Plater::convert_gcode_to_ascii()
 {
     // Ask user for a gcode file name.

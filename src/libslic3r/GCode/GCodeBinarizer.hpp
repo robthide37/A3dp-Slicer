@@ -108,6 +108,7 @@ enum class EBlockType : uint16_t
 enum class ECompressionType : uint16_t
 {
     None,
+    Deflate,
     Heatshrink_11_4,
     Heatshrink_12_4,
 };

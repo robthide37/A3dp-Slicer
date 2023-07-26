@@ -14,6 +14,7 @@ extern "C" {
 #include <heatshrink/heatshrink_encoder.h>
 #include <heatshrink/heatshrink_decoder.h>
 }
+#include <zlib.h>
 
 #include <algorithm>
 #include <cassert>
@@ -601,6 +602,56 @@ static bool compress(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst,
 {
     switch (compression_type)
     {
+    case ECompressionType::Deflate:
+    {
+        dst.clear();
+
+        const size_t BUFSIZE = 2048;
+        std::vector<uint8_t> temp_buffer(BUFSIZE);
+
+        z_stream strm{};
+        strm.next_in = const_cast<uint8_t*>(src.data());
+        strm.avail_in = (uInt)src.size();
+        strm.next_out = temp_buffer.data();
+        strm.avail_out = BUFSIZE;
+
+        const int level = Z_DEFAULT_COMPRESSION;
+        int res = deflateInit(&strm, level);
+        if (res != Z_OK)
+            return false;
+
+        while (strm.avail_in > 0) {
+            res = deflate(&strm, Z_NO_FLUSH);
+            if (res != Z_OK) {
+                deflateEnd(&strm);
+                return false;
+            }
+            if (strm.avail_out == 0) {
+                dst.insert(dst.end(), temp_buffer.data(), temp_buffer.data() + BUFSIZE);
+                strm.next_out = temp_buffer.data();
+                strm.avail_out = BUFSIZE;
+            }
+        }
+
+        int deflate_res = Z_OK;
+        while (deflate_res == Z_OK) {
+            if (strm.avail_out == 0) {
+                dst.insert(dst.end(), temp_buffer.data(), temp_buffer.data() + BUFSIZE);
+                strm.next_out = temp_buffer.data();
+                strm.avail_out = BUFSIZE;
+            }
+            deflate_res = deflate(&strm, Z_FINISH);
+        }
+
+        if (deflate_res != Z_STREAM_END) {
+            deflateEnd(&strm);
+            return false;
+        }
+
+        dst.insert(dst.end(), temp_buffer.data(), temp_buffer.data() + BUFSIZE - strm.avail_out);
+        deflateEnd(&strm);
+        break;
+    }
     case ECompressionType::Heatshrink_11_4:
     case ECompressionType::Heatshrink_12_4:
     {
@@ -676,6 +727,55 @@ static bool uncompress(const std::vector<uint8_t>& src, std::vector<uint8_t>& ds
 {
     switch (compression_type)
     {
+    case ECompressionType::Deflate:
+    {
+        dst.clear();
+        dst.reserve(uncompressed_size);
+
+        const size_t BUFSIZE = 2048;
+        std::vector<uint8_t> temp_buffer(BUFSIZE);
+
+        z_stream strm{};
+        strm.next_in = const_cast<uint8_t*>(src.data());
+        strm.avail_in = (uInt)src.size();
+        strm.next_out = temp_buffer.data();
+        strm.avail_out = BUFSIZE;
+        int res = inflateInit(&strm);
+        if (res != Z_OK)
+            return false;
+
+        while (strm.avail_in > 0) {
+            res = inflate(&strm, Z_NO_FLUSH);
+            if (res != Z_OK && res != Z_STREAM_END) {
+                inflateEnd(&strm);
+                return false;
+            }
+            if (strm.avail_out == 0) {
+                dst.insert(dst.end(), temp_buffer.data(), temp_buffer.data() + BUFSIZE);
+                strm.next_out = temp_buffer.data();
+                strm.avail_out = BUFSIZE;
+            }
+        }
+
+        int inflate_res = Z_OK;
+        while (inflate_res == Z_OK) {
+            if (strm.avail_out == 0) {
+                dst.insert(dst.end(), temp_buffer.data(), temp_buffer.data() + BUFSIZE);
+                strm.next_out = temp_buffer.data();
+                strm.avail_out = BUFSIZE;
+            }
+            inflate_res = inflate(&strm, Z_FINISH);
+        }
+
+        if (inflate_res != Z_STREAM_END) {
+            inflateEnd(&strm);
+            return false;
+        }
+
+        dst.insert(dst.end(), temp_buffer.data(), temp_buffer.data() + BUFSIZE - strm.avail_out);
+        inflateEnd(&strm);
+        break;
+    }
     case ECompressionType::Heatshrink_11_4:
     case ECompressionType::Heatshrink_12_4:
     {
