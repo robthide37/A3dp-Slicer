@@ -1,4 +1,7 @@
 #include "NSVGUtils.hpp"
+#include <array>
+#include <charconv> // to_chars
+
 #include "ClipperUtils.hpp"
 
 namespace {
@@ -27,7 +30,22 @@ ExPolygons to_expolygons(const NSVGimage &image, float tessTol, int max_level, f
             continue;
         expolygons_append(expolygons, union_ex(polygons));
     }
-    return union_ex(expolygons);
+    return expolygons;
+}
+
+void bounds(const NSVGimage &image, Vec2f& min, Vec2f &max)
+{
+    for (const NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next)
+        for (const NSVGpath *path = shape->paths; path != NULL; path = path->next) {
+            if (min.x() > path->bounds[0])
+                min.x() = path->bounds[0];
+            if (min.y() > path->bounds[1])
+                min.y() = path->bounds[1];
+            if (max.x() < path->bounds[2])
+                max.x() = path->bounds[2];
+            if (max.y() < path->bounds[3])
+                max.y() = path->bounds[3];
+        }
 }
 
 NSVGimage_ptr nsvgParseFromFile(const std::string &filename, const char *units, float dpi)
@@ -43,20 +61,12 @@ bool save(const NSVGimage &image, const std::string &svg_file_path)
         return false;
 
     fprintf(file, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>");
-
+    
+    // tl .. top left
     Vec2f tl(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    // br .. bottom right
     Vec2f br(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
-    for (const NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) 
-        for (const NSVGpath *path = shape->paths; path != NULL; path = path->next) {
-            if (tl.x() > path->bounds[0])
-                tl.x() = path->bounds[0];
-            if (tl.y() > path->bounds[1])
-                tl.y() = path->bounds[1];
-            if (br.x() < path->bounds[2])
-                br.x() = path->bounds[2];
-            if (br.y() < path->bounds[3])
-                br.y() = path->bounds[3];
-        }
+    bounds(image, tl, br);
 
     tl.x() = std::floor(tl.x());
     tl.y() = std::floor(tl.y());
@@ -64,21 +74,23 @@ bool save(const NSVGimage &image, const std::string &svg_file_path)
     br.x() = std::ceil(br.x());
     br.y() = std::ceil(br.y());
     Vec2f s = br - tl;
+    Point size = s.cast<Point::coord_type>();
 
-    //// IMPROVE: use path bounds instead of BoundingBox
-    //BoundingBox bb = get_extents(to_polygons(image)); 
-    //// bb has opposit value of y axe
-    //// Values stored in point are fixed point numbers need extend
-    //Point s = bb.size() + Point(2, 2); // extended size
-    //Point tl(bb.min.x() - 1, -bb.max.y() - 1); // top left corner
-    //Point br(tl.x() + s.x(), tl.y() + s.y());  // bottom right
-
-    fprintf(file, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%dmm\" height=\"%dmm\" viewBox=\"%d %d %d %d\" >\n", 
-        (int)s.x(), (int)s.y(), (int)tl.x(), (int)tl.y(), (int)br.x(), (int)br.y());
+    fprintf(file, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%dmm\" height=\"%dmm\" viewBox=\"0 0 %d %d\" >\n", 
+        size.x(), size.y(), size.x(), size.y());
     fprintf(file, "<!-- Created with PrusaSlicer (https://www.prusa3d.com/prusaslicer/) -->\n");
 
-    auto write_point = [](std::string &d, const float *p) { 
-        d += std::to_string(p[0]) + "," + std::to_string(p[1]) + " ";
+    std::array<char, 128> buffer;
+    auto write_point = [&tl, &buffer](std::string &d, const float *p) {
+        float x = p[0] - tl.x();
+        float y = p[1] - tl.y();
+        auto  to_string = [&buffer](float f) -> std::string {
+            auto [ptr, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), f);
+            if (ec != std::errc{})
+                return "0";            
+            return std::string(buffer.data(), ptr);
+        };
+        d += to_string(x) + "," + to_string(y) + " ";
     };
 
     for (const NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
@@ -94,8 +106,7 @@ bool save(const NSVGimage &image, const std::string &svg_file_path)
                 // NOTE: After close must be a space
                 d += " M "; // move on start point
             }
-            //write_point(d, path->pts);
-            d += std::to_string(path->pts[0]) + "," + std::to_string(path->pts[1]) + " ";
+            write_point(d, path->pts);
             size_t path_size = static_cast<size_t>(path->npts - 1);
 
             if (path->closed) {
@@ -112,9 +123,8 @@ bool save(const NSVGimage &image, const std::string &svg_file_path)
                         type = Type::curve;
                         d += "C "; // start sequence of triplets defining curves
                     }
-                    
-                    d += std::to_string(p[2]) + "," + std::to_string(p[3]) + " " +
-                         std::to_string(p[4]) + "," + std::to_string(p[5]) + " " ;
+                    write_point(d, &p[2]);
+                    write_point(d, &p[4]);
                 } else {
 
                     if (type != Type::line) {
@@ -122,7 +132,7 @@ bool save(const NSVGimage &image, const std::string &svg_file_path)
                         d += "L "; // start sequence of line points
                     }
                 }
-                d += std::to_string(p[6]) + "," + std::to_string(p[7]) + " ";
+                write_point(d, &p[6]);
             }
             if (path->closed) {
                 type = Type::close;

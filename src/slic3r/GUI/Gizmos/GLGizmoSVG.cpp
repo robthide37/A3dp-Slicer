@@ -16,6 +16,7 @@
 #include "libslic3r/SVG.hpp"      // debug store
 #include "libslic3r/Geometry.hpp" // covex hull 2d
 #include "libslic3r/Timer.hpp" // covex hull 2d
+#include "libslic3r/Emboss.hpp" // heal_shape
 
 #include "libslic3r/NSVGUtils.hpp"
 #include "libslic3r/Model.hpp"
@@ -875,7 +876,7 @@ bool GLGizmoSVG::draw_preview(){
         ImVec2      s(m_texture.width, m_texture.height);
         ImGui::Image(id, s);
         if(ImGui::IsItemHovered()){
-            size_t count_shapes = count(*m_volume->emboss_shape->svg_file.image->shapes);
+            size_t count_shapes = ::count(*m_volume->emboss_shape->svg_file.image->shapes);
             ImGui::SetTooltip("%d count shapes", count_shapes);
         }
     }
@@ -1000,18 +1001,20 @@ void GLGizmoSVG::draw_size()
 
     std::optional<Vec3d> new_absolute_scale;
 
+    const double minimal_scale_ratio_change = 1e-4;
+
     if (m_keep_ratio) {
         std::stringstream ss;
-        ss << std::setprecision(2) << width << " x " << height << " " << (use_inch ? "in" : "mm");
+        ss << std::setprecision(2) << std::fixed << width << " x " << height << " " << (use_inch ? "in" : "mm");
 
         ImGui::SameLine(m_gui_cfg->input_offset);
         ImGui::SetNextItemWidth(m_gui_cfg->input_width);
 
         // convert to float for slider
         float width_f = width;
-        if (m_imgui->slider_float("##width_size_slider", &width_f, 5.f, 100.f, ss.str().c_str())) {
+        if (m_imgui->slider_float("##width_size_slider", &width_f, 5.f, 100.f, ss.str().c_str(), 1.f, false)) {
             double width_ratio = width_f / width;
-            if (std::fabs(width_ratio - 1.) > 1e-4) {
+            if (std::fabs(width_ratio - 1.) > minimal_scale_ratio_change) {
                 m_scale_width      = m_scale_width.value_or(1.f) * width_ratio;
                 m_scale_height     = m_scale_height.value_or(1.f) * width_ratio;
                 new_absolute_scale = Vec3d(*m_scale_width, *m_scale_height, 1.);
@@ -1033,8 +1036,10 @@ void GLGizmoSVG::draw_size()
         double prev_width = width;
         if (ImGui::InputDouble("##width", &width, step, fast_step, size_format, flags)) {
             double width_ratio = width / prev_width;
-            m_scale_width = m_scale_width.value_or(1.f) * width_ratio;
-            new_absolute_scale = Vec3d(*m_scale_width, m_scale_height.value_or(1.f), 1.);
+            if (std::fabs(width_ratio - 1.) > minimal_scale_ratio_change) {
+                m_scale_width = m_scale_width.value_or(1.f) * width_ratio;
+                new_absolute_scale = Vec3d(*m_scale_width, m_scale_height.value_or(1.f), 1.);
+            }
         }
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", "Width of SVG.");
@@ -1044,8 +1049,10 @@ void GLGizmoSVG::draw_size()
         double prev_height = height;
         if (ImGui::InputDouble("##height", &height, step, fast_step, size_format, flags)) {
             double height_ratio = height / prev_height;
-            m_scale_height = m_scale_height.value_or(1.f) * height_ratio;
-            new_absolute_scale  = Vec3d(m_scale_width.value_or(1.f), *m_scale_height, 1.);
+            if (std::fabs(height_ratio - 1.) > minimal_scale_ratio_change) {
+                m_scale_height = m_scale_height.value_or(1.f) * height_ratio;
+                new_absolute_scale  = Vec3d(m_scale_width.value_or(1.f), *m_scale_height, 1.);
+            }
         }
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", "Height of SVG.");    
@@ -1464,11 +1471,16 @@ ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, double tesselati
     if (expoly.empty())
         return {};
 
+    expoly = union_ex(expoly);
+    if (!Slic3r::Emboss::heal_shape(expoly, 10))
+        return {};
+
     // SVG is used as centered
     // Do not disturb user by settings of pivot position
     BoundingBox bb = get_extents(expoly);
     translate(expoly, -bb.center());
 
+    // Preparation for multi shape in svg
     unsigned id = 0;
     return {{id, expoly}};
 }
