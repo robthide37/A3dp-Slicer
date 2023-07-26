@@ -226,6 +226,7 @@ bool pack(Strategy &strategy,
 {
     using KernelT = KernelTraits<decltype(strategy.kernel)>;
 
+    // The kernel might pack the item immediately
     bool packed = KernelT::on_start_packing(strategy.kernel, item, bed,
                                             packing_context, remaining_items);
 
@@ -235,9 +236,10 @@ bool pack(Strategy &strategy,
     Vec2crd orig_tr     = get_translation(item);
     Vec2crd final_tr    = orig_tr;
 
-    bool cancelled = false;
+    bool cancelled = strategy.stop_condition();
     const auto & rotations = allowed_rotations(item);
 
+    // Check all rotations but only if item is not already packed
     for (auto rot_it = rotations.begin();
          !cancelled && !packed && rot_it != rotations.end(); ++rot_it) {
 
@@ -261,12 +263,17 @@ bool pack(Strategy &strategy,
         }
     }
 
-    cancelled = !packed && (cancelled || std::isnan(final_score) || std::isinf(final_score));
-    packed = !cancelled;
+    // If the score is not valid, and the item is not already packed, or
+    // the packing was cancelled asynchronously by stop condition, then
+    // discard the packing
+    bool is_score_valid = !std::isnan(final_score) && !std::isinf(final_score);
+    packed = !cancelled && (packed || is_score_valid);
 
     if (packed) {
         set_translation(item, final_tr);
         set_rotation(item, orig_rot + final_rot);
+
+        // Finally, consult the kernel if the packing is sane
         packed = KernelT::on_item_packed(strategy.kernel, item);
     }
 

@@ -102,12 +102,12 @@ public:
     void distance_from_obj_range(float &min, float &max) const override { min = 0.f; max = 100.f; }
     void distance_from_bed_range(float &min, float &max) const override { min = 0.f; max = 100.f; }
 
-    ArrangeSettingsDb& set_distance_from_objects(float v) override { m_v.d_obj = v; return *this; }
-    ArrangeSettingsDb& set_distance_from_bed(float v) override { m_v.d_bed = v; return *this; }
-    ArrangeSettingsDb& set_rotation_enabled(bool v) override { m_v.rotations = v; return *this; }
-    ArrangeSettingsDb& set_xl_alignment(XLPivots v) override { m_v.xl_align = v; return *this; }
-    ArrangeSettingsDb& set_geometry_handling(GeometryHandling v) override { m_v.geom_handling = v; return *this; }
-    ArrangeSettingsDb& set_arrange_strategy(ArrangeStrategy v) override { m_v.arr_strategy = v; return *this; }
+    ArrangeSettings& set_distance_from_objects(float v) override { m_v.d_obj = v; return *this; }
+    ArrangeSettings& set_distance_from_bed(float v) override { m_v.d_bed = v; return *this; }
+    ArrangeSettings& set_rotation_enabled(bool v) override { m_v.rotations = v; return *this; }
+    ArrangeSettings& set_xl_alignment(XLPivots v) override { m_v.xl_align = v; return *this; }
+    ArrangeSettings& set_geometry_handling(GeometryHandling v) override { m_v.geom_handling = v; return *this; }
+    ArrangeSettings& set_arrange_strategy(ArrangeStrategy v) override { m_v.arr_strategy = v; return *this; }
 
     auto & values() const { return m_v; }
     auto & values() { return m_v; }

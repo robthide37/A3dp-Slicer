@@ -787,19 +787,50 @@ TEST_CASE("Testing arrangement involving virtual beds", "[arrange2][integration]
     using namespace Slic3r;
 
     Model model = get_example_model_with_arranged_primitives();
+    DynamicPrintConfig cfg;
+    cfg.load_from_ini(std::string(TEST_DATA_DIR PATH_SEPARATOR) + "default_fff.ini",
+                      ForwardCompatibilitySubstitutionRule::Enable);
+    auto bed = arr2::to_arrange_bed(get_bed_shape(cfg));
+    auto bedbb = bounding_box(bed);
+    auto bedsz = unscaled(bedbb.size());
 
-    arr2::ArrangeSettings settings;
-    auto bed = arr2::RectangleBed{scaled(250.), scaled(210.)};
+    auto strategy = GENERATE(arr2::ArrangeSettingsView::asAuto,
+                             arr2::ArrangeSettingsView::asPullToCenter);
+
+    INFO ("Strategy = " << strategy);
+
+    auto settings = arr2::ArrangeSettings{}
+                        .set_distance_from_objects(0.)
+                        .set_arrange_strategy(strategy);
 
     arr2::Scene scene{arr2::SceneBuilder{}
                           .set_model(model)
                           .set_arrange_settings(settings)
-                          .set_bed(bed)};
+                          .set_bed(cfg)};
 
-    auto task = arr2::ArrangeTask<arr2::ArrangeItem>::create(scene);
-    task->printable.selected.emplace_back(arr2::ArrangeItem{arr2::to_rectangle(offset(bed, -scaled(1.)))});
+    auto itm_conv = arr2::ArrangeableToItemConverter<arr2::ArrangeItem>::create(scene);
 
-    REQUIRE(task->printable.selected.size() == arr2::model_instance_count(model) + 1);
+    auto task = arr2::ArrangeTask<arr2::ArrangeItem>::create(scene, *itm_conv);
+
+    ModelObject* new_object = model.add_object();
+    new_object->name = "big_cube";
+    ModelInstance *bigcube_inst = new_object->add_instance();
+    TriangleMesh mesh = make_cube(bedsz.x() - 5., bedsz.y() - 5., 20.);
+    ModelVolume* new_volume = new_object->add_volume(mesh);
+    new_volume->name = new_object->name;
+
+    {
+        arr2::ArrangeItem bigitm;
+        scene.model().visit_arrangeable(bigcube_inst->id(),
+                                        [&bigitm, &itm_conv](
+                                            const arr2::Arrangeable &arrbl) {
+                                            bigitm = itm_conv->convert(arrbl);
+                                        });
+
+        task->printable.selected.emplace_back(std::move(bigitm));
+    }
+
+    REQUIRE(task->printable.selected.size() == arr2::model_instance_count(model));
 
     auto result = task->process_native(arr2::DummyCtl{});
 
@@ -812,6 +843,10 @@ TEST_CASE("Testing arrangement involving virtual beds", "[arrange2][integration]
                         [](auto &item) { return arr2::get_bed_index(item) == 1; }));
 
     REQUIRE(arr2::get_bed_index(result->items.back()) == arr2::PhysicalBedId);
+
+    bool applied = result->apply_on(scene.model());
+    REQUIRE(applied);
+    store_3mf("vbed_test_result.3mf", &model, &cfg, false);
 
     REQUIRE(std::all_of(task->printable.selected.begin(), task->printable.selected.end(),
                         [&bed](auto &item) { return bounding_box(bed).contains(arr2::envelope_bounding_box(item)); }));
