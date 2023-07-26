@@ -6,6 +6,7 @@
 #endif // _WIN32
 
 #define ENABLE_CHECKSUM_BLOCK 0
+#define ENABLE_FILE_CONVERSION_INTERFACE 1
 
 #include <array>
 #include <vector>
@@ -41,7 +42,9 @@ enum class EResult : uint16_t
     InvalidThumbnailFormat,
     InvalidThumbnailWidth,
     InvalidThumbnailHeight,
-    InvalidThumbnailDataSize
+    InvalidThumbnailDataSize,
+    InvalidBinaryGCodeFile,
+    InvalidSequenceOfBlocks
 };
 
 // Returns a string description of the given result
@@ -358,6 +361,20 @@ extern size_t checksum_size(EChecksumType type);
 
 // Returns the size of the content (parameters + data + checksum) of the block with the given header, in bytes.
 extern size_t block_content_size(const FileHeader& file_header, const BlockHeader& block_header);
+
+#if ENABLE_FILE_CONVERSION_INTERFACE
+//=====================================================================================================================================
+//
+// FILE CONVERSION INTERFACE
+//  
+//=====================================================================================================================================
+
+// Converts the gcode file contained into src_file from ascii to binary format and save the results into dst_file
+extern EResult from_ascii_to_binary(FILE& src_file, FILE& dst_file);
+
+// Converts the gcode file contained into src_file from binary to ascii format and save the results into dst_file
+extern EResult from_binary_to_ascii(FILE& src_file, FILE& dst_file, bool verify_checksum);
+#endif // ENABLE_FILE_CONVERSION_INTERFACE
 
 } // namespace BinaryGCode
 
