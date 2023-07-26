@@ -789,6 +789,7 @@ void Sidebar::priv::hide_rich_tip(wxButton* btn)
 Sidebar::Sidebar(Plater *parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(42 * wxGetApp().em_unit(), -1)), p(new priv(parent))
 {
+    SetFont(wxGetApp().normal_font());
     p->scrolled = new wxScrolledWindow(this);
 //    p->scrolled->SetScrollbars(0, 100, 1, 2); // ys_DELETE_after_testing. pixelsPerUnitY = 100 from https://github.com/prusa3d/PrusaSlicer/commit/8f019e5fa992eac2c9a1e84311c990a943f80b01, 
     // but this cause the bad layout of the sidebar, when all infoboxes appear.
@@ -796,7 +797,6 @@ Sidebar::Sidebar(Plater *parent)
     // But if we set this value to 5, layout will be better
     p->scrolled->SetScrollRate(0, 5);
 
-    SetFont(wxGetApp().normal_font());
 #ifndef __APPLE__
 #ifdef _WIN32
     wxGetApp().UpdateDarkUI(this);
@@ -2092,8 +2092,6 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     , collapse_toolbar(GLToolbar::Normal, "Collapse")
     , m_project_filename(wxEmptyString)
 {
-    this->q->SetFont(Slic3r::GUI::wxGetApp().normal_font());
-
     background_process.set_fff_print(&fff_print);
     background_process.set_sla_print(&sla_print);
     background_process.set_gcode_result(&gcode_result);
@@ -4472,7 +4470,10 @@ void Plater::priv::on_action_layersediting(SimpleEvent&)
 
 void Plater::priv::on_object_select(SimpleEvent& evt)
 {
-    wxGetApp().obj_list()->update_selections();
+    if (auto obj_list = wxGetApp().obj_list())
+        obj_list->update_selections();
+    else
+        return;
     selection_changed();
 }
 

@@ -21,6 +21,8 @@
 #include "GLCanvas3D.hpp"
 #include "ConfigWizard.hpp"
 
+#include "Widgets/SpinInput.hpp"
+
 #include <boost/dll/runtime_symbol_info.hpp>
 
 #ifdef WIN32
@@ -150,6 +152,8 @@ static void activate_options_tab(std::shared_ptr<ConfigOptionsGroup> optgroup)
 	optgroup->update_visibility(comSimple);
 	wxBoxSizer* sizer = static_cast<wxBoxSizer*>(static_cast<wxPanel*>(optgroup->parent())->GetSizer());
 	sizer->Add(optgroup->sizer, 0, wxEXPAND | wxALL, 10);
+
+	optgroup->parent()->Layout();
 
 	// apply sercher
 	wxGetApp().sidebar().get_searcher().append_preferences_options(optgroup->get_lines());
@@ -526,14 +530,14 @@ void PreferencesDialog::build()
 #endif
 
 		m_optgroup_gui->append_separator();
-
+/*
 		append_bool_option(m_optgroup_gui, "suppress_round_corners",
 			L("Suppress round corners for controls (experimental)"),
 			L("If enabled, Settings Tabs will be placed as menu items. If disabled, old UI will be used."),
 			app_config->get("suppress_round_corners") == "1");
 
 		m_optgroup_gui->append_separator();
-
+*/
 		append_bool_option(m_optgroup_gui, "show_hints",
 			L("Show \"Tip of the day\" notification after start"),
 			L("If enabled, useful hints are displayed at startup."),
@@ -1079,16 +1083,17 @@ void PreferencesDialog::create_settings_font_widget()
 
 	wxStaticText* font_example = new wxStaticText(parent, wxID_ANY, "Application text");
     int val = wxGetApp().normal_font().GetPointSize();
-	wxSpinCtrl* size_sc = new wxSpinCtrl(parent, wxID_ANY, format_wxstr("%1%", val), wxDefaultPosition, wxSize(15*em_unit(), -1), wxTE_PROCESS_ENTER | wxSP_ARROW_KEYS
+	SpinInput* size_sc = new SpinInput(parent, format_wxstr("%1%", val), "", wxDefaultPosition, wxSize(15 * em_unit(), -1), wxTE_PROCESS_ENTER | wxSP_ARROW_KEYS
 #ifdef _WIN32
 		| wxBORDER_SIMPLE
 #endif 
 	, 8, 20);
 	wxGetApp().UpdateDarkUI(size_sc);
 
-	auto apply_font = [this, font_example, opt_key](const int val, const wxFont& font) {
+	auto apply_font = [this, font_example, opt_key, stb_sizer](const int val, const wxFont& font) {
 		font_example->SetFont(font);
 		m_values[opt_key] = format("%1%", val);
+		stb_sizer->Layout();
 		refresh_og(m_optgroup_other);
 	};
 

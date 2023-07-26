@@ -1342,8 +1342,7 @@ PageUpdate::PageUpdate(ConfigWizard *parent)
     , preset_update(true)
 {
     const AppConfig *app_config = wxGetApp().app_config;
-    auto boldfont = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
-    boldfont.SetWeight(wxFONTWEIGHT_BOLD);
+    auto boldfont = wxGetApp().bold_font();
 
     auto *box_slic3r = new wxCheckBox(this, wxID_ANY, _L("Check for application updates"));
     box_slic3r->SetValue(app_config->get("notify_release") != "none");

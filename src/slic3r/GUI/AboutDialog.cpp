@@ -70,7 +70,7 @@ CopyrightsDialog::CopyrightsDialog()
     m_html = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, 
                               wxSize(40 * em_unit(), 20 * em_unit()), wxHW_SCROLLBAR_AUTO);
 
-    wxFont font = get_default_font(this);
+    wxFont font = this->GetFont();// get_default_font(this);
     const int fs = font.GetPointSize();
     const int fs2 = static_cast<int>(1.2f*fs);
     int size[] = { fs, fs, fs, fs, fs2, fs2, fs2 };
@@ -244,7 +244,7 @@ AboutDialog::AboutDialog()
         wxStaticText* title = new wxStaticText(this, wxID_ANY, wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME, wxDefaultPosition, wxDefaultSize);
         wxFont title_font = GUI::wxGetApp().bold_font();
         title_font.SetFamily(wxFONTFAMILY_ROMAN);
-        title_font.SetPointSize(24);
+        title_font.SetPointSize(int(2.5 * title_font.GetPointSize()));//title_font.SetPointSize(24);
         title->SetFont(title_font);
         vsizer->Add(title, 0, wxALIGN_LEFT | wxTOP, 10);
     }
@@ -267,7 +267,7 @@ AboutDialog::AboutDialog()
     m_html = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO/*NEVER*/);
     {
         m_html->SetMinSize(wxSize(-1, 16 * wxGetApp().em_unit()));
-        wxFont font = get_default_font(this);
+        wxFont font = wxGetApp().normal_font();// get_default_font(this);
         const auto text_clr = wxGetApp().get_label_clr_default();
         const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
         const auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));

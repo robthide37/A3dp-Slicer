@@ -742,9 +742,7 @@ void MainFrame::init_tabpanel()
 
     wxGetApp().UpdateDarkUI(m_tabpanel);
 
-#ifndef __WXOSX__ // Don't call SetFont under OSX to avoid name cutting in ObjectList
     m_tabpanel->SetFont(Slic3r::GUI::wxGetApp().normal_font());
-#endif
     m_tabpanel->Hide();
     m_settings_dialog.set_tabpanel(m_tabpanel);
 
@@ -2304,8 +2302,6 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
 {
     if (wxGetApp().is_gcode_viewer())
         return;
-
-//    this->SetFont(wxGetApp().normal_font());
 
     // Load the icon either from the exe, or from the ico file.
 #if _WIN32

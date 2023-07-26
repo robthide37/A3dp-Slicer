@@ -141,7 +141,7 @@ ConfigSnapshotDialog::ConfigSnapshotDialog(const Config::SnapshotDB &snapshot_db
     // text
     html = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO);
     {
-        wxFont font = get_default_font(this);
+        wxFont font = this->GetFont();// get_default_font(this);
         #ifdef __WXMSW__
             const int fs = font.GetPointSize();
             const int fs1 = static_cast<int>(0.8f*fs);

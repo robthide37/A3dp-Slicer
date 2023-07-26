@@ -1758,7 +1758,7 @@ bool GUI_App::tabs_as_menu() const
 
 bool GUI_App::suppress_round_corners() const
 {
-    return app_config->get("suppress_round_corners") == "1";
+    return true;// app_config->get("suppress_round_corners") == "1";
 }
 
 wxSize GUI_App::get_min_size() const
@@ -2129,6 +2129,9 @@ int GUI_App::GetSingleChoiceIndex(const wxString& message,
 #ifdef _WIN32
     wxSingleChoiceDialog dialog(nullptr, message, caption, choices);
     wxGetApp().UpdateDlgDarkUI(&dialog);
+    auto children = dialog.GetChildren();
+    for (auto child : children)
+        child->SetFont(normal_font());
 
     dialog.SetSelection(initialSelection);
     return dialog.ShowModal() == wxID_OK ? dialog.GetSelection() : -1;
@@ -2960,7 +2963,8 @@ ObjectSettings* GUI_App::obj_settings()
 
 ObjectList* GUI_App::obj_list()
 {
-    return sidebar().obj_list();
+    // If this method is called before plater_ has been initialized, return nullptr (to avoid a crash)
+    return plater_ ? sidebar().obj_list() : nullptr;
 }
 
 ObjectLayers* GUI_App::obj_layers()

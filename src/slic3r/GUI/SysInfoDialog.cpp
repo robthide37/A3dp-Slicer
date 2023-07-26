@@ -122,13 +122,13 @@ SysInfoDialog::SysInfoDialog()
         wxStaticText* title = new wxStaticText(this, wxID_ANY, wxGetApp().is_editor() ? SLIC3R_APP_NAME : GCODEVIEWER_APP_NAME, wxDefaultPosition, wxDefaultSize);
         wxFont title_font = wxGetApp().bold_font();
         title_font.SetFamily(wxFONTFAMILY_ROMAN);
-        title_font.SetPointSize(22);
+        title_font.SetPointSize(int(2.5 * title_font.GetPointSize()));//title_font.SetPointSize(22);
         title->SetFont(title_font);
         vsizer->Add(title, 0, wxEXPAND | wxALIGN_LEFT | wxTOP, wxGetApp().em_unit()/*50*/);
     }
 
     // main_info_text
-    wxFont font = get_default_font(this);
+    wxFont font = GetFont();// get_default_font(this);
     const auto text_clr = wxGetApp().get_label_clr_default();
     auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
     auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));

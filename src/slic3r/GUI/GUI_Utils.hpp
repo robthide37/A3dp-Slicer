@@ -96,6 +96,8 @@ public:
 
         if (font_point_size > 0)
             m_normal_font.SetPointSize(font_point_size);
+        else if (parent)
+            m_normal_font.SetPointSize(parent->GetFont().GetPointSize());
 
         /* Because of default window font is a primary display font, 
          * We should set correct font for window before getting em_unit value.
