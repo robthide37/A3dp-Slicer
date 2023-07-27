@@ -7874,7 +7874,7 @@ void GLCanvas3D::GizmoHighlighter::blink()
 #if ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
 void GLCanvas3D::show_binary_gcode_debug_window()
 {
-    BinaryGCode::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
+    bgcode::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
     imgui.begin(std::string("Binary GCode"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
@@ -7888,7 +7888,7 @@ void GLCanvas3D::show_binary_gcode_debug_window()
         std::vector<std::string> options = { "None", "Deflate", "heatshrink 11,4", "heatshrink 12,4" };
         int option_id = (int)binarizer_config.compression.file_metadata;
         if (imgui.combo(std::string("##file_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
-            binarizer_config.compression.file_metadata = (BinaryGCode::ECompressionType)option_id;
+            binarizer_config.compression.file_metadata = (bgcode::ECompressionType)option_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
@@ -7896,7 +7896,7 @@ void GLCanvas3D::show_binary_gcode_debug_window()
         ImGui::TableSetColumnIndex(1);
         option_id = (int)binarizer_config.compression.printer_metadata;
         if (imgui.combo(std::string("##printer_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
-            binarizer_config.compression.printer_metadata = (BinaryGCode::ECompressionType)option_id;
+            binarizer_config.compression.printer_metadata = (bgcode::ECompressionType)option_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
@@ -7904,7 +7904,7 @@ void GLCanvas3D::show_binary_gcode_debug_window()
         ImGui::TableSetColumnIndex(1);
         option_id = (int)binarizer_config.compression.print_metadata;
         if (imgui.combo(std::string("##print_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
-            binarizer_config.compression.print_metadata = (BinaryGCode::ECompressionType)option_id;
+            binarizer_config.compression.print_metadata = (bgcode::ECompressionType)option_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
@@ -7912,7 +7912,7 @@ void GLCanvas3D::show_binary_gcode_debug_window()
         ImGui::TableSetColumnIndex(1);
         option_id = (int)binarizer_config.compression.slicer_metadata;
         if (imgui.combo(std::string("##slicer_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
-            binarizer_config.compression.slicer_metadata = (BinaryGCode::ECompressionType)option_id;
+            binarizer_config.compression.slicer_metadata = (bgcode::ECompressionType)option_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
@@ -7920,7 +7920,7 @@ void GLCanvas3D::show_binary_gcode_debug_window()
         ImGui::TableSetColumnIndex(1);
         option_id = (int)binarizer_config.compression.gcode;
         if (imgui.combo(std::string("##gcode_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
-            binarizer_config.compression.gcode = (BinaryGCode::ECompressionType)option_id;
+            binarizer_config.compression.gcode = (bgcode::ECompressionType)option_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
@@ -7929,7 +7929,7 @@ void GLCanvas3D::show_binary_gcode_debug_window()
         options = { "None", "MeatPack", "MeatPack Comments" };
         option_id = (int)binarizer_config.gcode_encoding;
         if (imgui.combo(std::string("##gcode_encoding"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
-            binarizer_config.gcode_encoding = (BinaryGCode::EGCodeEncodingType)option_id;
+            binarizer_config.gcode_encoding = (bgcode::EGCodeEncodingType)option_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
@@ -7938,7 +7938,7 @@ void GLCanvas3D::show_binary_gcode_debug_window()
         options = { "INI" };
         option_id = (int)binarizer_config.metadata_encoding;
         if (imgui.combo(std::string("##metadata_encoding"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
-            binarizer_config.metadata_encoding = (BinaryGCode::EMetadataEncodingType)option_id;
+            binarizer_config.metadata_encoding = (bgcode::EMetadataEncodingType)option_id;
 
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
@@ -7947,7 +7947,7 @@ void GLCanvas3D::show_binary_gcode_debug_window()
         options = { "None", "CRC32" };
         option_id = (int)binarizer_config.checksum;
         if (imgui.combo(std::string("##4"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
-            binarizer_config.checksum = (BinaryGCode::EChecksumType)option_id;
+            binarizer_config.checksum = (bgcode::EChecksumType)option_id;
 
         ImGui::EndTable();
 

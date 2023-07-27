@@ -14,7 +14,7 @@
 #include <cstdio>
 #include <functional>
 
-namespace BinaryGCode {
+namespace bgcode {
 
 static const std::array<uint8_t, 4> MAGIC{ 'G', 'C', 'D', 'E' };
 static const uint32_t VERSION = 1;
@@ -48,7 +48,7 @@ enum class EResult : uint16_t
 };
 
 // Returns a string description of the given result
-extern std::string translate_result(BinaryGCode::EResult result);
+extern std::string translate_result(EResult result);
 
 enum class EChecksumType : uint16_t
 {
@@ -377,6 +377,6 @@ extern EResult from_ascii_to_binary(FILE& src_file, FILE& dst_file);
 extern EResult from_binary_to_ascii(FILE& src_file, FILE& dst_file, bool verify_checksum);
 #endif // ENABLE_FILE_CONVERSION_INTERFACE
 
-} // namespace BinaryGCode
+} // namespace bgcode
 
 #endif // slic3r_GCode_GCodeBinarizer_hpp_

@@ -5442,6 +5442,9 @@ void Plater::convert_gcode_to_ascii()
     public:
         explicit ScopedFile(FILE* file) : m_file(file) {}
         ~ScopedFile() { if (m_file != nullptr) fclose(m_file); }
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+        void unscope() { m_file = nullptr; }
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
     private:
         FILE* m_file{ nullptr };
     };
@@ -5471,10 +5474,15 @@ void Plater::convert_gcode_to_ascii()
     // Perform conversion
     {
         wxBusyCursor busy;
-        BinaryGCode::EResult res = BinaryGCode::from_binary_to_ascii(*in_file, *out_file, true);
-        if (res != BinaryGCode::EResult::Success) {
-            MessageDialog msg_dlg(this, _L(BinaryGCode::translate_result(res)), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+        bgcode::EResult res = bgcode::from_binary_to_ascii(*in_file, *out_file, true);
+        if (res != bgcode::EResult::Success) {
+            MessageDialog msg_dlg(this, _L(bgcode::translate_result(res)), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+            scoped_out_file.unscope();
+            fclose(out_file);
+            boost::nowide::remove(output_file.c_str());
+//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
             return;
         }
     }

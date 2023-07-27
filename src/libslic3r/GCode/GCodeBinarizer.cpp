@@ -19,7 +19,7 @@ extern "C" {
 #include <algorithm>
 #include <cassert>
 
-namespace BinaryGCode {
+namespace bgcode {
 
 static size_t g_checksum_max_cache_size = 65536;
 static constexpr const size_t MAX_GCODE_CACHE_SIZE = 65536;
@@ -1959,5 +1959,5 @@ EResult from_binary_to_ascii(FILE& src_file, FILE& dst_file, bool verify_checksu
 }
 #endif // ENABLE_FILE_CONVERSION_INTERFACE
 
-} // namespace BinaryGCode
+} // namespace bgcode
 
