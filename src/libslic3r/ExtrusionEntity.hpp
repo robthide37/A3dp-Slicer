@@ -103,7 +103,8 @@ inline bool operator==(const ExtrusionFlow &lhs, const ExtrusionFlow &rhs)
 }
 
 struct OverhangAttributes {
-    float max_distance_from_prev_layer;
+    float start_distance_from_prev_layer;
+    float end_distance_from_prev_layer;
     float proximity_to_curled_lines; //value between 0 and 1
 };
 
@@ -169,6 +170,7 @@ public:
     double                      mm3_per_mm() const { return m_attributes.mm3_per_mm; }
     // Minimum volumetric velocity of this extrusion entity. Used by the constant nozzle pressure algorithm.
     double                      min_mm3_per_mm() const override { return m_attributes.mm3_per_mm; }
+    std::optional<OverhangAttributes>& overhang_attributes_mutable() { return m_attributes.overhang_attributes; }
 
     // Produce a list of 2D polygons covered by the extruded paths, offsetted by the extrusion width.
     // Increase the offset by scaled_epsilon to achieve an overlap, so a union will produce no gaps.

@@ -26,6 +26,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <math.h>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -2775,25 +2776,8 @@ std::string GCodeGenerator::_extrude(
         );
     }
 
+    std::pair<float, float> dynamic_speed_and_fan_speed{-1, -1};
     if (path_attr.overhang_attributes.has_value()) {
-        std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_with_speeds = {{100, ConfigOptionFloatOrPercent{speed, false}}};
-        if (this->m_config.enable_dynamic_overhang_speeds) {
-            overhangs_with_speeds = {{0, m_config.overhang_speed_0},
-                                     {25, m_config.overhang_speed_1},
-                                     {50, m_config.overhang_speed_2},
-                                     {75, m_config.overhang_speed_3},
-                                     {100, ConfigOptionFloatOrPercent{speed, false}}};
-        }
-
-        std::vector<std::pair<int, ConfigOptionInts>> overhang_w_fan_speeds = {{100, ConfigOptionInts{0}}};
-        if (this->m_config.enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())) {
-            overhang_w_fan_speeds = {{0, m_config.overhang_fan_speed_0},
-                                     {25, m_config.overhang_fan_speed_1},
-                                     {50, m_config.overhang_fan_speed_2},
-                                     {75, m_config.overhang_fan_speed_3},
-                                     {100, ConfigOptionInts{0}}};
-        }
-
         double external_perim_reference_speed = m_config.get_abs_value("external_perimeter_speed");
         if (external_perim_reference_speed == 0)
             external_perim_reference_speed = m_volumetric_speed / path_attr.mm3_per_mm;
@@ -2805,58 +2789,13 @@ std::string GCodeGenerator::_extrude(
                                                       EXTRUDER_CONFIG(filament_max_volumetric_speed) / path_attr.mm3_per_mm);
         }
 
-        ExtrusionProcessor::calculate_overhang_speed();
-
-
-        new_points = m_extrusion_quality_estimator.estimate_speed_from_extrusion_quality(
-            // FIXME convert estimate_speed_from_extrusion_quality() to smooth paths or move it before smooth path interpolation.
-            Points{}, path_attr, overhangs_with_speeds, overhang_w_fan_speeds, m_writer.extruder()->id(), external_perim_reference_speed,
-            speed);
-        variable_speed_or_fan_speed = std::any_of(new_points.begin(), new_points.end(),
-                                                  [speed](const ProcessedPoint &p) { return p.speed != speed || p.fan_speed != 0; });
+        dynamic_speed_and_fan_speed = ExtrusionProcessor::calculate_overhang_speed(path_attr, this->m_config, m_writer.extruder()->id(),
+                                                                                   external_perim_reference_speed, speed);
     }
 
-    // bool                        variable_speed_or_fan_speed = false;
-    // std::vector<ProcessedPoint> new_points{};
-    // if ((this->m_config.enable_dynamic_overhang_speeds || this->config().enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())) &&
-    //     !this->on_first_layer() && path_attr.role.is_perimeter()) {
-    //     std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_with_speeds = {{100, ConfigOptionFloatOrPercent{speed, false}}};
-    //     if (this->m_config.enable_dynamic_overhang_speeds) {
-    //         overhangs_with_speeds = {{0, m_config.overhang_speed_0},
-    //                                  {25, m_config.overhang_speed_1},
-    //                                  {50, m_config.overhang_speed_2},
-    //                                  {75, m_config.overhang_speed_3},
-    //                                  {100, ConfigOptionFloatOrPercent{speed, false}}};
-    //     }
-
-    //     std::vector<std::pair<int, ConfigOptionInts>> overhang_w_fan_speeds = {{100, ConfigOptionInts{0}}};
-    //     if (this->m_config.enable_dynamic_fan_speeds.get_at(m_writer.extruder()->id())) {
-    //         overhang_w_fan_speeds = {{0, m_config.overhang_fan_speed_0},
-    //                                  {25, m_config.overhang_fan_speed_1},
-    //                                  {50, m_config.overhang_fan_speed_2},
-    //                                  {75, m_config.overhang_fan_speed_3},
-    //                                  {100, ConfigOptionInts{0}}};
-    //     }
-
-    //     double external_perim_reference_speed = m_config.get_abs_value("external_perimeter_speed");
-    //     if (external_perim_reference_speed == 0)
-    //         external_perim_reference_speed = m_volumetric_speed / path_attr.mm3_per_mm;
-    //     if (m_config.max_volumetric_speed.value > 0)
-    //         external_perim_reference_speed = std::min(external_perim_reference_speed, m_config.max_volumetric_speed.value / path_attr.mm3_per_mm);
-    //     if (EXTRUDER_CONFIG(filament_max_volumetric_speed) > 0) {
-    //         external_perim_reference_speed = std::min(external_perim_reference_speed,
-    //                                                   EXTRUDER_CONFIG(filament_max_volumetric_speed) / path_attr.mm3_per_mm);
-    //     }
-
-    //     new_points = m_extrusion_quality_estimator.estimate_speed_from_extrusion_quality(
-    //         //FIXME convert estimate_speed_from_extrusion_quality() to smooth paths or move it before smooth path interpolation.
-    //         Points{},
-    //         path_attr, overhangs_with_speeds, overhang_w_fan_speeds,
-    //         m_writer.extruder()->id(), external_perim_reference_speed,
-    //         speed);
-    //     variable_speed_or_fan_speed = std::any_of(new_points.begin(), new_points.end(),
-    //                                               [speed](const ProcessedPoint &p) { return p.speed != speed || p.fan_speed != 0; });
-    // }
+    if (dynamic_speed_and_fan_speed.first > -1) {
+        speed = dynamic_speed_and_fan_speed.first;
+    }
 
     double F = speed * 60;  // convert mm/sec to mm/min
 
@@ -2919,86 +2858,62 @@ std::string GCodeGenerator::_extrude(
             cooling_marker_setspeed_comments += ";_EXTERNAL_PERIMETER";
     }
 
-    //FIXME Variable speed on overhangs is inactive until the code is adapted to smooth path.
-    if (! variable_speed_or_fan_speed) {
-        // F is mm per minute.
-        gcode += m_writer.set_speed(F, "", cooling_marker_setspeed_comments);
-        double path_length = 0.;
-        std::string comment;
-        if (m_config.gcode_comments) {
-            comment = description;
-            comment += description_bridge;
-        }
-        Vec2d prev = this->point_to_gcode_quantized(path.front().point);
-        auto  it   = path.begin();
-        auto  end  = path.end();
-        const bool emit_radius = m_config.arc_fitting == ArcFittingType::EmitRadius;
-        for (++ it; it != end; ++ it) {
-            Vec2d p = this->point_to_gcode_quantized(it->point);
-            if (it->radius == 0) {
-                // Extrude line segment.
-                if (const double line_length = (p - prev).norm(); line_length > 0) {
-                    path_length += line_length;
-                    gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
-                }
-            } else {
-                // Extrude an arc.
-                assert(m_config.arc_fitting == ArcFittingType::EmitCenter ||
-                       m_config.arc_fitting == ArcFittingType::EmitRadius);
-                double radius = unscaled<double>(it->radius);
-                if (emit_radius)
-                    // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
-                    radius = GCodeFormatter::quantize_xyzf(radius);
-                Vec2d  ij;
-                if (! emit_radius) {
-                    // Calculate quantized IJ circle center offset.
-                    Vec2d center_raw = Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), it->ccw()) - prev;
-                    ij = GCodeFormatter::quantize(center_raw);
-                }
-                double angle = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
-                assert(angle > 0);
-                const double line_length = angle * std::abs(radius);
+    // F is mm per minute.
+    gcode += m_writer.set_speed(F, "", cooling_marker_setspeed_comments);
+    if (dynamic_speed_and_fan_speed.second >= 0)
+        gcode += ";_SET_FAN_SPEED" + std::to_string(int(dynamic_speed_and_fan_speed.second)) + "\n";
+    double path_length = 0.;
+    std::string comment;
+    if (m_config.gcode_comments) {
+        comment = description;
+        comment += description_bridge;
+    }
+    Vec2d prev = this->point_to_gcode_quantized(path.front().point);
+    auto  it   = path.begin();
+    auto  end  = path.end();
+    const bool emit_radius = m_config.arc_fitting == ArcFittingType::EmitRadius;
+    for (++ it; it != end; ++ it) {
+        Vec2d p = this->point_to_gcode_quantized(it->point);
+        if (it->radius == 0) {
+            // Extrude line segment.
+            if (const double line_length = (p - prev).norm(); line_length > 0) {
                 path_length += line_length;
-                const double dE = e_per_mm * line_length;
-                assert(dE > 0);
-                gcode += emit_radius ?
-                    m_writer.extrude_to_xy_G2G3R(p, radius, it->ccw(), dE, comment) :
-                    m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE, comment);
+                gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
             }
-            prev = p;
-        }
-    } else {
-        std::string marked_comment;
-        if (m_config.gcode_comments) {
-            marked_comment = description;
-            marked_comment += description_bridge;
-        }
-        double last_set_speed     = new_points[0].speed * 60.0;
-        double last_set_fan_speed = new_points[0].fan_speed;
-        gcode += m_writer.set_speed(last_set_speed, "", cooling_marker_setspeed_comments);
-        gcode += "\n;_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
-        Vec2d prev = this->point_to_gcode_quantized(new_points[0].p);
-        for (size_t i = 1; i < new_points.size(); i++) {
-            const ProcessedPoint &processed_point = new_points[i];
-            Vec2d                 p               = this->point_to_gcode_quantized(processed_point.p);
-            const double          line_length     = (p - prev).norm();
-            gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, marked_comment);
-            prev             = p;
-            double new_speed = processed_point.speed * 60.0;
-            if (last_set_speed != new_speed) {
-                gcode += m_writer.set_speed(new_speed, "", cooling_marker_setspeed_comments);
-                last_set_speed = new_speed;
+        } else {
+            // Extrude an arc.
+            assert(m_config.arc_fitting == ArcFittingType::EmitCenter ||
+                   m_config.arc_fitting == ArcFittingType::EmitRadius);
+            double radius = unscaled<double>(it->radius);
+            if (emit_radius)
+                // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
+                radius = GCodeFormatter::quantize_xyzf(radius);
+            Vec2d  ij;
+            if (! emit_radius) {
+                // Calculate quantized IJ circle center offset.
+                Vec2d center_raw = Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), it->ccw()) - prev;
+                ij = GCodeFormatter::quantize(center_raw);
             }
-            if (last_set_fan_speed != processed_point.fan_speed) {
-                last_set_fan_speed = processed_point.fan_speed;
-                gcode += "\n;_SET_FAN_SPEED" + std::to_string(int(last_set_fan_speed)) + "\n";
-            }
+            double angle = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
+            assert(angle > 0);
+            const double line_length = angle * std::abs(radius);
+            path_length += line_length;
+            const double dE = e_per_mm * line_length;
+            assert(dE > 0);
+            gcode += emit_radius ?
+                m_writer.extrude_to_xy_G2G3R(p, radius, it->ccw(), dE, comment) :
+                m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE, comment);
         }
-        gcode += "\n;_RESET_FAN_SPEED\n";
+        prev = p;
     }
 
     if (m_enable_cooling_markers)
-        gcode += path_attr.role.is_bridge() ? ";_BRIDGE_FAN_END\n" : ";_EXTRUDE_END\n";
+        gcode += path_attr.role.is_bridge() ? ";_BRIDGE_FAN_END" : ";_EXTRUDE_END";
+
+    if (dynamic_speed_and_fan_speed.second >= 0)
+        gcode += ";_RESET_FAN_SPEED";
+
+    gcode += "\n";
 
     this->set_last_pos(path.back().point);
     return gcode;

@@ -15,8 +15,10 @@
 #include "../Config.hpp"
 #include "../Line.hpp"
 #include "../Exception.hpp"
+#include "../PrintConfig.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <iterator>
@@ -227,147 +229,11 @@ ExtrusionEntityCollection calculate_and_split_overhanging_extrusions(
     const AABBTreeLines::LinesDistancer<Linef>      &unscaled_prev_layer,
     const AABBTreeLines::LinesDistancer<CurledLine> &prev_layer_curled_lines);
 
-struct ProcessedPoint
-{
-    Point p;
-    float speed     = 1.0f;
-    int   fan_speed = 0;
-};
-
-class ExtrusionQualityEstimator
-{
-    std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>>      prev_layer_boundaries;
-    std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>>      next_layer_boundaries;
-    std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<CurledLine>> prev_curled_extrusions;
-    std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<CurledLine>> next_curled_extrusions;
-    const PrintObject                                                                 *current_object;
-
-public:
-    void set_current_object(const PrintObject *object) { current_object = object; }
-
-    void prepare_for_new_layer(const Layer *layer)
-    {
-        if (layer == nullptr)
-            return;
-        const PrintObject *object      = layer->object();
-        prev_layer_boundaries[object]  = next_layer_boundaries[object];
-        next_layer_boundaries[object]  = AABBTreeLines::LinesDistancer<Linef>{to_unscaled_linesf(layer->lslices)};
-        prev_curled_extrusions[object] = next_curled_extrusions[object];
-        next_curled_extrusions[object] = AABBTreeLines::LinesDistancer<CurledLine>{layer->curled_lines};
-    }
-
-    std::vector<ProcessedPoint> estimate_speed_from_extrusion_quality(
-        const Points                                                 &path,
-        const ExtrusionFlow                                          &flow,
-        const std::vector<std::pair<int, ConfigOptionFloatOrPercent>> overhangs_w_speeds,
-        const std::vector<std::pair<int, ConfigOptionInts>>           overhangs_w_fan_speeds,
-        size_t                                                        extruder_id,
-        float                                                         ext_perimeter_speed,
-        float                                                         original_speed)
-    {
-        float                  speed_base = ext_perimeter_speed > 0 ? ext_perimeter_speed : original_speed;
-        std::map<float, float> speed_sections;
-        for (size_t i = 0; i < overhangs_w_speeds.size(); i++) {
-            float distance = flow.width * (1.0 - (overhangs_w_speeds[i].first / 100.0));
-            float speed    = overhangs_w_speeds[i].second.percent ? (speed_base * overhangs_w_speeds[i].second.value / 100.0) :
-                                                                    overhangs_w_speeds[i].second.value;
-            if (speed < EPSILON)
-                speed = speed_base;
-            speed_sections[distance] = speed;
-        }
-
-        std::map<float, float> fan_speed_sections;
-        for (size_t i = 0; i < overhangs_w_fan_speeds.size(); i++) {
-            float distance               = flow.width * (1.0 - (overhangs_w_fan_speeds[i].first / 100.0));
-            float fan_speed              = overhangs_w_fan_speeds[i].second.get_at(extruder_id);
-            fan_speed_sections[distance] = fan_speed;
-        }
-
-        std::vector<ExtendedPoint> extended_points =
-            estimate_points_properties<true, true, true, true>(path, prev_layer_boundaries[current_object], flow.width);
-
-        std::vector<ProcessedPoint> processed_points;
-        processed_points.reserve(extended_points.size());
-        for (size_t i = 0; i < extended_points.size(); i++) {
-            const ExtendedPoint &curr = extended_points[i];
-            const ExtendedPoint &next = extended_points[i + 1 < extended_points.size() ? i + 1 : i];
-
-            // The following code artifically increases the distance to provide slowdown for extrusions that are over curled lines
-            float        artificial_distance_to_curled_lines = 0.0;
-            const double dist_limit                          = 10.0 * flow.width;
-            {
-                Vec2d middle = 0.5 * (curr.position + next.position);
-                auto line_indices = prev_curled_extrusions[current_object].all_lines_in_radius(Point::new_scale(middle), scale_(dist_limit));
-                if (!line_indices.empty()) {
-                    double len = (next.position - curr.position).norm();
-                    // For long lines, there is a problem with the additional slowdown. If by accident, there is small curled line near
-                    // the middle of this long line
-                    //  The whole segment gets slower unnecesarily. For these long lines, we do additional check whether it is worth slowing
-                    //  down.
-                    // NOTE that this is still quite rough approximation, e.g. we are still checking lines only near the middle point
-                    // TODO maybe split the lines into smaller segments before running this alg? but can be demanding, and GCode will be huge
-                    if (len > 8) {
-                        Vec2d dir   = Vec2d(next.position - curr.position) / len;
-                        Vec2d right = Vec2d(-dir.y(), dir.x());
-
-                        Polygon box_of_influence = {
-                            scaled(Vec2d(curr.position + right * dist_limit)),
-                            scaled(Vec2d(next.position + right * dist_limit)),
-                            scaled(Vec2d(next.position - right * dist_limit)),
-                            scaled(Vec2d(curr.position - right * dist_limit)),
-                        };
-
-                        double projected_lengths_sum = 0;
-                        for (size_t idx : line_indices) {
-                            const CurledLine &line   = prev_curled_extrusions[current_object].get_line(idx);
-                            Lines             inside = intersection_ln({{line.a, line.b}}, {box_of_influence});
-                            if (inside.empty())
-                                continue;
-                            double projected_length = abs(dir.dot(unscaled(Vec2d((inside.back().b - inside.back().a).cast<double>()))));
-                            projected_lengths_sum += projected_length;
-                        }
-                        if (projected_lengths_sum < 0.4 * len) {
-                            line_indices.clear();
-                        }
-                    }
-
-                    for (size_t idx : line_indices) {
-                        const CurledLine &line                 = prev_curled_extrusions[current_object].get_line(idx);
-                        float             distance_from_curled = unscaled(line_alg::distance_to(line, Point::new_scale(middle)));
-                        float             dist                 = flow.width * (1.0 - (distance_from_curled / dist_limit)) *
-                                     (1.0 - (distance_from_curled / dist_limit)) *
-                                     (line.curled_height / (flow.height * 10.0f)); // max_curled_height_factor from SupportSpotGenerator
-                        artificial_distance_to_curled_lines = std::max(artificial_distance_to_curled_lines, dist);
-                    }
-                }
-            }
-
-            auto interpolate_speed = [](const std::map<float, float> &values, float distance) {
-                auto upper_dist = values.lower_bound(distance);
-                if (upper_dist == values.end()) {
-                    return values.rbegin()->second;
-                }
-                if (upper_dist == values.begin()) {
-                    return upper_dist->second;
-                }
-
-                auto  lower_dist = std::prev(upper_dist);
-                float t          = (distance - lower_dist->first) / (upper_dist->first - lower_dist->first);
-                return (1.0f - t) * lower_dist->second + t * upper_dist->second;
-            };
-
-            float extrusion_speed   = std::min(interpolate_speed(speed_sections, curr.distance),
-                                               interpolate_speed(speed_sections, next.distance));
-            float curled_base_speed = interpolate_speed(speed_sections, artificial_distance_to_curled_lines);
-            float final_speed       = std::min(curled_base_speed, extrusion_speed);
-            float fan_speed         = std::min(interpolate_speed(fan_speed_sections, curr.distance),
-                                               interpolate_speed(fan_speed_sections, next.distance));
-
-            processed_points.push_back({scaled(curr.position), final_speed, int(fan_speed)});
-        }
-        return processed_points;
-    }
-};
+std::pair<float, float> calculate_overhang_speed(const ExtrusionAttributes &attributes,
+                                                 const FullPrintConfig     &config,
+                                                 size_t                     extruder_id,
+                                                 float                      external_perim_reference_speed,
+                                                 float                      default_speed);
 
 }} // namespace Slic3r::ExtrusionProcessor
 
