@@ -799,14 +799,29 @@ std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Pri
     return instances;
 }
 
+static inline bool arc_welder_enabled(const PrintConfig& print_config)
+{
+    return
+        // Enabled
+        print_config.arc_fitting != ArcFittingType::Disabled &&
+        // Not a spiral vase print
+        !print_config.spiral_vase &&
+        // Presure equalizer not used
+        print_config.max_volumetric_extrusion_rate_slope_negative == 0. &&
+        print_config.max_volumetric_extrusion_rate_slope_positive == 0.;
+}
+
+static inline GCode::SmoothPathCache::InterpolationParameters interpolation_parameters(const PrintConfig& print_config)
+{
+    return {
+        scaled<double>(print_config.gcode_resolution.value),
+        arc_welder_enabled(print_config) ? Geometry::ArcWelder::default_arc_length_percent_tolerance : 0
+    };
+}
+
 static inline GCode::SmoothPathCache smooth_path_interpolate_global(const Print& print)
 {
-    const GCode::SmoothPathCache::InterpolationParameters interpolation_params {
-        scaled<double>(print.config().gcode_resolution.value),
-        print.config().arc_fitting != ArcFittingType::Disabled && ! print.config().spiral_vase ? 
-            Geometry::ArcWelder::default_arc_length_percent_tolerance :
-            0
-    };
+    const GCode::SmoothPathCache::InterpolationParameters interpolation_params = interpolation_parameters(print.config());
     GCode::SmoothPathCache out;
     out.interpolate_add(print.skirt(), interpolation_params);
     out.interpolate_add(print.brim(), interpolation_params);
@@ -1282,12 +1297,7 @@ void GCodeGenerator::process_layers(
     GCodeOutputStream                                                   &output_stream)
 {
     size_t layer_to_print_idx = 0;
-    const GCode::SmoothPathCache::InterpolationParameters interpolation_params {
-        scaled<double>(print.config().gcode_resolution.value),
-        print.config().arc_fitting != ArcFittingType::Disabled && ! print.config().spiral_vase ? 
-            Geometry::ArcWelder::default_arc_length_percent_tolerance :
-            0
-    };
+    const GCode::SmoothPathCache::InterpolationParameters interpolation_params = interpolation_parameters(print.config());
     const auto smooth_path_interpolator = tbb::make_filter<void, std::pair<size_t, GCode::SmoothPathCache>>(slic3r_tbb_filtermode::serial_in_order,
         [this, &print, &layers_to_print, &layer_to_print_idx, &interpolation_params](tbb::flow_control &fc) -> std::pair<size_t, GCode::SmoothPathCache> {
             if (layer_to_print_idx >= layers_to_print.size()) {
@@ -1385,12 +1395,7 @@ void GCodeGenerator::process_layers(
     GCodeOutputStream                       &output_stream)
 {
     size_t layer_to_print_idx = 0;
-    const GCode::SmoothPathCache::InterpolationParameters interpolation_params {
-        scaled<double>(print.config().gcode_resolution.value),
-        print.config().arc_fitting != ArcFittingType::Disabled && ! print.config().spiral_vase ?
-            Geometry::ArcWelder::default_arc_length_percent_tolerance :
-            0
-    };
+    const GCode::SmoothPathCache::InterpolationParameters interpolation_params = interpolation_parameters(print.config());
     const auto smooth_path_interpolator = tbb::make_filter<void, std::pair<size_t, GCode::SmoothPathCache>> (slic3r_tbb_filtermode::serial_in_order,
         [this, &print, &layers_to_print, &layer_to_print_idx, interpolation_params](tbb::flow_control &fc) -> std::pair<size_t, GCode::SmoothPathCache> {
             if (layer_to_print_idx >= layers_to_print.size()) {

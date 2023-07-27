@@ -645,7 +645,7 @@ std::pair<Path, Path> split_at(const Path &path, const PathSegmentProjection &pr
             }
         } else {
             assert(split_segment_id >= 0 && split_segment_id < path.size());
-            if (split_segment_id + 1 == path.size())
+            if (split_segment_id + 1 == int(path.size()))
                 out.first = path;
             else if (split_segment_id == 0)
                 out.second = path;
