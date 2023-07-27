@@ -283,6 +283,24 @@ void TextLinesModel::init(const Transform3d      &text_tr,
         }
     }
 
+    // fix for text line out of object
+    // When move text close to edge - line center could be out of object
+    for (Polygons &contours: line_contours) {
+        if (!contours.empty())
+            continue;
+
+        // use line center at zero, there should be some contour.
+        float line_center = 0.f;
+        for (const ModelVolume *volume : volumes_to_slice) {
+            MeshSlicingParams slicing_params;
+            slicing_params.trafo = c_trafo_inv * volume->get_matrix();
+            const Polygons polys = Slic3r::slice_mesh(volume->mesh().its, line_center, slicing_params);
+            if (polys.empty())
+                continue;
+            contours.insert(contours.end(), polys.begin(), polys.end());
+        }
+    }
+
     m_lines = select_closest_contour(line_contours);
     assert(m_lines.size() == count_lines);
     assert(line_centers.size() == count_lines);
