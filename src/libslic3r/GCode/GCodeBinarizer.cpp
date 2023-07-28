@@ -407,18 +407,31 @@ static void unbinarize(const std::vector<uint8_t>& src, std::string& dst) {
             }
         }
 
+        auto is_gline_parameter = [](const char c) {
+            static const std::vector<char> parameters = {
+                // G0, G1
+                'X', 'Y', 'Z', 'E', 'F',
+                // G2, G3
+                'I', 'J', 'R',
+                // G29
+                'P', 'W', 'H', 'C', 'A'
+            };
+            return std::find(parameters.begin(), parameters.end(), c) != parameters.end();
+        };
+
         std::array<char, 2> c_unbin{ 0, 0 };
         const size_t char_count = get_result_char(c_unbin);
         for (size_t i = 0; i < char_count; ++i) {
             // GCodeReader::parse_line_internal() is unable to parse a G line where the data are not separated by spaces
             // so we add them where needed
-            if (c_unbin[i] == 'G' && std::distance(unbin_buffer.begin(), it_unbin_end) > 0 && *std::prev(it_unbin_end, 1) == '\n')
+            const size_t curr_unbin_buffer_length = std::distance(unbin_buffer.begin(), it_unbin_end);
+            if (c_unbin[i] == 'G' && (curr_unbin_buffer_length == 0 || *std::prev(it_unbin_end, 1) == '\n'))
                 add_space = true;
             else if (c_unbin[i] == '\n')
                 add_space = false;
 
-            if (add_space && *std::prev(it_unbin_end, 1) != ' ' &&
-                (c_unbin[i] == 'X' || c_unbin[i] == 'Y' || c_unbin[i] == 'Z' || c_unbin[i] == 'E' || c_unbin[i] == 'F')) {
+            if (add_space && (curr_unbin_buffer_length == 0 || *std::prev(it_unbin_end, 1) != ' ') &&
+                is_gline_parameter(c_unbin[i])) {
                 *it_unbin_end = ' ';
                 ++it_unbin_end;
             }
