@@ -9,47 +9,47 @@ namespace Slic3r {
 
 class ArrangeSettingsDb_AppCfg: public arr2::ArrangeSettingsDb
 {
-    AppConfig *m_appcfg;
-    std::function<const DynamicPrintConfig*(void)> m_config_getter;
-    std::function<PrinterTechnology(void)> m_printtech_getter;
+public:
+    enum Slots { slotFFF, slotFFFSeqPrint, slotSLA };
 
-    struct Slot { Values vals; Values defaults; std::string postfix; };
+private:
+    AppConfig *m_appcfg;
+    Slots m_current_slot = slotFFF;
+
+    struct FloatRange { float minval = 0.f, maxval = 100.f; };
+    struct Slot
+    {
+        Values      vals;
+        Values      defaults;
+        FloatRange  dobj_range, dbed_range;
+        std::string postfix;
+    };
 
     // Settings and their defaults are stored separately for fff,
     // sla and fff sequential mode
     Slot m_settings_fff, m_settings_fff_seq, m_settings_sla;
 
-    PrinterTechnology current_printer_technology() const;
-    const DynamicPrintConfig *config() const;
-
     template<class Self>
-    static auto & get_slot(Self *self) {
-        PrinterTechnology ptech = self->current_printer_technology();
-
-        auto *ptr = &self->m_settings_fff;
-
-        if (ptech == ptSLA) {
-            ptr = &self->m_settings_sla;
-        } else if (ptech == ptFFF && self->config()) {
-            auto co_opt = self->config()->template option<ConfigOptionBool>(
-                "complete_objects");
-            if (co_opt && co_opt->value)
-                ptr = &self->m_settings_fff_seq;
-            else
-                ptr = &self->m_settings_fff;
+    static auto & get_slot(Self *self, Slots slot) {
+        switch(slot) {
+        case slotFFF: return self->m_settings_fff;
+        case slotFFFSeqPrint: return self->m_settings_fff_seq;
+        case slotSLA: return self->m_settings_sla;
         }
 
-        return *ptr;
+        return self->m_settings_fff;
+    }
+
+    template<class Self> static auto &get_slot(Self *self)
+    {
+        return get_slot(self, self->m_current_slot);
     }
 
     template<class Self>
     static auto& get_ref(Self *self) { return get_slot(self).vals; }
 
 public:
-    explicit ArrangeSettingsDb_AppCfg(
-        AppConfig *appcfg,
-        std::function<const DynamicPrintConfig *(void)> cfgfn,
-        std::function<PrinterTechnology(void)> printtech_getter);
+    explicit ArrangeSettingsDb_AppCfg(AppConfig *appcfg);
 
     float get_distance_from_objects() const override { return get_ref(this).d_obj; }
     float get_distance_from_bed() const  override { return get_ref(this).d_bed; }
@@ -71,6 +71,19 @@ public:
     ArrangeSettingsDb& set_arrange_strategy(ArrangeStrategy v) override;
 
     Values get_defaults() const override { return get_slot(this).defaults; }
+
+    void set_active_slot(Slots slot) noexcept { m_current_slot = slot; }
+    void set_distance_from_obj_range(Slots slot, float min, float max)
+    {
+        get_slot(this, slot).dobj_range = FloatRange{min, max};
+    }
+
+    void set_distance_from_bed_range(Slots slot, float min, float max)
+    {
+        get_slot(this, slot).dbed_range = FloatRange{min, max};
+    }
+
+    Values &get_defaults(Slots slot) { return get_slot(this, slot).defaults; }
 };
 
 } // namespace Slic3r

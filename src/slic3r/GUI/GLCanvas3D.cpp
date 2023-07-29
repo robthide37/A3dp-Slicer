@@ -35,7 +35,6 @@
 
 #include "slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
-#include "libslic3r/Arrange/ArrangeSettingsDb_AppCfg.hpp"
 
 #if ENABLE_RETINA_GL
 #include "slic3r/Utils/RetinaHelper.hpp"
@@ -1297,7 +1296,7 @@ void GLCanvas3D::SLAView::select_full_instance(const GLVolume::CompositeID& id)
 
 PrinterTechnology GLCanvas3D::current_printer_technology() const
 {
-    return m_process->current_printer_technology();
+    return m_process ? m_process->current_printer_technology() : ptFFF;
 }
 
 bool GLCanvas3D::is_arrange_alignment_enabled() const
@@ -1339,13 +1338,8 @@ GLCanvas3D::GLCanvas3D(wxGLCanvas *canvas, Bed3D &bed)
       m_labels(*this),
       m_slope(m_volumes),
       m_sla_view(*this),
-      m_arrange_settings_dialog{wxGetApp().imgui(),
-                                std::make_unique<ArrangeSettingsDb_AppCfg>(
-                                    wxGetApp().app_config,
-                                    [this]() { return m_config; },
-                                    [this] {
-                                        return current_printer_technology();
-                                    })}
+      m_arrange_settings_db{wxGetApp().app_config},
+      m_arrange_settings_dialog{wxGetApp().imgui(), &m_arrange_settings_db}
 {
     if (m_canvas != nullptr) {
         m_timer.SetOwner(m_canvas);
@@ -1628,6 +1622,29 @@ void GLCanvas3D::set_config(const DynamicPrintConfig* config)
 {
     m_config = config;
     m_layers_editing.set_config(config);
+
+
+    if (config) {
+        PrinterTechnology ptech = current_printer_technology();
+
+        auto slot = ArrangeSettingsDb_AppCfg::slotFFF;
+
+        if (ptech == ptSLA) {
+            slot = ArrangeSettingsDb_AppCfg::slotSLA;
+        } else if (ptech == ptFFF) {
+            auto co_opt = config->option<ConfigOptionBool>("complete_objects");
+            if (co_opt && co_opt->value)
+                slot = ArrangeSettingsDb_AppCfg::slotFFFSeqPrint;
+            else
+                slot = ArrangeSettingsDb_AppCfg::slotFFF;
+        }
+
+        m_arrange_settings_db.set_active_slot(slot);
+
+        double objdst = min_object_distance(*config);
+        m_arrange_settings_db.set_distance_from_obj_range(slot, min_object_distance(*config), 100.);
+        m_arrange_settings_db.get_defaults(slot).d_obj = objdst;
+    }
 }
 
 void GLCanvas3D::set_process(BackgroundSlicingProcess *process)

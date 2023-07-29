@@ -53,16 +53,24 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
     m_db->distance_from_obj_range(dobj_min, dobj_max);
     m_db->distance_from_bed_range(dbed_min, dbed_max);
 
+    if(dobj_min > settings.d_obj) {
+        settings.d_obj = std::max(dobj_min, settings.d_obj);
+        m_db->set_distance_from_objects(settings.d_obj);
+    }
+
+    if (dbed_min > settings.d_bed) {
+        settings.d_bed = std::max(dbed_min, settings.d_bed);
+        m_db->set_distance_from_bed(settings.d_bed);
+    }
+
     if (m_imgui->slider_float(_L("Spacing"), &settings.d_obj, dobj_min,
-                              dobj_max, "%5.2f") ||
-        dobj_min > settings.d_obj) {
+                              dobj_max, "%5.2f")) {
         settings.d_obj = std::max(dobj_min, settings.d_obj);
         m_db->set_distance_from_objects(settings.d_obj);
     }
 
     if (m_imgui->slider_float(_L("Spacing from bed"), &settings.d_bed,
-                              dbed_min, dbed_max, "%5.2f") ||
-        dbed_min > settings.d_bed) {
+                              dbed_min, dbed_max, "%5.2f")) {
         settings.d_bed = std::max(dbed_min, settings.d_bed);
         m_db->set_distance_from_bed(settings.d_bed);
     }
@@ -71,8 +79,7 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
         m_db->set_rotation_enabled(settings.rotations);
     }
 
-//    Points bed = m_config ? get_bed_shape(*m_config) : Points{};
-    if (/*arrangement::is_box(bed) */ m_show_xl_combo_predicate() &&
+    if (m_show_xl_combo_predicate() &&
         settings.xl_align >= 0 &&
         m_imgui->combo(_L("Alignment"),
                        {_u8L("Center"), _u8L("Rear left"), _u8L("Front left"),

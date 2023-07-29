@@ -18,6 +18,8 @@
 #include "Camera.hpp"
 #include "SceneRaycaster.hpp"
 #include "GUI_Utils.hpp"
+
+#include "libslic3r/Arrange/ArrangeSettingsDb_AppCfg.hpp"
 #include "ArrangeSettingsDialogImgui.hpp"
 
 #include "libslic3r/Slicing.hpp"
@@ -586,6 +588,7 @@ private:
 
     bool is_arrange_alignment_enabled() const;
 
+    ArrangeSettingsDb_AppCfg   m_arrange_settings_db;
     ArrangeSettingsDialogImgui m_arrange_settings_dialog;
 
 public:

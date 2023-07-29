@@ -2,31 +2,7 @@
 
 namespace Slic3r {
 
-PrinterTechnology ArrangeSettingsDb_AppCfg::current_printer_technology() const
-{
-    PrinterTechnology pt = ptFFF;
-
-    if (m_printtech_getter)
-        pt = m_printtech_getter();
-
-    return pt;
-}
-
-const DynamicPrintConfig *ArrangeSettingsDb_AppCfg::config() const
-{
-    const DynamicPrintConfig *ret = nullptr;
-
-    if (m_config_getter)
-        ret = m_config_getter();
-
-    return ret;
-}
-
-ArrangeSettingsDb_AppCfg::ArrangeSettingsDb_AppCfg(
-    AppConfig *appcfg,
-    std::function<const DynamicPrintConfig *(void)> cfgfn,
-    std::function<PrinterTechnology(void)> printtech_fn)
-    : m_appcfg{appcfg}, m_config_getter{cfgfn}, m_printtech_getter{printtech_fn}
+ArrangeSettingsDb_AppCfg::ArrangeSettingsDb_AppCfg(AppConfig *appcfg) : m_appcfg{appcfg}
 {
     m_settings_fff.postfix = "_fff";
     m_settings_fff_seq.postfix = "_fff_seq_print";
@@ -149,33 +125,20 @@ ArrangeSettingsDb_AppCfg::ArrangeSettingsDb_AppCfg(
     m_settings_sla.vals.arr_strategy = arr_strategy;
     m_settings_fff.vals.arr_strategy = arr_strategy;
     m_settings_fff_seq.vals.arr_strategy = arr_strategy;
-
-    if (config()) {
-        // Set default obj distance for fff sequential print mode
-        m_settings_fff_seq.defaults.d_obj =
-            std::max(m_settings_fff_seq.defaults.d_obj,
-                     float(min_object_distance(*config())));
-    }
 }
 
 void ArrangeSettingsDb_AppCfg::distance_from_obj_range(float &min,
                                                        float &max) const
 {
-    min = 0.f;
-    if (config() && current_printer_technology() == ptFFF) {
-        auto co_opt = config()->option<ConfigOptionBool>("complete_objects");
-        if (co_opt && co_opt->value) {
-            min = float(min_object_distance(*config()));
-        }
-    }
-    max = 100.f;
+    min = get_slot(this).dobj_range.minval;
+    max = get_slot(this).dobj_range.maxval;
 }
 
 void ArrangeSettingsDb_AppCfg::distance_from_bed_range(float &min,
                                                        float &max) const
 {
-    min = 0.f;
-    max = 100.f;
+    min = get_slot(this).dbed_range.minval;
+    max = get_slot(this).dbed_range.maxval;
 }
 
 arr2::ArrangeSettingsDb& ArrangeSettingsDb_AppCfg::set_distance_from_objects(float v)
