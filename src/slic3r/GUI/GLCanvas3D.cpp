@@ -1642,7 +1642,8 @@ void GLCanvas3D::set_config(const DynamicPrintConfig* config)
         m_arrange_settings_db.set_active_slot(slot);
 
         double objdst = min_object_distance(*config);
-        m_arrange_settings_db.set_distance_from_obj_range(slot, min_object_distance(*config), 100.);
+        double min_obj_dst = slot == ArrangeSettingsDb_AppCfg::slotFFFSeqPrint ? objdst : 0.;
+        m_arrange_settings_db.set_distance_from_obj_range(slot, min_obj_dst, 100.);
         m_arrange_settings_db.get_defaults(slot).d_obj = objdst;
     }
 }
