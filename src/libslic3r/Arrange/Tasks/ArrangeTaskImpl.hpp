@@ -54,6 +54,20 @@ std::unique_ptr<ArrangeTask<ArrItem>> ArrangeTask<ArrItem>::create(
     return task;
 }
 
+// Remove all items on the physical bed (not occupyable for unprintable items)
+// and shift all items to the next lower bed index, so that arrange will think
+// that logical bed no. 1 is the physical one
+template<class ItemCont>
+void prepare_fixed_unselected(ItemCont &items, int shift)
+{
+    for (auto &itm : items)
+        set_bed_index(itm, get_bed_index(itm) - shift);
+
+    items.erase(std::remove_if(items.begin(), items.end(),
+                               [](auto &itm) { return !is_arranged(itm); }),
+                items.end());
+}
+
 template<class ArrItem>
 std::unique_ptr<ArrangeTaskResult>
 ArrangeTask<ArrItem>::process_native(Ctl &ctl)
@@ -78,8 +92,15 @@ ArrangeTask<ArrItem>::process_native(Ctl &ctl)
 
     } subctl{ctl, *this};
 
-    arranger->arrange(printable.selected, printable.unselected, bed, subctl);
-    arranger->arrange(unprintable.selected, unprintable.unselected, bed, ctl);
+    auto fixed_items = printable.unselected;
+
+    // static (unselected) unprintable objects should not be overlapped by
+    // movable and printable objects
+    std::copy(unprintable.unselected.begin(),
+              unprintable.unselected.end(),
+              std::back_inserter(fixed_items));
+
+    arranger->arrange(printable.selected, fixed_items, bed, subctl);
 
     // Unprintable items should go to the first bed not containing any printable
     // items
@@ -88,6 +109,10 @@ ArrangeTask<ArrItem>::process_native(Ctl &ctl)
 
     // If there are no printables, leave the physical bed empty
     beds = std::max(beds, size_t{1});
+
+    prepare_fixed_unselected(unprintable.unselected, beds);
+
+    arranger->arrange(unprintable.selected, unprintable.unselected, bed, ctl);
 
     result->add_items(crange(printable.selected));
 

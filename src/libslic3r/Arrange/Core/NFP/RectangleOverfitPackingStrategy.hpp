@@ -19,6 +19,36 @@ struct CenterAlignmentFn {
     }
 };
 
+template<class ArrItem>
+struct RectangleOverfitPackingContext : public DefaultPackingContext<ArrItem>
+{
+    BoundingBox limits;
+    int bed_index;
+    PostAlignmentFn post_alignment_fn;
+
+    explicit RectangleOverfitPackingContext(const BoundingBox limits,
+                     int bedidx,
+                     PostAlignmentFn alignfn = CenterAlignmentFn{})
+        : limits{limits}, bed_index{bedidx}, post_alignment_fn{alignfn}
+    {}
+
+    void align_pile()
+    {
+        // Here, the post alignment can be safely done. No throwing
+        // functions are called!
+        if (fixed_items_range(*this).empty()) {
+            auto itms = packed_items_range(*this);
+            auto pilebb = bounding_box(itms);
+
+            for (auto &itm : itms) {
+                translate(itm, post_alignment_fn(limits, pilebb));
+            }
+        }
+    }
+
+    ~RectangleOverfitPackingContext() { align_pile(); }
+};
+
 // With rectange bed, and no fixed items, an infinite bed with
 // RectangleOverfitKernelWrapper can produce better results than a pure
 // RectangleBed with inner-fit polygon calculation.
@@ -29,31 +59,7 @@ struct RectangleOverfitPackingStrategy {
     PostAlignmentFn post_alignment_fn = CenterAlignmentFn{};
 
     template<class ArrItem>
-    struct Context: public DefaultPackingContext<ArrItem> {
-        BoundingBox limits;
-        int bed_index;
-        PostAlignmentFn post_alignment_fn;
-
-        explicit Context(const BoundingBox limits,
-                         int bedidx,
-                         PostAlignmentFn alignfn = CenterAlignmentFn{})
-            : limits{limits}, bed_index{bedidx}, post_alignment_fn{alignfn}
-        {}
-
-        ~Context()
-        {
-            // Here, the post alignment can be safely done. No throwing
-            // functions are called!
-            if (fixed_items_range(*this).empty()) {
-                auto itms = packed_items_range(*this);
-                auto pilebb = bounding_box(itms);
-
-                for (auto &itm : itms) {
-                    translate(itm, post_alignment_fn(limits, pilebb));
-                }
-            }
-        }
-    };
+    using Context = RectangleOverfitPackingContext<ArrItem>;
 
     RectangleOverfitPackingStrategy(PackStrategyNFP<Args...> s,
                                     PostAlignmentFn post_align_fn)
@@ -86,6 +92,19 @@ struct PackStrategyTraits_<RectangleOverfitPackingStrategy<Args...>> {
     {
         return Context<ArrItem>{bounding_box(bed), bed_index,
                                 ps.post_alignment_fn};
+    }
+};
+
+template<class ArrItem>
+struct PackingContextTraits_<RectangleOverfitPackingContext<ArrItem>>
+    : public PackingContextTraits_<DefaultPackingContext<ArrItem>>
+{
+    static void add_packed_item(RectangleOverfitPackingContext<ArrItem> &ctx, ArrItem &itm)
+    {
+        ctx.add_packed_item(itm);
+
+        // to prevent coords going out of range
+        ctx.align_pile();
     }
 };
 

@@ -93,6 +93,11 @@ template<class ArrItem> bool is_fixed(const ArrItem &ap)
     return get_bed_index(ap) >= PhysicalBedId;
 }
 
+template<class ArrItem> bool is_on_physical_bed(const ArrItem &ap)
+{
+    return get_bed_index(ap) == PhysicalBedId;
+}
+
 template<class ArrItem> void translate(ArrItem &ap, const Vec2crd &t)
 {
     set_translation(ap, get_translation(ap) + t);
