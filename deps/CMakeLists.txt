@@ -212,7 +212,7 @@ set(_dep_list
     dep_OpenCSG
     dep_CGAL
     dep_Qhull
-    # dep_OCCT
+    dep_OCCT
     ${PNG_PKG}
     ${ZLIB_PKG}
     ${EXPAT_PKG}
