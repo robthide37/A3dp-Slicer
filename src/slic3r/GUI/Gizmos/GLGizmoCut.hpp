@@ -83,6 +83,7 @@ class GLGizmoCut3D : public GLGizmoBase
     PickingModel m_plane;
     PickingModel m_sphere;
     PickingModel m_cone;
+    PickingModel m_cube;
     std::map<CutConnectorAttributes, PickingModel> m_shapes;
     std::vector<std::shared_ptr<SceneRaycasterItem>> m_raycasters;
 
