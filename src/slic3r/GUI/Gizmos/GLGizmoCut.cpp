@@ -1575,7 +1575,7 @@ void GLGizmoCut3D::on_register_raycasters_for_picking()
 
         m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, Z, *m_sphere.mesh_raycaster, Transform3d::Identity()));
 
-        m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CutPlane, *m_plane.mesh_raycaster, Transform3d::Identity()));
+        m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::FallbackGizmo, CutPlane, *m_plane.mesh_raycaster, Transform3d::Identity()));
 
         if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
             m_raycasters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, CutPlaneZRotation, *m_sphere.mesh_raycaster, Transform3d::Identity()));
@@ -1596,6 +1596,7 @@ void GLGizmoCut3D::on_register_raycasters_for_picking()
 void GLGizmoCut3D::on_unregister_raycasters_for_picking()
 {
     m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::Gizmo);
+    m_parent.remove_raycasters_for_picking(SceneRaycaster::EType::FallbackGizmo);
     m_raycasters.clear();
     // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
     m_parent.set_raycaster_gizmos_on_top(false);
