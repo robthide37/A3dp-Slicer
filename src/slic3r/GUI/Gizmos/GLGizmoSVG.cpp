@@ -999,8 +999,7 @@ void GLGizmoSVG::draw_size()
     double height = size.y() * m_volume_shape.scale * m_scale_height.value_or(1.f);
     if (use_inch) height *= ObjectManipulation::mm_to_in;
 
-    std::optional<Vec3d> new_absolute_scale;
-
+    std::optional<Vec3d> new_relative_scale;
     const double minimal_scale_ratio_change = 1e-4;
 
     if (m_keep_ratio) {
@@ -1017,7 +1016,7 @@ void GLGizmoSVG::draw_size()
             if (std::fabs(width_ratio - 1.) > minimal_scale_ratio_change) {
                 m_scale_width      = m_scale_width.value_or(1.f) * width_ratio;
                 m_scale_height     = m_scale_height.value_or(1.f) * width_ratio;
-                new_absolute_scale = Vec3d(*m_scale_width, *m_scale_height, 1.);
+                new_relative_scale = Vec3d(width_ratio, width_ratio, 1.);
             }
         }
     } else {
@@ -1038,7 +1037,7 @@ void GLGizmoSVG::draw_size()
             double width_ratio = width / prev_width;
             if (std::fabs(width_ratio - 1.) > minimal_scale_ratio_change) {
                 m_scale_width = m_scale_width.value_or(1.f) * width_ratio;
-                new_absolute_scale = Vec3d(*m_scale_width, m_scale_height.value_or(1.f), 1.);
+                new_relative_scale = Vec3d(width_ratio, 1., 1.);
             }
         }
         if (ImGui::IsItemHovered())
@@ -1051,7 +1050,7 @@ void GLGizmoSVG::draw_size()
             double height_ratio = height / prev_height;
             if (std::fabs(height_ratio - 1.) > minimal_scale_ratio_change) {
                 m_scale_height = m_scale_height.value_or(1.f) * height_ratio;
-                new_absolute_scale  = Vec3d(m_scale_width.value_or(1.f), *m_scale_height, 1.);
+                new_relative_scale  = Vec3d(1., height_ratio, 1.);
             }
         }
         if (ImGui::IsItemHovered())
@@ -1075,18 +1074,18 @@ void GLGizmoSVG::draw_size()
     bool can_reset = m_scale_width.has_value() || m_scale_height.has_value() || m_scale_depth.has_value();
     if (can_reset) {
         if (reset_button(m_icons)) {
-            new_absolute_scale = Vec3d(1., 1., 1.);
+            new_relative_scale = Vec3d(1./m_scale_width.value_or(1.f), 1./m_scale_height.value_or(1.f), 1.);
         } else if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", _u8L("Reset scale to loaded one from the SVG").c_str());
     }
 
-    if (new_absolute_scale.has_value()){
+    if (new_relative_scale.has_value()){
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
         TransformationType type = m_volume->is_the_only_one_part() ? 
-            TransformationType::Instance_Absolute_Independent :
-            TransformationType::Local_Absolute_Independent;
-        selection.scale(*new_absolute_scale, type);
+            TransformationType::Instance_Relative_Independent :
+            TransformationType::Local_Relative_Independent;
+        selection.scale(*new_relative_scale, type);
         m_parent.do_scale(L("Resize"));
         wxGetApp().obj_manipul()->set_dirty();
         // should be the almost same
