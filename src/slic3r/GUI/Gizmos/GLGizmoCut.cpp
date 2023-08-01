@@ -186,9 +186,6 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     , m_connector_style (int(CutConnectorStyle::Prism))
     , m_connector_shape_id (int(CutConnectorShape::Circle))
 {
-    m_connector_type = CutConnectorType::Snap;
-    m_mode = size_t(CutMode::cutTongueAndGroove);
-
     m_modes = { _u8L("Planar"), _u8L("Tongue and Groove")//, _u8L("Grid")
 //              , _u8L("Radial"), _u8L("Modular")
     };
@@ -229,6 +226,10 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
         {"Shape"        , _u8L("Shape")},
         {"Depth"        , _u8L("Depth")},
         {"Size"         , _u8L("Size")},
+        {"Groove"       , _u8L("Groove")},
+        {"Width"        , _u8L("Width")},
+        {"Flaps Angle"  , _u8L("Flaps Angle")},
+        {"Groove Angle" , _u8L("Groove Angle")},
     };
 
 //    update_connector_shape();
@@ -256,10 +257,14 @@ std::string GLGizmoCut3D::get_tooltip() const
         return tooltip;
     }
 
-    if (!m_dragging && m_hover_id == CutPlane)
+    if (!m_dragging && m_hover_id == CutPlane) {
+        if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
+            return _u8L("Click to flip the cut plane\n"
+                        "Drag to move the cut plane");
         return _u8L("Click to flip the cut plane\n"
                     "Drag to move the cut plane\n"
                     "Right-click a part to assign it to the other side");
+    }
 
     if (tooltip.empty() && (m_hover_id == X || m_hover_id == Y || m_hover_id == CutPlaneZRotation)) {
         std::string axis = m_hover_id == X ? "X" : m_hover_id == Y ? "Y" : "Z";
@@ -509,6 +514,8 @@ bool GLGizmoCut3D::render_cut_mode_combo()
             on_unregister_raycasters_for_picking();
         }
         reset_cut_by_contours();
+        update_clipper();
+        check_and_update_connectors_state();
     }
 
     return is_changed;
@@ -1931,7 +1938,7 @@ void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos, bool update_tbb /*=fa
 
     bool can_set_center_pos = false;
     {
-        double limit_val = CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.5 * double(m_groove_depth) : 0.5;
+        double limit_val = /*CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.5 * double(m_groove_depth) : */0.5;
         if (tbb.max.z() > -limit_val && tbb.min.z() < limit_val)
             can_set_center_pos = true;
         else {
@@ -2020,7 +2027,7 @@ void GLGizmoCut3D::update_bb()
         m_snap_fine_out_radius    = m_grabber_connection_len * 1.15;
 
         // input params for cut with tongue and groove
-        m_groove_depth = m_groove_depth_init = 0.5f * float(get_grabber_mean_size(m_bounding_box));
+        m_groove_depth = m_groove_depth_init = std::max(1.f , 0.5f * float(get_grabber_mean_size(m_bounding_box)));
         m_groove_width = m_groove_width_init = 4.0f * m_groove_depth;
         m_groove_flaps_angle = m_groove_flaps_angle_init = float(PI) / 3.f;
         m_groove_angle = m_groove_angle_init = 0.f;
@@ -2703,8 +2710,10 @@ void GLGizmoCut3D::reset_cut_by_contours()
             return;
         process_contours();
     }
-    else
+    else {
+        m_invalid_groove = false;
         toggle_model_objects_visibility();
+    }
 }
 
 void GLGizmoCut3D::process_contours()
@@ -2713,6 +2722,8 @@ void GLGizmoCut3D::process_contours()
     const ModelObjectPtrs& model_objects = selection.get_model()->objects;
 
     const int instance_idx = selection.get_instance_idx();
+    if (instance_idx < 0)
+        return;
     const int object_idx = selection.get_object_idx();
 
     wxBusyCursor wait;
@@ -2721,6 +2732,8 @@ void GLGizmoCut3D::process_contours()
         ModelObjectPtrs cut_objects = perform_cut_with_groove(model_objects[object_idx], true);
         if (!cut_objects.empty() && !m_invalid_groove)
             m_part_selection = PartSelection(cut_objects.front(), instance_idx);
+        else
+            m_invalid_groove = true;
     }
     else {
         reset_cut_by_contours();
@@ -2853,9 +2866,12 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
                               get_wraped_wxString(_L("Hold SHIFT key to draw a cut line"), 40));
         ImGui::Separator();
 
-        // WIP : cut plane mode
+        const bool has_connectors = !connectors.empty();
+
+        m_imgui->disabled_begin(has_connectors);
         if (render_cut_mode_combo())
             mode = CutMode(m_mode);
+        m_imgui->disabled_end();
 
         render_build_size();
 
@@ -2864,7 +2880,6 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         ImGui::SameLine();
         render_move_center_input(Z);
         ImGui::SameLine();
-        const bool has_connectors = !connectors.empty();
 
         const bool is_cut_plane_init = m_rotation_m.isApprox(Transform3d::Identity()) && m_bb_center.isApprox(m_plane_center);
         m_imgui->disabled_begin(is_cut_plane_init);
@@ -2898,13 +2913,12 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         }
         else if (mode == CutMode::cutTongueAndGroove) {
             ImGui::Separator();
-            ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _L("Groove") + ": ");
-            render_groove_float_input(_u8L("Depth"), m_groove_depth, m_groove_depth_init, m_groove_depth_tolerance);
-            render_groove_float_input(_u8L("Width"), m_groove_width, m_groove_width_init, m_groove_width_tolerance);
-            render_groove_angle_input(_u8L("Flaps Angle"), m_groove_flaps_angle, m_groove_flaps_angle_init, 30.f, 120.f);
-            render_groove_angle_input(_u8L("Groove Angle"), m_groove_angle, m_groove_angle_init, 0.f, 15.f);
-
-            m_imgui->checkbox(_L("Optimize rendering"), m_optimaze_groove_rendering);
+            ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, m_labels_map["Groove"] + ": ");
+            render_groove_float_input(m_labels_map["Depth"], m_groove_depth, m_groove_depth_init, m_groove_depth_tolerance);
+            render_groove_float_input(m_labels_map["Width"], m_groove_width, m_groove_width_init, m_groove_width_tolerance);
+            render_groove_angle_input(m_labels_map["Flaps Angle"], m_groove_flaps_angle, m_groove_flaps_angle_init, 30.f, 120.f);
+            render_groove_angle_input(m_labels_map["Groove Angle"], m_groove_angle, m_groove_angle_init, 0.f, 15.f);
+//            m_imgui->checkbox(_L("Optimize rendering"), m_optimaze_groove_rendering);
         }
 
         ImGui::Separator();
@@ -2974,7 +2988,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 
         add_vertical_scaled_interval(0.75f);
 
-        m_imgui->disabled_begin(has_connectors || m_part_selection.valid());
+        m_imgui->disabled_begin(has_connectors || m_part_selection.valid() || mode == CutMode::cutTongueAndGroove);
             ImGuiWrapper::text(_L("Cut into") + ":");
 
             if (m_part_selection.valid())
@@ -3222,6 +3236,8 @@ void GLGizmoCut3D::check_and_update_connectors_state()
 {
     m_info_stats.invalidate();
     m_invalid_connectors_idxs.clear();
+    if (CutMode(m_mode) != CutMode::cutPlanar)
+        return;
     const ModelObject* mo = m_c->selection_info()->model_object();
     auto inst_id = m_c->selection_info()->get_active_instance();
     if (inst_id < 0)
@@ -3262,7 +3278,8 @@ void GLGizmoCut3D::render_connectors()
 {
     ::glEnable(GL_DEPTH_TEST);
 
-    if (cut_line_processing() || 
+    if (cut_line_processing() ||
+        CutMode(m_mode) != CutMode::cutPlanar ||
         m_connector_mode == CutConnectorMode::Auto || !m_c->selection_info())
         return;
 
@@ -3341,7 +3358,7 @@ bool GLGizmoCut3D::can_perform_cut() const
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
         const float flaps_width = -2.f * m_groove_depth / tan(m_groove_flaps_angle);
-        return flaps_width < m_groove_width && !m_invalid_groove;
+        return flaps_width < m_groove_width && !m_invalid_groove && has_valid_contour();
     }
 
     if (m_part_selection.valid())
