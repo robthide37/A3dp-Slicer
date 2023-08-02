@@ -814,15 +814,15 @@ bool PrintObject::invalidate_state_by_config_options(
             || opt_key == "overhang_speed_2"
             || opt_key == "overhang_speed_3"
             || opt_key == "external_perimeter_speed"
-            || opt_key == "infill_speed"
-            || opt_key == "perimeter_speed"
             || opt_key == "small_perimeter_speed"
             || opt_key == "solid_infill_speed"
             || opt_key == "top_solid_infill_speed") {
             invalidated |= m_print->invalidate_step(psGCodeExport);
         } else if (
                opt_key == "wipe_into_infill"
-            || opt_key == "wipe_into_objects") {
+            || opt_key == "wipe_into_objects"
+            || opt_key == "infill_speed"
+            || opt_key == "perimeter_speed") {
             invalidated |= m_print->invalidate_step(psWipeTower);
             invalidated |= m_print->invalidate_step(psGCodeExport);
         } else {

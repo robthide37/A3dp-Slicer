@@ -6535,9 +6535,12 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
         csg::model_to_csgmesh(mo, Transform3d::Identity(), std::back_inserter(csgmesh),
                               csg::mpartsPositive | csg::mpartsNegative | csg::mpartsDoSplits);
 
-        if (csg::check_csgmesh_booleans(range(csgmesh)) == csgmesh.end()) {
+        auto csgrange = range(csgmesh);
+        if (csg::is_all_positive(csgrange)) {
+            mesh = TriangleMesh{csg::csgmesh_merge_positive_parts(csgrange)};
+        } else if (csg::check_csgmesh_booleans(csgrange) == csgrange.end()) {
             try {
-                auto cgalm = csg::perform_csgmesh_booleans(range(csgmesh));
+                auto cgalm = csg::perform_csgmesh_booleans(csgrange);
                 mesh = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalm);
             } catch (...) {}
         }
