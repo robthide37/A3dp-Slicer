@@ -563,20 +563,27 @@ void GLGizmoSVG::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(d
 
 #include "slic3r/GUI/BitmapCache.hpp"
 #include "nanosvg/nanosvgrast.h"
+#include "libslic3r/AABBTreeLines.hpp" // aabb lines for draw filled expolygon
+
 namespace{
 NSVGimage* init_image(EmbossShape::SvgFile &svg_file) {
     // is already initialized?
     if (svg_file.image.get() != nullptr)
         return svg_file.image.get();
 
-    // chech if path is known
-    if (svg_file.path.empty())
-        return nullptr;
+
+    if (svg_file.file_data == nullptr){
+        // chech if path is known
+        if (svg_file.path.empty())
+            return nullptr;
+        svg_file.file_data = read_from_disk(svg_file.path);
+        if (svg_file.file_data == nullptr)
+            return nullptr;
+    }
 
     // init svg image
-    svg_file.image = nsvgParseFromFile(svg_file.path);
-
-    if (svg_file.image.get() == nullptr)
+    svg_file.image = nsvgParse(svg_file.file_data);
+    if (svg_file.image.get() == NULL)
         return nullptr;
 
     // Disable stroke
@@ -586,37 +593,288 @@ NSVGimage* init_image(EmbossShape::SvgFile &svg_file) {
     return svg_file.image.get();
 }
 
-bool init_texture(Texture &texture, ModelVolume &mv, unsigned max_size_px)
-{
-    if (!mv.emboss_shape.has_value())
-        return false;
-
-    EmbossShape &es = *mv.emboss_shape;
-    NSVGimage *image = init_image(es.svg_file);
-    if (image == nullptr)
-        return false;
+// inspired by Xiaolin Wu's line algorithm - https://en.wikipedia.org/wiki/Xiaolin_Wu's_line_algorithm
+// Draw inner part of polygon CCW line as full brightness(edge of expolygon)
+void wu_draw_line_side(Linef line,
+                const std::function<void(int x, int y, float brightess)>& plot) {
+    auto ipart = [](float x) -> int {return static_cast<int>(std::floor(x));};
+    auto round = [](float x) -> float {return std::round(x);};
+    auto fpart = [](float x) -> float {return x - std::floor(x);};
+    auto rfpart = [=](float x) -> float {return 1 - fpart(x);};
     
-    // inspired by:
-    // GLTexture::load_from_svg_file(filepath, false, false, false, max_size_px);
+    Vec2d d = line.b - line.a;
+    const bool steep = abs(d.y()) > abs(d.x());
+    bool is_full; // identify full brightness pixel
+    if (steep) {
+        is_full = d.y() >= 0;
+        std::swap(line.a.x(), line.a.y());
+        std::swap(line.b.x(), line.b.y());
+        std::swap(d.x(), d.y());
+    }else
+        is_full = d.x() < 0; // opposit direction of y
 
-    // NOTE: Can not use es.shape --> it is aligned and one need offset in svg
-    Polygons shape = to_polygons(*image);
-    if (shape.empty())
-        return false;
+    if (line.a.x() > line.b.x()) {
+        std::swap(line.a.x(), line.b.x());
+        std::swap(line.a.y(), line.b.y());
+        d *= -1;
+    }
+    const float gradient = (d.x() == 0) ? 1. : d.y() / d.x();
+        
+    int xpx11;
+    float intery;
+    {
+        const float xend = round(line.a.x());
+        const float yend = line.a.y() + gradient * (xend - line.a.x());
+        const float xgap = rfpart(line.a.x() + 0.5f);
+        xpx11 = int(xend);
+        const int ypx11 = ipart(yend);
+        if (steep) {
+            plot(ypx11,     xpx11,  is_full? 1.f : (rfpart(yend) * xgap));
+            plot(ypx11 + 1, xpx11, !is_full? 1.f : ( fpart(yend) * xgap));
+        } else {
+            plot(xpx11, ypx11,     is_full? 1.f : (rfpart(yend) * xgap));
+            plot(xpx11, ypx11 + 1,!is_full? 1.f : ( fpart(yend) * xgap));
+        }
+        intery = yend + gradient;
+    }
+    
+    int xpx12;
+    {
+        const float xend = round(line.b.x());
+        const float yend = line.b.y() + gradient * (xend - line.b.x());
+        const float xgap = rfpart(line.b.x() + 0.5);
+        xpx12 = int(xend);
+        const int ypx12 = ipart(yend);
+        if (steep) {
+            plot(ypx12,     xpx12,  is_full? 1.f : (rfpart(yend) * xgap));
+            plot(ypx12 + 1, xpx12, !is_full? 1.f : ( fpart(yend) * xgap));
+        } else {
+            plot(xpx12, ypx12,      is_full? 1.f : (rfpart(yend) * xgap));
+            plot(xpx12, ypx12 + 1, !is_full? 1.f : ( fpart(yend) * xgap));
+        }
+    }
+        
+    if (steep) {
+        if (is_full){
+            for (int x = xpx11 + 1; x < xpx12; x++) {
+                plot(ipart(intery),     x, 1.f);
+                plot(ipart(intery) + 1, x, fpart(intery));
+                intery += gradient;
+            }
+        } else {
+            for (int x = xpx11 + 1; x < xpx12; x++) {
+                plot(ipart(intery),     x, rfpart(intery));
+                plot(ipart(intery) + 1, x, 1.f );
+                intery += gradient;
+            }
+        }
+    } else {
+        if (is_full){
+            for (int x = xpx11 + 1; x < xpx12; x++) {
+                plot(x, ipart(intery),     1.f);
+                plot(x, ipart(intery) + 1, fpart(intery));
+                intery += gradient;
+            }
+        } else {
+            for (int x = xpx11 + 1; x < xpx12; x++) {
+                plot(x, ipart(intery),     rfpart(intery));
+                plot(x, ipart(intery) + 1, 1.f);
+                intery += gradient;
+            }
+        }
+    }
+}
 
-    BoundingBox bb = get_extents(shape);
-    Point bb_size = bb.size();
-    double bb_width = bb_size.x();  // [in mm]
+// Wu's line algorithm - https://en.wikipedia.org/wiki/Xiaolin_Wu's_line_algorithm
+void wu_draw_line(Linef line,
+                const std::function<void(int x, int y, float brightess)>& plot) {
+    auto ipart = [](float x) -> int {return int(std::floor(x));};
+    auto round = [](float x) -> float {return std::round(x);};
+    auto fpart = [](float x) -> float {return x - std::floor(x);};
+    auto rfpart = [=](float x) -> float {return 1 - fpart(x);};
+    
+    Vec2d d = line.b - line.a;
+    const bool steep = abs(d.y()) > abs(d.x());
+    if (steep) {
+        std::swap(line.a.x(), line.a.y());
+        std::swap(line.b.x(), line.b.y());
+    }
+    if (line.a.x() > line.b.x()) {
+        std::swap(line.a.x(), line.b.x());
+        std::swap(line.a.y(), line.b.y());
+    }
+    d = line.b - line.a;
+    const float gradient = (d.x() == 0) ? 1 : d.y() / d.x();
+        
+    int xpx11;
+    float intery;
+    {
+        const float xend = round(line.a.x());
+        const float yend = line.a.y() + gradient * (xend - line.a.x());
+        const float xgap = rfpart(line.a.x() + 0.5);
+        xpx11 = int(xend);
+        const int ypx11 = ipart(yend);
+        if (steep) {
+            plot(ypx11,     xpx11,  rfpart(yend) * xgap);
+            plot(ypx11 + 1, xpx11,   fpart(yend) * xgap);
+        } else {
+            plot(xpx11, ypx11,    rfpart(yend) * xgap);
+            plot(xpx11, ypx11 + 1, fpart(yend) * xgap);
+        }
+        intery = yend + gradient;
+    }
+    
+    int xpx12;
+    {
+        const float xend = round(line.b.x());
+        const float yend = line.b.y() + gradient * (xend - line.b.x());
+        const float xgap = rfpart(line.b.x() + 0.5);
+        xpx12 = int(xend);
+        const int ypx12 = ipart(yend);
+        if (steep) {
+            plot(ypx12,     xpx12, rfpart(yend) * xgap);
+            plot(ypx12 + 1, xpx12,  fpart(yend) * xgap);
+        } else {
+            plot(xpx12, ypx12,     rfpart(yend) * xgap);
+            plot(xpx12, ypx12 + 1,  fpart(yend) * xgap);
+        }
+    }
+        
+    if (steep) {
+        for (int x = xpx11 + 1; x < xpx12; x++) {
+            plot(ipart(intery),     x, rfpart(intery));
+            plot(ipart(intery) + 1, x,  fpart(intery));
+            intery += gradient;
+        }
+    } else {
+        for (int x = xpx11 + 1; x < xpx12; x++) {
+            plot(x, ipart(intery),     rfpart(intery));
+            plot(x, ipart(intery) + 1,  fpart(intery));
+            intery += gradient;
+        }
+    }
+}
+
+/// <summary>
+/// Draw filled ExPolygon into data 
+/// line by line inspired by: http://alienryderflex.com/polygon_fill/
+/// </summary>
+/// <typeparam name="N">Count channels for one pixel(RGBA = 4)</typeparam>
+/// <param name="shape">Shape to draw</param>
+/// <param name="color">Color of shape</param>
+/// <param name="data">Image(2d) stored in 1d array</param>
+/// <param name="data_width">Count of pixel on one line(size in data = N x data_width)</param>
+/// <param name="scale">Shape scale for conversion to pixels</param>
+template<unsigned int N>
+void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& color, std::vector<unsigned char> &data, size_t data_width, double scale = 1.){
+    assert(data.size() % N == 0);
+    assert(data.size() % data_width == 0);
+    assert((data.size() % (N*data_width)) == 0);
+
+    BoundingBox bb_unscaled = get_extents(shape);
+    
+    Linesf lines = to_linesf(shape);
+    BoundingBoxf bb(
+        bb_unscaled.min.cast<double>(), 
+        bb_unscaled.max.cast<double>());
+
+    // scale lines to pixels
+    if (!is_approx(scale, 1.)) {
+        for (Linef &line : lines) {
+            line.a *= scale;
+            line.b *= scale;
+        }
+        bb.min *= scale;
+        bb.max *= scale;
+    }
+    auto tree = Slic3r::AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
+
+    int count_lines = data.size() / (N * data_width);
+    size_t data_line = N * data_width;
+    auto get_offset = [count_lines, data_line](int x, int y) {
+        // NOTE: y has opposit direction in texture
+        return (count_lines - y - 1) * data_line + x * N;
+    };
+    auto set_color = [&data, &color, get_offset](int x, int y) {
+        size_t offset = get_offset(x, y);
+        if (data[offset + N - 1] != 0)
+            return; // already setted by line
+        for (size_t i = 0; i < N; ++i)
+            data[offset + i] = color[i];
+    };
+
+    // anti aliased drawing of lines
+    auto draw = [&data, data_width, count_lines, get_offset, &color](int x, int y, float brightess) {
+        if (x < 0 || y < 0 || x >= data_width || y >= count_lines)
+            return; // out of image
+        size_t offset = get_offset(x, y);
+        unsigned char &alpha = data[offset + N - 1];
+        if (alpha == 0){
+            alpha = static_cast<unsigned char>(std::round(brightess * 255));
+            for (size_t i = 0; i < N-1; ++i)
+                data[offset + i] = color[i];
+        } else if (alpha != 255){
+            alpha = static_cast<unsigned char>(std::min(255, int(alpha) + static_cast<int>(std::round(brightess * 255))));
+        }
+    };
+    for (const Linef& line: lines) wu_draw_line_side(line, draw);
+    
+
+    // range for intersection line
+    double x1 = bb.min.x() - 1.f;
+    double x2 = bb.max.x() + 1.f;
+
+    int max_y = std::min(count_lines, static_cast<int>(std::round(bb.max.y())));
+    for (int y = std::max(0, static_cast<int>(std::round(bb.min.y()))); y < max_y; ++y){
+        double y_f = y + .5; // 0.5 ... intersection in center of pixel of pixel
+        Linef line(Vec2d(x1, y_f), Vec2d(x2, y_f));
+        using Intersection = std::pair<Vec2d, size_t>;
+        using Intersections = std::vector<Intersection>;
+        // sorted .. false
+        // <false, Vec2d, Linef, decltype(tree)>
+        Intersections intersections = Slic3r::AABBTreeLines::get_intersections_with_line<false, Vec2d, Linef>(lines, tree, line);
+        if (intersections.empty())
+            continue;
+
+        assert((intersections.size() % 2) == 0);
+
+        // sort intersections by x
+        std::sort(intersections.begin(), intersections.end(), 
+            [](const Intersection &i1, const Intersection &i2) { return i1.first.x() < i2.first.x(); });
+
+        // draw lines
+        for (size_t i = 0; i < intersections.size(); i+=2) {
+            const Vec2d& p2 = intersections[i+1].first;
+            if (p2.x() < 0)
+                continue; // out of data
+
+            const Vec2d& p1 = intersections[i].first;
+            if (p1.x() > data_width)
+                break; // out of data
+
+            // clamp to data
+            int max_x = std::min(static_cast<int>(data_width-1), static_cast<int>(std::round(p2.x())));
+            for (int x = std::max(0, static_cast<int>(std::round(p1.x()))); x <= max_x; ++x)
+                set_color(x, y);
+        }
+    }  
+}
+
+// init texture by draw expolygons into texture
+bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, unsigned max_size_px){
+    BoundingBox bb = get_extents(shapes_with_ids);
+    Point  bb_size   = bb.size();
+    double bb_width  = bb_size.x(); // [in mm]
     double bb_height = bb_size.y(); // [in mm]
 
     bool is_widder = bb_size.x() > bb_size.y();
-    float scale = 0.f;
-    if (is_widder){
-        scale = static_cast<float>(max_size_px / bb_width);
+    double scale = 0.f;
+    if (is_widder) {
+        scale          = max_size_px / bb_width;
         texture.width  = max_size_px;
         texture.height = static_cast<unsigned>(std::ceil(bb_height * scale));
     } else {
-        scale = static_cast<float>(max_size_px / bb_height);
+        scale          = max_size_px / bb_height;
         texture.width  = static_cast<unsigned>(std::ceil(bb_width * scale));
         texture.height = max_size_px;
     }
@@ -624,33 +882,32 @@ bool init_texture(Texture &texture, ModelVolume &mv, unsigned max_size_px)
     if (n_pixels <= 0)
         return false;
 
-    NSVGrasterizer* rast = nsvgCreateRasterizer();
-    if (rast == nullptr)
-        return false;    
-    ScopeGuard sg_rast([rast]() { nsvgDeleteRasterizer(rast); });
-
     constexpr int channels_count = 4;
-    std::vector<unsigned char> data(n_pixels * channels_count, 0);
-    float tx = static_cast<float>(-bb.min.x() * scale);
-    float ty = static_cast<float>(bb.max.y() * scale); // Reverse direction of y
-    int stride = texture.width * channels_count;
-    nsvgRasterize(rast, image, tx, ty, scale, data.data(), texture.width, texture.height, stride);
+    std::vector<unsigned char> data(n_pixels * channels_count, {0});
 
-    // fill by monotone color
-    std::vector<unsigned char> fill_color = {201, 201, 201}; // RGB and keep same alpha
-    for (size_t i = 0; i+2 < data.size(); i += channels_count)
-        if (data[i] != 0 || data[i + 1] != 0 || data[i + 2] != 0)
-            for (size_t j = 0; j < fill_color.size(); j++)
-                data[i + j] = fill_color[j];
+    // Union All shapes
+    ExPolygons shape;
+    for (const ExPolygonsWithId &shapes_with_id : shapes_with_ids)
+        expolygons_append(shape, shapes_with_id.expoly);
+    shape = union_ex(shape);
 
-    // sends data to gpu
+    // align to texture
+    for (ExPolygon& expolygon: shape)
+        expolygon.translate(-bb.min);
+
+    unsigned char alpha = 255; // without transparency
+    std::array<unsigned char, 4> color{201, 201, 201, alpha};
+    draw_filled(shape, color, data, texture.width, scale);
+
+    // sends data to gpu 
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     if (texture.id != 0)
         glsafe(::glDeleteTextures(1, &texture.id));
     glsafe(::glGenTextures(1, &texture.id));
     glsafe(::glBindTexture(GL_TEXTURE_2D, texture.id));
-    glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei) texture.width, (GLsizei) texture.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, (const void *) data.data()));
-        
+    glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei) texture.width, (GLsizei) texture.height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                          (const void *) data.data()));
+
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
@@ -691,6 +948,21 @@ void GLGizmoSVG::set_volume_by_selection()
         m_job_cancel->store(true);
         m_job_cancel = nullptr;
     }
+        
+    // calculate scale for height and depth inside of scaled object instance
+    calculate_scale(); // must be before calculation of tesselation
+
+    EmbossShape &es = *volume->emboss_shape;
+    ExPolygonsWithIds &shape_ids = es.shapes_with_ids;
+    if (shape_ids.empty()) {
+        // volume loaded from .3mf need to create shapes from svg
+        NSVGimage* image = init_image(es.svg_file);
+        assert(image != nullptr);
+        if (image != nullptr){
+            double tes_tol = get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)));
+            shape_ids = create_shape_with_ids(*image, tes_tol);
+        }        
+    }
 
     reset_volume(); // clear cached data
 
@@ -703,9 +975,6 @@ void GLGizmoSVG::set_volume_by_selection()
     m_distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
     
     m_shape_bb = get_extents(m_volume_shape.shapes_with_ids);
-
-    // calculate scale for height and depth inside of scaled object instance
-    calculate_scale();
 }
 namespace {
 void delete_texture(Texture& texture){
@@ -864,26 +1133,27 @@ bool GLGizmoSVG::draw_preview(){
         return false;
     }
 
+    const EmbossShape &es = *m_volume->emboss_shape;
     // init texture when not initialized yet.
     // drag&drop is out of rendering scope so texture must be created on this place
     if (m_texture.id == 0)
-        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
+        init_texture(m_texture, es.shapes_with_ids, m_gui_cfg->texture_max_size_px);
 
-    ::draw(m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
+    //::draw(m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
 
     if (m_texture.id != 0) {
         ImTextureID id = (void *) static_cast<intptr_t>(m_texture.id);
         ImVec2      s(m_texture.width, m_texture.height);
         ImGui::Image(id, s);
         if(ImGui::IsItemHovered()){
-            size_t count_shapes = ::count(*m_volume->emboss_shape->svg_file.image->shapes);
+            size_t count_shapes = ::count(*es.svg_file.image->shapes);
             ImGui::SetTooltip("%d count shapes", count_shapes);
         }
     }
 
     if (m_filename_preview.empty()){
         // create filename preview
-        m_filename_preview = get_file_name(m_volume->emboss_shape->svg_file.path);
+        m_filename_preview = get_file_name(es.svg_file.path);
         m_filename_preview = ImGuiWrapper::trunc(m_filename_preview, m_gui_cfg->input_width);
     }
 
@@ -898,7 +1168,7 @@ bool GLGizmoSVG::draw_preview(){
 
     is_hovered |= ImGui::IsItemHovered();
     if (is_hovered) {
-        std::string tooltip = GUI::format(_L("SVG file path is \"%1%\" "), m_volume->emboss_shape->svg_file.path);
+        std::string tooltip = GUI::format(_L("SVG file path is \"%1%\" "), es.svg_file.path);
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
 
@@ -931,10 +1201,10 @@ bool GLGizmoSVG::draw_preview(){
 
     if (file_changed) {
         double tes_tol = get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)));
-        EmbossShape es = select_shape(m_volume_shape.svg_file.path, tes_tol);
-        m_volume_shape.svg_file.image = es.svg_file.image;
-        m_volume_shape.shapes_with_ids = es.shapes_with_ids;
-        init_texture(m_texture, *m_volume, m_gui_cfg->texture_max_size_px);
+        EmbossShape es_ = select_shape(m_volume_shape.svg_file.path, tes_tol);
+        m_volume_shape.svg_file.image = std::move(es_.svg_file.image);
+        m_volume_shape.shapes_with_ids = std::move(es_.shapes_with_ids);
+        init_texture(m_texture, m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
         process();
     }
 
@@ -949,9 +1219,20 @@ bool GLGizmoSVG::draw_preview(){
 
     ImGui::SameLine();
     if (clickable(get_icon(m_icons, IconType::save), get_icon(m_icons, IconType::save_hover))) {
-        Slic3r::save(*m_volume_shape.svg_file.image, "C:/data/temp/saved.svg");
+        GUI::FileType file_type  = FT_SVG;
+        wxString wildcard = file_wildcards(file_type);
+        wxString dlg_title = _L("Export SVG file:");
+        wxString dlg_dir = from_u8(wxGetApp().app_config->get_last_dir());
+        const EmbossShape::SvgFile& svg = m_volume_shape.svg_file;
+        wxString dlg_file = from_u8(get_file_name(((!svg.path.empty()) ? svg.path : svg.path_in_3mf))) + ".svg";
+        wxFileDialog dlg(nullptr, dlg_title, dlg_dir, dlg_file, wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+        if (dlg.ShowModal() == wxID_OK ){
+            wxString out_path = dlg.GetPath();        
+            std::string path{out_path.c_str()};
+            Slic3r::save(*m_volume_shape.svg_file.image, path);
+        }
     } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", _u8L("Save as svg file").c_str());
+        ImGui::SetTooltip("%s", _u8L("Save as '.svg' file").c_str());
     }
     return true;
 }
@@ -1471,7 +1752,8 @@ ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, double tesselati
         return {};
 
     expoly = union_ex(expoly);
-    if (!Slic3r::Emboss::heal_shape(expoly, 10))
+    unsigned max_iteration = 10;
+    if (!Slic3r::Emboss::heal_shape(expoly, max_iteration))
         return {};
 
     // SVG is used as centered
@@ -1516,7 +1798,6 @@ EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance
     }
 
     // Set default and unchanging scale
-    shape.scale = SCALING_FACTOR;
     shape.shapes_with_ids = create_shape_with_ids(*shape.svg_file.image, tesselation_tolerance);
 
     // Must contain some shapes !!!
