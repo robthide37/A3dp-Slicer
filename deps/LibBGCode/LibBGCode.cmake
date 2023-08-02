@@ -9,6 +9,7 @@ endif ()
 prusaslicer_add_cmake_project(LibBGCode_deps
     ${_source_dir_line}
     SOURCE_SUBDIR deps
+    DEPENDS dep_Boost ${ZLIB_PKG}
     CMAKE_ARGS
         -DDEP_DOWNLOAD_DIR:PATH=${DEP_DOWNLOAD_DIR}
         -DLibBGCode_Deps_SELECT_ALL:BOOL=OFF
