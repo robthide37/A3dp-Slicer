@@ -1229,7 +1229,14 @@ bool GLGizmoSVG::draw_preview(){
         if (dlg.ShowModal() == wxID_OK ){
             wxString out_path = dlg.GetPath();        
             std::string path{out_path.c_str()};
-            Slic3r::save(*m_volume_shape.svg_file.image, path);
+            //Slic3r::save(*m_volume_shape.svg_file.image, path);
+
+            std::ofstream stream(path);
+            if (stream.is_open()){
+                stream << svg.file_data.get();
+            } else {
+                BOOST_LOG_TRIVIAL(error) << "Opening file: \"" << path << "\" Failed";
+            }
         }
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Save as '.svg' file").c_str());

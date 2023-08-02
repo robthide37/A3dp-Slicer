@@ -54,13 +54,43 @@ NSVGimage_ptr nsvgParseFromFile(const std::string &filename, const char *units, 
     return {image, ::nsvgDelete};
 }
 
-bool save(const NSVGimage &image, const std::string &svg_file_path) 
+std::unique_ptr<char[]> read_from_disk(const std::string& path)
 {
-    FILE * file = boost::nowide::fopen(svg_file_path.c_str(), "w");
-    if (file == NULL)
-        return false;
+    FILE *fp = boost::nowide::fopen(path.c_str(), "rb");
+    if (!fp)
+        return nullptr;
 
-    fprintf(file, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>");
+    fseek(fp, 0, SEEK_END);
+    size_t size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    std::unique_ptr<char[]> result{new char[size + 1]};
+    if (result == nullptr)
+        return nullptr;
+
+    if (fread(result.get(), 1, size, fp) != size)
+        return nullptr;
+
+    result.get()[size] = '\0'; // Must be null terminated.
+    fclose(fp);
+    return result;
+}
+
+NSVGimage_ptr nsvgParse(const std::shared_ptr<char[]> file_data, const char *units, float dpi){
+    size_t size = 0;
+    for (char *c = file_data.get(); *c != '\0'; ++c)
+        ++size;
+
+    // NOTE: nsvg parser consume data from pointer
+    std::unique_ptr<char[]> data_copy(new char[size]);
+    memcpy(data_copy.get(), file_data.get(), size);
+    NSVGimage *image = ::nsvgParse(data_copy.get(), units, dpi);
+    return {image, ::nsvgDelete};
+}
+
+void save(const NSVGimage &image, std::ostream &data)
+{
+    data << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>";
     
     // tl .. top left
     Vec2f tl(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
@@ -76,9 +106,11 @@ bool save(const NSVGimage &image, const std::string &svg_file_path)
     Vec2f s = br - tl;
     Point size = s.cast<Point::coord_type>();
 
-    fprintf(file, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%dmm\" height=\"%dmm\" viewBox=\"0 0 %d %d\" >\n", 
-        size.x(), size.y(), size.x(), size.y());
-    fprintf(file, "<!-- Created with PrusaSlicer (https://www.prusa3d.com/prusaslicer/) -->\n");
+    data << "<svg xmlns=\"http://www.w3.org/2000/svg\" "
+         << "width=\"" << size.x() << "mm\" "
+         << "height=\"" << size.y() << "mm\" "
+         << "viewBox=\"0 0 " << size.x() << " " << size.y() << "\" >\n";
+    data << "<!-- Created with PrusaSlicer (https://www.prusa3d.com/prusaslicer/) -->\n";
 
     std::array<char, 128> buffer;
     auto write_point = [&tl, &buffer](std::string &d, const float *p) {
@@ -143,10 +175,18 @@ bool save(const NSVGimage &image, const std::string &svg_file_path)
             type = Type::close;
             d += "Z"; // closed path
         }
-        fprintf(file, "<path fill=\"#D2D2D2\" d=\"%s\" />\n", d.c_str());
+        data << "<path fill=\"#D2D2D2\" d=\"" << d << "\" />\n";
     }
-    fprintf(file, "</svg>\n");
-    fclose(file);
+    data << "</svg>\n";
+}
+
+bool save(const NSVGimage &image, const std::string &svg_file_path) 
+{
+    std::ofstream file{svg_file_path};
+    if (!file.is_open())
+        return false;
+    save(image, file);
+    return true;
 }
 } // namespace Slic3r
 

@@ -39,6 +39,8 @@ namespace pt = boost::property_tree;
 #include "EmbossShape.hpp"
 #include "ExPolygonSerialize.hpp" 
 
+#include "NSVGUtils.hpp"
+
 #include <fast_float/fast_float.h>
 
 // Slightly faster than sprintf("%.9g"), but there is an issue with the karma floating point formatter,
@@ -173,9 +175,9 @@ static constexpr const char *FONT_WEIGHT_ATTR    = "weight";
 
 // Store / load of EmbossShape
 static constexpr const char *SHAPE_TAG = "slic3rpe:shape";
-static constexpr const char *SHAPE_EXPOLYS_ATTR = "expolygons";
 static constexpr const char *SHAPE_SCALE_ATTR   = "scale";
 static constexpr const char *SVG_FILE_PATH_ATTR = "filepath";
+static constexpr const char *SVG_FILE_PATH_IN_3MF_ATTR = "filepath3mf";
 
 // EmbossProjection
 static constexpr const char *DEPTH_ATTR       = "depth";
@@ -467,7 +469,7 @@ namespace Slic3r {
         typedef std::map<int, CutObjectInfo>         IdToCutObjectInfoMap;
         typedef std::map<int, std::vector<sla::SupportPoint>> IdToSlaSupportPointsMap;
         typedef std::map<int, std::vector<sla::DrainHole>> IdToSlaDrainHolesMap;
-
+        using PathToEmbossShapeFileMap = std::map<std::string, std::shared_ptr<char[]>>;
         // Version of the 3mf file
         unsigned int m_version;
         bool m_check_version;
@@ -497,6 +499,7 @@ namespace Slic3r {
         IdToLayerConfigRangesMap m_layer_config_ranges;
         IdToSlaSupportPointsMap m_sla_support_points;
         IdToSlaDrainHolesMap    m_sla_drain_holes;
+        PathToEmbossShapeFileMap m_path_to_emboss_shape_files;
         std::string m_curr_metadata_name;
         std::string m_curr_characters;
         std::string m_name;
@@ -523,6 +526,7 @@ namespace Slic3r {
         }
 
         bool _load_model_from_file(const std::string& filename, Model& model, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions);
+        bool _is_svg_shape_file(const std::string &filename);
         bool _extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat);
         void _extract_cut_information_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, ConfigSubstitutionContext& config_substitutions);
         void _extract_layer_heights_profile_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat);
@@ -534,6 +538,7 @@ namespace Slic3r {
 
         void _extract_print_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, DynamicPrintConfig& config, ConfigSubstitutionContext& subs_context, const std::string& archive_filename);
         bool _extract_model_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model);
+        void _extract_embossed_svg_shape_file(const std::string &filename, mz_zip_archive &archive, const mz_zip_archive_file_stat &stat);
 
         // handlers to parse the .model file
         void _handle_start_model_xml_element(const char* name, const char** attributes);
@@ -761,6 +766,9 @@ namespace Slic3r {
                         add_error("Archive does not contain a valid model config");
                         return false;
                     }
+                } 
+                else if (_is_svg_shape_file(name)) {
+                    _extract_embossed_svg_shape_file(name, archive, stat);
                 }
             }
         }
@@ -934,6 +942,10 @@ namespace Slic3r {
 //        model.adjust_min_z();
 
         return true;
+    }
+
+    bool _3MF_Importer::_is_svg_shape_file(const std::string &name) { 
+        return name._Starts_with(MODEL_FOLDER) && boost::algorithm::ends_with(name, ".svg");
     }
 
     bool _3MF_Importer::_extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
@@ -1365,6 +1377,36 @@ namespace Slic3r {
                 if (!sla_drain_holes.empty())
                     m_sla_drain_holes.insert({ object_id, sla_drain_holes });
             }
+        }
+    }
+
+    void _3MF_Importer::_extract_embossed_svg_shape_file(const std::string &filename, mz_zip_archive &archive, const mz_zip_archive_file_stat &stat){
+        assert(m_path_to_emboss_shape_files.find(filename) == m_path_to_emboss_shape_files.end());
+
+        std::unique_ptr<char[]> file{new char[stat.m_uncomp_size + 1]};
+        if (file == nullptr){
+            add_error("Cannot alocate space for SVG file.");
+            return;
+        }
+
+        mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void *) file.get(), (size_t) stat.m_uncomp_size, 0);
+        if (res == 0) {
+            add_error("Error while reading svg shape for emboss");
+            return;
+        }
+        file.get()[stat.m_uncomp_size] = '\0'; // Must be null terminated.
+        
+        // store for case svg is loaded before volume
+        m_path_to_emboss_shape_files[filename] = std::move(file);
+        
+        // find embossed volume, for case svg is loaded after volume
+        for (ModelObject* object : m_model->objects)
+        for (ModelVolume *volume : object->volumes) {
+            std::optional<EmbossShape> &es = volume->emboss_shape;
+            if (!es.has_value())
+                continue;
+            if (filename.compare(es->svg_file.path_in_3mf) == 0)
+                es->svg_file.file_data = m_path_to_emboss_shape_files[filename];
         }
     }
 
@@ -1977,7 +2019,7 @@ namespace Slic3r {
     }
 
     // Definition of read/write method for EmbossShape
-    static void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume& volume);
+    static void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume &volume, mz_zip_archive &archive);
     static std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned int num_attributes);
 
     bool _3MF_Importer::_handle_start_shape_configuration(const char **attributes, unsigned int num_attributes)
@@ -1994,7 +2036,21 @@ namespace Slic3r {
         }
         ObjectMetadata::VolumeMetadata &volume = volumes.back();
         volume.shape_configuration = read_emboss_shape(attributes, num_attributes);
-        return volume.shape_configuration.has_value();
+        if (!volume.shape_configuration.has_value())
+            return false;
+
+        // Fill svg file content into shape_configuration
+        EmbossShape::SvgFile &svg = volume.shape_configuration->svg_file;
+        const std::string &path = svg.path_in_3mf;
+        if (path.empty()) // do not contain svg file
+            return true; 
+
+        auto it = m_path_to_emboss_shape_files.find(path);
+        if (it == m_path_to_emboss_shape_files.end())
+            return true; // svg file is not loaded yet
+
+        svg.file_data = it->second;
+        return true;
     }
 
     bool _3MF_Importer::_create_object_instance(int object_id, const Transform3d& transform, const bool printable, unsigned int recur_counter)
@@ -2413,6 +2469,7 @@ namespace Slic3r {
         bool save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64);
         static void add_transformation(std::stringstream &stream, const Transform3d &tr);
     private:
+        void _publish(Model &model);
         bool _save_model_to_file(const std::string& filename, Model& model, const DynamicPrintConfig* config, const ThumbnailData* thumbnail_data);
         bool _add_content_types_file_to_archive(mz_zip_archive& archive);
         bool _add_thumbnail_file_to_archive(mz_zip_archive& archive, const ThumbnailData& thumbnail_data);
@@ -3359,7 +3416,7 @@ namespace Slic3r {
 
                     if (const std::optional<EmbossShape> &es = volume->emboss_shape;
                         es.has_value())
-                        to_xml(stream, *es, *volume);
+                        to_xml(stream, *es, *volume, archive);
                     
                     if (const std::optional<TextConfiguration> &tc = volume->text_configuration;
                         tc.has_value())
@@ -3681,21 +3738,37 @@ Transform3d create_fix(const std::optional<Transform3d> &prev, const ModelVolume
     return *prev * fix_trmat;
 }
 
-std::string to_string(const ExPolygonsWithIds &shapes)
-{
-    // TODO: Need to implement
-    return {};
+bool to_xml(std::stringstream &stream, const EmbossShape::SvgFile &svg, const ModelVolume &volume, mz_zip_archive &archive){
+    assert(!svg.path_in_3mf.empty());
+    if (svg.path_in_3mf.empty())
+        return false; // unwanted store .svg file into .3mf (protection of copyRight)
+
+    if (!svg.path.empty())
+        stream << SVG_FILE_PATH_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(svg.path) << "\" ";
+    stream << SVG_FILE_PATH_IN_3MF_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(svg.path_in_3mf) << "\" ";
+
+    char *data = svg.file_data.get();
+    assert(data != nullptr);
+    if (data == nullptr)
+        return false;
+
+    // NOTE: file data must be null terminated
+    size_t size = 0;
+    for (char *c = data; *c != '\0'; ++c) ++size;
+    if (!mz_zip_writer_add_mem(&archive, svg.path_in_3mf.c_str(), (const void *) data, size, MZ_DEFAULT_COMPRESSION))
+        return false;
+    return true;
 }
 
 } // namespace
 
-void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume &volume) {
-    stream << "   <" << SHAPE_TAG << " ";    
-    stream << SVG_FILE_PATH_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(es.svg_file.path) << "\" ";
+void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume &volume, mz_zip_archive &archive)
+{
+    stream << "   <" << SHAPE_TAG << " ";
+    if(!to_xml(stream, es.svg_file, volume, archive))
+        BOOST_LOG_TRIVIAL(warning) << "Can't write svg file defiden embossed shape into 3mf";
+    
     stream << SHAPE_SCALE_ATTR << "=\"" << es.scale << "\" ";
-
-    std::string expolygons_str = to_string(es.shapes_with_ids); // cereal serialize expolygons 
-    stream << SHAPE_EXPOLYS_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(expolygons_str) << "\" ";
 
     // projection
     const EmbossProjection &p = es.projection;
@@ -3708,11 +3781,11 @@ void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume 
     stream << TRANSFORM_ATTR << "=\"";
     _3MF_Exporter::add_transformation(stream, fix);
     stream << "\" ";
-    stream << "/>\n"; // end SHAPE_TAG
+
+    stream << "/>\n"; // end SHAPE_TAG    
 }
 
-std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned int num_attributes) {
-    
+std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned int num_attributes) {    
     double scale = get_attribute_value_float(attributes, num_attributes, SHAPE_SCALE_ATTR);
 
     EmbossProjection projection;
@@ -3726,9 +3799,13 @@ std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned i
     if (!fix_tr_mat_str.empty()) { 
         fix_tr_mat = get_transform_from_3mf_specs_string(fix_tr_mat_str);
     }
+
     std::string file_path = get_attribute_value_string(attributes, num_attributes, SVG_FILE_PATH_ATTR);
+    std::string file_path_3mf = get_attribute_value_string(attributes, num_attributes, SVG_FILE_PATH_IN_3MF_ATTR);
     ExPolygonsWithIds shapes; // TODO: need to implement 
-    return EmbossShape{shapes, scale, std::move(projection), std::move(fix_tr_mat), std::move(file_path)};
+
+    EmbossShape::SvgFile svg{file_path, file_path_3mf};
+    return EmbossShape{shapes, scale, std::move(projection), std::move(fix_tr_mat), std::move(svg)};
 }
 
 

@@ -73,7 +73,7 @@ struct EmbossShape
     ExPolygonsWithIds shapes_with_ids;
 
     // scale of shape, multiplier to get 3d point in mm from integer shape
-    double scale = 1.;
+    double scale = SCALING_FACTOR;
 
     // Define how to emboss shape
     EmbossProjection projection;
@@ -98,6 +98,9 @@ struct EmbossShape
         // Loaded svg file data.
         // !!! It is not serialized on undo/redo stack 
         std::shared_ptr<NSVGimage> image = nullptr;
+
+        // Loaded string data from file
+        std::shared_ptr<char[]> file_data = nullptr;
     };    
     SvgFile svg_file;
         

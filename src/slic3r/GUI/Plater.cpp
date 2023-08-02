@@ -6666,6 +6666,103 @@ void Plater::export_amf()
     }
 }
 
+namespace {
+std::string get_file_name(const std::string &file_path)
+{
+    size_t pos_last_delimiter = file_path.find_last_of("/\\");
+    size_t pos_point          = file_path.find_last_of('.');
+    size_t offset             = pos_last_delimiter + 1;
+    size_t count              = pos_point - pos_last_delimiter - 1;
+    return file_path.substr(offset, count);
+}
+using SvgFile = EmbossShape::SvgFile;
+using SvgFiles = std::vector<SvgFile*>;
+std::string create_unique_3mf_filepath(const std::string &file, const SvgFiles svgs)
+{
+    // const std::string MODEL_FOLDER = "3D/"; // copy from file 3mf.cpp
+    std::string path_in_3mf = "3D/" + file + ".svg";
+    size_t suffix_number = 0;
+    bool is_unique = false;
+    do{
+        is_unique = true;
+        path_in_3mf = "3D/" + file + ((suffix_number++)? ("_" + std::to_string(suffix_number)) : "") + ".svg";
+        for (SvgFile *svgfile : svgs) {
+            if (svgfile->path_in_3mf.empty())
+                continue;
+            if (svgfile->path_in_3mf.compare(path_in_3mf) == 0) {
+                is_unique = false;
+                break;
+            }
+        } 
+    } while (!is_unique);
+    return path_in_3mf;
+}
+
+bool set_by_local_path(SvgFile &svg, const SvgFiles& svgs)
+{
+    // Try to find already used svg file
+    for (SvgFile *svg_ : svgs) {
+        if (svg_->path_in_3mf.empty())
+            continue;
+        if (svg.path.compare(svg_->path) == 0) {
+            svg.path_in_3mf = svg_->path_in_3mf;
+            return true;
+        }
+    }
+    return false;
+}
+
+/// <summary>
+/// Function to secure private data before store to 3mf
+/// </summary>
+/// <param name="model">Data(also private) to clean before publishing</param>
+void publish(Model &model) {
+
+    // SVG file publishing
+    bool exist_new = false;
+    SvgFiles svgfiles;
+    for (ModelObject *object: model.objects){
+        for (ModelVolume *volume : object->volumes) {
+            if (!volume->emboss_shape.has_value())
+                continue;
+            SvgFile* svg = &volume->emboss_shape->svg_file;
+                
+            if (svg->path_in_3mf.empty())
+                exist_new = true;
+            svgfiles.push_back(svg);
+        }
+    }
+
+    if (exist_new){
+        MessageDialog dialog(nullptr,
+                             _L("Are you sure you want to store original SVGs with their local path into .3mf ?\n "
+                                "When you hit 'NO', all Embossed shape will not be editable any more."),
+                             _L("Private protection"), wxYES_NO | wxICON_QUESTION);
+        if (dialog.ShowModal() == wxID_NO){
+            for (ModelObject *object : model.objects) 
+                for (ModelVolume *volume : object->volumes)
+                    if (volume->emboss_shape.has_value())
+                        volume->emboss_shape.reset();
+        }
+    }
+
+    for (SvgFile* svgfile : svgfiles){
+        if (!svgfile->path_in_3mf.empty())
+            continue; // already suggested path (previous save)
+
+        // create unique name for svgs, when local path differ
+        std::string filename = "unknown";
+        if (!svgfile->path.empty()) {
+            if (set_by_local_path(*svgfile, svgfiles))
+                continue;
+            // check whether original filename is already in:
+            filename = get_file_name(svgfile->path);
+        }
+        svgfile->path_in_3mf = create_unique_3mf_filepath(filename, svgfiles);        
+    }
+}
+}
+
 bool Plater::export_3mf(const boost::filesystem::path& output_path)
 {
     if (p->model.objects.empty()) {
@@ -6685,6 +6782,10 @@ bool Plater::export_3mf(const boost::filesystem::path& output_path)
 
     if (!path.Lower().EndsWith(".3mf"))
         return false;
+
+    // take care about private data stored into .3mf
+    // modify model
+    publish(p->model);
 
     DynamicPrintConfig cfg = wxGetApp().preset_bundle->full_config_secure();
     const std::string path_u8 = into_u8(path);

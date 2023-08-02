@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <sstream>
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
 #include "nanosvg/nanosvg.h"    // load SVG file
@@ -26,8 +27,14 @@ ExPolygons to_expolygons(const NSVGimage &image, float tessTol = 10., int max_le
 
 void bounds(const NSVGimage &image, Vec2f &min, Vec2f &max);
 
+// read text data from file
+std::unique_ptr<char[]> read_from_disk(const std::string &path);
+
 using NSVGimage_ptr = std::unique_ptr<NSVGimage, void (*)(NSVGimage*)>;
 NSVGimage_ptr nsvgParseFromFile(const std::string &svg_file_path, const char *units = "mm", float dpi = 96.0f);
+NSVGimage_ptr nsvgParse(const std::shared_ptr<char[]> file_data, const char *units = "mm", float dpi = 96.0f);
+
+void save(const NSVGimage &image, std::ostream &data);
 bool save(const NSVGimage &image, const std::string &svg_file_path);
 } // namespace Slic3r
 #endif // slic3r_NSVGUtils_hpp_
