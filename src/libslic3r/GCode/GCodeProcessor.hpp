@@ -8,7 +8,7 @@
 #include "libslic3r/CustomGCode.hpp"
 
 #if ENABLE_BINARIZED_GCODE
-#include "GCodeBinarizer.hpp"
+#include <LibBGCode/base/base.hpp>
 #endif // ENABLE_BINARIZED_GCODE
 
 #include <cstdint>
@@ -528,14 +528,14 @@ namespace Slic3r {
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
 #if ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
-        static bgcode::BinarizerConfig& get_binarizer_config() { return s_binarizer_config; }
+        static bgcode::base::BinarizerConfig& get_binarizer_config() { return s_binarizer_config; }
 #endif // ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
 
     private:
         GCodeReader m_parser;
 #if ENABLE_BINARIZED_GCODE
-        bgcode::Binarizer m_binarizer;
-        static bgcode::BinarizerConfig s_binarizer_config;
+        bgcode::base::Binarizer m_binarizer;
+        static bgcode::base::BinarizerConfig s_binarizer_config;
 #endif // ENABLE_BINARIZED_GCODE
 
         EUnits m_units;
@@ -635,8 +635,8 @@ namespace Slic3r {
         void apply_config(const PrintConfig& config);
         void set_print(Print* print) { m_print = print; }
 #if ENABLE_BINARIZED_GCODE
-        bgcode::BinaryData& get_binary_data() { return m_binarizer.get_binary_data(); }
-        const bgcode::BinaryData& get_binary_data() const { return m_binarizer.get_binary_data(); }
+        bgcode::base::BinaryData& get_binary_data() { return m_binarizer.get_binary_data(); }
+        const bgcode::base::BinaryData& get_binary_data() const { return m_binarizer.get_binary_data(); }
 #endif // ENABLE_BINARIZED_GCODE
 
         void enable_stealth_time_estimator(bool enabled);

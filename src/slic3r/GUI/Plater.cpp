@@ -36,6 +36,10 @@
 #include <wx/popupwin.h>
 #endif
 
+#if ENABLE_BINARIZED_GCODE
+#include <LibBGCode/convert/convert.hpp>
+#endif // ENABLE_BINARIZED_GCODE
+
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Format/STL.hpp"
 #include "libslic3r/Format/AMF.hpp"
@@ -5472,9 +5476,9 @@ void Plater::convert_gcode_to_ascii()
     // Perform conversion
     {
         wxBusyCursor busy;
-        bgcode::EResult res = bgcode::from_binary_to_ascii(*in_file, *out_file, true);
-        if (res != bgcode::EResult::Success) {
-            MessageDialog msg_dlg(this, _L(bgcode::translate_result(res)), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+        bgcode::core::EResult res = bgcode::convert::from_binary_to_ascii(*in_file, *out_file, true);
+        if (res != bgcode::core::EResult::Success) {
+            MessageDialog msg_dlg(this, _L(bgcode::core::translate_result(res)), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
             scoped_out_file.unscope();
             fclose(out_file);

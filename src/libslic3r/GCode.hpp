@@ -21,15 +21,16 @@
 #include "GCode/GCodeProcessor.hpp"
 #include "EdgeGrid.hpp"
 #include "GCode/ThumbnailData.hpp"
-#if ENABLE_BINARIZED_GCODE
-#include "GCode/GCodeBinarizer.hpp"
-#endif // ENABLE_BINARIZED_GCODE
 
 #include <memory>
 #include <map>
 #include <string>
 
 #include "GCode/PressureEqualizer.hpp"
+
+#if ENABLE_BINARIZED_GCODE
+#include <LibBGCode/base/base.hpp>
+#endif // ENABLE_BINARIZED_GCODE
 
 namespace Slic3r {
 

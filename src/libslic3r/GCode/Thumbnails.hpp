@@ -4,13 +4,14 @@
 #include "../Point.hpp"
 #include "../PrintConfig.hpp"
 #include "ThumbnailData.hpp"
-#if ENABLE_BINARIZED_GCODE
-#include "GCode/GCodeBinarizer.hpp"
-#endif // ENABLE_BINARIZED_GCODE
 
 #include <vector>
 #include <memory>
 #include <string_view>
+
+#if ENABLE_BINARIZED_GCODE
+#include <LibBGCode/base/base.hpp>
+#endif // ENABLE_BINARIZED_GCODE
 
 #include <boost/beast/core/detail/base64.hpp>
 
@@ -60,7 +61,7 @@ inline void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb,
 
 #if ENABLE_BINARIZED_GCODE
 template<typename ThrowIfCanceledCallback>
-inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb, std::vector<bgcode::ThumbnailBlock>& out_thumbnails,
+inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb, std::vector<bgcode::base::ThumbnailBlock>& out_thumbnails,
     const std::vector<Vec2d>& sizes, GCodeThumbnailsFormat format, ThrowIfCanceledCallback throw_if_canceled)
 {
     out_thumbnails.clear();
@@ -70,13 +71,13 @@ inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb
             if (data.is_valid()) {
                 auto compressed = compress_thumbnail(data, format);
                 if (compressed->data != nullptr && compressed->size > 0) {
-                    bgcode::ThumbnailBlock& block = out_thumbnails.emplace_back(bgcode::ThumbnailBlock());
+                    bgcode::base::ThumbnailBlock& block = out_thumbnails.emplace_back(bgcode::base::ThumbnailBlock());
                     block.width = (uint16_t)data.width;
                     block.height = (uint16_t)data.height;
                     switch (format) {
-                    case GCodeThumbnailsFormat::PNG: { block.format = (uint16_t)bgcode::EThumbnailFormat::PNG; break; }
-                    case GCodeThumbnailsFormat::JPG: { block.format = (uint16_t)bgcode::EThumbnailFormat::JPG; break; }
-                    case GCodeThumbnailsFormat::QOI: { block.format = (uint16_t)bgcode::EThumbnailFormat::QOI; break; }
+                    case GCodeThumbnailsFormat::PNG: { block.format = (uint16_t)bgcode::core::EThumbnailFormat::PNG; break; }
+                    case GCodeThumbnailsFormat::JPG: { block.format = (uint16_t)bgcode::core::EThumbnailFormat::JPG; break; }
+                    case GCodeThumbnailsFormat::QOI: { block.format = (uint16_t)bgcode::core::EThumbnailFormat::QOI; break; }
                     }
                     block.data.resize(compressed->size);
                     memcpy(block.data.data(), compressed->data, compressed->size);
