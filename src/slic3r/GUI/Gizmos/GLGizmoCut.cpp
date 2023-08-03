@@ -509,10 +509,8 @@ bool GLGizmoCut3D::render_cut_mode_combo()
             m_contour_width = CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.f : 0.4f;
             oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
         }
-        if (m_use_TAG_mesh) {
-            m_plane.reset();
-            on_unregister_raycasters_for_picking();
-        }
+        if (m_use_TAG_mesh)
+            update_plane_model();
         reset_cut_by_contours();
         update_clipper();
         check_and_update_connectors_state();
@@ -921,6 +919,23 @@ indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
 
     const float cut_plane_thiknes = 0.02f;// 0.02f * (float)get_grabber_mean_size(m_bounding_box);   // cut_plane_thiknes
 
+    // Vertices of the groove used to detection if groove is valid
+    // They are written as:
+    // {left_ext_lower, left_nar_lower, left_ext_upper, left_nar_upper,
+    //  right_ext_lower, right_nar_lower, right_ext_upper, right_nar_upper }
+    {
+        m_groove_vertices.clear();
+        m_groove_vertices.reserve(8);
+
+        m_groove_vertices.emplace_back(Vec3f(-ext_lower_x, -y, z_lower).cast<double>());
+        m_groove_vertices.emplace_back(Vec3f(-nar_lower_x,  y, z_lower).cast<double>());
+        m_groove_vertices.emplace_back(Vec3f(-ext_upper_x, -y, z_upper).cast<double>());
+        m_groove_vertices.emplace_back(Vec3f(-nar_upper_x,  y, z_upper).cast<double>());
+        m_groove_vertices.emplace_back(Vec3f( ext_lower_x, -y, z_lower).cast<double>());
+        m_groove_vertices.emplace_back(Vec3f( nar_lower_x,  y, z_lower).cast<double>());
+        m_groove_vertices.emplace_back(Vec3f( ext_upper_x, -y, z_upper).cast<double>());
+        m_groove_vertices.emplace_back(Vec3f( nar_upper_x,  y, z_upper).cast<double>());
+    }
 
     // Different cases of groove plane:
 
@@ -1211,7 +1226,7 @@ void GLGizmoCut3D::render_cut_plane()
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
     if (m_use_TAG_mesh) {
-        ColorRGBA cp_clr = can_perform_cut() && has_valid_contour() ? CUT_PLANE_DEF_COLOR : CUT_PLANE_ERR_COLOR;
+        ColorRGBA cp_clr = can_perform_cut() && has_valid_groove() ? CUT_PLANE_DEF_COLOR : CUT_PLANE_ERR_COLOR;
         if (m_mode == size_t(CutMode::cutTongueAndGroove))
             cp_clr.a(cp_clr.a() - 0.1f);
         m_plane.model.set_color(cp_clr);
@@ -1716,6 +1731,14 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             }
         }
     }
+}
+
+void GLGizmoCut3D::update_plane_model()
+{
+    m_plane.reset();
+    on_unregister_raycasters_for_picking();
+
+    init_picking_models();
 }
 
 void GLGizmoCut3D::on_set_hover_id() 
@@ -2415,10 +2438,7 @@ void GLGizmoCut3D::render_debug_input_window(float x)
     is_changed |= m_imgui->checkbox(("Render Cut plane as a full mesh"), m_use_TAG_mesh_full);
 
     if (is_changed)
-    {
-        m_plane.reset();
-        on_unregister_raycasters_for_picking();
-    }
+        update_plane_model();
 
     m_imgui->end();
     return;
@@ -2710,14 +2730,12 @@ void GLGizmoCut3D::reset_cut_by_contours()
     m_part_selection = PartSelection();
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
-        if (m_optimaze_groove_rendering && m_dragging)
+        if (m_optimaze_groove_rendering && m_dragging || !has_valid_groove())
             return;
         process_contours();
     }
-    else {
-        m_invalid_groove = false;
+    else
         toggle_model_objects_visibility();
-    }
 }
 
 void GLGizmoCut3D::process_contours()
@@ -2734,10 +2752,8 @@ void GLGizmoCut3D::process_contours()
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
         ModelObjectPtrs cut_objects = perform_cut_with_groove(model_objects[object_idx], true);
-        if (!cut_objects.empty() && !m_invalid_groove)
+        if (!cut_objects.empty())
             m_part_selection = PartSelection(cut_objects.front(), instance_idx);
-        else
-            m_invalid_groove = true;
     }
     else {
         reset_cut_by_contours();
@@ -2808,10 +2824,8 @@ void GLGizmoCut3D::render_groove_float_input(const std::string& label, float& in
     m_imgui->disabled_end();
 
     if (is_changed) {
-        if (m_use_TAG_mesh) {
-            m_plane.reset();
-            on_unregister_raycasters_for_picking();
-        }
+        if (m_use_TAG_mesh)
+            update_plane_model();
         reset_cut_by_contours();
         //    Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
     }
@@ -2848,10 +2862,8 @@ void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in
     m_imgui->disabled_end();
 
     if (is_changed) {
-        if (m_use_TAG_mesh) {
-            m_plane.reset();
-            on_unregister_raycasters_for_picking();
-        }
+        if (m_use_TAG_mesh)
+            update_plane_model();
         reset_cut_by_contours();
         //    Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
     }
@@ -3129,7 +3141,7 @@ void GLGizmoCut3D::render_input_window_warning() const
         m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Select at least one object to keep after cutting."));
     if (!has_valid_contour())
         m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Cut plane is placed out of object"));
-    if (m_invalid_groove)
+    else if (!has_valid_groove())
         m_imgui->text(wxString(ImGui::WarningMarkerSmall) + _L("Cut plane with groove is invalid"));
 }
 
@@ -3362,11 +3374,44 @@ bool GLGizmoCut3D::can_perform_cut() const
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
         const float flaps_width = -2.f * m_groove_depth / tan(m_groove_flaps_angle);
-        return flaps_width < m_groove_width && !m_invalid_groove && has_valid_contour();
+        return flaps_width < m_groove_width && has_valid_groove();
     }
 
     if (m_part_selection.valid())
         return ! m_part_selection.is_one_object();
+
+    return true;
+}
+
+bool GLGizmoCut3D::has_valid_groove() const
+{
+    if (CutMode(m_mode) != CutMode::cutTongueAndGroove)
+        return true;
+
+    const Selection& selection  = m_parent.get_selection();
+    const auto&list = selection.get_volume_idxs();
+    // is more volumes selected?
+    if (list.empty())
+        return false;
+
+    const Transform3d cp_matrix = translation_transform(m_plane_center) * m_rotation_m;
+
+    for (size_t id = 0; id < m_groove_vertices.size(); id += 2) {
+        const Vec3d beg = cp_matrix * m_groove_vertices[id];
+        const Vec3d end = cp_matrix * m_groove_vertices[id + 1];
+
+        bool intersection = false;
+        for (const unsigned int volume_idx : list) {
+            const GLVolume* glvol = selection.get_volume(volume_idx);
+            if (!glvol->is_modifier && 
+                glvol->mesh_raycaster->intersects_line(beg, end - beg, glvol->world_matrix())) {
+                intersection = true;
+                break;
+            }
+        }
+        if (!intersection)
+            return false;
+    }
 
     return true;
 }
@@ -3569,7 +3614,8 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_by_contour(ModelObject* cut_mo, const 
 
 ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool keep_as_parts/* = false*/)
 {
-    m_invalid_groove = false;
+    if (!has_valid_groove())
+        return {};
 
     const Selection& selection = m_parent.get_selection();
     const int instance_idx = selection.get_instance_idx();
@@ -3684,9 +3730,6 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
     invalid_added_volumes |= !add_volumes_from_cut(upper, ModelObjectCutAttribute::KeepLower, cut_part_ptrs);
 
     if (keep_as_parts) {
-        if (!m_invalid_groove)
-            m_invalid_groove = upper->volumes.empty() || lower->volumes.empty() || invalid_added_volumes;
-
         // add volumes from lower object to the upper, but mark them as a lower
         const auto& volumes = lower->volumes;
         for (const ModelVolume* volume : volumes) {

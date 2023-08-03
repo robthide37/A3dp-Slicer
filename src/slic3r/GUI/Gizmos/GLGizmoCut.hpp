@@ -109,8 +109,6 @@ class GLGizmoCut3D : public GLGizmoBase
         } 
     } m_info_stats;
 
-    bool m_invalid_groove{ false };
-
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
     bool m_keep_as_parts{ false };
@@ -162,6 +160,9 @@ class GLGizmoCut3D : public GLGizmoBase
     std::vector<size_t> m_invalid_connectors_idxs;
     bool m_was_cut_plane_dragged { false };
     bool m_was_contour_selected { false };
+
+    // Vertices of the groove used to detection if groove is valid
+    std::vector<Vec3d> m_groove_vertices;
 
     class PartSelection {
     public:
@@ -323,6 +324,8 @@ protected:
     void set_volumes_picking_state(bool state);
     void update_raycasters_for_picking_transform();
 
+    void update_plane_model();
+
     void on_render_input_window(float x, float y, float bottom_limit) override;
 
     bool wants_enter_leave_snapshots() const override       { return true; }
@@ -348,6 +351,7 @@ private:
     void render_connectors();
 
     bool can_perform_cut() const;
+    bool has_valid_groove() const;
     bool has_valid_contour() const;
     void apply_connectors_in_model(ModelObject* mo, int &dowels_count);
     bool cut_line_processing() const;
