@@ -494,6 +494,22 @@ void GLGizmoCut3D::set_center(const Vec3d& center, bool update_tbb /*=false*/)
     update_clipper();
 }
 
+void GLGizmoCut3D::switch_to_mode(size_t new_mode)
+{
+    m_mode = new_mode;
+    update_raycasters_for_picking();
+
+    apply_color_clip_plane_colors();
+    if (auto oc = m_c->object_clipper()) {
+        m_contour_width = CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.f : 0.4f;
+        oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
+    }
+    if (m_use_TAG_mesh)
+        update_plane_model();
+    reset_cut_by_contours();
+    update_clipper();
+}
+
 bool GLGizmoCut3D::render_cut_mode_combo()
 {
     ImGui::AlignTextToFramePadding();
@@ -501,18 +517,8 @@ bool GLGizmoCut3D::render_cut_mode_combo()
     const bool is_changed = m_imgui->combo(_u8L("Mode"), m_modes, selection_idx, 0, m_label_width, m_control_width);
 
     if (is_changed) {
-        m_mode = size_t(selection_idx);
-        update_raycasters_for_picking();
-
-        apply_color_clip_plane_colors();
-        if (auto oc = m_c->object_clipper()) {
-            m_contour_width = CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.f : 0.4f;
-            oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
-        }
-        if (m_use_TAG_mesh)
-            update_plane_model();
-        reset_cut_by_contours();
-        update_clipper();
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Change cut mode"), UndoRedo::SnapshotType::GizmoAction);
+        switch_to_mode(size_t(selection_idx));
         check_and_update_connectors_state();
     }
 
@@ -1503,11 +1509,41 @@ bool GLGizmoCut3D::on_init()
 
 void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
 {
-    ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, m_connectors_editing,
-        m_ar_plane_center, m_rotation_m);
+    size_t mode;
+    float groove_depth;
+    float groove_width;
+    float groove_flaps_angle;
+    float groove_angle;
+    float groove_depth_tolerance;
+    float groove_width_tolerance;
+
+    ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, mode, m_connectors_editing,
+        m_ar_plane_center, m_rotation_m,
+        groove_depth, groove_width, groove_flaps_angle, groove_angle, groove_depth_tolerance, groove_width_tolerance);
 
     m_transformed_bounding_box = transformed_bounding_box(m_ar_plane_center, m_rotation_m);
     set_center_pos(m_ar_plane_center);
+
+    if (m_mode != mode)
+        switch_to_mode(mode);
+    else if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
+        if (!is_approx(m_groove_depth          , groove_depth) ||
+            !is_approx(m_groove_width          , groove_width) ||
+            !is_approx(m_groove_flaps_angle    , groove_flaps_angle) ||
+            !is_approx(m_groove_angle          , groove_angle) ||
+            !is_approx(m_groove_depth_tolerance, groove_depth_tolerance) ||
+            !is_approx(m_groove_width_tolerance, groove_width_tolerance) ) 
+        {
+            m_groove_depth          = groove_depth;
+            m_groove_width          = groove_width;
+            m_groove_flaps_angle    = groove_flaps_angle;
+            m_groove_angle          = groove_angle;
+            m_groove_depth_tolerance= groove_depth_tolerance;
+            m_groove_width_tolerance= groove_width_tolerance;
+            update_plane_model();
+        }
+        reset_cut_by_contours();
+    }
 
     m_parent.request_extra_frame();
 }
@@ -1515,7 +1551,8 @@ void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
 void GLGizmoCut3D::on_save(cereal::BinaryOutputArchive& ar) const
 { 
     ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, m_connectors_editing,
-        m_ar_plane_center, m_start_dragging_m);
+        m_ar_plane_center, m_start_dragging_m,
+        m_groove_depth, m_groove_width, m_groove_flaps_angle, m_groove_angle, m_groove_depth_tolerance, m_groove_width_tolerance);
 }
 
 std::string GLGizmoCut3D::on_get_name() const
@@ -1568,7 +1605,9 @@ void GLGizmoCut3D::on_set_state()
 
 void GLGizmoCut3D::on_register_raycasters_for_picking()
 {
-    assert(m_raycasters.empty());
+ //   assert(m_raycasters.empty());
+    if (!m_raycasters.empty())
+        on_unregister_raycasters_for_picking();
     // the gizmo grabbers are rendered on top of the scene, so the raytraced picker should take it into account
     m_parent.set_raycaster_gizmos_on_top(true);
 
@@ -2809,14 +2848,24 @@ void GLGizmoCut3D::render_groove_float_input(const std::string& label, float& in
 {
     bool is_changed{false};
 
-    if (render_slider_double_input(label, in_val, in_tolerance, -0.1f, std::min(0.3f*in_val, 1.5f)))
+    float val = in_val;
+    float tolerance = in_tolerance;
+    if (render_slider_double_input(label, val, tolerance, -0.1f, std::min(0.3f*in_val, 1.5f))) {
+        if (m_imgui->get_last_slider_status().can_take_snapshot) {
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
+            m_imgui->get_last_slider_status().invalidate_snapshot();
+        }
+        in_val = val;
+        in_tolerance = tolerance;
         is_changed = true;
+    }
 
     ImGui::SameLine();
 
     m_imgui->disabled_begin(is_approx(in_val, init_val));
         const std::string act_name = _u8L("Reset");
         if (render_reset_button(("##groove_" + label + act_name).c_str(), act_name)) {
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", act_name, label), UndoRedo::SnapshotType::GizmoAction);
             in_val = init_val;
             in_tolerance = 0.1f;
             is_changed = true;
@@ -2827,7 +2876,6 @@ void GLGizmoCut3D::render_groove_float_input(const std::string& label, float& in
         if (m_use_TAG_mesh)
             update_plane_model();
         reset_cut_by_contours();
-        //    Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
     }
 }
 
@@ -2847,6 +2895,10 @@ void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in
     m_imgui->slider_float(("##groove_" + label).c_str(), &val, min_val, max_val, format.c_str(), 1.f, true, from_u8(label));
 
     if (!is_approx(old_val, val)) {
+        if (m_imgui->get_last_slider_status().can_take_snapshot) {
+            Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
+            m_imgui->get_last_slider_status().invalidate_snapshot();
+        }
         in_val = deg2rad(val);
         is_changed = true;
     }
@@ -2856,6 +2908,7 @@ void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in
     m_imgui->disabled_begin(is_approx(in_val, init_val));
     const std::string act_name = _u8L("Reset");
     if (render_reset_button(("##groove_" + label + act_name).c_str(), act_name)) {
+        Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", act_name, label), UndoRedo::SnapshotType::GizmoAction);
         in_val = init_val;
         is_changed = true;
     }
@@ -2865,7 +2918,6 @@ void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in
         if (m_use_TAG_mesh)
             update_plane_model();
         reset_cut_by_contours();
-        //    Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
     }
 }
 
