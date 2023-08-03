@@ -23,3 +23,7 @@ prusaslicer_add_cmake_project(LibBGCode
     CMAKE_ARGS
         -DLibBGCode_BUILD_TESTS:BOOL=OFF
 )
+
+if (MSVC)
+    add_debug_dep(dep_LibBGCode)
+endif ()
