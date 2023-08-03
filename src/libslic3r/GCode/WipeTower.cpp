@@ -626,6 +626,9 @@ void WipeTower::set_extruder(size_t idx, const PrintConfig& config)
         m_filpar[idx].ramming_step_multiplicator /= 100;
         while (stream >> speed)
             m_filpar[idx].ramming_speed.push_back(speed);
+        // ramming_speed now contains speeds to be used for every 0.25s piece of the ramming line.
+        // This allows to have the ramming flow variable. The 0.25s value is how it is saved in config
+        // and the same time step has to be used when the ramming is performed.
     } else {
         // We will use the same variables internally, but the correspondence to the configuration options will be different.
         float vol  = config.filament_multitool_ramming_volume.get_at(idx);
@@ -633,7 +636,14 @@ void WipeTower::set_extruder(size_t idx, const PrintConfig& config)
         m_filpar[idx].multitool_ramming = config.filament_multitool_ramming.get_at(idx);
         m_filpar[idx].ramming_line_width_multiplicator = 2.;
         m_filpar[idx].ramming_step_multiplicator = 1.;
-        m_filpar[idx].ramming_speed.resize(4 *size_t(vol/flow + 0.5f), flow);
+
+        // Now the ramming speed vector. In this case it contains just one value (flow).
+        // The time is calculated and saved separately. This is here so that the MM ramming
+        // is not limited by the 0.25s granularity - it is not possible to create a SEMM-style
+        // ramming_speed vector that would respect both the volume and flow (because of 
+        // rounding issues with small volumes and high flow).
+        m_filpar[idx].ramming_speed.push_back(flow);
+        m_filpar[idx].multitool_ramming_time = vol/flow;
     }
 
     m_used_filament_length.resize(std::max(m_used_filament_length.size(), idx + 1)); // makes sure that the vector is big enough so we don't have to check later
@@ -891,10 +901,13 @@ void WipeTower::toolchange_Unload(
     // now the ramming itself:
     while (do_ramming && i < m_filpar[m_current_tool].ramming_speed.size())
     {
-        const float x = volume_to_length(m_filpar[m_current_tool].ramming_speed[i] * 0.25f, line_width, m_layer_height);
-        const float e = m_filpar[m_current_tool].ramming_speed[i] * 0.25f / filament_area(); // transform volume per sec to E move;
-        const float dist = std::min(x - e_done, remaining);		  // distance to travel for either the next 0.25s, or to the next turnaround
-        const float actual_time = dist/x * 0.25f;
+        // The time step is different for SEMM ramming and the MM ramming. See comments in set_extruder() for details.
+        const float time_step = m_semm ? 0.25f : m_filpar[m_current_tool].multitool_ramming_time;
+
+        const float x = volume_to_length(m_filpar[m_current_tool].ramming_speed[i] * time_step, line_width, m_layer_height);
+        const float e = m_filpar[m_current_tool].ramming_speed[i] * time_step / filament_area(); // transform volume per sec to E move;
+        const float dist = std::min(x - e_done, remaining);		  // distance to travel for either the next time_step, or to the next turnaround
+        const float actual_time = dist/x * time_step;
         writer.ram(writer.x(), writer.x() + (m_left_to_right ? 1.f : -1.f) * dist, 0.f, 0.f, e * (dist / x), dist / (actual_time / 60.f));
         remaining -= dist;
 

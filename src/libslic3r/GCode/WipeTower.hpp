@@ -242,6 +242,7 @@ public:
         float               nozzle_diameter;
         float               filament_area;
 		bool			    multitool_ramming;
+		float               multitool_ramming_time = 0.f;
     };
 
 private:
