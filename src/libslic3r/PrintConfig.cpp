@@ -1105,25 +1105,27 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("filament_multitool_ramming", coBools);
     def->label = L("Enable ramming for multitool setups");
-    def->tooltip = L("Perform ramming when using multitool printer (i.e. when the 'Single Extruder Multimaterial' in Printer Settings is unchecked).");
+    def->tooltip = L("Perform ramming when using multitool printer (i.e. when the 'Single Extruder Multimaterial' in Printer Settings is unchecked). "
+                     "When checked, a small amount of filament is rapidly extruded on the wipe tower just before the toolchange. "
+                     "This option is only used when the wipe tower is enabled.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBools { false });
 
     def = this->add("filament_multitool_ramming_volume", coFloats);
     def->label = L("Multitool ramming volume");
-    def->tooltip = L("");
+    def->tooltip = L("The volume to be rammed before the toolchange.");
     def->sidetext = L("mm³");
     def->min = 0;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloats { 0. });
+    def->set_default_value(new ConfigOptionFloats { 10. });
 
     def = this->add("filament_multitool_ramming_flow", coFloats);
     def->label = L("Multitool ramming flow");
-    def->tooltip = L("");
+    def->tooltip = L("Flow used for ramming the filament before the toolchange.");
     def->sidetext = L("mm³/s");
     def->min = 0;
     def->mode = comExpert;
-    def->set_default_value(new ConfigOptionFloats { 0. });
+    def->set_default_value(new ConfigOptionFloats { 10. });
 
     def = this->add("filament_diameter", coFloats);
     def->label = L("Diameter");
