@@ -1657,23 +1657,21 @@ void GLGizmoEmboss::draw_text_input()
             warning_tool_tip += t;
         };
 
-        if (priv::is_text_empty(m_text)) 
-            append_warning(_u8L("Embossed text cannot contain only white spaces."));
-        if (m_text_contain_unknown_glyph)
-            append_warning(_u8L("Text contains character glyph (represented by '?') unknown by font."));
+        if (priv::is_text_empty(m_text))  append_warning(_u8L("Embossed text cannot contain only white spaces."));
+        if (m_text_contain_unknown_glyph) append_warning(_u8L("Text contains character glyph (represented by '?') unknown by font."));
 
         const FontProp &prop = m_style_manager.get_font_prop();
-        if (prop.skew.has_value()) append_warning(_u8L("Text input doesn't show font skew."));
+        if (prop.skew.has_value())     append_warning(_u8L("Text input doesn't show font skew."));
         if (prop.boldness.has_value()) append_warning(_u8L("Text input doesn't show font boldness."));
-        if (prop.line_gap.has_value())
-            append_warning(_u8L("Text input doesn't show gap between lines."));
+        if (prop.line_gap.has_value()) append_warning(_u8L("Text input doesn't show gap between lines."));
         auto &ff         = m_style_manager.get_font_file_with_cache();
         float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file, scale);
         if (imgui_size > StyleManager::max_imgui_font_size)
             append_warning(_u8L("Too tall, diminished font height inside text input."));
         if (imgui_size < StyleManager::min_imgui_font_size)
             append_warning(_u8L("Too small, enlarged font height inside text input."));
-        if (prop.align.first == FontProp::HorizontalAlign::center || prop.align.first == FontProp::HorizontalAlign::right)
+        bool is_multiline = m_text_lines.get_lines().size() > 1;
+        if (is_multiline && (prop.align.first == FontProp::HorizontalAlign::center || prop.align.first == FontProp::HorizontalAlign::right))
             append_warning(_u8L("Text doesn't show current horizontal alignment."));
     }
     
