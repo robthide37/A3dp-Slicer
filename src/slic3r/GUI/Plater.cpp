@@ -5478,7 +5478,7 @@ void Plater::convert_gcode_to_ascii()
         wxBusyCursor busy;
         bgcode::core::EResult res = bgcode::convert::from_binary_to_ascii(*in_file, *out_file, true);
         if (res != bgcode::core::EResult::Success) {
-            MessageDialog msg_dlg(this, _L(bgcode::core::translate_result(res)), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+            MessageDialog msg_dlg(this, _L(std::string(bgcode::core::translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
             scoped_out_file.unscope();
             fclose(out_file);
