@@ -15,6 +15,9 @@ if (TARGET OpenVDB::openvdb)
 endif()
 
 find_package(LibBGCode REQUIRED COMPONENTS Convert)
+slic3r_remap_configs(LibBGCode::bgcode_core RelWithDebInfo Release)
+slic3r_remap_configs(LibBGCode::bgcode_base RelWithDebInfo Release)
+slic3r_remap_configs(LibBGCode::bgcode_convert RelWithDebInfo Release)
 
 set(SLIC3R_SOURCES
     pchheader.cpp
