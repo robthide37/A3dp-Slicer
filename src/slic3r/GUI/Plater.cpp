@@ -5522,17 +5522,8 @@ void Plater::convert_gcode_to_binary()
     // Perform conversion
     {
         wxBusyCursor busy;
-        // TODO: allow custommization of config
-        bgcode::base::BinarizerConfig config;
-        config.checksum = bgcode::core::EChecksumType::CRC32;
-        config.compression.file_metadata = bgcode::core::ECompressionType::None;
-        config.compression.print_metadata = bgcode::core::ECompressionType::None;
-        config.compression.printer_metadata = bgcode::core::ECompressionType::None;
-        config.compression.slicer_metadata = bgcode::core::ECompressionType::Deflate;
-        config.compression.gcode = bgcode::core::ECompressionType::Heatshrink_12_4;
-        config.gcode_encoding = bgcode::core::EGCodeEncodingType::MeatPackComments;
-        config.metadata_encoding = bgcode::core::EMetadataEncodingType::INI;
-        bgcode::core::EResult res = bgcode::convert::from_ascii_to_binary(*in_file, *out_file, config);
+        const bgcode::base::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
+        bgcode::core::EResult res = bgcode::convert::from_ascii_to_binary(*in_file, *out_file, binarizer_config);
         if (res != bgcode::core::EResult::Success) {
             MessageDialog msg_dlg(this, _L(std::string(bgcode::core::translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();

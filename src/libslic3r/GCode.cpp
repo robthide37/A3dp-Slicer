@@ -1146,29 +1146,27 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         }
 
         // file data
-        binary_data.file_metadata.encoding_type = (uint16_t)bgcode::core::EMetadataEncodingType::INI;
         binary_data.file_metadata.raw_data.emplace_back("Producer", std::string(SLIC3R_APP_NAME) + " " + std::string(SLIC3R_VERSION));
 
         // config data
-        binary_data.slicer_metadata.encoding_type = (uint16_t)bgcode::core::EMetadataEncodingType::INI;
         encode_full_config(print, binary_data.slicer_metadata.raw_data);
 
         // printer data
-        binary_data.printer_metadata.raw_data.emplace_back("printer model" , print.config().printer_model.value); // duplicated into config data
+        binary_data.printer_metadata.raw_data.emplace_back("printer_model", print.config().printer_model.value); // duplicated into config data
         std::string filament_types_str;
         for (size_t i = 0; i < print.config().filament_type.values.size(); ++i) {
             filament_types_str += print.config().filament_type.values[i];
             if (i < print.config().filament_type.values.size() - 1)
                 filament_types_str += ", ";
         }
-        binary_data.printer_metadata.raw_data.emplace_back("filament type", filament_types_str); // duplicated into config data
+        binary_data.printer_metadata.raw_data.emplace_back("filament_type", filament_types_str); // duplicated into config data
         std::string nozzle_diameters_str;
         char buf[1024];
         for (size_t i = 0; i < print.config().nozzle_diameter.values.size(); ++i) {
             sprintf(buf, i < print.config().nozzle_diameter.values.size() - 1 ? "%.2lf, " : "%.2lf", print.config().nozzle_diameter.values[i]);
             nozzle_diameters_str += buf;
         }
-        binary_data.printer_metadata.raw_data.emplace_back("nozzle diameter", nozzle_diameters_str); // duplicated into config data
+        binary_data.printer_metadata.raw_data.emplace_back("nozzle_diameter", nozzle_diameters_str); // duplicated into config data
     }
 
     // modifies m_silent_time_estimator_enabled
