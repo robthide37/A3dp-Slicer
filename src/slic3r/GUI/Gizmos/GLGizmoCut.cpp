@@ -2186,13 +2186,14 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transfor
 {
     m_model = Model();
     m_model.add_object(*mo);
-    ModelObjectPtrs cut_part_ptrs = m_model.objects.front()->cut(instance_idx_in, cut_matrix,
+
+    Model tmp_model = Model();
+    tmp_model.objects = m_model.objects.front()->cut(instance_idx_in, cut_matrix,
         ModelObjectCutAttribute::KeepUpper |
         ModelObjectCutAttribute::KeepLower |
         ModelObjectCutAttribute::KeepAsParts);
-    assert(cut_part_ptrs.size() == 1);
-    m_model = Model();
-    m_model.add_object(*cut_part_ptrs.front());
+    assert(tmp_model.objects.size() == 1);
+    m_model = tmp_model;
 
     m_instance_idx = instance_idx_in;
 
@@ -2790,9 +2791,11 @@ void GLGizmoCut3D::process_contours()
     wxBusyCursor wait;
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
-        ModelObjectPtrs cut_objects = perform_cut_with_groove(model_objects[object_idx], true);
-        if (!cut_objects.empty())
-            m_part_selection = PartSelection(cut_objects.front(), instance_idx);
+        Model tmp_model = Model();
+        tmp_model.objects = perform_cut_with_groove(model_objects[object_idx], true);
+        if (!tmp_model.objects.empty())
+            m_part_selection = PartSelection(tmp_model.objects.front(), instance_idx);
+        tmp_model = Model();
     }
     else {
         reset_cut_by_contours();
@@ -3682,15 +3685,14 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
 
     const Transform3d cut_matrix = get_cut_matrix(selection);
 
-    ModelObjectPtrs cut_part_ptrs;
+    Model tmp_model_for_cut = Model();
+
     Model tmp_model = Model();
     tmp_model.add_object(*cut_mo);
     ModelObject* tmp_object = tmp_model.objects.front();
 
-    bool invalid_added_volumes = false;
-
-    auto add_volumes_from_cut = [](ModelObject* object, const ModelObjectCutAttribute attribute, const ModelObjectPtrs& cut_part_ptrs) {
-        const auto& volumes = cut_part_ptrs.front()->volumes;
+    auto add_volumes_from_cut = [](ModelObject* object, const ModelObjectCutAttribute attribute, const Model& tmp_model_for_cut) {
+        const auto& volumes = tmp_model_for_cut.objects.front()->volumes;
         bool has_volume = false;
         for (const ModelVolume* volume : volumes)
             if ((attribute == ModelObjectCutAttribute::KeepUpper &&  volume->is_from_upper()) ||
@@ -3702,17 +3704,18 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
         return has_volume;
     };
 
-    auto cut =  [instance_idx, add_volumes_from_cut, &invalid_added_volumes]
-                (ModelObject* object, const Transform3d& cut_matrix, const ModelObjectCutAttribute attribute, ModelObjectPtrs& cut_part_ptrs) {
+    auto cut =  [instance_idx, add_volumes_from_cut]
+                (ModelObject* object, const Transform3d& cut_matrix, const ModelObjectCutAttribute attribute, Model& tmp_model_for_cut) {
         Model model = Model();
         model.add_object(*object);
 
-        cut_part_ptrs = model.objects.front()->cut(instance_idx, cut_matrix, ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepAsParts);
-        if (cut_part_ptrs.empty())
+        tmp_model_for_cut = Model();
+        tmp_model_for_cut.objects = model.objects.front()->cut(instance_idx, cut_matrix, ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepAsParts);
+        if (tmp_model_for_cut.objects.empty())
             return false;
 
         object->clear_volumes();
-        invalid_added_volumes |= !add_volumes_from_cut(object, attribute, cut_part_ptrs);
+        add_volumes_from_cut(object, attribute, tmp_model_for_cut);
         ModelObject::reset_instance_transformation(object, instance_idx);
         return true;
     };
@@ -3723,18 +3726,18 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
 
     const Transform3d cut_matrix_upper = translation_transform(m_rotation_m * (groove_half_depth * Vec3d::UnitZ())) * cut_matrix;
     {
-        if (!cut(tmp_object, cut_matrix_upper, ModelObjectCutAttribute::KeepLower, cut_part_ptrs))
+        if (!cut(tmp_object, cut_matrix_upper, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut))
             return cut_object_ptrs;
-        invalid_added_volumes |= !add_volumes_from_cut(upper, ModelObjectCutAttribute::KeepUpper, cut_part_ptrs);
+        add_volumes_from_cut(upper, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
     }
 
     // cut by lower plane
 
     const Transform3d cut_matrix_lower = translation_transform(m_rotation_m * (-groove_half_depth * Vec3d::UnitZ())) * cut_matrix;
     {
-        if (!cut(tmp_object, cut_matrix_lower, ModelObjectCutAttribute::KeepUpper, cut_part_ptrs))
+        if (!cut(tmp_object, cut_matrix_lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut))
             return cut_object_ptrs;
-        invalid_added_volumes |= !add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepLower, cut_part_ptrs);
+        add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
     }
 
     // cut middle part with 2 angles and add parts to related upper/lower objects
@@ -3745,18 +3748,18 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
     {
         const Transform3d cut_matrix_angle1 = translation_transform(m_rotation_m * (-h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, -m_groove_flaps_angle, -m_groove_angle));
 
-        if (!cut(tmp_object, cut_matrix_angle1, ModelObjectCutAttribute::KeepLower, cut_part_ptrs))
+        if (!cut(tmp_object, cut_matrix_angle1, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut))
             return cut_object_ptrs;
-        invalid_added_volumes |= !add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, cut_part_ptrs);
+        add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
     }
 
     // cut by angle2 plane
     {
         const Transform3d cut_matrix_angle2 = translation_transform(m_rotation_m * (h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, m_groove_flaps_angle, m_groove_angle));
 
-        if (!cut(tmp_object, cut_matrix_angle2, ModelObjectCutAttribute::KeepLower, cut_part_ptrs))
+        if (!cut(tmp_object, cut_matrix_angle2, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut))
             return cut_object_ptrs;
-        invalid_added_volumes |= !add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, cut_part_ptrs);
+        add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
     }
 
     // apply tolerance to the middle part
@@ -3764,22 +3767,22 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
         const double h_groove_shift_tolerance = groove_half_depth - (double)m_groove_depth_tolerance;
 
         const Transform3d cut_matrix_lower_tolerance = translation_transform(m_rotation_m * (-h_groove_shift_tolerance * Vec3d::UnitZ())) * cut_matrix;
-        if (!cut(tmp_object, cut_matrix_lower_tolerance, ModelObjectCutAttribute::KeepUpper, cut_part_ptrs))
+        if (!cut(tmp_object, cut_matrix_lower_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut))
             return cut_object_ptrs;
 
         const double h_side_shift_tolerance = h_side_shift - 0.5 * double(m_groove_width_tolerance);
 
         const Transform3d cut_matrix_angle1_tolerance = translation_transform(m_rotation_m * (-h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, -m_groove_flaps_angle, -m_groove_angle));
-        if (!cut(tmp_object, cut_matrix_angle1_tolerance, ModelObjectCutAttribute::KeepLower, cut_part_ptrs))
+        if (!cut(tmp_object, cut_matrix_angle1_tolerance, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut))
             return cut_object_ptrs;
 
         const Transform3d cut_matrix_angle2_tolerance = translation_transform(m_rotation_m * (h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, m_groove_flaps_angle, m_groove_angle));
-        if (!cut(tmp_object, cut_matrix_angle2_tolerance, ModelObjectCutAttribute::KeepUpper, cut_part_ptrs))
+        if (!cut(tmp_object, cut_matrix_angle2_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut))
             return cut_object_ptrs;
     }
 
     // this part can be added to the upper object now
-    invalid_added_volumes |= !add_volumes_from_cut(upper, ModelObjectCutAttribute::KeepLower, cut_part_ptrs);
+    add_volumes_from_cut(upper, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
 
     if (keep_as_parts) {
         // add volumes from lower object to the upper, but mark them as a lower
@@ -3789,6 +3792,9 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
             new_vol->cut_info.is_from_upper = false;
         }
         cut_object_ptrs.push_back(upper);
+
+        // add lower object to the cut_object_ptrs just to correct delete it from the Model destructor and avoid memory leaks
+        cut_object_ptrs.push_back(lower);
     }
     else {
         auto add_cut_objects = [this, &instance_idx](ModelObjectPtrs& cut_objects, ModelObject* object, const Transform3d& cut_matrix) {
@@ -3884,7 +3890,8 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         // update cut_id for the cut object in respect to the attributes
         update_object_cut_id(cut_mo->cut_id, attributes, dowels_count);
 
-        ModelObjectPtrs cut_object_ptrs = cut_by_contour    ? perform_cut_by_contour(cut_mo, attributes, dowels_count) :
+        Model tmp_model = Model();
+        tmp_model.objects               = cut_by_contour    ? perform_cut_by_contour(cut_mo, attributes, dowels_count) :
                                           cut_with_groove   ? perform_cut_with_groove(cut_mo) :
                                                               cut_mo->cut(instance_idx, cut_matrix, attributes);
 
@@ -3892,7 +3899,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         const CutObjectBase cut_id = cut_mo->cut_id;
 
         // update cut results on plater and in the model 
-        plater->cut(object_idx, cut_object_ptrs);
+        plater->cut(object_idx, tmp_model.objects);
 
         synchronize_model_after_cut(plater->model(), cut_id);
     }
