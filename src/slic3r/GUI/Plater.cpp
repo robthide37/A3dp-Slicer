@@ -5507,7 +5507,7 @@ void Plater::convert_gcode_to_binary()
     // Perform conversion
     {
         wxBusyCursor busy;
-        const bgcode::base::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
+        const bgcode::binarize::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
         bgcode::core::EResult res = bgcode::convert::from_ascii_to_binary(*in_file.f, *out_file.f, binarizer_config);
         if (res != bgcode::core::EResult::Success) {
             MessageDialog msg_dlg(this, _L(std::string(bgcode::core::translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);

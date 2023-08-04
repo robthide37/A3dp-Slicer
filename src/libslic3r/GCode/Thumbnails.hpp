@@ -10,7 +10,7 @@
 #include <string_view>
 
 #if ENABLE_BINARIZED_GCODE
-#include <LibBGCode/base/base.hpp>
+#include <LibBGCode/binarize/binarize.hpp>
 #endif // ENABLE_BINARIZED_GCODE
 
 #include <boost/beast/core/detail/base64.hpp>
@@ -61,7 +61,7 @@ inline void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb,
 
 #if ENABLE_BINARIZED_GCODE
 template<typename ThrowIfCanceledCallback>
-inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb, std::vector<bgcode::base::ThumbnailBlock>& out_thumbnails,
+inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb, std::vector<bgcode::binarize::ThumbnailBlock>& out_thumbnails,
     const std::vector<Vec2d>& sizes, GCodeThumbnailsFormat format, ThrowIfCanceledCallback throw_if_canceled)
 {
     out_thumbnails.clear();
@@ -71,7 +71,7 @@ inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb
             if (data.is_valid()) {
                 auto compressed = compress_thumbnail(data, format);
                 if (compressed->data != nullptr && compressed->size > 0) {
-                    bgcode::base::ThumbnailBlock& block = out_thumbnails.emplace_back(bgcode::base::ThumbnailBlock());
+                    bgcode::binarize::ThumbnailBlock& block = out_thumbnails.emplace_back(bgcode::binarize::ThumbnailBlock());
                     block.width = (uint16_t)data.width;
                     block.height = (uint16_t)data.height;
                     switch (format) {

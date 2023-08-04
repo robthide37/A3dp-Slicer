@@ -841,7 +841,7 @@ void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* resu
     m_processor.initialize(path_tmp);
     m_processor.set_print(print);
 #if ENABLE_BINARIZED_GCODE
-    m_processor.get_binary_data() = bgcode::base::BinaryData();
+    m_processor.get_binary_data() = bgcode::binarize::BinaryData();
 #endif // ENABLE_BINARIZED_GCODE
     GCodeOutputStream file(boost::nowide::fopen(path_tmp.c_str(), "wb"), m_processor);
     if (! file.is_open())
@@ -984,7 +984,7 @@ namespace DoExport {
         unsigned int                 initial_extruder_id,
         PrintStatistics              &print_statistics,
         bool                         export_binary_data,
-        bgcode::base::BinaryData     &binary_data)
+        bgcode::binarize::BinaryData &binary_data)
 #else
     static std::string update_print_stats_and_format_filament_stats(
         const bool                   has_wipe_tower,
@@ -1132,7 +1132,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     // 1) generate the thumbnails
     // 2) collect the config data
     if (export_to_binary_gcode) {
-        bgcode::base::BinaryData& binary_data = m_processor.get_binary_data();
+        bgcode::binarize::BinaryData& binary_data = m_processor.get_binary_data();
 
         // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
         // If "thumbnails_format" is not defined, export to PNG.
@@ -1611,7 +1611,7 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         file.write(filament_stats_string_out);
 
     if (export_to_binary_gcode) {
-        bgcode::base::BinaryData& binary_data = m_processor.get_binary_data();
+        bgcode::binarize::BinaryData& binary_data = m_processor.get_binary_data();
         if (print.m_print_statistics.total_toolchanges > 0)
             binary_data.print_metadata.raw_data.push_back({ "total toolchanges", std::to_string(print.m_print_statistics.total_toolchanges) });
     }

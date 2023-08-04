@@ -24,7 +24,7 @@
 #include <string.h>
 
 #if ENABLE_BINARIZED_GCODE
-#include <LibBGCode/base/base.hpp>
+#include <LibBGCode/binarize/binarize.hpp>
 #endif // ENABLE_BINARIZED_GCODE
 
 //FIXME for GCodeFlavor and gcfMarlin (for forward-compatibility conversion)
@@ -1090,7 +1090,7 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
         throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(bgcode::core::translate_result(res))));
     if ((bgcode::core::EBlockType)block_header.type != bgcode::core::EBlockType::SlicerMetadata)
         throw Slic3r::RuntimeError(format("Unable to find slicer metadata block in file: '%1%'", filename));
-    bgcode::base::SlicerMetadataBlock slicer_metadata_block;
+    bgcode::binarize::SlicerMetadataBlock slicer_metadata_block;
     res = slicer_metadata_block.read_data(*file.f, file_header, block_header);
     if (res != bgcode::core::EResult::Success)
         throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(bgcode::core::translate_result(res))));

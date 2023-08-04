@@ -7874,7 +7874,7 @@ void GLCanvas3D::GizmoHighlighter::blink()
 #if ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
 void GLCanvas3D::show_binary_gcode_debug_window()
 {
-    bgcode::base::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
+    bgcode::binarize::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
     imgui.begin(std::string("Binary GCode"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);

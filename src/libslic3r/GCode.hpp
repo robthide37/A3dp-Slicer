@@ -29,7 +29,7 @@
 #include "GCode/PressureEqualizer.hpp"
 
 #if ENABLE_BINARIZED_GCODE
-#include <LibBGCode/base/base.hpp>
+#include <LibBGCode/binarize/binarize.hpp>
 #endif // ENABLE_BINARIZED_GCODE
 
 namespace Slic3r {
