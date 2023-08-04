@@ -1609,7 +1609,23 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
         res.push_back(upper);
     }
     else {
+        // Delete all modifiers which are not intersecting with solid parts bounding box
+        auto delete_extra_modifiers = [instance](ModelObject* mo) {
+            if (!mo) return;
+            const BoundingBoxf3 obj_bb = mo->instance_bounding_box(instance);
+            const Transform3d inst_matrix = mo->instances[instance]->get_transformation().get_matrix();
+
+            for (int i = int(mo->volumes.size()) - 1; i >= 0; --i)
+                if (const ModelVolume* vol = mo->volumes[i];
+                    !vol->is_model_part() && !vol->is_cut_connector()) {
+                    auto bb = vol->mesh().transformed_bounding_box(inst_matrix * vol->get_matrix());
+                    if (!obj_bb.intersects(bb))
+                        mo->delete_volume(i);
+                }
+        };
+
         if (attributes.has(ModelObjectCutAttribute::KeepUpper) && !upper->volumes.empty()) {
+            delete_extra_modifiers(upper);
             reset_instance_transformation(upper, instance, cut_matrix,
                 attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper),
                 attributes.has(ModelObjectCutAttribute::FlipUpper));
@@ -1617,6 +1633,7 @@ ModelObjectPtrs ModelObject::cut(size_t instance, const Transform3d& cut_matrix,
         }
 
         if (attributes.has(ModelObjectCutAttribute::KeepLower) && !lower->volumes.empty()) {
+            delete_extra_modifiers(lower);
             reset_instance_transformation(lower, instance, cut_matrix,
                 attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),
                 attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) || attributes.has(ModelObjectCutAttribute::FlipLower));

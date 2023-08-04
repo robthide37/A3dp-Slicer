@@ -3547,6 +3547,48 @@ void synchronize_model_after_cut(Model& model, const CutObjectBase& cut_id)
             obj->cut_id.copy(cut_id);
 }
 
+void distribute_modifiers_from_object(ModelObject *from_obj, const int instance_idx, ModelObject *to_obj1, ModelObject *to_obj2)
+{
+    auto              obj1_bb    = to_obj1 ? to_obj1->instance_bounding_box(instance_idx) : BoundingBoxf3();
+    auto              obj2_bb    = to_obj2 ? to_obj2->instance_bounding_box(instance_idx) : BoundingBoxf3();
+    const Transform3d inst_matrix = from_obj->instances[instance_idx]->get_transformation().get_matrix();
+
+    for (ModelVolume*vol : from_obj->volumes)
+        if (!vol->is_model_part()) {
+            auto bb = vol->mesh().transformed_bounding_box(inst_matrix * vol->get_matrix());
+            // Don't add modifiers which are not intersecting with solid parts
+            if (obj1_bb.intersects(bb))
+                to_obj1->add_volume(*vol);
+            if (obj2_bb.intersects(bb))
+                to_obj2->add_volume(*vol);
+        }
+}
+
+void merge_solid_parts_inside_object(ModelObjectPtrs& objects)
+{
+    for (ModelObject* mo : objects) {
+        TriangleMesh mesh;
+        // Merge all SolidPart but not Connectors
+        for (const ModelVolume* mv : mo->volumes) {
+            if (mv->is_model_part() && !mv->is_cut_connector()) {
+                TriangleMesh m = mv->mesh();
+                m.transform(mv->get_matrix());
+                mesh.merge(m);
+            }
+        }
+        if (!mesh.empty()) {
+            ModelVolume* new_volume = mo->add_volume(mesh);
+            new_volume->name = mo->name;
+            // Delete all merged SolidPart but not Connectors
+            for (int i = int(mo->volumes.size()) - 2; i >= 0; --i) {
+                const ModelVolume* mv = mo->volumes[i];
+                if (mv->is_model_part() && !mv->is_cut_connector())
+                    mo->delete_volume(i);
+            }
+        }
+    }
+}
+
 ModelObjectPtrs GLGizmoCut3D::perform_cut_by_contour(ModelObject* cut_mo, const ModelObjectCutAttributes& attributes, int dowels_count)
 {
     const Selection& selection = m_parent.get_selection();
@@ -3584,20 +3626,7 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_by_contour(ModelObject* cut_mo, const 
 
     if (has_modifiers) {
         // Distribute Modifiers to the Upper/Lower object
-        auto upper_bb = upper ? upper->instance_bounding_box(instance_idx) : BoundingBoxf3();
-        auto lower_bb = lower ? lower->instance_bounding_box(instance_idx) : BoundingBoxf3();
-        const Transform3d inst_matrix = cut_mo->instances[instance_idx]->get_transformation().get_matrix();
-
-        for (size_t id = 0; id < cut_parts_cnt; ++id)
-            if (m_part_selection.parts()[id].is_modifier) {
-                ModelVolume* vol = cut_mo->volumes[id];
-                auto bb = vol->mesh().transformed_bounding_box(inst_matrix * vol->get_matrix());
-                // Don't add modifiers which are not intersecting with solid parts
-                if (upper_bb.intersects(bb))
-                    upper->add_volume(*vol);
-                if (lower_bb.intersects(bb))
-                    lower->add_volume(*vol);
-            }
+        distribute_modifiers_from_object(cut_mo, instance_idx, upper, lower);
     }
 
     ModelObjectPtrs cut_object_ptrs;
@@ -3640,29 +3669,7 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_by_contour(ModelObject* cut_mo, const 
     }
 
     // Now merge all model parts together:
-    {
-        for (ModelObject* mo : cut_object_ptrs) {
-            TriangleMesh mesh;
-            // Merge all SolidPart but not Connectors
-            for (const ModelVolume* mv : mo->volumes) {
-                if (mv->is_model_part() && !mv->is_cut_connector()) {
-                    TriangleMesh m = mv->mesh();
-                    m.transform(mv->get_matrix());
-                    mesh.merge(m);
-                }
-            }
-            if (!mesh.empty()) {
-                ModelVolume* new_volume = mo->add_volume(mesh);
-                new_volume->name = mo->name;
-                // Delete all merged SolidPart but not Connectors
-                for (int i = int(mo->volumes.size()) - 2; i >= 0; --i) {
-                    const ModelVolume* mv = mo->volumes[i];
-                    if (mv->is_model_part() && !mv->is_cut_connector())
-                        mo->delete_volume(i);
-                }
-            }
-        }
-    }
+    merge_solid_parts_inside_object(cut_object_ptrs);
 
     return cut_object_ptrs;
 }
@@ -3693,41 +3700,35 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
 
     auto add_volumes_from_cut = [](ModelObject* object, const ModelObjectCutAttribute attribute, const Model& tmp_model_for_cut) {
         const auto& volumes = tmp_model_for_cut.objects.front()->volumes;
-        bool has_volume = false;
         for (const ModelVolume* volume : volumes)
-            if ((attribute == ModelObjectCutAttribute::KeepUpper &&  volume->is_from_upper()) ||
-                (attribute != ModelObjectCutAttribute::KeepUpper && !volume->is_from_upper()) ) {
-                ModelVolume* new_vol = object->add_volume(*volume);
-                new_vol->reset_from_upper();
-                has_volume = true;
+            if (volume->is_model_part()) {
+                if ((attribute == ModelObjectCutAttribute::KeepUpper &&  volume->is_from_upper()) ||
+                    (attribute != ModelObjectCutAttribute::KeepUpper && !volume->is_from_upper()) ) {
+                    ModelVolume* new_vol = object->add_volume(*volume);
+                    new_vol->reset_from_upper();
+                }
             }
-        return has_volume;
     };
 
     auto cut =  [instance_idx, add_volumes_from_cut]
-                (ModelObject* object, const Transform3d& cut_matrix, const ModelObjectCutAttribute attribute, Model& tmp_model_for_cut) {
+                (ModelObject* object, const Transform3d& cut_matrix, const ModelObjectCutAttribute add_volumes_attribute, Model& tmp_model_for_cut) {
         Model model = Model();
         model.add_object(*object);
 
         tmp_model_for_cut = Model();
         tmp_model_for_cut.objects = model.objects.front()->cut(instance_idx, cut_matrix, ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepAsParts);
-        if (tmp_model_for_cut.objects.empty())
-            return false;
+        assert(!tmp_model_for_cut.objects.empty());
 
         object->clear_volumes();
-        add_volumes_from_cut(object, attribute, tmp_model_for_cut);
+        add_volumes_from_cut(object, add_volumes_attribute, tmp_model_for_cut);
         ModelObject::reset_instance_transformation(object, instance_idx);
-        return true;
     };
-
-    ModelObjectPtrs cut_object_ptrs;
 
     // cut by upper plane
 
     const Transform3d cut_matrix_upper = translation_transform(m_rotation_m * (groove_half_depth * Vec3d::UnitZ())) * cut_matrix;
     {
-        if (!cut(tmp_object, cut_matrix_upper, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut))
-            return cut_object_ptrs;
+        cut(tmp_object, cut_matrix_upper, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
         add_volumes_from_cut(upper, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
     }
 
@@ -3735,8 +3736,7 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
 
     const Transform3d cut_matrix_lower = translation_transform(m_rotation_m * (-groove_half_depth * Vec3d::UnitZ())) * cut_matrix;
     {
-        if (!cut(tmp_object, cut_matrix_lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut))
-            return cut_object_ptrs;
+        cut(tmp_object, cut_matrix_lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
         add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
     }
 
@@ -3748,8 +3748,7 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
     {
         const Transform3d cut_matrix_angle1 = translation_transform(m_rotation_m * (-h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, -m_groove_flaps_angle, -m_groove_angle));
 
-        if (!cut(tmp_object, cut_matrix_angle1, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut))
-            return cut_object_ptrs;
+        cut(tmp_object, cut_matrix_angle1, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
         add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
     }
 
@@ -3757,8 +3756,7 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
     {
         const Transform3d cut_matrix_angle2 = translation_transform(m_rotation_m * (h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, m_groove_flaps_angle, m_groove_angle));
 
-        if (!cut(tmp_object, cut_matrix_angle2, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut))
-            return cut_object_ptrs;
+        cut(tmp_object, cut_matrix_angle2, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
         add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
     }
 
@@ -3767,22 +3765,21 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
         const double h_groove_shift_tolerance = groove_half_depth - (double)m_groove_depth_tolerance;
 
         const Transform3d cut_matrix_lower_tolerance = translation_transform(m_rotation_m * (-h_groove_shift_tolerance * Vec3d::UnitZ())) * cut_matrix;
-        if (!cut(tmp_object, cut_matrix_lower_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut))
-            return cut_object_ptrs;
+        cut(tmp_object, cut_matrix_lower_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
 
         const double h_side_shift_tolerance = h_side_shift - 0.5 * double(m_groove_width_tolerance);
 
         const Transform3d cut_matrix_angle1_tolerance = translation_transform(m_rotation_m * (-h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, -m_groove_flaps_angle, -m_groove_angle));
-        if (!cut(tmp_object, cut_matrix_angle1_tolerance, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut))
-            return cut_object_ptrs;
+        cut(tmp_object, cut_matrix_angle1_tolerance, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
 
         const Transform3d cut_matrix_angle2_tolerance = translation_transform(m_rotation_m * (h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, m_groove_flaps_angle, m_groove_angle));
-        if (!cut(tmp_object, cut_matrix_angle2_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut))
-            return cut_object_ptrs;
+        cut(tmp_object, cut_matrix_angle2_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
     }
 
     // this part can be added to the upper object now
     add_volumes_from_cut(upper, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
+
+    ModelObjectPtrs cut_object_ptrs;
 
     if (keep_as_parts) {
         // add volumes from lower object to the upper, but mark them as a lower
@@ -3791,46 +3788,34 @@ ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool 
             ModelVolume* new_vol = upper->add_volume(*volume);
             new_vol->cut_info.is_from_upper = false;
         }
+
+        // add modifiers
+        for (const ModelVolume* volume : cut_mo->volumes)
+            if (!volume->is_model_part())
+                upper->add_volume(*volume);
+
         cut_object_ptrs.push_back(upper);
 
         // add lower object to the cut_object_ptrs just to correct delete it from the Model destructor and avoid memory leaks
         cut_object_ptrs.push_back(lower);
     }
     else {
-        auto add_cut_objects = [this, &instance_idx](ModelObjectPtrs& cut_objects, ModelObject* object, const Transform3d& cut_matrix) {
-            if (object && !object->volumes.empty()) {
-                ModelObject::reset_instance_transformation(object, instance_idx, cut_matrix, m_place_on_cut_upper, m_rotate_upper);
-                cut_objects.push_back(object);
+        // add modifiers if object has any
+        for (const ModelVolume* volume : cut_mo->volumes)
+            if (!volume->is_model_part()) {
+                distribute_modifiers_from_object(cut_mo, instance_idx, upper, lower);
+                break;
             }
-        };
 
-        add_cut_objects(cut_object_ptrs, upper, cut_matrix_upper);
-        add_cut_objects(cut_object_ptrs, lower, cut_matrix_lower);
+        assert(!upper->volumes.empty() && !lower->volumes.empty());
+
+        ModelObject::reset_instance_transformation(upper, instance_idx, cut_matrix_upper, m_place_on_cut_upper, m_rotate_upper);
+        cut_object_ptrs.push_back(upper);
+        ModelObject::reset_instance_transformation(lower, instance_idx, cut_matrix_lower, m_place_on_cut_upper, m_rotate_upper);
+        cut_object_ptrs.push_back(lower);
 
         // Now merge all model parts together:
-        {
-            for (ModelObject* mo : cut_object_ptrs) {
-                TriangleMesh mesh;
-                // Merge all SolidPart but not Connectors
-                for (const ModelVolume* mv : mo->volumes) {
-                    if (mv->is_model_part() && !mv->is_cut_connector()) {
-                        TriangleMesh m = mv->mesh();
-                        m.transform(mv->get_matrix());
-                        mesh.merge(m);
-                    }
-                }
-                if (!mesh.empty()) {
-                    ModelVolume* new_volume = mo->add_volume(mesh);
-                    new_volume->name = mo->name;
-                    // Delete all merged SolidPart but not Connectors
-                    for (int i = int(mo->volumes.size()) - 2; i >= 0; --i) {
-                        const ModelVolume* mv = mo->volumes[i];
-                        if (mv->is_model_part() && !mv->is_cut_connector())
-                            mo->delete_volume(i);
-                    }
-                }
-            }
-        }
+        merge_solid_parts_inside_object(cut_object_ptrs);
     }
 
     return cut_object_ptrs;
@@ -3860,8 +3845,9 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         // This shall delete the part selection class and deallocate the memory.
         ScopeGuard part_selection_killer([this]() { m_part_selection = PartSelection(); });
 
-        const bool cut_by_contour = m_part_selection.valid();
         const bool cut_with_groove = CutMode(m_mode) == CutMode::cutTongueAndGroove;
+        const bool cut_by_contour = !cut_with_groove && m_part_selection.valid();
+
         ModelObject* cut_mo = cut_by_contour ? m_part_selection.model_object() : nullptr;
         if (cut_mo)
             cut_mo->cut_connectors = mo->cut_connectors;
@@ -3885,7 +3871,7 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
                                               only_if(m_rotate_upper, ModelObjectCutAttribute::FlipUpper) |
                                               only_if(m_rotate_lower, ModelObjectCutAttribute::FlipLower) |
                                               only_if(dowels_count > 0, ModelObjectCutAttribute::CreateDowels) |
-                                              only_if(!has_connectors && cut_mo->cut_id.id().invalid(), ModelObjectCutAttribute::InvalidateCutInfo);
+                                              only_if(!has_connectors && !cut_with_groove && cut_mo->cut_id.id().invalid(), ModelObjectCutAttribute::InvalidateCutInfo);
 
         // update cut_id for the cut object in respect to the attributes
         update_object_cut_id(cut_mo->cut_id, attributes, dowels_count);
