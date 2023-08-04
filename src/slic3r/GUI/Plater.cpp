@@ -5435,16 +5435,6 @@ void Plater::reload_gcode_from_disk()
 }
 
 #if ENABLE_BINARIZED_GCODE
-class ScopedFile
-{
-public:
-    explicit ScopedFile(FILE* file) : m_file(file) {}
-    ~ScopedFile() { if (m_file != nullptr) fclose(m_file); }
-    void unscope() { m_file = nullptr; }
-private:
-    FILE* m_file{ nullptr };
-};
-
 void Plater::convert_gcode_to_ascii()
 {
     // Ask user for a gcode file name.
@@ -5452,36 +5442,33 @@ void Plater::convert_gcode_to_ascii()
     wxGetApp().load_gcode(this, input_file);
 
     // Open source file
-    FILE* in_file = boost::nowide::fopen(into_u8(input_file).c_str(), "rb");
-    if (in_file == nullptr) {
+    FilePtr in_file{ boost::nowide::fopen(into_u8(input_file).c_str(), "rb") };
+    if (in_file.f == nullptr) {
         MessageDialog msg_dlg(this, _L("Unable to open the selected file."), _L("Error"), wxICON_ERROR | wxOK);
         msg_dlg.ShowModal();
         return;
     }
-    ScopedFile scoped_in_file(in_file);
 
     // Set out filename
     boost::filesystem::path path(into_u8(input_file));
     const std::string output_file = path.parent_path().string() + "/" + path.stem().string() + "_ascii" + path.extension().string();
 
     // Open destination file
-    FILE* out_file = boost::nowide::fopen(output_file.c_str(), "wb");
-    if (out_file == nullptr) {
+    FilePtr out_file{ boost::nowide::fopen(output_file.c_str(), "wb") };
+    if (out_file.f == nullptr) {
         MessageDialog msg_dlg(this, _L("Unable to open output file."), _L("Error"), wxICON_ERROR | wxOK);
         msg_dlg.ShowModal();
         return;
     }
-    ScopedFile scoped_out_file(out_file);
 
     // Perform conversion
     {
         wxBusyCursor busy;
-        bgcode::core::EResult res = bgcode::convert::from_binary_to_ascii(*in_file, *out_file, true);
+        bgcode::core::EResult res = bgcode::convert::from_binary_to_ascii(*in_file.f, *out_file.f, true);
         if (res != bgcode::core::EResult::Success) {
             MessageDialog msg_dlg(this, _L(std::string(bgcode::core::translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
-            scoped_out_file.unscope();
-            fclose(out_file);
+            out_file.close();
             boost::nowide::remove(output_file.c_str());
             return;
         }
@@ -5498,37 +5485,34 @@ void Plater::convert_gcode_to_binary()
     wxGetApp().load_gcode(this, input_file);
 
     // Open source file
-    FILE* in_file = boost::nowide::fopen(into_u8(input_file).c_str(), "rb");
-    if (in_file == nullptr) {
+    FilePtr in_file{ boost::nowide::fopen(into_u8(input_file).c_str(), "rb") };
+    if (in_file.f == nullptr) {
         MessageDialog msg_dlg(this, _L("Unable to open the selected file."), _L("Error"), wxICON_ERROR | wxOK);
         msg_dlg.ShowModal();
         return;
     }
-    ScopedFile scoped_in_file(in_file);
 
     // Set out filename
     boost::filesystem::path path(into_u8(input_file));
     const std::string output_file = path.parent_path().string() + "/" + path.stem().string() + "_binary" + path.extension().string();
 
     // Open destination file
-    FILE* out_file = boost::nowide::fopen(output_file.c_str(), "wb");
-    if (out_file == nullptr) {
+    FilePtr out_file{ boost::nowide::fopen(output_file.c_str(), "wb") };
+    if (out_file.f == nullptr) {
         MessageDialog msg_dlg(this, _L("Unable to open output file."), _L("Error"), wxICON_ERROR | wxOK);
         msg_dlg.ShowModal();
         return;
     }
-    ScopedFile scoped_out_file(out_file);
 
     // Perform conversion
     {
         wxBusyCursor busy;
         const bgcode::base::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
-        bgcode::core::EResult res = bgcode::convert::from_ascii_to_binary(*in_file, *out_file, binarizer_config);
+        bgcode::core::EResult res = bgcode::convert::from_ascii_to_binary(*in_file.f, *out_file.f, binarizer_config);
         if (res != bgcode::core::EResult::Success) {
             MessageDialog msg_dlg(this, _L(std::string(bgcode::core::translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
-            scoped_out_file.unscope();
-            fclose(out_file);
+            out_file.close();
             boost::nowide::remove(output_file.c_str());
             return;
         }
