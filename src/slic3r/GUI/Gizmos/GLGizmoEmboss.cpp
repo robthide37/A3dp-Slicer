@@ -3406,8 +3406,11 @@ void GLGizmoEmboss::draw_advanced()
         const Camera &cam  = wxGetApp().plater()->get_camera();
         const FontProp &prop = m_style_manager.get_font_prop();
         if (priv::apply_camera_dir(cam, m_parent, m_keep_up) && 
-            (prop.use_surface || prop.per_glyph))
+            (prop.use_surface || prop.per_glyph)){
+            if (prop.per_glyph)
+                reinit_text_lines();
             process();
+        }
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
     }
