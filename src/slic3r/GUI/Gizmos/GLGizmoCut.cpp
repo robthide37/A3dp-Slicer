@@ -3427,10 +3427,8 @@ bool GLGizmoCut3D::can_perform_cut() const
     if (! m_invalid_connectors_idxs.empty() || (!m_keep_upper && !m_keep_lower) || m_connectors_editing)
         return false;
 
-    if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
-        const float flaps_width = -2.f * m_groove_depth / tan(m_groove_flaps_angle);
-        return flaps_width < m_groove_width && has_valid_groove();
-    }
+    if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
+        return has_valid_groove();
 
     if (m_part_selection.valid())
         return ! m_part_selection.is_one_object();
@@ -3442,6 +3440,10 @@ bool GLGizmoCut3D::has_valid_groove() const
 {
     if (CutMode(m_mode) != CutMode::cutTongueAndGroove)
         return true;
+
+    const float flaps_width = -2.f * m_groove_depth / tan(m_groove_flaps_angle);
+    if (flaps_width > m_groove_width)
+        return false;
 
     const Selection& selection  = m_parent.get_selection();
     const auto&list = selection.get_volume_idxs();
