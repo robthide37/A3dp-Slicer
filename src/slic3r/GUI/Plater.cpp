@@ -5440,6 +5440,8 @@ void Plater::convert_gcode_to_ascii()
     // Ask user for a gcode file name.
     wxString input_file;
     wxGetApp().load_gcode(this, input_file);
+    if (input_file.empty())
+        return;
 
     // Open source file
     FilePtr in_file{ boost::nowide::fopen(into_u8(input_file).c_str(), "rb") };
@@ -5483,6 +5485,8 @@ void Plater::convert_gcode_to_binary()
     // Ask user for a gcode file name.
     wxString input_file;
     wxGetApp().load_gcode(this, input_file);
+    if (input_file.empty())
+        return;
 
     // Open source file
     FilePtr in_file{ boost::nowide::fopen(into_u8(input_file).c_str(), "rb") };
