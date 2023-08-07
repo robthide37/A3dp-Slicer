@@ -1276,9 +1276,11 @@ void Sidebar::show_info_sizer()
 {
     Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
     ModelObjectPtrs objects = p->plater->model().objects;
-    int obj_idx = selection.get_object_idx();
+    const int obj_idx = selection.get_object_idx();
+    const int inst_idx = selection.get_instance_idx();
 
     if (m_mode < comExpert || objects.empty() || obj_idx < 0 || int(objects.size()) <= obj_idx ||
+        inst_idx < 0 || int(objects[obj_idx]->instances.size()) <= inst_idx ||
         objects[obj_idx]->volumes.empty() ||                                            // hack to avoid crash when deleting the last object on the bed
         (selection.is_single_full_object() && objects[obj_idx]->instances.size()> 1) ||
         !(selection.is_single_full_instance() || selection.is_single_volume())) {
@@ -1287,9 +1289,6 @@ void Sidebar::show_info_sizer()
     }
 
     const ModelObject* model_object = objects[obj_idx];
-
-    int inst_idx = selection.get_instance_idx();
-    assert(inst_idx >= 0);
 
     bool imperial_units = wxGetApp().app_config->get_bool("use_inches");
     double koef = imperial_units ? ObjectManipulation::mm_to_in : 1.0f;
