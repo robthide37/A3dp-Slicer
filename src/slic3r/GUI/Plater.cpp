@@ -1276,9 +1276,11 @@ void Sidebar::show_info_sizer()
 {
     Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
     ModelObjectPtrs objects = p->plater->model().objects;
-    int obj_idx = selection.get_object_idx();
+    const int obj_idx = selection.get_object_idx();
+    const int inst_idx = selection.get_instance_idx();
 
     if (m_mode < comExpert || objects.empty() || obj_idx < 0 || int(objects.size()) <= obj_idx ||
+        inst_idx < 0 || int(objects[obj_idx]->instances.size()) <= inst_idx ||
         objects[obj_idx]->volumes.empty() ||                                            // hack to avoid crash when deleting the last object on the bed
         (selection.is_single_full_object() && objects[obj_idx]->instances.size()> 1) ||
         !(selection.is_single_full_instance() || selection.is_single_volume())) {
@@ -1287,9 +1289,6 @@ void Sidebar::show_info_sizer()
     }
 
     const ModelObject* model_object = objects[obj_idx];
-
-    int inst_idx = selection.get_instance_idx();
-    assert(inst_idx >= 0);
 
     bool imperial_units = wxGetApp().app_config->get_bool("use_inches");
     double koef = imperial_units ? ObjectManipulation::mm_to_in : 1.0f;
@@ -6471,9 +6470,12 @@ void Plater::export_stl_obj(bool extended, bool selection_only)
         csg::model_to_csgmesh(mo, Transform3d::Identity(), std::back_inserter(csgmesh),
                               csg::mpartsPositive | csg::mpartsNegative | csg::mpartsDoSplits);
 
-        if (csg::check_csgmesh_booleans(range(csgmesh)) == csgmesh.end()) {
+        auto csgrange = range(csgmesh);
+        if (csg::is_all_positive(csgrange)) {
+            mesh = TriangleMesh{csg::csgmesh_merge_positive_parts(csgrange)};
+        } else if (csg::check_csgmesh_booleans(csgrange) == csgrange.end()) {
             try {
-                auto cgalm = csg::perform_csgmesh_booleans(range(csgmesh));
+                auto cgalm = csg::perform_csgmesh_booleans(csgrange);
                 mesh = MeshBoolean::cgal::cgal_to_triangle_mesh(*cgalm);
             } catch (...) {}
         }
@@ -7130,7 +7132,9 @@ void Plater::force_filament_cb_update()
 
     // Update preset comboboxes on sidebar and filaments tab
     p->sidebar->update_presets(Preset::TYPE_FILAMENT);
-    wxGetApp().get_tab(Preset::TYPE_FILAMENT)->select_preset(wxGetApp().preset_bundle->filaments.get_selected_preset_name());
+
+    TabFilament* tab = dynamic_cast<TabFilament*>(wxGetApp().get_tab(Preset::TYPE_FILAMENT));
+    tab->select_preset(wxGetApp().preset_bundle->extruders_filaments[tab->get_active_extruder()].get_selected_preset_name());
 }
 
 void Plater::force_print_bed_update()

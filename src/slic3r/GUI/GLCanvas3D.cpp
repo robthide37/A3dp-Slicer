@@ -4067,7 +4067,7 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
                 model_object->invalidate_bounding_box();
             }
         }
-        else if (v->is_wipe_tower)
+        else if (m_selection.is_wipe_tower() && v->is_wipe_tower)
             // Move a wipe tower proxy.
             wipe_tower_origin = v->get_volume_offset();
     }

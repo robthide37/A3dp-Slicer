@@ -516,7 +516,7 @@ WipeTower::ToolChangeResult WipeTower::construct_tcr(WipeTowerWriter& writer,
 
 
 
-WipeTower::WipeTower(const PrintConfig& config, const std::vector<std::vector<float>>& wiping_matrix, size_t initial_tool) :
+WipeTower::WipeTower(const PrintConfig& config, const PrintRegionConfig& default_region_config, const std::vector<std::vector<float>>& wiping_matrix, size_t initial_tool) :
     m_semm(config.single_extruder_multi_material.value),
     m_wipe_tower_pos(config.wipe_tower_x, config.wipe_tower_y),
     m_wipe_tower_width(float(config.wipe_tower_width)),
@@ -530,6 +530,8 @@ WipeTower::WipeTower(const PrintConfig& config, const std::vector<std::vector<fl
     m_no_sparse_layers(config.wipe_tower_no_sparse_layers),
     m_gcode_flavor(config.gcode_flavor),
     m_travel_speed(config.travel_speed),
+    m_infill_speed(default_region_config.infill_speed),
+    m_perimeter_speed(default_region_config.perimeter_speed),
     m_current_tool(initial_tool),
     wipe_volumes(wiping_matrix)
 {
@@ -540,6 +542,13 @@ WipeTower::WipeTower(const PrintConfig& config, const std::vector<std::vector<fl
     m_first_layer_speed = config.get_abs_value("first_layer_speed", default_speed);
     if (m_first_layer_speed == 0.f) // just to make sure autospeed doesn't break it.
         m_first_layer_speed = default_speed / 2.f;
+
+    // Autospeed may be used...
+    if (m_infill_speed == 0.f)
+        m_infill_speed = 80.f;
+    if (m_perimeter_speed == 0.f)
+        m_perimeter_speed = 80.f;
+
 
     // If this is a single extruder MM printer, we will use all the SE-specific config values.
     // Otherwise, the defaults will be used to turn off the SE stuff.
@@ -1034,7 +1043,7 @@ void WipeTower::toolchange_Wipe(
 	float x_to_wipe = volume_to_length(wipe_volume, m_perimeter_width, m_layer_height);
 	float dy = m_extra_spacing*m_perimeter_width;
 
-    const float target_speed = is_first_layer() ? m_first_layer_speed * 60.f : 4800.f;
+    const float target_speed = is_first_layer() ? m_first_layer_speed * 60.f : m_infill_speed * 60.f;
     float wipe_speed = 0.33f * target_speed;
 
     // if there is less than 2.5*m_perimeter_width to the edge, advance straightaway (there is likely a blob anyway)
@@ -1103,7 +1112,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
 
 	// Slow down on the 1st layer.
     bool first_layer = is_first_layer();
-    float feedrate = first_layer ? m_first_layer_speed * 60.f : 2900.f;
+    float feedrate = first_layer ? m_first_layer_speed * 60.f : m_infill_speed * 60.f;
 	float current_depth = m_layer_info->depth - m_layer_info->toolchanges_depth();
     box_coordinates fill_box(Vec2f(m_perimeter_width, m_layer_info->depth-(current_depth-m_perimeter_width)),
                              m_wipe_tower_width - 2 * m_perimeter_width, current_depth-m_perimeter_width);
@@ -1203,7 +1212,7 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         // First generate vector of annotated point which form the boundary.
         std::vector<std::pair<Vec2f, Type>> pts = {{wt_box.ru, Corner}};        
         if (double alpha_start = std::asin((0.5*w)/r); ! std::isnan(alpha_start) && r > 0.5*w+0.01) {
-            for (double alpha = alpha_start; alpha < M_PI-alpha_start+0.001; alpha+=(M_PI-2*alpha_start) / 20.)
+            for (double alpha = alpha_start; alpha < M_PI-alpha_start+0.001; alpha+=(M_PI-2*alpha_start) / 40.)
                 pts.emplace_back(Vec2f(center.x() + r*std::cos(alpha)/support_scale, center.y() + r*std::sin(alpha)), alpha == alpha_start ? ArcStart : Arc);
             pts.back().second = ArcEnd;
         }        
@@ -1284,6 +1293,8 @@ WipeTower::ToolChangeResult WipeTower::finish_layer()
         writer.extrude(pts[start_i].first, feedrate);
         return poly;
     };
+
+    feedrate = first_layer ? m_first_layer_speed * 60.f : m_perimeter_speed * 60.f;
 
     // outer contour (always)
     bool infill_cone = first_layer && m_wipe_tower_width > 2*spacing && m_wipe_tower_depth > 2*spacing;

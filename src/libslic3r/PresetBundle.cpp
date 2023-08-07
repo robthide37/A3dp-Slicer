@@ -675,7 +675,9 @@ void PresetBundle::load_selections(AppConfig &config, const PresetPreferences& p
 void PresetBundle::export_selections(AppConfig &config)
 {
 	assert(this->printers.get_edited_preset().printer_technology() != ptFFF || extruders_filaments.size() >= 1);
-    assert(this->printers.get_edited_preset().printer_technology() != ptFFF || extruders_filaments.size() > 1 || filaments.get_selected_preset().alias == extruders_filaments.front().get_selected_preset()->alias);
+    // #ysFIXME_delete_after_test !All filament selections are always saved in extruder_filaments (for MM and SM printers),
+    // so there is no need to control a correspondence between filaments and extruders_filaments
+    //assert(this->printers.get_edited_preset().printer_technology() != ptFFF || extruders_filaments.size() > 1 || filaments.get_selected_preset().alias == extruders_filaments.front().get_selected_preset()->alias);
     config.clear_section("presets");
     config.set("presets", "print",        prints.get_selected_preset_name());
     config.set("presets", "filament", extruders_filaments.front().get_selected_preset_name());
