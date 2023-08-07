@@ -2309,20 +2309,26 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         case EViewType::Temperature:    { color = m_extrusions.ranges.temperature.get_color_at(path.temperature); break; }
         case EViewType::LayerTimeLinear:
         case EViewType::LayerTimeLogarithmic: {
-            const Path::Sub_Path& sub_path = path.sub_paths.front();
-            double z = static_cast<double>(sub_path.first.position.z());
-            const std::vector<double>& zs = m_layers.get_zs();
-            const std::vector<Layers::Range>& ranges = m_layers.get_ranges();
-            size_t time_mode_id = static_cast<size_t>(m_time_estimate_mode);
-            for (size_t i = 0; i < zs.size(); ++i) {
-                if (std::abs(zs[i] - z) < EPSILON) {
-                    if (ranges[i].contains(sub_path.first.s_id)) {
-                        color = m_extrusions.ranges.layer_time[time_mode_id].get_color_at(m_layers_times[time_mode_id][i],
-                            (m_view_type == EViewType::LayerTimeLinear) ? Extrusions::Range::EType::Linear : Extrusions::Range::EType::Logarithmic);
-                        break;
+#if ENABLE_BINARIZED_GCODE
+        if (!m_layers_times.empty() && m_layers.size() == m_layers_times.front().size()) {
+#endif // ENABLE_BINARIZED_GCODE
+                const Path::Sub_Path& sub_path = path.sub_paths.front();
+                double z = static_cast<double>(sub_path.first.position.z());
+                const std::vector<double>& zs = m_layers.get_zs();
+                const std::vector<Layers::Range>& ranges = m_layers.get_ranges();
+                size_t time_mode_id = static_cast<size_t>(m_time_estimate_mode);
+                for (size_t i = 0; i < zs.size(); ++i) {
+                    if (std::abs(zs[i] - z) < EPSILON) {
+                        if (ranges[i].contains(sub_path.first.s_id)) {
+                            color = m_extrusions.ranges.layer_time[time_mode_id].get_color_at(m_layers_times[time_mode_id][i],
+                                (m_view_type == EViewType::LayerTimeLinear) ? Extrusions::Range::EType::Linear : Extrusions::Range::EType::Logarithmic);
+                            break;
+                        }
                     }
                 }
+#if ENABLE_BINARIZED_GCODE
             }
+#endif // ENABLE_BINARIZED_GCODE
             break;
         }
         case EViewType::VolumetricRate: { color = m_extrusions.ranges.volumetric_rate.get_color_at(path.volumetric_rate); break; }
@@ -3590,6 +3596,27 @@ void GCodeViewer::render_legend(float& legend_height)
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, { 0.2f, 0.2f, 0.2f, 0.8f });
+#if ENABLE_BINARIZED_GCODE
+    std::vector<std::string> view_options;
+    std::vector<int> view_options_id;
+    if (!m_layers_times.empty() && m_layers.size() == m_layers_times.front().size()) {
+        view_options = { _u8L("Feature type"), _u8L("Height (mm)"), _u8L("Width (mm)"), _u8L("Speed (mm/s)"), _u8L("Fan speed (%)"),
+                         _u8L("Temperature (°C)"), _u8L("Volumetric flow rate (mm³/s)"), _u8L("Layer time (linear)"), _u8L("Layer time (logarithmic)"),
+                         _u8L("Tool"), _u8L("Color Print") };
+        view_options_id = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+    }
+    else {
+        view_options = { _u8L("Feature type"), _u8L("Height (mm)"), _u8L("Width (mm)"), _u8L("Speed (mm/s)"), _u8L("Fan speed (%)"),
+                         _u8L("Temperature (°C)"), _u8L("Volumetric flow rate (mm³/s)"), _u8L("Tool"), _u8L("Color Print") };
+        view_options_id = { 0, 1, 2, 3, 4, 5, 6, 9, 10 };
+        if (view_type == 7 || view_type == 8)
+            view_type = 0;
+    }
+    auto view_type_it = std::find(view_options_id.begin(), view_options_id.end(), view_type);
+    int view_type_id = (view_type_it == view_options_id.end()) ? 0 : std::distance(view_options_id.begin(), view_type_it);
+    if (imgui.combo(std::string(), view_options, view_type_id, ImGuiComboFlags_HeightLargest, 0.0f, -1.0f))
+        view_type = view_options_id[view_type_id];
+#else
     imgui.combo(std::string(), { _u8L("Feature type"),
                       _u8L("Height (mm)"),
                       _u8L("Width (mm)"),
@@ -3601,6 +3628,7 @@ void GCodeViewer::render_legend(float& legend_height)
                       _u8L("Layer time (logarithmic)"),
                       _u8L("Tool"),
                       _u8L("Color Print") }, view_type, ImGuiComboFlags_HeightLargest, 0.0f, -1.0f);
+#endif // ENABLE_BINARIZED_GCODE
     ImGui::PopStyleColor(2);
    
     if (old_view_type != view_type) {
