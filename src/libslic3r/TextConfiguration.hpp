@@ -69,7 +69,7 @@ struct FontProp
     using Align = std::pair<HorizontalAlign, VerticalAlign>;
     // change pivot of text
     // When not set, center is used and is not stored
-    Align align = Align(HorizontalAlign::center, VerticalAlign::top);
+    Align align = Align(HorizontalAlign::center, VerticalAlign::center);
     
     //////
     // Duplicit data to wxFontDescriptor

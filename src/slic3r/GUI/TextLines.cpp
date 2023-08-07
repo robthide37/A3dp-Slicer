@@ -249,22 +249,60 @@ GLModel::Geometry create_geometry(const TextLines &lines)
         geometry.add_triangle(t[0], t[1], t[2]);
     return geometry;    
 }
+
+bool get_line_height_offset(const FontProp &fp, const FontFile &ff, double &line_height_mm, double &line_offset_mm)
+{
+    double third_ascent_shape_size = get_font_info(ff, fp).ascent / 3.;
+    int    line_height_shape_size  = get_line_height(ff, fp); // In shape size
+
+    double scale   = get_shape_scale(fp, ff);
+    line_offset_mm = third_ascent_shape_size * scale / SHAPE_SCALE;
+    line_height_mm = line_height_shape_size * scale;
+
+    if (line_height_mm < 0)
+        return false;
+
+    // fix for bad filled ascent in font file
+    if (line_offset_mm <= 0)
+        line_offset_mm = line_height_mm / 3;
+
+    return true;
+}
+
 } // namespace
 
 void TextLinesModel::init(const Transform3d      &text_tr,
                           const ModelVolumePtrs  &volumes_to_slice,
-                          FontProp::VerticalAlign align,
-                          double                  line_height,
-                          double                  offset,
+                          /*const*/ Emboss::StyleManager &style_manager,
                           unsigned                count_lines)
 {
+    assert(style_manager.is_active_font());
+    if (!style_manager.is_active_font())
+        return;
+    const auto &ffc = style_manager.get_font_file_with_cache();
+    assert(ffc.has_value());
+    if (!ffc.has_value())
+        return;
+    const auto &ff_ptr = ffc.font_file;
+    assert(ff_ptr != nullptr);
+    if (ff_ptr == nullptr)
+        return;
+    const FontFile &ff = *ff_ptr;
+    const FontProp &fp = style_manager.get_font_prop();
+
+    FontProp::VerticalAlign align = fp.align.second;
+
+    double line_height_mm, line_offset_mm;
+    if (!get_line_height_offset(fp, ff, line_height_mm, line_offset_mm))
+        return;
+
     m_model.reset();
     m_lines.clear();  
 
-    double first_line_center = offset + this->offset + get_align_y_offset(align, count_lines, line_height);    
+    double first_line_center = offset + this->offset + get_align_y_offset_in_mm(align, count_lines, ff, fp);    
     std::vector<float> line_centers(count_lines);
     for (size_t i = 0; i < count_lines; ++i)
-        line_centers[i] = static_cast<float>(first_line_center - i * line_height);
+        line_centers[i] = static_cast<float>(first_line_center - i * line_height_mm);
 
     // contour transformation
     Transform3d c_trafo = text_tr * get_rotation();
@@ -357,7 +395,7 @@ void TextLinesModel::render(const Transform3d &text_world)
 
 double TextLinesModel::calc_line_height(const Slic3r::Emboss::FontFile &ff, const FontProp &fp)
 {
-    int line_height = Emboss::get_line_height(ff, fp); // In shape size
-    double scale = Emboss::get_shape_scale(fp, ff);
+    int line_height = Slic3r::Emboss::get_line_height(ff, fp); // In shape size
+    double scale = Slic3r::Emboss::get_shape_scale(fp, ff);
     return line_height * scale;
 }

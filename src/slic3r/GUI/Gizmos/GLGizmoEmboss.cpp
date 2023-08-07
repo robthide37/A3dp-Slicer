@@ -1093,41 +1093,7 @@ EmbossStyles GLGizmoEmboss::create_default_styles()
     return styles;
 }
 
-namespace {
-
-bool get_line_height_offset(/* const*/ StyleManager &style_manager, double &line_height_mm, double &line_offset_mm)
-{
-    assert(style_manager.is_active_font());
-    if (!style_manager.is_active_font())
-        return false;
-    const auto &ffc = style_manager.get_font_file_with_cache();
-    assert(ffc.has_value());
-    if (!ffc.has_value())
-        return false;
-    const auto &ff_ptr = ffc.font_file;
-    assert(ff_ptr != nullptr);
-    if (ff_ptr == nullptr)
-        return false;
-    const FontProp &fp = style_manager.get_font_prop();
-    const FontFile &ff = *ff_ptr;
-
-    double third_ascent_shape_size = ff.infos[fp.collection_number.value_or(0)].ascent / 3.;
-    int    line_height_shape_size = get_line_height(ff, fp); // In shape size
-
-    double scale = get_shape_scale(fp, ff);
-    line_offset_mm = third_ascent_shape_size * scale / SHAPE_SCALE;
-    line_height_mm = line_height_shape_size * scale;
-
-    if (line_height_mm < 0)
-        return false;
-
-    // fix for bad filled ascent in font file
-    if (line_offset_mm <= 0)
-        line_offset_mm = line_height_mm / 3;
-
-    return true;
-}
-
+namespace{
 void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines)
 {    
     const GLVolume *gl_volume_ptr = selection.get_first_volume();
@@ -1178,12 +1144,7 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
     Transform3d mv_trafo = gl_volume.get_volume_transformation().get_matrix();
     if (tc.fix_3mf_tr.has_value())
         mv_trafo = mv_trafo * (tc.fix_3mf_tr->inverse());
-    FontProp::VerticalAlign align = style_manager.get_font_prop().align.second;
-    double line_height_mm, line_offset_mm;
-    if (!get_line_height_offset(style_manager, line_height_mm, line_offset_mm))
-        return;
-
-    text_lines.init(mv_trafo, volumes, align, line_height_mm, line_offset_mm, count_lines);
+    text_lines.init(mv_trafo, volumes, style_manager, count_lines);
 }
 
 void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_tr, const ModelObject& mo, /* const*/ StyleManager &style_manager)
@@ -1197,13 +1158,8 @@ void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_
             continue;
         volumes.push_back(volume);
     }
-
-    FontProp::VerticalAlign align = style_manager.get_font_prop().align.second;
-    double line_height_mm, line_offset_mm;
-    if (!get_line_height_offset(style_manager, line_height_mm, line_offset_mm))
-        return;
     unsigned count_lines = 1;
-    text_lines.init(new_text_tr, volumes, align, line_height_mm, line_offset_mm, count_lines);
+    text_lines.init(new_text_tr, volumes, style_manager, count_lines);
 }
 
 }
@@ -3129,10 +3085,7 @@ void GLGizmoEmboss::draw_advanced()
     }
 
     FontProp &font_prop = m_style_manager.get_font_prop();
-    const auto  &cn = m_style_manager.get_font_prop().collection_number;
-    unsigned int font_index = (cn.has_value()) ? *cn : 0;
-    const auto  &font_info  = ff.font_file->infos[font_index];
-
+    const FontFile::Info &font_info = get_font_info(*ff.font_file, font_prop);
 #ifdef SHOW_FONT_FILE_PROPERTY
     ImGui::SameLine();
     int cache_size = ff.has_value()? (int)ff.cache->size() : 0;
