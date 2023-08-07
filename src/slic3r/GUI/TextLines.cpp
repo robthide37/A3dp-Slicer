@@ -299,7 +299,7 @@ void TextLinesModel::init(const Transform3d      &text_tr,
     m_model.reset();
     m_lines.clear();  
 
-    double first_line_center = offset + this->offset + get_align_y_offset_in_mm(align, count_lines, ff, fp);    
+    double first_line_center = this->offset + line_height_mm / 3 + get_align_y_offset_in_mm(align, count_lines, ff, fp);    
     std::vector<float> line_centers(count_lines);
     for (size_t i = 0; i < count_lines; ++i)
         line_centers[i] = static_cast<float>(first_line_center - i * line_height_mm);
