@@ -507,7 +507,6 @@ void GLGizmoCut3D::switch_to_mode(size_t new_mode)
     if (m_use_TAG_mesh)
         update_plane_model();
     reset_cut_by_contours();
-    update_clipper();
 }
 
 bool GLGizmoCut3D::render_cut_mode_combo()
@@ -1572,7 +1571,6 @@ void GLGizmoCut3D::on_set_state()
 {
     if (m_state == On) {
         m_parent.set_use_color_clip_plane(true);
-        apply_color_clip_plane_colors();
 
         update_bb();
         m_connectors_editing = !m_selected.empty();
@@ -2065,8 +2063,14 @@ void GLGizmoCut3D::update_bb()
 
         m_bounding_box = box;
 
+        // check, if mode is set to Planar, when object has a connectors
+        if (const int object_idx = m_parent.get_selection().get_object_idx();
+            object_idx >= 0 && !wxGetApp().plater()->model().objects[object_idx]->cut_connectors.empty())
+            m_mode = size_t(CutMode::cutPlanar);
+
         invalidate_cut_plane();
         reset_cut_by_contours();
+        apply_color_clip_plane_colors();
 
         m_max_pos = box.max;
         m_min_pos = box.min;
@@ -2076,6 +2080,8 @@ void GLGizmoCut3D::update_bb()
             set_center_pos(m_bb_center + m_center_offset);
         else
             set_center_pos(m_bb_center);
+
+        m_contour_width = CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.f : 0.4f;
 
         m_radius = box.radius();
         m_grabber_connection_len = 0.5 * m_radius;// std::min<double>(0.75 * m_radius, 35.0);
@@ -2107,8 +2113,6 @@ void GLGizmoCut3D::update_bb()
         if (CommonGizmosDataObjects::SelectionInfo* selection = m_c->selection_info();
             selection && selection->model_object())
             m_selected.resize(selection->model_object()->cut_connectors.size(), false);
-
-//        reset_cut_by_contours();
     }
 }
 
