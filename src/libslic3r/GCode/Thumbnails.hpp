@@ -72,12 +72,12 @@ inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb
                 auto compressed = compress_thumbnail(data, format);
                 if (compressed->data != nullptr && compressed->size > 0) {
                     bgcode::binarize::ThumbnailBlock& block = out_thumbnails.emplace_back(bgcode::binarize::ThumbnailBlock());
-                    block.width = (uint16_t)data.width;
-                    block.height = (uint16_t)data.height;
+                    block.params.width = (uint16_t)data.width;
+                    block.params.height = (uint16_t)data.height;
                     switch (format) {
-                    case GCodeThumbnailsFormat::PNG: { block.format = (uint16_t)bgcode::core::EThumbnailFormat::PNG; break; }
-                    case GCodeThumbnailsFormat::JPG: { block.format = (uint16_t)bgcode::core::EThumbnailFormat::JPG; break; }
-                    case GCodeThumbnailsFormat::QOI: { block.format = (uint16_t)bgcode::core::EThumbnailFormat::QOI; break; }
+                    case GCodeThumbnailsFormat::PNG: { block.params.format = (uint16_t)bgcode::core::EThumbnailFormat::PNG; break; }
+                    case GCodeThumbnailsFormat::JPG: { block.params.format = (uint16_t)bgcode::core::EThumbnailFormat::JPG; break; }
+                    case GCodeThumbnailsFormat::QOI: { block.params.format = (uint16_t)bgcode::core::EThumbnailFormat::QOI; break; }
                     }
                     block.data.resize(compressed->size);
                     memcpy(block.data.data(), compressed->data, compressed->size);

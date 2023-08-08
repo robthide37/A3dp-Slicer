@@ -1196,8 +1196,8 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
 #if ENABLE_BINARIZED_GCODE_DEBUG
         if (thumbnail_block.data.size() > 0) {
             auto format_filename = [](const std::string& stem, const bgcode::binarize::ThumbnailBlock& block) {
-                std::string ret = stem + "_" + std::to_string(block.width) + "x" + std::to_string(block.height);
-                switch ((bgcode::core::EThumbnailFormat)block.format)
+                std::string ret = stem + "_" + std::to_string(block.params.width) + "x" + std::to_string(block.params.height);
+                switch ((bgcode::core::EThumbnailFormat)block.params.format)
                 {
                 case bgcode::core::EThumbnailFormat::PNG: { ret += ".png"; break; }
                 case bgcode::core::EThumbnailFormat::JPG: { ret += ".jpg"; break; }
