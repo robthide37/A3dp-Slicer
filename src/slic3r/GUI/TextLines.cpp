@@ -194,7 +194,8 @@ TextLines select_closest_contour(const std::vector<Polygons> &line_contours) {
 
         size_t line_idx;
         Vec2d  hit_point;
-        double distance = AABBTreeLines::squared_distance_to_indexed_lines(linesf, tree, zero, line_idx, hit_point);
+        // double distance = 
+        AABBTreeLines::squared_distance_to_indexed_lines(linesf, tree, zero, line_idx, hit_point);
 
         // conversion between index of point and expolygon
         ExPolygonsIndices cvt(expolygons);

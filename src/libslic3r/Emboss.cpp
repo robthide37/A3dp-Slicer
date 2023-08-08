@@ -1980,11 +1980,7 @@ void align_shape(std::vector<ExPolygons> &shapes, const std::wstring &text, cons
             line_bb.merge(get_extents(shapes[j]));
         return line_bb;
     };
-        
-    int line_height = get_line_height(font, prop);
     unsigned count_lines = get_count_lines(text);
-    int center_line = get_font_info(font, prop).ascent * ASCENT_CENTER;
-
     int y_offset = get_align_y_offset(prop.align.second, count_lines, font, prop);
 
     // Speed up for left aligned text
