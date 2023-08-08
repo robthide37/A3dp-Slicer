@@ -108,10 +108,6 @@ public:
     // remove cached imgui font for actual selected font
     void clear_imgui_font();
 
-    // calculate line height
-    // not const  because access to font file which could be created.
-    double get_line_height(); /* const */
-
     // getters for private data
     const Style *get_stored_style() const;
 

@@ -253,18 +253,37 @@ GLModel::Geometry create_geometry(const TextLines &lines)
 
 void TextLinesModel::init(const Transform3d      &text_tr,
                           const ModelVolumePtrs  &volumes_to_slice,
-                          FontProp::VerticalAlign align,
-                          double                  line_height,
-                          double                  offset,
+                          /*const*/ Emboss::StyleManager &style_manager,
                           unsigned                count_lines)
 {
+    assert(style_manager.is_active_font());
+    if (!style_manager.is_active_font())
+        return;
+    const auto &ffc = style_manager.get_font_file_with_cache();
+    assert(ffc.has_value());
+    if (!ffc.has_value())
+        return;
+    const auto &ff_ptr = ffc.font_file;
+    assert(ff_ptr != nullptr);
+    if (ff_ptr == nullptr)
+        return;
+    const FontFile &ff = *ff_ptr;
+    const FontProp &fp = style_manager.get_font_prop();
+
+    FontProp::VerticalAlign align = fp.align.second;
+
+    double line_height_mm = calc_line_height_in_mm(ff, fp);
+    assert(line_height_mm > 0);
+    if (line_height_mm <= 0)
+        return;
+
     m_model.reset();
     m_lines.clear();  
 
-    double first_line_center = offset + this->offset + get_align_y_offset(align, count_lines, line_height);    
+    double first_line_center = this->offset + line_height_mm / 3 + get_align_y_offset_in_mm(align, count_lines, ff, fp);    
     std::vector<float> line_centers(count_lines);
     for (size_t i = 0; i < count_lines; ++i)
-        line_centers[i] = static_cast<float>(first_line_center - i * line_height);
+        line_centers[i] = static_cast<float>(first_line_center - i * line_height_mm);
 
     // contour transformation
     Transform3d c_trafo = text_tr * get_rotation();
@@ -279,6 +298,24 @@ void TextLinesModel::init(const Transform3d      &text_tr,
             if (polys.empty())
                 continue;
             Polygons &contours = line_contours[i];
+            contours.insert(contours.end(), polys.begin(), polys.end());
+        }
+    }
+
+    // fix for text line out of object
+    // When move text close to edge - line center could be out of object
+    for (Polygons &contours: line_contours) {
+        if (!contours.empty())
+            continue;
+
+        // use line center at zero, there should be some contour.
+        float line_center = 0.f;
+        for (const ModelVolume *volume : volumes_to_slice) {
+            MeshSlicingParams slicing_params;
+            slicing_params.trafo = c_trafo_inv * volume->get_matrix();
+            const Polygons polys = Slic3r::slice_mesh(volume->mesh().its, line_center, slicing_params);
+            if (polys.empty())
+                continue;
             contours.insert(contours.end(), polys.begin(), polys.end());
         }
     }
@@ -337,9 +374,9 @@ void TextLinesModel::render(const Transform3d &text_world)
     shader->stop_using();
 }
 
-double TextLinesModel::calc_line_height(const Slic3r::Emboss::FontFile &ff, const FontProp &fp)
+double TextLinesModel::calc_line_height_in_mm(const Slic3r::Emboss::FontFile &ff, const FontProp &fp)
 {
-    int line_height = Emboss::get_line_height(ff, fp); // In shape size
-    double scale = Emboss::get_text_shape_scale(fp, ff);
+    int line_height = Slic3r::Emboss::get_line_height(ff, fp); // In shape size
+    double scale = Slic3r::Emboss::get_text_shape_scale(fp, ff);
     return line_height * scale;
 }

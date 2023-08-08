@@ -1014,39 +1014,6 @@ std::optional<wxString> get_installed_face_name(const std::optional<std::string>
     return {}; // not installed    
 }
 
-bool get_line_height_offset(/* const*/ StyleManager &style_manager, double &line_height_mm, double &line_offset_mm)
-{
-    assert(style_manager.is_active_font());
-    if (!style_manager.is_active_font())
-        return false;
-    const auto &ffc = style_manager.get_font_file_with_cache();
-    assert(ffc.has_value());
-    if (!ffc.has_value())
-        return false;
-    const auto &ff_ptr = ffc.font_file;
-    assert(ff_ptr != nullptr);
-    if (ff_ptr == nullptr)
-        return false;
-    const FontProp &fp = style_manager.get_font_prop();
-    const FontFile &ff = *ff_ptr;
-
-    double third_ascent_shape_size = ff.infos[fp.collection_number.value_or(0)].ascent / 3.;
-    int    line_height_shape_size = get_line_height(ff, fp); // In shape size
-
-    double scale   = get_text_shape_scale(fp, ff);
-    line_offset_mm = third_ascent_shape_size * scale / 0.001; // TODO:fix constatnt SHAPE_SCALE
-    line_height_mm = line_height_shape_size * scale;
-
-    if (line_height_mm < 0)
-        return false;
-
-    // fix for bad filled ascent in font file
-    if (line_offset_mm <= 0)
-        line_offset_mm = line_height_mm / 3;
-
-    return true;
-}
-
 void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* const*/ StyleManager &style_manager, unsigned count_lines)
 {    
     const GLVolume *gl_volume_ptr = selection.get_first_volume();
@@ -1102,13 +1069,24 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
     Transform3d mv_trafo = gl_volume.get_volume_transformation().get_matrix();
     if (es.fix_3mf_tr.has_value())
         mv_trafo = mv_trafo * (es.fix_3mf_tr->inverse());
-    FontProp::VerticalAlign align = style_manager.get_font_prop().align.second;
-    double line_height_mm, line_offset_mm;
-    if (!get_line_height_offset(style_manager, line_height_mm, line_offset_mm))
-        return;
-
-    text_lines.init(mv_trafo, volumes, align, line_height_mm, line_offset_mm, count_lines);
+    text_lines.init(mv_trafo, volumes, style_manager, count_lines);
 }
+
+void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_tr, const ModelObject& mo, /* const*/ StyleManager &style_manager)
+{
+    // prepare volumes to slice
+    ModelVolumePtrs volumes;
+    volumes.reserve(mo.volumes.size());
+    for (ModelVolume *volume : mo.volumes) {
+        // only part could be surface for volumes
+        if (!volume->is_model_part())
+            continue;
+        volumes.push_back(volume);
+    }
+    unsigned count_lines = 1;
+    text_lines.init(new_text_tr, volumes, style_manager, count_lines);
+}
+
 }
 
 void GLGizmoEmboss::reinit_text_lines(unsigned count_lines) {    
@@ -1516,17 +1494,17 @@ void GLGizmoEmboss::draw_text_input()
             append_warning(_u8L("Text contains character glyph (represented by '?') unknown by font."));
 
         const FontProp &prop = m_style_manager.get_font_prop();
-        if (prop.skew.has_value()) append_warning(_u8L("Text input doesn't show font skew."));
+        if (prop.skew.has_value())     append_warning(_u8L("Text input doesn't show font skew."));
         if (prop.boldness.has_value()) append_warning(_u8L("Text input doesn't show font boldness."));
-        if (prop.line_gap.has_value())
-            append_warning(_u8L("Text input doesn't show gap between lines."));
+        if (prop.line_gap.has_value()) append_warning(_u8L("Text input doesn't show gap between lines."));
         auto &ff         = m_style_manager.get_font_file_with_cache();
         float imgui_size = StyleManager::get_imgui_font_size(prop, *ff.font_file, scale);
         if (imgui_size > StyleManager::max_imgui_font_size)
             append_warning(_u8L("Too tall, diminished font height inside text input."));
         if (imgui_size < StyleManager::min_imgui_font_size)
             append_warning(_u8L("Too small, enlarged font height inside text input."));
-        if (prop.align.first == FontProp::HorizontalAlign::center || prop.align.first == FontProp::HorizontalAlign::right)
+        bool is_multiline = m_text_lines.get_lines().size() > 1;
+        if (is_multiline && (prop.align.first == FontProp::HorizontalAlign::center || prop.align.first == FontProp::HorizontalAlign::right))
             append_warning(_u8L("Text doesn't show current horizontal alignment."));
     }
     
@@ -2646,10 +2624,8 @@ void GLGizmoEmboss::draw_advanced()
         return;
     }
 
-    StyleManager::Style &current_style = m_style_manager.get_style();
-    FontProp            &current_prop  = current_style.prop;
-    
-    const FontFile::Info &font_info = ff.font_file->infos[current_prop.collection_number.value_or(0)];
+    FontProp &font_prop = m_style_manager.get_font_prop();
+    const FontFile::Info &font_info = get_font_info(*ff.font_file, font_prop);
 #ifdef SHOW_FONT_FILE_PROPERTY
     ImGui::SameLine();
     int cache_size = ff.has_value()? (int)ff.cache->size() : 0;
@@ -2679,6 +2655,7 @@ void GLGizmoEmboss::draw_advanced()
     m_imgui->disabled_begin(!can_use_surface);
     const bool *def_use_surface = stored_style ?
         &stored_style->projection.use_surface : nullptr;
+    StyleManager::Style &current_style = m_style_manager.get_style();
     bool &use_surface = current_style.projection.use_surface;
     if (rev_checkbox(tr.use_surface, use_surface, def_use_surface,
                      _u8L("Revert using of model surface."))) {
@@ -2689,7 +2666,6 @@ void GLGizmoEmboss::draw_advanced()
     }
     m_imgui->disabled_end(); // !can_use_surface
 
-    FontProp& font_prop = m_style_manager.get_font_prop();
     bool &per_glyph = font_prop.per_glyph;
     bool can_use_per_glyph = (per_glyph) ? true : // already used surface must have option to uncheck
                             !is_the_only_one_part;
@@ -2771,6 +2747,7 @@ void GLGizmoEmboss::draw_advanced()
     int half_ascent = font_info.ascent / 2;
     int min_char_gap = -half_ascent;
     int max_char_gap = half_ascent;
+    FontProp &current_prop = current_style.prop;
     if (rev_slider(tr.char_gap, current_prop.char_gap, def_char_gap, _u8L("Revert gap between characters"), 
         min_char_gap, max_char_gap, units_fmt, _L("Distance between characters"))){
         // Condition prevent recalculation when insertint out of limits value by imgui input
@@ -2926,8 +2903,7 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::Text("%s", tr.collection.c_str());
         ImGui::SameLine(m_gui_cfg->advanced_input_offset);
         ImGui::SetNextItemWidth(m_gui_cfg->input_width);
-        unsigned int selected = current_prop.collection_number.has_value() ?
-                               *current_prop.collection_number : 0;
+        unsigned int selected = current_prop.collection_number.value_or(0);
         if (ImGui::BeginCombo("## Font collection", std::to_string(selected).c_str())) {
             for (unsigned int i = 0; i < ff.font_file->infos.size(); ++i) {
                 ImGui::PushID(1 << (10 + i));
@@ -2957,9 +2933,13 @@ void GLGizmoEmboss::draw_advanced()
     if (ImGui::Button(_u8L("Set text to face camera").c_str())) {
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam = wxGetApp().plater()->get_camera();
+        FontProp& fp = m_style_manager.get_font_prop();
         if (face_selected_volume_to_camera(cam, m_parent) && 
-            (use_surface || m_style_manager.get_font_prop().per_glyph))
+            (use_surface || fp.per_glyph)) {
+            if (fp.per_glyph)
+                reinit_text_lines();
             process();
+        }
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
     }

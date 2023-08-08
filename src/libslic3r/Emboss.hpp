@@ -228,22 +228,28 @@ namespace Emboss
     double get_text_shape_scale(const FontProp &fp, const FontFile &ff);
 
     /// <summary>
+    /// getter of font info by collection defined in prop
+    /// </summary>
+    /// <param name="font">Contain infos about all fonts(collections) in file</param>
+    /// <param name="prop">Index of collection</param>
+    /// <returns>Ascent, descent, line gap</returns>
+    const FontFile::Info &get_font_info(const FontFile &font, const FontProp &prop);
+
+    /// <summary>
     /// Read from font file and properties height of line with spacing
     /// </summary>
     /// <param name="font">Infos for collections</param>
     /// <param name="prop">Collection index + Additional line gap</param>
-    /// <returns>Line height with spacing in ExPolygon size</returns>
+    /// <returns>Line height with spacing in scaled font points (same as ExPolygons)</returns>
     int get_line_height(const FontFile &font, const FontProp &prop);
 
     /// <summary>
     /// Calculate Vertical align
     /// </summary>
-    /// <typeparam name="T">double for mm</typeparam>
-    /// <param name="align">type</param>
+    /// <param name="align">Top | Center | Bottom</param>
     /// <param name="count_lines"></param>
-    /// <param name="line_height"></param>
-    /// <returns>In same unit as line height</returns>
-    double get_align_y_offset(FontProp::VerticalAlign align, unsigned count_lines, double line_height);
+    /// <returns>Return align Y offset in mm</returns>
+    double get_align_y_offset_in_mm(FontProp::VerticalAlign align, unsigned count_lines, const FontFile &ff, const FontProp &fp);
 
     /// <summary>
     /// Project spatial point

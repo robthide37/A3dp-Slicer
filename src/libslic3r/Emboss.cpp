@@ -19,6 +19,10 @@
 #include "libslic3r/Line.hpp"
 #include "libslic3r/BoundingBox.hpp"
 
+// Experimentaly suggested ration of font ascent by multiple fonts
+// to get approx center of normal text line
+const double ASCENT_CENTER = 1/3.; // 0.5 is above small letter
+
 // every glyph's shape point is divided by SHAPE_SCALE - increase precission of fixed point value
 // stored in fonts (to be able represents curve by sequence of lines)
 static constexpr double SHAPE_SCALE = 0.001; // SCALING_FACTOR promile is fine enough
@@ -1153,17 +1157,21 @@ std::optional<Glyph> Emboss::letter2glyph(const FontFile &font,
     return priv::get_glyph(*font_info_opt, letter, flatness);
 }
 
-int Emboss::get_line_height(const FontFile &font, const FontProp &prop) {
+const FontFile::Info &Emboss::get_font_info(const FontFile &font, const FontProp &prop)
+{
     unsigned int font_index = prop.collection_number.value_or(0);
     assert(priv::is_valid(font, font_index));
-    const FontFile::Info &info = font.infos[font_index];
+    return font.infos[font_index];
+}
+
+int Emboss::get_line_height(const FontFile &font, const FontProp &prop) {
+    const FontFile::Info &info = get_font_info(font, prop);
     int line_height = info.ascent - info.descent + info.linegap;
     line_height += prop.line_gap.value_or(0);
     return static_cast<int>(line_height / SHAPE_SCALE);
 }
 
 namespace {
-
 ExPolygons letter2shapes(
     wchar_t letter, Point &cursor, FontFileWithCache &font_with_cache, const FontProp &font_prop, fontinfo_opt& font_info_cache)
 {
@@ -1242,12 +1250,12 @@ namespace {
 /// <summary>
 /// Align shape against pivot
 /// </summary>
-/// <param name="type">Horizontal and vertical alignment</param>
 /// <param name="shapes">Shapes to align
 /// Prerequisities: shapes are aligned left top</param>
-/// <param name="text">To detect end of lines</param>
-/// <param name="line_height">Height of line for align[in font points]</param>
-void align_shape(FontProp::Align type, ExPolygonsWithIds &shape, const std::wstring &text, int line_height);
+/// <param name="text">To detect end of lines - to be able horizontal center the line</param>
+/// <param name="prop">Containe Horizontal and vertical alignment</param>
+/// <param name="font">Needed for scale and font size</param>
+void align_shape(ExPolygonsWithIds &shapes, const std::wstring &text, const FontProp &prop, const FontFile &font);
 }
 
 ExPolygonsWithIds Emboss::text2vshapes(FontFileWithCache &font_with_cache, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled){
@@ -1273,7 +1281,7 @@ ExPolygonsWithIds Emboss::text2vshapes(FontFileWithCache &font_with_cache, const
         result.push_back({id, letter2shapes(letter, cursor, font_with_cache, font_prop, font_info_cache)});
     }
 
-    align_shape(font_prop.align, result, text, get_line_height(font, font_prop));
+    align_shape(result, text, font_prop, font);
     return result;
 }
 
@@ -1417,8 +1425,7 @@ std::string Emboss::create_range_text(const std::string &text,
 
 double Emboss::get_text_shape_scale(const FontProp &fp, const FontFile &ff)
 {
-    size_t font_index  = fp.collection_number.value_or(0);
-    const FontFile::Info &info = ff.infos[font_index];
+    const FontFile::Info &info = get_font_info(ff, fp);
     double scale  = fp.size_in_mm / (double) info.unit_per_em;
     // Shape is scaled for store point coordinate as integer
     return scale * SHAPE_SCALE;
@@ -1889,20 +1896,22 @@ PolygonPoints Emboss::sample_slice(const TextLine &slice, const BoundingBoxes &b
 }
 
 namespace {
-template<typename T> T get_align_y_offset(FontProp::VerticalAlign align, unsigned count_lines, T line_height)
+float get_align_y_offset(FontProp::VerticalAlign align, unsigned count_lines, const FontFile &ff, const FontProp &fp)
 {
-    if (count_lines == 0)
-        return 0;
+    assert(count_lines != 0);
+    int line_height = get_line_height(ff, fp);
+    int ascent = get_font_info(ff, fp).ascent / SHAPE_SCALE;
+    float line_center = static_cast<float>(std::round(ascent * ASCENT_CENTER));
 
     // direction of Y in 2d is from top to bottom
     // zero is on base line of first line
     switch (align) {
-    case FontProp::VerticalAlign::center: return ((count_lines - 1) / 2) * line_height + ((count_lines % 2 == 0) ? (line_height / 2) : 0);
-    case FontProp::VerticalAlign::bottom: return (count_lines - 1) * line_height;
-    case FontProp::VerticalAlign::top: // no change
-    default: break;
+    case FontProp::VerticalAlign::bottom: return line_height * (count_lines - 1);
+    case FontProp::VerticalAlign::top: return -ascent;
+    case FontProp::VerticalAlign::center: 
+    default: 
+        return -line_center + line_height * (count_lines - 1) / 2.;
     }
-    return 0;
 }
 
 int32_t get_align_x_offset(FontProp::HorizontalAlign align, const BoundingBox &shape_bb, const BoundingBox &line_bb)
@@ -1916,11 +1925,10 @@ int32_t get_align_x_offset(FontProp::HorizontalAlign align, const BoundingBox &s
     return 0;
 }
 
-void align_shape(FontProp::Align type, ExPolygonsWithIds &shapes, const std::wstring &text, int line_height)
+void align_shape(ExPolygonsWithIds &shapes, const std::wstring &text, const FontProp &prop, const FontFile &font)
 {
-    constexpr FontProp::Align no_change(FontProp::HorizontalAlign::left, FontProp::VerticalAlign::top);
-    if (type == no_change)
-        return; // no alignment
+    // Shapes have to match letters in text
+    assert(shapes.size() == text.length());
 
     BoundingBox shape_bb;
     for (const ExPolygonsWithId& shape: shapes)
@@ -1932,15 +1940,30 @@ void align_shape(FontProp::Align type, ExPolygonsWithIds &shapes, const std::wst
             line_bb.merge(get_extents(shapes[j].expoly));
         return line_bb;
     };
+        
+    int line_height = get_line_height(font, prop);
+    unsigned count_lines = get_count_lines(text);
+    int center_line = get_font_info(font, prop).ascent * ASCENT_CENTER;
 
+    int y_offset = get_align_y_offset(prop.align.second, count_lines, font, prop);
+
+    // Speed up for left aligned text
+    if (prop.align.first == FontProp::HorizontalAlign::left){
+        // already horizontaly aligned
+        for (ExPolygonsWithId& shape : shapes)
+            for (ExPolygon &s : shape.expoly)
+                s.translate(Point(0, y_offset));
+        return;
+    }
+
+    // Align x line by line
     Point offset(
-        get_align_x_offset(type.first, shape_bb, get_line_bb(0)), 
-        get_align_y_offset(type.second, get_count_lines(shapes), line_height));
-    assert(shapes.size() == text.length());
+        get_align_x_offset(prop.align.first, shape_bb, get_line_bb(0)), 
+        y_offset);
     for (size_t i = 0; i < shapes.size(); ++i) {
         wchar_t letter = text[i];
         if (letter == '\n'){
-            offset.x() = get_align_x_offset(type.first, shape_bb, get_line_bb(i+1));
+            offset.x() = get_align_x_offset(prop.align.first, shape_bb, get_line_bb(i + 1));
             continue;
         }
         ExPolygons &shape = shapes[i].expoly;
@@ -1950,8 +1973,10 @@ void align_shape(FontProp::Align type, ExPolygonsWithIds &shapes, const std::wst
 }
 } // namespace
 
-double Emboss::get_align_y_offset(FontProp::VerticalAlign align, unsigned count_lines, double line_height){
-    return ::get_align_y_offset<double>(align, count_lines, line_height);
+double Emboss::get_align_y_offset_in_mm(FontProp::VerticalAlign align, unsigned count_lines, const FontFile &ff, const FontProp &fp){
+    float offset_in_font_point = get_align_y_offset(align, count_lines, ff, fp);
+    double scale = get_text_shape_scale(fp, ff);
+    return scale * offset_in_font_point;
 }
 
 #ifdef REMOVE_SPIKES
