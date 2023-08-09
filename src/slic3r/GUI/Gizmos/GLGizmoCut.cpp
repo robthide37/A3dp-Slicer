@@ -574,6 +574,8 @@ bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& v
         m_imgui->slider_float(label.c_str(), &value, min_val, max_val, format.c_str(), 1.f, true, tooltip);
         val = value * (m_imperial_units ? static_cast<float>(ObjectManipulation::in_to_mm) : 1.f);
 
+        m_is_slider_editing_done |= m_imgui->get_last_slider_status().deactivated_after_edit;
+
         return !is_approx(old_val, value);
     };
 
@@ -2436,7 +2438,7 @@ void GLGizmoCut3D::reset_cut_by_contours()
     m_part_selection = PartSelection();
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
-        if (m_dragging || !has_valid_groove())
+        if (m_dragging || m_groove_editing || !has_valid_groove())
             return;
         process_contours();
     }
@@ -2524,6 +2526,7 @@ void GLGizmoCut3D::render_groove_float_input(const std::string& label, float& in
         if (m_imgui->get_last_slider_status().can_take_snapshot) {
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
             m_imgui->get_last_slider_status().invalidate_snapshot();
+            m_groove_editing = true;
         }
         in_val = val;
         in_tolerance = tolerance;
@@ -2546,6 +2549,11 @@ void GLGizmoCut3D::render_groove_float_input(const std::string& label, float& in
         update_plane_model();
         reset_cut_by_contours();
     }
+
+    if (m_is_slider_editing_done) {
+        m_groove_editing = false;
+        reset_cut_by_contours();
+    }
 }
 
 void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in_val, const float& init_val, float min_val, float max_val)
@@ -2563,10 +2571,12 @@ void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in
     const std::string format = "%.0f " + _u8L("°");
     m_imgui->slider_float(("##groove_" + label).c_str(), &val, min_val, max_val, format.c_str(), 1.f, true, from_u8(label));
 
+    m_is_slider_editing_done |= m_imgui->get_last_slider_status().deactivated_after_edit;
     if (!is_approx(old_val, val)) {
         if (m_imgui->get_last_slider_status().can_take_snapshot) {
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Groove change"), label), UndoRedo::SnapshotType::GizmoAction);
             m_imgui->get_last_slider_status().invalidate_snapshot();
+            m_groove_editing = true;
         }
         in_val = deg2rad(val);
         is_changed = true;
@@ -2585,6 +2595,11 @@ void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in
 
     if (is_changed) {
         update_plane_model();
+        reset_cut_by_contours();
+    }
+
+    if (m_is_slider_editing_done) {
+        m_groove_editing = false;
         reset_cut_by_contours();
     }
 }
@@ -2648,6 +2663,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
             m_imgui->disabled_end();
         }
         else if (mode == CutMode::cutTongueAndGroove) {
+            m_is_slider_editing_done = false;
             ImGui::Separator();
             ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, m_labels_map["Groove"] + ": ");
             render_groove_float_input(m_labels_map["Depth"], m_groove.depth, m_groove.depth_init, m_groove.depth_tolerance);

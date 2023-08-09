@@ -120,6 +120,9 @@ class GLGizmoCut3D : public GLGizmoBase
 
     // Input params for cut with tongue and groove
     Cut::Groove m_groove;
+    bool m_groove_editing { false };
+
+    bool m_is_slider_editing_done { false };
 
     // Input params for cut with snaps
     float m_snap_bulge_proportion{ 0.15f };
