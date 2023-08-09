@@ -1970,6 +1970,18 @@ void align_shape(std::vector<ExPolygons> &shapes, const std::wstring &text, cons
     // Shapes have to match letters in text
     assert(shapes.size() == text.length());
 
+    unsigned count_lines = get_count_lines(text);
+    int y_offset = get_align_y_offset(prop.align.second, count_lines, font, prop);
+
+    // Speed up for left aligned text
+    //if (prop.align.first == FontProp::HorizontalAlign::left){
+    //    // already horizontaly aligned
+    //    for (ExPolygons shape : shapes)
+    //        for (ExPolygon &s : shape)
+    //            s.translate(Point(0, y_offset));
+    //    return;
+    //}
+
     BoundingBox shape_bb;
     for (const ExPolygons& shape: shapes)
         shape_bb.merge(get_extents(shape));
@@ -1980,17 +1992,6 @@ void align_shape(std::vector<ExPolygons> &shapes, const std::wstring &text, cons
             line_bb.merge(get_extents(shapes[j]));
         return line_bb;
     };
-    unsigned count_lines = get_count_lines(text);
-    int y_offset = get_align_y_offset(prop.align.second, count_lines, font, prop);
-
-    // Speed up for left aligned text
-    if (prop.align.first == FontProp::HorizontalAlign::left){
-        // already horizontaly aligned
-        for (ExPolygons shape : shapes)
-            for (ExPolygon &s : shape)
-                s.translate(Point(0, y_offset));
-        return;
-    }
 
     // Align x line by line
     Point offset(

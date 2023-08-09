@@ -45,52 +45,8 @@ const Slic3r::Polygon *largest(const Slic3r::Polygons &polygons)
     return result;
 }
 
-indexed_triangle_set its_create_belt(const Slic3r::Polygon &polygon, float width_half) {
-    // Improve: Create torus instead of flat belt path (with model overlaps)
-    assert(!polygon.empty());
-    if (polygon.empty())
-        return {};
-
-    // add a small positive offset to avoid z-fighting
-    float                  offset               = static_cast<float>(scale_(0.015f));
-    Polygons               polygons_expanded    = expand(polygon, offset);
-    const Slic3r::Polygon *polygon_expanded_ptr = largest(polygons_expanded);
-    assert(polygon_expanded_ptr != nullptr);
-    if (polygon_expanded_ptr == nullptr || polygon_expanded_ptr->empty())
-        return {};
-    const Slic3r::Polygon &polygon_expanded = *polygon_expanded_ptr;
-
-    // inspired by 3DScene.cpp void GLVolume::SinkingContours::update()
-    indexed_triangle_set model;
-    size_t count = polygon_expanded.size();
-    model.vertices.reserve(2 * count);
-    model.indices.reserve(2 * count);
-
-    for (const Point &point : polygon_expanded.points) {
-        Vec2f point_d = unscale(point).cast<float>();
-        Vec3f vertex(point_d.x(), point_d.y(), width_half);
-        model.vertices.push_back(vertex);
-        vertex.z() *= -1;
-        model.vertices.push_back(vertex);
-    }
-
-    unsigned int prev_i = count - 1;
-    for (unsigned int i = 0; i < count; ++i) {
-        // t .. top
-        // b .. bottom
-        unsigned int t1 = prev_i * 2;
-        unsigned int b1 = t1 + 1;
-        unsigned int t2 = i * 2;
-        unsigned int b2 = t2 + 1;
-        model.indices.emplace_back(t1, b1, t2);
-        model.indices.emplace_back(b2, t2, b1);
-        prev_i = i;
-    }
-    return model;
-}
-
-// Be careful it is not water tide and contain self intersection
-// For visualization purposes it doesnt matter
+// Be careful it is not water tide and contain self intersections
+// It is only for visualization purposes
 indexed_triangle_set its_create_torus(const Slic3r::Polygon &polygon, float radius, size_t steps = 20)
 {
     assert(!polygon.empty());
@@ -246,16 +202,14 @@ TextLines select_closest_contour(const std::vector<Polygons> &line_contours) {
 
 inline Eigen::AngleAxis<double> get_rotation() { return Eigen::AngleAxis(-M_PI_2, Vec3d::UnitX()); }
 
-indexed_triangle_set create_its(const TextLines &lines) 
-{ 
-    const float model_half_width = 0.75; // [in volume mm]
+indexed_triangle_set create_its(const TextLines &lines, float radius) 
+{
     indexed_triangle_set its;
     // create model from polygons
     for (const TextLine &line : lines) {
         const Slic3r::Polygon &polygon = line.polygon;
         if (polygon.empty()) continue;
-        //indexed_triangle_set line_its = its_create_belt(polygon, model_half_width); 
-        indexed_triangle_set line_its = its_create_torus(polygon, model_half_width);
+        indexed_triangle_set line_its = its_create_torus(polygon, radius);
         auto transl = Eigen::Translation3d(0., line.y, 0.);
         Transform3d tr = transl * get_rotation();
         its_transform(line_its, tr);
@@ -264,9 +218,9 @@ indexed_triangle_set create_its(const TextLines &lines)
     return its;
 }
 
-GLModel::Geometry create_geometry(const TextLines &lines)
+GLModel::Geometry create_geometry(const TextLines &lines, float radius)
 {
-    indexed_triangle_set its = create_its(lines);
+    indexed_triangle_set its = create_its(lines, radius);
 
     GLModel::Geometry geometry;
     geometry.format = {GLModel::Geometry::EPrimitiveType::Triangles, GUI::GLModel::Geometry::EVertexLayout::P3};
@@ -378,8 +332,9 @@ void TextLinesModel::init(const Transform3d      &text_tr,
     for (size_t i = 0; i < count_lines; ++i)
         m_lines[i].y = line_centers[i];
 
+    float radius = static_cast<float>(line_height_mm / 20.);
     //*
-    GLModel::Geometry geometry = create_geometry(m_lines);
+    GLModel::Geometry geometry = create_geometry(m_lines, radius);
     if (geometry.vertices_count() == 0 || geometry.indices_count() == 0)
         return;
     m_model.init_from(std::move(geometry));
