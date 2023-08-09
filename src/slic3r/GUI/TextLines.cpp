@@ -89,6 +89,8 @@ indexed_triangle_set its_create_belt(const Slic3r::Polygon &polygon, float width
     return model;
 }
 
+// Be careful it is not water tide and contain self intersection
+// For visualization purposes it doesnt matter
 indexed_triangle_set its_create_torus(const Slic3r::Polygon &polygon, float radius, size_t steps = 20)
 {
     assert(!polygon.empty());
@@ -117,12 +119,7 @@ indexed_triangle_set its_create_torus(const Slic3r::Polygon &polygon, float radi
         Vec2f dir = prev + next;
         return Vec2f(-dir.x(), dir.y());
     };
-    std::vector<Vec2f> points_norm(points_d.size());
-    points_norm.front() = calc_norm(line_norm.back(), line_norm[1]);
-    for (size_t i = 1; i < points_d.size() - 1; ++i)
-        points_norm[i] = calc_norm(line_norm[i - 1], line_norm[i + 1]);        
-    points_norm.back() = calc_norm(line_norm[points_d.size() - 2], line_norm.front());
-    
+        
     // precalculate sinus and cosinus
     double angle_step = 2 * M_PI / steps;
     std::vector<std::pair<double, float>> sin_cos;
@@ -135,38 +132,73 @@ indexed_triangle_set its_create_torus(const Slic3r::Polygon &polygon, float radi
         );
     }
     
+    indexed_triangle_set sphere = its_make_sphere(radius, 2 * PI / steps);
+
     // create torus model along polygon path
     indexed_triangle_set model;
-    model.vertices.reserve(steps * count);
-    model.indices.reserve(2 * steps * count);
+    model.vertices.reserve(2 * steps * count + sphere.vertices.size()*count);
+    model.indices.reserve(2 * steps * count + sphere.indices.size()*count);
+
+    const Vec2f *prev_prev_point_d = &points_d[count-2]; // one before back
+    const Vec2f *prev_point_d = &points_d.back();
+
+    auto calc_angle = [](const Vec2f &d0, const Vec2f &d1) {
+        double dot = d0.dot(d1);
+        double det = d0.x() * d1.y() - d0.y() * d1.x(); // Determinant
+        return std::atan2(det, dot);                    // atan2(y, x) or atan2(sin, cos)
+    };
+
+    // opposit previos direction of line - for calculate angle
+    Vec2f opposit_prev_dir = (*prev_prev_point_d) - (*prev_point_d);
     for (size_t i = 0; i < count; ++i) {
-        const Vec2f point_d = points_d[i];
-        const Vec2f norm = points_norm[i];
+
+        const Vec2f & point_d = points_d[i];
+        // line segment direction
+        Vec2f dir = point_d - (*prev_point_d);
+
+        double angle = calc_angle(opposit_prev_dir, dir);
+        double allowed_preccission = 1e-6;
+        if (angle >= (PI - allowed_preccission) || 
+            angle <= (-PI + allowed_preccission))
+            continue; // it is almost line
+
+        // perpendicular direction to line
+        Vec2d p_dir(dir.y(), -dir.x());
+        p_dir.normalize(); // Should done with double preccission
+        // p_dir is tube unit side vector
+        // tube unit top vector is z direction
+
+        // Tube
+        int prev_index = model.vertices.size() + 2 * sin_cos.size() - 2;
         for (const auto &[s, c] : sin_cos) {
-            Vec2f xy = s * norm + point_d;
-            model.vertices.emplace_back(xy.x(), xy.y(), c);
+            Vec2f side = (s * p_dir).cast<float>();
+            Vec2f xy0  = side + (*prev_point_d);
+            Vec2f xy1 = side + point_d;
+            model.vertices.emplace_back(xy0.x(), xy0.y(), c); // pointing of prev index
+            model.vertices.emplace_back(xy1.x(), xy1.y(), c);
+
+            // create triangle indices
+            int f0 = prev_index;
+            int s0 = f0 + 1;
+            int f1 = model.vertices.size() - 2;
+            int s1 = f1 + 1;
+            prev_index = f1;
+            model.indices.emplace_back(s0, f0, s1);
+            model.indices.emplace_back(f1, s1, f0);
         }
+
+        prev_prev_point_d = prev_point_d;
+        prev_point_d = &point_d;
+        opposit_prev_dir = -dir;
     }
 
-    unsigned int prev_i = count - 1;
-    for (unsigned int i = 0; i < count; ++i) {        
-        // TODO: solve <180, =180 and >180 angle
-        // to not create self intersection
-
-        // t .. top
-        // b .. bottom
-        unsigned int prev_t = (prev_i+1) * steps - 1;
-        unsigned int t = (i+1) * steps - 1;
-        for (size_t s = 0; s < steps; ++s) {
-            unsigned int prev_b = prev_i * steps + s;
-            unsigned int b = i * steps + s;
-            model.indices.emplace_back(prev_t, prev_b, t);
-            model.indices.emplace_back(b, t, prev_b);
-            prev_t = prev_b;
-            t = b;
-        }
-        prev_i = i;
+    // sphere on each point
+    for (Vec2f& p: points_d){
+        indexed_triangle_set sphere_copy = sphere;
+        its_translate(sphere_copy, Vec3f(p.x(), p.y(), 0.f));
+        its_merge(model, sphere_copy);
     }
+
     return model;
 }
 
@@ -222,8 +254,8 @@ indexed_triangle_set create_its(const TextLines &lines)
     for (const TextLine &line : lines) {
         const Slic3r::Polygon &polygon = line.polygon;
         if (polygon.empty()) continue;
-        indexed_triangle_set line_its = its_create_belt(polygon, model_half_width); 
-        //indexed_triangle_set line_its = its_create_torus(polygon, model_half_width);
+        //indexed_triangle_set line_its = its_create_belt(polygon, model_half_width); 
+        indexed_triangle_set line_its = its_create_torus(polygon, model_half_width);
         auto transl = Eigen::Translation3d(0., line.y, 0.);
         Transform3d tr = transl * get_rotation();
         its_transform(line_its, tr);
