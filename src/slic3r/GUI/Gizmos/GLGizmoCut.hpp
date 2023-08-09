@@ -120,7 +120,6 @@ class GLGizmoCut3D : public GLGizmoBase
 
     // Input params for cut with tongue and groove
     Cut::Groove m_groove;
-    bool  m_optimaze_groove_rendering{ true };
 
     // Input params for cut with snaps
     float m_snap_bulge_proportion{ 0.15f };
@@ -231,11 +230,6 @@ class GLGizmoCut3D : public GLGizmoBase
     std::map<std::string, wxString> m_part_orientation_names;
 
     std::map<std::string, std::string> m_labels_map;
-
-    // Debug values
-    bool m_use_TAG_mesh {true};
-    bool m_use_TAG_mesh_full {true};
-    // 
 
 public:
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
@@ -353,7 +347,6 @@ private:
     void discard_cut_line_processing();
 
     void apply_color_clip_plane_colors();
-    void render_cut_plate_for_tongue_and_groove(GLShaderProgram* shader);
     void render_cut_plane();
     static void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
     void render_line(GLModel& line_model, const ColorRGBA& color, Transform3d view_model_matrix, float width);
@@ -377,9 +370,6 @@ private:
 
     void toggle_model_objects_visibility();
 
-    indexed_triangle_set its_make_upper_groove_plane();
-    indexed_triangle_set its_make_lower_groove_plane(float flaps_width);
-    indexed_triangle_set its_make_sides_groove_plane(float flaps_width);
     indexed_triangle_set its_make_groove_plane();
 
     indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);

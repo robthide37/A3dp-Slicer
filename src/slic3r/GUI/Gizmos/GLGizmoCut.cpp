@@ -504,8 +504,8 @@ void GLGizmoCut3D::switch_to_mode(size_t new_mode)
         m_contour_width = CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.f : 0.4f;
         oc->set_behavior(m_connectors_editing, m_connectors_editing, double(m_contour_width));
     }
-    if (m_use_TAG_mesh)
-        update_plane_model();
+
+    update_plane_model();
     reset_cut_by_contours();
 }
 
@@ -673,227 +673,6 @@ static double get_grabber_mean_size(const BoundingBoxf3& bb)
     return (bb.size().x() + bb.size().y() + bb.size().z()) / 30.;
 }
 
-indexed_triangle_set GLGizmoCut3D::its_make_upper_groove_plane()
-{
-    const float ghw = 0.5f * m_groove.width;     // groove half width
-    const float cpr = 1.5f * float(m_radius);     // cut plane radius
-
-    const float cpl = 1.5f * cpr; // cut plane length
-    const float cph = 0.02f * (float)get_grabber_mean_size(m_bounding_box);   // cut plane height
-
-    // We need two upward facing triangles
-    float x = 0.5f * cpr, y = 0.5f * cpl;
-
-    const float proj = y * tan(m_groove.angle);
-    const float extension_x = ghw + proj;
-
-    // upper cut plane is simple
-
-    if (is_approx(ghw, proj)) {
-
-        return {
-            {
-                // roof
-                {0,1,6}, {6,1,2}, {2,3,5}, {5,3,4},
-                // sides
-                {0,7,8}, {0,8,1}, {1,8,9}, {1,9,2}, {2,9,10}, {2,10,3}, {3,10,11}, {3,11,4},
-                {4,11,12}, {4,12,5}, {5, 12,13}, {5,13,6}, {6,13,7}, {6, 7,0},
-                // bottom
-                {7,13,8}, {8,13,9}, {10,9,12}, {10,12,4}
-            }, 
-            {
-                // roof vertices
-                {-x, -y, cph}, {-extension_x, -y, cph}, {0.f, y, cph}, {extension_x, -y, cph}, {x, -y, cph}, {x, y, cph}, {-x, y, cph},
-                // bottom vertices
-                {-x, -y, 0.f}, {-extension_x, -y, 0.f}, {0.f, y, 0.f}, {extension_x, -y, 0.f}, {x, -y, 0.f}, {x, y, 0.f}, {-x, y, 0.f},
-            }
-        };
-    }
-
-    if (ghw < proj) {
-
-        const float cross_pt_y = ghw / tan(m_groove.angle);
-        return {
-            {
-                // roof
-                {0,1,6}, {1,2,6}, {2,5,6}, {2,3,5}, {3,4,5},
-                // sides
-                {0,7,8}, {0,8,1}, {1,8,9}, {1,9,2}, {2,9,10}, {2,10,3}, {3,10,11}, {3,11,4},
-                {4,11,12}, {4,12,5}, {5,12,13}, {5,13,6}, {6,13,7}, {6,7,0},
-                // bottom
-                {7,13,8}, {8,13,9}, {9,13,12}, {9,12,10}, {10,12, 11}
-            }, 
-            {
-                // roof vertices
-                {-x, -y, cph}, {-extension_x, -y, cph}, {0.f, cross_pt_y, cph}, {extension_x, -y, cph}, {x, -y, cph}, {x, y, cph}, {-x, y, cph},
-                // bottom vertices
-                {-x, -y, 0.f}, {-extension_x, -y, 0.f}, {0.f, cross_pt_y, 0.f}, {extension_x, -y, 0.f}, {x, -y, 0.f}, {x, y, 0.f}, {-x, y, 0.f}
-            }
-        };
-    }
-    
-    // upper cut plane contains 2 sub planes
-
-    const float narrowing_x = ghw - proj;
-    return {
-            {
-            // roof
-            {0,1,3}, {3,1,2}, {7,4,6}, {6,4,5},
-            // sides
-            {0,8,9}, {0,9,1}, {1,9,10}, {1,10,2}, {2,10,11}, {2,11,3}, {3,11,8}, {3,8,0},
-            {4,12,13}, {4,13,5}, {5,13,14}, {5,14,6}, {6,14,15}, {6,15,7}, {7,15,12}, {7,12,4},
-            // bottom
-            {9,8,11}, {9,11,10}, {12,15,14}, {12,14,13}
-        },
-        {
-            // roof vertices
-            {-x, -y, cph}, {-extension_x, -y, cph}, {-narrowing_x, y, cph}, {-x, y, cph}, {extension_x, -y, cph}, {x, -y, cph}, {x, y, cph}, {narrowing_x, y, cph},
-            // bottom vertices
-            {-x, -y, 0.f}, {-extension_x, -y, 0.f}, {-narrowing_x, y, 0.f}, {-x, y, 0.f}, {extension_x, -y, 0.f}, {x, -y, 0.f}, {x, y, 0.f}, {narrowing_x, y, 0.f},
-        }
-    };
-}
-
-indexed_triangle_set GLGizmoCut3D::its_make_lower_groove_plane(float flaps_width)
-{
-    const float ghw = 0.5f * (m_groove.width + flaps_width);     // groove half width
-    const float cpr = 1.5f * float(m_radius);     // cut plane radius
-
-    const float cpl = 1.5f * cpr; // cut plane length
-    const float cph = 0.02f * (float)get_grabber_mean_size(m_bounding_box);   // cut plane height
-
-    // We need two upward facing triangles
-    float x = 0.5f * cpr, y = 0.5f * cpl;
-
-    const float proj = y * tan(m_groove.angle);
-    const float extension_x = ghw + proj;
-
-    // upper cut plane is trapezium
-
-    if (ghw > proj) {
-
-        const float narrowing_x = ghw - proj;
-        return {
-                {
-                // roof
-                {0,3,1}, {1,3,2},
-                // sides
-                {0,4,7}, {0,7,3}, {3,7,6}, {3,6,2}, {2,6,5}, {2,5,1}, {1,5,4}, {1,4,0},
-                // bottom
-                {4,5,7}, {7,5,6}
-            },
-            {
-                // roof vertices
-                {-extension_x, -y, cph}, {-narrowing_x, y, cph}, {narrowing_x, y, cph}, {extension_x, -y, cph},
-                // bottom vertices
-                {-extension_x, -y, 0.f}, {-narrowing_x, y, 0.f}, {narrowing_x, y, 0.f}, {extension_x, -y, 0.f}
-            }
-        };
-    }
-
-    // upper cut plane is triangle
-
-    const float cross_pt_y = ghw / tan(m_groove.angle);
-    return {
-        {
-            // roof
-            {0,2,1},
-            // sides
-            {0,3,5}, {0,5,2}, {2,5,4}, {2,4,1}, {1,4,3}, {0,1,3},
-            // bottom
-            {3,4,5}
-        },
-        {
-            // roof vertices
-            {-extension_x, -y, cph}, {0.f, cross_pt_y, cph}, {extension_x, -y, cph},
-            // bottom vertices
-            {-extension_x, -y, 0.f}, {0.f, cross_pt_y, 0.f}, {extension_x, -y, 0.f}
-        }
-    };
-}
-
-indexed_triangle_set GLGizmoCut3D::its_make_sides_groove_plane(float flaps_width)
-{
-    const float ghw_upper = 0.5f * (m_groove.width);     // groove half width
-    const float ghw_lower = 0.5f * (m_groove.width + flaps_width);     // groove half width
-    const float cpr = 1.5f * float(m_radius);     // cut plane radius
-
-    const float cpl = 1.5f * cpr; // cut plane length
-    const float cph = 0.02f * (float)get_grabber_mean_size(m_bounding_box);   // cut plane height
-
-    const float ghd = 0.5f * m_groove.depth; // groove half depth
-
-
-    // We need two upward facing triangles
-    float x = 0.5f * cpr, y = 0.5f * cpl;
-    float z_upper = ghd;
-    float z_lower = -ghd;
-
-    const float proj = y * tan(m_groove.angle);
-
-    const float extension_upper_x = ghw_upper + proj;
-    const float extension_lower_x = ghw_lower + proj;
-
-    const float narrowing_upper_x = ghw_upper - proj;
-    const float narrowing_lower_x = ghw_lower - proj;
-
-    // groove is open
-
-    if (ghw_upper > proj && ghw_lower > proj) {
-        return {
-            {
-                {1,0,2}, {2,0,3}, {5,4,7}, {5,7,6},
-                {0,1,2}, {3,0,2}, {4,5,7}, {7,5,6}
-            },
-            {
-                // left vertices
-                {-extension_lower_x, -y, z_lower}, {-extension_upper_x, -y, z_upper}, {-narrowing_upper_x, y, z_upper}, {-narrowing_lower_x, y, z_lower}, 
-                // right vertices
-                {narrowing_lower_x, y, z_lower}, {narrowing_upper_x, y, z_upper}, {extension_upper_x, -y, z_upper}, {extension_lower_x, -y, z_lower}
-            }
-        };
-    }
-
-    const float cross_pt_upper_y = ghw_upper / tan(m_groove.angle);
-
-    // groove is closed
-
-    if (ghw_upper < proj && ghw_lower < proj) {
-        const float cross_pt_lower_y = ghw_lower / tan(m_groove.angle);
-
-        return {
-            {
-                {1,0,3}, {1,3,4}, {1,4,5}, {1,5,2},
-                {0,1,3}, {3,1,4}, {4,1,5}, {5,1,2}
-            },
-            {
-                // roof vertices
-                {-extension_upper_x, -y, z_upper}, {0.f, cross_pt_upper_y, z_upper}, {extension_upper_x, -y, z_upper},
-                // bottom vertices
-                {-extension_lower_x, -y, z_lower}, {0.f, cross_pt_lower_y, z_lower}, {extension_lower_x, -y, z_lower}
-            }
-        };
-
-    }
-
-    // groove is closed from the roof
-
-    return {
-        {
-            {1,0,3}, {1,3,4}, {1,5,6}, {1,6,2},
-            {0,1,3}, {3,1,4}, {5,1,6}, {6,1,2}
-        },
-        {
-            // roof vertices
-            {-extension_upper_x, -y, z_upper}, {0.f, cross_pt_upper_y, z_upper}, {extension_upper_x, -y, z_upper},
-            // bottom vertices
-            {-extension_lower_x, -y, z_lower}, {-narrowing_lower_x, y, z_lower}, {narrowing_lower_x, y, z_lower}, {extension_lower_x, -y, z_lower} 
-        }
-    };
-}
-
-
-
 indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
 {
     // values for calculation
@@ -965,57 +744,39 @@ indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
 
         z_upper -= cut_plane_thiknes;
         z_lower -= cut_plane_thiknes;
-        if (m_use_TAG_mesh_full) {
-            const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove.flaps_angle);
 
-            nar_upper_x += under_x_shift;
-            nar_lower_x += under_x_shift;
-            ext_upper_x += under_x_shift;
-            ext_lower_x += under_x_shift;
+        const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove.flaps_angle);
 
-            std::vector<stl_vertex> vertices = get_vertices(z_upper, z_lower, nar_upper_x, nar_lower_x, ext_upper_x, ext_lower_x);
-            mesh.vertices.insert(mesh.vertices.end(), vertices.begin(), vertices.end());
+        nar_upper_x += under_x_shift;
+        nar_lower_x += under_x_shift;
+        ext_upper_x += under_x_shift;
+        ext_lower_x += under_x_shift;
 
-            mesh.indices = {
-                // above view
-                {5,4,7}, {5,7,6},       // lower part
-                {3,4,5}, {3,5,2},       // left side
-                {9,6,8}, {8,6,7},       // right side
-                {1,0,2}, {2,0,3},       // upper left part
-                {9,8,10}, {10,8,11},    // upper right part
-                // under view
-                {20,21,22}, {20,22,23}, // upper right part
-                {12,13,14}, {12,14,15}, // upper left part
-                {18,21,20}, {18,20,19}, // right side
-                {16,15,14}, {16,14,17}, // left side
-                {16,17,18}, {16,18,19}, // lower part  
-                // left edge
-                {1,13,0}, {0,13,12},
-                // front edge
-                {0,12,3}, {3,12,15}, {3,15,4}, {4,15,16}, {4,16,7}, {7,16,19}, {7,19,20}, {7,20,8}, {8,20,11}, {11,20,23},
-                // right edge
-                {11,23,10}, {10,23,22},
-                // back edge
-                {1,13,2}, {2,13,14}, {2,14,17}, {2,17,5}, {5,17,6}, {6,17,18}, {6,18,9}, {9,18,21}, {9,21,10}, {10,21,22}
-            };
-        }
-        else {
-            std::vector<stl_vertex> vertices = get_vertices(z_upper, z_lower, nar_upper_x, nar_lower_x, ext_upper_x, ext_lower_x);
-            mesh.vertices.insert(mesh.vertices.end(), vertices.begin(), vertices.end());
+        std::vector<stl_vertex> vertices = get_vertices(z_upper, z_lower, nar_upper_x, nar_lower_x, ext_upper_x, ext_lower_x);
+        mesh.vertices.insert(mesh.vertices.end(), vertices.begin(), vertices.end());
 
-            mesh.indices = {
-                // above view
-                {5,4,7}, {5,7,6},       // lower part
-                {3,4,2}, {2,4,5},       // left side
-                {9,6,8}, {8,6,7},       // right side
-                {1,0,2}, {2,0,3},       // upper left part
-                {9,8,10}, {10,8,11},    // upper right part
-                // under view
-                {16,15,14}, {16,14,17}, // left side
-                {18,21,20}, {18,20,19}, // right side  
-                {16,17,18}, {16,18,19}  // lower part
-            };
-        }
+        mesh.indices = {
+            // above view
+            {5,4,7}, {5,7,6},       // lower part
+            {3,4,5}, {3,5,2},       // left side
+            {9,6,8}, {8,6,7},       // right side
+            {1,0,2}, {2,0,3},       // upper left part
+            {9,8,10}, {10,8,11},    // upper right part
+            // under view
+            {20,21,22}, {20,22,23}, // upper right part
+            {12,13,14}, {12,14,15}, // upper left part
+            {18,21,20}, {18,20,19}, // right side
+            {16,15,14}, {16,14,17}, // left side
+            {16,17,18}, {16,18,19}, // lower part  
+            // left edge
+            {1,13,0}, {0,13,12},
+            // front edge
+            {0,12,3}, {3,12,15}, {3,15,4}, {4,15,16}, {4,16,7}, {7,16,19}, {7,19,20}, {7,20,8}, {8,20,11}, {11,20,23},
+            // right edge
+            {11,23,10}, {10,23,22},
+            // back edge
+            {1,13,2}, {2,13,14}, {2,14,17}, {2,17,5}, {5,17,6}, {6,17,18}, {6,18,9}, {9,18,21}, {9,21,10}, {10,21,22}
+        };
         return mesh;
     }
 
@@ -1044,56 +805,38 @@ indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
         z_upper -= cut_plane_thiknes;
         z_lower -= cut_plane_thiknes;
 
-        if (m_use_TAG_mesh_full) {
-            const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove.flaps_angle);
+        const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove.flaps_angle);
 
-            cross_pt_upper_y += cut_plane_thiknes;
-            cross_pt_lower_y += cut_plane_thiknes;
-            ext_upper_x += under_x_shift;
-            ext_lower_x += under_x_shift;
+        cross_pt_upper_y += cut_plane_thiknes;
+        cross_pt_lower_y += cut_plane_thiknes;
+        ext_upper_x += under_x_shift;
+        ext_lower_x += under_x_shift;
 
-            std::vector<stl_vertex> vertices = get_vertices(z_upper, z_lower, cross_pt_upper_y, cross_pt_lower_y, ext_upper_x, ext_lower_x);
-            mesh.vertices.insert(mesh.vertices.end(), vertices.begin(), vertices.end());
+        std::vector<stl_vertex> vertices = get_vertices(z_upper, z_lower, cross_pt_upper_y, cross_pt_lower_y, ext_upper_x, ext_lower_x);
+        mesh.vertices.insert(mesh.vertices.end(), vertices.begin(), vertices.end());
 
-            mesh.indices = {
-                // above view
-                {8,7,9},                    // lower part
-                {5,8,6}, {6,8,7},       // left side
-                {4,9,8}, {4,8,5},       // right side
-                {1,0,6}, {1,6,5},{1,5,2}, {2,5,4}, {2,4,3},   // upper part
-                // under view
-                {10,11,16}, {16,11,15}, {15,11,12}, {15,12,14}, {14,12,13},   // upper part
-                {18,15,14}, {14,18,19}, // right side
-                {17,16,15}, {17,15,18}, // left side
-                {17,18,19},                 // lower part  
-                // left edge
-                {1,11,0}, {0,11,10},
-                // front edge
-                {0,10,6}, {6,10,16}, {6,17,16}, {6,7,17}, {7,17,19}, {7,19,9}, {4,14,19}, {4,19,9}, {4,14,13}, {4,13,3},
-                // right edge
-                {3,13,12}, {3,12,2},
-                // back edge
-                {2,12,11}, {2,11,1}
-            };
-        }
-        else {
-            std::vector<stl_vertex> vertices = get_vertices(z_upper, z_lower, cross_pt_upper_y, cross_pt_lower_y, ext_upper_x, ext_lower_x);
-            mesh.vertices.insert(mesh.vertices.end(), vertices.begin(), vertices.end());
+        mesh.indices = {
+            // above view
+            {8,7,9},                    // lower part
+            {5,8,6}, {6,8,7},       // left side
+            {4,9,8}, {4,8,5},       // right side
+            {1,0,6}, {1,6,5},{1,5,2}, {2,5,4}, {2,4,3},   // upper part
+            // under view
+            {10,11,16}, {16,11,15}, {15,11,12}, {15,12,14}, {14,12,13},   // upper part
+            {18,15,14}, {14,18,19}, // right side
+            {17,16,15}, {17,15,18}, // left side
+            {17,18,19},                 // lower part  
+            // left edge
+            {1,11,0}, {0,11,10},
+            // front edge
+            {0,10,6}, {6,10,16}, {6,17,16}, {6,7,17}, {7,17,19}, {7,19,9}, {4,14,19}, {4,19,9}, {4,14,13}, {4,13,3},
+            // right edge
+            {3,13,12}, {3,12,2},
+            // back edge
+            {2,12,11}, {2,11,1}
+        };
 
-            mesh.indices = {
-                // above view
-                {8,7,9},                    // lower part
-                {5,8,6}, {6,8,7},       // left side
-                {4,9,8}, {4,8,5},       // right side
-                {1,0,6}, {1,6,5},{1,5,2}, {2,5,4}, {2,4,3},   // upper part
-                // under view
-                {18,15,14}, {14,18,19}, // right side
-                {17,16,15}, {17,15,18}, // left side
-                {17,18,19},                 // lower part
-            };
-        }
         return mesh;
-
     }
 
     // groove is closed from the roof
@@ -1127,87 +870,28 @@ indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
     };
     mesh.vertices.insert(mesh.vertices.end(), vertices.begin(), vertices.end());
 
-    if (m_use_TAG_mesh_full) {
-        mesh.indices = {
-            // above view
-            {8,7,10}, {8,10,9},     // lower part
-            {5,8,7}, {5,7,6},       // left side
-            {4,10,9}, {4,9,5},      // right side
-            {1,0,6}, {1,6,5},{1,5,2}, {2,5,4}, {2,4,3},   // upper part
-            // under view
-            {11,12,18}, {18,12,17}, {17,12,16}, {16,12,13}, {16,13,15}, {15,13,14},   // upper part
-            {21,16,15}, {21,15,22}, // right side
-            {19,18,17}, {19,17,20}, // left side
-            {19,20,21}, {19,21,22}, // lower part  
-            // left edge
-            {1,12,11}, {1,11,0},
-            // front edge
-            {0,11,18}, {0,18,6}, {7,19,18}, {7,18,6}, {7,19,22}, {7,22,10}, {10,22,15}, {10,15,4}, {4,15,14}, {4,14,3},
-            // right edge
-            {3,14,13}, {3,14,2},
-            // back edge
-            {2,13,12}, {2,12,1}, {5,16,21}, {5,21,9}, {9,21,20}, {9,20,8}, {5,17,20}, {5,20,8}
-        };
-    }
-    else {
-        mesh.indices = {
-            // above view
-            {8,7,10}, {8,10,9},     // lower part
-            {5,8,7}, {5,7,6},       // left side
-            {4,10,9}, {4,9,5},      // right side
-            {1,0,6}, {1,6,5}, {1,5,2}, {2,5,4}, {2,4,3},   // upper part
-            // under view
-            {21,16,15}, {21,15,22}, // right side
-            {19,18,17}, {19,17,20}, // left side
-            {19,20,21}, {19,21,22}, // lower part  
-        };
-    }
+    mesh.indices = {
+        // above view
+        {8,7,10}, {8,10,9},     // lower part
+        {5,8,7}, {5,7,6},       // left side
+        {4,10,9}, {4,9,5},      // right side
+        {1,0,6}, {1,6,5},{1,5,2}, {2,5,4}, {2,4,3},   // upper part
+        // under view
+        {11,12,18}, {18,12,17}, {17,12,16}, {16,12,13}, {16,13,15}, {15,13,14},   // upper part
+        {21,16,15}, {21,15,22}, // right side
+        {19,18,17}, {19,17,20}, // left side
+        {19,20,21}, {19,21,22}, // lower part  
+        // left edge
+        {1,12,11}, {1,11,0},
+        // front edge
+        {0,11,18}, {0,18,6}, {7,19,18}, {7,18,6}, {7,19,22}, {7,22,10}, {10,22,15}, {10,15,4}, {4,15,14}, {4,14,3},
+        // right edge
+        {3,14,13}, {3,14,2},
+        // back edge
+        {2,13,12}, {2,12,1}, {5,16,21}, {5,21,9}, {9,21,20}, {9,20,8}, {5,17,20}, {5,20,8}
+    };
 
     return mesh;
-}
-
-void GLGizmoCut3D::render_cut_plate_for_tongue_and_groove(GLShaderProgram* shader)
-{
-    const Camera &    camera    = wxGetApp().plater()->get_camera();
-    const Transform3d cp_matrix = translation_transform(m_plane_center) * m_rotation_m;
-    ColorRGBA         cp_clr    = m_plane.model.get_color();
-
-    // values for calculaton
-    const double groove_half_depth = 0.5 * double(m_groove.depth);
-
-    const float  side_width     = is_approx(m_groove.flaps_angle, 0.f) ? m_groove.depth : (m_groove.depth / sin(m_groove.flaps_angle));
-    const float  flaps_width    = 2.f * side_width * cos(m_groove.flaps_angle);
-
-    GLModel model;
-
-    // upper cut_plane
-
-    model.init_from(its_make_upper_groove_plane());
-    model.set_color(cp_clr);
-
-    Transform3d view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (groove_half_depth * Vec3d::UnitZ())) * cp_matrix;
-    shader->set_uniform("view_model_matrix", view_model_matrix_);
-    model.render();
-
-    // lower part of cut_plane
-
-    model.reset();
-    model.init_from(its_make_lower_groove_plane(flaps_width));
-    cp_clr.a(cp_clr.a() + 0.1f);
-    model.set_color(cp_clr);
-
-    view_model_matrix_ = camera.get_view_matrix() * translation_transform(m_rotation_m * (-groove_half_depth * Vec3d::UnitZ())) * cp_matrix;
-    shader->set_uniform("view_model_matrix", view_model_matrix_);
-    model.render();
-
-    // side parts of cut_plane
-
-    model.reset();
-    model.init_from(its_make_sides_groove_plane(flaps_width));
-
-    view_model_matrix_ = camera.get_view_matrix() * cp_matrix;
-    shader->set_uniform("view_model_matrix", view_model_matrix_);
-    model.render();
 }
 
 void GLGizmoCut3D::render_cut_plane()
@@ -1230,27 +914,15 @@ void GLGizmoCut3D::render_cut_plane()
 
     shader->set_uniform("projection_matrix", camera.get_projection_matrix());
 
-    if (m_use_TAG_mesh) {
-        ColorRGBA cp_clr = can_perform_cut() && has_valid_groove() ? CUT_PLANE_DEF_COLOR : CUT_PLANE_ERR_COLOR;
-        if (m_mode == size_t(CutMode::cutTongueAndGroove))
-            cp_clr.a(cp_clr.a() - 0.1f);
-        m_plane.model.set_color(cp_clr);
+    ColorRGBA cp_clr = can_perform_cut() && has_valid_groove() ? CUT_PLANE_DEF_COLOR : CUT_PLANE_ERR_COLOR;
+    if (m_mode == size_t(CutMode::cutTongueAndGroove))
+        cp_clr.a(cp_clr.a() - 0.1f);
+    m_plane.model.set_color(cp_clr);
 
-        const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
-        shader->set_uniform("view_model_matrix", view_model_matrix);
-        m_plane.model.render();
-    }
-    else {
-    m_plane.model.set_color(can_perform_cut() && has_valid_contour() ? CUT_PLANE_DEF_COLOR : CUT_PLANE_ERR_COLOR);
+    const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
+    shader->set_uniform("view_model_matrix", view_model_matrix);
+    m_plane.model.render();
 
-    if (m_mode == size_t(CutMode::cutPlanar)) {
-        const Transform3d view_model_matrix = camera.get_view_matrix() * translation_transform(m_plane_center) * m_rotation_m;
-        shader->set_uniform("view_model_matrix", view_model_matrix);
-        m_plane.model.render();
-    }
-    else if (m_mode == size_t(CutMode::cutTongueAndGroove))
-        render_cut_plate_for_tongue_and_groove(shader);
-    }
     glsafe(::glEnable(GL_CULL_FACE));
     glsafe(::glDisable(GL_BLEND));
 
@@ -1981,7 +1653,7 @@ void GLGizmoCut3D::on_stop_dragging()
         m_ar_plane_center = m_plane_center;
     }
 
-    if (CutMode(m_mode) == CutMode::cutTongueAndGroove && m_optimaze_groove_rendering)
+    if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
         reset_cut_by_contours();
     //check_and_update_connectors_state();
 }
@@ -2136,12 +1808,8 @@ void GLGizmoCut3D::init_picking_models()
 
     if (!m_plane.model.is_initialized() && !m_hide_cut_plane && !m_connectors_editing) {
         const double cp_width = 0.02 * get_grabber_mean_size(m_bounding_box);
-        indexed_triangle_set its;
-        if (m_use_TAG_mesh)
-            its = m_mode == size_t(CutMode::cutTongueAndGroove) ? its_make_groove_plane() :
-                  its_make_frustum_dowel((double)m_cut_plane_radius_koef * m_radius, cp_width, m_cut_plane_as_circle ? 180 : 4);
-        else
-            its = its_make_frustum_dowel((double)m_cut_plane_radius_koef * m_radius, cp_width, m_cut_plane_as_circle ? 180 : 4);
+        indexed_triangle_set its = m_mode == size_t(CutMode::cutTongueAndGroove) ? its_make_groove_plane() :
+                                   its_make_frustum_dowel((double)m_cut_plane_radius_koef * m_radius, cp_width, m_cut_plane_as_circle ? 180 : 4);
 
         m_plane.model.init_from(its);
         m_plane.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(std::move(its)));
@@ -2476,20 +2144,10 @@ void GLGizmoCut3D::on_render()
 
 void GLGizmoCut3D::render_debug_input_window(float x)
 {
+    return;
     m_imgui->begin(wxString("DEBUG"));
 
-    ImVec2 pos = ImGui::GetWindowPos();
-    pos.x = x;
-    ImGui::SetWindowPos(pos, ImGuiCond_Always);
-
-    bool is_changed = m_imgui->checkbox(("Render Cut plane as a one mesh"), m_use_TAG_mesh);
-    is_changed |= m_imgui->checkbox(("Render Cut plane as a full mesh"), m_use_TAG_mesh_full);
-
-    if (is_changed)
-        update_plane_model();
-
     m_imgui->end();
-    return;
 /*
     static bool  hide_clipped  = false;
     static bool  fill_cut      = false;
@@ -2778,7 +2436,7 @@ void GLGizmoCut3D::reset_cut_by_contours()
     m_part_selection = PartSelection();
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
-        if (m_optimaze_groove_rendering && m_dragging || !has_valid_groove())
+        if (m_dragging || !has_valid_groove())
             return;
         process_contours();
     }
@@ -2885,8 +2543,7 @@ void GLGizmoCut3D::render_groove_float_input(const std::string& label, float& in
     m_imgui->disabled_end();
 
     if (is_changed) {
-        if (m_use_TAG_mesh)
-            update_plane_model();
+        update_plane_model();
         reset_cut_by_contours();
     }
 }
@@ -2927,8 +2584,7 @@ void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in
     m_imgui->disabled_end();
 
     if (is_changed) {
-        if (m_use_TAG_mesh)
-            update_plane_model();
+        update_plane_model();
         reset_cut_by_contours();
     }
 }
@@ -2998,7 +2654,6 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
             render_groove_float_input(m_labels_map["Width"], m_groove.width, m_groove.width_init, m_groove.width_tolerance);
             render_groove_angle_input(m_labels_map["Flaps Angle"], m_groove.flaps_angle, m_groove.flaps_angle_init, 30.f, 120.f);
             render_groove_angle_input(m_labels_map["Groove Angle"], m_groove.angle, m_groove.angle_init, 0.f, 15.f);
-//            m_imgui->checkbox(_L("Optimize rendering"), m_optimaze_groove_rendering);
         }
 
         ImGui::Separator();
