@@ -102,16 +102,6 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
                     settings.geom_handling));
     }
 
-    if (m_imgui->combo(_L("Strategy"),
-                       {_u8L("Automatic"), _u8L("Pull to center")},
-                       settings.arr_strategy)) {
-        if (settings.arr_strategy >= 0 &&
-            settings.arr_strategy < ArrangeSettingsView::asCount)
-            m_db->set_arrange_strategy(
-                static_cast<ArrangeSettingsView::ArrangeStrategy>(
-                    settings.arr_strategy));
-    }
-
     ImGui::Separator();
 
     if (m_imgui->button(_L("Reset defaults"))) {

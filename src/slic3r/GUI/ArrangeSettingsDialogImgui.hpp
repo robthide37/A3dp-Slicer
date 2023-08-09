@@ -45,7 +45,7 @@ public:
 
     XLPivots get_xl_alignment() const override { return m_db->get_xl_alignment(); }
     GeometryHandling get_geometry_handling() const override { return m_db->get_geometry_handling(); }
-    ArrangeStrategy get_arrange_strategy() const override { return m_db->get_arrange_strategy(); }
+    ArrangeStrategy get_arrange_strategy() const override { return arr2::ArrangeSettingsView::asAuto; }
 };
 
 }} // namespace Slic3r::GUI
