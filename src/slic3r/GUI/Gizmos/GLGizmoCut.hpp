@@ -193,6 +193,8 @@ class GLGizmoCut3D : public GLGizmoBase
 
         std::vector<Vec3d> m_contour_points;         // Debugging
         std::vector<std::vector<Vec3d>> m_debug_pts; // Debugging
+
+        void add_object(const ModelObject* object);
     };
 
     PartSelection m_part_selection;

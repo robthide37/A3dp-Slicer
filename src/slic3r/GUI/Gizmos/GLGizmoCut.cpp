@@ -1855,14 +1855,25 @@ void GLGizmoCut3D::render_clipper_cut()
         ::glEnable(GL_DEPTH_TEST);
 }
 
+void GLGizmoCut3D::PartSelection::add_object(const ModelObject* object)
+{
+    m_model = Model();
+    m_model.add_object(*object);
+
+    const double sla_shift_z = wxGetApp().plater()->canvas3D()->get_selection().get_first_volume()->get_sla_shift_z();
+    if (!is_approx(sla_shift_z, 0.)) {
+        Vec3d inst_offset = model_object()->instances[m_instance_idx]->get_offset();
+        inst_offset[Z] += sla_shift_z;
+        model_object()->instances[m_instance_idx]->set_offset(inst_offset);
+    }
+}
+
 
 GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx_in, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc)
+    : m_instance_idx(instance_idx_in)
 {
     Cut cut(mo, instance_idx_in, cut_matrix);
-    m_model = Model();
-    m_model.add_object(*cut.perform_with_plane().front());
-
-    m_instance_idx = instance_idx_in;
+    add_object(cut.perform_with_plane().front());
 
     const ModelVolumePtrs& volumes = model_object()->volumes;
 
@@ -1935,12 +1946,9 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transfor
 
 // In CutMode::cutTongueAndGroove we use PartSelection just for rendering
 GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* object, int instance_idx_in)
+    : m_instance_idx (instance_idx_in)
 {
-    m_instance_idx = instance_idx_in;
-
-    m_model = Model();
-    // add upper object
-    m_model.add_object(*object);
+    add_object(object);
 
     m_parts.clear();
 
