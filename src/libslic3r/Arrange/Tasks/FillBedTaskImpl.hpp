@@ -124,7 +124,7 @@ std::unique_ptr<FillBedTask<ArrItem>> FillBedTask<ArrItem>::create(
 
     task->settings.set_from(sc.settings());
 
-    task->bed = sc.bed();
+    task->bed = get_corrected_bed(sc.bed(), converter);
 
     extract(*task, sc, converter);
 

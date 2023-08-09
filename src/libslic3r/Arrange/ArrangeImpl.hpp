@@ -416,10 +416,20 @@ ArrItem AdvancedItemConverter<ArrItem>::get_arritem(const Arrangeable &arrbl,
 
     auto outline = arrbl.full_outline();
     auto envelope = arrbl.full_envelope();
+
     if (infl != 0) {
         outline = offset_ex(outline, infl);
         if (! envelope.empty())
             envelope = offset_ex(envelope, infl);
+    }
+
+    auto simpl_tol = static_cast<double>(this->simplification_tolerance());
+
+    if (simpl_tol > 0)
+    {
+        outline = expolygons_simplify(outline, simpl_tol);
+        if (!envelope.empty())
+            envelope = expolygons_simplify(envelope, simpl_tol);
     }
 
     ArrItem ret;
@@ -448,15 +458,17 @@ ArrangeableToItemConverter<ArrItem>::create(
 {
     std::unique_ptr<ArrangeableToItemConverter<ArrItem>> ret;
 
+    constexpr coord_t SimplifyTol = scaled(.2);
+
     switch(gh) {
     case arr2::ArrangeSettingsView::ghConvex:
         ret = std::make_unique<ConvexItemConverter<ArrItem>>(safety_d);
         break;
     case arr2::ArrangeSettingsView::ghBalanced:
-        ret = std::make_unique<BalancedItemConverter<ArrItem>>(safety_d);
+        ret = std::make_unique<BalancedItemConverter<ArrItem>>(safety_d, SimplifyTol);
         break;
     case arr2::ArrangeSettingsView::ghAdvanced:
-        ret = std::make_unique<AdvancedItemConverter<ArrItem>>(safety_d);
+        ret = std::make_unique<AdvancedItemConverter<ArrItem>>(safety_d, SimplifyTol);
         break;
     default:
         ;

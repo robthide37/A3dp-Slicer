@@ -15,7 +15,7 @@ std::unique_ptr<MultiplySelectionTask<ArrItem>> MultiplySelectionTask<ArrItem>::
 
     task.settings.set_from(scene.settings());
 
-    task.bed = scene.bed();
+    task.bed = get_corrected_bed(scene.bed(), itm_conv);
 
     task.prototype_item = {};
 

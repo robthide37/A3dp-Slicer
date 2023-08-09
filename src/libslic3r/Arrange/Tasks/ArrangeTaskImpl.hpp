@@ -47,7 +47,7 @@ std::unique_ptr<ArrangeTask<ArrItem>> ArrangeTask<ArrItem>::create(
 
     task->settings.set_from(sc.settings());
 
-    task->bed = sc.bed();
+    task->bed = get_corrected_bed(sc.bed(), converter);
 
     extract_selected(*task, sc.model(), converter);
 

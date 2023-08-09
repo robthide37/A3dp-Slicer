@@ -90,6 +90,10 @@ public:
 
     virtual ArrItem convert(const Arrangeable &arrbl, coord_t offs = 0) const = 0;
 
+    // Returns the extent of simplification that the converter utilizes when
+    // creating arrange items. Zero shall mean no simplification at all.
+    virtual coord_t simplification_tolerance() const { return 0; }
+
     static std::unique_ptr<ArrangeableToItemConverter> create(
         ArrangeSettingsView::GeometryHandling geometry_handling,
         coord_t                               safety_d);
@@ -120,11 +124,19 @@ template<class ArrItem>
 class BasicItemConverter : public ArrangeableToItemConverter<ArrItem>
 {
     coord_t m_safety_d;
+    coord_t m_simplify_tol;
 
 public:
-    BasicItemConverter(coord_t safety_d = 0) : m_safety_d{safety_d} {}
+    BasicItemConverter(coord_t safety_d = 0, coord_t simpl_tol = 0)
+        : m_safety_d{safety_d}, m_simplify_tol{simpl_tol}
+    {}
 
     coord_t safety_dist() const noexcept { return m_safety_d; }
+
+    coord_t simplification_tolerance() const override
+    {
+        return m_simplify_tol;
+    }
 };
 
 template<class ArrItem>
@@ -229,6 +241,18 @@ double get_fit_into_bed_rotation(const ArrItem &itm, const RectangleBed &bed)
         ret = fit_into_box_rotation(envelope_convex_hull(itm), binbb);
 
     return ret;
+}
+
+template<class ArrItem>
+auto get_corrected_bed(const ExtendedBed &bed,
+                       const ArrangeableToItemConverter<ArrItem> &converter)
+{
+    auto bedcpy = bed;
+    visit_bed([tol = -converter.simplification_tolerance()](auto &rawbed) {
+        rawbed = offset(rawbed, tol);
+    }, bedcpy);
+
+    return bedcpy;
 }
 
 }} // namespace Slic3r::arr2

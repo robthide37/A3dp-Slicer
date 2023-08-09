@@ -114,8 +114,7 @@ Vec2crd DecomposedShape::centroid() const
 
 DecomposedShape decompose(const ExPolygons &shape)
 {
-    ExPolygons shape_s = expolygons_simplify(shape, scaled(.2));
-    return DecomposedShape{convex_decomposition_tess(shape_s)};
+    return DecomposedShape{convex_decomposition_tess(shape)};
 }
 
 DecomposedShape decompose(const Polygon &shape)
@@ -126,9 +125,7 @@ DecomposedShape decompose(const Polygon &shape)
     if (is_convex) {
         convex_shapes.emplace_back(shape);
     } else {
-        Polygon shape_s = shape;
-        shape_s.simplify(scaled(.2));
-        convex_shapes = convex_decomposition_tess(shape_s);
+        convex_shapes = convex_decomposition_tess(shape);
     }
 
     return DecomposedShape{std::move(convex_shapes)};
