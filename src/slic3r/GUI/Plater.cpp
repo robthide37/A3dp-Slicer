@@ -6318,20 +6318,7 @@ void Plater::toggle_layers_editing(bool enable)
         canvas3D()->force_main_toolbar_left_action(canvas3D()->get_main_toolbar_item_id("layersediting"));
 }
 
-void Plater::cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_matrix, ModelObjectCutAttributes attributes)
-{
-    wxCHECK_RET(obj_idx < p->model.objects.size(), "obj_idx out of bounds");
-    auto* object = p->model.objects[obj_idx];
-
-    wxCHECK_RET(instance_idx < object->instances.size(), "instance_idx out of bounds");
-
-    wxBusyCursor wait;
-
-    const auto new_objects = object->cut(instance_idx, cut_matrix, attributes);
-    cut(obj_idx, new_objects);
-}
-
-void Plater::cut(size_t obj_idx, const ModelObjectPtrs& new_objects)
+void Plater::apply_cut_object_to_model(size_t obj_idx, const ModelObjectPtrs& new_objects)
 {
     model().delete_object(obj_idx);
     sidebar().obj_list()->delete_object_from_list(obj_idx);

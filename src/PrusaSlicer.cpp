@@ -40,6 +40,7 @@
 #include "libslic3r/Geometry.hpp"
 #include "libslic3r/GCode/PostProcessor.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/CutUtils.hpp"
 #include "libslic3r/ModelArrange.hpp"
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Print.hpp"
@@ -437,8 +438,11 @@ int CLI::run(int argc, char **argv)
                     }
 #else
 //                    model.objects.front()->cut(0, m_config.opt_float("cut"), ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::FlipLower);
-                    model.objects.front()->cut(0, Geometry::translation_transform(m_config.opt_float("cut") * Vec3d::UnitZ()),
+                    Cut cut(model.objects.front(), 0, Geometry::translation_transform(m_config.opt_float("cut") * Vec3d::UnitZ()),
                                                ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::PlaceOnCutUpper);
+                    auto cut_objects = cut.perform_with_plane();
+                    for (ModelObject* obj : cut_objects)
+                        model.add_object(*obj);
 #endif
                     model.delete_object(size_t(0));
                 }

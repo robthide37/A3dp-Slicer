@@ -675,7 +675,7 @@ static double get_grabber_mean_size(const BoundingBoxf3& bb)
 
 indexed_triangle_set GLGizmoCut3D::its_make_upper_groove_plane()
 {
-    const float ghw = 0.5f * m_groove_width;     // groove half width
+    const float ghw = 0.5f * m_groove.width;     // groove half width
     const float cpr = 1.5f * float(m_radius);     // cut plane radius
 
     const float cpl = 1.5f * cpr; // cut plane length
@@ -684,7 +684,7 @@ indexed_triangle_set GLGizmoCut3D::its_make_upper_groove_plane()
     // We need two upward facing triangles
     float x = 0.5f * cpr, y = 0.5f * cpl;
 
-    const float proj = y * tan(m_groove_angle);
+    const float proj = y * tan(m_groove.angle);
     const float extension_x = ghw + proj;
 
     // upper cut plane is simple
@@ -712,7 +712,7 @@ indexed_triangle_set GLGizmoCut3D::its_make_upper_groove_plane()
 
     if (ghw < proj) {
 
-        const float cross_pt_y = ghw / tan(m_groove_angle);
+        const float cross_pt_y = ghw / tan(m_groove.angle);
         return {
             {
                 // roof
@@ -756,7 +756,7 @@ indexed_triangle_set GLGizmoCut3D::its_make_upper_groove_plane()
 
 indexed_triangle_set GLGizmoCut3D::its_make_lower_groove_plane(float flaps_width)
 {
-    const float ghw = 0.5f * (m_groove_width + flaps_width);     // groove half width
+    const float ghw = 0.5f * (m_groove.width + flaps_width);     // groove half width
     const float cpr = 1.5f * float(m_radius);     // cut plane radius
 
     const float cpl = 1.5f * cpr; // cut plane length
@@ -765,7 +765,7 @@ indexed_triangle_set GLGizmoCut3D::its_make_lower_groove_plane(float flaps_width
     // We need two upward facing triangles
     float x = 0.5f * cpr, y = 0.5f * cpl;
 
-    const float proj = y * tan(m_groove_angle);
+    const float proj = y * tan(m_groove.angle);
     const float extension_x = ghw + proj;
 
     // upper cut plane is trapezium
@@ -793,7 +793,7 @@ indexed_triangle_set GLGizmoCut3D::its_make_lower_groove_plane(float flaps_width
 
     // upper cut plane is triangle
 
-    const float cross_pt_y = ghw / tan(m_groove_angle);
+    const float cross_pt_y = ghw / tan(m_groove.angle);
     return {
         {
             // roof
@@ -814,14 +814,14 @@ indexed_triangle_set GLGizmoCut3D::its_make_lower_groove_plane(float flaps_width
 
 indexed_triangle_set GLGizmoCut3D::its_make_sides_groove_plane(float flaps_width)
 {
-    const float ghw_upper = 0.5f * (m_groove_width);     // groove half width
-    const float ghw_lower = 0.5f * (m_groove_width + flaps_width);     // groove half width
+    const float ghw_upper = 0.5f * (m_groove.width);     // groove half width
+    const float ghw_lower = 0.5f * (m_groove.width + flaps_width);     // groove half width
     const float cpr = 1.5f * float(m_radius);     // cut plane radius
 
     const float cpl = 1.5f * cpr; // cut plane length
     const float cph = 0.02f * (float)get_grabber_mean_size(m_bounding_box);   // cut plane height
 
-    const float ghd = 0.5f * m_groove_depth; // groove half depth
+    const float ghd = 0.5f * m_groove.depth; // groove half depth
 
 
     // We need two upward facing triangles
@@ -829,7 +829,7 @@ indexed_triangle_set GLGizmoCut3D::its_make_sides_groove_plane(float flaps_width
     float z_upper = ghd;
     float z_lower = -ghd;
 
-    const float proj = y * tan(m_groove_angle);
+    const float proj = y * tan(m_groove.angle);
 
     const float extension_upper_x = ghw_upper + proj;
     const float extension_lower_x = ghw_lower + proj;
@@ -854,12 +854,12 @@ indexed_triangle_set GLGizmoCut3D::its_make_sides_groove_plane(float flaps_width
         };
     }
 
-    const float cross_pt_upper_y = ghw_upper / tan(m_groove_angle);
+    const float cross_pt_upper_y = ghw_upper / tan(m_groove.angle);
 
     // groove is closed
 
     if (ghw_upper < proj && ghw_lower < proj) {
-        const float cross_pt_lower_y = ghw_lower / tan(m_groove_angle);
+        const float cross_pt_lower_y = ghw_lower / tan(m_groove.angle);
 
         return {
             {
@@ -898,23 +898,23 @@ indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
 {
     // values for calculation
 
-    const float  side_width     = is_approx(m_groove_flaps_angle, 0.f) ? m_groove_depth : (m_groove_depth / sin(m_groove_flaps_angle));
-    const float  flaps_width    = 2.f * side_width * cos(m_groove_flaps_angle);
+    const float  side_width     = is_approx(m_groove.flaps_angle, 0.f) ? m_groove.depth : (m_groove.depth / sin(m_groove.flaps_angle));
+    const float  flaps_width    = 2.f * side_width * cos(m_groove.flaps_angle);
 
-    const float groove_half_width_upper = 0.5f * (m_groove_width);
-    const float groove_half_width_lower = 0.5f * (m_groove_width + flaps_width);
+    const float groove_half_width_upper = 0.5f * (m_groove.width);
+    const float groove_half_width_lower = 0.5f * (m_groove.width + flaps_width);
 
     const float cut_plane_radius = 1.5f * float(m_radius);
     const float cut_plane_length = 1.5f * cut_plane_radius;
 
-    const float groove_half_depth = 0.5f * m_groove_depth;
+    const float groove_half_depth = 0.5f * m_groove.depth;
 
     const float x       = 0.5f * cut_plane_radius;
     const float y       = 0.5f * cut_plane_length;
     float       z_upper = groove_half_depth;
     float       z_lower = -groove_half_depth;
 
-    const float proj = y * tan(m_groove_angle);
+    const float proj = y * tan(m_groove.angle);
 
     float ext_upper_x = groove_half_width_upper + proj; // upper_x extension
     float ext_lower_x = groove_half_width_lower + proj; // lower_x extension
@@ -966,7 +966,7 @@ indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
         z_upper -= cut_plane_thiknes;
         z_lower -= cut_plane_thiknes;
         if (m_use_TAG_mesh_full) {
-            const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove_flaps_angle);
+            const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove.flaps_angle);
 
             nar_upper_x += under_x_shift;
             nar_lower_x += under_x_shift;
@@ -1019,12 +1019,12 @@ indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
         return mesh;
     }
 
-    float cross_pt_upper_y = groove_half_width_upper / tan(m_groove_angle);
+    float cross_pt_upper_y = groove_half_width_upper / tan(m_groove.angle);
 
     // groove is closed
 
     if (groove_half_width_upper < proj && groove_half_width_lower < proj) {
-        float cross_pt_lower_y = groove_half_width_lower / tan(m_groove_angle);
+        float cross_pt_lower_y = groove_half_width_lower / tan(m_groove.angle);
 
         indexed_triangle_set mesh;
 
@@ -1045,7 +1045,7 @@ indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
         z_lower -= cut_plane_thiknes;
 
         if (m_use_TAG_mesh_full) {
-            const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove_flaps_angle);
+            const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove.flaps_angle);
 
             cross_pt_upper_y += cut_plane_thiknes;
             cross_pt_lower_y += cut_plane_thiknes;
@@ -1112,7 +1112,7 @@ indexed_triangle_set GLGizmoCut3D::its_make_groove_plane()
     z_upper -= cut_plane_thiknes;
     z_lower -= cut_plane_thiknes;
 
-    const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove_flaps_angle);
+    const float under_x_shift = cut_plane_thiknes / tan(0.5f * m_groove.flaps_angle);
 
     nar_lower_x += under_x_shift;
     ext_upper_x += under_x_shift;
@@ -1173,10 +1173,10 @@ void GLGizmoCut3D::render_cut_plate_for_tongue_and_groove(GLShaderProgram* shade
     ColorRGBA         cp_clr    = m_plane.model.get_color();
 
     // values for calculaton
-    const double groove_half_depth = 0.5 * double(m_groove_depth);
+    const double groove_half_depth = 0.5 * double(m_groove.depth);
 
-    const float  side_width     = is_approx(m_groove_flaps_angle, 0.f) ? m_groove_depth : (m_groove_depth / sin(m_groove_flaps_angle));
-    const float  flaps_width    = 2.f * side_width * cos(m_groove_flaps_angle);
+    const float  side_width     = is_approx(m_groove.flaps_angle, 0.f) ? m_groove.depth : (m_groove.depth / sin(m_groove.flaps_angle));
+    const float  flaps_width    = 2.f * side_width * cos(m_groove.flaps_angle);
 
     GLModel model;
 
@@ -1454,7 +1454,7 @@ void GLGizmoCut3D::render_cut_plane_grabbers()
 
         // render CutPlaneYMove grabber
 
-        if (m_groove_angle > 0.0f && (no_xy_grabber_hovered || m_hover_id == CutPlaneYMove))
+        if (m_groove.angle > 0.0f && (no_xy_grabber_hovered || m_hover_id == CutPlaneYMove))
         {
             size = (m_dragging ? get_dragging_half_size(mean_size) : get_half_size(mean_size));
             color = m_hover_id == CutPlaneYMove ? ColorRGBA::GREEN() : m_plane.model.get_color();
@@ -1526,19 +1526,19 @@ void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
     if (m_mode != mode)
         switch_to_mode(mode);
     else if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
-        if (!is_approx(m_groove_depth          , groove_depth) ||
-            !is_approx(m_groove_width          , groove_width) ||
-            !is_approx(m_groove_flaps_angle    , groove_flaps_angle) ||
-            !is_approx(m_groove_angle          , groove_angle) ||
-            !is_approx(m_groove_depth_tolerance, groove_depth_tolerance) ||
-            !is_approx(m_groove_width_tolerance, groove_width_tolerance) ) 
+        if (!is_approx(m_groove.depth          , groove_depth) ||
+            !is_approx(m_groove.width          , groove_width) ||
+            !is_approx(m_groove.flaps_angle    , groove_flaps_angle) ||
+            !is_approx(m_groove.angle          , groove_angle) ||
+            !is_approx(m_groove.depth_tolerance, groove_depth_tolerance) ||
+            !is_approx(m_groove.width_tolerance, groove_width_tolerance) ) 
         {
-            m_groove_depth          = groove_depth;
-            m_groove_width          = groove_width;
-            m_groove_flaps_angle    = groove_flaps_angle;
-            m_groove_angle          = groove_angle;
-            m_groove_depth_tolerance= groove_depth_tolerance;
-            m_groove_width_tolerance= groove_width_tolerance;
+            m_groove.depth          = groove_depth;
+            m_groove.width          = groove_width;
+            m_groove.flaps_angle    = groove_flaps_angle;
+            m_groove.angle          = groove_angle;
+            m_groove.depth_tolerance= groove_depth_tolerance;
+            m_groove.width_tolerance= groove_width_tolerance;
             update_plane_model();
         }
         reset_cut_by_contours();
@@ -1551,7 +1551,7 @@ void GLGizmoCut3D::on_save(cereal::BinaryOutputArchive& ar) const
 { 
     ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, m_connectors_editing,
         m_ar_plane_center, m_start_dragging_m,
-        m_groove_depth, m_groove_width, m_groove_flaps_angle, m_groove_angle, m_groove_depth_tolerance, m_groove_width_tolerance);
+        m_groove.depth, m_groove.width, m_groove.flaps_angle, m_groove.angle, m_groove.depth_tolerance, m_groove.width_tolerance);
 }
 
 std::string GLGizmoCut3D::on_get_name() const
@@ -1755,7 +1755,7 @@ void GLGizmoCut3D::update_raycasters_for_picking_transform()
             offset = (size + xy_connection_len) * Vec3d::UnitX();
             m_raycasters[id++]->set_transform(trafo * translation_transform(offset) * rotation_transform(0.5 * PI * Vec3d::UnitY()) * scale_transform(cone_scale));
 
-            if (m_groove_angle > 0.0f) {
+            if (m_groove.angle > 0.0f) {
                 offset = xy_connection_len * Vec3d::UnitY() - 0.5 * size * Vec3d::Ones();
                 m_raycasters[id++]->set_transform(trafo * translation_transform(offset) * scale_transform(size));
                 offset = (size + xy_connection_len) * Vec3d::UnitY();
@@ -1996,7 +1996,7 @@ void GLGizmoCut3D::set_center_pos(const Vec3d& center_pos, bool update_tbb /*=fa
 
     bool can_set_center_pos = false;
     {
-        double limit_val = /*CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.5 * double(m_groove_depth) : */0.5;
+        double limit_val = /*CutMode(m_mode) == CutMode::cutTongueAndGroove ? 0.5 * double(m_groove.depth) : */0.5;
         if (tbb.max.z() > -limit_val && tbb.min.z() < limit_val)
             can_set_center_pos = true;
         else {
@@ -2093,10 +2093,10 @@ void GLGizmoCut3D::update_bb()
         m_snap_fine_out_radius    = m_grabber_connection_len * 1.15;
 
         // input params for cut with tongue and groove
-        m_groove_depth = m_groove_depth_init = std::max(1.f , 0.5f * float(get_grabber_mean_size(m_bounding_box)));
-        m_groove_width = m_groove_width_init = 4.0f * m_groove_depth;
-        m_groove_flaps_angle = m_groove_flaps_angle_init = float(PI) / 3.f;
-        m_groove_angle = m_groove_angle_init = 0.f;
+        m_groove.depth = m_groove.depth_init = std::max(1.f , 0.5f * float(get_grabber_mean_size(m_bounding_box)));
+        m_groove.width = m_groove.width_init = 4.0f * m_groove.depth;
+        m_groove.flaps_angle = m_groove.flaps_angle_init = float(PI) / 3.f;
+        m_groove.angle = m_groove.angle_init = 0.f;
         m_plane.reset();
         m_cone.reset();
         m_sphere.reset();
@@ -2188,16 +2188,9 @@ void GLGizmoCut3D::render_clipper_cut()
 
 GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transform3d& cut_matrix, int instance_idx_in, const Vec3d& center, const Vec3d& normal, const CommonGizmosDataObjects::ObjectClipper& oc)
 {
+    Cut cut(mo, instance_idx_in, cut_matrix);
     m_model = Model();
-    m_model.add_object(*mo);
-
-    Model tmp_model = Model();
-    tmp_model.objects = m_model.objects.front()->cut(instance_idx_in, cut_matrix,
-        ModelObjectCutAttribute::KeepUpper |
-        ModelObjectCutAttribute::KeepLower |
-        ModelObjectCutAttribute::KeepAsParts);
-    assert(tmp_model.objects.size() == 1);
-    m_model = tmp_model;
+    m_model.add_object(*cut.perform_with_plane().front());
 
     m_instance_idx = instance_idx_in;
 
@@ -2270,6 +2263,7 @@ GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* mo, const Transfor
     m_valid = true;
 }
 
+// In CutMode::cutTongueAndGroove we use PartSelection just for rendering
 GLGizmoCut3D::PartSelection::PartSelection(const ModelObject* object, int instance_idx_in)
 {
     m_instance_idx = instance_idx_in;
@@ -2386,6 +2380,16 @@ bool GLGizmoCut3D::PartSelection::is_one_object() const
     return std::all_of(m_parts.begin(), m_parts.end(), [this](const Part& part) {
         return part.is_modifier || part.selected == m_parts.front().selected;
     });
+}
+
+std::vector<Cut::Part> GLGizmoCut3D::PartSelection::get_cut_parts()
+{
+    std::vector<Cut::Part> parts;
+
+    for (const auto& part : m_parts)
+        parts.push_back({part.selected, part.is_modifier});
+
+    return parts;
 }
 
 
@@ -2795,11 +2799,12 @@ void GLGizmoCut3D::process_contours()
     wxBusyCursor wait;
 
     if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
-        Model tmp_model = Model();
-        tmp_model.objects = perform_cut_with_groove(model_objects[object_idx], true);
-        if (!tmp_model.objects.empty())
-            m_part_selection = PartSelection(tmp_model.objects.front(), instance_idx);
-        tmp_model = Model();
+        if (has_valid_groove()) {
+            Cut cut(model_objects[object_idx], instance_idx, get_cut_matrix(selection));
+            const ModelObjectPtrs& new_objects = cut.perform_with_groove(m_groove, m_rotation_m, true);
+            if (!new_objects.empty())
+                m_part_selection = PartSelection(new_objects.front(), instance_idx);
+        }
     }
     else {
         reset_cut_by_contours();
@@ -2989,10 +2994,10 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
         else if (mode == CutMode::cutTongueAndGroove) {
             ImGui::Separator();
             ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, m_labels_map["Groove"] + ": ");
-            render_groove_float_input(m_labels_map["Depth"], m_groove_depth, m_groove_depth_init, m_groove_depth_tolerance);
-            render_groove_float_input(m_labels_map["Width"], m_groove_width, m_groove_width_init, m_groove_width_tolerance);
-            render_groove_angle_input(m_labels_map["Flaps Angle"], m_groove_flaps_angle, m_groove_flaps_angle_init, 30.f, 120.f);
-            render_groove_angle_input(m_labels_map["Groove Angle"], m_groove_angle, m_groove_angle_init, 0.f, 15.f);
+            render_groove_float_input(m_labels_map["Depth"], m_groove.depth, m_groove.depth_init, m_groove.depth_tolerance);
+            render_groove_float_input(m_labels_map["Width"], m_groove.width, m_groove.width_init, m_groove.width_tolerance);
+            render_groove_angle_input(m_labels_map["Flaps Angle"], m_groove.flaps_angle, m_groove.flaps_angle_init, 30.f, 120.f);
+            render_groove_angle_input(m_labels_map["Groove Angle"], m_groove.angle, m_groove.angle_init, 0.f, 15.f);
 //            m_imgui->checkbox(_L("Optimize rendering"), m_optimaze_groove_rendering);
         }
 
@@ -3445,8 +3450,8 @@ bool GLGizmoCut3D::has_valid_groove() const
     if (CutMode(m_mode) != CutMode::cutTongueAndGroove)
         return true;
 
-    const float flaps_width = -2.f * m_groove_depth / tan(m_groove_flaps_angle);
-    if (flaps_width > m_groove_width)
+    const float flaps_width = -2.f * m_groove.depth / tan(m_groove.flaps_angle);
+    if (flaps_width > m_groove.width)
         return false;
 
     const Selection& selection  = m_parent.get_selection();
@@ -3553,280 +3558,6 @@ void synchronize_model_after_cut(Model& model, const CutObjectBase& cut_id)
             obj->cut_id.copy(cut_id);
 }
 
-void distribute_modifiers_from_object(ModelObject *from_obj, const int instance_idx, ModelObject *to_obj1, ModelObject *to_obj2)
-{
-    auto              obj1_bb    = to_obj1 ? to_obj1->instance_bounding_box(instance_idx) : BoundingBoxf3();
-    auto              obj2_bb    = to_obj2 ? to_obj2->instance_bounding_box(instance_idx) : BoundingBoxf3();
-    const Transform3d inst_matrix = from_obj->instances[instance_idx]->get_transformation().get_matrix();
-
-    for (ModelVolume*vol : from_obj->volumes)
-        if (!vol->is_model_part()) {
-            auto bb = vol->mesh().transformed_bounding_box(inst_matrix * vol->get_matrix());
-            // Don't add modifiers which are not intersecting with solid parts
-            if (obj1_bb.intersects(bb))
-                to_obj1->add_volume(*vol);
-            if (obj2_bb.intersects(bb))
-                to_obj2->add_volume(*vol);
-        }
-}
-
-void merge_solid_parts_inside_object(ModelObjectPtrs& objects)
-{
-    for (ModelObject* mo : objects) {
-        TriangleMesh mesh;
-        // Merge all SolidPart but not Connectors
-        for (const ModelVolume* mv : mo->volumes) {
-            if (mv->is_model_part() && !mv->is_cut_connector()) {
-                TriangleMesh m = mv->mesh();
-                m.transform(mv->get_matrix());
-                mesh.merge(m);
-            }
-        }
-        if (!mesh.empty()) {
-            ModelVolume* new_volume = mo->add_volume(mesh);
-            new_volume->name = mo->name;
-            // Delete all merged SolidPart but not Connectors
-            for (int i = int(mo->volumes.size()) - 2; i >= 0; --i) {
-                const ModelVolume* mv = mo->volumes[i];
-                if (mv->is_model_part() && !mv->is_cut_connector())
-                    mo->delete_volume(i);
-            }
-        }
-    }
-}
-
-ModelObjectPtrs GLGizmoCut3D::perform_cut_by_contour(ModelObject* cut_mo, const ModelObjectCutAttributes& attributes, int dowels_count)
-{
-    const Selection& selection = m_parent.get_selection();
-    const int instance_idx = selection.get_instance_idx();
-
-    // Clone the object to duplicate instances, materials etc.
-    ModelObject* upper{ nullptr };
-    if (m_keep_upper) cut_mo->clone_for_cut(&upper);
-    ModelObject* lower{ nullptr };
-    if (m_keep_lower) cut_mo->clone_for_cut(&lower);
-
-    const Transform3d cut_matrix = get_cut_matrix(selection);
-
-    auto add_cut_objects = [this, &instance_idx, &cut_matrix](ModelObjectPtrs& cut_objects, ModelObject* upper, ModelObject* lower) {
-        if (upper && !upper->volumes.empty()) {
-            ModelObject::reset_instance_transformation(upper, instance_idx, cut_matrix, m_place_on_cut_upper, m_rotate_upper);
-            cut_objects.push_back(upper);
-        }
-        if (lower && !lower->volumes.empty()) {
-            ModelObject::reset_instance_transformation(lower, instance_idx, cut_matrix, m_place_on_cut_lower, m_place_on_cut_lower || m_rotate_lower);
-            cut_objects.push_back(lower);
-        }
-    };
-
-    const size_t cut_parts_cnt = m_part_selection.parts().size();
-    bool has_modifiers = false;
-
-    // Distribute SolidParts to the Upper/Lower object
-    for (size_t id = 0; id < cut_parts_cnt; ++id) {
-        if (m_part_selection.parts()[id].is_modifier)
-            has_modifiers = true; // modifiers will be added later to the related parts
-        else if (ModelObject* obj = (m_part_selection.parts()[id].selected ? upper : lower))
-            obj->add_volume(*(cut_mo->volumes[id]));
-    }
-
-    if (has_modifiers) {
-        // Distribute Modifiers to the Upper/Lower object
-        distribute_modifiers_from_object(cut_mo, instance_idx, upper, lower);
-    }
-
-    ModelObjectPtrs cut_object_ptrs;
-
-    ModelVolumePtrs& volumes = cut_mo->volumes;
-    if (volumes.size() == cut_parts_cnt) {
-        // Means that object is cut without connectors
-
-        // Just add Upper and Lower objects to cut_object_ptrs
-        add_cut_objects(cut_object_ptrs, upper, lower);
-    }
-    else if (volumes.size() > cut_parts_cnt) {
-        // Means that object is cut with connectors
-
-        // All volumes are distributed to Upper / Lower object,
-        // So we don’t need them anymore
-        for (size_t id = 0; id < cut_parts_cnt; id++)
-                    delete *(volumes.begin() + id);
-        volumes.erase(volumes.begin(), volumes.begin() + cut_parts_cnt);
-
-        // Perform cut just to get connectors
-        const ModelObjectPtrs cut_connectors_obj = cut_mo->cut(instance_idx, get_cut_matrix(selection), attributes);
-        assert(dowels_count > 0 ? cut_connectors_obj.size() >= 3 : cut_connectors_obj.size() == 2);
-
-        // Connectors from upper object
-        for (const ModelVolume* volume : cut_connectors_obj[0]->volumes)
-            upper->add_volume(*volume, volume->type());
-
-        // Connectors from lower object
-        for (const ModelVolume* volume : cut_connectors_obj[1]->volumes)
-            lower->add_volume(*volume, volume->type());
-
-        // Add Upper and Lower objects to cut_object_ptrs
-        add_cut_objects(cut_object_ptrs, upper, lower);
-
-        // Add Dowel-connectors as separate objects to cut_object_ptrs
-        if (cut_connectors_obj.size() >= 3)
-            for (size_t id = 2; id < cut_connectors_obj.size(); id++)
-                cut_object_ptrs.push_back(cut_connectors_obj[id]);
-    }
-
-    // Now merge all model parts together:
-    merge_solid_parts_inside_object(cut_object_ptrs);
-
-    return cut_object_ptrs;
-}
-
-ModelObjectPtrs GLGizmoCut3D::perform_cut_with_groove(ModelObject* cut_mo, bool keep_as_parts/* = false*/)
-{
-    if (!has_valid_groove())
-        return {};
-
-    const Selection& selection = m_parent.get_selection();
-    const int instance_idx = selection.get_instance_idx();
-
-    // Clone the object to duplicate instances, materials etc.
-    ModelObject* upper{ nullptr };
-    cut_mo->clone_for_cut(&upper);
-    ModelObject* lower{ nullptr };
-    cut_mo->clone_for_cut(&lower);
-
-    const double groove_half_depth = 0.5 * double(m_groove_depth);
-
-    const Transform3d cut_matrix = get_cut_matrix(selection);
-
-    Model tmp_model_for_cut = Model();
-
-    Model tmp_model = Model();
-    tmp_model.add_object(*cut_mo);
-    ModelObject* tmp_object = tmp_model.objects.front();
-
-    auto add_volumes_from_cut = [](ModelObject* object, const ModelObjectCutAttribute attribute, const Model& tmp_model_for_cut) {
-        const auto& volumes = tmp_model_for_cut.objects.front()->volumes;
-        for (const ModelVolume* volume : volumes)
-            if (volume->is_model_part()) {
-                if ((attribute == ModelObjectCutAttribute::KeepUpper &&  volume->is_from_upper()) ||
-                    (attribute != ModelObjectCutAttribute::KeepUpper && !volume->is_from_upper()) ) {
-                    ModelVolume* new_vol = object->add_volume(*volume);
-                    new_vol->reset_from_upper();
-                }
-            }
-    };
-
-    auto cut =  [instance_idx, add_volumes_from_cut]
-                (ModelObject* object, const Transform3d& cut_matrix, const ModelObjectCutAttribute add_volumes_attribute, Model& tmp_model_for_cut) {
-        Model model = Model();
-        model.add_object(*object);
-
-        tmp_model_for_cut = Model();
-        tmp_model_for_cut.objects = model.objects.front()->cut(instance_idx, cut_matrix, ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepAsParts);
-        assert(!tmp_model_for_cut.objects.empty());
-
-        object->clear_volumes();
-        add_volumes_from_cut(object, add_volumes_attribute, tmp_model_for_cut);
-        ModelObject::reset_instance_transformation(object, instance_idx);
-    };
-
-    // cut by upper plane
-
-    const Transform3d cut_matrix_upper = translation_transform(m_rotation_m * (groove_half_depth * Vec3d::UnitZ())) * cut_matrix;
-    {
-        cut(tmp_object, cut_matrix_upper, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
-        add_volumes_from_cut(upper, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
-    }
-
-    // cut by lower plane
-
-    const Transform3d cut_matrix_lower = translation_transform(m_rotation_m * (-groove_half_depth * Vec3d::UnitZ())) * cut_matrix;
-    {
-        cut(tmp_object, cut_matrix_lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
-        add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
-    }
-
-    // cut middle part with 2 angles and add parts to related upper/lower objects
-
-    const double h_side_shift = 0.5 * double(m_groove_width + m_groove_depth / tan(m_groove_flaps_angle));
-
-    // cut by angle1 plane
-    {
-        const Transform3d cut_matrix_angle1 = translation_transform(m_rotation_m * (-h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, -m_groove_flaps_angle, -m_groove_angle));
-
-        cut(tmp_object, cut_matrix_angle1, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
-        add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
-    }
-
-    // cut by angle2 plane
-    {
-        const Transform3d cut_matrix_angle2 = translation_transform(m_rotation_m * (h_side_shift * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, m_groove_flaps_angle, m_groove_angle));
-
-        cut(tmp_object, cut_matrix_angle2, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
-        add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
-    }
-
-    // apply tolerance to the middle part
-    {
-        const double h_groove_shift_tolerance = groove_half_depth - (double)m_groove_depth_tolerance;
-
-        const Transform3d cut_matrix_lower_tolerance = translation_transform(m_rotation_m * (-h_groove_shift_tolerance * Vec3d::UnitZ())) * cut_matrix;
-        cut(tmp_object, cut_matrix_lower_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
-
-        const double h_side_shift_tolerance = h_side_shift - 0.5 * double(m_groove_width_tolerance);
-
-        const Transform3d cut_matrix_angle1_tolerance = translation_transform(m_rotation_m * (-h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, -m_groove_flaps_angle, -m_groove_angle));
-        cut(tmp_object, cut_matrix_angle1_tolerance, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
-
-        const Transform3d cut_matrix_angle2_tolerance = translation_transform(m_rotation_m * (h_side_shift_tolerance * Vec3d::UnitX())) * cut_matrix * rotation_transform(Vec3d(0, m_groove_flaps_angle, m_groove_angle));
-        cut(tmp_object, cut_matrix_angle2_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
-    }
-
-    // this part can be added to the upper object now
-    add_volumes_from_cut(upper, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
-
-    ModelObjectPtrs cut_object_ptrs;
-
-    if (keep_as_parts) {
-        // add volumes from lower object to the upper, but mark them as a lower
-        const auto& volumes = lower->volumes;
-        for (const ModelVolume* volume : volumes) {
-            ModelVolume* new_vol = upper->add_volume(*volume);
-            new_vol->cut_info.is_from_upper = false;
-        }
-
-        // add modifiers
-        for (const ModelVolume* volume : cut_mo->volumes)
-            if (!volume->is_model_part())
-                upper->add_volume(*volume);
-
-        cut_object_ptrs.push_back(upper);
-
-        // add lower object to the cut_object_ptrs just to correct delete it from the Model destructor and avoid memory leaks
-        cut_object_ptrs.push_back(lower);
-    }
-    else {
-        // add modifiers if object has any
-        for (const ModelVolume* volume : cut_mo->volumes)
-            if (!volume->is_model_part()) {
-                distribute_modifiers_from_object(cut_mo, instance_idx, upper, lower);
-                break;
-            }
-
-        assert(!upper->volumes.empty() && !lower->volumes.empty());
-
-        ModelObject::reset_instance_transformation(upper, instance_idx, cut_matrix_upper, m_place_on_cut_upper, m_rotate_upper);
-        cut_object_ptrs.push_back(upper);
-        ModelObject::reset_instance_transformation(lower, instance_idx, cut_matrix_lower, m_place_on_cut_upper, m_rotate_upper);
-        cut_object_ptrs.push_back(lower);
-
-        // Now merge all model parts together:
-        merge_solid_parts_inside_object(cut_object_ptrs);
-    }
-
-    return cut_object_ptrs;
-}
-
 void GLGizmoCut3D::perform_cut(const Selection& selection)
 {
     if (!can_perform_cut())
@@ -3867,8 +3598,6 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
 
         wxBusyCursor wait;
 
-        const Transform3d cut_matrix = get_cut_matrix(selection);
-
         ModelObjectCutAttributes attributes = only_if(has_connectors ? true : m_keep_upper, ModelObjectCutAttribute::KeepUpper) |
                                               only_if(has_connectors ? true : m_keep_lower, ModelObjectCutAttribute::KeepLower) |
                                               only_if(has_connectors ? false : m_keep_as_parts, ModelObjectCutAttribute::KeepAsParts) |
@@ -3882,16 +3611,15 @@ void GLGizmoCut3D::perform_cut(const Selection& selection)
         // update cut_id for the cut object in respect to the attributes
         update_object_cut_id(cut_mo->cut_id, attributes, dowels_count);
 
-        Model tmp_model = Model();
-        tmp_model.objects               = cut_by_contour    ? perform_cut_by_contour(cut_mo, attributes, dowels_count) :
-                                          cut_with_groove   ? perform_cut_with_groove(cut_mo) :
-                                                              cut_mo->cut(instance_idx, cut_matrix, attributes);
-
+        Cut cut(cut_mo, instance_idx, get_cut_matrix(selection), attributes);
+        const ModelObjectPtrs& new_objects = cut_by_contour    ? cut.perform_by_contour(m_part_selection.get_cut_parts(), dowels_count):
+                                             cut_with_groove   ? cut.perform_with_groove(m_groove, m_rotation_m) :
+                                                                 cut.perform_with_plane();
         // save cut_id to post update synchronization
         const CutObjectBase cut_id = cut_mo->cut_id;
 
         // update cut results on plater and in the model 
-        plater->cut(object_idx, tmp_model.objects);
+        plater->apply_cut_object_to_model(object_idx, new_objects);
 
         synchronize_model_after_cut(plater->model(), cut_id);
     }

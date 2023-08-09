@@ -7,6 +7,7 @@
 #include "slic3r/GUI/I18N.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Model.hpp"
+#include "libslic3r/CutUtils.hpp"
 #include "imgui/imgui.h"
 
 namespace Slic3r {
@@ -118,16 +119,7 @@ class GLGizmoCut3D : public GLGizmoBase
     bool m_rotate_lower{ false };
 
     // Input params for cut with tongue and groove
-    float m_groove_depth;
-    float m_groove_width;
-    float m_groove_flaps_angle;
-    float m_groove_angle;
-    float m_groove_depth_init;
-    float m_groove_width_init;
-    float m_groove_flaps_angle_init;
-    float m_groove_angle_init;
-    float m_groove_depth_tolerance{ 0.1f };
-    float m_groove_width_tolerance{ 0.1f };
+    Cut::Groove m_groove;
     bool  m_optimaze_groove_rendering{ true };
 
     // Input params for cut with snaps
@@ -186,6 +178,8 @@ class GLGizmoCut3D : public GLGizmoBase
         bool is_one_object() const;
         const std::vector<Part>& parts() const { return m_parts; }
         const std::vector<size_t>* get_ignored_contours_ptr() const { return (valid() ? &m_ignored_contours : nullptr); }
+
+        std::vector<Cut::Part> get_cut_parts();
 
     private:
         Model m_model;
@@ -367,8 +361,6 @@ private:
     void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix, double line_len_koef = 1.0);
     void render_cut_plane_grabbers();
     void render_cut_line();
-    ModelObjectPtrs perform_cut_by_contour(ModelObject* cut_mo, const ModelObjectCutAttributes& attributes, int dowels_count);
-    ModelObjectPtrs perform_cut_with_groove(ModelObject* cut_mo, bool keep_as_parts = false);
     void perform_cut(const Selection&selection);
     void set_center_pos(const Vec3d&center_pos, bool update_tbb = false);
     void update_bb();
