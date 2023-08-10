@@ -10,7 +10,7 @@ else()
     set(_build_static ON)
 endif()
 
-prusaslicer_add_cmake_project(Blosc
+add_cmake_project(Blosc
     #URL https://github.com/Blosc/c-blosc/archive/refs/tags/v1.17.0.zip
     #URL_HASH SHA256=7463a1df566704f212263312717ab2c36b45d45cba6cd0dccebf91b2cc4b4da9
     URL https://github.com/tamasmeszaros/c-blosc/archive/refs/heads/v1.17.0_tm.zip
@@ -26,7 +26,3 @@ prusaslicer_add_cmake_project(Blosc
         -DBUILD_BENCHMARKS=OFF 
         -DPREFER_EXTERNAL_ZLIB=ON
 )
-
-if (MSVC)
-    add_debug_dep(dep_Blosc)
-endif ()

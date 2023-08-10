@@ -1,10 +1,7 @@
-#/|/ Copyright (c) Prusa Research 2020 - 2023 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv
-#/|/ Copyright (c) 2020 Bertrand Giot @bgiot
-#/|/
-#/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-#/|/
 set(_wx_toolkit "")
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    option(DEP_WX_GTK3 "Build wxWidgets for GTK3 instead of GTK2" OFF)
+
     set(_gtk_ver 2)
     if (DEP_WX_GTK3)
         set(_gtk_ver 3)
@@ -17,10 +14,9 @@ if (UNIX AND NOT APPLE) # wxWidgets will not use char as the underlying type for
     set (_unicode_utf8 ON)
 endif()
 
-prusaslicer_add_cmake_project(wxWidgets
+add_cmake_project(wxWidgets
     URL https://github.com/prusa3d/wxWidgets/archive/78aa2dc0ea7ce99dc19adc1140f74c3e2e3f3a26.zip
     URL_HASH SHA256=94b7d972373503e380e5a8b0ca63b1ccb956da4006402298dd89a0c5c7041b1e
-    DEPENDS ${PNG_PKG} ${ZLIB_PKG} ${EXPAT_PKG} dep_TIFF dep_JPEG dep_NanoSVG
     CMAKE_ARGS
         -DwxBUILD_PRECOMP=ON
         ${_wx_toolkit}
@@ -46,6 +42,4 @@ prusaslicer_add_cmake_project(wxWidgets
         -DwxUSE_WEBREQUEST=OFF
 )
 
-if (MSVC)
-    add_debug_dep(dep_wxWidgets)
-endif ()
+set(DEP_wxWidgets_DEPENDS ZLIB PNG EXPAT TIFF JPEG NanoSVG)

@@ -1,7 +1,3 @@
-#/|/ Copyright (c) Prusa Research 2021 - 2022 Tomáš Mészáros @tamasmeszaros
-#/|/
-#/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-#/|/
 set(_curl_platform_flags 
   -DENABLE_IPV6:BOOL=ON
   -DENABLE_VERSIONED_SYMBOLS:BOOL=ON
@@ -60,12 +56,11 @@ if (UNIX AND NOT APPLE)
   set (_patch_command echo set_target_properties(CURL::libcurl PROPERTIES INTERFACE_COMPILE_DEFINITIONS OPENSSL_CERT_OVERRIDE) >> CMake/curl-config.cmake.in)
 endif ()
 
-prusaslicer_add_cmake_project(CURL
+add_cmake_project(CURL
   # GIT_REPOSITORY      https://github.com/curl/curl.git
   # GIT_TAG             curl-7_75_0
   URL                 https://github.com/curl/curl/archive/refs/tags/curl-7_75_0.zip
   URL_HASH            SHA256=a63ae025bb0a14f119e73250f2c923f4bf89aa93b8d4fafa4a9f5353a96a765a
-  DEPENDS             ${ZLIB_PKG}
   # PATCH_COMMAND       ${GIT_EXECUTABLE} checkout -f -- . && git clean -df && 
   #                     ${GIT_EXECUTABLE} apply --whitespace=fix ${CMAKE_CURRENT_LIST_DIR}/curl-mods.patch
   PATCH_COMMAND       "${_patch_command}"
@@ -75,10 +70,8 @@ prusaslicer_add_cmake_project(CURL
     ${_curl_platform_flags}
 )
 
+set(DEP_CURL_DEPENDS ZLIB)
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  add_dependencies(dep_CURL dep_OpenSSL)
+  list(APPEND DEP_CURL_DEPENDS OpenSSL)
 endif ()
 
-if (MSVC)
-    add_debug_dep(dep_CURL)
-endif ()
