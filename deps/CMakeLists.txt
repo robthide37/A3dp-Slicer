@@ -74,6 +74,22 @@ else ()
 endif ()
 
 if (APPLE)
+    if (CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(DEP_OSX_TARGET "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+        dep_message(STATUS "OS X Deployment Target: ${DEP_OSX_TARGET}")
+    else ()
+        # Attempt to infer the SDK version from the CMAKE_OSX_SYSROOT,
+        # this is done because wxWidgets need the min version explicitly set
+        string(REGEX MATCH "[0-9]+[.][0-9]+[.]sdk$" DEP_OSX_TARGET "${CMAKE_OSX_SYSROOT}")
+        string(REGEX MATCH "^[0-9]+[.][0-9]+" DEP_OSX_TARGET "${DEP_OSX_TARGET}")
+
+        if (NOT DEP_OSX_TARGET)
+            message(FATAL_ERROR "Could not determine OS X SDK version. Please use -DCMAKE_OSX_DEPLOYMENT_TARGET=<version>")
+        endif ()
+
+        dep_message(STATUS "OS X Deployment Target (inferred from SDK): ${DEP_OSX_TARGET}")
+    endif ()
+
     # This ensures dependencies don't use SDK features which are not available in the version specified by Deployment target
     # That can happen when one uses a recent SDK but specifies an older Deployment target
     set(DEP_WERRORS_SDK "-Werror=partial-availability -Werror=unguarded-availability -Werror=unguarded-availability-new")
