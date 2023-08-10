@@ -1622,8 +1622,10 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloat(0.));
 
     def = this->add("mmu_segmented_region_interlocking_depth", coFloat);
-    def->label = L("Maximum interlocking depth of a segmented region");
-    def->tooltip = L("Maximum interlocking depth of a segmented region. Zero disables this feature.");
+    def->label = L("Interlocking depth of a segmented region");
+    def->tooltip = L("Interlocking depth of a segmented region. It will be ignored if "
+                       "\"mmu_segmented_region_max_width\" is zero or if \"mmu_segmented_region_interlocking_depth\""
+                       "is bigger then \"mmu_segmented_region_max_width\". Zero disables this feature.");
     def->sidetext = L("mm (zero to disable)");
     def->min = 0;
     def->category = L("Advanced");
