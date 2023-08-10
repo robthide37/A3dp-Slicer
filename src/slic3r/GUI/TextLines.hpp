@@ -17,9 +17,6 @@ namespace Slic3r::GUI {
 class TextLinesModel
 {
 public:
-    // line offset in y direction (up/down)
-    float offset = 0;
-
     /// <summary>
     /// Initialize model and lines
     /// </summary>
@@ -41,6 +38,11 @@ private:
 
     // Keep model for visualization text lines
     GLModel m_model;
+
+    // Used to move slice (text line) on place where is approx vertical center of text
+    // When copy value const double ASCENT_CENTER from Emboss.cpp and Vertical align is center than
+    // text line will cross object center 
+    const double ascent_ratio_offset = 1/3.;
 };
 
 } // namespace Slic3r::GUI
