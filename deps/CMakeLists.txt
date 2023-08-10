@@ -93,6 +93,7 @@ list_projects(FOUND_PACKAGES ${CMAKE_CURRENT_LIST_DIR})
 
 dep_message(STATUS "Found external package definitions: ${FOUND_PACKAGES}")
 
+# Current list of required dependencies for PS
 set(REQUIRED_PACKAGES
     Boost
     Catch2
@@ -167,7 +168,7 @@ list(REMOVE_DUPLICATES _build_list)
 dep_message(STATUS "Building dep targets (${CMAKE_BUILD_TYPE}): ${_build_list}")
 add_custom_target(deps ALL DEPENDS ${_dep_list})
 
-# Support legacy option DEP_DEBUG on MSVC to build debug libraries in the same cmake run as for Release:
+# Support legacy option DEP_DEBUG on MSVC to build debug libraries in the same cmake run as for CMAKE_BUILD_TYPE:
 if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(_build_list_dbg "")
   foreach (t ${_build_list})

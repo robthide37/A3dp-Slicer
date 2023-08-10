@@ -10,6 +10,8 @@ if (NOT CMAKE_BUILD_TYPE)
     message(STATUS "Forcing CMAKE_BUILD_TYPE to Release as it was not specified.")
 endif ()
 
+# The value of CMAKE_BUILD_TYPE will be used for building each dependency even if the 
+# generator is multi-config. Use this var to specify build type regardless of the generator. 
 function(add_cmake_project projectname)
     cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND" "CMAKE_ARGS" ${ARGN})
 
