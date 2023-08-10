@@ -22,6 +22,7 @@ prusaslicer_add_cmake_project(LibBGCode
     DEPENDS dep_LibBGCode_deps
     CMAKE_ARGS
         -DLibBGCode_BUILD_TESTS:BOOL=OFF
+        -DLibBGCode_BUILD_CMD_TOOL:BOOL=OFF
 )
 
 if (MSVC)
