@@ -229,6 +229,7 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_custom_target(${pkgtgt}_debug
       COMMAND ${CMAKE_COMMAND} --build . --target ${pkgtgt}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild
+      USES_TERMINAL
     )
     add_dependencies(deps_debug ${pkgtgt}_debug)
   endforeach()
