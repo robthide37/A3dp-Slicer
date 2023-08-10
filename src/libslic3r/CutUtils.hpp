@@ -26,6 +26,10 @@ class Cut {
     const Transform3d&          m_cut_matrix;
     ModelObjectCutAttributes    m_attributes;
 
+    void post_process(ModelObject* object, ModelObjectPtrs& objects, bool keep, bool place_on_cut, bool flip);
+    void post_process(ModelObject* upper_object, ModelObject* lower_object, ModelObjectPtrs& objects);
+    void finalize(const ModelObjectPtrs& objects);
+
 public:
 
     Cut(const ModelObject* object, int instance, const Transform3d& cut_matrix, 

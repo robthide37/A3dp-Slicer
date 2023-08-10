@@ -243,6 +243,42 @@ Cut::Cut(const ModelObject* object, int instance, const Transform3d& cut_matrix,
         m_model.add_object(*object);
 }
 
+void Cut::post_process(ModelObject* object, ModelObjectPtrs& cut_object_ptrs, bool keep, bool place_on_cut, bool flip)
+{
+    if (!object) return;
+
+    if (keep && !object->volumes.empty()) {
+        reset_instance_transformation(object, m_instance, m_cut_matrix, place_on_cut, flip);
+        cut_object_ptrs.push_back(object);
+    }
+    else
+        m_model.objects.push_back(object); // will be deleted in m_model.clear_objects();
+}
+
+void Cut::post_process(ModelObject* upper, ModelObject* lower, ModelObjectPtrs& cut_object_ptrs)
+{
+    post_process(upper, cut_object_ptrs,
+        m_attributes.has(ModelObjectCutAttribute::KeepUpper),
+        m_attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper),
+        m_attributes.has(ModelObjectCutAttribute::FlipUpper));
+
+    post_process(lower, cut_object_ptrs,
+        m_attributes.has(ModelObjectCutAttribute::KeepLower),
+        m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),
+        m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) || m_attributes.has(ModelObjectCutAttribute::FlipLower));
+}
+
+
+void Cut::finalize(const ModelObjectPtrs& objects)
+{
+    //clear model from temporarry objects
+    m_model.clear_objects();
+
+    // add to model result objects
+    m_model.objects = objects;
+}
+
+
 const ModelObjectPtrs& Cut::perform_with_plane()
 {
     if (!m_attributes.has(ModelObjectCutAttribute::KeepUpper) && !m_attributes.has(ModelObjectCutAttribute::KeepLower)) {
@@ -317,25 +353,13 @@ const ModelObjectPtrs& Cut::perform_with_plane()
                 }
         };
 
-        if (m_attributes.has(ModelObjectCutAttribute::KeepUpper) && !upper->volumes.empty()) {
-            delete_extra_modifiers(upper);
-            reset_instance_transformation(upper, m_instance, m_cut_matrix,
-                m_attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper),
-                m_attributes.has(ModelObjectCutAttribute::FlipUpper));
-            cut_object_ptrs.push_back(upper);
-        }
-
-        if (m_attributes.has(ModelObjectCutAttribute::KeepLower) && !lower->volumes.empty()) {
-            delete_extra_modifiers(lower);
-            reset_instance_transformation(lower, m_instance, m_cut_matrix,
-                m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),
-                m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) || m_attributes.has(ModelObjectCutAttribute::FlipLower));
-            cut_object_ptrs.push_back(lower);
-        }
+        post_process(upper, lower, cut_object_ptrs);
+        delete_extra_modifiers(upper);
+        delete_extra_modifiers(lower);
 
         if (m_attributes.has(ModelObjectCutAttribute::CreateDowels) && !dowels.empty()) {
             for (auto dowel : dowels) {
-                reset_instance_transformation(dowel, m_instance, Transform3d::Identity());
+                reset_instance_transformation(dowel, m_instance);
                 dowel->name += "-Dowel-" + dowel->volumes[0]->name;
                 cut_object_ptrs.push_back(dowel);
             }
@@ -344,8 +368,7 @@ const ModelObjectPtrs& Cut::perform_with_plane()
 
     BOOST_LOG_TRIVIAL(trace) << "ModelObject::cut - end";
 
-    m_model.clear_objects();
-    m_model.objects = cut_object_ptrs;
+    finalize(cut_object_ptrs);
 
     return m_model.objects;
 }
@@ -403,17 +426,6 @@ const ModelObjectPtrs& Cut::perform_by_contour(std::vector<Part> parts, int dowe
     ModelObject* lower{ nullptr };
     if (m_attributes.has(ModelObjectCutAttribute::KeepLower)) cut_mo->clone_for_cut(&lower);
 
-    auto add_cut_objects = [this](ModelObjectPtrs& cut_objects, ModelObject* upper, ModelObject* lower) {
-        if (upper && !upper->volumes.empty()) {
-            reset_instance_transformation(upper, m_instance, m_cut_matrix, m_attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper), m_attributes.has(ModelObjectCutAttribute::FlipUpper));
-            cut_objects.push_back(upper);
-        }
-        if (lower && !lower->volumes.empty()) {
-            reset_instance_transformation(lower, m_instance, m_cut_matrix, m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower), m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) || m_attributes.has(ModelObjectCutAttribute::FlipLower));
-            cut_objects.push_back(lower);
-        }
-    };
-
     const size_t cut_parts_cnt = parts.size();
     bool has_modifiers = false;
 
@@ -437,7 +449,7 @@ const ModelObjectPtrs& Cut::perform_by_contour(std::vector<Part> parts, int dowe
         // Means that object is cut without connectors
 
         // Just add Upper and Lower objects to cut_object_ptrs
-        add_cut_objects(cut_object_ptrs, upper, lower);
+        post_process(upper, lower, cut_object_ptrs);
     }
     else if (volumes.size() > cut_parts_cnt) {
         // Means that object is cut with connectors
@@ -462,7 +474,7 @@ const ModelObjectPtrs& Cut::perform_by_contour(std::vector<Part> parts, int dowe
             lower->add_volume(*volume, volume->type());
 
         // Add Upper and Lower objects to cut_object_ptrs
-        add_cut_objects(cut_object_ptrs, upper, lower);
+        post_process(upper, lower, cut_object_ptrs);
 
         // Add Dowel-connectors as separate objects to cut_object_ptrs
         if (cut_connectors_obj.size() >= 3)
@@ -473,8 +485,7 @@ const ModelObjectPtrs& Cut::perform_by_contour(std::vector<Part> parts, int dowe
     // Now merge all model parts together:
     merge_solid_parts_inside_object(cut_object_ptrs);
 
-    m_model.clear_objects();
-    m_model.objects = cut_object_ptrs;
+    finalize(cut_object_ptrs);
 
     return m_model.objects;
 }
@@ -608,28 +619,15 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
 
         assert(!upper->volumes.empty() && !lower->volumes.empty());
 
-        // check which parts have to stay/be deleted
+        // Add Upper and Lower parts to cut_object_ptrs
 
-        if (m_attributes.has(ModelObjectCutAttribute::KeepUpper)) {
-            reset_instance_transformation(upper, m_instance, m_cut_matrix, m_attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper), m_attributes.has(ModelObjectCutAttribute::FlipUpper));
-            cut_object_ptrs.push_back(upper);
-        }
-        else
-            m_model.objects.push_back(upper); // will be deleted in m_model.clear_objects();
-
-        if (m_attributes.has(ModelObjectCutAttribute::KeepLower)) {
-            reset_instance_transformation(lower, m_instance, m_cut_matrix, m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower), m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) || m_attributes.has(ModelObjectCutAttribute::FlipLower));
-            cut_object_ptrs.push_back(lower);
-        }
-        else
-            m_model.objects.push_back(lower); // will be deleted in m_model.clear_objects();
+        post_process(upper, lower, cut_object_ptrs);
 
         // Now merge all model parts together:
         merge_solid_parts_inside_object(cut_object_ptrs);
     }
 
-    m_model.clear_objects();
-    m_model.objects = cut_object_ptrs;
+    finalize(cut_object_ptrs);
 
     return m_model.objects;
 }
