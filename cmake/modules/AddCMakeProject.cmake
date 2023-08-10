@@ -14,9 +14,14 @@ endif ()
 # The value of CMAKE_BUILD_TYPE will be used for building each dependency even if the 
 # generator is multi-config. Use this var to specify build type regardless of the generator. 
 function(add_cmake_project projectname)
-    cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND;MAX_THREADS" "CMAKE_ARGS" ${ARGN})
+    cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND" "CMAKE_ARGS" ${ARGN})
 
-    set(_pcount ${P_ARGS_MAX_THREADS})
+    set(_pcount ${DEP_${projectname}_MAX_THREADS})
+
+    if (NOT _pcount)
+        set(_pcount ${DEP_MAX_THREADS})
+    endif ()
+
     if (NOT _pcount)
         ProcessorCount(_pcount)
     endif ()

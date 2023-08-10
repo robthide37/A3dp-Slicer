@@ -213,13 +213,15 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   foreach (t ${_build_list})
     list(APPEND _build_list_dbg ${t}_debug)
   endforeach()
-  dep_message(STATUS "Building dep targets (Debug): ${_build_list_dbg}")
 
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild)
   execute_process(
     COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR} -G${CMAKE_GENERATOR} -DCMAKE_BUILD_TYPE=Debug -DDEP_DOWNLOAD_DIR=${DEP_DOWNLOAD_DIR} -DDESTDIR=${DESTDIR} -DDEP_MESSAGES_WRITTEN=ON
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild 
+    OUTPUT_QUIET
   )
+
+  dep_message(STATUS "Building dep targets (Debug): ${_build_list_dbg}")
 
   # Can be used to build only the debug libs
   add_custom_target(deps_debug ALL)
