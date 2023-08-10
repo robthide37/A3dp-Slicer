@@ -1,4 +1,5 @@
 include(ExternalProject)
+include(ProcessorCount)
 
 set(DESTDIR "${CMAKE_CURRENT_BINARY_DIR}/destdir" CACHE PATH "Destination directory")
 set(DEP_DOWNLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR} CACHE PATH "Path for downloaded source packages.")
@@ -13,7 +14,21 @@ endif ()
 # The value of CMAKE_BUILD_TYPE will be used for building each dependency even if the 
 # generator is multi-config. Use this var to specify build type regardless of the generator. 
 function(add_cmake_project projectname)
-    cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND" "CMAKE_ARGS" ${ARGN})
+    cmake_parse_arguments(P_ARGS "" "INSTALL_DIR;BUILD_COMMAND;INSTALL_COMMAND;MAX_THREADS" "CMAKE_ARGS" ${ARGN})
+
+    set(_pcount ${P_ARGS_MAX_THREADS})
+    if (NOT _pcount)
+        ProcessorCount(_pcount)
+    endif ()
+
+    if (_pcount EQUAL 0)
+        set(_pcount 1)
+    endif ()
+
+    set(_build_j "-j${_pcount}")
+    if (CMAKE_GENERATOR MATCHES "Visual Studio")
+        set(_build_j "/m:${_pcount}")
+    endif ()
 
     set(_configs_line -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE})
     if (_is_multi)
@@ -38,7 +53,7 @@ function(add_cmake_project projectname)
             ${DEP_CMAKE_OPTS}
             ${P_ARGS_CMAKE_ARGS}
        ${P_ARGS_UNPARSED_ARGUMENTS}
-       BUILD_COMMAND ${CMAKE_COMMAND} --build . --config ${CMAKE_BUILD_TYPE}
+       BUILD_COMMAND ${CMAKE_COMMAND} --build . --config ${CMAKE_BUILD_TYPE} -- ${_build_j}
        INSTALL_COMMAND ${CMAKE_COMMAND} --build . --target install --config ${CMAKE_BUILD_TYPE}
     )
 
