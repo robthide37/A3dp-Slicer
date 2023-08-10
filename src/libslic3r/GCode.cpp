@@ -1157,16 +1157,62 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
         for (size_t i = 0; i < print.config().filament_type.values.size(); ++i) {
             filament_types_str += print.config().filament_type.values[i];
             if (i < print.config().filament_type.values.size() - 1)
-                filament_types_str += ", ";
+                filament_types_str += ";";
         }
         binary_data.printer_metadata.raw_data.emplace_back("filament_type", filament_types_str); // duplicated into config data
-        std::string nozzle_diameters_str;
         char buf[1024];
+        std::string nozzle_diameters_str;
         for (size_t i = 0; i < print.config().nozzle_diameter.values.size(); ++i) {
-            sprintf(buf, i < print.config().nozzle_diameter.values.size() - 1 ? "%.2lf, " : "%.2lf", print.config().nozzle_diameter.values[i]);
+            sprintf(buf, i < print.config().nozzle_diameter.values.size() - 1 ? "%.2g," : "%.2g", print.config().nozzle_diameter.values[i]);
             nozzle_diameters_str += buf;
         }
         binary_data.printer_metadata.raw_data.emplace_back("nozzle_diameter", nozzle_diameters_str); // duplicated into config data
+        std::string bed_temperatures_str;
+        for (size_t i = 0; i < print.config().bed_temperature.values.size(); ++i) {
+            sprintf(buf, i < print.config().bed_temperature.values.size() - 1 ? "%d," : "%d", print.config().bed_temperature.values[i]);
+            bed_temperatures_str += buf;
+        }
+        binary_data.printer_metadata.raw_data.emplace_back("bed_temperature", bed_temperatures_str); // duplicated into config data
+
+        const DynamicPrintConfig& cfg = print.full_print_config();
+        if (auto opt = cfg.option("brim_width"); opt != nullptr) {
+            sprintf(buf, "%.2g", dynamic_cast<const ConfigOptionFloat*>(opt)->value);
+            binary_data.printer_metadata.raw_data.emplace_back("brim_width", buf); // duplicated into config data
+        }
+        if (auto opt = cfg.option("fill_density"); opt != nullptr) {
+            sprintf(buf, "%.2g%%", dynamic_cast<const ConfigOptionPercent*>(opt)->value);
+            binary_data.printer_metadata.raw_data.emplace_back("fill_density", buf); // duplicated into config data
+        }
+        if (auto opt = cfg.option("layer_height"); opt != nullptr) {
+            sprintf(buf, "%.2g", dynamic_cast<const ConfigOptionFloat*>(opt)->value);
+            binary_data.printer_metadata.raw_data.emplace_back("layer_height", buf); // duplicated into config data
+        }
+        if (auto opt = cfg.option("temperature"); opt != nullptr) {
+            auto values = dynamic_cast<const ConfigOptionInts*>(opt)->values;
+            std::string temperatures_str;
+            for (size_t i = 0; i < values.size(); ++i) {
+                sprintf(buf, i < values.size() - 1 ? "%d," : "%d", values[i]);
+                temperatures_str += buf;
+            }
+            binary_data.printer_metadata.raw_data.emplace_back("temperature", temperatures_str); // duplicated into config data
+        }
+        if (auto opt = cfg.option("ironing"); opt != nullptr)
+            binary_data.printer_metadata.raw_data.emplace_back("ironing", dynamic_cast<const ConfigOptionBool*>(opt)->value ? "1" : "0"); // duplicated into config data
+        if (auto opt = cfg.option("support_material"); opt != nullptr)
+            binary_data.printer_metadata.raw_data.emplace_back("support_material", dynamic_cast<const ConfigOptionBool*>(opt)->value ? "1" : "0"); // duplicated into config data
+        if (auto opt = cfg.option("extruder_colour"); opt != nullptr) {
+            auto values = dynamic_cast<const ConfigOptionStrings*>(opt)->values;
+            std::string extruder_colours_str;
+            if (values.size() == 1 && values.front().empty())
+                extruder_colours_str = "\"\"";
+            else {
+                for (size_t i = 0; i < values.size(); ++i) {
+                    sprintf(buf, i < values.size() - 1 ? "%s;" : "%s", values[i].c_str());
+                    extruder_colours_str += buf;
+                }
+            }
+            binary_data.printer_metadata.raw_data.emplace_back("extruder_colour", extruder_colours_str); // duplicated into config data
+        }
     }
 
     // modifies m_silent_time_estimator_enabled
@@ -1613,7 +1659,10 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
     if (export_to_binary_gcode) {
         bgcode::binarize::BinaryData& binary_data = m_processor.get_binary_data();
         if (print.m_print_statistics.total_toolchanges > 0)
-            binary_data.print_metadata.raw_data.push_back({ "total toolchanges", std::to_string(print.m_print_statistics.total_toolchanges) });
+            binary_data.print_metadata.raw_data.emplace_back("total toolchanges", std::to_string(print.m_print_statistics.total_toolchanges));
+        char buf[1024];
+        sprintf(buf, "%.2lf", m_max_layer_z);
+        binary_data.printer_metadata.raw_data.emplace_back("max_layer_z", buf);
     }
     else {
 #else

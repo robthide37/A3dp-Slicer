@@ -3686,15 +3686,17 @@ void GCodeProcessor::post_process()
 
         // update binary data
         bgcode::binarize::BinaryData& binary_data = m_binarizer.get_binary_data();
-        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedMm, stringify(filament_mm) });
-        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedCm3, stringify(filament_cm3) });
-        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedG, stringify(filament_g) });
-        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::FilamentCost, stringify(filament_cost) });
-        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::TotalFilamentUsedG, stringify({ filament_total_g }) });
-        binary_data.print_metadata.raw_data.push_back({ PrintStatistics::TotalFilamentCost, stringify({ filament_total_cost }) });
+        binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedMm, stringify(filament_mm));
+        binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedCm3, stringify(filament_cm3));
+        binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedG, stringify(filament_g));
+        binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::FilamentCost, stringify(filament_cost));
+        binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentUsedG, stringify({ filament_total_g }));
+        binary_data.print_metadata.raw_data.emplace_back(PrintStatistics::TotalFilamentCost, stringify({ filament_total_cost }));
 
-        binary_data.printer_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedMm, stringify(filament_mm) }); // duplicated into print metadata
-        binary_data.printer_metadata.raw_data.push_back({ PrintStatistics::FilamentUsedG, stringify(filament_g) });   // duplicated into print metadata
+        binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedMm, stringify(filament_mm)); // duplicated into print metadata
+        binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedG, stringify(filament_g));   // duplicated into print metadata
+        binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentCost, stringify(filament_cost));   // duplicated into print metadata
+        binary_data.printer_metadata.raw_data.emplace_back(PrintStatistics::FilamentUsedCm3, stringify(filament_cm3)); // duplicated into print metadata
 
         for (size_t i = 0; i < static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Count); ++i) {
             const TimeMachine& machine = m_time_processor.machines[i];
@@ -3702,10 +3704,10 @@ void GCodeProcessor::post_process()
             if (mode == PrintEstimatedStatistics::ETimeMode::Normal || machine.enabled) {
                 char buf[128];
                 sprintf(buf, "(%s mode)", (mode == PrintEstimatedStatistics::ETimeMode::Normal) ? "normal" : "silent");
-                binary_data.print_metadata.raw_data.push_back({ "estimated printing time " + std::string(buf), get_time_dhms(machine.time) });
-                binary_data.print_metadata.raw_data.push_back({ "estimated first layer printing time " + std::string(buf), get_time_dhms(machine.layers_time.empty() ? 0.f : machine.layers_time.front()) });
+                binary_data.print_metadata.raw_data.emplace_back("estimated printing time " + std::string(buf), get_time_dhms(machine.time));
+                binary_data.print_metadata.raw_data.emplace_back("estimated first layer printing time " + std::string(buf), get_time_dhms(machine.layers_time.empty() ? 0.f : machine.layers_time.front()));
 
-                binary_data.printer_metadata.raw_data.push_back({ "estimated printing time " + std::string(buf), get_time_dhms(machine.time) });
+                binary_data.printer_metadata.raw_data.emplace_back("estimated printing time " + std::string(buf), get_time_dhms(machine.time));
             }
         }
 
