@@ -74,6 +74,8 @@ protected:
     virtual void on_register_raycasters_for_picking() override;
     virtual void on_unregister_raycasters_for_picking() override;
 
+    void on_set_state() override;
+
 private:
     void render_grabbers_connection(unsigned int id_1, unsigned int id_2, const ColorRGBA& color);
 
