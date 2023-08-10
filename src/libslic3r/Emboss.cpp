@@ -1936,8 +1936,8 @@ void align_shape(ExPolygonsWithIds &shapes, const std::wstring &text, const Font
     // Speed up for left aligned text
     if (prop.align.first == FontProp::HorizontalAlign::left){
         // already horizontaly aligned
-        for (ExPolygons shape : shapes)
-            for (ExPolygon &s : shape)
+        for (ExPolygonsWithId& shape : shapes)
+            for (ExPolygon &s : shape.expoly)
                 s.translate(Point(0, y_offset));
         return;
     }

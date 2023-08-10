@@ -590,17 +590,23 @@ void GLGizmoEmboss::volume_transformation_changing()
 
 void GLGizmoEmboss::volume_transformation_changed()
 {
-    if (m_volume == nullptr || !m_volume->text_configuration.has_value()) {
+    if (m_volume == nullptr || 
+        !m_volume->text_configuration.has_value() ||
+        !m_volume->emboss_shape.has_value()) {
         assert(false);
         return;
     }
+    const TextConfiguration &tc = *m_volume->text_configuration;
+    const EmbossShape &es = *m_volume->emboss_shape;
 
-    const FontProp &prop = m_volume->text_configuration->style.prop;
-    if (prop.per_glyph)
+    bool per_glyph = tc.style.prop.per_glyph;
+    if (per_glyph)
         init_text_lines(m_text_lines, m_parent.get_selection(), m_style_manager, m_text_lines.get_lines().size());
 
+    bool use_surface = es.projection.use_surface;
+
     // Update surface by new position
-    if (prop.use_surface || prop.per_glyph)
+    if (use_surface || per_glyph)
         process();
 
     // Show correct value of height & depth inside of inputs
