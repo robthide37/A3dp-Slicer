@@ -28,6 +28,9 @@ project(PrusaSlicer_deps)
 
 set(${PROJECT_NAME}_PACKAGE_EXCLUDES "" CACHE STRING "Exclude packages matching this regex pattern")
 
+# Slightly controversial
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/modules)
+
 if (MSVC)
   option(DEP_DEBUG "Build in debug version of packages automatically" OFF)
 endif ()
@@ -109,7 +112,7 @@ list_projects(FOUND_PACKAGES ${CMAKE_CURRENT_LIST_DIR})
 
 dep_message(STATUS "Found external package definitions: ${FOUND_PACKAGES}")
 
-# Current list of required dependencies for PS
+# Current list of all required dependencies for PS (top level)
 set(REQUIRED_PACKAGES
     Boost
     Catch2
@@ -124,16 +127,19 @@ set(REQUIRED_PACKAGES
     OpenVDB
     CGAL
     OCCT
+    ZLIB
 )
 
+set(${PROJECT_NAME}_PLATFORM_PACKAGES "" CACHE STRING "Select packages which are provided by the platform" )
 set(SYSTEM_PROVIDED_PACKAGES OpenGL)
 
-if (MSVC)
-    list(APPEND REQUIRED_PACKAGES ZLIB)
-elseif (UNIX)
+if (UNIX)
     # On UNIX systems (including Apple) ZLIB should be available
     list(APPEND SYSTEM_PROVIDED_PACKAGES ZLIB)
 endif ()
+
+list(APPEND SYSTEM_PROVIDED_PACKAGES ${${PROJECT_NAME}_PLATFORM_PACKAGES})
+list(REMOVE_DUPLICATES SYSTEM_PROVIDED_PACKAGES)
 
 include(CMakeDependentOption)
 option(${PROJECT_NAME}_SELECT_ALL "Choose all external projects to be built." ON)
@@ -144,9 +150,24 @@ find_package(Git REQUIRED)
 set(PATCH_CMD ${GIT_EXECUTABLE} apply --verbose --ignore-space-change --whitespace=fix)
 
 # all required package targets that have existing definitions will be gathered here
-set(_dep_list "")
+set(DEPS_TO_BUILD "")
 set(_build_list "")
+set(_build_list_toplevel "")
+set(_checked_list "")
 
+# function to check if a package ought to be provided by the platform can really be found
+function (check_system_package pkg checked_list)
+  if (NOT ${pkg} IN_LIST ${checked_list})
+    find_package(${pkg})
+    if (NOT ${pkg}_FOUND)
+      dep_message(WARNING "No ${pkg} found in system altough marked as system provided. This might cause trouble building the dependencies on this platform")
+    endif ()
+    list(APPEND ${checked_list} ${pkg})
+    set (${checked_list} ${${checked_list}} PARENT_SCOPE)
+  endif ()
+endfunction()
+
+# Go through all the found package definition folders and filter them according to the provided cache options
 set(SUPPORTED_PACKAGES "")
 foreach (pkg ${FOUND_PACKAGES})
     cmake_dependent_option(${PROJECT_NAME}_SELECT_${pkg} "Select package ${pkg} to be built." OFF  "NOT ${PROJECT_NAME}_SELECT_ALL" OFF)
@@ -154,21 +175,24 @@ foreach (pkg ${FOUND_PACKAGES})
         include(+${pkg}/${pkg}.cmake)
 
         list(APPEND SUPPORTED_PACKAGES ${pkg})
-        
-        if (${pkg} IN_LIST REQUIRED_PACKAGES)
-            list(APPEND _dep_list dep_${pkg})
+
+        if (${pkg} IN_LIST SYSTEM_PROVIDED_PACKAGES)
+          check_system_package(${pkg} _checked_list)
+        elseif (${pkg} IN_LIST REQUIRED_PACKAGES)
+          list(APPEND DEPS_TO_BUILD ${pkg})
         endif ()
     endif ()
 endforeach()
 
 # Establish dependency graph
 foreach (pkg ${SUPPORTED_PACKAGES})
+  if (${pkg} IN_LIST DEPS_TO_BUILD)
+    list(APPEND _build_list dep_${pkg})
+    list(APPEND _build_list_toplevel dep_${pkg})
+  endif ()
   foreach(deppkg ${DEP_${pkg}_DEPENDS})
     if (${deppkg} IN_LIST SYSTEM_PROVIDED_PACKAGES)
-      find_package(${deppkg} QUIET)
-      if (NOT ${deppkg}_FOUND)
-        dep_message(WARNING "No ${deppkg} found in system altough marked as system provided. This might cause trouble building the dependencies on this platform")
-      endif ()
+      check_system_package(${deppkg} _checked_list)
     else ()
       dep_message(STATUS "Mapping dep_${deppkg} => dep_${pkg}")
       add_dependencies(dep_${pkg} dep_${deppkg})
@@ -179,10 +203,9 @@ foreach (pkg ${SUPPORTED_PACKAGES})
   endforeach()
 endforeach()
 
-list(APPEND _build_list ${_dep_list})
 list(REMOVE_DUPLICATES _build_list)
 dep_message(STATUS "Building dep targets (${CMAKE_BUILD_TYPE}): ${_build_list}")
-add_custom_target(deps ALL DEPENDS ${_dep_list})
+add_custom_target(deps ALL DEPENDS ${_build_list_toplevel})
 
 # Support legacy option DEP_DEBUG on MSVC to build debug libraries in the same cmake run as for CMAKE_BUILD_TYPE:
 if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
