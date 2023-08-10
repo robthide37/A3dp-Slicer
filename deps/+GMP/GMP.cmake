@@ -17,8 +17,8 @@ if (MSVC)
     add_custom_target(dep_GMP SOURCES ${_output})
 
 else ()
-    string(TOUPPER ${CMAKE_BUILD_TYPE} _buildtype_upper)
-    set(_gmp_ccflags "${CMAKE_CXX_FLAGS}_${_buildtype_upper} -fPIC -DPIC -Wall -Wmissing-prototypes -Wpointer-arith -pedantic -fomit-frame-pointer -fno-common")
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" _buildtype_upper)
+    set(_gmp_ccflags "${CMAKE_CXX_FLAGS_${_buildtype_upper}} -fPIC -DPIC -Wall -Wmissing-prototypes -Wpointer-arith -pedantic -fomit-frame-pointer -fno-common")
     set(_gmp_build_tgt "${CMAKE_SYSTEM_PROCESSOR}")
 
     if (APPLE)
