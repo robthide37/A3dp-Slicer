@@ -2543,7 +2543,7 @@ void GLGizmoCut3D::render_groove_float_input(const std::string& label, float& in
 
     ImGui::SameLine();
 
-    m_imgui->disabled_begin(is_approx(in_val, init_val));
+    m_imgui->disabled_begin(is_approx(in_val, init_val) && is_approx(in_tolerance, 0.1f));
         const std::string act_name = _u8L("Reset");
         if (render_reset_button(("##groove_" + label + act_name).c_str(), act_name)) {
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", act_name, label), UndoRedo::SnapshotType::GizmoAction);
@@ -3446,6 +3446,8 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
     }
 
     if (cut_line_processing()) {
+        if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
+            m_groove_editing = true;
         reset_cut_by_contours();
 
         m_line_end = pt;
@@ -3478,8 +3480,10 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
             m_angle_arc.reset();
             discard_cut_line_processing();
 
-            if (CutMode(m_mode) == CutMode::cutTongueAndGroove)
+            if (CutMode(m_mode) == CutMode::cutTongueAndGroove) {
+                m_groove_editing = false;
                 reset_cut_by_contours();
+            }
         }
         else if (action == SLAGizmoEventType::Moving)
             this->set_dirty();
