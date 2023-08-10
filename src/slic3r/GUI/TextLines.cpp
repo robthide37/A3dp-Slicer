@@ -255,7 +255,6 @@ bool get_line_height_offset(const FontProp &fp, const FontFile &ff, double &line
 
     return true;
 }
-
 } // namespace
 
 void TextLinesModel::init(const Transform3d      &text_tr,
@@ -284,9 +283,11 @@ void TextLinesModel::init(const Transform3d      &text_tr,
         return;
 
     m_model.reset();
-    m_lines.clear();  
+    m_lines.clear();
 
-    double first_line_center = this->offset + line_height_mm / 3 + get_align_y_offset_in_mm(align, count_lines, ff, fp);    
+    // size_in_mm .. contain volume scale and should be ascent value in mm 
+    double line_offset = fp.size_in_mm * ascent_ratio_offset;
+    double first_line_center = line_offset + get_align_y_offset_in_mm(align, count_lines, ff, fp);    
     std::vector<float> line_centers(count_lines);
     for (size_t i = 0; i < count_lines; ++i)
         line_centers[i] = static_cast<float>(first_line_center - i * line_height_mm);

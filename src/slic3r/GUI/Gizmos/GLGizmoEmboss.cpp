@@ -3151,17 +3151,6 @@ void GLGizmoEmboss::draw_advanced()
     } else if (!per_glyph && m_text_lines.is_init())
         m_text_lines.reset();
     m_imgui->disabled_end(); // !can_use_per_glyph
-
-    // Set offset of slice from base line
-    //m_imgui->disabled_begin(!per_glyph); 
-    //ImGui::SameLine();
-    //ImGui::SetNextItemWidth(m_gui_cfg->input_width);
-    //if (m_imgui->slider_float("##base_line_y_offset", &m_text_lines.offset, -10.f, 10.f, "%f mm")) {
-    //    reinit_text_lines(m_text_lines.get_lines().size());
-    //    process();
-    //} else if (ImGui::IsItemHovered()) 
-    //    ImGui::SetTooltip("TEST PURPOSE ONLY\nMove base line (up/down) for allign letters");
-    //m_imgui->disabled_end(); // !per_glyph
         
     auto draw_align = [&align = font_prop.align, gui_cfg = m_gui_cfg, &icons = m_icons]() {
         bool is_change = false;
@@ -3224,6 +3213,8 @@ void GLGizmoEmboss::draw_advanced()
     }
 
     // input gap between lines
+    bool is_multiline = m_text_lines.get_lines().size() > 1;
+    m_imgui->disabled_begin(!is_multiline);
     auto def_line_gap = stored_style ?
         &stored_style->prop.line_gap : nullptr;
     int  min_line_gap = -half_ascent, max_line_gap = half_ascent;
@@ -3240,6 +3231,7 @@ void GLGizmoEmboss::draw_advanced()
             exist_change = true;
         }
     }
+    m_imgui->disabled_end(); // !is_multiline
 
     // input boldness
     auto def_boldness = stored_style ?
