@@ -208,7 +208,12 @@ static void reset_instance_transformation(ModelObject* object, size_t src_instan
         auto& obj_instance = object->instances[i];
         const double rot_z = obj_instance->get_rotation().z();
         
-        obj_instance->set_transformation(Transformation(obj_instance->get_transformation().get_matrix_no_scaling_factor()));
+        Transformation inst_trafo = Transformation(obj_instance->get_transformation().get_matrix_no_scaling_factor());
+        // add respect to mirroring
+        if (obj_instance->is_left_handed())
+            inst_trafo = inst_trafo * Transformation(scale_transform(Vec3d(-1, 1, 1)));
+
+        obj_instance->set_transformation(inst_trafo);
 
         Vec3d rotation = Vec3d::Zero();
         if (!flip && !place_on_cut) {
