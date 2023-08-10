@@ -1,7 +1,3 @@
-#/|/ Copyright (c) Prusa Research 2019 - 2021 Tomáš Mészáros @tamasmeszaros, David Kocík @kocikdav
-#/|/
-#/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-#/|/
 
 set(_srcdir ${CMAKE_CURRENT_LIST_DIR}/gmp)
 set(_dstdir ${DESTDIR}/usr/local)
@@ -21,7 +17,8 @@ if (MSVC)
     add_custom_target(dep_GMP SOURCES ${_output})
 
 else ()
-    set(_gmp_ccflags "-O2 -DNDEBUG -fPIC -DPIC -Wall -Wmissing-prototypes -Wpointer-arith -pedantic -fomit-frame-pointer -fno-common")
+    string(TOUPPER ${CMAKE_BUILD_TYPE} _buildtype_upper)
+    set(_gmp_ccflags "${CMAKE_CXX_FLAGS}_${_buildtype_upper} -fPIC -DPIC -Wall -Wmissing-prototypes -Wpointer-arith -pedantic -fomit-frame-pointer -fno-common")
     set(_gmp_build_tgt "${CMAKE_SYSTEM_PROCESSOR}")
 
     if (APPLE)

@@ -26,9 +26,8 @@
 cmake_minimum_required(VERSION 3.12)
 project(PrusaSlicer_deps)
 
-# Always ON options:
-if (NOT MSVC)
-    set(DEP_CMAKE_OPTS "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+if (MSVC)
+  option(DEP_DEBUG "Build in debug version of packages automatically" OFF)
 endif ()
 
 if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
@@ -51,6 +50,27 @@ macro(list_projects result curdir)
   set(${result} ${dirlist})
 endmacro()
 
+function(dep_message mode msg)
+  if (NOT DEP_MESSAGES_WRITTEN)
+    message(${mode} "${msg}")
+  endif()
+endfunction ()
+
+# Always ON options:
+if (MSVC)
+  if ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+    dep_message(STATUS "Detected 64-bit compiler => building 64-bit deps bundle")
+    set(DEPS_BITS 64)
+  elseif ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
+    dep_message(STATUS "Detected 32-bit compiler => building 32-bit deps bundle")
+    set(DEPS_BITS 32)
+  else ()
+    dep_message(FATAL_ERROR "Unable to detect architecture!")
+  endif ()
+else ()
+    set(DEP_CMAKE_OPTS "-DCMAKE_POSITION_INDEPENDENT_CODE=ON")
+endif ()
+
 if (APPLE)
     # This ensures dependencies don't use SDK features which are not available in the version specified by Deployment target
     # That can happen when one uses a recent SDK but specifies an older Deployment target
@@ -68,7 +88,8 @@ if (APPLE)
 endif ()
 
 list_projects(SUPPORTED_PACKAGES ${CMAKE_CURRENT_LIST_DIR})
-message(STATUS "Found external package definitions: ${SUPPORTED_PACKAGES}")
+
+dep_message(STATUS "Found external package definitions: ${SUPPORTED_PACKAGES}")
 
 set(REQUIRED_PACKAGES
     Boost
@@ -76,7 +97,14 @@ set(REQUIRED_PACKAGES
     Cereal
     CURL
     EXPAT
+    NLopt
+    GLEW
+    TBB
+    Qhull
     wxWidgets
+    OpenVDB
+    CGAL
+    OCCT
 )
 
 set(SYSTEM_PROVIDED_PACKAGES OpenGL)
@@ -112,24 +140,55 @@ foreach (pkg ${SUPPORTED_PACKAGES})
 endforeach()
 
 # Establish dependency graph
-foreach (pkg ${REQUIRED_PACKAGES})
+foreach (pkg ${SUPPORTED_PACKAGES})
   foreach(deppkg ${DEP_${pkg}_DEPENDS})
     if (${deppkg} IN_LIST SYSTEM_PROVIDED_PACKAGES)
       find_package(${deppkg} QUIET)
       if (NOT ${deppkg}_FOUND)
-        message(WARNING "No ${deppkg} found in system altough marked as system provided. This might cause trouble building the dependencies on this platform")
+        dep_message(WARNING "No ${deppkg} found in system altough marked as system provided. This might cause trouble building the dependencies on this platform")
       endif ()
     else ()
-      message(STATUS "Mapping dep_${deppkg} => dep_${pkg}")
+      dep_message(STATUS "Mapping dep_${deppkg} => dep_${pkg}")
       add_dependencies(dep_${pkg} dep_${deppkg})
-      list(APPEND _build_list dep_${deppkg})
+      if (${pkg} IN_LIST REQUIRED_PACKAGES)
+        list(APPEND _build_list dep_${deppkg})
+      endif ()
     endif ()
   endforeach()
 endforeach()
 
 list(APPEND _build_list ${_dep_list})
 list(REMOVE_DUPLICATES _build_list)
-message(STATUS "Building dep targets: ${_build_list}")
+dep_message(STATUS "Building dep targets (${CMAKE_BUILD_TYPE}): ${_build_list}")
 add_custom_target(deps ALL DEPENDS ${_dep_list})
+
+# Support legacy option DEP_DEBUG on MSVC to build debug libraries in the same cmake run as for Release:
+if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(_build_list_dbg "")
+  foreach (t ${_build_list})
+    list(APPEND _build_list_dbg ${t}_debug)
+  endforeach()
+  dep_message(STATUS "Building dep targets (Debug): ${_build_list_dbg}")
+
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild)
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR} -G${CMAKE_GENERATOR} -DCMAKE_BUILD_TYPE=Debug -DDEP_DOWNLOAD_DIR=${DEP_DOWNLOAD_DIR} -DDESTDIR=${DESTDIR} -DDEP_MESSAGES_WRITTEN=ON
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild 
+  )
+
+  # Can be used to build only the debug libs
+  add_custom_target(deps_debug ALL)
+  
+  # Each lib will have a dep_<package>_debug target to build only the debug counterpart
+  foreach(pkgtgt ${_build_list})
+    add_custom_target(${pkgtgt}_debug
+      COMMAND ${CMAKE_COMMAND} --build . --target ${pkgtgt}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild
+    )
+    add_dependencies(deps_debug ${pkgtgt}_debug)
+  endforeach()
+endif ()
+
+set(DEP_MESSAGES_WRITTEN ON CACHE BOOL "")
 
 install(CODE "message(STATUS \"Built packages succesfully.\")")

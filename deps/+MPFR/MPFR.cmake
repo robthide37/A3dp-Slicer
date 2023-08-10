@@ -1,7 +1,3 @@
-#/|/ Copyright (c) Prusa Research 2019 - 2021 Tomáš Mészáros @tamasmeszaros
-#/|/
-#/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-#/|/
 set(_srcdir ${CMAKE_CURRENT_LIST_DIR}/mpfr)
 set(_dstdir ${DESTDIR}/usr/local)
 
@@ -37,6 +33,7 @@ else ()
         CONFIGURE_COMMAND env "CFLAGS=${_gmp_ccflags}" "CXXFLAGS=${_gmp_ccflags}" ./configure ${_cross_compile_arg} --prefix=${DESTDIR}/usr/local --enable-shared=no --enable-static=yes --with-gmp=${DESTDIR}/usr/local ${_gmp_build_tgt}
         BUILD_COMMAND make -j
         INSTALL_COMMAND make install
-        DEPENDS dep_GMP
     )
 endif ()
+
+set(DEP_MPFR_DEPENDS GMP)
