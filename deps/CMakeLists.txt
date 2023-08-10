@@ -46,8 +46,8 @@ macro(list_projects result curdir)
   set(dirlist "")
   foreach(child ${children})
     if(IS_DIRECTORY ${curdir}/${child})
-      string(REGEX MATCH "^\\+([a-zA-Z0-9]+)" is_package ${child})
-      if(is_package) 
+      string(REGEX MATCH "^\\+([a-zA-Z0-9]+)" is_package_dir ${child})
+      if(is_package_dir AND EXISTS ${curdir}/${child}/${CMAKE_MATCH_1}.cmake) 
         list(APPEND dirlist ${CMAKE_MATCH_1})
       endif()
     endif()
@@ -193,7 +193,7 @@ foreach (pkg ${SUPPORTED_PACKAGES})
   foreach(deppkg ${DEP_${pkg}_DEPENDS})
     if (${deppkg} IN_LIST SYSTEM_PROVIDED_PACKAGES)
       check_system_package(${deppkg} _checked_list)
-    else ()
+    elseif(TARGET dep_${deppkg})
       dep_message(STATUS "Mapping dep_${deppkg} => dep_${pkg}")
       add_dependencies(dep_${pkg} dep_${deppkg})
       if (${pkg} IN_LIST REQUIRED_PACKAGES)
@@ -209,32 +209,60 @@ add_custom_target(deps ALL DEPENDS ${_build_list_toplevel})
 
 # Support legacy option DEP_DEBUG on MSVC to build debug libraries in the same cmake run as for CMAKE_BUILD_TYPE:
 if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+  # MSVC has this nice feature to not be able to link release mode libs to Debug mode
+  # projects
+
+  # Exclude the libraries which have no problem to link to Debug builds in
+  # Release mode (mostly C libraries)
+  set(DEP_DEBUG_EXCLUDES GMP MPFR OpenSSL NanoSVG TIFF JPEG ZLIB)
+  
+  # Create the list of targets needed in debug mode
   set(_build_list_dbg "")
-  foreach (t ${_build_list})
+  set(_build_list_filt ${_build_list})
+  list(JOIN  DEP_DEBUG_EXCLUDES "|" _excl_regexp)
+  list(FILTER _build_list_filt EXCLUDE REGEX "${_excl_regexp}")
+
+  foreach (t ${_build_list_filt})
     list(APPEND _build_list_dbg ${t}_debug)
   endforeach()
 
+  # Create a subdirectory for the Debug build within the current binary dir:
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild)
   execute_process(
-    COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR} -G${CMAKE_GENERATOR} -DCMAKE_BUILD_TYPE=Debug -DDEP_DOWNLOAD_DIR=${DEP_DOWNLOAD_DIR} -DDESTDIR=${DESTDIR} -DDEP_MESSAGES_WRITTEN=ON
+    COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR} -G${CMAKE_GENERATOR} 
+      -DCMAKE_BUILD_TYPE=Debug 
+      -DDEP_DOWNLOAD_DIR=${DEP_DOWNLOAD_DIR} 
+      -DDESTDIR=${DESTDIR}
+      -D${PROJECT_NAME}_PACKAGE_EXCLUDES="${_excl_regexp}"
+      -DDEP_MESSAGES_WRITTEN=ON
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild 
     OUTPUT_QUIET
   )
 
   dep_message(STATUS "Building dep targets (Debug): ${_build_list_dbg}")
 
-  # Can be used to build only the debug libs
-  add_custom_target(deps_debug ALL)
-  
   # Each lib will have a dep_<package>_debug target to build only the debug counterpart
-  foreach(pkgtgt ${_build_list})
+  # Not part of ALL (problem with parallelization)
+  foreach(pkgtgt ${_build_list_dbg})
     add_custom_target(${pkgtgt}_debug
       COMMAND ${CMAKE_COMMAND} --build . --target ${pkgtgt}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild
       USES_TERMINAL
     )
-    add_dependencies(deps_debug ${pkgtgt}_debug)
   endforeach()
+
+  # Can be used to build all the debug libs
+  string(JOIN " " _build_list_filt_targets "${_build_list_filt}")
+  add_custom_target(deps_debug ALL 
+    COMMAND ${CMAKE_COMMAND} --build . --target ${_build_list_filt_targets}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild
+    USES_TERMINAL
+  )
+
+  # The Release must be built before, as there are libs in this debug session which need
+  # the release versions of the excluded libs
+  add_dependencies(deps_debug deps)
+
 endif ()
 
 set(DEP_MESSAGES_WRITTEN ON CACHE BOOL "")
