@@ -608,10 +608,21 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
 
         assert(!upper->volumes.empty() && !lower->volumes.empty());
 
-        reset_instance_transformation(upper, m_instance, cut_matrix_upper, m_attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper), m_attributes.has(ModelObjectCutAttribute::FlipUpper));
-        cut_object_ptrs.push_back(upper);
-        reset_instance_transformation(lower, m_instance, cut_matrix_lower, m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower), m_attributes.has(ModelObjectCutAttribute::FlipUpper));
-        cut_object_ptrs.push_back(lower);
+        // check which parts have to stay/be deleted
+
+        if (m_attributes.has(ModelObjectCutAttribute::KeepUpper)) {
+            reset_instance_transformation(upper, m_instance, m_cut_matrix, m_attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper), m_attributes.has(ModelObjectCutAttribute::FlipUpper));
+            cut_object_ptrs.push_back(upper);
+        }
+        else
+            m_model.objects.push_back(upper); // will be deleted in m_model.clear_objects();
+
+        if (m_attributes.has(ModelObjectCutAttribute::KeepLower)) {
+            reset_instance_transformation(lower, m_instance, m_cut_matrix, m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower), m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) || m_attributes.has(ModelObjectCutAttribute::FlipLower));
+            cut_object_ptrs.push_back(lower);
+        }
+        else
+            m_model.objects.push_back(lower); // will be deleted in m_model.clear_objects();
 
         // Now merge all model parts together:
         merge_solid_parts_inside_object(cut_object_ptrs);
