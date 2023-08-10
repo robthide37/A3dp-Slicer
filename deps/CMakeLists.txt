@@ -26,6 +26,8 @@
 cmake_minimum_required(VERSION 3.12)
 project(PrusaSlicer_deps)
 
+set(${PROJECT_NAME}_PACKAGE_EXCLUDES "" CACHE STRING "Exclude packages matching this regex pattern")
+
 if (MSVC)
   option(DEP_DEBUG "Build in debug version of packages automatically" OFF)
 endif ()
@@ -87,9 +89,9 @@ if (APPLE)
     )
 endif ()
 
-list_projects(SUPPORTED_PACKAGES ${CMAKE_CURRENT_LIST_DIR})
+list_projects(FOUND_PACKAGES ${CMAKE_CURRENT_LIST_DIR})
 
-dep_message(STATUS "Found external package definitions: ${SUPPORTED_PACKAGES}")
+dep_message(STATUS "Found external package definitions: ${FOUND_PACKAGES}")
 
 set(REQUIRED_PACKAGES
     Boost
@@ -128,11 +130,14 @@ set(PATCH_CMD ${GIT_EXECUTABLE} apply --verbose --ignore-space-change --whitespa
 set(_dep_list "")
 set(_build_list "")
 
-foreach (pkg ${SUPPORTED_PACKAGES})
+set(SUPPORTED_PACKAGES "")
+foreach (pkg ${FOUND_PACKAGES})
     cmake_dependent_option(${PROJECT_NAME}_SELECT_${pkg} "Select package ${pkg} to be built." OFF  "NOT ${PROJECT_NAME}_SELECT_ALL" OFF)
-    if (${PROJECT_NAME}_SELECT_ALL OR ${PROJECT_NAME}_SELECT_${pkg})
+    if (NOT ${PROJECT_NAME}_PACKAGE_EXCLUDES MATCHES ${pkg} AND (${PROJECT_NAME}_SELECT_ALL OR ${PROJECT_NAME}_SELECT_${pkg}))
         include(+${pkg}/${pkg}.cmake)
 
+        list(APPEND SUPPORTED_PACKAGES ${pkg})
+        
         if (${pkg} IN_LIST REQUIRED_PACKAGES)
             list(APPEND _dep_list dep_${pkg})
         endif ()
