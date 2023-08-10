@@ -51,6 +51,14 @@ public:
     /// Handle pressing of shortcut
     /// </summary>
     void on_shortcut_key();
+
+    /// <summary>
+    /// Call on change inside of object conatining projected volume
+    /// </summary>
+    /// <param name="job_cancel">Way to stop re_emboss job</param>
+    /// <returns>True on success otherwise False</returns>
+    static bool re_emboss(const ModelVolume &text, std::shared_ptr<std::atomic<bool>> job_cancel = nullptr);
+
 protected:
     bool on_init() override;
     std::string on_get_name() const override;

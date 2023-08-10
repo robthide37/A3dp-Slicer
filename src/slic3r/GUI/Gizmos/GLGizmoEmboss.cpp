@@ -349,6 +349,31 @@ void GLGizmoEmboss::on_shortcut_key() {
     }
 }
 
+bool GLGizmoEmboss::re_emboss(const ModelVolume &text_volume, std::shared_ptr<std::atomic<bool>> job_cancel)
+{
+    assert(text_volume.text_configuration.has_value());
+    assert(text_volume.emboss_shape.has_value());
+    if (!text_volume.text_configuration.has_value() || 
+        !text_volume.emboss_shape.has_value())
+        return false; // not valid text volume to re emboss
+    const TextConfiguration &tc = *text_volume.text_configuration;
+    const EmbossShape       &es = *text_volume.emboss_shape;
+    const ImWchar* ranges = ImGui::GetIO().Fonts->GetGlyphRangesDefault();
+
+    StyleManager style_manager(ranges, create_default_styles);
+    StyleManager::Style style{tc.style};
+    if (!style_manager.load_style(style))
+        return false; // can't load font
+
+    TextLinesModel text_lines;
+    const Selection &selection = wxGetApp().plater()->canvas3D()->get_selection();
+    DataBasePtr base = create_emboss_data_base(tc.text, style_manager, text_lines, selection, text_volume.type(), job_cancel);
+    DataUpdate  data{std::move(base), text_volume.id()};
+
+    RaycastManager raycast_manager; // Nothing is cached now, so It need to create raycasters
+    return start_update_volume(std::move(data), text_volume, selection, raycast_manager);
+}
+
 namespace{
 // verify correct volume type for creation of text
 bool check(ModelVolumeType volume_type) {
@@ -1272,61 +1297,16 @@ bool GLGizmoEmboss::process()
 
     // exist loaded font file?
     if (!m_style_manager.is_active_font()) return false;
-    
-    DataUpdate data{create_emboss_data_base(m_text, m_style_manager, m_text_lines, m_parent.get_selection(), m_volume->type(), m_job_cancel),
-                    m_volume->id()};
-    std::unique_ptr<Job> job = nullptr;
 
-    // check cutting from source mesh
-    bool &use_surface = data.base->shape.projection.use_surface;
-    if (use_surface && m_volume->is_the_only_one_part()) 
-        use_surface = false;
-    
-    assert(data.base->text_lines.empty() || 
-           data.base->text_lines.size() == get_count_lines(m_text));
+    const Selection& selection = m_parent.get_selection();
+    DataBasePtr base = create_emboss_data_base(m_text, m_style_manager, m_text_lines, selection, m_volume->type(), m_job_cancel);
+    DataUpdate  data{std::move(base), m_volume->id()};
 
-    if (use_surface) {
-        // Model to cut surface from.
-        SurfaceVolumeData::ModelSources sources = create_volume_sources(*m_volume);
-        if (sources.empty()) 
-            return false;
+    // check valid count of text lines
+    assert(data.base->text_lines.empty() || data.base->text_lines.size() == get_count_lines(m_text));
 
-        const std::optional<EmbossShape> &es_opt = m_volume->emboss_shape;
-        if (!es_opt.has_value())
-            return false;
-        const EmbossShape &es = *es_opt;
-
-        Transform3d text_tr = m_volume->get_matrix();
-        auto& fix_3mf = es.fix_3mf_tr;
-        if (fix_3mf.has_value())
-            text_tr = text_tr * fix_3mf->inverse();
-
-        // when it is new applying of use surface than move origin onto surfaca
-        if (!es.projection.use_surface) {
-            auto offset = calc_surface_offset(m_parent.get_selection(), m_raycast_manager);
-            if (offset.has_value())
-                text_tr *= Eigen::Translation<double, 3>(*offset);
-        }
-
-        // check that there is not unexpected volume type
-        bool is_valid_type = check(m_volume->type());
-        assert(is_valid_type);
-        if (!is_valid_type)
-            return false;
-
-        UpdateSurfaceVolumeData surface_data{std::move(data), {text_tr, std::move(sources)}};
-        job = std::make_unique<UpdateSurfaceVolumeJob>(std::move(surface_data));                  
-    } else {
-        job = std::make_unique<UpdateJob>(std::move(data));
-    }
-
-#ifndef EXECUTE_PROCESS_ON_MAIN_THREAD
-    auto &worker = wxGetApp().plater()->get_ui_job_worker();
-    queue_job(worker, std::move(job));
-#else 
-    // Run Job on main thread (blocking) - ONLY DEBUG
-    execute_job(std::move(job));
-#endif // EXECUTE_PROCESS_ON_MAIN_THREAD
+    if (!start_update_volume(std::move(data), *m_volume, selection, m_raycast_manager))
+        return false;
 
     // notification is removed befor object is changed by job
     remove_notification_not_valid_font();
