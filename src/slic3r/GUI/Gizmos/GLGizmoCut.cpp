@@ -835,6 +835,8 @@ void GLGizmoCut3D::on_load(cereal::BinaryInputArchive& ar)
     ar( m_keep_upper, m_keep_lower, m_rotate_lower, m_rotate_upper, m_hide_cut_plane, m_mode, m_connectors_editing,
         m_ar_plane_center, m_rotation_m);
 
+    m_start_dragging_m = m_rotation_m;
+
     m_transformed_bounding_box = transformed_bounding_box(m_ar_plane_center, m_rotation_m);
     set_center_pos(m_ar_plane_center);
 
