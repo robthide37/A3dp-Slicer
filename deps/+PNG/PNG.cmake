@@ -25,4 +25,4 @@ add_cmake_project(PNG
         ${_disable_neon_extension}
 )
 
-set(DEP_PMG_DEPENDS ZLIB)
+set(DEP_PNG_DEPENDS ZLIB)
