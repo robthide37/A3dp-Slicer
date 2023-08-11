@@ -1075,8 +1075,6 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
         throw Slic3r::RuntimeError(format("The selected file is not a valid binary gcode.\nError: %1%",
             std::string(bgcode::core::translate_result(res))));
 
-    fseek(file.f, 0, SEEK_END);
-    const long file_size = ftell(file.f);
     rewind(file.f);
 
     bgcode::core::FileHeader file_header;

@@ -38,6 +38,11 @@
 #include <algorithm>
 #include <chrono>
 
+#if ENABLE_BINARIZED_GCODE_WIN_DEBUG
+#include <windows.h>
+#include <debugapi.h>
+#endif // ENABLE_BINARIZED_GCODE_WIN_DEBUG
+
 namespace Slic3r {
 namespace GUI {
 
@@ -364,13 +369,16 @@ void GCodeViewer::SequentialView::Marker::render()
 
 void GCodeViewer::SequentialView::GCodeWindow::load_gcode(const std::string& filename, const std::vector<size_t>& lines_ends)
 {
+#if !ENABLE_BINARIZED_GCODE
     assert(! m_file.is_open());
     if (m_file.is_open())
         return;
+#endif // !ENABLE_BINARIZED_GCODE
 
     m_filename   = filename;
     m_lines_ends = lines_ends;
 
+#if !ENABLE_BINARIZED_GCODE
     m_selected_line_id = 0;
     m_last_lines_size = 0;
 
@@ -383,42 +391,217 @@ void GCodeViewer::SequentialView::GCodeWindow::load_gcode(const std::string& fil
         BOOST_LOG_TRIVIAL(error) << "Unable to map file " << m_filename << ". Cannot show G-code window.";
         reset();
     }
+#endif // !ENABLE_BINARIZED_GCODE
 }
 
+#if ENABLE_BINARIZED_GCODE
+void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, size_t curr_line_id)
+{
+    auto update_lines = [this]() {
+        m_lines_cache.clear();
+        m_lines_cache.reserve(m_cache_range.size());
+        FILE* file = boost::nowide::fopen(m_filename.c_str(), "rb");
+        if (file != nullptr) {
+            for (size_t id = *m_cache_range.start_id; id <= *m_cache_range.end_id; ++id) {
+                assert(id > 0);
+                // read line from file
+                const size_t start = id == 1 ? 0 : m_lines_ends[id - 2];
+                const size_t len = m_lines_ends[id - 1] - start;
+                std::string gline(len, '\0');
+                fseek(file, start, SEEK_SET);
+                const size_t rsize = fread((void*)gline.data(), 1, len, file);
+                if (ferror(file) || rsize != len) {
+                    m_lines_cache.clear();
+                    break;
+                }
+
+                std::string command;
+                std::string parameters;
+                std::string comment;
+
+                // extract comment
+                std::vector<std::string> tokens;
+                boost::split(tokens, gline, boost::is_any_of(";"), boost::token_compress_on);
+                command = tokens.front();
+                if (tokens.size() > 1)
+                    comment = ";" + tokens.back();
+
+                // extract gcode command and parameters
+                if (!command.empty()) {
+                    boost::split(tokens, command, boost::is_any_of(" "), boost::token_compress_on);
+                    command = tokens.front();
+                    if (tokens.size() > 1) {
+                        for (size_t i = 1; i < tokens.size(); ++i) {
+                            parameters += " " + tokens[i];
+                        }
+                    }
+                }
+                m_lines_cache.push_back({ command, parameters, comment });
+            }
+            fclose(file);
+        }
+    };
+
+    static const ImVec4 LINE_NUMBER_COLOR = ImGuiWrapper::COL_ORANGE_LIGHT;
+    static const ImVec4 SELECTION_RECT_COLOR = ImGuiWrapper::COL_ORANGE_DARK;
+    static const ImVec4 COMMAND_COLOR = { 0.8f, 0.8f, 0.0f, 1.0f };
+    static const ImVec4 PARAMETERS_COLOR = { 1.0f, 1.0f, 1.0f, 1.0f };
+    static const ImVec4 COMMENT_COLOR = { 0.7f, 0.7f, 0.7f, 1.0f };
+    static const ImVec4 ELLIPSIS_COLOR = { 0.0f, 0.7f, 0.0f, 1.0f };
+
+    if (!m_visible || m_filename.empty() || m_lines_ends.empty() || curr_line_id == 0)
+        return;
+
+    // window height
+    const float wnd_height = bottom - top;
+
+    // number of visible lines
+    const float text_height = ImGui::CalcTextSize("0").y;
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const size_t visible_lines_count = static_cast<size_t>((wnd_height - 2.0f * style.WindowPadding.y + style.ItemSpacing.y) / (text_height + style.ItemSpacing.y));
+
+    if (visible_lines_count == 0)
+        return;
+
+    auto resize_range = [&](Range& range, size_t lines_count) {
+        const size_t half_lines_count = lines_count / 2;
+        range.start_id = (curr_line_id >= half_lines_count) ? curr_line_id - half_lines_count : 1;
+        range.end_id = *range.start_id + lines_count - 1;
+        if (*range.end_id >= m_lines_ends.size()) {
+            range.end_id = m_lines_ends.size() - 1;
+            range.start_id = *range.end_id - lines_count + 1;
+        }
+    };
+
+    // visible range
+    Range visible_range;
+    resize_range(visible_range, visible_lines_count);
+
+    // update cache if needed
+    if (m_cache_range.empty() || !m_cache_range.contains(visible_range)) {
+        resize_range(m_cache_range, 4 * visible_range.size());
+        update_lines();
+    }
+
+    // line number's column width
+    const float id_width = ImGui::CalcTextSize(std::to_string(*visible_range.end_id).c_str()).x;
+
+    ImGuiWrapper& imgui = *wxGetApp().imgui();
+
+    auto add_item_to_line = [&imgui](const std::string& txt, const ImVec4& color, float spacing, size_t& current_length) {
+        static const size_t LENGTH_THRESHOLD = 60;
+
+        if (txt.empty())
+            return false;
+
+        std::string out_text = txt;
+        bool reduced = false;
+        if (current_length + out_text.length() > LENGTH_THRESHOLD) {
+            out_text = out_text.substr(0, LENGTH_THRESHOLD - current_length);
+            reduced = true;
+        }
+
+        current_length += out_text.length();
+
+        ImGui::SameLine(0.0f, spacing);
+        imgui.text_colored(color, out_text);
+        if (reduced) {
+            ImGui::SameLine(0.0f, 0.0f);
+            imgui.text_colored(ELLIPSIS_COLOR, "...");
+        }
+
+        return reduced;
+    };
+
+    imgui.set_next_window_pos(0.0f, top, ImGuiCond_Always, 0.0f, 0.0f);
+    imgui.set_next_window_size(0.0f, wnd_height, ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::SetNextWindowBgAlpha(0.6f);
+    imgui.begin(std::string("G-code"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+
+    // center the text in the window by pushing down the first line
+    const float f_lines_count = static_cast<float>(visible_lines_count);
+    ImGui::SetCursorPosY(0.5f * (wnd_height - f_lines_count * text_height - (f_lines_count - 1.0f) * style.ItemSpacing.y));
+
+    // render text lines
+    size_t max_line_length = 0;
+    for (size_t id = *visible_range.start_id; id <= *visible_range.end_id; ++id) {
+        const Line& line = m_lines_cache[id - *m_cache_range.start_id];
+
+        // rect around the current selected line
+        if (id == curr_line_id) {
+            const float pos_y = ImGui::GetCursorScreenPos().y;
+            const float half_ItemSpacing_y = 0.5f * style.ItemSpacing.y;
+            const float half_padding_x = 0.5f * style.WindowPadding.x;
+            ImGui::GetWindowDrawList()->AddRect({ half_padding_x, pos_y - half_ItemSpacing_y },
+                { ImGui::GetCurrentWindow()->Size.x - half_padding_x, pos_y + text_height + half_ItemSpacing_y },
+                ImGui::GetColorU32(SELECTION_RECT_COLOR));
+        }
+
+        const std::string id_str = std::to_string(id);
+        // spacer to right align text
+        ImGui::Dummy({ id_width - ImGui::CalcTextSize(id_str.c_str()).x, text_height });
+
+        size_t line_length = 0;
+        // render line number
+        bool stop_adding = add_item_to_line(id_str, LINE_NUMBER_COLOR, 0.0f, line_length);
+        if (!stop_adding && !line.command.empty())
+            // render command
+            stop_adding = add_item_to_line(line.command, COMMAND_COLOR, -1.0f, line_length);
+        if (!stop_adding && !line.parameters.empty())
+            // render parameters
+            stop_adding = add_item_to_line(line.parameters, PARAMETERS_COLOR, 0.0f, line_length);
+        if (!stop_adding && !line.comment.empty())
+            // render comment
+            stop_adding = add_item_to_line(line.comment, COMMENT_COLOR, line.command.empty() ? -1.0f : 0.0f, line_length);
+
+        max_line_length = std::max(max_line_length, line_length);
+    }
+
+    imgui.end();
+    ImGui::PopStyleVar();
+
+    // request an extra frame if window's width changed
+    if (m_max_line_length != max_line_length) {
+        m_max_line_length = max_line_length;
+        imgui.set_requires_extra_frame();
+    }
+}
+#else
 void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, uint64_t curr_line_id) const
 {
     auto update_lines = [this](uint64_t start_id, uint64_t end_id) {
         std::vector<Line> ret;
         ret.reserve(end_id - start_id + 1);
-        for (uint64_t id = start_id; id <= end_id; ++id) {
-            // read line from file
-            const size_t start = id == 1 ? 0 : m_lines_ends[id - 2];
-            const size_t len   = m_lines_ends[id - 1] - start;
-            std::string gline(m_file.data() + start, len);
+            for (uint64_t id = start_id; id <= end_id; ++id) {
+                // read line from file
+                const size_t start = id == 1 ? 0 : m_lines_ends[id - 2];
+                const size_t len = m_lines_ends[id - 1] - start;
+                std::string gline(m_file.data() + start, len);
 
-            std::string command;
-            std::string parameters;
-            std::string comment;
+                std::string command;
+                std::string parameters;
+                std::string comment;
 
-            // extract comment
-            std::vector<std::string> tokens;
-            boost::split(tokens, gline, boost::is_any_of(";"), boost::token_compress_on);
-            command = tokens.front();
-            if (tokens.size() > 1)
-                comment = ";" + tokens.back();
-
-            // extract gcode command and parameters
-            if (!command.empty()) {
-                boost::split(tokens, command, boost::is_any_of(" "), boost::token_compress_on);
+                // extract comment
+                std::vector<std::string> tokens;
+                boost::split(tokens, gline, boost::is_any_of(";"), boost::token_compress_on);
                 command = tokens.front();
-                if (tokens.size() > 1) {
-                    for (size_t i = 1; i < tokens.size(); ++i) {
-                        parameters += " " + tokens[i];
+                if (tokens.size() > 1)
+                    comment = ";" + tokens.back();
+
+                // extract gcode command and parameters
+                if (!command.empty()) {
+                    boost::split(tokens, command, boost::is_any_of(" "), boost::token_compress_on);
+                    command = tokens.front();
+                    if (tokens.size() > 1) {
+                        for (size_t i = 1; i < tokens.size(); ++i) {
+                            parameters += " " + tokens[i];
+                        }
                     }
                 }
+                ret.push_back({ command, parameters, comment });
             }
-            ret.push_back({ command, parameters, comment });
-        }
         return ret;
     };
 
@@ -546,12 +729,15 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, u
     imgui.end();
     ImGui::PopStyleVar();
 }
+#endif // ENABLE_BINARIZED_GCODE
 
+#if !ENABLE_BINARIZED_GCODE
 void GCodeViewer::SequentialView::GCodeWindow::stop_mapping_file()
 {
     if (m_file.is_open())
         m_file.close();
 }
+#endif // !ENABLE_BINARIZED_GCODE
 
 void GCodeViewer::SequentialView::render(float legend_height)
 {

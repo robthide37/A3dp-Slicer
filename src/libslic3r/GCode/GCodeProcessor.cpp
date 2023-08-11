@@ -25,10 +25,10 @@
 #endif
 
 #include <chrono>
-#if ENABLE_BINARIZED_GCODE_DEBUG
+#if ENABLE_BINARIZED_GCODE_WIN_DEBUG
 #include <windows.h>
 #include <debugapi.h>
-#endif // ENABLE_BINARIZED_GCODE_DEBUG
+#endif // ENABLE_BINARIZED_GCODE_WIN_DEBUG
 
 static const float DEFAULT_TOOLPATH_WIDTH = 0.4f;
 static const float DEFAULT_TOOLPATH_HEIGHT = 0.2f;
@@ -1173,7 +1173,7 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
     res = printer_metadata_block.read_data(*file.f, file_header, block_header);
     if (res != bgcode::core::EResult::Success)
         throw Slic3r::RuntimeError("Error while reading file '" + filename + "': " + std::string(bgcode::core::translate_result(res)) + "\n");
-#if ENABLE_BINARIZED_GCODE_DEBUG
+#if ENABLE_BINARIZED_GCODE_WIN_DEBUG
     OutputDebugStringA("Printer metadata:\n");
     for (const auto& [key, value] : printer_metadata_block.raw_data) {
         OutputDebugStringA(key.c_str());
@@ -1181,7 +1181,7 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
         OutputDebugStringA(value.c_str());
         OutputDebugStringA("\n");
     }
-#endif // ENABLE_BINARIZED_GCODE_DEBUG
+#endif // ENABLE_BINARIZED_GCODE_WIN_DEBUG
 
     // read thumbnail blocks
     res = bgcode::core::read_next_block_header(*file.f, file_header, block_header, verify_checksum);
@@ -1229,7 +1229,7 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
     res = print_metadata_block.read_data(*file.f, file_header, block_header);
     if (res != bgcode::core::EResult::Success)
         throw Slic3r::RuntimeError("Error while reading file '" + filename + "': " + std::string(bgcode::core::translate_result(res)) + "\n");
-#if ENABLE_BINARIZED_GCODE_DEBUG
+#if ENABLE_BINARIZED_GCODE_WIN_DEBUG
     OutputDebugStringA("Print metadata:\n");
     for (const auto& [key, value] : print_metadata_block.raw_data) {
         OutputDebugStringA(key.c_str());
@@ -1237,7 +1237,7 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
         OutputDebugStringA(value.c_str());
         OutputDebugStringA("\n");
     }
-#endif // ENABLE_BINARIZED_GCODE_DEBUG
+#endif // ENABLE_BINARIZED_GCODE_WIN_DEBUG
 
     // read slicer metadata block
     res = bgcode::core::read_next_block_header(*file.f, file_header, block_header, verify_checksum);
@@ -1249,7 +1249,7 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
     res = slicer_metadata_block.read_data(*file.f, file_header, block_header);
     if (res != bgcode::core::EResult::Success)
         throw Slic3r::RuntimeError("Error while reading file '" + filename + "': " + std::string(bgcode::core::translate_result(res)) + "\n");
-#if ENABLE_BINARIZED_GCODE_DEBUG
+#if ENABLE_BINARIZED_GCODE_WIN_DEBUG
     OutputDebugStringA("Slicer metadata:\n");
     for (const auto& [key, value] : slicer_metadata_block.raw_data) {
         OutputDebugStringA(key.c_str());
@@ -1257,7 +1257,7 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
         OutputDebugStringA(value.c_str());
         OutputDebugStringA("\n");
     }
-#endif // ENABLE_BINARIZED_GCODE_DEBUG
+#endif // ENABLE_BINARIZED_GCODE_WIN_DEBUG
     DynamicPrintConfig config;
     config.apply(FullPrintConfig::defaults());
     std::string str;

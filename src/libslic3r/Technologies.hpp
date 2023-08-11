@@ -63,13 +63,16 @@
 
 
 //====================
-// 2.6.1.alpha1 techs
+// 2.6.2.alpha1 techs
 //====================
-#define ENABLE_2_6_1_ALPHA1 1
+#define ENABLE_2_6_2_ALPHA1 1
 
 // Enable export of binarized gcode
-#define ENABLE_BINARIZED_GCODE (1 && ENABLE_2_6_1_ALPHA1)
+#define ENABLE_BINARIZED_GCODE (1 && ENABLE_2_6_2_ALPHA1)
 #define ENABLE_BINARIZED_GCODE_DEBUG (1 && ENABLE_BINARIZED_GCODE)
+#ifdef _WIN32
+#define ENABLE_BINARIZED_GCODE_WIN_DEBUG (1 && ENABLE_BINARIZED_GCODE_DEBUG)
+#endif // _WIN32
 #define ENABLE_BINARIZED_GCODE_DEBUG_WINDOW (1 && ENABLE_BINARIZED_GCODE)
 
 
