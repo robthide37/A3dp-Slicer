@@ -208,7 +208,7 @@ dep_message(STATUS "Building dep targets (${CMAKE_BUILD_TYPE}): ${_build_list}")
 add_custom_target(deps ALL DEPENDS ${_build_list_toplevel})
 
 # Support legacy option DEP_DEBUG on MSVC to build debug libraries in the same cmake run as for CMAKE_BUILD_TYPE:
-if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (MSVC AND DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   # MSVC has this nice feature to not be able to link release mode libs to Debug mode
   # projects
 
@@ -243,7 +243,7 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 
   # Each lib will have a dep_<package>_debug target to build only the debug counterpart
   # Not part of ALL (problem with parallelization)
-  foreach(pkgtgt ${_build_list_dbg})
+  foreach(pkgtgt ${_build_list_filt})
     add_custom_target(${pkgtgt}_debug
       COMMAND ${CMAKE_COMMAND} --build . --target ${pkgtgt}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild
