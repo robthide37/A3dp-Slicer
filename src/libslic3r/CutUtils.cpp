@@ -186,8 +186,10 @@ static void process_solid_part_cut(ModelVolume* volume, const Transform3d& insta
 
     if (attributes.has(ModelObjectCutAttribute::KeepAsParts)) {
         add_cut_volume(upper_mesh, upper, volume, cut_matrix, "_A");
-        add_cut_volume(lower_mesh, upper, volume, cut_matrix, "_B");
-        upper->volumes.back()->cut_info.is_from_upper = false;
+        if (!lower_mesh.empty()) {
+            add_cut_volume(lower_mesh, upper, volume, cut_matrix, "_B");
+            upper->volumes.back()->cut_info.is_from_upper = false;
+        }
         return;
     }
 
