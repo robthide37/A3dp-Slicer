@@ -1,9 +1,11 @@
 
 #include "CutUtils.hpp"
+#include "Geometry.hpp"
 #include "libslic3r.h"
 #include "Model.hpp"
 #include "TriangleMeshSlicer.hpp"
 #include "TriangleSelector.hpp"
+#include "ObjectID.hpp"
 
 
 namespace Slic3r {

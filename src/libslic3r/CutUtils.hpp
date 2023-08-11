@@ -1,10 +1,7 @@
 #ifndef slic3r_CutUtils_hpp_
 #define slic3r_CutUtils_hpp_
 
-#include "libslic3r.h"
 #include "enum_bitmask.hpp"
-#include "Geometry.hpp"
-#include "ObjectID.hpp"
 #include "Point.hpp"
 #include "Model.hpp"
 
@@ -23,7 +20,7 @@ class Cut {
 
     Model                       m_model;
     int                         m_instance;
-    const Transform3d&          m_cut_matrix;
+    const Transform3d           m_cut_matrix;
     ModelObjectCutAttributes    m_attributes;
 
     void post_process(ModelObject* object, ModelObjectPtrs& objects, bool keep, bool place_on_cut, bool flip);
