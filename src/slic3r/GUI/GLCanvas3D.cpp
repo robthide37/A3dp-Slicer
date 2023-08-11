@@ -1301,7 +1301,7 @@ PrinterTechnology GLCanvas3D::current_printer_technology() const
 
 bool GLCanvas3D::is_arrange_alignment_enabled() const
 {
-    return m_config ? is_XL_printer(*m_config) : false;
+    return m_config ? is_XL_printer(*m_config) && !this->get_wipe_tower_info() : false;
 }
 
 GLCanvas3D::GLCanvas3D(wxGLCanvas *canvas, Bed3D &bed)
