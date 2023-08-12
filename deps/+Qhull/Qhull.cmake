@@ -1,10 +1,19 @@
 include(GNUInstallDirs)
-# WARNING: Qhull does this nice thing to remove previous configs when installing.
-# It does that only on Unix. If you build release, then install, then build
-# debug, then install, it will delete the previous release config....
+
+set(_qhull_static_libs "-DBUILD_STATIC_LIBS:BOOL=ON")
+set(_qhull_shared_libs "-DBUILD_SHARED_LIBS:BOOL=OFF")
+if (BUILD_SHARED_LIBS)
+    set(_qhull_static_libs "-DBUILD_STATIC_LIBS:BOOL=OFF")
+    set(_qhull_shared_libs "-DBUILD_SHARED_LIBS:BOOL=ON")
+endif ()
+
 add_cmake_project(Qhull
-    URL "https://github.com/qhull/qhull/archive/v8.0.1.zip"
-    URL_HASH SHA256=5287f5edd6a0372588f5d6640799086a4033d89d19711023ef8229dd9301d69b
+    URL "https://github.com/qhull/qhull/archive/refs/tags/v8.1-alpha3.zip"
+    URL_HASH SHA256=7bd9b5ffae01e69c2ead52f9a9b688af6c65f9a1da05da0a170fa20d81404c06
     CMAKE_ARGS 
         -DINCLUDE_INSTALL_DIR=${CMAKE_INSTALL_INCLUDEDIR}
+        -DBUILD_APPLICATIONS:BOOL=OFF
+        ${_qhull_shared_libs}
+        ${_qhull_static_libs}
+        -DQHULL_ENABLE_TESTING:BOOL=OFF
 )
