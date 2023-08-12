@@ -56,7 +56,7 @@ function(add_cmake_project projectname)
             -DCMAKE_INSTALL_PREFIX:STRING=${DESTDIR}/usr/local
             -DCMAKE_MODULE_PATH:STRING=${CMAKE_MODULE_PATH}
             -DCMAKE_PREFIX_PATH:STRING=${DESTDIR}/usr/local
-            -DCMAKE_DEBUG_POSTFIX:STRING=d
+            -DCMAKE_DEBUG_POSTFIX:STRING=${CMAKE_DEBUG_POSTFIX}
             -DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER}
             -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}
             -DCMAKE_CXX_FLAGS_${_build_type_upper}:STRING=${CMAKE_CXX_FLAGS_${_build_type_upper}}

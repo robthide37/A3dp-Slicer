@@ -215,6 +215,10 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Exclude the libraries which have no problem to link to Debug builds in
   # Release mode (mostly C libraries)
   set(DEP_DEBUG_EXCLUDES GMP MPFR OpenSSL NanoSVG TIFF JPEG ZLIB)
+  if (UNIX)
+    # Making a separate debug build on Unix of wx is a nightmare
+    list(APPEND DEP_DEBUG_EXCLUDES wxWidgets)
+  endif ()
   
   # Create the list of targets needed in debug mode
   set(_build_list_dbg "")
@@ -230,10 +234,15 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild)
   execute_process(
     COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR} -G${CMAKE_GENERATOR} 
-      -DCMAKE_BUILD_TYPE=Debug 
+      -DCMAKE_BUILD_TYPE=Debug
+      -DDEP_WX_GTK3=${DEP_WX_GTK3}
       -DDEP_DOWNLOAD_DIR=${DEP_DOWNLOAD_DIR} 
       -DDESTDIR=${DESTDIR}
       -D${PROJECT_NAME}_PACKAGE_EXCLUDES="${_excl_regexp}"
+      -D${PROJECT_NAME}_SELECT_ALL=${${PROJECT_NAME}_SELECT_ALL}
+      -DDEP_BUILD_VERBOSE=${DEP_BUILD_VERBOSE}
+      -DCMAKE_DEBUG_POSTFIX=d
+      #TODO: forward per-package selector variables
       -DDEP_MESSAGES_WRITTEN=ON
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild 
     OUTPUT_QUIET
