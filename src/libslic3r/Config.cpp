@@ -741,8 +741,9 @@ ConfigSubstitutions ConfigBase::load(const std::string& filename, ForwardCompati
         if (file == nullptr)
             throw Slic3r::RuntimeError("Error opening the file: " + filename + "\n");
 
+        using namespace bgcode::core;
         std::vector<uint8_t> cs_buffer(65536);
-        file_type = (bgcode::core::is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == bgcode::core::EResult::Success) ? EFileType::BinaryGCode : EFileType::AsciiGCode;
+        file_type = (is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == EResult::Success) ? EFileType::BinaryGCode : EFileType::AsciiGCode;
         fclose(file);
     }
     else 
@@ -1071,29 +1072,31 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
     if (file.f == nullptr)
         throw Slic3r::RuntimeError(format("Error opening the file: %1%", filename));
 
+    using namespace bgcode::core;
+    using namespace bgcode::binarize;
     std::vector<uint8_t> cs_buffer(65536);
-    bgcode::core::EResult res = bgcode::core::is_valid_binary_gcode(*file.f, true, cs_buffer.data(), cs_buffer.size());
-    if (res != bgcode::core::EResult::Success)
+    EResult res = is_valid_binary_gcode(*file.f, true, cs_buffer.data(), cs_buffer.size());
+    if (res != EResult::Success)
         throw Slic3r::RuntimeError(format("The selected file is not a valid binary gcode.\nError: %1%",
-            std::string(bgcode::core::translate_result(res))));
+            std::string(translate_result(res))));
 
     rewind(file.f);
 
-    bgcode::core::FileHeader file_header;
-    res = bgcode::core::read_header(*file.f, file_header, nullptr);
-    if (res != bgcode::core::EResult::Success)
-        throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(bgcode::core::translate_result(res))));
+    FileHeader file_header;
+    res = read_header(*file.f, file_header, nullptr);
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(translate_result(res))));
 
-    bgcode::core::BlockHeader block_header;
-    res = read_next_block_header(*file.f, file_header, block_header, bgcode::core::EBlockType::SlicerMetadata, cs_buffer.data(), cs_buffer.size());
-    if (res != bgcode::core::EResult::Success)
-        throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(bgcode::core::translate_result(res))));
-    if ((bgcode::core::EBlockType)block_header.type != bgcode::core::EBlockType::SlicerMetadata)
+    BlockHeader block_header;
+    res = read_next_block_header(*file.f, file_header, block_header, EBlockType::SlicerMetadata, cs_buffer.data(), cs_buffer.size());
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(translate_result(res))));
+    if ((EBlockType)block_header.type != EBlockType::SlicerMetadata)
         throw Slic3r::RuntimeError(format("Unable to find slicer metadata block in file: '%1%'", filename));
-    bgcode::binarize::SlicerMetadataBlock slicer_metadata_block;
+    SlicerMetadataBlock slicer_metadata_block;
     res = slicer_metadata_block.read_data(*file.f, file_header, block_header);
-    if (res != bgcode::core::EResult::Success)
-        throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(bgcode::core::translate_result(res))));
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(translate_result(res))));
 
     for (const auto& [key, value] : slicer_metadata_block.raw_data) {
         this->set_deserialize(key, value, substitutions_ctxt);

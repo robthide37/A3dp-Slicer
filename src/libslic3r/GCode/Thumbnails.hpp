@@ -64,6 +64,8 @@ template<typename ThrowIfCanceledCallback>
 inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb, std::vector<bgcode::binarize::ThumbnailBlock>& out_thumbnails,
     const std::vector<Vec2d>& sizes, GCodeThumbnailsFormat format, ThrowIfCanceledCallback throw_if_canceled)
 {
+    using namespace bgcode::core;
+    using namespace bgcode::binarize;
     out_thumbnails.clear();
     if (thumbnail_cb != nullptr) {
         ThumbnailsList thumbnails = thumbnail_cb(ThumbnailsParams{ sizes, true, true, true, true });
@@ -71,13 +73,13 @@ inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb
             if (data.is_valid()) {
                 auto compressed = compress_thumbnail(data, format);
                 if (compressed->data != nullptr && compressed->size > 0) {
-                    bgcode::binarize::ThumbnailBlock& block = out_thumbnails.emplace_back(bgcode::binarize::ThumbnailBlock());
+                    ThumbnailBlock& block = out_thumbnails.emplace_back(ThumbnailBlock());
                     block.params.width = (uint16_t)data.width;
                     block.params.height = (uint16_t)data.height;
                     switch (format) {
-                    case GCodeThumbnailsFormat::PNG: { block.params.format = (uint16_t)bgcode::core::EThumbnailFormat::PNG; break; }
-                    case GCodeThumbnailsFormat::JPG: { block.params.format = (uint16_t)bgcode::core::EThumbnailFormat::JPG; break; }
-                    case GCodeThumbnailsFormat::QOI: { block.params.format = (uint16_t)bgcode::core::EThumbnailFormat::QOI; break; }
+                    case GCodeThumbnailsFormat::PNG: { block.params.format = (uint16_t)EThumbnailFormat::PNG; break; }
+                    case GCodeThumbnailsFormat::JPG: { block.params.format = (uint16_t)EThumbnailFormat::JPG; break; }
+                    case GCodeThumbnailsFormat::QOI: { block.params.format = (uint16_t)EThumbnailFormat::QOI; break; }
                     }
                     block.data.resize(compressed->size);
                     memcpy(block.data.data(), compressed->data, compressed->size);

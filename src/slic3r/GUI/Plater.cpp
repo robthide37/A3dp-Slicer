@@ -5466,9 +5466,10 @@ void Plater::convert_gcode_to_ascii()
     // Perform conversion
     {
         wxBusyCursor busy;
-        bgcode::core::EResult res = bgcode::convert::from_binary_to_ascii(*in_file.f, *out_file.f, true);
-        if (res != bgcode::core::EResult::Success) {
-            MessageDialog msg_dlg(this, _L(std::string(bgcode::core::translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+        using namespace bgcode::core;
+        EResult res = bgcode::convert::from_binary_to_ascii(*in_file.f, *out_file.f, true);
+        if (res != EResult::Success) {
+            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
             out_file.close();
             boost::nowide::remove(output_file.c_str());
@@ -5511,10 +5512,11 @@ void Plater::convert_gcode_to_binary()
     // Perform conversion
     {
         wxBusyCursor busy;
+        using namespace bgcode::core;
         const bgcode::binarize::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
-        bgcode::core::EResult res = bgcode::convert::from_ascii_to_binary(*in_file.f, *out_file.f, binarizer_config);
-        if (res != bgcode::core::EResult::Success) {
-            MessageDialog msg_dlg(this, _L(std::string(bgcode::core::translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+        EResult res = bgcode::convert::from_ascii_to_binary(*in_file.f, *out_file.f, binarizer_config);
+        if (res != EResult::Success) {
+            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
             out_file.close();
             boost::nowide::remove(output_file.c_str());
