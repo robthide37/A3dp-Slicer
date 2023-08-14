@@ -65,29 +65,21 @@ public:
     }
 };
 
-struct WipeTowerGeometry
+static Polygon get_wtpoly(const GLCanvas3D::WipeTowerInfo &wti)
 {
-    Polygon poly;
-    Point pos = Point::Zero();
-    double rot = 0.;
-};
-
-static WipeTowerGeometry get_wtg(const GLCanvas3D::WipeTowerInfo &wti)
-{
-    WipeTowerGeometry ret;
 
     auto bb = scaled(wti.bounding_box());
-    ret.poly = Polygon({
+    Polygon poly = Polygon({
         {bb.min},
         {bb.max.x(), bb.min.y()},
         {bb.max},
         {bb.min.x(), bb.max.y()}
     });
 
-    ret.pos  = scaled(wti.pos());
-    ret.rot  = wti.rotation();
+    poly.rotate(wti.rotation());
+    poly.translate(scaled(wti.pos()));
 
-    return ret;
+    return poly;
 }
 
 // Wipe tower logic based on GLCanvas3D::WipeTowerInfo implements the Arrangeable
@@ -95,18 +87,24 @@ static WipeTowerGeometry get_wtg(const GLCanvas3D::WipeTowerInfo &wti)
 class ArrangeableWT: public arr2::ArrangeableWipeTowerBase
 {
     BoundingBox m_xl_bb;
+    Vec2d m_orig_tr;
+    double m_orig_rot;
+
 public:
-    explicit ArrangeableWT(const ObjectID &oid,
-                           const WipeTowerGeometry &wtg,
-                           std::function<bool()> sel_pred,
-                           const BoundingBox xl_bb = {})
-        : arr2::ArrangeableWipeTowerBase{oid, wtg.poly, wtg.pos, wtg.rot,
-                                         std::move(sel_pred)}, m_xl_bb{xl_bb}
+    explicit ArrangeableWT(const ObjectID                  &oid,
+                           const GLCanvas3D::WipeTowerInfo &wti,
+                           std::function<bool()>            sel_pred,
+                           const BoundingBox                xl_bb = {})
+        : arr2::ArrangeableWipeTowerBase{oid, get_wtpoly(wti), std::move(sel_pred)}
+        , m_orig_tr{wti.pos()}
+        , m_orig_rot{wti.rotation()}
+        , m_xl_bb{xl_bb}
     {}
 
-    void transform(const Vec2d &transl, double rot) override
+    // Rotation is disabled for wipe tower in arrangement
+    void transform(const Vec2d &transl, double /*rot*/) override
     {
-        GLCanvas3D::WipeTowerInfo::apply_wipe_tower(unscaled(pos) + transl, rot);
+        GLCanvas3D::WipeTowerInfo::apply_wipe_tower(m_orig_tr + transl, m_orig_rot);
     }
 
     void imbue_data(arr2::AnyWritable &datastore) const override
@@ -142,8 +140,7 @@ struct WTH : public arr2::WipeTowerHandler
     template<class Self, class Fn>
     static void visit_(Self &&self, Fn &&fn)
     {
-        auto wtg = get_wtg(self.wti);
-        ArrangeableWT wta{self.oid, wtg, self.sel_pred, self.xl_bb};
+        ArrangeableWT wta{self.oid, self.wti, self.sel_pred, self.xl_bb};
         fn(wta);
     }
 

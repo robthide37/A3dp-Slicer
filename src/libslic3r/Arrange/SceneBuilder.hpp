@@ -115,20 +115,14 @@ struct ArrangeableWipeTowerBase: public Arrangeable
     ObjectID oid;
 
     Polygon poly;
-    Point pos = Point::Zero();
-    double rot = 0.;
     SelectionPredicate selection_pred;
 
     ArrangeableWipeTowerBase(
         const ObjectID &objid,
         Polygon shape,
-        const Point &p,
-        double r,
         SelectionPredicate selection_predicate = [] { return false; })
         : oid{objid},
           poly{std::move(shape)},
-          pos{p},
-          rot{r},
           selection_pred{std::move(selection_predicate)}
     {}
 
@@ -138,15 +132,12 @@ struct ArrangeableWipeTowerBase: public Arrangeable
     ExPolygons full_outline() const override
     {
         auto cpy = poly;
-        cpy.translate(pos);
-        return {ExPolygon{cpy}};
+        return {ExPolygon{std::move(cpy)}};
     }
 
     Polygon convex_outline() const override
     {
-        auto cpy = poly;
-        cpy.translate(pos);
-        return cpy;
+        return poly;
     }
 
     bool is_selected() const override

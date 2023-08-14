@@ -882,12 +882,12 @@ public:
 
     void visit(std::function<void(Arrangeable &)> fn) override
     {
-        MocWT wt{m_id, Polygon{}, Point::Zero(), 0., m_sel_pred};
+        MocWT wt{m_id, Polygon{}, m_sel_pred};
         fn(wt);
     }
     void visit(std::function<void(const Arrangeable &)> fn) const override
     {
-        MocWT wt{m_id, Polygon{}, Point::Zero(), 0., m_sel_pred};
+        MocWT wt{m_id, Polygon{}, m_sel_pred};
         fn(wt);
     }
     void set_selection_predicate(std::function<bool()> pred) override

@@ -225,6 +225,9 @@ void fill_rotations(const Range<It>           &items,
         return;
 
     for (auto &itm : items) {
+        if (is_wipe_tower(itm)) // Rotating the wipe tower is currently problematic
+            continue;
+
         // Use the minimum bounding box rotation as a starting point.
         auto minbbr = get_min_area_bounding_box_rotation(itm);
         std::vector<double> rotations =
