@@ -3975,12 +3975,12 @@ void GCodeProcessor::post_process()
 #endif // ENABLE_BINARIZED_GCODE
                 write_to_file(out, out_string, result, out_path);
 #if ENABLE_BINARIZED_GCODE
-            update_out_file_pos(out, out_string, result);
+            update_out_file_pos(out_string, result);
 #endif // ENABLE_BINARIZED_GCODE
         }
 
 #if ENABLE_BINARIZED_GCODE
-        void update_out_file_pos(FilePtr& out, const std::string& out_string, GCodeProcessorResult& result) {
+        void update_out_file_pos(const std::string& out_string, GCodeProcessorResult& result) {
             for (size_t i = 0; i < out_string.size(); ++i) {
                 if (out_string[i] == '\n')
                     result.lines_ends.emplace_back(m_out_file_pos + i + 1);
@@ -4011,7 +4011,7 @@ void GCodeProcessor::post_process()
 #endif // ENABLE_BINARIZED_GCODE
                 write_to_file(out, out_string, result, out_path);
 #if ENABLE_BINARIZED_GCODE
-            update_out_file_pos(out, out_string, result);
+            update_out_file_pos(out_string, result);
 #endif // ENABLE_BINARIZED_GCODE
         }
 
