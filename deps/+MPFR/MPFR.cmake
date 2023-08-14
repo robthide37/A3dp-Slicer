@@ -1,5 +1,5 @@
 set(_srcdir ${CMAKE_CURRENT_LIST_DIR}/mpfr)
-set(_dstdir ${DESTDIR}/usr/local)
+set(_dstdir ${${PROJECT_NAME}_DEP_INSTALL_PREFIX})
 
 if (MSVC)
     set(_output  ${_dstdir}/include/mpfr.h
@@ -29,9 +29,9 @@ else ()
         EXCLUDE_FROM_ALL ON
         URL http://ftp.vim.org/ftp/gnu/mpfr/mpfr-3.1.6.tar.bz2 https://www.mpfr.org/mpfr-3.1.6/mpfr-3.1.6.tar.bz2  # mirrors are allowed
         URL_HASH SHA256=cf4f4b2d80abb79e820e78c8077b6725bbbb4e8f41896783c899087be0e94068
-        DOWNLOAD_DIR ${DEP_DOWNLOAD_DIR}/MPFR
+        DOWNLOAD_DIR ${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}/MPFR
         BUILD_IN_SOURCE ON
-        CONFIGURE_COMMAND env "CFLAGS=${_gmp_ccflags}" "CXXFLAGS=${_gmp_ccflags}" ./configure ${_cross_compile_arg} --prefix=${DESTDIR}/usr/local --enable-shared=no --enable-static=yes --with-gmp=${DESTDIR}/usr/local ${_gmp_build_tgt}
+        CONFIGURE_COMMAND env "CFLAGS=${_gmp_ccflags}" "CXXFLAGS=${_gmp_ccflags}" ./configure ${_cross_compile_arg} --prefix=${${PROJECT_NAME}_DEP_INSTALL_PREFIX} --enable-shared=no --enable-static=yes --with-gmp=${DESTDIR}/usr/local ${_gmp_build_tgt}
         BUILD_COMMAND make -j
         INSTALL_COMMAND make install
     )

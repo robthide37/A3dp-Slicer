@@ -1,6 +1,6 @@
 
 set(_srcdir ${CMAKE_CURRENT_LIST_DIR}/gmp)
-set(_dstdir ${DESTDIR}/usr/local)
+set(_dstdir ${${PROJECT_NAME}_DEP_INSTALL_PREFIX})
 
 if (MSVC)
     set(_output  ${_dstdir}/include/gmp.h 
@@ -47,9 +47,9 @@ else ()
         EXCLUDE_FROM_ALL ON
         URL https://gmplib.org/download/gmp/gmp-6.2.1.tar.bz2
         URL_HASH SHA256=eae9326beb4158c386e39a356818031bd28f3124cf915f8c5b1dc4c7a36b4d7c
-        DOWNLOAD_DIR ${DEP_DOWNLOAD_DIR}/GMP
+        DOWNLOAD_DIR ${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}/GMP
         BUILD_IN_SOURCE ON 
-        CONFIGURE_COMMAND  env "CFLAGS=${_gmp_ccflags}" "CXXFLAGS=${_gmp_ccflags}" ./configure ${_cross_compile_arg} --enable-shared=no --enable-cxx=yes --enable-static=yes "--prefix=${DESTDIR}/usr/local" ${_gmp_build_tgt}
+        CONFIGURE_COMMAND  env "CFLAGS=${_gmp_ccflags}" "CXXFLAGS=${_gmp_ccflags}" ./configure ${_cross_compile_arg} --enable-shared=no --enable-cxx=yes --enable-static=yes "--prefix=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}" ${_gmp_build_tgt}
         BUILD_COMMAND     make -j
         INSTALL_COMMAND   make install
     )

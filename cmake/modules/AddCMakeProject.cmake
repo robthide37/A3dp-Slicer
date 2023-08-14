@@ -1,9 +1,9 @@
 include(ExternalProject)
 include(ProcessorCount)
 
-set(DESTDIR "${CMAKE_CURRENT_BINARY_DIR}/destdir" CACHE PATH "Destination directory")
-set(DEP_DOWNLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR} CACHE PATH "Path for downloaded source packages.")
-option(DEP_BUILD_VERBOSE "Use verbose output for each dependency build" OFF)
+set(${PROJECT_NAME}_DEP_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/destdir/usr/local" CACHE PATH "Destination directory")
+set(${PROJECT_NAME}_DEP_DOWNLOAD_DIR ${CMAKE_CURRENT_BINARY_DIR}/downloads CACHE PATH "Path for downloaded source packages.")
+option(${PROJECT_NAME}_DEP_BUILD_VERBOSE "Use verbose output for each dependency build" OFF)
 
 get_property(_is_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 
@@ -45,17 +45,19 @@ function(add_cmake_project projectname)
     set(_verbose_switch "")
     if (CMAKE_GENERATOR MATCHES "Ninja")
         set(_verbose_switch "--verbose")
+    elseif (CMAKE_GENERATOR MATCHES "Visual Studio")
+        set(_verbose_switch "-v:d")
     endif ()
 
     ExternalProject_Add(
         dep_${projectname}
         EXCLUDE_FROM_ALL    ON  # Not built by default, dep_${projectname} needs to be added to ALL target
-        INSTALL_DIR         ${DESTDIR}/usr/local
-        DOWNLOAD_DIR        ${DEP_DOWNLOAD_DIR}/${projectname}
+        INSTALL_DIR         ${${PROJECT_NAME}_DEP_INSTALL_PREFIX}
+        DOWNLOAD_DIR        ${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}/${projectname}
         CMAKE_ARGS
-            -DCMAKE_INSTALL_PREFIX:STRING=${DESTDIR}/usr/local
+            -DCMAKE_INSTALL_PREFIX:STRING=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}
             -DCMAKE_MODULE_PATH:STRING=${CMAKE_MODULE_PATH}
-            -DCMAKE_PREFIX_PATH:STRING=${DESTDIR}/usr/local
+            -DCMAKE_PREFIX_PATH:STRING=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}
             -DCMAKE_DEBUG_POSTFIX:STRING=${CMAKE_DEBUG_POSTFIX}
             -DCMAKE_C_COMPILER:STRING=${CMAKE_C_COMPILER}
             -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}

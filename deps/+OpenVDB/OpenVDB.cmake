@@ -7,7 +7,7 @@ else()
 endif()
 
 set (_openvdb_vdbprint ON)
-if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" OR ${CMAKE_BUILD_TYPE} STREQUAL Debug)
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" OR NOT ${CMAKE_BUILD_TYPE} STREQUAL Release)
     # Build fails on raspberry pi due to missing link directive to latomic
     # Let's hope it will be fixed soon.
     set (_openvdb_vdbprint OFF)

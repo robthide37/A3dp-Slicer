@@ -28,6 +28,16 @@ project(PrusaSlicer_deps)
 
 set(${PROJECT_NAME}_PACKAGE_EXCLUDES "" CACHE STRING "Exclude packages matching this regex pattern")
 
+# Support legacy parameter DESTDIR
+if (DESTDIR)
+  set(${PROJECT_NAME}_DEP_INSTALL_PREFIX ${DESTDIR}/usr/local CACHE PATH "Destination directory" FORCE)
+endif ()
+
+# Support legacy parameter DEP_DOWNLOAD_DIR
+if (DEP_DOWNLOAD_DIR)
+  set(${PROJECT_NAME}_DEP_DOWNLOAD_DIR ${DEP_DOWNLOAD_DIR} CACHE PATH "Path for downloaded source packages." FORCE)
+endif ()
+
 # Slightly controversial
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/modules)
 
@@ -236,11 +246,11 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR} -G${CMAKE_GENERATOR} 
       -DCMAKE_BUILD_TYPE=Debug
       -DDEP_WX_GTK3=${DEP_WX_GTK3}
-      -DDEP_DOWNLOAD_DIR=${DEP_DOWNLOAD_DIR} 
-      -DDESTDIR=${DESTDIR}
+      -D${PROJECT_NAME}_DEP_DOWNLOAD_DIR=${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}
+      -D${PROJECT_NAME}_DEP_INSTALL_PREFIX=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}
       -D${PROJECT_NAME}_PACKAGE_EXCLUDES="${_excl_regexp}"
       -D${PROJECT_NAME}_SELECT_ALL=${${PROJECT_NAME}_SELECT_ALL}
-      -DDEP_BUILD_VERBOSE=${DEP_BUILD_VERBOSE}
+      -D${PROJECT_NAME}_DEP_BUILD_VERBOSE=${${PROJECT_NAME}_DEP_BUILD_VERBOSE}
       -DCMAKE_DEBUG_POSTFIX=d
       #TODO: forward per-package selector variables
       -DDEP_MESSAGES_WRITTEN=ON
