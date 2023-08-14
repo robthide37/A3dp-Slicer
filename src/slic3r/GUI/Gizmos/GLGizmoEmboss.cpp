@@ -361,6 +361,67 @@ void GLGizmoEmboss::on_shortcut_key() {
 }
 
 namespace{
+ModelVolumePtrs prepare_volumes_to_slice(const ModelVolume &mv)
+{
+    const ModelVolumePtrs &volumes = mv.get_object()->volumes;
+    ModelVolumePtrs        result;
+    result.reserve(volumes.size());
+    for (ModelVolume *volume : volumes) {
+        // only part could be surface for volumes
+        if (!volume->is_model_part())
+            continue;
+
+        // is selected volume
+        if (mv.id() == volume->id())
+            continue;
+
+        result.push_back(volume);
+    }
+    return result;
+}
+}
+
+bool GLGizmoEmboss::do_mirror(size_t axis)
+{ 
+    // is valid input
+    assert(axis < 3);
+    if (axis >= 3)
+        return false;
+
+    // is gizmo opened and initialized?
+    assert(m_parent.get_gizmos_manager().get_current_type() == GLGizmosManager::Emboss);
+    if (m_parent.get_gizmos_manager().get_current_type() != GLGizmosManager::Emboss)
+        return false;
+
+    const TextConfiguration &tc= *m_volume->text_configuration;
+    if(tc.style.prop.per_glyph){
+        // init textlines before mirroring on mirrored text volume transformation
+        Transform3d tr = m_volume->get_matrix();
+        const std::optional<Transform3d> &fix_tr = tc.fix_3mf_tr;
+        if (fix_tr.has_value())
+            tr = tr * (fix_tr->inverse());
+
+        // mirror
+        Vec3d scale = Vec3d::Ones();
+        scale[axis] = -1.;
+        tr = tr * Eigen::Scaling(scale);
+
+        // collect volumes in object
+        ModelVolumePtrs volumes = prepare_volumes_to_slice(*m_volume);
+        m_text_lines.init(tr, volumes, m_style_manager, m_text_lines.get_lines().size());
+    }
+
+    // mirror
+    Transform3d tr = m_volume->get_matrix();
+    Vec3d scale = Vec3d::Ones();
+    scale[axis] = -1.;
+    tr = tr * Eigen::Scaling(scale);
+    m_volume->set_transformation(tr); 
+    // NOTE: Staff around volume transformation change is done in job finish
+    return process();
+}
+
+namespace{
 // verify correct volume type for creation of text
 bool check(ModelVolumeType volume_type) {
     return volume_type == ModelVolumeType::MODEL_PART ||
@@ -1101,11 +1162,6 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
         return;
     const GLVolume        &gl_volume = *gl_volume_ptr;
     const ModelObjectPtrs &objects   = selection.get_model()->objects;
-    const ModelObject     *mo_ptr    = get_model_object(gl_volume, objects);
-    if (mo_ptr == nullptr)
-        return;
-    const ModelObject &mo = *mo_ptr;
-
     const ModelVolume *mv_ptr = get_model_volume(gl_volume, objects);
     if (mv_ptr == nullptr)
         return;
@@ -1126,19 +1182,7 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
     }
 
     // prepare volumes to slice
-    ModelVolumePtrs volumes;
-    volumes.reserve(mo.volumes.size());
-    for (ModelVolume *volume : mo.volumes) {
-        // only part could be surface for volumes
-        if (!volume->is_model_part())
-            continue;
-
-        // is selected volume
-        if (mv.id() == volume->id())
-            continue;
-
-        volumes.push_back(volume);
-    }
+    ModelVolumePtrs volumes = prepare_volumes_to_slice(mv);
 
     // For interactivity during drag over surface it must be from gl_volume not volume.
     Transform3d mv_trafo = gl_volume.get_volume_transformation().get_matrix();

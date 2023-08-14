@@ -218,7 +218,7 @@ indexed_triangle_set create_its(const TextLines &lines, float radius)
     return its;
 }
 
-GLModel::Geometry create_geometry(const TextLines &lines, float radius)
+GLModel::Geometry create_geometry(const TextLines &lines, float radius, bool is_mirrored)
 {
     indexed_triangle_set its = create_its(lines, radius);
 
@@ -232,8 +232,15 @@ GLModel::Geometry create_geometry(const TextLines &lines, float radius)
         geometry.add_vertex(vertex);
 
     geometry.reserve_indices(its.indices.size() * 3);
-    for (Vec3i t : its.indices)
-        geometry.add_triangle(t[0], t[1], t[2]);
+
+    if (is_mirrored) {
+        // change order of indices
+        for (Vec3i t : its.indices)
+            geometry.add_triangle(t[0], t[2], t[1]);
+    } else {
+        for (Vec3i t : its.indices)
+            geometry.add_triangle(t[0], t[1], t[2]);
+    }
     return geometry;    
 }
 
@@ -333,9 +340,10 @@ void TextLinesModel::init(const Transform3d      &text_tr,
     for (size_t i = 0; i < count_lines; ++i)
         m_lines[i].y = line_centers[i];
 
+    bool is_mirrored = has_reflection(text_tr);
     float radius = static_cast<float>(line_height_mm / 20.);
     //*
-    GLModel::Geometry geometry = create_geometry(m_lines, radius);
+    GLModel::Geometry geometry = create_geometry(m_lines, radius, is_mirrored);
     if (geometry.vertices_count() == 0 || geometry.indices_count() == 0)
         return;
     m_model.init_from(std::move(geometry));
