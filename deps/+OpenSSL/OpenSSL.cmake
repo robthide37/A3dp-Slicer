@@ -24,7 +24,7 @@ ExternalProject_Add(dep_OpenSSL
     DOWNLOAD_DIR ${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}/OpenSSL
     BUILD_IN_SOURCE ON
     CONFIGURE_COMMAND ${_conf_cmd} ${_cross_arch}
-        "--prefix=${PROJECT_NAME}_DEP_INSTALL_PREFIX"
+        "--prefix=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}"
         ${_cross_comp_prefix_line}
         no-shared
         no-ssl3-method
