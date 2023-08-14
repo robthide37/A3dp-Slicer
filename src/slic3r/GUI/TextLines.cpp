@@ -24,27 +24,6 @@ using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
 
 namespace {
-const Slic3r::Polygon *largest(const Slic3r::Polygons &polygons)
-{
-    if (polygons.empty())
-        return nullptr;
-    if (polygons.size() == 1)
-        return &polygons.front();
-
-    // compare polygon to find largest
-    size_t                 biggest_size = 0;
-    const Slic3r::Polygon *result       = nullptr;
-    for (const Slic3r::Polygon &polygon : polygons) {
-        Point  s    = polygon.bounding_box().size();
-        size_t size = s.x() * s.y();
-        if (size <= biggest_size)
-            continue;
-        biggest_size = size;
-        result       = &polygon;
-    }
-    return result;
-}
-
 // Be careful it is not water tide and contain self intersections
 // It is only for visualization purposes
 indexed_triangle_set its_create_torus(const Slic3r::Polygon &polygon, float radius, size_t steps = 20)
@@ -69,12 +48,6 @@ indexed_triangle_set its_create_torus(const Slic3r::Polygon &polygon, float radi
     for (size_t i = 0; i < count - 1; ++i)
         line_norm[i] = calc_line_norm(points_d[i], points_d[i + 1]);
     line_norm.back() = calc_line_norm(points_d.back(), points_d.front());
-
-    // calculate normals for each point
-    auto calc_norm = [](const Vec2f &prev, const Vec2f &next) -> Vec2f {
-        Vec2f dir = prev + next;
-        return Vec2f(-dir.x(), dir.y());
-    };
         
     // precalculate sinus and cosinus
     double angle_step = 2 * M_PI / steps;
