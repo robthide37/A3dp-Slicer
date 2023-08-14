@@ -653,22 +653,6 @@ ExPolygons ArrangeableSLAPrintObject::full_envelope() const
             Polygons ptmp = project_mesh(pmesh.its, trafo_instance, [] {});
             ret = union_ex(ret, ptmp);
         }
-    } else {
-        // The 1.1 multiplier is a safety gap, as the offset might be bigger
-        // in sharp edges of a polygon, depending on clipper's offset algorithm
-        coord_t pad_infl = 0;
-        {
-            double infl = m_po->config().pad_enable.getBool() *
-                          (m_po->config().pad_brim_size.getFloat() +
-                           m_po->config().pad_around_object.getBool() *
-                               m_po->config().pad_object_gap.getFloat());
-
-            pad_infl = scaled(1.1 * infl);
-        }
-
-        if (pad_infl > 0) {
-            ret = offset_ex(ret, pad_infl);
-        }
     }
 
     return ret;
@@ -721,22 +705,6 @@ Polygon ArrangeableSLAPrintObject::convex_envelope() const
 
             polys.emplace_back(
                 its_convex_hull_2d_above(pmesh.its, trafo_instance, zlvl));
-        }
-    } else {
-        // The 1.1 multiplier is a safety gap, as the offset might be bigger
-        // in sharp edges of a polygon, depending on clipper's offset algorithm
-        coord_t pad_infl = 0;
-        {
-            double infl = m_po->config().pad_enable.getBool() *
-                          (m_po->config().pad_brim_size.getFloat() +
-                           m_po->config().pad_around_object.getBool() *
-                               m_po->config().pad_object_gap.getFloat());
-
-            pad_infl = scaled(1.1 * infl);
-        }
-
-        if (pad_infl > 0) {
-            polys = offset(polys, pad_infl);
         }
     }
 
