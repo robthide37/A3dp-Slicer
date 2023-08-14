@@ -741,7 +741,8 @@ ConfigSubstitutions ConfigBase::load(const std::string& filename, ForwardCompati
         if (file == nullptr)
             throw Slic3r::RuntimeError("Error opening the file: " + filename + "\n");
 
-        file_type = (bgcode::core::is_valid_binary_gcode(*file, true) == bgcode::core::EResult::Success) ? EFileType::BinaryGCode : EFileType::AsciiGCode;
+        std::vector<uint8_t> cs_buffer(65536);
+        file_type = (bgcode::core::is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == bgcode::core::EResult::Success) ? EFileType::BinaryGCode : EFileType::AsciiGCode;
         fclose(file);
     }
     else 
@@ -1070,7 +1071,8 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
     if (file.f == nullptr)
         throw Slic3r::RuntimeError(format("Error opening the file: %1%", filename));
 
-    bgcode::core::EResult res = bgcode::core::is_valid_binary_gcode(*file.f);
+    std::vector<uint8_t> cs_buffer(65536);
+    bgcode::core::EResult res = bgcode::core::is_valid_binary_gcode(*file.f, true, cs_buffer.data(), cs_buffer.size());
     if (res != bgcode::core::EResult::Success)
         throw Slic3r::RuntimeError(format("The selected file is not a valid binary gcode.\nError: %1%",
             std::string(bgcode::core::translate_result(res))));
@@ -1083,7 +1085,7 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
         throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(bgcode::core::translate_result(res))));
 
     bgcode::core::BlockHeader block_header;
-    res = read_next_block_header(*file.f, file_header, block_header, bgcode::core::EBlockType::SlicerMetadata, true);
+    res = read_next_block_header(*file.f, file_header, block_header, bgcode::core::EBlockType::SlicerMetadata, cs_buffer.data(), cs_buffer.size());
     if (res != bgcode::core::EResult::Success)
         throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(bgcode::core::translate_result(res))));
     if ((bgcode::core::EBlockType)block_header.type != bgcode::core::EBlockType::SlicerMetadata)

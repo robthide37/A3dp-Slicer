@@ -883,7 +883,8 @@ ConfigSubstitutions PresetBundle::load_config_file(const std::string &path, Forw
         FILE* file = boost::nowide::fopen(path.c_str(), "rb");
         if (file == nullptr)
             throw Slic3r::RuntimeError("Error opening the file: " + path + "\n");
-        const bool is_binary = bgcode::core::is_valid_binary_gcode(*file, true) == bgcode::core::EResult::Success;
+        std::vector<uint8_t> cs_buffer(65536);
+        const bool is_binary = bgcode::core::is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == bgcode::core::EResult::Success;
         fclose(file);
 
         DynamicPrintConfig config;
