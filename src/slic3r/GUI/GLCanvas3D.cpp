@@ -2691,6 +2691,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::Gizmo);
     if (curr_gizmo != nullptr && !m_selection.is_empty())
         curr_gizmo->register_raycasters_for_picking();
+    m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::FallbackGizmo);
+    if (curr_gizmo != nullptr && !m_selection.is_empty())
+        curr_gizmo->register_raycasters_for_picking();
 
     // and force this canvas to be redrawn.
     m_dirty = true;
@@ -3597,11 +3600,6 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                     update_sequential_clearance(true);
             }
         }
-        else if (evt.LeftUp() &&
-            m_gizmos.get_current_type() == GLGizmosManager::EType::Scale &&
-            m_gizmos.get_current()->get_state() == GLGizmoBase::EState::On) {
-            wxGetApp().obj_list()->selection_changed();
-        }
 
         return;
     }
@@ -4071,7 +4069,7 @@ void GLCanvas3D::do_move(const std::string& snapshot_type)
                 model_object->invalidate_bounding_box();
             }
         }
-        else if (v->is_wipe_tower)
+        else if (m_selection.is_wipe_tower() && v->is_wipe_tower)
             // Move a wipe tower proxy.
             wipe_tower_origin = v->get_volume_offset();
     }
@@ -5749,6 +5747,7 @@ void GLCanvas3D::_picking_pass()
             break;
         }
         case SceneRaycaster::EType::Gizmo:
+        case SceneRaycaster::EType::FallbackGizmo:
         {
             const Size& cnv_size = get_canvas_size();
             const bool inside = 0 <= m_mouse.position.x() && m_mouse.position.x() < cnv_size.get_width() &&
@@ -5781,6 +5780,7 @@ void GLCanvas3D::_picking_pass()
     {
     case SceneRaycaster::EType::Bed:   { object_type = "Bed"; break; }
     case SceneRaycaster::EType::Gizmo: { object_type = "Gizmo element"; break; }
+    case SceneRaycaster::EType::FallbackGizmo: { object_type = "Gizmo2 element"; break; }
     case SceneRaycaster::EType::Volume:
     {
         if (m_volumes.volumes[hit.raycaster_id]->is_wipe_tower)
@@ -5835,6 +5835,8 @@ void GLCanvas3D::_picking_pass()
         add_strings_row_to_table("Volumes", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
         sprintf(buf, "%d (%d)", (int)m_scene_raycaster.gizmos_count(), (int)m_scene_raycaster.active_gizmos_count());
         add_strings_row_to_table("Gizmo elements", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+        sprintf(buf, "%d (%d)", (int)m_scene_raycaster.fallback_gizmos_count(), (int)m_scene_raycaster.active_fallback_gizmos_count());
+        add_strings_row_to_table("Gizmo2 elements", ImGuiWrapper::COL_ORANGE_LIGHT, std::string(buf), ImGui::GetStyleColorVec4(ImGuiCol_Text));
         ImGui::EndTable();
     }
 
@@ -5847,6 +5849,20 @@ void GLCanvas3D::_picking_pass()
                 add_strings_row_to_table(std::to_string(i), ImGuiWrapper::COL_ORANGE_LIGHT,
                     std::to_string(SceneRaycaster::decode_id(SceneRaycaster::EType::Gizmo, (*gizmo_raycasters)[i]->get_id())), ImGui::GetStyleColorVec4(ImGuiCol_Text),
                     to_string(Geometry::Transformation((*gizmo_raycasters)[i]->get_transform()).get_offset()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
+            }
+            ImGui::EndTable();
+        }
+    }
+
+    std::vector<std::shared_ptr<SceneRaycasterItem>>* gizmo2_raycasters = m_scene_raycaster.get_raycasters(SceneRaycaster::EType::FallbackGizmo);
+    if (gizmo2_raycasters != nullptr && !gizmo2_raycasters->empty()) {
+        ImGui::Separator();
+        imgui.text("Gizmo2 raycasters IDs:");
+        if (ImGui::BeginTable("Gizmo2Raycasters", 3)) {
+            for (size_t i = 0; i < gizmo2_raycasters->size(); ++i) {
+                add_strings_row_to_table(std::to_string(i), ImGuiWrapper::COL_ORANGE_LIGHT,
+                    std::to_string(SceneRaycaster::decode_id(SceneRaycaster::EType::FallbackGizmo, (*gizmo2_raycasters)[i]->get_id())), ImGui::GetStyleColorVec4(ImGuiCol_Text),
+                    to_string(Geometry::Transformation((*gizmo2_raycasters)[i]->get_transform()).get_offset()), ImGui::GetStyleColorVec4(ImGuiCol_Text));
             }
             ImGui::EndTable();
         }

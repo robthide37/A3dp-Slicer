@@ -503,6 +503,11 @@ void ObjectManipulation::Show(const bool show)
         }
         m_word_local_combo->Show(show_world_local_combo);
         m_empty_str->Show(!show_world_local_combo);
+
+        m_skew_label->Show(m_show_skew);
+        m_reset_skew_button->Show(m_show_skew);
+
+        m_parent->Layout();
     }
 }
 
@@ -795,15 +800,22 @@ void ObjectManipulation::update_reset_buttons_visibility()
         m_mirror_warning_bitmap->SetBitmap(show_mirror ? m_manifold_warning_bmp.bmp() : wxNullBitmap);
         m_mirror_warning_bitmap->SetMinSize(show_mirror ? m_manifold_warning_bmp.GetSize() : wxSize(0, 0));
         m_mirror_warning_bitmap->SetToolTip(show_mirror ? _L("Left handed") : "");
-        m_reset_skew_button->Show(show_skew);
-        m_skew_label->Show(show_skew);
 
-        // Because of CallAfter we need to layout sidebar after Show/hide of reset buttons one more time
-        Sidebar& panel = wxGetApp().sidebar();
-        if (!panel.IsFrozen()) {
-            panel.Freeze();
-            panel.Layout();
-            panel.Thaw();
+        if (m_show_skew == show_skew)
+            get_sizer()->Layout();
+        else {
+            // Call sidebar layout only if it's really needed,
+            // it means, when we show/hide additional line for skew information
+            m_show_skew = show_skew;
+            m_reset_skew_button->Show(m_show_skew);
+            m_skew_label->Show(m_show_skew);
+            // Because of CallAfter we need to layout sidebar after Show/hide of reset buttons one more time
+            Sidebar& panel = wxGetApp().sidebar();
+            if (!panel.IsFrozen()) {
+                panel.Freeze();
+                panel.Layout();
+                panel.Thaw();
+            }
         }
     });
 }
