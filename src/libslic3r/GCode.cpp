@@ -886,14 +886,37 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     // Write information on the generator.
     file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
 
-    // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
-    // If "thumbnails_format" is not defined, export to PNG.
-    if (const auto [thumbnails, thumbnails_format] = std::make_pair(
-            print.full_print_config().option<ConfigOptionPoints>("thumbnails"),
-            print.full_print_config().option<ConfigOptionEnum<GCodeThumbnailsFormat>>("thumbnails_format"));
-        thumbnails)
-        GCodeThumbnails::export_thumbnails_to_file(
-            thumbnail_cb, thumbnails->values, thumbnails_format ? thumbnails_format->value : GCodeThumbnailsFormat::PNG,
+    // ??? Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
+    // ??? If "thumbnails_format" is not defined, export to PNG.
+
+    // generate thumbnails data to process it
+
+    std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails_list;
+    if (const auto thumbnails_value = print.full_print_config().option<ConfigOptionString>("thumbnails")) {
+        std::string str = thumbnails_value->value;
+        std::istringstream is(str);
+        std::string point_str;
+        while (std::getline(is, point_str, ',')) {
+            Vec2d point(Vec2d::Zero());
+            GCodeThumbnailsFormat format;
+            std::istringstream iss(point_str);
+            std::string coord_str;
+            if (std::getline(iss, coord_str, 'x')) {
+                std::istringstream(coord_str) >> point(0);
+                if (std::getline(iss, coord_str, '/')) {
+                    std::istringstream(coord_str) >> point(1);
+                    std::string ext_str;
+                    if (std::getline(iss, ext_str, '/'))
+                        format = ext_str == "JPG" ? GCodeThumbnailsFormat::JPG :
+                                 ext_str == "QOI" ? GCodeThumbnailsFormat::QOI :GCodeThumbnailsFormat::PNG;
+                }
+            }
+            thumbnails_list.emplace_back(std::make_pair(format, point));
+        }
+    }
+
+    if (!thumbnails_list.empty())
+        GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, thumbnails_list,
             [&file](const char* sz) { file.write(sz); },
             [&print]() { print.throw_if_canceled(); });
 

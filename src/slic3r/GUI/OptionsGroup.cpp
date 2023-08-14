@@ -904,9 +904,13 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 		ret = double_to_string(val);
 		}
 		break;
-	case coString:
-		ret = from_u8(config.opt_string(opt_key));
-		break;
+	case coString: {
+        if (opt_key == "thumbnails")
+            ret = get_valid_thumbnails_string(config);
+        else
+            ret = from_u8(config.opt_string(opt_key));
+        break;
+    }
 	case coStrings:
 		if (opt_key == "compatible_printers" || opt_key == "compatible_prints" || opt_key == "gcode_substitutions") {
 			ret = config.option<ConfigOptionStrings>(opt_key)->values;
@@ -946,8 +950,6 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 	case coPoints:
 		if (opt_key == "bed_shape")
 			ret = config.option<ConfigOptionPoints>(opt_key)->values;
-        else if (opt_key == "thumbnails")
-            ret = get_thumbnails_string(config.option<ConfigOptionPoints>(opt_key)->values);
 		else
 			ret = config.option<ConfigOptionPoints>(opt_key)->get_at(idx);
 		break;

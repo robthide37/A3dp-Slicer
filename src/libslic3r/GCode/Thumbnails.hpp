@@ -24,34 +24,36 @@ struct CompressedImageBuffer
 std::unique_ptr<CompressedImageBuffer> compress_thumbnail(const ThumbnailData &data, GCodeThumbnailsFormat format);
 
 template<typename WriteToOutput, typename ThrowIfCanceledCallback>
-inline void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb, const std::vector<Vec2d> &sizes, GCodeThumbnailsFormat format, WriteToOutput output, ThrowIfCanceledCallback throw_if_canceled)
+inline void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb, const std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>>& thumbnails_list, WriteToOutput output, ThrowIfCanceledCallback throw_if_canceled)
 {
     // Write thumbnails using base64 encoding
     if (thumbnail_cb != nullptr) {
-        static constexpr const size_t max_row_length = 78;
-        ThumbnailsList thumbnails = thumbnail_cb(ThumbnailsParams{ sizes, true, true, true, true });
-        for (const ThumbnailData& data : thumbnails)
-            if (data.is_valid()) {
-                auto compressed = compress_thumbnail(data, format);
-                if (compressed->data && compressed->size) {
-                    std::string encoded;
-                    encoded.resize(boost::beast::detail::base64::encoded_size(compressed->size));
-                    encoded.resize(boost::beast::detail::base64::encode((void*)encoded.data(), (const void*)compressed->data, compressed->size));
+        for (const auto& [format, size] : thumbnails_list) {
+            static constexpr const size_t max_row_length = 78;
+            ThumbnailsList thumbnails = thumbnail_cb(ThumbnailsParams{ {size}, true, true, true, true });
+            for (const ThumbnailData& data : thumbnails)
+                if (data.is_valid()) {
+                    auto compressed = compress_thumbnail(data, format);
+                    if (compressed->data && compressed->size) {
+                        std::string encoded;
+                        encoded.resize(boost::beast::detail::base64::encoded_size(compressed->size));
+                        encoded.resize(boost::beast::detail::base64::encode((void*)encoded.data(), (const void*)compressed->data, compressed->size));
 
-                    output((boost::format("\n;\n; %s begin %dx%d %d\n") % compressed->tag() % data.width % data.height % encoded.size()).str().c_str());
+                        output((boost::format("\n;\n; %s begin %dx%d %d\n") % compressed->tag() % data.width % data.height % encoded.size()).str().c_str());
 
-                    while (encoded.size() > max_row_length) {
-                        output((boost::format("; %s\n") % encoded.substr(0, max_row_length)).str().c_str());
-                        encoded = encoded.substr(max_row_length);
+                        while (encoded.size() > max_row_length) {
+                            output((boost::format("; %s\n") % encoded.substr(0, max_row_length)).str().c_str());
+                            encoded = encoded.substr(max_row_length);
+                        }
+
+                        if (encoded.size() > 0)
+                            output((boost::format("; %s\n") % encoded).str().c_str());
+
+                        output((boost::format("; %s end\n;\n") % compressed->tag()).str().c_str());
                     }
-
-                    if (encoded.size() > 0)
-                        output((boost::format("; %s\n") % encoded).str().c_str());
-
-                    output((boost::format("; %s end\n;\n") % compressed->tag()).str().c_str());
+                    throw_if_canceled();
                 }
-                throw_if_canceled();
-            }
+        }
     }
 }
 

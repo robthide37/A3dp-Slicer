@@ -636,6 +636,21 @@ void Tab::update_changed_ui()
             if (tab->m_sys_extruders_count != tab->m_extruders_count)
                 nonsys_options.emplace_back("extruders_count");
         }
+
+        // "thumbnails" can not containe a extentions in old config but are valid and use PNG extention by default
+        // So, check if "thumbnails" is really changed
+        // We will compare full strings for thumnails instead of exactly config values
+        {
+            auto check_thumbnails_option = [](std::vector<std::string>& keys, const DynamicPrintConfig& config, const DynamicPrintConfig& config_new) {
+                if (auto it = std::find(keys.begin(), keys.end(), "thumbnails"); it != keys.end())
+                    if (get_valid_thumbnails_string(config) == get_valid_thumbnails_string(config_new))
+                        // if those strings are actually the same, erase them from the list of dirty oprions
+                        keys.erase(it);
+            };
+            check_thumbnails_option(dirty_options, m_presets->get_edited_preset().config, m_presets->get_selected_preset().config);
+            if (const Preset* parent_preset = m_presets->get_selected_preset_parent())
+                check_thumbnails_option(nonsys_options, m_presets->get_edited_preset().config, parent_preset->config);
+        }
     }
 
     for (auto& it : m_options_list)
@@ -2526,7 +2541,6 @@ void TabPrinter::build_fff()
         option = optgroup->get_option("thumbnails");
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
-        optgroup->append_single_option_line("thumbnails_format");
 
         optgroup->append_single_option_line("silent_mode");
         optgroup->append_single_option_line("remaining_times");
