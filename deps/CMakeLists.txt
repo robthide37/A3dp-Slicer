@@ -136,7 +136,7 @@ set(REQUIRED_PACKAGES
     wxWidgets
     OpenVDB
     CGAL
-    OCCT
+    # OCCT
     ZLIB
 )
 
