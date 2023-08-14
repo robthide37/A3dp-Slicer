@@ -2879,8 +2879,15 @@ void GLCanvas3D::on_char(wxKeyEvent& evt)
     if (keyCode == WXK_ESCAPE && (_deactivate_undo_redo_toolbar_items() || _deactivate_search_toolbar_item() || _deactivate_arrange_menu()))
         return;
 
-    if (m_gizmos.on_char(evt))
+    if (m_gizmos.on_char(evt)) {
+        if (m_gizmos.get_current_type() == GLGizmosManager::EType::Scale &&
+            m_gizmos.get_current()->get_state() == GLGizmoBase::EState::On) {
+            // Update selection from object list to check selection of the cut objects
+            // It's not allowed to scale separate ct parts
+            wxGetApp().obj_list()->selection_changed();
+        }
         return;
+    }
 
     if ((evt.GetModifiers() & ctrlMask) != 0) {
         // CTRL is pressed
@@ -3595,6 +3602,13 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                 if (current_printer_technology() == ptFFF && fff_print()->config().complete_objects)
                     update_sequential_clearance(true);
             }
+        }
+        else if (evt.LeftUp() &&
+            m_gizmos.get_current_type() == GLGizmosManager::EType::Scale &&
+            m_gizmos.get_current()->get_state() == GLGizmoBase::EState::On) {
+            // Update selection from object list to check selection of the cut objects
+            // It's not allowed to scale separate ct parts
+            wxGetApp().obj_list()->selection_changed();
         }
 
         return;
