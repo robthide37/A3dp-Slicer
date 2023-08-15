@@ -43,10 +43,12 @@ function(add_cmake_project projectname)
     endif ()
 
     set(_verbose_switch "")
-    if (CMAKE_GENERATOR MATCHES "Ninja")
-        set(_verbose_switch "--verbose")
-    elseif (CMAKE_GENERATOR MATCHES "Visual Studio")
-        set(_verbose_switch "-v:d")
+    if (${PROJECT_NAME}_DEP_BUILD_VERBOSE)
+        if (CMAKE_GENERATOR MATCHES "Ninja")
+            set(_verbose_switch "--verbose")
+        elseif (CMAKE_GENERATOR MATCHES "Visual Studio")
+            set(_verbose_switch "-v:d")
+        endif ()
     endif ()
 
     ExternalProject_Add(
@@ -64,7 +66,7 @@ function(add_cmake_project projectname)
             -DCMAKE_CXX_FLAGS_${_build_type_upper}:STRING=${CMAKE_CXX_FLAGS_${_build_type_upper}}
             -DCMAKE_C_FLAGS_${_build_type_upper}:STRING=${CMAKE_C_FLAGS_${_build_type_upper}}
             -DCMAKE_TOOLCHAIN_FILE:STRING=${CMAKE_TOOLCHAIN_FILE}
-            -DBUILD_SHARED_LIBS:BOOL=OFF
+            -DBUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}
             "${_configs_line}"
             ${DEP_CMAKE_OPTS}
             ${P_ARGS_CMAKE_ARGS}

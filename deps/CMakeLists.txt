@@ -26,6 +26,9 @@
 cmake_minimum_required(VERSION 3.12)
 project(PrusaSlicer_deps)
 
+# Redefine BUILD_SHARED_LIBS with default being OFF
+option(BUILD_SHARED_LIBS "Build shared libraries instead of static (experimental)" OFF)
+
 set(${PROJECT_NAME}_PACKAGE_EXCLUDES "" CACHE STRING "Exclude packages matching this regex pattern")
 
 # Support legacy parameter DESTDIR
