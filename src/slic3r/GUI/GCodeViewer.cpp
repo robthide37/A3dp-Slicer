@@ -892,8 +892,8 @@ void GCodeViewer::reset()
         buffer.reset();
     }
 
-    m_paths_bounding_box = BoundingBoxf3();
-    m_max_bounding_box = BoundingBoxf3();
+    m_paths_bounding_box.reset();
+    m_max_bounding_box.reset();
     m_max_print_height = 0.0f;
     m_tool_colors = std::vector<ColorRGBA>();
     m_extruders_count = 0;
@@ -1541,6 +1541,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
     m_statistics.results_time = gcode_result.time;
 #endif // ENABLE_GCODE_VIEWER_STATISTICS
 
+    m_max_bounding_box.reset();
+
     m_moves_count = gcode_result.moves.size();
     if (m_moves_count == 0)
         return;
@@ -1565,10 +1567,6 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
                 m_paths_bounding_box.merge(move.position.cast<double>());
         }
     }
-
-    // set approximate max bounding box (take in account also the tool marker)
-    m_max_bounding_box = m_paths_bounding_box;
-    m_max_bounding_box.merge(m_paths_bounding_box.max + m_sequential_view.marker.get_bounding_box().size().z() * Vec3d::UnitZ());
 
     if (wxGetApp().is_editor())
         m_contained_in_bed = wxGetApp().plater()->build_volume().all_paths_inside(gcode_result, m_paths_bounding_box);
@@ -2289,6 +2287,13 @@ void GCodeViewer::load_shells(const Print& print)
         volume->force_native_color = true;
         volume->set_render_color(true);
     }
+
+    m_shells_bounding_box.reset();
+    for (const GLVolume* volume : m_shells.volumes.volumes) {
+        m_shells_bounding_box.merge(volume->transformed_bounding_box());
+    }
+
+    m_max_bounding_box.reset();
 }
 
 void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const

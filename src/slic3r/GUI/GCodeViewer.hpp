@@ -752,7 +752,9 @@ private:
     std::vector<TBuffer> m_buffers{ static_cast<size_t>(EMoveType::Extrude) };
     // bounding box of toolpaths
     BoundingBoxf3 m_paths_bounding_box;
-    // bounding box of toolpaths + marker tools
+    // bounding box of shells
+    BoundingBoxf3 m_shells_bounding_box;
+    // bounding box of toolpaths + marker tools + shells
     BoundingBoxf3 m_max_bounding_box;
     float m_max_print_height{ 0.0f };
     std::vector<ColorRGBA> m_tool_colors;
@@ -811,7 +813,16 @@ public:
     bool can_export_toolpaths() const;
 
     const BoundingBoxf3& get_paths_bounding_box() const { return m_paths_bounding_box; }
-    const BoundingBoxf3& get_max_bounding_box() const { return m_max_bounding_box; }
+    const BoundingBoxf3& get_shells_bounding_box() const { return m_shells_bounding_box; }
+    const BoundingBoxf3& get_max_bounding_box() const {
+        BoundingBoxf3& max_bounding_box = const_cast<BoundingBoxf3&>(m_max_bounding_box);
+        if (!max_bounding_box.defined) {
+            max_bounding_box = m_shells_bounding_box;
+            max_bounding_box.merge(m_paths_bounding_box);
+            max_bounding_box.merge(m_paths_bounding_box.max + m_sequential_view.marker.get_bounding_box().size().z() * Vec3d::UnitZ());
+        }
+        return m_max_bounding_box;
+    }
     const std::vector<double>& get_layers_zs() const { return m_layers.get_zs(); }
 
     const SequentialView& get_sequential_view() const { return m_sequential_view; }
