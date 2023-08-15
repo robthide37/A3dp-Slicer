@@ -2259,12 +2259,38 @@ void GCodeViewer::load_shells(const Print& print)
     while (true) {
         GLVolumePtrs::iterator it = std::find_if(m_shells.volumes.volumes.begin(), m_shells.volumes.volumes.end(), [](GLVolume* volume) { return volume->is_modifier; });
         if (it != m_shells.volumes.volumes.end()) {
-            delete (*it);
+            delete *it;
             m_shells.volumes.volumes.erase(it);
         }
         else
             break;
-    } 
+    }
+
+    // removes volumes which are completely below bed
+    int i = 0;
+    while (i < m_shells.volumes.volumes.size()) {
+        GLVolume* v = m_shells.volumes.volumes[i];
+        if (v->transformed_bounding_box().max.z() < SINKING_MIN_Z_THRESHOLD + EPSILON) {
+            delete v;
+            m_shells.volumes.volumes.erase(m_shells.volumes.volumes.begin() + i);
+            --i;
+        }
+        ++i;
+    }
+
+    // search for sinking volumes and replace their mesh with the part of it with positive z
+    for (GLVolume* v : m_shells.volumes.volumes) {
+        if (v->is_sinking()) {
+            TriangleMesh mesh(wxGetApp().plater()->model().objects[v->object_idx()]->volumes[v->volume_idx()]->mesh());
+            mesh.transform(v->world_matrix(), true);
+            indexed_triangle_set upper_its;
+            cut_mesh(mesh.its, 0.0f, &upper_its, nullptr);
+            v->model.reset();
+            v->model.init_from(upper_its);
+            v->set_instance_transformation(Transform3d::Identity());
+            v->set_volume_transformation(Transform3d::Identity());
+        }
+    }
 
     for (GLVolume* volume : m_shells.volumes.volumes) {
         volume->zoom_to_volumes = false;
