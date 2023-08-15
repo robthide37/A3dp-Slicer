@@ -948,6 +948,7 @@ void GLGizmoCut3D::render_model(GLModel& model, const ColorRGBA& color, Transfor
         shader->start_using();
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("emission_factor", 0.2f);
         shader->set_uniform("projection_matrix", wxGetApp().plater()->get_camera().get_projection_matrix());
 
         model.set_color(color);
