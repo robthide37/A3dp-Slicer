@@ -739,6 +739,7 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     m_max_print_height = gcode_result.max_print_height;
 
     load_toolpaths(gcode_result);
+    load_wipetower_shell(print);
 
     if (m_layers.empty())
         return;
@@ -2254,22 +2255,6 @@ void GCodeViewer::load_shells(const Print& print)
         ++object_id;
     }
 
-    if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF) {
-        // adds wipe tower's volume
-        const double max_z = print.objects()[0]->model_object()->get_model()->max_z();
-        const PrintConfig& config = print.config();
-        const size_t extruders_count = config.nozzle_diameter.size();
-        if (extruders_count > 1 && config.wipe_tower && !config.complete_objects) {
-            const WipeTowerData& wipe_tower_data = print.wipe_tower_data(extruders_count);
-            const float depth = wipe_tower_data.depth;
-            const std::vector<std::pair<float, float>> z_and_depth_pairs = print.wipe_tower_data(extruders_count).z_and_depth_pairs;
-            const float brim_width = wipe_tower_data.brim_width;
-            if (depth != 0.)
-                m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, z_and_depth_pairs, max_z, config.wipe_tower_cone_angle, config.wipe_tower_rotation_angle,
-                    !print.is_step_done(psWipeTower), brim_width);
-        }
-    }
-
     // remove modifiers
     while (true) {
         GLVolumePtrs::iterator it = std::find_if(m_shells.volumes.volumes.begin(), m_shells.volumes.volumes.end(), [](GLVolume* volume) { return volume->is_modifier; });
@@ -2294,6 +2279,32 @@ void GCodeViewer::load_shells(const Print& print)
     }
 
     m_max_bounding_box.reset();
+}
+
+void GCodeViewer::load_wipetower_shell(const Print& print)
+{
+    if (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptFFF && print.is_step_done(psWipeTower)) {
+        // adds wipe tower's volume
+        const double max_z = print.objects()[0]->model_object()->get_model()->max_z();
+        const PrintConfig& config = print.config();
+        const size_t extruders_count = config.nozzle_diameter.size();
+        if (extruders_count > 1 && config.wipe_tower && !config.complete_objects) {
+            const WipeTowerData& wipe_tower_data = print.wipe_tower_data(extruders_count);
+            const float depth = wipe_tower_data.depth;
+            const std::vector<std::pair<float, float>> z_and_depth_pairs = print.wipe_tower_data(extruders_count).z_and_depth_pairs;
+            const float brim_width = wipe_tower_data.brim_width;
+            if (depth != 0.) {
+                m_shells.volumes.load_wipe_tower_preview(config.wipe_tower_x, config.wipe_tower_y, config.wipe_tower_width, depth, z_and_depth_pairs,
+                    max_z, config.wipe_tower_cone_angle, config.wipe_tower_rotation_angle, false, brim_width);
+                GLVolume* volume = m_shells.volumes.volumes.back();
+                volume->color.a(0.25f);
+                volume->force_native_color = true;
+                volume->set_render_color(true);
+                m_shells_bounding_box.merge(volume->transformed_bounding_box());
+                m_max_bounding_box.reset();
+            }
+        }
+    }
 }
 
 void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool keep_sequential_current_last) const

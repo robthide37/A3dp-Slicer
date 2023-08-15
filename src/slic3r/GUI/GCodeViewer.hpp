@@ -867,6 +867,7 @@ public:
 
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);
+    void load_wipetower_shell(const Print& print);
     void render_toolpaths();
     void render_shells();
     void render_legend(float& legend_height);
