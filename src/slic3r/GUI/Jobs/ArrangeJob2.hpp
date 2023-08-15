@@ -58,9 +58,15 @@ public:
         typename decltype(std::declval<ArrangeTaskT>().process_native(
             std::declval<arr2::ArrangeTaskCtl>()))::element_type;
 
+    // All callbacks are called in the main thread.
     struct Callbacks {
+        // Task is prepared but not no processing has been initiated
         std::function<void(ArrangeTaskT &)> on_prepared;
+
+        // Task has been completed but the result is not yet written (inside finalize)
         std::function<void(ArrangeTaskT &)> on_processed;
+
+        // Task result has been written
         std::function<void(ResultType &)> on_finished;
     };
 

@@ -6279,7 +6279,7 @@ void Plater::fill_bed_with_instances()
             ModelObject *model_object = prototype_mi->get_object();
             assert(model_object);
 
-//            model_object->ensure_on_bed();
+            model_object->ensure_on_bed();
 
             size_t inst_cnt = model_object->instances.size();
             if (inst_cnt == 0)
@@ -6290,19 +6290,17 @@ void Plater::fill_bed_with_instances()
             if (object_idx < 0 || object_idx >= int(model().objects.size()))
                 return;
 
-            int added_cnt = result.to_add.size();
+            update(static_cast<unsigned int>(UpdateParams::FORCE_FULL_SCREEN_REFRESH));
 
-            if (added_cnt > 0) {
-                update(static_cast<unsigned int>(UpdateParams::FORCE_FULL_SCREEN_REFRESH));
+            if (!result.to_add.empty()) {
+                auto added_cnt = result.to_add.size();
 
                 // FIXME: somebody explain why this is needed for
                 // increase_object_instances
-                if (inst_cnt == 1)
+                if (result.arranged_items.size() == 1)
                     added_cnt++;
 
-                sidebar()
-                    .obj_list()
-                    ->increase_object_instances(object_idx, size_t(added_cnt));
+                sidebar().obj_list()->increase_object_instances(object_idx, added_cnt);
             }
         };
 
