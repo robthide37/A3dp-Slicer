@@ -330,6 +330,35 @@ public:
     Transform3d get_physical_bed_trafo(int bed_index) const override;
 };
 
+class GridStriderVBedHandler: public VirtualBedHandler
+{
+    // This vbed handler defines a grid of virtual beds with a large number
+    // of columns so that it behaves as XStrider for regular cases.
+    // The goal is to handle objects residing at world coordinates
+    // not representable with scaled coordinates. Combining XStrider with
+    // YStrider takes care of the X and Y axis to be mapped into the physical
+    // bed's coordinate region (which is representable in scaled coords)
+    static const int ColsOutside = std::sqrt(std::numeric_limits<int>::max());
+
+    XStriderVBedHandler m_xstrider;
+    YStriderVBedHandler m_ystrider;
+
+public:
+    GridStriderVBedHandler(const BoundingBox &bedbb,
+                           coord_t            gap)
+        : m_xstrider{bedbb, gap}
+        , m_ystrider{bedbb, gap}
+    {}
+
+    Vec2i raw2grid(int bedidx) const;
+    int grid2raw(const Vec2i &crd) const;
+
+    int get_bed_index(const VBedPlaceable &obj) const override;
+    bool assign_bed(VBedPlaceable &inst, int bed_idx) override;
+
+    Transform3d get_physical_bed_trafo(int bed_index) const override;
+};
+
 std::vector<size_t> selected_object_indices(const SelectionMask &sm);
 std::vector<size_t> selected_instance_indices(int obj_idx, const SelectionMask &sm);
 

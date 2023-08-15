@@ -262,6 +262,47 @@ Transform3d YStriderVBedHandler::get_physical_bed_trafo(int bed_index) const
     return tr;
 }
 
+Vec2i GridStriderVBedHandler::raw2grid(int bed_idx) const
+{
+    Vec2i ret{bed_idx % ColsOutside, bed_idx / ColsOutside};
+
+    return ret;
+}
+
+int GridStriderVBedHandler::grid2raw(const Vec2i &crd) const
+{
+    assert(crd.x() < ColsOutside - 1 && crd.y() < ColsOutside - 1);
+
+    return crd.y() * ColsOutside + crd.x();
+}
+
+int GridStriderVBedHandler::get_bed_index(const VBedPlaceable &obj) const
+{
+    Vec2i crd = {m_xstrider.get_bed_index(obj), m_ystrider.get_bed_index(obj)};
+
+    return grid2raw(crd);
+}
+
+bool GridStriderVBedHandler::assign_bed(VBedPlaceable &inst, int bed_idx)
+{
+    Vec2i crd = raw2grid(bed_idx);
+
+    bool retx = m_xstrider.assign_bed(inst, crd.x());
+    bool rety = m_ystrider.assign_bed(inst, crd.y());
+
+    return retx && rety;
+}
+
+Transform3d GridStriderVBedHandler::get_physical_bed_trafo(int bed_idx) const
+{
+    Vec2i crd = raw2grid(bed_idx);
+
+    Transform3d ret = m_xstrider.get_physical_bed_trafo(crd.x()) *
+                      m_ystrider.get_physical_bed_trafo(crd.y());
+
+    return ret;
+}
+
 FixedSelection::FixedSelection(const Model &m) : m_wp{true}
 {
     m_seldata.resize(m.objects.size());
@@ -805,7 +846,7 @@ std::unique_ptr<VirtualBedHandler> VirtualBedHandler::create(const ExtendedBed &
     if (is_infinite_bed(bed)) {
         ret = std::make_unique<PhysicalOnlyVBedHandler>();
     } else {
-        // The gap between logical beds in the x axis expressed in ratio of
+        // The gap between logical beds expressed in ratio of
         // the current bed width.
         constexpr double LogicalBedGap = 1. / 10.;
 
@@ -814,7 +855,7 @@ std::unique_ptr<VirtualBedHandler> VirtualBedHandler::create(const ExtendedBed &
 
         auto bedwidth = bedbb.size().x();
         coord_t xgap = LogicalBedGap * bedwidth;
-        ret = std::make_unique<XStriderVBedHandler>(bedbb, xgap);
+        ret = std::make_unique<GridStriderVBedHandler>(bedbb, xgap);
     }
 
     return ret;

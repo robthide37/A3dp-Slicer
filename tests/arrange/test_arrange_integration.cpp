@@ -326,10 +326,18 @@ auto create_vbed_handler<Slic3r::arr2::YStriderVBedHandler>(const Slic3r::Boundi
     return Slic3r::arr2::YStriderVBedHandler{bedbb, gap};
 }
 
-TEMPLATE_TEST_CASE("Common virtual bed handlers", "[arrange2][integration][vbeds]",
-                        Slic3r::arr2::PhysicalOnlyVBedHandler,
-                        Slic3r::arr2::XStriderVBedHandler,
-                        Slic3r::arr2::YStriderVBedHandler)
+template<>
+auto create_vbed_handler<Slic3r::arr2::GridStriderVBedHandler>(const Slic3r::BoundingBox &bedbb, coord_t gap)
+{
+    return Slic3r::arr2::GridStriderVBedHandler{bedbb, gap};
+}
+
+TEMPLATE_TEST_CASE("Common virtual bed handlers",
+                   "[arrange2][integration][vbeds]",
+                   Slic3r::arr2::PhysicalOnlyVBedHandler,
+                   Slic3r::arr2::XStriderVBedHandler,
+                   Slic3r::arr2::YStriderVBedHandler,
+                   Slic3r::arr2::GridStriderVBedHandler)
 {
     using namespace Slic3r;
     using VBP = arr2::VBedPlaceableMI;
@@ -413,7 +421,7 @@ TEMPLATE_TEST_CASE("Common virtual bed handlers", "[arrange2][integration][vbeds
         WHEN ("moving back to the physical bed")
         {
             auto &mi_back_to_phys = *model.objects.front()->add_instance(mi_to_move);
-            bool moved_back_to_physical = vbedh->assign_bed(VBP{mi_back_to_phys}, 0);
+            bool moved_back_to_physical = vbedh->assign_bed(VBP{mi_back_to_phys}, arr2::PhysicalBedId);
 
             THEN("model instance should actually move back to the physical bed")
             {
