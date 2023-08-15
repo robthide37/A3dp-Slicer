@@ -3652,7 +3652,8 @@ bool Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
             }
         }
 
- //       update_tab_ui(); //! ysFIXME delete after testing
+        // ! update preset combobox, to revert previously selection
+        update_tab_ui();
 
         // Trigger the on_presets_changed event so that we also restore the previous value in the plater selector,
         // if this action was initiated from the plater.
