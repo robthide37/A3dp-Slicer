@@ -3209,8 +3209,10 @@ void GCodeViewer::render_shells()
         return;
 
     shader->start_using();
+    shader->set_uniform("emission_factor", 0.1f);
     const Camera& camera = wxGetApp().plater()->get_camera();
     m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, true, camera.get_view_matrix(), camera.get_projection_matrix());
+    shader->set_uniform("emission_factor", 0.0f);
     shader->stop_using();
 }
 
