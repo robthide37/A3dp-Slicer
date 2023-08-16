@@ -279,6 +279,12 @@ void nfp_convex_convex(const Polygon &fixed, const Polygon &movable, Polygon &po
 
     // Output iterator adapter for std::merge
     struct OutItAdaptor {
+        using value_type = Line;
+        using difference_type = std::ptrdiff_t;
+        using pointer = Line*;
+        using reference = Line&;
+        using iterator_category = std::output_iterator_tag;
+
         Polygon *outpoly;
         OutItAdaptor(Polygon &out) : outpoly{&out} {}
 
