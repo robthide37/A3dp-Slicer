@@ -5,6 +5,8 @@
 
 #include "Arrange/Core/NFP/NFPArrangeItemTraits.hpp"
 
+#include <boost/log/trivial.hpp>
+
 namespace Slic3r { namespace arr2 {
 
 template<class ArrItem>
@@ -81,15 +83,20 @@ void extract(FillBedTask<ArrItem> &task,
 
     auto collect_task_items = [&prototype_geometry_id, &task,
                                &itm_conv](const Arrangeable &arrbl) {
-        if (arrbl.geometry_id() == prototype_geometry_id) {
-            if (arrbl.is_printable()) {
-                auto itm = itm_conv.convert(arrbl);
-                raise_priority(itm);
-                task.selected.emplace_back(std::move(itm));
+        try {
+            if (arrbl.geometry_id() == prototype_geometry_id) {
+                if (arrbl.is_printable()) {
+                    auto itm = itm_conv.convert(arrbl);
+                    raise_priority(itm);
+                    task.selected.emplace_back(std::move(itm));
+                }
+            } else {
+                auto itm = itm_conv.convert(arrbl, -SCALED_EPSILON);
+                task.unselected.emplace_back(std::move(itm));
             }
-        } else {
-            auto itm = itm_conv.convert(arrbl, -SCALED_EPSILON);
-            task.unselected.emplace_back(std::move(itm));
+        } catch (const EmptyItemOutlineError &ex) {
+            BOOST_LOG_TRIVIAL(error)
+                << "ObjectID " << std::to_string(arrbl.id().id) << ": " << ex.what();
         }
     };
 

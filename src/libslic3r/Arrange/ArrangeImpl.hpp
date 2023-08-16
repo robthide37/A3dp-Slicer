@@ -370,6 +370,10 @@ ArrItem ConvexItemConverter<ArrItem>::convert(const Arrangeable &arrbl,
 {
     auto bed_index = arrbl.get_bed_index();
     Polygon outline = arrbl.convex_outline();
+
+    if (outline.empty())
+        throw EmptyItemOutlineError{};
+
     Polygon envelope = arrbl.convex_envelope();
 
     coord_t infl = offs + coord_t(std::ceil(this->safety_dist() / 2.));
@@ -418,6 +422,10 @@ ArrItem AdvancedItemConverter<ArrItem>::get_arritem(const Arrangeable &arrbl,
     coord_t infl = offs + coord_t(std::ceil(this->safety_dist() / 2.));
 
     auto outline = arrbl.full_outline();
+
+    if (outline.empty())
+        throw EmptyItemOutlineError{};
+
     auto envelope = arrbl.full_envelope();
 
     if (infl != 0) {

@@ -377,6 +377,9 @@ void transform_instance(ModelInstance     &mi,
 BoundingBoxf3 instance_bounding_box(const ModelInstance &mi,
                                     bool dont_translate = false);
 
+BoundingBoxf3 instance_bounding_box(const ModelInstance &mi,
+                                    const Transform3d &tr,
+                                    bool dont_translate = false);
 
 ExPolygons extract_full_outline(const ModelInstance &inst,
                                 const Transform3d &tr = Transform3d::Identity());

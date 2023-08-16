@@ -64,16 +64,18 @@ void transform_instance(ModelInstance     &mi,
     mi.invalidate_object_bounding_box();
 }
 
-BoundingBoxf3 instance_bounding_box(const ModelInstance &mi, bool dont_translate)
+BoundingBoxf3 instance_bounding_box(const ModelInstance &mi,
+                                    const Transform3d &tr,
+                                    bool dont_translate)
 {
     BoundingBoxf3 bb;
     const Transform3d inst_matrix
         = dont_translate ? mi.get_transformation().get_matrix_no_offset()
-                           : mi.get_transformation().get_matrix();
+                         : mi.get_transformation().get_matrix();
 
     for (ModelVolume *v : mi.get_object()->volumes) {
         if (v->is_model_part()) {
-            bb.merge(v->mesh().transformed_bounding_box(inst_matrix
+            bb.merge(v->mesh().transformed_bounding_box(tr * inst_matrix
                                                         * v->get_matrix()));
         }
     }
@@ -81,11 +83,32 @@ BoundingBoxf3 instance_bounding_box(const ModelInstance &mi, bool dont_translate
     return bb;
 }
 
+BoundingBoxf3 instance_bounding_box(const ModelInstance &mi, bool dont_translate)
+{
+    return instance_bounding_box(mi, Transform3d::Identity(), dont_translate);
+}
+
+bool check_coord_bounds(const BoundingBoxf &bb)
+{
+    constexpr double hi = 1000.;
+
+    return std::abs(bb.min.x()) < hi &&
+           std::abs(bb.min.y()) < hi &&
+           std::abs(bb.max.x()) < hi &&
+           std::abs(bb.max.y()) < hi;
+}
+
 ExPolygons extract_full_outline(const ModelInstance &inst, const Transform3d &tr)
 {
     ExPolygons outline;
     for (const ModelVolume *v : inst.get_object()->volumes) {
         Polygons vol_outline;
+
+        if (!check_coord_bounds(to_2d(v->mesh().transformed_bounding_box(tr)))) {
+            outline.clear();
+            break;
+        }
+
         vol_outline = project_mesh(v->mesh().its,
                                    tr * inst.get_matrix() * v->get_matrix(),
                                    [] {});
@@ -105,7 +128,14 @@ ExPolygons extract_full_outline(const ModelInstance &inst, const Transform3d &tr
 
 Polygon extract_convex_outline(const ModelInstance &inst, const Transform3d &tr)
 {
-    return inst.get_object()->convex_hull_2d(tr * inst.get_matrix());
+    auto bb = to_2d(instance_bounding_box(inst, tr));
+    Polygon ret;
+
+    if (check_coord_bounds(bb)) {
+        ret = inst.get_object()->convex_hull_2d(tr * inst.get_matrix());
+    }
+
+    return ret;
 }
 
 inline static bool is_infinite_bed(const ExtendedBed &ebed) noexcept
@@ -190,7 +220,14 @@ int XStriderVBedHandler::get_bed_index(const VBedPlaceable &obj) const
         auto reference_pos_x = (instance_bb.min.x() - bedx);
         auto stride = unscaled(stride_s);
 
-        bedidx = static_cast<int>(std::floor(reference_pos_x / stride));
+        auto bedidx_d = std::floor(reference_pos_x / stride);
+
+        if (bedidx_d < std::numeric_limits<int>::min())
+            bedidx = std::numeric_limits<int>::min();
+        else if (bedidx_d > std::numeric_limits<int>::max())
+            bedidx = std::numeric_limits<int>::max();
+        else
+            bedidx = static_cast<int>(bedidx_d);
     }
 
     return bedidx;
@@ -231,7 +268,14 @@ int YStriderVBedHandler::get_bed_index(const VBedPlaceable &obj) const
         auto reference_pos_y = (instance_bb.min.y() - ystart);
         auto stride = unscaled(stride_s);
 
-        bedidx = static_cast<int>(std::floor(reference_pos_y / stride));
+        auto bedidx_d = std::floor(reference_pos_y / stride);
+
+        if (bedidx_d < std::numeric_limits<int>::min())
+            bedidx = std::numeric_limits<int>::min();
+        else if (bedidx_d > std::numeric_limits<int>::max())
+            bedidx = std::numeric_limits<int>::max();
+        else
+            bedidx = static_cast<int>(bedidx_d);
     }
 
     return bedidx;
@@ -274,7 +318,8 @@ Vec2i GridStriderVBedHandler::raw2grid(int bed_idx) const
 
 int GridStriderVBedHandler::grid2raw(const Vec2i &crd) const
 {
-    assert(crd.x() < ColsOutside - 1 && crd.y() < ColsOutside - 1);
+    assert(std::abs(crd.x()) < ColsOutside - 1 &&
+           std::abs(crd.y()) < ColsOutside - 1);
 
     return crd.y() * ColsOutside + crd.x();
 }

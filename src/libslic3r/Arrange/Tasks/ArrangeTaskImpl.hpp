@@ -3,6 +3,8 @@
 
 #include <random>
 
+#include <boost/log/trivial.hpp>
+
 #include "ArrangeTask.hpp"
 
 namespace Slic3r { namespace arr2 {
@@ -20,16 +22,21 @@ void extract_selected(ArrangeTask<ArrItem> &task,
             bool selected = arrbl.is_selected();
             bool printable = arrbl.is_printable();
 
-            auto itm = itm_conv.convert(arrbl, selected ? 0 : -SCALED_EPSILON);
+            try {
+                auto itm = itm_conv.convert(arrbl, selected ? 0 : -SCALED_EPSILON);
 
-            auto &container_parent = printable ? task.printable :
+                auto &container_parent = printable ? task.printable :
                                                  task.unprintable;
 
-            auto &container = selected ?
+                auto &container = selected ?
                                        container_parent.selected :
                                        container_parent.unselected;
 
-            container.emplace_back(std::move(itm));
+                container.emplace_back(std::move(itm));
+            } catch (const EmptyItemOutlineError &ex) {
+                BOOST_LOG_TRIVIAL(error)
+                    << "ObjectID " << std::to_string(arrbl.id().id) << ": " << ex.what();
+            }
         });
 
     // If the selection was empty arrange everything
