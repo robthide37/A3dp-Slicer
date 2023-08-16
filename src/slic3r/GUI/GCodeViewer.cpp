@@ -2255,9 +2255,12 @@ void GCodeViewer::load_shells(const Print& print)
         ++object_id;
     }
 
-    // remove modifiers
+    wxGetApp().plater()->get_current_canvas3D()->check_volumes_outside_state(m_shells.volumes);
+
+    // remove modifiers, non-printable and out-of-bed volumes
     while (true) {
-        GLVolumePtrs::iterator it = std::find_if(m_shells.volumes.volumes.begin(), m_shells.volumes.volumes.end(), [](GLVolume* volume) { return volume->is_modifier; });
+        GLVolumePtrs::iterator it = std::find_if(m_shells.volumes.volumes.begin(), m_shells.volumes.volumes.end(),
+            [](GLVolume* volume) { return volume->is_modifier || !volume->printable || volume->is_outside; });
         if (it != m_shells.volumes.volumes.end()) {
             delete *it;
             m_shells.volumes.volumes.erase(it);
@@ -3243,7 +3246,7 @@ void GCodeViewer::render_toolpaths()
 
 void GCodeViewer::render_shells()
 {
-    if (!m_shells.visible || m_shells.volumes.empty())
+    if (m_shells.volumes.empty() || (!m_shells.visible && !m_shells.force_visible))
         return;
 
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");

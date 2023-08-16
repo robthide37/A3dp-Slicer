@@ -509,7 +509,6 @@ private:
     TriangleMesh m_wipe_tower_mesh;
 #endif // ENABLE_OPENGL_ES
     GCodeViewer m_gcode_viewer;
-    bool m_gcode_viewer_shells_visible{ true };
 
     RenderTimer m_render_timer;
 
@@ -712,10 +711,15 @@ public:
     const GLVolumeCollection& get_volumes() const { return m_volumes; }
     void reset_volumes();
     ModelInstanceEPrintVolumeState check_volumes_outside_state(bool selection_only = true) const;
+    // update the is_outside state of all the volumes contained in the given collection
+    void check_volumes_outside_state(GLVolumeCollection& volumes) const;
+
+private:
     // returns true if all the volumes are completely contained in the print volume
     // returns the containment state in the given out_state, if non-null
-    bool check_volumes_outside_state(const Slic3r::BuildVolume& build_volume, ModelInstanceEPrintVolumeState* out_state, bool selection_only = true) const;
+    bool check_volumes_outside_state(GLVolumeCollection& volumes, ModelInstanceEPrintVolumeState* out_state, bool selection_only = true) const;
 
+public:
     void init_gcode_viewer() { m_gcode_viewer.init(); }
     void reset_gcode_toolpaths() { m_gcode_viewer.reset(); }
     const GCodeViewer::SequentialView& get_gcode_sequential_view() const { return m_gcode_viewer.get_sequential_view(); }

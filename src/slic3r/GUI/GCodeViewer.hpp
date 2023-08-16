@@ -378,6 +378,7 @@ class GCodeViewer
     {
         GLVolumeCollection volumes;
         bool visible{ false };
+        bool force_visible{ false };
     };
 
     // helper to render center of gravity
@@ -849,8 +850,7 @@ public:
     bool is_legend_enabled() const { return m_legend_enabled; }
     void enable_legend(bool enable) { m_legend_enabled = enable; }
 
-    bool are_shells_visible() const { return m_shells.visible; }
-    void set_shells_visible(bool visible) { m_shells.visible = visible; }
+    void set_force_shells_visible(bool visible) { m_shells.force_visible = visible; }
 
     void export_toolpaths_to_obj(const char* filename) const;
 

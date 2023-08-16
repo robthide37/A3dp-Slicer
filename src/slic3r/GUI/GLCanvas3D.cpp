@@ -1442,11 +1442,16 @@ ModelInstanceEPrintVolumeState GLCanvas3D::check_volumes_outside_state(bool sele
 {
     ModelInstanceEPrintVolumeState state = ModelInstanceEPrintVolumeState::ModelInstancePVS_Inside;
     if (m_initialized && !m_volumes.empty())
-        check_volumes_outside_state(m_bed.build_volume(), &state, selection_only);
+        check_volumes_outside_state(const_cast<GLVolumeCollection&>(m_volumes), &state, selection_only);
     return state;
 }
 
-bool GLCanvas3D::check_volumes_outside_state(const Slic3r::BuildVolume& build_volume, ModelInstanceEPrintVolumeState* out_state, bool selection_only) const
+void GLCanvas3D::check_volumes_outside_state(GLVolumeCollection& volumes) const
+{
+    check_volumes_outside_state(volumes, nullptr, false);
+}
+
+bool GLCanvas3D::check_volumes_outside_state(GLVolumeCollection& volumes, ModelInstanceEPrintVolumeState* out_state, bool selection_only) const
 {
     auto                volume_below = [](GLVolume& volume) -> bool
     { return volume.object_idx() != -1 && volume.volume_idx() != -1 && volume.is_below_printbed(); };
@@ -1460,26 +1465,27 @@ bool GLCanvas3D::check_volumes_outside_state(const Slic3r::BuildVolume& build_vo
     auto                volume_convex_mesh = [this, volume_sinking](GLVolume& volume) -> const TriangleMesh&
     { return volume_sinking(volume) ? m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh() : *volume.convex_hull(); };
 
-    auto volumes_to_process_idxs = [this, selection_only]() {
-        std::vector<unsigned int> ret;
-        if (!selection_only || m_selection.is_empty()) {
-            ret = std::vector<unsigned int>(m_volumes.volumes.size());
-            std::iota(ret.begin(), ret.end(), 0);
-        }
-        else {
-            const GUI::Selection::IndicesList& selected_volume_idxs = m_selection.get_volume_idxs();
-            ret.assign(selected_volume_idxs.begin(), selected_volume_idxs.end());
-        }
-        return ret;
+    auto volumes_to_process_idxs = [this, &volumes, selection_only]() {
+      std::vector<unsigned int> ret;
+      if (!selection_only || m_selection.is_empty()) {
+          ret = std::vector<unsigned int>(volumes.volumes.size());
+          std::iota(ret.begin(), ret.end(), 0);
+      }
+      else {
+          const GUI::Selection::IndicesList& selected_volume_idxs = m_selection.get_volume_idxs();
+          ret.assign(selected_volume_idxs.begin(), selected_volume_idxs.end());
+      }
+      return ret;
     };
 
     ModelInstanceEPrintVolumeState overall_state = ModelInstancePVS_Inside;
     bool contained_min_one = false;
 
-    const std::vector<unsigned int> volumes_idxs = volumes_to_process_idxs();
+    const Slic3r::BuildVolume& build_volume = m_bed.build_volume();
 
+    const std::vector<unsigned int> volumes_idxs = volumes_to_process_idxs();
     for (unsigned int vol_idx : volumes_idxs) {
-        GLVolume* volume = m_volumes.volumes[vol_idx];
+        GLVolume* volume = volumes.volumes[vol_idx];
         if (!volume->is_modifier && (volume->shader_outside_printer_detection_enabled || (!volume->is_wipe_tower && volume->composite_id.volume_id >= 0))) {
             BuildVolume::ObjectState state;
             if (volume_below(*volume))
@@ -1492,7 +1498,7 @@ bool GLCanvas3D::check_volumes_outside_state(const Slic3r::BuildVolume& build_vo
                     break;
                 case BuildVolume::Type::Circle:
                 case BuildVolume::Type::Convex:
-                    //FIXME doing test on convex hull until we learn to do test on non-convex polygons efficiently.
+                //FIXME doing test on convex hull until we learn to do test on non-convex polygons efficiently.
                 case BuildVolume::Type::Custom:
                     state = build_volume.object_state(volume_convex_mesh(*volume).its, volume->world_matrix().cast<float>(), volume_sinking(*volume));
                     break;
@@ -1514,9 +1520,9 @@ bool GLCanvas3D::check_volumes_outside_state(const Slic3r::BuildVolume& build_vo
         }
     }
 
-    for (unsigned int vol_idx = 0; vol_idx < m_volumes.volumes.size(); ++vol_idx) {
+    for (unsigned int vol_idx = 0; vol_idx < volumes.volumes.size(); ++vol_idx) {
         if (std::find(volumes_idxs.begin(), volumes_idxs.end(), vol_idx) == volumes_idxs.end()) {
-            if (!m_volumes.volumes[vol_idx]->is_outside) {
+            if (!volumes.volumes[vol_idx]->is_outside) {
                 contained_min_one = true;
                 break;
             }
@@ -2562,7 +2568,7 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     // checks for geometry outside the print volume to render it accordingly
     if (!m_volumes.empty()) {
         ModelInstanceEPrintVolumeState state;
-        const bool contained_min_one = check_volumes_outside_state(m_bed.build_volume(), &state, !force_full_scene_refresh);
+        const bool contained_min_one = check_volumes_outside_state(m_volumes, &state, !force_full_scene_refresh);
         const bool partlyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Partly_Outside);
         const bool fullyOut = (state == ModelInstanceEPrintVolumeState::ModelInstancePVS_Fully_Outside);
 
@@ -2639,10 +2645,9 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
 void GLCanvas3D::load_gcode_shells()
 {
-    m_gcode_viewer_shells_visible = m_gcode_viewer.are_shells_visible();
     m_gcode_viewer.load_shells(*this->fff_print());
     m_gcode_viewer.update_shells_color_by_extruder(m_config);
-    m_gcode_viewer.set_shells_visible(true);
+    m_gcode_viewer.set_force_shells_visible(true);
 }
 
 void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, const std::vector<std::string>& str_tool_colors)
@@ -2697,7 +2702,7 @@ void GLCanvas3D::load_preview(const std::vector<std::string>& str_tool_colors, c
     for (const PrintObject* object : print->objects())
         _load_print_object_toolpaths(*object, build_volume, str_tool_colors, color_print_values);
 
-    m_gcode_viewer.set_shells_visible(m_gcode_viewer_shells_visible);
+    m_gcode_viewer.set_force_shells_visible(false);
     _set_warning_notification_if_needed(EWarning::ToolpathOutside);
 }
 
@@ -6036,7 +6041,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type)
         }
         }
         if (m_requires_check_outside_state) {
-            check_volumes_outside_state(build_volume, nullptr);
+            check_volumes_outside_state(m_volumes, nullptr);
             m_requires_check_outside_state = false;
         }
     }
