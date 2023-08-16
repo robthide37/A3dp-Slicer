@@ -90,12 +90,10 @@ BoundingBoxf3 instance_bounding_box(const ModelInstance &mi, bool dont_translate
 
 bool check_coord_bounds(const BoundingBoxf &bb)
 {
-    constexpr double hi = 1000.;
-
-    return std::abs(bb.min.x()) < hi &&
-           std::abs(bb.min.y()) < hi &&
-           std::abs(bb.max.x()) < hi &&
-           std::abs(bb.max.y()) < hi;
+    return std::abs(bb.min.x()) < UnscaledCoordLimit &&
+           std::abs(bb.min.y()) < UnscaledCoordLimit &&
+           std::abs(bb.max.x()) < UnscaledCoordLimit &&
+           std::abs(bb.max.y()) < UnscaledCoordLimit;
 }
 
 ExPolygons extract_full_outline(const ModelInstance &inst, const Transform3d &tr)

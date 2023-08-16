@@ -381,6 +381,8 @@ BoundingBoxf3 instance_bounding_box(const ModelInstance &mi,
                                     const Transform3d &tr,
                                     bool dont_translate = false);
 
+constexpr double UnscaledCoordLimit = 1000.;
+
 ExPolygons extract_full_outline(const ModelInstance &inst,
                                 const Transform3d &tr = Transform3d::Identity());
 
