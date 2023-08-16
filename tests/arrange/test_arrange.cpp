@@ -466,8 +466,7 @@ TEST_CASE("NFP should be empty if item cannot fit into bed", "[arrange2]") {
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem.hpp>
 
-TEMPLATE_TEST_CASE("NFP algorithm test",
-                   "[arrange2]",
+TEMPLATE_TEST_CASE("NFP algorithm test", "[arrange2][Slow]",
                    Slic3r::arr2::InfiniteBed,
                    Slic3r::arr2::RectangleBed,
                    Slic3r::arr2::CircleBed,
