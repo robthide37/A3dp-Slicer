@@ -42,7 +42,7 @@ SCENARIO("Model construction", "[Model]") {
 				}
             }
             model_object->add_instance();
-            arrange_objects(model, InfiniteBed{scaled(Vec2d(100, 100))}, ArrangeParams{scaled(min_object_distance(config))});
+            arrange_objects(model, arr2::InfiniteBed{scaled(Vec2d(100, 100))}, arr2::ArrangeSettings{}.set_distance_from_objects(min_object_distance(config)));
 			model_object->ensure_on_bed();
 			print.auto_assign_extruders(model_object);
 			THEN("Print works?") {

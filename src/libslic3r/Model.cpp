@@ -1062,7 +1062,8 @@ Polygon ModelObject::convex_hull_2d(const Transform3d& trafo_instance) const
     tbb::parallel_for(tbb::blocked_range<size_t>(0, volumes.size()), [&](const tbb::blocked_range<size_t>& range) {
         for (size_t i = range.begin(); i < range.end(); ++i) {
             const ModelVolume* v = volumes[i];
-            chs.emplace_back(its_convex_hull_2d_above(v->mesh().its, (trafo_instance * v->get_matrix()).cast<float>(), 0.0f));
+            if (v->is_model_part())
+                chs.emplace_back(its_convex_hull_2d_above(v->mesh().its, (trafo_instance * v->get_matrix()).cast<float>(), 0.0f));
         }
     });
 
@@ -1995,38 +1996,6 @@ void ModelInstance::transform_polygon(Polygon* polygon) const
     polygon->rotate(get_rotation(Z)); // rotate around polygon origin
     // CHECK_ME -> Is the following correct ?
     polygon->scale(get_scaling_factor(X), get_scaling_factor(Y)); // scale around polygon origin
-}
-
-arrangement::ArrangePolygon ModelInstance::get_arrange_polygon() const
-{
-//    static const double SIMPLIFY_TOLERANCE_MM = 0.1;
-
-    Polygon p = get_object()->convex_hull_2d(this->get_matrix());
-
-//    if (!p.points.empty()) {
-//        Polygons pp{p};
-//        pp = p.simplify(scaled<double>(SIMPLIFY_TOLERANCE_MM));
-//        if (!pp.empty()) p = pp.front();
-//    }
-   
-    arrangement::ArrangePolygon ret;
-    ret.poly.contour = std::move(p);
-    ret.translation  = Vec2crd::Zero();
-    ret.rotation     = 0.;
-
-    return ret;
-}
-
-void ModelInstance::apply_arrange_result(const Vec2d &offs, double rotation)
-{
-    // write the transformation data into the model instance
-    auto trafo = get_transformation().get_matrix();
-    auto tr = Transform3d::Identity();
-    tr.translate(to_3d(unscaled(offs), 0.));
-    trafo = tr * Eigen::AngleAxisd(rotation, Vec3d::UnitZ()) * trafo;
-    m_transformation.set_matrix(trafo);
-
-    this->object->invalidate_bounding_box();
 }
 
 indexed_triangle_set FacetsAnnotation::get_facets(const ModelVolume& mv, EnforcerBlockerType type) const

@@ -4651,9 +4651,11 @@ std::string validate(const FullPrintConfig &cfg)
     BOOST_PP_SEQ_FOR_EACH(PRINT_CONFIG_CACHE_ELEMENT_DEFINITION, _, BOOST_PP_TUPLE_TO_SEQ(CLASSES_SEQ)) \
     int print_config_static_initializer() { \
         /* Putting a trace here to avoid the compiler to optimize out this function. */ \
-        BOOST_LOG_TRIVIAL(trace) << "Initializing StaticPrintConfigs"; \
+        /*BOOST_LOG_TRIVIAL(trace) << "Initializing StaticPrintConfigs";*/ \
+        /* Tamas: alternative solution through a static volatile int. Boost log pollutes stdout and prevents tests from generating clean output */ \
+        static volatile int ret = 1; \
         BOOST_PP_SEQ_FOR_EACH(PRINT_CONFIG_CACHE_ELEMENT_INITIALIZATION, _, BOOST_PP_TUPLE_TO_SEQ(CLASSES_SEQ)) \
-        return 1; \
+        return ret; \
     }
 PRINT_CONFIG_CACHE_INITIALIZE((
     PrintObjectConfig, PrintRegionConfig, MachineEnvelopeConfig, GCodeConfig, PrintConfig, FullPrintConfig, 
@@ -4947,15 +4949,6 @@ Points get_bed_shape(const DynamicPrintConfig &config)
     }
     
     return to_points(bed_shape_opt->values);
-}
-
-void get_bed_shape(const DynamicPrintConfig &cfg, arrangement::ArrangeBed &out)
-{
-    if (is_XL_printer(cfg)) {
-        out = arrangement::SegmentedRectangleBed{get_extents(get_bed_shape(cfg)), 4, 4};
-    } else {
-        out = arrangement::to_arrange_bed(get_bed_shape(cfg));
-    }
 }
 
 Points get_bed_shape(const PrintConfig &cfg)

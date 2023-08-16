@@ -268,6 +268,12 @@ bool polygons_match(const Polygon &l, const Polygon &r);
 Polygon make_circle(double radius, double error);
 Polygon make_circle_num_segments(double radius, size_t num_segments);
 
+// To replace reserve_vector where it's used for Polygons
+template<class I> IntegerOnly<I, Polygons> reserve_polygons(I cap)
+{
+    return reserve_vector<Polygon, I, typename Polygons::allocator_type>(cap);
+}
+
 } // Slic3r
 
 // start Boost
