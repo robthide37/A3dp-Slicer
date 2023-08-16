@@ -262,6 +262,9 @@ Transform3d YStriderVBedHandler::get_physical_bed_trafo(int bed_index) const
     return tr;
 }
 
+const int GridStriderVBedHandler::ColsOutside =
+        static_cast<int>(std::sqrt(std::numeric_limits<int>::max()));
+
 Vec2i GridStriderVBedHandler::raw2grid(int bed_idx) const
 {
     Vec2i ret{bed_idx % ColsOutside, bed_idx / ColsOutside};

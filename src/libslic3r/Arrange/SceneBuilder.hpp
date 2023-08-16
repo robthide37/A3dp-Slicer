@@ -338,7 +338,7 @@ class GridStriderVBedHandler: public VirtualBedHandler
     // not representable with scaled coordinates. Combining XStrider with
     // YStrider takes care of the X and Y axis to be mapped into the physical
     // bed's coordinate region (which is representable in scaled coords)
-    static const int ColsOutside = std::sqrt(std::numeric_limits<int>::max());
+    static const int ColsOutside;
 
     XStriderVBedHandler m_xstrider;
     YStriderVBedHandler m_ystrider;
