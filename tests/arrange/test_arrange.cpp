@@ -760,7 +760,7 @@ TEST_CASE("First fit selection strategy", "[arrange2]")
 
             THEN("The item should be left unpacked")
             {
-                REQUIRE(std::all_of(items.begin(), items.end(), [](auto &itm) {
+                REQUIRE(std::all_of(items.begin(), items.end(), [](const ArrItem &itm) {
                     return !Slic3r::arr2::is_arranged(itm);
                 }));
             }
@@ -878,7 +878,7 @@ TEST_CASE("First fit selection strategy", "[arrange2]")
 
             THEN("all items should fit onto the beds from index 0 to 4")
             {
-                REQUIRE(std::all_of(items.begin(), items.end(), [](auto &itm) {
+                REQUIRE(std::all_of(items.begin(), items.end(), [](const ArrItem &itm) {
                     auto bed_idx = Slic3r::arr2::get_bed_index(itm);
                     return bed_idx >= 0 && bed_idx < Count / Capacity;
                 }));
