@@ -2629,8 +2629,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     if (curr_gizmo != nullptr)
         curr_gizmo->unregister_raycasters_for_picking();
     m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::Gizmo);
-    if (curr_gizmo != nullptr && !m_selection.is_empty())
-        curr_gizmo->register_raycasters_for_picking();
     m_scene_raycaster.remove_raycasters(SceneRaycaster::EType::FallbackGizmo);
     if (curr_gizmo != nullptr && !m_selection.is_empty())
         curr_gizmo->register_raycasters_for_picking();
