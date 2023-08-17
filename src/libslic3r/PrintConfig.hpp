@@ -19,7 +19,6 @@
 #include "libslic3r.h"
 #include "Config.hpp"
 #include "SLA/SupportTreeStrategies.hpp"
-#include "libslic3r/Arrange.hpp"
 
 #include <boost/preprocessor/facilities/empty.hpp>
 #include <boost/preprocessor/punctuation/comma_if.hpp>
@@ -500,6 +499,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionBool,                interface_shells))
     ((ConfigOptionFloat,               layer_height))
     ((ConfigOptionFloat,               mmu_segmented_region_max_width))
+    ((ConfigOptionFloat,               mmu_segmented_region_interlocking_depth))
     ((ConfigOptionFloat,               raft_contact_distance))
     ((ConfigOptionFloat,               raft_expansion))
     ((ConfigOptionPercent,             raft_first_layer_density))
@@ -1199,8 +1199,6 @@ bool is_XL_printer(const PrintConfig &cfg);
 Points get_bed_shape(const DynamicPrintConfig &cfg);
 Points get_bed_shape(const PrintConfig &cfg);
 Points get_bed_shape(const SLAPrinterConfig &cfg);
-
-void get_bed_shape(const DynamicPrintConfig &cfg, arrangement::ArrangeBed &out);
 
 std::string get_sla_suptree_prefix(const DynamicPrintConfig &config);
 

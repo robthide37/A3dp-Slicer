@@ -314,10 +314,10 @@ int CLI::run(int argc, char **argv)
     
     // Loop through transform options.
     bool user_center_specified = false;
-    Points bed = get_bed_shape(m_print_config);
-    ArrangeParams arrange_cfg;
-    arrange_cfg.min_obj_distance = scaled(min_object_distance(m_print_config));
-    
+    arr2::ArrangeBed bed = arr2::to_arrange_bed(get_bed_shape(m_print_config));
+    arr2::ArrangeSettings arrange_cfg;
+    arrange_cfg.set_distance_from_objects(min_object_distance(m_print_config));
+
     for (auto const &opt_key : m_transforms) {
         if (opt_key == "merge") {
             Model m;
@@ -330,7 +330,7 @@ int CLI::run(int argc, char **argv)
                 if (this->has_print_action())
                     arrange_objects(m, bed, arrange_cfg);
                 else
-                    arrange_objects(m, InfiniteBed{}, arrange_cfg);
+                    arrange_objects(m, arr2::InfiniteBed{}, arrange_cfg);
             }
             m_models.clear();
             m_models.emplace_back(std::move(m));
@@ -576,7 +576,7 @@ int CLI::run(int argc, char **argv)
                 if (! m_config.opt_bool("dont_arrange")) {
                     if (user_center_specified) {
                         Vec2d c = m_config.option<ConfigOptionPoint>("center")->value;
-                        arrange_objects(model, InfiniteBed{scaled(c)}, arrange_cfg);
+                        arrange_objects(model, arr2::InfiniteBed{scaled(c)}, arrange_cfg);
                     } else
                         arrange_objects(model, bed, arrange_cfg);
                 }

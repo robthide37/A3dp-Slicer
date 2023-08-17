@@ -8,6 +8,8 @@ set(SLIC3R_GUI_SOURCES
     pchheader.hpp
     GUI/AboutDialog.cpp
     GUI/AboutDialog.hpp
+    GUI/ArrangeSettingsDialogImgui.hpp
+    GUI/ArrangeSettingsDialogImgui.cpp
     GUI/SysInfoDialog.cpp
     GUI/SysInfoDialog.hpp
     GUI/KBShortcutsDialog.cpp
@@ -196,8 +198,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/BusyCursorJob.hpp
     GUI/Jobs/CancellableJob.hpp
     GUI/Jobs/PlaterWorker.hpp
-    GUI/Jobs/ArrangeJob.hpp
-    GUI/Jobs/ArrangeJob.cpp
+    GUI/Jobs/ArrangeJob2.hpp
+    GUI/Jobs/ArrangeJob2.cpp
     GUI/Jobs/CreateFontNameImageJob.cpp
     GUI/Jobs/CreateFontNameImageJob.hpp
     GUI/Jobs/CreateFontStyleImagesJob.cpp
@@ -206,8 +208,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/EmbossJob.hpp
     GUI/Jobs/RotoptimizeJob.hpp
     GUI/Jobs/RotoptimizeJob.cpp
-    GUI/Jobs/FillBedJob.hpp
-    GUI/Jobs/FillBedJob.cpp
     GUI/Jobs/SLAImportJob.hpp
     GUI/Jobs/SLAImportJob.cpp
     GUI/Jobs/ProgressIndicator.hpp

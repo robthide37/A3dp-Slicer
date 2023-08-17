@@ -283,6 +283,12 @@ struct PolygonPoint
 };
 using PolygonPoints = std::vector<PolygonPoint>;
 
+// To replace reserve_vector where it's used for Polygons
+template<class I> IntegerOnly<I, Polygons> reserve_polygons(I cap)
+{
+    return reserve_vector<Polygon, I, typename Polygons::allocator_type>(cap);
+}
+
 } // Slic3r
 
 // start Boost
