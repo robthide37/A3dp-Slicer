@@ -361,7 +361,7 @@ bool GLGizmoEmboss::re_emboss(const ModelVolume &text_volume, std::shared_ptr<st
     const ImWchar* ranges = ImGui::GetIO().Fonts->GetGlyphRangesDefault();
 
     StyleManager style_manager(ranges, create_default_styles);
-    StyleManager::Style style{tc.style};
+    StyleManager::Style style{tc.style, es.projection};
     if (!style_manager.load_style(style))
         return false; // can't load font
 
