@@ -234,7 +234,43 @@ void arrange(SelectionStrategy &&selstrategy,
 }
 
 template<class It>
+std::vector<int> get_bed_indices(const Range<It> &items)
+{
+    auto bed_indices = reserve_vector<int>(items.size());
+
+    for (auto &itm : items)
+        bed_indices.emplace_back(get_bed_index(itm));
+
+    std::sort(bed_indices.begin(), bed_indices.end());
+    auto endit = std::unique(bed_indices.begin(), bed_indices.end());
+
+    bed_indices.erase(endit, bed_indices.end());
+
+    return bed_indices;
+}
+
+template<class It, class CIt>
+std::vector<int> get_bed_indices(const Range<It> &items, const Range<CIt> &fixed)
+{
+    std::vector<int> ret;
+
+    auto iitems = get_bed_indices(items);
+    auto ifixed = get_bed_indices(fixed);
+    ret.reserve(std::max(iitems.size(), ifixed.size()));
+    std::set_union(iitems.begin(), iitems.end(),
+                   ifixed.begin(), ifixed.end(),
+                   std::back_inserter(ret));
+
+    return ret;
+}
+
+template<class It>
 size_t get_bed_count(const Range<It> &items)
+{
+    return get_bed_indices(items).size();
+}
+
+template<class It> int get_max_bed_index(const Range<It> &items)
 {
     auto it = std::max_element(items.begin(),
                                items.end(),
@@ -242,11 +278,11 @@ size_t get_bed_count(const Range<It> &items)
                                    return get_bed_index(i1) < get_bed_index(i2);
                                });
 
-    size_t beds = 0;
+    int ret = Unarranged;
     if (it != items.end())
-        beds = get_bed_index(*it) + 1;
+        ret = get_bed_index(*it);
 
-    return beds;
+    return ret;
 }
 
 struct DefaultStopCondition {

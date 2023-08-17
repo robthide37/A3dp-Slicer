@@ -75,6 +75,21 @@ void prepare_fixed_unselected(ItemCont &items, int shift)
                 items.end());
 }
 
+inline int find_first_empty_bed(const std::vector<int>& bed_indices,
+                                int starting_from = 0) {
+    int ret = starting_from;
+
+    for (int idx : bed_indices) {
+        if (idx == ret) {
+            ret++;
+        } else if (idx > ret) {
+            break;
+        }
+    }
+
+    return ret;
+}
+
 template<class ArrItem>
 std::unique_ptr<ArrangeTaskResult>
 ArrangeTask<ArrItem>::process_native(Ctl &ctl)
@@ -109,15 +124,17 @@ ArrangeTask<ArrItem>::process_native(Ctl &ctl)
 
     arranger->arrange(printable.selected, fixed_items, bed, subctl);
 
-    // Unprintable items should go to the first bed not containing any printable
-    // items
-    auto beds = std::max(get_bed_count(crange(printable.selected)),
-                         get_bed_count(crange(printable.unselected)));
+    std::vector<int> printable_bed_indices =
+        get_bed_indices(crange(printable.selected), crange(printable.unselected));
 
     // If there are no printables, leave the physical bed empty
-    beds = std::max(beds, size_t{1});
+    constexpr int SearchFrom = 1;
 
-    prepare_fixed_unselected(unprintable.unselected, beds);
+    // Unprintable items should go to the first logical (!) bed not containing
+    // any printable items
+    int first_empty_bed = find_first_empty_bed(printable_bed_indices, SearchFrom);
+
+    prepare_fixed_unselected(unprintable.unselected, first_empty_bed);
 
     arranger->arrange(unprintable.selected, unprintable.unselected, bed, ctl);
 
@@ -125,7 +142,7 @@ ArrangeTask<ArrItem>::process_native(Ctl &ctl)
 
     for (auto &itm : unprintable.selected) {
         if (is_arranged(itm)) {
-            int bedidx = get_bed_index(itm) + beds;
+            int bedidx = get_bed_index(itm) + first_empty_bed;
             arr2::set_bed_index(itm, bedidx);
         }
 

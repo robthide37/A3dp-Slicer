@@ -2,6 +2,7 @@
 #define ARRANGEIMPL_HPP
 
 #include <random>
+#include <map>
 
 #include "Arrange.hpp"
 
@@ -43,25 +44,36 @@ void arrange(SelectionStrategy &&selstrategy,
             std::forward<PackStrategy>(packingstrategy), items, fixed,
             RectangleBed{bed.bb}, SelStrategyTag<SelectionStrategy>{});
 
-    size_t beds = get_bed_count(crange(items));
-    size_t fixed_beds = std::max(beds, get_bed_count(fixed));
-    std::vector<bool> fixed_is_empty(fixed_beds, true);
+    std::vector<int> bed_indices = get_bed_indices(items, fixed);
 
-    std::vector<BoundingBox> pilebb(beds);
+    size_t beds = bed_indices.size();
+
+    auto fixed_is_empty = [&bed_indices](int bidx) {
+        auto it = std::lower_bound(bed_indices.begin(), bed_indices.end(), bidx);
+        return it == bed_indices.end() || *it != bidx;
+    };
+
+    auto set_bed_as_empty = [&bed_indices](int bidx) {
+        auto it = std::lower_bound(bed_indices.begin(), bed_indices.end(), bidx);
+        if (it != bed_indices.end())
+            bed_indices.erase(it);
+    };
+
+    std::vector<BoundingBox> pilebb(bed_indices.size());
 
     for (auto &itm : items) {
         auto bedidx = get_bed_index(itm);
         if (bedidx >= 0) {
             pilebb[bedidx].merge(fixed_bounding_box(itm));
             if (is_wipe_tower(itm))
-                fixed_is_empty[bedidx] = false;
+                set_bed_as_empty(bedidx);
         }
     }
 
     for (auto &fxitm : fixed) {
         auto bedidx = get_bed_index(fxitm);
         if (bedidx >= 0 || is_wipe_tower(fxitm))
-            fixed_is_empty[bedidx] = false;
+            set_bed_as_empty(bedidx);
     }
 
     auto bedbb = bounding_box(bed);
@@ -74,7 +86,7 @@ void arrange(SelectionStrategy &&selstrategy,
     Pivots pivot = bed.alignment();
 
     for (size_t bedidx = 0; bedidx < beds; ++bedidx) {
-        if (! fixed_is_empty[bedidx])
+        if (! fixed_is_empty(bedidx))
             continue;
 
         BoundingBox bb;

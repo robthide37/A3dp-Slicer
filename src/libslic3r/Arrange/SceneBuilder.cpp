@@ -304,22 +304,28 @@ Transform3d YStriderVBedHandler::get_physical_bed_trafo(int bed_index) const
     return tr;
 }
 
-const int GridStriderVBedHandler::ColsOutside =
-        static_cast<int>(std::sqrt(std::numeric_limits<int>::max()));
+const int GridStriderVBedHandler::Cols =
+    2 * static_cast<int>(std::sqrt(std::numeric_limits<int>::max()) / 2);
+
+const int GridStriderVBedHandler::HalfCols = Cols / 2;
+const int GridStriderVBedHandler::Offset = HalfCols + Cols * HalfCols;
 
 Vec2i GridStriderVBedHandler::raw2grid(int bed_idx) const
 {
-    Vec2i ret{bed_idx % ColsOutside, bed_idx / ColsOutside};
+    bed_idx += Offset;
+
+    Vec2i ret{bed_idx % Cols - HalfCols, bed_idx / Cols - HalfCols};
 
     return ret;
 }
 
 int GridStriderVBedHandler::grid2raw(const Vec2i &crd) const
 {
-    assert(std::abs(crd.x()) < ColsOutside - 1 &&
-           std::abs(crd.y()) < ColsOutside - 1);
+    // Overlapping virtual beds will happen if the crd values exceed limits
+    assert((crd.x() < HalfCols - 1 && crd.x() >= -HalfCols) &&
+           (crd.y() < HalfCols - 1 && crd.y() >= -HalfCols));
 
-    return crd.y() * ColsOutside + crd.x();
+    return (crd.x() + HalfCols) + Cols * (crd.y() + HalfCols) - Offset;
 }
 
 int GridStriderVBedHandler::get_bed_index(const VBedPlaceable &obj) const
