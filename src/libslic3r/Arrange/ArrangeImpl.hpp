@@ -295,10 +295,10 @@ class DefaultArranger: public Arranger<ArrItem> {
         default:
             [[fallthrough]];
         case ArrangeSettingsView::asAuto:
-            if constexpr (std::is_convertible_v<Bed, RectangleBed>){
-                basekernel = TMArrangeKernel{items.size(), area(bed)};
-            } else {
+            if constexpr (std::is_convertible_v<Bed, CircleBed>){
                 basekernel = GravityKernel{};
+            } else {
+                basekernel = TMArrangeKernel{items.size(), area(bed)};
             }
             break;
         case ArrangeSettingsView::asPullToCenter:
