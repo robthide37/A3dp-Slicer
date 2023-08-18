@@ -45,35 +45,22 @@ void arrange(SelectionStrategy &&selstrategy,
             RectangleBed{bed.bb}, SelStrategyTag<SelectionStrategy>{});
 
     std::vector<int> bed_indices = get_bed_indices(items, fixed);
-
-    size_t beds = bed_indices.size();
-
-    auto fixed_is_empty = [&bed_indices](int bidx) {
-        auto it = std::lower_bound(bed_indices.begin(), bed_indices.end(), bidx);
-        return it == bed_indices.end() || *it != bidx;
-    };
-
-    auto set_bed_as_empty = [&bed_indices](int bidx) {
-        auto it = std::lower_bound(bed_indices.begin(), bed_indices.end(), bidx);
-        if (it != bed_indices.end())
-            bed_indices.erase(it);
-    };
-
-    std::vector<BoundingBox> pilebb(bed_indices.size());
+    std::map<int, BoundingBox> pilebb;
+    std::map<int, bool> bed_occupied;
 
     for (auto &itm : items) {
         auto bedidx = get_bed_index(itm);
         if (bedidx >= 0) {
             pilebb[bedidx].merge(fixed_bounding_box(itm));
             if (is_wipe_tower(itm))
-                set_bed_as_empty(bedidx);
+                bed_occupied[bedidx] = true;
         }
     }
 
     for (auto &fxitm : fixed) {
         auto bedidx = get_bed_index(fxitm);
-        if (bedidx >= 0 || is_wipe_tower(fxitm))
-            set_bed_as_empty(bedidx);
+        if (bedidx >= 0)
+            bed_occupied[bedidx] = true;
     }
 
     auto bedbb = bounding_box(bed);
@@ -85,8 +72,9 @@ void arrange(SelectionStrategy &&selstrategy,
 
     Pivots pivot = bed.alignment();
 
-    for (size_t bedidx = 0; bedidx < beds; ++bedidx) {
-        if (! fixed_is_empty(bedidx))
+    for (int bedidx : bed_indices) {
+        if (auto occup_it = bed_occupied.find(bedidx);
+            occup_it != bed_occupied.end() && occup_it->second)
             continue;
 
         BoundingBox bb;

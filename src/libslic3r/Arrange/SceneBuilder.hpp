@@ -205,6 +205,7 @@ protected:
 
     AnyPtr<const SLAPrint> m_sla_print;
     AnyPtr<const Print>    m_fff_print;
+    bool m_xl_printer = false;
 
     void set_brim_and_skirt();
 
@@ -498,9 +499,9 @@ class ArrangeableSLAPrint : public ArrangeableSlicerModel {
     static void visit_arrangeable_(Self &&self, const ObjectID &id, Fn &&fn);
 
 public:
-    explicit ArrangeableSLAPrint(const SLAPrint *slaprint,
-                                          SceneBuilder &builder)
-        : m_slaprint{slaprint}, ArrangeableSlicerModel{builder}
+    explicit ArrangeableSLAPrint(const SLAPrint *slaprint, SceneBuilder &builder)
+        : m_slaprint{slaprint}
+        , ArrangeableSlicerModel{builder}
     {
         assert(slaprint != nullptr);
     }

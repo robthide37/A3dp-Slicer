@@ -199,6 +199,17 @@ void SceneBuilder::build_arrangeable_slicer_model(ArrangeableSlicerModel &amodel
         m_wipetower_handler = std::make_unique<MissingWipeTowerHandler>();
     }
 
+    if (m_fff_print && !m_xl_printer)
+        m_xl_printer = is_XL_printer(m_fff_print->config());
+
+    bool has_wipe_tower = false;
+    m_wipetower_handler->visit(
+        [&has_wipe_tower](const Arrangeable &arrbl) { has_wipe_tower = true; });
+
+    if (m_xl_printer && !has_wipe_tower) {
+        m_bed = XLBed{bounding_box(m_bed)};
+    }
+
     amodel.m_vbed_handler = std::move(m_vbed_handler);
     amodel.m_model = std::move(m_model);
     amodel.m_selmask = std::move(m_selection);
@@ -443,10 +454,10 @@ SceneBuilder &&SceneBuilder::set_bed(const DynamicPrintConfig &cfg)
     Points bedpts = get_bed_shape(cfg);
 
     if (is_XL_printer(cfg)) {
-        m_bed = XLBed{get_extents(bedpts)};
-    } else {
-        m_bed = arr2::to_arrange_bed(bedpts);
+        m_xl_printer = true;
     }
+
+    m_bed = arr2::to_arrange_bed(bedpts);
 
     return std::move(*this);
 }
