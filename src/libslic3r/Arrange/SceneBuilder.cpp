@@ -99,25 +99,23 @@ bool check_coord_bounds(const BoundingBoxf &bb)
 ExPolygons extract_full_outline(const ModelInstance &inst, const Transform3d &tr)
 {
     ExPolygons outline;
-    for (const ModelVolume *v : inst.get_object()->volumes) {
-        Polygons vol_outline;
 
-        if (!check_coord_bounds(to_2d(v->mesh().transformed_bounding_box(tr)))) {
-            outline.clear();
-            break;
-        }
+    if (check_coord_bounds(to_2d(instance_bounding_box(inst, tr)))) {
+        for (const ModelVolume *v : inst.get_object()->volumes) {
+            Polygons vol_outline;
 
-        vol_outline = project_mesh(v->mesh().its,
-                                   tr * inst.get_matrix() * v->get_matrix(),
-                                   [] {});
-        switch (v->type()) {
-        case ModelVolumeType::MODEL_PART:
-            outline = union_ex(outline, vol_outline);
-            break;
-        case ModelVolumeType::NEGATIVE_VOLUME:
-            outline = diff_ex(outline, vol_outline);
-            break;
-        default:;
+            vol_outline = project_mesh(v->mesh().its,
+                                       tr * inst.get_matrix() * v->get_matrix(),
+                                       [] {});
+            switch (v->type()) {
+            case ModelVolumeType::MODEL_PART:
+                outline = union_ex(outline, vol_outline);
+                break;
+            case ModelVolumeType::NEGATIVE_VOLUME:
+                outline = diff_ex(outline, vol_outline);
+                break;
+            default:;
+            }
         }
     }
 
