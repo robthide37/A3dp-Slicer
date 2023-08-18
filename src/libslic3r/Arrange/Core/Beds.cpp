@@ -110,7 +110,7 @@ template<class Fn> auto call_with_bed(const Points &bed, Fn &&fn)
 
         if ((1.0 - parea / area(bb)) < 1e-3) {
             return fn(RectangleBed{bb});
-        } else if (!std::isnan(circ.radius()))
+        } else if (!std::isnan(circ.radius()) && (1.0 - parea / area(circ)) < 1e-2)
             return fn(circ);
         else
             return fn(IrregularBed{{ExPolygon(bed)}});
