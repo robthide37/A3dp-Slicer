@@ -8,6 +8,7 @@
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/MsgDialog.hpp"
 #include "slic3r/GUI/format.hpp"
+#include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/CameraUtils.hpp"
 #include "slic3r/GUI/Jobs/EmbossJob.hpp"
 #include "slic3r/GUI/Jobs/CreateFontNameImageJob.hpp"
@@ -2631,7 +2632,7 @@ void GLGizmoEmboss::draw_style_list() {
         trunc_name = ImGuiWrapper::trunc(current_name, max_style_name_width);
     }
 
-    std::string title = _u8L("Styles");
+    std::string title = _u8L("Style");
     if (m_style_manager.exist_stored_style())
         ImGui::Text("%s", title.c_str());
     else
@@ -3187,7 +3188,7 @@ void GLGizmoEmboss::draw_advanced()
         if (per_glyph) {
             ImGui::SetTooltip("%s", _u8L("Set global orientation for whole text.").c_str());
         } else {
-            ImGui::SetTooltip("%s", _u8L("Set position and orientation per Glyph.").c_str());
+            ImGui::SetTooltip("%s", _u8L("Set position and orientation per glyph.").c_str());
             if (!m_text_lines.is_init())
                 reinit_text_lines();
         }
@@ -3200,28 +3201,28 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::SameLine(gui_cfg->advanced_input_offset);
         if (align.first==FontProp::HorizontalAlign::left) draw(get_icon(icons, IconType::align_horizontal_left, IconState::hovered));
         else if (draw_button(icons, IconType::align_horizontal_left)) { align.first=FontProp::HorizontalAlign::left; is_change = true; }
-        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set left alignment").c_str());
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _CTX_utf8(L_CONTEXT("Left", "Alignment"), "Alignment").c_str());
         ImGui::SameLine();
         if (align.first==FontProp::HorizontalAlign::center) draw(get_icon(icons, IconType::align_horizontal_center, IconState::hovered));
         else if (draw_button(icons, IconType::align_horizontal_center)) { align.first=FontProp::HorizontalAlign::center; is_change = true; }
-        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set horizont center alignment").c_str());
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _CTX_utf8(L_CONTEXT("Center", "Alignment"), "Alignment").c_str());
         ImGui::SameLine();
         if (align.first==FontProp::HorizontalAlign::right) draw(get_icon(icons, IconType::align_horizontal_right, IconState::hovered));
         else if (draw_button(icons, IconType::align_horizontal_right)) { align.first=FontProp::HorizontalAlign::right; is_change = true; }
-        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set right alignment").c_str());
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _CTX_utf8(L_CONTEXT("Right", "Alignment"), "Alignment").c_str());
 
         ImGui::SameLine();
         if (align.second==FontProp::VerticalAlign::top) draw(get_icon(icons, IconType::align_vertical_top, IconState::hovered));
         else if (draw_button(icons, IconType::align_vertical_top)) { align.second=FontProp::VerticalAlign::top; is_change = true; }
-        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set top alignment").c_str());
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _CTX_utf8(L_CONTEXT("Top", "Alignment"), "Alignment").c_str());
         ImGui::SameLine();
         if (align.second==FontProp::VerticalAlign::center) draw(get_icon(icons, IconType::align_vertical_center, IconState::hovered));
         else if (draw_button(icons, IconType::align_vertical_center)) { align.second=FontProp::VerticalAlign::center; is_change = true; }
-        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set vertical center alignment").c_str());
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _CTX_utf8(L_CONTEXT("Middle", "Alignment"), "Alignment").c_str());
         ImGui::SameLine();
         if (align.second==FontProp::VerticalAlign::bottom) draw(get_icon(icons, IconType::align_vertical_bottom, IconState::hovered));
         else if (draw_button(icons, IconType::align_vertical_bottom)) { align.second=FontProp::VerticalAlign::bottom; is_change = true; }
-        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _u8L("Set bottom alignment").c_str());
+        else if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", _CTX_utf8(L_CONTEXT("Bottom", "Alignment"), "Alignment").c_str());
         return is_change;
     };
     const FontProp::Align * def_align = stored_style ? &stored_style->prop.align : nullptr;

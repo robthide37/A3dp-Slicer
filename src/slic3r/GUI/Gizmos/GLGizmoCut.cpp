@@ -194,7 +194,8 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
 
     std::map<const wchar_t, std::string> connetor_types = {
         {ImGui::PlugMarker , _u8L("Plug")  }, 
-        {ImGui::DowelMarker, _u8L("Dowel") }, 
+        {ImGui::DowelMarker, _u8L("Dowel") },
+        //TRN Connectors type next to "Plug" and "Dowel"
         {ImGui::SnapMarker,  _u8L("Snap") },
     };
     for (auto connector : connetor_types) {
@@ -2679,7 +2680,7 @@ void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
             ImGuiWrapper::text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, m_labels_map["Groove"] + ": ");
             render_groove_float_input(m_labels_map["Depth"], m_groove.depth, m_groove.depth_init, m_groove.depth_tolerance);
             render_groove_float_input(m_labels_map["Width"], m_groove.width, m_groove.width_init, m_groove.width_tolerance);
-            render_groove_angle_input(m_labels_map["Flaps Angle"], m_groove.flaps_angle, m_groove.flaps_angle_init, 30.f, 120.f);
+            render_groove_angle_input(m_labels_map["Flap Angle"], m_groove.flaps_angle, m_groove.flaps_angle_init, 30.f, 120.f);
             render_groove_angle_input(m_labels_map["Groove Angle"], m_groove.angle, m_groove.angle_init, 0.f, 15.f);
         }
 
