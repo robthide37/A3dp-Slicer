@@ -373,10 +373,26 @@ public:
     }
 };
 
-void arrange(Scene &scene, ArrangeTaskCtl &ctl);
-inline void arrange(Scene &scene, ArrangeTaskCtl &&ctl = DummyCtl{})
+bool arrange(Scene &scene, ArrangeTaskCtl &ctl);
+inline bool arrange(Scene &scene, ArrangeTaskCtl &&ctl = DummyCtl{})
 {
-    arrange(scene, ctl);
+    return arrange(scene, ctl);
+}
+
+inline bool arrange(Scene &&scene, ArrangeTaskCtl &ctl)
+{
+    return arrange(scene, ctl);
+}
+
+inline bool arrange(Scene &&scene, ArrangeTaskCtl &&ctl = DummyCtl{})
+{
+    return arrange(scene, ctl);
+}
+
+template<class Builder, class Ctl = DummyCtl>
+bool arrange(SceneBuilderBase<Builder> &&builder, Ctl &&ctl = {})
+{
+    return arrange(Scene{std::move(builder)}, ctl);
 }
 
 } // namespace arr2

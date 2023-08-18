@@ -1,14 +1,11 @@
 #include "ModelArrange.hpp"
 
-
 #include <libslic3r/Arrange/SceneBuilder.hpp>
+#include <libslic3r/Arrange/Items/ArrangeItem.hpp>
+#include <libslic3r/Arrange/Tasks/MultiplySelectionTask.hpp>
 
 #include <libslic3r/Model.hpp>
 #include <libslic3r/Geometry/ConvexHull.hpp>
-#include "Arrange/Core/ArrangeItemTraits.hpp"
-#include "Arrange/Items/ArrangeItem.hpp"
-
-#include "MTUtils.hpp"
 
 namespace Slic3r {
 
@@ -27,14 +24,10 @@ bool arrange_objects(Model &model,
                      const arr2::ArrangeBed &bed,
                      const arr2::ArrangeSettingsView &settings)
 {
-    arr2::Scene scene{arr2::SceneBuilder{}
-                          .set_bed(bed)
-                          .set_arrange_settings(settings)
-                          .set_model(model)};
-
-    auto task = arr2::ArrangeTaskBase::create(arr2::Tasks::Arrange, scene);
-    auto result = task->process();
-    return result->apply_on(scene.model());
+    return arrange(arr2::SceneBuilder{}
+                       .set_bed(bed)
+                       .set_arrange_settings(settings)
+                       .set_model(model));
 }
 
 void duplicate_objects(Model &model,
