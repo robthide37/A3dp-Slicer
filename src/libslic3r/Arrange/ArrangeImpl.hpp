@@ -272,7 +272,7 @@ class DefaultArranger: public Arranger<ArrItem> {
             int pa = get_priority(itm1);
             int pb = get_priority(itm2);
 
-            return pa == pb ? envelope_area(itm1) > envelope_area(itm2) :
+            return pa == pb ? area(envelope_convex_hull(itm1)) > area(envelope_convex_hull(itm2)) :
                               pa > pb;
         };
 
@@ -295,7 +295,11 @@ class DefaultArranger: public Arranger<ArrItem> {
         default:
             [[fallthrough]];
         case ArrangeSettingsView::asAuto:
-            basekernel = TMArrangeKernel{items.size(), area(bed)};
+            if constexpr (std::is_convertible_v<Bed, RectangleBed>){
+                basekernel = TMArrangeKernel{items.size(), area(bed)};
+            } else {
+                basekernel = GravityKernel{};
+            }
             break;
         case ArrangeSettingsView::asPullToCenter:
             basekernel = GravityKernel{};
