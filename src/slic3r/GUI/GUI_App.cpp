@@ -2864,6 +2864,9 @@ void GUI_App::load_current_presets(bool check_printer_presets_ /*= true*/)
 				// Mark the plater to update print bed by tab->load_current_preset() from Plater::on_config_change().
 				this->plater()->force_print_bed_update();
 			}
+            else if (tab->type() == Preset::TYPE_FILAMENT)
+                // active extruder can be changed in a respect to the new loaded configurations, if some filament preset will be modified
+                static_cast<TabFilament*>(tab)->invalidate_active_extruder();
 			tab->load_current_preset();
 		}
 }

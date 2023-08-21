@@ -1986,8 +1986,16 @@ void TabFilament::update_extruder_combobox()
             m_extruders_cb->Append(format_wxstr("%1% %2%", _L("Extruder"), id), *get_bmp_bundle("funnel"));
     }
 
-    if (m_active_extruder >= int(extruder_cnt))
+    if (m_active_extruder >= int(extruder_cnt)) {
         m_active_extruder = 0;
+        // update selected and, as a result, editing preset
+        const std::string& preset_name = m_preset_bundle->extruders_filaments[0].get_selected_preset_name();
+        m_presets->select_preset_by_name(preset_name, true);
+
+        // To avoid inconsistance between value of active_extruder in FilamentTab and TabPresetComboBox,
+        // which can causes a crash on switch preset from MM printer to SM printer
+        m_presets_choice->set_active_extruder(m_active_extruder);
+    }
 
     m_extruders_cb->SetSelection(m_active_extruder);
 }
@@ -2317,11 +2325,36 @@ void TabFilament::sys_color_changed()
 
 void TabFilament::load_current_preset()
 {
+    const std::string& selected_filament_name = m_presets->get_selected_preset_name();
+    if (m_active_extruder < 0) {
+        // active extruder was invalidated before load new project file or configuration,
+        // so we have to update active extruder selection from selected filament
+        const std::string& edited_filament_name = m_presets->get_edited_preset().name;
+        assert(!selected_filament_name.empty() && selected_filament_name == edited_filament_name);
+
+        for (int i = 0; i < int(m_preset_bundle->extruders_filaments.size()); i++) {
+            const std::string& selected_extr_filament_name = m_preset_bundle->extruders_filaments[i].get_selected_preset_name();
+            if (selected_extr_filament_name == edited_filament_name) {
+                m_active_extruder = i;
+                break;
+            }
+        }
+        assert(m_active_extruder >= 0);
+
+        m_presets_choice->set_active_extruder(m_active_extruder);
+        if (m_active_extruder != m_extruders_cb->GetSelection())
+            m_extruders_cb->Select(m_active_extruder);
+    }
+
     assert(m_active_extruder >= 0 && m_active_extruder < m_preset_bundle->extruders_filaments.size());
     const std::string& selected_extr_filament_name = m_preset_bundle->extruders_filaments[m_active_extruder].get_selected_preset_name();
-    const std::string& selected_filament_name = m_presets->get_selected_preset_name();
-    if (selected_extr_filament_name != selected_filament_name)
+    if (selected_extr_filament_name != selected_filament_name) {
         m_presets->select_preset_by_name(selected_extr_filament_name, false);
+
+        // To avoid inconsistance between value of active_extruder in FilamentTab and TabPresetComboBox,
+        // which can causes a crash on switch preset from MM printer to SM printer
+        m_presets_choice->set_active_extruder(m_active_extruder);
+    }
 
     Tab::load_current_preset();
 }
@@ -3639,8 +3672,17 @@ bool Tab::select_preset(std::string preset_name, bool delete_current /*=false*/,
             for (PresetUpdate &pu : updates) {
                 pu.old_preset_dirty = (old_printer_technology == pu.technology) && pu.presets->current_is_dirty();
                 pu.new_preset_compatible = (new_printer_technology == pu.technology) && is_compatible_with_printer(pu.presets->get_edited_preset_with_vendor_profile(), new_printer_preset_with_vendor_profile);
+                bool force_update_edited_preset = false;
+                if (pu.tab_type == Preset::TYPE_FILAMENT && pu.new_preset_compatible) {
+                    // check if edited preset will be still correct after selection new printer 
+                    const int active_extruder    = dynamic_cast<const TabFilament*>(wxGetApp().get_tab(Preset::TYPE_FILAMENT))->get_active_extruder();
+                    const int extruder_count_new = int(dynamic_cast<const ConfigOptionFloats*>(new_printer_preset.config.option("nozzle_diameter"))->size());
+                    // if active_extruder is bigger than extruders_count,
+                    // then it means that edited filament preset will be changed and we have to check this changes
+                    force_update_edited_preset = active_extruder >= extruder_count_new;
+                }
                 if (!canceled)
-                    canceled = pu.old_preset_dirty && !pu.new_preset_compatible && !may_discard_current_dirty_preset(pu.presets, preset_name);
+                    canceled = pu.old_preset_dirty && (!pu.new_preset_compatible || force_update_edited_preset) && !may_discard_current_dirty_preset(pu.presets, preset_name);
             }
             if (!canceled) {
                 for (PresetUpdate &pu : updates) {
