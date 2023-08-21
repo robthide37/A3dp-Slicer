@@ -3670,9 +3670,8 @@ void GCodeProcessor::post_process()
     // temporary file to contain modified gcode
     std::string out_path = m_result.filename + ".postprocess";
     FilePtr out{ boost::nowide::fopen(out_path.c_str(), "wb") };
-    if (out.f == nullptr) {
+    if (out.f == nullptr)
         throw Slic3r::RuntimeError(std::string("GCode processor post process export failed.\nCannot open file for writing.\n"));
-    }
 
 #if ENABLE_BINARIZED_GCODE
     std::vector<double> filament_mm(m_result.extruders_count, 0.0);
@@ -4404,6 +4403,60 @@ void GCodeProcessor::post_process()
 
     out.close();
     in.close();
+
+#if ENABLE_BINARIZED_GCODE
+    if (m_binarizer.is_enabled()) {
+        // updates m_result.lines_ends from binarized gcode file
+        m_result.lines_ends.clear();
+
+        FilePtr file(boost::nowide::fopen(out_path.c_str(), "rb"));
+        if (file.f != nullptr) {
+            fseek(file.f, 0, SEEK_END);
+            const long file_size = ftell(file.f);
+            rewind(file.f);
+
+            // read file header
+            using namespace bgcode::core;
+            using namespace bgcode::binarize;
+            FileHeader file_header;
+            EResult res = read_header(*file.f, file_header, nullptr);
+            if (res == EResult::Success) {
+                // search first GCode block
+                BlockHeader block_header;
+                res = read_next_block_header(*file.f, file_header, block_header, EBlockType::GCode, nullptr, 0);
+                while (res == EResult::Success) {
+                    GCodeBlock block;
+                    res = block.read_data(*file.f, file_header, block_header);
+                    if (res != EResult::Success)
+                        break;
+
+                    // extract lines ends from block
+                    std::vector<size_t>& lines_ends = m_result.lines_ends.emplace_back(std::vector<size_t>());
+                    for (size_t i = 0; i < block.raw_data.size(); ++i) {
+                        if (block.raw_data[i] == '\n')
+                            lines_ends.emplace_back(i + 1);
+                    }
+
+                    if (ftell(file.f) == file_size)
+                        break;
+
+                    // read next block header
+                    res = read_next_block_header(*file.f, file_header, block_header, nullptr, 0);
+                    if (res != EResult::Success)
+                        break;
+                    if (block_header.type != (uint16_t)EBlockType::GCode) {
+                        res = EResult::InvalidBlockType;
+                        break;
+                    }
+                }
+            }
+
+            if (res != EResult::Success && !m_result.lines_ends.empty() && !m_result.lines_ends.front().empty())
+                // some error occourred, clear lines ends
+                m_result.lines_ends = { std::vector<size_t>() };
+        }
+    }
+#endif // ENABLE_BINARIZED_GCODE
 
     export_lines.synchronize_moves(m_result);
 
