@@ -71,7 +71,7 @@ const float GCodeProcessor::Wipe_Height = 0.05f;
 
 #if ENABLE_BINARIZED_GCODE
 bgcode::binarize::BinarizerConfig GCodeProcessor::s_binarizer_config{};
-#endif // ENABLE_BINARIZED
+#endif // ENABLE_BINARIZED_GCODE
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
 const std::string GCodeProcessor::Mm3_Per_Mm_Tag = "MM3_PER_MM:";
@@ -1129,7 +1129,7 @@ void GCodeProcessor::process_ascii_file(const std::string& filename, std::functi
 }
 
 #if ENABLE_BINARIZED_GCODE
-static void update_out_file_pos(const std::string& out_string, std::vector<size_t>& lines_ends, size_t* out_file_pos)
+static void update_lines_ends_and_out_file_pos(const std::string& out_string, std::vector<size_t>& lines_ends, size_t* out_file_pos)
 {
     for (size_t i = 0; i < out_string.size(); ++i) {
         if (out_string[i] == '\n')
@@ -1306,7 +1306,7 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
             throw Slic3r::RuntimeError("Error while reading file '" + filename + "': " + std::string(translate_result(res)) + "\n");
 
         std::vector<size_t>& lines_ends = m_result.lines_ends.emplace_back(std::vector<size_t>());
-        update_out_file_pos(block.raw_data, lines_ends, nullptr);
+        update_lines_ends_and_out_file_pos(block.raw_data, lines_ends, nullptr);
 
         m_parser.parse_buffer(block.raw_data, [this](GCodeReader& reader, const GCodeReader::GCodeLine& line) {
             this->process_gcode_line(line, true);
@@ -3730,9 +3730,8 @@ void GCodeProcessor::post_process()
             }
         }
 
-        using namespace bgcode::core;
-        const EResult res = m_binarizer.initialize(*out.f, s_binarizer_config);
-        if (res != EResult::Success)
+        const bgcode::core::EResult res = m_binarizer.initialize(*out.f, s_binarizer_config);
+        if (res != bgcode::core::EResult::Success)
             throw Slic3r::RuntimeError(std::string("Unable to initialize the gcode binarizer.\n"));
     }
 #endif // ENABLE_BINARIZED_GCODE
@@ -3985,13 +3984,12 @@ void GCodeProcessor::post_process()
 
 #if ENABLE_BINARIZED_GCODE
             if (m_binarizer.is_enabled()) {
-                bgcode::core::EResult res = m_binarizer.append_gcode(out_string);
-                if (res != bgcode::core::EResult::Success)
+                if (m_binarizer.append_gcode(out_string) != bgcode::core::EResult::Success)
                     throw Slic3r::RuntimeError(std::string("Error while sending gcode to the binarizer.\n"));
             }
             else {
                 write_to_file(out, out_string, result, out_path);
-                update_out_file_pos(out_string, result.lines_ends.front(), &m_out_file_pos);
+                update_lines_ends_and_out_file_pos(out_string, result.lines_ends.front(), &m_out_file_pos);
             }
 #else
             write_to_file(out, out_string, result, out_path);
@@ -4018,7 +4016,7 @@ void GCodeProcessor::post_process()
             }
             else {
                 write_to_file(out, out_string, result, out_path);
-                update_out_file_pos(out_string, result.lines_ends.front(), &m_out_file_pos);
+                update_lines_ends_and_out_file_pos(out_string, result.lines_ends.front(), &m_out_file_pos);
             }
 #else
             write_to_file(out, out_string, result, out_path);

@@ -1214,13 +1214,10 @@ void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGenerato
             binary_data.printer_metadata.raw_data.emplace_back("extruder_colour", extruder_colours_str); // duplicated into config data
         }
     }
-
-    // modifies m_silent_time_estimator_enabled
-    DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
-#else
-    // modifies m_silent_time_estimator_enabled
-    DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
 #endif // ENABLE_BINARIZED_GCODE
+    
+    // modifies m_silent_time_estimator_enabled
+    DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
 
     if (! print.config().gcode_substitutions.values.empty()) {
         m_find_replace = make_unique<GCodeFindReplace>(print.config());

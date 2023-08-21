@@ -1077,16 +1077,14 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
     std::vector<uint8_t> cs_buffer(65536);
     EResult res = is_valid_binary_gcode(*file.f, true, cs_buffer.data(), cs_buffer.size());
     if (res != EResult::Success)
-        throw Slic3r::RuntimeError(format("The selected file is not a valid binary gcode.\nError: %1%",
-            std::string(translate_result(res))));
-
-    rewind(file.f);
+        throw Slic3r::RuntimeError(format("The selected file is not a valid binary gcode.\nError: %1%", std::string(translate_result(res))));
 
     FileHeader file_header;
     res = read_header(*file.f, file_header, nullptr);
     if (res != EResult::Success)
         throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(translate_result(res))));
 
+    // searches for config block
     BlockHeader block_header;
     res = read_next_block_header(*file.f, file_header, block_header, EBlockType::SlicerMetadata, cs_buffer.data(), cs_buffer.size());
     if (res != EResult::Success)
@@ -1098,6 +1096,7 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
     if (res != EResult::Success)
         throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(translate_result(res))));
 
+    // extracts data from block
     for (const auto& [key, value] : slicer_metadata_block.raw_data) {
         this->set_deserialize(key, value, substitutions_ctxt);
     }
