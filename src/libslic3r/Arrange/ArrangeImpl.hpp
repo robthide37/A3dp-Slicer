@@ -2,6 +2,7 @@
 #define ARRANGEIMPL_HPP
 
 #include <random>
+#include <map>
 
 #include "Arrange.hpp"
 
@@ -43,25 +44,23 @@ void arrange(SelectionStrategy &&selstrategy,
             std::forward<PackStrategy>(packingstrategy), items, fixed,
             RectangleBed{bed.bb}, SelStrategyTag<SelectionStrategy>{});
 
-    size_t beds = get_bed_count(crange(items));
-    size_t fixed_beds = std::max(beds, get_bed_count(fixed));
-    std::vector<bool> fixed_is_empty(fixed_beds, true);
-
-    std::vector<BoundingBox> pilebb(beds);
+    std::vector<int> bed_indices = get_bed_indices(items, fixed);
+    std::map<int, BoundingBox> pilebb;
+    std::map<int, bool> bed_occupied;
 
     for (auto &itm : items) {
         auto bedidx = get_bed_index(itm);
         if (bedidx >= 0) {
             pilebb[bedidx].merge(fixed_bounding_box(itm));
             if (is_wipe_tower(itm))
-                fixed_is_empty[bedidx] = false;
+                bed_occupied[bedidx] = true;
         }
     }
 
     for (auto &fxitm : fixed) {
         auto bedidx = get_bed_index(fxitm);
-        if (bedidx >= 0 || is_wipe_tower(fxitm))
-            fixed_is_empty[bedidx] = false;
+        if (bedidx >= 0)
+            bed_occupied[bedidx] = true;
     }
 
     auto bedbb = bounding_box(bed);
@@ -73,8 +72,9 @@ void arrange(SelectionStrategy &&selstrategy,
 
     Pivots pivot = bed.alignment();
 
-    for (size_t bedidx = 0; bedidx < beds; ++bedidx) {
-        if (! fixed_is_empty[bedidx])
+    for (int bedidx : bed_indices) {
+        if (auto occup_it = bed_occupied.find(bedidx);
+            occup_it != bed_occupied.end() && occup_it->second)
             continue;
 
         BoundingBox bb;
@@ -272,7 +272,7 @@ class DefaultArranger: public Arranger<ArrItem> {
             int pa = get_priority(itm1);
             int pb = get_priority(itm2);
 
-            return pa == pb ? envelope_area(itm1) > envelope_area(itm2) :
+            return pa == pb ? area(envelope_convex_hull(itm1)) > area(envelope_convex_hull(itm2)) :
                               pa > pb;
         };
 
@@ -295,7 +295,11 @@ class DefaultArranger: public Arranger<ArrItem> {
         default:
             [[fallthrough]];
         case ArrangeSettingsView::asAuto:
-            basekernel = TMArrangeKernel{items.size(), area(bed)};
+            if constexpr (std::is_convertible_v<Bed, CircleBed>){
+                basekernel = GravityKernel{};
+            } else {
+                basekernel = TMArrangeKernel{items.size(), area(bed)};
+            }
             break;
         case ArrangeSettingsView::asPullToCenter:
             basekernel = GravityKernel{};
@@ -370,6 +374,10 @@ ArrItem ConvexItemConverter<ArrItem>::convert(const Arrangeable &arrbl,
 {
     auto bed_index = arrbl.get_bed_index();
     Polygon outline = arrbl.convex_outline();
+
+    if (outline.empty())
+        throw EmptyItemOutlineError{};
+
     Polygon envelope = arrbl.convex_envelope();
 
     coord_t infl = offs + coord_t(std::ceil(this->safety_dist() / 2.));
@@ -418,6 +426,10 @@ ArrItem AdvancedItemConverter<ArrItem>::get_arritem(const Arrangeable &arrbl,
     coord_t infl = offs + coord_t(std::ceil(this->safety_dist() / 2.));
 
     auto outline = arrbl.full_outline();
+
+    if (outline.empty())
+        throw EmptyItemOutlineError{};
+
     auto envelope = arrbl.full_envelope();
 
     if (infl != 0) {

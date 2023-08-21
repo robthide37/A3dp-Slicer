@@ -2,6 +2,7 @@
 #define ARRANGEFIRSTFIT_HPP
 
 #include <iterator>
+#include <map>
 
 #include <libslic3r/Arrange/Core/ArrangeBase.hpp>
 
@@ -88,21 +89,28 @@ void arrange(
         sorted_items.emplace_back(itm);
     }
 
-    int max_bed_idx = get_bed_count(fixed);
-
     using Context = PackStrategyContext<PackStrategy, ArrItem>;
 
-    auto bed_contexts = reserve_vector<Context>(max_bed_idx + 1);
+    std::map<int, Context> bed_contexts;
+    auto get_or_init_context = [&ps, &bed, &bed_contexts](int bedidx) -> Context& {
+        auto ctx_it = bed_contexts.find(bedidx);
+        if (ctx_it == bed_contexts.end()) {
+            auto res = bed_contexts.emplace(
+                bedidx, create_context<ArrItem>(ps, bed, bedidx));
+
+            assert(res.second);
+
+            ctx_it = res.first;
+        }
+
+        return ctx_it->second;
+    };
 
     for (auto &itm : fixed) {
-        if (get_bed_index(itm) >= 0) {
-            auto bedidx = static_cast<size_t>(get_bed_index(itm));
-
-            while (bed_contexts.size() <= bedidx)
-                bed_contexts.emplace_back(
-                    create_context<ArrItem>(ps, bed, bedidx));
-
-            add_fixed_item(bed_contexts[bedidx], itm);
+        auto bedidx = get_bed_index(itm);
+        if (bedidx >= 0) {
+            Context &ctx = get_or_init_context(bedidx);
+            add_fixed_item(ctx, itm);
         }
     }
 
@@ -124,18 +132,20 @@ void arrange(
 
     while (it != sorted_items.end() && !is_cancelled()) {
         bool was_packed = false;
-        size_t j = 0;
+        int bedidx = 0;
         while (!was_packed && !is_cancelled()) {
-            for (; j < bed_contexts.size() && !was_packed && !is_cancelled(); j++) {
-                set_bed_index(*it, int(j));
+            for (; !was_packed && !is_cancelled(); bedidx++) {
+                set_bed_index(*it, bedidx);
 
                 auto remaining = Range{std::next(static_cast<SConstIt>(it)),
                                        sorted_items.cend()};
 
-                was_packed = pack(ps, bed, *it, bed_contexts[j], remaining);
+                Context &ctx = get_or_init_context(bedidx);
+
+                was_packed = pack(ps, bed, *it, ctx, remaining);
 
                 if(was_packed) {
-                    add_packed_item(bed_contexts[j], *it);
+                    add_packed_item(ctx, *it);
 
                     auto packed_range = Range{sorted_items.cbegin(),
                                               static_cast<SConstIt>(it)};
@@ -144,12 +154,6 @@ void arrange(
                 } else {
                     set_bed_index(*it, Unarranged);
                 }
-            }
-
-            if (!was_packed) {
-                bed_contexts.emplace_back(
-                    create_context<ArrItem>(ps, bed, bed_contexts.size()));
-                j = bed_contexts.size() - 1;
             }
         }
         ++it;

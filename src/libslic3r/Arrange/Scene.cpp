@@ -54,11 +54,11 @@ std::set<ObjectID> selected_geometry_ids(const Scene &sc)
     return result;
 }
 
-void arrange(Scene &scene, ArrangeTaskCtl &ctl)
+bool arrange(Scene &scene, ArrangeTaskCtl &ctl)
 {
     auto task = ArrangeTaskBase::create(Tasks::Arrange, scene);
     auto result = task->process(ctl);
-    result->apply_on(scene.model());
+    return result->apply_on(scene.model());
 }
 
 }} // namespace Slic3r::arr2

@@ -205,6 +205,7 @@ protected:
 
     AnyPtr<const SLAPrint> m_sla_print;
     AnyPtr<const Print>    m_fff_print;
+    bool m_xl_printer = false;
 
     void set_brim_and_skirt();
 
@@ -338,7 +339,9 @@ class GridStriderVBedHandler: public VirtualBedHandler
     // not representable with scaled coordinates. Combining XStrider with
     // YStrider takes care of the X and Y axis to be mapped into the physical
     // bed's coordinate region (which is representable in scaled coords)
-    static const int ColsOutside;
+    static const int Cols;
+    static const int HalfCols;
+    static const int Offset;
 
     XStriderVBedHandler m_xstrider;
     YStriderVBedHandler m_ystrider;
@@ -377,6 +380,11 @@ void transform_instance(ModelInstance     &mi,
 BoundingBoxf3 instance_bounding_box(const ModelInstance &mi,
                                     bool dont_translate = false);
 
+BoundingBoxf3 instance_bounding_box(const ModelInstance &mi,
+                                    const Transform3d &tr,
+                                    bool dont_translate = false);
+
+constexpr double UnscaledCoordLimit = 1000.;
 
 ExPolygons extract_full_outline(const ModelInstance &inst,
                                 const Transform3d &tr = Transform3d::Identity());
@@ -491,9 +499,9 @@ class ArrangeableSLAPrint : public ArrangeableSlicerModel {
     static void visit_arrangeable_(Self &&self, const ObjectID &id, Fn &&fn);
 
 public:
-    explicit ArrangeableSLAPrint(const SLAPrint *slaprint,
-                                          SceneBuilder &builder)
-        : m_slaprint{slaprint}, ArrangeableSlicerModel{builder}
+    explicit ArrangeableSLAPrint(const SLAPrint *slaprint, SceneBuilder &builder)
+        : m_slaprint{slaprint}
+        , ArrangeableSlicerModel{builder}
     {
         assert(slaprint != nullptr);
     }

@@ -49,8 +49,8 @@ static Slic3r::Model get_example_model_with_random_cube_objects(size_t N = 0)
     for (size_t i = 0; i < cube_count; ++i) {
         ModelInstance *inst = new_object->add_instance();
         arr2::transform_instance(*inst,
-                                 Vec2d{random_value(-200., 200.),
-                                       random_value(-200., 200.)},
+                                 Vec2d{random_value(-arr2::UnscaledCoordLimit / 10., arr2::UnscaledCoordLimit / 10.),
+                                       random_value(-arr2::UnscaledCoordLimit / 10., arr2::UnscaledCoordLimit / 10.)},
                                  random_value(0., 2 * PI));
     }
 
@@ -168,7 +168,8 @@ TEMPLATE_TEST_CASE("Writing arrange transformations into ModelInstance should be
 {
     auto [tx, ty, rot] = GENERATE(map(
         [](int i) {
-            return std::make_tuple(-500. + i * 20., -500. + i * 20.,
+            return std::make_tuple(-Slic3r::arr2::UnscaledCoordLimit / 2. + i * Slic3r::arr2::UnscaledCoordLimit / 100.,
+                                   -Slic3r::arr2::UnscaledCoordLimit / 2. + i * Slic3r::arr2::UnscaledCoordLimit / 100.,
                                    -PI + i * (2 * PI / 100.));
         },
         range(0, 100)));

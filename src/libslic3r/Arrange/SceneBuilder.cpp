@@ -64,16 +64,18 @@ void transform_instance(ModelInstance     &mi,
     mi.invalidate_object_bounding_box();
 }
 
-BoundingBoxf3 instance_bounding_box(const ModelInstance &mi, bool dont_translate)
+BoundingBoxf3 instance_bounding_box(const ModelInstance &mi,
+                                    const Transform3d &tr,
+                                    bool dont_translate)
 {
     BoundingBoxf3 bb;
     const Transform3d inst_matrix
         = dont_translate ? mi.get_transformation().get_matrix_no_offset()
-                           : mi.get_transformation().get_matrix();
+                         : mi.get_transformation().get_matrix();
 
     for (ModelVolume *v : mi.get_object()->volumes) {
         if (v->is_model_part()) {
-            bb.merge(v->mesh().transformed_bounding_box(inst_matrix
+            bb.merge(v->mesh().transformed_bounding_box(tr * inst_matrix
                                                         * v->get_matrix()));
         }
     }
@@ -81,22 +83,39 @@ BoundingBoxf3 instance_bounding_box(const ModelInstance &mi, bool dont_translate
     return bb;
 }
 
+BoundingBoxf3 instance_bounding_box(const ModelInstance &mi, bool dont_translate)
+{
+    return instance_bounding_box(mi, Transform3d::Identity(), dont_translate);
+}
+
+bool check_coord_bounds(const BoundingBoxf &bb)
+{
+    return std::abs(bb.min.x()) < UnscaledCoordLimit &&
+           std::abs(bb.min.y()) < UnscaledCoordLimit &&
+           std::abs(bb.max.x()) < UnscaledCoordLimit &&
+           std::abs(bb.max.y()) < UnscaledCoordLimit;
+}
+
 ExPolygons extract_full_outline(const ModelInstance &inst, const Transform3d &tr)
 {
     ExPolygons outline;
-    for (const ModelVolume *v : inst.get_object()->volumes) {
-        Polygons vol_outline;
-        vol_outline = project_mesh(v->mesh().its,
-                                   tr * inst.get_matrix() * v->get_matrix(),
-                                   [] {});
-        switch (v->type()) {
-        case ModelVolumeType::MODEL_PART:
-            outline = union_ex(outline, vol_outline);
-            break;
-        case ModelVolumeType::NEGATIVE_VOLUME:
-            outline = diff_ex(outline, vol_outline);
-            break;
-        default:;
+
+    if (check_coord_bounds(to_2d(instance_bounding_box(inst, tr)))) {
+        for (const ModelVolume *v : inst.get_object()->volumes) {
+            Polygons vol_outline;
+
+            vol_outline = project_mesh(v->mesh().its,
+                                       tr * inst.get_matrix() * v->get_matrix(),
+                                       [] {});
+            switch (v->type()) {
+            case ModelVolumeType::MODEL_PART:
+                outline = union_ex(outline, vol_outline);
+                break;
+            case ModelVolumeType::NEGATIVE_VOLUME:
+                outline = diff_ex(outline, vol_outline);
+                break;
+            default:;
+            }
         }
     }
 
@@ -105,7 +124,14 @@ ExPolygons extract_full_outline(const ModelInstance &inst, const Transform3d &tr
 
 Polygon extract_convex_outline(const ModelInstance &inst, const Transform3d &tr)
 {
-    return inst.get_object()->convex_hull_2d(tr * inst.get_matrix());
+    auto bb = to_2d(instance_bounding_box(inst, tr));
+    Polygon ret;
+
+    if (check_coord_bounds(bb)) {
+        ret = inst.get_object()->convex_hull_2d(tr * inst.get_matrix());
+    }
+
+    return ret;
 }
 
 inline static bool is_infinite_bed(const ExtendedBed &ebed) noexcept
@@ -171,6 +197,17 @@ void SceneBuilder::build_arrangeable_slicer_model(ArrangeableSlicerModel &amodel
         m_wipetower_handler = std::make_unique<MissingWipeTowerHandler>();
     }
 
+    if (m_fff_print && !m_xl_printer)
+        m_xl_printer = is_XL_printer(m_fff_print->config());
+
+    bool has_wipe_tower = false;
+    m_wipetower_handler->visit(
+        [&has_wipe_tower](const Arrangeable &arrbl) { has_wipe_tower = true; });
+
+    if (m_xl_printer && !has_wipe_tower) {
+        m_bed = XLBed{bounding_box(m_bed)};
+    }
+
     amodel.m_vbed_handler = std::move(m_vbed_handler);
     amodel.m_model = std::move(m_model);
     amodel.m_selmask = std::move(m_selection);
@@ -190,7 +227,14 @@ int XStriderVBedHandler::get_bed_index(const VBedPlaceable &obj) const
         auto reference_pos_x = (instance_bb.min.x() - bedx);
         auto stride = unscaled(stride_s);
 
-        bedidx = static_cast<int>(std::floor(reference_pos_x / stride));
+        auto bedidx_d = std::floor(reference_pos_x / stride);
+
+        if (bedidx_d < std::numeric_limits<int>::min())
+            bedidx = std::numeric_limits<int>::min();
+        else if (bedidx_d > std::numeric_limits<int>::max())
+            bedidx = std::numeric_limits<int>::max();
+        else
+            bedidx = static_cast<int>(bedidx_d);
     }
 
     return bedidx;
@@ -231,7 +275,14 @@ int YStriderVBedHandler::get_bed_index(const VBedPlaceable &obj) const
         auto reference_pos_y = (instance_bb.min.y() - ystart);
         auto stride = unscaled(stride_s);
 
-        bedidx = static_cast<int>(std::floor(reference_pos_y / stride));
+        auto bedidx_d = std::floor(reference_pos_y / stride);
+
+        if (bedidx_d < std::numeric_limits<int>::min())
+            bedidx = std::numeric_limits<int>::min();
+        else if (bedidx_d > std::numeric_limits<int>::max())
+            bedidx = std::numeric_limits<int>::max();
+        else
+            bedidx = static_cast<int>(bedidx_d);
     }
 
     return bedidx;
@@ -262,21 +313,28 @@ Transform3d YStriderVBedHandler::get_physical_bed_trafo(int bed_index) const
     return tr;
 }
 
-const int GridStriderVBedHandler::ColsOutside =
-        static_cast<int>(std::sqrt(std::numeric_limits<int>::max()));
+const int GridStriderVBedHandler::Cols =
+    2 * static_cast<int>(std::sqrt(std::numeric_limits<int>::max()) / 2);
+
+const int GridStriderVBedHandler::HalfCols = Cols / 2;
+const int GridStriderVBedHandler::Offset = HalfCols + Cols * HalfCols;
 
 Vec2i GridStriderVBedHandler::raw2grid(int bed_idx) const
 {
-    Vec2i ret{bed_idx % ColsOutside, bed_idx / ColsOutside};
+    bed_idx += Offset;
+
+    Vec2i ret{bed_idx % Cols - HalfCols, bed_idx / Cols - HalfCols};
 
     return ret;
 }
 
 int GridStriderVBedHandler::grid2raw(const Vec2i &crd) const
 {
-    assert(crd.x() < ColsOutside - 1 && crd.y() < ColsOutside - 1);
+    // Overlapping virtual beds will happen if the crd values exceed limits
+    assert((crd.x() < HalfCols - 1 && crd.x() >= -HalfCols) &&
+           (crd.y() < HalfCols - 1 && crd.y() >= -HalfCols));
 
-    return crd.y() * ColsOutside + crd.x();
+    return (crd.x() + HalfCols) + Cols * (crd.y() + HalfCols) - Offset;
 }
 
 int GridStriderVBedHandler::get_bed_index(const VBedPlaceable &obj) const
@@ -394,10 +452,10 @@ SceneBuilder &&SceneBuilder::set_bed(const DynamicPrintConfig &cfg)
     Points bedpts = get_bed_shape(cfg);
 
     if (is_XL_printer(cfg)) {
-        m_bed = XLBed{get_extents(bedpts)};
-    } else {
-        m_bed = arr2::to_arrange_bed(bedpts);
+        m_xl_printer = true;
     }
+
+    m_bed = arr2::to_arrange_bed(bedpts);
 
     return std::move(*this);
 }

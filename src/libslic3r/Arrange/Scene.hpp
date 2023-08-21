@@ -161,6 +161,14 @@ template<class BedFn> void visit_bed(BedFn &&fn, ExtendedBed &bed)
     boost::apply_visitor(fn, bed);
 }
 
+inline BoundingBox bounding_box(const ExtendedBed &bed)
+{
+    BoundingBox bedbb;
+    visit_bed([&bedbb](auto &rawbed) { bedbb = bounding_box(rawbed); }, bed);
+
+    return bedbb;
+}
+
 class Scene;
 
 // SceneBuilderBase is intended for Scene construction. A simple constructor
@@ -365,10 +373,26 @@ public:
     }
 };
 
-void arrange(Scene &scene, ArrangeTaskCtl &ctl);
-inline void arrange(Scene &scene, ArrangeTaskCtl &&ctl = DummyCtl{})
+bool arrange(Scene &scene, ArrangeTaskCtl &ctl);
+inline bool arrange(Scene &scene, ArrangeTaskCtl &&ctl = DummyCtl{})
 {
-    arrange(scene, ctl);
+    return arrange(scene, ctl);
+}
+
+inline bool arrange(Scene &&scene, ArrangeTaskCtl &ctl)
+{
+    return arrange(scene, ctl);
+}
+
+inline bool arrange(Scene &&scene, ArrangeTaskCtl &&ctl = DummyCtl{})
+{
+    return arrange(scene, ctl);
+}
+
+template<class Builder, class Ctl = DummyCtl>
+bool arrange(SceneBuilderBase<Builder> &&builder, Ctl &&ctl = {})
+{
+    return arrange(Scene{std::move(builder)}, ctl);
 }
 
 } // namespace arr2

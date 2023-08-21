@@ -83,11 +83,19 @@ void Arranger<ArrItem>::arrange(std::vector<ArrItem> &items,
     arrange(items, fixed, bed, DefaultArrangerCtl<ArrItem>{ctl});
 }
 
+class EmptyItemOutlineError: public std::exception {
+    static constexpr const char *Msg = "No outline can be derived for object";
+
+public:
+    const char* what() const noexcept override { return Msg; }
+};
+
 template<class ArrItem> class ArrangeableToItemConverter
 {
 public:
     virtual ~ArrangeableToItemConverter() = default;
 
+    // May throw EmptyItemOutlineError
     virtual ArrItem convert(const Arrangeable &arrbl, coord_t offs = 0) const = 0;
 
     // Returns the extent of simplification that the converter utilizes when
