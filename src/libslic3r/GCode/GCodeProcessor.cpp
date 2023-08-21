@@ -464,6 +464,9 @@ void GCodeProcessorResult::reset() {
 #else
 void GCodeProcessorResult::reset() {
 
+#if ENABLE_BINARIZED_GCODE
+    is_binary_file = false;
+#endif // ENABLE_BINARIZED_GCODE
     moves.clear();
     lines_ends.clear();
     bed_shape = Pointfs();
@@ -564,6 +567,7 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
 
 #if ENABLE_BINARIZED_GCODE
     m_binarizer.set_enabled(config.gcode_binary);
+    m_result.is_binary_file = config.gcode_binary;
 #endif // ENABLE_BINARIZED_GCODE
 
     m_producer = EProducer::PrusaSlicer;
@@ -1104,6 +1108,9 @@ void GCodeProcessor::process_ascii_file(const std::string& filename, std::functi
 
     // process gcode
     m_result.filename = filename;
+#if ENABLE_BINARIZED_GCODE
+    m_result.is_binary_file = false;
+#endif // ENABLE_BINARIZED_GCODE
     m_result.id = ++s_result_id;
     initialize_result_moves();
     size_t parse_line_callback_cntr = 10000;
@@ -1122,6 +1129,16 @@ void GCodeProcessor::process_ascii_file(const std::string& filename, std::functi
 }
 
 #if ENABLE_BINARIZED_GCODE
+static void update_out_file_pos(const std::string& out_string, std::vector<size_t>& lines_ends, size_t* out_file_pos)
+{
+    for (size_t i = 0; i < out_string.size(); ++i) {
+        if (out_string[i] == '\n')
+            lines_ends.emplace_back((out_file_pos != nullptr) ? *out_file_pos + i + 1 : i + 1);
+    }
+    if (out_file_pos != nullptr)
+        *out_file_pos += out_string.size();
+}
+
 void GCodeProcessor::process_binary_file(const std::string& filename, std::function<void()> cancel_callback)
 {
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -1272,6 +1289,7 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
     apply_config(config);
 
     m_result.filename = filename;
+    m_result.is_binary_file = true;
     m_result.id = ++s_result_id;
     initialize_result_moves();
 
@@ -1287,7 +1305,8 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
         if (res != EResult::Success)
             throw Slic3r::RuntimeError("Error while reading file '" + filename + "': " + std::string(translate_result(res)) + "\n");
 
-        // TODO: Update m_result.lines_ends
+        std::vector<size_t>& lines_ends = m_result.lines_ends.emplace_back(std::vector<size_t>());
+        update_out_file_pos(block.raw_data, lines_ends, nullptr);
 
         m_parser.parse_buffer(block.raw_data, [this](GCodeReader& reader, const GCodeReader::GCodeLine& line) {
             this->process_gcode_line(line, true);
@@ -3971,23 +3990,14 @@ void GCodeProcessor::post_process()
                 if (res != bgcode::core::EResult::Success)
                     throw Slic3r::RuntimeError(std::string("Error while sending gcode to the binarizer.\n"));
             }
-            else
-#endif // ENABLE_BINARIZED_GCODE
+            else {
                 write_to_file(out, out_string, result, out_path);
-#if ENABLE_BINARIZED_GCODE
-            update_out_file_pos(out_string, result);
-#endif // ENABLE_BINARIZED_GCODE
-        }
-
-#if ENABLE_BINARIZED_GCODE
-        void update_out_file_pos(const std::string& out_string, GCodeProcessorResult& result) {
-            for (size_t i = 0; i < out_string.size(); ++i) {
-                if (out_string[i] == '\n')
-                    result.lines_ends.emplace_back(m_out_file_pos + i + 1);
+                update_out_file_pos(out_string, result.lines_ends.front(), &m_out_file_pos);
             }
-            m_out_file_pos += out_string.size();
-        }
+#else
+            write_to_file(out, out_string, result, out_path);
 #endif // ENABLE_BINARIZED_GCODE
+        }
 
         // flush the current content of the cache to file
         void flush(FilePtr& out, GCodeProcessorResult& result, const std::string& out_path) {
@@ -4007,11 +4017,12 @@ void GCodeProcessor::post_process()
                 if (m_binarizer.append_gcode(out_string) != bgcode::core::EResult::Success)
                     throw Slic3r::RuntimeError(std::string("Error while sending gcode to the binarizer.\n"));
             }
-            else
-#endif // ENABLE_BINARIZED_GCODE
+            else {
                 write_to_file(out, out_string, result, out_path);
-#if ENABLE_BINARIZED_GCODE
-            update_out_file_pos(out_string, result);
+                update_out_file_pos(out_string, result.lines_ends.front(), &m_out_file_pos);
+            }
+#else
+            write_to_file(out, out_string, result, out_path);
 #endif // ENABLE_BINARIZED_GCODE
         }
 
@@ -4312,6 +4323,9 @@ void GCodeProcessor::post_process()
     };
 
     m_result.lines_ends.clear();
+#if ENABLE_BINARIZED_GCODE
+    m_result.lines_ends.emplace_back(std::vector<size_t>());
+#endif // ENABLE_BINARIZED_GCODE
 
     unsigned int line_id = 0;
     // Backtrace data for Tx gcode lines

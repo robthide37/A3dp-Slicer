@@ -686,29 +686,30 @@ public:
 
             struct Range
             {
-                std::optional<size_t> start_id;
-                std::optional<size_t> end_id;
+                std::optional<size_t> min;
+                std::optional<size_t> max;
                 bool empty() const {
-                    return !start_id.has_value() || !end_id.has_value();
+                    return !min.has_value() || !max.has_value();
                 }
                 bool contains(const Range& other) const {
-                    return !this->empty() && !other.empty() && *this->start_id <= *other.start_id && *this->end_id >= other.end_id;
+                    return !this->empty() && !other.empty() && *this->min <= *other.min && *this->max >= other.max;
                 }
                 size_t size() const {
-                    return empty() ? 0 : *this->end_id - *this->start_id + 1;
+                    return empty() ? 0 : *this->max - *this->min + 1;
                 }
             };
 
             bool m_visible{ true };
             std::string m_filename;
+            bool m_is_binary_file{ false };
             // map for accessing data in file by line number
-            std::vector<size_t> m_lines_ends;
+            std::vector<std::vector<size_t>> m_lines_ends;
             std::vector<Line> m_lines_cache;
             Range m_cache_range;
             size_t m_max_line_length{ 0 };
 
         public:
-            void load_gcode(const std::string& filename, const std::vector<size_t>& lines_ends);
+            void load_gcode(const GCodeProcessorResult& gcode_result);
             void reset() {
                 m_lines_ends.clear();
                 m_lines_cache.clear();
@@ -716,6 +717,9 @@ public:
             }
             void toggle_visibility() { m_visible = !m_visible; }
             void render(float top, float bottom, size_t curr_line_id);
+
+        private:
+            void add_gcode_line_to_lines_cache(const std::string& src);
         };
 #else
         class GCodeWindow

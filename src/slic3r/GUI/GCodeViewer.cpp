@@ -367,18 +367,22 @@ void GCodeViewer::SequentialView::Marker::render()
     ImGui::PopStyleVar();
 }
 
+#if ENABLE_BINARIZED_GCODE
+void GCodeViewer::SequentialView::GCodeWindow::load_gcode(const GCodeProcessorResult& gcode_result)
+{
+    m_filename = gcode_result.filename;
+    m_is_binary_file = gcode_result.is_binary_file;
+    m_lines_ends = gcode_result.lines_ends;
+}
+#else
 void GCodeViewer::SequentialView::GCodeWindow::load_gcode(const std::string& filename, const std::vector<size_t>& lines_ends)
 {
-#if !ENABLE_BINARIZED_GCODE
-    assert(! m_file.is_open());
+    assert(!m_file.is_open());
     if (m_file.is_open())
         return;
-#endif // !ENABLE_BINARIZED_GCODE
 
-    m_filename   = filename;
+    m_filename = filename;
     m_lines_ends = lines_ends;
-
-#if !ENABLE_BINARIZED_GCODE
     m_selected_line_id = 0;
     m_last_lines_size = 0;
 
@@ -391,54 +395,150 @@ void GCodeViewer::SequentialView::GCodeWindow::load_gcode(const std::string& fil
         BOOST_LOG_TRIVIAL(error) << "Unable to map file " << m_filename << ". Cannot show G-code window.";
         reset();
     }
-#endif // !ENABLE_BINARIZED_GCODE
 }
+#endif // ENABLE_BINARIZED_GCODE
 
 #if ENABLE_BINARIZED_GCODE
+void GCodeViewer::SequentialView::GCodeWindow::add_gcode_line_to_lines_cache(const std::string& src)
+{
+    std::string command;
+    std::string parameters;
+    std::string comment;
+
+    // extract comment
+    std::vector<std::string> tokens;
+    boost::split(tokens, src, boost::is_any_of(";"), boost::token_compress_on);
+    command = tokens.front();
+    if (tokens.size() > 1)
+        comment = ";" + tokens.back();
+
+    // extract gcode command and parameters
+    if (!command.empty()) {
+        boost::split(tokens, command, boost::is_any_of(" "), boost::token_compress_on);
+        command = tokens.front();
+        if (tokens.size() > 1) {
+            for (size_t i = 1; i < tokens.size(); ++i) {
+                parameters += " " + tokens[i];
+            }
+        }
+    }
+
+    m_lines_cache.push_back({ command, parameters, comment });
+}
+
 void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, size_t curr_line_id)
 {
-    auto update_lines = [this]() {
+    auto update_lines_ascii = [this]() {
         m_lines_cache.clear();
         m_lines_cache.reserve(m_cache_range.size());
+        const std::vector<size_t>& lines_ends = m_lines_ends.front();
         FILE* file = boost::nowide::fopen(m_filename.c_str(), "rb");
         if (file != nullptr) {
-            for (size_t id = *m_cache_range.start_id; id <= *m_cache_range.end_id; ++id) {
+            for (size_t id = *m_cache_range.min; id <= *m_cache_range.max; ++id) {
                 assert(id > 0);
                 // read line from file
-                const size_t start = id == 1 ? 0 : m_lines_ends[id - 2];
-                const size_t len = m_lines_ends[id - 1] - start;
+                const size_t begin = id == 1 ? 0 : lines_ends[id - 2];
+                const size_t len = lines_ends[id - 1] - begin;
                 std::string gline(len, '\0');
-                fseek(file, start, SEEK_SET);
+                fseek(file, begin, SEEK_SET);
                 const size_t rsize = fread((void*)gline.data(), 1, len, file);
                 if (ferror(file) || rsize != len) {
                     m_lines_cache.clear();
                     break;
                 }
 
-                std::string command;
-                std::string parameters;
-                std::string comment;
+                add_gcode_line_to_lines_cache(gline);
+            }
+            fclose(file);
+        }
+    };
 
-                // extract comment
-                std::vector<std::string> tokens;
-                boost::split(tokens, gline, boost::is_any_of(";"), boost::token_compress_on);
-                command = tokens.front();
-                if (tokens.size() > 1)
-                    comment = ";" + tokens.back();
+    auto update_lines_binary = [this]() {
+        m_lines_cache.clear();
+        m_lines_cache.reserve(m_cache_range.size());
 
-                // extract gcode command and parameters
-                if (!command.empty()) {
-                    boost::split(tokens, command, boost::is_any_of(" "), boost::token_compress_on);
-                    command = tokens.front();
-                    if (tokens.size() > 1) {
-                        for (size_t i = 1; i < tokens.size(); ++i) {
-                            parameters += " " + tokens[i];
+        size_t cumulative_lines_count = 0;
+        std::vector<size_t> cumulative_lines_counts;
+        cumulative_lines_counts.reserve(m_lines_ends.size());
+        for (size_t i = 0; i < m_lines_ends.size(); ++i) {
+            cumulative_lines_count += m_lines_ends[i].size();
+            cumulative_lines_counts.emplace_back(cumulative_lines_count);
+        }
+
+        size_t first_block_id = 0;
+        for (size_t i = 0; i < cumulative_lines_counts.size(); ++i) {
+            if (*m_cache_range.min <= cumulative_lines_counts[i]) {
+                first_block_id = i;
+                break;
+            }
+        }
+        size_t last_block_id = 0;
+        for (size_t i = 0; i < cumulative_lines_counts.size(); ++i) {
+            if (*m_cache_range.max <= cumulative_lines_counts[i]) {
+                last_block_id = i;
+                break;
+            }
+        }
+        assert(last_block_id >= first_block_id);
+
+        FilePtr file(boost::nowide::fopen(m_filename.c_str(), "rb"));
+        if (file.f != nullptr) {
+            fseek(file.f, 0, SEEK_END);
+            const long file_size = ftell(file.f);
+            rewind(file.f);
+
+            // read file header
+            using namespace bgcode::core;
+            using namespace bgcode::binarize;
+            FileHeader file_header;
+            EResult res = read_header(*file.f, file_header, nullptr);
+            if (res == EResult::Success) {
+                // search first GCode block
+                BlockHeader block_header;
+                res = read_next_block_header(*file.f, file_header, block_header, EBlockType::GCode, nullptr, 0);
+                if (res == EResult::Success) {
+                    for (size_t i = 0; i < first_block_id; ++i) {
+                        skip_block(*file.f, file_header, block_header);
+                        res = read_next_block_header(*file.f, file_header, block_header, nullptr, 0);
+                        if (res != EResult::Success || block_header.type != (uint16_t)EBlockType::GCode) {
+                            m_lines_cache.clear();
+                            return;
+                        }
+                    }
+
+                    for (size_t i = first_block_id; i <= last_block_id; ++i) {
+                        GCodeBlock block;
+                        res = block.read_data(*file.f, file_header, block_header);
+                        if (res != EResult::Success) {
+                            m_lines_cache.clear();
+                            return;
+                        }
+
+                        const size_t ref_id = (i == 0) ? 0 : i - 1;
+                        const size_t first_line_id = (i == 0) ? *m_cache_range.min :
+                            (*m_cache_range.min - 1 >= cumulative_lines_counts[ref_id]) ? *m_cache_range.min - cumulative_lines_counts[ref_id] : 1;
+                        const size_t last_line_id = (*m_cache_range.max - 1 <= cumulative_lines_counts[i]) ?
+                            (i == 0) ? *m_cache_range.max : *m_cache_range.max - cumulative_lines_counts[ref_id] : m_lines_ends[i].size() - 1;
+
+                        for (size_t j = first_line_id; j <= last_line_id; ++j) {
+                            const size_t begin = (j == 1) ? 0 : m_lines_ends[i][j - 2];
+                            const size_t end = m_lines_ends[i][j - 1];
+                            std::string gline;
+                            gline.insert(gline.end(), block.raw_data.begin() + begin, block.raw_data.begin() + end);
+                            add_gcode_line_to_lines_cache(gline);
+                        }
+
+                        if (ftell(file.f) == file_size)
+                          break;
+
+                        res = read_next_block_header(*file.f, file_header, block_header, nullptr, 0);
+                        if (res != EResult::Success || block_header.type != (uint16_t)EBlockType::GCode) {
+                            m_lines_cache.clear();
+                            return;
                         }
                     }
                 }
-                m_lines_cache.push_back({ command, parameters, comment });
             }
-            fclose(file);
         }
     };
 
@@ -463,13 +563,20 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, s
     if (visible_lines_count == 0)
         return;
 
+    if (m_lines_ends.empty() || m_lines_ends.front().empty())
+        return;
+
     auto resize_range = [&](Range& range, size_t lines_count) {
         const size_t half_lines_count = lines_count / 2;
-        range.start_id = (curr_line_id >= half_lines_count) ? curr_line_id - half_lines_count : 1;
-        range.end_id = *range.start_id + lines_count - 1;
-        if (*range.end_id >= m_lines_ends.size()) {
-            range.end_id = m_lines_ends.size() - 1;
-            range.start_id = *range.end_id - lines_count + 1;
+        range.min = (curr_line_id >= half_lines_count) ? curr_line_id - half_lines_count : 1;
+        range.max = *range.min + lines_count - 1;
+        size_t lines_ends_count = 0;
+        for (const auto& le : m_lines_ends) {
+            lines_ends_count += le.size();
+        }
+        if (*range.max >= lines_ends_count) {
+            range.max = lines_ends_count - 1;
+            range.min = *range.max - lines_count + 1;
         }
     };
 
@@ -480,11 +587,17 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, s
     // update cache if needed
     if (m_cache_range.empty() || !m_cache_range.contains(visible_range)) {
         resize_range(m_cache_range, 4 * visible_range.size());
-        update_lines();
+        if (m_is_binary_file)
+            update_lines_binary();
+        else
+            update_lines_ascii();
     }
 
+    if (m_lines_cache.empty())
+        return;
+
     // line number's column width
-    const float id_width = ImGui::CalcTextSize(std::to_string(*visible_range.end_id).c_str()).x;
+    const float id_width = ImGui::CalcTextSize(std::to_string(*visible_range.max).c_str()).x;
 
     ImGuiWrapper& imgui = *wxGetApp().imgui();
 
@@ -525,8 +638,8 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, s
 
     // render text lines
     size_t max_line_length = 0;
-    for (size_t id = *visible_range.start_id; id <= *visible_range.end_id; ++id) {
-        const Line& line = m_lines_cache[id - *m_cache_range.start_id];
+    for (size_t id = *visible_range.min; id <= *visible_range.max; ++id) {
+        const Line& line = m_lines_cache[id - *m_cache_range.min];
 
         // rect around the current selected line
         if (id == curr_line_id) {
@@ -729,15 +842,13 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, u
     imgui.end();
     ImGui::PopStyleVar();
 }
-#endif // ENABLE_BINARIZED_GCODE
 
-#if !ENABLE_BINARIZED_GCODE
 void GCodeViewer::SequentialView::GCodeWindow::stop_mapping_file()
 {
     if (m_file.is_open())
         m_file.close();
 }
-#endif // !ENABLE_BINARIZED_GCODE
+#endif // ENABLE_BINARIZED_GCODE
 
 void GCodeViewer::SequentialView::render(float legend_height)
 {
@@ -917,7 +1028,11 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     // release gpu memory, if used
     reset(); 
 
+#if ENABLE_BINARIZED_GCODE
+    m_sequential_view.gcode_window.load_gcode(gcode_result);
+#else
     m_sequential_view.gcode_window.load_gcode(gcode_result.filename, gcode_result.lines_ends);
+#endif // ENABLE_BINARIZED_GCODE
 
     if (wxGetApp().is_gcode_viewer())
         m_custom_gcode_per_print_z = gcode_result.custom_gcode_per_print_z;

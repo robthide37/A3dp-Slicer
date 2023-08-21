@@ -139,10 +139,17 @@ namespace Slic3r {
         };
 
         std::string filename;
+#if ENABLE_BINARIZED_GCODE
+        bool is_binary_file;
+#endif // ENABLE_BINARIZED_GCODE
         unsigned int id;
         std::vector<MoveVertex> moves;
         // Positions of ends of lines of the final G-code this->filename after TimeProcessor::post_process() finalizes the G-code.
+#if ENABLE_BINARIZED_GCODE
+        std::vector<std::vector<size_t>> lines_ends;
+#else
         std::vector<size_t> lines_ends;
+#endif // ENABLE_BINARIZED_GCODE
         Pointfs bed_shape;
         float max_print_height;
         SettingsIds settings_ids;
