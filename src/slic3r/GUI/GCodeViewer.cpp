@@ -2271,7 +2271,7 @@ void GCodeViewer::load_shells(const Print& print)
 
     // removes volumes which are completely below bed
     int i = 0;
-    while (i < m_shells.volumes.volumes.size()) {
+    while (i < (int)m_shells.volumes.volumes.size()) {
         GLVolume* v = m_shells.volumes.volumes[i];
         if (v->transformed_bounding_box().max.z() < SINKING_MIN_Z_THRESHOLD + EPSILON) {
             delete v;
