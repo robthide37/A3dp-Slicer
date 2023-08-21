@@ -164,6 +164,8 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
     m_param_label = new wxStaticText(this, wxID_ANY, _L("Select placeholder"));
     m_param_label->SetFont(wxGetApp().bold_font());
 
+    m_param_description = new wxStaticText(this, wxID_ANY, wxEmptyString);
+
     wxStdDialogButtonSizer* btns = this->CreateStdDialogButtonSizer(wxOK | wxCANCEL);
     wxGetApp().UpdateDarkUI(this->FindWindowById(wxID_OK, this));
     wxGetApp().UpdateDarkUI(this->FindWindowById(wxID_CANCEL, this));
@@ -173,6 +175,7 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
     topSizer->Add(label_top           , 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
     topSizer->Add(grid_sizer          , 1, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
     topSizer->Add(m_param_label       , 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
+    topSizer->Add(m_param_description , 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
     topSizer->Add(btns                , 0, wxEXPAND | wxALL, border);
 
     SetSizer(topSizer);
@@ -390,6 +393,7 @@ void EditGCodeDialog::bind_list_and_button()
 {
     m_params_list->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxDataViewEvent& evt) {
         wxString label;
+        wxString description;
 
         const std::string opt_key = m_params_list->GetSelectedParamKey();
         if (!opt_key.empty()) {
@@ -427,12 +431,17 @@ void EditGCodeDialog::bind_list_and_button()
                         (!cod->full_label.empty() && !cod->label.empty() ) ?
                         format_wxstr("%1% > %2%\n(%3%)", _(cod->full_label), _(cod->label), type_str) :
                         format_wxstr("%1%\n(%2%)", cod->label.empty() ? _(cod->full_label) : _(cod->label), type_str);
+
+                if (cod)
+                    description = _(cod->tooltip);
             }
             else
                 label = "Undef optptr";
         }
 
         m_param_label->SetLabel(label);
+        m_param_description->SetLabel(description);
+
         Layout();
     });
 
