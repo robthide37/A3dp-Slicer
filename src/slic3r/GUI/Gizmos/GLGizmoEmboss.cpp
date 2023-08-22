@@ -2863,7 +2863,6 @@ bool GLGizmoEmboss::revertible(const std::string &name,
     else
         ImGuiWrapper::text(name);
 
-    bool result = draw();
     // render revert changes button
     if (changed) {
         ImGuiWindow *window = ImGui::GetCurrentWindow();
@@ -2876,7 +2875,7 @@ bool GLGizmoEmboss::revertible(const std::string &name,
             ImGui::SetTooltip("%s", undo_tooltip.c_str());
         window->DC.CursorPosPrevLine.x = prev_x; // set back previous position
     }
-    return result;
+    return draw();
 }
 
 
