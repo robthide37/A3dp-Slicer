@@ -28,7 +28,12 @@ ExPolygons to_expolygons(const NSVGimage &image, float tessTol, int max_level, f
         Polygons polygons = ::to_polygons(*shape, tessTol, max_level, scale, is_y_negative);
         if (polygons.empty())
             continue;
-        expolygons_append(expolygons, union_ex(polygons));
+
+        ClipperLib::PolyFillType fill_type = ClipperLib::pftNonZero;
+        //if (shape->fillRule == NSVGfillRule::NSVG_FILLRULE_NONZERO)
+        if (shape->fillRule == NSVGfillRule::NSVG_FILLRULE_EVENODD)
+            fill_type = ClipperLib::pftEvenOdd;
+        expolygons_append(expolygons, union_ex(polygons, fill_type));
     }
     return expolygons;
 }

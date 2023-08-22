@@ -640,7 +640,7 @@ void wu_draw_line_side(Linef line,
     {
         const float xend = round(line.b.x());
         const float yend = line.b.y() + gradient * (xend - line.b.x());
-        const float xgap = rfpart(line.b.x() + 0.5);
+        const float xgap = rfpart(line.b.x() + 0.5f);
         xpx12 = int(xend);
         const int ypx12 = ipart(yend);
         if (steep) {
@@ -759,11 +759,11 @@ void wu_draw_line(Linef line,
 /// </summary>
 /// <typeparam name="N">Count channels for one pixel(RGBA = 4)</typeparam>
 /// <param name="shape">Shape to draw</param>
-/// <param name="color">Color of shape</param>
+/// <param name="color">Color of shape contain count of channels(N)</param>
 /// <param name="data">Image(2d) stored in 1d array</param>
 /// <param name="data_width">Count of pixel on one line(size in data = N x data_width)</param>
 /// <param name="scale">Shape scale for conversion to pixels</param>
-template<unsigned int N>
+template<unsigned int N> // N .. count of channels per pixel
 void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& color, std::vector<unsigned char> &data, size_t data_width, double scale = 1.){
     assert(data.size() % N == 0);
     assert(data.size() % data_width == 0);
@@ -915,8 +915,15 @@ bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, un
     return true;
 }
 
+bool is_closed(NSVGpath *path){
+    for (; path != NULL; path = path->next)
+        if (path->next == NULL && path->closed)
+            return true;    
+    return false;
+}
+
 std::string create_shape_warnings(const NSVGimage& image){
-    const float preccission = 1e-4;
+    const float preccission = 1e-4f;
     std::string warnings;
     for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
         std::string warning;
@@ -938,22 +945,22 @@ std::string create_shape_warnings(const NSVGimage& image){
             add_warning(GUI::format(_L("Stroke gradient (%1%)"), shape->strokeGradient));
 
         // identity matrix - nsvg__xformIdentity
-        const std::array<float, 6> identity = {1.f, 0.f, 0.f, 1.f, 0.f, 0.f};
-        bool is_identity = true;
-        for (size_t i = 0; i < 6; ++i)
-            if (!is_approx(shape->xform[i], identity[i], preccission)){
-                is_identity = false;
-                break;
-            }
-        if (!is_identity) {
-            std::stringstream ss;
-            for (size_t i = 0; i < 6; ++i) {
-                if (i != 0)
-                    ss << ", ";
-                ss << shape->xform[i];
-            }
-            add_warning(GUI::format(_L("XForm(%1%)"), ss.str()));
-        }
+        //const std::array<float, 6> identity = {1.f, 0.f, 0.f, 1.f, 0.f, 0.f};
+        //bool is_identity = true;
+        //for (size_t i = 0; i < 6; ++i)
+        //    if (!is_approx(shape->xform[i], identity[i], preccission)){
+        //        is_identity = false;
+        //        break;
+        //    }
+        //if (!is_identity) {
+        //    std::stringstream ss;
+        //    for (size_t i = 0; i < 6; ++i) {
+        //        if (i != 0)
+        //            ss << ", ";
+        //        ss << shape->xform[i];
+        //    }
+        //    add_warning(GUI::format(_L("XForm(%1%)"), ss.str()));
+        //}
 
         switch (shape->fill.type){
         case NSVG_PAINT_UNDEF: 
@@ -967,10 +974,15 @@ std::string create_shape_warnings(const NSVGimage& image){
             if (!is_fill_gradient)
                 add_warning(_u8L("Radial fill gradient"));
             break;
-        case NSVG_PAINT_COLOR: 
         case NSVG_PAINT_NONE:
+        case NSVG_PAINT_COLOR: 
         default: break;
         }        
+
+        // Unfilled is only line which could be opened
+        if (shape->fill.type != NSVG_PAINT_NONE && 
+            !is_closed(shape->paths))
+            add_warning(_u8L("Open filled path"));
 
         switch (shape->stroke.type){
         case NSVG_PAINT_UNDEF: 
@@ -1079,7 +1091,7 @@ void GLGizmoSVG::reset_volume()
     m_volume_id.id = 0;
     m_volume_shape.shapes_with_ids.clear();
     m_filename_preview.clear();
-    m_shape_warnings.empty();
+    m_shape_warnings.clear();
     // delete texture after finish imgui draw
     wxGetApp().plater()->CallAfter([&]() { delete_texture(m_texture); });
 }
@@ -1271,8 +1283,9 @@ void GLGizmoSVG::draw_filename(){
 
     if (!m_shape_warnings.empty()){
         draw(get_icon(m_icons, IconType::exclamation));
-        if (ImGui::IsItemHovered)
+        if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", m_shape_warnings.c_str());
+        ImGui::SameLine();
     }
 
     // Remove space between filename and gray suffix ".svg"
@@ -1405,6 +1418,25 @@ void GLGizmoSVG::draw_filename(){
             }
         } else if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", _u8L("Save as '.svg' file").c_str());
+        }
+
+        draw(get_icon(m_icons, IconType::save));
+        ImGui::SameLine();
+        if (ImGui::Selectable((_L("Save used as") + dots).ToUTF8().data())) {
+            GUI::FileType file_type  = FT_SVG;
+            wxString wildcard = file_wildcards(file_type);
+            wxString dlg_title = _L("Export SVG file:");
+            wxString dlg_dir = from_u8(wxGetApp().app_config->get_last_dir());
+            const EmbossShape::SvgFile& svg = m_volume_shape.svg_file;
+            wxString dlg_file = from_u8(get_file_name(((!svg.path.empty()) ? svg.path : svg.path_in_3mf))) + ".svg";
+            wxFileDialog dlg(nullptr, dlg_title, dlg_dir, dlg_file, wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+            if (dlg.ShowModal() == wxID_OK ){
+                wxString out_path = dlg.GetPath();        
+                std::string path{out_path.c_str()};
+                Slic3r::save(*m_volume_shape.svg_file.image, path);
+            }
+        } else if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", _u8L("Save only used path as '.svg' file").c_str());
         }
     }
 

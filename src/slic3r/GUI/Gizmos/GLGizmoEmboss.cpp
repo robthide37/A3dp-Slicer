@@ -2383,7 +2383,6 @@ bool GLGizmoEmboss::revertible(const std::string &name,
     else
         ImGuiWrapper::text(name);
 
-    bool result = draw();
     // render revert changes button
     if (changed) {
         ImGuiWindow *window = ImGui::GetCurrentWindow();
@@ -2396,7 +2395,7 @@ bool GLGizmoEmboss::revertible(const std::string &name,
             ImGui::SetTooltip("%s", undo_tooltip.c_str());
         window->DC.CursorPosPrevLine.x = prev_x; // set back previous position
     }
-    return result;
+    return draw();
 }
 // May be move to ImGuiWrapper
 template<typename T> bool imgui_input(const char *label, T *v, T step, T step_fast, const char *format, ImGuiInputTextFlags flags);
@@ -2922,6 +2921,8 @@ void GLGizmoEmboss::draw_advanced()
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
     }
+
+    ImGui::SameLine(); if (ImGui::Button("Re-emboss")) GLGizmoEmboss::re_emboss(*m_volume);    
 
 #ifdef ALLOW_DEBUG_MODE
     ImGui::Text("family = %s", (current_prop.family.has_value() ?
