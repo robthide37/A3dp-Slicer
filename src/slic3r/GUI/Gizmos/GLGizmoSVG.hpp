@@ -116,7 +116,8 @@ private:
     bool process();
     void close();
     void draw_window();
-    bool draw_preview();
+    void draw_preview();
+    void draw_filename();
     void draw_depth();
     void draw_size();
     void draw_use_surface();
@@ -134,7 +135,13 @@ private:
 
     // actual selected only one volume - with emboss data
     ModelVolume *m_volume = nullptr;
-    EmbossShape  m_volume_shape; // copy from m_volume for edit
+
+    // Is used to edit eboss and send changes to job
+    // Inside volume is current state of shape WRT Volume
+    EmbossShape m_volume_shape; // copy from m_volume for edit
+
+    // same index as volumes in 
+    std::string m_shape_warnings;
 
     // When work with undo redo stack there could be situation that 
     // m_volume point to unexisting volume so One need also objectID

@@ -116,11 +116,10 @@ enum class IconType : unsigned {
     refresh,
     refresh_hover,
     change_file,
-    change_file_hover,
     bake,
-    bake_hover,
+    bake_inactive,
     save,
-    save_hover,
+    exclamation,
     lock,
     lock_hover,
     unlock,
@@ -391,16 +390,15 @@ IconManager::Icons init_icons(IconManager &mng, const GuiCfg &cfg)
     ImVec2 size(cfg.icon_width, cfg.icon_width);
     // icon order has to match the enum IconType
     IconManager::InitTypes init_types{
-        {"undo.svg",         size, IconManager::RasterType::white_only_data}, // undo           
-        {"undo.svg",         size, IconManager::RasterType::color},           // undo_hovered
+        {"undo.svg",         size, IconManager::RasterType::white_only_data}, // reset_value           
+        {"undo.svg",         size, IconManager::RasterType::color},           // reset_value_hover
         {"refresh.svg",      size, IconManager::RasterType::white_only_data}, // refresh           
         {"refresh.svg",      size, IconManager::RasterType::color},           // refresh_hovered
-        {"open.svg",         size, IconManager::RasterType::white_only_data}, // changhe_file
-        {"open.svg",         size, IconManager::RasterType::color},           // changhe_file_hovered
-        {"burn.svg",         size, IconManager::RasterType::white_only_data}, // bake_file
-        {"burn.svg",         size, IconManager::RasterType::color},           // bake_hovered
-        {"save.svg",         size, IconManager::RasterType::white_only_data}, // save
-        {"save.svg",         size, IconManager::RasterType::color},           // save_hovered
+        {"open.svg",         size, IconManager::RasterType::color},           // changhe_file
+        {"burn.svg",         size, IconManager::RasterType::color},           // bake
+        {"burn.svg",         size, IconManager::RasterType::gray_only_data},  // bake_inactive
+        {"save.svg",         size, IconManager::RasterType::color},           // save
+        {"exclamation.svg",  size, IconManager::RasterType::color},           // exclamation
         {"lock_closed.svg",  size, IconManager::RasterType::white_only_data}, // lock
         {"lock_open_f.svg",  size, IconManager::RasterType::white_only_data}, // lock_hovered
         {"lock_open.svg",    size, IconManager::RasterType::white_only_data}, // unlock
@@ -916,7 +914,93 @@ bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, un
     glsafe(::glBindTexture(GL_TEXTURE_2D, NO_TEXTURE_ID));
     return true;
 }
-} 
+
+std::string create_shape_warnings(const NSVGimage& image){
+    const float preccission = 1e-4;
+    std::string warnings;
+    for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
+        std::string warning;
+        auto add_warning = [&warning](const std::string& w){ 
+            if (!warning.empty())
+                warning += ", ";
+            warning += w;
+        };
+
+        if (shape->opacity <= preccission)
+            add_warning(GUI::format(_L("Opacity (%1%)"), shape->opacity));
+
+        // if(shape->flags != NSVG_FLAGS_VISIBLE) add_warning(_u8L("Visibility flag"));
+        bool is_fill_gradient = shape->fillGradient[0] != '\0';
+        if (is_fill_gradient)
+            add_warning(GUI::format(_L("Fill gradient (%1%)"), shape->fillGradient));
+        bool is_stroke_gradient = shape->strokeGradient[0] != '\0';
+        if (is_stroke_gradient)
+            add_warning(GUI::format(_L("Stroke gradient (%1%)"), shape->strokeGradient));
+
+        // identity matrix - nsvg__xformIdentity
+        const std::array<float, 6> identity = {1.f, 0.f, 0.f, 1.f, 0.f, 0.f};
+        bool is_identity = true;
+        for (size_t i = 0; i < 6; ++i)
+            if (!is_approx(shape->xform[i], identity[i], preccission)){
+                is_identity = false;
+                break;
+            }
+        if (!is_identity) {
+            std::stringstream ss;
+            for (size_t i = 0; i < 6; ++i) {
+                if (i != 0)
+                    ss << ", ";
+                ss << shape->xform[i];
+            }
+            add_warning(GUI::format(_L("XForm(%1%)"), ss.str()));
+        }
+
+        switch (shape->fill.type){
+        case NSVG_PAINT_UNDEF: 
+            add_warning(_u8L("Undefined fill type"));
+            break;
+        case NSVG_PAINT_LINEAR_GRADIENT:
+            if (!is_fill_gradient)
+                add_warning(_u8L("Linear fill gradient"));
+            break;
+        case NSVG_PAINT_RADIAL_GRADIENT:
+            if (!is_fill_gradient)
+                add_warning(_u8L("Radial fill gradient"));
+            break;
+        case NSVG_PAINT_COLOR: 
+        case NSVG_PAINT_NONE:
+        default: break;
+        }        
+
+        switch (shape->stroke.type){
+        case NSVG_PAINT_UNDEF: 
+            add_warning(_u8L("Undefined stroke type"));
+            break;
+        case NSVG_PAINT_LINEAR_GRADIENT:
+            if (!is_stroke_gradient)
+                add_warning(_u8L("Linear stroke gradient"));
+            break;
+        case NSVG_PAINT_RADIAL_GRADIENT:
+            if (!is_stroke_gradient)
+                add_warning(_u8L("Radial stroke gradient"));
+            break;
+        case NSVG_PAINT_COLOR: 
+        case NSVG_PAINT_NONE:
+        default: break;
+        }
+
+        if (!warning.empty()){
+            if (!warnings.empty())
+                warnings += "\n";
+
+            warnings += GUI::format(_L("Shape(%1%) contain unsupported: %2% "), shape->id, warning);
+        }
+    }
+    return warnings;
+}
+
+
+} // namespace
 
 void GLGizmoSVG::set_volume_by_selection()
 {
@@ -969,6 +1053,8 @@ void GLGizmoSVG::set_volume_by_selection()
     m_volume = volume;
     m_volume_id = volume->id();
     m_volume_shape = *volume->emboss_shape; // copy
+    assert(es.svg_file.image.get() != nullptr);
+    m_shape_warnings = create_shape_warnings(*es.svg_file.image);
 
     // Calculate current angle of up vector
     m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
@@ -993,7 +1079,9 @@ void GLGizmoSVG::reset_volume()
     m_volume_id.id = 0;
     m_volume_shape.shapes_with_ids.clear();
     m_filename_preview.clear();
-    delete_texture(m_texture);
+    m_shape_warnings.empty();
+    // delete texture after finish imgui draw
+    wxGetApp().plater()->CallAfter([&]() { delete_texture(m_texture); });
 }
 
 void GLGizmoSVG::calculate_scale() {
@@ -1046,11 +1134,13 @@ bool GLGizmoSVG::process()
 
 void GLGizmoSVG::close()
 {
-    reset_volume();
+    ImDrawData *data = ImGui::GetDrawData();
+
     // close gizmo == open it again
-    auto& mng = m_parent.get_gizmos_manager();
+    auto &mng = m_parent.get_gizmos_manager();
     if (mng.get_current_type() == GLGizmosManager::Svg)
         mng.open_gizmo(GLGizmosManager::Svg);
+    reset_volume();
 }
 
 void GLGizmoSVG::draw_window()
@@ -1062,8 +1152,18 @@ void GLGizmoSVG::draw_window()
         ImGui::Text("Not valid state please report reproduction steps on github");
         return;
     }
-    if(!draw_preview())
+
+    assert(m_volume->emboss_shape.has_value());
+    if (!m_volume->emboss_shape.has_value()) {
+        ImGui::Text("No embossed file");
         return;
+    }
+
+    draw_preview();
+    draw_filename();
+
+    // Is SVG baked?
+    if (m_volume == nullptr) return;
 
     ImGui::Separator();
 
@@ -1126,18 +1226,14 @@ void draw(const ExPolygonsWithIds& shapes_with_ids, unsigned max_size)
     }
 }
 }
-bool GLGizmoSVG::draw_preview(){
-    assert(m_volume->emboss_shape.has_value());
-    if (!m_volume->emboss_shape.has_value()) {
-        ImGui::Text("No embossed file");
-        return false;
-    }
 
-    const EmbossShape &es = *m_volume->emboss_shape;
+void GLGizmoSVG::draw_preview(){
     // init texture when not initialized yet.
     // drag&drop is out of rendering scope so texture must be created on this place
-    if (m_texture.id == 0)
-        init_texture(m_texture, es.shapes_with_ids, m_gui_cfg->texture_max_size_px);
+    if (m_texture.id == 0) {
+        const ExPolygonsWithIds &shapes = m_volume->emboss_shape->shapes_with_ids;
+        init_texture(m_texture, shapes, m_gui_cfg->texture_max_size_px);
+    }
 
     //::draw(m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
 
@@ -1145,21 +1241,42 @@ bool GLGizmoSVG::draw_preview(){
         ImTextureID id = (void *) static_cast<intptr_t>(m_texture.id);
         ImVec2      s(m_texture.width, m_texture.height);
         ImGui::Image(id, s);
-        if(ImGui::IsItemHovered()){
+        if(ImGui::IsItemHovered()){            
+            const EmbossShape &es = *m_volume->emboss_shape;
             size_t count_shapes = ::count(*es.svg_file.image->shapes);
             ImGui::SetTooltip("%d count shapes", count_shapes);
         }
-    }
+    }    
+}
 
+#include <sstream>
+
+void GLGizmoSVG::draw_filename(){
+    const EmbossShape &es = *m_volume->emboss_shape;
     if (m_filename_preview.empty()){
         // create filename preview
-        m_filename_preview = get_file_name(es.svg_file.path);
-        m_filename_preview = ImGuiWrapper::trunc(m_filename_preview, m_gui_cfg->input_width);
+        if (!es.svg_file.path.empty()) {
+            m_filename_preview = get_file_name(es.svg_file.path);
+        } else if (!es.svg_file.path_in_3mf.empty()) {
+            m_filename_preview = get_file_name(es.svg_file.path_in_3mf);
+        }
+
+        if (m_filename_preview.empty()){
+            assert(false);
+            m_filename_preview = "unknown";
+        } else {        
+            m_filename_preview = ImGuiWrapper::trunc(m_filename_preview, m_gui_cfg->input_width);
+        }
+    }
+
+    if (!m_shape_warnings.empty()){
+        draw(get_icon(m_icons, IconType::exclamation));
+        if (ImGui::IsItemHovered)
+            ImGui::SetTooltip("%s", m_shape_warnings.c_str());
     }
 
     // Remove space between filename and gray suffix ".svg"
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-
     ImGui::Text("%s", m_filename_preview.c_str());
     bool is_hovered = ImGui::IsItemHovered();
     ImGui::SameLine();
@@ -1188,15 +1305,107 @@ bool GLGizmoSVG::draw_preview(){
             ImGui::SetTooltip("%s", _u8L("Re-load SVG file from disk.").c_str());
     }
 
+    ImGuiComboFlags flags = ImGuiComboFlags_PopupAlignLeft | ImGuiComboFlags_NoPreview;
     ImGui::SameLine();
-    if (clickable(get_icon(m_icons, IconType::change_file), get_icon(m_icons, IconType::change_file_hover))) {
-        std::string new_path = choose_svg_file();
-        if (!new_path.empty()) {
-            file_changed = true;
-            m_volume_shape.svg_file.path = new_path;
+    if (ImGui::BeginCombo("##file_options", nullptr, flags)) {
+        ScopeGuard combo_sg([]() { ImGui::EndCombo(); });
+
+        draw(get_icon(m_icons, IconType::change_file));
+        ImGui::SameLine();
+        if (ImGui::Selectable((_L("Change file") + dots).ToUTF8().data())) {
+            std::string new_path = choose_svg_file();
+            if (!new_path.empty()) {
+                file_changed = true;
+                m_volume_shape.svg_file.path = new_path;
+            }
+        } else if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", _u8L("Change to another .svg file").c_str());
         }
-    } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", _u8L("Change to another .svg file").c_str());
+
+        std::string bake1 = _u8L("Bake 1 ©");
+        if (m_volume->emboss_shape->svg_file.path.empty()){
+            draw(get_icon(m_icons, IconType::bake_inactive));
+            ImGui::SameLine();
+            m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, bake1.c_str());
+        } else {
+            draw(get_icon(m_icons, IconType::bake));
+            ImGui::SameLine();
+            if (ImGui::Selectable(bake1.c_str())) {
+                // set .svg_file.path_in_3mf to remember file name
+                m_volume->emboss_shape->svg_file.path.clear();
+                m_volume_shape.svg_file.path.clear();
+                m_filename_preview.clear();
+            } else if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", _u8L("Remove path to local svg file.\nDisable reload from disk.").c_str());
+            }
+        }
+
+        draw(get_icon(m_icons, IconType::bake));
+        ImGui::SameLine();
+        if (ImGui::Selectable(_u8L("Bake 2 ©").c_str())) {
+            EmbossShape::SvgFile &svg = m_volume_shape.svg_file;
+            std::stringstream ss;
+            Slic3r::save(*svg.image, ss);
+            ss << '\0'; // Must be null terminated.
+            std::string str = ss.str();
+            std::unique_ptr<char[]> new_data{new char[str.size() + 1]};
+            assert(new_data != nullptr);
+            if (new_data != nullptr) {
+                std::copy(str.begin(), str.end(), new_data.get());
+                svg.file_data = std::move(new_data);
+                svg.image     = nsvgParse(svg.file_data);
+                assert(svg.image.get() != NULL);
+                if (svg.image.get() != NULL) {
+                    m_volume->emboss_shape->svg_file = svg; // copy - write changes into volume
+                } else {
+                    svg = m_volume->emboss_shape->svg_file; // revert changes
+                }
+            }
+        } else if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", _u8L("Use only paths from svg - recreate svg").c_str());
+        }
+                
+        draw(get_icon(m_icons, IconType::bake));
+        ImGui::SameLine();
+        if (ImGui::Selectable(_u8L("Bake 3 ©").c_str())) {
+            m_volume->emboss_shape.reset();
+            close();
+        } else if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", _u8L("Bake to uneditable part and save copyright of svg").c_str());
+        }
+
+        draw(get_icon(m_icons, IconType::save));
+        ImGui::SameLine();
+        if (ImGui::Selectable((_L("Save as") + dots).ToUTF8().data())) {
+            GUI::FileType file_type  = FT_SVG;
+            wxString wildcard = file_wildcards(file_type);
+            wxString dlg_title = _L("Export SVG file:");
+            wxString dlg_dir = from_u8(wxGetApp().app_config->get_last_dir());
+            const EmbossShape::SvgFile& svg = m_volume_shape.svg_file;
+            wxString dlg_file = from_u8(get_file_name(((!svg.path.empty()) ? svg.path : svg.path_in_3mf))) + ".svg";
+            wxFileDialog dlg(nullptr, dlg_title, dlg_dir, dlg_file, wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+            if (dlg.ShowModal() == wxID_OK ){
+                wxString out_path = dlg.GetPath();        
+                std::string path{out_path.c_str()};
+                //Slic3r::save(*m_volume_shape.svg_file.image, path);
+
+                std::ofstream stream(path);
+                if (stream.is_open()){
+                    stream << svg.file_data.get();
+
+                    // change source file
+                    m_filename_preview.clear();
+                    m_volume_shape.svg_file.path = path;
+                    m_volume_shape.svg_file.path_in_3mf.clear(); // possible change name
+                    m_volume->emboss_shape->svg_file = m_volume_shape.svg_file; // copy - write changes into volume
+                } else {
+                    BOOST_LOG_TRIVIAL(error) << "Opening file: \"" << path << "\" Failed";
+                }
+
+            }
+        } else if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", _u8L("Save as '.svg' file").c_str());
+        }
     }
 
     if (file_changed) {
@@ -1204,44 +1413,10 @@ bool GLGizmoSVG::draw_preview(){
         EmbossShape es_ = select_shape(m_volume_shape.svg_file.path, tes_tol);
         m_volume_shape.svg_file.image = std::move(es_.svg_file.image);
         m_volume_shape.shapes_with_ids = std::move(es_.shapes_with_ids);
+        m_shape_warnings = create_shape_warnings(*m_volume_shape.svg_file.image);
         init_texture(m_texture, m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
         process();
     }
-
-    ImGui::SameLine();
-    if (clickable(get_icon(m_icons, IconType::bake), get_icon(m_icons, IconType::bake_hover))) {
-        m_volume->emboss_shape.reset();
-        close();
-        return false;
-    } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", _u8L("Bake to uneditable part and save copyright of svg").c_str());
-    }
-
-    ImGui::SameLine();
-    if (clickable(get_icon(m_icons, IconType::save), get_icon(m_icons, IconType::save_hover))) {
-        GUI::FileType file_type  = FT_SVG;
-        wxString wildcard = file_wildcards(file_type);
-        wxString dlg_title = _L("Export SVG file:");
-        wxString dlg_dir = from_u8(wxGetApp().app_config->get_last_dir());
-        const EmbossShape::SvgFile& svg = m_volume_shape.svg_file;
-        wxString dlg_file = from_u8(get_file_name(((!svg.path.empty()) ? svg.path : svg.path_in_3mf))) + ".svg";
-        wxFileDialog dlg(nullptr, dlg_title, dlg_dir, dlg_file, wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
-        if (dlg.ShowModal() == wxID_OK ){
-            wxString out_path = dlg.GetPath();        
-            std::string path{out_path.c_str()};
-            //Slic3r::save(*m_volume_shape.svg_file.image, path);
-
-            std::ofstream stream(path);
-            if (stream.is_open()){
-                stream << svg.file_data.get();
-            } else {
-                BOOST_LOG_TRIVIAL(error) << "Opening file: \"" << path << "\" Failed";
-            }
-        }
-    } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", _u8L("Save as '.svg' file").c_str());
-    }
-    return true;
 }
 
 void GLGizmoSVG::draw_depth()
@@ -1278,6 +1453,12 @@ void GLGizmoSVG::draw_depth()
 void GLGizmoSVG::draw_size() 
 {
     ImGuiWrapper::text(m_gui_cfg->translations.size);
+    if (ImGui::IsItemHovered()){
+        size_t count_points = 0;
+        for (const auto &s : m_volume_shape.shapes_with_ids)
+            count_points += Slic3r::count_points(s.expoly);
+        ImGui::SetTooltip("%s", GUI::format(_L("Scale also change amout of curve samples(%1%)"), count_points).c_str());
+    }
 
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
     
