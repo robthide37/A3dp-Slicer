@@ -15,10 +15,43 @@
 #include "MainFrame.hpp"
 #include "MsgDialog.hpp"
 
+#include <GL/glew.h> //  Fix for fatal  error C1189: #error:  gl.h included before glew.h (compiling source file C:\git\slicer2\src\slic3r\GUI\GUI_ObjectManipulation.cpp)
 #include <wx/glcanvas.h>
 
 #include <boost/algorithm/string.hpp>
 #include "slic3r/Utils/FixModelByWin10.hpp"
+
+// For special mirroring in manipulation gizmo
+#include "Gizmos/GLGizmosManager.hpp"
+#include "Gizmos/GLGizmoEmboss.hpp"
+namespace {
+using namespace Slic3r::GUI;
+bool is_emboss_mirror(size_t axis_idx)
+{    
+    Plater* plater = wxGetApp().plater();
+    if (!plater)
+        return false;
+
+    GLCanvas3D *canvas  = plater->canvas3D();
+    if (!canvas)
+        return false;
+
+    GLGizmosManager &manager = canvas->get_gizmos_manager();
+    // is embossing
+    if (manager.get_current_type() != GLGizmosManager::Emboss)
+        return false;
+
+    GLGizmoBase *gizmo = manager.get_current();
+    if (!gizmo)
+        return false;
+
+    GLGizmoEmboss *emboss = dynamic_cast<GLGizmoEmboss *>(gizmo);
+    if (!emboss)
+        return false;
+
+    return emboss->do_mirror(axis_idx);
+}
+} // namespace
 
 namespace Slic3r
 {
@@ -253,10 +286,12 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 
         sizer->AddStretchSpacer(2);
         sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL);
-
+        
         btn->Bind(wxEVT_BUTTON, [this, axis_idx](wxCommandEvent&) {
+            if (::is_emboss_mirror(axis_idx))
+                return;
+
             GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
-            Selection& selection = canvas->get_selection();
             TransformationType transformation_type;
             if (is_local_coordinates())
                 transformation_type.set_local();
@@ -265,6 +300,7 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
 
             transformation_type.set_relative();
 
+            Selection& selection = canvas->get_selection();
             selection.setup_cache();
             selection.mirror((Axis)axis_idx, transformation_type);
 

@@ -222,6 +222,8 @@ public:
     const wxColour& get_label_clr_default() { return m_color_label_default; }
     const wxColour& get_window_default_clr(){ return m_color_window_default; }
 
+    const std::string       get_html_bg_color(wxWindow* html_parent);
+
     const std::string&      get_mode_btn_color(int mode_id);
     std::vector<wxColour>   get_mode_palette();
     void                    set_mode_palette(const std::vector<wxColour> &palette);

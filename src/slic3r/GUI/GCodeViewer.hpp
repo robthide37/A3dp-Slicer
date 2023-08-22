@@ -380,6 +380,7 @@ class GCodeViewer
     {
         GLVolumeCollection volumes;
         bool visible{ false };
+        bool force_visible{ false };
     };
 
     // helper to render center of gravity
@@ -803,7 +804,9 @@ private:
     std::vector<TBuffer> m_buffers{ static_cast<size_t>(EMoveType::Extrude) };
     // bounding box of toolpaths
     BoundingBoxf3 m_paths_bounding_box;
-    // bounding box of toolpaths + marker tools
+    // bounding box of shells
+    BoundingBoxf3 m_shells_bounding_box;
+    // bounding box of toolpaths + marker tools + shells
     BoundingBoxf3 m_max_bounding_box;
     float m_max_print_height{ 0.0f };
     std::vector<ColorRGBA> m_tool_colors;
@@ -862,7 +865,16 @@ public:
     bool can_export_toolpaths() const;
 
     const BoundingBoxf3& get_paths_bounding_box() const { return m_paths_bounding_box; }
-    const BoundingBoxf3& get_max_bounding_box() const { return m_max_bounding_box; }
+    const BoundingBoxf3& get_shells_bounding_box() const { return m_shells_bounding_box; }
+    const BoundingBoxf3& get_max_bounding_box() const {
+        BoundingBoxf3& max_bounding_box = const_cast<BoundingBoxf3&>(m_max_bounding_box);
+        if (!max_bounding_box.defined) {
+            max_bounding_box = m_shells_bounding_box;
+            max_bounding_box.merge(m_paths_bounding_box);
+            max_bounding_box.merge(m_paths_bounding_box.max + m_sequential_view.marker.get_bounding_box().size().z() * Vec3d::UnitZ());
+        }
+        return m_max_bounding_box;
+    }
     const std::vector<double>& get_layers_zs() const { return m_layers.get_zs(); }
 
     const SequentialView& get_sequential_view() const { return m_sequential_view; }
@@ -889,6 +901,8 @@ public:
     bool is_legend_enabled() const { return m_legend_enabled; }
     void enable_legend(bool enable) { m_legend_enabled = enable; }
 
+    void set_force_shells_visible(bool visible) { m_shells.force_visible = visible; }
+
     void export_toolpaths_to_obj(const char* filename) const;
 
     void toggle_gcode_window_visibility() { m_sequential_view.gcode_window.toggle_visibility(); }
@@ -900,9 +914,11 @@ public:
 
     const ConflictResultOpt& get_conflict_result() const { return m_conflict_result; }
 
+    void load_shells(const Print& print);
+
 private:
     void load_toolpaths(const GCodeProcessorResult& gcode_result);
-    void load_shells(const Print& print);
+    void load_wipetower_shell(const Print& print);
     void render_toolpaths();
     void render_shells();
     void render_legend(float& legend_height);

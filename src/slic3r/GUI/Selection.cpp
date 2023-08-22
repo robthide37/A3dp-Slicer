@@ -849,11 +849,31 @@ std::pair<BoundingBoxf3, Transform3d> Selection::get_bounding_box_in_reference_s
             }
         }
     }
+
     const Vec3d box_size = max - min;
-    const Vec3d half_box_size = 0.5 * box_size;
-    BoundingBoxf3 out_box(-half_box_size, half_box_size);
+    Vec3d half_box_size = 0.5 * box_size;
     Geometry::Transformation out_trafo(trafo);
-    const Vec3d center = 0.5 * (min + max);
+    Vec3d center = 0.5 * (min + max);
+
+    // Fix for non centered volume 
+    // by move with calculated center(to volume center) and extend half box size
+    // e.g. for right aligned embossed text
+    if (m_list.size() == 1 &&
+        type == ECoordinatesType::Local) {
+        const GLVolume& vol = *get_volume(*m_list.begin());
+        const Transform3d vol_world_trafo = vol.world_matrix();
+        Vec3d world_zero = vol_world_trafo * Vec3d::Zero();
+        for (size_t i = 0; i < 3; i++){
+            // move center to local volume zero
+            center[i] = world_zero.dot(axes[i]);
+            // extend half size to bigger distance from center
+            half_box_size[i] = std::max(
+                abs(center[i] - min[i]),
+                abs(center[i] - max[i]));
+        }
+    }
+    
+    const BoundingBoxf3 out_box(-half_box_size, half_box_size);
     out_trafo.set_offset(basis_trafo * center);
     return { out_box, out_trafo.get_matrix_no_scaling_factor() };
 }

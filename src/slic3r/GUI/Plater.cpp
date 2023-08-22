@@ -83,8 +83,10 @@
 #include "Camera.hpp"
 #include "Mouse3DController.hpp"
 #include "Tab.hpp"
-#include "Jobs/ArrangeJob.hpp"
-#include "Jobs/FillBedJob.hpp"
+//#include "Jobs/ArrangeJob.hpp"
+#include "Jobs/ArrangeJob2.hpp"
+
+//#include "Jobs/FillBedJob.hpp"
 #include "Jobs/RotoptimizeJob.hpp"
 #include "Jobs/SLAImportJob.hpp"
 #include "Jobs/SLAImportDialog.hpp"
@@ -3993,6 +3995,7 @@ void Plater::priv::set_current_panel(wxPanel* panel)
             bool model_fits = view3D->get_canvas3d()->check_volumes_outside_state() != ModelInstancePVS_Partly_Outside;
             if (!model.objects.empty() && !export_in_progress && model_fits) {
                 preview->get_canvas3d()->init_gcode_viewer();
+                preview->load_gcode_shells();
                 q->reslice();
             }
             // keeps current gcode preview, if any
@@ -6358,8 +6361,50 @@ void Plater::fill_bed_with_instances()
 {
     auto &w = get_ui_job_worker();
     if (w.is_idle()) {
-        p->take_snapshot(_L("Fill bed"));
-        replace_job(w, std::make_unique<FillBedJob>());
+
+        FillBedJob2::Callbacks cbs;
+        cbs.on_processed = [this](arr2::ArrangeTaskBase &t) {
+            p->take_snapshot(_L("Fill bed"));
+        };
+
+        auto scene = arr2::Scene{
+            build_scene(*this, ArrangeSelectionMode::SelectionOnly)};
+
+        cbs.on_finished = [this](arr2::FillBedTaskResult &result) {
+            auto [prototype_mi, pos] = arr2::find_instance_by_id(model(), result.prototype_id);
+
+            if (!prototype_mi)
+                return;
+
+            ModelObject *model_object = prototype_mi->get_object();
+            assert(model_object);
+
+            model_object->ensure_on_bed();
+
+            size_t inst_cnt = model_object->instances.size();
+            if (inst_cnt == 0)
+                return;
+
+            int object_idx = pos.obj_idx;
+
+            if (object_idx < 0 || object_idx >= int(model().objects.size()))
+                return;
+
+            update(static_cast<unsigned int>(UpdateParams::FORCE_FULL_SCREEN_REFRESH));
+
+            if (!result.to_add.empty()) {
+                auto added_cnt = result.to_add.size();
+
+                // FIXME: somebody explain why this is needed for
+                // increase_object_instances
+                if (result.arranged_items.size() == 1)
+                    added_cnt++;
+
+                sidebar().obj_list()->increase_object_instances(object_idx, added_cnt);
+            }
+        };
+
+        replace_job(w, std::make_unique<FillBedJob2>(std::move(scene), cbs));
     }
 }
 
@@ -6437,8 +6482,8 @@ void Plater::apply_cut_object_to_model(size_t obj_idx, const ModelObjectPtrs& ne
         selection.add_object((unsigned int)(last_id - i), i == 0);
 
     UIThreadWorker w;
-    replace_job(w, std::make_unique<ArrangeJob>(ArrangeJob::SelectionOnly));
-    w.process_events();
+    arrange(w, true);
+    w.wait_for_idle();
 }
 
 void Plater::export_gcode(bool prefer_removable)
@@ -7328,17 +7373,68 @@ GLCanvas3D* Plater::get_current_canvas3D()
     return p->get_current_canvas3D();
 }
 
+static std::string concat_strings(const std::set<std::string> &strings,
+                                  const std::string &delim = "\n")
+{
+    return std::accumulate(
+        strings.begin(), strings.end(), std::string(""),
+        [delim](const std::string &s, const std::string &name) {
+            return s + name + delim;
+        });
+}
+
 void Plater::arrange()
 {
     if (p->can_arrange()) {
         auto &w = get_ui_job_worker();
-        p->take_snapshot(_L("Arrange"));
-
-        auto mode = wxGetKeyState(WXK_SHIFT) ? ArrangeJob::SelectionOnly :
-                                               ArrangeJob::Full;
-
-        replace_job(w, std::make_unique<ArrangeJob>(mode));
+        arrange(w, wxGetKeyState(WXK_SHIFT));
     }
+}
+
+void Plater::arrange(Worker &w, bool selected)
+{
+    ArrangeSelectionMode mode = selected ?
+                                     ArrangeSelectionMode::SelectionOnly :
+                                     ArrangeSelectionMode::Full;
+
+    arr2::Scene arrscene{build_scene(*this, mode)};
+
+    ArrangeJob2::Callbacks cbs;
+
+    cbs.on_processed = [this](arr2::ArrangeTaskBase &t) {
+        p->take_snapshot(_L("Arrange"));
+    };
+
+    cbs.on_finished = [this](arr2::ArrangeTaskResult &t) {
+        std::set<std::string> names;
+
+        auto collect_unarranged = [this, &names](const arr2::TrafoOnlyArrangeItem &itm) {
+            if (!arr2::is_arranged(itm)) {
+                std::optional<ObjectID> id = arr2::retrieve_id(itm);
+                if (id) {
+                    auto [mi, pos] = arr2::find_instance_by_id(p->model, *id);
+                    if (mi && mi->get_object()) {
+                        names.insert(mi->get_object()->name);
+                    }
+                }
+            }
+        };
+
+        for (const arr2::TrafoOnlyArrangeItem &itm : t.items)
+            collect_unarranged(itm);
+
+        if (!names.empty()) {
+            get_notification_manager()->push_notification(
+                GUI::format(_L("Arrangement ignored the following objects which "
+                               "can't fit into a single bed:\n%s"),
+                            concat_strings(names, "\n")));
+        }
+
+        update(static_cast<unsigned int>(UpdateParams::FORCE_FULL_SCREEN_REFRESH));
+        wxGetApp().obj_manipul()->set_dirty();
+    };
+
+    replace_job(w, std::make_unique<ArrangeJob2>(std::move(arrscene), cbs));
 }
 
 void Plater::set_current_canvas_as_dirty()

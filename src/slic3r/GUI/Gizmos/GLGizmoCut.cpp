@@ -186,7 +186,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
     , m_connector_style (int(CutConnectorStyle::Prism))
     , m_connector_shape_id (int(CutConnectorShape::Circle))
 {
-    m_modes = { _u8L("Planar"), _u8L("Tongue and Groove")//, _u8L("Grid")
+    m_modes = { _u8L("Planar"), _u8L("Dovetail")//, _u8L("Grid")
 //              , _u8L("Radial"), _u8L("Modular")
     };
 
@@ -228,7 +228,7 @@ GLGizmoCut3D::GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename,
         {"Size"         , _u8L("Size")},
         {"Groove"       , _u8L("Groove")},
         {"Width"        , _u8L("Width")},
-        {"Flaps Angle"  , _u8L("Flaps Angle")},
+        {"Flap Angle"   , _u8L("Flap Angle")},
         {"Groove Angle" , _u8L("Groove Angle")},
     };
 
@@ -948,6 +948,7 @@ void GLGizmoCut3D::render_model(GLModel& model, const ColorRGBA& color, Transfor
         shader->start_using();
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
+        shader->set_uniform("emission_factor", 0.2f);
         shader->set_uniform("projection_matrix", wxGetApp().plater()->get_camera().get_projection_matrix());
 
         model.set_color(color);

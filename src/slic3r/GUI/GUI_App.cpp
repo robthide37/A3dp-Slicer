@@ -1732,6 +1732,24 @@ void GUI_App::set_label_clr_sys(const wxColour& clr)
     app_config->set("label_clr_sys", str);
 }
 
+const std::string GUI_App::get_html_bg_color(wxWindow* html_parent)
+{
+    wxColour    bgr_clr = html_parent->GetBackgroundColour();
+#ifdef __APPLE__
+    // On macOS 10.13 and older the background color returned by wxWidgets
+    // is wrong, which leads to https://github.com/prusa3d/PrusaSlicer/issues/7603
+    // and https://github.com/prusa3d/PrusaSlicer/issues/3775. wxSYS_COLOUR_WINDOW
+    // may not match the window background exactly, but it seems to never end up
+    // as black on black.
+
+    if (wxPlatformInfo::Get().GetOSMajorVersion() == 10
+        && wxPlatformInfo::Get().GetOSMinorVersion() < 14)
+        bgr_clr = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW);
+#endif
+
+    return encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
+}
+
 const std::string& GUI_App::get_mode_btn_color(int mode_id)
 {
     assert(0 <= mode_id && size_t(mode_id) < m_mode_palette.size());
