@@ -1,5 +1,5 @@
-#ifndef OPTIMIZER_HPP
-#define OPTIMIZER_HPP
+#ifndef PRUSASLICER_OPTIMIZER_HPP
+#define PRUSASLICER_OPTIMIZER_HPP
 
 #include <utility>
 #include <tuple>
@@ -9,6 +9,11 @@
 #include <limits>
 #include <cassert>
 #include <optional>
+
+#ifdef WIN32
+#undef min
+#undef max
+#endif
 
 namespace Slic3r { namespace opt {
 

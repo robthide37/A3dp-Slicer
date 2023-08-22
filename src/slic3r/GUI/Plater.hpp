@@ -264,8 +264,7 @@ public:
     void convert_unit(ConversionType conv_type);
     void toggle_layers_editing(bool enable);
 
-    void cut(size_t obj_idx, size_t instance_idx, const Transform3d& cut_matrix, ModelObjectCutAttributes attributes);
-    void cut(size_t init_obj_idx, const ModelObjectPtrs& cut_objects);
+    void apply_cut_object_to_model(size_t init_obj_idx, const ModelObjectPtrs& cut_objects);
 
     void export_gcode(bool prefer_removable);
     void export_stl_obj(bool extended = false, bool selection_only = false);
@@ -338,6 +337,7 @@ public:
     GLCanvas3D* get_current_canvas3D();
     
     void arrange();
+    void arrange(Worker &w, bool selected);
 
     void set_current_canvas_as_dirty();
     void unbind_canvas_event_handlers();

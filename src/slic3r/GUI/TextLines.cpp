@@ -24,27 +24,6 @@ using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
 
 namespace {
-const Slic3r::Polygon *largest(const Slic3r::Polygons &polygons)
-{
-    if (polygons.empty())
-        return nullptr;
-    if (polygons.size() == 1)
-        return &polygons.front();
-
-    // compare polygon to find largest
-    size_t                 biggest_size = 0;
-    const Slic3r::Polygon *result       = nullptr;
-    for (const Slic3r::Polygon &polygon : polygons) {
-        Point  s    = polygon.bounding_box().size();
-        size_t size = s.x() * s.y();
-        if (size <= biggest_size)
-            continue;
-        biggest_size = size;
-        result       = &polygon;
-    }
-    return result;
-}
-
 // Be careful it is not water tide and contain self intersections
 // It is only for visualization purposes
 indexed_triangle_set its_create_torus(const Slic3r::Polygon &polygon, float radius, size_t steps = 20)
@@ -69,12 +48,6 @@ indexed_triangle_set its_create_torus(const Slic3r::Polygon &polygon, float radi
     for (size_t i = 0; i < count - 1; ++i)
         line_norm[i] = calc_line_norm(points_d[i], points_d[i + 1]);
     line_norm.back() = calc_line_norm(points_d.back(), points_d.front());
-
-    // calculate normals for each point
-    auto calc_norm = [](const Vec2f &prev, const Vec2f &next) -> Vec2f {
-        Vec2f dir = prev + next;
-        return Vec2f(-dir.x(), dir.y());
-    };
         
     // precalculate sinus and cosinus
     double angle_step = 2 * M_PI / steps;
@@ -218,7 +191,7 @@ indexed_triangle_set create_its(const TextLines &lines, float radius)
     return its;
 }
 
-GLModel::Geometry create_geometry(const TextLines &lines, float radius)
+GLModel::Geometry create_geometry(const TextLines &lines, float radius, bool is_mirrored)
 {
     indexed_triangle_set its = create_its(lines, radius);
 
@@ -232,8 +205,15 @@ GLModel::Geometry create_geometry(const TextLines &lines, float radius)
         geometry.add_vertex(vertex);
 
     geometry.reserve_indices(its.indices.size() * 3);
-    for (Vec3i t : its.indices)
-        geometry.add_triangle(t[0], t[1], t[2]);
+
+    if (is_mirrored) {
+        // change order of indices
+        for (Vec3i t : its.indices)
+            geometry.add_triangle(t[0], t[2], t[1]);
+    } else {
+        for (Vec3i t : its.indices)
+            geometry.add_triangle(t[0], t[1], t[2]);
+    }
     return geometry;    
 }
 } // namespace
@@ -315,9 +295,10 @@ void TextLinesModel::init(const Transform3d      &text_tr,
     for (size_t i = 0; i < count_lines; ++i)
         m_lines[i].y = line_centers[i];
 
+    bool is_mirrored = has_reflection(text_tr);
     float radius = static_cast<float>(line_height_mm / 20.);
     //*
-    GLModel::Geometry geometry = create_geometry(m_lines, radius);
+    GLModel::Geometry geometry = create_geometry(m_lines, radius, is_mirrored);
     if (geometry.vertices_count() == 0 || geometry.indices_count() == 0)
         return;
     m_model.init_from(std::move(geometry));

@@ -707,6 +707,10 @@ PageMaterials::PageMaterials(ConfigWizard *parent, Materials *materials, wxStrin
     list_vendor->SetMinSize(wxSize(13*em, list_h));
     list_profile->SetMinSize(wxSize(23*em, list_h));
 
+#ifdef __APPLE__
+    for (wxWindow* win : std::initializer_list<wxWindow*>{ list_printer, list_type, list_vendor, list_profile })
+        win->SetBackgroundColour(wxGetApp().get_window_default_clr());
+#endif
 
 
     grid = new wxFlexGridSizer(4, em/2, em);
@@ -817,19 +821,9 @@ void PageMaterials::reload_presets()
 
 void PageMaterials::set_compatible_printers_html_window(const std::vector<std::string>& printer_names, bool all_printers)
 {
-    const auto bgr_clr = 
-#if defined(__APPLE__)
-        html_window->GetParent()->GetBackgroundColour();
-#else 
-#if defined(_WIN32)
-        wxGetApp().get_window_default_clr();
-#else
-        wxSystemSettings::GetColour(wxSYS_COLOUR_MENU);
-#endif
-#endif
     const auto text_clr = wxGetApp().get_label_clr_default();
-    const auto bgr_clr_str = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
     const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+    const auto bgr_clr_str = wxGetApp().get_html_bg_color(parent);
     wxString text;
     if (materials->technology == T_FFF && template_shown) {
         // TRN ConfigWizard: Materials : "%1%" = "Filaments"/"SLA materials"
@@ -1468,11 +1462,43 @@ PageDownloader::PageDownloader(ConfigWizard* parent)
     box_allow_downloads->SetValue(box_allow_value);
     append(box_allow_downloads);
 
-    // TRN ConfigWizard : Downloader : %1% = "PrusaSlicer"
-    append_text(format_wxstr(_L("If enabled, %1% registers to start on custom URL on www.printables.com."
-        " You will be able to use button with %1% logo to open models in this %1%."
-        " The model will be downloaded into folder you choose bellow."
-    ), SLIC3R_APP_NAME));
+    // append info line with link on printables.com
+    {
+        const int em = parent->em_unit();
+        wxHtmlWindow* html_window = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxSize(60 * em, 5 * em), wxHW_SCROLLBAR_NEVER);
+
+        html_window->Bind(wxEVT_HTML_LINK_CLICKED, [](wxHtmlLinkEvent& event) {
+            wxGetApp().open_browser_with_warning_dialog(event.GetLinkInfo().GetHref());
+            event.Skip(false);
+            });
+
+        append(html_window);
+
+        const auto text_clr = wxGetApp().get_label_clr_default();
+        const auto bgr_clr_str = wxGetApp().get_html_bg_color(parent);
+        const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+
+        const wxString link = format_wxstr("<a href = \"%1%\">%1%</a>", "printables.com");
+
+        // TRN ConfigWizard : Downloader : %1% = "printables.com", %2% = "PrusaSlicer"
+        const wxString main_text = format_wxstr(_L("If enabled, you will be able to open models from the %1% "
+                                                   "online database with a single click (using a %2% logo button)."
+        ), link, SLIC3R_APP_NAME);
+
+        const wxFont& font = this->GetFont();
+        const int fs = font.GetPointSize();
+        int size[] = { fs,fs,fs,fs,fs,fs,fs };
+        html_window->SetFonts(font.GetFaceName(), font.GetFaceName(), size);
+
+        html_window->SetPage(format_wxstr(
+            "<html><body bgcolor=%1% link=%2%>"
+            "<font color=%2% size=\"3\">%3%</font>"
+            "</body></html>"
+            , bgr_clr_str
+            , text_clr_str
+            , main_text
+        ));
+    }
 
 #ifdef __linux__
     append_text(wxString::Format(_L(
@@ -3351,6 +3377,9 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     : DPIDialog(parent, wxID_ANY, wxString(SLIC3R_APP_NAME) + " - " + _(name()), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
     , p(new priv(this))
 {
+#ifdef __APPLE__
+    this->SetBackgroundColour(wxGetApp().get_window_default_clr());
+#endif
     wxBusyCursor wait;
 
     this->SetFont(wxGetApp().normal_font());

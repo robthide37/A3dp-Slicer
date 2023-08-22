@@ -53,6 +53,15 @@ public:
     void on_shortcut_key();
 
     /// <summary>
+    /// Mirroring from object manipulation panel
+    /// !! Emboss gizmo must be active
+    /// </summary>
+    /// <param name="axis">Axis for mirroring must be one of {0,1,2}</param>
+    /// <returns>True on success start job otherwise False</returns>
+    bool do_mirror(size_t axis);
+
+
+    /// <summary>
     /// Call on change inside of object conatining projected volume
     /// </summary>
     /// <param name="job_cancel">Way to stop re_emboss job</param>

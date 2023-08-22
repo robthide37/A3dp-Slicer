@@ -771,7 +771,7 @@ void FirmwareDialog::priv::ensure_joined()
 const char* FirmwareDialog::priv::avr109_dev_name(Avr109Pid usb_pid) {
 	switch (usb_pid.boot) {
 		case USB_PID_MMU_BOOT:
-			return "Original Prusa MMU 2.0 Control";
+			return "Original Prusa Multi Material 2 & 3 Upgrade (bootloader)";
 		case USB_PID_CW1_BOOT:
 			return "Original Prusa CW1";
 		case USB_PID_CW1S_BOOT:
