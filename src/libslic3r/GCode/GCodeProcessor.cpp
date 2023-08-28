@@ -69,7 +69,18 @@ const float GCodeProcessor::Wipe_Width = 0.05f;
 const float GCodeProcessor::Wipe_Height = 0.05f;
 
 #if ENABLE_BINARIZED_GCODE
-bgcode::binarize::BinarizerConfig GCodeProcessor::s_binarizer_config{};
+bgcode::binarize::BinarizerConfig GCodeProcessor::s_binarizer_config{
+    {
+        bgcode::core::ECompressionType::None, // file metadata
+        bgcode::core::ECompressionType::None, // printer metadata
+        bgcode::core::ECompressionType::Deflate, // print metadata
+        bgcode::core::ECompressionType::Deflate, // slicer metadata
+        bgcode::core::ECompressionType::Heatshrink_12_4, // gcode
+    },
+    bgcode::core::EGCodeEncodingType::MeatPackComments,
+    bgcode::core::EMetadataEncodingType::INI,
+    bgcode::core::EChecksumType::CRC32
+};
 #endif // ENABLE_BINARIZED_GCODE
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING
