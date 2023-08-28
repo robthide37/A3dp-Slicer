@@ -34,6 +34,13 @@ static t_config_enum_names enum_names_from_keys_map(const t_config_enum_values &
     template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values() { return s_keys_map_##NAME; } \
     template<> const t_config_enum_names& ConfigOptionEnum<NAME>::get_enum_names() { return s_keys_names_##NAME; }
 
+static const t_config_enum_values s_keys_map_ArcFittingType {
+    { "disabled",       int(ArcFittingType::Disabled) },
+    { "emit_center",    int(ArcFittingType::EmitCenter) },
+    { "emit_radius",    int(ArcFittingType::EmitRadius) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ArcFittingType)
+
 static t_config_enum_values s_keys_map_PrinterTechnology {
     { "FFF",            ptFFF },
     { "SLA",            ptSLA }
@@ -396,6 +403,27 @@ void PrintConfigDef::init_common_params()
 void PrintConfigDef::init_fff_params()
 {
     ConfigOptionDef* def;
+
+    def = this->add("arc_fitting", coEnum);
+    def->label = L("Arc fitting");
+    def->tooltip = L("Enable this to get a G-code file which has G2 and G3 moves. "
+                     "And the fitting tolerance is same with resolution");
+    def->set_enum<ArcFittingType>({
+        { "disabled",       "Disabled" },
+        { "emit_center",    "Enabled: G2/3 I J" },
+        { "emit_radius",    "Enabled: G2/3 R" }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<ArcFittingType>(ArcFittingType::Disabled));
+
+    def = this->add("arc_fitting_tolerance", coFloatOrPercent);
+    def->label = L("Arc fitting tolerance");
+    def->sidetext = L("mm or %");
+    def->tooltip = L("When using the arc_fitting option, allow the curve to deviate a cetain % from the collection of strait paths.\n"
+                     "Can be a mm value or a percentage of the current extrusion width.");
+    def->mode = comAdvanced;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloatOrPercent(5, true));
 
     // Maximum extruder temperature, bumped to 1500 to support printing of glass.
     const int max_temp = 1500;

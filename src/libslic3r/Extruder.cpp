@@ -1,5 +1,5 @@
 #include "Extruder.hpp"
-#include "GCodeWriter.hpp"
+#include "GCode/GCodeWriter.hpp"
 #include "PrintConfig.hpp"
 
 namespace Slic3r {

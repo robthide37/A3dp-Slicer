@@ -146,8 +146,10 @@ void Polyline::split_at(const Point &point, Polyline* p1, Polyline* p2) const
     }
 
     if (this->points.front() == point) {
+        //FIXME why is p1 NOT empty as in the case above?
         *p1 = { point };
         *p2 = *this;
+        return;
     }
 
     auto  min_dist2    = std::numeric_limits<double>::max();
