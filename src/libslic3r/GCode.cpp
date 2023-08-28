@@ -103,6 +103,41 @@ namespace Slic3r {
     }
 
 
+    // Accepts vector of PrintObjectPtrs and an object and instance ids. Returns starting tag for label object function.
+    static std::string label_object_start(LabelObjects label_object_style, const SpanOfConstPtrs<PrintObject>& objects, int object_id, int instance_id)
+    {
+        int unique_id = 0;
+        for (size_t idx = 0; idx < size_t(object_id); ++idx)
+            unique_id += int(objects[idx]->model_object()->instances.size());
+        unique_id += instance_id;
+
+        std::string name = objects[object_id]->model_object()->name;
+        if (label_object_style == loMarlin && objects[object_id]->model_object()->instances.size() > 1u)
+            name += " (copy " + std::to_string(instance_id) + ")";
+
+        std::string out;
+        if (label_object_style == loOctoprint)
+            out += std::string("; printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
+        else if (label_object_style == loMarlin) {
+            out += std::string("M486 S") + std::to_string(unique_id) + "\n";
+            out += std::string("M486 N") + name + "\n";
+        }
+        return out;
+    }
+
+
+    static std::string label_object_stop(LabelObjects label_object_style, int object_id, int instance_id, const std::string& name)
+    {
+        std::string out;
+        if (label_object_style == loOctoprint)
+            out += std::string("; stop printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
+        else if (label_object_style == loMarlin)
+            out += std::string("M486 S-1\n");
+        return out;
+    }
+
+
+
     // Return true if tch_prefix is found in custom_gcode
     static bool custom_gcode_changes_tool(const std::string& custom_gcode, const std::string& tch_prefix, unsigned next_extruder)
     {
@@ -1214,6 +1249,18 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
 
     // Set other general things.
     file.write(this->preamble());
+
+    // Label all objects so printer knows about them since the start.
+    if (config().gcode_label_objects != loDisabled) {
+        file.write("\n");
+        for (size_t object_idx = 0; object_idx < print.objects().size(); ++object_idx) {
+            for (size_t inst_idx = 0; inst_idx < print.objects()[object_idx]->model_object()->instances.size(); ++inst_idx) {
+                file.write(label_object_start(config().gcode_label_objects, print.objects(), object_idx, inst_idx));
+                file.write(label_object_stop(config().gcode_label_objects, object_idx, inst_idx, print.objects()[object_idx]->model_object()->name));
+            }
+        }
+        file.write("\n");
+    }
 
     print.throw_if_canceled();
 
@@ -2354,13 +2401,13 @@ void GCodeGenerator::process_layer_single_object(
                 m_avoid_crossing_perimeters.use_external_mp_once();
             m_last_obj_copy = this_object_copy;
             this->set_origin(unscale(offset));
-            if (this->config().gcode_label_objects) {
-                for (const PrintObject *po : print_object.print()->objects())
+            if (this->config().gcode_label_objects != loDisabled) {
+                for (const PrintObject* po : print_object.print()->objects()) {
                     if (po == &print_object)
                         break;
-                    else
-                        ++ object_id;
-                gcode += std::string("; printing object ") + print_object.model_object()->name + " id:" + std::to_string(object_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
+                    ++object_id;
+                }
+                gcode += label_object_start(config().gcode_label_objects, print_object.print()->objects(), object_id, print_instance.instance_id);
             }
         }
     };
@@ -2538,8 +2585,8 @@ void GCodeGenerator::process_layer_single_object(
                 }
             }
         }
-    if (! first && this->config().gcode_label_objects)
-        gcode += std::string("; stop printing object ") + print_object.model_object()->name + " id:" + std::to_string(object_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
+    if (! first && config().gcode_label_objects != loDisabled)
+        gcode += label_object_stop(config().gcode_label_objects, object_id, print_instance.instance_id, print_object.model_object()->name);
 }
 
 void GCodeGenerator::apply_print_config(const PrintConfig &print_config)

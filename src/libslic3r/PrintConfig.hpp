@@ -147,6 +147,10 @@ enum DraftShield {
     dsDisabled, dsLimited, dsEnabled
 };
 
+enum LabelObjects {
+    loDisabled, loOctoprint, loMarlin
+};
+
 enum class PerimeterGeneratorType
 {
     // Classic perimeter generator using Clipper offsets with constant extrusion width.
@@ -183,6 +187,7 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLAPillarConnectionMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLASupportTreeType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(DraftShield)
+CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(LabelObjects)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(GCodeThumbnailsFormat)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(ForwardCompatibilitySubstitutionRule)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(PerimeterGeneratorType)
@@ -729,7 +734,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloats,              filament_multitool_ramming_flow))
     ((ConfigOptionBool,                gcode_comments))
     ((ConfigOptionEnum<GCodeFlavor>,   gcode_flavor))
-    ((ConfigOptionBool,                gcode_label_objects))
+    ((ConfigOptionEnum<LabelObjects>,  gcode_label_objects))
     // Triples of strings: "search pattern", "replace with pattern", "attribs"
     // where "attribs" are one of:
     //      r - regular expression
