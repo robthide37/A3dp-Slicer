@@ -114,8 +114,8 @@ Works on a fresh installation of MacOS Catalina 10.15.6
 brew update
 brew install cmake git gettext
 brew upgrade
-git clone https://github.com/prusa3d/PrusaSlicer/
-cd PrusaSlicer/deps
+git clone https://github.com/slic3r/Slic3r.git
+cd Slic3r/deps
 mkdir build
 cd build
 cmake ..
@@ -125,5 +125,5 @@ mkdir build
 cd build
 cmake .. -DCMAKE_PREFIX_PATH="$PWD/../deps/build/destdir/usr/local"
 make
-src/prusa-slicer
+src/slic3r
 ```
