@@ -356,7 +356,10 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
             const GLVolume* volume = selection.get_first_volume();
             const double min_z = get_volume_min_z(*volume);
             if (!is_world_coordinates()) {
-                const Vec3d diff = m_cache.position - volume->get_instance_transformation().get_matrix_no_offset().inverse() * (min_z * Vec3d::UnitZ());
+                Vec3d diff = volume->get_instance_transformation().get_matrix_no_offset().inverse() * (min_z * Vec3d::UnitZ());
+                if (is_local_coordinates())
+                    diff = volume->get_volume_transformation().get_matrix_no_offset().inverse() * diff;
+                diff = m_cache.position - diff;
 
                 Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("Drop to bed"));
                 change_position_value(0, diff.x());
@@ -942,7 +945,7 @@ void ObjectManipulation::change_position_value(int axis, double value)
     selection.setup_cache();
     TransformationType trafo_type;
     trafo_type.set_relative();
-    switch (get_coordinates_type())
+    switch (m_coordinates_type)
     {
     case ECoordinatesType::Instance: { trafo_type.set_instance(); break; }
     case ECoordinatesType::Local:    { trafo_type.set_local(); break; }
@@ -952,7 +955,7 @@ void ObjectManipulation::change_position_value(int axis, double value)
     canvas->do_move(L("Set Position"));
 
     m_cache.position = position;
-	m_cache.position_rounded(axis) = DBL_MAX;
+    m_cache.position_rounded(axis) = DBL_MAX;
     this->UpdateAndShow(true);
 }
 

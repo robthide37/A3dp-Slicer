@@ -906,20 +906,31 @@ void Print::process()
     name_tbb_thread_pool_threads_set_locale();
 
     BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
-    for (PrintObject *obj : m_objects)
-        obj->make_perimeters();
-    for (PrintObject *obj : m_objects)
-        obj->infill();
-    for (PrintObject *obj : m_objects)
-        obj->ironing();
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_objects.size(), 1), [this](const tbb::blocked_range<size_t> &range) {
+        for (size_t idx = range.begin(); idx < range.end(); ++idx) {
+            m_objects[idx]->make_perimeters();
+            m_objects[idx]->infill();
+            m_objects[idx]->ironing();
+        }
+    }, tbb::simple_partitioner());
+
+    // The following step writes to m_shared_regions, it should not run in parallel.
     for (PrintObject *obj : m_objects)
         obj->generate_support_spots();
     // check data from previous step, format the error message(s) and send alert to ui
+    // this also has to be done sequentially.
     alert_when_supports_needed();
-    for (PrintObject *obj : m_objects)
-        obj->generate_support_material();
-    for (PrintObject *obj : m_objects)
-        obj->estimate_curled_extrusions();
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_objects.size(), 1), [this](const tbb::blocked_range<size_t> &range) {
+        for (size_t idx = range.begin(); idx < range.end(); ++idx) {
+            PrintObject &obj = *m_objects[idx];
+            obj.generate_support_material();
+            obj.estimate_curled_extrusions();
+            obj.calculate_overhanging_perimeters();
+        }
+    }, tbb::simple_partitioner());
+
     if (this->set_started(psWipeTower)) {
         m_wipe_tower_data.clear();
         m_tool_ordering.clear();
@@ -1003,7 +1014,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     this->set_status(90, message);
 
     // Create GCode on heap, it has quite a lot of data.
-    std::unique_ptr<GCode> gcode(new GCode);
+    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator);
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
 
     if (m_conflict_result.has_value())
@@ -1119,13 +1130,15 @@ void Print::_make_skirt()
         }
         // Extrude the skirt loop.
         ExtrusionLoop eloop(elrSkirt);
-        eloop.paths.emplace_back(ExtrusionPath(
-            ExtrusionPath(
+        eloop.paths.emplace_back(
+            ExtrusionAttributes{
                 ExtrusionRole::Skirt,
-                (float)mm3_per_mm,         // this will be overridden at G-code export time
-                flow.width(),
-				(float)first_layer_height  // this will be overridden at G-code export time
-            )));
+                ExtrusionFlow{
+                    float(mm3_per_mm),        // this will be overridden at G-code export time
+                    flow.width(),
+                    float(first_layer_height) // this will be overridden at G-code export time
+                }
+            });
         eloop.paths.back().polyline = loop.split_at_first_point();
         m_skirt.append(eloop);
         if (m_config.min_skirt_length.value > 0) {
@@ -1653,8 +1666,8 @@ std::string PrintStatistics::finalize_output_path(const std::string &path_in) co
             }
 
 
-            ExtrusionPath path(ExtrusionRole::WipeTower, 0.0, 0.0, lh);
-            path.polyline = { minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner };
+            ExtrusionPath path({ minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner },
+                ExtrusionAttributes{ ExtrusionRole::WipeTower, ExtrusionFlow{ 0.0, 0.0, lh } });
             paths.push_back({ path });
 
             // We added the border, now add several parallel lines so we can detect an object that is fully inside the tower.

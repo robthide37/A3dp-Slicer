@@ -92,8 +92,14 @@ void ArrangeSettingsDialogImgui::render(float pos_x, float pos_y)
                 settings.xl_align));
     }
 
+    // TRN ArrangeDialog
     if (m_imgui->combo(_L("Geometry handling"),
-                       {_u8L("Fast"), _u8L("Balanced"), _u8L("Full complexity")},
+        // TRN ArrangeDialog: Type of "Geometry handling"
+         {_u8L("Fast"),
+        // TRN ArrangeDialog: Type of "Geometry handling"
+          _u8L("Balanced"),
+        // TRN ArrangeDialog: Type of "Geometry handling"
+          _u8L("Accurate")},
                        settings.geom_handling)) {
         if (settings.geom_handling >= 0 &&
             settings.geom_handling < ArrangeSettingsView::ghCount)

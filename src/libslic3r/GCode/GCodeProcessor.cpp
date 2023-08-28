@@ -4,8 +4,9 @@
 #include "libslic3r/LocalesUtils.hpp"
 #include "libslic3r/format.hpp"
 #include "libslic3r/I18N.hpp"
-#include "libslic3r/GCodeWriter.hpp"
+#include "libslic3r/GCode/GCodeWriter.hpp"
 #include "libslic3r/I18N.hpp"
+#include "libslic3r/Geometry/ArcWelder.hpp"
 #include "GCodeProcessor.hpp"
 
 #include <boost/algorithm/string/case_conv.hpp>
@@ -46,8 +47,6 @@ static const float DEFAULT_FILAMENT_COST = 0.0f;
 static const Slic3r::Vec3f DEFAULT_EXTRUDER_OFFSET = Slic3r::Vec3f::Zero();
 // taken from PrusaResearch.ini - [printer:Original Prusa i3 MK2.5 MMU2]
 static const std::vector<std::string> DEFAULT_EXTRUDER_COLORS = { "#FF8000", "#DB5182", "#3EC0FF", "#FF4F4F", "#FBEB7D" };
-
-static const std::string INTERNAL_G2G3_TAG = "!#!#! internal only - from G2/G3 expansion !#!#!";
 
 namespace Slic3r {
 
@@ -2598,13 +2597,10 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     if (line.has_e()) g1_axes[E] = (double)line.e();
     std::optional<double> g1_feedrate = std::nullopt;
     if (line.has_f()) g1_feedrate = (double)line.f();
-    std::optional<std::string> g1_cmt = std::nullopt;
-    if (!line.comment().empty()) g1_cmt = line.comment();
-
-    process_G1(g1_axes, g1_feedrate, g1_cmt);
+    process_G1(g1_axes, g1_feedrate);
 }
 
-void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes, std::optional<double> feedrate, std::optional<std::string> cmt)
+void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes, std::optional<double> feedrate, G1DiscretizationOrigin origin)
 {
     const float filament_diameter = (static_cast<size_t>(m_extruder_id) < m_result.filament_diameters.size()) ? m_result.filament_diameters[m_extruder_id] : m_result.filament_diameters.back();
     const float filament_radius = 0.5f * filament_diameter;
@@ -2687,7 +2683,7 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
             m_height = m_forced_height;
         else if (m_layer_id == 0)
             m_height = m_first_layer_height + m_z_offset;
-        else if (!cmt.has_value() || *cmt != INTERNAL_G2G3_TAG) {
+        else if (origin == G1DiscretizationOrigin::G1) {
             if (m_end_position[Z] > m_extruded_last_z + EPSILON && delta_pos[Z] == 0.0)
                 m_height = m_end_position[Z] - m_extruded_last_z;
         }
@@ -2698,7 +2694,7 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
         if (m_end_position[Z] == 0.0f || (m_extrusion_role == GCodeExtrusionRole::Custom && m_layer_id == 0))
             m_end_position[Z] = m_height;
 
-        if (!cmt.has_value() || *cmt != INTERNAL_G2G3_TAG)
+        if (origin == G1DiscretizationOrigin::G1)
             m_extruded_last_z = m_end_position[Z];
         m_options_z_corrector.update(m_height);
 
@@ -2928,18 +2924,48 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
     }
 
     // store move
-    store_move_vertex(type, cmt.has_value() && *cmt == INTERNAL_G2G3_TAG);
+    store_move_vertex(type, origin == G1DiscretizationOrigin::G2G3);
 }
 
 void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise)
 {
-    if (!line.has('I') || !line.has('J'))
+    enum class EFitting { None, IJ, R };
+    const EFitting fitting = line.has('R') ? EFitting::R : (line.has('I') && line.has('J')) ? EFitting::IJ : EFitting::None;
+
+    if (fitting == EFitting::None)
         return;
+
+    const float filament_diameter = (static_cast<size_t>(m_extruder_id) < m_result.filament_diameters.size()) ? m_result.filament_diameters[m_extruder_id] : m_result.filament_diameters.back();
+    const float filament_radius = 0.5f * filament_diameter;
+    const float area_filament_cross_section = static_cast<float>(M_PI) * sqr(filament_radius);
+
+    AxisCoords end_position = m_start_position;
+    for (unsigned char a = X; a <= E; ++a) {
+        end_position[a] = extract_absolute_position_on_axis((Axis)a, line, double(area_filament_cross_section));
+    }
 
     // relative center
     Vec3f rel_center = Vec3f::Zero();
-    if (!line.has_value('I', rel_center.x()) || !line.has_value('J', rel_center.y()))
-        return;
+#ifndef _NDEBUG
+    double radius = 0.0;
+#endif // _NDEBUG
+    if (fitting == EFitting::R) {
+        float r;
+        if (!line.has_value('R', r) || r == 0.0f)
+            return;
+#ifndef _NDEBUG
+        radius = (double)std::abs(r);
+#endif // _NDEBUG
+        const Vec2f start_pos((float)m_start_position[X], (float)m_start_position[Y]);
+        const Vec2f end_pos((float)end_position[X], (float)end_position[Y]);
+        const Vec2f c = Geometry::ArcWelder::arc_center(start_pos, end_pos, r, !clockwise);
+        rel_center.x() = c.x() - m_start_position[X];
+        rel_center.y() = c.y() - m_start_position[Y];
+    }
+    else {
+        if (!line.has_value('I', rel_center.x()) || !line.has_value('J', rel_center.y()))
+            return;
+    }
 
     // scale center, if needed
     if (m_units == EUnits::Inches)
@@ -2975,15 +3001,6 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     // arc center
     arc.center = arc.start + rel_center.cast<double>();
 
-    const float filament_diameter = (static_cast<size_t>(m_extruder_id) < m_result.filament_diameters.size()) ? m_result.filament_diameters[m_extruder_id] : m_result.filament_diameters.back();
-    const float filament_radius = 0.5f * filament_diameter;
-    const float area_filament_cross_section = static_cast<float>(M_PI) * sqr(filament_radius);
-
-    AxisCoords end_position = m_start_position;
-    for (unsigned char a = X; a <= E; ++a) {
-        end_position[a] = extract_absolute_position_on_axis((Axis)a, line, double(area_filament_cross_section));
-    }
-
     // arc end endpoint
     arc.end = Vec3d(end_position[X], end_position[Y], end_position[Z]);
 
@@ -2991,6 +3008,8 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     if (std::abs(arc.end_radius() - arc.start_radius()) > EPSILON) {
         // what to do ???
     }
+
+    assert(fitting != EFitting::R || std::abs(radius - arc.start_radius()) < EPSILON);
 
     // updates feedrate from line
     std::optional<float> feedrate;
@@ -3051,9 +3070,7 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
             g1_feedrate = (double)*feedrate;
         if (extrusion.has_value())
             g1_axes[E] = target[E];
-        std::optional<std::string> g1_cmt = INTERNAL_G2G3_TAG;
-
-        process_G1(g1_axes, g1_feedrate, g1_cmt);
+        process_G1(g1_axes, g1_feedrate, G1DiscretizationOrigin::G2G3);
     };
 
     // calculate arc segments
@@ -3062,8 +3079,13 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     // https://github.com/prusa3d/Prusa-Firmware/blob/MK3/Firmware/motion_control.cpp
 
     // segments count
+#if 0
     static const double MM_PER_ARC_SEGMENT = 1.0;
     const size_t segments = std::max<size_t>(std::floor(travel_length / MM_PER_ARC_SEGMENT), 1);
+#else
+    static const double gcode_arc_tolerance = 0.0125;
+    const size_t segments = Geometry::ArcWelder::arc_discretization_steps(arc.start_radius(), std::abs(arc.angle), gcode_arc_tolerance);
+#endif
 
     const double inv_segment = 1.0 / double(segments);
     const double theta_per_segment = arc.angle  * inv_segment;
