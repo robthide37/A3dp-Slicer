@@ -2469,6 +2469,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     int answer_convert_from_meters          = wxOK_DEFAULT;
     int answer_convert_from_imperial_units  = wxOK_DEFAULT;
+    int answer_consider_as_multi_part_objects = wxOK_DEFAULT;
 
     bool in_temp = false; 
     const fs::path temp_path = wxStandardPaths::Get().GetTempDir().utf8_str().data();
@@ -2650,14 +2651,21 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 }
 
                 if (model.looks_like_multipart_object()) {
-                    MessageDialog msg_dlg(q, _L(
-                        "This file contains several objects positioned at multiple heights.\n"
-                        "Instead of considering them as multiple objects, should \n"
-                        "the file be loaded as a single object having multiple parts?") + "\n",
-                        _L("Multi-part object detected"), wxICON_WARNING | wxYES | wxNO);
-                    if (msg_dlg.ShowModal() == wxID_YES) {
-                        model.convert_multipart_object(nozzle_dmrs->values.size());
+                    if (answer_consider_as_multi_part_objects == wxOK_DEFAULT) {
+                        RichMessageDialog dlg(q, _L(
+                            "This file contains several objects positioned at multiple heights.\n"
+                            "Instead of considering them as multiple objects, should \n"
+                            "the file be loaded as a single object having multiple parts?") + "\n",
+                            _L("Multi-part object detected"), wxICON_QUESTION | wxYES_NO);
+                        dlg.ShowCheckBox(_L("Apply to all multiple objects being loaded."));
+                        int answer = dlg.ShowModal();
+                        if (dlg.IsCheckBoxChecked())
+                            answer_consider_as_multi_part_objects = answer;
+                        if (answer == wxID_YES)
+                            model.convert_multipart_object(nozzle_dmrs->size());
                     }
+                    else if (answer_consider_as_multi_part_objects == wxID_YES)
+                        model.convert_multipart_object(nozzle_dmrs->size());
                 }
             }
             if ((wxGetApp().get_mode() == comSimple) && (type_3mf || type_any_amf) && model_has_advanced_features(model)) {
@@ -3567,9 +3575,9 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
         new_volume->convert_from_imperial_units();
     else if (old_volume->source.is_converted_from_meters)
         new_volume->convert_from_meters();
-    new_volume->supported_facets.assign(old_volume->supported_facets);
-    new_volume->seam_facets.assign(old_volume->seam_facets);
-    new_volume->mmu_segmentation_facets.assign(old_volume->mmu_segmentation_facets);
+        new_volume->supported_facets.assign(old_volume->supported_facets);
+        new_volume->seam_facets.assign(old_volume->seam_facets);
+        new_volume->mmu_segmentation_facets.assign(old_volume->mmu_segmentation_facets);
     std::swap(old_model_object->volumes[volume_idx], old_model_object->volumes.back());
     old_model_object->delete_volume(old_model_object->volumes.size() - 1);
     if (!sinking)
