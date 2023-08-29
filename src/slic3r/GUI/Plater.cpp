@@ -2779,7 +2779,9 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
 #endif /* AUTOPLACEMENT_ON_LOAD */
         }
 
-        for (size_t i = 0; i < object->instances.size(); ++i) {
+        for (size_t i = 0; i < object->instances.size() 
+             && !object->is_cut()       // don't apply scaled_down functionality to cut objects
+            ; ++i) {
             ModelInstance* instance = object->instances[i];
             const Vec3d size = object->instance_bounding_box(i).size();
             const Vec3d ratio = size.cwiseQuotient(bed_size);
