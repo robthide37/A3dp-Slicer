@@ -1151,10 +1151,12 @@ static wxMenu* generate_help_menu()
     append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("%s &Website"), SLIC3R_APP_NAME),
         wxString::Format(_L("Open the %s website in your browser"), SLIC3R_APP_NAME),
         [](wxCommandEvent&) { wxGetApp().open_web_page_localized("https://www.prusa3d.com/slicerweb"); });
-    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("Quick Start"), SLIC3R_APP_NAME),
+    // TRN Item from "Help" menu
+    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("&Quick Start"), SLIC3R_APP_NAME),
         wxString::Format(_L("Open the %s website in your browser"), SLIC3R_APP_NAME),
         [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://help.prusa3d.com/article/first-print-with-prusaslicer_1753", nullptr, false); });
-    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("Sample G-codes and Models"), SLIC3R_APP_NAME),
+    // TRN Item from "Help" menu
+    append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("Sample &G-codes and Models"), SLIC3R_APP_NAME),
         wxString::Format(_L("Open the %s website in your browser"), SLIC3R_APP_NAME),
         [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://help.prusa3d.com/article/sample-g-codes_529630", nullptr, false); });
     helpMenu->AppendSeparator();
