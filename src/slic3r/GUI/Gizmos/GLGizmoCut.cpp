@@ -3022,7 +3022,7 @@ void GLGizmoCut3D::toggle_model_objects_visibility()
 {
     bool has_active_volume = false;
     std::vector<std::shared_ptr<SceneRaycasterItem>>* raycasters = m_parent.get_raycasters_for_picking(SceneRaycaster::EType::Volume);
-    for (const auto raycaster : *raycasters)
+    for (const std::shared_ptr<SceneRaycasterItem> &raycaster : *raycasters)
         if (raycaster->is_active()) {
             has_active_volume = true;
             break;

@@ -1611,7 +1611,7 @@ void PrintObject::discover_vertical_shells()
                                                                  to_polygons(m_layers[idx_layer + 1]->lslices) :
                                                                  Polygons{};
                             object_volume = intersection(shrinked_bottom_slice, shrinked_upper_slice);
-                            internal_volume = closing(polygonsInternal, SCALED_EPSILON);
+                            internal_volume = closing(polygonsInternal, float(SCALED_EPSILON));
                         }
 
                         // The regularization operation may cause scattered tiny drops on the smooth parts of the model, filter them out
