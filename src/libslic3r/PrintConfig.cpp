@@ -3068,18 +3068,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
-    def = this->add("threads", coInt);
-    def->label = L("Threads");
-    def->tooltip = L("Threads are used to parallelize long-running tasks. Optimal threads number "
-                   "is slightly above the number of available cores/processors.");
-    def->readonly = true;
-    def->min = 1;
-    {
-        int threads = (unsigned int)boost::thread::hardware_concurrency();
-        def->set_default_value(new ConfigOptionInt(threads > 0 ? threads : 2));
-        def->cli = ConfigOptionDef::nocli;
-    }
-
     def = this->add("toolchange_gcode", coString);
     def->label = L("Tool change G-code");
     def->tooltip = L("This custom code is inserted before every toolchange. Placeholder variables for all PrusaSlicer settings "
