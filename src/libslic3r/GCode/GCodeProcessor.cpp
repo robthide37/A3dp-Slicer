@@ -2711,16 +2711,16 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
 
     // relative center
     Vec3f rel_center = Vec3f::Zero();
-#ifndef _NDEBUG
+#ifndef NDEBUG
     double radius = 0.0;
-#endif // _NDEBUG
+#endif // NDEBUG
     if (fitting == EFitting::R) {
         float r;
         if (!line.has_value('R', r) || r == 0.0f)
             return;
-#ifndef _NDEBUG
+#ifndef NDEBUG
         radius = (double)std::abs(r);
-#endif // _NDEBUG
+#endif // NDEBUG
         const Vec2f start_pos((float)m_start_position[X], (float)m_start_position[Y]);
         const Vec2f end_pos((float)end_position[X], (float)end_position[Y]);
         const Vec2f c = Geometry::ArcWelder::arc_center(start_pos, end_pos, r, !clockwise);

@@ -457,7 +457,7 @@ double clip_start(Path &path, const double len)
 double clip_end(Path &path, double distance)
 {
     while (distance > 0) {
-        Segment &last = path.back();
+        const Segment last = path.back();
         path.pop_back();
         if (path.empty())
             break;

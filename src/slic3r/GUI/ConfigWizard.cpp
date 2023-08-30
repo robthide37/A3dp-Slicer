@@ -2360,7 +2360,7 @@ void ConfigWizard::priv::load_pages()
             return a.first < b.first;
             });
 
-        for (const std::pair<std::wstring, std::string> v : sorted_vendors) {
+        for (const std::pair<std::wstring, std::string> &v : sorted_vendors) {
             const auto& pages = pages_3rdparty.find(v.second);
             if (pages == pages_3rdparty.end())
                 continue; // Should not happen
