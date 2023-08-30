@@ -558,7 +558,7 @@ bool GLGizmoCut3D::render_double_input(const std::string& label, double& value_i
 
 bool GLGizmoCut3D::render_slider_double_input(const std::string& label, float& value_in, float& tolerance_in, float min_val/* = -0.1f*/, float max_tolerance/* = -0.1f*/)
 {
-    constexpr const float UndefMinVal = -0.1f;
+    static constexpr const float UndefMinVal = -0.1f;
     const float f_mm_to_in = static_cast<float>(ObjectManipulation::mm_to_in);
 
     auto render_slider = [this, f_mm_to_in]
