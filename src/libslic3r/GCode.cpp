@@ -20,7 +20,10 @@
 #include "ClipperUtils.hpp"
 #include "libslic3r.h"
 #include "LocalesUtils.hpp"
-#include "libslic3r/format.hpp"
+#include "format.hpp"
+#if ENABLE_BINARIZED_GCODE
+#include "libslic3r_version.h"
+#endif // ENABLE_BINARIZED_GCODE
 
 #include <algorithm>
 #include <cstdlib>
@@ -556,6 +559,9 @@ void GCodeGenerator::do_export(Print* print, const char* path, GCodeProcessorRes
 
     m_processor.initialize(path_tmp);
     m_processor.set_print(print);
+#if ENABLE_BINARIZED_GCODE
+    m_processor.get_binary_data() = bgcode::binarize::BinaryData();
+#endif // ENABLE_BINARIZED_GCODE
     GCodeOutputStream file(boost::nowide::fopen(path_tmp.c_str(), "wb"), m_processor);
     if (! file.is_open())
         throw Slic3r::RuntimeError(std::string("G-code export to ") + path + " failed.\nCannot open the file for writing.\n");
@@ -688,68 +694,105 @@ namespace DoExport {
 	}
 
 	// Fill in print_statistics and return formatted string containing filament statistics to be inserted into G-code comment section.
+#if ENABLE_BINARIZED_GCODE
     static std::string update_print_stats_and_format_filament_stats(
         const bool                   has_wipe_tower,
-	    const WipeTowerData         &wipe_tower_data,
+        const WipeTowerData          &wipe_tower_data,
+        const FullPrintConfig        &config,
+        const std::vector<Extruder>  &extruders,
+        unsigned int                 initial_extruder_id,
+        PrintStatistics              &print_statistics,
+        bool                         export_binary_data,
+        bgcode::binarize::BinaryData &binary_data)
+#else
+    static std::string update_print_stats_and_format_filament_stats(
+        const bool                   has_wipe_tower,
+        const WipeTowerData         &wipe_tower_data,
         const FullPrintConfig       &config,
-	    const std::vector<Extruder> &extruders,
+	      const std::vector<Extruder> &extruders,
         unsigned int                 initial_extruder_id,
 		PrintStatistics 		    &print_statistics)
+#endif // ENABLE_BINARIZED_GCODE
     {
-		std::string filament_stats_string_out;
+        std::string filament_stats_string_out;
 
-	    print_statistics.clear();
+        print_statistics.clear();
         print_statistics.total_toolchanges = std::max(0, wipe_tower_data.number_of_toolchanges);
         print_statistics.initial_extruder_id = initial_extruder_id;
         std::vector<std::string> filament_types;
-	    if (! extruders.empty()) {
-	        std::pair<std::string, unsigned int> out_filament_used_mm ("; filament used [mm] = ", 0);
-	        std::pair<std::string, unsigned int> out_filament_used_cm3("; filament used [cm3] = ", 0);
-	        std::pair<std::string, unsigned int> out_filament_used_g  ("; filament used [g] = ", 0);
-	        std::pair<std::string, unsigned int> out_filament_cost    ("; filament cost = ", 0);
-	        for (const Extruder &extruder : extruders) {
+        if (! extruders.empty()) {
+#if ENABLE_BINARIZED_GCODE
+            std::pair<std::string, unsigned int> out_filament_used_mm(PrintStatistics::FilamentUsedMmMask + " ", 0);
+            std::pair<std::string, unsigned int> out_filament_used_cm3(PrintStatistics::FilamentUsedCm3Mask + " ", 0);
+            std::pair<std::string, unsigned int> out_filament_used_g(PrintStatistics::FilamentUsedGMask + " ", 0);
+            std::pair<std::string, unsigned int> out_filament_cost(PrintStatistics::FilamentCostMask + " ", 0);
+#else
+            std::pair<std::string, unsigned int> out_filament_used_mm("; filament used [mm] = ", 0);
+            std::pair<std::string, unsigned int> out_filament_used_cm3("; filament used [cm3] = ", 0);
+            std::pair<std::string, unsigned int> out_filament_used_g  ("; filament used [g] = ", 0);
+            std::pair<std::string, unsigned int> out_filament_cost("; filament cost = ", 0);
+#endif // ENABLE_BINARIZED_GCODE
+            for (const Extruder &extruder : extruders) {
                 print_statistics.printing_extruders.emplace_back(extruder.id());
                 filament_types.emplace_back(config.filament_type.get_at(extruder.id()));
 
-	            double used_filament   = extruder.used_filament() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] : 0.f);
-	            double extruded_volume = extruder.extruded_volume() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] * 2.4052f : 0.f); // assumes 1.75mm filament diameter
-	            double filament_weight = extruded_volume * extruder.filament_density() * 0.001;
-	            double filament_cost   = filament_weight * extruder.filament_cost()    * 0.001;
+                double used_filament   = extruder.used_filament() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] : 0.f);
+                double extruded_volume = extruder.extruded_volume() + (has_wipe_tower ? wipe_tower_data.used_filament[extruder.id()] * 2.4052f : 0.f); // assumes 1.75mm filament diameter
+                double filament_weight = extruded_volume * extruder.filament_density() * 0.001;
+                double filament_cost   = filament_weight * extruder.filament_cost()    * 0.001;
                 auto append = [&extruder](std::pair<std::string, unsigned int> &dst, const char *tmpl, double value) {
                     assert(is_decimal_separator_point());
-	                while (dst.second < extruder.id()) {
-	                    // Fill in the non-printing extruders with zeros.
-	                    dst.first += (dst.second > 0) ? ", 0" : "0";
-	                    ++ dst.second;
-	                }
-	                if (dst.second > 0)
-	                    dst.first += ", ";
-	                char buf[64];
-					sprintf(buf, tmpl, value);
-	                dst.first += buf;
-	                ++ dst.second;
-	            };
-	            append(out_filament_used_mm,  "%.2lf", used_filament);
-	            append(out_filament_used_cm3, "%.2lf", extruded_volume * 0.001);
-	            if (filament_weight > 0.) {
-	                print_statistics.total_weight = print_statistics.total_weight + filament_weight;
-	                append(out_filament_used_g, "%.2lf", filament_weight);
-	                if (filament_cost > 0.) {
-	                    print_statistics.total_cost = print_statistics.total_cost + filament_cost;
-	                    append(out_filament_cost, "%.2lf", filament_cost);
-	                }
-	            }
-	            print_statistics.total_used_filament += used_filament;
-	            print_statistics.total_extruded_volume += extruded_volume;
-	            print_statistics.total_wipe_tower_filament += has_wipe_tower ? used_filament - extruder.used_filament() : 0.;
-	            print_statistics.total_wipe_tower_cost += has_wipe_tower ? (extruded_volume - extruder.extruded_volume())* extruder.filament_density() * 0.001 * extruder.filament_cost() * 0.001 : 0.;
-	        }
-	        filament_stats_string_out += out_filament_used_mm.first;
-            filament_stats_string_out += "\n" + out_filament_used_cm3.first;
-            if (out_filament_used_g.second)
-                filament_stats_string_out += "\n" + out_filament_used_g.first;
-            if (out_filament_cost.second)
-                filament_stats_string_out += "\n" + out_filament_cost.first;
+                    while (dst.second < extruder.id()) {
+                        // Fill in the non-printing extruders with zeros.
+                        dst.first += (dst.second > 0) ? ", 0" : "0";
+                        ++ dst.second;
+                    }
+                    if (dst.second > 0)
+                        dst.first += ", ";
+                    char buf[64];
+                    sprintf(buf, tmpl, value);
+                    dst.first += buf;
+                    ++ dst.second;
+                };
+#if ENABLE_BINARIZED_GCODE
+                if (!export_binary_data) {
+#endif // ENABLE_BINARIZED_GCODE
+                    append(out_filament_used_mm,  "%.2lf", used_filament);
+                    append(out_filament_used_cm3, "%.2lf", extruded_volume * 0.001);
+#if ENABLE_BINARIZED_GCODE
+                }
+#endif // ENABLE_BINARIZED_GCODE
+                if (filament_weight > 0.) {
+                    print_statistics.total_weight = print_statistics.total_weight + filament_weight;
+#if ENABLE_BINARIZED_GCODE
+                    if (!export_binary_data)
+#endif // ENABLE_BINARIZED_GCODE
+                        append(out_filament_used_g, "%.2lf", filament_weight);
+                    if (filament_cost > 0.) {
+                        print_statistics.total_cost = print_statistics.total_cost + filament_cost;
+#if ENABLE_BINARIZED_GCODE
+                        if (!export_binary_data)
+#endif // ENABLE_BINARIZED_GCODE
+                            append(out_filament_cost, "%.2lf", filament_cost);
+                    }
+                }
+                print_statistics.total_used_filament += used_filament;
+                print_statistics.total_extruded_volume += extruded_volume;
+                print_statistics.total_wipe_tower_filament += has_wipe_tower ? used_filament - extruder.used_filament() : 0.;
+                print_statistics.total_wipe_tower_cost += has_wipe_tower ? (extruded_volume - extruder.extruded_volume())* extruder.filament_density() * 0.001 * extruder.filament_cost() * 0.001 : 0.;
+            }
+#if ENABLE_BINARIZED_GCODE
+            if (!export_binary_data) {
+#endif // ENABLE_BINARIZED_GCODE
+                filament_stats_string_out += out_filament_used_mm.first;
+                filament_stats_string_out += "\n" + out_filament_used_cm3.first;
+                if (out_filament_used_g.second)
+                    filament_stats_string_out += "\n" + out_filament_used_g.first;
+                if (out_filament_cost.second)
+                    filament_stats_string_out += "\n" + out_filament_cost.first;
+#if ENABLE_BINARIZED_GCODE
+            }
+#endif // ENABLE_BINARIZED_GCODE
             print_statistics.initial_filament_type = config.filament_type.get_at(initial_extruder_id);
             std::sort(filament_types.begin(), filament_types.end());
             print_statistics.printing_filament_types = filament_types.front();
@@ -830,6 +873,94 @@ static inline GCode::SmoothPathCache smooth_path_interpolate_global(const Print&
 
 void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
+#if ENABLE_BINARIZED_GCODE
+    const bool export_to_binary_gcode = print.full_print_config().option<ConfigOptionBool>("gcode_binary")->value;
+    // if exporting gcode in binary format: 
+    // we generate here the data to be passed to the post-processor, who is responsible to export them to file 
+    // 1) generate the thumbnails
+    // 2) collect the config data
+    if (export_to_binary_gcode) {
+        bgcode::binarize::BinaryData& binary_data = m_processor.get_binary_data();
+
+        // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
+        // If "thumbnails_format" is not defined, export to PNG.
+        if (std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails = GCodeThumbnails::make_thumbnail_list(print.full_print_config());
+            ! thumbnails.empty())
+            GCodeThumbnails::generate_binary_thumbnails(
+                thumbnail_cb, binary_data.thumbnails, thumbnails,
+                [&print]() { print.throw_if_canceled(); });
+
+        // file data
+        binary_data.file_metadata.raw_data.emplace_back("Producer", std::string(SLIC3R_APP_NAME) + " " + std::string(SLIC3R_VERSION));
+
+        // config data
+        encode_full_config(print, binary_data.slicer_metadata.raw_data);
+
+        // printer data
+        binary_data.printer_metadata.raw_data.emplace_back("printer_model", print.config().printer_model.value); // duplicated into config data
+        std::string filament_types_str;
+        for (size_t i = 0; i < print.config().filament_type.values.size(); ++i) {
+            filament_types_str += print.config().filament_type.values[i];
+            if (i < print.config().filament_type.values.size() - 1)
+                filament_types_str += ";";
+        }
+        binary_data.printer_metadata.raw_data.emplace_back("filament_type", filament_types_str); // duplicated into config data
+        char buf[1024];
+        std::string nozzle_diameters_str;
+        for (size_t i = 0; i < print.config().nozzle_diameter.values.size(); ++i) {
+            sprintf(buf, i < print.config().nozzle_diameter.values.size() - 1 ? "%.2g," : "%.2g", print.config().nozzle_diameter.values[i]);
+            nozzle_diameters_str += buf;
+        }
+        binary_data.printer_metadata.raw_data.emplace_back("nozzle_diameter", nozzle_diameters_str); // duplicated into config data
+        std::string bed_temperatures_str;
+        for (size_t i = 0; i < print.config().bed_temperature.values.size(); ++i) {
+            sprintf(buf, i < print.config().bed_temperature.values.size() - 1 ? "%d," : "%d", print.config().bed_temperature.values[i]);
+            bed_temperatures_str += buf;
+        }
+        binary_data.printer_metadata.raw_data.emplace_back("bed_temperature", bed_temperatures_str); // duplicated into config data
+
+        const DynamicPrintConfig& cfg = print.full_print_config();
+        if (auto opt = cfg.option("brim_width"); opt != nullptr) {
+            sprintf(buf, "%.2g", dynamic_cast<const ConfigOptionFloat*>(opt)->value);
+            binary_data.printer_metadata.raw_data.emplace_back("brim_width", buf); // duplicated into config data
+        }
+        if (auto opt = cfg.option("fill_density"); opt != nullptr) {
+            sprintf(buf, "%.2g%%", dynamic_cast<const ConfigOptionPercent*>(opt)->value);
+            binary_data.printer_metadata.raw_data.emplace_back("fill_density", buf); // duplicated into config data
+        }
+        if (auto opt = cfg.option("layer_height"); opt != nullptr) {
+            sprintf(buf, "%.2g", dynamic_cast<const ConfigOptionFloat*>(opt)->value);
+            binary_data.printer_metadata.raw_data.emplace_back("layer_height", buf); // duplicated into config data
+        }
+        if (auto opt = cfg.option("temperature"); opt != nullptr) {
+            auto values = dynamic_cast<const ConfigOptionInts*>(opt)->values;
+            std::string temperatures_str;
+            for (size_t i = 0; i < values.size(); ++i) {
+                sprintf(buf, i < values.size() - 1 ? "%d," : "%d", values[i]);
+                temperatures_str += buf;
+            }
+            binary_data.printer_metadata.raw_data.emplace_back("temperature", temperatures_str); // duplicated into config data
+        }
+        if (auto opt = cfg.option("ironing"); opt != nullptr)
+            binary_data.printer_metadata.raw_data.emplace_back("ironing", dynamic_cast<const ConfigOptionBool*>(opt)->value ? "1" : "0"); // duplicated into config data
+        if (auto opt = cfg.option("support_material"); opt != nullptr)
+            binary_data.printer_metadata.raw_data.emplace_back("support_material", dynamic_cast<const ConfigOptionBool*>(opt)->value ? "1" : "0"); // duplicated into config data
+        if (auto opt = cfg.option("extruder_colour"); opt != nullptr) {
+            auto values = dynamic_cast<const ConfigOptionStrings*>(opt)->values;
+            std::string extruder_colours_str;
+            if (values.size() == 1 && values.front().empty())
+                extruder_colours_str = "\"\"";
+            else {
+                for (size_t i = 0; i < values.size(); ++i) {
+                    sprintf(buf, i < values.size() - 1 ? "%s;" : "%s", values[i].c_str());
+                    extruder_colours_str += buf;
+                }
+            }
+            binary_data.printer_metadata.raw_data.emplace_back("extruder_colour", extruder_colours_str); // duplicated into config data
+        }
+    }
+#endif // ENABLE_BINARIZED_GCODE
+    
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
 
@@ -883,42 +1014,24 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         this->m_avoid_crossing_curled_overhangs.init_bed_shape(get_bed_shape(print.config()));
     }
 
-    // Write information on the generator.
-    file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
+#if ENABLE_BINARIZED_GCODE
+    if (!export_to_binary_gcode)
+#endif // ENABLE_BINARIZED_GCODE
+        // Write information on the generator.
+        file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
 
-    // ??? Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
-    // ??? If "thumbnails_format" is not defined, export to PNG.
-
-    // generate thumbnails data to process it
-
-    std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails_list;
-    if (const auto thumbnails_value = print.full_print_config().option<ConfigOptionString>("thumbnails")) {
-        std::string str = thumbnails_value->value;
-        std::istringstream is(str);
-        std::string point_str;
-        while (std::getline(is, point_str, ',')) {
-            Vec2d point(Vec2d::Zero());
-            GCodeThumbnailsFormat format;
-            std::istringstream iss(point_str);
-            std::string coord_str;
-            if (std::getline(iss, coord_str, 'x')) {
-                std::istringstream(coord_str) >> point(0);
-                if (std::getline(iss, coord_str, '/')) {
-                    std::istringstream(coord_str) >> point(1);
-                    std::string ext_str;
-                    if (std::getline(iss, ext_str, '/'))
-                        format = ext_str == "JPG" ? GCodeThumbnailsFormat::JPG :
-                                 ext_str == "QOI" ? GCodeThumbnailsFormat::QOI :GCodeThumbnailsFormat::PNG;
-                }
-            }
-            thumbnails_list.emplace_back(std::make_pair(format, point));
-        }
+#if ENABLE_BINARIZED_GCODE
+    // if exporting gcode in ascii format, generate the thumbnails here
+    if (! export_to_binary_gcode) {
+#endif // ENABLE_BINARIZED_GCODE
+        if (std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails = GCodeThumbnails::make_thumbnail_list(print.full_print_config());
+            ! thumbnails.empty())
+            GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, thumbnails,
+                [&file](const char* sz) { file.write(sz); },
+                [&print]() { print.throw_if_canceled(); });
+#if ENABLE_BINARIZED_GCODE
     }
-
-    if (!thumbnails_list.empty())
-        GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, thumbnails_list,
-            [&file](const char* sz) { file.write(sz); },
-            [&print]() { print.throw_if_canceled(); });
+#endif // ENABLE_BINARIZED_GCODE
 
     // Write notes (content of the Print Settings tab -> Notes)
     {
@@ -940,20 +1053,26 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     const double       layer_height         = first_object->config().layer_height.value;
     assert(! print.config().first_layer_height.percent);
     const double       first_layer_height   = print.config().first_layer_height.value;
-    for (size_t region_id = 0; region_id < print.num_print_regions(); ++ region_id) {
-        const PrintRegion &region = print.get_print_region(region_id);
-        file.write_format("; external perimeters extrusion width = %.2fmm\n", region.flow(*first_object, frExternalPerimeter, layer_height).width());
-        file.write_format("; perimeters extrusion width = %.2fmm\n",          region.flow(*first_object, frPerimeter,         layer_height).width());
-        file.write_format("; infill extrusion width = %.2fmm\n",              region.flow(*first_object, frInfill,            layer_height).width());
-        file.write_format("; solid infill extrusion width = %.2fmm\n",        region.flow(*first_object, frSolidInfill,       layer_height).width());
-        file.write_format("; top infill extrusion width = %.2fmm\n",          region.flow(*first_object, frTopSolidInfill,    layer_height).width());
-        if (print.has_support_material())
-            file.write_format("; support material extrusion width = %.2fmm\n", support_material_flow(first_object).width());
-        if (print.config().first_layer_extrusion_width.value > 0)
-            file.write_format("; first layer extrusion width = %.2fmm\n",   region.flow(*first_object, frPerimeter, first_layer_height, true).width());
-        file.write_format("\n");
+#if ENABLE_BINARIZED_GCODE
+    if (!export_to_binary_gcode) {
+#endif // ENABLE_BINARIZED_GCODE
+        for (size_t region_id = 0; region_id < print.num_print_regions(); ++ region_id) {
+            const PrintRegion &region = print.get_print_region(region_id);
+            file.write_format("; external perimeters extrusion width = %.2fmm\n", region.flow(*first_object, frExternalPerimeter, layer_height).width());
+            file.write_format("; perimeters extrusion width = %.2fmm\n",          region.flow(*first_object, frPerimeter,         layer_height).width());
+            file.write_format("; infill extrusion width = %.2fmm\n",              region.flow(*first_object, frInfill,            layer_height).width());
+            file.write_format("; solid infill extrusion width = %.2fmm\n",        region.flow(*first_object, frSolidInfill,       layer_height).width());
+            file.write_format("; top infill extrusion width = %.2fmm\n",          region.flow(*first_object, frTopSolidInfill,    layer_height).width());
+            if (print.has_support_material())
+                file.write_format("; support material extrusion width = %.2fmm\n", support_material_flow(first_object).width());
+            if (print.config().first_layer_extrusion_width.value > 0)
+                file.write_format("; first layer extrusion width = %.2fmm\n",   region.flow(*first_object, frPerimeter, first_layer_height, true).width());
+            file.write_format("\n");
+        }
+        print.throw_if_canceled();
+#if ENABLE_BINARIZED_GCODE
     }
-    print.throw_if_canceled();
+#endif // ENABLE_BINARIZED_GCODE
 
     // adds tags for time estimators
     if (print.config().remaining_times.value)
@@ -1267,31 +1386,72 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     print.throw_if_canceled();
 
     // Get filament stats.
-    file.write(DoExport::update_print_stats_and_format_filament_stats(
-    	// Const inputs
+#if ENABLE_BINARIZED_GCODE
+    const std::string filament_stats_string_out = DoExport::update_print_stats_and_format_filament_stats(
+        // Const inputs
         has_wipe_tower, print.wipe_tower_data(),
         this->config(),
         m_writer.extruders(),
         initial_extruder_id,
         // Modifies
-        print.m_print_statistics));
-    file.write("\n");
-    file.write_format("; total filament used [g] = %.2lf\n", print.m_print_statistics.total_weight);
-    file.write_format("; total filament cost = %.2lf\n", print.m_print_statistics.total_cost);
-    if (print.m_print_statistics.total_toolchanges > 0)
-    	file.write_format("; total toolchanges = %i\n", print.m_print_statistics.total_toolchanges);
-    file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Estimated_Printing_Time_Placeholder).c_str());
+        print.m_print_statistics,
+        export_to_binary_gcode,
+        m_processor.get_binary_data()
+    );
 
-    // Append full config, delimited by two 'phony' configuration keys prusaslicer_config = begin and prusaslicer_config = end.
-    // The delimiters are structured as configuration key / value pairs to be parsable by older versions of PrusaSlicer G-code viewer.
-    {
-        file.write("\n; prusaslicer_config = begin\n");
-        std::string full_config;
-        append_full_config(print, full_config);
-        if (!full_config.empty())
-            file.write(full_config);
-        file.write("; prusaslicer_config = end\n");
+    if (!export_to_binary_gcode)
+        file.write(filament_stats_string_out);
+
+    if (export_to_binary_gcode) {
+        bgcode::binarize::BinaryData& binary_data = m_processor.get_binary_data();
+        if (print.m_print_statistics.total_toolchanges > 0)
+            binary_data.print_metadata.raw_data.emplace_back("total toolchanges", std::to_string(print.m_print_statistics.total_toolchanges));
+        char buf[1024];
+        sprintf(buf, "%.2lf", m_max_layer_z);
+        binary_data.printer_metadata.raw_data.emplace_back("max_layer_z", buf);
     }
+    else {
+#else
+        file.write(DoExport::update_print_stats_and_format_filament_stats(
+    	      // Const inputs
+            has_wipe_tower, print.wipe_tower_data(),
+            this->config(),
+            m_writer.extruders(),
+            initial_extruder_id,
+            // Modifies
+            print.m_print_statistics));
+#endif // ENABLE_BINARIZED_GCODE
+#if ENABLE_BINARIZED_GCODE
+        // if exporting gcode in ascii format, statistics export is done here
+#endif // ENABLE_BINARIZED_GCODE
+        file.write("\n");
+#if ENABLE_BINARIZED_GCODE
+        file.write_format(PrintStatistics::TotalFilamentUsedGValueMask.c_str(), print.m_print_statistics.total_weight);
+        file.write_format(PrintStatistics::TotalFilamentCostValueMask.c_str(), print.m_print_statistics.total_cost);
+#else
+        file.write_format("; total filament used [g] = %.2lf\n", print.m_print_statistics.total_weight);
+        file.write_format("; total filament cost = %.2lf\n", print.m_print_statistics.total_cost);
+#endif // ENABLE_BINARIZED_GCODE
+        if (print.m_print_statistics.total_toolchanges > 0)
+            file.write_format("; total toolchanges = %i\n", print.m_print_statistics.total_toolchanges);
+        file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Estimated_Printing_Time_Placeholder).c_str());
+
+#if ENABLE_BINARIZED_GCODE
+        // if exporting gcode in ascii format, config export is done here
+#endif // ENABLE_BINARIZED_GCODE
+        // Append full config, delimited by two 'phony' configuration keys prusaslicer_config = begin and prusaslicer_config = end.
+        // The delimiters are structured as configuration key / value pairs to be parsable by older versions of PrusaSlicer G-code viewer.
+        {
+            file.write("\n; prusaslicer_config = begin\n");
+            std::string full_config;
+            append_full_config(print, full_config);
+            if (!full_config.empty())
+                file.write(full_config);
+            file.write("; prusaslicer_config = end\n");
+        }
+#if ENABLE_BINARIZED_GCODE
+    }
+#endif // ENABLE_BINARIZED_GCODE
     print.throw_if_canceled();
 }
 
@@ -2400,6 +2560,13 @@ void GCodeGenerator::apply_print_config(const PrintConfig &print_config)
 
 void GCodeGenerator::append_full_config(const Print &print, std::string &str)
 {
+#if ENABLE_BINARIZED_GCODE
+    std::vector<std::pair<std::string, std::string>> config;
+    encode_full_config(print, config);
+    for (const auto& [key, value] : config) {
+        str += "; " + key + " = " + value + "\n";
+    }
+#else
     const DynamicPrintConfig &cfg = print.full_print_config();
     // Sorted list of config keys, which shall not be stored into the G-code. Initializer list.
     static constexpr auto banned_keys = {
@@ -2417,7 +2584,34 @@ void GCodeGenerator::append_full_config(const Print &print, std::string &str)
     for (const std::string &key : cfg.keys())
         if (! is_banned(key) && ! cfg.option(key)->is_nil())
             str += "; " + key + " = " + cfg.opt_serialize(key) + "\n";
+#endif // ENABLE_BINARIZED_GCODE
 }
+
+#if ENABLE_BINARIZED_GCODE
+void GCodeGenerator::encode_full_config(const Print& print, std::vector<std::pair<std::string, std::string>>& config)
+{
+    const DynamicPrintConfig& cfg = print.full_print_config();
+    // Sorted list of config keys, which shall not be stored into the G-code. Initializer list.
+    static constexpr auto banned_keys = {
+        "compatible_printers"sv,
+        "compatible_prints"sv,
+        //FIXME The print host keys should not be exported to full_print_config anymore. The following keys may likely be removed.
+        "print_host"sv,
+        "printhost_apikey"sv,
+        "printhost_cafile"sv
+    };
+    assert(std::is_sorted(banned_keys.begin(), banned_keys.end()));
+    auto is_banned = [](const std::string& key) {
+        return std::binary_search(banned_keys.begin(), banned_keys.end(), key);
+    };
+    config.reserve(config.size() + cfg.keys().size());
+    for (const std::string& key : cfg.keys()) {
+        if (!is_banned(key) && !cfg.option(key)->is_nil())
+            config.emplace_back(key, cfg.opt_serialize(key));
+    }
+    config.shrink_to_fit();
+}
+#endif // ENABLE_BINARIZED_GCODE
 
 void GCodeGenerator::set_extruders(const std::vector<unsigned int> &extruder_ids)
 {

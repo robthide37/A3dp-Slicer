@@ -116,4 +116,38 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail(const ThumbnailData &d
     }
 }
 
+std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> make_thumbnail_list(const DynamicPrintConfig &config)
+{
+    // ??? Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
+    // ??? If "thumbnails_format" is not defined, export to PNG.
+
+    // generate thumbnails data to process it
+
+    std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails_list;
+    if (const auto thumbnails_value = config.option<ConfigOptionString>("thumbnails")) {
+        std::string str = thumbnails_value->value;
+        std::istringstream is(str);
+        std::string point_str;
+        while (std::getline(is, point_str, ',')) {
+            Vec2d point(Vec2d::Zero());
+            GCodeThumbnailsFormat format;
+            std::istringstream iss(point_str);
+            std::string coord_str;
+            if (std::getline(iss, coord_str, 'x')) {
+                std::istringstream(coord_str) >> point(0);
+                if (std::getline(iss, coord_str, '/')) {
+                    std::istringstream(coord_str) >> point(1);
+                    std::string ext_str;
+                    if (std::getline(iss, ext_str, '/'))
+                        format = ext_str == "JPG" ? GCodeThumbnailsFormat::JPG :
+                                 ext_str == "QOI" ? GCodeThumbnailsFormat::QOI :GCodeThumbnailsFormat::PNG;
+                }
+            }
+            thumbnails_list.emplace_back(std::make_pair(format, point));
+        }
+    }
+
+    return thumbnails_list;
+}
+
 } // namespace Slic3r::GCodeThumbnails

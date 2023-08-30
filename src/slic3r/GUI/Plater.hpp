@@ -172,6 +172,10 @@ public:
     void load_gcode();
     void load_gcode(const wxString& filename);
     void reload_gcode_from_disk();
+#if ENABLE_BINARIZED_GCODE
+    void convert_gcode_to_ascii();
+    void convert_gcode_to_binary();
+#endif // ENABLE_BINARIZED_GCODE
     void refresh_print();
 
     std::vector<size_t> load_files(const std::vector<boost::filesystem::path>& input_files, bool load_model = true, bool load_config = true, bool imperial_units = false);

@@ -785,7 +785,8 @@ bool ImGuiWrapper::combo(const wxString& label, const std::vector<std::string>& 
 bool ImGuiWrapper::combo(const std::string& label, const std::vector<std::string>& options, int& selection, ImGuiComboFlags flags/* = 0*/, float label_width/* = 0.0f*/, float item_width/* = 0.0f*/)
 {
     // this is to force the label to the left of the widget:
-    if (!label.empty()) {
+    const bool hidden_label = boost::starts_with(label, "##");
+    if (!label.empty() && !hidden_label) {
         text(label);
         ImGui::SameLine(label_width);
     }
@@ -795,7 +796,7 @@ bool ImGuiWrapper::combo(const std::string& label, const std::vector<std::string
     bool res = false;
 
     const char *selection_str = selection < int(options.size()) && selection >= 0 ? options[selection].c_str() : "";
-    if (ImGui::BeginCombo(("##" + label).c_str(), selection_str, flags)) {
+    if (ImGui::BeginCombo(hidden_label ? label.c_str() : ("##" + label).c_str(), selection_str, flags)) {
         for (int i = 0; i < (int)options.size(); i++) {
             if (ImGui::Selectable(options[i].c_str(), i == selection)) {
                 selection_out = i;

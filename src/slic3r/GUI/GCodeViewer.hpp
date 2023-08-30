@@ -6,7 +6,9 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GLModel.hpp"
 
+#if !ENABLE_BINARIZED_GCODE
 #include <boost/iostreams/device/mapped_file.hpp>
+#endif // !ENABLE_BINARIZED_GCODE
 
 #include <cstdint>
 #include <float.h>
@@ -673,6 +675,54 @@ public:
             void render();
         };
 
+#if ENABLE_BINARIZED_GCODE
+        class GCodeWindow
+        {
+            struct Line
+            {
+                std::string command;
+                std::string parameters;
+                std::string comment;
+            };
+
+            struct Range
+            {
+                std::optional<size_t> min;
+                std::optional<size_t> max;
+                bool empty() const {
+                    return !min.has_value() || !max.has_value();
+                }
+                bool contains(const Range& other) const {
+                    return !this->empty() && !other.empty() && *this->min <= *other.min && *this->max >= other.max;
+                }
+                size_t size() const {
+                    return empty() ? 0 : *this->max - *this->min + 1;
+                }
+            };
+
+            bool m_visible{ true };
+            std::string m_filename;
+            bool m_is_binary_file{ false };
+            // map for accessing data in file by line number
+            std::vector<std::vector<size_t>> m_lines_ends;
+            std::vector<Line> m_lines_cache;
+            Range m_cache_range;
+            size_t m_max_line_length{ 0 };
+
+        public:
+            void load_gcode(const GCodeProcessorResult& gcode_result);
+            void reset() {
+                m_lines_ends.clear();
+                m_lines_cache.clear();
+                m_filename.clear();
+            }
+            void toggle_visibility() { m_visible = !m_visible; }
+            void render(float top, float bottom, size_t curr_line_id);
+
+        private:
+            void add_gcode_line_to_lines_cache(const std::string& src);
+        };
+#else
         class GCodeWindow
         {
             struct Line
@@ -692,7 +742,7 @@ public:
             std::vector<Line> m_lines;
 
         public:
-            GCodeWindow() = default;
+          GCodeWindow() = default;
             ~GCodeWindow() { stop_mapping_file(); }
             void load_gcode(const std::string& filename, const std::vector<size_t>& lines_ends);
             void reset() {
@@ -708,6 +758,7 @@ public:
 
             void stop_mapping_file();
         };
+#endif // ENABLE_BINARIZED_GCODE
 
         struct Endpoints
         {

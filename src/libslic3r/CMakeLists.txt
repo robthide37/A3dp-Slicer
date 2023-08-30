@@ -14,6 +14,11 @@ if (TARGET OpenVDB::openvdb)
     set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp OpenVDBUtilsLegacy.hpp)
 endif()
 
+find_package(LibBGCode REQUIRED COMPONENTS Convert)
+slic3r_remap_configs(LibBGCode::bgcode_core RelWithDebInfo Release)
+slic3r_remap_configs(LibBGCode::bgcode_binarize RelWithDebInfo Release)
+slic3r_remap_configs(LibBGCode::bgcode_convert RelWithDebInfo Release)
+
 set(SLIC3R_SOURCES
     pchheader.cpp
     pchheader.hpp
@@ -571,6 +576,7 @@ target_link_libraries(libslic3r
     ZLIB::ZLIB
 	JPEG::JPEG
     qoi
+    LibBGCode::bgcode_convert
     )
 
 if (APPLE)

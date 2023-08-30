@@ -36,6 +36,10 @@
 #include <wx/popupwin.h>
 #endif
 
+#if ENABLE_BINARIZED_GCODE
+#include <LibBGCode/convert/convert.hpp>
+#endif // ENABLE_BINARIZED_GCODE
+
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Format/STL.hpp"
 #include "libslic3r/Format/AMF.hpp"
@@ -5439,6 +5443,101 @@ void Plater::reload_gcode_from_disk()
     m_last_loaded_gcode.clear();
     load_gcode(filename);
 }
+
+#if ENABLE_BINARIZED_GCODE
+void Plater::convert_gcode_to_ascii()
+{
+    // Ask user for a gcode file name.
+    wxString input_file;
+    wxGetApp().load_gcode(this, input_file);
+    if (input_file.empty())
+        return;
+
+    // Open source file
+    FilePtr in_file{ boost::nowide::fopen(into_u8(input_file).c_str(), "rb") };
+    if (in_file.f == nullptr) {
+        MessageDialog msg_dlg(this, _L("Unable to open the selected file."), _L("Error"), wxICON_ERROR | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    // Set out filename
+    boost::filesystem::path path(into_u8(input_file));
+    const std::string output_file = path.parent_path().string() + "/" + path.stem().string() + "_ascii" + path.extension().string();
+
+    // Open destination file
+    FilePtr out_file{ boost::nowide::fopen(output_file.c_str(), "wb") };
+    if (out_file.f == nullptr) {
+        MessageDialog msg_dlg(this, _L("Unable to open output file."), _L("Error"), wxICON_ERROR | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    // Perform conversion
+    {
+        wxBusyCursor busy;
+        using namespace bgcode::core;
+        EResult res = bgcode::convert::from_binary_to_ascii(*in_file.f, *out_file.f, true);
+        if (res != EResult::Success) {
+            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+            msg_dlg.ShowModal();
+            out_file.close();
+            boost::nowide::remove(output_file.c_str());
+            return;
+        }
+    }
+
+    MessageDialog msg_dlg(this, _L("Succesfully created gcode ascii file:\n") + output_file, _L("Convert gcode file to ascii format"), wxICON_ERROR | wxOK);
+    msg_dlg.ShowModal();
+}
+
+void Plater::convert_gcode_to_binary()
+{
+    // Ask user for a gcode file name.
+    wxString input_file;
+    wxGetApp().load_gcode(this, input_file);
+    if (input_file.empty())
+        return;
+
+    // Open source file
+    FilePtr in_file{ boost::nowide::fopen(into_u8(input_file).c_str(), "rb") };
+    if (in_file.f == nullptr) {
+        MessageDialog msg_dlg(this, _L("Unable to open the selected file."), _L("Error"), wxICON_ERROR | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    // Set out filename
+    boost::filesystem::path path(into_u8(input_file));
+    const std::string output_file = path.parent_path().string() + "/" + path.stem().string() + "_binary" + path.extension().string();
+
+    // Open destination file
+    FilePtr out_file{ boost::nowide::fopen(output_file.c_str(), "wb") };
+    if (out_file.f == nullptr) {
+        MessageDialog msg_dlg(this, _L("Unable to open output file."), _L("Error"), wxICON_ERROR | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    // Perform conversion
+    {
+        wxBusyCursor busy;
+        using namespace bgcode::core;
+        const bgcode::binarize::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
+        EResult res = bgcode::convert::from_ascii_to_binary(*in_file.f, *out_file.f, binarizer_config);
+        if (res != EResult::Success) {
+            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+            msg_dlg.ShowModal();
+            out_file.close();
+            boost::nowide::remove(output_file.c_str());
+            return;
+        }
+    }
+
+    MessageDialog msg_dlg(this, _L("Succesfully created gcode binary file:\n") + output_file, _L("Convert gcode file to binary format"), wxICON_ERROR | wxOK);
+    msg_dlg.ShowModal();
+}
+#endif // ENABLE_BINARIZED_GCODE
 
 void Plater::refresh_print()
 {
