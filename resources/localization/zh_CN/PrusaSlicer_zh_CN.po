@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-08-22 17:26+0200\n"
+"POT-Creation-Date: 2023-08-30 15:32+0200\n"
 "PO-Revision-Date: 2023-05-30 18:31+0800\n"
 "Last-Translator: Ptsa <ptsa1987@gmail.com>\n"
 "Language-Team: ptsa1987@gmail.com\n"
@@ -807,7 +807,7 @@ msgstr ""
 #: src/slic3r/GUI/GCodeViewer.cpp:3536 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:244
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:553
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:573
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2385
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2351
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1222
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1988
 #: src/slic3r/GUI/GUI_ObjectLayers.cpp:145
@@ -1143,7 +1143,7 @@ msgstr ""
 #: src/libslic3r/PrintConfig.cpp:3235 src/libslic3r/PrintConfig.cpp:3361
 #: src/libslic3r/PrintConfig.cpp:3599 src/libslic3r/PrintConfig.cpp:4088
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:272
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2583
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2549
 msgid "°"
 msgstr "°"
 
@@ -3440,7 +3440,7 @@ msgstr "最近的"
 msgid "Aligned"
 msgstr "对齐"
 
-#: src/libslic3r/PrintConfig.cpp:2343 src/slic3r/GUI/MainFrame.cpp:1209
+#: src/libslic3r/PrintConfig.cpp:2343 src/slic3r/GUI/MainFrame.cpp:1219
 msgid "Rear"
 msgstr "后面"
 
@@ -5477,7 +5477,7 @@ msgid "Export the model(s) as STL."
 msgstr "将模型导出为 STL。"
 
 #: src/libslic3r/PrintConfig.cpp:4749 src/slic3r/GUI/KBShortcutsDialog.cpp:96
-#: src/slic3r/GUI/Plater.cpp:954 src/slic3r/GUI/Plater.cpp:7379
+#: src/slic3r/GUI/Plater.cpp:954 src/slic3r/GUI/Plater.cpp:7386
 msgid "Export G-code"
 msgstr "导出 G-Code"
 
@@ -5634,7 +5634,7 @@ msgid ""
 msgstr ""
 "将提供的模型排列在一个板中，并将它们合并到单个模型中，以便执行一次操作。"
 
-#: src/libslic3r/PrintConfig.cpp:4868 src/slic3r/GUI/MainFrame.cpp:1845
+#: src/libslic3r/PrintConfig.cpp:4868 src/slic3r/GUI/MainFrame.cpp:1855
 msgid "Repair"
 msgstr "修复"
 
@@ -6153,7 +6153,7 @@ msgstr ""
 
 #: src/slic3r/GUI/ArrangeSettingsDialogImgui.cpp:130
 #: src/slic3r/GUI/GLCanvas3D.cpp:5214 src/slic3r/GUI/KBShortcutsDialog.cpp:141
-#: src/slic3r/GUI/Plater.cpp:7306
+#: src/slic3r/GUI/Plater.cpp:7313
 msgid "Arrange"
 msgstr "整理"
 
@@ -6333,7 +6333,7 @@ msgid "Load shape from STL..."
 msgstr "从 STL 文件加载形状..."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:252 src/slic3r/GUI/GCodeViewer.cpp:3984
-#: src/slic3r/GUI/MainFrame.cpp:2241
+#: src/slic3r/GUI/MainFrame.cpp:2251
 msgid "Settings"
 msgstr "设置"
 
@@ -6921,7 +6921,7 @@ msgid "Chosen directory for downloads does not exist."
 msgstr "选择的下载目录不存在。"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1619 src/slic3r/GUI/GUI_Factories.cpp:818
-#: src/slic3r/GUI/Plater.cpp:3757
+#: src/slic3r/GUI/Plater.cpp:3764
 msgid "Reload from disk"
 msgstr "从磁盘重新加载"
 
@@ -7027,7 +7027,7 @@ msgstr "设置打印机热床的形状。"
 
 #. TRN ConfigWizard : Size of possible print, related on printer size
 #: src/slic3r/GUI/ConfigWizard.cpp:1838
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2393
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2359
 msgid "Build Volume"
 msgstr "生成卷"
 
@@ -7211,7 +7211,7 @@ msgstr "完成(&F)"
 #: src/slic3r/GUI/FileArchiveDialog.cpp:277
 #: src/slic3r/GUI/FileArchiveDialog.cpp:286
 #: src/slic3r/GUI/FirmwareDialog.cpp:153
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2376
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2342
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2396
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2485
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:66
@@ -7323,7 +7323,7 @@ msgstr "执行"
 
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:653
 #: src/slic3r/GUI/GLCanvas3D.cpp:5395 src/slic3r/GUI/KBShortcutsDialog.cpp:106
-#: src/slic3r/GUI/MainFrame.cpp:1426
+#: src/slic3r/GUI/MainFrame.cpp:1436
 msgid "Undo"
 msgstr "撤销"
 
@@ -7966,7 +7966,7 @@ msgstr "确认"
 msgid "Cancelling..."
 msgstr "正在取消..."
 
-#: src/slic3r/GUI/GalleryDialog.cpp:69 src/slic3r/GUI/MainFrame.cpp:1488
+#: src/slic3r/GUI/GalleryDialog.cpp:69 src/slic3r/GUI/MainFrame.cpp:1498
 msgid "Shape Gallery"
 msgstr "形状画廊"
 
@@ -8055,7 +8055,7 @@ msgstr "生成索引缓冲区"
 #: src/slic3r/GUI/GCodeViewer.cpp:3337 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:244
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:553
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:573
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2385
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2351
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1222
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1988
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:345
@@ -8367,14 +8367,14 @@ msgid "Groove Angle"
 msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:247
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2705
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2702
 #: src/slic3r/GUI/GUI_ObjectList.cpp:4137
 #: src/slic3r/GUI/GUI_ObjectList.cpp:4329
 msgid "Part"
 msgstr "部件"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:247
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2705
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2702
 msgid "Object"
 msgstr "对象"
 
@@ -8426,7 +8426,7 @@ msgid "Left click"
 msgstr "左鍵單擊"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1175
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3507
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3504
 msgid "Add connector"
 msgstr "添加连接器"
 
@@ -8471,149 +8471,150 @@ msgstr "旋转剖切面"
 msgid "Remove connectors"
 msgstr "移除连接器"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2334
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2329
 msgid "Bulge"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2341
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2329
 msgid "Bulge proportion related to radius"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2348
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2330
 #, fuzzy
 msgid "Space"
 msgstr "空格"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2355
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2330
 msgid "Space proportion related to radius"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2369
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2335
 msgid "Confirm connectors"
 msgstr "确认连接器"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2438
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2497
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2404
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2463
 msgid "Flip cut plane"
 msgstr "翻转剖切面"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2539
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2589
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2505
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2555
 msgid "Groove change"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2551
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2600 src/slic3r/GUI/GLCanvas3D.cpp:259
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2517
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2566
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2604 src/slic3r/GUI/GLCanvas3D.cpp:259
 msgid "Reset"
 msgstr "重置"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2629
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2626
 msgid "Hold SHIFT key to draw a cut line"
 msgstr "按住SHIFT键绘制剪切线"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2642
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2639
 msgid "Cut position"
 msgstr "切割位置"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2649
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2646
 msgid "Reset cutting plane"
 msgstr "重置切割平面"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2662
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2659
 msgid "Edit connectors"
 msgstr "编辑连接器"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2662
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2659
 msgid "Add connectors"
 msgstr "添加连接器"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2669
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2666
 msgid "Reset cut"
 msgstr "重置切割"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2670
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2667
 msgid "Reset cutting plane and remove connectors"
 msgstr "重置切割平面并移除连接器"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2735
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2732
 msgid "Cut result"
 msgstr "切割结果"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2755
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2752
 msgid "Cut into"
 msgstr "切入"
 
 #. TRN CutGizmo: RadioButton Cut into ...
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2762
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2759
 msgid "Objects"
 msgstr "物体"
 
 #. TRN CutGizmo: RadioButton Cut into ...
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2766
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2763
 msgid "Parts"
 msgstr "部分"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2780
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2777
 msgid "Perform cut"
 msgstr "执行切割"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2876
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2873
 msgid "Invalid connectors detected"
 msgstr "检测到无效连接器"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2878
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2875
 #, c-format, boost-format
 msgid "%1$d connector is out of cut contour"
 msgid_plural "%1$d connectors are out of cut contour"
 msgstr[0] "%1$d 连接器超出切割轮廓"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2881
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2878
 #, c-format, boost-format
 msgid "%1$d connector is out of object"
 msgid_plural "%1$d connectors are out of object"
 msgstr[0] "%1$d 连接器超出对象"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2884
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2881
 msgid "Some connectors are overlapped"
 msgstr "有些连接器重叠"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2888
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2885
 msgid "Select at least one object to keep after cutting."
 msgstr "切割后至少选择一个要保留的对象。"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2890
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2887
 msgid "Cut plane is placed out of object"
 msgstr "剖切面放置在对象之外"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2892
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2889
 msgid "Cut plane with groove is invalid"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3194
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3191
 msgid "Connector"
 msgstr "连接器"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3263
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3260
 msgid "Cut by Plane"
 msgstr "按平面切割"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3477
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3474
 msgid "Cut by line"
 msgstr "按线切割"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3533
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3530
 msgid "Delete connector"
 msgstr "删除连接器"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:325
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:326
 msgid "Entering Cut gizmo"
 msgstr "进入切割小工具"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:326
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:327
 msgid "Leaving Cut gizmo"
 msgstr "离开切割小工具"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:327
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:328
 msgid "Cut gizmo editing"
 msgstr "编辑剪切小工具"
 
@@ -9705,7 +9706,7 @@ msgid "Simplification is currently only allowed when a single part is selected"
 msgstr "当前仅当选择单个零件时才允许简化"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:191
-#: src/slic3r/GUI/MainFrame.cpp:1246 src/slic3r/GUI/MainFrame.cpp:1717
+#: src/slic3r/GUI/MainFrame.cpp:1256 src/slic3r/GUI/MainFrame.cpp:1727
 #: src/slic3r/GUI/PrintHostDialogs.cpp:425
 msgid "Error"
 msgstr "错误"
@@ -10094,7 +10095,7 @@ msgid "Add..."
 msgstr "添加..."
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:5205 src/slic3r/GUI/KBShortcutsDialog.cpp:105
-#: src/slic3r/GUI/Plater.cpp:6106 src/slic3r/GUI/Tab.cpp:4619
+#: src/slic3r/GUI/Plater.cpp:6113 src/slic3r/GUI/Tab.cpp:4619
 msgid "Delete all"
 msgstr "全部删除"
 
@@ -10141,7 +10142,7 @@ msgid "Next Undo action: %1%"
 msgstr "下一个撤消操作： %1%"
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:5432 src/slic3r/GUI/KBShortcutsDialog.cpp:107
-#: src/slic3r/GUI/MainFrame.cpp:1429
+#: src/slic3r/GUI/MainFrame.cpp:1439
 msgid "Redo"
 msgstr "重做"
 
@@ -10948,7 +10949,7 @@ msgstr "输出为STL/OBJ"
 msgid "Reload the selected volumes from disk"
 msgstr "从磁盘重新加载所选卷"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:825 src/slic3r/GUI/Plater.cpp:3627
+#: src/slic3r/GUI/GUI_Factories.cpp:825 src/slic3r/GUI/Plater.cpp:3634
 msgid "Replace with STL"
 msgstr "替换为 STL"
 
@@ -10968,19 +10969,19 @@ msgstr "缩放打印体积"
 msgid "Scale the selected object to fit the print volume"
 msgstr "缩放所选对象以适合可打印体积"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:929 src/slic3r/GUI/Plater.cpp:6333
+#: src/slic3r/GUI/GUI_Factories.cpp:929 src/slic3r/GUI/Plater.cpp:6340
 msgid "Convert from imperial units"
 msgstr "换算成英制单位"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:930 src/slic3r/GUI/Plater.cpp:6334
+#: src/slic3r/GUI/GUI_Factories.cpp:930 src/slic3r/GUI/Plater.cpp:6341
 msgid "Revert conversion from imperial units"
 msgstr "恢复英制单位的换算"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:931 src/slic3r/GUI/Plater.cpp:6335
+#: src/slic3r/GUI/GUI_Factories.cpp:931 src/slic3r/GUI/Plater.cpp:6342
 msgid "Convert from meters"
 msgstr "从米换算"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:932 src/slic3r/GUI/Plater.cpp:6335
+#: src/slic3r/GUI/GUI_Factories.cpp:932 src/slic3r/GUI/Plater.cpp:6342
 msgid "Revert conversion from meters"
 msgstr "从仪表恢复转换"
 
@@ -11367,7 +11368,7 @@ msgstr "无法拆分所选对象，因为它仅包含一个部件。"
 msgid "Split to Parts"
 msgstr "拆分为零件"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2185 src/slic3r/GUI/Plater.cpp:3144
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2185 src/slic3r/GUI/Plater.cpp:3146
 msgid ""
 "Custom supports, seams and multimaterial painting were removed after "
 "splitting the object."
@@ -11783,7 +11784,7 @@ msgstr "布局完成。"
 msgid "Could not arrange model objects! Some geometries may be invalid."
 msgstr "无法排列模型对象！某些几何图形可能无效。"
 
-#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:359 src/slic3r/GUI/Plater.cpp:7329
+#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:359 src/slic3r/GUI/Plater.cpp:7336
 #, c-format, boost-format
 msgid ""
 "Arrangement ignored the following objects which can't fit into a single "
@@ -11946,7 +11947,7 @@ msgid ""
 "or missing."
 msgstr "无法从存档中检索到任何对象。切片可能已损坏或丢失。"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:18 src/slic3r/GUI/MainFrame.cpp:1184
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:18 src/slic3r/GUI/MainFrame.cpp:1194
 msgid "Keyboard Shortcuts"
 msgstr "键盘快捷键"
 
@@ -11982,7 +11983,7 @@ msgstr "从这个 /amf/3mf/gcode 导入配置"
 msgid "Load Config from ini/amf/3mf/gcode and merge"
 msgstr "从 ini/amf/3mf/gcode 加载配置并合并"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:97 src/slic3r/GUI/Plater.cpp:7380
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:97 src/slic3r/GUI/Plater.cpp:7387
 msgid "Send G-code"
 msgstr "发送 G-Code"
 
@@ -12327,13 +12328,13 @@ msgstr "设置所选项目的挤出机编号"
 msgid "Objects List"
 msgstr "对象列表"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:211 src/slic3r/GUI/MainFrame.cpp:1612
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:211 src/slic3r/GUI/MainFrame.cpp:1622
 msgid "Open a G-code file"
 msgstr "打开一个 G-Code 文件"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:213 src/slic3r/GUI/MainFrame.cpp:1443
-#: src/slic3r/GUI/MainFrame.cpp:1447 src/slic3r/GUI/MainFrame.cpp:1617
-#: src/slic3r/GUI/MainFrame.cpp:1621
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:213 src/slic3r/GUI/MainFrame.cpp:1453
+#: src/slic3r/GUI/MainFrame.cpp:1457 src/slic3r/GUI/MainFrame.cpp:1627
+#: src/slic3r/GUI/MainFrame.cpp:1631
 msgid "Reload the plater from disk"
 msgstr "从磁盘重新加载制版机"
 
@@ -12369,7 +12370,7 @@ msgstr "显示/隐藏图例"
 msgid "Show/Hide G-code window"
 msgstr "显示/隐藏 G-Code 窗口"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:236 src/slic3r/GUI/Plater.cpp:4615
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:236 src/slic3r/GUI/Plater.cpp:4622
 #: src/slic3r/GUI/Tab.cpp:2973
 msgid "Preview"
 msgstr "预览"
@@ -12448,7 +12449,7 @@ msgid "Keyboard shortcuts"
 msgstr "键盘快捷键"
 
 #: src/slic3r/GUI/MainFrame.cpp:77 src/slic3r/GUI/MainFrame.cpp:91
-#: src/slic3r/GUI/MainFrame.cpp:1503
+#: src/slic3r/GUI/MainFrame.cpp:1513
 msgid "Open a new PrusaSlicer instance"
 msgstr "打开一个新的 PrusaSlicer 实例"
 
@@ -12456,11 +12457,11 @@ msgstr "打开一个新的 PrusaSlicer 实例"
 msgid "G-code preview"
 msgstr "G-Code 预览"
 
-#: src/slic3r/GUI/MainFrame.cpp:80 src/slic3r/GUI/MainFrame.cpp:1388
+#: src/slic3r/GUI/MainFrame.cpp:80 src/slic3r/GUI/MainFrame.cpp:1398
 msgid "Open G-code viewer"
 msgstr "打开 G-Code 查看器"
 
-#: src/slic3r/GUI/MainFrame.cpp:91 src/slic3r/GUI/MainFrame.cpp:1628
+#: src/slic3r/GUI/MainFrame.cpp:91 src/slic3r/GUI/MainFrame.cpp:1638
 msgid "Open PrusaSlicer"
 msgstr "打开 PrusaSlicer"
 
@@ -12486,13 +12487,13 @@ msgid "Print Settings"
 msgstr "打印设置"
 
 #: src/slic3r/GUI/MainFrame.cpp:331 src/slic3r/GUI/MainFrame.cpp:384
-#: src/slic3r/GUI/MainFrame.cpp:2197 src/slic3r/GUI/MainFrame.cpp:2198
+#: src/slic3r/GUI/MainFrame.cpp:2207 src/slic3r/GUI/MainFrame.cpp:2208
 #: src/slic3r/GUI/Tab.hpp:541
 msgid "Material Settings"
 msgstr "材料设置"
 
 #: src/slic3r/GUI/MainFrame.cpp:331 src/slic3r/GUI/MainFrame.cpp:382
-#: src/slic3r/GUI/MainFrame.cpp:2197 src/slic3r/GUI/MainFrame.cpp:2198
+#: src/slic3r/GUI/MainFrame.cpp:2207 src/slic3r/GUI/MainFrame.cpp:2208
 #: src/slic3r/GUI/Tab.hpp:456
 msgid "Filament Settings"
 msgstr "耗材设置"
@@ -12503,7 +12504,7 @@ msgid "Printer Settings"
 msgstr "打印机设置"
 
 #: src/slic3r/GUI/MainFrame.cpp:685 src/slic3r/GUI/Plater.cpp:1724
-#: src/slic3r/GUI/Plater.cpp:2877
+#: src/slic3r/GUI/Plater.cpp:2879
 msgid "Untitled"
 msgstr "无标题"
 
@@ -12511,155 +12512,166 @@ msgstr "无标题"
 msgid "based on Slic3r"
 msgstr "基于 Slic3r"
 
-#: src/slic3r/GUI/MainFrame.cpp:1150
-msgid "Prusa 3D &Drivers"
-msgstr "Prusa 3D 驱动程序(&D)"
-
-#: src/slic3r/GUI/MainFrame.cpp:1150
-msgid "Open the Prusa3D drivers download page in your browser"
-msgstr "在浏览器中打开 Prusa3d 驱动程序下载页"
-
-#: src/slic3r/GUI/MainFrame.cpp:1152
-msgid "Software &Releases"
-msgstr "软件发布(&R)"
-
-#: src/slic3r/GUI/MainFrame.cpp:1152
-msgid "Open the software releases page in your browser"
-msgstr "在浏览器中打开软件发布页面"
-
-#: src/slic3r/GUI/MainFrame.cpp:1158
+#: src/slic3r/GUI/MainFrame.cpp:1151
 #, c-format, boost-format
 msgid "%s &Website"
 msgstr "%s 网站(&W)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1159
+#: src/slic3r/GUI/MainFrame.cpp:1152 src/slic3r/GUI/MainFrame.cpp:1156
+#: src/slic3r/GUI/MainFrame.cpp:1160
 #, c-format, boost-format
 msgid "Open the %s website in your browser"
 msgstr "在浏览器中打开 %s 网站"
 
+#. TRN Item from "Help" menu
+#: src/slic3r/GUI/MainFrame.cpp:1155
+msgid "&Quick Start"
+msgstr ""
+
+#. TRN Item from "Help" menu
+#: src/slic3r/GUI/MainFrame.cpp:1159
+msgid "Sample &G-codes and Models"
+msgstr ""
+
+#: src/slic3r/GUI/MainFrame.cpp:1163
+msgid "Prusa 3D &Drivers"
+msgstr "Prusa 3D 驱动程序(&D)"
+
+#: src/slic3r/GUI/MainFrame.cpp:1163
+msgid "Open the Prusa3D drivers download page in your browser"
+msgstr "在浏览器中打开 Prusa3d 驱动程序下载页"
+
 #: src/slic3r/GUI/MainFrame.cpp:1165
+msgid "Software &Releases"
+msgstr "软件发布(&R)"
+
+#: src/slic3r/GUI/MainFrame.cpp:1165
+msgid "Open the software releases page in your browser"
+msgstr "在浏览器中打开软件发布页面"
+
+#: src/slic3r/GUI/MainFrame.cpp:1175
 msgid "System &Info"
 msgstr "系统信息(&I)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1165
+#: src/slic3r/GUI/MainFrame.cpp:1175
 msgid "Show system information"
 msgstr "显示系统信息"
 
-#: src/slic3r/GUI/MainFrame.cpp:1167
+#: src/slic3r/GUI/MainFrame.cpp:1177
 msgid "Show &Configuration Folder"
 msgstr "显示配置文件夹(&C)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1167
+#: src/slic3r/GUI/MainFrame.cpp:1177
 msgid "Show user configuration folder (datadir)"
 msgstr "显示用户配置文件夹（数据目录）"
 
-#: src/slic3r/GUI/MainFrame.cpp:1169
+#: src/slic3r/GUI/MainFrame.cpp:1179
 msgid "Report an I&ssue"
 msgstr "报告问题(&S)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1169
+#: src/slic3r/GUI/MainFrame.cpp:1179
 #, c-format, boost-format
 msgid "Report an issue on %s"
 msgstr "报告 %s 上的问题"
 
-#: src/slic3r/GUI/MainFrame.cpp:1172 src/slic3r/GUI/MainFrame.cpp:1175
+#: src/slic3r/GUI/MainFrame.cpp:1182 src/slic3r/GUI/MainFrame.cpp:1185
 #, c-format, boost-format
 msgid "&About %s"
 msgstr "关于 %s(&A)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1172 src/slic3r/GUI/MainFrame.cpp:1175
+#: src/slic3r/GUI/MainFrame.cpp:1182 src/slic3r/GUI/MainFrame.cpp:1185
 msgid "Show about dialog"
 msgstr "显示关于对话框"
 
-#: src/slic3r/GUI/MainFrame.cpp:1177
+#: src/slic3r/GUI/MainFrame.cpp:1187
 msgid "Show Tip of the Day"
 msgstr "显示每日小贴士"
 
-#: src/slic3r/GUI/MainFrame.cpp:1181
+#: src/slic3r/GUI/MainFrame.cpp:1191
 msgid ""
 "Opens Tip of the day notification in bottom right corner or shows another "
 "tip if already opened."
 msgstr "在右下角打开“每日提示”通知，或在已打开的情况下显示另一个提示。"
 
-#: src/slic3r/GUI/MainFrame.cpp:1184
+#: src/slic3r/GUI/MainFrame.cpp:1194
 msgid "Show the list of the keyboard shortcuts"
 msgstr "显示键盘快捷键的列表"
 
-#: src/slic3r/GUI/MainFrame.cpp:1198
+#: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Iso"
 msgstr "等距"
 
-#: src/slic3r/GUI/MainFrame.cpp:1198
+#: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Iso View"
 msgstr "等距视图"
 
 #. TRN Main menu: View->Top
-#: src/slic3r/GUI/MainFrame.cpp:1202
+#: src/slic3r/GUI/MainFrame.cpp:1212
 msgid "Top"
 msgstr "顶部"
 
-#: src/slic3r/GUI/MainFrame.cpp:1202
+#: src/slic3r/GUI/MainFrame.cpp:1212
 msgid "Top View"
 msgstr "顶部视图"
 
 #. TRN Main menu: View->Bottom
-#: src/slic3r/GUI/MainFrame.cpp:1205
+#: src/slic3r/GUI/MainFrame.cpp:1215
 msgid "Bottom"
 msgstr "底部"
 
-#: src/slic3r/GUI/MainFrame.cpp:1205
+#: src/slic3r/GUI/MainFrame.cpp:1215
 msgid "Bottom View"
 msgstr "底部视图"
 
-#: src/slic3r/GUI/MainFrame.cpp:1207
+#: src/slic3r/GUI/MainFrame.cpp:1217
 msgid "Front"
 msgstr "前面"
 
-#: src/slic3r/GUI/MainFrame.cpp:1207
+#: src/slic3r/GUI/MainFrame.cpp:1217
 msgid "Front View"
 msgstr "前视图"
 
-#: src/slic3r/GUI/MainFrame.cpp:1209
+#: src/slic3r/GUI/MainFrame.cpp:1219
 msgid "Rear View"
 msgstr "后视图"
 
-#: src/slic3r/GUI/MainFrame.cpp:1211
+#: src/slic3r/GUI/MainFrame.cpp:1221
 msgid "Left"
 msgstr "左面"
 
-#: src/slic3r/GUI/MainFrame.cpp:1211
+#: src/slic3r/GUI/MainFrame.cpp:1221
 msgid "Left View"
 msgstr "左视图"
 
-#: src/slic3r/GUI/MainFrame.cpp:1213
+#: src/slic3r/GUI/MainFrame.cpp:1223
 msgid "Right"
 msgstr "右面"
 
-#: src/slic3r/GUI/MainFrame.cpp:1213
+#: src/slic3r/GUI/MainFrame.cpp:1223
 msgid "Right View"
 msgstr "右视图"
 
-#: src/slic3r/GUI/MainFrame.cpp:1226
+#: src/slic3r/GUI/MainFrame.cpp:1236
 msgid "&New Project"
 msgstr "新建项目(&N)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1226
+#: src/slic3r/GUI/MainFrame.cpp:1236
 msgid "Start a new project"
 msgstr "启动一个新项目"
 
-#: src/slic3r/GUI/MainFrame.cpp:1229
+#: src/slic3r/GUI/MainFrame.cpp:1239
 msgid "&Open Project"
 msgstr "打开项目(&O)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1229
+#: src/slic3r/GUI/MainFrame.cpp:1239
 msgid "Open a project file"
 msgstr "打开项目文件"
 
-#: src/slic3r/GUI/MainFrame.cpp:1234
+#: src/slic3r/GUI/MainFrame.cpp:1244
 msgid "Recent projects"
 msgstr "最近项目"
 
-#: src/slic3r/GUI/MainFrame.cpp:1246
+#: src/slic3r/GUI/MainFrame.cpp:1256
 msgid ""
 "The selected project is no longer available.\n"
 "Do you want to remove it from the recent projects list?"
@@ -12667,548 +12679,548 @@ msgstr ""
 "所选项目不再可用。\n"
 "是否要将其从最近的项目列表中删除？"
 
-#: src/slic3r/GUI/MainFrame.cpp:1270
+#: src/slic3r/GUI/MainFrame.cpp:1280
 msgid "&Save Project"
 msgstr "保存项目(&S)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1270
+#: src/slic3r/GUI/MainFrame.cpp:1280
 msgid "Save current project file"
 msgstr "保存当前项目文件"
 
-#: src/slic3r/GUI/MainFrame.cpp:1274 src/slic3r/GUI/MainFrame.cpp:1276
+#: src/slic3r/GUI/MainFrame.cpp:1284 src/slic3r/GUI/MainFrame.cpp:1286
 msgid "Save Project &as"
 msgstr "将项目另存为(&A)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1274 src/slic3r/GUI/MainFrame.cpp:1276
+#: src/slic3r/GUI/MainFrame.cpp:1284 src/slic3r/GUI/MainFrame.cpp:1286
 msgid "Save current project file as"
 msgstr "将当前项目文件另存为"
 
-#: src/slic3r/GUI/MainFrame.cpp:1284
+#: src/slic3r/GUI/MainFrame.cpp:1294
 msgid "Import STL/3MF/STEP/OBJ/AM&F"
 msgstr "导入 STL/3MF/STEP/OBJ/AMF(&F)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1284
+#: src/slic3r/GUI/MainFrame.cpp:1294
 msgid "Load a model"
 msgstr "加载模型"
 
-#: src/slic3r/GUI/MainFrame.cpp:1288
+#: src/slic3r/GUI/MainFrame.cpp:1298
 msgid "Import STL (Imperial Units)"
 msgstr "导入 STL (英制单位)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1288
+#: src/slic3r/GUI/MainFrame.cpp:1298
 msgid "Load an model saved with imperial units"
 msgstr "加载使用英制单位保存的模型"
 
-#: src/slic3r/GUI/MainFrame.cpp:1292
+#: src/slic3r/GUI/MainFrame.cpp:1302
 msgid "Import SLA Archive"
 msgstr "导入SLA存档"
 
-#: src/slic3r/GUI/MainFrame.cpp:1292
+#: src/slic3r/GUI/MainFrame.cpp:1302
 msgid "Load an SLA archive"
 msgstr "加载SLA存档"
 
-#: src/slic3r/GUI/MainFrame.cpp:1296
+#: src/slic3r/GUI/MainFrame.cpp:1306
 msgid "Import ZIP Archive"
 msgstr "导入ZIP存档"
 
-#: src/slic3r/GUI/MainFrame.cpp:1296
+#: src/slic3r/GUI/MainFrame.cpp:1306
 msgid "Load a ZIP archive"
 msgstr "加载ZIP存档"
 
-#: src/slic3r/GUI/MainFrame.cpp:1301
+#: src/slic3r/GUI/MainFrame.cpp:1311
 msgid "Import &Config"
 msgstr "导入配置(&C)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1301
+#: src/slic3r/GUI/MainFrame.cpp:1311
 msgid "Load exported configuration file"
 msgstr "加载导出的配置文件"
 
-#: src/slic3r/GUI/MainFrame.cpp:1304
+#: src/slic3r/GUI/MainFrame.cpp:1314
 msgid "Import Config from &Project"
 msgstr "从项目导入配置(&P)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1304
+#: src/slic3r/GUI/MainFrame.cpp:1314
 msgid "Load configuration from project file"
 msgstr "从项目文件加载配置"
 
-#: src/slic3r/GUI/MainFrame.cpp:1308
+#: src/slic3r/GUI/MainFrame.cpp:1318
 msgid "Import Config &Bundle"
 msgstr "导入配置组(&B)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1308
+#: src/slic3r/GUI/MainFrame.cpp:1318
 msgid "Load presets from a bundle"
 msgstr "从包加载预设"
 
-#: src/slic3r/GUI/MainFrame.cpp:1311
+#: src/slic3r/GUI/MainFrame.cpp:1321
 msgid "&Import"
 msgstr "导入(&I)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1314 src/slic3r/GUI/MainFrame.cpp:1677
+#: src/slic3r/GUI/MainFrame.cpp:1324 src/slic3r/GUI/MainFrame.cpp:1687
 msgid "Export &G-code"
 msgstr "导出 G-Code(&G)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1314
+#: src/slic3r/GUI/MainFrame.cpp:1324
 msgid "Export current plate as G-code"
 msgstr "将当构建板导出为 G-Code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1318 src/slic3r/GUI/MainFrame.cpp:1678
+#: src/slic3r/GUI/MainFrame.cpp:1328 src/slic3r/GUI/MainFrame.cpp:1688
 msgid "S&end G-code"
 msgstr "发送 G-Code(&E)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1318
+#: src/slic3r/GUI/MainFrame.cpp:1328
 msgid "Send to print current plate as G-code"
 msgstr "发送以 G-Code 打印当前板"
 
-#: src/slic3r/GUI/MainFrame.cpp:1322
+#: src/slic3r/GUI/MainFrame.cpp:1332
 msgid "Export G-code to SD Card / Flash Drive"
 msgstr "将 G-Code 导出到 SD 卡/闪存驱动器"
 
-#: src/slic3r/GUI/MainFrame.cpp:1322
+#: src/slic3r/GUI/MainFrame.cpp:1332
 msgid "Export current plate as G-code to SD card / Flash drive"
 msgstr "将当前板作为 G-Code 导出到 SD 卡/闪存驱动器"
 
-#: src/slic3r/GUI/MainFrame.cpp:1326
+#: src/slic3r/GUI/MainFrame.cpp:1336
 msgid "Export Plate as &STL/OBJ"
 msgstr "将板块导出为STL/OBJ(&S)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1326
+#: src/slic3r/GUI/MainFrame.cpp:1336
 msgid "Export current plate as STL/OBJ"
 msgstr "以STL/OBJ形式导出当前板块"
 
-#: src/slic3r/GUI/MainFrame.cpp:1329
+#: src/slic3r/GUI/MainFrame.cpp:1339
 msgid "Export Plate as STL/OBJ &Including Supports"
 msgstr "以STL/OBJ的形式导出板块，并包括支撑(&I)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1329
+#: src/slic3r/GUI/MainFrame.cpp:1339
 msgid "Export current plate as STL/OBJ including supports"
 msgstr "以STL/OBJ的形式导出当前板块，并包括支撑"
 
-#: src/slic3r/GUI/MainFrame.cpp:1337 src/slic3r/GUI/MainFrame.cpp:1625
+#: src/slic3r/GUI/MainFrame.cpp:1347 src/slic3r/GUI/MainFrame.cpp:1635
 msgid "Export &Toolpaths as OBJ"
 msgstr "将工具路径导出为 OBJ(&T)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1337 src/slic3r/GUI/MainFrame.cpp:1625
+#: src/slic3r/GUI/MainFrame.cpp:1347 src/slic3r/GUI/MainFrame.cpp:1635
 msgid "Export toolpaths as OBJ"
 msgstr "导出工具路径作为 OBJ"
 
-#: src/slic3r/GUI/MainFrame.cpp:1341
+#: src/slic3r/GUI/MainFrame.cpp:1351
 msgid "Export &Config"
 msgstr "导出配置(&C)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1341
+#: src/slic3r/GUI/MainFrame.cpp:1351
 msgid "Export current configuration to file"
 msgstr "将当前配置导出到文件"
 
-#: src/slic3r/GUI/MainFrame.cpp:1344
+#: src/slic3r/GUI/MainFrame.cpp:1354
 msgid "Export Config &Bundle"
 msgstr "导出配置包(&B)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1344
+#: src/slic3r/GUI/MainFrame.cpp:1354
 msgid "Export all presets to file"
 msgstr "将所有预设导出到文件"
 
-#: src/slic3r/GUI/MainFrame.cpp:1347
+#: src/slic3r/GUI/MainFrame.cpp:1357
 msgid "Export Config Bundle With Physical Printers"
 msgstr "使用物理打印机导出配置包"
 
-#: src/slic3r/GUI/MainFrame.cpp:1347
+#: src/slic3r/GUI/MainFrame.cpp:1357
 msgid "Export all presets including physical printers to file"
 msgstr "将包括物理打印机在内的所有预设导出到文件"
 
-#: src/slic3r/GUI/MainFrame.cpp:1350
+#: src/slic3r/GUI/MainFrame.cpp:1360
 msgid "&Export"
 msgstr "导出(&E)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1352
+#: src/slic3r/GUI/MainFrame.cpp:1362
 msgid "Ejec&t SD Card / Flash Drive"
 msgstr "弹出 SD 卡/闪存驱动器(&T)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1352
+#: src/slic3r/GUI/MainFrame.cpp:1362
 msgid "Eject SD card / Flash drive after the G-code was exported to it."
 msgstr "将 G-Code 导出到 SD 卡/闪存驱动器后将其弹出。"
 
-#: src/slic3r/GUI/MainFrame.cpp:1360
+#: src/slic3r/GUI/MainFrame.cpp:1370
 msgid "Quick Slice"
 msgstr "快速切片"
 
-#: src/slic3r/GUI/MainFrame.cpp:1360
+#: src/slic3r/GUI/MainFrame.cpp:1370
 msgid "Slice a file into a G-code"
 msgstr "将文件切片成 G-Code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1366
+#: src/slic3r/GUI/MainFrame.cpp:1376
 msgid "Quick Slice and Save As"
 msgstr "快速切片并另存为"
 
-#: src/slic3r/GUI/MainFrame.cpp:1366
+#: src/slic3r/GUI/MainFrame.cpp:1376
 msgid "Slice a file into a G-code, save as"
 msgstr "将文件切片成 G-Code, 并另存为"
 
-#: src/slic3r/GUI/MainFrame.cpp:1372
+#: src/slic3r/GUI/MainFrame.cpp:1382
 msgid "Repeat Last Quick Slice"
 msgstr "重复上次快速切片"
 
-#: src/slic3r/GUI/MainFrame.cpp:1372
+#: src/slic3r/GUI/MainFrame.cpp:1382
 msgid "Repeat last quick slice"
 msgstr "重复最后一个快速切片"
 
-#: src/slic3r/GUI/MainFrame.cpp:1380
+#: src/slic3r/GUI/MainFrame.cpp:1390
 msgid "(Re)Slice No&w"
 msgstr "立即重新切片(&W)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1380
+#: src/slic3r/GUI/MainFrame.cpp:1390
 msgid "Start new slicing process"
 msgstr "开始新的切片流程"
 
-#: src/slic3r/GUI/MainFrame.cpp:1384
+#: src/slic3r/GUI/MainFrame.cpp:1394
 msgid "&Repair STL file"
 msgstr "修复 STL 文件(&R)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1384
+#: src/slic3r/GUI/MainFrame.cpp:1394
 msgid "Automatically repair an STL file"
 msgstr "自动修复 STL 文件"
 
-#: src/slic3r/GUI/MainFrame.cpp:1388
+#: src/slic3r/GUI/MainFrame.cpp:1398
 msgid "&G-code Preview"
 msgstr "G-Code 预览(&G)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1392
+#: src/slic3r/GUI/MainFrame.cpp:1402
 msgid "E&xit"
 msgstr "退出(&x)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1392 src/slic3r/GUI/UpdateDialogs.cpp:376
+#: src/slic3r/GUI/MainFrame.cpp:1402 src/slic3r/GUI/UpdateDialogs.cpp:376
 #: src/slic3r/GUI/UpdateDialogs.cpp:423
 #, c-format, boost-format
 msgid "Exit %s"
 msgstr "退出 %s"
 
-#: src/slic3r/GUI/MainFrame.cpp:1394 src/slic3r/GUI/MainFrame.cpp:1632
+#: src/slic3r/GUI/MainFrame.cpp:1404 src/slic3r/GUI/MainFrame.cpp:1642
 msgid "&Quit"
 msgstr "退出(&Q)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1394 src/slic3r/GUI/MainFrame.cpp:1632
+#: src/slic3r/GUI/MainFrame.cpp:1404 src/slic3r/GUI/MainFrame.cpp:1642
 #, c-format, boost-format
 msgid "Quit %s"
 msgstr "退出 %s"
 
-#: src/slic3r/GUI/MainFrame.cpp:1410
+#: src/slic3r/GUI/MainFrame.cpp:1420
 msgid "&Select All"
 msgstr "全选(&S)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1411
+#: src/slic3r/GUI/MainFrame.cpp:1421
 msgid "Selects all objects"
 msgstr "选择所有对象"
 
-#: src/slic3r/GUI/MainFrame.cpp:1413
+#: src/slic3r/GUI/MainFrame.cpp:1423
 msgid "D&eselect All"
 msgstr "取消选择(&E)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1414
+#: src/slic3r/GUI/MainFrame.cpp:1424
 msgid "Deselects all objects"
 msgstr "取消选择所有对象"
 
-#: src/slic3r/GUI/MainFrame.cpp:1417
+#: src/slic3r/GUI/MainFrame.cpp:1427
 msgid "&Delete Selected"
 msgstr "删除所选内容(&D)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1418
+#: src/slic3r/GUI/MainFrame.cpp:1428
 msgid "Deletes the current selection"
 msgstr "删除当前选择"
 
-#: src/slic3r/GUI/MainFrame.cpp:1420
+#: src/slic3r/GUI/MainFrame.cpp:1430
 msgid "Delete &All"
 msgstr "全部删除(&A)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1421
+#: src/slic3r/GUI/MainFrame.cpp:1431
 msgid "Deletes all objects"
 msgstr "删除所有对象"
 
-#: src/slic3r/GUI/MainFrame.cpp:1425
+#: src/slic3r/GUI/MainFrame.cpp:1435
 msgid "&Undo"
 msgstr "撤销(&U)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1428
+#: src/slic3r/GUI/MainFrame.cpp:1438
 msgid "&Redo"
 msgstr "重做(&R)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1433
+#: src/slic3r/GUI/MainFrame.cpp:1443
 msgid "&Copy"
 msgstr "复制(&C)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1434
+#: src/slic3r/GUI/MainFrame.cpp:1444
 msgid "Copy selection to clipboard"
 msgstr "将选择复制到剪贴板"
 
-#: src/slic3r/GUI/MainFrame.cpp:1436
+#: src/slic3r/GUI/MainFrame.cpp:1446
 msgid "&Paste"
 msgstr "粘贴(&P)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1437
+#: src/slic3r/GUI/MainFrame.cpp:1447
 msgid "Paste clipboard"
 msgstr "粘贴剪贴板"
 
-#: src/slic3r/GUI/MainFrame.cpp:1442 src/slic3r/GUI/MainFrame.cpp:1446
-#: src/slic3r/GUI/MainFrame.cpp:1616 src/slic3r/GUI/MainFrame.cpp:1620
+#: src/slic3r/GUI/MainFrame.cpp:1452 src/slic3r/GUI/MainFrame.cpp:1456
+#: src/slic3r/GUI/MainFrame.cpp:1626 src/slic3r/GUI/MainFrame.cpp:1630
 msgid "Re&load from Disk"
 msgstr "从磁盘重新加载(&L)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1452
+#: src/slic3r/GUI/MainFrame.cpp:1462
 msgid "Searc&h"
 msgstr "搜索(&H)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1453
+#: src/slic3r/GUI/MainFrame.cpp:1463
 msgid "Search in settings"
 msgstr "在设置中搜索"
 
-#: src/slic3r/GUI/MainFrame.cpp:1461
+#: src/slic3r/GUI/MainFrame.cpp:1471
 msgid "&Plater Tab"
 msgstr "构建板选项卡(&P)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1461
+#: src/slic3r/GUI/MainFrame.cpp:1471
 msgid "Show the plater"
 msgstr "显示平台构建板"
 
-#: src/slic3r/GUI/MainFrame.cpp:1466
+#: src/slic3r/GUI/MainFrame.cpp:1476
 msgid "P&rint Settings Tab"
 msgstr "打印设置选项卡(&R)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1466
+#: src/slic3r/GUI/MainFrame.cpp:1476
 msgid "Show the print settings"
 msgstr "显示打印设置"
 
-#: src/slic3r/GUI/MainFrame.cpp:1469 src/slic3r/GUI/MainFrame.cpp:1680
+#: src/slic3r/GUI/MainFrame.cpp:1479 src/slic3r/GUI/MainFrame.cpp:1690
 msgid "&Filament Settings Tab"
 msgstr "耗材设置选项卡(&F)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1469
+#: src/slic3r/GUI/MainFrame.cpp:1479
 msgid "Show the filament settings"
 msgstr "显示耗材设置"
 
-#: src/slic3r/GUI/MainFrame.cpp:1473
+#: src/slic3r/GUI/MainFrame.cpp:1483
 msgid "Print&er Settings Tab"
 msgstr "打印机设置选项卡(&E)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1473
+#: src/slic3r/GUI/MainFrame.cpp:1483
 msgid "Show the printer settings"
 msgstr "显示打印机设置"
 
-#: src/slic3r/GUI/MainFrame.cpp:1479
+#: src/slic3r/GUI/MainFrame.cpp:1489
 msgid "3&D"
 msgstr "3&D"
 
-#: src/slic3r/GUI/MainFrame.cpp:1479
+#: src/slic3r/GUI/MainFrame.cpp:1489
 msgid "Show the 3D editing view"
 msgstr "显示 3D 编辑视图"
 
-#: src/slic3r/GUI/MainFrame.cpp:1482
+#: src/slic3r/GUI/MainFrame.cpp:1492
 msgid "Pre&view"
 msgstr "预览(&V)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1482
+#: src/slic3r/GUI/MainFrame.cpp:1492
 msgid "Show the 3D slices preview"
 msgstr "显示 3D 切片预览"
 
-#: src/slic3r/GUI/MainFrame.cpp:1488
+#: src/slic3r/GUI/MainFrame.cpp:1498
 msgid "Open the dialog to modify shape gallery"
 msgstr "打开对话框以修改形状库"
 
-#: src/slic3r/GUI/MainFrame.cpp:1499
+#: src/slic3r/GUI/MainFrame.cpp:1509
 msgid "Print &Host Upload Queue"
 msgstr "打印主机上传队列(&H)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1499
+#: src/slic3r/GUI/MainFrame.cpp:1509
 msgid "Display the Print Host Upload Queue window"
 msgstr "显示打印主机上传队列窗口"
 
-#: src/slic3r/GUI/MainFrame.cpp:1503
+#: src/slic3r/GUI/MainFrame.cpp:1513
 msgid "Open New Instance"
 msgstr "打开新实例"
 
-#: src/slic3r/GUI/MainFrame.cpp:1507
+#: src/slic3r/GUI/MainFrame.cpp:1517
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1733
 msgid "Compare Presets"
 msgstr "比较预设"
 
-#: src/slic3r/GUI/MainFrame.cpp:1507
+#: src/slic3r/GUI/MainFrame.cpp:1517
 msgid "Compare presets"
 msgstr "比较预设"
 
-#: src/slic3r/GUI/MainFrame.cpp:1517
+#: src/slic3r/GUI/MainFrame.cpp:1527
 msgid "Show &Labels"
 msgstr "显示标签(&L)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1517
+#: src/slic3r/GUI/MainFrame.cpp:1527
 msgid "Show object/instance labels in 3D scene"
 msgstr "在三维场景中显示对象/实例标签"
 
-#: src/slic3r/GUI/MainFrame.cpp:1520 src/slic3r/GUI/MainFrame.cpp:1642
+#: src/slic3r/GUI/MainFrame.cpp:1530 src/slic3r/GUI/MainFrame.cpp:1652
 msgid "Show Legen&d"
 msgstr "显示图例(&d)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1520
+#: src/slic3r/GUI/MainFrame.cpp:1530
 msgid "Show legend in preview"
 msgstr "在预览中显示图例"
 
-#: src/slic3r/GUI/MainFrame.cpp:1523
+#: src/slic3r/GUI/MainFrame.cpp:1533
 msgid "&Collapse Sidebar"
 msgstr "折叠边栏(&C)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1523 src/slic3r/GUI/Plater.cpp:2340
+#: src/slic3r/GUI/MainFrame.cpp:1533 src/slic3r/GUI/Plater.cpp:2340
 msgid "Collapse sidebar"
 msgstr "折叠边栏"
 
-#: src/slic3r/GUI/MainFrame.cpp:1528
+#: src/slic3r/GUI/MainFrame.cpp:1538
 msgid "&Fullscreen"
 msgstr "全屏(&F)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1528
+#: src/slic3r/GUI/MainFrame.cpp:1538
 msgid "Fullscreen"
 msgstr "全屏"
 
-#: src/slic3r/GUI/MainFrame.cpp:1544 src/slic3r/GUI/MainFrame.cpp:1651
+#: src/slic3r/GUI/MainFrame.cpp:1554 src/slic3r/GUI/MainFrame.cpp:1661
 msgid "&File"
 msgstr "文件(&F)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1545
+#: src/slic3r/GUI/MainFrame.cpp:1555
 msgid "&Edit"
 msgstr "编辑(&E)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1546
+#: src/slic3r/GUI/MainFrame.cpp:1556
 msgid "&Window"
 msgstr "窗口(&W)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1547 src/slic3r/GUI/MainFrame.cpp:1652
+#: src/slic3r/GUI/MainFrame.cpp:1557 src/slic3r/GUI/MainFrame.cpp:1662
 msgid "&View"
 msgstr "视图(&V)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1550 src/slic3r/GUI/MainFrame.cpp:1655
+#: src/slic3r/GUI/MainFrame.cpp:1560 src/slic3r/GUI/MainFrame.cpp:1665
 msgid "&Help"
 msgstr "帮助(&H)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1612
+#: src/slic3r/GUI/MainFrame.cpp:1622
 msgid "&Open G-code"
 msgstr "打开 G-Code(&O)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1628
+#: src/slic3r/GUI/MainFrame.cpp:1638
 msgid "Open &PrusaSlicer"
 msgstr "打开 PrusaSlicer(&P)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1642
+#: src/slic3r/GUI/MainFrame.cpp:1652
 msgid "Show legend"
 msgstr "显示图例"
 
-#: src/slic3r/GUI/MainFrame.cpp:1677
+#: src/slic3r/GUI/MainFrame.cpp:1687
 msgid "E&xport"
 msgstr "导出(&X)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1678
+#: src/slic3r/GUI/MainFrame.cpp:1688
 msgid "S&end to print"
 msgstr "发送到打印机(&E)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1680
+#: src/slic3r/GUI/MainFrame.cpp:1690
 msgid "Mate&rial Settings Tab"
 msgstr "配合设置选项卡(&R)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1704
+#: src/slic3r/GUI/MainFrame.cpp:1714
 msgid "Choose a file to slice (STL/OBJ/AMF/3MF/PRUSA):"
 msgstr "选择要切片的文件 (STL/OBJ/AMF/3MF/PRUSA):"
 
-#: src/slic3r/GUI/MainFrame.cpp:1716
+#: src/slic3r/GUI/MainFrame.cpp:1726
 msgid "No previously sliced file."
 msgstr "没有预切片的文件。"
 
-#: src/slic3r/GUI/MainFrame.cpp:1723
+#: src/slic3r/GUI/MainFrame.cpp:1733
 msgid "Previously sliced file ("
 msgstr "预切片文件 ("
 
-#: src/slic3r/GUI/MainFrame.cpp:1723
+#: src/slic3r/GUI/MainFrame.cpp:1733
 msgid ") not found."
 msgstr ") 无法找到。"
 
-#: src/slic3r/GUI/MainFrame.cpp:1724
+#: src/slic3r/GUI/MainFrame.cpp:1734
 msgid "File Not Found"
 msgstr "文件未找到"
 
-#: src/slic3r/GUI/MainFrame.cpp:1759
+#: src/slic3r/GUI/MainFrame.cpp:1769
 #, c-format, boost-format
 msgid "Save %s file as:"
 msgstr "将 %s 文件另存为:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1759
+#: src/slic3r/GUI/MainFrame.cpp:1769
 msgid "SVG"
 msgstr "SVG"
 
-#: src/slic3r/GUI/MainFrame.cpp:1759
+#: src/slic3r/GUI/MainFrame.cpp:1769
 msgid "G-code"
 msgstr "G-Code"
 
-#: src/slic3r/GUI/MainFrame.cpp:1771
+#: src/slic3r/GUI/MainFrame.cpp:1781
 msgid "Save ZIP file as:"
 msgstr "将ZIP文件另存为："
 
-#: src/slic3r/GUI/MainFrame.cpp:1780 src/slic3r/GUI/Plater.cpp:3388
-#: src/slic3r/GUI/Plater.cpp:6797 src/slic3r/GUI/Tab.cpp:1647
+#: src/slic3r/GUI/MainFrame.cpp:1790 src/slic3r/GUI/Plater.cpp:3390
+#: src/slic3r/GUI/Plater.cpp:6804 src/slic3r/GUI/Tab.cpp:1647
 #: src/slic3r/GUI/Tab.cpp:5238
 msgid "Slicing"
 msgstr "切片"
 
 #. TRN ProgressDialog on reslicing: "input file basename"
-#: src/slic3r/GUI/MainFrame.cpp:1782
+#: src/slic3r/GUI/MainFrame.cpp:1792
 #, c-format, boost-format
 msgid "Processing %s"
 msgstr "处理 %s"
 
-#: src/slic3r/GUI/MainFrame.cpp:1805
+#: src/slic3r/GUI/MainFrame.cpp:1815
 #, boost-format
 msgid "%1% was successfully sliced."
 msgstr "%1% 已成功切片。"
 
-#: src/slic3r/GUI/MainFrame.cpp:1808
+#: src/slic3r/GUI/MainFrame.cpp:1818
 msgid "Slicing Done!"
 msgstr "切片完成！"
 
-#: src/slic3r/GUI/MainFrame.cpp:1824
+#: src/slic3r/GUI/MainFrame.cpp:1834
 msgid "Select the STL file to repair:"
 msgstr "选择要修复的 STL 文件:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1834
+#: src/slic3r/GUI/MainFrame.cpp:1844
 msgid "Save OBJ file (less prone to coordinate errors than STL) as:"
 msgstr "将 OBJ 文件 (不像 STL 那样容易发生坐标错误) 保存为:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1845
+#: src/slic3r/GUI/MainFrame.cpp:1855
 msgid "Your file was repaired."
 msgstr "您的文件已修复。"
 
-#: src/slic3r/GUI/MainFrame.cpp:1859
+#: src/slic3r/GUI/MainFrame.cpp:1869
 msgid "Save configuration as:"
 msgstr "将配置另存为:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1876
+#: src/slic3r/GUI/MainFrame.cpp:1886
 msgid "Loading of a configuration file"
 msgstr "加载配置文件"
 
-#: src/slic3r/GUI/MainFrame.cpp:1878 src/slic3r/GUI/MainFrame.cpp:1945
+#: src/slic3r/GUI/MainFrame.cpp:1888 src/slic3r/GUI/MainFrame.cpp:1955
 msgid "Select configuration to load:"
 msgstr "选择要加载的配置:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1909
+#: src/slic3r/GUI/MainFrame.cpp:1919
 msgid "Exporting configuration bundle"
 msgstr "导出配置包"
 
-#: src/slic3r/GUI/MainFrame.cpp:1910
+#: src/slic3r/GUI/MainFrame.cpp:1920
 msgid ""
 "Some presets are modified and the unsaved changes will not be exported into "
 "configuration bundle."
 msgstr "某些预设已修改，未保存的更改将不会导出到配置包中。"
 
-#: src/slic3r/GUI/MainFrame.cpp:1919
+#: src/slic3r/GUI/MainFrame.cpp:1929
 msgid "Save presets bundle as:"
 msgstr "将预设配置组另存为:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1942
+#: src/slic3r/GUI/MainFrame.cpp:1952
 msgid "Loading of a configuration bundle"
 msgstr "加载配置包"
 
-#: src/slic3r/GUI/MainFrame.cpp:1972
+#: src/slic3r/GUI/MainFrame.cpp:1982
 #, c-format, boost-format
 msgid "%d presets successfully imported."
 msgstr "%d 预设已成功导入。"
@@ -13421,7 +13433,7 @@ msgstr "导出。"
 #: src/slic3r/GUI/NotificationManager.cpp:2113
 #: src/slic3r/GUI/NotificationManager.cpp:2140
 #: src/slic3r/GUI/NotificationManager.cpp:2148
-#: src/slic3r/GUI/NotificationManager.cpp:2159 src/slic3r/GUI/Plater.cpp:3235
+#: src/slic3r/GUI/NotificationManager.cpp:2159 src/slic3r/GUI/Plater.cpp:3237
 msgid "WARNING:"
 msgstr "警告:"
 
@@ -13730,12 +13742,12 @@ msgstr "对象底部"
 msgid "Around object"
 msgstr "对象周围"
 
-#: src/slic3r/GUI/Plater.cpp:935 src/slic3r/GUI/Plater.cpp:7380
+#: src/slic3r/GUI/Plater.cpp:935 src/slic3r/GUI/Plater.cpp:7387
 msgid "Send to printer"
 msgstr "发送到打印机"
 
-#: src/slic3r/GUI/Plater.cpp:955 src/slic3r/GUI/Plater.cpp:3388
-#: src/slic3r/GUI/Plater.cpp:6800
+#: src/slic3r/GUI/Plater.cpp:955 src/slic3r/GUI/Plater.cpp:3390
+#: src/slic3r/GUI/Plater.cpp:6807
 msgid "Slice now"
 msgstr "现在切片"
 
@@ -13835,7 +13847,7 @@ msgstr "成功卸载。设备 %s(%s) 现在可以安全地从计算机上删除�
 msgid "Ejecting of device %s(%s) has failed."
 msgstr "弹出设备 %s(%s) 失败。"
 
-#: src/slic3r/GUI/Plater.cpp:2232 src/slic3r/GUI/Plater.cpp:5253
+#: src/slic3r/GUI/Plater.cpp:2232 src/slic3r/GUI/Plater.cpp:5260
 msgid "New Project"
 msgstr "新项目"
 
@@ -13943,41 +13955,41 @@ msgstr ""
 "除了将它们视为多个对象之外，我是否应该将这些文件视为\n"
 "表示具有多个部分的单个对象？"
 
-#: src/slic3r/GUI/Plater.cpp:2825
+#: src/slic3r/GUI/Plater.cpp:2827
 msgid ""
 "Your object appears to be too large, so it was automatically scaled down to "
 "fit your print bed."
 msgstr "对象看起来太大，因此会自动缩小，以适应构建板。"
 
-#: src/slic3r/GUI/Plater.cpp:2826
+#: src/slic3r/GUI/Plater.cpp:2828
 msgid "Object too large?"
 msgstr "对象太大？"
 
-#: src/slic3r/GUI/Plater.cpp:2906
+#: src/slic3r/GUI/Plater.cpp:2908
 msgid "Export STL file:"
 msgstr "导出 STL 文件:"
 
-#: src/slic3r/GUI/Plater.cpp:2913
+#: src/slic3r/GUI/Plater.cpp:2915
 msgid "Export AMF file:"
 msgstr "导出 AMF 文件:"
 
-#: src/slic3r/GUI/Plater.cpp:2919
+#: src/slic3r/GUI/Plater.cpp:2921
 msgid "Save file as:"
 msgstr "将文件另存为:"
 
-#: src/slic3r/GUI/Plater.cpp:2925
+#: src/slic3r/GUI/Plater.cpp:2927
 msgid "Export OBJ file:"
 msgstr "导出 OBJ 文件:"
 
-#: src/slic3r/GUI/Plater.cpp:3039
+#: src/slic3r/GUI/Plater.cpp:3041
 msgid "Delete object which is a part of cut object"
 msgstr "删除属于切割对象的一部分的对象"
 
-#: src/slic3r/GUI/Plater.cpp:3040
+#: src/slic3r/GUI/Plater.cpp:3042
 msgid "You try to delete an object which is a part of a cut object."
 msgstr "你试图删除一个属于切割对象的一部分的对象。"
 
-#: src/slic3r/GUI/Plater.cpp:3041
+#: src/slic3r/GUI/Plater.cpp:3043
 msgid ""
 "This action will break a cut information.\n"
 "After that PrusaSlicer can't guarantee model consistency"
@@ -13985,148 +13997,148 @@ msgstr ""
 "这个动作会破坏一个切割信息。\n"
 "此后，PrusaSlicer不能保证模型的一致性"
 
-#: src/slic3r/GUI/Plater.cpp:3044
+#: src/slic3r/GUI/Plater.cpp:3046
 msgid "Delete object"
 msgstr "删除对象"
 
-#: src/slic3r/GUI/Plater.cpp:3049
+#: src/slic3r/GUI/Plater.cpp:3051
 msgid "Delete Object"
 msgstr "删除对象"
 
-#: src/slic3r/GUI/Plater.cpp:3068
+#: src/slic3r/GUI/Plater.cpp:3070
 msgid "Delete All Objects"
 msgstr "删除所有对象"
 
-#: src/slic3r/GUI/Plater.cpp:3097
+#: src/slic3r/GUI/Plater.cpp:3099
 msgid "Reset Project"
 msgstr "重置项目"
 
-#: src/slic3r/GUI/Plater.cpp:3152
+#: src/slic3r/GUI/Plater.cpp:3154
 msgid ""
 "The selected object couldn't be split because it contains only one solid "
 "part."
 msgstr "无法拆分选定对象，因为它只包含一个实体零件。"
 
-#: src/slic3r/GUI/Plater.cpp:3159
+#: src/slic3r/GUI/Plater.cpp:3161
 msgid "All non-solid parts (modifiers) were deleted"
 msgstr "删除了所有非实体零件（修改器）"
 
-#: src/slic3r/GUI/Plater.cpp:3161
+#: src/slic3r/GUI/Plater.cpp:3163
 msgid "Split to Objects"
 msgstr "拆分为对象"
 
-#: src/slic3r/GUI/Plater.cpp:3215
+#: src/slic3r/GUI/Plater.cpp:3217
 msgid ""
 "An object has custom support enforcers which will not be used because "
 "supports are disabled."
 msgstr "对象具有自定义支持强制器，由于支持已禁用，因此将不使用这些强制器。"
 
-#: src/slic3r/GUI/Plater.cpp:3217
+#: src/slic3r/GUI/Plater.cpp:3219
 msgid "Enable supports for enforcers only"
 msgstr "仅对实施者启用支持"
 
-#: src/slic3r/GUI/Plater.cpp:3230
+#: src/slic3r/GUI/Plater.cpp:3232
 msgid "Bed temperatures for the used filaments differ significantly."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:3368 src/slic3r/GUI/Plater.cpp:4296
+#: src/slic3r/GUI/Plater.cpp:3370 src/slic3r/GUI/Plater.cpp:4303
 msgid "Invalid data"
 msgstr "无效数据"
 
-#: src/slic3r/GUI/Plater.cpp:3439
+#: src/slic3r/GUI/Plater.cpp:3441
 msgid "Another export job is currently running."
 msgstr "当前正在运行另一个导出作业。"
 
-#: src/slic3r/GUI/Plater.cpp:3525
+#: src/slic3r/GUI/Plater.cpp:3527
 msgid "Replace from:"
 msgstr "替换自:"
 
-#: src/slic3r/GUI/Plater.cpp:3543
+#: src/slic3r/GUI/Plater.cpp:3545
 msgid "Unable to replace with more than one volume"
 msgstr "无法替换为多个卷"
 
-#: src/slic3r/GUI/Plater.cpp:3543 src/slic3r/GUI/Plater.cpp:3622
+#: src/slic3r/GUI/Plater.cpp:3545 src/slic3r/GUI/Plater.cpp:3629
 msgid "Error during replace"
 msgstr "更换过程中出错"
 
-#: src/slic3r/GUI/Plater.cpp:3614
+#: src/slic3r/GUI/Plater.cpp:3621
 msgid "Select the new file"
 msgstr "选择新文件"
 
-#: src/slic3r/GUI/Plater.cpp:3622
+#: src/slic3r/GUI/Plater.cpp:3629
 msgid "File for the replace wasn't selected"
 msgstr "未选择替换文件"
 
-#: src/slic3r/GUI/Plater.cpp:3709
+#: src/slic3r/GUI/Plater.cpp:3716
 msgid "Please select the file to reload"
 msgstr "请选择要重新加载的文件"
 
-#: src/slic3r/GUI/Plater.cpp:3740 src/slic3r/GUI/Plater.cpp:5410
-#: src/slic3r/GUI/Plater.cpp:5420
+#: src/slic3r/GUI/Plater.cpp:3747 src/slic3r/GUI/Plater.cpp:5417
+#: src/slic3r/GUI/Plater.cpp:5427
 msgid "The selected file"
 msgstr "选定的文件"
 
-#: src/slic3r/GUI/Plater.cpp:3741
+#: src/slic3r/GUI/Plater.cpp:3748
 msgid "differs from the original file"
 msgstr "与原始文件不同"
 
-#: src/slic3r/GUI/Plater.cpp:3741
+#: src/slic3r/GUI/Plater.cpp:3748
 msgid "Do you want to replace it"
 msgstr "你想替换它吗"
 
-#: src/slic3r/GUI/Plater.cpp:3761 src/slic3r/GUI/Plater.cpp:3767
+#: src/slic3r/GUI/Plater.cpp:3768 src/slic3r/GUI/Plater.cpp:3774
 msgid "Reload from:"
 msgstr "从以下位置重新加载:"
 
-#: src/slic3r/GUI/Plater.cpp:3882
+#: src/slic3r/GUI/Plater.cpp:3889
 msgid "Unable to reload:"
 msgstr "无法重新加载:"
 
-#: src/slic3r/GUI/Plater.cpp:3887
+#: src/slic3r/GUI/Plater.cpp:3894
 msgid "Error during reload"
 msgstr "重新加载时出错"
 
-#: src/slic3r/GUI/Plater.cpp:3905
+#: src/slic3r/GUI/Plater.cpp:3912
 msgid "Reload all from disk"
 msgstr "从磁盘重新加载所有"
 
-#: src/slic3r/GUI/Plater.cpp:4105 src/slic3r/GUI/Plater.cpp:4111
+#: src/slic3r/GUI/Plater.cpp:4112 src/slic3r/GUI/Plater.cpp:4118
 msgid "You are using template filament preset."
 msgid_plural "You are using template filament presets."
 msgstr[0] ""
 
-#: src/slic3r/GUI/Plater.cpp:4107 src/slic3r/GUI/Plater.cpp:4112
+#: src/slic3r/GUI/Plater.cpp:4114 src/slic3r/GUI/Plater.cpp:4119
 msgid ""
 "Please note that template presets are not customized for specific printer "
 "and should only be used as a starting point for creating your own user "
 "presets."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:4108
+#: src/slic3r/GUI/Plater.cpp:4115
 msgid "More info at"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:4249
+#: src/slic3r/GUI/Plater.cpp:4256
 msgid "There are active warnings concerning sliced models:"
 msgstr "存在有关切片模型的活动警告:"
 
-#: src/slic3r/GUI/Plater.cpp:4260
+#: src/slic3r/GUI/Plater.cpp:4267
 msgid "generated warnings"
 msgstr "生成的警告"
 
-#: src/slic3r/GUI/Plater.cpp:4305
+#: src/slic3r/GUI/Plater.cpp:4312
 msgid "Slicing Cancelled."
 msgstr "切片取消。"
 
-#: src/slic3r/GUI/Plater.cpp:4607
+#: src/slic3r/GUI/Plater.cpp:4614
 msgid "3D editor view"
 msgstr "3D 编辑器视图"
 
-#: src/slic3r/GUI/Plater.cpp:5034
+#: src/slic3r/GUI/Plater.cpp:5041
 msgid "Undo / Redo is processing"
 msgstr "撤消/重做正在处理"
 
-#: src/slic3r/GUI/Plater.cpp:5036
+#: src/slic3r/GUI/Plater.cpp:5043
 #, boost-format
 msgid ""
 "Switching the printer technology from %1% to %2%.\n"
@@ -14136,19 +14148,19 @@ msgstr ""
 "将打印机技术从 %1% 切换到 %2%。\n"
 "修改了某些 %1% 的预设，切换打印机技术后这些预设将丢失。"
 
-#: src/slic3r/GUI/Plater.cpp:5238
+#: src/slic3r/GUI/Plater.cpp:5245
 msgid "Creating a new project while the current project is modified."
 msgstr "在修改当前项目时创建新项目。"
 
-#: src/slic3r/GUI/Plater.cpp:5241
+#: src/slic3r/GUI/Plater.cpp:5248
 msgid "Creating a new project while some presets are modified."
 msgstr "在修改某些预设时创建新项目。"
 
-#: src/slic3r/GUI/Plater.cpp:5242
+#: src/slic3r/GUI/Plater.cpp:5249
 msgid "You can keep presets modifications to the new project or discard them"
 msgstr "可以保留对新项目的预设修改，也可以放弃它们"
 
-#: src/slic3r/GUI/Plater.cpp:5243
+#: src/slic3r/GUI/Plater.cpp:5250
 msgid ""
 "You can keep presets modifications to the new project, discard them or save "
 "changes as new presets.\n"
@@ -14157,187 +14169,187 @@ msgstr ""
 "可以保留对新项目的预设修改、放弃它们或将更改另存为新预设。\n"
 "注意，如果更改将被保存，那么新项目将不会保留它们"
 
-#: src/slic3r/GUI/Plater.cpp:5248
+#: src/slic3r/GUI/Plater.cpp:5255
 msgid "Creating a new project"
 msgstr "创建新项目"
 
-#: src/slic3r/GUI/Plater.cpp:5282
+#: src/slic3r/GUI/Plater.cpp:5289
 msgid "Load Project"
 msgstr "加载项目"
 
-#: src/slic3r/GUI/Plater.cpp:5312
+#: src/slic3r/GUI/Plater.cpp:5319
 msgid "Import Object"
 msgstr "导入对象"
 
-#: src/slic3r/GUI/Plater.cpp:5316
+#: src/slic3r/GUI/Plater.cpp:5323
 msgid "Import Objects"
 msgstr "导入对象"
 
-#: src/slic3r/GUI/Plater.cpp:5346
+#: src/slic3r/GUI/Plater.cpp:5353
 msgid "Import SLA archive"
 msgstr "导入 SLA 存档"
 
-#: src/slic3r/GUI/Plater.cpp:5410 src/slic3r/GUI/Plater.cpp:5420
+#: src/slic3r/GUI/Plater.cpp:5417 src/slic3r/GUI/Plater.cpp:5427
 msgid "does not contain valid gcode."
 msgstr "不包含有效的 gcode。"
 
-#: src/slic3r/GUI/Plater.cpp:5411 src/slic3r/GUI/Plater.cpp:5421
+#: src/slic3r/GUI/Plater.cpp:5418 src/slic3r/GUI/Plater.cpp:5428
 msgid "Error while loading .gcode file"
 msgstr "加载 .gcode 文件时出错"
 
-#: src/slic3r/GUI/Plater.cpp:5488
+#: src/slic3r/GUI/Plater.cpp:5495
 #, boost-format
 msgid "%1% - Multiple projects file"
 msgstr "%1% - 多个项目文件"
 
-#: src/slic3r/GUI/Plater.cpp:5498
+#: src/slic3r/GUI/Plater.cpp:5505
 msgid "There are several files being loaded, including Project files."
 msgstr "有几个文件正在加载，包括项目文件。"
 
-#: src/slic3r/GUI/Plater.cpp:5498 src/slic3r/GUI/Plater.cpp:5501
+#: src/slic3r/GUI/Plater.cpp:5505 src/slic3r/GUI/Plater.cpp:5508
 msgid "Select an action to apply to all files."
 msgstr "选择一个动作，应用于所有文件。"
 
-#: src/slic3r/GUI/Plater.cpp:5501
+#: src/slic3r/GUI/Plater.cpp:5508
 msgid "There are several files being loaded."
 msgstr "有几个文件正在加载。"
 
-#: src/slic3r/GUI/Plater.cpp:5503 src/slic3r/GUI/Plater.cpp:5899
+#: src/slic3r/GUI/Plater.cpp:5510 src/slic3r/GUI/Plater.cpp:5906
 msgid "Action"
 msgstr "行动"
 
-#: src/slic3r/GUI/Plater.cpp:5524
+#: src/slic3r/GUI/Plater.cpp:5531
 msgid "Import 3D models"
 msgstr "导入3D模型"
 
-#: src/slic3r/GUI/Plater.cpp:5537
+#: src/slic3r/GUI/Plater.cpp:5544
 msgid "Start a new instance of PrusaSlicer"
 msgstr "启动PrusaSlicer的新实例"
 
-#: src/slic3r/GUI/Plater.cpp:5551
+#: src/slic3r/GUI/Plater.cpp:5558
 msgid "Select one to load as project"
 msgstr "选择一个作为项目加载"
 
-#: src/slic3r/GUI/Plater.cpp:5562
+#: src/slic3r/GUI/Plater.cpp:5569
 msgid "Select only one file to load the configuration."
 msgstr "只选择一个文件来加载配置。"
 
 #. TRN %1% is archive path
-#: src/slic3r/GUI/Plater.cpp:5609
+#: src/slic3r/GUI/Plater.cpp:5616
 #, boost-format
 msgid "Loading of a ZIP archive on path %1% has failed."
 msgstr "加载路径为%1%的ZIP档案失败。"
 
-#: src/slic3r/GUI/Plater.cpp:5668
+#: src/slic3r/GUI/Plater.cpp:5675
 #, boost-format
 msgid "Failed to unzip file to %1%: %2% "
 msgstr "解压缩文件到 %1%: %2%时失败 "
 
-#: src/slic3r/GUI/Plater.cpp:5678
+#: src/slic3r/GUI/Plater.cpp:5685
 #, boost-format
 msgid "Failed to find unzipped file at %1%. Unzipping of file has failed."
 msgstr "未能找到位于 %1% 的解压文件。解压缩文件失败。"
 
-#: src/slic3r/GUI/Plater.cpp:5878
+#: src/slic3r/GUI/Plater.cpp:5885
 msgid "Load project file"
 msgstr "加载项目文件"
 
-#: src/slic3r/GUI/Plater.cpp:5887
+#: src/slic3r/GUI/Plater.cpp:5894
 msgid "Open as project"
 msgstr "作为项目打开"
 
-#: src/slic3r/GUI/Plater.cpp:5888
+#: src/slic3r/GUI/Plater.cpp:5895
 msgid "Import 3D models only"
 msgstr "仅导入3D模型"
 
-#: src/slic3r/GUI/Plater.cpp:5889
+#: src/slic3r/GUI/Plater.cpp:5896
 msgid "Import config only"
 msgstr "仅导入配置"
 
-#: src/slic3r/GUI/Plater.cpp:5891
+#: src/slic3r/GUI/Plater.cpp:5898
 msgid "Start new PrusaSlicer instance"
 msgstr "启动新的PrusaSlicer实例"
 
-#: src/slic3r/GUI/Plater.cpp:5894
+#: src/slic3r/GUI/Plater.cpp:5901
 msgid "Select an action to apply to the file"
 msgstr "选择要应用于文件的操作"
 
-#: src/slic3r/GUI/Plater.cpp:5915
+#: src/slic3r/GUI/Plater.cpp:5922
 msgid "Don't show again"
 msgstr "别再出现了"
 
-#: src/slic3r/GUI/Plater.cpp:5956
+#: src/slic3r/GUI/Plater.cpp:5963
 msgid "You can open only one .gcode file at a time."
 msgstr "你一次只能打开一个 .gcode 文件。"
 
-#: src/slic3r/GUI/Plater.cpp:5957
+#: src/slic3r/GUI/Plater.cpp:5964
 msgid "Drag and drop G-code file"
 msgstr "拖放 G-Code 文件"
 
-#: src/slic3r/GUI/Plater.cpp:6051
+#: src/slic3r/GUI/Plater.cpp:6058
 msgid "Load File"
 msgstr "加载文件"
 
-#: src/slic3r/GUI/Plater.cpp:6056
+#: src/slic3r/GUI/Plater.cpp:6063
 msgid "Load Files"
 msgstr "加载文件"
 
-#: src/slic3r/GUI/Plater.cpp:6106
+#: src/slic3r/GUI/Plater.cpp:6113
 msgid "All objects will be removed, continue?"
 msgstr "将删除所有对象，是否继续？"
 
-#: src/slic3r/GUI/Plater.cpp:6117
+#: src/slic3r/GUI/Plater.cpp:6124
 msgid "Delete Selected Objects"
 msgstr "删除选定对象"
 
-#: src/slic3r/GUI/Plater.cpp:6126
+#: src/slic3r/GUI/Plater.cpp:6133
 msgid "Increase Instances"
 msgstr "增加实例"
 
-#: src/slic3r/GUI/Plater.cpp:6182
+#: src/slic3r/GUI/Plater.cpp:6189
 msgid "Decrease Instances"
 msgstr "减少实例"
 
-#: src/slic3r/GUI/Plater.cpp:6240
+#: src/slic3r/GUI/Plater.cpp:6247
 msgid "Enter the number of copies:"
 msgstr "输入副本数:"
 
-#: src/slic3r/GUI/Plater.cpp:6241
+#: src/slic3r/GUI/Plater.cpp:6248
 msgid "Copies of the selected object"
 msgstr "选定对象的副本"
 
-#: src/slic3r/GUI/Plater.cpp:6244
+#: src/slic3r/GUI/Plater.cpp:6251
 #, c-format, boost-format
 msgid "Set numbers of copies to %d"
 msgstr "将副本数设置为 %d"
 
-#: src/slic3r/GUI/Plater.cpp:6268
+#: src/slic3r/GUI/Plater.cpp:6275
 msgid "Fill bed"
 msgstr "填充床"
 
-#: src/slic3r/GUI/Plater.cpp:6438
+#: src/slic3r/GUI/Plater.cpp:6445
 msgid "Save G-code file as:"
 msgstr "将 G-Code 文件另存为:"
 
-#: src/slic3r/GUI/Plater.cpp:6438
+#: src/slic3r/GUI/Plater.cpp:6445
 msgid "Save SL1 / SL1S file as:"
 msgstr "将 SL1 / SL1S 文件另存为:"
 
-#: src/slic3r/GUI/Plater.cpp:6453
+#: src/slic3r/GUI/Plater.cpp:6460
 msgid "The provided file name is not valid."
 msgstr "提供的文件名无效。"
 
-#: src/slic3r/GUI/Plater.cpp:6454
+#: src/slic3r/GUI/Plater.cpp:6461
 msgid "The following characters are not allowed by a FAT file system:"
 msgstr "FAT 文件系统不允许使用以下字符:"
 
-#: src/slic3r/GUI/Plater.cpp:6517
+#: src/slic3r/GUI/Plater.cpp:6524
 msgid ""
 "Unable to perform boolean operation on model meshes. Only positive parts "
 "will be exported."
 msgstr "无法对模型网格进行布尔运算。只有正数部分会被导出。"
 
-#: src/slic3r/GUI/Plater.cpp:6671
+#: src/slic3r/GUI/Plater.cpp:6678
 msgid ""
 "The plater is empty.\n"
 "Do you want to save the project?"
@@ -14345,27 +14357,27 @@ msgstr ""
 "盘子是空的。\n"
 "你想保存这个项目吗？"
 
-#: src/slic3r/GUI/Plater.cpp:6671
+#: src/slic3r/GUI/Plater.cpp:6678
 msgid "Save project"
 msgstr "保存项目"
 
-#: src/slic3r/GUI/Plater.cpp:6715
+#: src/slic3r/GUI/Plater.cpp:6722
 msgid "Unable to save file"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:6909
+#: src/slic3r/GUI/Plater.cpp:6916
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
 msgstr "打印机准备好了吗？打印材料是否到位，空且干净？"
 
-#: src/slic3r/GUI/Plater.cpp:6909 src/slic3r/GUI/PrintHostDialogs.cpp:132
+#: src/slic3r/GUI/Plater.cpp:6916 src/slic3r/GUI/PrintHostDialogs.cpp:132
 msgid "Upload and Print"
 msgstr "上传和打印"
 
-#: src/slic3r/GUI/Plater.cpp:7379
+#: src/slic3r/GUI/Plater.cpp:7386
 msgid "Export"
 msgstr "导出"
 
-#: src/slic3r/GUI/Plater.cpp:7524
+#: src/slic3r/GUI/Plater.cpp:7531
 msgid "Paste From Clipboard"
 msgstr "从剪贴板粘贴"
 

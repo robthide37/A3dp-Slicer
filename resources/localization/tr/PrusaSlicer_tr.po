@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-08-22 17:26+0200\n"
+"POT-Creation-Date: 2023-08-30 15:32+0200\n"
 "PO-Revision-Date: 2023-04-10 05:30+0300\n"
 "Last-Translator: Mehmet Sutas <msutas@gmail.com>\n"
 "Language-Team: \n"
@@ -857,7 +857,7 @@ msgstr ""
 #: src/slic3r/GUI/GCodeViewer.cpp:3536 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:244
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:553
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:573
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2385
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2351
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1222
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1988
 #: src/slic3r/GUI/GUI_ObjectLayers.cpp:145
@@ -1218,7 +1218,7 @@ msgstr ""
 #: src/libslic3r/PrintConfig.cpp:3235 src/libslic3r/PrintConfig.cpp:3361
 #: src/libslic3r/PrintConfig.cpp:3599 src/libslic3r/PrintConfig.cpp:4088
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:272
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2583
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2549
 msgid "°"
 msgstr "°"
 
@@ -3689,7 +3689,7 @@ msgstr "En yakın"
 msgid "Aligned"
 msgstr "Hizalı"
 
-#: src/libslic3r/PrintConfig.cpp:2343 src/slic3r/GUI/MainFrame.cpp:1209
+#: src/libslic3r/PrintConfig.cpp:2343 src/slic3r/GUI/MainFrame.cpp:1219
 msgid "Rear"
 msgstr "Arka"
 
@@ -5848,7 +5848,7 @@ msgid "Export the model(s) as STL."
 msgstr "Model(ler)i STL olarak dışa aktar."
 
 #: src/libslic3r/PrintConfig.cpp:4749 src/slic3r/GUI/KBShortcutsDialog.cpp:96
-#: src/slic3r/GUI/Plater.cpp:954 src/slic3r/GUI/Plater.cpp:7379
+#: src/slic3r/GUI/Plater.cpp:954 src/slic3r/GUI/Plater.cpp:7386
 msgid "Export G-code"
 msgstr "G-code Dışa Aktar"
 
@@ -6012,7 +6012,7 @@ msgstr ""
 "Tedarik edilen modelleri bir plaka içinde düzenleyin ve bir kez işlem yapmak "
 "için bunları tek bir modelde birleştirin."
 
-#: src/libslic3r/PrintConfig.cpp:4868 src/slic3r/GUI/MainFrame.cpp:1845
+#: src/libslic3r/PrintConfig.cpp:4868 src/slic3r/GUI/MainFrame.cpp:1855
 msgid "Repair"
 msgstr "Onar"
 
@@ -6563,7 +6563,7 @@ msgstr ""
 
 #: src/slic3r/GUI/ArrangeSettingsDialogImgui.cpp:130
 #: src/slic3r/GUI/GLCanvas3D.cpp:5214 src/slic3r/GUI/KBShortcutsDialog.cpp:141
-#: src/slic3r/GUI/Plater.cpp:7306
+#: src/slic3r/GUI/Plater.cpp:7313
 msgid "Arrange"
 msgstr "Hizala"
 
@@ -6751,7 +6751,7 @@ msgid "Load shape from STL..."
 msgstr "STL dosyadan şekil yükle..."
 
 #: src/slic3r/GUI/BedShapeDialog.cpp:252 src/slic3r/GUI/GCodeViewer.cpp:3984
-#: src/slic3r/GUI/MainFrame.cpp:2241
+#: src/slic3r/GUI/MainFrame.cpp:2251
 msgid "Settings"
 msgstr "Ayarlar"
 
@@ -7362,7 +7362,7 @@ msgid "Chosen directory for downloads does not exist."
 msgstr "İndirmeler için seçilen dizin mevcut değil."
 
 #: src/slic3r/GUI/ConfigWizard.cpp:1619 src/slic3r/GUI/GUI_Factories.cpp:818
-#: src/slic3r/GUI/Plater.cpp:3757
+#: src/slic3r/GUI/Plater.cpp:3764
 msgid "Reload from disk"
 msgstr "Diskten yeniden yükle"
 
@@ -7471,7 +7471,7 @@ msgstr "Yazıcı tablasının şeklini ayarlayın."
 
 #. TRN ConfigWizard : Size of possible print, related on printer size
 #: src/slic3r/GUI/ConfigWizard.cpp:1838
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2393
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2359
 msgid "Build Volume"
 msgstr "Yapı Hacmi"
 
@@ -7667,7 +7667,7 @@ msgstr "&Bitti"
 #: src/slic3r/GUI/FileArchiveDialog.cpp:277
 #: src/slic3r/GUI/FileArchiveDialog.cpp:286
 #: src/slic3r/GUI/FirmwareDialog.cpp:153
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2376
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2342
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2396
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:2485
 #: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp:66
@@ -7790,7 +7790,7 @@ msgstr "Uygula"
 
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:653
 #: src/slic3r/GUI/GLCanvas3D.cpp:5395 src/slic3r/GUI/KBShortcutsDialog.cpp:106
-#: src/slic3r/GUI/MainFrame.cpp:1426
+#: src/slic3r/GUI/MainFrame.cpp:1436
 msgid "Undo"
 msgstr "Geri Al"
 
@@ -8451,7 +8451,7 @@ msgstr "Onaylama"
 msgid "Cancelling..."
 msgstr "İptal ediliyor..."
 
-#: src/slic3r/GUI/GalleryDialog.cpp:69 src/slic3r/GUI/MainFrame.cpp:1488
+#: src/slic3r/GUI/GalleryDialog.cpp:69 src/slic3r/GUI/MainFrame.cpp:1498
 msgid "Shape Gallery"
 msgstr "Şekil Galerisi"
 
@@ -8540,7 +8540,7 @@ msgstr "Dizin arabellekleri oluşturuluyor"
 #: src/slic3r/GUI/GCodeViewer.cpp:3337 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:244
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:553
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:573
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2385
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2351
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1222
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1988
 #: src/slic3r/GUI/GUI_ObjectManipulation.cpp:345
@@ -8852,14 +8852,14 @@ msgid "Groove Angle"
 msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:247
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2705
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2702
 #: src/slic3r/GUI/GUI_ObjectList.cpp:4137
 #: src/slic3r/GUI/GUI_ObjectList.cpp:4329
 msgid "Part"
 msgstr "Bölüm"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:247
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2705
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2702
 msgid "Object"
 msgstr "Nesne"
 
@@ -8910,7 +8910,7 @@ msgid "Left click"
 msgstr "Sol tık"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1175
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3507
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3504
 msgid "Add connector"
 msgstr "Bağlayıcı ekle"
 
@@ -8955,154 +8955,155 @@ msgstr "Kesme düzlemini döndür"
 msgid "Remove connectors"
 msgstr "Bağlantıları kaldır"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2334
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2329
 msgid "Bulge"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2341
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2329
 msgid "Bulge proportion related to radius"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2348
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2330
 msgid "Space"
 msgstr "Boşluk"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2355
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2330
 msgid "Space proportion related to radius"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2369
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2335
 msgid "Confirm connectors"
 msgstr "Bağlayıcıları onaylama"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2438
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2497
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2404
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2463
 msgid "Flip cut plane"
 msgstr "Kesim düzlemini çevir"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2539
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2589
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2505
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2555
 msgid "Groove change"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2551
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2600 src/slic3r/GUI/GLCanvas3D.cpp:259
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2517
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2566
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2604 src/slic3r/GUI/GLCanvas3D.cpp:259
 msgid "Reset"
 msgstr "Sıfırla"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2629
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2626
 msgid "Hold SHIFT key to draw a cut line"
 msgstr "Kesme çizgisi çizmek için SHIFT tuşunu basılı tutun"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2642
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2639
 msgid "Cut position"
 msgstr "Kesim pozisyonu: "
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2649
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2646
 msgid "Reset cutting plane"
 msgstr "Kesme düzlemini sıfırla"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2662
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2659
 msgid "Edit connectors"
 msgstr "Bağlayıcıları düzenleme"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2662
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2659
 msgid "Add connectors"
 msgstr "Bağlayıcı ekleme"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2669
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2666
 msgid "Reset cut"
 msgstr "Kesimi sıfırla"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2670
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2667
 msgid "Reset cutting plane and remove connectors"
 msgstr "Kesme düzlemini sıfırla ve bağlantıları kaldır"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2735
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2732
 msgid "Cut result"
 msgstr "Kesimden sonra"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2755
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2752
 msgid "Cut into"
 msgstr "Kesim"
 
 #. TRN CutGizmo: RadioButton Cut into ...
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2762
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2759
 msgid "Objects"
 msgstr "Nesneler"
 
 #. TRN CutGizmo: RadioButton Cut into ...
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2766
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2763
 msgid "Parts"
 msgstr "Parçalar"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2780
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2777
 msgid "Perform cut"
 msgstr "Kesme islemini uygula"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2876
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2873
 msgid "Invalid connectors detected"
 msgstr "Geçersiz bağlayıcılar algılandı"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2878
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2875
 #, c-format, boost-format
 msgid "%1$d connector is out of cut contour"
 msgid_plural "%1$d connectors are out of cut contour"
 msgstr[0] "%1$d bağlantısı kesilmiş kontur dışında"
 msgstr[1] "%1$d bağlantıları kesilmiş kontur dışında"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2881
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2878
 #, c-format, boost-format
 msgid "%1$d connector is out of object"
 msgid_plural "%1$d connectors are out of object"
 msgstr[0] "%1$d bağlantısı nesne dışında"
 msgstr[1] "%1$d bağlantıları nesne dışında"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2884
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2881
 msgid "Some connectors are overlapped"
 msgstr "Bazı bağlayıcılar üst üste biniyor"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2888
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2885
 msgid "Select at least one object to keep after cutting."
 msgstr ""
 "Geçersiz durum.\n"
 "Kesimden sonra tutmak için hiçbir parça seçilmedi"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2890
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2887
 msgid "Cut plane is placed out of object"
 msgstr ""
 "Uyarı durumu. \n"
 "Kesme düzlemi nesnenin dışında"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2892
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2889
 msgid "Cut plane with groove is invalid"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3194
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3191
 msgid "Connector"
 msgstr "Bağlayıcı"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3263
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3260
 msgid "Cut by Plane"
 msgstr "Düzlemle Kes"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3477
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3474
 msgid "Cut by line"
 msgstr "Çizgiyle kes"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3533
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3530
 msgid "Delete connector"
 msgstr "Bağlayıcıyı silme"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:325
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:326
 msgid "Entering Cut gizmo"
 msgstr "Cut aracına giriliyor"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:326
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:327
 msgid "Leaving Cut gizmo"
 msgstr "Kesme aracından çık"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:327
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp:328
 msgid "Cut gizmo editing"
 msgstr "Kesme aracı düzenleme"
 
@@ -10210,7 +10211,7 @@ msgstr ""
 "Sadeleştirmeye şu anda yalnızca tek bir parça seçildiğinde izin verilmektedir"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp:191
-#: src/slic3r/GUI/MainFrame.cpp:1246 src/slic3r/GUI/MainFrame.cpp:1717
+#: src/slic3r/GUI/MainFrame.cpp:1256 src/slic3r/GUI/MainFrame.cpp:1727
 #: src/slic3r/GUI/PrintHostDialogs.cpp:425
 msgid "Error"
 msgstr "Hata"
@@ -10608,7 +10609,7 @@ msgid "Add..."
 msgstr "Ekle..."
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:5205 src/slic3r/GUI/KBShortcutsDialog.cpp:105
-#: src/slic3r/GUI/Plater.cpp:6106 src/slic3r/GUI/Tab.cpp:4619
+#: src/slic3r/GUI/Plater.cpp:6113 src/slic3r/GUI/Tab.cpp:4619
 msgid "Delete all"
 msgstr "Tümünü sil"
 
@@ -10655,7 +10656,7 @@ msgid "Next Undo action: %1%"
 msgstr "Sonraki Geri alma eylemi: %1%"
 
 #: src/slic3r/GUI/GLCanvas3D.cpp:5432 src/slic3r/GUI/KBShortcutsDialog.cpp:107
-#: src/slic3r/GUI/MainFrame.cpp:1429
+#: src/slic3r/GUI/MainFrame.cpp:1439
 msgid "Redo"
 msgstr "Yinele"
 
@@ -11496,7 +11497,7 @@ msgstr "STL/OBJ olarak dışa aktarma"
 msgid "Reload the selected volumes from disk"
 msgstr "Seçilen birimleri diskten yeniden yükle"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:825 src/slic3r/GUI/Plater.cpp:3627
+#: src/slic3r/GUI/GUI_Factories.cpp:825 src/slic3r/GUI/Plater.cpp:3634
 msgid "Replace with STL"
 msgstr "STL ile değiştir"
 
@@ -11516,19 +11517,19 @@ msgstr "Baskı hacmine ölçeklendir"
 msgid "Scale the selected object to fit the print volume"
 msgstr "Seçili nesneyi yazdırma hacmine sığacak şekilde ölçeklendir"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:929 src/slic3r/GUI/Plater.cpp:6333
+#: src/slic3r/GUI/GUI_Factories.cpp:929 src/slic3r/GUI/Plater.cpp:6340
 msgid "Convert from imperial units"
 msgstr "İngiliz ölçü birimlerinden dönüştür"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:930 src/slic3r/GUI/Plater.cpp:6334
+#: src/slic3r/GUI/GUI_Factories.cpp:930 src/slic3r/GUI/Plater.cpp:6341
 msgid "Revert conversion from imperial units"
 msgstr "İngiliz ölçü birimlerinden dönüştür"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:931 src/slic3r/GUI/Plater.cpp:6335
+#: src/slic3r/GUI/GUI_Factories.cpp:931 src/slic3r/GUI/Plater.cpp:6342
 msgid "Convert from meters"
 msgstr "Metreden dönüştür"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:932 src/slic3r/GUI/Plater.cpp:6335
+#: src/slic3r/GUI/GUI_Factories.cpp:932 src/slic3r/GUI/Plater.cpp:6342
 msgid "Revert conversion from meters"
 msgstr "Metreden dönüşümü geri al"
 
@@ -11927,7 +11928,7 @@ msgstr "Seçilen nesne bölünemedi çünkü yalnızca bir parça içeriyordu."
 msgid "Split to Parts"
 msgstr "Paçalara böl"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2185 src/slic3r/GUI/Plater.cpp:3144
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2185 src/slic3r/GUI/Plater.cpp:3146
 msgid ""
 "Custom supports, seams and multimaterial painting were removed after "
 "splitting the object."
@@ -12351,7 +12352,7 @@ msgstr "Düzenleme yapıldı."
 msgid "Could not arrange model objects! Some geometries may be invalid."
 msgstr "Model nesneleri düzenlenemedi! Bazı geometriler geçersiz olabilir."
 
-#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:359 src/slic3r/GUI/Plater.cpp:7329
+#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:359 src/slic3r/GUI/Plater.cpp:7336
 #, c-format, boost-format
 msgid ""
 "Arrangement ignored the following objects which can't fit into a single "
@@ -12521,7 +12522,7 @@ msgid ""
 "or missing."
 msgstr "Arşivden hiçbir nesne alınamadı. Dilimler bozuk veya eksik olabilir."
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:18 src/slic3r/GUI/MainFrame.cpp:1184
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:18 src/slic3r/GUI/MainFrame.cpp:1194
 msgid "Keyboard Shortcuts"
 msgstr "Klavye kısayolları"
 
@@ -12559,7 +12560,7 @@ msgstr "Yapılandırmayı ini/amf/3mf/gcode'dan içe aktarma"
 msgid "Load Config from ini/amf/3mf/gcode and merge"
 msgstr "Yapılandırmayı ini/amf/3mf/gcode'dan yükle ve birleştir"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:97 src/slic3r/GUI/Plater.cpp:7380
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:97 src/slic3r/GUI/Plater.cpp:7387
 msgid "Send G-code"
 msgstr "G kodunu gönder"
 
@@ -12914,13 +12915,13 @@ msgstr "Seçili öğeler için ekstrüder numarasını ayarla"
 msgid "Objects List"
 msgstr "Nesne Listesi"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:211 src/slic3r/GUI/MainFrame.cpp:1612
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:211 src/slic3r/GUI/MainFrame.cpp:1622
 msgid "Open a G-code file"
 msgstr "G kod dosyası aç"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:213 src/slic3r/GUI/MainFrame.cpp:1443
-#: src/slic3r/GUI/MainFrame.cpp:1447 src/slic3r/GUI/MainFrame.cpp:1617
-#: src/slic3r/GUI/MainFrame.cpp:1621
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:213 src/slic3r/GUI/MainFrame.cpp:1453
+#: src/slic3r/GUI/MainFrame.cpp:1457 src/slic3r/GUI/MainFrame.cpp:1627
+#: src/slic3r/GUI/MainFrame.cpp:1631
 msgid "Reload the plater from disk"
 msgstr "Tablayı diskten yeniden yükle"
 
@@ -12956,7 +12957,7 @@ msgstr "Göstergeyi göster/gizle"
 msgid "Show/Hide G-code window"
 msgstr "G kod penceresini göster/gizle"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:236 src/slic3r/GUI/Plater.cpp:4615
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:236 src/slic3r/GUI/Plater.cpp:4622
 #: src/slic3r/GUI/Tab.cpp:2973
 msgid "Preview"
 msgstr "Ön izleme"
@@ -13041,7 +13042,7 @@ msgid "Keyboard shortcuts"
 msgstr "Klavye kısayolları"
 
 #: src/slic3r/GUI/MainFrame.cpp:77 src/slic3r/GUI/MainFrame.cpp:91
-#: src/slic3r/GUI/MainFrame.cpp:1503
+#: src/slic3r/GUI/MainFrame.cpp:1513
 msgid "Open a new PrusaSlicer instance"
 msgstr "Yeni bir PrusaSlicer örneği aç"
 
@@ -13049,11 +13050,11 @@ msgstr "Yeni bir PrusaSlicer örneği aç"
 msgid "G-code preview"
 msgstr "G kod önizlemesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:80 src/slic3r/GUI/MainFrame.cpp:1388
+#: src/slic3r/GUI/MainFrame.cpp:80 src/slic3r/GUI/MainFrame.cpp:1398
 msgid "Open G-code viewer"
 msgstr "G kod görüntüleyiciyi aç"
 
-#: src/slic3r/GUI/MainFrame.cpp:91 src/slic3r/GUI/MainFrame.cpp:1628
+#: src/slic3r/GUI/MainFrame.cpp:91 src/slic3r/GUI/MainFrame.cpp:1638
 msgid "Open PrusaSlicer"
 msgstr "PrusaSlicer'ı Aç"
 
@@ -13079,13 +13080,13 @@ msgid "Print Settings"
 msgstr "Baskı Ayarları"
 
 #: src/slic3r/GUI/MainFrame.cpp:331 src/slic3r/GUI/MainFrame.cpp:384
-#: src/slic3r/GUI/MainFrame.cpp:2197 src/slic3r/GUI/MainFrame.cpp:2198
+#: src/slic3r/GUI/MainFrame.cpp:2207 src/slic3r/GUI/MainFrame.cpp:2208
 #: src/slic3r/GUI/Tab.hpp:541
 msgid "Material Settings"
 msgstr "Malzeme Ayarları"
 
 #: src/slic3r/GUI/MainFrame.cpp:331 src/slic3r/GUI/MainFrame.cpp:382
-#: src/slic3r/GUI/MainFrame.cpp:2197 src/slic3r/GUI/MainFrame.cpp:2198
+#: src/slic3r/GUI/MainFrame.cpp:2207 src/slic3r/GUI/MainFrame.cpp:2208
 #: src/slic3r/GUI/Tab.hpp:456
 msgid "Filament Settings"
 msgstr "Filament Ayarları"
@@ -13096,7 +13097,7 @@ msgid "Printer Settings"
 msgstr "Yazıcı ayarları"
 
 #: src/slic3r/GUI/MainFrame.cpp:685 src/slic3r/GUI/Plater.cpp:1724
-#: src/slic3r/GUI/Plater.cpp:2877
+#: src/slic3r/GUI/Plater.cpp:2879
 msgid "Untitled"
 msgstr "Başlıksız"
 
@@ -13104,71 +13105,82 @@ msgstr "Başlıksız"
 msgid "based on Slic3r"
 msgstr "slic3r uygulamasına dayalı"
 
-#: src/slic3r/GUI/MainFrame.cpp:1150
-msgid "Prusa 3D &Drivers"
-msgstr "Prusa 3D ve Sürücüler"
-
-#: src/slic3r/GUI/MainFrame.cpp:1150
-msgid "Open the Prusa3D drivers download page in your browser"
-msgstr "Prusa3D sürücüleri indirme sayfasını tarayıcınızda açar"
-
-#: src/slic3r/GUI/MainFrame.cpp:1152
-msgid "Software &Releases"
-msgstr "Yazılım ve Bültenler"
-
-#: src/slic3r/GUI/MainFrame.cpp:1152
-msgid "Open the software releases page in your browser"
-msgstr "Tarayıcınızda yazılım sürümleri sayfasını açar"
-
-#: src/slic3r/GUI/MainFrame.cpp:1158
+#: src/slic3r/GUI/MainFrame.cpp:1151
 #, c-format, boost-format
 msgid "%s &Website"
 msgstr "%s &Web Sitesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1159
+#: src/slic3r/GUI/MainFrame.cpp:1152 src/slic3r/GUI/MainFrame.cpp:1156
+#: src/slic3r/GUI/MainFrame.cpp:1160
 #, c-format, boost-format
 msgid "Open the %s website in your browser"
 msgstr "Tarayıcınızda %s web sitesini açar"
 
+#. TRN Item from "Help" menu
+#: src/slic3r/GUI/MainFrame.cpp:1155
+msgid "&Quick Start"
+msgstr ""
+
+#. TRN Item from "Help" menu
+#: src/slic3r/GUI/MainFrame.cpp:1159
+msgid "Sample &G-codes and Models"
+msgstr ""
+
+#: src/slic3r/GUI/MainFrame.cpp:1163
+msgid "Prusa 3D &Drivers"
+msgstr "Prusa 3D ve Sürücüler"
+
+#: src/slic3r/GUI/MainFrame.cpp:1163
+msgid "Open the Prusa3D drivers download page in your browser"
+msgstr "Prusa3D sürücüleri indirme sayfasını tarayıcınızda açar"
+
 #: src/slic3r/GUI/MainFrame.cpp:1165
+msgid "Software &Releases"
+msgstr "Yazılım ve Bültenler"
+
+#: src/slic3r/GUI/MainFrame.cpp:1165
+msgid "Open the software releases page in your browser"
+msgstr "Tarayıcınızda yazılım sürümleri sayfasını açar"
+
+#: src/slic3r/GUI/MainFrame.cpp:1175
 msgid "System &Info"
 msgstr "Sistem bilgisi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1165
+#: src/slic3r/GUI/MainFrame.cpp:1175
 msgid "Show system information"
 msgstr "Sistem bilgisini göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1167
+#: src/slic3r/GUI/MainFrame.cpp:1177
 msgid "Show &Configuration Folder"
 msgstr "&Yapılandırma Klasörünü Göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1167
+#: src/slic3r/GUI/MainFrame.cpp:1177
 msgid "Show user configuration folder (datadir)"
 msgstr "Kullanıcı konfigürasyon klasörünü göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1169
+#: src/slic3r/GUI/MainFrame.cpp:1179
 msgid "Report an I&ssue"
 msgstr "Bir Görüş Bildirin"
 
-#: src/slic3r/GUI/MainFrame.cpp:1169
+#: src/slic3r/GUI/MainFrame.cpp:1179
 #, c-format, boost-format
 msgid "Report an issue on %s"
 msgstr "%s ile ilgili görüş bildirin"
 
-#: src/slic3r/GUI/MainFrame.cpp:1172 src/slic3r/GUI/MainFrame.cpp:1175
+#: src/slic3r/GUI/MainFrame.cpp:1182 src/slic3r/GUI/MainFrame.cpp:1185
 #, c-format, boost-format
 msgid "&About %s"
 msgstr "%s &Hakkında"
 
-#: src/slic3r/GUI/MainFrame.cpp:1172 src/slic3r/GUI/MainFrame.cpp:1175
+#: src/slic3r/GUI/MainFrame.cpp:1182 src/slic3r/GUI/MainFrame.cpp:1185
 msgid "Show about dialog"
 msgstr "Hakkında"
 
-#: src/slic3r/GUI/MainFrame.cpp:1177
+#: src/slic3r/GUI/MainFrame.cpp:1187
 msgid "Show Tip of the Day"
 msgstr "Günün İpucunu Göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1181
+#: src/slic3r/GUI/MainFrame.cpp:1191
 msgid ""
 "Opens Tip of the day notification in bottom right corner or shows another "
 "tip if already opened."
@@ -13176,85 +13188,85 @@ msgstr ""
 "Sağ alt köşedeki Günün İpucu bildirimini açar veya zaten açılmışsa başka bir "
 "ipucu gösterir."
 
-#: src/slic3r/GUI/MainFrame.cpp:1184
+#: src/slic3r/GUI/MainFrame.cpp:1194
 msgid "Show the list of the keyboard shortcuts"
 msgstr "Klavye kısayollarının listesini göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1198
+#: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Iso"
 msgstr "Perspektif"
 
-#: src/slic3r/GUI/MainFrame.cpp:1198
+#: src/slic3r/GUI/MainFrame.cpp:1208
 msgid "Iso View"
 msgstr "Perspektif görünümü"
 
 #. TRN Main menu: View->Top
-#: src/slic3r/GUI/MainFrame.cpp:1202
+#: src/slic3r/GUI/MainFrame.cpp:1212
 msgid "Top"
 msgstr "Üst"
 
-#: src/slic3r/GUI/MainFrame.cpp:1202
+#: src/slic3r/GUI/MainFrame.cpp:1212
 msgid "Top View"
 msgstr "Üst Görünüm"
 
 #. TRN Main menu: View->Bottom
-#: src/slic3r/GUI/MainFrame.cpp:1205
+#: src/slic3r/GUI/MainFrame.cpp:1215
 msgid "Bottom"
 msgstr "Alt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1205
+#: src/slic3r/GUI/MainFrame.cpp:1215
 msgid "Bottom View"
 msgstr "Alt Görünüm"
 
-#: src/slic3r/GUI/MainFrame.cpp:1207
+#: src/slic3r/GUI/MainFrame.cpp:1217
 msgid "Front"
 msgstr "Ön"
 
-#: src/slic3r/GUI/MainFrame.cpp:1207
+#: src/slic3r/GUI/MainFrame.cpp:1217
 msgid "Front View"
 msgstr "Ön görünüm"
 
-#: src/slic3r/GUI/MainFrame.cpp:1209
+#: src/slic3r/GUI/MainFrame.cpp:1219
 msgid "Rear View"
 msgstr "Arka görünüm"
 
-#: src/slic3r/GUI/MainFrame.cpp:1211
+#: src/slic3r/GUI/MainFrame.cpp:1221
 msgid "Left"
 msgstr "Sol"
 
-#: src/slic3r/GUI/MainFrame.cpp:1211
+#: src/slic3r/GUI/MainFrame.cpp:1221
 msgid "Left View"
 msgstr "Sol görünüm"
 
-#: src/slic3r/GUI/MainFrame.cpp:1213
+#: src/slic3r/GUI/MainFrame.cpp:1223
 msgid "Right"
 msgstr "Sağ"
 
-#: src/slic3r/GUI/MainFrame.cpp:1213
+#: src/slic3r/GUI/MainFrame.cpp:1223
 msgid "Right View"
 msgstr "Sağ görünüm"
 
-#: src/slic3r/GUI/MainFrame.cpp:1226
+#: src/slic3r/GUI/MainFrame.cpp:1236
 msgid "&New Project"
 msgstr "&Yeni Proje"
 
-#: src/slic3r/GUI/MainFrame.cpp:1226
+#: src/slic3r/GUI/MainFrame.cpp:1236
 msgid "Start a new project"
 msgstr "Yeni bir proje başlat"
 
-#: src/slic3r/GUI/MainFrame.cpp:1229
+#: src/slic3r/GUI/MainFrame.cpp:1239
 msgid "&Open Project"
 msgstr "& Proje Aç"
 
-#: src/slic3r/GUI/MainFrame.cpp:1229
+#: src/slic3r/GUI/MainFrame.cpp:1239
 msgid "Open a project file"
 msgstr "Bir proje dosyası açın"
 
-#: src/slic3r/GUI/MainFrame.cpp:1234
+#: src/slic3r/GUI/MainFrame.cpp:1244
 msgid "Recent projects"
 msgstr "Son projeler"
 
-#: src/slic3r/GUI/MainFrame.cpp:1246
+#: src/slic3r/GUI/MainFrame.cpp:1256
 msgid ""
 "The selected project is no longer available.\n"
 "Do you want to remove it from the recent projects list?"
@@ -13262,536 +13274,536 @@ msgstr ""
 "Seçilen proje artık kullanılamaz.\n"
 "Son projeler listesinden kaldırmak istiyor musunuz?"
 
-#: src/slic3r/GUI/MainFrame.cpp:1270
+#: src/slic3r/GUI/MainFrame.cpp:1280
 msgid "&Save Project"
 msgstr "& Projeyi Kaydet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1270
+#: src/slic3r/GUI/MainFrame.cpp:1280
 msgid "Save current project file"
 msgstr "Mevcut proje dosyasını kaydet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1274 src/slic3r/GUI/MainFrame.cpp:1276
+#: src/slic3r/GUI/MainFrame.cpp:1284 src/slic3r/GUI/MainFrame.cpp:1286
 msgid "Save Project &as"
 msgstr "Projeyi farklı kaydet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1274 src/slic3r/GUI/MainFrame.cpp:1276
+#: src/slic3r/GUI/MainFrame.cpp:1284 src/slic3r/GUI/MainFrame.cpp:1286
 msgid "Save current project file as"
 msgstr "Mevcut proje dosyasını farklı kaydet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1284
+#: src/slic3r/GUI/MainFrame.cpp:1294
 msgid "Import STL/3MF/STEP/OBJ/AM&F"
 msgstr "STL/3MF/STEP/OBJ/AM&F"
 
-#: src/slic3r/GUI/MainFrame.cpp:1284
+#: src/slic3r/GUI/MainFrame.cpp:1294
 msgid "Load a model"
 msgstr "Bir model yükle"
 
-#: src/slic3r/GUI/MainFrame.cpp:1288
+#: src/slic3r/GUI/MainFrame.cpp:1298
 msgid "Import STL (Imperial Units)"
 msgstr "STL içe aktar (İngiliz Birimleri)"
 
-#: src/slic3r/GUI/MainFrame.cpp:1288
+#: src/slic3r/GUI/MainFrame.cpp:1298
 msgid "Load an model saved with imperial units"
 msgstr "İngiliz birimleriyle kaydedilmiş bir modeli yükleme"
 
-#: src/slic3r/GUI/MainFrame.cpp:1292
+#: src/slic3r/GUI/MainFrame.cpp:1302
 msgid "Import SLA Archive"
 msgstr "SLA Arşivini İçe Aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1292
+#: src/slic3r/GUI/MainFrame.cpp:1302
 msgid "Load an SLA archive"
 msgstr "SLA arşivi yükleme"
 
-#: src/slic3r/GUI/MainFrame.cpp:1296
+#: src/slic3r/GUI/MainFrame.cpp:1306
 msgid "Import ZIP Archive"
 msgstr "ZIP arşivini İçe Aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1296
+#: src/slic3r/GUI/MainFrame.cpp:1306
 msgid "Load a ZIP archive"
 msgstr "ZIP arşivini yükle"
 
-#: src/slic3r/GUI/MainFrame.cpp:1301
+#: src/slic3r/GUI/MainFrame.cpp:1311
 msgid "Import &Config"
 msgstr "&Ayarları İçe Aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1301
+#: src/slic3r/GUI/MainFrame.cpp:1311
 msgid "Load exported configuration file"
 msgstr "Dışa aktarılan yapılandırma dosyasını yükle"
 
-#: src/slic3r/GUI/MainFrame.cpp:1304
+#: src/slic3r/GUI/MainFrame.cpp:1314
 msgid "Import Config from &Project"
 msgstr "Yapılandırmayı &Projeden İçe Aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1304
+#: src/slic3r/GUI/MainFrame.cpp:1314
 msgid "Load configuration from project file"
 msgstr "Proje dosyasından yapılandırmayı yükle"
 
-#: src/slic3r/GUI/MainFrame.cpp:1308
+#: src/slic3r/GUI/MainFrame.cpp:1318
 msgid "Import Config &Bundle"
 msgstr "Ha&zır Ayarları İçe Aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1308
+#: src/slic3r/GUI/MainFrame.cpp:1318
 msgid "Load presets from a bundle"
 msgstr "Paketten hazır ayarları yükleme"
 
-#: src/slic3r/GUI/MainFrame.cpp:1311
+#: src/slic3r/GUI/MainFrame.cpp:1321
 msgid "&Import"
 msgstr "&İçe Aktarma"
 
-#: src/slic3r/GUI/MainFrame.cpp:1314 src/slic3r/GUI/MainFrame.cpp:1677
+#: src/slic3r/GUI/MainFrame.cpp:1324 src/slic3r/GUI/MainFrame.cpp:1687
 msgid "Export &G-code"
 msgstr "&G-code Dışa Aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1314
+#: src/slic3r/GUI/MainFrame.cpp:1324
 msgid "Export current plate as G-code"
 msgstr "Geçerli tablayı G-code olarak dışa aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1318 src/slic3r/GUI/MainFrame.cpp:1678
+#: src/slic3r/GUI/MainFrame.cpp:1328 src/slic3r/GUI/MainFrame.cpp:1688
 msgid "S&end G-code"
 msgstr "G-Kodu Gönder"
 
-#: src/slic3r/GUI/MainFrame.cpp:1318
+#: src/slic3r/GUI/MainFrame.cpp:1328
 msgid "Send to print current plate as G-code"
 msgstr "Geçerli tablayı G kodu olarak yazdırmak için gönder"
 
-#: src/slic3r/GUI/MainFrame.cpp:1322
+#: src/slic3r/GUI/MainFrame.cpp:1332
 msgid "Export G-code to SD Card / Flash Drive"
 msgstr "G kodu SD Karta / Flash Sürücüye aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1322
+#: src/slic3r/GUI/MainFrame.cpp:1332
 msgid "Export current plate as G-code to SD card / Flash drive"
 msgstr "Geçerli tablayı SD karta / Flash sürücüye G kod olarak aktarın"
 
-#: src/slic3r/GUI/MainFrame.cpp:1326
+#: src/slic3r/GUI/MainFrame.cpp:1336
 msgid "Export Plate as &STL/OBJ"
 msgstr "Tablayı &STL/OBJ olarak dışa aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1326
+#: src/slic3r/GUI/MainFrame.cpp:1336
 msgid "Export current plate as STL/OBJ"
 msgstr "Geçerli tablayı STL/OBJ olarak dışa aktarın"
 
-#: src/slic3r/GUI/MainFrame.cpp:1329
+#: src/slic3r/GUI/MainFrame.cpp:1339
 msgid "Export Plate as STL/OBJ &Including Supports"
 msgstr "Geçerli tablayı desteklerle birlikte STL/OBJ olarak dışa aktarın"
 
-#: src/slic3r/GUI/MainFrame.cpp:1329
+#: src/slic3r/GUI/MainFrame.cpp:1339
 msgid "Export current plate as STL/OBJ including supports"
 msgstr "Geçerli tablayı desteklerle birlikte STL/OBJ olarak dışa aktarın"
 
-#: src/slic3r/GUI/MainFrame.cpp:1337 src/slic3r/GUI/MainFrame.cpp:1625
+#: src/slic3r/GUI/MainFrame.cpp:1347 src/slic3r/GUI/MainFrame.cpp:1635
 msgid "Export &Toolpaths as OBJ"
 msgstr "Takım yollarını OBJ olarak dışa aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1337 src/slic3r/GUI/MainFrame.cpp:1625
+#: src/slic3r/GUI/MainFrame.cpp:1347 src/slic3r/GUI/MainFrame.cpp:1635
 msgid "Export toolpaths as OBJ"
 msgstr "Takım yollarını OBJ olarak dışa aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1341
+#: src/slic3r/GUI/MainFrame.cpp:1351
 msgid "Export &Config"
 msgstr "Ayarları &Dışa Aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1341
+#: src/slic3r/GUI/MainFrame.cpp:1351
 msgid "Export current configuration to file"
 msgstr "Geçerli yapılandırmayı dışa aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1344
+#: src/slic3r/GUI/MainFrame.cpp:1354
 msgid "Export Config &Bundle"
 msgstr "&Hazır Ayarları Dışa Aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1344
+#: src/slic3r/GUI/MainFrame.cpp:1354
 msgid "Export all presets to file"
 msgstr "Tüm hazır ayarları dışa aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1347
+#: src/slic3r/GUI/MainFrame.cpp:1357
 msgid "Export Config Bundle With Physical Printers"
 msgstr "Fiziksel Yazıcılarla Yapılandırma Paketini Dışa Aktarma"
 
-#: src/slic3r/GUI/MainFrame.cpp:1347
+#: src/slic3r/GUI/MainFrame.cpp:1357
 msgid "Export all presets including physical printers to file"
 msgstr ""
 "Fiziksel yazıcılar da dahil olmak üzere tüm hazır ayarları dosyaya aktarma"
 
-#: src/slic3r/GUI/MainFrame.cpp:1350
+#: src/slic3r/GUI/MainFrame.cpp:1360
 msgid "&Export"
 msgstr "&Dışa Aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1352
+#: src/slic3r/GUI/MainFrame.cpp:1362
 msgid "Ejec&t SD Card / Flash Drive"
 msgstr "SD kartı / Flash sürücüyü çıkar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1352
+#: src/slic3r/GUI/MainFrame.cpp:1362
 msgid "Eject SD card / Flash drive after the G-code was exported to it."
 msgstr "G kod dışa aktarıldıktan sonra SD kartı / Flash sürücüyü çıkar."
 
-#: src/slic3r/GUI/MainFrame.cpp:1360
+#: src/slic3r/GUI/MainFrame.cpp:1370
 msgid "Quick Slice"
 msgstr "Hızlı Dilim"
 
-#: src/slic3r/GUI/MainFrame.cpp:1360
+#: src/slic3r/GUI/MainFrame.cpp:1370
 msgid "Slice a file into a G-code"
 msgstr "Bir dosyayı G koduna dilimleme"
 
-#: src/slic3r/GUI/MainFrame.cpp:1366
+#: src/slic3r/GUI/MainFrame.cpp:1376
 msgid "Quick Slice and Save As"
 msgstr "Hızlı Dilim ve Farklı Kaydet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1366
+#: src/slic3r/GUI/MainFrame.cpp:1376
 msgid "Slice a file into a G-code, save as"
 msgstr "Bir dosyayı dilimle ve farklı kaydet"
 
-#: src/slic3r/GUI/MainFrame.cpp:1372
+#: src/slic3r/GUI/MainFrame.cpp:1382
 msgid "Repeat Last Quick Slice"
 msgstr "Son Hızlı Dilimi Tekrarla"
 
-#: src/slic3r/GUI/MainFrame.cpp:1372
+#: src/slic3r/GUI/MainFrame.cpp:1382
 msgid "Repeat last quick slice"
 msgstr "Son hızlı dilimi tekrarla"
 
-#: src/slic3r/GUI/MainFrame.cpp:1380
+#: src/slic3r/GUI/MainFrame.cpp:1390
 msgid "(Re)Slice No&w"
 msgstr "(Tekrar)Dilimle"
 
-#: src/slic3r/GUI/MainFrame.cpp:1380
+#: src/slic3r/GUI/MainFrame.cpp:1390
 msgid "Start new slicing process"
 msgstr "Yeni dilimleme işlemine başla"
 
-#: src/slic3r/GUI/MainFrame.cpp:1384
+#: src/slic3r/GUI/MainFrame.cpp:1394
 msgid "&Repair STL file"
 msgstr "& STL dosyasını onar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1384
+#: src/slic3r/GUI/MainFrame.cpp:1394
 msgid "Automatically repair an STL file"
 msgstr "Bir STL dosyasını otomatik olarak onar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1388
+#: src/slic3r/GUI/MainFrame.cpp:1398
 msgid "&G-code Preview"
 msgstr "&G kod önizlemesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1392
+#: src/slic3r/GUI/MainFrame.cpp:1402
 msgid "E&xit"
 msgstr "Ç&ıkış"
 
-#: src/slic3r/GUI/MainFrame.cpp:1392 src/slic3r/GUI/UpdateDialogs.cpp:376
+#: src/slic3r/GUI/MainFrame.cpp:1402 src/slic3r/GUI/UpdateDialogs.cpp:376
 #: src/slic3r/GUI/UpdateDialogs.cpp:423
 #, c-format, boost-format
 msgid "Exit %s"
 msgstr "%s Çıkış"
 
-#: src/slic3r/GUI/MainFrame.cpp:1394 src/slic3r/GUI/MainFrame.cpp:1632
+#: src/slic3r/GUI/MainFrame.cpp:1404 src/slic3r/GUI/MainFrame.cpp:1642
 msgid "&Quit"
 msgstr "&Çıkış"
 
-#: src/slic3r/GUI/MainFrame.cpp:1394 src/slic3r/GUI/MainFrame.cpp:1632
+#: src/slic3r/GUI/MainFrame.cpp:1404 src/slic3r/GUI/MainFrame.cpp:1642
 #, c-format, boost-format
 msgid "Quit %s"
 msgstr "%s uygulamasını kapat"
 
-#: src/slic3r/GUI/MainFrame.cpp:1410
+#: src/slic3r/GUI/MainFrame.cpp:1420
 msgid "&Select All"
 msgstr "&Tümünü Seç"
 
-#: src/slic3r/GUI/MainFrame.cpp:1411
+#: src/slic3r/GUI/MainFrame.cpp:1421
 msgid "Selects all objects"
 msgstr "Tüm nesneleri seçer"
 
-#: src/slic3r/GUI/MainFrame.cpp:1413
+#: src/slic3r/GUI/MainFrame.cpp:1423
 msgid "D&eselect All"
 msgstr "Tüm seçimleri kaldır"
 
-#: src/slic3r/GUI/MainFrame.cpp:1414
+#: src/slic3r/GUI/MainFrame.cpp:1424
 msgid "Deselects all objects"
 msgstr "Tüm nesnelerin seçimini kaldırır"
 
-#: src/slic3r/GUI/MainFrame.cpp:1417
+#: src/slic3r/GUI/MainFrame.cpp:1427
 msgid "&Delete Selected"
 msgstr "&Seçileni sil"
 
-#: src/slic3r/GUI/MainFrame.cpp:1418
+#: src/slic3r/GUI/MainFrame.cpp:1428
 msgid "Deletes the current selection"
 msgstr "Mevcut seçimi siler"
 
-#: src/slic3r/GUI/MainFrame.cpp:1420
+#: src/slic3r/GUI/MainFrame.cpp:1430
 msgid "Delete &All"
 msgstr "Tümünü &sil"
 
-#: src/slic3r/GUI/MainFrame.cpp:1421
+#: src/slic3r/GUI/MainFrame.cpp:1431
 msgid "Deletes all objects"
 msgstr "Tüm nesneleri sil"
 
-#: src/slic3r/GUI/MainFrame.cpp:1425
+#: src/slic3r/GUI/MainFrame.cpp:1435
 msgid "&Undo"
 msgstr "&Geri Al"
 
-#: src/slic3r/GUI/MainFrame.cpp:1428
+#: src/slic3r/GUI/MainFrame.cpp:1438
 msgid "&Redo"
 msgstr "&Yinele"
 
-#: src/slic3r/GUI/MainFrame.cpp:1433
+#: src/slic3r/GUI/MainFrame.cpp:1443
 msgid "&Copy"
 msgstr "&Kopyala"
 
-#: src/slic3r/GUI/MainFrame.cpp:1434
+#: src/slic3r/GUI/MainFrame.cpp:1444
 msgid "Copy selection to clipboard"
 msgstr "Seçimi panoya kopyala"
 
-#: src/slic3r/GUI/MainFrame.cpp:1436
+#: src/slic3r/GUI/MainFrame.cpp:1446
 msgid "&Paste"
 msgstr "&Yapıştır"
 
-#: src/slic3r/GUI/MainFrame.cpp:1437
+#: src/slic3r/GUI/MainFrame.cpp:1447
 msgid "Paste clipboard"
 msgstr "Panodan yapıştır"
 
-#: src/slic3r/GUI/MainFrame.cpp:1442 src/slic3r/GUI/MainFrame.cpp:1446
-#: src/slic3r/GUI/MainFrame.cpp:1616 src/slic3r/GUI/MainFrame.cpp:1620
+#: src/slic3r/GUI/MainFrame.cpp:1452 src/slic3r/GUI/MainFrame.cpp:1456
+#: src/slic3r/GUI/MainFrame.cpp:1626 src/slic3r/GUI/MainFrame.cpp:1630
 msgid "Re&load from Disk"
 msgstr "Diskten Yeniden Yükle"
 
-#: src/slic3r/GUI/MainFrame.cpp:1452
+#: src/slic3r/GUI/MainFrame.cpp:1462
 msgid "Searc&h"
 msgstr "Arama"
 
-#: src/slic3r/GUI/MainFrame.cpp:1453
+#: src/slic3r/GUI/MainFrame.cpp:1463
 msgid "Search in settings"
 msgstr "Ayarlarda ara"
 
-#: src/slic3r/GUI/MainFrame.cpp:1461
+#: src/slic3r/GUI/MainFrame.cpp:1471
 msgid "&Plater Tab"
 msgstr "&Tabla Sekmesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1461
+#: src/slic3r/GUI/MainFrame.cpp:1471
 msgid "Show the plater"
 msgstr "Tablayı göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1466
+#: src/slic3r/GUI/MainFrame.cpp:1476
 msgid "P&rint Settings Tab"
 msgstr "B&askı Ayarları Sekmesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1466
+#: src/slic3r/GUI/MainFrame.cpp:1476
 msgid "Show the print settings"
 msgstr "Baskı ayarlarını göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1469 src/slic3r/GUI/MainFrame.cpp:1680
+#: src/slic3r/GUI/MainFrame.cpp:1479 src/slic3r/GUI/MainFrame.cpp:1690
 msgid "&Filament Settings Tab"
 msgstr "& Filament Ayarları Sekmesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1469
+#: src/slic3r/GUI/MainFrame.cpp:1479
 msgid "Show the filament settings"
 msgstr "Filament ayarlarını göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1473
+#: src/slic3r/GUI/MainFrame.cpp:1483
 msgid "Print&er Settings Tab"
 msgstr "Yazıcı Ayarları S&ekmesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1473
+#: src/slic3r/GUI/MainFrame.cpp:1483
 msgid "Show the printer settings"
 msgstr "Yazıcı ayarlarını göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1479
+#: src/slic3r/GUI/MainFrame.cpp:1489
 msgid "3&D"
 msgstr "3&B"
 
-#: src/slic3r/GUI/MainFrame.cpp:1479
+#: src/slic3r/GUI/MainFrame.cpp:1489
 msgid "Show the 3D editing view"
 msgstr "3B düzenleme görünümünü göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1482
+#: src/slic3r/GUI/MainFrame.cpp:1492
 msgid "Pre&view"
 msgstr "Ön izleme"
 
-#: src/slic3r/GUI/MainFrame.cpp:1482
+#: src/slic3r/GUI/MainFrame.cpp:1492
 msgid "Show the 3D slices preview"
 msgstr "3B dilimleme ön izlemesini göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1488
+#: src/slic3r/GUI/MainFrame.cpp:1498
 msgid "Open the dialog to modify shape gallery"
 msgstr "Şekil galerisini değiştirmek için iletişim kutusunu aç"
 
-#: src/slic3r/GUI/MainFrame.cpp:1499
+#: src/slic3r/GUI/MainFrame.cpp:1509
 msgid "Print &Host Upload Queue"
 msgstr "Yazdırma ve Ana Bilgisayar Yükleme Kuyruğu"
 
-#: src/slic3r/GUI/MainFrame.cpp:1499
+#: src/slic3r/GUI/MainFrame.cpp:1509
 msgid "Display the Print Host Upload Queue window"
 msgstr "Ana Bilgisayar Yükleme Sırasını Yazdır penceresini görüntüle"
 
-#: src/slic3r/GUI/MainFrame.cpp:1503
+#: src/slic3r/GUI/MainFrame.cpp:1513
 msgid "Open New Instance"
 msgstr "Yeni Örnek Aç"
 
-#: src/slic3r/GUI/MainFrame.cpp:1507
+#: src/slic3r/GUI/MainFrame.cpp:1517
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1733
 msgid "Compare Presets"
 msgstr "Hazır Ayarları Karşılaştır"
 
-#: src/slic3r/GUI/MainFrame.cpp:1507
+#: src/slic3r/GUI/MainFrame.cpp:1517
 msgid "Compare presets"
 msgstr "Hazır ayarları karşılaştır"
 
-#: src/slic3r/GUI/MainFrame.cpp:1517
+#: src/slic3r/GUI/MainFrame.cpp:1527
 msgid "Show &Labels"
 msgstr "Etiketleri Göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1517
+#: src/slic3r/GUI/MainFrame.cpp:1527
 msgid "Show object/instance labels in 3D scene"
 msgstr "Nesne/örnek etiketlerini 3B sahnede göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1520 src/slic3r/GUI/MainFrame.cpp:1642
+#: src/slic3r/GUI/MainFrame.cpp:1530 src/slic3r/GUI/MainFrame.cpp:1652
 msgid "Show Legen&d"
 msgstr "Tarihçeyi Göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1520
+#: src/slic3r/GUI/MainFrame.cpp:1530
 msgid "Show legend in preview"
 msgstr "Tarihçeyi Ön İzlemede Göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1523
+#: src/slic3r/GUI/MainFrame.cpp:1533
 msgid "&Collapse Sidebar"
 msgstr "&Kenar Çubuğunu Daralt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1523 src/slic3r/GUI/Plater.cpp:2340
+#: src/slic3r/GUI/MainFrame.cpp:1533 src/slic3r/GUI/Plater.cpp:2340
 msgid "Collapse sidebar"
 msgstr "Kenar çubuğunu daralt"
 
-#: src/slic3r/GUI/MainFrame.cpp:1528
+#: src/slic3r/GUI/MainFrame.cpp:1538
 msgid "&Fullscreen"
 msgstr "&Tam ekran"
 
-#: src/slic3r/GUI/MainFrame.cpp:1528
+#: src/slic3r/GUI/MainFrame.cpp:1538
 msgid "Fullscreen"
 msgstr "Tam Ekran"
 
-#: src/slic3r/GUI/MainFrame.cpp:1544 src/slic3r/GUI/MainFrame.cpp:1651
+#: src/slic3r/GUI/MainFrame.cpp:1554 src/slic3r/GUI/MainFrame.cpp:1661
 msgid "&File"
 msgstr "&Dosya"
 
-#: src/slic3r/GUI/MainFrame.cpp:1545
+#: src/slic3r/GUI/MainFrame.cpp:1555
 msgid "&Edit"
 msgstr "&Düzenle"
 
-#: src/slic3r/GUI/MainFrame.cpp:1546
+#: src/slic3r/GUI/MainFrame.cpp:1556
 msgid "&Window"
 msgstr "&Pencere"
 
-#: src/slic3r/GUI/MainFrame.cpp:1547 src/slic3r/GUI/MainFrame.cpp:1652
+#: src/slic3r/GUI/MainFrame.cpp:1557 src/slic3r/GUI/MainFrame.cpp:1662
 msgid "&View"
 msgstr "&Görünüm"
 
-#: src/slic3r/GUI/MainFrame.cpp:1550 src/slic3r/GUI/MainFrame.cpp:1655
+#: src/slic3r/GUI/MainFrame.cpp:1560 src/slic3r/GUI/MainFrame.cpp:1665
 msgid "&Help"
 msgstr "&Yardım"
 
-#: src/slic3r/GUI/MainFrame.cpp:1612
+#: src/slic3r/GUI/MainFrame.cpp:1622
 msgid "&Open G-code"
 msgstr "&G kod aç"
 
-#: src/slic3r/GUI/MainFrame.cpp:1628
+#: src/slic3r/GUI/MainFrame.cpp:1638
 msgid "Open &PrusaSlicer"
 msgstr "&PrusaSlicer'ı Aç"
 
-#: src/slic3r/GUI/MainFrame.cpp:1642
+#: src/slic3r/GUI/MainFrame.cpp:1652
 msgid "Show legend"
 msgstr "Tarihçeyi Göster"
 
-#: src/slic3r/GUI/MainFrame.cpp:1677
+#: src/slic3r/GUI/MainFrame.cpp:1687
 msgid "E&xport"
 msgstr "E&xport"
 
-#: src/slic3r/GUI/MainFrame.cpp:1678
+#: src/slic3r/GUI/MainFrame.cpp:1688
 msgid "S&end to print"
 msgstr "Baskıya Gönder"
 
-#: src/slic3r/GUI/MainFrame.cpp:1680
+#: src/slic3r/GUI/MainFrame.cpp:1690
 msgid "Mate&rial Settings Tab"
 msgstr "Mate&ryal Ayarları Sekmesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1704
+#: src/slic3r/GUI/MainFrame.cpp:1714
 msgid "Choose a file to slice (STL/OBJ/AMF/3MF/PRUSA):"
 msgstr "Dilimlemek için bir dosya seçin (STL / OBJ / AMF / 3MF / PRUSA):"
 
-#: src/slic3r/GUI/MainFrame.cpp:1716
+#: src/slic3r/GUI/MainFrame.cpp:1726
 msgid "No previously sliced file."
 msgstr "Daha önce dilimlenmiş dosya yok."
 
-#: src/slic3r/GUI/MainFrame.cpp:1723
+#: src/slic3r/GUI/MainFrame.cpp:1733
 msgid "Previously sliced file ("
 msgstr "Önceden dilimlenmiş dosya ("
 
-#: src/slic3r/GUI/MainFrame.cpp:1723
+#: src/slic3r/GUI/MainFrame.cpp:1733
 msgid ") not found."
 msgstr ") bulunamadı."
 
-#: src/slic3r/GUI/MainFrame.cpp:1724
+#: src/slic3r/GUI/MainFrame.cpp:1734
 msgid "File Not Found"
 msgstr "Dosya bulunamadı"
 
-#: src/slic3r/GUI/MainFrame.cpp:1759
+#: src/slic3r/GUI/MainFrame.cpp:1769
 #, c-format, boost-format
 msgid "Save %s file as:"
 msgstr "%s dosyasını farklı kaydet:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1759
+#: src/slic3r/GUI/MainFrame.cpp:1769
 msgid "SVG"
 msgstr "SVG"
 
-#: src/slic3r/GUI/MainFrame.cpp:1759
+#: src/slic3r/GUI/MainFrame.cpp:1769
 msgid "G-code"
 msgstr "G-kod"
 
-#: src/slic3r/GUI/MainFrame.cpp:1771
+#: src/slic3r/GUI/MainFrame.cpp:1781
 msgid "Save ZIP file as:"
 msgstr ""
 
-#: src/slic3r/GUI/MainFrame.cpp:1780 src/slic3r/GUI/Plater.cpp:3388
-#: src/slic3r/GUI/Plater.cpp:6797 src/slic3r/GUI/Tab.cpp:1647
+#: src/slic3r/GUI/MainFrame.cpp:1790 src/slic3r/GUI/Plater.cpp:3390
+#: src/slic3r/GUI/Plater.cpp:6804 src/slic3r/GUI/Tab.cpp:1647
 #: src/slic3r/GUI/Tab.cpp:5238
 msgid "Slicing"
 msgstr "Dilimleme"
 
 #. TRN ProgressDialog on reslicing: "input file basename"
-#: src/slic3r/GUI/MainFrame.cpp:1782
+#: src/slic3r/GUI/MainFrame.cpp:1792
 #, c-format, boost-format
 msgid "Processing %s"
 msgstr "%s"
 
-#: src/slic3r/GUI/MainFrame.cpp:1805
+#: src/slic3r/GUI/MainFrame.cpp:1815
 #, boost-format
 msgid "%1% was successfully sliced."
 msgstr "%1% başarıyla dilimlendi."
 
-#: src/slic3r/GUI/MainFrame.cpp:1808
+#: src/slic3r/GUI/MainFrame.cpp:1818
 msgid "Slicing Done!"
 msgstr "Dilimleme Yapıldı!"
 
-#: src/slic3r/GUI/MainFrame.cpp:1824
+#: src/slic3r/GUI/MainFrame.cpp:1834
 msgid "Select the STL file to repair:"
 msgstr "Onarılacak STL dosyasını seçin:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1834
+#: src/slic3r/GUI/MainFrame.cpp:1844
 msgid "Save OBJ file (less prone to coordinate errors than STL) as:"
 msgstr ""
 "OBJ dosyasını kaydet (hataları STL'den koordine etmeye daha az eğilimli):"
 
-#: src/slic3r/GUI/MainFrame.cpp:1845
+#: src/slic3r/GUI/MainFrame.cpp:1855
 msgid "Your file was repaired."
 msgstr "Dosyanız onarıldı."
 
-#: src/slic3r/GUI/MainFrame.cpp:1859
+#: src/slic3r/GUI/MainFrame.cpp:1869
 msgid "Save configuration as:"
 msgstr "Yapılandırmayı farklı kaydet:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1876
+#: src/slic3r/GUI/MainFrame.cpp:1886
 msgid "Loading of a configuration file"
 msgstr "Yapılandırma dosyasının yüklenmesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1878 src/slic3r/GUI/MainFrame.cpp:1945
+#: src/slic3r/GUI/MainFrame.cpp:1888 src/slic3r/GUI/MainFrame.cpp:1955
 msgid "Select configuration to load:"
 msgstr "Yüklenecek yapılandırmayı seçin:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1909
+#: src/slic3r/GUI/MainFrame.cpp:1919
 msgid "Exporting configuration bundle"
 msgstr "Yapılandırma paketini dışa aktar"
 
-#: src/slic3r/GUI/MainFrame.cpp:1910
+#: src/slic3r/GUI/MainFrame.cpp:1920
 msgid ""
 "Some presets are modified and the unsaved changes will not be exported into "
 "configuration bundle."
@@ -13799,15 +13811,15 @@ msgstr ""
 "Bazı hazır ayarlar değiştirildi ve kaydedilmemiş değişiklikler yapılandırma "
 "paketine aktarılmayacak."
 
-#: src/slic3r/GUI/MainFrame.cpp:1919
+#: src/slic3r/GUI/MainFrame.cpp:1929
 msgid "Save presets bundle as:"
 msgstr "Ön ayar paketini farklı kaydet:"
 
-#: src/slic3r/GUI/MainFrame.cpp:1942
+#: src/slic3r/GUI/MainFrame.cpp:1952
 msgid "Loading of a configuration bundle"
 msgstr "Yapılandırma paketinin yüklenmesi"
 
-#: src/slic3r/GUI/MainFrame.cpp:1972
+#: src/slic3r/GUI/MainFrame.cpp:1982
 #, c-format, boost-format
 msgid "%d presets successfully imported."
 msgstr "%d ön ayar başarıyla içe aktarıldı."
@@ -14029,7 +14041,7 @@ msgstr "Dışa Aktar"
 #: src/slic3r/GUI/NotificationManager.cpp:2113
 #: src/slic3r/GUI/NotificationManager.cpp:2140
 #: src/slic3r/GUI/NotificationManager.cpp:2148
-#: src/slic3r/GUI/NotificationManager.cpp:2159 src/slic3r/GUI/Plater.cpp:3235
+#: src/slic3r/GUI/NotificationManager.cpp:2159 src/slic3r/GUI/Plater.cpp:3237
 msgid "WARNING:"
 msgstr "UYARI:"
 
@@ -14355,12 +14367,12 @@ msgstr "Nesnenin altında"
 msgid "Around object"
 msgstr "Nesnenin etrafında"
 
-#: src/slic3r/GUI/Plater.cpp:935 src/slic3r/GUI/Plater.cpp:7380
+#: src/slic3r/GUI/Plater.cpp:935 src/slic3r/GUI/Plater.cpp:7387
 msgid "Send to printer"
 msgstr "Yazıcıya gönder"
 
-#: src/slic3r/GUI/Plater.cpp:955 src/slic3r/GUI/Plater.cpp:3388
-#: src/slic3r/GUI/Plater.cpp:6800
+#: src/slic3r/GUI/Plater.cpp:955 src/slic3r/GUI/Plater.cpp:3390
+#: src/slic3r/GUI/Plater.cpp:6807
 msgid "Slice now"
 msgstr "Şimdi dilimle"
 
@@ -14465,7 +14477,7 @@ msgstr ""
 msgid "Ejecting of device %s(%s) has failed."
 msgstr "Aygıt %s(%s) çıkarılamadı."
 
-#: src/slic3r/GUI/Plater.cpp:2232 src/slic3r/GUI/Plater.cpp:5253
+#: src/slic3r/GUI/Plater.cpp:2232 src/slic3r/GUI/Plater.cpp:5260
 msgid "New Project"
 msgstr "Yeni Proje"
 
@@ -14595,7 +14607,7 @@ msgstr ""
 "Onları birden fazla nesne olarak düşünmek yerine, bu dosyaların\n"
 "birden fazla parçaya sahip tek bir nesneyi temsil ettiğini düşünmeli miyim?"
 
-#: src/slic3r/GUI/Plater.cpp:2825
+#: src/slic3r/GUI/Plater.cpp:2827
 msgid ""
 "Your object appears to be too large, so it was automatically scaled down to "
 "fit your print bed."
@@ -14603,35 +14615,35 @@ msgstr ""
 "Nesneniz çok büyük görünüyor, bu nedenle baskı tablanıza uyacak şekilde "
 "otomatik olarak küçültüldü."
 
-#: src/slic3r/GUI/Plater.cpp:2826
+#: src/slic3r/GUI/Plater.cpp:2828
 msgid "Object too large?"
 msgstr "Nesne çok mu büyük?"
 
-#: src/slic3r/GUI/Plater.cpp:2906
+#: src/slic3r/GUI/Plater.cpp:2908
 msgid "Export STL file:"
 msgstr "Dışa aktarılacak STL dosya:"
 
-#: src/slic3r/GUI/Plater.cpp:2913
+#: src/slic3r/GUI/Plater.cpp:2915
 msgid "Export AMF file:"
 msgstr "AMF dosyasını dışa aktar:"
 
-#: src/slic3r/GUI/Plater.cpp:2919
+#: src/slic3r/GUI/Plater.cpp:2921
 msgid "Save file as:"
 msgstr "Farklı kaydet:"
 
-#: src/slic3r/GUI/Plater.cpp:2925
+#: src/slic3r/GUI/Plater.cpp:2927
 msgid "Export OBJ file:"
 msgstr "OBJ dosyasına aktar:"
 
-#: src/slic3r/GUI/Plater.cpp:3039
+#: src/slic3r/GUI/Plater.cpp:3041
 msgid "Delete object which is a part of cut object"
 msgstr "Kesilmiş nesnenin bir parçası olan nesneyi sil"
 
-#: src/slic3r/GUI/Plater.cpp:3040
+#: src/slic3r/GUI/Plater.cpp:3042
 msgid "You try to delete an object which is a part of a cut object."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:3041
+#: src/slic3r/GUI/Plater.cpp:3043
 msgid ""
 "This action will break a cut information.\n"
 "After that PrusaSlicer can't guarantee model consistency"
@@ -14640,37 +14652,37 @@ msgstr ""
 "Bu eylem kesme ilişkisini kıracaktır.\n"
 "Bundan sonra PrusaSlicer model tutarlılığını garanti edemez"
 
-#: src/slic3r/GUI/Plater.cpp:3044
+#: src/slic3r/GUI/Plater.cpp:3046
 msgid "Delete object"
 msgstr "Nesneyi Sil"
 
-#: src/slic3r/GUI/Plater.cpp:3049
+#: src/slic3r/GUI/Plater.cpp:3051
 msgid "Delete Object"
 msgstr "Nesneyi Sil"
 
-#: src/slic3r/GUI/Plater.cpp:3068
+#: src/slic3r/GUI/Plater.cpp:3070
 msgid "Delete All Objects"
 msgstr "Tüm Nesneleri Sil"
 
-#: src/slic3r/GUI/Plater.cpp:3097
+#: src/slic3r/GUI/Plater.cpp:3099
 msgid "Reset Project"
 msgstr "Projeyi Sıfırla"
 
-#: src/slic3r/GUI/Plater.cpp:3152
+#: src/slic3r/GUI/Plater.cpp:3154
 msgid ""
 "The selected object couldn't be split because it contains only one solid "
 "part."
 msgstr "Seçilen nesne yalnızca bir katı parça içerdiğinden bölünemedi."
 
-#: src/slic3r/GUI/Plater.cpp:3159
+#: src/slic3r/GUI/Plater.cpp:3161
 msgid "All non-solid parts (modifiers) were deleted"
 msgstr "Katı olmayan tüm parçalar (değiştiriciler) silindi"
 
-#: src/slic3r/GUI/Plater.cpp:3161
+#: src/slic3r/GUI/Plater.cpp:3163
 msgid "Split to Objects"
 msgstr "Nesnelere böl"
 
-#: src/slic3r/GUI/Plater.cpp:3215
+#: src/slic3r/GUI/Plater.cpp:3217
 msgid ""
 "An object has custom support enforcers which will not be used because "
 "supports are disabled."
@@ -14678,113 +14690,113 @@ msgstr ""
 "Bir nesnenin, destekler devre dışı bırakıldığı için kullanılamayacak olan "
 "özel destek uygulayıcıları var."
 
-#: src/slic3r/GUI/Plater.cpp:3217
+#: src/slic3r/GUI/Plater.cpp:3219
 msgid "Enable supports for enforcers only"
 msgstr "Yalnızca uygulayıcılar için destekleri etkinleştir"
 
-#: src/slic3r/GUI/Plater.cpp:3230
+#: src/slic3r/GUI/Plater.cpp:3232
 msgid "Bed temperatures for the used filaments differ significantly."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:3368 src/slic3r/GUI/Plater.cpp:4296
+#: src/slic3r/GUI/Plater.cpp:3370 src/slic3r/GUI/Plater.cpp:4303
 msgid "Invalid data"
 msgstr "Geçersiz veri"
 
-#: src/slic3r/GUI/Plater.cpp:3439
+#: src/slic3r/GUI/Plater.cpp:3441
 msgid "Another export job is currently running."
 msgstr "Şu anda başka bir dışa aktarma işlemi çalışıyor."
 
-#: src/slic3r/GUI/Plater.cpp:3525
+#: src/slic3r/GUI/Plater.cpp:3527
 msgid "Replace from:"
 msgstr "Şuradan değiştir:"
 
-#: src/slic3r/GUI/Plater.cpp:3543
+#: src/slic3r/GUI/Plater.cpp:3545
 msgid "Unable to replace with more than one volume"
 msgstr "Birden fazla hacimle değiştirilemiyor"
 
-#: src/slic3r/GUI/Plater.cpp:3543 src/slic3r/GUI/Plater.cpp:3622
+#: src/slic3r/GUI/Plater.cpp:3545 src/slic3r/GUI/Plater.cpp:3629
 msgid "Error during replace"
 msgstr "Değiştirme sırasında hata oluştu"
 
-#: src/slic3r/GUI/Plater.cpp:3614
+#: src/slic3r/GUI/Plater.cpp:3621
 msgid "Select the new file"
 msgstr "Yeni dosyayı seç"
 
-#: src/slic3r/GUI/Plater.cpp:3622
+#: src/slic3r/GUI/Plater.cpp:3629
 msgid "File for the replace wasn't selected"
 msgstr "Değiştirme için dosya seçilmedi"
 
-#: src/slic3r/GUI/Plater.cpp:3709
+#: src/slic3r/GUI/Plater.cpp:3716
 msgid "Please select the file to reload"
 msgstr "Lütfen yeniden yüklenecek dosyayı seçin"
 
-#: src/slic3r/GUI/Plater.cpp:3740 src/slic3r/GUI/Plater.cpp:5410
-#: src/slic3r/GUI/Plater.cpp:5420
+#: src/slic3r/GUI/Plater.cpp:3747 src/slic3r/GUI/Plater.cpp:5417
+#: src/slic3r/GUI/Plater.cpp:5427
 msgid "The selected file"
 msgstr "Seçilen dosya"
 
-#: src/slic3r/GUI/Plater.cpp:3741
+#: src/slic3r/GUI/Plater.cpp:3748
 msgid "differs from the original file"
 msgstr "orijinal dosyadan farklı"
 
-#: src/slic3r/GUI/Plater.cpp:3741
+#: src/slic3r/GUI/Plater.cpp:3748
 msgid "Do you want to replace it"
 msgstr "Değiştirmek istiyor musunuz?"
 
-#: src/slic3r/GUI/Plater.cpp:3761 src/slic3r/GUI/Plater.cpp:3767
+#: src/slic3r/GUI/Plater.cpp:3768 src/slic3r/GUI/Plater.cpp:3774
 msgid "Reload from:"
 msgstr "Şuradan yeniden yükle:"
 
-#: src/slic3r/GUI/Plater.cpp:3882
+#: src/slic3r/GUI/Plater.cpp:3889
 msgid "Unable to reload:"
 msgstr "Yeniden yüklenemiyor:"
 
-#: src/slic3r/GUI/Plater.cpp:3887
+#: src/slic3r/GUI/Plater.cpp:3894
 msgid "Error during reload"
 msgstr "Yeniden yükleme sırasında hata oluştu"
 
-#: src/slic3r/GUI/Plater.cpp:3905
+#: src/slic3r/GUI/Plater.cpp:3912
 msgid "Reload all from disk"
 msgstr "Tümünü diskten yeniden yükle"
 
-#: src/slic3r/GUI/Plater.cpp:4105 src/slic3r/GUI/Plater.cpp:4111
+#: src/slic3r/GUI/Plater.cpp:4112 src/slic3r/GUI/Plater.cpp:4118
 msgid "You are using template filament preset."
 msgid_plural "You are using template filament presets."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/slic3r/GUI/Plater.cpp:4107 src/slic3r/GUI/Plater.cpp:4112
+#: src/slic3r/GUI/Plater.cpp:4114 src/slic3r/GUI/Plater.cpp:4119
 msgid ""
 "Please note that template presets are not customized for specific printer "
 "and should only be used as a starting point for creating your own user "
 "presets."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:4108
+#: src/slic3r/GUI/Plater.cpp:4115
 msgid "More info at"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:4249
+#: src/slic3r/GUI/Plater.cpp:4256
 msgid "There are active warnings concerning sliced models:"
 msgstr "Dilimlenmiş modellerle ilgili aktif uyarılar var:"
 
-#: src/slic3r/GUI/Plater.cpp:4260
+#: src/slic3r/GUI/Plater.cpp:4267
 msgid "generated warnings"
 msgstr "oluşturulan uyarılar"
 
-#: src/slic3r/GUI/Plater.cpp:4305
+#: src/slic3r/GUI/Plater.cpp:4312
 msgid "Slicing Cancelled."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:4607
+#: src/slic3r/GUI/Plater.cpp:4614
 msgid "3D editor view"
 msgstr "3B düzenleme görünümü"
 
-#: src/slic3r/GUI/Plater.cpp:5034
+#: src/slic3r/GUI/Plater.cpp:5041
 msgid "Undo / Redo is processing"
 msgstr "Geri Al / Yinele işleniyor"
 
-#: src/slic3r/GUI/Plater.cpp:5036
+#: src/slic3r/GUI/Plater.cpp:5043
 #, boost-format
 msgid ""
 "Switching the printer technology from %1% to %2%.\n"
@@ -14795,20 +14807,20 @@ msgstr ""
 "Bazı %1% ön ayarları değiştirildi, bu da yazıcı teknolojisini değiştirdikten "
 "sonra kaybolacak."
 
-#: src/slic3r/GUI/Plater.cpp:5238
+#: src/slic3r/GUI/Plater.cpp:5245
 msgid "Creating a new project while the current project is modified."
 msgstr "Geçerli proje değiştirilirken yeni bir proje oluşturuluyor."
 
-#: src/slic3r/GUI/Plater.cpp:5241
+#: src/slic3r/GUI/Plater.cpp:5248
 msgid "Creating a new project while some presets are modified."
 msgstr "Bazı hazır ayarlar değiştirilirken yeni bir proje oluşturuluyor."
 
-#: src/slic3r/GUI/Plater.cpp:5242
+#: src/slic3r/GUI/Plater.cpp:5249
 msgid "You can keep presets modifications to the new project or discard them"
 msgstr ""
 "Yeni projedeki hazır ayar değişikliklerini koruyabilir veya atabilirsiniz"
 
-#: src/slic3r/GUI/Plater.cpp:5243
+#: src/slic3r/GUI/Plater.cpp:5250
 msgid ""
 "You can keep presets modifications to the new project, discard them or save "
 "changes as new presets.\n"
@@ -14818,190 +14830,190 @@ msgstr ""
 "değişiklikleri yeni hazır ayarlar olarak kaydedebilirsiniz.\n"
 "Not, değişiklikler kaydedilecekse, yeni proje bunları tutmaz"
 
-#: src/slic3r/GUI/Plater.cpp:5248
+#: src/slic3r/GUI/Plater.cpp:5255
 msgid "Creating a new project"
 msgstr "Yeni proje oluşturuluyor"
 
-#: src/slic3r/GUI/Plater.cpp:5282
+#: src/slic3r/GUI/Plater.cpp:5289
 msgid "Load Project"
 msgstr "Proje Yükle"
 
-#: src/slic3r/GUI/Plater.cpp:5312
+#: src/slic3r/GUI/Plater.cpp:5319
 msgid "Import Object"
 msgstr "Nesneyi İçe Aktar"
 
-#: src/slic3r/GUI/Plater.cpp:5316
+#: src/slic3r/GUI/Plater.cpp:5323
 msgid "Import Objects"
 msgstr "Nesneleri İçe Aktar"
 
-#: src/slic3r/GUI/Plater.cpp:5346
+#: src/slic3r/GUI/Plater.cpp:5353
 msgid "Import SLA archive"
 msgstr "SLA Arşivini İçe Aktar"
 
-#: src/slic3r/GUI/Plater.cpp:5410 src/slic3r/GUI/Plater.cpp:5420
+#: src/slic3r/GUI/Plater.cpp:5417 src/slic3r/GUI/Plater.cpp:5427
 msgid "does not contain valid gcode."
 msgstr "geçerli gcode içermiyor."
 
-#: src/slic3r/GUI/Plater.cpp:5411 src/slic3r/GUI/Plater.cpp:5421
+#: src/slic3r/GUI/Plater.cpp:5418 src/slic3r/GUI/Plater.cpp:5428
 msgid "Error while loading .gcode file"
 msgstr ".gcode dosyası yüklenirken hata oluştu"
 
-#: src/slic3r/GUI/Plater.cpp:5488
+#: src/slic3r/GUI/Plater.cpp:5495
 #, boost-format
 msgid "%1% - Multiple projects file"
 msgstr "%s - Birden fazla proje dosyası"
 
-#: src/slic3r/GUI/Plater.cpp:5498
+#: src/slic3r/GUI/Plater.cpp:5505
 msgid "There are several files being loaded, including Project files."
 msgstr ""
 "Proje dosyaları da dahil olmak üzere yüklenmekte olan birkaç dosya vardır."
 
-#: src/slic3r/GUI/Plater.cpp:5498 src/slic3r/GUI/Plater.cpp:5501
+#: src/slic3r/GUI/Plater.cpp:5505 src/slic3r/GUI/Plater.cpp:5508
 msgid "Select an action to apply to all files."
 msgstr "Tüm dosyalara uygulanacak bir eylem seç."
 
-#: src/slic3r/GUI/Plater.cpp:5501
+#: src/slic3r/GUI/Plater.cpp:5508
 msgid "There are several files being loaded."
 msgstr "Yüklenmekte olan birkaç dosya var."
 
-#: src/slic3r/GUI/Plater.cpp:5503 src/slic3r/GUI/Plater.cpp:5899
+#: src/slic3r/GUI/Plater.cpp:5510 src/slic3r/GUI/Plater.cpp:5906
 msgid "Action"
 msgstr "İşlem"
 
-#: src/slic3r/GUI/Plater.cpp:5524
+#: src/slic3r/GUI/Plater.cpp:5531
 msgid "Import 3D models"
 msgstr "Geometriyi içe aktar"
 
-#: src/slic3r/GUI/Plater.cpp:5537
+#: src/slic3r/GUI/Plater.cpp:5544
 msgid "Start a new instance of PrusaSlicer"
 msgstr "Yeni PrusaSlicer örneği başlat"
 
-#: src/slic3r/GUI/Plater.cpp:5551
+#: src/slic3r/GUI/Plater.cpp:5558
 msgid "Select one to load as project"
 msgstr "Proje olarak yüklenecek birini seç"
 
-#: src/slic3r/GUI/Plater.cpp:5562
+#: src/slic3r/GUI/Plater.cpp:5569
 msgid "Select only one file to load the configuration."
 msgstr "Yalnızca yapılandırmayı yüklemek için birini seç"
 
 #. TRN %1% is archive path
-#: src/slic3r/GUI/Plater.cpp:5609
+#: src/slic3r/GUI/Plater.cpp:5616
 #, boost-format
 msgid "Loading of a ZIP archive on path %1% has failed."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5668
+#: src/slic3r/GUI/Plater.cpp:5675
 #, boost-format
 msgid "Failed to unzip file to %1%: %2% "
 msgstr "Dosya %1% açılamadı: %2% "
 
-#: src/slic3r/GUI/Plater.cpp:5678
+#: src/slic3r/GUI/Plater.cpp:5685
 #, boost-format
 msgid "Failed to find unzipped file at %1%. Unzipping of file has failed."
 msgstr ""
 "%1%'de sıkıştırılmamış dosya bulunamadı. Dosyanın sıkıştırmadan çıkartılması "
 "başarısız oldu."
 
-#: src/slic3r/GUI/Plater.cpp:5878
+#: src/slic3r/GUI/Plater.cpp:5885
 msgid "Load project file"
 msgstr "%s - Proje dosyasını yükle"
 
-#: src/slic3r/GUI/Plater.cpp:5887
+#: src/slic3r/GUI/Plater.cpp:5894
 msgid "Open as project"
 msgstr "Proje olarak aç"
 
-#: src/slic3r/GUI/Plater.cpp:5888
+#: src/slic3r/GUI/Plater.cpp:5895
 msgid "Import 3D models only"
 msgstr "Yalnızca geometriyi içe aktar"
 
-#: src/slic3r/GUI/Plater.cpp:5889
+#: src/slic3r/GUI/Plater.cpp:5896
 msgid "Import config only"
 msgstr "Yalnızca yapılandırmayı içe aktar"
 
-#: src/slic3r/GUI/Plater.cpp:5891
+#: src/slic3r/GUI/Plater.cpp:5898
 msgid "Start new PrusaSlicer instance"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:5894
+#: src/slic3r/GUI/Plater.cpp:5901
 msgid "Select an action to apply to the file"
 msgstr "Dosyaya uygulanacak eylemi seç"
 
-#: src/slic3r/GUI/Plater.cpp:5915
+#: src/slic3r/GUI/Plater.cpp:5922
 msgid "Don't show again"
 msgstr "Tekrar gösterme"
 
-#: src/slic3r/GUI/Plater.cpp:5956
+#: src/slic3r/GUI/Plater.cpp:5963
 msgid "You can open only one .gcode file at a time."
 msgstr "Aynı anda yalnızca bir .gcode dosyası açabilirsiniz."
 
-#: src/slic3r/GUI/Plater.cpp:5957
+#: src/slic3r/GUI/Plater.cpp:5964
 msgid "Drag and drop G-code file"
 msgstr "G kod dosyasını sürükleyip bırakın"
 
-#: src/slic3r/GUI/Plater.cpp:6051
+#: src/slic3r/GUI/Plater.cpp:6058
 msgid "Load File"
 msgstr "Dosya Yükle"
 
-#: src/slic3r/GUI/Plater.cpp:6056
+#: src/slic3r/GUI/Plater.cpp:6063
 msgid "Load Files"
 msgstr "Dosyaları Yükle"
 
-#: src/slic3r/GUI/Plater.cpp:6106
+#: src/slic3r/GUI/Plater.cpp:6113
 msgid "All objects will be removed, continue?"
 msgstr "Tüm nesneler kaldırılacak, devam?"
 
-#: src/slic3r/GUI/Plater.cpp:6117
+#: src/slic3r/GUI/Plater.cpp:6124
 msgid "Delete Selected Objects"
 msgstr "Seçili Nesneleri Sil"
 
-#: src/slic3r/GUI/Plater.cpp:6126
+#: src/slic3r/GUI/Plater.cpp:6133
 msgid "Increase Instances"
 msgstr "Örnekleri Azalt"
 
-#: src/slic3r/GUI/Plater.cpp:6182
+#: src/slic3r/GUI/Plater.cpp:6189
 msgid "Decrease Instances"
 msgstr "Örnekleri Azalt"
 
-#: src/slic3r/GUI/Plater.cpp:6240
+#: src/slic3r/GUI/Plater.cpp:6247
 msgid "Enter the number of copies:"
 msgstr "Kopya sayısını girin:"
 
-#: src/slic3r/GUI/Plater.cpp:6241
+#: src/slic3r/GUI/Plater.cpp:6248
 msgid "Copies of the selected object"
 msgstr "Seçili nesnenin kopyaları"
 
-#: src/slic3r/GUI/Plater.cpp:6244
+#: src/slic3r/GUI/Plater.cpp:6251
 #, c-format, boost-format
 msgid "Set numbers of copies to %d"
 msgstr "Kopya sayısını %d olarak ayarla"
 
-#: src/slic3r/GUI/Plater.cpp:6268
+#: src/slic3r/GUI/Plater.cpp:6275
 msgid "Fill bed"
 msgstr "Tablayı doldur"
 
-#: src/slic3r/GUI/Plater.cpp:6438
+#: src/slic3r/GUI/Plater.cpp:6445
 msgid "Save G-code file as:"
 msgstr "G kodu dosyasını farklı kaydet:"
 
-#: src/slic3r/GUI/Plater.cpp:6438
+#: src/slic3r/GUI/Plater.cpp:6445
 msgid "Save SL1 / SL1S file as:"
 msgstr "SL1 / SL1S dosyasını farklı kaydet:"
 
-#: src/slic3r/GUI/Plater.cpp:6453
+#: src/slic3r/GUI/Plater.cpp:6460
 msgid "The provided file name is not valid."
 msgstr "Sağlanan dosya adı geçerli değil."
 
-#: src/slic3r/GUI/Plater.cpp:6454
+#: src/slic3r/GUI/Plater.cpp:6461
 msgid "The following characters are not allowed by a FAT file system:"
 msgstr "Aşağıdaki karakterlere FAT dosya sistemi tarafından izin verilmez:"
 
-#: src/slic3r/GUI/Plater.cpp:6517
+#: src/slic3r/GUI/Plater.cpp:6524
 msgid ""
 "Unable to perform boolean operation on model meshes. Only positive parts "
 "will be exported."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:6671
+#: src/slic3r/GUI/Plater.cpp:6678
 msgid ""
 "The plater is empty.\n"
 "Do you want to save the project?"
@@ -15009,27 +15021,27 @@ msgstr ""
 "Tabla boş.\n"
 "Projeyi kaydetmek istiyor musunuz?"
 
-#: src/slic3r/GUI/Plater.cpp:6671
+#: src/slic3r/GUI/Plater.cpp:6678
 msgid "Save project"
 msgstr "Projeyi kaydet"
 
-#: src/slic3r/GUI/Plater.cpp:6715
+#: src/slic3r/GUI/Plater.cpp:6722
 msgid "Unable to save file"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:6909
+#: src/slic3r/GUI/Plater.cpp:6916
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
 msgstr "Yazıcı hazır mı? Baskı tablası  yerinde, boş ve temiz mi?"
 
-#: src/slic3r/GUI/Plater.cpp:6909 src/slic3r/GUI/PrintHostDialogs.cpp:132
+#: src/slic3r/GUI/Plater.cpp:6916 src/slic3r/GUI/PrintHostDialogs.cpp:132
 msgid "Upload and Print"
 msgstr "Yükle ve Yazdır"
 
-#: src/slic3r/GUI/Plater.cpp:7379
+#: src/slic3r/GUI/Plater.cpp:7386
 msgid "Export"
 msgstr "Dışa Aktar"
 
-#: src/slic3r/GUI/Plater.cpp:7524
+#: src/slic3r/GUI/Plater.cpp:7531
 msgid "Paste From Clipboard"
 msgstr "Panodan Yapıştır"
 
