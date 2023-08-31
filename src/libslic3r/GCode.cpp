@@ -3236,7 +3236,7 @@ std::string GCodeGenerator::travel_to(const Point &point, ExtrusionRole role, st
 
 bool GCodeGenerator::needs_retraction(const Polyline &travel, ExtrusionRole role)
 {
-    if (travel.length() < scale_(EXTRUDER_CONFIG(retract_before_travel))) {
+    if (! m_writer.extruder() || travel.length() < scale_(EXTRUDER_CONFIG(retract_before_travel))) {
         // skip retraction if the move is shorter than the configured threshold
         return false;
     }

@@ -2791,7 +2791,9 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
 #endif /* AUTOPLACEMENT_ON_LOAD */
         }
 
-        for (size_t i = 0; i < object->instances.size(); ++i) {
+        for (size_t i = 0; i < object->instances.size() 
+             && !object->is_cut()       // don't apply scaled_down functionality to cut objects
+            ; ++i) {
             ModelInstance* instance = object->instances[i];
             const Vec3d size = object->instance_bounding_box(i).size();
             const Vec3d ratio = size.cwiseQuotient(bed_size);
@@ -3579,9 +3581,14 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
         new_volume->convert_from_imperial_units();
     else if (old_volume->source.is_converted_from_meters)
         new_volume->convert_from_meters();
-    new_volume->supported_facets.assign(old_volume->supported_facets);
-    new_volume->seam_facets.assign(old_volume->seam_facets);
-    new_volume->mmu_segmentation_facets.assign(old_volume->mmu_segmentation_facets);
+
+    if (old_volume->mesh().its == new_volume->mesh().its) {
+        // This function is called both from reload_from_disk and replace_with_stl.
+        // We need to make sure that the painted data point to existing triangles.
+        new_volume->supported_facets.assign(old_volume->supported_facets);
+        new_volume->seam_facets.assign(old_volume->seam_facets);
+        new_volume->mmu_segmentation_facets.assign(old_volume->mmu_segmentation_facets);
+    }
     std::swap(old_model_object->volumes[volume_idx], old_model_object->volumes.back());
     old_model_object->delete_volume(old_model_object->volumes.size() - 1);
     if (!sinking)
@@ -4003,7 +4010,8 @@ void Plater::priv::set_current_panel(wxPanel* panel)
             bool model_fits = view3D->get_canvas3d()->check_volumes_outside_state() != ModelInstancePVS_Partly_Outside;
             if (!model.objects.empty() && !export_in_progress && model_fits) {
                 preview->get_canvas3d()->init_gcode_viewer();
-                preview->load_gcode_shells();
+                if (! this->background_process.finished())
+                    preview->load_gcode_shells();
                 q->reslice();
             }
             // keeps current gcode preview, if any
@@ -6539,19 +6547,12 @@ void Plater::export_gcode(bool prefer_removable)
 
     fs::path output_path;
     {
-#if !ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
         std::string ext = default_output_file.extension().string();
-#endif // !ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
         wxFileDialog dlg(this, (printer_technology() == ptFFF) ? _L("Save G-code file as:") : _L("Save SL1 / SL1S file as:"),
             start_dir,
             from_path(default_output_file.filename()),
-#if ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
-            printer_technology() == ptFFF ?  GUI::file_wildcards(FT_GCODE) :
-                                             GUI::sla_wildcards(p->sla_print.printer_config().sla_archive_format.value.c_str()),
-#else
             printer_technology() == ptFFF ? GUI::file_wildcards(FT_GCODE, ext) :
                                             GUI::sla_wildcards(p->sla_print.printer_config().sla_archive_format.value.c_str()),
-#endif // ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
             wxFD_SAVE | wxFD_OVERWRITE_PROMPT
         );
         if (dlg.ShowModal() == wxID_OK) {
