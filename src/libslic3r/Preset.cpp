@@ -1376,6 +1376,10 @@ Preset& PresetCollection::select_preset(size_t idx)
     if (idx >= m_presets.size())
         idx = first_visible_idx();
     m_idx_selected = idx;
+    if (!m_presets[idx].is_visible)
+        // The newly selected preset can be activated -> make it visible.
+        m_presets[idx].is_visible = true;
+
     m_edited_preset = m_presets[idx];
     bool default_visible = ! m_default_suppressed || m_idx_selected < m_num_default_presets;
     for (size_t i = 0; i < m_num_default_presets; ++i)

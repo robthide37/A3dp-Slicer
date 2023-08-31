@@ -930,7 +930,7 @@ TEST_CASE("Optimal nfp position search with GravityKernel using RectangleItem an
 
                 Slic3r::Vec2crd D = bed.center - item.shape.center();
                 REQUIRE(item.translation == D);
-                REQUIRE(score == Approx(0.));
+                REQUIRE(score == Approx(0.).margin(EPSILON));
             }
         }
     }

@@ -2326,42 +2326,8 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
         });
 
     if (m_connector_type == CutConnectorType::Snap) {
-
-        const std::string format = "%.0f %%";
-
-        bool is_changed = false;
-        {
-            const std::string label = _u8L("Bulge");
-            ImGuiWrapper::text(label);
-
-            ImGui::SameLine(m_label_width);
-            ImGui::PushItemWidth(m_control_width * 0.7f);
-
-            float val = m_snap_bulge_proportion *100.f;
-            if (m_imgui->slider_float(("##snap_" + label).c_str(), &val, 5.f, 100.f * m_snap_space_proportion, format.c_str(), 1.f, true, _u8L("Bulge proportion related to radius"))) {
-                m_snap_bulge_proportion = val * 0.01f;
-                is_changed = true;
-            }
-        }
-
-        {
-            const std::string label = _u8L("Space");
-            ImGuiWrapper::text(label);
-
-            ImGui::SameLine(m_label_width);
-            ImGui::PushItemWidth(m_control_width * 0.7f);
-
-            float val = m_snap_space_proportion *100.f;
-            if (m_imgui->slider_float(("##snap_" + label).c_str(), &val, 10.f, 50.f, format.c_str(), 1.f, true, _u8L("Space proportion related to radius"))) {
-                m_snap_space_proportion = val * 0.01f;
-                is_changed = true;
-            }
-        }
-
-        if (is_changed) {
-            update_connector_shape();
-            update_raycasters_for_picking();
-        }
+        render_snap_specific_input(_u8L("Bulge"), _u8L("Bulge proportion related to radius"), m_snap_bulge_proportion, 0.15f, 5.f, 100.f * m_snap_space_proportion);
+        render_snap_specific_input(_u8L("Space"), _u8L("Space proportion related to radius"), m_snap_space_proportion, 0.3f, 10.f, 50.f);
     }
 
     ImGui::Separator();
@@ -2616,6 +2582,37 @@ void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in
     }
 }
 
+void GLGizmoCut3D::render_snap_specific_input(const std::string& label, const std::string& tooltip, float& in_val, const float& init_val, const float min_val, const float max_val)
+{
+    ImGuiWrapper::text(label);
+
+    ImGui::SameLine(m_label_width);
+    ImGui::PushItemWidth(m_control_width * 0.7f);
+
+    bool is_changed = false;
+    const std::string format = "%.0f %%";
+
+    float val = in_val * 100.f;
+    if (m_imgui->slider_float(("##snap_" + label).c_str(), &val, min_val, max_val, format.c_str(), 1.f, true, tooltip)) {
+        in_val = val * 0.01f;
+        is_changed = true;
+    }
+    
+    ImGui::SameLine();
+
+    m_imgui->disabled_begin(is_approx(in_val, init_val));
+    const std::string act_name = _u8L("Reset");
+    if (render_reset_button(("##snap_" + label + act_name).c_str(), act_name)) {
+        in_val = init_val;
+        is_changed = true;
+    }
+    m_imgui->disabled_end();
+
+    if (is_changed) {
+        update_connector_shape();
+        update_raycasters_for_picking();
+    }
+}
 
 void GLGizmoCut3D::render_cut_plane_input_window(CutConnectors &connectors)
 {

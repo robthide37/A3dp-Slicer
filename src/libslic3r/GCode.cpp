@@ -239,11 +239,12 @@ namespace Slic3r {
 
         const bool needs_toolchange = gcodegen.writer().need_toolchange(new_extruder_id);
         const bool will_go_down = ! is_approx(z, current_z);
-        const bool is_ramming = (gcodegen.config().single_extruder_multi_material && ! tcr.priming)
+        const bool is_ramming = (gcodegen.config().single_extruder_multi_material)
                              || (! gcodegen.config().single_extruder_multi_material && gcodegen.config().filament_multitool_ramming.get_at(tcr.initial_tool));
-        const bool should_travel_to_tower = tcr.force_travel        // wipe tower says so
-                                         || ! needs_toolchange      // this is just finishing the tower with no toolchange
-                                         || is_ramming;
+        const bool should_travel_to_tower = ! tcr.priming
+                                         && (tcr.force_travel        // wipe tower says so
+                                             || ! needs_toolchange   // this is just finishing the tower with no toolchange
+                                             || is_ramming);
         if (should_travel_to_tower) {
             // FIXME: It would be better if the wipe tower set the force_travel flag for all toolchanges,
             // then we could simplify the condition and make it more readable.
@@ -3256,7 +3257,7 @@ std::string GCode::travel_to(const Point &point, ExtrusionRole role, std::string
 
 bool GCode::needs_retraction(const Polyline &travel, ExtrusionRole role)
 {
-    if (travel.length() < scale_(EXTRUDER_CONFIG(retract_before_travel))) {
+    if (! m_writer.extruder() || travel.length() < scale_(EXTRUDER_CONFIG(retract_before_travel))) {
         // skip retraction if the move is shorter than the configured threshold
         return false;
     }
