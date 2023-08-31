@@ -6440,19 +6440,12 @@ void Plater::export_gcode(bool prefer_removable)
 
     fs::path output_path;
     {
-#if !ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
         std::string ext = default_output_file.extension().string();
-#endif // !ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
         wxFileDialog dlg(this, (printer_technology() == ptFFF) ? _L("Save G-code file as:") : _L("Save SL1 / SL1S file as:"),
             start_dir,
             from_path(default_output_file.filename()),
-#if ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
-            printer_technology() == ptFFF ?  GUI::file_wildcards(FT_GCODE) :
-                                             GUI::sla_wildcards(p->sla_print.printer_config().sla_archive_format.value.c_str()),
-#else
             printer_technology() == ptFFF ? GUI::file_wildcards(FT_GCODE, ext) :
                                             GUI::sla_wildcards(p->sla_print.printer_config().sla_archive_format.value.c_str()),
-#endif // ENABLE_ALTERNATIVE_FILE_WILDCARDS_GENERATOR
             wxFD_SAVE | wxFD_OVERWRITE_PROMPT
         );
         if (dlg.ShowModal() == wxID_OK) {
