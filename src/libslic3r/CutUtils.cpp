@@ -11,6 +11,7 @@
 #include "TriangleSelector.hpp"
 #include "ObjectID.hpp"
 
+#include <boost/log/trivial.hpp>
 
 namespace Slic3r {
 
