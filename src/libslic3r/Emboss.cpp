@@ -1223,7 +1223,6 @@ ExPolygons letter2shapes(
 const int CANCEL_CHECK = 10;
 } // namespace
 
-
 /// Union shape defined by glyphs
 ExPolygons Slic3r::union_ex(const ExPolygonsWithIds &shapes)
 {
@@ -1237,6 +1236,26 @@ ExPolygons Slic3r::union_ex(const ExPolygonsWithIds &shapes)
     result = union_ex(result);
     heal_shape(result);
     return result;
+}
+
+void Slic3r::translate(ExPolygonsWithIds &e, const Point &p)
+{
+    for (auto &[id, expoly] : e)
+        translate(expoly, p);
+}
+
+BoundingBox Slic3r::get_extents(const ExPolygonsWithIds &e)
+{
+    BoundingBox bb;
+    for (auto &[id, expoly] : e)
+        bb.merge(get_extents(expoly));
+    return bb;
+}
+
+void Slic3r::center(ExPolygonsWithIds &e)
+{
+    BoundingBox bb = get_extents(e);
+    translate(e, -bb.center());
 }
 
 ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache, const char *text, const FontProp &font_prop, const std::function<bool()>& was_canceled)

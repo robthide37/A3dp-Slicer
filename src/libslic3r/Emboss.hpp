@@ -458,7 +458,12 @@ namespace Emboss
 
 } // namespace Emboss
 
-
+///////////////////////
+// Move to ExPolygonsWithIds Utils
+void translate(ExPolygonsWithIds &e, const Point &p);
+BoundingBox get_extents(const ExPolygonsWithIds &e);
+void center(ExPolygonsWithIds &e);
 ExPolygons union_ex(const ExPolygonsWithIds &shapes);
+
 } // namespace Slic3r
 #endif // slic3r_Emboss_hpp_

@@ -30,6 +30,7 @@
 
 #include <GL/glew.h>
 #include <chrono> // measure enumeration of fonts
+#include <sstream> // save for svg
 
 using namespace Slic3r;
 using namespace Slic3r::Emboss;
@@ -67,7 +68,6 @@ constexpr double get_tesselation_tolerance(double scale){
     constexpr double tesselation_tolerance_scaled = (tesselation_tolerance_in_mm*tesselation_tolerance_in_mm) / SCALING_FACTOR / SCALING_FACTOR;
     return tesselation_tolerance_scaled / scale / scale;
 }
-ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, double tesselation_tolerance);
 
 /// <summary>
 /// Let user to choose file with (S)calable (V)ector (G)raphics - SVG.
@@ -143,8 +143,8 @@ const IconManager::Icon &get_icon(const IconManager::Icons &icons, IconType type
 struct GuiCfg
 {
     // Detect invalid config values when change monitor DPI
-    double screen_scale;
-    float  main_toolbar_height;
+    double screen_scale = -1.;
+    float  main_toolbar_height = -1.f;
 
     // Define bigger size(width or height)
     unsigned texture_max_size_px = 256;
@@ -177,16 +177,6 @@ GuiCfg create_gui_configuration();
 
 // use private definition
 struct GLGizmoSVG::GuiCfg: public ::GuiCfg{};
-
-namespace Slic3r {
-BoundingBox get_extents(const ExPolygonsWithIds &expoly_ids)
-{
-    BoundingBox result;
-    for (const ExPolygonsWithId &expoly_id : expoly_ids)
-        result.merge(get_extents(expoly_id.expoly));
-    return result;
-}
-} // namespace Slic3r
 
 bool GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos)
 {
@@ -585,8 +575,8 @@ NSVGimage* init_image(EmbossShape::SvgFile &svg_file) {
         return nullptr;
 
     // Disable stroke
-    for (NSVGshape *shape = svg_file.image->shapes; shape != NULL; shape = shape->next)
-        shape->stroke.type = 0;
+    //for (NSVGshape *shape = svg_file.image->shapes; shape != NULL; shape = shape->next)
+    //    shape->stroke.type = 0;
 
     return svg_file.image.get();
 }
@@ -922,93 +912,92 @@ bool is_closed(NSVGpath *path){
     return false;
 }
 
-std::string create_shape_warnings(const NSVGimage& image){
-    const float preccission = 1e-4f;
-    std::string warnings;
-    for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
-        std::string warning;
-        auto add_warning = [&warning](const std::string& w){ 
-            if (!warning.empty())
-                warning += ", ";
-            warning += w;
-        };
+void add_comma_separated(std::string &result, const std::string &add){
+    if (!result.empty())
+        result += ", ";
+    result += add;
+}
 
-        if (shape->opacity <= preccission)
-            add_warning(GUI::format(_L("Opacity (%1%)"), shape->opacity));
+const float warning_preccission = 1e-4f;
+std::string create_fill_warning(const NSVGshape &shape) {
+    std::string warning;
+    if (shape.opacity <= warning_preccission)
+        add_comma_separated(warning, GUI::format(_L("Opacity (%1%)"), shape.opacity));
 
-        // if(shape->flags != NSVG_FLAGS_VISIBLE) add_warning(_u8L("Visibility flag"));
-        bool is_fill_gradient = shape->fillGradient[0] != '\0';
-        if (is_fill_gradient)
-            add_warning(GUI::format(_L("Fill gradient (%1%)"), shape->fillGradient));
-        bool is_stroke_gradient = shape->strokeGradient[0] != '\0';
-        if (is_stroke_gradient)
-            add_warning(GUI::format(_L("Stroke gradient (%1%)"), shape->strokeGradient));
+    // if(shape->flags != NSVG_FLAGS_VISIBLE) add_warning(_u8L("Visibility flag"));
+    bool is_fill_gradient = shape.fillGradient[0] != '\0';
+    if (is_fill_gradient)
+        add_comma_separated(warning, GUI::format(_L("Fill gradient (%1%)"), shape.fillGradient));
 
-        // identity matrix - nsvg__xformIdentity
-        //const std::array<float, 6> identity = {1.f, 0.f, 0.f, 1.f, 0.f, 0.f};
-        //bool is_identity = true;
-        //for (size_t i = 0; i < 6; ++i)
-        //    if (!is_approx(shape->xform[i], identity[i], preccission)){
-        //        is_identity = false;
-        //        break;
-        //    }
-        //if (!is_identity) {
-        //    std::stringstream ss;
-        //    for (size_t i = 0; i < 6; ++i) {
-        //        if (i != 0)
-        //            ss << ", ";
-        //        ss << shape->xform[i];
-        //    }
-        //    add_warning(GUI::format(_L("XForm(%1%)"), ss.str()));
-        //}
+    switch (shape.fill.type) {
+    case NSVG_PAINT_UNDEF: add_comma_separated(warning, _u8L("Undefined fill type")); break;
+    case NSVG_PAINT_LINEAR_GRADIENT:
+        if (!is_fill_gradient)
+            add_comma_separated(warning, _u8L("Linear fill gradient"));
+        break;
+    case NSVG_PAINT_RADIAL_GRADIENT:
+        if (!is_fill_gradient)
+            add_comma_separated(warning, _u8L("Radial fill gradient"));
+        break;
+    // case NSVG_PAINT_NONE:
+    // case NSVG_PAINT_COLOR:
+    // default: break;
+    }
 
-        switch (shape->fill.type){
-        case NSVG_PAINT_UNDEF: 
-            add_warning(_u8L("Undefined fill type"));
-            break;
-        case NSVG_PAINT_LINEAR_GRADIENT:
-            if (!is_fill_gradient)
-                add_warning(_u8L("Linear fill gradient"));
-            break;
-        case NSVG_PAINT_RADIAL_GRADIENT:
-            if (!is_fill_gradient)
-                add_warning(_u8L("Radial fill gradient"));
-            break;
-        case NSVG_PAINT_NONE:
-        case NSVG_PAINT_COLOR: 
-        default: break;
-        }        
+    // Unfilled is only line which could be opened
+    if (shape.fill.type != NSVG_PAINT_NONE && !is_closed(shape.paths))
+        add_comma_separated(warning, _u8L("Open filled path"));
+    return warning;    
+}
 
-        // Unfilled is only line which could be opened
-        if (shape->fill.type != NSVG_PAINT_NONE && 
-            !is_closed(shape->paths))
-            add_warning(_u8L("Open filled path"));
+std::string create_stroke_warning(const NSVGshape &shape) {
+    std::string warning;
+    bool is_stroke_gradient = shape.strokeGradient[0] != '\0';
+    if (is_stroke_gradient)
+        add_comma_separated(warning, GUI::format(_L("Stroke gradient (%1%)"), shape.strokeGradient));
 
-        switch (shape->stroke.type){
-        case NSVG_PAINT_UNDEF: 
-            add_warning(_u8L("Undefined stroke type"));
-            break;
-        case NSVG_PAINT_LINEAR_GRADIENT:
-            if (!is_stroke_gradient)
-                add_warning(_u8L("Linear stroke gradient"));
-            break;
-        case NSVG_PAINT_RADIAL_GRADIENT:
-            if (!is_stroke_gradient)
-                add_warning(_u8L("Radial stroke gradient"));
-            break;
-        case NSVG_PAINT_COLOR: 
-        case NSVG_PAINT_NONE:
-        default: break;
+    switch (shape.stroke.type) {
+    case NSVG_PAINT_UNDEF: add_comma_separated(warning, _u8L("Undefined stroke type")); break;
+    case NSVG_PAINT_LINEAR_GRADIENT:
+        if (!is_stroke_gradient)
+            add_comma_separated(warning, _u8L("Linear stroke gradient"));
+        break;
+    case NSVG_PAINT_RADIAL_GRADIENT:
+        if (!is_stroke_gradient)
+            add_comma_separated(warning, _u8L("Radial stroke gradient"));
+        break;
+    // case NSVG_PAINT_COLOR:
+    // case NSVG_PAINT_NONE:
+    // default: break;
+    }
+    return warning;
+}
+
+/// <summary>
+/// Create warnings about shape
+/// </summary>
+/// <param name="image">Input svg loaded to shapes</param>
+/// <returns>Vector of warnings with same size as EmbossShape::shapes_with_ids
+/// or Empty when no warnings -> for fast checking that every thing is all right(more common case) </returns>
+std::vector<std::string> create_shape_warnings(const NSVGimage &image){
+    std::vector<std::string> result;
+    size_t shape_index = 0;
+    for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next, ++shape_index) {
+        std::string fill_warning = create_fill_warning(*shape);
+        if (!fill_warning.empty()) {
+            if (result.empty())
+                result = std::vector<std::string>(get_shapes_count(image) * 2);
+            result[shape_index * 2] = GUI::format(_L("Fill of shape(%1%) contain unsupported: %2% "), shape->id, fill_warning);
         }
 
-        if (!warning.empty()){
-            if (!warnings.empty())
-                warnings += "\n";
-
-            warnings += GUI::format(_L("Shape(%1%) contain unsupported: %2% "), shape->id, warning);
+        std::string stroke_warning = create_stroke_warning(*shape);
+        if (!stroke_warning.empty()) {
+            if (result.empty())
+                result = std::vector<std::string>(get_shapes_count(image) * 2);
+            result[shape_index * 2 + 1] = GUI::format(_L("Stroke of shape(%1%) contain unsupported: %2% "), shape->id, stroke_warning);
         }
     }
-    return warnings;
+    return result;
 }
 
 
@@ -1055,8 +1044,8 @@ void GLGizmoSVG::set_volume_by_selection()
         NSVGimage* image = init_image(es.svg_file);
         assert(image != nullptr);
         if (image != nullptr){
-            double tes_tol = get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)));
-            shape_ids = create_shape_with_ids(*image, tes_tol);
+            NSVGLineParams params{get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)))};
+            shape_ids = create_shape_with_ids(*image, params);
         }        
     }
 
@@ -1203,13 +1192,6 @@ void GLGizmoSVG::draw_window()
     }
 }
 namespace {
-size_t count(const NSVGshape &shape){
-    size_t res = 0;
-    for (const NSVGshape *shape_ptr = &shape; shape_ptr != NULL; shape_ptr = shape_ptr->next)
-        ++res;
-    return res;
-}
-
 void draw(const ExPolygonsWithIds& shapes_with_ids, unsigned max_size)
 {
     ImVec2 actual_pos = ImGui::GetCursorPos();
@@ -1255,13 +1237,11 @@ void GLGizmoSVG::draw_preview(){
         ImGui::Image(id, s);
         if(ImGui::IsItemHovered()){            
             const EmbossShape &es = *m_volume->emboss_shape;
-            size_t count_shapes = ::count(*es.svg_file.image->shapes);
+            size_t count_shapes = get_shapes_count(*es.svg_file.image);
             ImGui::SetTooltip("%d count shapes", count_shapes);
         }
     }    
 }
-
-#include <sstream>
 
 void GLGizmoSVG::draw_filename(){
     const EmbossShape &es = *m_volume->emboss_shape;
@@ -1283,8 +1263,17 @@ void GLGizmoSVG::draw_filename(){
 
     if (!m_shape_warnings.empty()){
         draw(get_icon(m_icons, IconType::exclamation));
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", m_shape_warnings.c_str());
+        if (ImGui::IsItemHovered()) {
+            std::string tooltip;
+            for (const std::string &w: m_shape_warnings){
+                if (w.empty())
+                    continue;
+                if (!tooltip.empty())
+                    tooltip += "\n";
+                tooltip += w;
+            }
+            ImGui::SetTooltip("%s", tooltip.c_str());
+        }
         ImGui::SameLine();
     }
 
@@ -1595,8 +1584,8 @@ void GLGizmoSVG::draw_size()
         NSVGimage *img = m_volume_shape.svg_file.image.get();
         assert(img != NULL);
         if (img != NULL){
-            double tes_tol = get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)));
-            m_volume_shape.shapes_with_ids = create_shape_with_ids(*img, tes_tol);
+            NSVGLineParams params{get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)))};
+            m_volume_shape.shapes_with_ids = create_shape_with_ids(*img, params);
             process();        
         }
     }
@@ -1958,34 +1947,6 @@ std::string choose_svg_file()
     return path;
 }
 
-void translate(ExPolygons &expolys, const Point &p) {
-    for (ExPolygon &expoly : expolys)
-        expoly.translate(p);
-}
-
-ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, double tesselation_tolerance)
-{
-    int max_level = 10;
-    bool is_y_negative = true;
-    ExPolygons expoly = to_expolygons(image, tesselation_tolerance, max_level, 1.0/SCALING_FACTOR, is_y_negative);
-    if (expoly.empty())
-        return {};
-
-    expoly = union_ex(expoly);
-    unsigned max_iteration = 10;
-    if (!Slic3r::Emboss::heal_shape(expoly, max_iteration))
-        return {};
-
-    // SVG is used as centered
-    // Do not disturb user by settings of pivot position
-    BoundingBox bb = get_extents(expoly);
-    translate(expoly, -bb.center());
-
-    // Preparation for multi shape in svg
-    unsigned id = 0;
-    return {{id, expoly}};
-}
-
 EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance)
 {
     EmbossShape shape;
@@ -2018,7 +1979,8 @@ EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance
     }
 
     // Set default and unchanging scale
-    shape.shapes_with_ids = create_shape_with_ids(*shape.svg_file.image, tesselation_tolerance);
+    NSVGLineParams params{tesselation_tolerance};
+    shape.shapes_with_ids = create_shape_with_ids(*shape.svg_file.image, params);
 
     // Must contain some shapes !!!
     if (shape.shapes_with_ids.empty()) {

@@ -437,7 +437,7 @@ bool has_duplicate_points(const Polygons &polys)
 #endif
 }
 
-bool remove_same_neighbor(Slic3r::Polygon &polygon)
+bool remove_same_neighbor(Polygon &polygon)
 {
     Points &points = polygon.points;
     if (points.empty())

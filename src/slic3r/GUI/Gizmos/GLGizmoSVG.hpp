@@ -141,7 +141,7 @@ private:
     EmbossShape m_volume_shape; // copy from m_volume for edit
 
     // same index as volumes in 
-    std::string m_shape_warnings;
+    std::vector<std::string> m_shape_warnings;
 
     // When work with undo redo stack there could be situation that 
     // m_volume point to unexisting volume so One need also objectID

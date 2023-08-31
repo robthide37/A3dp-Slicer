@@ -3,39 +3,77 @@
 #include <charconv> // to_chars
 
 #include "ClipperUtils.hpp"
+#include "Emboss.hpp" // heal for shape
 
-namespace {
-Slic3r::Polygons to_polygons(const NSVGshape &shape, float tessTol, int max_level, float scale, bool is_y_negative);
-
+namespace {    
+using namespace Slic3r; // Polygon
 // see function nsvg__lineTo(NSVGparser* p, float x, float y)
-bool is_line(const float *p, float precision = 1e-4);
-
+bool is_line(const float *p, float precision = 1e-4f);
+// convert curve in path to lines
+struct LinesPath{
+    Polygons polygons;
+    Polylines polylines; };
+LinesPath linearize_path(NSVGpath *first_path, const NSVGLineParams &param);
+ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape);
+ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param);
 } // namespace
 
 namespace Slic3r {
 
-Polygons to_polygons(const NSVGimage &image, float tessTol, int max_level, float scale, bool is_y_negative)
+ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, const NSVGLineParams &param)
 {
-    Polygons polygons;
-    for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next)
-        polygons_append(polygons, ::to_polygons(*shape, tessTol, max_level, scale, is_y_negative));
-    return polygons;
-}
-
-ExPolygons to_expolygons(const NSVGimage &image, float tessTol, int max_level, float scale, bool is_y_negative){
-    ExPolygons expolygons;
-    for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
-        Polygons polygons = ::to_polygons(*shape, tessTol, max_level, scale, is_y_negative);
-        if (polygons.empty())
+    ExPolygonsWithIds result;
+    size_t shape_id = 0;
+    for (NSVGshape *shape_ptr = image.shapes; shape_ptr != NULL; shape_ptr = shape_ptr->next, ++shape_id) {
+        const NSVGshape &shape = *shape_ptr;
+        if (!(shape.flags & NSVG_FLAGS_VISIBLE))
             continue;
 
-        ClipperLib::PolyFillType fill_type = ClipperLib::pftNonZero;
-        //if (shape->fillRule == NSVGfillRule::NSVG_FILLRULE_NONZERO)
-        if (shape->fillRule == NSVGfillRule::NSVG_FILLRULE_EVENODD)
-            fill_type = ClipperLib::pftEvenOdd;
-        expolygons_append(expolygons, union_ex(polygons, fill_type));
+        bool is_fill_used = shape.fill.type != NSVG_PAINT_NONE;
+        bool is_stroke_used = 
+            shape.stroke.type != NSVG_PAINT_NONE &&
+            shape.strokeWidth > 1e-5f;
+
+        if (!is_fill_used && !is_stroke_used)
+            continue;
+
+        const LinesPath lines_path = linearize_path(shape.paths, param);
+
+        if (is_fill_used) {
+            unsigned unique_id = static_cast<unsigned>(2 * shape_id);
+            result.push_back({unique_id, fill_to_expolygons(lines_path, shape)});
+        }        
+        if (is_stroke_used) {
+            unsigned unique_id = static_cast<unsigned>(2 * shape_id + 1);
+            result.push_back({unique_id, stroke_to_expolygons(lines_path, shape, param)});
+        }
     }
-    return expolygons;
+
+    // heal shapes
+    if (param.max_heal_iteration > 0)
+        for (auto &[id, expoly] : result)
+            Slic3r::Emboss::heal_shape(expoly, param.max_heal_iteration);
+
+    // SVG is used as centered
+    // Do not disturb user by settings of pivot position
+    center(result);
+    return result;
+}
+
+Polygons to_polygons(const NSVGimage &image, const NSVGLineParams &param)
+{
+    Polygons result;
+    for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
+        if (!(shape->flags & NSVG_FLAGS_VISIBLE))
+            continue;
+        if (shape->fill.type == NSVG_PAINT_NONE)
+            continue;
+        const LinesPath lines_path = linearize_path(shape->paths, param);
+        polygons_append(result, lines_path.polygons);
+        // close polyline to create polygon
+        polygons_append(result, to_polygons(lines_path.polylines));        
+    }
+    return result;
 }
 
 void bounds(const NSVGimage &image, Vec2f& min, Vec2f &max)
@@ -91,6 +129,14 @@ NSVGimage_ptr nsvgParse(const std::shared_ptr<char[]> file_data, const char *uni
     memcpy(data_copy.get(), file_data.get(), size);
     NSVGimage *image = ::nsvgParse(data_copy.get(), units, dpi);
     return {image, ::nsvgDelete};
+}
+
+size_t get_shapes_count(const NSVGimage &image)
+{
+    size_t count = 0;
+    for (NSVGshape * s = image.shapes; s != NULL; s = s->next)
+        ++count;
+    return count;
 }
 
 void save(const NSVGimage &image, std::ostream &data)
@@ -177,7 +223,7 @@ void save(const NSVGimage &image, std::ostream &data)
             }
         }
         if (type != Type::close) {
-            type = Type::close;
+            //type = Type::close;
             d += "Z"; // closed path
         }
         data << "<path fill=\"#D2D2D2\" d=\"" << d << "\" />\n";
@@ -198,18 +244,7 @@ bool save(const NSVGimage &image, const std::string &svg_file_path)
 namespace {
 using namespace Slic3r; // Polygon + Vec2f
 
-bool is_useable(const NSVGshape &shape)
-{
-    if (!(shape.flags & NSVG_FLAGS_VISIBLE))
-        return false;
-    if (shape.fill.type == NSVG_PAINT_NONE)
-        return false;
-    return true;
-}
-
-Point::coord_type to_coor(float val, float scale) { return static_cast<Point::coord_type>(std::round(val * scale)); }
-
-
+Point::coord_type to_coor(float val, double scale) { return static_cast<Point::coord_type>(std::round(val * scale)); }
 
 bool need_flattening(float tessTol, const Vec2f &p1, const Vec2f &p2, const Vec2f &p3, const Vec2f &p4) {
     // f .. first
@@ -256,12 +291,12 @@ bool is_line(const float *p, float precision){
 /// <param name="p3">Curve point</param>
 /// <param name="p4">Curve point</param>
 /// <param name="level">Actual depth of recursion</param>
-void flatten_cubic_bez(Polygon &polygon, float tessTol, const Vec2f& p1, const Vec2f& p2, const Vec2f& p3, const Vec2f& p4, int level)
+void flatten_cubic_bez(Points &points, float tessTol, const Vec2f& p1, const Vec2f& p2, const Vec2f& p3, const Vec2f& p4, int level)
 {
     if (!need_flattening(tessTol, p1, p2, p3, p4)) {
         Point::coord_type x = static_cast<Point::coord_type>(std::round(p4.x()));
         Point::coord_type y = static_cast<Point::coord_type>(std::round(p4.y()));
-        polygon.points.emplace_back(x, y);
+        points.emplace_back(x, y);
         return;
     }
 
@@ -275,60 +310,104 @@ void flatten_cubic_bez(Polygon &polygon, float tessTol, const Vec2f& p1, const V
     Vec2f p123 = (p12 + p23) * 0.5f;
     Vec2f p234  = (p23 + p34) * 0.5f;
     Vec2f p1234 = (p123 + p234) * 0.5f;
-    flatten_cubic_bez(polygon, tessTol, p1, p12, p123, p1234, level);
-    flatten_cubic_bez(polygon, tessTol, p1234, p234, p34, p4, level);
+    flatten_cubic_bez(points, tessTol, p1, p12, p123, p1234, level);
+    flatten_cubic_bez(points, tessTol, p1234, p234, p34, p4, level);
 }
 
-Polygons to_polygons(NSVGpath *first_path, float tessTol, int max_level, float scale)
+LinesPath linearize_path(NSVGpath *first_path, const NSVGLineParams &param)
 {
-    Polygons polygons;
-    Polygon  polygon;
+    LinesPath result;
+    Polygons  &polygons  = result.polygons;
+    Polylines &polylines = result.polylines;
+
+    // multiple use of allocated memmory for points between paths
+    Points points;
     for (NSVGpath *path = first_path; path != NULL; path = path->next) {
         // Flatten path
-        Point::coord_type x = to_coor(path->pts[0], scale);
-        Point::coord_type y = to_coor(path->pts[1], scale);
-        polygon.points.emplace_back(x, y);
+        Point::coord_type x = to_coor(path->pts[0], param.scale);
+        Point::coord_type y = to_coor(path->pts[1], param.scale);
+        points.emplace_back(x, y);
         size_t path_size = (path->npts > 1) ? static_cast<size_t>(path->npts - 1) : 0;
         for (size_t i = 0; i < path_size; i += 3) {
             const float *p = &path->pts[i * 2];
             if (is_line(p)) {
                 // point p4
-                Point::coord_type x = to_coor(p[6], scale);
-                Point::coord_type y = to_coor(p[7], scale);
-                polygon.points.emplace_back(x, y);
+                Point::coord_type xx = to_coor(p[6], param.scale);
+                Point::coord_type yy = to_coor(p[7], param.scale);
+                points.emplace_back(xx, yy);
                 continue;
             }
             Vec2f p1(p[0], p[1]);
             Vec2f p2(p[2], p[3]);
             Vec2f p3(p[4], p[5]);
             Vec2f p4(p[6], p[7]);
-            flatten_cubic_bez(polygon, tessTol, p1 * scale, p2 * scale, p3 * scale, p4 * scale, max_level);
+            flatten_cubic_bez(points, param.tesselation_tolerance, 
+                p1 * param.scale, p2 * param.scale, p3 * param.scale, p4 * param.scale, 
+                param.max_level);
         }
-        if (path->closed && !polygon.empty()) {
-            polygons.push_back(polygon);
-            polygon = Polygon();
-        }
-    }
-    if (!polygon.empty())
-        polygons.push_back(polygon);
+        assert(!points.empty());
+        if (points.empty()) 
+            continue;
 
-    remove_same_neighbor(polygons);
-    return polygons;
-}
-
-Polygons to_polygons(const NSVGshape &shape, float tessTol, int max_level, float scale, bool is_y_negative)
-{
-    if (!is_useable(shape))
-        return {};
-
-    Polygons polygons = to_polygons(shape.paths, tessTol, max_level, scale);
-    
-    if (is_y_negative)
-        for (Polygon &polygon : polygons)
-            for (Point &p : polygon.points)
+        if (param.is_y_negative)
+            for (Point &p : points)
                 p.y() = -p.y();
 
-    return polygons;
+        if (path->closed) {
+            polygons.emplace_back(points);
+        } else {
+            polylines.emplace_back(points);
+        }
+        // prepare for new path - recycle alocated memory
+        points.clear();
+    }
+    remove_same_neighbor(polygons);
+    remove_same_neighbor(polylines);
+    return result;
+}
+
+ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape)
+{
+    Polygons fill = lines_path.polygons; // copy
+
+    // close polyline to create polygon
+    polygons_append(fill, to_polygons(lines_path.polylines));
+    if (fill.empty())
+        return {};
+
+    ClipperLib::PolyFillType fill_type = ClipperLib::pftNonZero;
+    // if (shape->fillRule == NSVGfillRule::NSVG_FILLRULE_NONZERO)
+    if (shape.fillRule == NSVGfillRule::NSVG_FILLRULE_EVENODD)
+        fill_type = ClipperLib::pftEvenOdd;
+    return union_ex(fill, fill_type);
+}
+
+ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param)
+{
+    // convert stroke to polygon
+    ClipperLib::JoinType join_type = ClipperLib::JoinType::jtSquare;
+    switch (static_cast<NSVGlineJoin>(shape.strokeLineJoin)) {
+    case NSVGlineJoin::NSVG_JOIN_BEVEL: join_type = ClipperLib::JoinType::jtSquare; break;
+    case NSVGlineJoin::NSVG_JOIN_MITER: join_type = ClipperLib::JoinType::jtMiter; break;
+    case NSVGlineJoin::NSVG_JOIN_ROUND: join_type = ClipperLib::JoinType::jtRound; break;
+    }
+
+    double mitter = shape.miterLimit * param.scale;
+    if (join_type == ClipperLib::JoinType::jtRound) {
+        // mitter is ArcTolerance
+        mitter = std::pow(param.tesselation_tolerance, 1/3.);
+    }
+    float stroke_width = static_cast<float>(shape.strokeWidth * param.scale);
+    Polygons result = contour_to_polygons(lines_path.polygons, stroke_width, join_type, mitter);
+
+    ClipperLib::EndType end_type = ClipperLib::EndType::etOpenButt;
+    switch (static_cast<NSVGlineCap>(shape.strokeLineCap)) {
+    case NSVGlineCap::NSVG_CAP_BUTT: end_type = ClipperLib::EndType::etOpenButt; break;
+    case NSVGlineCap::NSVG_CAP_ROUND: end_type = ClipperLib::EndType::etOpenRound; break;
+    case NSVGlineCap::NSVG_CAP_SQUARE: end_type = ClipperLib::EndType::etOpenSquare; break;
+    }    
+    polygons_append(result, offset(lines_path.polylines, stroke_width / 2, join_type, mitter, end_type));
+    return union_ex(result, ClipperLib::pftNonZero);
 }
 
 } // namespace
