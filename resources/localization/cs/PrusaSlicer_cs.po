@@ -1589,7 +1589,7 @@ msgstr "Záchrana při neznámých hodnotách konfigurace"
 #: src/slic3r/GUI/ArrangeSettingsDialogImgui.cpp:100
 #: src/slic3r/GUI/Jobs/SLAImportDialog.hpp:118
 msgid "Balanced"
-msgstr "Vyvážený"
+msgstr "Vyvážené"
 
 #: src/slic3r/GUI/MainFrame.cpp:710
 msgid "based on Slic3r"
@@ -5293,7 +5293,7 @@ msgstr "Ventilátor bude vypnutý."
 #: src/slic3r/GUI/ArrangeSettingsDialogImgui.cpp:98
 #: src/slic3r/GUI/Jobs/SLAImportDialog.hpp:119
 msgid "Fast"
-msgstr "Rychlý"
+msgstr "Rychlé"
 
 #: src/libslic3r/PrintConfig.cpp:3700
 msgid "Fast tilt"

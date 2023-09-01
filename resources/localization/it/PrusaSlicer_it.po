@@ -9056,7 +9056,7 @@ msgstr "mm (imposta a zero per disabilitare)"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:517 src/slic3r/GUI/GUI_App.cpp:2472
 msgid "Mode"
-msgstr "&Modalità"
+msgstr "Modalità"
 
 #: src/slic3r/GUI/wxExtensions.cpp:714
 msgctxt "Mode"
