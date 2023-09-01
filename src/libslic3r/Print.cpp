@@ -689,7 +689,7 @@ std::string Print::validate(std::vector<std::string>* warnings) const
 //        	double extrusion_width_min = config.get_abs_value(opt_key, min_nozzle_diameter);
 //        	double extrusion_width_max = config.get_abs_value(opt_key, max_nozzle_diameter);
             double extrusion_width_min = config.get_abs_value(opt_key, layer_height);
-            double extrusion_width_max = config.get_abs_value(opt_key, layer_height);
+            double extrusion_width_max = extrusion_width_min;
         	if (extrusion_width_min == 0) {
         		// Default "auto-generated" extrusion width is always valid.
         	} else if (extrusion_width_min <= layer_height) {
@@ -722,6 +722,17 @@ std::string Print::validate(std::vector<std::string>* warnings) const
     						return _u8L("The Wipe Tower currently supports the non-soluble supports only if they are printed with the current extruder without triggering a tool change. "
     							     "(both support_material_extruder and support_material_interface_extruder need to be set to 0).");
     				}
+                }
+                if (object->config().support_material_style == smsOrganic) {
+                    float extrusion_width = std::min(
+                        support_material_flow(object).width(),
+                        support_material_interface_flow(object).width());
+                    if (object->config().support_tree_tip_diameter < extrusion_width - EPSILON)
+                        return _u8L("Organic support tree tip diameter must not be smaller than support material extrusion width.");
+                    if (object->config().support_tree_branch_diameter < 2. * extrusion_width - EPSILON)
+                        return _u8L("Organic support branch diameter must not be smaller than 2x support material extrusion width.");
+                    if (object->config().support_tree_branch_diameter < object->config().support_tree_tip_diameter)
+                        return _u8L("Organic support branch diameter must not be smaller than support tree tip diameter.");
                 }
             }
 
