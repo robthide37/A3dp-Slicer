@@ -43,8 +43,6 @@ namespace Slic3r {
 class BuildVolume;
 class Model;
 class ModelObject;
-enum class ModelObjectCutAttribute : int;
-using ModelObjectCutAttributes = enum_bitmask<ModelObjectCutAttribute>;
 class ModelInstance;
 class Print;
 class SLAPrint;

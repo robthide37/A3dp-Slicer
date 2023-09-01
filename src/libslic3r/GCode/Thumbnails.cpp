@@ -9,6 +9,9 @@
 #include <jpeglib.h>
 #include <jerror.h>
 
+#include <boost/algorithm/string.hpp>
+#include <string>
+
 namespace Slic3r::GCodeThumbnails {
 
 using namespace std::literals;
@@ -120,7 +123,57 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail(const ThumbnailData &d
     }
 }
 
-std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> make_thumbnail_list(const DynamicPrintConfig &config)
+std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> make_and_check_thumbnail_list(const std::string& thumbnails_string, ThumbnailErrors& errors, std::string def_ext /*= "PNG"*/)
+{
+    if (thumbnails_string.empty())
+        return {};
+
+    const auto& extentions = ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_names();
+
+    std::istringstream is(thumbnails_string);
+    std::string point_str;
+
+    // generate thumbnails data to process it
+
+    std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails_list;
+    while (std::getline(is, point_str, ',')) {
+        Vec2d point(Vec2d::Zero());
+        GCodeThumbnailsFormat format;
+        std::istringstream iss(point_str);
+        std::string coord_str;
+        if (std::getline(iss, coord_str, 'x')) {
+            std::istringstream(coord_str) >> point(0);
+            if (std::getline(iss, coord_str, '/')) {
+                std::istringstream(coord_str) >> point(1);
+
+                if (0 < point(0) && point(0) < 1000 && 0 < point(1) && point(1) < 1000) {
+                    std::string ext_str;
+                    std::getline(iss, ext_str, '/');
+
+                    if (ext_str.empty())
+                        ext_str = def_ext;
+                    else {
+                        // check validity of extention
+                        boost::to_upper(ext_str);
+                        if (std::find(extentions.begin(), extentions.end(), ext_str) == extentions.end())
+                            errors = enum_bitmask(errors | ThumbnailError::InvalidExt);
+                    }
+                    format = ext_str == "JPG" ? GCodeThumbnailsFormat::JPG :
+                             ext_str == "QOI" ? GCodeThumbnailsFormat::QOI : GCodeThumbnailsFormat::PNG;
+                    thumbnails_list.emplace_back(std::make_pair(format, point));
+                }
+                else
+                    errors = enum_bitmask(errors | ThumbnailError::OutOfRange);
+                continue;
+            }
+        }
+        errors = enum_bitmask(errors | ThumbnailError::InvalidVal);
+    }
+
+    return thumbnails_list;
+}
+
+std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> make_thumbnail_list(const DynamicPrintConfig& config)
 {
     // ??? Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
     // ??? If "thumbnails_format" is not defined, export to PNG.
@@ -129,26 +182,9 @@ std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> make_thumbnail_list(const D
 
     std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails_list;
     if (const auto thumbnails_value = config.option<ConfigOptionString>("thumbnails")) {
-        std::string str = thumbnails_value->value;
-        std::istringstream is(str);
-        std::string point_str;
-        while (std::getline(is, point_str, ',')) {
-            Vec2d point(Vec2d::Zero());
-            GCodeThumbnailsFormat format;
-            std::istringstream iss(point_str);
-            std::string coord_str;
-            if (std::getline(iss, coord_str, 'x')) {
-                std::istringstream(coord_str) >> point(0);
-                if (std::getline(iss, coord_str, '/')) {
-                    std::istringstream(coord_str) >> point(1);
-                    std::string ext_str;
-                    if (std::getline(iss, ext_str, '/'))
-                        format = ext_str == "JPG" ? GCodeThumbnailsFormat::JPG :
-                                 ext_str == "QOI" ? GCodeThumbnailsFormat::QOI :GCodeThumbnailsFormat::PNG;
-                }
-            }
-            thumbnails_list.emplace_back(std::make_pair(format, point));
-        }
+        ThumbnailErrors errors;
+        thumbnails_list = make_and_check_thumbnail_list(thumbnails_value->value, errors);
+        assert(errors == enum_bitmask<ThumbnailError>());
     }
 
     return thumbnails_list;

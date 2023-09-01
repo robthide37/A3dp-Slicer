@@ -15,6 +15,7 @@
 
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/enum_bitmask.hpp"
+#include "libslic3r/GCode/Thumbnails.hpp"
 
 #include <regex>
 #include <wx/numformatter.h>
@@ -33,13 +34,7 @@
 #define wxOSX false
 #endif
 
-namespace Slic3r {
-
-enum class ThumbnailError : int { InvalidVal, OutOfRange, InvalidExt };
-using ThumbnailErrors = enum_bitmask<ThumbnailError>;
-ENABLE_ENUM_BITMASK_OPERATORS(ThumbnailError);
-
-namespace GUI {
+namespace Slic3r :: GUI {
 
 wxString double_to_string(double const value, const int max_precision /*= 4*/)
 {
@@ -71,81 +66,23 @@ wxString double_to_string(double const value, const int max_precision /*= 4*/)
     return s;
 }
 
-bool is_valid_thumbnails_extention(wxString& ext)
-{
-    ext.UpperCase();
-    static const std::vector<wxString> extentions = { "PNG", "JPG", "QOI" };
-
-    return std::find(extentions.begin(), extentions.end(), ext) != extentions.end();
-}
-
 ThumbnailErrors validate_thumbnails_string(wxString& str, const wxString& def_ext = "PNG")
 {
-    bool invalid_val, out_of_range_val, invalid_ext;
-    invalid_val = out_of_range_val = invalid_ext = false;
-    str.Replace(" ", wxEmptyString, true);
+    std::string input_string = into_u8(str);
 
-    if (!str.IsEmpty()) {
+    str.Clear();
+    ThumbnailErrors errors;
 
-        std::vector<std::pair<Vec2d, std::string>> out_thumbnails;
-
-        wxStringTokenizer thumbnails(str, ",");
-        while (thumbnails.HasMoreTokens()) {
-            wxString token = thumbnails.GetNextToken();
-            double x, y;
-            wxStringTokenizer thumbnail(token, "x");
-            if (thumbnail.HasMoreTokens()) {
-                wxString x_str = thumbnail.GetNextToken();
-                if (x_str.ToDouble(&x) && thumbnail.HasMoreTokens()) {
-                    wxStringTokenizer y_and_ext(thumbnail.GetNextToken(), "/");
-
-                    wxString y_str = y_and_ext.GetNextToken();
-                    if (y_str.ToDouble(&y)) {
-                        // thumbnail has no extension 
-                        if (0 < x && x < 1000 && 0 < y && y < 1000) {
-                            wxString ext = y_and_ext.HasMoreTokens() ? y_and_ext.GetNextToken() : def_ext;
-                            bool is_valid_ext = is_valid_thumbnails_extention(ext);
-                            invalid_ext |= !is_valid_ext;
-                            out_thumbnails.push_back({ Vec2d(x, y), into_u8(is_valid_ext ? ext : def_ext) });
-                            continue;
-                        }
-                        out_of_range_val |= true;
-                        continue;
-                    }
-                }
-            }
-            invalid_val |= true;
-        }
-
-        str.Clear();
-        for (const auto& [size, ext] : out_thumbnails)
-            str += format_wxstr("%1%x%2%/%3%, ", size.x(), size.y(), ext);
-        str.resize(str.Len()-2);
+    auto thumbnails_list = Slic3r::GCodeThumbnails::make_and_check_thumbnail_list(input_string, errors);
+    if (!thumbnails_list.empty()) {
+        const auto& extentions = ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_names();
+        for (const auto& [format, size] : thumbnails_list)
+            str += format_wxstr("%1%x%2%/%3%, ", size.x(), size.y(), extentions[int(format)]);
+        str.resize(str.Len() - 2);
     }
-
-    ThumbnailErrors errors = only_if(invalid_val,      ThumbnailError::InvalidVal) |
-                             only_if(invalid_ext,      ThumbnailError::InvalidExt) |
-                             only_if(out_of_range_val, ThumbnailError::OutOfRange);
 
     return errors;
 }
-
-wxString get_valid_thumbnails_string(const DynamicPrintConfig& config)
-{
-    // >>> ysFIXME - temporary code, till "thumbnails_format" options exists in config
-    wxString format = "PNG";
-    if (const ConfigOptionDef* opt = config.def()->get("thumbnails_format"))
-        if (auto label = opt->enum_def->enum_to_label(config.option("thumbnails_format")->getInt());
-            label.has_value())
-            format = from_u8(*label);
-    // <<<
-
-    wxString str = from_u8(config.opt_string("thumbnails"));
-    validate_thumbnails_string(str, format);
-
-    return str;
-}
-
 
 Field::~Field()
 {
@@ -1765,5 +1702,5 @@ boost::any& SliderCtrl::get_value()
 }
 
 
-} // GUI
-} // Slic3r
+} // Slic3r :: GUI
+

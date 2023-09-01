@@ -1160,11 +1160,8 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
         }
         return _L("Undef");
     }
-    case coString: {
-        if (opt_key == "thumbnails")
-            return get_valid_thumbnails_string(config);
+    case coString:
         return from_u8(config.opt_string(opt_key));
-    }
     case coStrings: {
         const ConfigOptionStrings* strings = config.opt<ConfigOptionStrings>(opt_key);
         if (strings) {
