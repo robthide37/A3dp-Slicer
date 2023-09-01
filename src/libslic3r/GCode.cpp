@@ -3119,9 +3119,9 @@ std::string GCodeGenerator::_extrude(
                 radius = GCodeFormatter::quantize_xyzf(radius);
             } else {
                 // Calculate quantized IJ circle center offset.
-                ij = GCodeFormatter::quantize(
-                        Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), it->ccw()) 
-                        - prev);
+                ij = GCodeFormatter::quantize(Vec2d(
+                        Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), it->ccw())
+                        - prev));
                 if (ij == Vec2d::Zero())
                     // Don't extrude a degenerated circle.
                     radius = 0;
