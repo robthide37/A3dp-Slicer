@@ -117,7 +117,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             return done;
         };
         const bool emit_radius = gcodegen.config().arc_fitting == ArcFittingType::EmitRadius;
-        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, emit_radius](
+        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, emit_radius, &wipe_linear](
             const Vec2d &prev_quantized, Vec2d &p, double radius_in, const bool ccw) {
             Vec2d  p_quantized = GCodeFormatter::quantize(p);
             if (p_quantized == prev_quantized) {
@@ -126,6 +126,9 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             }
             // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
             double radius = emit_radius ? GCodeFormatter::quantize_xyzf(radius_in) : radius_in;
+            if (radius == 0)
+                // Degenerated arc after quantization. Process it as if it was a line segment.
+                return wipe_linear(prev_quantized, p);
             Vec2d  center = Geometry::ArcWelder::arc_center(prev_quantized.cast<double>(), p_quantized.cast<double>(), double(radius), ccw);
             float  angle  = Geometry::ArcWelder::arc_angle(prev_quantized.cast<double>(), p_quantized.cast<double>(), double(radius));
             assert(angle > 0);
@@ -152,8 +155,13 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
                 gcode += gcodegen.writer().extrude_to_xy_G2G3R(p, radius, ccw, -dE, wipe_retract_comment);
             } else {
                 // Calculate quantized IJ circle center offset.
+                Vec2d ij = GCodeFormatter::quantize(Vec2d(center - prev_quantized));
+                if (ij == Vec2d::Zero())
+                    // Degenerated arc after quantization. Process it as if it was a line segment.
+                    return wipe_linear(prev_quantized, p);
+                // The arc is valid.
                 gcode += gcodegen.writer().extrude_to_xy_G2G3IJ(
-                    p, GCodeFormatter::quantize(Vec2d(center - prev_quantized)), ccw, -dE, wipe_retract_comment);
+                    p, ij, ccw, -dE, wipe_retract_comment);
             }
             retract_length -= dE;
             return done;

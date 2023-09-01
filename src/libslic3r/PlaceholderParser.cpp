@@ -1643,6 +1643,7 @@ namespace client
 
             // Check whether the table X values are sorted.
             double x = expr_x.as_d();
+            assert(! std::isnan(x));
             bool   evaluated = false;
             for (size_t i = 1; i < table.table.size(); ++i) {
                 double x0 = table.table[i - 1].x;

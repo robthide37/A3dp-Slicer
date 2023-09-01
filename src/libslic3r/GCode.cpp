@@ -3105,27 +3105,35 @@ std::string GCodeGenerator::_extrude(
     auto  end  = path.end();
     const bool emit_radius = m_config.arc_fitting == ArcFittingType::EmitRadius;
     for (++ it; it != end; ++ it) {
-        Vec2d p = this->point_to_gcode_quantized(it->point);
-        if (it->radius == 0) {
+        Vec2d  p = this->point_to_gcode_quantized(it->point);
+        // Center of the radius to be emitted into the G-code: Either by radius or by center offset.
+        double radius = 0;
+        Vec2d  ij;
+        if (it->radius != 0) {
+            // Extrude an arc.
+            assert(m_config.arc_fitting == ArcFittingType::EmitCenter ||
+                   m_config.arc_fitting == ArcFittingType::EmitRadius);
+            radius = unscaled<double>(it->radius);
+            if (emit_radius) {
+                // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
+                radius = GCodeFormatter::quantize_xyzf(radius);
+            } else {
+                // Calculate quantized IJ circle center offset.
+                ij = GCodeFormatter::quantize(
+                        Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), it->ccw()) 
+                        - prev);
+                if (ij == Vec2d::Zero())
+                    // Don't extrude a degenerated circle.
+                    radius = 0;
+            }
+        }
+        if (radius == 0) {
             // Extrude line segment.
             if (const double line_length = (p - prev).norm(); line_length > 0) {
                 path_length += line_length;
                 gcode += m_writer.extrude_to_xy(p, e_per_mm * line_length, comment);
             }
         } else {
-            // Extrude an arc.
-            assert(m_config.arc_fitting == ArcFittingType::EmitCenter ||
-                   m_config.arc_fitting == ArcFittingType::EmitRadius);
-            double radius = unscaled<double>(it->radius);
-            if (emit_radius)
-                // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
-                radius = GCodeFormatter::quantize_xyzf(radius);
-            Vec2d  ij;
-            if (! emit_radius) {
-                // Calculate quantized IJ circle center offset.
-                Vec2d center_raw = Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), it->ccw()) - prev;
-                ij = GCodeFormatter::quantize(center_raw);
-            }
             double angle = Geometry::ArcWelder::arc_angle(prev.cast<double>(), p.cast<double>(), double(radius));
             assert(angle > 0);
             const double line_length = angle * std::abs(radius);
