@@ -165,7 +165,10 @@ namespace Slic3r {
 
     int OozePrevention::_get_temp(const GCodeGenerator &gcodegen) const
     {
-        return (gcodegen.layer() == nullptr || gcodegen.layer()->id() == 0)
+        // First layer temperature should be used when on the first layer (obviously) and when
+        // "other layers" is set to zero (which means it should not be used).
+        return (gcodegen.layer() == nullptr || gcodegen.layer()->id() == 0
+             || gcodegen.config().temperature.get_at(gcodegen.writer().extruder()->id()) == 0)
             ? gcodegen.config().first_layer_temperature.get_at(gcodegen.writer().extruder()->id())
             : gcodegen.config().temperature.get_at(gcodegen.writer().extruder()->id());
     }
