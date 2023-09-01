@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2022 Filip Sykala @Jony01, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Triangulation.hpp"
 #include "IntersectionPoints.hpp"
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>

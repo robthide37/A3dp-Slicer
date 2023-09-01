@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 David Kocík @kocikdav, Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_PhysicalPrinterDialog_hpp_
 #define slic3r_PhysicalPrinterDialog_hpp_
 

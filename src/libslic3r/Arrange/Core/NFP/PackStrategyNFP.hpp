@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2023 Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef PACKSTRATEGYNFP_HPP
 #define PACKSTRATEGYNFP_HPP
 

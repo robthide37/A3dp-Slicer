@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2021 Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Oleksandra Iushchenko @YuSanka
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "CustomGCode.hpp"
 #include "Config.hpp"
 #include "GCode.hpp"

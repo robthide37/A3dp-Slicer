@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 David Kocík @kocikdav, Roman Beránek @zavorka, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_GUI_RemovableDriveManager_hpp_
 #define slic3r_GUI_RemovableDriveManager_hpp_
 

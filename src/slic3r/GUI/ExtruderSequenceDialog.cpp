@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2022 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ExtruderSequenceDialog.hpp"
 
 #include <wx/wx.h>

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2023 Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "SimpleArrangeItem.hpp"
 #include "libslic3r/Arrange/ArrangeImpl.hpp"
 #include "libslic3r/Arrange/Tasks/ArrangeTaskImpl.hpp"
