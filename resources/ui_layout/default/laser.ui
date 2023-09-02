@@ -1,0 +1,15 @@
+
+page:idx:Laser:funnel
+#group:Size
+#	setting:idx:laser_diameter
+group:Position
+	setting:idx:laser_offset
+	setting:idx:laser_z_offset
+group:Power
+	setting:idx:laser_power
+group:validate_gcode:Laser on/off
+	setting:idx:full_width:height$2:laser_enable_gcode
+	setting:idx:full_width:height$2:laser_disable_gcode
+group:validate_gcode:G-Code
+	setting:idx:full_width:height$15:laser_toolchange_start_gcode
+	setting:idx:full_width:height$15:laser_toolchange_end_gcode

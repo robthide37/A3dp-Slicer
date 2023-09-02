@@ -540,13 +540,19 @@ public:
 	size_t		m_extruders_count_old = 0;
 	size_t		m_initial_extruders_count = 0;
 	size_t		m_sys_extruders_count = 0;
-
 	size_t		m_cache_extruder_count = 0;
+	
 	size_t		m_milling_count = 0;
 	size_t		m_milling_count_old = 0;
 	size_t		m_initial_milling_count;
 	size_t		m_sys_milling_count = 0;
 	size_t		m_cache_milling_count = 0;
+	
+	size_t		m_laser_count = 0;
+	size_t		m_laser_count_old = 0;
+	size_t		m_initial_laser_count;
+	size_t		m_sys_laser_count = 0;
+	size_t		m_cache_laser_count = 0;
 
     PrinterTechnology               m_printer_technology = ptFFF;
 
@@ -567,7 +573,8 @@ public:
     void        update_pages(); // update m_pages according to printer technology
     void        update_printers();
 	void		extruders_count_changed(size_t extruders_count);
-	void		milling_count_changed(size_t extruders_count);
+	void		milling_count_changed(size_t mills_count);
+	void		lasers_count_changed(size_t lasers_count);
 	PageShp		build_kinematics_page();
 	void		build_unregular_pages(bool from_initial_build = false);
 	void		on_preset_loaded() override;

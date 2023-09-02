@@ -11,10 +11,11 @@ group:Size and coordinates
 		setting:lift_min
 		setting:z_offset
 	end_line
-group:extruders_count_event:milling_count_event:Capabilities
+group:extruders_count_event:milling_count_event:laser_count_event:Capabilities
 	extruders_count
 	setting:single_extruder_multi_material
 	milling_count
+	laser_count
 group:Print Host upload
 	print_host_upload_description
 group:silent_mode_event:Firmware

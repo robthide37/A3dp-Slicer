@@ -32,12 +32,12 @@ std::string SpiralVase::process_layer(const std::string &gcode)
         //FIXME Performance warning: This copies the GCodeConfig of the reader.
         GCodeReader r = m_reader;  // clone
         bool set_z = false;
-        bool milling = false;
-        r.parse_buffer(gcode, [&total_layer_length, &layer_height, &z, &set_z, &height_str, &milling]
+        bool is_milling_or_laser = false;
+        r.parse_buffer(gcode, [&total_layer_length, &layer_height, &z, &set_z, &height_str, &is_milling_or_laser]
             (GCodeReader &reader, const GCodeReader::GCodeLine &line) {
-            if (boost::starts_with(line.comment(), " milling"))
-                milling = true;
-            if (!milling) {
+            if (boost::starts_with(line.comment(), " milling") || boost::starts_with(line.comment(), " laser"))
+                is_milling_or_laser = true;
+            if (!is_milling_or_laser) {
                 if (line.cmd_is("G1")) {
                     if (line.extruding(reader)) {
                         total_layer_length += line.dist_XY(reader);
@@ -61,7 +61,7 @@ std::string SpiralVase::process_layer(const std::string &gcode)
         });
     }
     
-    // Remove layer height from initial Z.
+    // Remove layer height from initial Z.
     z -= layer_height;
     
     std::string new_gcode;
@@ -84,13 +84,13 @@ std::string SpiralVase::process_layer(const std::string &gcode)
     float len = 0.f;
     double E_accumulator = 0;
     double last_old_E = 0;
-    bool is_milling = false;
+    bool is_milling_or_laser = false;
     GCodeReader::GCodeLine line_last_position;
-    m_reader.parse_buffer(gcode, [this, &keep_first_travel , &new_gcode, &z, total_layer_length, layer_height_factor, &len, &E_accumulator, &last_old_E, &height_str, &is_milling, &line_last_position]
+    m_reader.parse_buffer(gcode, [this, &keep_first_travel , &new_gcode, &z, total_layer_length, layer_height_factor, &len, &E_accumulator, &last_old_E, &height_str, &is_milling_or_laser, &line_last_position]
         (GCodeReader &reader, GCodeReader::GCodeLine line) {
-        if (boost::starts_with(line.comment()," milling"))
-            is_milling = true;
-        if (!is_milling) {
+        if (boost::starts_with(line.comment()," milling") || boost::starts_with(line.comment()," laser"))
+            is_milling_or_laser = true;
+        if (!is_milling_or_laser) {
             if (line.cmd_is("G1")) {
                 if (line.has_z()) {
                     // If this is the initial Z move of the layer, replace it with a
@@ -155,7 +155,7 @@ std::string SpiralVase::process_layer(const std::string &gcode)
         //restore height/width
         new_gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Height) + height_str +"\n";
     }
-    if (is_milling) {
+    if (is_milling_or_laser) {
         //travel back to last good position.
         line_last_position.set(m_reader, Axis::E, 0);
         new_gcode += "; return to spiral location\n";

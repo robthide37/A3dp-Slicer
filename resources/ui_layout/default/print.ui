@@ -503,6 +503,9 @@ group:Post-processing milling
 	setting:milling_extra_size
 	setting:milling_after_z
 	setting:milling_speed
+group:Support interface laser post-process
+	setting:laser_support_interface_pp
+	setting:laser_energy
 	
 page:Notes:note
 group:no_title:Notes

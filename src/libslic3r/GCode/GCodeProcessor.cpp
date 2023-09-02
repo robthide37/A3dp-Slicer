@@ -49,6 +49,8 @@ const std::vector<std::string> GCodeProcessor::Reserved_Tags = {
     "COLOR_CHANGE",
     "PAUSE_PRINT",
     "CUSTOM_GCODE",
+    "LASER_START",
+    "LASER_END",
     "_GP_FIRST_LINE_M73_PLACEHOLDER",
     "_GP_LAST_LINE_M73_PLACEHOLDER",
     "_GP_ESTIMATED_PRINTING_TIME_PLACEHOLDER"
@@ -2037,6 +2039,19 @@ void GCodeProcessor::process_tags(const std::string_view comment, bool producers
         return;
     }
 
+    // laser start tag
+    if (boost::starts_with(comment, reserved_tag(ETags::Laser_Start))) {
+        m_laser = true;
+        return;
+    }
+
+    // laser end tag
+    if (boost::starts_with(comment, reserved_tag(ETags::Laser_End))) {
+        m_laser = false;
+        store_move_vertex(EMoveType::Seam);
+        return;
+    }
+
     if (!producers_enabled || m_producer == EProducer::PrusaSlicer || m_producer == EProducer::Slic3r || m_producer == EProducer::SuperSlicer) {
         // height tag
         if (boost::starts_with(comment, reserved_tag(ETags::Height))) {
@@ -2674,6 +2689,8 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
 
         if (m_wiping)
             type = EMoveType::Wipe;
+        else if (m_laser)
+            type = EMoveType::Extrude;
         else if (delta_pos[E] < 0.0f)
             type = (delta_pos[X] != 0.0f || delta_pos[Y] != 0.0f || delta_pos[Z] != 0.0f) ? EMoveType::Travel : EMoveType::Retract;
         else if (delta_pos[E] > 0.0f) {
@@ -2798,6 +2815,12 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
                 height_saved = m_height;
                 m_height = m_width;
             }
+        }
+
+        if (m_laser) {
+            m_height = 0.01f;
+            m_width = 0.1f;
+            delta_pos[E] = 0.01f;
         }
 
 #if ENABLE_GCODE_VIEWER_DATA_CHECKING

@@ -159,6 +159,8 @@ std::map<Slic3r::OptionCategory, std::string> SettingsFactory::CATEGORY_ICON =
     //others
     {OptionCategory::milling_extruders, "milling"},
     {OptionCategory::milling,       "milling"},
+    {OptionCategory::laser_tools,   "laser"},
+    {OptionCategory::laser,         "laser"},
 };
 
 wxBitmap SettingsFactory::get_category_bitmap(const Slic3r::OptionCategory& category, bool menu_bmp /*= true*/)

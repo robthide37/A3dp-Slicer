@@ -46,6 +46,7 @@ enum ExtrusionRole : uint16_t {
     erSupportMaterialInterface = ermInfill | ermSupport | ermExternal,
     erWipeTower = ermSkirt | ermSupport,
     erMilling = ermOther | ermPerimeter,
+    erLaser = ermOther | erSupportMaterialInterface,
     erCustom = ermOther | ermSkirt,
     // Extrusion role for a collection with multiple extrusion roles.
     erMixed = ermOther
@@ -69,6 +70,7 @@ enum ExtrusionRole : uint8_t {
     erSupportMaterialInterface,
     erWipeTower,
     erMilling,
+    erLaser,
     erCustom,
     // Extrusion role for a collection with multiple extrusion roles.
     erMixed,

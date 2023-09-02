@@ -1306,6 +1306,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
                     category_icon_map.find(wxGetApp().get_tab(type)->get_page(0)->title()) != category_icon_map.end() ? category_icon_map.at(wxGetApp().get_tab(type)->get_page(0)->title()) : "wrench"/*category_icon_map.at("General")*/);
         }
         //TODO same for milling head?
+        //TODO same for laser head?
 
         for (const std::string& opt_key : dirty_options) {
             const Search::Option& option = searcher.get_option(opt_key, type);

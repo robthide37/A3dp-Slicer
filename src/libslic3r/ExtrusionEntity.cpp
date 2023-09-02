@@ -327,6 +327,7 @@ std::string ExtrusionEntity::role_to_string(ExtrusionRole role)
         case erSupportMaterialInterface     : return L("Support material interface");
         case erWipeTower                    : return L("Wipe tower");
         case erMilling                      : return L("Mill");
+        case erLaser                        : return L("Laser");
         case erCustom                       : return L("Custom");
         case erMixed                        : return L("Mixed");
         default                             : assert(false);
@@ -370,6 +371,8 @@ ExtrusionRole ExtrusionEntity::string_to_role(const std::string_view role)
         return erWipeTower;
     else if (role == L("Mill"))
         return erMilling;
+    else if (role == L("Laser"))
+        return erLaser;
     else if (role == L("Custom"))
         return erCustom;
     else if (role == L("Mixed"))

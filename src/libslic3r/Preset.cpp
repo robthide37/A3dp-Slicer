@@ -321,10 +321,14 @@ void Preset::normalize(DynamicPrintConfig &config)
                 static_cast<ConfigOptionStrings*>(opt)->values.resize(n, std::string());
         }
     }
-    auto *milling_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("milling_diameter"));
+    auto* milling_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("milling_diameter"));
     if (milling_diameter != nullptr)
         // Loaded the FFF Printer settings. Verify, that all extruder dependent values have enough values.
         config.set_num_milling((unsigned int)milling_diameter->values.size());
+    auto* laser_power = dynamic_cast<const ConfigOptionFloats*>(config.option("laser_power"));
+    if (laser_power != nullptr)
+        // Loaded the FFF Printer settings. Verify, that all extruder dependent values have enough values.
+        config.set_num_laser((unsigned int)laser_power->values.size());
     if (const auto *gap_fill_speed = config.option<ConfigOptionFloat>("gap_fill_speed", false); gap_fill_speed && gap_fill_speed->value <= 0.) {
         // Legacy conversion. If the gap fill speed is zero, it means the gap fill is not enabled.
         // Set the new gap_fill_enabled value, so that it will show up in the UI as disabled.
@@ -415,6 +419,9 @@ bool is_compatible_with_printer(const PresetWithVendorProfile &preset, const Pre
     opt = active_printer.preset.config.option("milling_diameter");
     if (opt)
         config.set_key_value("num_milling", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
+    opt = active_printer.preset.config.option("laser_power");
+    if (opt)
+        config.set_key_value("num_laser", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
     return is_compatible_with_printer(preset, active_printer, &config);
 }
 
@@ -716,6 +723,9 @@ static std::vector<std::string> s_Preset_print_options {
         "milling_post_process",
         "milling_extra_size",
         "milling_speed",
+        //laser
+        "laser_support_interface_pp",
+        "laser_energy",
         //Arachne
         "perimeter_generator", "wall_transition_length", "wall_transition_filter_deviation", "wall_transition_angle",
         "wall_distribution_count", "min_feature_size", "min_bead_width"
@@ -973,7 +983,8 @@ const std::vector<std::string>& Preset::machine_limits_options() { return s_Pres
 // The following nozzle options of a printer profile will be adjusted to match the size
 // of the nozzle_diameter vector.
 const std::vector<std::string>& Preset::nozzle_options()         { return print_config_def.extruder_option_keys(); }
-const std::vector<std::string>& Preset::milling_options()         { return print_config_def.milling_option_keys(); }
+const std::vector<std::string>& Preset::milling_options()        { return print_config_def.milling_option_keys(); }
+const std::vector<std::string>& Preset::laser_options()          { return print_config_def.laser_option_keys(); }
 const std::vector<std::string>& Preset::sla_print_options()      { return s_Preset_sla_print_options; }
 const std::vector<std::string>& Preset::sla_material_options()   { return s_Preset_sla_material_options; }
 const std::vector<std::string>& Preset::sla_printer_options()    { return s_Preset_sla_printer_options; }
@@ -985,6 +996,7 @@ const std::vector<std::string>& Preset::printer_options()
         append(opts, s_Preset_machine_limits_options);
         append(opts, Preset::nozzle_options());
         append(opts, Preset::milling_options());
+        append(opts, Preset::laser_options());
         return opts;
     }();
     return s_opts;
@@ -1470,12 +1482,19 @@ size_t PresetCollection::update_compatible_internal(const PresetWithVendorProfil
 {
     DynamicPrintConfig config;
     config.set_key_value("printer_preset", new ConfigOptionString(active_printer.preset.name));
+    // extruders
     const ConfigOption *opt = active_printer.preset.config.option("nozzle_diameter");
     if (opt)
         config.set_key_value("num_extruders", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
+    // mills
     opt = active_printer.preset.config.option("milling_diameter");
     if (opt)
         config.set_key_value("num_milling", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
+    // lasers
+    opt = active_printer.preset.config.option("laser_power");
+    if (opt)
+        config.set_key_value("num_laser", new ConfigOptionInt((int)static_cast<const ConfigOptionFloats*>(opt)->values.size()));
+
     bool some_compatible = false;
     if(m_idx_selected < m_num_default_presets && unselect_if_incompatible != PresetSelectCompatibleType::Never)
         m_idx_selected = size_t(-1);

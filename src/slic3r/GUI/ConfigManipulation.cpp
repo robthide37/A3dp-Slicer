@@ -534,6 +534,10 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     //TODO: can the milling_diameter or the milling_cutter be check to enable/disable this?
     for (auto el : { "milling_after_z", "milling_extra_size", "milling_speed" })
         toggle_field(el, config->opt_bool("milling_post_process"));
+	
+    //TODO: can the laser_power or the laser_tool be check to enable/disable this?
+    for (auto el : { "laser_energy" })
+        toggle_field(el, config->opt_bool("laser_support_interface_pp"));
 
     bool have_default_acceleration = config->option<ConfigOptionFloatOrPercent>("default_acceleration")->value > 0;
     for (auto el : { "perimeter_acceleration", "external_perimeter_acceleration", "thin_walls_acceleration" })

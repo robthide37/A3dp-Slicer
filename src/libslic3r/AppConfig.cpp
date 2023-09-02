@@ -680,10 +680,17 @@ void AppConfig::init_ui_layout() {
                 //this is useful when there is many rapid changes, to test modifications.
                 for (boost::filesystem::directory_entry& resources_file : boost::filesystem::directory_iterator(layout.second.path)) {
                     boost::filesystem::path datadir_path = it_datadir_layout->second.path / resources_file.path().filename();
-                    std::time_t resources_last_mod = boost::filesystem::last_write_time(resources_file.path());
-                    std::time_t datadir_last_mod = boost::filesystem::last_write_time(datadir_path);
-                    if (datadir_last_mod < resources_last_mod) {
-                        boost::filesystem::remove_all(datadir_path);
+                    if (boost::filesystem::exists(datadir_path)) {
+                        //check if the resources one is more recent.
+                        std::time_t resources_last_mod = boost::filesystem::last_write_time(resources_file.path());
+                        std::time_t datadir_last_mod = boost::filesystem::last_write_time(datadir_path);
+                        if (datadir_last_mod < resources_last_mod) {
+                            boost::filesystem::remove_all(datadir_path);
+                            if (copy_file_inner(resources_file.path(), datadir_path, error_message))
+                                throw FileIOError(error_message);
+                        }
+                    } else {
+                        //new ui file: copy
                         if (copy_file_inner(resources_file.path(), datadir_path, error_message))
                             throw FileIOError(error_message);
                     }

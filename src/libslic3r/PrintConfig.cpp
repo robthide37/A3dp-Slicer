@@ -336,6 +336,8 @@ PrintConfigDef::PrintConfigDef()
     assign_printer_technology_to_unknown(this->options, ptSLA);
     this->init_milling_params();
     assign_printer_technology_to_unknown(this->options, ptMill);
+    this->init_laser_params();
+    assign_printer_technology_to_unknown(this->options, ptLaser);
 }
 
 void PrintConfigDef::init_common_params()
@@ -6598,7 +6600,7 @@ void PrintConfigDef::init_milling_params()
     def->sidetext = L("mm");
     def->mode = comAdvancedE | comSuSi;
     def->is_vector_extruder = true;
-    def->set_default_value(new ConfigOptionPoints( Vec2d(0,0) ));
+    def->set_default_value(new ConfigOptionPoints{ Vec2d(0, 0) });
 
     def = this->add("milling_z_offset", coFloats);
     def->label = L("Tool z offset");
@@ -6682,6 +6684,148 @@ void PrintConfigDef::init_milling_params()
     def->min = 0;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloat(30));
+}
+
+void PrintConfigDef::init_laser_params()
+{
+    // ConfigOptionFloats, ConfigOptionPercents, ConfigOptionBools, ConfigOptionStrings
+    m_laser_option_keys = {
+        //"laser_diameter",
+        "laser_toolchange_end_gcode",
+        "laser_toolchange_start_gcode",
+        "laser_offset",
+        "laser_z_offset",
+        "laser_power",
+        "laser_disable_gcode",
+        "laser_enable_gcode"
+
+    };
+
+    ConfigOptionDef* def;
+
+    // laser Printer settings
+
+    def = this->add("laser_head", coInt);
+    def->gui_type = ConfigOptionDef::GUIType::i_enum_open;
+    def->label = L("laser cutter");
+    def->category = OptionCategory::general;
+    def->tooltip = L("The laser head to use (unless more specific tool settings are specified). ");
+    def->min = 0;  // 0 = inherit defaults
+    def->enum_labels.push_back("default");  // override label for item 0
+    def->enum_labels.push_back("1");
+    def->enum_labels.push_back("2");
+    def->enum_labels.push_back("3");
+    def->enum_labels.push_back("4");
+    def->enum_labels.push_back("5");
+    def->enum_labels.push_back("6");
+    def->enum_labels.push_back("7");
+    def->enum_labels.push_back("8");
+    def->enum_labels.push_back("9");
+
+    //def = this->add("laser_diameter", coFloats);
+    //def->label = L("laser diameter");
+    //def->category = OptionCategory::laser_tools;
+    //def->tooltip = L("This is the diameter of the laser on the focus point.");
+    //def->sidetext = L("mm");
+    //def->mode = comAdvancedE | comSuSi;
+    //def->is_vector_extruder = true;
+    //def->set_default_value(new ConfigOptionFloats(3.14));
+
+    def = this->add("laser_offset", coPoints);
+    def->label = L("Tool offset");
+    def->category = OptionCategory::laser_tools;
+    def->tooltip = L("If your firmware doesn't handle the tool displacement you need the G-code "
+        "to take it into account. This option lets you specify the displacement of each tool "
+        "with respect to the first one. It expects positive coordinates (they will be subtracted "
+        "from the XY coordinate).");
+    def->sidetext = L("mm");
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionPoints{ Vec2d(0,0) });
+
+    def = this->add("laser_z_offset", coFloats);
+    def->label = L("Tool z offset");
+    def->category = OptionCategory::laser_tools;
+    def->tooltip = L(".");
+    def->sidetext = L("mm");
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionFloats(0));
+
+    def = this->add("laser_power", coFloats);
+    def->label = L("Laser power");
+    def->category = OptionCategory::laser_tools;
+    def->tooltip = L("Power in watt from the laser head when activated.");
+    def->sidetext = L("W");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloats(2));
+
+    def = this->add("laser_toolchange_start_gcode", coStrings);
+    def->label = L("G-Code to switch to this toolhead");
+    def->category = OptionCategory::laser_tools;
+    def->tooltip = L("Put here the gcode to change the toolhead (called after the g-code T{next_extruder}). You have access to {next_extruder} and {previous_extruder}."
+        " next_extruder is the 'extruder number' of the new laser tool, it's equal to the index (begining at 0) of the laser tool plus the number of extruders."
+        " previous_extruder is the 'extruder number' of the previous tool, it may be a normal extruder, if it's below the number of extruders."
+        " The number of extruder is available at {extruder} and the number of laser tool is available at {laser_cutter}.");
+    def->multiline = true;
+    def->full_width = true;
+    def->height = 12;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionStrings(""));
+
+    def = this->add("laser_toolchange_end_gcode", coStrings);
+    def->label = L("G-Code to switch from this toolhead");
+    def->category = OptionCategory::laser_tools;
+    def->tooltip = L("Enter here the gcode to end the toolhead action, like stopping the spindle. You have access to {next_extruder} and {previous_extruder}."
+        " previous_extruder is the 'extruder number' of the current laser tool, it's equal to the index (begining at 0) of the laser tool plus the number of extruders."
+        " next_extruder is the 'extruder number' of the next tool, it may be a normal extruder, if it's below the number of extruders."
+        " The number of extruder is available at {extruder}and the number of laser tool is available at {laser_cutter}.");
+    def->multiline = true;
+    def->full_width = true;
+    def->height = 12;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionStrings(""));
+
+    def = this->add("laser_enable_gcode", coStrings);
+    def->label = L("G-Code to fire the laser");
+    def->category = OptionCategory::laser_tools;
+    def->tooltip = L("The gcode to activate the laser .");
+    def->multiline = true;
+    def->full_width = true;
+    def->height = 12;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionStrings(""));
+
+    def = this->add("laser_disable_gcode", coStrings);
+    def->label = L("G-Code to turn off the laser");
+    def->category = OptionCategory::laser_tools;
+    def->tooltip = L("The gcode to disable the laser.");
+    def->multiline = true;
+    def->full_width = true;
+    def->height = 12;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionStrings(""));
+
+    // laser Print settings
+
+    def = this->add("laser_support_interface_pp", coBool);
+    def->label = L("laser post-processing");
+    def->category = OptionCategory::laser;
+    def->tooltip = L("If activated, at the end of each layer with support interfec, the printer will switch to a laser head and will pass over the interface to charcoal them.");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionBool(false));
+
+    def = this->add("laser_energy", coFloat);
+    def->label = L("laser enrgy");
+    def->category = OptionCategory::laser;
+    def->tooltip = L("How much energy to use per mm of travel? Increase it to make the laser move slower to tranfert more enrgy. If your laser has a power of 1W, set this to 0.1 so it takes 1 second to do 10mm of post-processing.");
+    def->sidetext = L("Ws/mm");
+    def->mode = comAdvancedE | comSuSi;
+    def->set_default_value(new ConfigOptionFloat(1.f));
 }
 
 void PrintConfigDef::init_sla_params()
@@ -7892,6 +8036,17 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "milling_toolchange_start_gcode",
 "milling_z_lift",
 "milling_z_offset",
+"laser_activate_gcode",
+"laser_diameter",
+"laser_disable_gcode",
+"laser_energy",
+"laser_head",
+"laser_support_interface_pp",
+"laser_power",
+"laser_offset",
+"laser_toolchange_end_gcode",
+"laser_toolchange_start_gcode",
+"laser_z_offset",
 "min_length",
 "min_width_top_surface",
 "model_precision",
@@ -8406,6 +8561,18 @@ void DynamicPrintConfig::set_num_milling(unsigned int num_milling)
         assert(opt->is_vector());
         if (opt != nullptr && opt->is_vector())
             static_cast<ConfigOptionVectorBase*>(opt)->resize(num_milling, defaults.option(key));
+    }
+}
+
+void DynamicPrintConfig::set_num_laser(unsigned int num_laser)
+{
+    const auto& defaults = FullPrintConfig::defaults();
+    for (const std::string& key : print_config_def.laser_option_keys()) {
+        auto* opt = this->option(key, false);
+        assert(opt != nullptr);
+        assert(opt->is_vector());
+        if (opt != nullptr && opt->is_vector())
+            static_cast<ConfigOptionVectorBase*>(opt)->resize(num_laser, defaults.option(key));
     }
 }
 

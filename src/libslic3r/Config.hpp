@@ -119,6 +119,9 @@ enum class OptionCategory : int
 
     milling_extruders,
     milling,
+
+    laser_tools,
+    laser,
 };
 std::string toString(OptionCategory opt);
 

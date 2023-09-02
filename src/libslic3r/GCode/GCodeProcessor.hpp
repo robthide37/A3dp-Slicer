@@ -29,6 +29,7 @@ namespace Slic3r {
         Custom_GCode,
         Travel,
         Wipe,
+        Laser,
         Extrude,
         Count
     };
@@ -167,6 +168,8 @@ namespace Slic3r {
             Color_Change,
             Pause_Print,
             Custom_Code,
+            Laser_Start,
+            Laser_End,
             First_Line_M73_Placeholder,
             Last_Line_M73_Placeholder,
             Estimated_Printing_Time_Placeholder
@@ -538,6 +541,7 @@ namespace Slic3r {
         AxisCoords m_origin; // mm
         CachedPosition m_cached_position;
         bool m_wiping;
+        bool m_laser = false;
 
         unsigned int m_line_id;
         unsigned int m_last_line_id;

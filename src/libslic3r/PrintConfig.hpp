@@ -322,6 +322,8 @@ public:
     const std::vector<std::string>& extruder_retract_keys() const { return m_extruder_retract_keys; }
     // Array options growing with the number of milling cutters
     const std::vector<std::string>& milling_option_keys() const { return m_milling_option_keys; }
+    // Array options growing with the number of laser heads
+    const std::vector<std::string>& laser_option_keys() const { return m_laser_option_keys; }
 
 private:
     void init_common_params();
@@ -329,10 +331,12 @@ private:
     void init_extruder_option_keys();
     void init_sla_params();
     void init_milling_params();
+    void init_laser_params();
 
     std::vector<std::string>    m_extruder_option_keys;
     std::vector<std::string>    m_extruder_retract_keys;
     std::vector<std::string>    m_milling_option_keys;
+    std::vector<std::string>    m_laser_option_keys;
 };
 
 
@@ -377,6 +381,8 @@ public:
     void                set_num_extruders(unsigned int num_extruders);
 
     void                set_num_milling(unsigned int num_milling);
+
+    void                set_num_laser(unsigned int num_laser);
 
     // Validate the PrintConfig. Returns an empty string on success, otherwise an error message is returned.
     std::string         validate();
@@ -712,6 +718,10 @@ PRINT_CONFIG_CLASS_DEFINE(
     // Force the generation of solid shells between adjacent materials/volumes.
     ((ConfigOptionBool,                 interface_shells))
     ((ConfigOptionFloat,                layer_height))
+    // laser options
+    ((ConfigOptionBool,                 laser_support_interface_pp))
+    ((ConfigOptionFloat,                laser_energy))
+    //
     ((ConfigOptionFloatOrPercent,       min_bead_width))
     ((ConfigOptionFloatOrPercent,       min_feature_size))
     ((ConfigOptionFloat,                mmu_segmented_region_max_width))
@@ -1200,6 +1210,14 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE(
     ((ConfigOptionStrings,              milling_toolchange_start_gcode))
     //((ConfigOptionPoints,               milling_offset))
     //((ConfigOptionFloats,               milling_z_offset))
+    //((ConfigOptionFloats,               laser_diameter))
+    ((ConfigOptionStrings,              laser_toolchange_end_gcode))
+    ((ConfigOptionStrings,              laser_toolchange_start_gcode))
+    ((ConfigOptionStrings,              laser_enable_gcode))
+    ((ConfigOptionStrings,              laser_disable_gcode))
+    ((ConfigOptionPoints,               laser_offset))
+    ((ConfigOptionFloats,               laser_power))
+    ((ConfigOptionFloats,               laser_z_offset))
     ((ConfigOptionInts,                 min_fan_speed))
     ((ConfigOptionFloatsOrPercents,     min_layer_height))
     ((ConfigOptionFloats,               min_print_speed))

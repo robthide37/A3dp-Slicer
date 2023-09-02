@@ -682,6 +682,9 @@ void ConfigOptionsGroup::back_to_config_value(const DynamicPrintConfig& config, 
 	} else if (opt_key == "milling_count") {
 		auto   *milling_diameter = dynamic_cast<const ConfigOptionFloats*>(config.option("milling_diameter"));
 		value = int(milling_diameter->values.size());
+	} else if (opt_key == "laser_count") {
+		auto   *laser_power = dynamic_cast<const ConfigOptionFloats*>(config.option("laser_power"));
+		value = int(laser_power->values.size());
 	} else if (it_opt != m_options.end() && it_opt->second.opt.is_script) {
         // when a scripted key is reset, reset its deps
         // call the reset function if it exits

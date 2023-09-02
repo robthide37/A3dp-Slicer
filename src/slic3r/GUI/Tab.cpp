@@ -763,6 +763,10 @@ void Tab::update_changed_ui()
             dirty_options.emplace_back("milling_count");
         if (tab->m_sys_milling_count != tab->m_milling_count)
             nonsys_options.emplace_back("milling_count");
+        if (tab->m_initial_laser_count != tab->m_laser_count)
+            dirty_options.emplace_back("laser_count");
+        if (tab->m_sys_laser_count != tab->m_laser_count)
+            nonsys_options.emplace_back("laser_count");
     }
 
     for (auto& it : m_options_list)
@@ -1845,7 +1849,8 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                             }
                         }
                     });
-                } else if (params[i] == "milling_count_event") {
+                }
+                else if (params[i] == "milling_count_event") {
                     TabPrinter* tab = nullptr;
                     if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
                     current_group->m_on_change = set_or_add(current_group->m_on_change, [this, tab, current_group](t_config_option_key opt_key, boost::any value) {
@@ -1858,6 +1863,20 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
                             init_options_list(); // m_options_list should be updated before UI updating
                         }
                     });
+                }
+                else if (params[i] == "laser_count_event") {
+                    TabPrinter* tab = nullptr;
+                    if ((tab = dynamic_cast<TabPrinter*>(this)) == nullptr) continue;
+                    current_group->m_on_change = set_or_add(current_group->m_on_change, [this, tab, current_group](t_config_option_key opt_key, boost::any value) {
+                        // optgroup->get_value() return int for def.type == coInt,
+                        // Thus, there should be boost::any_cast<int> !
+                        // Otherwise, boost::any_cast<size_t> causes an "unhandled unknown exception"
+                        if (opt_key == "laser_count") {
+                            size_t laser_count = size_t(boost::any_cast<int>(current_group->get_value("laser_count")));
+                            tab->lasers_count_changed(laser_count);
+                            init_options_list(); // m_options_list should be updated before UI updating
+                        }
+                        });
                 }
                 else if (params[i] == "silent_mode_event") {
                     TabPrinter* tab = nullptr;
@@ -2436,6 +2455,16 @@ std::vector<Slic3r::GUI::PageShp> Tab::create_pages(std::string setting_type_nam
             def.mode = comAdvancedE | comSuSi;
             Option option(def, "milling_count");
             current_group->append_single_option_line(option);
+        } else if (full_line == "laser_count") {
+            ConfigOptionDef def;
+            def.type = coInt,
+                def.set_default_value(new ConfigOptionInt(0));
+            def.label = L("laser cutters");
+            def.tooltip = L("Number of laser heads.");
+            def.min = 0;
+            def.mode = comAdvancedE | comSuSi;
+            Option option(def, "laser_count");
+            current_group->append_single_option_line(option);
         } else if (full_line == "update_nozzle_diameter") {
             current_group->m_on_change = set_or_add(current_group->m_on_change, [this, idx_page](const t_config_option_key& opt_key, boost::any value)
             {
@@ -2937,12 +2966,17 @@ void TabPrinter::build_fff()
     auto* milling_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("milling_diameter"));
     m_initial_milling_count = m_milling_count = milling_diameter->values.size();
 
+    auto* laser_power = dynamic_cast<const ConfigOptionFloats*>(m_config->option("laser_power"));
+    m_initial_laser_count = m_laser_count = laser_power->values.size();
+
     const Preset* parent_preset = m_printer_technology == ptSLA ? nullptr // just for first build, if SLA printer preset is selected 
                                   : m_presets->get_selected_preset_parent();
     m_sys_extruders_count = parent_preset == nullptr ? 0 :
         static_cast<const ConfigOptionFloats*>(parent_preset->config.option("nozzle_diameter"))->values.size();
     m_sys_milling_count = parent_preset == nullptr ? 0 :
         static_cast<const ConfigOptionFloats*>(parent_preset->config.option("milling_diameter"))->values.size();
+    m_sys_laser_count = parent_preset == nullptr ? 0 :
+        static_cast<const ConfigOptionFloats*>(parent_preset->config.option("laser_power"))->values.size();
 
     append(this->m_pages, create_pages("printer_fff.ui"));
 
@@ -2981,7 +3015,7 @@ void TabPrinter::extruders_count_changed(size_t extruders_count)
     if (is_count_changed) {
         /* This function should be call in any case because of correct updating/rebuilding
          * of unregular pages of a Printer Settings
-         * But now that is only varies extruders & milling, it's not really needed to do bouble-update everytime.
+         * But now that is only varies extruders & milling & lasers, it's not really needed to do bouble-update everytime.
          * It also crate bugs as some gui can't rebuild the tree two times.
          */
         build_unregular_pages(false);
@@ -3016,6 +3050,27 @@ void TabPrinter::milling_count_changed(size_t milling_count)
         //propagate change
         on_value_change("milling_count", milling_count);
         //wxGetApp().sidebar().update_objects_list_milling_column(milling_count);
+    }
+}
+
+void TabPrinter::lasers_count_changed(size_t laser_count)
+{
+    bool is_count_changed = false;
+    if (m_laser_count != laser_count) {
+        m_laser_count = laser_count;
+        m_preset_bundle->printers.get_edited_preset().set_num_laser(laser_count);
+        is_count_changed = true;
+    }
+
+    if (is_count_changed) {
+        /* This function should be call in any case because of correct updating/rebuilding
+         * of unregular pages of a Printer Settings
+         */
+        build_unregular_pages(false);
+
+        //propagate change
+        on_value_change("laser_count", laser_count);
+        //wxGetApp().sidebar().update_objects_list_laser_column(laser_count);
     }
 }
 
@@ -3232,6 +3287,23 @@ void TabPrinter::build_unregular_pages(bool from_initial_build/* = false*/)
     }
     m_milling_count_old = m_milling_count;
 
+    // Build missed laser pages
+    for (size_t laser_idx = m_laser_count_old; laser_idx < m_laser_count; ++laser_idx) {
+        std::vector<PageShp> pages = this->create_pages("laser.ui", laser_idx);
+        assert(pages.size() == 1);
+        if (m_pages.size() > n_before_extruders + 1)
+            m_pages.insert(m_pages.begin() + n_before_extruders + m_extruders_count + laser_idx, pages[0]);
+        changed = true;
+
+    }
+    // # remove extra pages
+    if (m_laser_count < m_laser_count_old) {
+        m_pages.erase(m_pages.begin() + n_before_extruders + m_extruders_count + m_laser_count,
+            m_pages.begin() + n_before_extruders + m_extruders_count + m_laser_count_old);
+        changed = true;
+    }
+    m_laser_count_old = m_laser_count;
+
     Thaw();
 
     if(changed)
@@ -3258,6 +3330,11 @@ void TabPrinter::on_preset_loaded()
     auto* milling_diameter = dynamic_cast<const ConfigOptionFloats*>(m_config->option("milling_diameter"));
     size_t milling_count = milling_diameter->values.size();
     milling_count_changed(milling_count);
+
+    //same for laser
+    auto* laser_power = dynamic_cast<const ConfigOptionFloats*>(m_config->option("laser_power"));
+    size_t laser_count = laser_power->values.size();
+    lasers_count_changed(laser_count);
 }
 
 void TabPrinter::update_pages()
@@ -3309,6 +3386,8 @@ void TabPrinter::reload_config()
         m_active_page->set_value("extruders_count", int(m_extruders_count));
     if (m_active_page && m_active_page->get_field("milling_count"))
         m_active_page->set_value("milling_count", int(m_milling_count));
+    if (m_active_page && m_active_page->get_field("laser_count"))
+        m_active_page->set_value("laser_count", int(m_laser_count));
 }
 
 void TabPrinter::activate_selected_page(std::function<void()> throw_if_canceled)
@@ -3321,6 +3400,8 @@ void TabPrinter::activate_selected_page(std::function<void()> throw_if_canceled)
         m_active_page->set_value("extruders_count", int(m_extruders_count));
     if (m_active_page && m_active_page->get_field("milling_count"))
         m_active_page->set_value("milling_count", int(m_milling_count));
+    if (m_active_page && m_active_page->get_field("laser_count"))
+        m_active_page->set_value("laser_count", int(m_laser_count));
 }
 
 void TabPrinter::clear_pages()
@@ -3691,6 +3772,9 @@ void Tab::load_current_preset()
                 static_cast<TabPrinter*>(this)->m_initial_milling_count = static_cast<TabPrinter*>(this)->m_milling_count;
                 static_cast<TabPrinter*>(this)->m_sys_milling_count = parent_preset == nullptr ? 0 :
                     static_cast<const ConfigOptionFloats*>(parent_preset->config.option("milling_diameter"))->values.size();
+                static_cast<TabPrinter*>(this)->m_initial_laser_count = static_cast<TabPrinter*>(this)->m_laser_count;
+                static_cast<TabPrinter*>(this)->m_sys_laser_count = parent_preset == nullptr ? 0 :
+                    static_cast<const ConfigOptionFloats*>(parent_preset->config.option("laser_power"))->values.size();
             }
         }
         else {
@@ -4180,6 +4264,8 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
         static_cast<TabPrinter*>(this)->m_initial_extruders_count = static_cast<TabPrinter*>(this)->m_extruders_count;
     if (m_type == Preset::TYPE_PRINTER)
         static_cast<TabPrinter*>(this)->m_initial_milling_count = static_cast<TabPrinter*>(this)->m_milling_count;
+    if (m_type == Preset::TYPE_PRINTER)
+        static_cast<TabPrinter*>(this)->m_initial_laser_count = static_cast<TabPrinter*>(this)->m_laser_count;
 
     // Parent preset is "default" after detaching, so we should to update UI values, related on parent preset  
     if (detach)
@@ -4772,6 +4858,7 @@ void TabPrinter::cache_extruder_cnt()
 
     m_cache_extruder_count = m_extruders_count;
     m_cache_milling_count = m_milling_count;
+    m_cache_laser_count = m_laser_count;
 }
 
 bool TabPrinter::apply_extruder_cnt_from_cache()
@@ -4782,6 +4869,10 @@ bool TabPrinter::apply_extruder_cnt_from_cache()
     if (m_cache_milling_count > 0) {
         m_presets->get_edited_preset().set_num_milling(m_cache_milling_count);
         m_cache_milling_count = 0;
+    }
+    if (m_cache_laser_count > 0) {
+        m_presets->get_edited_preset().set_num_laser(m_cache_laser_count);
+        m_cache_laser_count = 0;
     }
 
     if (m_cache_extruder_count > 0) {

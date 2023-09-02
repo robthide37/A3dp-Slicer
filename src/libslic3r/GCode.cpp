@@ -844,6 +844,34 @@ namespace DoExport {
             }
         }
         if (ret.size() < MAX_TAGS_COUNT) {
+            for (const std::string& value : print.config().laser_toolchange_start_gcode.values) {
+                check(_(L("Laser Start G-code")), value);
+                if (ret.size() == MAX_TAGS_COUNT)
+                    break;
+            }
+        }
+        if (ret.size() < MAX_TAGS_COUNT) {
+            for (const std::string& value : print.config().laser_toolchange_end_gcode.values) {
+                check(_(L("Laser End G-code")), value);
+                if (ret.size() == MAX_TAGS_COUNT)
+                    break;
+            }
+        }
+        if (ret.size() < MAX_TAGS_COUNT) {
+            for (const std::string& value : print.config().laser_enable_gcode.values) {
+                check(_(L("Laser Enable G-code")), value);
+                if (ret.size() == MAX_TAGS_COUNT)
+                    break;
+            }
+        }
+        if (ret.size() < MAX_TAGS_COUNT) {
+            for (const std::string& value : print.config().laser_disable_gcode.values) {
+                check(_(L("Laser Disable G-code")), value);
+                if (ret.size() == MAX_TAGS_COUNT)
+                    break;
+            }
+        }
+        if (ret.size() < MAX_TAGS_COUNT) {
             const CustomGCode::Info& custom_gcode_per_print_z = print.model().custom_gcode_per_print_z;
             for (const auto& gcode : custom_gcode_per_print_z.gcodes) {
                 check(_(L("Custom G-code")), gcode.extra);
@@ -968,6 +996,7 @@ namespace DoExport {
         ExtrusionMinMM(const ConfigBase* config) {
             excluded.insert(erIroning);
             excluded.insert(erMilling);
+            excluded.insert(erLaser);
             excluded.insert(erCustom);
             excluded.insert(erMixed);
             excluded.insert(erNone);
@@ -3379,7 +3408,7 @@ LayerResult GCode::process_layer(
         }
     }
 
-
+    //TODO: put post-process on their own thread.
 
     //add milling post-process if enabled
     if (!config().milling_diameter.values.empty()) {
@@ -3456,6 +3485,152 @@ LayerResult GCode::process_layer(
             //gcode += (layer_tools.has_wipe_tower && m_wipe_tower) ?
             //    m_wipe_tower->tool_change(*this, current_extruder_filament, current_extruder_filament == layer_tools.extruders.back()) :
             //    this->set_extruder(current_extruder_filament, print_z);
+        }
+    }
+
+    //add laser post-process if enabled
+    //TODO: move to its own file
+    if (!config().laser_power.values.empty() && support_layer != nullptr) {
+        if (support_layer->object()->config().laser_support_interface_pp) {
+            if (!m_gcode_label_objects_end.empty()) {
+                gcode += m_gcode_label_objects_end;
+                m_gcode_label_objects_end = "";
+            }
+            //switch to laser
+            gcode += "; laser ok\n";
+            uint32_t current_extruder_filament = m_writer.tool()->id();
+            uint32_t laser_tool_id = uint32_t(config().nozzle_diameter.values.size());
+            m_writer.toolchange(laser_tool_id);
+            m_placeholder_parser.set("current_extruder", laser_tool_id);
+            // Append the filament start G-code.
+            const std::string& start_laser_gcode = m_config.laser_toolchange_start_gcode.get_at(0); //TODO: multiple lasers
+            if (!start_laser_gcode.empty()) {
+                DynamicConfig config;
+                config.set_key_value("previous_extruder", new ConfigOptionInt((int)current_extruder_filament));
+                config.set_key_value("laser_id", new ConfigOptionInt((int)laser_tool_id));
+                config.set_key_value("next_extruder", new ConfigOptionInt((int)laser_tool_id));
+                config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
+                config.set_key_value("previous_layer_z", new ConfigOptionFloat(previous_print_z));
+                config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
+                // Process the start_laser_gcode for the new filament.
+                gcode += this->placeholder_parser_process("laser_toolchange_start_gcode", start_laser_gcode, current_extruder_filament, &config);
+                check_add_eol(gcode);
+            }
+
+            //visitor to re-pass on support interface
+            class InterfaceLaserVisitor : public ExtrusionVisitorRecursiveConst {
+            public:
+                Point last_point{ 0,0 };
+                bool is_enable = false;
+                std::string gcode;
+                std::string laser_enable_gcode;
+                std::string laser_disable_gcode;
+                GCodeWriter* writer;
+                GCode* gcode_obj;
+                Vec2d offset;
+                double speed;
+                void do_laser(const ExtrusionPath& path) {
+                    if (path.role() == erSupportMaterialInterface) {
+                        const Points& pts = path.polyline.get_points();
+                        assert(pts.size() > 1);
+                        // move? (todo: if higher than the laser diameter)
+                        //if (last_point.distance_to(pts.front()) > scale_t(0.3f)) {
+                            if (is_enable) {
+                                gcode + ";disable laser\n";
+                                gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Laser_End) + "\n";
+                                gcode += laser_disable_gcode;
+                                is_enable = false;
+                            }
+                            gcode += ";travel\n";
+                            gcode += writer->travel_to_xy(gcode_obj->point_to_gcode(pts.front()) + offset, speed, "travel to next laser point");
+                            gcode += "; end travel\n";
+                            gcode += ";enable laser\n";
+                            gcode += laser_enable_gcode;
+                            gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Laser_Start) + "\n";
+                            is_enable = true;
+                        //}
+                            gcode += ";now do it laser\n";
+                        for (size_t i = 1; i < pts.size(); i++) {
+                            const Point& pt = pts[i];
+                            gcode += writer->travel_to_xy(gcode_obj->point_to_gcode(pt) + offset, speed, "laser");
+                        }
+                        last_point = pts.back();
+                    }
+                }
+                virtual void use(const ExtrusionPath& path) override {
+                    do_laser(path);
+                }
+                virtual void use(const ExtrusionPath3D& path3D) override {
+                    //use(static_cast<const ExtrusionPath&>(path3D));
+                    do_laser(path3D);
+                }
+            } visitor;
+            visitor.gcode_obj = this;
+            visitor.writer = &this->m_writer;
+            visitor.offset = m_config.laser_offset.get_at(0); //TODO: multiple lasers
+                // W / (Ws/mm) => mm/s 
+            visitor.speed = m_config.laser_power.get_at(0) / support_layer->object()->config().laser_energy.value; //TODO: multiple lasers
+
+            //create eable/disable gcode lines
+            const std::string& raw_enable_laser_gcode = m_config.laser_enable_gcode.get_at(0); //TODO: multiple lasers
+            const std::string& raw_disable_laser_gcode = m_config.laser_disable_gcode.get_at(0); //TODO: multiple lasers
+            {
+                DynamicConfig config;
+                config.set_key_value("previous_extruder", new ConfigOptionInt((int)current_extruder_filament));
+                config.set_key_value("laser_id", new ConfigOptionInt((int)laser_tool_id));
+                config.set_key_value("next_extruder", new ConfigOptionInt((int)laser_tool_id));
+                config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
+                config.set_key_value("previous_layer_z", new ConfigOptionFloat(previous_print_z));
+                config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
+                if (!raw_enable_laser_gcode.empty()) {
+                    visitor.laser_enable_gcode = this->placeholder_parser_process("laser_enable_gcode", raw_enable_laser_gcode, current_extruder_filament, &config);
+                    check_add_eol(visitor.laser_enable_gcode);
+                }
+                if (!raw_disable_laser_gcode.empty()) {
+                    visitor.laser_disable_gcode = this->placeholder_parser_process("laser_disable_gcode", raw_disable_laser_gcode, current_extruder_filament, &config);
+                    check_add_eol(visitor.laser_disable_gcode);
+                }
+            }
+
+            double old_z = m_writer.get_position().z();
+            if (m_config.laser_z_offset.get_at(0) != 0) {
+                gcode += m_writer.travel_to_z(old_z + m_config.laser_z_offset.get_at(0));
+            }
+            gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role) + ExtrusionEntity::role_to_string(ExtrusionRole::erLaser) + "\n";
+            //for each region, visit the interfaces
+            support_layer->support_fills.visit(visitor);
+            gcode += visitor.gcode;
+            //disable the laser before switching back
+            if (visitor.is_enable) {
+                gcode + ";lst disable laser\n";
+                gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Laser_End) + "\n";
+                gcode += visitor.laser_disable_gcode;
+            }
+
+            if (m_config.laser_z_offset.get_at(0) != 0) {
+                gcode += m_writer.travel_to_z(old_z);
+            }
+
+            gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Role) + ExtrusionEntity::role_to_string(m_last_processor_extrusion_role) + "\n";
+
+            //switch to extruder
+            m_placeholder_parser.set("current_extruder", current_extruder_filament);
+            // Append the filament start G-code.
+            const std::string& end_laser_gcode = m_config.laser_toolchange_end_gcode.get_at(0); //TODO: multiple lasers
+            if (!end_laser_gcode.empty()) {
+                DynamicConfig config;
+                config.set_key_value("previous_extruder", new ConfigOptionInt((int)laser_tool_id));
+                config.set_key_value("laser_id", new ConfigOptionInt((int)laser_tool_id));
+                config.set_key_value("next_extruder", new ConfigOptionInt((int)current_extruder_filament));
+                config.set_key_value("layer_num", new ConfigOptionInt(m_layer_index));
+                config.set_key_value("previous_layer_z", new ConfigOptionFloat(previous_print_z));
+                config.set_key_value("layer_z", new ConfigOptionFloat(print_z));
+                // Process the end_laser_gcode for the new filament.
+                gcode += this->placeholder_parser_process("lasertoolchange_start_gcode", end_laser_gcode, current_extruder_filament, &config);
+                check_add_eol(gcode);
+            }
+            gcode += "; will go back to normal extruder\n";
+            m_writer.toolchange(current_extruder_filament);
         }
     }
 
@@ -5296,6 +5471,9 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
             speed = m_config.get_computed_value("travel_speed");
         } else if (path.role() == erMilling) {
             speed = m_config.get_computed_value("milling_speed");
+        } else if (path.role() == erLaser) {
+            // W / (Ws/mm) => mm/s 
+            speed = m_config.laser_power.get_at(0) / m_config.laser_energy.value; //TODO: multiple lasers
         } else if (path.role() == erSupportMaterial) {
             speed = m_config.get_computed_value("support_material_speed");
         } else if (path.role() == erSupportMaterialInterface) {
@@ -5531,6 +5709,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                 }
                 goto accel_externalPerimeter;
             case erMilling:
+            case erLaser:
             case erCustom:
             case erMixed:
             case erCount:
@@ -5596,6 +5775,7 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
             pa = m_config.get_computed_value("filament_thin_walls_pa", m_writer.tool()->id());
             break;
         case erMilling:
+        case erLaser:
         case erCustom:
         case erMixed:
         case erCount:
@@ -6436,6 +6616,8 @@ GCode::extrusion_role_to_string_for_parser(const ExtrusionRole & role) {
         return "WipeTower";
     case erMilling:
         return "Mill";
+    case erLaser:
+        return "Laser";
     case erCustom:
     case erMixed:
     case erCount:
