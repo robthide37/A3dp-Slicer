@@ -74,8 +74,7 @@ void extract(FillBedTask<ArrItem> &task,
 
     // Workaround for missing items when arranging the same geometry only:
     // Injecting a number of items but with slightly shrinked shape, so that
-    // they can fill the emerging holes. Priority is set to lowest so that
-    // these filler items will only be inserted as the last ones.
+    // they can fill the emerging holes.
     ArrItem prototype_item_shrinked;
     scene.model().visit_arrangeable(selected_ids.front(),
         [&prototype_item_shrinked, &itm_conv](const Arrangeable &arrbl) {
@@ -104,10 +103,6 @@ void extract(FillBedTask<ArrItem> &task,
         }
     };
 
-    // Set the lowest priority to the shrinked prototype (hole filler) item
-    set_priority(prototype_item_shrinked,
-                 lowest_priority(range(task.selected)) - 1);
-
     scene.model().for_each_arrangeable(collect_task_items);
 
     int needed_items = calculate_items_needed_to_fill_bed(task.bed,
@@ -122,7 +117,7 @@ void extract(FillBedTask<ArrItem> &task,
 
     // Add as many filler items as there are needed items. Most of them will
     // be discarded anyways.
-    std::fill_n(std::back_inserter(task.selected), needed_items,
+    std::fill_n(std::back_inserter(task.selected_fillers), needed_items,
                 prototype_item_shrinked);
 }
 
@@ -175,7 +170,7 @@ std::unique_ptr<FillBedTaskResult> FillBedTask<ArrItem>::process_native(
         void on_packed(ArrItem &itm) override
         {
             // Stop at the first filler that is not on the physical bed
-            do_stop = get_bed_index(itm) > PhysicalBedId && get_priority(itm) < 0;
+            do_stop = get_bed_index(itm) > PhysicalBedId && get_priority(itm) == 0;
         }
 
     } subctl(ctl, *this);
@@ -183,6 +178,13 @@ std::unique_ptr<FillBedTaskResult> FillBedTask<ArrItem>::process_native(
     auto arranger = Arranger<ArrItem>::create(settings);
 
     arranger->arrange(selected, unselected, bed, subctl);
+
+    auto unsel_cpy = unselected;
+    for (const auto &itm : selected) {
+        unsel_cpy.emplace_back(itm);
+    }
+
+    arranger->arrange(selected_fillers, unsel_cpy, bed, FillBedCtl{ctl, *this});
 
     auto arranged_range = Range{selected.begin(),
                                 selected.begin() + selected_existing_count};
@@ -193,6 +195,10 @@ std::unique_ptr<FillBedTaskResult> FillBedTask<ArrItem>::process_native(
                               selected.end()};
 
     for (auto &itm : to_add_range)
+        if (get_bed_index(itm) == PhysicalBedId)
+            result->add_new_item(itm);
+
+    for (auto &itm : selected_fillers)
         if (get_bed_index(itm) == PhysicalBedId)
             result->add_new_item(itm);
 
