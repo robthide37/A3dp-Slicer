@@ -4167,7 +4167,7 @@ void Tab::rename_preset()
     if (dlg.ShowModal() != wxID_OK)
         return;
 
-    const std::string new_name = into_u8(dlg.get_name());
+    const std::string new_name = dlg.get_name();
     if (new_name.empty() || new_name == m_presets->get_selected_preset().name)
         return;
 
