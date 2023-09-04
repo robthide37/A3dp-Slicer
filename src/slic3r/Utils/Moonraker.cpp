@@ -1,3 +1,8 @@
+///|/ Copyright (c) 2023 Pedro Lamas @PedroLamas
+///|/ Copyright (c) Prusa Research 2023 Vojtěch Bubník @bubnikv, David Kocík @kocikdav
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Moonraker.hpp"
 
 #include <algorithm>

@@ -1,3 +1,8 @@
+#/|/ Copyright (c) Prusa Research 2021 - 2023 Lukáš Matěna @lukasmatena, Tomáš Mészáros @tamasmeszaros
+#/|/ Copyright (c) 2023 Robert Schiele @schiele
+#/|/
+#/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+#/|/
 prusaslicer_add_cmake_project(OpenEXR
     # GIT_REPOSITORY https://github.com/openexr/openexr.git
     URL https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v2.5.5.zip

@@ -1,3 +1,9 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Oleksandra Iushchenko @YuSanka, David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966
+///|/ Copyright (c) 2020 vintagepc
+///|/ Copyright (c) 2019 Stephan Reichhelm @stephanr
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "FlashAir.hpp"
 
 #include <algorithm>

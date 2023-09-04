@@ -1,3 +1,8 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Enrico Turri @enricoturri1966, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, Lukáš Matěna @lukasmatena, Filip Sykala @Jony01, Oleksandra Iushchenko @YuSanka
+///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Print.hpp"
@@ -3610,7 +3615,8 @@ void GCodeProcessor::post_process()
                 while (rev_it != m_lines.rend() && rev_it->time > time_threshold_i && curr_cmd != cmd && curr_cmd != "G28" && curr_cmd != "G29") {
                     rev_it->line = line_replacer(rev_it->line);
                     ++rev_it;
-                    curr_cmd = GCodeReader::GCodeLine::extract_cmd(rev_it->line);
+                    if (rev_it != m_lines.rend())
+                        curr_cmd = GCodeReader::GCodeLine::extract_cmd(rev_it->line);
                 }
 
                 // we met the previous evenience of cmd, or a G28/G29 command. stop inserting lines
