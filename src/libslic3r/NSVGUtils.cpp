@@ -382,6 +382,112 @@ ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shap
     return union_ex(fill, fill_type);
 }
 
+struct DashesParam{
+    // first dash length
+    float dash_length = 1.f; // scaled
+
+    // is current dash .. true
+    // is current space .. false
+    bool is_line = true;
+
+    // current index to array
+    unsigned char dash_index = 0;
+    static constexpr size_t max_dash_array_size = 8; // limitation of nanosvg strokeDashArray
+    std::array<float, max_dash_array_size> dash_array;     // scaled
+    unsigned char dash_count = 0; // count of values in array
+
+    explicit DashesParam(const NSVGshape &shape, double scale) :
+        dash_count(shape.strokeDashCount)
+    {
+        assert(dash_count > 0);
+        assert(dash_count <= max_dash_array_size); // limitation of nanosvg strokeDashArray
+        for (size_t i = 0; i < dash_count; ++i)
+            dash_array[i] = static_cast<float>(shape.strokeDashArray[i] * scale);
+        
+        // Figure out dash offset.
+        float all_dash_length = 0;
+        for (unsigned char j = 0; j < dash_count; ++j)
+            all_dash_length += dash_array[j];
+
+        if (dash_count%2 == 1) // (shape.strokeDashCount & 1)
+            all_dash_length *= 2.0f;
+
+        // Find location inside pattern
+        float dash_offset = fmodf(static_cast<float>(shape.strokeDashOffset * scale), all_dash_length);
+        if (dash_offset < 0.0f)
+            dash_offset += all_dash_length;
+
+        while (dash_offset > dash_array[dash_index]) {
+            dash_offset -= dash_array[dash_index];
+            dash_index = (dash_index + 1) % shape.strokeDashCount;
+            is_line    = !is_line;
+        }
+
+        dash_length = dash_array[dash_index] - dash_offset;
+    }
+};
+
+Polylines to_dashes(const Polyline &polyline, const DashesParam& param)
+{
+    Polylines dashes;
+    Polyline dash; // cache for one dash in dashed line
+    Point prev_point;        
+    
+    bool is_line = param.is_line;
+    unsigned char dash_index = param.dash_index;
+    float dash_length = param.dash_length; // current rest of dash distance
+    for (const Point &point : polyline.points) {
+        if (&point == &polyline.points.front()) {
+            // is first point
+            prev_point = point; // copy
+            continue;
+        }
+
+        Point diff = point - prev_point;
+        float line_segment_length = diff.cast<float>().norm();
+        while (dash_length < line_segment_length) {
+            // Calculate intermediate point
+            float d = dash_length / line_segment_length;
+            Point move_point   = diff * d;
+            Point intermediate = prev_point + move_point;
+            
+            // add Dash in stroke
+            if (is_line) {
+                if (dash.empty()) {
+                    dashes.emplace_back(Points{prev_point, intermediate});
+                } else {
+                    dash.append(prev_point);
+                    dash.append(intermediate);
+                    dashes.push_back(dash);
+                    dash.clear();
+                }
+            }
+
+            diff -= move_point;
+            line_segment_length -= dash_length;
+            prev_point = intermediate;
+
+            // Advance dash pattern
+            is_line = !is_line;
+            dash_index = (dash_index + 1) % param.dash_count;
+            dash_length = param.dash_array[dash_index];
+        }
+
+        if (is_line)
+            dash.append(prev_point);
+        dash_length -= line_segment_length;
+        prev_point = point; // copy
+    }
+
+    // add last dash
+    if (is_line){
+        assert(!dash.empty());
+        dash.append(prev_point); // prev_point == polyline.points.back()
+        dashes.push_back(dash);
+    }
+    return dashes;
+}
+
 ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param)
 {
     // convert stroke to polygon
@@ -394,19 +500,33 @@ ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &sh
 
     double mitter = shape.miterLimit * param.scale;
     if (join_type == ClipperLib::JoinType::jtRound) {
-        // mitter is ArcTolerance
+        // mitter is used as ArcTolerance
+        // http://www.angusj.com/delphi/clipper/documentation/Docs/Units/ClipperLib/Classes/ClipperOffset/Properties/ArcTolerance.htm
         mitter = std::pow(param.tesselation_tolerance, 1/3.);
     }
     float stroke_width = static_cast<float>(shape.strokeWidth * param.scale);
-    Polygons result = contour_to_polygons(lines_path.polygons, stroke_width, join_type, mitter);
 
     ClipperLib::EndType end_type = ClipperLib::EndType::etOpenButt;
     switch (static_cast<NSVGlineCap>(shape.strokeLineCap)) {
     case NSVGlineCap::NSVG_CAP_BUTT: end_type = ClipperLib::EndType::etOpenButt; break;
     case NSVGlineCap::NSVG_CAP_ROUND: end_type = ClipperLib::EndType::etOpenRound; break;
     case NSVGlineCap::NSVG_CAP_SQUARE: end_type = ClipperLib::EndType::etOpenSquare; break;
-    }    
-    polygons_append(result, offset(lines_path.polylines, stroke_width / 2, join_type, mitter, end_type));
+    }
+
+    Polygons result;
+    if (shape.strokeDashCount > 0) {
+        DashesParam params(shape, param.scale);
+        Polylines dashes;
+        for (const Polyline &polyline : lines_path.polylines)
+            polylines_append(dashes, to_dashes(polyline, params));
+        for (const Polygon &polygon : lines_path.polygons)
+            polylines_append(dashes, to_dashes(to_polyline(polygon), params));
+        result = offset(dashes, stroke_width / 2, join_type, mitter, end_type);
+    } else {
+        result = contour_to_polygons(lines_path.polygons, stroke_width, join_type, mitter);
+        polygons_append(result, offset(lines_path.polylines, stroke_width / 2, join_type, mitter, end_type));    
+    }
+
     return union_ex(result, ClipperLib::pftNonZero);
 }
 

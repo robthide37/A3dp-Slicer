@@ -179,6 +179,7 @@ private:
     std::optional<float> m_scale_height;
     std::optional<float> m_scale_depth;
     void calculate_scale();
+    float get_scale_for_tolerance();
 
     // keep SVG data rendered on GPU
     Texture m_texture;

@@ -920,24 +920,28 @@ void add_comma_separated(std::string &result, const std::string &add){
 
 const float warning_preccission = 1e-4f;
 std::string create_fill_warning(const NSVGshape &shape) {
+    if (!(shape.flags & NSVG_FLAGS_VISIBLE) || 
+        shape.fill.type == NSVG_PAINT_NONE)
+        return {}; // not visible
+
     std::string warning;
-    if (shape.opacity <= warning_preccission)
+    if ((shape.opacity - 1.f) <= warning_preccission)
         add_comma_separated(warning, GUI::format(_L("Opacity (%1%)"), shape.opacity));
 
     // if(shape->flags != NSVG_FLAGS_VISIBLE) add_warning(_u8L("Visibility flag"));
     bool is_fill_gradient = shape.fillGradient[0] != '\0';
     if (is_fill_gradient)
-        add_comma_separated(warning, GUI::format(_L("Fill gradient (%1%)"), shape.fillGradient));
+        add_comma_separated(warning, GUI::format(_L("Color gradient (%1%)"), shape.fillGradient));
 
     switch (shape.fill.type) {
     case NSVG_PAINT_UNDEF: add_comma_separated(warning, _u8L("Undefined fill type")); break;
     case NSVG_PAINT_LINEAR_GRADIENT:
         if (!is_fill_gradient)
-            add_comma_separated(warning, _u8L("Linear fill gradient"));
+            add_comma_separated(warning, _u8L("Linear gradient"));
         break;
     case NSVG_PAINT_RADIAL_GRADIENT:
         if (!is_fill_gradient)
-            add_comma_separated(warning, _u8L("Radial fill gradient"));
+            add_comma_separated(warning, _u8L("Radial gradient"));
         break;
     // case NSVG_PAINT_NONE:
     // case NSVG_PAINT_COLOR:
@@ -951,25 +955,37 @@ std::string create_fill_warning(const NSVGshape &shape) {
 }
 
 std::string create_stroke_warning(const NSVGshape &shape) {
+
     std::string warning;
+    if (!(shape.flags & NSVG_FLAGS_VISIBLE) ||        
+        shape.stroke.type == NSVG_PAINT_NONE ||
+        shape.strokeWidth <= 1e-5f)
+        return {}; // not visible
+
+    if ((shape.opacity - 1.f) <= warning_preccission)
+        add_comma_separated(warning, GUI::format(_L("Opacity (%1%)"), shape.opacity));
+
     bool is_stroke_gradient = shape.strokeGradient[0] != '\0';
     if (is_stroke_gradient)
-        add_comma_separated(warning, GUI::format(_L("Stroke gradient (%1%)"), shape.strokeGradient));
+        add_comma_separated(warning, GUI::format(_L("Color gradient (%1%)"), shape.strokeGradient));
 
     switch (shape.stroke.type) {
     case NSVG_PAINT_UNDEF: add_comma_separated(warning, _u8L("Undefined stroke type")); break;
     case NSVG_PAINT_LINEAR_GRADIENT:
         if (!is_stroke_gradient)
-            add_comma_separated(warning, _u8L("Linear stroke gradient"));
+            add_comma_separated(warning, _u8L("Linear gradient"));
         break;
     case NSVG_PAINT_RADIAL_GRADIENT:
         if (!is_stroke_gradient)
-            add_comma_separated(warning, _u8L("Radial stroke gradient"));
+            add_comma_separated(warning, _u8L("Radial gradient"));
         break;
     // case NSVG_PAINT_COLOR:
     // case NSVG_PAINT_NONE:
     // default: break;
     }
+
+    if (shape.opacity)
+
     return warning;
 }
 
@@ -979,23 +995,33 @@ std::string create_stroke_warning(const NSVGshape &shape) {
 /// <param name="image">Input svg loaded to shapes</param>
 /// <returns>Vector of warnings with same size as EmbossShape::shapes_with_ids
 /// or Empty when no warnings -> for fast checking that every thing is all right(more common case) </returns>
-std::vector<std::string> create_shape_warnings(const NSVGimage &image){
+std::vector<std::string> create_shape_warnings(const NSVGimage &image, float scale){
     std::vector<std::string> result;
+    auto add_warning = [&result, &image](size_t index, const std::string &message) {
+        if (result.empty())
+            result = std::vector<std::string>(get_shapes_count(image) * 2);
+        result[index] = message;
+    };
+
     size_t shape_index = 0;
     for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next, ++shape_index) {
-        std::string fill_warning = create_fill_warning(*shape);
-        if (!fill_warning.empty()) {
-            if (result.empty())
-                result = std::vector<std::string>(get_shapes_count(image) * 2);
-            result[shape_index * 2] = GUI::format(_L("Fill of shape(%1%) contain unsupported: %2% "), shape->id, fill_warning);
+        if (!(shape->flags & NSVG_FLAGS_VISIBLE)){
+            add_warning(shape_index * 2, GUI::format(_L("Shape(%1%) is marked as invisible "), shape->id));
+            continue;
         }
 
-        std::string stroke_warning = create_stroke_warning(*shape);
-        if (!stroke_warning.empty()) {
-            if (result.empty())
-                result = std::vector<std::string>(get_shapes_count(image) * 2);
-            result[shape_index * 2 + 1] = GUI::format(_L("Stroke of shape(%1%) contain unsupported: %2% "), shape->id, stroke_warning);
+        std::string fill_warning = create_fill_warning(*shape);
+        if (!fill_warning.empty())
+            add_warning(shape_index * 2, GUI::format(_L("Fill of shape(%1%) contain unsupported: %2% "), shape->id, fill_warning));
+        
+        float minimal_width_in_mm = 1e-3f;
+        if (shape->strokeWidth <= minimal_width_in_mm * scale) {
+            add_warning(shape_index * 2, GUI::format(_L("Stroke of shape(%1%) is too thin (minimal width is %2% mm)"), shape->id, minimal_width_in_mm));
+            continue;
         }
+        std::string stroke_warning = create_stroke_warning(*shape);
+        if (!stroke_warning.empty())
+            add_warning(shape_index * 2 + 1, GUI::format(_L("Stroke of shape(%1%) contain unsupported: %2% "), shape->id, stroke_warning));
     }
     return result;
 }
@@ -1044,7 +1070,7 @@ void GLGizmoSVG::set_volume_by_selection()
         NSVGimage* image = init_image(es.svg_file);
         assert(image != nullptr);
         if (image != nullptr){
-            NSVGLineParams params{get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)))};
+            NSVGLineParams params{get_tesselation_tolerance(get_scale_for_tolerance())};
             shape_ids = create_shape_with_ids(*image, params);
         }        
     }
@@ -1055,7 +1081,7 @@ void GLGizmoSVG::set_volume_by_selection()
     m_volume_id = volume->id();
     m_volume_shape = *volume->emboss_shape; // copy
     assert(es.svg_file.image.get() != nullptr);
-    m_shape_warnings = create_shape_warnings(*es.svg_file.image);
+    m_shape_warnings = create_shape_warnings(*es.svg_file.image, get_scale_for_tolerance());
 
     // Calculate current angle of up vector
     m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
@@ -1106,6 +1132,9 @@ void GLGizmoSVG::calculate_scale() {
     calc(Vec3d::UnitY(), m_scale_height);
     calc(Vec3d::UnitZ(), m_scale_depth);
 }
+
+float GLGizmoSVG::get_scale_for_tolerance(){ 
+    return std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)); }
 
 bool GLGizmoSVG::process()
 {
@@ -1430,11 +1459,12 @@ void GLGizmoSVG::draw_filename(){
     }
 
     if (file_changed) {
-        double tes_tol = get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)));
+        float scale = get_scale_for_tolerance();
+        double tes_tol = get_tesselation_tolerance(scale);
         EmbossShape es_ = select_shape(m_volume_shape.svg_file.path, tes_tol);
         m_volume_shape.svg_file.image = std::move(es_.svg_file.image);
         m_volume_shape.shapes_with_ids = std::move(es_.shapes_with_ids);
-        m_shape_warnings = create_shape_warnings(*m_volume_shape.svg_file.image);
+        m_shape_warnings = create_shape_warnings(*m_volume_shape.svg_file.image, scale);
         init_texture(m_texture, m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
         process();
     }
@@ -1584,7 +1614,7 @@ void GLGizmoSVG::draw_size()
         NSVGimage *img = m_volume_shape.svg_file.image.get();
         assert(img != NULL);
         if (img != NULL){
-            NSVGLineParams params{get_tesselation_tolerance(std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)))};
+            NSVGLineParams params{get_tesselation_tolerance(get_scale_for_tolerance())};
             m_volume_shape.shapes_with_ids = create_shape_with_ids(*img, params);
             process();        
         }
