@@ -925,7 +925,7 @@ std::string create_fill_warning(const NSVGshape &shape) {
         return {}; // not visible
 
     std::string warning;
-    if ((shape.opacity - 1.f) <= warning_preccission)
+    if ((shape.opacity - 1.f + warning_preccission) <= 0.f)
         add_comma_separated(warning, GUI::format(_L("Opacity (%1%)"), shape.opacity));
 
     // if(shape->flags != NSVG_FLAGS_VISIBLE) add_warning(_u8L("Visibility flag"));
@@ -962,7 +962,7 @@ std::string create_stroke_warning(const NSVGshape &shape) {
         shape.strokeWidth <= 1e-5f)
         return {}; // not visible
 
-    if ((shape.opacity - 1.f) <= warning_preccission)
+    if ((shape.opacity - 1.f + warning_preccission) <= 0.f)
         add_comma_separated(warning, GUI::format(_L("Opacity (%1%)"), shape.opacity));
 
     bool is_stroke_gradient = shape.strokeGradient[0] != '\0';
