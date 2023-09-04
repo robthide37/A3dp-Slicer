@@ -59,7 +59,6 @@ if (APPLE)
     endif ()
 endif ()
 
-# Proposal for C++ unit tests and sandboxes
 option(SLIC3R_BUILD_SANDBOXES   "Build development sandboxes" OFF)
 option(SLIC3R_BUILD_TESTS       "Build unit tests" ON)
 
