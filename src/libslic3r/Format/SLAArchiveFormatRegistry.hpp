@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2023 Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef SLA_ARCHIVE_FORMAT_REGISTRY_HPP
 #define SLA_ARCHIVE_FORMAT_REGISTRY_HPP
 

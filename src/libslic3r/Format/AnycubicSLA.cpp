@@ -1,3 +1,9 @@
+///|/ Copyright (c) 2023 Mimoja @Mimoja
+///|/ Copyright (c) Prusa Research 2022 Tomáš Mészáros @tamasmeszaros, Lukáš Hejl @hejllukas
+///|/ Copyright (c) 2022 ole00 @ole00
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "AnycubicSLA.hpp"
 #include "GCode/ThumbnailData.hpp"
 #include "SLA/RasterBase.hpp"

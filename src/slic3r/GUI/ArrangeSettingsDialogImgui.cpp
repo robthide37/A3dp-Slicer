@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2023 Oleksandra Iushchenko @YuSanka, Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ArrangeSettingsDialogImgui.hpp"
 #include "I18N.hpp"
 #include "slic3r/GUI/format.hpp"
