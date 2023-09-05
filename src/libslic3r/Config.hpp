@@ -1836,6 +1836,8 @@ public:
         // Close parameter, string value could be one of the list values.
         select_close,
     };
+    static bool is_gui_type_enum_open(const GUIType gui_type) 
+        { return gui_type == ConfigOptionDef::GUIType::i_enum_open || gui_type == ConfigOptionDef::GUIType::f_enum_open || gui_type == ConfigOptionDef::GUIType::select_open; }
 
 	// Identifier of this option. It is stored here so that it is accessible through the by_serialization_key_ordinal map.
 	t_config_option_key 				opt_key;
@@ -1923,6 +1925,7 @@ public:
     // Special values - "i_enum_open", "f_enum_open" to provide combo box for int or float selection,
     // "select_open" - to open a selection dialog (currently only a serial port selection).
     GUIType                             gui_type { GUIType::undefined };
+    bool                                is_gui_type_enum_open() const { return is_gui_type_enum_open(this->gui_type); }
     // Usually empty. Otherwise "serialized" or "show_value"
     // The flags may be combined.
     // "serialized" - vector valued option is entered in a single edit field. Values are separated by a semicolon.
