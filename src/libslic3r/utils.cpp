@@ -798,8 +798,9 @@ bool is_idx_file(const boost::filesystem::directory_entry &dir_entry)
 
 bool is_gcode_file(const std::string &path)
 {
-	return boost::iends_with(path, ".gcode") || boost::iends_with(path, ".gco") ||
-		   boost::iends_with(path, ".g")     || boost::iends_with(path, ".ngc");
+		return boost::iends_with(path, ".gcode") || boost::iends_with(path, ".gco") ||
+					 boost::iends_with(path, ".g") || boost::iends_with(path, ".ngc") ||
+					 boost::iends_with(path, ".bgcode") || boost::iends_with(path, ".bgc");
 }
 
 bool is_img_file(const std::string &path)
