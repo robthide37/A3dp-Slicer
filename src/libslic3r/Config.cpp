@@ -423,7 +423,7 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
                 descr += " (";
                 if (!def.sidetext.empty()) {
                     descr += def.sidetext + ", ";
-                } else if (def.enum_def->has_values()) {
+                } else if (def.enum_def && def.enum_def->has_values()) {
                     descr += boost::algorithm::join(def.enum_def->values(), ", ") + "; ";
                 }
                 descr += "default: " + def.default_value->serialize() + ")";
