@@ -104,7 +104,7 @@ namespace Slic3r {
 
 
     // Accepts vector of PrintObjectPtrs and an object and instance ids. Returns starting tag for label object function.
-    static std::string label_object_start(LabelObjects label_object_style, const SpanOfConstPtrs<PrintObject>& objects, int object_id, int instance_id)
+    static std::string label_object_start(LabelObjects label_object_style, GCodeFlavor flavor, const SpanOfConstPtrs<PrintObject>& objects, int object_id, int instance_id)
     {
         int unique_id = 0;
         for (size_t idx = 0; idx < size_t(object_id); ++idx)
@@ -119,25 +119,33 @@ namespace Slic3r {
         if (label_object_style == LabelObjects::Octoprint)
             out += std::string("; printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
         else if (label_object_style == LabelObjects::Firmware) {
-            out += std::string("M486 S") + std::to_string(unique_id) + "\n";
-            out += std::string("M486 N") + name + "\n";
+            if (flavor == GCodeFlavor::gcfMarlinFirmware || flavor == GCodeFlavor::gcfMarlinLegacy || flavor == GCodeFlavor::gcfRepRapFirmware) {
+                out += std::string("M486 S") + std::to_string(unique_id) + "\n";
+                out += std::string("M486 A") + name + "\n";
+            } else {
+                // Not supported by / implemented for the other firmware flavors.
+            }
         }
         return out;
     }
 
 
-    static std::string label_object_stop(LabelObjects label_object_style, int object_id, int instance_id, const std::string& name)
+    static std::string label_object_stop(LabelObjects label_object_style, GCodeFlavor flavor, int object_id, int instance_id, const std::string& name)
     {
         std::string out;
         if (label_object_style == LabelObjects::Octoprint)
             out += std::string("; stop printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
         else if (label_object_style == LabelObjects::Firmware)
-            out += std::string("M486 S-1\n");
+            if (flavor == GCodeFlavor::gcfMarlinFirmware || flavor == GCodeFlavor::gcfMarlinLegacy || flavor == GCodeFlavor::gcfRepRapFirmware)
+                out += std::string("M486 S-1\n");
+            else {
+                // Not supported by / implemented for the other firmware flavors.
+            }
         return out;
     }
 
 
-    static std::string label_all_objects(LabelObjects label_objects_style, const Print& print)
+    static std::string label_all_objects(LabelObjects label_objects_style, GCodeFlavor flavor, const Print& print)
     {
         std::string out;
 
@@ -145,8 +153,8 @@ namespace Slic3r {
             out += "\n";
             for (size_t object_idx = 0; object_idx < print.objects().size(); ++object_idx) {
                 for (size_t inst_idx = 0; inst_idx < print.objects()[object_idx]->model_object()->instances.size(); ++inst_idx) {
-                    out += label_object_start(label_objects_style, print.objects(), object_idx, inst_idx);
-                    out += label_object_stop(label_objects_style, object_idx, inst_idx, print.objects()[object_idx]->model_object()->name);
+                    out += label_object_start(label_objects_style, flavor, print.objects(), object_idx, inst_idx);
+                    out += label_object_stop(label_objects_style, flavor, object_idx, inst_idx, print.objects()[object_idx]->model_object()->name);
                 }
             }
             out += "\n";
@@ -1269,7 +1277,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     file.write(this->preamble());
 
     // Label all objects so printer knows about them since the start.
-    file.write(label_all_objects(config().gcode_label_objects, print));
+    file.write(label_all_objects(config().gcode_label_objects, config().gcode_flavor, print));
 
     print.throw_if_canceled();
 
@@ -2416,7 +2424,7 @@ void GCodeGenerator::process_layer_single_object(
                         break;
                     ++object_id;
                 }
-                gcode += label_object_start(config().gcode_label_objects, print_object.print()->objects(), object_id, print_instance.instance_id);
+                gcode += label_object_start(config().gcode_label_objects, config().gcode_flavor, print_object.print()->objects(), object_id, print_instance.instance_id);
             }
         }
     };
@@ -2595,7 +2603,7 @@ void GCodeGenerator::process_layer_single_object(
             }
         }
     if (! first && config().gcode_label_objects != LabelObjects::Disabled)
-        gcode += label_object_stop(config().gcode_label_objects, object_id, print_instance.instance_id, print_object.model_object()->name);
+        gcode += label_object_stop(config().gcode_label_objects, config().gcode_flavor, object_id, print_instance.instance_id, print_object.model_object()->name);
 }
 
 void GCodeGenerator::apply_print_config(const PrintConfig &print_config)
