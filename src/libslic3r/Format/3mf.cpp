@@ -531,7 +531,7 @@ namespace Slic3r {
         }
 
         bool _load_model_from_file(const std::string& filename, Model& model, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions);
-        bool _is_svg_shape_file(const std::string &filename);
+        bool _is_svg_shape_file(const std::string &filename) const;
         bool _extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat);
         void _extract_cut_information_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, ConfigSubstitutionContext& config_substitutions);
         void _extract_layer_heights_profile_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat);
@@ -949,8 +949,8 @@ namespace Slic3r {
         return true;
     }
 
-    bool _3MF_Importer::_is_svg_shape_file(const std::string &name) { 
-        return name._Starts_with(MODEL_FOLDER) && boost::algorithm::ends_with(name, ".svg");
+    bool _3MF_Importer::_is_svg_shape_file(const std::string &name) const { 
+        return boost::starts_with(name, MODEL_FOLDER) && boost::ends_with(name, ".svg");
     }
 
     bool _3MF_Importer::_extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
