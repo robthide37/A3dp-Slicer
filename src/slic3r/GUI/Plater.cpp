@@ -5487,7 +5487,12 @@ void Plater::convert_gcode_to_ascii()
 
     // Set out filename
     boost::filesystem::path path(into_u8(input_file));
-    const std::string output_file = path.parent_path().string() + "/" + path.stem().string() + "_ascii" + path.extension().string();
+    const std::string output_file = path.replace_extension("gcode").string();
+    if (boost::filesystem::exists(output_file)) {
+        MessageDialog msg_dlg(this, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), output_file), _L("Notice"), wxYES_NO);
+        if (msg_dlg.ShowModal() != wxID_YES)
+            return;
+    }
 
     // Open destination file
     FilePtr out_file{ boost::nowide::fopen(output_file.c_str(), "wb") };
@@ -5533,7 +5538,12 @@ void Plater::convert_gcode_to_binary()
 
     // Set out filename
     boost::filesystem::path path(into_u8(input_file));
-    const std::string output_file = path.parent_path().string() + "/" + path.stem().string() + "_binary" + path.extension().string();
+    const std::string output_file = path.replace_extension("bgcode").string();
+    if (boost::filesystem::exists(output_file)) {
+        MessageDialog msg_dlg(this, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), output_file), _L("Notice"), wxYES_NO);
+        if (msg_dlg.ShowModal() != wxID_YES)
+            return;
+    }
 
     // Open destination file
     FilePtr out_file{ boost::nowide::fopen(output_file.c_str(), "wb") };
