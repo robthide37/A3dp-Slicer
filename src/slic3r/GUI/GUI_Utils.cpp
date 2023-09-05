@@ -305,8 +305,9 @@ TaskTimer::~TaskTimer()
 {
     std::chrono::milliseconds stop_timer = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch());
-    const auto process_duration_ms = std::chrono::milliseconds(stop_timer - start_timer).count();
-    const auto process_duration_s = long long(0.001 * process_duration_ms);
+    const auto timer_delta = stop_timer - start_timer;
+    const auto process_duration_ms = std::chrono::milliseconds(timer_delta).count();
+    const auto process_duration_s = std::chrono::duration_cast<std::chrono::duration<float>>(timer_delta).count();
     std::string out = format("\n!   \"%1%\" duration = %2% s (%3% ms) \n", task_name, process_duration_s, process_duration_ms);
     printf("%s", out.c_str());
 #ifdef __WXMSW__
