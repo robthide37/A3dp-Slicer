@@ -112,13 +112,13 @@ namespace Slic3r {
         unique_id += instance_id;
 
         std::string name = objects[object_id]->model_object()->name;
-        if (label_object_style == LabelObjects::Marlin && objects[object_id]->model_object()->instances.size() > 1u)
+        if (label_object_style == LabelObjects::Firmware && objects[object_id]->model_object()->instances.size() > 1u)
             name += " (copy " + std::to_string(instance_id) + ")";
 
         std::string out;
         if (label_object_style == LabelObjects::Octoprint)
             out += std::string("; printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
-        else if (label_object_style == LabelObjects::Marlin) {
+        else if (label_object_style == LabelObjects::Firmware) {
             out += std::string("M486 S") + std::to_string(unique_id) + "\n";
             out += std::string("M486 N") + name + "\n";
         }
@@ -131,7 +131,7 @@ namespace Slic3r {
         std::string out;
         if (label_object_style == LabelObjects::Octoprint)
             out += std::string("; stop printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
-        else if (label_object_style == LabelObjects::Marlin)
+        else if (label_object_style == LabelObjects::Firmware)
             out += std::string("M486 S-1\n");
         return out;
     }

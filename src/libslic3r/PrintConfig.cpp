@@ -232,7 +232,7 @@ CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(DraftShield)
 static const t_config_enum_values s_keys_map_LabelObjects = {
     { "disabled",  int(LabelObjects::Disabled)  },
     { "octoprint", int(LabelObjects::Octoprint) },
-    { "marlin",    int(LabelObjects::Marlin)    }
+    { "firmware",  int(LabelObjects::Firmware)  }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(LabelObjects)
 
@@ -1502,13 +1502,15 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("gcode_label_objects", coEnum);
     def->label = L("Label objects");
-    def->tooltip = L("Enable this to add comments into the G-Code labeling print moves with what object they belong to,"
-                   " which is useful for the Octoprint CancelObject plugin. This settings is NOT compatible with "
-                   "Single Extruder Multi Material setup and Wipe into Object / Wipe into Infill.");
+    def->tooltip = L("Selects whether labels should be exported at object boundaries and in what format.\n"
+                   " Octoprint = comments to be consumed by Octoprint CancelObject plugin.\n"
+                   " Firmware = firmware specific G-code (it will be chosen based on firmware flavor and it can end up to be empty).\n\n"
+                   "This settings is NOT compatible with Single Extruder Multi Material setup and Wipe into Object / Wipe into Infill.");
+
     def->set_enum<LabelObjects>({
         { "disabled",   L("Disabled") },
         { "octoprint",  L("OctoPrint comments") },
-        { "marlin",     L("Marlin (M486)") }
+        { "firmware",   L("Firmware-specific") }
         });
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<LabelObjects>(LabelObjects::Disabled));
