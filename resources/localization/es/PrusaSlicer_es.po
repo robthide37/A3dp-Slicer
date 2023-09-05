@@ -9072,7 +9072,7 @@ msgstr "mm (cero para deshabilitar)"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:517 src/slic3r/GUI/GUI_App.cpp:2472
 msgid "Mode"
-msgstr "&Modo"
+msgstr "Modo"
 
 #: src/slic3r/GUI/wxExtensions.cpp:714
 msgctxt "Mode"

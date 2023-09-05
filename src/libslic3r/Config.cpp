@@ -333,12 +333,9 @@ void ConfigDef::finalize()
         if (def.type == coEnum) {
             assert(def.enum_def);
             assert(def.enum_def->is_valid_closed_enum());
-            assert(def.gui_type != ConfigOptionDef::GUIType::i_enum_open && 
-                   def.gui_type != ConfigOptionDef::GUIType::f_enum_open && 
-                   def.gui_type != ConfigOptionDef::GUIType::select_open);
+            assert(! def.is_gui_type_enum_open());
             def.enum_def->finalize_closed_enum();
-        } else if (def.gui_type == ConfigOptionDef::GUIType::i_enum_open || def.gui_type == ConfigOptionDef::GUIType::f_enum_open ||
-                   def.gui_type == ConfigOptionDef::GUIType::select_open) {
+        } else if (def.is_gui_type_enum_open()) {
             assert(def.enum_def);
             assert(def.enum_def->is_valid_open_enum());
             assert(def.gui_type != ConfigOptionDef::GUIType::i_enum_open || def.type == coInt || def.type == coInts);
@@ -425,7 +422,7 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
                 descr += " (";
                 if (!def.sidetext.empty()) {
                     descr += def.sidetext + ", ";
-                } else if (def.enum_def->has_values()) {
+                } else if (def.enum_def && def.enum_def->has_values()) {
                     descr += boost::algorithm::join(def.enum_def->values(), ", ") + "; ";
                 }
                 descr += "default: " + def.default_value->serialize() + ")";
