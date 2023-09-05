@@ -44,11 +44,6 @@
 #include <algorithm>
 #include <chrono>
 
-#if ENABLE_BINARIZED_GCODE_WIN_DEBUG
-#include <windows.h>
-#include <debugapi.h>
-#endif // ENABLE_BINARIZED_GCODE_WIN_DEBUG
-
 namespace Slic3r {
 namespace GUI {
 
