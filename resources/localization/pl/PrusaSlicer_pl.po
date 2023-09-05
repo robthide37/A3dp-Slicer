@@ -9040,7 +9040,7 @@ msgstr "mm (zero, aby wyłączyć)"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:517 src/slic3r/GUI/GUI_App.cpp:2472
 msgid "Mode"
-msgstr "&Tryb"
+msgstr "Tryb"
 
 #: src/slic3r/GUI/wxExtensions.cpp:714
 msgctxt "Mode"

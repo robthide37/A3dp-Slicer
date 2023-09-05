@@ -2330,8 +2330,8 @@ void GLGizmoCut3D::render_connectors_input_window(CutConnectors &connectors)
         });
 
     if (m_connector_type == CutConnectorType::Snap) {
-        render_snap_specific_input(_u8L("Bulge"), _u8L("Bulge proportion related to radius"), m_snap_bulge_proportion, 0.15f, 5.f, 100.f * m_snap_space_proportion);
-        render_snap_specific_input(_u8L("Space"), _u8L("Space proportion related to radius"), m_snap_space_proportion, 0.3f, 10.f, 50.f);
+        render_snap_specific_input(_u8L("Bulge"), _L("Bulge proportion related to radius"), m_snap_bulge_proportion, 0.15f, 5.f, 100.f * m_snap_space_proportion);
+        render_snap_specific_input(_u8L("Space"), _L("Space proportion related to radius"), m_snap_space_proportion, 0.3f, 10.f, 50.f);
     }
 
     ImGui::Separator();
@@ -2586,7 +2586,7 @@ void GLGizmoCut3D::render_groove_angle_input(const std::string& label, float& in
     }
 }
 
-void GLGizmoCut3D::render_snap_specific_input(const std::string& label, const std::string& tooltip, float& in_val, const float& init_val, const float min_val, const float max_val)
+void GLGizmoCut3D::render_snap_specific_input(const std::string& label, const wxString& tooltip, float& in_val, const float& init_val, const float min_val, const float max_val)
 {
     ImGuiWrapper::text(label);
 

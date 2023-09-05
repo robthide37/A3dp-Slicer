@@ -8909,7 +8909,7 @@ msgstr "mm (0で無効化)"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:517 src/slic3r/GUI/GUI_App.cpp:2472
 msgid "Mode"
-msgstr "モード (&M)"
+msgstr "モード "
 
 #: src/slic3r/GUI/wxExtensions.cpp:714
 msgctxt "Mode"

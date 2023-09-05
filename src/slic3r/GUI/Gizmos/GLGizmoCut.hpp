@@ -306,7 +306,7 @@ protected:
     void render_color_marker(float size, const ImU32& color);
     void render_groove_float_input(const std::string &label, float &in_val, const float &init_val, float &in_tolerance);
     void render_groove_angle_input(const std::string &label, float &in_val, const float &init_val, float min_val, float max_val);
-    void render_snap_specific_input(const std::string& label, const std::string& tooltip, float& in_val, const float& init_val, const float min_val, const float max_val);
+    void render_snap_specific_input(const std::string& label, const wxString& tooltip, float& in_val, const float& init_val, const float min_val, const float max_val);
     void render_cut_plane_input_window(CutConnectors &connectors);
     void init_input_window_data(CutConnectors &connectors);
     void render_input_window_warning() const;
