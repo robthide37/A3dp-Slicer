@@ -984,8 +984,6 @@ std::string create_stroke_warning(const NSVGshape &shape) {
     // default: break;
     }
 
-    if (shape.opacity)
-
     return warning;
 }
 
