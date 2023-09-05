@@ -289,7 +289,9 @@ TEST_CASE("Heal of points close to line", "[Emboss]")
     std::string file_name = "points_close_to_line.svg";
     std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + file_name;
     NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
-    Polygons polygons = to_polygons(*image, NSVGLineParams{1000});
+    NSVGLineParams param{1000};
+    param.scale = 1.;
+    Polygons polygons = to_polygons(*image, param);
     nsvgDelete(image);
     REQUIRE(polygons.size() == 1);
     Polygon polygon = polygons.front();
