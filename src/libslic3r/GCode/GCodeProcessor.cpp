@@ -1213,30 +1213,6 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
         res = thumbnail_block.read_data(*file.f, file_header, block_header);
         if (res != EResult::Success)
             throw Slic3r::RuntimeError("Error while reading file '" + filename + "': " + std::string(translate_result(res)) + "\n");
-#if ENABLE_BINARIZED_GCODE_DEBUG
-        if (thumbnail_block.data.size() > 0) {
-            auto format_filename = [](const std::string& stem, const ThumbnailBlock& block) {
-                std::string ret = stem + "_" + std::to_string(block.params.width) + "x" + std::to_string(block.params.height);
-                switch ((EThumbnailFormat)block.params.format)
-                {
-                case EThumbnailFormat::PNG: { ret += ".png"; break; }
-                case EThumbnailFormat::JPG: { ret += ".jpg"; break; }
-                case EThumbnailFormat::QOI: { ret += ".qoi"; break; }
-                }
-                return ret;
-            };
-
-            const boost::filesystem::path path(filename);
-            const std::string out_path = path.parent_path().string();
-            const std::string out_filename = out_path + "\\" + format_filename(path.stem().string(), thumbnail_block);
-            FILE* outfile = boost::nowide::fopen(out_filename.c_str(), "wb");
-            if (outfile != nullptr) {
-                fwrite((const void*)thumbnail_block.data.data(), 1, thumbnail_block.data.size(), outfile);
-                fclose(outfile);
-            }
-        }
-#endif // ENABLE_BINARIZED_GCODE_DEBUG
-
         res = read_next_block_header(*file.f, file_header, block_header, cs_buffer.data(), cs_buffer.size());
         if (res != EResult::Success)
             throw Slic3r::RuntimeError("Error while reading file '" + filename + "': " + std::string(translate_result(res)) + "\n");
