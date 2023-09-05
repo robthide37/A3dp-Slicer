@@ -12,10 +12,6 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GLModel.hpp"
 
-#if !ENABLE_BINARIZED_GCODE
-#include <boost/iostreams/device/mapped_file.hpp>
-#endif // !ENABLE_BINARIZED_GCODE
-
 #include <cstdint>
 #include <float.h>
 #include <set>
@@ -681,7 +677,6 @@ public:
             void render();
         };
 
-#if ENABLE_BINARIZED_GCODE
         class GCodeWindow
         {
             struct Line
@@ -728,43 +723,6 @@ public:
         private:
             void add_gcode_line_to_lines_cache(const std::string& src);
         };
-#else
-        class GCodeWindow
-        {
-            struct Line
-            {
-                std::string command;
-                std::string parameters;
-                std::string comment;
-            };
-            bool m_visible{ true };
-            uint64_t m_selected_line_id{ 0 };
-            size_t m_last_lines_size{ 0 };
-            std::string m_filename;
-            boost::iostreams::mapped_file_source m_file;
-            // map for accessing data in file by line number
-            std::vector<size_t> m_lines_ends;
-            // current visible lines
-            std::vector<Line> m_lines;
-
-        public:
-          GCodeWindow() = default;
-            ~GCodeWindow() { stop_mapping_file(); }
-            void load_gcode(const std::string& filename, const std::vector<size_t>& lines_ends);
-            void reset() {
-                stop_mapping_file();
-                m_lines_ends.clear();
-                m_lines.clear();
-                m_filename.clear();
-            }
-
-            void toggle_visibility() { m_visible = !m_visible; }
-
-            void render(float top, float bottom, uint64_t curr_line_id) const;
-
-            void stop_mapping_file();
-        };
-#endif // ENABLE_BINARIZED_GCODE
 
         struct Endpoints
         {

@@ -139,9 +139,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "perimeter_acceleration",
         "post_process",
         "gcode_substitutions",
-#if ENABLE_BINARIZED_GCODE
         "gcode_binary",
-#endif // ENABLE_BINARIZED_GCODE
         "printer_notes",
         "retract_before_travel",
         "retract_before_wipe",
@@ -1637,27 +1635,25 @@ std::string Print::output_filename(const std::string &filename_base) const
     return this->PrintBase::output_filename(m_config.output_filename_format.value, ".gcode", filename_base, &config);
 }
 
-#if ENABLE_BINARIZED_GCODE
 const std::string PrintStatistics::FilamentUsedG     = "filament used [g]";
-const std::string PrintStatistics::FilamentUsedGMask = "; " + PrintStatistics::FilamentUsedG + " =";
+const std::string PrintStatistics::FilamentUsedGMask = "; filament used [g] =";
 
-const std::string PrintStatistics::TotalFilamentUsedG          = "total " + PrintStatistics::FilamentUsedG;
-const std::string PrintStatistics::TotalFilamentUsedGMask      = "; " + PrintStatistics::TotalFilamentUsedG + " =";
-const std::string PrintStatistics::TotalFilamentUsedGValueMask = TotalFilamentUsedGMask + " %.2lf\n";
+const std::string PrintStatistics::TotalFilamentUsedG          = "total filament used [g]";
+const std::string PrintStatistics::TotalFilamentUsedGMask      = "; total filament used [g] =";
+const std::string PrintStatistics::TotalFilamentUsedGValueMask = "; total filament used [g] = %.2lf\n";
 
 const std::string PrintStatistics::FilamentUsedCm3     = "filament used [cm3]";
-const std::string PrintStatistics::FilamentUsedCm3Mask = "; " + PrintStatistics::FilamentUsedCm3 + " =";
+const std::string PrintStatistics::FilamentUsedCm3Mask = "; filament used [cm3] =";
 
 const std::string PrintStatistics::FilamentUsedMm     = "filament used [mm]";
-const std::string PrintStatistics::FilamentUsedMmMask = "; " + PrintStatistics::FilamentUsedMm + " =";
+const std::string PrintStatistics::FilamentUsedMmMask = "; filament used [mm] =";
 
 const std::string PrintStatistics::FilamentCost     = "filament cost";
-const std::string PrintStatistics::FilamentCostMask = "; " + PrintStatistics::FilamentCost + " =";
+const std::string PrintStatistics::FilamentCostMask = "; filament cost =";
 
-const std::string PrintStatistics::TotalFilamentCost          = "total " + PrintStatistics::FilamentCost;
-const std::string PrintStatistics::TotalFilamentCostMask      = "; " + PrintStatistics::TotalFilamentCost + " =";
-const std::string PrintStatistics::TotalFilamentCostValueMask = PrintStatistics::TotalFilamentCostMask + " %.2lf\n";
-#endif // ENABLE_BINARIZED_GCODE
+const std::string PrintStatistics::TotalFilamentCost          = "total filament cost";
+const std::string PrintStatistics::TotalFilamentCostMask      = "; total filament cost =";
+const std::string PrintStatistics::TotalFilamentCostValueMask = "; total filament cost = %.2lf\n";
 
 DynamicConfig PrintStatistics::config() const
 {

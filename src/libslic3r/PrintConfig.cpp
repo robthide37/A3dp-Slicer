@@ -1504,13 +1504,11 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionStrings());
 
-#if ENABLE_BINARIZED_GCODE
     def = this->add("gcode_binary", coBool);
     def->label = L("Export as binary G-code");
-    def->tooltip = L("Exports the G-code in binary format.");
+    def->tooltip = L("Exports G-code in binary format.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(0));
-#endif // ENABLE_BINARIZED_GCODE
 
     def = this->add("high_current_on_filament_swap", coBool);
     def->label = L("High extruder current on filament swap");

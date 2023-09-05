@@ -55,9 +55,7 @@
 #include <wx/popupwin.h>
 #endif
 
-#if ENABLE_BINARIZED_GCODE
 #include <LibBGCode/convert/convert.hpp>
-#endif // ENABLE_BINARIZED_GCODE
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Format/STL.hpp"
@@ -5471,7 +5469,6 @@ void Plater::reload_gcode_from_disk()
     load_gcode(filename);
 }
 
-#if ENABLE_BINARIZED_GCODE
 void Plater::convert_gcode_to_ascii()
 {
     // Ask user for a gcode file name.
@@ -5514,7 +5511,7 @@ void Plater::convert_gcode_to_ascii()
         }
     }
 
-    MessageDialog msg_dlg(this, _L("Succesfully created gcode ascii file:\n") + output_file, _L("Convert gcode file to ascii format"), wxICON_ERROR | wxOK);
+    MessageDialog msg_dlg(this, _L("Succesfully created gcode ascii file \n") + output_file, _L("Convert gcode file to ascii format"), wxICON_ERROR | wxOK);
     msg_dlg.ShowModal();
 }
 
@@ -5561,10 +5558,9 @@ void Plater::convert_gcode_to_binary()
         }
     }
 
-    MessageDialog msg_dlg(this, _L("Succesfully created gcode binary file:\n") + output_file, _L("Convert gcode file to binary format"), wxICON_ERROR | wxOK);
+    MessageDialog msg_dlg(this, _L("Succesfully created gcode binary file \n") + output_file, _L("Convert gcode file to binary format"), wxICON_ERROR | wxOK);
     msg_dlg.ShowModal();
 }
-#endif // ENABLE_BINARIZED_GCODE
 
 void Plater::refresh_print()
 {

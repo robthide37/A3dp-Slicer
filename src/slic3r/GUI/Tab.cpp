@@ -1717,9 +1717,7 @@ void TabPrint::build()
         Option option = optgroup->get_option("output_filename_format");
         option.opt.full_width = true;
         optgroup->append_single_option_line(option);
-#if ENABLE_BINARIZED_GCODE
         optgroup->append_single_option_line("gcode_binary");
-#endif // ENABLE_BINARIZED_GCODE
 
         optgroup = page->new_optgroup(L("Other"));
 

@@ -13,9 +13,7 @@
 #include <memory>
 #include <string_view>
 
-#if ENABLE_BINARIZED_GCODE
 #include <LibBGCode/binarize/binarize.hpp>
-#endif // ENABLE_BINARIZED_GCODE
 
 #include <boost/beast/core/detail/base64.hpp>
 
@@ -67,7 +65,6 @@ inline void export_thumbnails_to_file(ThumbnailsGeneratorCallback &thumbnail_cb,
     }
 }
 
-#if ENABLE_BINARIZED_GCODE
 template<typename ThrowIfCanceledCallback>
 inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb, std::vector<bgcode::binarize::ThumbnailBlock>& out_thumbnails,
     const std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> &thumbnails_list, ThrowIfCanceledCallback throw_if_canceled)
@@ -98,7 +95,6 @@ inline void generate_binary_thumbnails(ThumbnailsGeneratorCallback& thumbnail_cb
         }
     }
 }
-#endif // ENABLE_BINARIZED_GCODE
 
 } // namespace Slic3r::GCodeThumbnails
 

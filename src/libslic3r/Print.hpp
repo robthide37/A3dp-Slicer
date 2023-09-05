@@ -550,7 +550,6 @@ struct PrintStatistics
         printing_extruders.clear();
     }
 
-#if ENABLE_BINARIZED_GCODE
     static const std::string FilamentUsedG;
     static const std::string FilamentUsedGMask;
     static const std::string TotalFilamentUsedG;
@@ -565,7 +564,6 @@ struct PrintStatistics
     static const std::string TotalFilamentCost;
     static const std::string TotalFilamentCostMask;
     static const std::string TotalFilamentCostValueMask;
-#endif // ENABLE_BINARIZED_GCODE
 };
 
 using PrintObjectPtrs          = std::vector<PrintObject*>;

@@ -135,11 +135,7 @@ public:
     bool parse_file(const std::string &file, callback_t callback);
     // Collect positions of line ends in the binary G-code to be used by the G-code viewer when memory mapping and displaying section of G-code
     // as an overlay in the 3D scene.
-#if ENABLE_BINARIZED_GCODE
     bool parse_file(const std::string& file, callback_t callback, std::vector<std::vector<size_t>>& lines_ends);
-#else
-    bool parse_file(const std::string &file, callback_t callback, std::vector<size_t> &lines_ends);
-#endif // ENABLE_BINARIZED_GCODE
     // Just read the G-code file line by line, calls callback (const char *begin, const char *end). Returns false if reading the file failed.
     bool parse_file_raw(const std::string &file, raw_line_callback_t callback);
 

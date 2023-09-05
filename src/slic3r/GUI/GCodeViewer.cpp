@@ -368,38 +368,13 @@ void GCodeViewer::SequentialView::Marker::render()
     ImGui::PopStyleVar();
 }
 
-#if ENABLE_BINARIZED_GCODE
 void GCodeViewer::SequentialView::GCodeWindow::load_gcode(const GCodeProcessorResult& gcode_result)
 {
     m_filename = gcode_result.filename;
     m_is_binary_file = gcode_result.is_binary_file;
     m_lines_ends = gcode_result.lines_ends;
 }
-#else
-void GCodeViewer::SequentialView::GCodeWindow::load_gcode(const std::string& filename, const std::vector<size_t>& lines_ends)
-{
-    assert(!m_file.is_open());
-    if (m_file.is_open())
-        return;
 
-    m_filename = filename;
-    m_lines_ends = lines_ends;
-    m_selected_line_id = 0;
-    m_last_lines_size = 0;
-
-    try
-    {
-        m_file.open(boost::filesystem::path(m_filename));
-    }
-    catch (...)
-    {
-        BOOST_LOG_TRIVIAL(error) << "Unable to map file " << m_filename << ". Cannot show G-code window.";
-        reset();
-    }
-}
-#endif // ENABLE_BINARIZED_GCODE
-
-#if ENABLE_BINARIZED_GCODE
 void GCodeViewer::SequentialView::GCodeWindow::add_gcode_line_to_lines_cache(const std::string& src)
 {
     std::string command;
@@ -681,175 +656,6 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, s
         imgui.set_requires_extra_frame();
     }
 }
-#else
-void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, uint64_t curr_line_id) const
-{
-    auto update_lines = [this](uint64_t start_id, uint64_t end_id) {
-        std::vector<Line> ret;
-        ret.reserve(end_id - start_id + 1);
-            for (uint64_t id = start_id; id <= end_id; ++id) {
-                // read line from file
-                const size_t start = id == 1 ? 0 : m_lines_ends[id - 2];
-                const size_t len = m_lines_ends[id - 1] - start;
-                std::string gline(m_file.data() + start, len);
-
-                std::string command;
-                std::string parameters;
-                std::string comment;
-
-                // extract comment
-                std::vector<std::string> tokens;
-                boost::split(tokens, gline, boost::is_any_of(";"), boost::token_compress_on);
-                command = tokens.front();
-                if (tokens.size() > 1)
-                    comment = ";" + tokens.back();
-
-                // extract gcode command and parameters
-                if (!command.empty()) {
-                    boost::split(tokens, command, boost::is_any_of(" "), boost::token_compress_on);
-                    command = tokens.front();
-                    if (tokens.size() > 1) {
-                        for (size_t i = 1; i < tokens.size(); ++i) {
-                            parameters += " " + tokens[i];
-                        }
-                    }
-                }
-                ret.push_back({ command, parameters, comment });
-            }
-        return ret;
-    };
-
-    static const ImVec4 LINE_NUMBER_COLOR    = ImGuiWrapper::COL_ORANGE_LIGHT;
-    static const ImVec4 SELECTION_RECT_COLOR = ImGuiWrapper::COL_ORANGE_DARK;
-    static const ImVec4 COMMAND_COLOR        = { 0.8f, 0.8f, 0.0f, 1.0f };
-    static const ImVec4 PARAMETERS_COLOR     = { 1.0f, 1.0f, 1.0f, 1.0f };
-    static const ImVec4 COMMENT_COLOR        = { 0.7f, 0.7f, 0.7f, 1.0f };
-    static const ImVec4 ELLIPSIS_COLOR       = { 0.0f, 0.7f, 0.0f, 1.0f };
-
-    if (!m_visible || m_filename.empty() || m_lines_ends.empty() || curr_line_id == 0)
-        return;
-
-    // window height
-    const float wnd_height = bottom - top;
-
-    // number of visible lines
-    const float text_height = ImGui::CalcTextSize("0").y;
-    const ImGuiStyle& style = ImGui::GetStyle();
-    const uint64_t lines_count = static_cast<uint64_t>((wnd_height - 2.0f * style.WindowPadding.y + style.ItemSpacing.y) / (text_height + style.ItemSpacing.y));
-
-    if (lines_count == 0)
-        return;
-
-    // visible range
-    const uint64_t half_lines_count = lines_count / 2;
-    uint64_t start_id = (curr_line_id >= half_lines_count) ? curr_line_id - half_lines_count : 0;
-    uint64_t end_id = start_id + lines_count - 1;
-    if (end_id >= static_cast<uint64_t>(m_lines_ends.size())) {
-        end_id = static_cast<uint64_t>(m_lines_ends.size()) - 1;
-        start_id = end_id - lines_count + 1;
-    }
-
-    // updates list of lines to show, if needed
-    if (m_selected_line_id != curr_line_id || m_last_lines_size != end_id - start_id + 1) {
-        try
-        {
-            *const_cast<std::vector<Line>*>(&m_lines) = update_lines(start_id, end_id);
-        }
-        catch (...)
-        {
-            BOOST_LOG_TRIVIAL(error) << "Error while loading from file " << m_filename << ". Cannot show G-code window.";
-            return;
-        }
-        *const_cast<uint64_t*>(&m_selected_line_id) = curr_line_id;
-        *const_cast<size_t*>(&m_last_lines_size) = m_lines.size();
-    }
-
-    // line number's column width
-    const float id_width = ImGui::CalcTextSize(std::to_string(end_id).c_str()).x;
-
-    ImGuiWrapper& imgui = *wxGetApp().imgui();
-
-    auto add_item_to_line = [&imgui](const std::string& txt, const ImVec4& color, float spacing, size_t& current_length) {
-        static const size_t LENGTH_THRESHOLD = 60;
-
-        if (txt.empty())
-            return false;
-
-        std::string out_text = txt;
-        bool reduced = false;
-        if (current_length + out_text.length() > LENGTH_THRESHOLD) {
-            out_text = out_text.substr(0, LENGTH_THRESHOLD - current_length);
-            reduced = true;
-        }
-
-        current_length += out_text.length();
-
-        ImGui::SameLine(0.0f, spacing);
-        ImGui::PushStyleColor(ImGuiCol_Text, color);
-        imgui.text(out_text);
-        ImGui::PopStyleColor();
-        if (reduced) {
-            ImGui::SameLine(0.0f, 0.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, ELLIPSIS_COLOR);
-            imgui.text("...");
-            ImGui::PopStyleColor();
-        }
-
-        return reduced;
-    };
-
-    imgui.set_next_window_pos(0.0f, top, ImGuiCond_Always, 0.0f, 0.0f);
-    imgui.set_next_window_size(0.0f, wnd_height, ImGuiCond_Always);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    ImGui::SetNextWindowBgAlpha(0.6f);
-    imgui.begin(std::string("G-code"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
-   
-    // center the text in the window by pushing down the first line
-    const float f_lines_count = static_cast<float>(lines_count);
-    ImGui::SetCursorPosY(0.5f * (wnd_height - f_lines_count * text_height - (f_lines_count - 1.0f) * style.ItemSpacing.y));
-
-    // render text lines
-    for (uint64_t id = start_id; id <= end_id; ++id) {
-        const Line& line = m_lines[id - start_id];
-
-        // rect around the current selected line
-        if (id == curr_line_id) {
-            const float pos_y = ImGui::GetCursorScreenPos().y;
-            const float half_ItemSpacing_y = 0.5f * style.ItemSpacing.y;
-            const float half_padding_x = 0.5f * style.WindowPadding.x;
-            ImGui::GetWindowDrawList()->AddRect({ half_padding_x, pos_y - half_ItemSpacing_y },
-                { ImGui::GetCurrentWindow()->Size.x - half_padding_x, pos_y + text_height + half_ItemSpacing_y },
-                ImGui::GetColorU32(SELECTION_RECT_COLOR));
-        }
-
-        const std::string id_str = std::to_string(id);
-        // spacer to right align text
-        ImGui::Dummy({ id_width - ImGui::CalcTextSize(id_str.c_str()).x, text_height });
-
-        size_t line_length = 0;
-        // render line number
-        bool stop_adding = add_item_to_line(id_str, LINE_NUMBER_COLOR, 0.0f, line_length);
-        if (!stop_adding && !line.command.empty())
-            // render command
-            stop_adding = add_item_to_line(line.command, COMMAND_COLOR, -1.0f, line_length);
-        if (!stop_adding && !line.parameters.empty())
-            // render parameters
-            stop_adding = add_item_to_line(line.parameters, PARAMETERS_COLOR, 0.0f, line_length);
-        if (!stop_adding && !line.comment.empty())
-            // render comment
-            stop_adding = add_item_to_line(line.comment, COMMENT_COLOR, line.command.empty() ? -1.0f : 0.0f, line_length);
-    }
-
-    imgui.end();
-    ImGui::PopStyleVar();
-}
-
-void GCodeViewer::SequentialView::GCodeWindow::stop_mapping_file()
-{
-    if (m_file.is_open())
-        m_file.close();
-}
-#endif // ENABLE_BINARIZED_GCODE
 
 void GCodeViewer::SequentialView::render(float legend_height)
 {
@@ -1029,11 +835,7 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
     // release gpu memory, if used
     reset(); 
 
-#if ENABLE_BINARIZED_GCODE
     m_sequential_view.gcode_window.load_gcode(gcode_result);
-#else
-    m_sequential_view.gcode_window.load_gcode(gcode_result.filename, gcode_result.lines_ends);
-#endif // ENABLE_BINARIZED_GCODE
 
     if (wxGetApp().is_gcode_viewer())
         m_custom_gcode_per_print_z = gcode_result.custom_gcode_per_print_z;
@@ -2656,9 +2458,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         case EViewType::Temperature:    { color = m_extrusions.ranges.temperature.get_color_at(path.temperature); break; }
         case EViewType::LayerTimeLinear:
         case EViewType::LayerTimeLogarithmic: {
-#if ENABLE_BINARIZED_GCODE
         if (!m_layers_times.empty() && m_layers.size() == m_layers_times.front().size()) {
-#endif // ENABLE_BINARIZED_GCODE
                 const Path::Sub_Path& sub_path = path.sub_paths.front();
                 double z = static_cast<double>(sub_path.first.position.z());
                 const std::vector<double>& zs = m_layers.get_zs();
@@ -2673,9 +2473,7 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
                         }
                     }
                 }
-#if ENABLE_BINARIZED_GCODE
             }
-#endif // ENABLE_BINARIZED_GCODE
             break;
         }
         case EViewType::VolumetricRate: { color = m_extrusions.ranges.volumetric_rate.get_color_at(path.volumetric_rate); break; }
@@ -3945,7 +3743,6 @@ void GCodeViewer::render_legend(float& legend_height)
 
     ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.1f, 0.1f, 0.1f, 0.8f });
     ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, { 0.2f, 0.2f, 0.2f, 0.8f });
-#if ENABLE_BINARIZED_GCODE
     std::vector<std::string> view_options;
     std::vector<int> view_options_id;
     if (!m_layers_times.empty() && m_layers.size() == m_layers_times.front().size()) {
@@ -3965,19 +3762,6 @@ void GCodeViewer::render_legend(float& legend_height)
     int view_type_id = (view_type_it == view_options_id.end()) ? 0 : std::distance(view_options_id.begin(), view_type_it);
     if (imgui.combo(std::string(), view_options, view_type_id, ImGuiComboFlags_HeightLargest, 0.0f, -1.0f))
         view_type = view_options_id[view_type_id];
-#else
-    imgui.combo(std::string(), { _u8L("Feature type"),
-                      _u8L("Height (mm)"),
-                      _u8L("Width (mm)"),
-                      _u8L("Speed (mm/s)"),
-                      _u8L("Fan speed (%)"),
-                      _u8L("Temperature (°C)"),
-                      _u8L("Volumetric flow rate (mm³/s)"),
-                      _u8L("Layer time (linear)"),
-                      _u8L("Layer time (logarithmic)"),
-                      _u8L("Tool"),
-                      _u8L("Color Print") }, view_type, ImGuiComboFlags_HeightLargest, 0.0f, -1.0f);
-#endif // ENABLE_BINARIZED_GCODE
     ImGui::PopStyleColor(2);
    
     if (old_view_type != view_type) {

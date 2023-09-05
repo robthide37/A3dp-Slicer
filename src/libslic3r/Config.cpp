@@ -43,9 +43,7 @@
 #include <boost/format.hpp>
 #include <string.h>
 
-#if ENABLE_BINARIZED_GCODE
 #include <LibBGCode/binarize/binarize.hpp>
-#endif // ENABLE_BINARIZED_GCODE
 
 //FIXME for GCodeFlavor and gcfMarlin (for forward-compatibility conversion)
 // This is not nice, likely it would be better to pass the ConfigSubstitutionContext to handle_legacy().
@@ -746,7 +744,6 @@ void ConfigBase::setenv_() const
 
 ConfigSubstitutions ConfigBase::load(const std::string& filename, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
-#if ENABLE_BINARIZED_GCODE
     enum class EFileType
     {
         Ini,
@@ -759,10 +756,10 @@ ConfigSubstitutions ConfigBase::load(const std::string& filename, ForwardCompati
     if (is_gcode_file(filename)) {
         FILE* file = boost::nowide::fopen(filename.c_str(), "rb");
         if (file == nullptr)
-            throw Slic3r::RuntimeError("Error opening the file: " + filename + "\n");
+            throw Slic3r::RuntimeError(format("Error opening file %1%", filename));
 
-        using namespace bgcode::core;
         std::vector<uint8_t> cs_buffer(65536);
+        using namespace bgcode::core;
         file_type = (is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == EResult::Success) ? EFileType::BinaryGCode : EFileType::AsciiGCode;
         fclose(file);
     }
@@ -774,13 +771,8 @@ ConfigSubstitutions ConfigBase::load(const std::string& filename, ForwardCompati
     case EFileType::Ini:         { return this->load_from_ini(filename, compatibility_rule); }
     case EFileType::AsciiGCode:  { return this->load_from_gcode_file(filename, compatibility_rule);}
     case EFileType::BinaryGCode: { return this->load_from_binary_gcode_file(filename, compatibility_rule);}
-    default:                     { throw Slic3r::RuntimeError("Invalid file: " + filename + "\n"); }
+    default:                     { throw Slic3r::RuntimeError(format("Invalid file %1%", filename)); }
     }
-#else
-    return is_gcode_file(filename) ?
-        this->load_from_gcode_file(filename, compatibility_rule) :
-        this->load_from_ini(filename, compatibility_rule);
-#endif // ENABLE_BINARIZED_GCODE
 }
 
 ConfigSubstitutions ConfigBase::load_from_ini(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule)
@@ -1086,38 +1078,38 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &filename
     return std::move(substitutions_ctxt.substitutions);
 }
 
-#if ENABLE_BINARIZED_GCODE
 ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& filename, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
     ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
 
     FilePtr file{ boost::nowide::fopen(filename.c_str(), "rb") };
     if (file.f == nullptr)
-        throw Slic3r::RuntimeError(format("Error opening the file: %1%", filename));
+        throw Slic3r::RuntimeError(format("Error opening file %1%", filename));
 
     using namespace bgcode::core;
     using namespace bgcode::binarize;
     std::vector<uint8_t> cs_buffer(65536);
     EResult res = is_valid_binary_gcode(*file.f, true, cs_buffer.data(), cs_buffer.size());
     if (res != EResult::Success)
-        throw Slic3r::RuntimeError(format("The selected file is not a valid binary gcode.\nError: %1%", std::string(translate_result(res))));
+        throw Slic3r::RuntimeError(format("File %1% does not contain a valid binary gcode\nError: %2%", filename,
+            std::string(translate_result(res))));
 
     FileHeader file_header;
     res = read_header(*file.f, file_header, nullptr);
     if (res != EResult::Success)
-        throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(translate_result(res))));
+        throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
 
     // searches for config block
     BlockHeader block_header;
     res = read_next_block_header(*file.f, file_header, block_header, EBlockType::SlicerMetadata, cs_buffer.data(), cs_buffer.size());
     if (res != EResult::Success)
-        throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(translate_result(res))));
+        throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
     if ((EBlockType)block_header.type != EBlockType::SlicerMetadata)
-        throw Slic3r::RuntimeError(format("Unable to find slicer metadata block in file: '%1%'", filename));
+        throw Slic3r::RuntimeError(format("Unable to find slicer metadata block in file %1%", filename));
     SlicerMetadataBlock slicer_metadata_block;
     res = slicer_metadata_block.read_data(*file.f, file_header, block_header);
     if (res != EResult::Success)
-        throw Slic3r::RuntimeError(format("Error while reading file '%1%': %2%", filename, std::string(translate_result(res))));
+        throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
 
     // extracts data from block
     for (const auto& [key, value] : slicer_metadata_block.raw_data) {
@@ -1126,7 +1118,6 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
 
     return std::move(substitutions_ctxt.substitutions);
 }
-#endif // ENABLE_BINARIZED_GCODE
 
 void ConfigBase::save(const std::string &file) const
 {

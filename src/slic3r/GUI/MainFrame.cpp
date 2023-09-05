@@ -1370,16 +1370,14 @@ void MainFrame::init_menubar_as_editor()
             []() {return true; }, this);
         append_submenu(fileMenu, export_menu, wxID_ANY, _L("&Export"), "");
 
-#if ENABLE_BINARIZED_GCODE
         wxMenu* convert_menu = new wxMenu();
         append_menu_item(convert_menu, wxID_ANY, _L("Convert ascii G-code to &binary") + dots, _L("Convert a G-code file from ascii to binary format"),
-          [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_binary(); }, "convert_file", nullptr,
-          [this]() { return true; }, this);
+            [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_binary(); }, "convert_file", nullptr,
+            [this]() { return true; }, this);
         append_menu_item(convert_menu, wxID_ANY, _L("Convert binary G-code to &ascii") + dots, _L("Convert a G-code file from binary to ascii format"),
-          [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_ascii(); }, "convert_file", nullptr,
-          [this]() { return true; }, this);
+            [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_ascii(); }, "convert_file", nullptr,
+            [this]() { return true; }, this);
         append_submenu(fileMenu, convert_menu, wxID_ANY, _L("&Convert"), "");
-#endif // ENABLE_BINARIZED_GCODE
 
 		append_menu_item(fileMenu, wxID_ANY, _L("Ejec&t SD Card / Flash Drive") + dots + "\tCtrl+T", _L("Eject SD card / Flash drive after the G-code was exported to it."),
 			[this](wxCommandEvent&) { if (m_plater) m_plater->eject_drive(); }, "eject_sd", nullptr,
@@ -1653,7 +1651,6 @@ void MainFrame::init_menubar_as_gcodeviewer()
             _L("Reload the plater from disk"), [this](wxCommandEvent&) { m_plater->reload_gcode_from_disk(); },
             "", nullptr, [this]() { return !m_plater->get_last_loaded_gcode().empty(); }, this);
 #endif // __APPLE__
-#if ENABLE_BINARIZED_GCODE
         fileMenu->AppendSeparator();
         append_menu_item(fileMenu, wxID_ANY, _L("Convert ascii G-code to &binary") + dots, _L("Convert a G-code file from ascii to binary format"),
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_binary(); }, "convert_file", nullptr,
@@ -1661,7 +1658,6 @@ void MainFrame::init_menubar_as_gcodeviewer()
         append_menu_item(fileMenu, wxID_ANY, _L("Convert binary G-code to &ascii") + dots, _L("Convert a G-code file from binary to ascii format"),
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_ascii(); }, "convert_file", nullptr,
             [this]() { return true; }, this);
-#endif // ENABLE_BINARIZED_GCODE
         fileMenu->AppendSeparator();
         append_menu_item(fileMenu, wxID_ANY, _L("Export &Toolpaths as OBJ") + dots, _L("Export toolpaths as OBJ"),
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->export_toolpaths_to_obj(); }, "export_plater", nullptr,

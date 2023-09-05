@@ -199,20 +199,12 @@ bool GCodeReader::parse_file(const std::string &file, callback_t callback)
     return this->parse_file_internal(file, callback, [](size_t){});
 }
 
-#if ENABLE_BINARIZED_GCODE
 bool GCodeReader::parse_file(const std::string& file, callback_t callback, std::vector<std::vector<size_t>>& lines_ends)
 {
     lines_ends.clear();
     lines_ends.push_back(std::vector<size_t>());
     return this->parse_file_internal(file, callback, [&lines_ends](size_t file_pos) { lines_ends.front().emplace_back(file_pos); });
 }
-#else
-bool GCodeReader::parse_file(const std::string &file, callback_t callback, std::vector<size_t> &lines_ends)
-{
-    lines_ends.clear();
-    return this->parse_file_internal(file, callback, [&lines_ends](size_t file_pos){ lines_ends.emplace_back(file_pos); });
-}
-#endif // ENABLE_BINARIZED_GCODE
 
 bool GCodeReader::parse_file_raw(const std::string &filename, raw_line_callback_t line_callback)
 {

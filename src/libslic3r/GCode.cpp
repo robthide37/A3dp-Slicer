@@ -43,9 +43,6 @@
 #include "libslic3r.h"
 #include "LocalesUtils.hpp"
 #include "format.hpp"
-#if ENABLE_BINARIZED_GCODE
-#include "libslic3r_version.h"
-#endif // ENABLE_BINARIZED_GCODE
 
 #include <algorithm>
 #include <cstdlib>
@@ -581,9 +578,7 @@ void GCodeGenerator::do_export(Print* print, const char* path, GCodeProcessorRes
 
     m_processor.initialize(path_tmp);
     m_processor.set_print(print);
-#if ENABLE_BINARIZED_GCODE
     m_processor.get_binary_data() = bgcode::binarize::BinaryData();
-#endif // ENABLE_BINARIZED_GCODE
     GCodeOutputStream file(boost::nowide::fopen(path_tmp.c_str(), "wb"), m_processor);
     if (! file.is_open())
         throw Slic3r::RuntimeError(std::string("G-code export to ") + path + " failed.\nCannot open the file for writing.\n");
@@ -716,7 +711,6 @@ namespace DoExport {
 	}
 
 	// Fill in print_statistics and return formatted string containing filament statistics to be inserted into G-code comment section.
-#if ENABLE_BINARIZED_GCODE
     static std::string update_print_stats_and_format_filament_stats(
         const bool                   has_wipe_tower,
         const WipeTowerData          &wipe_tower_data,
@@ -726,15 +720,6 @@ namespace DoExport {
         PrintStatistics              &print_statistics,
         bool                         export_binary_data,
         bgcode::binarize::BinaryData &binary_data)
-#else
-    static std::string update_print_stats_and_format_filament_stats(
-        const bool                   has_wipe_tower,
-        const WipeTowerData         &wipe_tower_data,
-        const FullPrintConfig       &config,
-	      const std::vector<Extruder> &extruders,
-        unsigned int                 initial_extruder_id,
-		PrintStatistics 		    &print_statistics)
-#endif // ENABLE_BINARIZED_GCODE
     {
         std::string filament_stats_string_out;
 
@@ -743,17 +728,10 @@ namespace DoExport {
         print_statistics.initial_extruder_id = initial_extruder_id;
         std::vector<std::string> filament_types;
         if (! extruders.empty()) {
-#if ENABLE_BINARIZED_GCODE
             std::pair<std::string, unsigned int> out_filament_used_mm(PrintStatistics::FilamentUsedMmMask + " ", 0);
             std::pair<std::string, unsigned int> out_filament_used_cm3(PrintStatistics::FilamentUsedCm3Mask + " ", 0);
             std::pair<std::string, unsigned int> out_filament_used_g(PrintStatistics::FilamentUsedGMask + " ", 0);
             std::pair<std::string, unsigned int> out_filament_cost(PrintStatistics::FilamentCostMask + " ", 0);
-#else
-            std::pair<std::string, unsigned int> out_filament_used_mm("; filament used [mm] = ", 0);
-            std::pair<std::string, unsigned int> out_filament_used_cm3("; filament used [cm3] = ", 0);
-            std::pair<std::string, unsigned int> out_filament_used_g  ("; filament used [g] = ", 0);
-            std::pair<std::string, unsigned int> out_filament_cost("; filament cost = ", 0);
-#endif // ENABLE_BINARIZED_GCODE
             for (const Extruder &extruder : extruders) {
                 print_statistics.printing_extruders.emplace_back(extruder.id());
                 filament_types.emplace_back(config.filament_type.get_at(extruder.id()));
@@ -776,25 +754,17 @@ namespace DoExport {
                     dst.first += buf;
                     ++ dst.second;
                 };
-#if ENABLE_BINARIZED_GCODE
                 if (!export_binary_data) {
-#endif // ENABLE_BINARIZED_GCODE
                     append(out_filament_used_mm,  "%.2lf", used_filament);
                     append(out_filament_used_cm3, "%.2lf", extruded_volume * 0.001);
-#if ENABLE_BINARIZED_GCODE
                 }
-#endif // ENABLE_BINARIZED_GCODE
                 if (filament_weight > 0.) {
                     print_statistics.total_weight = print_statistics.total_weight + filament_weight;
-#if ENABLE_BINARIZED_GCODE
                     if (!export_binary_data)
-#endif // ENABLE_BINARIZED_GCODE
                         append(out_filament_used_g, "%.2lf", filament_weight);
                     if (filament_cost > 0.) {
                         print_statistics.total_cost = print_statistics.total_cost + filament_cost;
-#if ENABLE_BINARIZED_GCODE
                         if (!export_binary_data)
-#endif // ENABLE_BINARIZED_GCODE
                             append(out_filament_cost, "%.2lf", filament_cost);
                     }
                 }
@@ -803,18 +773,14 @@ namespace DoExport {
                 print_statistics.total_wipe_tower_filament += has_wipe_tower ? used_filament - extruder.used_filament() : 0.;
                 print_statistics.total_wipe_tower_cost += has_wipe_tower ? (extruded_volume - extruder.extruded_volume())* extruder.filament_density() * 0.001 * extruder.filament_cost() * 0.001 : 0.;
             }
-#if ENABLE_BINARIZED_GCODE
             if (!export_binary_data) {
-#endif // ENABLE_BINARIZED_GCODE
                 filament_stats_string_out += out_filament_used_mm.first;
                 filament_stats_string_out += "\n" + out_filament_used_cm3.first;
                 if (out_filament_used_g.second)
                     filament_stats_string_out += "\n" + out_filament_used_g.first;
                 if (out_filament_cost.second)
                     filament_stats_string_out += "\n" + out_filament_cost.first;
-#if ENABLE_BINARIZED_GCODE
             }
-#endif // ENABLE_BINARIZED_GCODE
             print_statistics.initial_filament_type = config.filament_type.get_at(initial_extruder_id);
             std::sort(filament_types.begin(), filament_types.end());
             print_statistics.printing_filament_types = filament_types.front();
@@ -895,7 +861,6 @@ static inline GCode::SmoothPathCache smooth_path_interpolate_global(const Print&
 
 void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
-#if ENABLE_BINARIZED_GCODE
     const bool export_to_binary_gcode = print.full_print_config().option<ConfigOptionBool>("gcode_binary")->value;
     // if exporting gcode in binary format: 
     // we generate here the data to be passed to the post-processor, who is responsible to export them to file 
@@ -981,7 +946,6 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
             binary_data.printer_metadata.raw_data.emplace_back("extruder_colour", extruder_colours_str); // duplicated into config data
         }
     }
-#endif // ENABLE_BINARIZED_GCODE
     
     // modifies m_silent_time_estimator_enabled
     DoExport::init_gcode_processor(print.config(), m_processor, m_silent_time_estimator_enabled);
@@ -1036,24 +1000,18 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         this->m_avoid_crossing_curled_overhangs.init_bed_shape(get_bed_shape(print.config()));
     }
 
-#if ENABLE_BINARIZED_GCODE
     if (!export_to_binary_gcode)
-#endif // ENABLE_BINARIZED_GCODE
         // Write information on the generator.
         file.write_format("; %s\n\n", Slic3r::header_slic3r_generated().c_str());
 
-#if ENABLE_BINARIZED_GCODE
-    // if exporting gcode in ascii format, generate the thumbnails here
     if (! export_to_binary_gcode) {
-#endif // ENABLE_BINARIZED_GCODE
+        // if exporting gcode in ascii format, generate the thumbnails here
         if (std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails = GCodeThumbnails::make_thumbnail_list(print.full_print_config());
             ! thumbnails.empty())
             GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, thumbnails,
                 [&file](const char* sz) { file.write(sz); },
                 [&print]() { print.throw_if_canceled(); });
-#if ENABLE_BINARIZED_GCODE
     }
-#endif // ENABLE_BINARIZED_GCODE
 
     // Write notes (content of the Print Settings tab -> Notes)
     {
@@ -1075,9 +1033,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     const double       layer_height         = first_object->config().layer_height.value;
     assert(! print.config().first_layer_height.percent);
     const double       first_layer_height   = print.config().first_layer_height.value;
-#if ENABLE_BINARIZED_GCODE
     if (!export_to_binary_gcode) {
-#endif // ENABLE_BINARIZED_GCODE
         for (size_t region_id = 0; region_id < print.num_print_regions(); ++ region_id) {
             const PrintRegion &region = print.get_print_region(region_id);
             file.write_format("; external perimeters extrusion width = %.2fmm\n", region.flow(*first_object, frExternalPerimeter, layer_height).width());
@@ -1092,9 +1048,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
             file.write_format("\n");
         }
         print.throw_if_canceled();
-#if ENABLE_BINARIZED_GCODE
     }
-#endif // ENABLE_BINARIZED_GCODE
 
     // adds tags for time estimators
     if (print.config().remaining_times.value)
@@ -1408,7 +1362,6 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     print.throw_if_canceled();
 
     // Get filament stats.
-#if ENABLE_BINARIZED_GCODE
     const std::string filament_stats_string_out = DoExport::update_print_stats_and_format_filament_stats(
         // Const inputs
         has_wipe_tower, print.wipe_tower_data(),
@@ -1433,34 +1386,15 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         binary_data.printer_metadata.raw_data.emplace_back("max_layer_z", buf);
     }
     else {
-#else
-        file.write(DoExport::update_print_stats_and_format_filament_stats(
-    	      // Const inputs
-            has_wipe_tower, print.wipe_tower_data(),
-            this->config(),
-            m_writer.extruders(),
-            initial_extruder_id,
-            // Modifies
-            print.m_print_statistics));
-#endif // ENABLE_BINARIZED_GCODE
-#if ENABLE_BINARIZED_GCODE
         // if exporting gcode in ascii format, statistics export is done here
-#endif // ENABLE_BINARIZED_GCODE
         file.write("\n");
-#if ENABLE_BINARIZED_GCODE
         file.write_format(PrintStatistics::TotalFilamentUsedGValueMask.c_str(), print.m_print_statistics.total_weight);
         file.write_format(PrintStatistics::TotalFilamentCostValueMask.c_str(), print.m_print_statistics.total_cost);
-#else
-        file.write_format("; total filament used [g] = %.2lf\n", print.m_print_statistics.total_weight);
-        file.write_format("; total filament cost = %.2lf\n", print.m_print_statistics.total_cost);
-#endif // ENABLE_BINARIZED_GCODE
         if (print.m_print_statistics.total_toolchanges > 0)
             file.write_format("; total toolchanges = %i\n", print.m_print_statistics.total_toolchanges);
         file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Estimated_Printing_Time_Placeholder).c_str());
 
-#if ENABLE_BINARIZED_GCODE
         // if exporting gcode in ascii format, config export is done here
-#endif // ENABLE_BINARIZED_GCODE
         // Append full config, delimited by two 'phony' configuration keys prusaslicer_config = begin and prusaslicer_config = end.
         // The delimiters are structured as configuration key / value pairs to be parsable by older versions of PrusaSlicer G-code viewer.
         {
@@ -1471,9 +1405,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
                 file.write(full_config);
             file.write("; prusaslicer_config = end\n");
         }
-#if ENABLE_BINARIZED_GCODE
     }
-#endif // ENABLE_BINARIZED_GCODE
     print.throw_if_canceled();
 }
 
@@ -2582,34 +2514,13 @@ void GCodeGenerator::apply_print_config(const PrintConfig &print_config)
 
 void GCodeGenerator::append_full_config(const Print &print, std::string &str)
 {
-#if ENABLE_BINARIZED_GCODE
     std::vector<std::pair<std::string, std::string>> config;
     encode_full_config(print, config);
     for (const auto& [key, value] : config) {
         str += "; " + key + " = " + value + "\n";
     }
-#else
-    const DynamicPrintConfig &cfg = print.full_print_config();
-    // Sorted list of config keys, which shall not be stored into the G-code. Initializer list.
-    static constexpr auto banned_keys = {
-        "compatible_printers"sv,
-        "compatible_prints"sv,
-        //FIXME The print host keys should not be exported to full_print_config anymore. The following keys may likely be removed.
-        "print_host"sv,
-        "printhost_apikey"sv,
-        "printhost_cafile"sv
-    };
-    assert(std::is_sorted(banned_keys.begin(), banned_keys.end()));
-    auto is_banned = [](const std::string &key) {
-        return std::binary_search(banned_keys.begin(), banned_keys.end(), key);
-    };
-    for (const std::string &key : cfg.keys())
-        if (! is_banned(key) && ! cfg.option(key)->is_nil())
-            str += "; " + key + " = " + cfg.opt_serialize(key) + "\n";
-#endif // ENABLE_BINARIZED_GCODE
 }
 
-#if ENABLE_BINARIZED_GCODE
 void GCodeGenerator::encode_full_config(const Print& print, std::vector<std::pair<std::string, std::string>>& config)
 {
     const DynamicPrintConfig& cfg = print.full_print_config();
@@ -2633,7 +2544,6 @@ void GCodeGenerator::encode_full_config(const Print& print, std::vector<std::pai
     }
     config.shrink_to_fit();
 }
-#endif // ENABLE_BINARIZED_GCODE
 
 void GCodeGenerator::set_extruders(const std::vector<unsigned int> &extruder_ids)
 {

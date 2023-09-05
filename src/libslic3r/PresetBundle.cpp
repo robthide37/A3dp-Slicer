@@ -28,9 +28,7 @@
 #include <boost/locale.hpp>
 #include <boost/log/trivial.hpp>
 
-#if ENABLE_BINARIZED_GCODE
 #include <LibBGCode/core/core.hpp>
-#endif // ENABLE_BINARIZED_GCODE
 
 // Store the print/filament/printer presets into a "presets" subdirectory of the Slic3rPE config dir.
 // This breaks compatibility with the upstream Slic3r if the --datadir is used to switch between the two versions.
@@ -886,11 +884,10 @@ DynamicPrintConfig PresetBundle::full_sla_config() const
 // If the file is loaded successfully, its print / filament / printer profiles will be activated.
 ConfigSubstitutions PresetBundle::load_config_file(const std::string &path, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
-#if ENABLE_BINARIZED_GCODE
     if (is_gcode_file(path)) {
         FILE* file = boost::nowide::fopen(path.c_str(), "rb");
         if (file == nullptr)
-            throw Slic3r::RuntimeError("Error opening the file: " + path + "\n");
+            throw Slic3r::RuntimeError(format("Error opening file %1%", path));
         std::vector<uint8_t> cs_buffer(65536);
         const bool is_binary = bgcode::core::is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == bgcode::core::EResult::Success;
         fclose(file);
@@ -903,16 +900,6 @@ ConfigSubstitutions PresetBundle::load_config_file(const std::string &path, Forw
         load_config_file_config(path, true, std::move(config));
         return config_substitutions;
     }
-#else
-    if (is_gcode_file(path)) {
-        DynamicPrintConfig config;
-        config.apply(FullPrintConfig::defaults());
-        ConfigSubstitutions config_substitutions = config.load_from_gcode_file(path, compatibility_rule);
-        Preset::normalize(config);
-        load_config_file_config(path, true, std::move(config));
-        return config_substitutions;
-    }
-#endif // ENABLE_BINARIZED_GCODE
 
     // 1) Try to load the config file into a boost property tree.
     boost::property_tree::ptree tree;
