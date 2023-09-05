@@ -147,8 +147,8 @@ enum DraftShield {
     dsDisabled, dsLimited, dsEnabled
 };
 
-enum LabelObjects {
-    loDisabled, loOctoprint, loMarlin
+enum class LabelObjects {
+    Disabled, Octoprint, Marlin
 };
 
 enum class PerimeterGeneratorType

@@ -112,13 +112,13 @@ namespace Slic3r {
         unique_id += instance_id;
 
         std::string name = objects[object_id]->model_object()->name;
-        if (label_object_style == loMarlin && objects[object_id]->model_object()->instances.size() > 1u)
+        if (label_object_style == LabelObjects::Marlin && objects[object_id]->model_object()->instances.size() > 1u)
             name += " (copy " + std::to_string(instance_id) + ")";
 
         std::string out;
-        if (label_object_style == loOctoprint)
+        if (label_object_style == LabelObjects::Octoprint)
             out += std::string("; printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
-        else if (label_object_style == loMarlin) {
+        else if (label_object_style == LabelObjects::Marlin) {
             out += std::string("M486 S") + std::to_string(unique_id) + "\n";
             out += std::string("M486 N") + name + "\n";
         }
@@ -129,10 +129,28 @@ namespace Slic3r {
     static std::string label_object_stop(LabelObjects label_object_style, int object_id, int instance_id, const std::string& name)
     {
         std::string out;
-        if (label_object_style == loOctoprint)
+        if (label_object_style == LabelObjects::Octoprint)
             out += std::string("; stop printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
-        else if (label_object_style == loMarlin)
+        else if (label_object_style == LabelObjects::Marlin)
             out += std::string("M486 S-1\n");
+        return out;
+    }
+
+
+    static std::string label_all_objects(LabelObjects label_objects_style, const Print& print)
+    {
+        std::string out;
+
+        if (label_objects_style != LabelObjects::Disabled) {
+            out += "\n";
+            for (size_t object_idx = 0; object_idx < print.objects().size(); ++object_idx) {
+                for (size_t inst_idx = 0; inst_idx < print.objects()[object_idx]->model_object()->instances.size(); ++inst_idx) {
+                    out += label_object_start(label_objects_style, print.objects(), object_idx, inst_idx);
+                    out += label_object_stop(label_objects_style, object_idx, inst_idx, print.objects()[object_idx]->model_object()->name);
+                }
+            }
+            out += "\n";
+        }
         return out;
     }
 
@@ -1251,16 +1269,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     file.write(this->preamble());
 
     // Label all objects so printer knows about them since the start.
-    if (config().gcode_label_objects != loDisabled) {
-        file.write("\n");
-        for (size_t object_idx = 0; object_idx < print.objects().size(); ++object_idx) {
-            for (size_t inst_idx = 0; inst_idx < print.objects()[object_idx]->model_object()->instances.size(); ++inst_idx) {
-                file.write(label_object_start(config().gcode_label_objects, print.objects(), object_idx, inst_idx));
-                file.write(label_object_stop(config().gcode_label_objects, object_idx, inst_idx, print.objects()[object_idx]->model_object()->name));
-            }
-        }
-        file.write("\n");
-    }
+    file.write(label_all_objects(config().gcode_label_objects, print));
 
     print.throw_if_canceled();
 
@@ -2401,7 +2410,7 @@ void GCodeGenerator::process_layer_single_object(
                 m_avoid_crossing_perimeters.use_external_mp_once();
             m_last_obj_copy = this_object_copy;
             this->set_origin(unscale(offset));
-            if (this->config().gcode_label_objects != loDisabled) {
+            if (this->config().gcode_label_objects != LabelObjects::Disabled) {
                 for (const PrintObject* po : print_object.print()->objects()) {
                     if (po == &print_object)
                         break;
@@ -2585,7 +2594,7 @@ void GCodeGenerator::process_layer_single_object(
                 }
             }
         }
-    if (! first && config().gcode_label_objects != loDisabled)
+    if (! first && config().gcode_label_objects != LabelObjects::Disabled)
         gcode += label_object_stop(config().gcode_label_objects, object_id, print_instance.instance_id, print_object.model_object()->name);
 }
 

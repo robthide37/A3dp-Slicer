@@ -230,9 +230,9 @@ static const t_config_enum_values s_keys_map_DraftShield = {
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(DraftShield)
 
 static const t_config_enum_values s_keys_map_LabelObjects = {
-    { "disabled",  loDisabled  },
-    { "octoprint", loOctoprint },
-    { "marlin",    loMarlin    }
+    { "disabled",  int(LabelObjects::Disabled)  },
+    { "octoprint", int(LabelObjects::Octoprint) },
+    { "marlin",    int(LabelObjects::Marlin)    }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(LabelObjects)
 
@@ -1511,7 +1511,7 @@ void PrintConfigDef::init_fff_params()
         { "marlin",     L("Marlin (M486)") }
         });
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum<LabelObjects>(loDisabled));
+    def->set_default_value(new ConfigOptionEnum<LabelObjects>(LabelObjects::Disabled));
 
     def = this->add("gcode_substitutions", coStrings);
     def->label = L("G-code substitutions");
