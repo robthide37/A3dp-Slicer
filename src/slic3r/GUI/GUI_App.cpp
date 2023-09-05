@@ -2025,7 +2025,7 @@ void GUI_App::load_gcode(wxWindow* parent, wxString& input_file) const
 {
     input_file.Clear();
     wxFileDialog dialog(parent ? parent : GetTopWindow(),
-        _L("Choose one file (GCODE/.GCO/.G/.ngc/NGC):"),
+        _L("Choose one file (GCODE/GCO/G/BGCODE/BGC/NGC):"),
         app_config->get_last_dir(), "",
         file_wildcards(FT_GCODE), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
 
