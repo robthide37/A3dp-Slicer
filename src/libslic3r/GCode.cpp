@@ -121,7 +121,8 @@ namespace Slic3r {
         else if (label_object_style == LabelObjects::Firmware) {
             if (flavor == GCodeFlavor::gcfMarlinFirmware || flavor == GCodeFlavor::gcfMarlinLegacy || flavor == GCodeFlavor::gcfRepRapFirmware) {
                 out += std::string("M486 S") + std::to_string(unique_id) + "\n";
-                out += std::string("M486 A") + name + "\n";
+                out += std::string("M486 A");
+                out += (flavor == GCodeFlavor::gcfRepRapFirmware ? (std::string("\"") + name + "\"") : name) + "\n";
             } else {
                 // Not supported by / implemented for the other firmware flavors.
             }
@@ -1205,6 +1206,9 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     // Emit machine envelope limits for the Marlin firmware.
     this->print_machine_envelope(file, print);
 
+    // Label all objects so printer knows about them since the start.
+    file.write(label_all_objects(config().gcode_label_objects, config().gcode_flavor, print));
+
     // Update output variables after the extruders were initialized.
     m_placeholder_parser_integration.init(m_writer);
     // Let the start-up script prime the 1st printing tool.
@@ -1275,9 +1279,6 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
 
     // Set other general things.
     file.write(this->preamble());
-
-    // Label all objects so printer knows about them since the start.
-    file.write(label_all_objects(config().gcode_label_objects, config().gcode_flavor, print));
 
     print.throw_if_canceled();
 
