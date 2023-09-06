@@ -570,7 +570,7 @@ NSVGimage* init_image(EmbossShape::SvgFile &svg_file) {
     }
 
     // init svg image
-    svg_file.image = nsvgParse(svg_file.file_data);
+    svg_file.image = nsvgParse(*svg_file.file_data);
     if (svg_file.image.get() == NULL)
         return nullptr;
 
@@ -1375,20 +1375,13 @@ void GLGizmoSVG::draw_filename(){
             EmbossShape::SvgFile &svg = m_volume_shape.svg_file;
             std::stringstream ss;
             Slic3r::save(*svg.image, ss);
-            ss << '\0'; // Must be null terminated.
-            std::string str = ss.str();
-            std::unique_ptr<char[]> new_data{new char[str.size() + 1]};
-            assert(new_data != nullptr);
-            if (new_data != nullptr) {
-                std::copy(str.begin(), str.end(), new_data.get());
-                svg.file_data = std::move(new_data);
-                svg.image     = nsvgParse(svg.file_data);
-                assert(svg.image.get() != NULL);
-                if (svg.image.get() != NULL) {
-                    m_volume->emboss_shape->svg_file = svg; // copy - write changes into volume
-                } else {
-                    svg = m_volume->emboss_shape->svg_file; // revert changes
-                }
+            svg.file_data = std::make_unique<std::string>(ss.str());
+            svg.image     = nsvgParse(*svg.file_data);
+            assert(svg.image.get() != NULL);
+            if (svg.image.get() != NULL) {
+                m_volume->emboss_shape->svg_file = svg; // copy - write changes into volume
+            } else {
+                svg = m_volume->emboss_shape->svg_file; // revert changes
             }
         } else if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", _u8L("Use only paths from svg - recreate svg").c_str());
@@ -2000,8 +1993,7 @@ EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance
         return {};
     }
 
-    init_image(shape.svg_file);
-    if (shape.svg_file.image.get() == NULL) {
+    if(init_image(shape.svg_file) == nullptr) {
         show_error(nullptr, GUI::format(_u8L("Nano SVG parser can't load from file(%1%)."), shape.svg_file.path));
         return {};
     }

@@ -100,7 +100,7 @@ struct EmbossShape
         std::shared_ptr<NSVGimage> image = nullptr;
 
         // Loaded string data from file
-        std::shared_ptr<char[]> file_data = nullptr;
+        std::shared_ptr<std::string> file_data = nullptr;
     };    
     SvgFile svg_file;
         

@@ -474,7 +474,7 @@ namespace Slic3r {
         typedef std::map<int, CutObjectInfo>         IdToCutObjectInfoMap;
         typedef std::map<int, std::vector<sla::SupportPoint>> IdToSlaSupportPointsMap;
         typedef std::map<int, std::vector<sla::DrainHole>> IdToSlaDrainHolesMap;
-        using PathToEmbossShapeFileMap = std::map<std::string, std::shared_ptr<char[]>>;
+        using PathToEmbossShapeFileMap = std::map<std::string, std::shared_ptr<std::string>>;
         // Version of the 3mf file
         unsigned int m_version;
         bool m_check_version;
@@ -1387,25 +1387,18 @@ namespace Slic3r {
 
     void _3MF_Importer::_extract_embossed_svg_shape_file(const std::string &filename, mz_zip_archive &archive, const mz_zip_archive_file_stat &stat){
         assert(m_path_to_emboss_shape_files.find(filename) == m_path_to_emboss_shape_files.end());
-
-        std::unique_ptr<char[]> file{new char[stat.m_uncomp_size + 1]};
-        if (file == nullptr){
-            add_error("Cannot alocate space for SVG file.");
-            return;
-        }
-
-        mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void *) file.get(), (size_t) stat.m_uncomp_size, 0);
+        auto file = std::make_unique<std::string>(stat.m_uncomp_size, '\0');
+        mz_bool res  = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void *) file->data(), stat.m_uncomp_size, 0);
         if (res == 0) {
             add_error("Error while reading svg shape for emboss");
             return;
         }
-        file.get()[stat.m_uncomp_size] = '\0'; // Must be null terminated.
         
         // store for case svg is loaded before volume
         m_path_to_emboss_shape_files[filename] = std::move(file);
         
         // find embossed volume, for case svg is loaded after volume
-        for (ModelObject* object : m_model->objects)
+        for (const ModelObject* object : m_model->objects)
         for (ModelVolume *volume : object->volumes) {
             std::optional<EmbossShape> &es = volume->emboss_shape;
             if (!es.has_value())
@@ -3752,15 +3745,8 @@ bool to_xml(std::stringstream &stream, const EmbossShape::SvgFile &svg, const Mo
         stream << SVG_FILE_PATH_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(svg.path) << "\" ";
     stream << SVG_FILE_PATH_IN_3MF_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(svg.path_in_3mf) << "\" ";
 
-    char *data = svg.file_data.get();
-    assert(data != nullptr);
-    if (data == nullptr)
-        return false;
-
-    // NOTE: file data must be null terminated
-    size_t size = 0;
-    for (char *c = data; *c != '\0'; ++c) ++size;
-    if (!mz_zip_writer_add_mem(&archive, svg.path_in_3mf.c_str(), (const void *) data, size, MZ_DEFAULT_COMPRESSION))
+    const std::string &file_data = *svg.file_data; 
+    if (!mz_zip_writer_add_mem(&archive, svg.path_in_3mf.c_str(), (const void *) file_data.c_str(), file_data.size(), MZ_DEFAULT_COMPRESSION))
         return false;
     return true;
 }

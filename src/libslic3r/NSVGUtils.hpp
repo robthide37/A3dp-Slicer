@@ -66,11 +66,11 @@ Polygons to_polygons(const NSVGimage &image, const NSVGLineParams &param);
 void bounds(const NSVGimage &image, Vec2f &min, Vec2f &max);
 
 // read text data from file
-std::unique_ptr<char[]> read_from_disk(const std::string &path);
+std::unique_ptr<std::string> read_from_disk(const std::string &path);
 
 using NSVGimage_ptr = std::unique_ptr<NSVGimage, void (*)(NSVGimage*)>;
 NSVGimage_ptr nsvgParseFromFile(const std::string &svg_file_path, const char *units = "mm", float dpi = 96.0f);
-NSVGimage_ptr nsvgParse(const std::shared_ptr<char[]> file_data, const char *units = "mm", float dpi = 96.0f);
+NSVGimage_ptr nsvgParse(const std::string& file_data, const char *units = "mm", float dpi = 96.0f);
 
 /// <summary>
 /// Iterate over shapes and calculate count

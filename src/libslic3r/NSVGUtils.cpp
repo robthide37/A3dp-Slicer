@@ -98,41 +98,28 @@ void bounds(const NSVGimage &image, Vec2f& min, Vec2f &max)
 NSVGimage_ptr nsvgParseFromFile(const std::string &filename, const char *units, float dpi)
 {
     NSVGimage *image = ::nsvgParseFromFile(filename.c_str(), units, dpi);
-    return {image, ::nsvgDelete};
+    return {image, &nsvgDelete};
 }
 
-std::unique_ptr<char[]> read_from_disk(const std::string& path)
+std::unique_ptr<std::string> read_from_disk(const std::string &path)
 {
-    FILE *fp = boost::nowide::fopen(path.c_str(), "rb");
-    if (!fp)
+    std::ifstream fs{path};
+    if (!fs.is_open())
         return nullptr;
-
-    fseek(fp, 0, SEEK_END);
-    size_t size = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    std::unique_ptr<char[]> result{new char[size + 1]};
-    if (result == nullptr)
-        return nullptr;
-
-    if (fread(result.get(), 1, size, fp) != size)
-        return nullptr;
-
-    result.get()[size] = '\0'; // Must be null terminated.
-    fclose(fp);
-    return result;
+    std::stringstream ss;
+    ss << fs.rdbuf();
+    return std::make_unique<std::string>(ss.str());
 }
 
-NSVGimage_ptr nsvgParse(const std::shared_ptr<char[]> file_data, const char *units, float dpi){
-    size_t size = 0;
-    for (char *c = file_data.get(); *c != '\0'; ++c)
-        ++size;
-
-    // NOTE: nsvg parser consume data from pointer
-    std::unique_ptr<char[]> data_copy(new char[size]);
-    memcpy(data_copy.get(), file_data.get(), size);
+NSVGimage_ptr nsvgParse(const std::string& file_data, const char *units, float dpi){
+    // NOTE: nsvg parser consume data from input(char *)
+    size_t size = file_data.size();
+    // file data could be big, so it is allocated on heap
+    std::unique_ptr<char[]> data_copy(new char[size+1]);
+    memcpy(data_copy.get(), file_data.c_str(), size);
+    data_copy[size]  = '\0'; // data for nsvg must be null terminated
     NSVGimage *image = ::nsvgParse(data_copy.get(), units, dpi);
-    return {image, ::nsvgDelete};
+    return {image, &nsvgDelete};
 }
 
 size_t get_shapes_count(const NSVGimage &image)
