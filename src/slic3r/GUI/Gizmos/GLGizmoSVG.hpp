@@ -39,7 +39,7 @@ struct Texture{
 class GLGizmoSVG : public GLGizmoBase
 {
 public:
-    GLGizmoSVG(GLCanvas3D &parent);
+    explicit GLGizmoSVG(GLCanvas3D &parent);
 
     /// <summary>
     /// Create new embossed text volume by type on position of mouse
@@ -60,10 +60,11 @@ public:
     /// Create volume from already selected svg file
     /// </summary>
     /// <param name="svg_file">File path</param>
-    /// <param name="volume_type">Object part / Negative volume / Modifier</param>
     /// <param name="mouse_pos">Position on screen where to create volume</param>
+    /// <param name="volume_type">Object part / Negative volume / Modifier</param>
     /// <returns>True on succesfull start creation otherwise False</returns>
-    bool create_volume(std::string_view svg_file, ModelVolumeType volume_type = ModelVolumeType::MODEL_PART, const Vec2d &mouse_pos = Vec2d(std::nan, std::nan));
+    bool create_volume(std::string_view svg_file, const Vec2d &mouse_pos, ModelVolumeType volume_type = ModelVolumeType::MODEL_PART);
+    bool create_volume(std::string_view svg_file, ModelVolumeType volume_type = ModelVolumeType::MODEL_PART);
 
     /// <summary>
     /// Check whether volume is object containing only emboss volume

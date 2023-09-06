@@ -1656,7 +1656,7 @@ bool emboss_svg(Plater& plater, const wxString &svg_file, const Vec2d& mouse_dro
     evt.SetPosition(wxPoint(mouse_drop_position.x(), mouse_drop_position.y()));
     canvas->on_mouse(evt); // call render where is call GLCanvas3D::_picking_pass()
 
-    return svg->create_volume(svg_file_str, ModelVolumeType::MODEL_PART, mouse_drop_position);
+    return svg->create_volume(svg_file_str, mouse_drop_position, ModelVolumeType::MODEL_PART);
 }
 }
 
