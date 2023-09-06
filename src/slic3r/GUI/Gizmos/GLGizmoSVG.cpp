@@ -31,6 +31,7 @@
 #include <GL/glew.h>
 #include <chrono> // measure enumeration of fonts
 #include <sstream> // save for svg
+#include <array>
 
 using namespace Slic3r;
 using namespace Slic3r::Emboss;
@@ -754,7 +755,7 @@ void wu_draw_line(Linef line,
 /// <param name="data_width">Count of pixel on one line(size in data = N x data_width)</param>
 /// <param name="scale">Shape scale for conversion to pixels</param>
 template<unsigned int N> // N .. count of channels per pixel
-void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& color, std::vector<unsigned char> &data, size_t data_width, double scale = 1.){
+void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& color, std::vector<unsigned char> &data, size_t data_width, double scale){
     assert(data.size() % N == 0);
     assert(data.size() % data_width == 0);
     assert((data.size() % (N*data_width)) == 0);
@@ -885,7 +886,7 @@ bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, un
 
     unsigned char alpha = 255; // without transparency
     std::array<unsigned char, 4> color{201, 201, 201, alpha};
-    draw_filled(shape, color, data, texture.width, scale);
+    draw_filled<4>(shape, color, data, (size_t)texture.width, scale);
 
     // sends data to gpu 
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
