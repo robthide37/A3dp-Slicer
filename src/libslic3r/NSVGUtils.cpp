@@ -130,106 +130,106 @@ size_t get_shapes_count(const NSVGimage &image)
     return count;
 }
 
-void save(const NSVGimage &image, std::ostream &data)
-{
-    data << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>";
-    
-    // tl .. top left
-    Vec2f tl(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
-    // br .. bottom right
-    Vec2f br(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
-    bounds(image, tl, br);
-
-    tl.x() = std::floor(tl.x());
-    tl.y() = std::floor(tl.y());
-
-    br.x() = std::ceil(br.x());
-    br.y() = std::ceil(br.y());
-    Vec2f s = br - tl;
-    Point size = s.cast<Point::coord_type>();
-
-    data << "<svg xmlns=\"http://www.w3.org/2000/svg\" "
-         << "width=\"" << size.x() << "mm\" "
-         << "height=\"" << size.y() << "mm\" "
-         << "viewBox=\"0 0 " << size.x() << " " << size.y() << "\" >\n";
-    data << "<!-- Created with PrusaSlicer (https://www.prusa3d.com/prusaslicer/) -->\n";
-
-    std::array<char, 128> buffer;
-    auto write_point = [&tl, &buffer](std::string &d, const float *p) {
-        float x = p[0] - tl.x();
-        float y = p[1] - tl.y();
-        auto  to_string = [&buffer](float f) -> std::string {
-            auto [ptr, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), f);
-            if (ec != std::errc{})
-                return "0";            
-            return std::string(buffer.data(), ptr);
-        };
-        d += to_string(x) + "," + to_string(y) + " ";
-    };
-
-    for (const NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
-        enum struct Type { move, line, curve, close }; // https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/d
-        Type type = Type::move;
-        std::string d = "M "; // move on start point
-        for (const NSVGpath *path = shape->paths; path != NULL; path = path->next) {
-            if (path->npts <= 1)
-                continue;
-
-            if (type == Type::close) {
-                Type type = Type::move;
-                // NOTE: After close must be a space
-                d += " M "; // move on start point
-            }
-            write_point(d, path->pts);
-            size_t path_size = static_cast<size_t>(path->npts - 1);
-
-            if (path->closed) {
-                // Do not use last point in path it is duplicit
-                if (path->npts <= 4)
-                    continue;
-                path_size = static_cast<size_t>(path->npts - 4);
-            }
-
-            for (size_t i = 0; i < path_size; i += 3) {
-                const float *p = &path->pts[i * 2];
-                if (!::is_line(p)) {
-                    if (type != Type::curve) {
-                        type = Type::curve;
-                        d += "C "; // start sequence of triplets defining curves
-                    }
-                    write_point(d, &p[2]);
-                    write_point(d, &p[4]);
-                } else {
-
-                    if (type != Type::line) {
-                        type = Type::line;
-                        d += "L "; // start sequence of line points
-                    }
-                }
-                write_point(d, &p[6]);
-            }
-            if (path->closed) {
-                type = Type::close;
-                d += "Z"; // start sequence of line points
-            }
-        }
-        if (type != Type::close) {
-            //type = Type::close;
-            d += "Z"; // closed path
-        }
-        data << "<path fill=\"#D2D2D2\" d=\"" << d << "\" />\n";
-    }
-    data << "</svg>\n";
-}
-
-bool save(const NSVGimage &image, const std::string &svg_file_path) 
-{
-    std::ofstream file{svg_file_path};
-    if (!file.is_open())
-        return false;
-    save(image, file);
-    return true;
-}
+//void save(const NSVGimage &image, std::ostream &data)
+//{
+//    data << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>";
+//    
+//    // tl .. top left
+//    Vec2f tl(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+//    // br .. bottom right
+//    Vec2f br(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
+//    bounds(image, tl, br);
+//
+//    tl.x() = std::floor(tl.x());
+//    tl.y() = std::floor(tl.y());
+//
+//    br.x() = std::ceil(br.x());
+//    br.y() = std::ceil(br.y());
+//    Vec2f s = br - tl;
+//    Point size = s.cast<Point::coord_type>();
+//
+//    data << "<svg xmlns=\"http://www.w3.org/2000/svg\" "
+//         << "width=\"" << size.x() << "mm\" "
+//         << "height=\"" << size.y() << "mm\" "
+//         << "viewBox=\"0 0 " << size.x() << " " << size.y() << "\" >\n";
+//    data << "<!-- Created with PrusaSlicer (https://www.prusa3d.com/prusaslicer/) -->\n";
+//
+//    std::array<char, 128> buffer;
+//    auto write_point = [&tl, &buffer](std::string &d, const float *p) {
+//        float x = p[0] - tl.x();
+//        float y = p[1] - tl.y();
+//        auto  to_string = [&buffer](float f) -> std::string {
+//            auto [ptr, ec] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), f);
+//            if (ec != std::errc{})
+//                return "0";            
+//            return std::string(buffer.data(), ptr);
+//        };
+//        d += to_string(x) + "," + to_string(y) + " ";
+//    };
+//
+//    for (const NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next) {
+//        enum struct Type { move, line, curve, close }; // https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/d
+//        Type type = Type::move;
+//        std::string d = "M "; // move on start point
+//        for (const NSVGpath *path = shape->paths; path != NULL; path = path->next) {
+//            if (path->npts <= 1)
+//                continue;
+//
+//            if (type == Type::close) {
+//                type = Type::move;
+//                // NOTE: After close must be a space
+//                d += " M "; // move on start point
+//            }
+//            write_point(d, path->pts);
+//            size_t path_size = static_cast<size_t>(path->npts - 1);
+//
+//            if (path->closed) {
+//                // Do not use last point in path it is duplicit
+//                if (path->npts <= 4)
+//                    continue;
+//                path_size = static_cast<size_t>(path->npts - 4);
+//            }
+//
+//            for (size_t i = 0; i < path_size; i += 3) {
+//                const float *p = &path->pts[i * 2];
+//                if (!::is_line(p)) {
+//                    if (type != Type::curve) {
+//                        type = Type::curve;
+//                        d += "C "; // start sequence of triplets defining curves
+//                    }
+//                    write_point(d, &p[2]);
+//                    write_point(d, &p[4]);
+//                } else {
+//
+//                    if (type != Type::line) {
+//                        type = Type::line;
+//                        d += "L "; // start sequence of line points
+//                    }
+//                }
+//                write_point(d, &p[6]);
+//            }
+//            if (path->closed) {
+//                type = Type::close;
+//                d += "Z"; // start sequence of line points
+//            }
+//        }
+//        if (type != Type::close) {
+//            //type = Type::close;
+//            d += "Z"; // closed path
+//        }
+//        data << "<path fill=\"#D2D2D2\" d=\"" << d << "\" />\n";
+//    }
+//    data << "</svg>\n";
+//}
+//
+//bool save(const NSVGimage &image, const std::string &svg_file_path) 
+//{
+//    std::ofstream file{svg_file_path};
+//    if (!file.is_open())
+//        return false;
+//    save(image, file);
+//    return true;
+//}
 } // namespace Slic3r
 
 namespace {
