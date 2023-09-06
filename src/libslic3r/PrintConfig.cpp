@@ -1503,7 +1503,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("gcode_label_objects", coEnum);
     def->label = L("Label objects");
     def->tooltip = L("Selects whether labels should be exported at object boundaries and in what format.\n"
-                   " Octoprint = comments to be consumed by Octoprint CancelObject plugin.\n"
+                   " OctoPrint = comments to be consumed by OctoPrint CancelObject plugin.\n"
                    " Firmware = firmware specific G-code (it will be chosen based on firmware flavor and it can end up to be empty).\n\n"
                    "This settings is NOT compatible with Single Extruder Multi Material setup and Wipe into Object / Wipe into Infill.");
 
