@@ -1166,8 +1166,6 @@ bool GLGizmoSVG::process()
 
 void GLGizmoSVG::close()
 {
-    ImDrawData *data = ImGui::GetDrawData();
-
     // close gizmo == open it again
     auto &mng = m_parent.get_gizmos_manager();
     if (mng.get_current_type() == GLGizmosManager::Svg)

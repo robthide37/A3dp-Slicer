@@ -645,9 +645,10 @@ std::optional<StyleManager::Style> load_style(const Section &app_cfg_section)
     const std::string  default_name = "font_name";
     s.name = (name_it == app_cfg_section.end()) ? default_name : name_it->second;
 
-    float depth;
     read(app_cfg_section, APP_CONFIG_FONT_LINE_HEIGHT, fp.size_in_mm);
-    read(app_cfg_section, APP_CONFIG_FONT_DEPTH, depth);ep.depth = depth;
+    float depth = 1.;
+    read(app_cfg_section, APP_CONFIG_FONT_DEPTH, depth);
+    ep.depth = depth;
     read(app_cfg_section, APP_CONFIG_FONT_USE_SURFACE, ep.use_surface);
     read(app_cfg_section, APP_CONFIG_FONT_BOLDNESS, fp.boldness);
     read(app_cfg_section, APP_CONFIG_FONT_SKEW, fp.skew);

@@ -1151,22 +1151,6 @@ void init_text_lines(TextLinesModel &text_lines, const Selection& selection, /* 
         mv_trafo = mv_trafo * (es.fix_3mf_tr->inverse());
     text_lines.init(mv_trafo, volumes, style_manager, count_lines);
 }
-
-void init_new_text_line(TextLinesModel &text_lines, const Transform3d& new_text_tr, const ModelObject& mo, /* const*/ StyleManager &style_manager)
-{
-    // prepare volumes to slice
-    ModelVolumePtrs volumes;
-    volumes.reserve(mo.volumes.size());
-    for (ModelVolume *volume : mo.volumes) {
-        // only part could be surface for volumes
-        if (!volume->is_model_part())
-            continue;
-        volumes.push_back(volume);
-    }
-    unsigned count_lines = 1;
-    text_lines.init(new_text_tr, volumes, style_manager, count_lines);
-}
-
 }
 
 void GLGizmoEmboss::reinit_text_lines(unsigned count_lines) {    
