@@ -151,7 +151,8 @@ struct GuiCfg
     unsigned texture_max_size_px = 256;
 
     // Zero means it is calculated in init function
-    ImVec2 minimal_window_size = ImVec2(0, 0);
+    ImVec2 window_size = ImVec2(0, 0);
+    ImVec2 window_size_for_object = ImVec2(0, 0); // without change type
 
     float input_width  = 0.f;
     float input_offset = 0.f;
@@ -461,9 +462,9 @@ void GLGizmoSVG::on_render_input_window(float x, float y, float bottom_limit)
         m_icons = init_icons(m_icon_manager, *m_gui_cfg); // need regeneration when change resolution(move between monitors)
     }
 
-    const ImVec2 &min_window_size = m_gui_cfg->minimal_window_size;
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowMinSize, min_window_size);
-
+    const ImVec2 &window_size = m_volume->is_the_only_one_part() ? 
+        m_gui_cfg->window_size_for_object : m_gui_cfg->window_size;        
+    ImGui::SetNextWindowSize(window_size);
     // Draw origin position of text during dragging
     if (m_surface_drag.has_value()) {
         ImVec2 mouse_pos = ImGui::GetMousePos();
@@ -483,21 +484,16 @@ void GLGizmoSVG::on_render_input_window(float x, float y, float bottom_limit)
     if (m_set_window_offset.has_value()) {
         if (m_set_window_offset->y < 0)
             // position near toolbar
-            m_set_window_offset = ImVec2(x, std::min(y, bottom_limit - min_window_size.y));
+            m_set_window_offset = ImVec2(x, std::min(y, bottom_limit - window_size.y));
         
         ImGui::SetNextWindowPos(*m_set_window_offset, ImGuiCond_Always);
         m_set_window_offset.reset();
     } 
 
     bool is_opened = true;
-    ImGuiWindowFlags flag = ImGuiWindowFlags_NoCollapse;
-    if (ImGui::Begin(on_get_name().c_str(), &is_opened, flag)) {
-        // Need to pop var before draw window
-        ImGui::PopStyleVar(); // WindowMinSize
+    constexpr ImGuiWindowFlags flag = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
+    if (ImGui::Begin(on_get_name().c_str(), &is_opened, flag))
         draw_window();
-    } else {
-        ImGui::PopStyleVar(); // WindowMinSize
-    }
 
     ImGui::End();
     if (!is_opened)
@@ -1263,12 +1259,30 @@ void GLGizmoSVG::draw_preview(){
     if (m_texture.id != 0) {
         ImTextureID id = (void *) static_cast<intptr_t>(m_texture.id);
         ImVec2      s(m_texture.width, m_texture.height);
+
+        std::optional<float> spacing;
+        // is texture over full height?
+        if (m_texture.height != m_gui_cfg->texture_max_size_px) {
+            spacing = (m_gui_cfg->texture_max_size_px - m_texture.height) / 2.f;
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + *spacing);
+        }
+        // is texture over full width?
+        unsigned window_width = static_cast<unsigned>(
+            ImGui::GetWindowSize().x - 2*ImGui::GetStyle().WindowPadding.x);
+        if (window_width > m_texture.width){
+            float space = (window_width - m_texture.width) / 2.f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + space);
+        }
+
         ImGui::Image(id, s);
         if(ImGui::IsItemHovered()){            
             const EmbossShape &es = *m_volume->emboss_shape;
             size_t count_shapes = get_shapes_count(*es.svg_file.image);
             ImGui::SetTooltip("%d count shapes", count_shapes);
         }
+                
+        if (spacing.has_value())
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + *spacing);        
     }    
 }
 
@@ -1926,7 +1940,25 @@ GuiCfg create_gui_configuration() {
     ImVec2 letter_m_size = ImGui::CalcTextSize("M");
     const float count_letter_M_in_input = 12.f;
     cfg.input_width = letter_m_size.x * count_letter_M_in_input;
-    cfg.texture_max_size_px = std::round((cfg.input_width + cfg.input_offset + cfg.icon_width +space)/8) * 8;
+    cfg.texture_max_size_px = std::round((cfg.input_width + cfg.input_offset + cfg.icon_width + space)/8) * 8;
+
+     // calculate window size
+    float window_input_width = cfg.input_offset + cfg.input_width + style.WindowPadding.x + space;
+    float window_image_width = cfg.texture_max_size_px + 2*style.WindowPadding.x;
+
+    float window_title     = line_height + 2 * style.FramePadding.y + 2 * style.WindowTitleAlign.y;
+    float input_height     = line_height_with_spacing + 2 * style.FramePadding.y;
+    float separator_height = 1 + style.FramePadding.y;
+    float window_height = 
+        window_title + // window title
+        cfg.texture_max_size_px +  // preview
+        line_height_with_spacing + // filename
+        separator_height + // separator - orange line
+        input_height * 7 + // depth + size + use_surface + FromSurface + Rotation + Mirror + FaceTheCamera
+        2 * style.WindowPadding.y;
+    cfg.window_size_for_object = ImVec2(std::max(window_input_width, window_image_width), window_height);
+    float change_type_height = separator_height + line_height_with_spacing + input_height;
+    cfg.window_size = ImVec2(cfg.window_size_for_object.x, cfg.window_size_for_object.y + change_type_height);
     return cfg;
 }
 
