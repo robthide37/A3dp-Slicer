@@ -168,7 +168,7 @@ struct GuiCfg
         std::string use_surface;
         std::string rotation;
         std::string distance; // from surface
-        std::string reflection;
+        std::string mirror;
     };
     Translations translations;
 };
@@ -500,8 +500,8 @@ void GLGizmoSVG::on_render_input_window(float x, float y, float bottom_limit)
     }
 
     ImGui::End();
-    //if (!is_opened)
-    //    close();
+    if (!is_opened)
+        close();
 }
 
 void GLGizmoSVG::on_set_state()
@@ -1204,7 +1204,7 @@ void GLGizmoSVG::draw_window()
 
     draw_distance();
     draw_rotation();
-    draw_reflection();
+    draw_mirroring();
 
     if (ImGui::Button(_u8L("Face the camera").c_str())) {
         const Camera &cam = wxGetApp().plater()->get_camera();
@@ -1736,9 +1736,9 @@ void GLGizmoSVG::draw_rotation()
     }
 }
 
-void GLGizmoSVG::draw_reflection()
+void GLGizmoSVG::draw_mirroring()
 {
-    ImGui::Text("%s", m_gui_cfg->translations.reflection.c_str());
+    ImGui::Text("%s", m_gui_cfg->translations.mirror.c_str());
     ImGui::SameLine(m_gui_cfg->input_offset);
     Axis axis = Axis::UNKNOWN_AXIS;
     if(clickable(get_icon(m_icons, IconType::reflection_x), get_icon(m_icons, IconType::reflection_x_hover))){
@@ -1909,14 +1909,14 @@ GuiCfg create_gui_configuration() {
     tr.use_surface = _u8L("Use surface");
     tr.distance    = _u8L("From surface");
     tr.rotation    = _u8L("Rotation");
-    tr.reflection  = _u8L("Reflection");
+    tr.mirror      = _u8L("Mirror");
     float max_tr_width = std::max({
         ImGui::CalcTextSize(tr.depth.c_str()).x,
         ImGui::CalcTextSize(tr.size.c_str()).x + lock_width,
         ImGui::CalcTextSize(tr.use_surface.c_str()).x,
         ImGui::CalcTextSize(tr.distance.c_str()).x,
         ImGui::CalcTextSize(tr.rotation.c_str()).x + lock_width,
-        ImGui::CalcTextSize(tr.reflection.c_str()).x,
+        ImGui::CalcTextSize(tr.mirror.c_str()).x,
     });
 
     const ImGuiStyle &style = ImGui::GetStyle();

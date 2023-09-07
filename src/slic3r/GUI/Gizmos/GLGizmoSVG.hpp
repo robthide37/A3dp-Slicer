@@ -124,7 +124,7 @@ private:
     void draw_use_surface();
     void draw_distance();
     void draw_rotation();
-    void draw_reflection();
+    void draw_mirroring();
     void draw_model_type();
 
     // process mouse event
