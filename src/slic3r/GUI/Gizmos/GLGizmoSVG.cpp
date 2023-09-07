@@ -1277,8 +1277,18 @@ void GLGizmoSVG::draw_preview(){
         ImGui::Image(id, s);
         if(ImGui::IsItemHovered()){            
             const EmbossShape &es = *m_volume->emboss_shape;
-            size_t count_shapes = get_shapes_count(*es.svg_file.image);
-            ImGui::SetTooltip("%d count shapes", count_shapes);
+            size_t count_of_shapes = get_shapes_count(*es.svg_file.image);
+            size_t count_of_expolygons = 0;
+            size_t count_of_points = 0;
+            for (const auto &shape : es.shapes_with_ids) {
+                for (const ExPolygon &expoly : shape.expoly){
+                    ++count_of_expolygons;
+                    count_of_points += count_points(expoly);
+                }
+            }
+            std::string tooltip = GUI::format(_L("SVG contain %1% shapes which creates %2% polygons with %3% line segments"),
+                count_of_shapes, count_of_expolygons, count_of_points);
+            ImGui::SetTooltip("%s", tooltip.c_str());
         }
                 
         if (spacing.has_value())
