@@ -59,6 +59,6 @@
 #define ENABLE_OPENGL_DEBUG_OPTION (1 && ENABLE_GL_CORE_PROFILE)
 
 // Enable imgui dialog which allows to set the parameters used to export binarized gcode
-#define ENABLE_BINARIZED_GCODE_DEBUG_WINDOW 1
+#define ENABLE_BINARIZED_GCODE_DEBUG_WINDOW 0
 
 #endif // _prusaslicer_technologies_h_
