@@ -27,6 +27,7 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "libslic3r/GCode/GCodeWriter.hpp"
+#include "libslic3r/GCode/Thumbnails.hpp"
 
 #include "slic3r/Utils/Http.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
@@ -2658,6 +2659,32 @@ void TabPrinter::build_fff()
 
         optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
             wxTheApp->CallAfter([this, opt_key, value]() {
+                if (opt_key == "thumbnails" && m_config->has("thumbnails_format")) {
+                    // to backward compatibility we need to update "thumbnails_format" from new "thumbnails"
+                    if (const std::string val = boost::any_cast<std::string>(value); !value.empty()) {
+                        auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(val);
+
+                        if (errors != enum_bitmask<ThumbnailError>()) {
+                            std::string error_str = format(_u8L("Invalid value provided for parameter %1%: %2%"), "thumbnails", val);
+                            error_str += GCodeThumbnails::get_error_string(errors);
+                            InfoDialog(parent(), _L("G-code flavor is switched"), from_u8(error_str)).ShowModal();
+                        }
+
+                        if (!thumbnails_list.empty()) {
+                            GCodeThumbnailsFormat old_format = GCodeThumbnailsFormat(m_config->option("thumbnails_format")->getInt());
+                            GCodeThumbnailsFormat new_format = thumbnails_list.begin()->first;
+                            if (old_format != new_format) {
+                                DynamicPrintConfig new_conf = *m_config;
+
+                                auto* opt = m_config->option("thumbnails_format")->clone();
+                                opt->setInt(int(new_format));
+                                new_conf.set_key_value("thumbnails_format", opt);
+
+                                load_config(new_conf);
+                            }
+                        }
+                    }
+                }
                 if (opt_key == "silent_mode") {
                     bool val = boost::any_cast<bool>(value);
                     if (m_use_silent_mode != val) {

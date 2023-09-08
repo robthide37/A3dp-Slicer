@@ -4373,7 +4373,7 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config)
 {
     if (config.has("thumbnails")) {
-        std::string extention = "PNG";
+        std::string extention;
         if (config.has("thumbnails_format")) {
             if (const ConfigOptionDef* opt = config.def()->get("thumbnails_format")) {
                 auto label = opt->enum_def->enum_to_label(config.option("thumbnails_format")->getInt());
@@ -4381,11 +4381,15 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config)
                     extention = *label;
             }
         }
-        std::string thumbnails_str = config.opt_string("thumbnails");
 
-        ThumbnailErrors errors;
-        auto thumbnails_list = GCodeThumbnails::make_and_check_thumbnail_list(thumbnails_str, errors, extention);
-        assert(errors == enum_bitmask<ThumbnailError>());
+        std::string thumbnails_str = config.opt_string("thumbnails");
+        auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(thumbnails_str, extention);
+
+        if (errors != enum_bitmask<ThumbnailError>()) {
+            std::string error_str = "\n" + format("Invalid value provided for parameter %1%: %2%", "thumbnails", thumbnails_str);
+            error_str += GCodeThumbnails::get_error_string(errors);
+            throw BadOptionValueException(error_str);
+        }
 
         if (!thumbnails_list.empty()) {
             const auto& extentions = ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_names();

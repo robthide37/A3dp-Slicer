@@ -71,9 +71,8 @@ ThumbnailErrors validate_thumbnails_string(wxString& str, const wxString& def_ex
     std::string input_string = into_u8(str);
 
     str.Clear();
-    ThumbnailErrors errors;
 
-    auto thumbnails_list = Slic3r::GCodeThumbnails::make_and_check_thumbnail_list(input_string, errors);
+    auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(input_string);
     if (!thumbnails_list.empty()) {
         const auto& extentions = ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_names();
         for (const auto& [format, size] : thumbnails_list)
