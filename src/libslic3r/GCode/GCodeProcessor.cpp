@@ -1161,29 +1161,35 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
         throw Slic3r::RuntimeError(format("File %1% does not contain a valid binary gcode\nError: %2%", filename, 
             std::string(translate_result(res))));
 
-    // read file metadata block
+    // read file metadata block, if present
     BlockHeader block_header;
     std::vector<uint8_t> cs_buffer(65536);
     res = read_next_block_header(*file.f, file_header, block_header, cs_buffer.data(), cs_buffer.size());
     if (res != EResult::Success)
         throw Slic3r::RuntimeError(format("Error reading file %1%: %2%", filename, std::string(translate_result(res))));
-    if ((EBlockType)block_header.type != EBlockType::FileMetadata)
+    if ((EBlockType)block_header.type != EBlockType::FileMetadata && 
+        (EBlockType)block_header.type != EBlockType::PrinterMetadata)
         throw Slic3r::RuntimeError(format("Unable to find file metadata block in file %1%", filename));
-    FileMetadataBlock file_metadata_block;
-    res = file_metadata_block.read_data(*file.f, file_header, block_header);
-    if (res != EResult::Success)
-        throw Slic3r::RuntimeError(format("Error reading file %1%: %2%", filename, std::string(translate_result(res))));
-    auto producer_it = std::find_if(file_metadata_block.raw_data.begin(), file_metadata_block.raw_data.end(),
-        [](const std::pair<std::string, std::string>& item) { return item.first == "Producer"; });
-    if (producer_it != file_metadata_block.raw_data.end() && boost::starts_with(producer_it->second, std::string(SLIC3R_APP_NAME)))
-        m_producer = EProducer::PrusaSlicer;
-    else
+    if ((EBlockType)block_header.type == EBlockType::FileMetadata) {
+        FileMetadataBlock file_metadata_block;
+        res = file_metadata_block.read_data(*file.f, file_header, block_header);
+        if (res != EResult::Success)
+            throw Slic3r::RuntimeError(format("Error reading file %1%: %2%", filename, std::string(translate_result(res))));
+        auto producer_it = std::find_if(file_metadata_block.raw_data.begin(), file_metadata_block.raw_data.end(),
+            [](const std::pair<std::string, std::string>& item) { return item.first == "Producer"; });
+        if (producer_it != file_metadata_block.raw_data.end() && boost::starts_with(producer_it->second, std::string(SLIC3R_APP_NAME)))
+            m_producer = EProducer::PrusaSlicer;
+        else
+            m_producer = EProducer::Unknown;
+        res = read_next_block_header(*file.f, file_header, block_header, cs_buffer.data(), cs_buffer.size());
+        if (res != EResult::Success)
+            throw Slic3r::RuntimeError(format("Error reading file %1%: %2%", filename, std::string(translate_result(res))));
+    }
+    else {
         m_producer = EProducer::Unknown;
+    }
 
     // read printer metadata block
-    res = read_next_block_header(*file.f, file_header, block_header, cs_buffer.data(), cs_buffer.size());
-    if (res != EResult::Success)
-        throw Slic3r::RuntimeError(format("Error reading file %1%: %2%", filename, std::string(translate_result(res))));
     if ((EBlockType)block_header.type != EBlockType::PrinterMetadata)
         throw Slic3r::RuntimeError(format("Unable to find printer metadata block in file %1%", filename));
     PrinterMetadataBlock printer_metadata_block;
@@ -3701,7 +3707,7 @@ void GCodeProcessor::post_process()
 
         const bgcode::core::EResult res = m_binarizer.initialize(*out.f, s_binarizer_config);
         if (res != bgcode::core::EResult::Success)
-            throw Slic3r::RuntimeError(std::string("Unable to initialize the gcode binarizer."));
+            throw Slic3r::RuntimeError(format("Unable to initialize the gcode binarizer.\nError: %1%", bgcode::core::translate_result(res)));
     }
 
     auto time_in_minutes = [](float time_in_seconds) {
