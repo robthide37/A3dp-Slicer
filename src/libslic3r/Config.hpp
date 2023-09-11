@@ -1989,7 +1989,7 @@ public:
 
     void set_enum_values(GUIType gui_type, const std::initializer_list<std::string_view> il) {
         this->enum_def_new();
-        assert(gui_type == GUIType::i_enum_open || gui_type == GUIType::f_enum_open || gui_type == GUIType::select_open);
+        assert(is_gui_type_enum_open(gui_type));
         this->gui_type = gui_type;
         enum_def->set_values(il);
     }
