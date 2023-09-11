@@ -1729,7 +1729,8 @@ void generate_support_toolpaths(
                         // Filler and its parameters
                         filler, float(density),
                         // Extrusion parameters
-                        ExtrusionRole::SupportMaterialInterface, interface_flow);
+                        interface_as_base ? ExtrusionRole::SupportMaterial : ExtrusionRole::SupportMaterialInterface,
+                        interface_flow);
                 }
             };
             const bool top_interfaces = config.support_material_interface_layers.value != 0;
