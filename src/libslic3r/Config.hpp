@@ -2103,7 +2103,7 @@ public:
             out.push_back(kvp.first);
         return out;
     }
-    bool                    empty() { return options.empty(); }
+    bool                    empty() const { return options.empty(); }
 
     // Iterate through all of the CLI options and write them to a stream.
     std::ostream&           print_cli_help(

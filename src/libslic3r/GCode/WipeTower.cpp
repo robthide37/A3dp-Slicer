@@ -1008,7 +1008,7 @@ void WipeTower::toolchange_Change(
     // This is where we want to place the custom gcodes. We will use placeholders for this.
     // These will be substituted by the actual gcodes when the gcode is generated.
     //writer.append("[end_filament_gcode]\n");
-    writer.append("[toolchange_gcode]\n");
+    writer.append("[toolchange_gcode_from_wipe_tower_generator]\n");
 
     // Travel to where we assume we are. Custom toolchange or some special T code handling (parking extruder etc)
     // gcode could have left the extruder somewhere, we cannot just start extruding. We should also inform the

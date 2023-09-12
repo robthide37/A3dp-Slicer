@@ -3,6 +3,8 @@
 #include "../GCode.hpp"
 #include "../libslic3r.h"
 
+#include "boost/algorithm/string/replace.hpp"
+
 namespace Slic3r::GCode {
 
 static inline Point wipe_tower_point_to_object_point(GCodeGenerator &gcodegen, const Vec2f& wipe_tower_pt)
@@ -81,19 +83,15 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
         if (gcodegen.config().wipe_tower)
             deretraction_str = gcodegen.unretract();
     }
-
-    
-
+    assert(toolchange_gcode_str.empty() || toolchange_gcode_str.back() == '\n');
+    assert(deretraction_str.empty() || deretraction_str.back() == '\n');
 
     // Insert the toolchange and deretraction gcode into the generated gcode.
-    DynamicConfig config;
-    config.set_key_value("toolchange_gcode", new ConfigOptionString(toolchange_gcode_str));
-    config.set_key_value("deretraction_from_wipe_tower_generator", new ConfigOptionString(deretraction_str));
-    std::string tcr_gcode, tcr_escaped_gcode = gcodegen.placeholder_parser_process("tcr_rotated_gcode", tcr_rotated_gcode, new_extruder_id, &config);
-    unescape_string_cstyle(tcr_escaped_gcode, tcr_gcode);
+    boost::replace_first(tcr_rotated_gcode, "[toolchange_gcode_from_wipe_tower_generator]", toolchange_gcode_str);
+    boost::replace_first(tcr_rotated_gcode, "[deretraction_from_wipe_tower_generator]", deretraction_str);
+    std::string tcr_gcode;
+    unescape_string_cstyle(tcr_rotated_gcode, tcr_gcode);
     gcode += tcr_gcode;
-    if (! toolchange_gcode_str.empty() && toolchange_gcode_str.back() != '\n')
-        toolchange_gcode_str += '\n';
 
     // A phony move to the end position at the wipe tower.
     gcodegen.writer().travel_to_xy(end_pos.cast<double>());
