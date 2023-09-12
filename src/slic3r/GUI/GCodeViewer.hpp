@@ -830,12 +830,16 @@ public:
 
     const BoundingBoxf3& get_paths_bounding_box() const { return m_paths_bounding_box; }
     const BoundingBoxf3& get_shells_bounding_box() const { return m_shells_bounding_box; }
+
     const BoundingBoxf3& get_max_bounding_box() const {
         BoundingBoxf3& max_bounding_box = const_cast<BoundingBoxf3&>(m_max_bounding_box);
         if (!max_bounding_box.defined) {
-            max_bounding_box = m_shells_bounding_box;
-            max_bounding_box.merge(m_paths_bounding_box);
-            max_bounding_box.merge(m_paths_bounding_box.max + m_sequential_view.marker.get_bounding_box().size().z() * Vec3d::UnitZ());
+            if (m_shells_bounding_box.defined)
+                max_bounding_box = m_shells_bounding_box;
+            if (m_paths_bounding_box.defined) {
+                max_bounding_box.merge(m_paths_bounding_box);
+                max_bounding_box.merge(m_paths_bounding_box.max + m_sequential_view.marker.get_bounding_box().size().z() * Vec3d::UnitZ());
+            }
         }
         return m_max_bounding_box;
     }
