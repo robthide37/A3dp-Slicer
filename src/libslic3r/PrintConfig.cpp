@@ -229,12 +229,12 @@ static const t_config_enum_values s_keys_map_DraftShield = {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(DraftShield)
 
-static const t_config_enum_values s_keys_map_LabelObjects = {
-    { "disabled",  int(LabelObjects::Disabled)  },
-    { "octoprint", int(LabelObjects::Octoprint) },
-    { "firmware",  int(LabelObjects::Firmware)  }
+static const t_config_enum_values s_keys_map_LabelObjectsStyle = {
+    { "disabled",  int(LabelObjectsStyle::Disabled)  },
+    { "octoprint", int(LabelObjectsStyle::Octoprint) },
+    { "firmware",  int(LabelObjectsStyle::Firmware)  }
 };
-CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(LabelObjects)
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(LabelObjectsStyle)
 
 static const t_config_enum_values s_keys_map_GCodeThumbnailsFormat = {
     { "PNG", int(GCodeThumbnailsFormat::PNG) },
@@ -1507,13 +1507,13 @@ void PrintConfigDef::init_fff_params()
                    " Firmware = firmware specific G-code (it will be chosen based on firmware flavor and it can end up to be empty).\n\n"
                    "This settings is NOT compatible with Single Extruder Multi Material setup and Wipe into Object / Wipe into Infill.");
 
-    def->set_enum<LabelObjects>({
+    def->set_enum<LabelObjectsStyle>({
         { "disabled",   L("Disabled") },
         { "octoprint",  L("OctoPrint comments") },
         { "firmware",   L("Firmware-specific") }
         });
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionEnum<LabelObjects>(LabelObjects::Disabled));
+    def->set_default_value(new ConfigOptionEnum<LabelObjectsStyle>(LabelObjectsStyle::Disabled));
 
     def = this->add("gcode_substitutions", coStrings);
     def->label = L("G-code substitutions");

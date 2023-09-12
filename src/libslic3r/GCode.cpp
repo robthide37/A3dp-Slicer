@@ -28,6 +28,7 @@
 #include "Exception.hpp"
 #include "ExtrusionEntity.hpp"
 #include "Geometry/ConvexHull.hpp"
+#include "GCode/LabelObjects.hpp"
 #include "GCode/PrintExtents.hpp"
 #include "GCode/Thumbnails.hpp"
 #include "GCode/WipeTower.hpp"
@@ -101,69 +102,6 @@ namespace Slic3r {
         if (!gcode.empty() && gcode.back() != '\n')
             gcode += '\n';
     }
-
-
-    // Accepts vector of PrintObjectPtrs and an object and instance ids. Returns starting tag for label object function.
-    static std::string label_object_start(LabelObjects label_object_style, GCodeFlavor flavor, const SpanOfConstPtrs<PrintObject>& objects, int object_id, int instance_id)
-    {
-        int unique_id = 0;
-        for (size_t idx = 0; idx < size_t(object_id); ++idx)
-            unique_id += int(objects[idx]->model_object()->instances.size());
-        unique_id += instance_id;
-
-        std::string name = objects[object_id]->model_object()->name;
-        if (label_object_style == LabelObjects::Firmware && objects[object_id]->model_object()->instances.size() > 1u)
-            name += " (copy " + std::to_string(instance_id) + ")";
-
-        std::string out;
-        if (label_object_style == LabelObjects::Octoprint)
-            out += std::string("; printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
-        else if (label_object_style == LabelObjects::Firmware) {
-            if (flavor == GCodeFlavor::gcfMarlinFirmware || flavor == GCodeFlavor::gcfMarlinLegacy || flavor == GCodeFlavor::gcfRepRapFirmware) {
-                out += std::string("M486 S") + std::to_string(unique_id) + "\n";
-                out += std::string("M486 A");
-                out += (flavor == GCodeFlavor::gcfRepRapFirmware ? (std::string("\"") + name + "\"") : name) + "\n";
-            } else {
-                // Not supported by / implemented for the other firmware flavors.
-            }
-        }
-        return out;
-    }
-
-
-    static std::string label_object_stop(LabelObjects label_object_style, GCodeFlavor flavor, int object_id, int instance_id, const std::string& name)
-    {
-        std::string out;
-        if (label_object_style == LabelObjects::Octoprint)
-            out += std::string("; stop printing object ") + name + " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id) + "\n";
-        else if (label_object_style == LabelObjects::Firmware)
-            if (flavor == GCodeFlavor::gcfMarlinFirmware || flavor == GCodeFlavor::gcfMarlinLegacy || flavor == GCodeFlavor::gcfRepRapFirmware)
-                out += std::string("M486 S-1\n");
-            else {
-                // Not supported by / implemented for the other firmware flavors.
-            }
-        return out;
-    }
-
-
-    static std::string label_all_objects(LabelObjects label_objects_style, GCodeFlavor flavor, const Print& print)
-    {
-        std::string out;
-
-        if (label_objects_style != LabelObjects::Disabled) {
-            out += "\n";
-            for (size_t object_idx = 0; object_idx < print.objects().size(); ++object_idx) {
-                for (size_t inst_idx = 0; inst_idx < print.objects()[object_idx]->model_object()->instances.size(); ++inst_idx) {
-                    out += label_object_start(label_objects_style, flavor, print.objects(), object_idx, inst_idx);
-                    out += label_object_stop(label_objects_style, flavor, object_idx, inst_idx, print.objects()[object_idx]->model_object()->name);
-                }
-            }
-            out += "\n";
-        }
-        return out;
-    }
-
-
 
     // Return true if tch_prefix is found in custom_gcode
     static bool custom_gcode_changes_tool(const std::string& custom_gcode, const std::string& tch_prefix, unsigned next_extruder)
@@ -1207,7 +1145,8 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     this->print_machine_envelope(file, print);
 
     // Label all objects so printer knows about them since the start.
-    file.write(label_all_objects(config().gcode_label_objects, config().gcode_flavor, print));
+    m_label_objects.init(print);
+    file.write(m_label_objects.all_objects_header());
 
     // Update output variables after the extruders were initialized.
     m_placeholder_parser_integration.init(m_writer);
@@ -2419,13 +2358,13 @@ void GCodeGenerator::process_layer_single_object(
                 m_avoid_crossing_perimeters.use_external_mp_once();
             m_last_obj_copy = this_object_copy;
             this->set_origin(unscale(offset));
-            if (this->config().gcode_label_objects != LabelObjects::Disabled) {
+            if (this->config().gcode_label_objects != LabelObjectsStyle::Disabled) {
                 for (const PrintObject* po : print_object.print()->objects()) {
                     if (po == &print_object)
                         break;
                     ++object_id;
                 }
-                gcode += label_object_start(config().gcode_label_objects, config().gcode_flavor, print_object.print()->objects(), object_id, print_instance.instance_id);
+                gcode += m_label_objects.start_object(print_instance.print_object.instances()[print_instance.instance_id], GCode::LabelObjects::IncludeName::No);
             }
         }
     };
@@ -2603,8 +2542,8 @@ void GCodeGenerator::process_layer_single_object(
                 }
             }
         }
-    if (! first && config().gcode_label_objects != LabelObjects::Disabled)
-        gcode += label_object_stop(config().gcode_label_objects, config().gcode_flavor, object_id, print_instance.instance_id, print_object.model_object()->name);
+    if (! first)
+        gcode += m_label_objects.stop_object(print_instance.print_object.instances()[print_instance.instance_id]);
 }
 
 void GCodeGenerator::apply_print_config(const PrintConfig &print_config)

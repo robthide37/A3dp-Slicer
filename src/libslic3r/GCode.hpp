@@ -28,6 +28,7 @@
 #include "GCode/CoolingBuffer.hpp"
 #include "GCode/FindReplace.hpp"
 #include "GCode/GCodeWriter.hpp"
+#include "GCode/LabelObjects.hpp"
 #include "GCode/PressureEqualizer.hpp"
 #include "GCode/RetractWhenCrossingPerimeters.hpp"
 #include "GCode/SmoothPath.hpp"
@@ -353,6 +354,7 @@ private:
 
     OozePrevention                      m_ooze_prevention;
     GCode::Wipe                         m_wipe;
+    GCode::LabelObjects                 m_label_objects;
     AvoidCrossingPerimeters             m_avoid_crossing_perimeters;
     JPSPathFinder                       m_avoid_crossing_curled_overhangs;
     RetractWhenCrossingPerimeters       m_retract_when_crossing_perimeters;
