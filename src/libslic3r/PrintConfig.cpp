@@ -5223,27 +5223,21 @@ TimestampsConfigDef::TimestampsConfigDef()
 
     def = this->add("year", coInt);
     def->label = L("Year");
-    def->tooltip = L("");
 
     def = this->add("month", coInt);
     def->label = L("Month");
-    def->tooltip = L("");
 
     def = this->add("day", coInt);
     def->label = L("Day");
-    def->tooltip = L("");
 
     def = this->add("hour", coInt);
     def->label = L("Hour");
-    def->tooltip = L("");
 
     def = this->add("minute", coInt);
     def->label = L("Minute");
-    def->tooltip = L("");
 
     def = this->add("second", coInt);
     def->label = L("Second");
-    def->tooltip = L("");
 }
 
 OtherPresetsConfigDef::OtherPresetsConfigDef()
@@ -5259,17 +5253,17 @@ OtherPresetsConfigDef::OtherPresetsConfigDef()
     def->tooltip = L("Name of the print preset used for slicing.");
 
     def = this->add("filament_preset", coString);
-    def->label = L("");
+    def->label = L("Filament preset name");
     def->tooltip = L("Names of the filament presets used for slicing. The variable is a vector "
                      "containing one name for each extruder.");
 
     def = this->add("printer_preset", coString);
-    def->label = L("");
+    def->label = L("Printer preset name");
     def->tooltip = L("Name of the printer preset used for slicing.");
 
     def = this->add("physical_printer_preset", coString);
-    def->label = L("");
-    def->tooltip = L("Name of the physical print preset used for slicing.");
+    def->label = L("Physical printer name");
+    def->tooltip = L("Name of the physical printer used for slicing.");
 }
 
 
