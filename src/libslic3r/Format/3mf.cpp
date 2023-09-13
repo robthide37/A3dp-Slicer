@@ -1961,8 +1961,15 @@ namespace Slic3r {
     {
     public:
         TextConfigurationSerialization() = delete;
+                
+        using TypeToName = boost::bimap<EmbossStyle::Type, std::string_view>;
+        static const TypeToName type_to_name;
 
-        static const boost::bimap<EmbossStyle::Type, std::string_view> type_to_name;
+        using HorizontalAlignToName = boost::bimap<FontProp::HorizontalAlign, std::string_view>;
+        static const HorizontalAlignToName horizontal_align_to_name;
+
+        using VerticalAlignToName = boost::bimap<FontProp::VerticalAlign, std::string_view>;
+        static const VerticalAlignToName vertical_align_to_name;
         
         static EmbossStyle::Type get_type(std::string_view type) {
             const auto& to_type = TextConfigurationSerialization::type_to_name.right;
@@ -3583,16 +3590,61 @@ bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config,
     return res;
 }
 
+namespace{
+
+// Conversion with bidirectional map
+// F .. first, S .. second
+template<typename F, typename S>
+F bimap_cvt(const boost::bimap<F, S> &bmap, S s, const F & def_value) {
+    const auto &map = bmap.right;
+    auto found_item = map.find(s);
+
+    // only for back and forward compatibility
+    assert(found_item != map.end()); 
+    if (found_item == map.end())
+        return def_value;
+
+    return found_item->second;
+}
+
+template<typename F, typename S> 
+S bimap_cvt(const boost::bimap<F, S> &bmap, F f, const S &def_value)
+{
+    const auto &map = bmap.left;
+    auto found_item = map.find(f);
+
+    // only for back and forward compatibility
+    assert(found_item != map.end());
+    if (found_item == map.end())
+        return def_value;
+
+    return found_item->second;
+}
+
+} // namespace
+
 /// <summary>
 /// TextConfiguration serialization
 /// </summary>
-using TypeToName = boost::bimap<EmbossStyle::Type, std::string_view>;
-const TypeToName TextConfigurationSerialization::type_to_name =
-            boost::assign::list_of<TypeToName::relation>
+const TextConfigurationSerialization::TypeToName TextConfigurationSerialization::type_to_name =
+    boost::assign::list_of<TypeToName::relation>
     (EmbossStyle::Type::file_path, "file_name")
     (EmbossStyle::Type::wx_win_font_descr, "wxFontDescriptor_Windows")
     (EmbossStyle::Type::wx_lin_font_descr, "wxFontDescriptor_Linux")
     (EmbossStyle::Type::wx_mac_font_descr, "wxFontDescriptor_MacOsX");
+
+const TextConfigurationSerialization::HorizontalAlignToName TextConfigurationSerialization::horizontal_align_to_name =
+    boost::assign::list_of<HorizontalAlignToName::relation>
+    (FontProp::HorizontalAlign::left, "left")
+    (FontProp::HorizontalAlign::center, "center")
+    (FontProp::HorizontalAlign::right, "right");
+
+const TextConfigurationSerialization::VerticalAlignToName TextConfigurationSerialization::vertical_align_to_name =
+    boost::assign::list_of<VerticalAlignToName::relation>
+    (FontProp::VerticalAlign::top, "top")
+    (FontProp::VerticalAlign::center, "middle")
+    (FontProp::VerticalAlign::bottom, "bottom");
+
 
 void TextConfigurationSerialization::to_xml(std::stringstream &stream, const TextConfiguration &tc)
 {
@@ -3603,7 +3655,9 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
     const EmbossStyle &style = tc.style;
     stream << STYLE_NAME_ATTR <<  "=\"" << xml_escape_double_quotes_attribute_value(style.name) << "\" ";
     stream << FONT_DESCRIPTOR_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(style.path) << "\" ";
-    stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << TextConfigurationSerialization::get_name(style.type) << "\" ";
+    constexpr std::string_view dafault_type{"undefined"};
+    std::string_view style_type = bimap_cvt(type_to_name, style.type, dafault_type);
+    stream << FONT_DESCRIPTOR_TYPE_ATTR << "=\"" << style_type << "\" ";
 
     // font property
     const FontProp &fp = tc.style.prop;
@@ -3619,8 +3673,8 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
         stream << SKEW_ATTR << "=\"" << *fp.skew << "\" ";
     if (fp.per_glyph)
         stream << PER_GLYPH_ATTR << "=\"" << 1 << "\" ";
-    stream << HORIZONTAL_ALIGN_ATTR << "=\"" << static_cast<int>(fp.align.first) << "\" ";
-    stream << VERTICAL_ALIGN_ATTR << "=\"" << static_cast<int>(fp.align.second) << "\" ";    
+    stream << HORIZONTAL_ALIGN_ATTR << "=\"" << bimap_cvt(horizontal_align_to_name, fp.align.first, dafault_type) << "\" ";
+    stream << VERTICAL_ALIGN_ATTR   << "=\"" << bimap_cvt(vertical_align_to_name,  fp.align.second, dafault_type) << "\" ";
     if (fp.collection_number.has_value())
         stream << COLLECTION_NUMBER_ATTR << "=\"" << *fp.collection_number << "\" ";
     // font descriptor
@@ -3635,6 +3689,48 @@ void TextConfigurationSerialization::to_xml(std::stringstream &stream, const Tex
 
     stream << "/>\n"; // end TEXT_TAG
 }
+namespace {
+
+FontProp::HorizontalAlign read_horizontal_align(const char **attributes, unsigned int num_attributes, const TextConfigurationSerialization::HorizontalAlignToName& horizontal_align_to_name){
+    std::string horizontal_align_str = get_attribute_value_string(attributes, num_attributes, HORIZONTAL_ALIGN_ATTR);
+
+    // Back compatibility
+    // PS 2.6.0 do not have align
+    if (horizontal_align_str.empty())
+        return FontProp::HorizontalAlign::center;
+
+    // Back compatibility
+    // PS 2.6.1 store indices(0|1|2) instead of text for align
+    if (horizontal_align_str.length() == 1) {
+        int horizontal_align_int = 0;
+        if(boost::spirit::qi::parse(horizontal_align_str.c_str(), horizontal_align_str.c_str() + 1, boost::spirit::qi::int_, horizontal_align_int))
+            return static_cast<FontProp::HorizontalAlign>(horizontal_align_int);
+    }
+
+    return bimap_cvt(horizontal_align_to_name, std::string_view(horizontal_align_str), FontProp::HorizontalAlign::center);    
+}
+
+
+FontProp::VerticalAlign read_vertical_align(const char **attributes, unsigned int num_attributes, const TextConfigurationSerialization::VerticalAlignToName& vertical_align_to_name){
+    std::string vertical_align_str = get_attribute_value_string(attributes, num_attributes, VERTICAL_ALIGN_ATTR);
+
+    // Back compatibility
+    // PS 2.6.0 do not have align
+    if (vertical_align_str.empty())
+        return FontProp::VerticalAlign::center;
+
+    // Back compatibility
+    // PS 2.6.1 store indices(0|1|2) instead of text for align
+    if (vertical_align_str.length() == 1) {
+        int vertical_align_int = 0;
+        if(boost::spirit::qi::parse(vertical_align_str.c_str(), vertical_align_str.c_str() + 1, boost::spirit::qi::int_, vertical_align_int))
+            return static_cast<FontProp::VerticalAlign>(vertical_align_int);
+    }
+
+    return bimap_cvt(vertical_align_to_name, std::string_view(vertical_align_str), FontProp::VerticalAlign::center);
+}
+
+} // namespace
 
 std::optional<TextConfiguration> TextConfigurationSerialization::read(const char **attributes, unsigned int num_attributes)
 {
@@ -3652,17 +3748,9 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     int per_glyph = get_attribute_value_int(attributes, num_attributes, PER_GLYPH_ATTR);
     if (per_glyph == 1) fp.per_glyph = true;
 
-    if (get_attribute_value_string(attributes, num_attributes, HORIZONTAL_ALIGN_ATTR).empty()){
-        // align is not set(version without align) --> center is near previous version
-        fp.align = {FontProp::HorizontalAlign::center, FontProp::VerticalAlign::center};
-    } else{    
-        int horizontal = get_attribute_value_int(attributes, num_attributes, HORIZONTAL_ALIGN_ATTR);
-        int vertical = get_attribute_value_int(attributes, num_attributes, VERTICAL_ALIGN_ATTR);
-        fp.align  = FontProp::Align(
-            static_cast<FontProp::HorizontalAlign>(horizontal),
-            static_cast<FontProp::VerticalAlign>(vertical));
-    }
-
+    fp.align = FontProp::Align(
+        read_horizontal_align(attributes, num_attributes, horizontal_align_to_name),
+        read_vertical_align(attributes, num_attributes, vertical_align_to_name));
 
     int collection_number = get_attribute_value_int(attributes, num_attributes, COLLECTION_NUMBER_ATTR);
     if (collection_number > 0) fp.collection_number = static_cast<unsigned int>(collection_number);
@@ -3681,7 +3769,7 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     std::string style_name = get_attribute_value_string(attributes, num_attributes, STYLE_NAME_ATTR);
     std::string font_descriptor = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_ATTR);
     std::string type_str = get_attribute_value_string(attributes, num_attributes, FONT_DESCRIPTOR_TYPE_ATTR);
-    EmbossStyle::Type type = TextConfigurationSerialization::get_type(type_str);
+    EmbossStyle::Type type = bimap_cvt(type_to_name, std::string_view{type_str}, EmbossStyle::Type::undefined);
 
     std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
     EmbossStyle es{style_name, std::move(font_descriptor), type, std::move(fp)};
