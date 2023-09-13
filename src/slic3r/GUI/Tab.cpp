@@ -2456,7 +2456,7 @@ void TabFilament::load_current_preset()
             m_extruders_cb->Select(m_active_extruder);
     }
 
-    assert(m_active_extruder >= 0 && m_active_extruder < m_preset_bundle->extruders_filaments.size());
+    assert(m_active_extruder >= 0 && size_t(m_active_extruder) < m_preset_bundle->extruders_filaments.size());
     const std::string& selected_extr_filament_name = m_preset_bundle->extruders_filaments[m_active_extruder].get_selected_preset_name();
     if (selected_extr_filament_name != selected_filament_name) {
         m_presets->select_preset_by_name(selected_extr_filament_name, false);

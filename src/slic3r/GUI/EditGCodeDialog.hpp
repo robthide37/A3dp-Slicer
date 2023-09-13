@@ -13,6 +13,7 @@
 class wxListBox;
 class wxTextCtrl;
 class ScalableButton;
+class wxStaticText;
 
 namespace Slic3r {
 

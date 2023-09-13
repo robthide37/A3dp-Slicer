@@ -28,6 +28,7 @@
 #include <regex>
 #include <future>
 #include <boost/algorithm/string.hpp>
+#include <boost/nowide/cstdio.hpp>
 #include <boost/optional.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
