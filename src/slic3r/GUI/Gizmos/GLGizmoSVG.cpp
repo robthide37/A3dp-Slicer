@@ -1106,24 +1106,40 @@ void GLGizmoSVG::reset_volume()
     m_filename_preview.clear();
     m_shape_warnings.clear();
     // delete texture after finish imgui draw
-    wxGetApp().plater()->CallAfter([&]() { delete_texture(m_texture); });
+    wxGetApp().plater()->CallAfter([&texture = m_texture]() { delete_texture(texture); });
 }
 
 void GLGizmoSVG::calculate_scale() {
-    Transform3d to_world = m_parent.get_selection().get_first_volume()->world_matrix();
+    // be carefull m_volume is not set yet
+    const Selection &selection = m_parent.get_selection(); 
+    const GLVolume *gl_volume = selection.get_first_volume();
+    if (gl_volume == nullptr)
+        return;
+
+    Transform3d to_world = gl_volume->world_matrix();
+
+    const ModelVolume *volume_ptr = get_model_volume(*gl_volume, selection.get_model()->objects);
+    assert(volume_ptr != nullptr);
+    assert(volume_ptr->emboss_shape.has_value());
+    // Fix for volume loaded from 3mf
+    if (volume_ptr != nullptr &&
+        volume_ptr->emboss_shape.has_value()) {
+        const std::optional<Transform3d> &fix_tr = volume_ptr->emboss_shape->fix_3mf_tr;
+        if (fix_tr.has_value())
+            to_world = to_world * (fix_tr->inverse());    
+    }
+    
     auto to_world_linear = to_world.linear();
-    auto calc = [&to_world_linear](const Vec3d &axe, std::optional<float>& scale)->bool {
-        Vec3d  axe_world = to_world_linear * axe;
-        double norm_sq   = axe_world.squaredNorm();
+    auto calc = [&to_world_linear](const Vec3d &axe, std::optional<float>& scale) {
+        Vec3d axe_world = to_world_linear * axe;
+        double norm_sq  = axe_world.squaredNorm();
         if (is_approx(norm_sq, 1.)) {
-            if (scale.has_value())
-                scale.reset();
-            else
-                return false;
+            if (!scale.has_value())
+                return;
+            scale.reset();
         } else {
             scale = sqrt(norm_sq);
         }
-        return true;
     };
 
     calc(Vec3d::UnitX(), m_scale_width);
@@ -1622,7 +1638,22 @@ void GLGizmoSVG::draw_size()
         TransformationType type = m_volume->is_the_only_one_part() ? 
             TransformationType::Instance_Relative_Independent :
             TransformationType::Local_Relative_Independent;
+        
+        const std::optional<Transform3d> &fix_tr = m_volume->emboss_shape->fix_3mf_tr;
+        if (fix_tr.has_value()){
+            GLVolume* gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
+            gl_volume->set_volume_transformation(gl_volume->get_volume_transformation().get_matrix() * fix_tr->inverse());
+            selection.setup_cache();
+        }
+
         selection.scale(*new_relative_scale, type);
+
+        if (fix_tr.has_value()) {
+            GLVolume *gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
+            gl_volume->set_volume_transformation(gl_volume->get_volume_transformation().get_matrix() * (*fix_tr));
+            selection.setup_cache();
+        }
+
         m_parent.do_scale(L("Resize"));
         wxGetApp().obj_manipul()->set_dirty();
         // should be the almost same

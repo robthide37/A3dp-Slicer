@@ -6779,8 +6779,10 @@ void publish(Model &model) {
         for (ModelVolume *volume : object->volumes) {
             if (!volume->emboss_shape.has_value())
                 continue;
-            SvgFile* svg = &volume->emboss_shape->svg_file;
-                
+            if (volume->text_configuration.has_value())
+                continue; // text dosen't have svg path
+
+            SvgFile* svg = &volume->emboss_shape->svg_file;                
             if (svg->path_in_3mf.empty())
                 exist_new = true;
             svgfiles.push_back(svg);

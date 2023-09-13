@@ -269,6 +269,7 @@ auto was_canceled(const Job::Ctl &ctl, const DataBase &base){
 void Slic3r::GUI::Emboss::DataBase::write(ModelVolume &volume) const{
     volume.name         = volume_name;
     volume.emboss_shape = shape;
+    volume.emboss_shape->fix_3mf_tr.reset();
 }
 
 /////////////////

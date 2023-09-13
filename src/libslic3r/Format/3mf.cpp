@@ -3833,18 +3833,16 @@ Transform3d create_fix(const std::optional<Transform3d> &prev, const ModelVolume
 }
 
 bool to_xml(std::stringstream &stream, const EmbossShape::SvgFile &svg, const ModelVolume &volume, mz_zip_archive &archive){
-    assert(!svg.path_in_3mf.empty());
     if (svg.path_in_3mf.empty())
-        return false; // unwanted store .svg file into .3mf (protection of copyRight)
+        return true; // EmbossedText OR unwanted store .svg file into .3mf (protection of copyRight)
 
     if (!svg.path.empty())
         stream << SVG_FILE_PATH_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(svg.path) << "\" ";
     stream << SVG_FILE_PATH_IN_3MF_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(svg.path_in_3mf) << "\" ";
 
     const std::string &file_data = *svg.file_data; 
-    if (!mz_zip_writer_add_mem(&archive, svg.path_in_3mf.c_str(), (const void *) file_data.c_str(), file_data.size(), MZ_DEFAULT_COMPRESSION))
-        return false;
-    return true;
+    return mz_zip_writer_add_mem(&archive, svg.path_in_3mf.c_str(), 
+        (const void *) file_data.c_str(), file_data.size(), MZ_DEFAULT_COMPRESSION);
 }
 
 } // namespace
