@@ -1,12 +1,12 @@
 #ifndef slic3r_GCode_LabelObjects_hpp_
 #define slic3r_GCode_LabelObjects_hpp_
 
-#include "Print.hpp"
-
 namespace Slic3r {
 
 enum GCodeFlavor : unsigned char;
 enum class LabelObjectsStyle;
+struct PrintInstance;
+class Print;
 
 
 namespace GCode {

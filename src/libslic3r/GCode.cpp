@@ -2340,9 +2340,8 @@ void GCodeGenerator::process_layer_single_object(
     const bool                print_wipe_extrusions)
 {
     bool     first     = true;
-    int      object_id = 0;
     // Delay layer initialization as many layers may not print with all extruders.
-    auto init_layer_delayed = [this, &print_instance, &layer_to_print, &first, &object_id, &gcode]() {
+    auto init_layer_delayed = [this, &print_instance, &layer_to_print, &first, &gcode]() {
         if (first) {
             first = false;
             const PrintObject &print_object = print_instance.print_object;
@@ -2358,14 +2357,7 @@ void GCodeGenerator::process_layer_single_object(
                 m_avoid_crossing_perimeters.use_external_mp_once();
             m_last_obj_copy = this_object_copy;
             this->set_origin(unscale(offset));
-            if (this->config().gcode_label_objects != LabelObjectsStyle::Disabled) {
-                for (const PrintObject* po : print_object.print()->objects()) {
-                    if (po == &print_object)
-                        break;
-                    ++object_id;
-                }
-                gcode += m_label_objects.start_object(print_instance.print_object.instances()[print_instance.instance_id], GCode::LabelObjects::IncludeName::No);
-            }
+            gcode += m_label_objects.start_object(print_instance.print_object.instances()[print_instance.instance_id], GCode::LabelObjects::IncludeName::No);
         }
     };
 

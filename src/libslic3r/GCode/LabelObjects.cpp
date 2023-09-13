@@ -1,8 +1,42 @@
 #include "LabelObjects.hpp"
 
+#include "ClipperUtils.hpp"
+#include "Model.hpp"
+#include "Print.hpp"
+#include "TriangleMeshSlicer.hpp"
+
 
 namespace Slic3r::GCode {
 
+
+namespace {
+
+Polygon instance_outline(const PrintInstance* pi)
+{
+    ExPolygons outline;
+    const ModelObject* mo = pi->model_instance->get_object();
+    const ModelInstance* mi = pi->model_instance;
+    for (const ModelVolume *v : mo->volumes) {
+        Polygons vol_outline;
+        vol_outline = project_mesh(v->mesh().its,
+                                    mi->get_matrix() * v->get_matrix(),
+                                    [] {});
+        switch (v->type()) {
+        case ModelVolumeType::MODEL_PART: outline = union_ex(outline, vol_outline); break;
+        case ModelVolumeType::NEGATIVE_VOLUME: outline = diff_ex(outline, vol_outline); break;
+        default:;
+        }
+    }
+
+    // The projection may contain multiple polygons, which is not supported by Klipper.
+    // When that happens, calculate and use a 2d convex hull instead.
+    if (outline.size() == 1u)
+        return outline.front().contour;
+    else
+        return pi->model_instance->get_object()->convex_hull_2d(pi->model_instance->get_matrix());
+}
+
+}; // anonymous namespace
 
 
 void LabelObjects::init(const Print& print)
@@ -78,7 +112,7 @@ std::string LabelObjects::all_objects_header() const
         if (m_flavor == gcfKlipper)  {
             char buffer[64];
             out += "EXCLUDE_OBJECT_DEFINE NAME=" + label.name;
-            Polygon outline = print_instance->model_instance->get_object()->convex_hull_2d(print_instance->model_instance->get_matrix());
+            Polygon outline = instance_outline(print_instance);
             assert(! outline.empty());
             outline.douglas_peucker(50000.f);
             Point center = outline.centroid();
@@ -139,7 +173,7 @@ std::string LabelObjects::stop_object(const PrintInstance& print_instance) const
     std::string out;
     if (m_label_objects_style == LabelObjectsStyle::Octoprint)
         out += std::string("; stop printing object ") + label.name + "\n";
-    else if (m_label_objects_style == LabelObjectsStyle::Firmware)
+    else if (m_label_objects_style == LabelObjectsStyle::Firmware) {
         if (m_flavor == GCodeFlavor::gcfMarlinFirmware || m_flavor == GCodeFlavor::gcfMarlinLegacy || m_flavor == GCodeFlavor::gcfRepRapFirmware)
             out += std::string("M486 S-1\n");
         else if (m_flavor ==gcfKlipper)
@@ -147,6 +181,7 @@ std::string LabelObjects::stop_object(const PrintInstance& print_instance) const
         else {
             // Not supported by / implemented for the other firmware flavors.
         }
+    }
     return out;
 }
 
