@@ -3652,11 +3652,17 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     int per_glyph = get_attribute_value_int(attributes, num_attributes, PER_GLYPH_ATTR);
     if (per_glyph == 1) fp.per_glyph = true;
 
-    int horizontal = get_attribute_value_int(attributes, num_attributes, HORIZONTAL_ALIGN_ATTR);
-    int vertical = get_attribute_value_int(attributes, num_attributes, VERTICAL_ALIGN_ATTR);
-    fp.align  = FontProp::Align(
-        static_cast<FontProp::HorizontalAlign>(horizontal),
-        static_cast<FontProp::VerticalAlign>(vertical));
+    if (get_attribute_value_string(attributes, num_attributes, HORIZONTAL_ALIGN_ATTR).empty()){
+        // align is not set(version without align) --> center is near previous version
+        fp.align = {FontProp::HorizontalAlign::center, FontProp::VerticalAlign::center};
+    } else{    
+        int horizontal = get_attribute_value_int(attributes, num_attributes, HORIZONTAL_ALIGN_ATTR);
+        int vertical = get_attribute_value_int(attributes, num_attributes, VERTICAL_ALIGN_ATTR);
+        fp.align  = FontProp::Align(
+            static_cast<FontProp::HorizontalAlign>(horizontal),
+            static_cast<FontProp::VerticalAlign>(vertical));
+    }
+
 
     int collection_number = get_attribute_value_int(attributes, num_attributes, COLLECTION_NUMBER_ATTR);
     if (collection_number > 0) fp.collection_number = static_cast<unsigned int>(collection_number);
@@ -3783,6 +3789,9 @@ std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned i
 
     EmbossProjection projection;
     projection.depth = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
+    if (is_approx(projection.depth, 0.))
+        projection.depth = 10.;
+
     int use_surface  = get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR);
     if (use_surface == 1)
         projection.use_surface = true;     
