@@ -11,10 +11,6 @@ enum class LabelObjectsStyle;
 
 namespace GCode {
 
-    //std::string label_object_start(LabelObjectsStyle label_object_style, GCodeFlavor flavor, const SpanOfConstPtrs<PrintObject>& objects, int object_id, int instance_id);
-    //std::string label_object_stop(LabelObjectsStyle label_object_style, GCodeFlavor flavor, int object_id, int instance_id, const std::string& name);
-    //std::string label_all_objects(LabelObjectsStyle label_objects_style, GCodeFlavor flavor, const Print& print);
-
 
 class LabelObjects {
 public:
@@ -31,9 +27,6 @@ private:
     struct LabelData {
         std::string name;
         int unique_id;
-        int object_id;
-        int instance_id;
-        bool object_has_more_instances;
     };
 
     LabelObjectsStyle m_label_objects_style;

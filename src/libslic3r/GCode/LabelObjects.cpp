@@ -30,14 +30,26 @@ void LabelObjects::init(const Print& print)
         const ModelObjectPtrs& model_objects = model_object->get_model()->objects;
         int object_id = int(std::find(model_objects.begin(), model_objects.end(), model_object) - model_objects.begin());
         for (const PrintInstance* const pi : print_instances) {
+            bool object_has_more_instances = print_instances.size() > 1u;
             int instance_id = int(std::find(model_object->instances.begin(), model_object->instances.end(), pi->model_instance) - model_object->instances.begin());
-            if (m_label_objects_style != LabelObjectsStyle::Octoprint) {
-                // OctoPrint comments have always indexed instances from 0, let's keep it that way.
-                // In the other cases, we will use one-based indexing so the indices match with the one in PrusaSlicer.
-                ++instance_id;
+
+            // Now compose the name of the object and define whether indexing is 0 or 1-based.
+            std::string name = model_object->name;
+            if (m_label_objects_style == LabelObjectsStyle::Octoprint) {
+                // use zero-based indexing for objects and instances, as we always have done
+                name += " id:" + std::to_string(object_id) + " copy " + std::to_string(instance_id); 
             }
-            m_label_data.emplace(pi, LabelData{model_object->name, unique_id, object_id, instance_id, print_instances.size() > 1});
-            ++unique_id;                
+            else if (m_label_objects_style == LabelObjectsStyle::Firmware) {
+                // use one-based indexing for objects and instances so indices match what we see in PrusaSlicer.
+                ++object_id;
+                ++instance_id;
+
+                if (object_has_more_instances)
+                    name += " (Instance " + std::to_string(instance_id) + ")";
+            }
+
+            m_label_data.emplace(pi, LabelData{name, unique_id});
+            ++unique_id;
         }
     }
 }
@@ -63,7 +75,7 @@ std::string LabelObjects::all_objects_header() const
         out += stop_object(*print_instance);
     }
     out += "\n";
-    return out;    
+    return out;
 }
 
 
@@ -75,19 +87,15 @@ std::string LabelObjects::start_object(const PrintInstance& print_instance, Incl
 
     const LabelData& label = m_label_data.at(&print_instance);
 
-    std::string name = label.name;
-    if (m_label_objects_style == LabelObjectsStyle::Firmware && label.object_has_more_instances)
-        name += " (copy " + std::to_string(label.instance_id) + ")";
-
     std::string out;
     if (m_label_objects_style == LabelObjectsStyle::Octoprint)
-        out += std::string("; printing object ") + name + " id:" + std::to_string(label.object_id) + " copy " + std::to_string(label.instance_id) + "\n";
+        out += std::string("; printing object ") + label.name + "\n";
     else if (m_label_objects_style == LabelObjectsStyle::Firmware) {
         if (m_flavor == GCodeFlavor::gcfMarlinFirmware || m_flavor == GCodeFlavor::gcfMarlinLegacy || m_flavor == GCodeFlavor::gcfRepRapFirmware) {
             out += std::string("M486 S") + std::to_string(label.unique_id) + "\n";
             if (include_name == IncludeName::Yes) {
                 out += std::string("M486 A");
-                out += (m_flavor == GCodeFlavor::gcfRepRapFirmware ? (std::string("\"") + name + "\"") : name) + "\n";
+                out += (m_flavor == GCodeFlavor::gcfRepRapFirmware ? (std::string("\"") + label.name + "\"") : label.name) + "\n";
             }
         } else {
             // Not supported by / implemented for the other firmware flavors.
@@ -107,7 +115,7 @@ std::string LabelObjects::stop_object(const PrintInstance& print_instance) const
 
     std::string out;
     if (m_label_objects_style == LabelObjectsStyle::Octoprint)
-        out += std::string("; stop printing object ") + label.name + " id:" + std::to_string(label.object_id) + " copy " + std::to_string(label.instance_id) + "\n";
+        out += std::string("; stop printing object ") + label.name + "\n";
     else if (m_label_objects_style == LabelObjectsStyle::Firmware)
         if (m_flavor == GCodeFlavor::gcfMarlinFirmware || m_flavor == GCodeFlavor::gcfMarlinLegacy || m_flavor == GCodeFlavor::gcfRepRapFirmware)
             out += std::string("M486 S-1\n");
