@@ -5185,7 +5185,7 @@ DimensionsConfigDef::DimensionsConfigDef()
 
     def = this->add("first_layer_print_convex_hull", coPoints);
     def->label = L("First layer convex hull");
-    def->tooltip = L("Vector of points of the first layer convex hull. Each element has the following format:"
+    def->tooltip = L("Vector of points of the first layer convex hull. Each element has the following format: "
                      "'[x, y]' (x and y are floating-point numbers in mm).");
 
     def = this->add("first_layer_print_min", coFloats);
@@ -5252,7 +5252,7 @@ OtherPresetsConfigDef::OtherPresetsConfigDef()
     def->label = L("Print preset name");
     def->tooltip = L("Name of the print preset used for slicing.");
 
-    def = this->add("filament_preset", coString);
+    def = this->add("filament_preset", coStrings);
     def->label = L("Filament preset name");
     def->tooltip = L("Names of the filament presets used for slicing. The variable is a vector "
                      "containing one name for each extruder.");
@@ -5287,7 +5287,7 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
 
     def = this->add("layer_num", coInt);
     def->label = L("Layer number");
-    def->tooltip = L("Index of the current layer. One-based (i.e. first layer is number 1).");
+    def->tooltip = L("Zero-based index of the current layer (i.e. first layer is number 0).");
 
     def = this->add("layer_z", coFloat);
     def->label = L("Layer z");
@@ -5298,8 +5298,8 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
     def->tooltip = L("Height of the last layer above the print bed.");
 
     def = this->add("filament_extruder_id", coInt);
-    def->label = L("");
-    def->tooltip = L("");
+    def->label = L("Current extruder index");
+    def->tooltip = L("Zero-based index of currently used extruder (i.e. first extruder has index 0).");
 
     def = this->add("previous_extruder", coInt);
     def->label = L("Previous extruder");
