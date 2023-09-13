@@ -874,8 +874,15 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
 
         // Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
         // If "thumbnails_format" is not defined, export to PNG.
-        if (std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails = GCodeThumbnails::make_thumbnail_list(print.full_print_config());
-            ! thumbnails.empty())
+        auto [thumbnails, errors] = GCodeThumbnails::make_and_check_thumbnail_list(print.full_print_config());
+
+        if (errors != enum_bitmask<ThumbnailError>()) {
+            std::string error_str = format("Invalid thumbnails value:");
+            error_str += GCodeThumbnails::get_error_string(errors);
+            throw Slic3r::ExportError(error_str);
+        }
+
+        if (!thumbnails.empty())
             GCodeThumbnails::generate_binary_thumbnails(
                 thumbnail_cb, binary_data.thumbnails, thumbnails,
                 [&print]() { print.throw_if_canceled(); });
@@ -1009,8 +1016,15 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
 
     if (! export_to_binary_gcode) {
         // if exporting gcode in ascii format, generate the thumbnails here
-        if (std::vector<std::pair<GCodeThumbnailsFormat, Vec2d>> thumbnails = GCodeThumbnails::make_thumbnail_list(print.full_print_config());
-            ! thumbnails.empty())
+        auto [thumbnails, errors] = GCodeThumbnails::make_and_check_thumbnail_list(print.full_print_config());
+
+        if (errors != enum_bitmask<ThumbnailError>()) {
+            std::string error_str = format("Invalid thumbnails value:");
+            error_str += GCodeThumbnails::get_error_string(errors);
+            throw Slic3r::ExportError(error_str);
+        }
+
+        if (!thumbnails.empty())
             GCodeThumbnails::export_thumbnails_to_file(thumbnail_cb, thumbnails,
                 [&file](const char* sz) { file.write(sz); },
                 [&print]() { print.throw_if_canceled(); });

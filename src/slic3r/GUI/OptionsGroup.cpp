@@ -925,10 +925,7 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 		}
 		break;
 	case coString: {
-        if (opt_key == "thumbnails")
-            ret = get_valid_thumbnails_string(config);
-        else
-            ret = from_u8(config.opt_string(opt_key));
+        ret = from_u8(config.opt_string(opt_key));
         break;
     }
 	case coStrings:

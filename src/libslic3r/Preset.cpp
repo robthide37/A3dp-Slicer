@@ -44,6 +44,7 @@
 #include "libslic3r.h"
 #include "Utils.hpp"
 #include "PlaceholderParser.hpp"
+#include "GCode/Thumbnails.hpp"
 
 using boost::property_tree::ptree;
 
@@ -1299,7 +1300,6 @@ static const std::set<std::string> independent_from_extruder_number_options = {
     "filament_ramming_parameters",
     "gcode_substitutions",
     "post_process",
-    "thumbnails",
 };
 
 bool PresetCollection::is_independent_from_extruder_number_option(const std::string& opt_key)
@@ -1323,6 +1323,15 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
             } else if (opt_key == "default_filament_profile") {
                 // Ignore this field, it is not presented to the user, therefore showing a "modified" flag for this parameter does not help.
                 // Also the length of this field may differ, which may lead to a crash if the block below is used.
+            } else if (opt_key == "thumbnails") {
+                // "thumbnails" can not containes a extentions in old config but are valid and use PNG extention by default
+                // So, check if "thumbnails" is really changed
+                // We will compare full thumnails instead of exactly config values
+                auto [thumbnails, er]         = GCodeThumbnails::make_and_check_thumbnail_list(config_this);
+                auto [thumbnails_new, er_new] = GCodeThumbnails::make_and_check_thumbnail_list(config_other);
+                if (thumbnails != thumbnails_new || er != er_new)
+                    // if those strings are actually the same, erase them from the list of dirty oprions
+                    diff.emplace_back(opt_key);
             } else {
                 switch (other_opt->type()) {
                 case coInts:    add_correct_opts_to_diff<ConfigOptionInts       >(opt_key, diff, config_other, config_this);  break;
@@ -1346,7 +1355,14 @@ bool PresetCollection::is_dirty(const Preset *edited, const Preset *reference)
 {
     if (edited != nullptr && reference != nullptr) {
         // Only compares options existing in both configs.
-        if (! reference->config.equals(edited->config))
+        bool is_dirty = !reference->config.equals(edited->config);
+        if (is_dirty && edited->type != Preset::TYPE_FILAMENT) {
+            // for non-filaments preset check deep difference for compared configs
+            // there can be cases (as for thumbnails), when configs can logically equal
+            // even when their values are not equal.
+            is_dirty = !deep_diff(edited->config, reference->config).empty();
+        }
+        if (is_dirty)
             return true;
         // The "compatible_printers" option key is handled differently from the others:
         // It is not mandatory. If the key is missing, it means it is compatible with any printer.

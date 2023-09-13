@@ -24,6 +24,7 @@
 #include "I18N.hpp"
 
 #include "SLA/SupportTree.hpp"
+#include "GCode/Thumbnails.hpp"
 
 #include <set>
 #include <boost/algorithm/string/replace.hpp>
@@ -4371,6 +4372,35 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 // Don't convert single options here, implement such conversion in PrintConfigDef::handle_legacy() instead.
 void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config)
 {
+    if (config.has("thumbnails")) {
+        std::string extention;
+        if (config.has("thumbnails_format")) {
+            if (const ConfigOptionDef* opt = config.def()->get("thumbnails_format")) {
+                auto label = opt->enum_def->enum_to_label(config.option("thumbnails_format")->getInt());
+                if (label.has_value())
+                    extention = *label;
+            }
+        }
+
+        std::string thumbnails_str = config.opt_string("thumbnails");
+        auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(thumbnails_str, extention);
+
+        if (errors != enum_bitmask<ThumbnailError>()) {
+            std::string error_str = "\n" + format("Invalid value provided for parameter %1%: %2%", "thumbnails", thumbnails_str);
+            error_str += GCodeThumbnails::get_error_string(errors);
+            throw BadOptionValueException(error_str);
+        }
+
+        if (!thumbnails_list.empty()) {
+            const auto& extentions = ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_names();
+            thumbnails_str.clear();
+            for (const auto& [ext, size] : thumbnails_list)
+                thumbnails_str += format("%1%x%2%/%3%, ", size.x(), size.y(), extentions[int(ext)]);
+            thumbnails_str.resize(thumbnails_str.length() - 2);
+
+            config.set_key_value("thumbnails", new ConfigOptionString(thumbnails_str));
+        }
+    }
 }
 
 const PrintConfigDef print_config_def;
