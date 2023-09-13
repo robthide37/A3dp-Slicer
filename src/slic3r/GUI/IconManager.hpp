@@ -98,9 +98,6 @@ private:
     GLTexture m_icons_texture;
 
     unsigned int m_id{ 0 };
-    int m_width{ 0 };
-    int m_height{ 0 };
-
     Icons m_icons;
 };
 
