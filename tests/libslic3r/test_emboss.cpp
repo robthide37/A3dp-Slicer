@@ -313,18 +313,19 @@ The other kids at school nicknamed him Ix,\n\
 which in the language of Betelgeuse Five translates as\t\n\
 \"boy who is not able satisfactorily to explain what a Hrung is,\n\
 nor why it should choose to collapse on Betelgeuse Seven\".";
-    float line_height = 10.f, depth = 2.f;
+    float line_height = 10.f;
 
     auto font = Emboss::create_font_file(font_path.c_str());
     REQUIRE(font != nullptr);
 
     Emboss::FontFileWithCache ffwc(std::move(font));
-    FontProp fp{line_height, depth};
+    FontProp fp{line_height};
 
     auto was_canceled = []() { return false; };
     ExPolygons shapes = Emboss::text2shapes(ffwc, text.c_str(), fp, was_canceled);
     REQUIRE(!shapes.empty());
 
+    float depth = 2.f;  
     Emboss::ProjectZ projection(depth);
     indexed_triangle_set its = Emboss::polygons2model(shapes, projection);
     CHECK(!its.indices.empty());

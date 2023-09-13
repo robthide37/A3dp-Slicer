@@ -413,12 +413,14 @@ bool GLGizmoEmboss::do_mirror(size_t axis)
         return false;
 
     const TextConfiguration &tc= *m_volume->text_configuration;
-    if(tc.style.prop.per_glyph){
+    if(tc.style.prop.per_glyph){ 
         // init textlines before mirroring on mirrored text volume transformation
         Transform3d tr = m_volume->get_matrix();
-        const std::optional<Transform3d> &fix_tr = tc.fix_3mf_tr;
-        if (fix_tr.has_value())
-            tr = tr * (fix_tr->inverse());
+        if (m_volume->emboss_shape.has_value()) {
+            const std::optional<Transform3d> &fix_tr = m_volume->emboss_shape->fix_3mf_tr;
+            if (fix_tr.has_value())
+                tr = tr * (fix_tr->inverse());
+        }
 
         // mirror
         Vec3d scale = Vec3d::Ones();
@@ -563,8 +565,7 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
             assert(m_style_manager.is_active_font());
             if (gl_volume == nullptr || !m_style_manager.is_active_font())
                 return res;
-
-            m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
+            m_style_manager.get_style().angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
         }
 
         volume_transformation_changing();
@@ -1272,7 +1273,7 @@ void GLGizmoEmboss::set_volume_by_selection()
     // Calculate current angle of up vector
     assert(m_style_manager.is_active_font());
     if (m_style_manager.is_active_font()) 
-        m_style_manager.get_font_prop().angle = calc_up(gl_volume->world_matrix(), up_limit);    
+        m_style_manager.get_style().angle = calc_up(gl_volume->world_matrix(), up_limit);    
 
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();    
@@ -3261,26 +3262,7 @@ void TextDataBase::write(ModelVolume &volume) const
 {
     DataBase::write(volume);
     volume.text_configuration = m_text_configuration; // copy
-
-    // TEMPORARY check until depricated variable will be deleted
-    FontProp &fp = volume.text_configuration->style.prop;
-    // Distance and angle are calculated on the fly it should not be stored in volume
-    assert(!fp.angle.has_value());
-    if (fp.angle.has_value())
-        fp.angle.reset();
-    assert(!fp.distance.has_value());
-    if (fp.distance.has_value())
-        fp.distance.reset();
-
-    // use_surface and emboss are stored in projection
     assert(volume.emboss_shape.has_value());
-    if (!volume.emboss_shape.has_value())
-        return;
-    const EmbossProjection &ep = volume.emboss_shape->projection;
-    if (fp.use_surface != ep.use_surface)
-        fp.use_surface = ep.use_surface;
-    if (!is_approx(fp.emboss, static_cast<float>(ep.depth)))
-        fp.emboss = static_cast<float>(ep.depth);
 }
 
 std::unique_ptr<DataBase> create_emboss_data_base(const std::string                  &text,

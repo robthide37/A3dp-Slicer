@@ -54,18 +54,6 @@ struct FontProp
     // change pivot of text
     // When not set, center is used and is not stored
     Align align = Align(HorizontalAlign::center, VerticalAlign::center);
-    
-    [[deprecated("Back compatibility only, now it is stored EmbossProjection like depth")]]
-    float emboss; 
-
-    [[deprecated("Back compatibility only, now it is stored EmbossProjection")]]
-    bool use_surface;
-
-    [[deprecated("it is calculated on the fly")]]
-    std::optional<float> distance;        
-    
-    [[deprecated("it is calculated on the fly")]]
-    std::optional<float> angle; 
 
     //////
     // Duplicit data to wxFontDescriptor
@@ -88,7 +76,7 @@ struct FontProp
     /// </summary>
     /// <param name="line_height">Y size of text [in mm]</param>
     /// <param name="depth">Z size of text [in mm]</param>
-    FontProp(float line_height = 10.f, float depth = 2.f) : emboss(depth), size_in_mm(line_height), use_surface(false), per_glyph(false)
+    FontProp(float line_height = 10.f) : size_in_mm(line_height), per_glyph(false)
     {}
 
     bool operator==(const FontProp& other) const {
@@ -193,9 +181,6 @@ struct TextConfiguration
 
     // Embossed text value
     std::string text = "None";
-
-    [[deprecated("only for back compatibility, now it is stored in EmbossShape")]]
-    std::optional<Transform3d> fix_3mf_tr;
 
     // undo / redo stack recovery
     template<class Archive> void serialize(Archive &ar) { ar(style, text); }

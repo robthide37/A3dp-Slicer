@@ -1352,10 +1352,6 @@ unsigned Emboss::get_count_lines(const ExPolygonsWithIds &shapes) {
     return result;
 }
 
-void Emboss::apply_transformation(const FontProp &font_prop, Transform3d &transformation){
-    apply_transformation(font_prop.angle, font_prop.distance, transformation);
-}
-
 void Emboss::apply_transformation(const std::optional<float>& angle, const std::optional<float>& distance, Transform3d &transformation) {
     if (angle.has_value()) {
         double angle_z = *angle;

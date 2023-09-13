@@ -198,10 +198,9 @@ namespace Emboss
     /// <summary>
     /// Use data from font property to modify transformation
     /// </summary>
-    /// <param name="font_prop">Z-move as surface distance(FontProp::distance)
-    /// Z-rotation as angle to Y axis(FontProp::angle)</param>
+    /// <param name="angle">Z-rotation as angle to Y axis</param>
+    /// <param name="distance">Z-move as surface distance</param>
     /// <param name="transformation">In / Out transformation to modify by property</param>
-    void apply_transformation(const FontProp &font_prop, Transform3d &transformation);
     void apply_transformation(const std::optional<float> &angle, const std::optional<float> &distance, Transform3d &transformation);
 
     /// <summary>

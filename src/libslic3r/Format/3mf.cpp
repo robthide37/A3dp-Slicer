@@ -1982,6 +1982,7 @@ namespace Slic3r {
 
         static void to_xml(std::stringstream &stream, const TextConfiguration &tc);
         static std::optional<TextConfiguration> read(const char **attributes, unsigned int num_attributes);
+        static EmbossShape read_old(const char **attributes, unsigned int num_attributes);
     };
 
     bool _3MF_Importer::_handle_start_text_configuration(const char **attributes, unsigned int num_attributes)
@@ -2005,14 +2006,7 @@ namespace Slic3r {
             return true;
 
         // Back compatibility for 3mf version without shapes
-        const TextConfiguration &tc = *volume.text_configuration;
-        EmbossShape es;
-        es.fix_3mf_tr = tc.fix_3mf_tr;
-        const FontProp &fp = tc.style.prop;
-        EmbossProjection& ep = es.projection;
-        ep.depth = fp.emboss;
-        ep.use_surface = fp.use_surface;
-        volume.shape_configuration = es;
+        volume.shape_configuration = TextConfigurationSerialization::read_old(attributes, num_attributes);
         return true;
     }
 
@@ -3655,8 +3649,6 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     float skew = get_attribute_value_float(attributes, num_attributes, SKEW_ATTR);
     if (std::fabs(skew) > std::numeric_limits<float>::epsilon())
         fp.skew = skew;
-    int use_surface = get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR);
-    if (use_surface == 1) fp.use_surface = true;
     int per_glyph = get_attribute_value_int(attributes, num_attributes, PER_GLYPH_ATTR);
     if (per_glyph == 1) fp.per_glyph = true;
 
@@ -3686,18 +3678,28 @@ std::optional<TextConfiguration> TextConfigurationSerialization::read(const char
     EmbossStyle::Type type = TextConfigurationSerialization::get_type(type_str);
 
     std::string text = get_attribute_value_string(attributes, num_attributes, TEXT_DATA_ATTR);
+    EmbossStyle es{style_name, std::move(font_descriptor), type, std::move(fp)};
+    return TextConfiguration{std::move(es), std::move(text)};
+}
 
-    // Read of old fashion save style for Back compatibility
-    std::optional<Transform3d> fix_tr_mat;
+EmbossShape TextConfigurationSerialization::read_old(const char **attributes, unsigned int num_attributes)
+{
+    EmbossShape es;
     std::string fix_tr_mat_str = get_attribute_value_string(attributes, num_attributes, TRANSFORM_ATTR);
-    if (!fix_tr_mat_str.empty()) 
-        fix_tr_mat = get_transform_from_3mf_specs_string(fix_tr_mat_str);
-    if (get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR) == 1)
-        fp.use_surface = true;
-    fp.emboss = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
+    if (!fix_tr_mat_str.empty())
+        es.fix_3mf_tr = get_transform_from_3mf_specs_string(fix_tr_mat_str);
 
-    EmbossStyle fi{style_name, std::move(font_descriptor), type, std::move(fp)};
-    return TextConfiguration{std::move(fi), std::move(text), std::move(fix_tr_mat)};
+
+    if (get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR) == 1)
+        es.projection.use_surface = true;
+
+    es.projection.depth = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
+
+    int use_surface = get_attribute_value_int(attributes, num_attributes, USE_SURFACE_ATTR);
+    if (use_surface == 1)
+        es.projection.use_surface = true;
+
+    return es;
 }
 
 namespace {
