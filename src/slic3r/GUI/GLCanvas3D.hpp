@@ -1102,6 +1102,10 @@ private:
     bool _deactivate_arrange_menu();
 
     float get_overlay_window_width() { return LayersEditing::get_overlay_window_width(); }
+
+#if ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
+    void show_binary_gcode_debug_window();
+#endif // ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
 };
 
 const ModelVolume *get_model_volume(const GLVolume &v, const Model &model);

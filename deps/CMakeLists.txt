@@ -24,8 +24,8 @@
 # therefore, unfortunatelly, the installation cannot be copied/moved elsewhere without re-installing wxWidgets.
 #
 
+cmake_minimum_required(VERSION 3.10)
 project(PrusaSlicer-deps)
-cmake_minimum_required(VERSION 3.2)
 
 include(ExternalProject)
 include(ProcessorCount)
@@ -64,6 +64,10 @@ get_property(_is_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if (NOT _is_multi AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
     message(STATUS "Forcing CMAKE_BUILD_TYPE to Release as it was not specified.")
+endif ()
+
+if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+    cmake_policy(SET CMP0135 NEW)
 endif ()
 
 function(prusaslicer_add_cmake_project projectname)
@@ -199,6 +203,8 @@ include(NanoSVG/NanoSVG.cmake)
 include(wxWidgets/wxWidgets.cmake)
 include(OCCT/OCCT.cmake)
 
+include(LibBGCode/LibBGCode.cmake)
+
 set(_dep_list
     dep_Boost
     dep_TBB
@@ -214,6 +220,7 @@ set(_dep_list
     ${PNG_PKG}
     ${ZLIB_PKG}
     ${EXPAT_PKG}
+    dep_LibBGCode
     )
 
 # if (NOT MSVC)

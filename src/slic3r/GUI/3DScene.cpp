@@ -1453,8 +1453,8 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionPath& extrusion_path, flo
     polyline.remove_duplicate_points();
     polyline.translate(copy);
     const Lines               lines = polyline.lines();
-    std::vector<double> widths(lines.size(), extrusion_path.width);
-    std::vector<double> heights(lines.size(), extrusion_path.height);
+    std::vector<double> widths(lines.size(), extrusion_path.width());
+    std::vector<double> heights(lines.size(), extrusion_path.height());
     thick_lines_to_verts(lines, widths, heights, false, print_z, geometry);
 }
 
@@ -1470,8 +1470,8 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionLoop& extrusion_loop, flo
         polyline.translate(copy);
         const Lines lines_this = polyline.lines();
         append(lines, lines_this);
-        widths.insert(widths.end(), lines_this.size(), extrusion_path.width);
-        heights.insert(heights.end(), lines_this.size(), extrusion_path.height);
+        widths.insert(widths.end(), lines_this.size(), extrusion_path.width());
+        heights.insert(heights.end(), lines_this.size(), extrusion_path.height());
     }
     thick_lines_to_verts(lines, widths, heights, true, print_z, geometry);
 }
@@ -1488,8 +1488,8 @@ void _3DScene::extrusionentity_to_verts(const ExtrusionMultiPath& extrusion_mult
         polyline.translate(copy);
         const Lines lines_this = polyline.lines();
         append(lines, lines_this);
-        widths.insert(widths.end(), lines_this.size(), extrusion_path.width);
-        heights.insert(heights.end(), lines_this.size(), extrusion_path.height);
+        widths.insert(widths.end(), lines_this.size(), extrusion_path.width());
+        heights.insert(heights.end(), lines_this.size(), extrusion_path.height());
     }
     thick_lines_to_verts(lines, widths, heights, false, print_z, geometry);
 }

@@ -227,6 +227,8 @@ protected:
 	ScalableBitmap 		   *m_bmp_non_system;
 	// Bitmaps to be shown on the "Undo user changes" button next to each input field.
 	ScalableBitmap 			m_bmp_value_revert;
+	// Bitmaps to be shown on the "Undo user changes" button next to each input field.
+	ScalableBitmap 			m_bmp_edit_value;
     
     std::vector<ScalableButton*>	m_scaled_buttons = {};    
     std::vector<ScalableBitmap*>	m_scaled_bitmaps = {};    
@@ -403,6 +405,10 @@ public:
 	bool        validate_custom_gcodes();
     bool        validate_custom_gcodes_was_shown{ false };
 
+    void						edit_custom_gcode(const t_config_option_key& opt_key);
+    virtual const std::string&	get_custom_gcode(const t_config_option_key& opt_key);
+    virtual void				set_custom_gcode(const t_config_option_key& opt_key, const std::string& value);
+
 protected:
 	void			create_line_with_widget(ConfigOptionsGroup* optgroup, const std::string& opt_key, const std::string& path, widget_t widget);
 	wxSizer*		compatible_widget_create(wxWindow* parent, PresetDependencies &deps);
@@ -486,6 +492,9 @@ public:
     void        invalidate_active_extruder() { m_active_extruder = -1; }
     void        update_extruder_combobox();
     int         get_active_extruder() const { return m_active_extruder; }
+
+	const std::string&	get_custom_gcode(const t_config_option_key& opt_key) override;
+	void				set_custom_gcode(const t_config_option_key& opt_key, const std::string& value) override;
 
 protected:
     bool        select_preset_by_name(const std::string& name_w_suffix, bool force) override;

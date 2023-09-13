@@ -33,6 +33,7 @@ src/slic3r/GUI/DesktopIntegrationDialog.cpp
 src/slic3r/GUI/DoubleSlider.cpp
 src/slic3r/GUI/Downloader.cpp
 src/slic3r/GUI/DownloaderFileGet.cpp
+src/slic3r/GUI/EditGCodeDialog.cpp
 src/slic3r/GUI/ExtraRenderers.cpp
 src/slic3r/GUI/ExtruderSequenceDialog.cpp
 src/slic3r/GUI/Field.cpp

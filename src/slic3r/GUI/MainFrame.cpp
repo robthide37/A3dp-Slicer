@@ -1370,6 +1370,15 @@ void MainFrame::init_menubar_as_editor()
             []() {return true; }, this);
         append_submenu(fileMenu, export_menu, wxID_ANY, _L("&Export"), "");
 
+        wxMenu* convert_menu = new wxMenu();
+        append_menu_item(convert_menu, wxID_ANY, _L("Convert ascii G-code to &binary") + dots, _L("Convert a G-code file from ascii to binary format"),
+            [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_binary(); }, "convert_file", nullptr,
+            []() { return true; }, this);
+        append_menu_item(convert_menu, wxID_ANY, _L("Convert binary G-code to &ascii") + dots, _L("Convert a G-code file from binary to ascii format"),
+            [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_ascii(); }, "convert_file", nullptr,
+            []() { return true; }, this);
+        append_submenu(fileMenu, convert_menu, wxID_ANY, _L("&Convert"), "");
+
 		append_menu_item(fileMenu, wxID_ANY, _L("Ejec&t SD Card / Flash Drive") + dots + "\tCtrl+T", _L("Eject SD card / Flash drive after the G-code was exported to it."),
 			[this](wxCommandEvent&) { if (m_plater) m_plater->eject_drive(); }, "eject_sd", nullptr,
 			[this]() {return can_eject(); }, this);
@@ -1643,12 +1652,19 @@ void MainFrame::init_menubar_as_gcodeviewer()
             "", nullptr, [this]() { return !m_plater->get_last_loaded_gcode().empty(); }, this);
 #endif // __APPLE__
         fileMenu->AppendSeparator();
+        append_menu_item(fileMenu, wxID_ANY, _L("Convert ascii G-code to &binary") + dots, _L("Convert a G-code file from ascii to binary format"),
+            [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_binary(); }, "convert_file", nullptr,
+            []() { return true; }, this);
+        append_menu_item(fileMenu, wxID_ANY, _L("Convert binary G-code to &ascii") + dots, _L("Convert a G-code file from binary to ascii format"),
+            [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_ascii(); }, "convert_file", nullptr,
+            []() { return true; }, this);
+        fileMenu->AppendSeparator();
         append_menu_item(fileMenu, wxID_ANY, _L("Export &Toolpaths as OBJ") + dots, _L("Export toolpaths as OBJ"),
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->export_toolpaths_to_obj(); }, "export_plater", nullptr,
             [this]() {return can_export_toolpaths(); }, this);
         append_menu_item(fileMenu, wxID_ANY, _L("Open &PrusaSlicer") + dots, _L("Open PrusaSlicer"),
             [](wxCommandEvent&) { start_new_slicer(); }, "", nullptr,
-            []() {return true; }, this);
+            []() { return true; }, this);
         fileMenu->AppendSeparator();
         append_menu_item(fileMenu, wxID_EXIT, _L("&Quit"), wxString::Format(_L("Quit %s"), SLIC3R_APP_NAME),
             [this](wxCommandEvent&) { Close(false); });
@@ -1898,8 +1914,8 @@ void MainFrame::load_config_file()
         return;
     wxFileDialog dlg(this, _L("Select configuration to load:"),
         !m_last_config.IsEmpty() ? get_dir_name(m_last_config) : wxGetApp().app_config->get_last_dir(),
-        "config.ini", "INI files (*.ini, *.gcode)|*.ini;*.INI;*.gcode;*.g", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-	wxString file;
+        "config.ini", "INI files (*.ini, *.gcode, *.bgcode)|*.ini;*.INI;*.gcode;*.g;*.bgcode;*.bgc", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    wxString file;
     if (dlg.ShowModal() == wxID_OK)
         file = dlg.GetPath();
     if (! file.IsEmpty() && this->load_config_file(file.ToUTF8().data())) {

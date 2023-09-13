@@ -12,12 +12,14 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "GCodeWriter.hpp"
-#include "CustomGCode.hpp"
+#include "../CustomGCode.hpp"
+
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
 #include <map>
 #include <assert.h>
+#include <string_view>
 
 #ifdef __APPLE__
     #include <boost/spirit/include/karma.hpp>
@@ -25,6 +27,8 @@
 
 #define FLAVOR_IS(val) this->config.gcode_flavor == val
 #define FLAVOR_IS_NOT(val) this->config.gcode_flavor != val
+
+using namespace std::string_view_literals;
 
 namespace Slic3r {
 
@@ -103,17 +107,17 @@ std::string GCodeWriter::set_temperature(unsigned int temperature, bool wait, in
     if (wait && (FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish)))
         return {};
     
-    std::string code, comment;
+    std::string_view code, comment;
     if (wait && FLAVOR_IS_NOT(gcfTeacup) && FLAVOR_IS_NOT(gcfRepRapFirmware)) {
-        code = "M109";
-        comment = "set temperature and wait for it to be reached";
+        code = "M109"sv;
+        comment = "set temperature and wait for it to be reached"sv;
     } else {
         if (FLAVOR_IS(gcfRepRapFirmware)) { // M104 is deprecated on RepRapFirmware
-            code = "G10";
+            code = "G10"sv;
         } else {
-            code = "M104";
+            code = "M104"sv;
         }
-        comment = "set temperature";
+        comment = "set temperature"sv;
     }
     
     std::ostringstream gcode;
@@ -143,22 +147,22 @@ std::string GCodeWriter::set_temperature(unsigned int temperature, bool wait, in
 std::string GCodeWriter::set_bed_temperature(unsigned int temperature, bool wait)
 {
     if (temperature == m_last_bed_temperature && (! wait || m_last_bed_temperature_reached))
-        return std::string();
+        return {};
 
     m_last_bed_temperature = temperature;
     m_last_bed_temperature_reached = wait;
 
-    std::string code, comment;
+    std::string_view code, comment;
     if (wait && FLAVOR_IS_NOT(gcfTeacup)) {
         if (FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish)) {
-            code = "M109";
+            code = "M109"sv;
         } else {
-            code = "M190";
+            code = "M190"sv;
         }
-        comment = "set bed temperature and wait for it to be reached";
+        comment = "set bed temperature and wait for it to be reached"sv;
     } else {
-        code = "M140";
-        comment = "set bed temperature";
+        code = "M140"sv;
+        comment = "set bed temperature"sv;
     }
     
     std::ostringstream gcode;
@@ -189,7 +193,7 @@ std::string GCodeWriter::set_acceleration_internal(Acceleration type, unsigned i
 
     auto& last_value = separate_travel ? m_last_travel_acceleration : m_last_acceleration ;
     if (acceleration == 0 || acceleration == last_value)
-        return std::string();
+        return {};
     
     last_value = acceleration;
     
@@ -258,7 +262,7 @@ std::string GCodeWriter::toolchange(unsigned int extruder_id)
     return gcode.str();
 }
 
-std::string GCodeWriter::set_speed(double F, const std::string &comment, const std::string &cooling_marker) const
+std::string GCodeWriter::set_speed(double F, const std::string_view comment, const std::string_view cooling_marker) const
 {
     assert(F > 0.);
     assert(F < 100000.);
@@ -270,10 +274,9 @@ std::string GCodeWriter::set_speed(double F, const std::string &comment, const s
     return w.string();
 }
 
-std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string &comment)
+std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string_view comment)
 {
-    m_pos.x() = point.x();
-    m_pos.y() = point.y();
+    m_pos.head<2>() = point.head<2>();
     
     GCodeG1Formatter w;
     w.emit_xy(point);
@@ -282,7 +285,40 @@ std::string GCodeWriter::travel_to_xy(const Vec2d &point, const std::string &com
     return w.string();
 }
 
-std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const std::string &comment)
+std::string GCodeWriter::travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment)
+{
+    assert(std::abs(point.x()) < 1200.);
+    assert(std::abs(point.y()) < 1200.);
+    assert(std::abs(ij.x()) < 1200.);
+    assert(std::abs(ij.y()) < 1200.);
+    assert(std::abs(ij.x()) >= 0.001 || std::abs(ij.y()) >= 0.001);
+ 
+    m_pos.head<2>() = point.head<2>();
+
+    GCodeG2G3Formatter w(ccw);
+    w.emit_xy(point);
+    w.emit_ij(ij);
+    w.emit_comment(this->config.gcode_comments, comment);
+    return w.string();
+}
+
+std::string GCodeWriter::travel_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, const std::string_view comment)
+{
+    assert(std::abs(point.x()) < 1200.);
+    assert(std::abs(point.y()) < 1200.);
+    assert(std::abs(radius) >= 0.001);
+    assert(std::abs(radius) < 1800.);
+
+    m_pos.head<2>() = point.head<2>();
+
+    GCodeG2G3Formatter w(ccw);
+    w.emit_xy(point);
+    w.emit_radius(radius);
+    w.emit_comment(this->config.gcode_comments, comment);
+    return w.string();
+}
+
+std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const std::string_view comment)
 {
     // FIXME: This function was not being used when travel_speed_z was separated (bd6badf).
     // Calculation of feedrate was not updated accordingly. If you want to use
@@ -315,7 +351,7 @@ std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const std::string &co
     return w.string();
 }
 
-std::string GCodeWriter::travel_to_z(double z, const std::string &comment)
+std::string GCodeWriter::travel_to_z(double z, const std::string_view comment)
 {
     /*  If target Z is lower than current Z but higher than nominal Z
         we don't perform the move but we only adjust the nominal Z by
@@ -334,7 +370,7 @@ std::string GCodeWriter::travel_to_z(double z, const std::string &comment)
     return this->_travel_to_z(z, comment);
 }
 
-std::string GCodeWriter::_travel_to_z(double z, const std::string &comment)
+std::string GCodeWriter::_travel_to_z(double z, const std::string_view comment)
 {
     m_pos.z() = z;
 
@@ -361,10 +397,12 @@ bool GCodeWriter::will_move_z(double z) const
     return true;
 }
 
-std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std::string &comment)
+std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment)
 {
-    m_pos.x() = point.x();
-    m_pos.y() = point.y();
+    assert(dE != 0);
+    assert(std::abs(dE) < 1000.0);
+
+    m_pos.head<2>() = point.head<2>();
 
     GCodeG1Formatter w;
     w.emit_xy(point);
@@ -373,8 +411,47 @@ std::string GCodeWriter::extrude_to_xy(const Vec2d &point, double dE, const std:
     return w.string();
 }
 
+std::string GCodeWriter::extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, double dE, const std::string_view comment)
+{
+    assert(std::abs(dE) < 1000.0);
+    assert(dE != 0);
+    assert(std::abs(point.x()) < 1200.);
+    assert(std::abs(point.y()) < 1200.);
+    assert(std::abs(ij.x()) < 1200.);
+    assert(std::abs(ij.y()) < 1200.);
+    assert(std::abs(ij.x()) >= 0.001 || std::abs(ij.y()) >= 0.001);
+
+    m_pos.head<2>() = point.head<2>();
+
+    GCodeG2G3Formatter w(ccw);
+    w.emit_xy(point);
+    w.emit_ij(ij);
+    w.emit_e(m_extrusion_axis, m_extruder->extrude(dE).second);
+    w.emit_comment(this->config.gcode_comments, comment);
+    return w.string();
+}
+
+std::string GCodeWriter::extrude_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, double dE, const std::string_view comment)
+{
+    assert(dE != 0);
+    assert(std::abs(dE) < 1000.0);
+    assert(std::abs(point.x()) < 1200.);
+    assert(std::abs(point.y()) < 1200.);
+    assert(std::abs(radius) >= 0.001);
+    assert(std::abs(radius) < 1800.);
+
+    m_pos.head<2>() = point.head<2>();
+
+    GCodeG2G3Formatter w(ccw);
+    w.emit_xy(point);
+    w.emit_radius(radius);
+    w.emit_e(m_extrusion_axis, m_extruder->extrude(dE).second);
+    w.emit_comment(this->config.gcode_comments, comment);
+    return w.string();
+}
+
 #if 0
-std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std::string &comment)
+std::string GCodeWriter::extrude_to_xyz(const Vec3d &point, double dE, const std::string_view comment)
 {
     m_pos = point;
     m_lifted = 0;
@@ -410,8 +487,11 @@ std::string GCodeWriter::retract_for_toolchange(bool before_wipe)
     );
 }
 
-std::string GCodeWriter::_retract(double length, double restart_extra, const std::string &comment)
+std::string GCodeWriter::_retract(double length, double restart_extra, const std::string_view comment)
 {
+    assert(std::abs(length) < 1000.0);
+    assert(std::abs(restart_extra) < 1000.0);
+
     /*  If firmware retraction is enabled, we use a fake value of 1
         since we ignore the actual configured retract_length which 
         might be 0, in which case the retraction logic gets skipped. */

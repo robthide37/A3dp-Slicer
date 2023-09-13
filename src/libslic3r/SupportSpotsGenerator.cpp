@@ -332,10 +332,10 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
         if (entity->length() < scale_(params.min_distance_to_allow_local_supports)) {
             return {};
         }
-        const float                flow_width       = get_flow_width(layer_region, entity->role());
-        std::vector<ExtendedPoint> annotated_points = estimate_points_properties<true, true, true, true>(entity->as_polyline().points,
-                                                                                                         prev_layer_boundary, flow_width,
-                                                                                                         params.bridge_distance);
+        const float                                    flow_width = get_flow_width(layer_region, entity->role());
+        std::vector<ExtrusionProcessor::ExtendedPoint> annotated_points =
+            ExtrusionProcessor::estimate_points_properties<true, true, true, true>(entity->as_polyline().points, prev_layer_boundary,
+                                                                                   flow_width, params.bridge_distance);
 
         std::vector<ExtrusionLine> lines_out;
         lines_out.reserve(annotated_points.size());
@@ -344,8 +344,8 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
         std::optional<Vec2d> bridging_dir{};
 
         for (size_t i = 0; i < annotated_points.size(); ++i) {
-            ExtendedPoint &curr_point = annotated_points[i];
-            const ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+            ExtrusionProcessor::ExtendedPoint       &curr_point = annotated_points[i];
+            const ExtrusionProcessor::ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i];
 
             SupportPointCause potential_cause = std::abs(curr_point.curvature) > 0.1 ? SupportPointCause::FloatingBridgeAnchor :
                                                                                        SupportPointCause::LongBridge;
@@ -387,19 +387,19 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
 
         const float flow_width = get_flow_width(layer_region, entity->role());
         // Compute only unsigned distance - prev_layer_lines can contain unconnected paths, thus the sign of the distance is unreliable
-        std::vector<ExtendedPoint> annotated_points = estimate_points_properties<true, true, false, false>(entity->as_polyline().points,
-                                                                                                           prev_layer_lines, flow_width,
-                                                                                                           params.bridge_distance);
+        std::vector<ExtrusionProcessor::ExtendedPoint> annotated_points =
+            ExtrusionProcessor::estimate_points_properties<true, true, false, false>(entity->as_polyline().points, prev_layer_lines,
+                                                                                     flow_width, params.bridge_distance);
 
         std::vector<ExtrusionLine> lines_out;
         lines_out.reserve(annotated_points.size());
         float bridged_distance = annotated_points.front().position != annotated_points.back().position ? (params.bridge_distance + 1.0f) :
                                                                                                          0.0f;
         for (size_t i = 0; i < annotated_points.size(); ++i) {
-            ExtendedPoint       &curr_point = annotated_points[i];
-            const ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i];
-            float                line_len   = (prev_point.position - curr_point.position).norm();
-            ExtrusionLine        line_out{prev_point.position.cast<float>(), curr_point.position.cast<float>(), line_len, entity};
+            ExtrusionProcessor::ExtendedPoint       &curr_point = annotated_points[i];
+            const ExtrusionProcessor::ExtendedPoint &prev_point = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+            float                                    line_len   = (prev_point.position - curr_point.position).norm();
+            ExtrusionLine line_out{prev_point.position.cast<float>(), curr_point.position.cast<float>(), line_len, entity};
 
             Vec2f middle                               = 0.5 * (line_out.a + line_out.b);
             auto [middle_distance, bottom_line_idx, x] = prev_layer_lines.distance_from_lines_extra<false>(middle);
@@ -1112,12 +1112,13 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
             Polygon  pol(pl.points);
             pol.make_counter_clockwise();
 
-            auto annotated_points = estimate_points_properties<true, true, false, false>(pol.points, prev_layer_lines, flow_width);
+            auto annotated_points = ExtrusionProcessor::estimate_points_properties<true, true, false, false>(pol.points, prev_layer_lines,
+                                                                                                             flow_width);
 
             for (size_t i = 0; i < annotated_points.size(); ++i) {
-                const ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
-                const ExtendedPoint &b = annotated_points[i];
-                ExtrusionLine        line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
+                const ExtrusionProcessor::ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+                const ExtrusionProcessor::ExtendedPoint &b = annotated_points[i];
+                ExtrusionLine line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
                                        extrusion};
 
                 Vec2f middle                               = 0.5 * (line_out.a + line_out.b);
@@ -1187,11 +1188,13 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
                 Points extrusion_pts;
                 extrusion->collect_points(extrusion_pts);
                 float flow_width       = get_flow_width(layer_region, extrusion->role());
-                auto  annotated_points = estimate_points_properties<true, true, false, false>(extrusion_pts, prev_layer_lines, flow_width,
-                                                                                             params.bridge_distance);
+                auto  annotated_points = ExtrusionProcessor::estimate_points_properties<true, true, false, false>(extrusion_pts,
+                                                                                                                 prev_layer_lines,
+                                                                                                                 flow_width,
+                                                                                                                 params.bridge_distance);
                 for (size_t i = 0; i < annotated_points.size(); ++i) {
-                    const ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
-                    const ExtendedPoint &b = annotated_points[i];
+                    const ExtrusionProcessor::ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+                    const ExtrusionProcessor::ExtendedPoint &b = annotated_points[i];
                     ExtrusionLine line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
                                            extrusion};
 
@@ -1201,7 +1204,8 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
                                                                                                         prev_layer_lines.get_line(bottom_line_idx);
 
                     // correctify the distance sign using slice polygons
-                    float sign = (prev_layer_boundary.distance_from_lines<true>(middle.cast<double>()) + 0.5f * flow_width) < 0.0f ? -1.0f : 1.0f;
+                    float sign = (prev_layer_boundary.distance_from_lines<true>(middle.cast<double>()) + 0.5f * flow_width) < 0.0f ? -1.0f :
+                                                                                                                                     1.0f;
 
                     line_out.curled_up_height = estimate_curled_up_height(middle_distance * sign, 0.5 * (a.curvature + b.curvature),
                                                                           l->height, flow_width, bottom_line.curled_up_height, params);

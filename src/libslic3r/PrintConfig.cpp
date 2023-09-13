@@ -24,6 +24,7 @@
 #include "I18N.hpp"
 
 #include "SLA/SupportTree.hpp"
+#include "GCode/Thumbnails.hpp"
 
 #include <set>
 #include <boost/algorithm/string/replace.hpp>
@@ -54,6 +55,13 @@ static t_config_enum_names enum_names_from_keys_map(const t_config_enum_values &
     static t_config_enum_names s_keys_names_##NAME = enum_names_from_keys_map(s_keys_map_##NAME); \
     template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values() { return s_keys_map_##NAME; } \
     template<> const t_config_enum_names& ConfigOptionEnum<NAME>::get_enum_names() { return s_keys_names_##NAME; }
+
+static const t_config_enum_values s_keys_map_ArcFittingType {
+    { "disabled",       int(ArcFittingType::Disabled) },
+    { "emit_center",    int(ArcFittingType::EmitCenter) },
+    { "emit_radius",    int(ArcFittingType::EmitRadius) }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ArcFittingType)
 
 static t_config_enum_values s_keys_map_PrinterTechnology {
     { "FFF",            ptFFF },
@@ -299,12 +307,12 @@ void PrintConfigDef::init_common_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloat(0.));
 
-    def = this->add("thumbnails", coPoints);
+    def = this->add("thumbnails", coString);
     def->label = L("G-code thumbnails");
-    def->tooltip = L("Picture sizes to be stored into a .gcode and .sl1 / .sl1s files, in the following format: \"XxY, XxY, ...\"");
+    def->tooltip = L("Picture sizes to be stored into a .gcode and .sl1 / .sl1s files, in the following format: \"XxYxEXT, XxYxEXT, ...\"");
     def->mode = comExpert;
     def->gui_type = ConfigOptionDef::GUIType::one_string;
-    def->set_default_value(new ConfigOptionPoints());
+    def->set_default_value(new ConfigOptionString());
 
     def = this->add("thumbnails_format", coEnum);
     def->label = L("Format of G-code thumbnails");
@@ -417,6 +425,27 @@ void PrintConfigDef::init_common_params()
 void PrintConfigDef::init_fff_params()
 {
     ConfigOptionDef* def;
+
+    def = this->add("arc_fitting", coEnum);
+    def->label = L("Arc fitting");
+    def->tooltip = L("Enable this to get a G-code file which has G2 and G3 moves. "
+                     "And the fitting tolerance is same with resolution");
+    def->set_enum<ArcFittingType>({
+        { "disabled",       "Disabled" },
+        { "emit_center",    "Enabled: G2/3 I J" },
+        { "emit_radius",    "Enabled: G2/3 R" }
+    });
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionEnum<ArcFittingType>(ArcFittingType::Disabled));
+
+    def = this->add("arc_fitting_tolerance", coFloatOrPercent);
+    def->label = L("Arc fitting tolerance");
+    def->sidetext = L("mm or %");
+    def->tooltip = L("When using the arc_fitting option, allow the curve to deviate a cetain % from the collection of strait paths.\n"
+                     "Can be a mm value or a percentage of the current extrusion width.");
+    def->mode = comAdvanced;
+    def->min = 0;
+    def->set_default_value(new ConfigOptionFloatOrPercent(5, true));
 
     // Maximum extruder temperature, bumped to 1500 to support printing of glass.
     const int max_temp = 1500;
@@ -1475,6 +1504,12 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("Find / replace patterns in G-code lines and substitute them.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionStrings());
+
+    def = this->add("gcode_binary", coBool);
+    def->label = L("Export as binary G-code");
+    def->tooltip = L("Exports G-code in binary format.");
+    def->mode = comExpert;
+    def->set_default_value(new ConfigOptionBool(0));
 
     def = this->add("high_current_on_filament_swap", coBool);
     def->label = L("High extruder current on filament swap");
@@ -3061,18 +3096,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
 
-    def = this->add("threads", coInt);
-    def->label = L("Threads");
-    def->tooltip = L("Threads are used to parallelize long-running tasks. Optimal threads number "
-                   "is slightly above the number of available cores/processors.");
-    def->readonly = true;
-    def->min = 1;
-    {
-        int threads = (unsigned int)boost::thread::hardware_concurrency();
-        def->set_default_value(new ConfigOptionInt(threads > 0 ? threads : 2));
-        def->cli = ConfigOptionDef::nocli;
-    }
-
     def = this->add("toolchange_gcode", coString);
     def->label = L("Tool change G-code");
     def->tooltip = L("This custom code is inserted before every toolchange. Placeholder variables for all PrusaSlicer settings "
@@ -4349,6 +4372,35 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
 // Don't convert single options here, implement such conversion in PrintConfigDef::handle_legacy() instead.
 void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config)
 {
+    if (config.has("thumbnails")) {
+        std::string extention;
+        if (config.has("thumbnails_format")) {
+            if (const ConfigOptionDef* opt = config.def()->get("thumbnails_format")) {
+                auto label = opt->enum_def->enum_to_label(config.option("thumbnails_format")->getInt());
+                if (label.has_value())
+                    extention = *label;
+            }
+        }
+
+        std::string thumbnails_str = config.opt_string("thumbnails");
+        auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(thumbnails_str, extention);
+
+        if (errors != enum_bitmask<ThumbnailError>()) {
+            std::string error_str = "\n" + format("Invalid value provided for parameter %1%: %2%", "thumbnails", thumbnails_str);
+            error_str += GCodeThumbnails::get_error_string(errors);
+            throw BadOptionValueException(error_str);
+        }
+
+        if (!thumbnails_list.empty()) {
+            const auto& extentions = ConfigOptionEnum<GCodeThumbnailsFormat>::get_enum_names();
+            thumbnails_str.clear();
+            for (const auto& [ext, size] : thumbnails_list)
+                thumbnails_str += format("%1%x%2%/%3%, ", size.x(), size.y(), extentions[int(ext)]);
+            thumbnails_str.resize(thumbnails_str.length() - 2);
+
+            config.set_key_value("thumbnails", new ConfigOptionString(thumbnails_str));
+        }
+    }
 }
 
 const PrintConfigDef print_config_def;
@@ -4990,6 +5042,309 @@ void DynamicPrintAndCLIConfig::handle_legacy(t_config_option_key &opt_key, std::
         PrintConfigDef::handle_legacy(opt_key, value);
     }
 }
+
+// SlicingStatesConfigDefs
+
+ReadOnlySlicingStatesConfigDef::ReadOnlySlicingStatesConfigDef()
+{
+    ConfigOptionDef* def;
+
+    def = this->add("zhop", coFloat);
+    def->label = L("Current z-hop");
+    def->tooltip = L("Contains z-hop present at the beginning of the custom G-code block.");
+}
+
+ReadWriteSlicingStatesConfigDef::ReadWriteSlicingStatesConfigDef()
+{
+    ConfigOptionDef* def;
+
+    def = this->add("position", coFloats);
+    def->label = L("Position");
+    def->tooltip = L("Position of the extruder at the beginning of the custom G-code block. If the custom G-code travels somewhere else, "
+                     "it should write to this variable so PrusaSlicer knows where it travels from when it gets control back.");
+
+    def = this->add("e_retracted", coFloats);
+    def->label = L("Retraction");
+    def->tooltip = L("Retraction state at the beginning of the custom G-code block. If the custom G-code moves the extruder axis, "
+                     "it should write to this variable so PrusaSlicer deretracts correctly when it gets control back.");
+
+    def = this->add("e_restart_extra", coFloats);
+    def->label = L("Extra deretraction");
+    def->tooltip = L("Currently planned extra extruder priming after deretraction.");
+
+    def = this->add("e_position", coFloats);
+    def->label = L("Absolute E position");
+    def->tooltip = L("Current position of the extruder axis. Only used with absolute extruder addressing.");
+}
+
+OtherSlicingStatesConfigDef::OtherSlicingStatesConfigDef()
+{
+    ConfigOptionDef* def;
+
+    def = this->add("current_extruder", coInt);
+    def->label = L("Current extruder");
+    def->tooltip = L("Zero-based index of currently used extruder.");
+
+    def = this->add("current_object_idx", coInt);
+    def->label = L("Current object index");
+    def->tooltip = L("Specific for sequential printing. Zero-based index of currently printed object.");
+
+    def = this->add("has_single_extruder_multi_material_priming", coBool);
+    def->label = L("Has single extruder MM priming");
+    def->tooltip = L("Are the extra multi-material priming regions used in this print?");
+
+    def = this->add("has_wipe_tower", coBool);
+    def->label = L("Has wipe tower");
+    def->tooltip = L("Whether or not wipe tower is being generated in the print.");
+
+    def = this->add("initial_extruder", coInt);
+    def->label = L("Initial extruder");
+    def->tooltip = L("Zero-based index of the first extruder used in the print. Same as initial_tool.");
+
+    def = this->add("initial_filament_type", coString);
+    def->label = L("Initial filament type");
+    def->tooltip = L("String containing filament type of the first used extruder.");
+
+    def = this->add("initial_tool", coInt);
+    def->label = L("Initial tool");
+    def->tooltip = L("Zero-based index of the first extruder used in the print. Same as initial_extruder.");
+
+    def = this->add("is_extruder_used", coBools);
+    def->label = L("Is extruder used?");
+    def->tooltip = L("Vector of bools stating whether a given extruder is used in the print.");
+}
+
+PrintStatisticsConfigDef::PrintStatisticsConfigDef()
+{
+    ConfigOptionDef* def;
+
+    def = this->add("extruded_volume", coFloats);
+    def->label = L("Volume per extruder");
+    def->tooltip = L("Total filament volume extruded per extruder during the entire print.");
+
+    def = this->add("normal_print_time", coString);
+    def->label = L("Print time (normal mode)");
+    def->tooltip = L("Estimated print time when printed in normal mode (i.e. not in silent mode). Same as print_time.");
+    
+    def = this->add("num_printing_extruders", coInt);
+    def->label = L("Number of printing extruders");
+    def->tooltip = L("Number of extruders used during the print.");
+
+    def = this->add("print_time", coString);
+    def->label = L("Print time (normal mode)");
+    def->tooltip = L("Estimated print time when printed in normal mode (i.e. not in silent mode). Same as normal_print_time.");
+
+    def = this->add("printing_filament_types", coString);
+    def->label = L("Used filament types");
+    def->tooltip = L("Comma-separated list of all filament types used during the print.");
+
+    def = this->add("silent_print_time", coString);
+    def->label = L("Print time (silent mode)");
+    def->tooltip = L("Estimated print time when printed in silent mode.");
+
+    def = this->add("total_cost", coFloat);
+    def->label = L("Total cost");
+    def->tooltip = L("Total cost of all material used in the print. Calculated from filament_cost value in Filament Settings.");
+
+    def = this->add("total_weight", coFloat);
+    def->label = L("Total weight");
+    def->tooltip = L("Total weight of the print. Calculated from filament_density value in Filament Settings.");
+
+    def = this->add("total_wipe_tower_cost", coFloat);
+    def->label = L("Total wipe tower cost");
+    def->tooltip = L("Total cost of the material wasted on the wipe tower. Calculated from filament_cost value in Filament Settings.");
+
+    def = this->add("total_wipe_tower_filament", coFloat);
+    def->label = L("Wipe tower volume");
+    def->tooltip = L("Total filament volume extruded on the wipe tower.");
+
+    def = this->add("used_filament", coFloat);
+    def->label = L("Used filament");
+    def->tooltip = L("Total length of filament used in the print.");
+
+    def = this->add("total_toolchanges", coInt);
+    def->label = L("Total toolchanges");
+    def->tooltip = L("Number of toolchanges during the print.");
+
+    def = this->add("extruded_volume_total", coFloat);
+    def->label = L("Total volume");
+    def->tooltip = L("Total volume of filament used during the entire print.");
+
+    def = this->add("extruded_weight", coFloats);
+    def->label = L("Weight per extruder");
+    def->tooltip = L("Weight per extruder extruded during the entire print. Calculated from filament_density value in Filament Settings.");
+
+    def = this->add("extruded_weight_total", coFloat);
+    def->label = L("Total weight");
+    def->tooltip = L("Total weight of the print. Calculated from filament_density value in Filament Settings.");
+
+    def = this->add("total_layer_count", coInt);
+    def->label = L("Total layer count");
+    def->tooltip = L("Number of layers in the entire print.");
+}
+
+ObjectsInfoConfigDef::ObjectsInfoConfigDef()
+{
+    ConfigOptionDef* def;
+
+    def = this->add("num_objects", coInt);
+    def->label = L("Number of objects");
+    def->tooltip = L("Total number of objects in the print.");
+
+    def = this->add("num_instances", coInt);
+    def->label = L("Number of instances");
+    def->tooltip = L("Total number of object instances in the print, summed over all objects.");
+
+    def = this->add("scale", coStrings);
+    def->label = L("Scale per object");
+    def->tooltip = L("Contains a string with the information about what scaling was applied to the individual objects. "
+                     "Indexing of the objects is zero-based (first object has index 0).\n"
+                     "Example: 'x:100% y:50% z:100'.");
+
+    def = this->add("input_filename_base", coString);
+    def->label = L("Input filename without extension");
+    def->tooltip = L("Source filename of the first object, without extension.");
+}
+
+DimensionsConfigDef::DimensionsConfigDef()
+{
+    ConfigOptionDef* def;
+
+    const std::string point_tooltip   = L("The vector has two elements: x and y coordinate of the point. Values in mm.");
+    const std::string bb_size_tooltip = L("The vector has two elements: x and y dimension of the bounding box. Values in mm.");
+
+    def = this->add("first_layer_print_convex_hull", coPoints);
+    def->label = L("First layer convex hull");
+    def->tooltip = L("Vector of points of the first layer convex hull. Each element has the following format: "
+                     "'[x, y]' (x and y are floating-point numbers in mm).");
+
+    def = this->add("first_layer_print_min", coFloats);
+    def->label = L("Bottom-left corner of first layer bounding box");
+    def->tooltip = point_tooltip;
+
+    def = this->add("first_layer_print_max", coFloats);
+    def->label = L("Top-right corner of first layer bounding box");
+    def->tooltip = point_tooltip;
+
+    def = this->add("first_layer_print_size", coFloats);
+    def->label = L("Size of the first layer bounding box");
+    def->tooltip = bb_size_tooltip;
+
+    def = this->add("print_bed_min", coFloats);
+    def->label = L("Bottom-left corner of print bed bounding box");
+    def->tooltip = point_tooltip;
+
+    def = this->add("print_bed_max", coFloats);
+    def->label = L("Top-right corner of print bed bounding box");
+    def->tooltip = point_tooltip;
+
+    def = this->add("print_bed_size", coFloats);
+    def->label = L("Size of the print bed bounding box");
+    def->tooltip = bb_size_tooltip;
+}
+
+TimestampsConfigDef::TimestampsConfigDef()
+{
+    ConfigOptionDef* def;
+
+    def = this->add("timestamp", coString);
+    def->label = L("Timestamp");
+    def->tooltip = L("String containing current time in yyyyMMdd-hhmmss format.");
+
+    def = this->add("year", coInt);
+    def->label = L("Year");
+
+    def = this->add("month", coInt);
+    def->label = L("Month");
+
+    def = this->add("day", coInt);
+    def->label = L("Day");
+
+    def = this->add("hour", coInt);
+    def->label = L("Hour");
+
+    def = this->add("minute", coInt);
+    def->label = L("Minute");
+
+    def = this->add("second", coInt);
+    def->label = L("Second");
+}
+
+OtherPresetsConfigDef::OtherPresetsConfigDef()
+{
+    ConfigOptionDef* def;
+
+    def = this->add("num_extruders", coInt);
+    def->label = L("Number of extruders");
+    def->tooltip = L("Total number of extruders, regardless of whether they are used in the current print.");
+
+    def = this->add("print_preset", coString);
+    def->label = L("Print preset name");
+    def->tooltip = L("Name of the print preset used for slicing.");
+
+    def = this->add("filament_preset", coStrings);
+    def->label = L("Filament preset name");
+    def->tooltip = L("Names of the filament presets used for slicing. The variable is a vector "
+                     "containing one name for each extruder.");
+
+    def = this->add("printer_preset", coString);
+    def->label = L("Printer preset name");
+    def->tooltip = L("Name of the printer preset used for slicing.");
+
+    def = this->add("physical_printer_preset", coString);
+    def->label = L("Physical printer name");
+    def->tooltip = L("Name of the physical printer used for slicing.");
+}
+
+
+static std::map<t_custom_gcode_key, t_config_option_keys> s_CustomGcodeSpecificPlaceholders{
+    {"start_filament_gcode",    {"layer_num", "layer_z", "max_layer_z", "filament_extruder_id"}},
+    {"end_filament_gcode",      {"layer_num", "layer_z", "max_layer_z", "filament_extruder_id"}},
+    {"end_gcode",               {"layer_num", "layer_z", "max_layer_z", "filament_extruder_id"}},
+    {"before_layer_gcode",      {"layer_num", "layer_z", "max_layer_z"}},
+    {"layer_gcode",             {"layer_num", "layer_z", "max_layer_z"}},
+    {"toolchange_gcode",        {"layer_num", "layer_z", "max_layer_z", "previous_extruder", "next_extruder", "toolchange_z"}},
+};
+
+const std::map<t_custom_gcode_key, t_config_option_keys>& custom_gcode_specific_placeholders()
+{
+    return s_CustomGcodeSpecificPlaceholders;
+}
+
+CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
+{
+    ConfigOptionDef* def;
+
+    def = this->add("layer_num", coInt);
+    def->label = L("Layer number");
+    def->tooltip = L("Zero-based index of the current layer (i.e. first layer is number 0).");
+
+    def = this->add("layer_z", coFloat);
+    def->label = L("Layer z");
+    def->tooltip = L("Height of the current layer above the print bed, measured to the top of the layer.");
+
+    def = this->add("max_layer_z", coFloat);
+    def->label = L("Maximal layer z");
+    def->tooltip = L("Height of the last layer above the print bed.");
+
+    def = this->add("filament_extruder_id", coInt);
+    def->label = L("Current extruder index");
+    def->tooltip = L("Zero-based index of currently used extruder (i.e. first extruder has index 0).");
+
+    def = this->add("previous_extruder", coInt);
+    def->label = L("Previous extruder");
+    def->tooltip = L("Index of the extruder that is being unloaded. The index is zero based (first extruder has index 0).");
+
+    def = this->add("next_extruder", coInt);
+    def->label = L("Next extruder");
+    def->tooltip = L("Index of the extruder that is being loaded. The index is zero based (first extruder has index 0).");
+
+    def = this->add("toolchange_z", coFloat);
+    def->label = L("Toolchange z");
+    def->tooltip = L("Height above the print bed when the toolchange takes place. Usually the same as layer_z, but can be different.");
+}
+
+const CustomGcodeSpecificConfigDef custom_gcode_specific_config_def;
 
 uint64_t ModelConfig::s_last_timestamp = 1;
 

@@ -139,6 +139,7 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
         "perimeter_acceleration",
         "post_process",
         "gcode_substitutions",
+        "gcode_binary",
         "printer_notes",
         "retract_before_travel",
         "retract_before_wipe",
@@ -954,8 +955,10 @@ void Print::process()
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, m_objects.size(), 1), [this](const tbb::blocked_range<size_t> &range) {
         for (size_t idx = range.begin(); idx < range.end(); ++idx) {
-            m_objects[idx]->generate_support_material();
-            m_objects[idx]->estimate_curled_extrusions();
+            PrintObject &obj = *m_objects[idx];
+            obj.generate_support_material();
+            obj.estimate_curled_extrusions();
+            obj.calculate_overhanging_perimeters();
         }
     }, tbb::simple_partitioner());
 
@@ -1042,7 +1045,7 @@ std::string Print::export_gcode(const std::string& path_template, GCodeProcessor
     this->set_status(90, message);
 
     // Create GCode on heap, it has quite a lot of data.
-    std::unique_ptr<GCode> gcode(new GCode);
+    std::unique_ptr<GCodeGenerator> gcode(new GCodeGenerator);
     gcode->do_export(this, path.c_str(), result, thumbnail_cb);
 
     if (m_conflict_result.has_value())
@@ -1158,13 +1161,15 @@ void Print::_make_skirt()
         }
         // Extrude the skirt loop.
         ExtrusionLoop eloop(elrSkirt);
-        eloop.paths.emplace_back(ExtrusionPath(
-            ExtrusionPath(
+        eloop.paths.emplace_back(
+            ExtrusionAttributes{
                 ExtrusionRole::Skirt,
-                (float)mm3_per_mm,         // this will be overridden at G-code export time
-                flow.width(),
-				(float)first_layer_height  // this will be overridden at G-code export time
-            )));
+                ExtrusionFlow{
+                    float(mm3_per_mm),        // this will be overridden at G-code export time
+                    flow.width(),
+                    float(first_layer_height) // this will be overridden at G-code export time
+                }
+            });
         eloop.paths.back().polyline = loop.split_at_first_point();
         m_skirt.append(eloop);
         if (m_config.min_skirt_length.value > 0) {
@@ -1590,6 +1595,26 @@ std::string Print::output_filename(const std::string &filename_base) const
     return this->PrintBase::output_filename(m_config.output_filename_format.value, ".gcode", filename_base, &config);
 }
 
+const std::string PrintStatistics::FilamentUsedG     = "filament used [g]";
+const std::string PrintStatistics::FilamentUsedGMask = "; filament used [g] =";
+
+const std::string PrintStatistics::TotalFilamentUsedG          = "total filament used [g]";
+const std::string PrintStatistics::TotalFilamentUsedGMask      = "; total filament used [g] =";
+const std::string PrintStatistics::TotalFilamentUsedGValueMask = "; total filament used [g] = %.2lf\n";
+
+const std::string PrintStatistics::FilamentUsedCm3     = "filament used [cm3]";
+const std::string PrintStatistics::FilamentUsedCm3Mask = "; filament used [cm3] =";
+
+const std::string PrintStatistics::FilamentUsedMm     = "filament used [mm]";
+const std::string PrintStatistics::FilamentUsedMmMask = "; filament used [mm] =";
+
+const std::string PrintStatistics::FilamentCost     = "filament cost";
+const std::string PrintStatistics::FilamentCostMask = "; filament cost =";
+
+const std::string PrintStatistics::TotalFilamentCost          = "total filament cost";
+const std::string PrintStatistics::TotalFilamentCostMask      = "; total filament cost =";
+const std::string PrintStatistics::TotalFilamentCostValueMask = "; total filament cost = %.2lf\n";
+
 DynamicConfig PrintStatistics::config() const
 {
     DynamicConfig config;
@@ -1670,8 +1695,8 @@ std::string PrintStatistics::finalize_output_path(const std::string &path_in) co
             }
 
 
-            ExtrusionPath path(ExtrusionRole::WipeTower, 0.0, 0.0, lh);
-            path.polyline = { minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner };
+            ExtrusionPath path({ minCorner, {maxCorner.x(), minCorner.y()}, maxCorner, {minCorner.x(), maxCorner.y()}, minCorner },
+                ExtrusionAttributes{ ExtrusionRole::WipeTower, ExtrusionFlow{ 0.0, 0.0, lh } });
             paths.push_back({ path });
 
             // We added the border, now add several parallel lines so we can detect an object that is fully inside the tower.

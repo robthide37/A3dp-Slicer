@@ -9,13 +9,15 @@
 #ifndef slic3r_GCodeWriter_hpp_
 #define slic3r_GCodeWriter_hpp_
 
-#include "libslic3r.h"
+#include "../libslic3r.h"
+#include "../Extruder.hpp"
+#include "../Point.hpp"
+#include "../PrintConfig.hpp"
+#include "CoolingBuffer.hpp"
+
 #include <string>
+#include <string_view>
 #include <charconv>
-#include "Extruder.hpp"
-#include "Point.hpp"
-#include "PrintConfig.hpp"
-#include "GCode/CoolingBuffer.hpp"
 
 namespace Slic3r {
 
@@ -64,13 +66,17 @@ public:
     // printed with the same extruder.
     std::string toolchange_prefix() const;
     std::string toolchange(unsigned int extruder_id);
-    std::string set_speed(double F, const std::string &comment = std::string(), const std::string &cooling_marker = std::string()) const;
-    std::string travel_to_xy(const Vec2d &point, const std::string &comment = std::string());
-    std::string travel_to_xyz(const Vec3d &point, const std::string &comment = std::string());
-    std::string travel_to_z(double z, const std::string &comment = std::string());
+    std::string set_speed(double F, const std::string_view comment = {}, const std::string_view cooling_marker = {}) const;
+    std::string travel_to_xy(const Vec2d &point, const std::string_view comment = {});
+    std::string travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment = {});
+    std::string travel_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, const std::string_view comment = {});
+    std::string travel_to_xyz(const Vec3d &point, const std::string_view comment = {});
+    std::string travel_to_z(double z, const std::string_view comment = {});
     bool        will_move_z(double z) const;
-    std::string extrude_to_xy(const Vec2d &point, double dE, const std::string &comment = std::string());
-//    std::string extrude_to_xyz(const Vec3d &point, double dE, const std::string &comment = std::string());
+    std::string extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment = {});
+    std::string extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, double dE, const std::string_view comment);
+    std::string extrude_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, double dE, const std::string_view comment);
+//    std::string extrude_to_xyz(const Vec3d &point, double dE, const std::string_view comment = {});
     std::string retract(bool before_wipe = false);
     std::string retract_for_toolchange(bool before_wipe = false);
     std::string unretract();
@@ -121,8 +127,8 @@ private:
         Print
     };
 
-    std::string _travel_to_z(double z, const std::string &comment);
-    std::string _retract(double length, double restart_extra, const std::string &comment);
+    std::string _travel_to_z(double z, const std::string_view comment);
+    std::string _retract(double length, double restart_extra, const std::string_view comment);
     std::string set_acceleration_internal(Acceleration type, unsigned int acceleration);
 };
 
@@ -160,6 +166,10 @@ public:
     static double                                 quantize(double v, size_t ndigits) { return std::round(v * pow_10[ndigits]) * pow_10_inv[ndigits]; }
     static double                                 quantize_xyzf(double v) { return quantize(v, XYZF_EXPORT_DIGITS); }
     static double                                 quantize_e(double v) { return quantize(v, E_EXPORT_DIGITS); }
+    static Vec2d                                  quantize(const Vec2d &pt)
+        { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS) }; }
+    static Vec3d                                  quantize(const Vec3d &pt)
+        { return { quantize(pt.x(), XYZF_EXPORT_DIGITS), quantize(pt.y(), XYZF_EXPORT_DIGITS), quantize(pt.z(), XYZF_EXPORT_DIGITS) }; }
 
     void emit_axis(const char axis, const double v, size_t digits);
 
@@ -178,7 +188,20 @@ public:
         this->emit_axis('Z', z, XYZF_EXPORT_DIGITS);
     }
 
-    void emit_e(const std::string &axis, double v) {
+    void emit_ij(const Vec2d &point) {
+        if (point.x() != 0)
+            this->emit_axis('I', point.x(), XYZF_EXPORT_DIGITS);
+        if (point.y() != 0)
+            this->emit_axis('J', point.y(), XYZF_EXPORT_DIGITS);
+    }
+
+    // Positive radius means a smaller arc, 
+    // negative radius means a larger arc.
+    void emit_radius(const double radius) {
+        this->emit_axis('R', radius, XYZF_EXPORT_DIGITS);
+    }
+
+    void emit_e(const std::string_view axis, double v) {
         if (! axis.empty()) {
             // not gcfNoExtrusion
             this->emit_axis(axis[0], v, E_EXPORT_DIGITS);
@@ -189,12 +212,12 @@ public:
         this->emit_axis('F', speed, XYZF_EXPORT_DIGITS);
     }
 
-    void emit_string(const std::string &s) {
-        strncpy(ptr_err.ptr, s.c_str(), s.size());
+    void emit_string(const std::string_view s) {
+        strncpy(ptr_err.ptr, s.data(), s.size());
         ptr_err.ptr += s.size();
     }
 
-    void emit_comment(bool allow_comments, const std::string &comment) {
+    void emit_comment(bool allow_comments, const std::string_view comment) {
         if (allow_comments && ! comment.empty()) {
             *ptr_err.ptr ++ = ' '; *ptr_err.ptr ++ = ';'; *ptr_err.ptr ++ = ' ';
             this->emit_string(comment);
@@ -218,12 +241,23 @@ public:
     GCodeG1Formatter() {
         this->buf[0] = 'G';
         this->buf[1] = '1';
-        this->buf_end = buf + buflen;
-        this->ptr_err.ptr = this->buf + 2;
+        this->ptr_err.ptr += 2;
     }
 
     GCodeG1Formatter(const GCodeG1Formatter&) = delete;
     GCodeG1Formatter& operator=(const GCodeG1Formatter&) = delete;
+};
+
+class GCodeG2G3Formatter : public GCodeFormatter {
+public:
+    GCodeG2G3Formatter(bool ccw) {
+        this->buf[0] = 'G';
+        this->buf[1] = ccw ? '3' : '2';
+        this->ptr_err.ptr += 2;
+    }
+
+    GCodeG2G3Formatter(const GCodeG2G3Formatter&) = delete;
+    GCodeG2G3Formatter& operator=(const GCodeG2G3Formatter&) = delete;
 };
 
 } /* namespace Slic3r */

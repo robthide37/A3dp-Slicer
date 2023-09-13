@@ -13,6 +13,8 @@
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/CustomGCode.hpp"
 
+#include <LibBGCode/binarize/binarize.hpp>
+
 #include <cstdint>
 #include <array>
 #include <vector>
@@ -62,16 +64,20 @@ namespace Slic3r {
                 time = 0.0f;
                 travel_time = 0.0f;
                 custom_gcode_times.clear();
+                custom_gcode_times.shrink_to_fit();
                 moves_times.clear();
+                moves_times.shrink_to_fit();
                 roles_times.clear();
+                roles_times.shrink_to_fit();
                 layers_times.clear();
+                layers_times.shrink_to_fit();
             }
         };
 
-        std::vector<double>                                 volumes_per_color_change;
-        std::map<size_t, double>                            volumes_per_extruder;
+        std::vector<double>                                     volumes_per_color_change;
+        std::map<size_t, double>                                volumes_per_extruder;
         std::map<GCodeExtrusionRole, std::pair<double, double>> used_filaments_per_role;
-        std::map<size_t, double>                            cost_per_extruder;
+        std::map<size_t, double>                                cost_per_extruder;
 
         std::array<Mode, static_cast<size_t>(ETimeMode::Count)> modes;
 
@@ -82,6 +88,7 @@ namespace Slic3r {
                 m.reset();
             }
             volumes_per_color_change.clear();
+            volumes_per_color_change.shrink_to_fit();
             volumes_per_extruder.clear();
             used_filaments_per_role.clear();
             cost_per_extruder.clear();
@@ -141,10 +148,13 @@ namespace Slic3r {
         };
 
         std::string filename;
+        bool is_binary_file;
         unsigned int id;
         std::vector<MoveVertex> moves;
         // Positions of ends of lines of the final G-code this->filename after TimeProcessor::post_process() finalizes the G-code.
-        std::vector<size_t> lines_ends;
+        // Binarized gcodes usually have several gcode blocks. Each block has its own list on ends of lines.
+        // Ascii gcodes have only one list on ends of lines
+        std::vector<std::vector<size_t>> lines_ends;
         Pointfs bed_shape;
         float max_print_height;
         SettingsIds settings_ids;
@@ -529,8 +539,12 @@ namespace Slic3r {
         };
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
+        static bgcode::binarize::BinarizerConfig& get_binarizer_config() { return s_binarizer_config; }
+
     private:
         GCodeReader m_parser;
+        bgcode::binarize::Binarizer m_binarizer;
+        static bgcode::binarize::BinarizerConfig s_binarizer_config;
 
         EUnits m_units;
         EPositioningType m_global_positioning_type;
@@ -628,6 +642,8 @@ namespace Slic3r {
 
         void apply_config(const PrintConfig& config);
         void set_print(Print* print) { m_print = print; }
+        bgcode::binarize::BinaryData& get_binary_data() { return m_binarizer.get_binary_data(); }
+        const bgcode::binarize::BinaryData& get_binary_data() const { return m_binarizer.get_binary_data(); }
 
         void enable_stealth_time_estimator(bool enabled);
         bool is_stealth_time_estimator_enabled() const {
@@ -670,6 +686,9 @@ namespace Slic3r {
         void apply_config_kissslicer(const std::string& filename);
         void process_gcode_line(const GCodeReader::GCodeLine& line, bool producers_enabled);
 
+        void process_ascii_file(const std::string& filename, std::function<void()> cancel_callback = nullptr);
+        void process_binary_file(const std::string& filename, std::function<void()> cancel_callback = nullptr);
+
         // Process tags embedded into comments
         void process_tags(const std::string_view comment, bool producers_enabled);
         bool process_producers_tags(const std::string_view comment);
@@ -686,8 +705,12 @@ namespace Slic3r {
         // Move
         void process_G0(const GCodeReader::GCodeLine& line);
         void process_G1(const GCodeReader::GCodeLine& line);
+        enum class G1DiscretizationOrigin {
+            G1,
+            G2G3,
+        };
         void process_G1(const std::array<std::optional<double>, 4>& axes = { std::nullopt, std::nullopt, std::nullopt, std::nullopt },
-            std::optional<double> feedrate = std::nullopt, std::optional<std::string> cmt = std::nullopt);
+            std::optional<double> feedrate = std::nullopt, G1DiscretizationOrigin origin = G1DiscretizationOrigin::G1);
 
         // Arc Move
         void process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise);
@@ -821,7 +844,7 @@ namespace Slic3r {
         // Simulates firmware st_synchronize() call
         void simulate_st_synchronize(float additional_time = 0.0f);
 
-        void update_estimated_times_stats();
+        void update_estimated_statistics();
 
         double extract_absolute_position_on_axis(Axis axis, const GCodeReader::GCodeLine& line, double area_filament_cross_section);
    };

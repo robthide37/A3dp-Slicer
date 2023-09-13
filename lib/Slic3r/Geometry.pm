@@ -25,7 +25,6 @@ our @EXPORT_OK = qw(
 
     X Y Z
     convex_hull
-    chained_path_from
     deg2rad
     rad2deg
 );

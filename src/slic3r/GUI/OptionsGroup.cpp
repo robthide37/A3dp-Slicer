@@ -108,6 +108,14 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
 	};
     field->m_parent = parent();
 
+    if (edit_custom_gcode && opt.is_code) {
+        field->m_fn_edit_value = [this](std::string opt_id) {
+            if (!m_disabled)
+                this->edit_custom_gcode(opt_id);
+        };
+        field->set_edit_tooltip(_L("Edit CustomG-code"));
+    }
+
 	field->m_back_to_initial_value = [this](std::string opt_id) {
 		if (!m_disabled)
 			this->back_to_initial_value(opt_id);
@@ -916,9 +924,10 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 		ret = double_to_string(val);
 		}
 		break;
-	case coString:
-		ret = from_u8(config.opt_string(opt_key));
-		break;
+	case coString: {
+        ret = from_u8(config.opt_string(opt_key));
+        break;
+    }
 	case coStrings:
 		if (opt_key == "compatible_printers" || opt_key == "compatible_prints" || opt_key == "gcode_substitutions") {
 			ret = config.option<ConfigOptionStrings>(opt_key)->values;
@@ -958,8 +967,6 @@ boost::any ConfigOptionsGroup::get_config_value(const DynamicPrintConfig& config
 	case coPoints:
 		if (opt_key == "bed_shape")
 			ret = config.option<ConfigOptionPoints>(opt_key)->values;
-        else if (opt_key == "thumbnails")
-            ret = get_thumbnails_string(config.option<ConfigOptionPoints>(opt_key)->values);
 		else
 			ret = config.option<ConfigOptionPoints>(opt_key)->get_at(idx);
 		break;
@@ -1014,7 +1021,7 @@ wxString OptionsGroup::get_url(const std::string& path_end)
     if (path_end.empty())
         return wxEmptyString;
 
-    wxString language = get_app_config()->get("translation_language");
+    wxString language = wxGetApp().current_language_code_safe();
     wxString lang_marker = language.IsEmpty() ? "en" : language.BeforeFirst('_');
 
     return wxString("https://help.prusa3d.com/") + lang_marker + wxString("/article/" + path_end);

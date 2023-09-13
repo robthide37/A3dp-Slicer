@@ -28,6 +28,7 @@
 #include <regex>
 #include <future>
 #include <boost/algorithm/string.hpp>
+#include <boost/nowide/cstdio.hpp>
 #include <boost/optional.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
@@ -54,6 +55,8 @@
 #include <wx/custombgwin.h>
 #include <wx/popupwin.h>
 #endif
+
+#include <LibBGCode/convert/convert.hpp>
 
 #include "libslic3r/libslic3r.h"
 #include "libslic3r/Format/STL.hpp"
@@ -2523,6 +2526,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
     int answer_convert_from_meters          = wxOK_DEFAULT;
     int answer_convert_from_imperial_units  = wxOK_DEFAULT;
+    int answer_consider_as_multi_part_objects = wxOK_DEFAULT;
 
     bool in_temp = false; 
     const fs::path temp_path = wxStandardPaths::Get().GetTempDir().utf8_str().data();
@@ -2704,14 +2708,21 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                 }
 
                 if (model.looks_like_multipart_object()) {
-                    MessageDialog msg_dlg(q, _L(
-                        "This file contains several objects positioned at multiple heights.\n"
-                        "Instead of considering them as multiple objects, should \n"
-                        "the file be loaded as a single object having multiple parts?") + "\n",
-                        _L("Multi-part object detected"), wxICON_WARNING | wxYES | wxNO);
-                    if (msg_dlg.ShowModal() == wxID_YES) {
-                        model.convert_multipart_object(nozzle_dmrs->values.size());
+                    if (answer_consider_as_multi_part_objects == wxOK_DEFAULT) {
+                        RichMessageDialog dlg(q, _L(
+                            "This file contains several objects positioned at multiple heights.\n"
+                            "Instead of considering them as multiple objects, should \n"
+                            "the file be loaded as a single object having multiple parts?") + "\n",
+                            _L("Multi-part object detected"), wxICON_QUESTION | wxYES_NO);
+                        dlg.ShowCheckBox(_L("Apply to all multiple objects being loaded."));
+                        int answer = dlg.ShowModal();
+                        if (dlg.IsCheckBoxChecked())
+                            answer_consider_as_multi_part_objects = answer;
+                        if (answer == wxID_YES)
+                            model.convert_multipart_object(nozzle_dmrs->size());
                     }
+                    else if (answer_consider_as_multi_part_objects == wxID_YES)
+                        model.convert_multipart_object(nozzle_dmrs->size());
                 }
             }
             if ((wxGetApp().get_mode() == comSimple) && (type_3mf || type_any_amf) && model_has_advanced_features(model)) {
@@ -5494,6 +5505,109 @@ void Plater::reload_gcode_from_disk()
     load_gcode(filename);
 }
 
+void Plater::convert_gcode_to_ascii()
+{
+    // Ask user for a gcode file name.
+    wxString input_file;
+    wxGetApp().load_gcode(this, input_file);
+    if (input_file.empty())
+        return;
+
+    // Open source file
+    FilePtr in_file{ boost::nowide::fopen(into_u8(input_file).c_str(), "rb") };
+    if (in_file.f == nullptr) {
+        MessageDialog msg_dlg(this, _L("Unable to open the selected file."), _L("Error"), wxICON_ERROR | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    // Set out filename
+    boost::filesystem::path path(into_u8(input_file));
+    const std::string output_file = path.replace_extension("gcode").string();
+    if (boost::filesystem::exists(output_file)) {
+        MessageDialog msg_dlg(this, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), output_file), _L("Notice"), wxYES_NO);
+        if (msg_dlg.ShowModal() != wxID_YES)
+            return;
+    }
+
+    // Open destination file
+    FilePtr out_file{ boost::nowide::fopen(output_file.c_str(), "wb") };
+    if (out_file.f == nullptr) {
+        MessageDialog msg_dlg(this, _L("Unable to open output file."), _L("Error"), wxICON_ERROR | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    // Perform conversion
+    {
+        wxBusyCursor busy;
+        using namespace bgcode::core;
+        EResult res = bgcode::convert::from_binary_to_ascii(*in_file.f, *out_file.f, true);
+        if (res != EResult::Success) {
+            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+            msg_dlg.ShowModal();
+            out_file.close();
+            boost::nowide::remove(output_file.c_str());
+            return;
+        }
+    }
+
+    MessageDialog msg_dlg(this, _L("Succesfully created gcode ascii file \n") + output_file, _L("Convert gcode file to ascii format"), wxICON_ERROR | wxOK);
+    msg_dlg.ShowModal();
+}
+
+void Plater::convert_gcode_to_binary()
+{
+    // Ask user for a gcode file name.
+    wxString input_file;
+    wxGetApp().load_gcode(this, input_file);
+    if (input_file.empty())
+        return;
+
+    // Open source file
+    FilePtr in_file{ boost::nowide::fopen(into_u8(input_file).c_str(), "rb") };
+    if (in_file.f == nullptr) {
+        MessageDialog msg_dlg(this, _L("Unable to open the selected file."), _L("Error"), wxICON_ERROR | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    // Set out filename
+    boost::filesystem::path path(into_u8(input_file));
+    const std::string output_file = path.replace_extension("bgcode").string();
+    if (boost::filesystem::exists(output_file)) {
+        MessageDialog msg_dlg(this, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), output_file), _L("Notice"), wxYES_NO);
+        if (msg_dlg.ShowModal() != wxID_YES)
+            return;
+    }
+
+    // Open destination file
+    FilePtr out_file{ boost::nowide::fopen(output_file.c_str(), "wb") };
+    if (out_file.f == nullptr) {
+        MessageDialog msg_dlg(this, _L("Unable to open output file."), _L("Error"), wxICON_ERROR | wxOK);
+        msg_dlg.ShowModal();
+        return;
+    }
+
+    // Perform conversion
+    {
+        wxBusyCursor busy;
+        using namespace bgcode::core;
+        const bgcode::binarize::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
+        EResult res = bgcode::convert::from_ascii_to_binary(*in_file.f, *out_file.f, binarizer_config);
+        if (res != EResult::Success) {
+            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+            msg_dlg.ShowModal();
+            out_file.close();
+            boost::nowide::remove(output_file.c_str());
+            return;
+        }
+    }
+
+    MessageDialog msg_dlg(this, _L("Succesfully created gcode binary file \n") + output_file, _L("Convert gcode file to binary format"), wxICON_ERROR | wxOK);
+    msg_dlg.ShowModal();
+}
+
 void Plater::refresh_print()
 {
     p->preview->refresh_print();
@@ -6001,7 +6115,7 @@ void ProjectDropDialog::on_dpi_changed(const wxRect& suggested_rect)
 bool Plater::load_files(const wxArrayString& filenames, bool delete_after_load/*=false*/)
 {
     const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|prusa|step|stp|zip)", std::regex::icase);
-    const std::regex pattern_gcode_drop(".*[.](gcode|g)", std::regex::icase);
+    const std::regex pattern_gcode_drop(".*[.](gcode|g|bgcode|bgc)", std::regex::icase);
 
     std::vector<fs::path> paths;
 

@@ -2008,6 +2008,11 @@ void GLCanvas3D::render()
 #endif // ENABLE_SLA_VIEW_DEBUG_WINDOW
     }
 
+#if ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
+    if (wxGetApp().plater()->is_view3D_shown() && current_printer_technology() != ptSLA && fff_print()->config().gcode_binary)
+        show_binary_gcode_debug_window();
+#endif // ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
+
     std::string tooltip;
 
 	// Negative coordinate means out of the window, likely because the window was deactivated.
@@ -7780,6 +7785,96 @@ void GLCanvas3D::GizmoHighlighter::blink()
     if ((++m_blink_counter) >= 11)
         invalidate();
 }
+
+#if ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
+void GLCanvas3D::show_binary_gcode_debug_window()
+{
+    bgcode::binarize::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
+
+    ImGuiWrapper& imgui = *wxGetApp().imgui();
+    imgui.begin(std::string("Binary GCode"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+
+    using namespace bgcode::core;
+    if (ImGui::BeginTable("BinaryGCodeConfig", 2)) {
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "File metadata compression");
+        ImGui::TableSetColumnIndex(1);
+        std::vector<std::string> options = { "None", "Deflate", "heatshrink 11,4", "heatshrink 12,4" };
+        int option_id = (int)binarizer_config.compression.file_metadata;
+        if (imgui.combo(std::string("##file_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.file_metadata = (ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Printer metadata compression");
+        ImGui::TableSetColumnIndex(1);
+        option_id = (int)binarizer_config.compression.printer_metadata;
+        if (imgui.combo(std::string("##printer_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.printer_metadata = (ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Print metadata compression");
+        ImGui::TableSetColumnIndex(1);
+        option_id = (int)binarizer_config.compression.print_metadata;
+        if (imgui.combo(std::string("##print_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.print_metadata = (ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Slicer metadata compression");
+        ImGui::TableSetColumnIndex(1);
+        option_id = (int)binarizer_config.compression.slicer_metadata;
+        if (imgui.combo(std::string("##slicer_metadata_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.slicer_metadata = (ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "GCode compression");
+        ImGui::TableSetColumnIndex(1);
+        option_id = (int)binarizer_config.compression.gcode;
+        if (imgui.combo(std::string("##gcode_compression"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.compression.gcode = (ECompressionType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "GCode encoding");
+        ImGui::TableSetColumnIndex(1);
+        options = { "None", "MeatPack", "MeatPack Comments" };
+        option_id = (int)binarizer_config.gcode_encoding;
+        if (imgui.combo(std::string("##gcode_encoding"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.gcode_encoding = (EGCodeEncodingType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Metadata encoding");
+        ImGui::TableSetColumnIndex(1);
+        options = { "INI" };
+        option_id = (int)binarizer_config.metadata_encoding;
+        if (imgui.combo(std::string("##metadata_encoding"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.metadata_encoding = (EMetadataEncodingType)option_id;
+
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, "Checksum type");
+        ImGui::TableSetColumnIndex(1);
+        options = { "None", "CRC32" };
+        option_id = (int)binarizer_config.checksum;
+        if (imgui.combo(std::string("##4"), options, option_id, ImGuiComboFlags_HeightLargest, 0.0f, 175.0f))
+            binarizer_config.checksum = (EChecksumType)option_id;
+
+        ImGui::EndTable();
+
+        ImGui::Separator();
+        imgui.text("!!! WARNING !!!");
+        imgui.text("Changing values does NOT invalidate the current slice");
+    }
+
+    imgui.end();
+}
+#endif // ENABLE_BINARIZED_GCODE_DEBUG_WINDOW
 
 const ModelVolume *get_model_volume(const GLVolume &v, const Model &model)
 {

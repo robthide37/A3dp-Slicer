@@ -1943,7 +1943,7 @@ std::vector<ExPolygons> slice_mesh_ex(
                     &expolygons);
 
 #if 0
-//#ifndef _NDEBUG
+//#ifndef NDEBUG
                 // Test whether the expolygons in a single layer overlap.
                 for (size_t i = 0; i < expolygons.size(); ++ i)
                     for (size_t j = i + 1; j < expolygons.size(); ++ j) {
@@ -1952,7 +1952,7 @@ std::vector<ExPolygons> slice_mesh_ex(
                     }
 #endif
 #if 0
-//#ifndef _NDEBUG
+//#ifndef NDEBUG
                 for (const ExPolygon &ex : expolygons) {
                     assert(! has_duplicate_points(ex.contour));
                     for (const Polygon &hole : ex.holes)
@@ -1960,7 +1960,7 @@ std::vector<ExPolygons> slice_mesh_ex(
                     assert(! has_duplicate_points(ex));
                 }
                 assert(!has_duplicate_points(expolygons));
-#endif // _NDEBUG
+#endif // NDEBUG
                 //FIXME simplify
                 if (this_mode == MeshSlicingParams::SlicingMode::PositiveLargestContour)
                     keep_largest_contour_only(expolygons);
@@ -1972,7 +1972,7 @@ std::vector<ExPolygons> slice_mesh_ex(
                     expolygons = std::move(simplified);
                 }
 #if 0
-//#ifndef _NDEBUG
+//#ifndef NDEBUG
                 for (const ExPolygon &ex : expolygons) {
                     assert(! has_duplicate_points(ex.contour));
                     for (const Polygon &hole : ex.holes)
@@ -1980,7 +1980,7 @@ std::vector<ExPolygons> slice_mesh_ex(
                     assert(! has_duplicate_points(ex));
                 }
                 assert(! has_duplicate_points(expolygons));
-#endif // _NDEBUG
+#endif // NDEBUG
             }
         });
 //    BOOST_LOG_TRIVIAL(debug) << "slice_mesh make_expolygons in parallel - end";
