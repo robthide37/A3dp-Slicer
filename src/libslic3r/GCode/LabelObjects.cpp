@@ -46,6 +46,10 @@ void LabelObjects::init(const Print& print)
 
                 if (object_has_more_instances)
                     name += " (Instance " + std::to_string(instance_id) + ")";
+                if (m_flavor == gcfKlipper) {
+                    const std::string banned = "-. \r\n\v\t\f";
+                    std::replace_if(name.begin(), name.end(), [&banned](char c) { return banned.find(c) != std::string::npos; }, '_');
+                }
             }
 
             m_label_data.emplace(pi, LabelData{name, unique_id});
@@ -71,8 +75,25 @@ std::string LabelObjects::all_objects_header() const
 
     out += "\n";
     for (const auto& [print_instance, label] : label_data_sorted) {
-        out += start_object(*print_instance, IncludeName::Yes);
-        out += stop_object(*print_instance);
+        if (m_flavor == gcfKlipper)  {
+            char buffer[64];
+            out += "EXCLUDE_OBJECT_DEFINE NAME=" + label.name;
+            Polygon outline = print_instance->model_instance->get_object()->convex_hull_2d(print_instance->model_instance->get_matrix());
+            assert(! outline.empty());
+            outline.douglas_peucker(50000.f);
+            Point center = outline.centroid();
+            std::snprintf(buffer, sizeof(buffer) - 1, " CENTER=%.3f,%.3f", unscale<float>(center[0]), unscale<float>(center[1]));
+            out += buffer + std::string(" POLYGON=[");
+            for (const Point& point : outline) {
+                std::snprintf(buffer, sizeof(buffer) - 1, "[%.3f,%.3f],", unscale<float>(point[0]), unscale<float>(point[1]));
+                out += buffer;
+            }
+            out.pop_back();
+            out += "]\n";
+        } else {
+            out += start_object(*print_instance, IncludeName::Yes);
+            out += stop_object(*print_instance);
+        }
     }
     out += "\n";
     return out;
@@ -97,7 +118,9 @@ std::string LabelObjects::start_object(const PrintInstance& print_instance, Incl
                 out += std::string("M486 A");
                 out += (m_flavor == GCodeFlavor::gcfRepRapFirmware ? (std::string("\"") + label.name + "\"") : label.name) + "\n";
             }
-        } else {
+        } else if (m_flavor == gcfKlipper)
+            out += "EXCLUDE_OBJECT_START NAME=" + label.name + "\n";
+        else {
             // Not supported by / implemented for the other firmware flavors.
         }
     }
@@ -119,6 +142,8 @@ std::string LabelObjects::stop_object(const PrintInstance& print_instance) const
     else if (m_label_objects_style == LabelObjectsStyle::Firmware)
         if (m_flavor == GCodeFlavor::gcfMarlinFirmware || m_flavor == GCodeFlavor::gcfMarlinLegacy || m_flavor == GCodeFlavor::gcfRepRapFirmware)
             out += std::string("M486 S-1\n");
+        else if (m_flavor ==gcfKlipper)
+            out += "EXCLUDE_OBJECT_END NAME=" + label.name + "\n";
         else {
             // Not supported by / implemented for the other firmware flavors.
         }
