@@ -40,7 +40,6 @@ using namespace Slic3r::GUI::Emboss;
 
 GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -3)
-    , m_gui_cfg(nullptr)
     , m_rotate_gizmo(parent, GLGizmoRotate::Axis::Z) // grab id = 2 (Z axis)
 {
     m_rotate_gizmo.set_group_id(0);
@@ -233,6 +232,17 @@ TransformationType get_transformation_type(const Selection &selection)
         TransformationType::Local_Relative_Joint :
         TransformationType::Instance_Relative_Joint; // object
 }
+
+/// <summary>
+/// Wrap function around selection transformation to apply fix transformation
+/// Fix transformation is needed because of (store/load) volume (to/from) 3mf
+/// </summary>
+/// <param name="selection">Selection to be modified</param>
+/// <param name="selection_transformation_fnc">Function modified Selection transformation</param>
+/// <param name="volume">Volume which may(or may not) contain fix matrix</param>
+template<typename Fnc> 
+void selection_transform(Selection &selection, Fnc selection_transformation_fnc, const ModelVolume &volume);
+
 } // namespace
 
 bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
@@ -250,7 +260,10 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 
         // temporary rotation
         Selection &selection = m_parent.get_selection();
-        selection.rotate(Vec3d(0., 0., angle), get_transformation_type(selection));
+        //auto selection_rotate_fnc = [&angle, &selection](){ 
+            selection.rotate(Vec3d(0., 0., angle), get_transformation_type(selection));
+        //};
+        //selection_transform(selection, selection_rotate_fnc, *m_volume);
 
         angle += *m_rotate_start_angle;
         // move to range <-M_PI, M_PI>
@@ -263,6 +276,29 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
             m_angle.reset();
     }
     return used;
+}
+
+namespace{
+std::optional<float> calculate_angle(const Selection& selection)
+{
+    const GLVolume *gl_volume = selection.get_first_volume();
+    assert(gl_volume != nullptr);
+    if (gl_volume == nullptr)
+        return {};
+
+    Transform3d to_world = gl_volume->world_matrix();
+    const ModelVolume* volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+    assert(volume != nullptr);
+    assert(volume->emboss_shape.has_value());
+    if (volume == nullptr || 
+        !volume->emboss_shape.has_value() ||
+        !volume->emboss_shape->fix_3mf_tr)        
+        return calc_up(to_world, Slic3r::GUI::up_limit);
+
+    // exist fix matrix and must be applied before calculation
+    to_world = to_world * volume->emboss_shape->fix_3mf_tr->inverse();
+    return calc_up(to_world, Slic3r::GUI::up_limit);
+}
 }
 
 bool GLGizmoSVG::on_mouse_for_translate(const wxMouseEvent &mouse_event)
@@ -308,11 +344,8 @@ bool GLGizmoSVG::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         calculate_scale();
 
         // Recalculate angle for GUI
-        if (!m_keep_up) {
-            const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
-            assert(gl_volume != nullptr);
-            m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
-        }
+        if (!m_keep_up)
+            m_angle = calculate_angle(m_parent.get_selection());
     }
     return res;
 }
@@ -1082,7 +1115,7 @@ void GLGizmoSVG::set_volume_by_selection()
     m_shape_warnings = create_shape_warnings(*es.svg_file.image, get_scale_for_tolerance());
 
     // Calculate current angle of up vector
-    m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
+    m_angle    = calculate_angle(selection);
     m_distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
     
     m_shape_bb = get_extents(m_volume_shape.shapes_with_ids);
@@ -1665,13 +1698,13 @@ void GLGizmoSVG::draw_size()
     if (new_relative_scale.has_value()){
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
-        TransformationType type = m_volume->is_the_only_one_part() ? 
-            TransformationType::Instance_Relative_Independent :
-            TransformationType::Local_Relative_Independent;
 
-        auto seloection_scale_fnc = [&selection, rel_scale = *new_relative_scale, type]()
-        { selection.scale(rel_scale, type); };
-        
+        auto seloection_scale_fnc = [&selection, rel_scale = *new_relative_scale]() {
+            TransformationType type = selection.is_single_volume() ? 
+                TransformationType::Local_Relative_Independent:
+                TransformationType::Instance_Relative_Independent;
+            selection.scale(rel_scale, type);
+        };        
         selection_transform(selection, seloection_scale_fnc, *m_volume);
 
         m_parent.do_scale(L("Resize"));
@@ -1772,11 +1805,23 @@ void GLGizmoSVG::draw_rotation()
         Geometry::to_range_pi_pi(angle_rad);                
 
         double diff_angle = angle_rad - angle;
-        do_local_z_rotate(m_parent, diff_angle);
+
+        //do_local_z_rotate(m_parent, diff_angle);
+        Selection& selection = m_parent.get_selection();
+        selection.setup_cache();
+        auto selection_rotate_fnc = [&selection, &diff_angle]() {
+            TransformationType transformation_type = selection.is_single_volume() ? 
+                TransformationType::Local_Relative_Joint :
+                TransformationType::Instance_Relative_Joint;
+            selection.rotate(Vec3d(0., 0., diff_angle), transformation_type);        
+        };
+        selection_transform(selection, selection_rotate_fnc, *m_volume);
+
+        std::string snapshot_name; // empty meand no store undo / redo
+        m_parent.do_rotate(snapshot_name);
         
         // calc angle after rotation
-        const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
-        m_angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
+        m_angle = calculate_angle(selection);
         
         // recalculate for surface cut
         if (m_volume->emboss_shape->projection.use_surface)
@@ -1833,10 +1878,10 @@ void GLGizmoSVG::draw_mirroring()
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
 
-        auto selection_mirror_fnc = [&selection, &axis, &volume = *m_volume]()
-        {        
-            TransformationType type = volume.is_the_only_one_part()? 
-                TransformationType::Instance : TransformationType::Local;
+        auto selection_mirror_fnc = [&selection, &axis, &volume = *m_volume](){        
+            TransformationType type = selection.is_single_volume()? 
+                TransformationType::Local:
+                TransformationType::Instance;
             selection.mirror(axis, type);
         };
         selection_transform(selection, selection_mirror_fnc, *m_volume);

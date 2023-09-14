@@ -132,7 +132,7 @@ private:
     bool on_mouse_for_translate(const wxMouseEvent &mouse_event);
     
     struct GuiCfg;
-    std::unique_ptr<const GuiCfg> m_gui_cfg;
+    std::unique_ptr<const GuiCfg> m_gui_cfg = nullptr;
 
     // actual selected only one volume - with emboss data
     ModelVolume *m_volume = nullptr;
