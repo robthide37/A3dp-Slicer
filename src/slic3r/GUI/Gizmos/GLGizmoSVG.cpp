@@ -1534,6 +1534,36 @@ void GLGizmoSVG::draw_depth()
         ImGui::SetTooltip("%s", _u8L("Size in emboss direction.").c_str());
 }
 
+namespace{
+
+/// <summary>
+/// Wrap function around selection transformation to apply fix transformation after load volume from 3mf
+/// </summary>
+/// <param name="selection"></param>
+/// <param name="volume">Volume which may contain fix matrix</param>
+template<typename Fnc>
+void selection_transform(Selection &selection, Fnc selection_transformation_fnc, const ModelVolume& volume)
+{
+    if (!volume.emboss_shape.has_value())
+        return selection_transformation_fnc();
+
+    const std::optional<Transform3d> &fix_tr = volume.emboss_shape->fix_3mf_tr;
+    if (!fix_tr.has_value())
+        return selection_transformation_fnc();
+        
+    GLVolume* gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
+    Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
+    gl_volume->set_volume_transformation(volume_tr * fix_tr->inverse());
+    selection.setup_cache();
+    
+    selection_transformation_fnc();
+    
+    volume_tr = gl_volume->get_volume_transformation().get_matrix();
+    gl_volume->set_volume_transformation(volume_tr * (*fix_tr));
+    selection.setup_cache();
+}
+} 
+
 void GLGizmoSVG::draw_size() 
 {
     ImGuiWrapper::text(m_gui_cfg->translations.size);
@@ -1638,21 +1668,11 @@ void GLGizmoSVG::draw_size()
         TransformationType type = m_volume->is_the_only_one_part() ? 
             TransformationType::Instance_Relative_Independent :
             TransformationType::Local_Relative_Independent;
+
+        auto seloection_scale_fnc = [&selection, rel_scale = *new_relative_scale, type]()
+        { selection.scale(rel_scale, type); };
         
-        const std::optional<Transform3d> &fix_tr = m_volume->emboss_shape->fix_3mf_tr;
-        if (fix_tr.has_value()){
-            GLVolume* gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
-            gl_volume->set_volume_transformation(gl_volume->get_volume_transformation().get_matrix() * fix_tr->inverse());
-            selection.setup_cache();
-        }
-
-        selection.scale(*new_relative_scale, type);
-
-        if (fix_tr.has_value()) {
-            GLVolume *gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
-            gl_volume->set_volume_transformation(gl_volume->get_volume_transformation().get_matrix() * (*fix_tr));
-            selection.setup_cache();
-        }
+        selection_transform(selection, seloection_scale_fnc, *m_volume);
 
         m_parent.do_scale(L("Resize"));
         wxGetApp().obj_manipul()->set_dirty();
@@ -1812,8 +1832,15 @@ void GLGizmoSVG::draw_mirroring()
     if (axis != Axis::UNKNOWN_AXIS){
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
-        TransformationType type = m_volume->is_the_only_one_part()? TransformationType::Instance : TransformationType::Local;
-        selection.mirror(axis, type);
+
+        auto selection_mirror_fnc = [&selection, &axis, &volume = *m_volume]()
+        {        
+            TransformationType type = volume.is_the_only_one_part()? 
+                TransformationType::Instance : TransformationType::Local;
+            selection.mirror(axis, type);
+        };
+        selection_transform(selection, selection_mirror_fnc, *m_volume);
+
         m_parent.do_mirror(L("Set Mirror"));
         wxGetApp().obj_manipul()->UpdateAndShow(true);
 
