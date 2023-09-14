@@ -22,8 +22,6 @@
 #include <GL/glew.h>
 
 namespace Slic3r{
-//class AppConfig;
-class GLVolume;
 class ModelVolume;
 enum class ModelVolumeType : int;
 }

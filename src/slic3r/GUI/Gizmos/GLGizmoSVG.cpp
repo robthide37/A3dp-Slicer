@@ -247,36 +247,22 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         double angle = m_rotate_gizmo.get_angle();
         angle -= PI / 2; // Grabber is upward
 
-        // temporary rotation
+        double new_angle = angle + *m_rotate_start_angle;
+        // move to range <-M_PI, M_PI>
+        Geometry::to_range_pi_pi(new_angle);      
+
+        double z_rotation = m_volume->emboss_shape->fix_3mf_tr.has_value()? 
+            (new_angle - m_angle.value_or(0.f)) : // relative angle
+            angle; // relativity is keep by selection cache
+
         Selection &selection = m_parent.get_selection();
-        auto selection_rotate_fnc = [&angle, &selection](){ 
-            selection.rotate(Vec3d(0., 0., angle), get_transformation_type(selection));
+        auto selection_rotate_fnc = [z_rotation, &selection]() { 
+            selection.rotate(Vec3d(0., 0., z_rotation), get_transformation_type(selection));
         };
         selection_transform(selection, selection_rotate_fnc, m_volume);
-
-        angle += *m_rotate_start_angle;
-        // move to range <-M_PI, M_PI>
-        Geometry::to_range_pi_pi(angle);
-
-        //{ // Slow alternative to valid rotation
-        //    Selection &selection = m_parent.get_selection();
-        //    selection.setup_cache();
-        //    double diff_angle = angle - m_angle.value_or(0.f);
-        //    auto selection_rotate_fnc = [&selection, &diff_angle]() {
-        //        TransformationType transformation_type = selection.is_single_volume() ? 
-        //            TransformationType::Local_Relative_Joint :
-        //            TransformationType::Instance_Relative_Joint;
-        //        selection.rotate(Vec3d(0., 0., diff_angle), transformation_type);
-        //    };
-        //    selection_transform(selection, selection_rotate_fnc, m_volume);
-
-        //    std::string snapshot_name; // empty meand no store undo / redo
-        //    m_parent.do_rotate(snapshot_name);
-        //}
         
         // propagate angle into property
-        m_angle = static_cast<float>(angle);
-
+        m_angle = static_cast<float>(new_angle);
 
         // do not store zero
         if (is_approx(*m_angle, 0.f))
