@@ -2956,7 +2956,7 @@ void GLGizmoEmboss::draw_advanced()
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
     }
 
-    ImGui::SameLine(); if (ImGui::Button("Re-emboss")) GLGizmoEmboss::re_emboss(*m_volume);    
+    //ImGui::SameLine(); if (ImGui::Button("Re-emboss")) GLGizmoEmboss::re_emboss(*m_volume);    
 
 #ifdef ALLOW_DEBUG_MODE
     ImGui::Text("family = %s", (current_prop.family.has_value() ?
