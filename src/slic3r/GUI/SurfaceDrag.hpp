@@ -5,9 +5,11 @@
 #include "libslic3r/Point.hpp" // Vec2d, Transform3d
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "wx/event.h" // wxMouseEvent
+#include <functional>
 
 namespace Slic3r {
 class GLVolume;
+class ModelVolume;
 } // namespace Slic3r
 
 namespace Slic3r::GUI {
@@ -105,6 +107,16 @@ Transform3d world_matrix_fixed(const GLVolume &gl_volume, const ModelObjectPtrs&
 /// <param name="selection">Selected volume</param>
 /// <returns>Fixed Transformation of selected volume in selection</returns>
 Transform3d world_matrix_fixed(const Selection &selection);
+
+/// <summary>
+/// Wrap function around selection transformation to apply fix transformation
+/// Fix transformation is needed because of (store/load) volume (to/from) 3mf
+/// </summary>
+/// <param name="selection">Selected gl volume will be modified</param>
+/// <param name="selection_transformation_fnc">Function modified Selection transformation</param>
+/// <param name="volume">Same as selected GLVolume, volume may(or may not) contain fix matrix,
+///  when nullptr it is gathered from selection</param>
+void selection_transform(Selection &selection, const std::function<void()>& selection_transformation_fnc, const ModelVolume *volume = nullptr);
 
 /// <summary>
 /// Apply camera direction for emboss direction

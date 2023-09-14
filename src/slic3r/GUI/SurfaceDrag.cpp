@@ -257,6 +257,36 @@ Transform3d world_matrix_fixed(const Selection &selection)
     return world_matrix_fixed(*gl_volume, selection.get_model()->objects);
 }
 
+void selection_transform(Selection &selection, const std::function<void()> &selection_transformation_fnc, const ModelVolume *volume)
+{
+    GLVolume *gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
+    if (gl_volume == nullptr)
+        return selection_transformation_fnc();
+
+    if (volume == nullptr) {
+        volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+        if (volume == nullptr)
+            return selection_transformation_fnc();
+    }
+
+    if (!volume->emboss_shape.has_value())
+        return selection_transformation_fnc();
+
+    const std::optional<Transform3d> &fix_tr = volume->emboss_shape->fix_3mf_tr;
+    if (!fix_tr.has_value())
+        return selection_transformation_fnc();
+
+    Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
+    gl_volume->set_volume_transformation(volume_tr * fix_tr->inverse());
+    selection.setup_cache();
+
+    selection_transformation_fnc();
+
+    volume_tr = gl_volume->get_volume_transformation().get_matrix();
+    gl_volume->set_volume_transformation(volume_tr * (*fix_tr));
+    selection.setup_cache();
+}
+
 bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas)
 {
     const Vec3d &cam_dir = camera.get_dir_forward();
@@ -312,9 +342,14 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
     if (!selection.is_single_full_object() && !selection.is_single_volume()) return;
 
     selection.setup_cache();
-    TransformationType transformation_type = selection.is_single_volume() ? 
-        TransformationType::Local_Relative_Joint : TransformationType::Instance_Relative_Joint;
-    selection.rotate(Vec3d(0., 0., relative_angle), transformation_type);
+
+    auto selection_rotate_fnc = [&selection, &relative_angle](){
+        TransformationType transformation_type = selection.is_single_volume() ? 
+            TransformationType::Local_Relative_Joint : 
+            TransformationType::Instance_Relative_Joint;
+        selection.rotate(Vec3d(0., 0., relative_angle), transformation_type);    
+    };
+    selection_transform(selection, selection_rotate_fnc);
 
     std::string snapshot_name; // empty meand no store undo / redo
     // NOTE: it use L instead of _L macro because prefix _ is appended
@@ -330,8 +365,11 @@ void do_local_z_move(GLCanvas3D &canvas, double relative_move) {
     if (selection.is_empty()) return;
 
     selection.setup_cache();
-    Vec3d translate = Vec3d::UnitZ() * relative_move;
-    selection.translate(translate, TransformationType::Local);
+    auto selection_translate_fnc = [&selection, relative_move]() {
+        Vec3d translate = Vec3d::UnitZ() * relative_move;
+        selection.translate(translate, TransformationType::Local);
+    };
+    selection_transform(selection, selection_translate_fnc);
 
     std::string snapshot_name; // empty mean no store undo / redo
     // NOTE: it use L instead of _L macro because prefix _ is appended inside
