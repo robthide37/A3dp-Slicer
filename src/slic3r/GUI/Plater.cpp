@@ -1682,7 +1682,10 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
         if (file_extension.CmpNoCase(".svg") == 0) {
             const wxPoint offset = m_plater.GetPosition();
             Vec2d mouse_position(x - offset.x, y - offset.y);
-            return emboss_svg(m_plater, filename,mouse_position);
+            // Scale for retina displays
+            const GLCanvas3D *canvas = m_plater.canvas3D();
+            canvas->apply_retina_scale(mouse_position);
+            return emboss_svg(m_plater, filename, mouse_position);
         }
     }
     bool res = m_plater.load_files(filenames);
