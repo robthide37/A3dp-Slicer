@@ -3611,8 +3611,14 @@ GuiCfg create_gui_configuration()
     cfg.input_width = letter_m_size.x * count_letter_M_in_input;
     GuiCfg::Translations &tr = cfg.translations;
 
+    // TRN - Input label. Be short as possible
+    // Select look of letter shape
     tr.font   = _u8L("Font");
+    // TRN - Input label. Be short as possible
+    // Height of one text line - Font Ascent
     tr.height = _u8L("Height");
+    // TRN - Input label. Be short as possible
+    // Size in emboss direction
     tr.depth  = _u8L("Depth");
 
     float max_text_width = std::max({
@@ -3622,17 +3628,45 @@ GuiCfg create_gui_configuration()
     cfg.indent       = static_cast<float>(cfg.icon_width);
     cfg.input_offset = style.WindowPadding.x + cfg.indent + max_text_width + space;
 
-    tr.use_surface  = _u8L("Use surface");
-    tr.per_glyph    = _u8L("Per glyph orientation");
-    tr.alignment    = _u8L("Alignment");
-    tr.char_gap     = _u8L("Char gap");
-    tr.line_gap     = _u8L("Line gap");
-    tr.boldness     = _u8L("Boldness");
-    tr.skew_ration  = _u8L("Skew ratio");
+    // TRN - Input label. Be short as possible
+    // Copy surface of model on surface of the embossed text
+    tr.use_surface = _u8L("Use surface");
+    // TRN - Input label. Be short as possible
+    // Option to change projection on curved surface 
+    // for each character in text separately
+    tr.per_glyph = _u8L("Per glyph orientation");
+    // TRN - Input label. Be short as possible
+    // Align Top|Middle|Bottom and Left|Center|Right
+    tr.alignment = _u8L("Alignment");
+    // TRN - Input label. Be short as possible
+    tr.char_gap = _u8L("Char gap");
+    // TRN - Input label. Be short as possible
+    tr.line_gap = _u8L("Line gap");
+    // TRN - Input label. Be short as possible
+    tr.boldness = _u8L("Boldness");
+
+    // TRN - Input label. Be short as possible
+    // Like Font italic 
+    tr.skew_ration = _u8L("Skew ratio");
+
+    // TRN - Input label. Be short as possible
+    // Distance from model surface to be able 
+    // move text as part fully into not flat surface
+    // move text as modifier fully out of not flat surface
     tr.from_surface = _u8L("From surface");
-    tr.rotation     = _u8L("Rotation");
-    tr.keep_up      = _u8L("Keep Up");
-    tr.collection   = _u8L("Collection");
+
+    // TRN - Input label. Be short as possible
+    // Angle between Y axis and text line direction.
+    tr.rotation = _u8L("Rotation");
+
+    // TRN - Input label. Be short as possible
+    // Keep vector from bottom to top of text aligned with printer Y axis
+    tr.keep_up = _u8L("Keep Up");
+
+    // TRN - Input label. Be short as possible. 
+    // Some Font file contain multiple fonts inside and
+    // this is numerical selector of font inside font collections
+    tr.collection = _u8L("Collection");
 
     float max_advanced_text_width = std::max({
         ImGui::CalcTextSize(tr.use_surface.c_str()).x,
@@ -3654,7 +3688,7 @@ GuiCfg create_gui_configuration()
     float window_title = line_height + 2*style.FramePadding.y + 2 * style.WindowTitleAlign.y;
     float input_height = line_height_with_spacing + 2*style.FramePadding.y;
     float tree_header  = line_height_with_spacing;
-    float separator_height = 1 + style.FramePadding.y;
+    float separator_height = 2 + style.FramePadding.y;
 
     // "Text is to object" + radio buttons
     cfg.height_of_volume_type_selector = separator_height + line_height_with_spacing + input_height;

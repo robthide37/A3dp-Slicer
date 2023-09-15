@@ -1983,11 +1983,17 @@ GuiCfg create_gui_configuration() {
     GuiCfg::Translations &tr = cfg.translations;
 
     float lock_width = cfg.icon_width + 3 * space;
+    // TRN - Input label. Be short as possible
     tr.depth       = _u8L("Depth");
+    // TRN - Input label. Be short as possible
     tr.size        = _u8L("Size");
+    // TRN - Input label. Be short as possible
     tr.use_surface = _u8L("Use surface");
+    // TRN - Input label. Be short as possible
     tr.distance    = _u8L("From surface");
+    // TRN - Input label. Be short as possible
     tr.rotation    = _u8L("Rotation");
+    // TRN - Input label. Be short as possible
     tr.mirror      = _u8L("Mirror");
     float max_tr_width = std::max({
         ImGui::CalcTextSize(tr.depth.c_str()).x,
@@ -2013,7 +2019,7 @@ GuiCfg create_gui_configuration() {
 
     float window_title     = line_height + 2 * style.FramePadding.y + 2 * style.WindowTitleAlign.y;
     float input_height     = line_height_with_spacing + 2 * style.FramePadding.y;
-    float separator_height = 1 + style.FramePadding.y;
+    float separator_height = 2 + style.FramePadding.y;
     float window_height = 
         window_title + // window title
         cfg.texture_max_size_px +  // preview
