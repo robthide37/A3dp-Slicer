@@ -904,6 +904,10 @@ size_t ConfigBase::load_from_gcode_string_legacy(ConfigBase& config, const char*
         end = start;
     }
 
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    config.handle_legacy_composite();
+
     return num_key_value_pairs;
 }
 
@@ -1073,6 +1077,10 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &filename
 
     if (key_value_pairs < 80)
         throw Slic3r::RuntimeError(format("Suspiciously low number of configuration values extracted from %1%: %2%", filename, key_value_pairs));
+
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    this->handle_legacy_composite();
     return std::move(substitutions_ctxt.substitutions);
 }
 
@@ -1114,6 +1122,9 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
         this->set_deserialize(key, value, substitutions_ctxt);
     }
 
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    this->handle_legacy_composite();
     return std::move(substitutions_ctxt.substitutions);
 }
 
