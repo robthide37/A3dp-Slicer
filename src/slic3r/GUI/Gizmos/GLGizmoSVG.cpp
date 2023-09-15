@@ -1830,7 +1830,7 @@ void GLGizmoSVG::draw_mirroring()
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
 
-        auto selection_mirror_fnc = [&selection, &axis, &volume = *m_volume](){        
+        auto selection_mirror_fnc = [&selection, &axis](){        
             TransformationType type = selection.is_single_volume()? 
                 TransformationType::Local:
                 TransformationType::Instance;
