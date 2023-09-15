@@ -22,6 +22,7 @@
 #include "PrintConfig.hpp"
 #include "Config.hpp"
 #include "I18N.hpp"
+#include "format.hpp"
 
 #include "SLA/SupportTree.hpp"
 #include "GCode/Thumbnails.hpp"
@@ -3175,8 +3176,8 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("use_firmware_retraction", coBool);
     def->label = L("Use firmware retraction");
-    def->tooltip = L("This experimental setting uses G10 and G11 commands to have the firmware "
-                   "handle the retraction. This is only supported in recent Marlin.");
+    def->tooltip = L("This setting uses G10 and G11 commands to have the firmware "
+                   "handle the retraction. Note that this has to be supported by firmware.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 

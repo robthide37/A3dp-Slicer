@@ -4,6 +4,7 @@
 ///|/
 #include "Thumbnails.hpp"
 #include "../miniz_extension.hpp"
+#include "../format.hpp"
 
 #include <qoi/qoi.h>
 #include <jpeglib.h>
