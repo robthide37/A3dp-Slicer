@@ -261,9 +261,8 @@ struct GuiCfg
     ImVec2 text_size;
 
     // maximal size of face name image
-    Vec2i face_name_size             = Vec2i(100, 0);
-    float face_name_max_width        = 100.f;
-    float face_name_texture_offset_x = 105.f;
+    Vec2i face_name_size             = Vec2i(0, 0);
+    float face_name_texture_offset_x = 0.f;
 
     // maximal texture generate jobs running at once
     unsigned int max_count_opened_font_files = 10;
@@ -3633,8 +3632,8 @@ GuiCfg create_gui_configuration()
     tr.use_surface = _u8L("Use surface");
     // TRN - Input label. Be short as possible
     // Option to change projection on curved surface 
-    // for each character in text separately
-    tr.per_glyph = _u8L("Per glyph orientation");
+    // for each character(glyph) in text separately
+    tr.per_glyph = _u8L("Per glyph");
     // TRN - Input label. Be short as possible
     // Align Top|Middle|Bottom and Left|Center|Right
     tr.alignment = _u8L("Alignment");
@@ -3719,7 +3718,8 @@ GuiCfg create_gui_configuration()
     int max_style_image_width = static_cast<int>(std::round(cfg.max_style_name_width/2 - 2 * style.FramePadding.x));
     int max_style_image_height = static_cast<int>(std::round(1.5 * input_height));
     cfg.max_style_image_size = Vec2i(max_style_image_width, max_style_image_height);
-    cfg.face_name_size.y() = line_height_with_spacing;
+    cfg.face_name_size = Vec2i(cfg.input_width, line_height_with_spacing);
+    cfg.face_name_texture_offset_x = cfg.face_name_size.x() + space;
     return cfg;
 }
 } // namespace
