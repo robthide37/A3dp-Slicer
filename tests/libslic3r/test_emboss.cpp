@@ -244,7 +244,9 @@ void scale(Polygons &polygons, double multiplicator) {
 Polygons load_polygons(const std::string &svg_file) {
     std::string file_path = TEST_DATA_DIR PATH_SEPARATOR + svg_file;
     NSVGimage *image = nsvgParseFromFile(file_path.c_str(), "px", 96.0f);
-    Polygons polygons = to_polygons(*image, NSVGLineParams{1000});
+    NSVGLineParams param{1000};
+    param.scale = 10.;
+    Polygons polygons = to_polygons(*image, param);
     nsvgDelete(image);
     return polygons;
 }
