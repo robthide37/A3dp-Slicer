@@ -2022,7 +2022,7 @@ GuiCfg create_gui_configuration() {
     float separator_height = 2 + style.FramePadding.y;
     float window_height = 
         window_title + // window title
-        cfg.texture_max_size_px +  // preview
+        cfg.texture_max_size_px + 2 * style.FramePadding.y +  // preview
         line_height_with_spacing + // filename
         separator_height + // separator - orange line
         input_height * 7 + // depth + size + use_surface + FromSurface + Rotation + Mirror + FaceTheCamera
