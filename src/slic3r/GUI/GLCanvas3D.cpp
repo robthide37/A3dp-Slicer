@@ -346,7 +346,7 @@ std::string GLCanvas3D::LayersEditing::get_tooltip(const GLCanvas3D& canvas) con
                 }
             }
             if (h > 0.0f)
-                ret = std::to_string(h);
+                ret = format("%.3f", h);
         }
     }
     return ret;
