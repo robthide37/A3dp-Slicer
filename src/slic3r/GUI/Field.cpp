@@ -382,7 +382,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 set_value(str_out, true);
                 wxString error_str;
                 if (errors.has(ThumbnailError::InvalidVal))
-                    error_str += format_wxstr(_L("Invalid input format. Expected vector of dimensions in the following format: \"%1%\""), "XxYxEXT, XxYxEXT, ...");
+                    error_str += format_wxstr(_L("Invalid input format. Expected vector of dimensions in the following format: \"%1%\""), "XxY/EXT, XxY/EXT, ...");
                 if (errors.has(ThumbnailError::OutOfRange)) {
                     if (!error_str.empty())
                         error_str += "\n\n";
