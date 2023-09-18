@@ -175,6 +175,12 @@ static const constexpr std::array<std::pair<const char *, const char *>, 3> TEXT
         {L("Add negative text"),    "add_text_negative" },   // ~ModelVolumeType::NEGATIVE_VOLUME
         {L("Add text modifier"),    "add_text_modifier"},    // ~ModelVolumeType::PARAMETER_MODIFIER
 }};
+// Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
+static const constexpr std::array<std::pair<const char *, const char *>, 3> SVG_VOLUME_ICONS{{
+    {L("Add svg part"),     "svg_part"},     // ~ModelVolumeType::MODEL_PART
+    {L("Add negative svg"), "svg_negative"}, // ~ModelVolumeType::NEGATIVE_VOLUME
+    {L("Add svg modifier"), "svg_modifier"}, // ~ModelVolumeType::PARAMETER_MODIFIER
+}};
 
 static Plater* plater()
 {
@@ -446,7 +452,7 @@ std::vector<wxBitmapBundle*> MenuFactory::get_volume_bitmaps()
 {
     std::vector<wxBitmapBundle*> volume_bmps;
     volume_bmps.reserve(ADD_VOLUME_MENU_ITEMS.size());
-    for (auto item : ADD_VOLUME_MENU_ITEMS)
+    for (const auto& item : ADD_VOLUME_MENU_ITEMS)
         volume_bmps.push_back(get_bmp_bundle(item.second));
     return volume_bmps;
 }
@@ -455,7 +461,16 @@ std::vector<wxBitmapBundle*> MenuFactory::get_text_volume_bitmaps()
 {
     std::vector<wxBitmapBundle*> volume_bmps;
     volume_bmps.reserve(TEXT_VOLUME_ICONS.size());
-    for (auto item : TEXT_VOLUME_ICONS)
+    for (const auto& item : TEXT_VOLUME_ICONS)
+        volume_bmps.push_back(get_bmp_bundle(item.second));
+    return volume_bmps;
+}
+
+std::vector<wxBitmapBundle*> MenuFactory::get_svg_volume_bitmaps()
+{
+    std::vector<wxBitmapBundle *> volume_bmps;
+    volume_bmps.reserve(SVG_VOLUME_ICONS.size());
+    for (const auto &item : SVG_VOLUME_ICONS)
         volume_bmps.push_back(get_bmp_bundle(item.second));
     return volume_bmps;
 }
