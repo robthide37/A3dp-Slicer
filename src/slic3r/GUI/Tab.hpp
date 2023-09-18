@@ -71,9 +71,10 @@ class SubstitutionManager
 	std::function<void()> m_cb_hide_delete_all_btn{ nullptr };
 
 	std::vector<std::string>	m_substitutions;
+	std::vector<wxCheckBox*>	m_chb_match_single_lines;
 
-	void validate_lenth();
-	bool is_compatibile_with_ui();
+	void validate_length();
+	bool is_compatible_with_ui();
 	bool is_valid_id(int substitution_id, const wxString& message);
 
 public:
