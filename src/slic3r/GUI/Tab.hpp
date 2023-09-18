@@ -70,6 +70,8 @@ class SubstitutionManager
 	std::function<void()> m_cb_edited_substitution{ nullptr };
 	std::function<void()> m_cb_hide_delete_all_btn{ nullptr };
 
+	std::vector<std::string>	m_substitutions;
+
 	void validate_lenth();
 	bool is_compatibile_with_ui();
 	bool is_valid_id(int substitution_id, const wxString& message);
