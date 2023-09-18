@@ -1799,7 +1799,7 @@ void TabPrint::update_description_lines()
                 _L("Post processing scripts shall modify G-code file in place."));
             m_post_process_explanation->SetPathEnd("post-processing-scripts_283913");
         }
-        // upadte G-code substitutions from the current configuration
+        // update G-code substitutions from the current configuration
         {
             m_subst_manager.update_from_config();
             if (m_del_all_substitutions_btn)
@@ -4548,7 +4548,7 @@ void SubstitutionManager::init(DynamicPrintConfig* config, wxWindow* parent, wxF
     m_substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
 }
 
-void SubstitutionManager::validate_lenth()
+void SubstitutionManager::validate_length()
 {
     if ((m_substitutions.size() % 4) != 0) {
         WarningDialog(m_parent, "Value of gcode_substitutions parameter will be cut to valid length",
@@ -4559,7 +4559,7 @@ void SubstitutionManager::validate_lenth()
     }
 }
 
-bool SubstitutionManager::is_compatibile_with_ui()
+bool SubstitutionManager::is_compatible_with_ui()
 {
     if (int(m_substitutions.size() / 4) != m_grid_sizer->GetEffectiveRowsCount() - 1) {
         ErrorDialog(m_parent, "Invalid compatibility between UI and BE", false).ShowModal();
@@ -4596,15 +4596,13 @@ void SubstitutionManager::create_legend()
 // delete substitution_id from substitutions
 void SubstitutionManager::delete_substitution(int substitution_id)
 {
-    validate_lenth();
+    validate_length();
     if (!is_valid_id(substitution_id, "Invalid substitution_id to delete"))
         return;
 
     // delete substitution
-    m_substitutions.erase(std::next(m_substitutions.begin(), substitution_id * 4), std::next(m_substitutions.begin(), substitution_id * 4 + 4));
-
-    // save changes from m_substitutions to config 
-    m_config->option<ConfigOptionStrings>("gcode_substitutions")->values = m_substitutions;
+    std::vector<std::string>& substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    substitutions.erase(std::next(substitutions.begin(), substitution_id * 4), std::next(substitutions.begin(), substitution_id * 4 + 4));
 
     call_ui_update();
 
@@ -4695,13 +4693,7 @@ void SubstitutionManager::add_substitution( int substitution_id,
     auto chb_match_single_line = new wxCheckBox(m_parent, wxID_ANY, _L("Match single line"));
     chb_match_single_line->SetValue(match_single_line);
     chb_match_single_line->Show(regexp);
-
-    chb_match_single_line->Bind(wxEVT_SHOW, [chb_match_single_line, chb_regexp](wxShowEvent& evt) {
-        if (evt.IsShown() && !chb_regexp->GetValue()) {
-            // To avoid a case, when ShowAll() is called for m_grid_sizer but chb_match_single_line have to be hidden
-            chb_match_single_line->Hide();
-        }
-    });
+    m_chb_match_single_lines.emplace_back(chb_match_single_line);
 
     params_sizer->Add(chb_match_single_line, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, m_em);
 
@@ -4740,21 +4732,31 @@ void SubstitutionManager::update_from_config()
 {
     std::vector<std::string>& subst = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
     if (m_substitutions == subst && m_grid_sizer->IsShown(1)) {
+        // just update visibility for chb_match_single_lines
+        int subst_id = 0;
+        for (size_t i = 0; i < subst.size(); i += 4) {
+            const std::string& params = subst[i + 2];
+            const bool         regexp = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
+            m_chb_match_single_lines[subst_id++]->Show(regexp);
+        }
+
         // "gcode_substitutions" values didn't changed in config. There is no need to update/recreate controls
         return;
     }
 
     m_substitutions = subst;
 
-    if (!m_grid_sizer->IsEmpty())
+    if (!m_grid_sizer->IsEmpty()) {
         m_grid_sizer->Clear(true);
+        m_chb_match_single_lines.clear();
+    }
 
     if (subst.empty())
         hide_delete_all_btn();
     else
         create_legend();
 
-    validate_lenth();
+    validate_length();
 
     int subst_id = 0;
     for (size_t i = 0; i < subst.size(); i += 4)
@@ -4777,8 +4779,8 @@ void SubstitutionManager::delete_all()
 
 void SubstitutionManager::edit_substitution(int substitution_id, int opt_pos, const std::string& value)
 {
-    validate_lenth();
-    if(!is_compatibile_with_ui() || !is_valid_id(substitution_id, "Invalid substitution_id to edit"))
+    validate_length();
+    if(!is_compatible_with_ui() || !is_valid_id(substitution_id, "Invalid substitution_id to edit"))
         return;
 
     m_substitutions[substitution_id * 4 + opt_pos] = value;
