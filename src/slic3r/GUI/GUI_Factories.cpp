@@ -1021,15 +1021,18 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
     wxString name        = _L("Edit text");
 
     auto can_edit_text = []() {
-        if (plater() != nullptr) {
-            const Selection& sel = plater()->get_selection();
-            if (sel.volumes_count() == 1) {
-                const GLVolume* gl_vol = sel.get_first_volume();
-                const ModelVolume* vol = plater()->model().objects[gl_vol->object_idx()]->volumes[gl_vol->volume_idx()];
-                return vol->text_configuration.has_value();
-            }
-        }
-        return false;
+        if (plater() == nullptr)
+            return false;        
+        const Selection& selection = plater()->get_selection();
+        if (selection.volumes_count() != 1)
+            return false;
+        const GLVolume* gl_volume = selection.get_first_volume();
+        if (gl_volume == nullptr)
+            return false;
+        const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+        if (volume == nullptr)
+            return false;
+        return volume->is_text();        
     };
 
     if (menu != &m_text_part_menu) {
@@ -1041,7 +1044,7 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
     }
 
     wxString description = _L("Ability to change text, font, size, ...");
-    std::string icon = "";
+    std::string icon = "cog";
     auto open_emboss = [](const wxCommandEvent &) {
         GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
         if (mng.get_current_type() == GLGizmosManager::Emboss)
@@ -1049,6 +1052,43 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
         mng.open_gizmo(GLGizmosManager::Emboss);
     };
     append_menu_item(menu, wxID_ANY, name, description, open_emboss, icon, nullptr, can_edit_text, m_parent);
+}
+
+void MenuFactory::append_menu_item_edit_svg(wxMenu *menu)
+{
+    wxString name = _L("Edit svg");
+    auto can_edit_svg = []() {
+        if (plater() == nullptr)
+            return false;        
+        const Selection& selection = plater()->get_selection();
+        if (selection.volumes_count() != 1)
+            return false;
+        const GLVolume* gl_volume = selection.get_first_volume();
+        if (gl_volume == nullptr)
+            return false;
+        const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+        if (volume == nullptr)
+            return false;
+        return volume->is_svg();        
+    };
+
+    if (menu != &m_svg_part_menu) {
+        const int menu_item_id = menu->FindItem(name);
+        if (menu_item_id != wxNOT_FOUND)
+            menu->Destroy(menu_item_id);
+        if (!can_edit_svg())
+            return;
+    }
+
+    wxString description = _L("Ability to change SVG source file, projection, size, ...");
+    std::string icon = "cog";
+    auto open_svg = [](const wxCommandEvent &) {
+        GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
+        if (mng.get_current_type() == GLGizmosManager::Svg)
+            mng.open_gizmo(GLGizmosManager::Svg); // close() and reopen - move to be visible
+        mng.open_gizmo(GLGizmosManager::Svg);
+    };
+    append_menu_item(menu, wxID_ANY, name, description, open_svg, icon, nullptr, can_edit_svg, m_parent);
 }
 
 MenuFactory::MenuFactory()
@@ -1150,8 +1190,20 @@ void MenuFactory::create_text_part_menu()
 {
     wxMenu* menu = &m_text_part_menu;
 
-    append_menu_item_delete(menu);
     append_menu_item_edit_text(menu);
+    append_menu_item_delete(menu);
+    append_menu_item_fix_through_netfabb(menu);
+    append_menu_item_simplify(menu);
+
+    append_immutable_part_menu_items(menu);
+}
+
+void MenuFactory::create_svg_part_menu()
+{
+    wxMenu* menu = &m_svg_part_menu;
+
+    append_menu_item_edit_svg(menu);
+    append_menu_item_delete(menu);
     append_menu_item_fix_through_netfabb(menu);
     append_menu_item_simplify(menu);
 
@@ -1175,6 +1227,7 @@ void MenuFactory::init(wxWindow* parent)
     create_common_object_menu(&m_sla_object_menu);
     create_part_menu();
     create_text_part_menu();
+    create_svg_part_menu();
     create_instance_menu();
 }
 
@@ -1197,6 +1250,7 @@ wxMenu* MenuFactory::object_menu()
     update_menu_items_instance_manipulation(mtObjectFFF);
     append_menu_item_invalidate_cut_info(&m_object_menu);
     append_menu_item_edit_text(&m_object_menu);
+    append_menu_item_edit_svg(&m_object_menu);
 
     return &m_object_menu;
 }
@@ -1208,6 +1262,7 @@ wxMenu* MenuFactory::sla_object_menu()
     update_menu_items_instance_manipulation(mtObjectSLA);
     append_menu_item_invalidate_cut_info(&m_sla_object_menu);
     append_menu_item_edit_text(&m_sla_object_menu);
+    append_menu_item_edit_svg(&m_object_menu);
 
     return &m_sla_object_menu;
 }
@@ -1226,6 +1281,12 @@ wxMenu* MenuFactory::text_part_menu()
     append_mutable_part_menu_items(&m_text_part_menu);
 
     return &m_text_part_menu;
+}
+
+wxMenu *MenuFactory::svg_part_menu()
+{
+    append_mutable_part_menu_items(&m_svg_part_menu);
+    return &m_svg_part_menu;
 }
 
 wxMenu* MenuFactory::instance_menu()

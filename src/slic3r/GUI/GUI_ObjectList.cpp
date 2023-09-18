@@ -1040,7 +1040,11 @@ void ObjectList::show_context_menu(const bool evt_context_menu)
                 get_selected_item_indexes(obj_idx, vol_idx, item);
                 if (obj_idx < 0 || vol_idx < 0)
                     return;
-                menu = object(obj_idx)->volumes[vol_idx]->text_configuration.has_value() ? plater->text_part_menu() : plater->part_menu();
+                const ModelVolume *volume = object(obj_idx)->volumes[vol_idx];
+
+                menu = volume->is_text() ? plater->text_part_menu() : 
+                       volume->is_svg() ? plater->svg_part_menu() : 
+                    plater->part_menu();
             }
             else
                 menu = type & itInstance             ? plater->instance_menu() :
