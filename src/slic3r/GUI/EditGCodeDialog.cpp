@@ -8,6 +8,7 @@
 #include <wx/textctrl.h>
 #include <wx/button.h>
 #include <wx/wupdlock.h>
+#include <wx/html/htmlwin.h>
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
@@ -39,6 +40,39 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
 
     int border = 10;
     int em = em_unit();
+
+    // append info line with link on printables.com
+    wxHtmlWindow* html_window = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxSize(60 * em, 5 * em), wxHW_SCROLLBAR_NEVER);
+
+    html_window->Bind(wxEVT_HTML_LINK_CLICKED, [](wxHtmlLinkEvent& event) {
+        wxGetApp().open_browser_with_warning_dialog(event.GetLinkInfo().GetHref());
+        event.Skip(false);
+    });
+
+    const auto text_clr = wxGetApp().get_label_clr_default();
+    const auto bgr_clr_str = wxGetApp().get_html_bg_color(parent);
+    const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
+
+    //TRN this word-combination is a part of phraze "For more information about placeholders and its use visit our help page"
+    const wxString link = format_wxstr("<a href = \"%1%\">%2%</a>", "help.prusa3d.com/article/macros_1775", _L("help page"));
+
+    // TRN ConfigWizard : Downloader : %1% = "help page"
+    const wxString main_text = format_wxstr(_L("For more information about placeholders and its use visit our %1%."), link);
+
+    const wxFont& font = this->GetFont();
+    const int fs = font.GetPointSize();
+    int size[] = { fs,fs,fs,fs,fs,fs,fs };
+    html_window->SetFonts(font.GetFaceName(), font.GetFaceName(), size);
+
+    html_window->SetPage(format_wxstr(
+        "<html><body bgcolor=%1% link=%2%>"
+        "<font color=%2% size=\"3\">%3%</font>"
+        "</body></html>"
+        , bgr_clr_str
+        , text_clr_str
+        , main_text
+    ));
+
 
     wxStaticText* label_top = new wxStaticText(this, wxID_ANY, _L("Built-in placeholders (Double click item to add to G-code)") + ":");
 
@@ -80,6 +114,7 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
 
     wxBoxSizer* topSizer = new wxBoxSizer(wxVERTICAL);
 
+    topSizer->Add(html_window         , 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
     topSizer->Add(label_top           , 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
     topSizer->Add(grid_sizer          , 1, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
     topSizer->Add(m_param_label       , 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
