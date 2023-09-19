@@ -45,7 +45,7 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
     auto* grid_sizer = new wxFlexGridSizer(1, 3, 5, 15);
     grid_sizer->SetFlexibleDirection(wxBOTH);
 
-    m_params_list = new ParamsViewCtrl(this, wxSize(em * 30, em * 70));
+    m_params_list = new ParamsViewCtrl(this, wxSize(em * 45, em * 70));
     m_params_list->SetFont(wxGetApp().code_font());
     wxGetApp().UpdateDarkUI(m_params_list);
 
@@ -58,6 +58,7 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
 #endif
     );
     m_gcode_editor->SetFont(wxGetApp().code_font());
+    m_gcode_editor->SetInsertionPointEnd();
     wxGetApp().UpdateDarkUI(m_gcode_editor);
 
     grid_sizer->Add(m_params_list,  1, wxEXPAND);
@@ -95,6 +96,13 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
 
     init_params_list(key);
     bind_list_and_button();
+}
+
+EditGCodeDialog::~EditGCodeDialog()
+{
+    // To avoid redundant process of wxEVT_DATAVIEW_SELECTION_CHANGED after dialog distroing (on Linux)
+    // unbind this event from params_list
+    m_params_list->Unbind(wxEVT_DATAVIEW_SELECTION_CHANGED, &EditGCodeDialog::selection_changed, this);
 }
 
 std::string EditGCodeDialog::get_edited_gcode() const
@@ -229,74 +237,90 @@ wxDataViewItem EditGCodeDialog::add_presets_placeholders()
 void EditGCodeDialog::add_selected_value_to_gcode()
 {
     const wxString val = m_params_list->GetSelectedValue();
-    if (!val.IsEmpty())
-        m_gcode_editor->WriteText(val + "\n");
+    if (val.IsEmpty())
+        return;
+
+    const long pos = m_gcode_editor->GetInsertionPoint();
+    m_gcode_editor->WriteText(m_gcode_editor->GetInsertionPoint() == m_gcode_editor->GetLastPosition() ? "\n" + val : val);
+
+    if (val.Last() == ']') {
+        const long new_pos = m_gcode_editor->GetInsertionPoint();
+        if (val[val.Len() - 2] == '[')
+            m_gcode_editor->SetInsertionPoint(new_pos - 1);          // set cursor into brackets
+        else
+            m_gcode_editor->SetSelection(new_pos - 17, new_pos - 1); // select "current_extruder"
+    }
+
+    m_gcode_editor->SetFocus();
+}
+
+void EditGCodeDialog::selection_changed(wxDataViewEvent& evt)
+{   
+    wxString label;
+    wxString description;
+
+    const std::string opt_key = m_params_list->GetSelectedParamKey();
+    if (!opt_key.empty()) {
+        const ConfigOptionDef*    def     { nullptr };
+
+        const auto& full_config = wxGetApp().preset_bundle->full_config();
+        if (const ConfigDef* config_def = full_config.def(); config_def && config_def->has(opt_key)) {
+            def = config_def->get(opt_key);
+        }
+        else {
+            for (const ConfigDef* config: std::initializer_list<const ConfigDef*> {
+                    &custom_gcode_specific_config_def,
+                    &cgp_ro_slicing_states_config_def,
+                    &cgp_rw_slicing_states_config_def,
+                    &cgp_other_slicing_states_config_def,
+                    &cgp_print_statistics_config_def,
+                    &cgp_objects_info_config_def,
+                    &cgp_dimensions_config_def,
+                    &cgp_timestamps_config_def,
+                    &cgp_other_presets_config_def
+            }) {
+                if (config->has(opt_key)) {
+                    def = config->get(opt_key);
+                    break;
+                }
+            }
+        }
+
+        if (def) {
+            const ConfigOptionType scalar_type = def->is_scalar() ? def->type : static_cast<ConfigOptionType>(def->type - coVectorType);
+            wxString type_str = scalar_type == coNone           ? "none" :
+                                scalar_type == coFloat          ? "float" : 
+                                scalar_type == coInt            ? "integer" :
+                                scalar_type == coString         ? "string" :
+                                scalar_type == coPercent        ? "percent" :
+                                scalar_type == coFloatOrPercent ? "float or percent" :
+                                scalar_type == coPoint          ? "point" :
+                                scalar_type == coBool           ? "bool" :
+                                scalar_type == coEnum           ? "enum" : "undef";
+            if (!def->is_scalar())
+                type_str += "[]";
+
+            label = (!def || (def->full_label.empty() && def->label.empty()) ) ? format_wxstr("%1%\n(%2%)", opt_key, type_str) :
+                    (!def->full_label.empty() && !def->label.empty() ) ?
+                    format_wxstr("%1% > %2%\n(%3%)", _(def->full_label), _(def->label), type_str) :
+                    format_wxstr("%1%\n(%2%)", def->label.empty() ? _(def->full_label) : _(def->label), type_str);
+
+            if (def)
+                description = get_wraped_wxString(_(def->tooltip), 120);
+        }
+        else
+            label = "Undef optptr";
+    }
+
+    m_param_label->SetLabel(label);
+    m_param_description->SetLabel(description);
+
+    Layout();
 }
 
 void EditGCodeDialog::bind_list_and_button()
 {
-    m_params_list->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxDataViewEvent& evt) {
-        wxString label;
-        wxString description;
-
-        const std::string opt_key = m_params_list->GetSelectedParamKey();
-        if (!opt_key.empty()) {
-            const ConfigOptionDef*    def     { nullptr };
-
-            const auto& full_config = wxGetApp().preset_bundle->full_config();
-            if (const ConfigDef* config_def = full_config.def(); config_def && config_def->has(opt_key)) {
-                def = config_def->get(opt_key);
-            }
-            else {
-                for (const ConfigDef* config: std::initializer_list<const ConfigDef*> {
-                     &custom_gcode_specific_config_def,
-                     &cgp_ro_slicing_states_config_def,
-                     &cgp_rw_slicing_states_config_def,
-                     &cgp_other_slicing_states_config_def,
-                     &cgp_print_statistics_config_def,
-                     &cgp_objects_info_config_def,
-                     &cgp_dimensions_config_def,
-                     &cgp_timestamps_config_def,
-                     &cgp_other_presets_config_def
-                }) {
-                    if (config->has(opt_key)) {
-                        def = config->get(opt_key);
-                        break;
-                    }
-                }
-            }
-
-            if (def) {
-                const ConfigOptionType scalar_type = def->is_scalar() ? def->type : static_cast<ConfigOptionType>(def->type - coVectorType);
-                wxString type_str = scalar_type == coNone           ? "none" :
-                                    scalar_type == coFloat          ? "float" : 
-                                    scalar_type == coInt            ? "integer" :
-                                    scalar_type == coString         ? "string" :
-                                    scalar_type == coPercent        ? "percent" :
-                                    scalar_type == coFloatOrPercent ? "float or percent" :
-                                    scalar_type == coPoint          ? "point" :
-                                    scalar_type == coBool           ? "bool" :
-                                    scalar_type == coEnum           ? "enum" : "undef";
-                if (!def->is_scalar())
-                    type_str += "[]";
-
-                label = (!def || (def->full_label.empty() && def->label.empty()) ) ? format_wxstr("%1%\n(%2%)", opt_key, type_str) :
-                        (!def->full_label.empty() && !def->label.empty() ) ?
-                        format_wxstr("%1% > %2%\n(%3%)", _(def->full_label), _(def->label), type_str) :
-                        format_wxstr("%1%\n(%2%)", def->label.empty() ? _(def->full_label) : _(def->label), type_str);
-
-                if (def)
-                    description = get_wraped_wxString(_(def->tooltip), 120);
-            }
-            else
-                label = "Undef optptr";
-        }
-
-        m_param_label->SetLabel(label);
-        m_param_description->SetLabel(description);
-
-        Layout();
-    });
+    m_params_list->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, &EditGCodeDialog::selection_changed, this);
 
     m_params_list->Bind(wxEVT_DATAVIEW_ITEM_ACTIVATED, [this](wxDataViewEvent& ) {
         add_selected_value_to_gcode();
