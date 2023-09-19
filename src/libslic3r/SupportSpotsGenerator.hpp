@@ -147,6 +147,33 @@ struct PartialObject
     bool  connected_to_bed;
 };
 
+
+/**
+ * Unsacled values of integrals over a polygonal domain.
+ */
+class Integrals{
+  public:
+    /**
+     * Construct integral x_i int x_i^2 (i=1,2), xy and integral 1 (area).
+     *
+     * @param polygons List of polygons specifing the domain.
+     */
+    explicit Integrals(const Polygons& polygons);
+
+    // TODO refactor and delete the default constructor
+    Integrals() = default;
+
+    float area{};
+    Vec2f x_i{Vec2f::Zero()};
+    Vec2f x_i_squared{Vec2f::Zero()};
+    float xy{};
+};
+
+float compute_second_moment(
+    const Integrals& integrals,
+    const Vec2f& axis_direction
+);
+
 using PartialObjects = std::vector<PartialObject>;
 
 // Both support points and partial objects are sorted from the lowest z to the highest
