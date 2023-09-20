@@ -1666,10 +1666,10 @@ void MainFrame::init_menubar_as_gcodeviewer()
             "", nullptr, [this]() { return !m_plater->get_last_loaded_gcode().empty(); }, this);
 #endif // __APPLE__
         fileMenu->AppendSeparator();
-        append_menu_item(fileMenu, wxID_ANY, _L("Convert ascii G-code to &binary") + dots, _L("Convert a G-code file from ascii to binary format"),
+        append_menu_item(fileMenu, wxID_ANY, _L("Convert ASCII G-code to &binary") + dots, _L("Convert a G-code file from ASCII to binary format"),
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_binary(); }, "convert_file", nullptr,
             []() { return true; }, this);
-        append_menu_item(fileMenu, wxID_ANY, _L("Convert binary G-code to &ascii") + dots, _L("Convert a G-code file from binary to ascii format"),
+        append_menu_item(fileMenu, wxID_ANY, _L("Convert binary G-code to &ASCII") + dots, _L("Convert a G-code file from binary to ASCII format"),
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_ascii(); }, "convert_file", nullptr,
             []() { return true; }, this);
         fileMenu->AppendSeparator();

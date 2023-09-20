@@ -310,7 +310,7 @@ void PrintConfigDef::init_common_params()
 
     def = this->add("thumbnails", coString);
     def->label = L("G-code thumbnails");
-    def->tooltip = L("Picture sizes to be stored into a .gcode and .sl1 / .sl1s files, in the following format: \"XxY/EXT, XxY/EXT, ...\"");
+    def->tooltip = L("Picture sizes to be stored into a .gcode / .bgcode and .sl1 / .sl1s files, in the following format: \"XxY/EXT, XxY/EXT, ...\"");
     def->mode = comExpert;
     def->gui_type = ConfigOptionDef::GUIType::one_string;
     def->set_default_value(new ConfigOptionString());
@@ -429,8 +429,8 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("arc_fitting", coEnum);
     def->label = L("Arc fitting");
-    def->tooltip = L("Enable this to get a G-code file which has G2 and G3 moves. "
-                     "And the fitting tolerance is same with resolution");
+    def->tooltip = L("Enable to get a G-code file which has G2 and G3 moves. "
+                     "G-code resolution will be used as the fitting tolerance.");
     def->set_enum<ArcFittingType>({
         { "disabled",       "Disabled" },
         { "emit_center",    "Enabled: G2/3 I J" },
@@ -442,8 +442,8 @@ void PrintConfigDef::init_fff_params()
     def = this->add("arc_fitting_tolerance", coFloatOrPercent);
     def->label = L("Arc fitting tolerance");
     def->sidetext = L("mm or %");
-    def->tooltip = L("When using the arc_fitting option, allow the curve to deviate a cetain % from the collection of strait paths.\n"
-                     "Can be a mm value or a percentage of the current extrusion width.");
+    def->tooltip = L("When using the arc_fitting option, allow the curve to deviate certain % from the collection of straight paths.\n"
+                     "Can be either a mm value or a percentage of the current extrusion width.");
     def->mode = comAdvanced;
     def->min = 0;
     def->set_default_value(new ConfigOptionFloatOrPercent(5, true));
@@ -5103,6 +5103,7 @@ OtherSlicingStatesConfigDef::OtherSlicingStatesConfigDef()
     def->tooltip = L("Zero-based index of the first extruder used in the print. Same as initial_tool.");
 
     def = this->add("initial_filament_type", coString);
+    // TRN: Meaning 'filament type of the initial filament'
     def->label = L("Initial filament type");
     def->tooltip = L("String containing filament type of the first used extruder.");
 
@@ -5145,15 +5146,15 @@ PrintStatisticsConfigDef::PrintStatisticsConfigDef()
 
     def = this->add("total_cost", coFloat);
     def->label = L("Total cost");
-    def->tooltip = L("Total cost of all material used in the print. Calculated from filament_cost value in Filament Settings.");
+    def->tooltip = L("Total cost of all material used in the print. Calculated from cost in Filament Settings.");
 
     def = this->add("total_weight", coFloat);
     def->label = L("Total weight");
-    def->tooltip = L("Total weight of the print. Calculated from filament_density value in Filament Settings.");
+    def->tooltip = L("Total weight of the print. Calculated from density in Filament Settings.");
 
     def = this->add("total_wipe_tower_cost", coFloat);
     def->label = L("Total wipe tower cost");
-    def->tooltip = L("Total cost of the material wasted on the wipe tower. Calculated from filament_cost value in Filament Settings.");
+    def->tooltip = L("Total cost of the material wasted on the wipe tower. Calculated from cost in Filament Settings.");
 
     def = this->add("total_wipe_tower_filament", coFloat);
     def->label = L("Wipe tower volume");
@@ -5164,7 +5165,7 @@ PrintStatisticsConfigDef::PrintStatisticsConfigDef()
     def->tooltip = L("Total length of filament used in the print.");
 
     def = this->add("total_toolchanges", coInt);
-    def->label = L("Total toolchanges");
+    def->label = L("Total number of toolchanges");
     def->tooltip = L("Number of toolchanges during the print.");
 
     def = this->add("extruded_volume_total", coFloat);
@@ -5173,11 +5174,11 @@ PrintStatisticsConfigDef::PrintStatisticsConfigDef()
 
     def = this->add("extruded_weight", coFloats);
     def->label = L("Weight per extruder");
-    def->tooltip = L("Weight per extruder extruded during the entire print. Calculated from filament_density value in Filament Settings.");
+    def->tooltip = L("Weight per extruder extruded during the entire print. Calculated from density in Filament Settings.");
 
     def = this->add("extruded_weight_total", coFloat);
     def->label = L("Total weight");
-    def->tooltip = L("Total weight of the print. Calculated from filament_density value in Filament Settings.");
+    def->tooltip = L("Total weight of the print. Calculated from density in Filament Settings.");
 
     def = this->add("total_layer_count", coInt);
     def->label = L("Total layer count");

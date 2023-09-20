@@ -391,7 +391,7 @@ void Field::get_value_by_opt_type(wxString& str, const bool check_value/* = true
                 if (errors.has(ThumbnailError::InvalidExt)) {
                     if (!error_str.empty())
                         error_str += "\n\n";
-                    error_str += _L("Some input extention is invalid");
+                    error_str += _L("Some extension in the input is invalid");
                 }
                 show_error(m_parent, error_str);
             }

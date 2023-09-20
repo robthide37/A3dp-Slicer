@@ -33,6 +33,7 @@ namespace GUI {
 //------------------------------------------
 
 EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const std::string& value) :
+    // TRN: This is title of a dialog. The argument is the name of the currently edited custom G-code.
     DPIDialog(parent, wxID_ANY, format_wxstr(_L("Edit Custom G-code (%1%)"), key), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
     SetFont(wxGetApp().normal_font());
@@ -218,6 +219,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
     // Add specific placeholders
 
     if (!specific_params.empty()) {
+        // TRN: The argument is the name of currently edited custom gcode. The string starts a section of placeholders only available in this gcode.
         wxDataViewItem group = m_params_list->AppendGroup(format_wxstr(_L("Specific for %1%"), custom_gcode_name), "add_gcode");
         for (const auto& opt_key : specific_params)
             if (custom_gcode_specific_config_def.has(opt_key)) {
