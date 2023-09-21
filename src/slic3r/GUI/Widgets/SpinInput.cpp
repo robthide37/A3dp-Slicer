@@ -73,8 +73,8 @@ void SpinInput::Create(wxWindow *parent,
     text_ctrl->Bind(wxEVT_TEXT_ENTER, &SpinInput::onTextEnter, this);
     text_ctrl->Bind(wxEVT_KEY_DOWN, &SpinInput::keyPressed, this);
     text_ctrl->Bind(wxEVT_RIGHT_DOWN, [this](auto &e) {}); // disable context menu
-    button_inc = createButton(true);
-    button_dec = createButton(false);
+    button_inc = create_button(ButtonId::btnIncrease);
+    button_dec = create_button(ButtonId::btnDecrease);
     delta      = 0;
     timer.Bind(wxEVT_TIMER, &SpinInput::onTimer, this);
 
@@ -265,11 +265,11 @@ void SpinInput::render(wxDC& dc)
     // draw seperator of buttons
     wxPoint pt = button_inc->GetPosition();
     pt.y = size.y / 2;
-    pt.x += 1;
     dc.SetPen(wxPen(border_color.defaultColor()));
 
     const double scale = dc.GetContentScaleFactor();
-    dc.DrawLine(pt, pt + wxSize{button_inc->GetSize().x - int(3. * scale), 0});
+    const int    btn_w = button_inc->GetSize().GetWidth();
+    dc.DrawLine(pt, pt + wxSize{ btn_w - int(scale), 0});
     // draw label
     auto label = GetLabel();
     if (!label.IsEmpty()) {
@@ -308,16 +308,16 @@ void SpinInput::messureSize()
     button_dec->SetPosition({size.x - btnSize.x - int(3. * scale), size.y / 2 + 1});
 }
 
-Button *SpinInput::createButton(bool inc)
+Button *SpinInput::create_button(ButtonId id)
 {
-    auto btn = new Button(this, "", inc ? "spin_inc_act" : "spin_dec_act", wxBORDER_NONE, wxSize(12, 7));
+    auto btn = new Button(this, "", id == ButtonId::btnIncrease ? "spin_inc_act" : "spin_dec_act", wxBORDER_NONE, wxSize(12, 7));
     btn->SetCornerRadius(0);
-    btn->SetInactiveIcon(inc ? "spin_inc" : "spin_dec");
+    btn->SetInactiveIcon(id == ButtonId::btnIncrease ? "spin_inc" : "spin_dec");
     btn->DisableFocusFromKeyboard();
     btn->SetSelected(false);
 
     btn->Bind(wxEVT_LEFT_DOWN, [=](auto &e) {
-        delta = inc ? 1 : -1;
+        delta = id == ButtonId::btnIncrease ? 1 : -1;
         SetValue(val + delta);
         text_ctrl->SetFocus();
         btn->CaptureMouse();
@@ -326,7 +326,7 @@ Button *SpinInput::createButton(bool inc)
         sendSpinEvent();
     });
     btn->Bind(wxEVT_LEFT_DCLICK, [=](auto &e) {
-        delta = inc ? 1 : -1;
+        delta = id == ButtonId::btnIncrease ? 1 : -1;
         btn->CaptureMouse();
         SetValue(val + delta);
         sendSpinEvent();

@@ -24,6 +24,12 @@ class SpinInput : public wxNavigationEnabled<StaticBox>
     static const int SpinInputWidth = 200;
     static const int SpinInputHeight = 50;
 
+    enum class ButtonId
+    {
+        btnIncrease,
+        btnDecrease
+    };
+
 public:
     SpinInput();
 
@@ -90,7 +96,7 @@ private:
 
     void messureSize();
 
-    Button *createButton(bool inc);
+    Button *create_button(ButtonId id);
 
     // some useful events
     void mouseWheelMoved(wxMouseEvent& event);
