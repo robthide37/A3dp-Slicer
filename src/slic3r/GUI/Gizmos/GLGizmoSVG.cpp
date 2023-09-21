@@ -1687,10 +1687,7 @@ void GLGizmoSVG::draw_size()
         selection.setup_cache();
 
         auto selection_scale_fnc = [&selection, rel_scale = *new_relative_scale]() {
-            TransformationType type = selection.is_single_volume() ? 
-                TransformationType::Local_Relative_Independent:
-                TransformationType::Instance_Relative_Independent;
-            selection.scale(rel_scale, type);
+            selection.scale(rel_scale, get_transformation_type(selection));
         };        
         selection_transform(selection, selection_scale_fnc, m_volume);
 
@@ -1853,11 +1850,8 @@ void GLGizmoSVG::draw_mirroring()
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
 
-        auto selection_mirror_fnc = [&selection, &axis](){        
-            TransformationType type = selection.is_single_volume()? 
-                TransformationType::Local:
-                TransformationType::Instance;
-            selection.mirror(axis, type);
+        auto selection_mirror_fnc = [&selection, &axis](){
+            selection.mirror(axis, get_transformation_type(selection));
         };
         selection_transform(selection, selection_mirror_fnc, m_volume);
 
