@@ -53,7 +53,9 @@ namespace{
 // Variable keep limits for variables
 const struct Limits
 {
-    MinMax<double> depth{0.01f, 1e4f}; // in mm
+    MinMax<double> depth{0.01, 1e4}; // in mm
+    MinMax<float> size{0.01f, 1e4f}; // in mm (width + height)
+    MinMax<double> relative_scale_ratio{1e-5, 1e4}; // change size
     // distance text object from surface
     MinMax<float> angle{-180.f, 180.f}; // in degrees
 } limits;
@@ -1586,9 +1588,20 @@ void GLGizmoSVG::draw_size()
     double height = size.y() * m_volume_shape.scale * m_scale_height.value_or(1.f);
     if (use_inch) height *= ObjectManipulation::mm_to_in;
 
-    std::optional<Vec3d> new_relative_scale;
-    const double minimal_scale_ratio_change = 1e-4;
+    const auto is_valid_scale_ratio = [limit = &limits.relative_scale_ratio](double ratio) {
+        if (std::fabs(ratio - 1.) < limit->min)
+            return false; // too small ratio --> without effect
 
+        if (ratio > limit->max)
+            return false;
+
+        if (ratio < 0.)
+            return false;
+
+        return true;    
+    };
+
+    std::optional<Vec3d> new_relative_scale;
     if (m_keep_ratio) {
         std::stringstream ss;
         ss << std::setprecision(2) << std::fixed << width << " x " << height << " " << (use_inch ? "in" : "mm");
@@ -1600,7 +1613,7 @@ void GLGizmoSVG::draw_size()
         float width_f = width;
         if (m_imgui->slider_float("##width_size_slider", &width_f, 5.f, 100.f, ss.str().c_str(), 1.f, false)) {
             double width_ratio = width_f / width;
-            if (std::fabs(width_ratio - 1.) > minimal_scale_ratio_change) {
+            if (is_valid_scale_ratio(width_ratio)) {
                 m_scale_width      = m_scale_width.value_or(1.f) * width_ratio;
                 m_scale_height     = m_scale_height.value_or(1.f) * width_ratio;
                 new_relative_scale = Vec3d(width_ratio, width_ratio, 1.);
@@ -1622,7 +1635,7 @@ void GLGizmoSVG::draw_size()
         double prev_width = width;
         if (ImGui::InputDouble("##width", &width, step, fast_step, size_format, flags)) {
             double width_ratio = width / prev_width;
-            if (std::fabs(width_ratio - 1.) > minimal_scale_ratio_change) {
+            if (is_valid_scale_ratio(width_ratio)) {
                 m_scale_width = m_scale_width.value_or(1.f) * width_ratio;
                 new_relative_scale = Vec3d(width_ratio, 1., 1.);
             }
@@ -1635,7 +1648,7 @@ void GLGizmoSVG::draw_size()
         double prev_height = height;
         if (ImGui::InputDouble("##height", &height, step, fast_step, size_format, flags)) {
             double height_ratio = height / prev_height;
-            if (std::fabs(height_ratio - 1.) > minimal_scale_ratio_change) {
+            if (is_valid_scale_ratio(height_ratio)) {
                 m_scale_height = m_scale_height.value_or(1.f) * height_ratio;
                 new_relative_scale  = Vec3d(1., height_ratio, 1.);
             }
@@ -1670,13 +1683,13 @@ void GLGizmoSVG::draw_size()
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
 
-        auto seloection_scale_fnc = [&selection, rel_scale = *new_relative_scale]() {
+        auto selection_scale_fnc = [&selection, rel_scale = *new_relative_scale]() {
             TransformationType type = selection.is_single_volume() ? 
                 TransformationType::Local_Relative_Independent:
                 TransformationType::Instance_Relative_Independent;
             selection.scale(rel_scale, type);
         };        
-        selection_transform(selection, seloection_scale_fnc, m_volume);
+        selection_transform(selection, selection_scale_fnc, m_volume);
 
         m_parent.do_scale(L("Resize"));
         wxGetApp().obj_manipul()->set_dirty();
