@@ -1420,6 +1420,7 @@ void GLGizmoSVG::draw_filename(){
             std::string new_path = choose_svg_file();
             if (!new_path.empty()) {
                 file_changed = true;
+                m_volume_shape.svg_file = {}; // clear data
                 m_volume_shape.svg_file.path = new_path;
             }
         } else if (ImGui::IsItemHovered()) {
@@ -1528,7 +1529,7 @@ void GLGizmoSVG::draw_filename(){
         float scale = get_scale_for_tolerance();
         double tes_tol = get_tesselation_tolerance(scale);
         EmbossShape es_ = select_shape(m_volume_shape.svg_file.path, tes_tol);
-        m_volume_shape.svg_file.image = std::move(es_.svg_file.image);
+        m_volume_shape.svg_file = std::move(es_.svg_file);
         m_volume_shape.shapes_with_ids = std::move(es_.shapes_with_ids);
         m_shape_warnings = create_shape_warnings(*m_volume_shape.svg_file.image, scale);
         init_texture(m_texture, m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
