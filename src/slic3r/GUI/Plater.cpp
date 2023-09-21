@@ -209,11 +209,9 @@ public:
     wxStaticText *info_size;
     wxStaticText *info_volume;
     wxStaticText *info_facets;
-//    wxStaticText *info_materials;
     wxStaticText *info_manifold;
 
     wxStaticText *label_volume;
-//    wxStaticText *label_materials; // ysFIXME - delete after next release if anyone will not complain about this
     std::vector<wxStaticText *> sla_hidden_items;
 
     bool        showing_manifold_warning_icon;
@@ -1115,10 +1113,14 @@ void Sidebar::update_presets(Preset::Type preset_type)
     case Preset::TYPE_PRINTER:
     {
         update_all_preset_comboboxes();
+#if 1 // #ysFIXME_delete_after_test_of  >> it looks like CallAfter() is no need [issue with disapearing of comboboxes are not reproducible]
+        p->show_preset_comboboxes();
+#else
         // CallAfter is really needed here to correct layout of the preset comboboxes,
         // when printer technology is changed during a project loading AND/OR switching the application mode.
         // Otherwise, some of comboboxes are invisible 
         CallAfter([this]() { p->show_preset_comboboxes(); });
+#endif
         break;
     }
 

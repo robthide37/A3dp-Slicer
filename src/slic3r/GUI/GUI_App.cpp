@@ -791,15 +791,10 @@ void GUI_App::post_init()
             this->mainframe->load_config_file(this->init_params->load_configs.back());
         // If loading a 3MF file, the config is loaded from the last one.
         if (!this->init_params->input_files.empty()) {
-#if 1 // #ysFIXME_delete_after_test_of
             wxArrayString fns;
             for (const std::string& name : this->init_params->input_files)
                 fns.Add(from_u8(name));
             if (plater()->load_files(fns) && this->init_params->input_files.size() == 1) {
-#else
-            const std::vector<size_t> res = this->plater()->load_files(this->init_params->input_files, true, true);
-            if (!res.empty() && this->init_params->input_files.size() == 1) {
-#endif
                 // Update application titlebar when opening a project file
                 const std::string& filename = this->init_params->input_files.front();
                 if (boost::algorithm::iends_with(filename, ".amf") ||
@@ -1247,7 +1242,6 @@ bool GUI_App::on_init_inner()
     
     if (! older_data_dir_path.empty()) {
         preset_bundle->import_newer_configs(older_data_dir_path);
-        //app_config->save(); // It looks like redundant call of save. ysFIXME delete after testing
     }
 
     if (is_editor()) {
