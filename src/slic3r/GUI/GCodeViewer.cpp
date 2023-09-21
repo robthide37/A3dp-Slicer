@@ -505,7 +505,7 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, s
                         }
 
                         if (ftell(file.f) == file_size)
-                          break;
+                            break;
 
                         res = read_next_block_header(*file.f, file_header, block_header, nullptr, 0);
                         if (res != EResult::Success || block_header.type != (uint16_t)EBlockType::GCode) {
@@ -2540,8 +2540,11 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
         const size_t min_s_id = m_layers.get_range_at(min_id).first;
         const size_t max_s_id = m_layers.get_range_at(max_id).last;
 
-        return (min_s_id <= path.sub_paths.front().first.s_id && path.sub_paths.front().first.s_id <= max_s_id) ||
-            (min_s_id <= path.sub_paths.back().last.s_id && path.sub_paths.back().last.s_id <= max_s_id);
+        const bool top_layer_shown = max_id == m_layers.size() - 1;
+
+        return (min_s_id <= path.sub_paths.front().first.s_id && path.sub_paths.front().first.s_id <= max_s_id) || // the leading vertex is contained
+               (min_s_id <= path.sub_paths.back().last.s_id && path.sub_paths.back().last.s_id <= max_s_id) ||     // the trailing vertex is contained
+               (top_layer_shown && max_s_id < path.sub_paths.front().first.s_id); // the leading vertex is above the top layer and the top layer is shown
     };
 
 #if ENABLE_GCODE_VIEWER_STATISTICS
