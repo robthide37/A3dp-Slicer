@@ -53,7 +53,7 @@ namespace{
 // Variable keep limits for variables
 const struct Limits
 {
-    MinMax<float> emboss{0.01f, 1e4f}; // in mm
+    MinMax<double> depth{0.01f, 1e4f}; // in mm
     // distance text object from surface
     MinMax<float> angle{-180.f, 180.f}; // in degrees
 } limits;
@@ -1540,26 +1540,31 @@ void GLGizmoSVG::draw_depth()
 
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
     double &value = m_volume_shape.projection.depth;
+    constexpr double step = 1.;
+    constexpr double step_fast = 10.;
+    std::optional<double> result_scale;
+    const char *size_format = "%.1f mm";
+    double input = value;
     if (use_inch) {
-        const char *size_format = "%.2f in";
-        double value_inch = value * ObjectManipulation::mm_to_in * m_scale_depth.value_or(1.f);
-        if (ImGui::InputDouble("##depth", &value_inch, 1., 10., size_format)) {
-            value = value_inch * ObjectManipulation::in_to_mm / m_scale_depth.value_or(1.f);
-            process();
-        }
+        size_format = "%.2f in";
+        // input in inches
+        input *= ObjectManipulation::mm_to_in * m_scale_depth.value_or(1.f);
+        result_scale = ObjectManipulation::in_to_mm / m_scale_depth.value_or(1.f);
     } else if (m_scale_depth.has_value()) {
-        const char *size_format = "%.1f mm";
-        double value_mm = value * (*m_scale_depth);
-        if (ImGui::InputDouble("##depth", &value_mm, 1., 10., size_format)) {
-            value = value_mm / (*m_scale_depth);
+        // scale input
+        input *= (*m_scale_depth);
+        result_scale = 1. / (*m_scale_depth);
+    }
+    
+    if (ImGui::InputDouble("##depth", &input, step, step_fast, size_format)) {
+        if (result_scale.has_value())
+            input *= (*result_scale);
+        apply(input, limits.depth);
+        if (!is_approx(input, value, 1e-4)){
+            value = input;
             process();
         }
-    } else {
-        const char *size_format = "%.1f mm";
-        if (ImGui::InputDouble("##depth", &value, 1., 10., size_format))
-            process();
-    }
-    if (ImGui::IsItemHovered())
+    } else if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", _u8L("Size in emboss direction.").c_str());
 }
 
