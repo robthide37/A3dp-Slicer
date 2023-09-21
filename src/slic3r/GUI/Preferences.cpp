@@ -227,7 +227,12 @@ void PreferencesDialog::build()
 	tabs = new Notebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME | wxNB_DEFAULT);
 #else
     tabs = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL  |wxNB_NOPAGETHEME | wxNB_DEFAULT );
-//	tabs->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+#ifdef __linux__
+	tabs->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
+		e.Skip();
+		CallAfter([this]() { tabs->GetCurrentPage()->Layout(); });
+    });
+#endif
 #endif
 
 	// Add "General" tab
@@ -1094,7 +1099,11 @@ void PreferencesDialog::create_settings_font_widget()
 		font_example->SetFont(font);
 		m_values[opt_key] = format("%1%", val);
 		stb_sizer->Layout();
+#ifdef __linux__
+		CallAfter([this]() { refresh_og(m_optgroup_other); });
+#else
 		refresh_og(m_optgroup_other);
+#endif
 	};
 
 	auto change_value = [size_sc, apply_font](wxCommandEvent& evt) {
