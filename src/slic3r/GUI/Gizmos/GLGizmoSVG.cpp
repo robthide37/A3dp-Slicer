@@ -55,6 +55,8 @@ const struct Limits
 {
     MinMax<double> depth{0.01, 1e4}; // in mm
     MinMax<float> size{0.01f, 1e4f}; // in mm (width + height)
+    MinMax<float> ui_size{5.f, 100.f}; // in mm (width + height) - only slider values
+    MinMax<float> ui_size_in{.1f, 4.f};// in inches (width + height) - only slider values
     MinMax<double> relative_scale_ratio{1e-5, 1e4}; // change size
     // distance text object from surface
     MinMax<float> angle{-180.f, 180.f}; // in degrees
@@ -1595,8 +1597,8 @@ void GLGizmoSVG::draw_size()
         if (ratio > limit->max)
             return false;
 
-        if (ratio < 0.)
-            return false;
+        if (ratio < 1e-4) 
+            return false; // negative scale is not allowed
 
         return true;    
     };
@@ -1609,9 +1611,10 @@ void GLGizmoSVG::draw_size()
         ImGui::SameLine(m_gui_cfg->input_offset);
         ImGui::SetNextItemWidth(m_gui_cfg->input_width);
 
+        const MinMax<float> &minmax = use_inch ? limits.ui_size_in : limits.ui_size;
         // convert to float for slider
-        float width_f = width;
-        if (m_imgui->slider_float("##width_size_slider", &width_f, 5.f, 100.f, ss.str().c_str(), 1.f, false)) {
+        float width_f = static_cast<float>(width);
+        if (m_imgui->slider_float("##width_size_slider", &width_f, minmax.min, minmax.max, ss.str().c_str(), 1.f, false)) {
             double width_ratio = width_f / width;
             if (is_valid_scale_ratio(width_ratio)) {
                 m_scale_width      = m_scale_width.value_or(1.f) * width_ratio;
