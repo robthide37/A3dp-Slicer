@@ -234,8 +234,8 @@ TransformationType get_transformation_type(const Selection &selection)
 {
     assert(selection.is_single_full_object() || selection.is_single_volume());
     return selection.is_single_volume() ? 
-        TransformationType::Local_Relative_Joint :
-        TransformationType::Instance_Relative_Joint; // object
+        TransformationType::Local_Relative_Independent :
+        TransformationType::Instance_Relative_Independent; // object
 }
 } // namespace
 

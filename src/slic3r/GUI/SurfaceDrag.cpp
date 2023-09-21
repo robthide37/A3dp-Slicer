@@ -345,8 +345,8 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
 
     auto selection_rotate_fnc = [&selection, &relative_angle](){
         TransformationType transformation_type = selection.is_single_volume() ? 
-            TransformationType::Local_Relative_Joint : 
-            TransformationType::Instance_Relative_Joint;
+            TransformationType::Local_Relative_Independent : 
+            TransformationType::Instance_Relative_Independent;
         selection.rotate(Vec3d(0., 0., relative_angle), transformation_type);    
     };
     selection_transform(selection, selection_rotate_fnc);
