@@ -1089,15 +1089,18 @@ void GLGizmoSVG::set_volume_by_selection()
     calculate_scale(); // must be before calculation of tesselation
 
     EmbossShape &es = *volume->emboss_shape;
+    EmbossShape::SvgFile &svg_file = es.svg_file;
+    if (svg_file.image == nullptr) {
+        if (init_image(svg_file) == nullptr)
+            return reset_volume();
+    }
+    assert(svg_file.image != nullptr);
+    assert(svg_file.image.get() != nullptr);
+    const NSVGimage &image = *svg_file.image;
     ExPolygonsWithIds &shape_ids = es.shapes_with_ids;
-    if (shape_ids.empty()) {
-        // volume loaded from .3mf need to create shapes from svg
-        NSVGimage* image = init_image(es.svg_file);
-        assert(image != nullptr);
-        if (image != nullptr){
-            NSVGLineParams params{get_tesselation_tolerance(get_scale_for_tolerance())};
-            shape_ids = create_shape_with_ids(*image, params);
-        }        
+    if (shape_ids.empty()) {        
+        NSVGLineParams params{get_tesselation_tolerance(get_scale_for_tolerance())};
+        shape_ids = create_shape_with_ids(image, params);                
     }
 
     reset_volume(); // clear cached data
@@ -1105,8 +1108,7 @@ void GLGizmoSVG::set_volume_by_selection()
     m_volume = volume;
     m_volume_id = volume->id();
     m_volume_shape = *volume->emboss_shape; // copy
-    assert(es.svg_file.image.get() != nullptr);
-    m_shape_warnings = create_shape_warnings(*es.svg_file.image, get_scale_for_tolerance());
+    m_shape_warnings = create_shape_warnings(image, get_scale_for_tolerance());
 
     // Calculate current angle of up vector
     m_angle    = calculate_angle(selection);
