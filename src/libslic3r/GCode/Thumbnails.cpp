@@ -196,7 +196,7 @@ std::string get_error_string(const ThumbnailErrors& errors)
     if (errors.has(ThumbnailError::OutOfRange))
         error_str += "\n - Input value is out of range";
     if (errors.has(ThumbnailError::InvalidExt))
-        error_str += "\n - Some input extention is invalid";
+        error_str += "\n - Some extension in the input is invalid";
 
     return error_str;
 }

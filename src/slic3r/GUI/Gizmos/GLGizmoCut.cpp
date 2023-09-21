@@ -2562,6 +2562,7 @@ bool GLGizmoCut3D::render_angle_input(const std::string& label, float& in_val, c
     m_is_slider_editing_done |= m_imgui->get_last_slider_status().deactivated_after_edit;
     if (!is_approx(old_val, val)) {
         if (m_imgui->get_last_slider_status().can_take_snapshot) {
+            // TRN: This is an entry in the Undo/Redo stack. The whole line will be 'Edited: (name of whatever was edited)'.
             Plater::TakeSnapshot snapshot(wxGetApp().plater(), format_wxstr("%1%: %2%", _L("Edited"), label), UndoRedo::SnapshotType::GizmoAction);
             m_imgui->get_last_slider_status().invalidate_snapshot();
             if (m_mode == size_t(CutMode::cutTongueAndGroove))

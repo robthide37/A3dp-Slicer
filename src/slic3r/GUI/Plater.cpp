@@ -2717,7 +2717,7 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             "Instead of considering them as multiple objects, should \n"
                             "the file be loaded as a single object having multiple parts?") + "\n",
                             _L("Multi-part object detected"), wxICON_QUESTION | wxYES_NO);
-                        dlg.ShowCheckBox(_L("Apply to all multiple objects being loaded."));
+                        dlg.ShowCheckBox(_L("Apply to all objects being loaded."));
                         int answer = dlg.ShowModal();
                         if (dlg.IsCheckBoxChecked())
                             answer_consider_as_multi_part_objects = answer;
@@ -5551,7 +5551,7 @@ void Plater::convert_gcode_to_ascii()
         using namespace bgcode::core;
         EResult res = bgcode::convert::from_binary_to_ascii(*in_file.f, *out_file.f, true);
         if (res != EResult::Success) {
-            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting G-code file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
             out_file.close();
             boost::nowide::remove(output_file.c_str());
@@ -5559,7 +5559,8 @@ void Plater::convert_gcode_to_ascii()
         }
     }
 
-    MessageDialog msg_dlg(this, _L("Succesfully created gcode ascii file \n") + output_file, _L("Convert gcode file to ascii format"), wxICON_ERROR | wxOK);
+    MessageDialog msg_dlg(this, Slic3r::GUI::format_wxstr("%1%\n%2%", _L("Successfully created G-code ASCII file"), output_file),
+                          _L("Convert G-code file to ASCII format"), wxICON_ERROR | wxOK);
     msg_dlg.ShowModal();
 }
 
@@ -5603,7 +5604,7 @@ void Plater::convert_gcode_to_binary()
         const bgcode::binarize::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
         EResult res = bgcode::convert::from_ascii_to_binary(*in_file.f, *out_file.f, binarizer_config);
         if (res != EResult::Success) {
-            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting gcode file"), wxICON_INFORMATION | wxOK);
+            MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting G-code file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
             out_file.close();
             boost::nowide::remove(output_file.c_str());
@@ -5611,7 +5612,8 @@ void Plater::convert_gcode_to_binary()
         }
     }
 
-    MessageDialog msg_dlg(this, _L("Succesfully created gcode binary file \n") + output_file, _L("Convert gcode file to binary format"), wxICON_ERROR | wxOK);
+    MessageDialog msg_dlg(this, Slic3r::GUI::format_wxstr("%1%\n%2%", _L("Successfully created G-code binary file"), output_file),
+                         _L("Convert G-code file to binary format"), wxICON_ERROR | wxOK);
     msg_dlg.ShowModal();
 }
 
@@ -5848,7 +5850,8 @@ bool Plater::preview_zip_archive(const boost::filesystem::path& archive_path)
                             // Decompress action. We already has correct file index in stat structure. 
                             mz_bool res = mz_zip_reader_extract_to_mem(&archive, stat.m_file_index, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
                             if (res == 0) {
-                                wxString error_log = GUI::format_wxstr(_L("Failed to unzip file to %1%: %2% "), final_path.string(), mz_zip_get_error_string(mz_zip_get_last_error(&archive)));
+                                // TRN: First argument = path to file, second argument = error description
+                                wxString error_log = GUI::format_wxstr(_L("Failed to unzip file to %1%: %2%"), final_path.string(), mz_zip_get_error_string(mz_zip_get_last_error(&archive)));
                                 BOOST_LOG_TRIVIAL(error) << error_log;
                                 show_error(nullptr, error_log);
                                 break;

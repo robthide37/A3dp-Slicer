@@ -1155,6 +1155,30 @@ static const wxString sep = " - ";
 static const wxString sep_space = "";
 #endif
 
+static void append_about_menu_item(wxMenu* target_menu, int insert_pos = wxNOT_FOUND)
+{
+    if (wxGetApp().is_editor())
+        append_menu_item(target_menu, wxID_ANY, wxString::Format(_L("&About %s"), SLIC3R_APP_NAME), _L("Show about dialog"),
+            [](wxCommandEvent&) { Slic3r::GUI::about(); }, nullptr, nullptr, []() {return true; }, nullptr, insert_pos);
+    else
+        append_menu_item(target_menu, wxID_ANY, wxString::Format(_L("&About %s"), GCODEVIEWER_APP_NAME), _L("Show about dialog"),
+            [](wxCommandEvent&) { Slic3r::GUI::about(); }, nullptr, nullptr, []() {return true; }, nullptr, insert_pos);
+}
+
+#ifdef __APPLE__
+static void init_macos_application_menu(wxMenuBar* menu_bar, MainFrame* main_frame)
+{
+    wxMenu* apple_menu = menu_bar->OSXGetAppleMenu();
+    if (apple_menu != nullptr) {
+        append_about_menu_item(apple_menu, 0);
+
+        // This fixes a bug on macOS where the quit command doesn't emit window close events.
+        // wx bug: https://trac.wxwidgets.org/ticket/18328
+        apple_menu->Bind(wxEVT_MENU, [main_frame](wxCommandEvent&) { main_frame->Close(); }, wxID_EXIT);
+    }
+}
+#endif // __APPLE__
+
 static wxMenu* generate_help_menu()
 {
     wxMenu* helpMenu = new wxMenu();
@@ -1189,13 +1213,10 @@ static wxMenu* generate_help_menu()
         [](wxCommandEvent&) { Slic3r::GUI::desktop_open_datadir_folder(); });
     append_menu_item(helpMenu, wxID_ANY, _L("Report an I&ssue"), wxString::Format(_L("Report an issue on %s"), SLIC3R_APP_NAME),
         [](wxCommandEvent&) { wxGetApp().open_browser_with_warning_dialog("https://github.com/prusa3d/slic3r/issues/new", nullptr, false); });
-    if (wxGetApp().is_editor())
-        append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("&About %s"), SLIC3R_APP_NAME), _L("Show about dialog"),
-            [](wxCommandEvent&) { Slic3r::GUI::about(); });
-    else
-        append_menu_item(helpMenu, wxID_ANY, wxString::Format(_L("&About %s"), GCODEVIEWER_APP_NAME), _L("Show about dialog"),
-            [](wxCommandEvent&) { Slic3r::GUI::about(); });
-    append_menu_item(helpMenu, wxID_ANY, _L("Show Tip of the Day") 
+#ifndef __APPLE__
+    append_about_menu_item(helpMenu);
+#endif // __APPLE__
+    append_menu_item(helpMenu, wxID_ANY, _L("Show Tip of the Day")
 #if 0//debug
         + "\tCtrl+Shift+T"
 #endif
@@ -1594,14 +1615,7 @@ void MainFrame::init_menubar_as_editor()
 #endif
 
 #ifdef __APPLE__
-    // This fixes a bug on Mac OS where the quit command doesn't emit window close events
-    // wx bug: https://trac.wxwidgets.org/ticket/18328
-    wxMenu* apple_menu = m_menubar->OSXGetAppleMenu();
-    if (apple_menu != nullptr) {
-        apple_menu->Bind(wxEVT_MENU, [this](wxCommandEvent &) {
-            Close();
-        }, wxID_EXIT);
-    }
+    init_macos_application_menu(m_menubar, this);
 #endif // __APPLE__
 
     if (plater()->printer_technology() == ptSLA)
@@ -1652,10 +1666,10 @@ void MainFrame::init_menubar_as_gcodeviewer()
             "", nullptr, [this]() { return !m_plater->get_last_loaded_gcode().empty(); }, this);
 #endif // __APPLE__
         fileMenu->AppendSeparator();
-        append_menu_item(fileMenu, wxID_ANY, _L("Convert ascii G-code to &binary") + dots, _L("Convert a G-code file from ascii to binary format"),
+        append_menu_item(fileMenu, wxID_ANY, _L("Convert ASCII G-code to &binary") + dots, _L("Convert a G-code file from ASCII to binary format"),
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_binary(); }, "convert_file", nullptr,
             []() { return true; }, this);
-        append_menu_item(fileMenu, wxID_ANY, _L("Convert binary G-code to &ascii") + dots, _L("Convert a G-code file from binary to ascii format"),
+        append_menu_item(fileMenu, wxID_ANY, _L("Convert binary G-code to &ASCII") + dots, _L("Convert a G-code file from binary to ASCII format"),
             [this](wxCommandEvent&) { if (m_plater != nullptr) m_plater->convert_gcode_to_ascii(); }, "convert_file", nullptr,
             []() { return true; }, this);
         fileMenu->AppendSeparator();
@@ -1693,14 +1707,7 @@ void MainFrame::init_menubar_as_gcodeviewer()
     SetMenuBar(m_menubar);
 
 #ifdef __APPLE__
-    // This fixes a bug on Mac OS where the quit command doesn't emit window close events
-    // wx bug: https://trac.wxwidgets.org/ticket/18328
-    wxMenu* apple_menu = m_menubar->OSXGetAppleMenu();
-    if (apple_menu != nullptr) {
-        apple_menu->Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-            Close();
-            }, wxID_EXIT);
-    }
+    init_macos_application_menu(m_menubar, this);
 #endif // __APPLE__
 }
 

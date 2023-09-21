@@ -2665,6 +2665,7 @@ void TabPrinter::build_fff()
                         auto [thumbnails_list, errors] = GCodeThumbnails::make_and_check_thumbnail_list(val);
 
                         if (errors != enum_bitmask<ThumbnailError>()) {
+                            // TRN: First argument is parameter name, the second one is the value.
                             std::string error_str = format(_u8L("Invalid value provided for parameter %1%: %2%"), "thumbnails", val);
                             error_str += GCodeThumbnails::get_error_string(errors);
                             InfoDialog(parent(), _L("G-code flavor is switched"), from_u8(error_str)).ShowModal();
@@ -5004,11 +5005,8 @@ void Tab::fill_icon_descriptions()
         "the last saved preset."));
 
     m_icon_descriptions.emplace_back(&m_bmp_edit_value, L("EDIT VALUE"),
-        // TRN Description for "EDIT VALUE"
-        L("indicates that the settings were changed and are not equal to the last saved preset for "
-        "the current option group.\n"
-        "Click the BACK ARROW icon to reset all settings for the current option group to "
-        "the last saved preset."));
+        // TRN Description for "EDIT VALUE" in the Help dialog (the icon is currently used only to edit custom gcodes).
+        L("clicking this icon opens a dialog allowing to edit this value."));
 }
 
 void Tab::set_tooltips_text()

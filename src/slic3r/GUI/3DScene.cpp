@@ -251,7 +251,7 @@ GLVolume::GLVolume(float r, float g, float b, float a)
 
 void GLVolume::set_render_color(bool force_transparent)
 {
-    bool outside = is_outside || is_below_printbed();
+    bool outside = is_outside || (!is_modifier && is_below_printbed());
 
     if (force_native_color || force_neutral_color) {
         if (outside && shader_outside_printer_detection_enabled)
