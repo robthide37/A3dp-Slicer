@@ -1077,7 +1077,7 @@ std::optional<wxString> get_installed_face_name(const std::optional<std::string>
     // Could exist OS without getter on face_name,
     // but it is able to restore font from descriptor
     // Soo default value must be TRUE
-    if (face_name_opt.has_value())
+    if (!face_name_opt.has_value())
         return wxString();
 
     wxString face_name(face_name_opt->c_str());
