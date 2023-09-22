@@ -2639,9 +2639,10 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         raycaster->set_active(v->is_active);
     }
 
+    // check activity/visibility of the modifiers in SLA mode
     for (GLVolume* volume : m_volumes.volumes)
         if (volume->object_idx() < (int)m_model->objects.size() && m_model->objects[volume->object_idx()]->instances[volume->instance_idx()]->is_printable()) {
-            if (volume->is_modifier && m_model->objects[volume->object_idx()]->volumes[volume->volume_idx()]->is_modifier())
+            if (volume->is_active && volume->is_modifier && m_model->objects[volume->object_idx()]->volumes[volume->volume_idx()]->is_modifier())
                 volume->is_active = printer_technology != ptSLA;
         }
 
