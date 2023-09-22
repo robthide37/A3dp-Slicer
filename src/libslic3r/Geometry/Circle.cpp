@@ -161,7 +161,7 @@ Circled circle_least_squares_by_solver(const Vec2ds &input, Solver solver)
             b(r) = p.squaredNorm();
         }
         auto result = solver(A, b);
-        out.center = result.head<2>();
+        out.center = result.template head<2>();
         double r2 = out.center.squaredNorm() - result(2);
         if (r2 <= EPSILON)
             out.make_invalid();
