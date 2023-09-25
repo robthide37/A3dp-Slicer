@@ -2258,20 +2258,22 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         if (move.type == EMoveType::Seam)
             ++seams_count;
 
-        size_t move_id = i - seams_count;
+        const size_t move_id = i - seams_count;
 
         if (move.type == EMoveType::Extrude) {
-            if (!move.internal_only) {
-                // layers zs
-                const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
-                const double z = static_cast<double>(move.position.z());
-                if (last_z == nullptr || z < *last_z - EPSILON || *last_z + EPSILON < z) {
-                    const size_t start_it = (m_layers.empty() && first_travel_s_id != 0) ? first_travel_s_id : last_travel_s_id;
-                    m_layers.append(z, { start_it, move_id });
-                }
-                else
-                    m_layers.get_ranges().back().last = move_id;
+            // layers zs/ranges
+            const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
+            const double z = static_cast<double>(move.position.z());
+            if (last_z == nullptr || z < *last_z - EPSILON || *last_z + EPSILON < z) {
+                // start a new layer
+                const size_t start_it = (m_layers.empty() && first_travel_s_id != 0) ? first_travel_s_id : last_travel_s_id;
+                m_layers.append(z, { start_it, move_id });
             }
+            else if (!move.internal_only) {
+                // update last layer
+                m_layers.get_ranges().back().last = move_id;
+            }
+            
             // extruder ids
             m_extruder_ids.emplace_back(move.extruder_id);
             // roles
