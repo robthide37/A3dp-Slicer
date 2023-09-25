@@ -268,29 +268,6 @@ float get_flow_width(const LayerRegion *region, ExtrusionRole role)
     return region->flow(FlowRole::frPerimeter).width();
 }
 
-std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length_limit)
-{
-    assert(!e->is_collection());
-    Polyline                   pl = e->as_polyline();
-    std::vector<ExtrusionLine> lines;
-    lines.reserve(pl.points.size() * 1.5f);
-    for (int point_idx = 0; point_idx < int(pl.points.size()) - 1; ++point_idx) {
-        Vec2f start        = unscaled(pl.points[point_idx]).cast<float>();
-        Vec2f next         = unscaled(pl.points[point_idx + 1]).cast<float>();
-        Vec2f v            = next - start; // vector from next to current
-        float dist_to_next = v.norm();
-        v.normalize();
-        int   lines_count = int(std::ceil(dist_to_next / length_limit));
-        float step_size   = dist_to_next / lines_count;
-        for (int i = 0; i < lines_count; ++i) {
-            Vec2f a(start + v * (i * step_size));
-            Vec2f b(start + v * ((i + 1) * step_size));
-            lines.emplace_back(a, b, (a-b).norm(), e);
-        }
-    }
-    return lines;
-}
-
 float estimate_curled_up_height(
     float distance, float curvature, float layer_height, float flow_width, float prev_line_curled_height, Params params)
 {
@@ -513,7 +490,48 @@ public:
     float sticking_second_moment_of_area_covariance_accumulator{};
     bool  connected_to_bed = false;
 
-    ObjectPart() = default;
+    ObjectPart(
+        const std::vector<const ExtrusionEntityCollection*>& extrusion_collections,
+        const bool connected_to_bed,
+        const coordf_t print_head_z,
+        const coordf_t layer_height,
+        const std::optional<Polygons>& brim
+    ) {
+        if (connected_to_bed) {
+            this->connected_to_bed = true;
+        }
+
+        const auto bottom_z = print_head_z - layer_height;
+        const auto center_z = print_head_z - layer_height / 2;
+
+        for (const ExtrusionEntityCollection* collection : extrusion_collections) {
+            if (collection->empty()) {
+                continue;
+            }
+
+            const Polygons polygons{collection->polygons_covered_by_width()};
+
+            const Integrals integrals{polygons};
+            const float volume = integrals.area * layer_height;
+            this->volume += volume;
+            this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume; // TODO check that it is correct
+
+            if (this->connected_to_bed) {
+                this->sticking_area += integrals.area;
+                this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area); // TODO check that it layer height should be added
+                this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
+                this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+            }
+        }
+
+        if (brim) {
+            Integrals integrals{*brim};
+            this->sticking_area += integrals.area;
+            this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
+            this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
+            this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+        }
+    }
 
     void add(const ObjectPart &other)
     {
@@ -678,117 +696,67 @@ public:
     }
 };
 
-// return new object part and actual area covered by extrusions
-std::tuple<ObjectPart, float> build_object_part_from_slice(const size_t &slice_idx, const Layer *layer, const Params& params)
-{
-    ObjectPart new_object_part;
-    float      area_covered_by_extrusions = 0;
-    const LayerSlice& slice = layer->lslices_ex.at(slice_idx);
-
-    auto add_extrusions_to_object = [&new_object_part, &area_covered_by_extrusions, &params](const ExtrusionEntity *e,
-                                                                                             const LayerRegion     *region) {
-        float                      flow_width = get_flow_width(region, e->role());
-        const Layer               *l          = region->layer();
-        float                      slice_z    = l->slice_z;
-        float                      height     = l->height;
-        std::vector<ExtrusionLine> lines      = to_short_lines(e, 5.0);
-        for (const ExtrusionLine &line : lines) {
-            float volume = line.len * height * flow_width * PI / 4.0f;
-            area_covered_by_extrusions += line.len * flow_width;
-            new_object_part.volume += volume;
-            new_object_part.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), slice_z) * volume;
-
-            if (int(l->id()) == params.raft_layers_count) { // layer attached on bed/raft
-                new_object_part.connected_to_bed = true;
-                float sticking_area              = line.len * flow_width;
-                new_object_part.sticking_area += sticking_area;
-                Vec2f middle = Vec2f((line.a + line.b) / 2.0f);
-                new_object_part.sticking_centroid_accumulator += sticking_area * to_3d(middle, slice_z);
-                // Bottom infill lines can be quite long, and algined, so the middle approximaton used above does not work
-                Vec2f dir            = (line.b - line.a).normalized();
-                float segment_length = flow_width; // segments of size flow_width
-                for (float segment_middle_dist = std::min(line.len, segment_length * 0.5f); segment_middle_dist < line.len;
-                     segment_middle_dist += segment_length) {
-                    Vec2f segment_middle = line.a + segment_middle_dist * dir;
-                    new_object_part.sticking_second_moment_of_area_accumulator += segment_length * flow_width *
-                                                                                  segment_middle.cwiseProduct(segment_middle);
-                    new_object_part.sticking_second_moment_of_area_covariance_accumulator += segment_length * flow_width *
-                                                                                             segment_middle.x() * segment_middle.y();
-                }
-            }
-        }
-    };
+std::vector<const ExtrusionEntityCollection*> gather_extrusions(const LayerSlice& slice, const Layer* layer) {
+    // TODO reserve might be good, benchmark
+    std::vector<const ExtrusionEntityCollection*> result;
 
     for (const auto &island : slice.islands) {
         const LayerRegion *perimeter_region = layer->get_region(island.perimeters.region());
         for (size_t perimeter_idx : island.perimeters) {
-            for (const ExtrusionEntity *perimeter :
-                 static_cast<const ExtrusionEntityCollection *>(perimeter_region->perimeters().entities[perimeter_idx])->entities) {
-                add_extrusions_to_object(perimeter, perimeter_region);
-            }
+            auto collection = static_cast<const ExtrusionEntityCollection *>(
+                perimeter_region->perimeters().entities[perimeter_idx]
+            );
+            result.push_back(collection);
         }
         for (const LayerExtrusionRange &fill_range : island.fills) {
             const LayerRegion *fill_region = layer->get_region(fill_range.region());
             for (size_t fill_idx : fill_range) {
-                for (const ExtrusionEntity *fill :
-                     static_cast<const ExtrusionEntityCollection *>(fill_region->fills().entities[fill_idx])->entities) {
-                    add_extrusions_to_object(fill, fill_region);
-                }
+                auto collection = static_cast<const ExtrusionEntityCollection *>(
+                   fill_region->fills().entities[fill_idx]
+                );
+                result.push_back(collection);
             }
         }
-        for (size_t thin_fill_idx : island.thin_fills) {
-            add_extrusions_to_object(perimeter_region->thin_fills().entities[thin_fill_idx], perimeter_region);
+        const ExtrusionEntityCollection& collection = perimeter_region->thin_fills();
+        result.push_back(&collection);
+    }
+    return result;
+}
+
+bool has_brim(const Layer* layer, const Params& params){
+    return
+        int(layer->id()) == params.raft_layers_count
+        && params.raft_layers_count == 0
+        && params.brim_type != BrimType::btNoBrim
+        && params.brim_width > 0.0;
+}
+
+
+Polygons get_brim(const ExPolygon& slice_polygon, const BrimType brim_type, const float brim_width) {
+    // TODO: The algorithm here should take into account that multiple slices may
+    // have coliding Brim areas and the final brim area is smaller,
+    // thus has lower adhesion. For now this effect will be neglected.
+    ExPolygons brim;
+    if (brim_type == BrimType::btOuterAndInner || brim_type == BrimType::btOuterOnly) {
+        Polygon brim_hole = slice_polygon.contour;
+        brim_hole.reverse();
+        Polygons c = expand(slice_polygon.contour, scale_(brim_width)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
+        if (!c.empty()) {
+            brim.push_back(ExPolygon{c.front(), brim_hole});
         }
     }
-
-    //  BRIM HANDLING
-    if (int(layer->id()) == params.raft_layers_count && params.raft_layers_count == 0 && params.brim_type != BrimType::btNoBrim &&
-        params.brim_width > 0.0) {
-        // TODO: The algorithm here should take into account that multiple slices may have coliding Brim areas and the final brim area is
-        // smaller,
-        //  thus has lower adhesion. For now this effect will be neglected.
-        ExPolygon  slice_poly = layer->lslices[slice_idx];
-        ExPolygons brim;
-        if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btOuterOnly) {
-            Polygon brim_hole = slice_poly.contour;
-            brim_hole.reverse();
-            Polygons c = expand(slice_poly.contour, scale_(params.brim_width)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
-            if (!c.empty()) {
-                brim.push_back(ExPolygon{c.front(), brim_hole});
-            }
-        }
-        if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btInnerOnly) {
-            Polygons brim_contours = slice_poly.holes;
-            polygons_reverse(brim_contours);
-            for (const Polygon &brim_contour : brim_contours) {
-                Polygons brim_holes = shrink({brim_contour}, scale_(params.brim_width));
-                polygons_reverse(brim_holes);
-                ExPolygon inner_brim{brim_contour};
-                inner_brim.holes = brim_holes;
-                brim.push_back(inner_brim);
-            }
-        }
-
-        for (const Polygon &poly : to_polygons(brim)) {
-            Vec2f p0 = unscaled(poly.first_point()).cast<float>();
-            for (size_t i = 2; i < poly.points.size(); i++) {
-                Vec2f p1 = unscaled(poly.points[i - 1]).cast<float>();
-                Vec2f p2 = unscaled(poly.points[i]).cast<float>();
-
-                float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
-
-                auto [area, first_moment_of_area, second_moment_area,
-                      second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
-                new_object_part.sticking_area += sign * area;
-                new_object_part.sticking_centroid_accumulator += sign * Vec3f(first_moment_of_area.x(), first_moment_of_area.y(),
-                                                                              layer->print_z * area);
-                new_object_part.sticking_second_moment_of_area_accumulator += sign * second_moment_area;
-                new_object_part.sticking_second_moment_of_area_covariance_accumulator += sign * second_moment_of_area_covariance;
-            }
+    if (brim_type == BrimType::btOuterAndInner || brim_type == BrimType::btInnerOnly) {
+        Polygons brim_contours = slice_polygon.holes;
+        polygons_reverse(brim_contours);
+        for (const Polygon &brim_contour : brim_contours) {
+            Polygons brim_holes = shrink({brim_contour}, scale_(brim_width));
+            polygons_reverse(brim_holes);
+            ExPolygon inner_brim{brim_contour};
+            inner_brim.holes = brim_holes;
+            brim.push_back(inner_brim);
         }
     }
-
-    return {new_object_part, area_covered_by_extrusions};
+    return to_polygons(brim);
 }
 
 class ActiveObjectParts
@@ -862,7 +830,22 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject     
 
         for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
             const LayerSlice &slice             = layer->lslices_ex.at(slice_idx);
-            auto [new_part, covered_area]              = build_object_part_from_slice(slice_idx, layer, params);
+            const std::vector<const ExtrusionEntityCollection*> extrusion_collections{gather_extrusions(slice, layer)};
+            const bool connected_to_bed = int(layer->id()) == params.raft_layers_count;
+
+            const std::optional<Polygons> brim{
+                 has_brim(layer, params) ?
+                 std::optional{get_brim(layer->lslices[slice_idx], params.brim_type, params.brim_width)} :
+                 std::nullopt
+            };
+            ObjectPart new_part{
+                extrusion_collections,
+                connected_to_bed,
+                layer->print_z,
+                layer->height,
+                brim
+            };
+
             const SliceConnection &connection_to_below = precomputed_slices_connections[layer_idx][slice_idx];
 
 #ifdef DETAILED_DEBUG_LOGS
