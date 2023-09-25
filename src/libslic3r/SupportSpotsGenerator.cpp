@@ -478,11 +478,11 @@ ObjectPart::ObjectPart(
         const Integrals integrals{polygons};
         const float volume = integrals.area * layer_height;
         this->volume += volume;
-        this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume; // TODO check that it is correct
+        this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume;
 
         if (this->connected_to_bed) {
             this->sticking_area += integrals.area;
-            this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area); // TODO check that it layer height should be added
+            this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
             this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
             this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
         }

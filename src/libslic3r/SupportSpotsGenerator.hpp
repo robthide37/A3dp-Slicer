@@ -208,6 +208,8 @@ struct SliceConnection
     void print_info(const std::string &tag) const;
 };
 
+Polygons get_brim(const ExPolygon& slice_polygon, const BrimType brim_type, const float brim_width);
+
 class ObjectPart
 {
 public:
