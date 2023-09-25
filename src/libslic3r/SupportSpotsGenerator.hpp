@@ -174,6 +174,77 @@ float compute_second_moment(
     const Vec2f& axis_direction
 );
 
+class ExtrusionLine
+{
+public:
+    ExtrusionLine();
+    ExtrusionLine(const Vec2f &a, const Vec2f &b, float len, const ExtrusionEntity *origin_entity);
+    ExtrusionLine(const Vec2f &a, const Vec2f &b);
+
+    bool is_external_perimeter() const;
+
+    Vec2f                  a;
+    Vec2f                  b;
+    float                  len;
+    const ExtrusionEntity *origin_entity;
+
+    std::optional<SupportSpotsGenerator::SupportPointCause> support_point_generated = {};
+    float form_quality            = 1.0f;
+    float curled_up_height        = 0.0f;
+
+    static const constexpr int Dim = 2;
+    using Scalar                   = Vec2f::Scalar;
+};
+
+struct SliceConnection
+{
+    float area{};
+    Vec3f centroid_accumulator              = Vec3f::Zero();
+    Vec2f second_moment_of_area_accumulator = Vec2f::Zero();
+    float second_moment_of_area_covariance_accumulator{};
+
+    void add(const SliceConnection &other);
+
+    void print_info(const std::string &tag) const;
+};
+
+class ObjectPart
+{
+public:
+    float volume{};
+    Vec3f volume_centroid_accumulator = Vec3f::Zero();
+    float sticking_area{};
+    Vec3f sticking_centroid_accumulator              = Vec3f::Zero();
+    Vec2f sticking_second_moment_of_area_accumulator = Vec2f::Zero();
+    float sticking_second_moment_of_area_covariance_accumulator{};
+    bool  connected_to_bed = false;
+
+    ObjectPart(
+        const std::vector<const ExtrusionEntityCollection*>& extrusion_collections,
+        const bool connected_to_bed,
+        const coordf_t print_head_z,
+        const coordf_t layer_height,
+        const std::optional<Polygons>& brim
+    );
+
+    void add(const ObjectPart &other);
+
+    void add_support_point(const Vec3f &position, float sticking_area);
+
+
+    float compute_elastic_section_modulus(
+        const Vec2f &line_dir,
+        const Vec3f &extreme_point,
+        const Integrals& integrals
+    ) const;
+
+    std::tuple<float, SupportPointCause> is_stable_while_extruding(const SliceConnection &connection,
+                                    const ExtrusionLine   &extruded_line,
+                                    const Vec3f           &extreme_point,
+                                    float                  layer_z,
+                                    const Params          &params) const;
+};
+
 using PartialObjects = std::vector<PartialObject>;
 
 // Both support points and partial objects are sorted from the lowest z to the highest

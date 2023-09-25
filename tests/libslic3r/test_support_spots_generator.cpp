@@ -95,3 +95,24 @@ TEST_CASE("Moments calculation for rotated axis.", "[SupportSpotsGenerator]") {
 
     CHECK(moment_calculated_then_rotated == Approx(moment_rotated_polygon));
 }
+
+TEST_CASE("TODO", "[SupportSpotsGenerator]") {
+    const Polyline polyline{
+        Point{scaled(Vec2f{0, 0})},
+        Point{scaled(Vec2f{1, 0})},
+    };
+    ExtrusionAttributes attributes;
+    attributes.width = 0.1;
+    const ExtrusionPath path{polyline, attributes};
+    ExtrusionEntityCollection collection;
+    collection.append(path);
+    std::vector<const ExtrusionEntityCollection*> collections{&collection};
+
+    Polygons polygons = path.polygons_covered_by_width();
+    for (const Polygon& polygon : polygons) {
+        std::cout << "Polygon: " << std::endl;
+        for (const Line& line : polygon.lines()) {
+            std::cout << "(" << line.a.x() << ", " << line.a.y() << ")" << std::endl;
+        }
+    }
+}
