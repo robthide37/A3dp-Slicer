@@ -2593,10 +2593,8 @@ void GCodeViewer::refresh_render_paths(bool keep_sequential_current_first, bool 
             for (size_t i = 0; i < buffer.paths.size(); ++i) {
                 const Path& path = buffer.paths[i];
                 if (path.type == EMoveType::Travel) {
-                    if (path.sub_paths.front().first.s_id > m_layers_z_range[0]) {
-                        if (!is_travel_in_layers_range(i, m_layers_z_range[0], m_layers_z_range[1]))
-                            continue;
-                    }
+                    if (!is_travel_in_layers_range(i, m_layers_z_range[0], m_layers_z_range[1]))
+                          continue;
                 }
                 else if (!is_in_layers_range(path, m_layers_z_range[0], m_layers_z_range[1]))
                     continue;
