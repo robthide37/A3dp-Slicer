@@ -157,6 +157,7 @@ namespace Slic3r {
         std::vector<std::vector<size_t>> lines_ends;
         Pointfs bed_shape;
         float max_print_height;
+        float z_offset;
         SettingsIds settings_ids;
         size_t extruders_count;
         bool backtrace_enabled;

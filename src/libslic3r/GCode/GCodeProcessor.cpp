@@ -457,6 +457,7 @@ void GCodeProcessorResult::reset() {
     moves = std::vector<GCodeProcessorResult::MoveVertex>();
     bed_shape = Pointfs();
     max_print_height = 0.0f;
+    z_offset = 0.0f;
     settings_ids.reset();
     extruders_count = 0;
     backtrace_enabled = false;
@@ -476,6 +477,7 @@ void GCodeProcessorResult::reset() {
     lines_ends.clear();
     bed_shape = Pointfs();
     max_print_height = 0.0f;
+    z_offset = 0.0f;
     settings_ids.reset();
     extruders_count = 0;
     backtrace_enabled = false;
@@ -1304,6 +1306,8 @@ void GCodeProcessor::process_buffer(const std::string &buffer)
 
 void GCodeProcessor::finalize(bool perform_post_process)
 {
+    m_result.z_offset = m_z_offset;
+
     // update width/height of wipe moves
     for (GCodeProcessorResult::MoveVertex& move : m_result.moves) {
         if (move.type == EMoveType::Wipe) {

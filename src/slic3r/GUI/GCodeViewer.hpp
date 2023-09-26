@@ -656,11 +656,14 @@ public:
             GLModel m_model;
             Vec3f m_world_position;
             Transform3f m_world_transform;
-            // for seams, the position of the marker is on the last endpoint of the toolpath containing it
-            // the offset is used to show the correct value of tool position in the "ToolPosition" window
-            // see implementation of render() method
+            // For seams, the position of the marker is on the last endpoint of the toolpath containing it.
+            // This offset is used to show the correct value of tool position in the "ToolPosition" window.
+            // See implementation of render() method
             Vec3f m_world_offset;
-            float m_z_offset{ 0.5f };
+            // z offset of the print
+            float m_z_offset{ 0.0f };
+            // z offset of the model
+            float m_model_z_offset{ 0.5f };
             bool m_visible{ true };
 
         public:
@@ -670,6 +673,7 @@ public:
 
             void set_world_position(const Vec3f& position);
             void set_world_offset(const Vec3f& offset) { m_world_offset = offset; }
+            void set_z_offset(float z_offset) { m_z_offset = z_offset; }
 
             bool is_visible() const { return m_visible; }
             void set_visible(bool visible) { m_visible = visible; }
@@ -773,6 +777,7 @@ private:
     // bounding box of toolpaths + marker tools + shells
     BoundingBoxf3 m_max_bounding_box;
     float m_max_print_height{ 0.0f };
+    float m_z_offset{ 0.0f };
     std::vector<ColorRGBA> m_tool_colors;
     Layers m_layers;
     std::array<unsigned int, 2> m_layers_z_range;

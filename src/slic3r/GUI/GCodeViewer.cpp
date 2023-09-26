@@ -307,8 +307,8 @@ void GCodeViewer::SequentialView::Marker::init()
 void GCodeViewer::SequentialView::Marker::set_world_position(const Vec3f& position)
 {    
     m_world_position = position;
-    m_world_transform = (Geometry::translation_transform((position + m_z_offset * Vec3f::UnitZ()).cast<double>()) *
-      Geometry::translation_transform(m_model.get_bounding_box().size().z() * Vec3d::UnitZ()) * Geometry::rotation_transform({ M_PI, 0.0, 0.0 })).cast<float>();
+    m_world_transform = (Geometry::translation_transform((position + m_model_z_offset * Vec3f::UnitZ()).cast<double>()) *
+        Geometry::translation_transform(m_model.get_bounding_box().size().z() * Vec3d::UnitZ()) * Geometry::rotation_transform({ M_PI, 0.0, 0.0 })).cast<float>();
 }
 
 void GCodeViewer::SequentialView::Marker::render()
@@ -351,7 +351,7 @@ void GCodeViewer::SequentialView::Marker::render()
     imgui.text_colored(ImGuiWrapper::COL_ORANGE_LIGHT, _u8L("Tool position") + ":");
     ImGui::SameLine();
     char buf[1024];
-    const Vec3f position = m_world_position + m_world_offset;
+    const Vec3f position = m_world_position + m_world_offset + m_z_offset * Vec3f::UnitZ();
     sprintf(buf, "X: %.3f, Y: %.3f, Z: %.3f", position.x(), position.y(), position.z());
     imgui.text(std::string(buf));
 
@@ -841,6 +841,7 @@ void GCodeViewer::load(const GCodeProcessorResult& gcode_result, const Print& pr
         m_custom_gcode_per_print_z = gcode_result.custom_gcode_per_print_z;
 
     m_max_print_height = gcode_result.max_print_height;
+    m_z_offset = gcode_result.z_offset;
 
     load_toolpaths(gcode_result);
     load_wipetower_shell(print);
@@ -1000,6 +1001,7 @@ void GCodeViewer::reset()
     m_paths_bounding_box.reset();
     m_max_bounding_box.reset();
     m_max_print_height = 0.0f;
+    m_z_offset = 0.0f;
     m_tool_colors = std::vector<ColorRGBA>();
     m_extruders_count = 0;
     m_extruder_ids = std::vector<unsigned char>();
@@ -1042,6 +1044,7 @@ void GCodeViewer::render()
         if (m_sequential_view.current.last != m_sequential_view.endpoints.last) {
             m_sequential_view.marker.set_world_position(m_sequential_view.current_position);
             m_sequential_view.marker.set_world_offset(m_sequential_view.current_offset);
+            m_sequential_view.marker.set_z_offset(m_z_offset);
             m_sequential_view.render(legend_height);
         }
     }
