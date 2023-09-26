@@ -28,6 +28,7 @@
 #include "Exception.hpp"
 #include "ExtrusionEntity.hpp"
 #include "Geometry/ConvexHull.hpp"
+#include "GCode/LabelObjects.hpp"
 #include "GCode/PrintExtents.hpp"
 #include "GCode/Thumbnails.hpp"
 #include "GCode/WipeTower.hpp"
@@ -101,7 +102,6 @@ namespace Slic3r {
         if (!gcode.empty() && gcode.back() != '\n')
             gcode += '\n';
     }
-
 
     // Return true if tch_prefix is found in custom_gcode
     static bool custom_gcode_changes_tool(const std::string& custom_gcode, const std::string& tch_prefix, unsigned next_extruder)
@@ -1143,6 +1143,10 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
 
     // Emit machine envelope limits for the Marlin firmware.
     this->print_machine_envelope(file, print);
+
+    // Label all objects so printer knows about them since the start.
+    m_label_objects.init(print);
+    file.write(m_label_objects.all_objects_header());
 
     // Update output variables after the extruders were initialized.
     m_placeholder_parser_integration.init(m_writer);
@@ -2336,9 +2340,8 @@ void GCodeGenerator::process_layer_single_object(
     const bool                print_wipe_extrusions)
 {
     bool     first     = true;
-    int      object_id = 0;
     // Delay layer initialization as many layers may not print with all extruders.
-    auto init_layer_delayed = [this, &print_instance, &layer_to_print, &first, &object_id, &gcode]() {
+    auto init_layer_delayed = [this, &print_instance, &layer_to_print, &first, &gcode]() {
         if (first) {
             first = false;
             const PrintObject &print_object = print_instance.print_object;
@@ -2354,14 +2357,7 @@ void GCodeGenerator::process_layer_single_object(
                 m_avoid_crossing_perimeters.use_external_mp_once();
             m_last_obj_copy = this_object_copy;
             this->set_origin(unscale(offset));
-            if (this->config().gcode_label_objects) {
-                for (const PrintObject *po : print_object.print()->objects())
-                    if (po == &print_object)
-                        break;
-                    else
-                        ++ object_id;
-                gcode += std::string("; printing object ") + print_object.model_object()->name + " id:" + std::to_string(object_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
-            }
+            gcode += m_label_objects.start_object(print_instance.print_object.instances()[print_instance.instance_id], GCode::LabelObjects::IncludeName::No);
         }
     };
 
@@ -2538,8 +2534,8 @@ void GCodeGenerator::process_layer_single_object(
                 }
             }
         }
-    if (! first && this->config().gcode_label_objects)
-        gcode += std::string("; stop printing object ") + print_object.model_object()->name + " id:" + std::to_string(object_id) + " copy " + std::to_string(print_instance.instance_id) + "\n";
+    if (! first)
+        gcode += m_label_objects.stop_object(print_instance.print_object.instances()[print_instance.instance_id]);
 }
 
 void GCodeGenerator::apply_print_config(const PrintConfig &print_config)
