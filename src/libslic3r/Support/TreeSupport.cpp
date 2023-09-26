@@ -81,7 +81,7 @@ static inline void validate_range(const MultiPoint &mp)
     validate_range(mp.points);
 }
 
-static inline void validate_range(const Polygons &polygons) 
+[[maybe_unused]] static inline void validate_range(const Polygons &polygons) 
 {
     for (const Polygon &p : polygons)
         validate_range(p);

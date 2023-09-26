@@ -72,7 +72,7 @@ TEST_CASE("Moments calculation for rotated axis.", "[SupportSpotsGenerator]") {
     Integrals integrals{{polygon}};
 
     std::mt19937 generator{std::random_device{}()};
-    std::uniform_real_distribution<float> angle_distribution{0, 2*M_PI};
+    std::uniform_real_distribution<float> angle_distribution{0.f, float(2*M_PI)};
 
     // Meassured counterclockwise from (1, 0)
     const float angle = angle_distribution(generator);

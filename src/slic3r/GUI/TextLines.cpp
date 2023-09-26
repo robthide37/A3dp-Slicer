@@ -154,7 +154,7 @@ TextLines select_closest_contour(const std::vector<Polygons> &line_contours) {
         std::vector<Linef> linesf = to_linesf(expolygons);
         AABBTreeIndirect::Tree2d tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(linesf);
 
-        size_t line_idx;
+        size_t line_idx = 0;
         Vec2d  hit_point;
         // double distance = 
         AABBTreeLines::squared_distance_to_indexed_lines(linesf, tree, zero, line_idx, hit_point);
