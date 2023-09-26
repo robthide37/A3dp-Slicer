@@ -166,7 +166,7 @@ struct SliceConnection
         this->second_moment_of_area_covariance_accumulator += other.second_moment_of_area_covariance_accumulator;
     }
 
-    void print_info(const std::string &tag)
+    void print_info(const std::string &tag) const
     {
         Vec3f centroid   = centroid_accumulator / area;
         Vec2f variance   = (second_moment_of_area_accumulator / area - centroid.head<2>().cwiseProduct(centroid.head<2>()));
@@ -178,6 +178,27 @@ struct SliceConnection
         std::cout << "covariance: " << covariance << std::endl;
     }
 };
+
+Integrals::Integrals (const Polygons& polygons) {
+    for (const Polygon &polygon : polygons) {
+        Vec2f p0 = unscaled(polygon.first_point()).cast<float>();
+        for (size_t i = 2; i < polygon.points.size(); i++) {
+            Vec2f p1 = unscaled(polygon.points[i - 1]).cast<float>();
+            Vec2f p2 = unscaled(polygon.points[i]).cast<float>();
+
+            float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
+
+            auto [area, first_moment_of_area, second_moment_area,
+                  second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
+
+            this->area += sign * area;
+            this->x_i += sign * first_moment_of_area;
+            this->x_i_squared += sign * second_moment_area;
+            this->xy += sign * second_moment_of_area_covariance;
+        }
+    }
+}
+
 
 SliceConnection estimate_slice_connection(size_t slice_idx, const Layer *layer)
 {
@@ -200,22 +221,11 @@ SliceConnection estimate_slice_connection(size_t slice_idx, const Layer *layer)
     Polygons overlap = intersection(ClipperUtils::clip_clipper_polygons_with_subject_bbox(slice_polys, below_bb),
                                     ClipperUtils::clip_clipper_polygons_with_subject_bbox(below_polys, slice_bb));
 
-    for (const Polygon &poly : overlap) {
-        Vec2f p0 = unscaled(poly.first_point()).cast<float>();
-        for (size_t i = 2; i < poly.points.size(); i++) {
-            Vec2f p1 = unscaled(poly.points[i - 1]).cast<float>();
-            Vec2f p2 = unscaled(poly.points[i]).cast<float>();
-
-            float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
-
-            auto [area, first_moment_of_area, second_moment_area,
-                  second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
-            connection.area += sign * area;
-            connection.centroid_accumulator += sign * Vec3f(first_moment_of_area.x(), first_moment_of_area.y(), layer->print_z * area);
-            connection.second_moment_of_area_accumulator += sign * second_moment_area;
-            connection.second_moment_of_area_covariance_accumulator += sign * second_moment_of_area_covariance;
-        }
-    }
+    const Integrals integrals{overlap};
+    connection.area += integrals.area;
+    connection.centroid_accumulator += Vec3f(integrals.x_i.x(), integrals.x_i.y(), layer->print_z * integrals.area);
+    connection.second_moment_of_area_accumulator += integrals.x_i_squared;
+    connection.second_moment_of_area_covariance_accumulator += integrals.xy;
 
     return connection;
 };
@@ -450,6 +460,48 @@ std::vector<ExtrusionLine> check_extrusion_entity_stability(const ExtrusionEntit
     }
 }
 
+/**
+ * Calculates the second moment of area over an arbitrary polygon.
+ *
+ * Important note: The calculated moment is for an axis with origin at
+ * the polygon centroid!
+ *
+ * @param integrals Integrals over the polygon area.
+ * @param axis_direction Direction of the rotation axis going through centroid.
+ */
+float compute_second_moment(
+    const Integrals& integrals,
+    const Vec2f& axis_direction
+) {
+    // Second moment of area for any axis intersecting coordinate system origin
+    // can be evaluated using the second moments of area calculated for the coordinate
+    // system axis and the moment product (int xy).
+    // The equation is derived appling known formulas for the moment of inertia
+    // to a plannar problem. One can reason about second moment
+    // of area by by setting density to 1 in the moment of inertia formulas.
+    const auto area = integrals.area;
+    const auto I_xx = integrals.x_i_squared.y();
+    const auto I_yy = integrals.x_i_squared.x();
+    const auto I_xy = -integrals.xy;
+
+    const Vec2f centroid = integrals.x_i / area;
+
+    Matrix2f moment_tensor{};
+    moment_tensor <<
+        I_xx, I_xy,
+        I_xy, I_yy;
+
+    const float moment_at_0_0 = axis_direction.transpose() * moment_tensor * axis_direction;
+
+    // Apply parallel axis theorem to move the moment to centroid
+    using line_alg::distance_to_infinite_squared;
+
+    const Linef axis_at_0_0 = {{0, 0}, axis_direction.cast<double>()};
+
+    const double distance = distance_to_infinite_squared(axis_at_0_0, centroid.cast<double>());
+    return moment_at_0_0 - area * distance;
+}
+
 class ObjectPart
 {
 public:
@@ -482,43 +534,22 @@ public:
         this->sticking_second_moment_of_area_covariance_accumulator += sticking_area * position.x() * position.y();
     }
 
-    float compute_directional_xy_variance(const Vec2f &line_dir,
-                                          const Vec3f &centroid_accumulator,
-                                          const Vec2f &second_moment_of_area_accumulator,
-                                          const float &second_moment_of_area_covariance_accumulator,
-                                          const float &area) const
-    {
-        assert(area > 0);
-        Vec3f centroid   = centroid_accumulator / area;
-        Vec2f variance   = (second_moment_of_area_accumulator / area - centroid.head<2>().cwiseProduct(centroid.head<2>()));
-        float covariance = second_moment_of_area_covariance_accumulator / area - centroid.x() * centroid.y();
-        // Var(aX+bY)=a^2*Var(X)+b^2*Var(Y)+2*a*b*Cov(X,Y)
-        float directional_xy_variance = line_dir.x() * line_dir.x() * variance.x() + line_dir.y() * line_dir.y() * variance.y() +
-                                        2.0f * line_dir.x() * line_dir.y() * covariance;
-#ifdef DETAILED_DEBUG_LOGS
-        BOOST_LOG_TRIVIAL(debug) << "centroid: " << centroid.x() << "  " << centroid.y() << "  " << centroid.z();
-        BOOST_LOG_TRIVIAL(debug) << "variance: " << variance.x() << "  " << variance.y();
-        BOOST_LOG_TRIVIAL(debug) << "covariance: " << covariance;
-        BOOST_LOG_TRIVIAL(debug) << "directional_xy_variance: " << directional_xy_variance;
-#endif
-        return directional_xy_variance;
-    }
 
-    float compute_elastic_section_modulus(const Vec2f &line_dir,
-                                          const Vec3f &extreme_point,
-                                          const Vec3f &centroid_accumulator,
-                                          const Vec2f &second_moment_of_area_accumulator,
-                                          const float &second_moment_of_area_covariance_accumulator,
-                                          const float &area) const
-    {
-        float directional_xy_variance = compute_directional_xy_variance(line_dir, centroid_accumulator, second_moment_of_area_accumulator,
-                                                                        second_moment_of_area_covariance_accumulator, area);
-        if (directional_xy_variance < EPSILON) { return 0.0f; }
-        Vec3f centroid                = centroid_accumulator / area;
+    float compute_elastic_section_modulus(
+        const Vec2f &line_dir,
+        const Vec3f &extreme_point,
+        const Integrals& integrals
+    ) const {
+        float second_moment_of_area = compute_second_moment(integrals, Vec2f{-line_dir.y(), line_dir.x()});
+
+        if (second_moment_of_area < EPSILON) { return 0.0f; }
+
+        Vec2f centroid                = integrals.x_i / integrals.area;
         float extreme_fiber_dist      = line_alg::distance_to(Linef(centroid.head<2>().cast<double>(),
                                                                     (centroid.head<2>() + Vec2f(line_dir.y(), -line_dir.x())).cast<double>()),
                                                               extreme_point.head<2>().cast<double>());
-        float elastic_section_modulus = area * directional_xy_variance / extreme_fiber_dist;
+
+        float elastic_section_modulus = second_moment_of_area / extreme_fiber_dist;
 
 #ifdef DETAILED_DEBUG_LOGS
         BOOST_LOG_TRIVIAL(debug) << "extreme_fiber_dist: " << extreme_fiber_dist;
@@ -534,6 +565,12 @@ public:
                                     float                  layer_z,
                                     const Params          &params) const
     {
+        // Note that exteme point is calculated for the current layer, while it should
+        // be computed for the first layer. The shape of the first layer however changes a lot,
+        // during support points additions (for organic supports it is not even clear how)
+        // and during merging. Using the current layer is heuristics and also small optimization,
+        // as the AABB tree for it is calculated anyways. This heuristic should usually be
+        // on the safe side.
         Vec2f        line_dir      = (extruded_line.b - extruded_line.a).normalized();
         const Vec3f &mass_centroid = this->volume_centroid_accumulator / this->volume;
         float        mass          = this->volume * params.filament_density;
@@ -548,19 +585,19 @@ public:
         {
             if (this->sticking_area < EPSILON) return {1.0f, SupportPointCause::UnstableFloatingPart};
 
+            Integrals integrals;
+            integrals.area = this->sticking_area;
+            integrals.x_i = this->sticking_centroid_accumulator.head<2>();
+            integrals.x_i_squared = this->sticking_second_moment_of_area_accumulator;
+            integrals.xy = this->sticking_second_moment_of_area_covariance_accumulator;
+
             Vec3f bed_centroid     = this->sticking_centroid_accumulator / this->sticking_area;
-            float bed_yield_torque = -compute_elastic_section_modulus(line_dir, extreme_point, this->sticking_centroid_accumulator,
-                                                                      this->sticking_second_moment_of_area_accumulator,
-                                                                      this->sticking_second_moment_of_area_covariance_accumulator,
-                                                                      this->sticking_area) *
-                                     params.get_bed_adhesion_yield_strength();
+            float bed_yield_torque = -compute_elastic_section_modulus(line_dir, extreme_point, integrals) * params.get_bed_adhesion_yield_strength();
 
             Vec2f bed_weight_arm             = (mass_centroid.head<2>() - bed_centroid.head<2>());
             float bed_weight_arm_len         = bed_weight_arm.norm();
-            float bed_weight_dir_xy_variance = compute_directional_xy_variance(bed_weight_arm, this->sticking_centroid_accumulator,
-                                                                               this->sticking_second_moment_of_area_accumulator,
-                                                                               this->sticking_second_moment_of_area_covariance_accumulator,
-                                                                               this->sticking_area);
+
+            float bed_weight_dir_xy_variance = compute_second_moment(integrals, {-bed_weight_arm.y(), bed_weight_arm.x()}) / this->sticking_area;
             float bed_weight_sign            = bed_weight_arm_len < 2.0f * sqrt(bed_weight_dir_xy_variance) ? -1.0f : 1.0f;
             float bed_weight_torque          = bed_weight_sign * bed_weight_arm_len * weight;
 
@@ -600,11 +637,14 @@ public:
             Vec3f conn_centroid = connection.centroid_accumulator / connection.area;
 
             if (layer_z - conn_centroid.z() < 3.0f) { return {-1.0f, SupportPointCause::WeakObjectPart}; }
-            float conn_yield_torque = compute_elastic_section_modulus(line_dir, extreme_point, connection.centroid_accumulator,
-                                                                      connection.second_moment_of_area_accumulator,
-                                                                      connection.second_moment_of_area_covariance_accumulator,
-                                                                      connection.area) *
-                                      params.material_yield_strength;
+
+            Integrals integrals;
+            integrals.area = connection.area;
+            integrals.x_i = connection.centroid_accumulator.head<2>();
+            integrals.x_i_squared = connection.second_moment_of_area_accumulator;
+            integrals.xy = connection.second_moment_of_area_covariance_accumulator;
+
+            float conn_yield_torque = compute_elastic_section_modulus(line_dir, extreme_point, integrals) * params.material_yield_strength;
 
             float conn_weight_arm    = (conn_centroid.head<2>() - mass_centroid.head<2>()).norm();
             if (layer_z - conn_centroid.z() < 30.0) {

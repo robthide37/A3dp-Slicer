@@ -49,6 +49,34 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
                                                       float                                   flow_width,
                                                       float                                   max_line_length = -1.0f)
 {
+    bool   looped     = input_points.front() == input_points.back();
+    std::function<int(int,size_t)> get_prev_index = [](int idx, size_t count) {
+        if (idx > 0) {
+            return idx - 1;
+        } else
+            return idx;
+    };
+    if (looped) {
+        get_prev_index = [](int idx, size_t count) {
+            if (idx == 0)
+                idx = count;
+            return --idx;
+        };
+    };
+    std::function<int(int,size_t)> get_next_index = [](int idx, size_t size) {
+        if (idx + 1 < size) {
+            return idx + 1;
+        } else
+            return idx;
+    };
+    if (looped) {
+        get_next_index = [](int idx, size_t count) {
+            if (++idx == count)
+                idx = 0;
+            return idx;
+        };
+    };
+
     using P = typename POINTS::value_type;
 
     using AABBScalar = typename AABBTreeLines::LinesDistancer<L>::Scalar;
@@ -156,69 +184,65 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
         points = std::move(new_points);
     }
 
-    std::vector<float> angles_for_curvature(points.size());
+    float accumulated_distance = 0;
     std::vector<float> distances_for_curvature(points.size());
+    for (int point_idx = 0; point_idx < int(points.size()); ++point_idx) {
+        const ExtendedPoint &a = points[point_idx];
+        const ExtendedPoint &b = points[get_prev_index(point_idx, points.size())];
 
-    for (size_t point_idx = 0; point_idx < points.size(); ++point_idx) {
-        ExtendedPoint &a    = points[point_idx];
-        size_t         prev = prev_idx_modulo(point_idx, points.size());
-        size_t         next = next_idx_modulo(point_idx, points.size());
-
-        int iter_limit = points.size();
-        while ((a.position - points[prev].position).squaredNorm() < 1 && iter_limit > 0) {
-            prev = prev_idx_modulo(prev, points.size());
-            iter_limit--;
-        }
-
-        while ((a.position - points[next].position).squaredNorm() < 1 && iter_limit > 0) {
-            next = next_idx_modulo(next, points.size());
-            iter_limit--;
-        }
-
-        distances_for_curvature[point_idx] = (points[prev].position - a.position).norm();
-        float alfa                         = angle(a.position - points[prev].position, points[next].position - a.position);
-        angles_for_curvature[point_idx]    = alfa;
+        distances_for_curvature[point_idx] = (b.position - a.position).norm();
+        accumulated_distance += distances_for_curvature[point_idx];
     }
 
-    if (std::accumulate(distances_for_curvature.begin(), distances_for_curvature.end(), 0) > EPSILON)
+    if (accumulated_distance > EPSILON)
         for (float window_size : {3.0f, 9.0f, 16.0f}) {
-            size_t tail_point      = 0;
-            float  tail_window_acc = 0;
-            float  tail_angle_acc  = 0;
+            for (int point_idx = 0; point_idx < int(points.size()); ++point_idx) {
+                ExtendedPoint &current = points[point_idx];
 
-            size_t head_point      = 0;
-            float  head_window_acc = 0;
-            float  head_angle_acc  = 0;
-
-            for (size_t point_idx = 0; point_idx < points.size(); ++point_idx) {
-                if (point_idx == 0) {
-                    while (tail_window_acc < window_size * 0.5) {
-                        tail_window_acc += distances_for_curvature[tail_point];
-                        tail_angle_acc += angles_for_curvature[tail_point];
-                        tail_point = prev_idx_modulo(tail_point, points.size());
+                Vec2d back_position = current.position;
+                {
+                    size_t back_point_index = point_idx;
+                    float  dist_backwards   = 0;
+                    while (dist_backwards < window_size * 0.5 && back_point_index != get_prev_index(back_point_index, points.size())) {
+                        float line_dist = distances_for_curvature[get_prev_index(back_point_index, points.size())];
+                        if (dist_backwards + line_dist > window_size * 0.5) {
+                            back_position = points[back_point_index].position +
+                                            (window_size * 0.5 - dist_backwards) *
+                                                (points[get_prev_index(back_point_index, points.size())].position -
+                                                 points[back_point_index].position)
+                                                    .normalized();
+                            dist_backwards += window_size * 0.5 - dist_backwards + EPSILON;
+                        } else {
+                            dist_backwards += line_dist;
+                            back_point_index = get_prev_index(back_point_index, points.size());
+                        }
                     }
                 }
-                while (tail_window_acc - distances_for_curvature[next_idx_modulo(tail_point, points.size())] > window_size * 0.5) {
-                    tail_point = next_idx_modulo(tail_point, points.size());
-                    tail_window_acc -= distances_for_curvature[tail_point];
-                    tail_angle_acc -= angles_for_curvature[tail_point];
+
+                Vec2d front_position = current.position;
+                {
+                    size_t front_point_index = point_idx;
+                    float  dist_forwards     = 0;
+                    while (dist_forwards < window_size * 0.5 && front_point_index != get_next_index(front_point_index, points.size())) {
+                        float line_dist = distances_for_curvature[front_point_index];
+                        if (dist_forwards + line_dist > window_size * 0.5) {
+                            front_position = points[front_point_index].position +
+                                             (window_size * 0.5 - dist_forwards) *
+                                                 (points[get_next_index(front_point_index, points.size())].position -
+                                                  points[front_point_index].position)
+                                                     .normalized();
+                            dist_forwards += window_size * 0.5 - dist_forwards + EPSILON;
+                        } else {
+                            dist_forwards += line_dist;
+                            front_point_index = get_next_index(front_point_index, points.size());
+                        }
+                    }
                 }
 
-                while (head_window_acc < window_size * 0.5) {
-                    head_point = next_idx_modulo(head_point, points.size());
-                    head_window_acc += distances_for_curvature[head_point];
-                    head_angle_acc += angles_for_curvature[head_point];
+                float new_curvature = angle(current.position - back_position, front_position - current.position) / window_size;
+                if (abs(current.curvature) < abs(new_curvature)) {
+                    current.curvature = new_curvature;
                 }
-
-                float curvature = (tail_angle_acc + head_angle_acc) / window_size;
-                if (std::abs(curvature) > std::abs(points[point_idx].curvature)) {
-                    points[point_idx].curvature = curvature;
-                }
-
-                tail_window_acc += distances_for_curvature[point_idx];
-                tail_angle_acc += angles_for_curvature[point_idx];
-                head_window_acc -= distances_for_curvature[point_idx];
-                head_angle_acc -= angles_for_curvature[point_idx];
             }
         }
 

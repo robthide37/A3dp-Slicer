@@ -595,8 +595,12 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
     for (size_t i = 0; i < extruders_count; ++ i) {
         m_extruder_offsets[i]           = to_3d(config.extruder_offset.get_at(i).cast<float>().eval(), 0.f);
         m_extruder_colors[i]            = static_cast<unsigned char>(i);
-        m_extruder_temps_config[i]      = static_cast<int>(config.temperature.get_at(i));
         m_extruder_temps_first_layer_config[i] = static_cast<int>(config.first_layer_temperature.get_at(i));
+        m_extruder_temps_config[i]      = static_cast<int>(config.temperature.get_at(i));
+        if (m_extruder_temps_config[i] == 0) {
+            // This means the value should be ignored and first layer temp should be used.
+            m_extruder_temps_config[i] = m_extruder_temps_first_layer_config[i];
+        }
         m_result.filament_diameters[i]  = static_cast<float>(config.filament_diameter.get_at(i));
         m_result.filament_densities[i]  = static_cast<float>(config.filament_density.get_at(i));
         m_result.filament_cost[i]       = static_cast<float>(config.filament_cost.get_at(i));

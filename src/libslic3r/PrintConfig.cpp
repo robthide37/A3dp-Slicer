@@ -229,6 +229,13 @@ static const t_config_enum_values s_keys_map_DraftShield = {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(DraftShield)
 
+static const t_config_enum_values s_keys_map_LabelObjectsStyle = {
+    { "disabled",  int(LabelObjectsStyle::Disabled)  },
+    { "octoprint", int(LabelObjectsStyle::Octoprint) },
+    { "firmware",  int(LabelObjectsStyle::Firmware)  }
+};
+CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(LabelObjectsStyle)
+
 static const t_config_enum_values s_keys_map_GCodeThumbnailsFormat = {
     { "PNG", int(GCodeThumbnailsFormat::PNG) },
     { "JPG", int(GCodeThumbnailsFormat::JPG) },
@@ -1493,13 +1500,20 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionEnum<GCodeFlavor>(gcfRepRapSprinter));
 
-    def = this->add("gcode_label_objects", coBool);
+    def = this->add("gcode_label_objects", coEnum);
     def->label = L("Label objects");
-    def->tooltip = L("Enable this to add comments into the G-Code labeling print moves with what object they belong to,"
-                   " which is useful for the Octoprint CancelObject plugin. This settings is NOT compatible with "
-                   "Single Extruder Multi Material setup and Wipe into Object / Wipe into Infill.");
+    def->tooltip = L("Selects whether labels should be exported at object boundaries and in what format.\n"
+                   " OctoPrint = comments to be consumed by OctoPrint CancelObject plugin.\n"
+                   " Firmware = firmware specific G-code (it will be chosen based on firmware flavor and it can end up to be empty).\n\n"
+                   "This settings is NOT compatible with Single Extruder Multi Material setup and Wipe into Object / Wipe into Infill.");
+
+    def->set_enum<LabelObjectsStyle>({
+        { "disabled",   L("Disabled") },
+        { "octoprint",  L("OctoPrint comments") },
+        { "firmware",   L("Firmware-specific") }
+        });
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionBool(0));
+    def->set_default_value(new ConfigOptionEnum<LabelObjectsStyle>(LabelObjectsStyle::Disabled));
 
     def = this->add("gcode_substitutions", coStrings);
     def->label = L("G-code substitutions");
@@ -4335,6 +4349,10 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     } else if (opt_key == "draft_shield" && (value == "1" || value == "0")) {
         // draft_shield used to be a bool, it was turned into an enum in PrusaSlicer 2.4.0.
         value = value == "1" ? "enabled" : "disabled";
+    } else if (opt_key == "gcode_label_objects" && (value == "1" || value == "0")) {
+        // gcode_label_objects used to be a bool (the behavior was nothing or "octoprint"), it is
+        // and enum since PrusaSlicer 2.6.2.
+        value = value == "1" ? "octoprint" : "disabled";
     } else if (opt_key == "octoprint_host") {
         opt_key = "print_host";
     } else if (opt_key == "octoprint_cafile") {

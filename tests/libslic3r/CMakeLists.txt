@@ -39,6 +39,7 @@ add_executable(${_TEST_NAME}_tests
     test_astar.cpp
     test_anyptr.cpp
     test_jump_point_search.cpp
+    test_support_spots_generator.cpp
     ../data/prusaparts.cpp
     ../data/prusaparts.hpp
 	)

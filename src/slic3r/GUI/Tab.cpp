@@ -4735,6 +4735,7 @@ void SubstitutionManager::update_from_config()
     if (m_substitutions == subst && m_grid_sizer->IsShown(1)) {
         // just update visibility for chb_match_single_lines
         int subst_id = 0;
+        assert(m_chb_match_single_lines.size() == size_t(subst.size()/4));
         for (size_t i = 0; i < subst.size(); i += 4) {
             const std::string& params = subst[i + 2];
             const bool         regexp = strchr(params.c_str(), 'r') != nullptr || strchr(params.c_str(), 'R') != nullptr;
@@ -4772,8 +4773,10 @@ void SubstitutionManager::delete_all()
     m_config->option<ConfigOptionStrings>("gcode_substitutions")->values.clear();
     call_ui_update();
 
-    if (!m_grid_sizer->IsEmpty())
+    if (!m_grid_sizer->IsEmpty()) {
         m_grid_sizer->Clear(true);
+        m_chb_match_single_lines.clear();
+    }
 
     m_parent->GetParent()->Layout();
 }
@@ -4839,6 +4842,7 @@ wxSizer* TabPrint::create_substitutions_widget(wxWindow* parent)
     m_subst_manager.init(m_config, parent, grid_sizer);
     m_subst_manager.set_cb_edited_substitution([this]() {
         update_dirty();
+        Layout();
         wxGetApp().mainframe->on_config_changed(m_config); // invalidate print
     });
     m_subst_manager.set_cb_hide_delete_all_btn([this]() {

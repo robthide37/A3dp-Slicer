@@ -160,6 +160,8 @@ set(SLIC3R_SOURCES
     GCode/ExtrusionProcessor.hpp
     GCode/FindReplace.cpp
     GCode/FindReplace.hpp
+    GCode/LabelObjects.cpp
+    GCode/LabelObjects.hpp
     GCode/GCodeWriter.cpp
     GCode/GCodeWriter.hpp
     GCode/PostProcessor.cpp
