@@ -341,6 +341,25 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
     assert(selection.is_single_full_object() || selection.is_single_volume());
     if (!selection.is_single_full_object() && !selection.is_single_volume()) return;
 
+    // Fix angle for mirrored volume
+    bool is_mirrored = false;
+    const GLVolume* gl_volume = selection.get_first_volume();
+    if (gl_volume != nullptr) {
+        if (selection.is_single_full_object()) {
+            const ModelInstance *instance = get_model_instance(*gl_volume, selection.get_model()->objects);
+            if (instance != nullptr)
+                is_mirrored = has_reflection(instance->get_matrix());
+        } else {
+            // selection.is_single_volume()
+            const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+            if (volume != nullptr)
+                is_mirrored = has_reflection(volume->get_matrix());
+        }    
+    }
+    if (is_mirrored)
+        relative_angle *= -1;
+
+
     selection.setup_cache();
 
     auto selection_rotate_fnc = [&selection, &relative_angle](){
