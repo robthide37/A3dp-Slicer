@@ -62,6 +62,9 @@ const struct Limits
     MinMax<float> angle{-180.f, 180.f}; // in degrees
 } limits;
 
+// Store path to directory with svg for import and export svg's
+wxString last_used_directory = wxEmptyString;
+
 /// <summary>
 /// Open file dialog with svg files
 /// </summary>
@@ -1475,15 +1478,16 @@ void GLGizmoSVG::draw_filename(){
         draw(get_icon(m_icons, IconType::save));
         ImGui::SameLine();
         if (ImGui::Selectable((_L("Save as") + dots).ToUTF8().data())) {
+            wxWindow *parent = nullptr;
             GUI::FileType file_type  = FT_SVG;
             wxString wildcard = file_wildcards(file_type);
             wxString dlg_title = _L("Export SVG file:");
-            wxString dlg_dir = from_u8(wxGetApp().app_config->get_last_dir());
             const EmbossShape::SvgFile& svg = m_volume_shape.svg_file;
             wxString dlg_file = from_u8(get_file_name(((!svg.path.empty()) ? svg.path : svg.path_in_3mf))) + ".svg";
-            wxFileDialog dlg(nullptr, dlg_title, dlg_dir, dlg_file, wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+            wxFileDialog dlg(parent, dlg_title, last_used_directory, dlg_file, wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
             if (dlg.ShowModal() == wxID_OK ){
-                wxString out_path = dlg.GetPath();        
+                last_used_directory = dlg.GetDirectory();
+                wxString out_path = dlg.GetPath();
                 std::string path{out_path.c_str()};
                 //Slic3r::save(*m_volume_shape.svg_file.image, path);
 
@@ -2053,13 +2057,12 @@ GuiCfg create_gui_configuration() {
 
 std::string choose_svg_file()
 {
-    wxWindow    *parent       = nullptr;
-    wxString     message      = _L("Choose SVG file for emboss:");
-    wxString     defaultDir   = wxEmptyString;
-    wxString     selectedFile = wxEmptyString;
-    wxString     wildcard     = file_wildcards(FT_SVG);
-    long         style        = wxFD_OPEN | wxFD_FILE_MUST_EXIST;
-    wxFileDialog dialog(parent, message, defaultDir, selectedFile, wildcard, style);
+    wxWindow *parent = nullptr;
+    wxString message = _L("Choose SVG file for emboss:");
+    wxString selected_file = wxEmptyString;
+    wxString wildcard = file_wildcards(FT_SVG);
+    long style = wxFD_OPEN | wxFD_FILE_MUST_EXIST;
+    wxFileDialog dialog(parent, message, last_used_directory, selected_file, wildcard, style);
     if (dialog.ShowModal() != wxID_OK) {
         BOOST_LOG_TRIVIAL(warning) << "SVG file for emboss was NOT selected.";
         return {};
@@ -2088,6 +2091,7 @@ std::string choose_svg_file()
         return {};    
     }
 
+    last_used_directory = dialog.GetDirectory();
     return path;
 }
 
