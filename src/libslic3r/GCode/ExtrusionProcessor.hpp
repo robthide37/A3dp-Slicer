@@ -50,27 +50,27 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
                                                       float                                   max_line_length = -1.0f)
 {
     bool   looped     = input_points.front() == input_points.back();
-    std::function<int(int,size_t)> get_prev_index = [](int idx, size_t count) {
+    std::function<size_t(size_t,size_t)> get_prev_index = [](size_t idx, size_t count) {
         if (idx > 0) {
             return idx - 1;
         } else
             return idx;
     };
     if (looped) {
-        get_prev_index = [](int idx, size_t count) {
+        get_prev_index = [](size_t idx, size_t count) {
             if (idx == 0)
                 idx = count;
             return --idx;
         };
     };
-    std::function<int(int,size_t)> get_next_index = [](int idx, size_t size) {
+    std::function<size_t(size_t,size_t)> get_next_index = [](size_t idx, size_t size) {
         if (idx + 1 < size) {
             return idx + 1;
         } else
             return idx;
     };
     if (looped) {
-        get_next_index = [](int idx, size_t count) {
+        get_next_index = [](size_t idx, size_t count) {
             if (++idx == count)
                 idx = 0;
             return idx;
@@ -186,7 +186,7 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
 
     float accumulated_distance = 0;
     std::vector<float> distances_for_curvature(points.size());
-    for (int point_idx = 0; point_idx < int(points.size()); ++point_idx) {
+    for (size_t point_idx = 0; point_idx < points.size(); ++point_idx) {
         const ExtendedPoint &a = points[point_idx];
         const ExtendedPoint &b = points[get_prev_index(point_idx, points.size())];
 
