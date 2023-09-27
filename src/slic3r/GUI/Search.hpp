@@ -182,7 +182,7 @@ class SearchDialog : public GUI::DPIDialog
 
 public:
     SearchDialog(OptionsSearcher* searcher);
-    ~SearchDialog() {}
+    ~SearchDialog();
 
     void Popup(wxPoint position = wxDefaultPosition);
     void ProcessSelection(wxDataViewItem selection);
