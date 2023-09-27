@@ -53,7 +53,11 @@
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
 #include "libslic3r/Color.hpp"
+constexpr bool debug_files = true;
+#else
+constexpr bool debug_files = false;
 #endif
+
 
 namespace Slic3r::SupportSpotsGenerator {
 
@@ -71,10 +75,6 @@ bool ExtrusionLine::is_external_perimeter() const
     assert(origin_entity != nullptr);
     return origin_entity->role().is_external_perimeter();
 }
-
-auto get_a(ExtrusionLine &&l) { return l.a; }
-auto get_b(ExtrusionLine &&l) { return l.b; }
-
 
 using LD = AABBTreeLines::LinesDistancer<ExtrusionLine>;
 
@@ -761,6 +761,41 @@ public:
     }
 };
 
+// Function that is used when new support point is generated. It will update the ObjectPart stability, weakest conneciton info,
+// and the support presence grid and add the point to the issues.
+void reckon_new_support_point(ObjectPart        &part,
+                              SliceConnection   &weakest_conn,
+                              SupportPoints     &supp_points,
+                              SupportGridFilter &supports_presence_grid,
+                              const SupportPoint& support_point,
+                              bool               is_global = false)
+{
+    // if position is taken and point is for global stability (force > 0) or we are too close to the bed, do not add
+    // This allows local support points (e.g. bridging) to be generated densely
+    if ((supports_presence_grid.position_taken(support_point.position) && is_global)) {
+        return;
+    }
+
+    float area = support_point.spot_radius * support_point.spot_radius * float(PI);
+    // add the stability effect of the point only if the spot is not taken, so that the densely created local support points do
+    // not add unrealistic amount of stability to the object (due to overlaping of local support points)
+    if (!(supports_presence_grid.position_taken(support_point.position))) {
+        part.add_support_point(support_point.position, area);
+    }
+
+    supp_points.push_back(support_point);
+    supports_presence_grid.take_position(support_point.position);
+
+    // The support point also increases the stability of the weakest connection of the object, which should be reflected
+    if (weakest_conn.area > EPSILON) { // Do not add it to the weakest connection if it is not valid - does not exist
+        weakest_conn.area += area;
+        weakest_conn.centroid_accumulator += support_point.position * area;
+        weakest_conn.second_moment_of_area_accumulator += area *
+                                                          support_point.position.head<2>().cwiseProduct(support_point.position.head<2>());
+        weakest_conn.second_moment_of_area_covariance_accumulator += area * support_point.position.x() * support_point.position.y();
+    }
+}
+
 std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject                 *po,
                                                           const PrecomputedSliceConnections &precomputed_slices_connections,
                                                           const PrintTryCancel              &cancel_func,
@@ -931,23 +966,37 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject     
         std::vector<tbb::concurrent_vector<ExtrusionLine>> unstable_lines_per_slice(layer->lslices_ex.size());
         std::vector<tbb::concurrent_vector<ExtrusionLine>> ext_perim_lines_per_slice(layer->lslices_ex.size());
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, entities_to_check.size()),
-                          [&entities_to_check, &prev_layer_ext_perim_lines, &prev_layer_boundary, &unstable_lines_per_slice,
-                           &ext_perim_lines_per_slice, &params](tbb::blocked_range<size_t> r) {
-                              for (size_t entity_idx = r.begin(); entity_idx < r.end(); ++entity_idx) {
-                                  const auto &e_to_check = entities_to_check[entity_idx];
-                                  for (const auto &line :
-                                       check_extrusion_entity_stability(e_to_check.e, e_to_check.region, prev_layer_ext_perim_lines,
-                                                                        prev_layer_boundary, params)) {
-                                      if (line.support_point_generated.has_value()) {
-                                          unstable_lines_per_slice[e_to_check.slice_idx].push_back(line);
-                                      }
-                                      if (line.is_external_perimeter()) {
-                                          ext_perim_lines_per_slice[e_to_check.slice_idx].push_back(line);
+        if constexpr (debug_files) {
+            for (const auto &e_to_check : entities_to_check) {
+                for (const auto &line : check_extrusion_entity_stability(e_to_check.e, e_to_check.region, prev_layer_ext_perim_lines,
+                                                                         prev_layer_boundary, params)) {
+                    if (line.support_point_generated.has_value()) {
+                        unstable_lines_per_slice[e_to_check.slice_idx].push_back(line);
+                    }
+                    if (line.is_external_perimeter()) {
+                        ext_perim_lines_per_slice[e_to_check.slice_idx].push_back(line);
+                    }
+                }
+            }
+        } else {
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, entities_to_check.size()),
+                              [&entities_to_check, &prev_layer_ext_perim_lines, &prev_layer_boundary, &unstable_lines_per_slice,
+                               &ext_perim_lines_per_slice, &params](tbb::blocked_range<size_t> r) {
+                                  for (size_t entity_idx = r.begin(); entity_idx < r.end(); ++entity_idx) {
+                                      const auto &e_to_check = entities_to_check[entity_idx];
+                                      for (const auto &line :
+                                           check_extrusion_entity_stability(e_to_check.e, e_to_check.region, prev_layer_ext_perim_lines,
+                                                                            prev_layer_boundary, params)) {
+                                          if (line.support_point_generated.has_value()) {
+                                              unstable_lines_per_slice[e_to_check.slice_idx].push_back(line);
+                                          }
+                                          if (line.is_external_perimeter()) {
+                                              ext_perim_lines_per_slice[e_to_check.slice_idx].push_back(line);
+                                          }
                                       }
                                   }
-                              }
-                          });
+                              });
+        }
 
         std::vector<ExtrusionLine> current_layer_ext_perims_lines{};
         current_layer_ext_perims_lines.reserve(prev_layer_ext_perim_lines.get_lines().size());
@@ -960,40 +1009,14 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject     
 #ifdef DETAILED_DEBUG_LOGS
             weakest_conn.print_info("weakest connection info: ");
 #endif
-            // Function that is used when new support point is generated. It will update the ObjectPart stability, weakest conneciton info,
-            // and the support presence grid and add the point to the issues.
-            auto reckon_new_support_point = [&part, &weakest_conn, &supp_points, &supports_presence_grid, &params,
-                                             &layer_idx](SupportPointCause cause, const Vec3f &support_point, float force,
-                                                         const Vec2f &dir) {
-                // if position is taken and point is for global stability (force > 0) or we are too close to the bed, do not add
-                // This allows local support points (e.g. bridging) to be generated densely
-                if ((supports_presence_grid.position_taken(support_point) && force > 0) || layer_idx <= 1) {
-                    return;
+
+            if (layer_idx > 1) {
+                for (const auto &l : unstable_lines_per_slice[slice_idx]) {
+                    assert(l.support_point_generated.has_value());
+                    SupportPoint support_point{*l.support_point_generated, create_support_point_position(l.b),
+                                               params.support_points_interface_radius};
+                    reckon_new_support_point(part, weakest_conn, supp_points, supports_presence_grid, support_point);
                 }
-
-                float area = params.support_points_interface_radius * params.support_points_interface_radius * float(PI);
-                // add the stability effect of the point only if the spot is not taken, so that the densely created local support points do
-                // not add unrealistic amount of stability to the object (due to overlaping of local support points)
-                if (!(supports_presence_grid.position_taken(support_point))) {
-                    part.add_support_point(support_point, area);
-                }
-
-                float radius = params.support_points_interface_radius;
-                supp_points.emplace_back(cause, support_point, force, radius, dir);
-                supports_presence_grid.take_position(support_point);
-
-                // The support point also increases the stability of the weakest connection of the object, which should be reflected
-                if (weakest_conn.area > EPSILON) { // Do not add it to the weakest connection if it is not valid - does not exist
-                    weakest_conn.area += area;
-                    weakest_conn.centroid_accumulator += support_point * area;
-                    weakest_conn.second_moment_of_area_accumulator += area * support_point.head<2>().cwiseProduct(support_point.head<2>());
-                    weakest_conn.second_moment_of_area_covariance_accumulator += area * support_point.x() * support_point.y();
-                }
-            };
-
-            for (const auto &l : unstable_lines_per_slice[slice_idx]) {
-                assert(l.support_point_generated.has_value());
-                reckon_new_support_point(*l.support_point_generated, create_support_point_position(l.b), float(-EPSILON), Vec2f::Zero());
             }
 
             LD    current_slice_lines_distancer({ext_perim_lines_per_slice[slice_idx].begin(), ext_perim_lines_per_slice[slice_idx].end()});
@@ -1008,10 +1031,13 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject     
                     Vec2f pivot_site_search_point = Vec2f(line.b + (line.b - line.a).normalized() * 300.0f);
                     auto [dist, nidx,
                           nearest_point]          = current_slice_lines_distancer.distance_from_lines_extra<false>(pivot_site_search_point);
-                    Vec3f support_point           = create_support_point_position(nearest_point);
-                    auto [force, cause]           = part.is_stable_while_extruding(weakest_conn, line, support_point, bottom_z, params);
-                    if (force > 0) {
-                        reckon_new_support_point(cause, support_point, force, (line.b - line.a).normalized());
+                    Vec3f position           = create_support_point_position(nearest_point);
+                    auto [force, cause]           = part.is_stable_while_extruding(weakest_conn, line, position, bottom_z, params);
+                    if (force > 0 && layer_idx > 1) {
+                        SupportPoint support_point{
+                            cause, position, params.support_points_interface_radius
+                        };
+                        reckon_new_support_point(part, weakest_conn, supp_points, supports_presence_grid, support_point, true);
                     }
                 }
             }

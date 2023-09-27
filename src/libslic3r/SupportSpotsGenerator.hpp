@@ -104,8 +104,8 @@ enum class SupportPointCause {
 //    Note that the force is only the difference - the amount needed to stabilize the object again.
 struct SupportPoint
 {
-    SupportPoint(SupportPointCause cause, const Vec3f &position, float force, float spot_radius, const Vec2f &direction)
-        : cause(cause), position(position), force(force), spot_radius(spot_radius), direction(direction)
+    SupportPoint(SupportPointCause cause, const Vec3f &position, float spot_radius)
+        : cause(cause), position(position), spot_radius(spot_radius)
     {}
 
     bool is_local_extrusion_support() const
@@ -122,12 +122,9 @@ struct SupportPoint
     // values gathered from large XL model: Min : 0 | Max : 18713800 | Average : 1361186 | Median : 329103
     // For reference 18713800 is weight of 1.8 Kg object, 329103 is weight of 0.03 Kg
     // The final sliced object weight was approx 0.5 Kg
-    float force;
     // Expected spot size. The support point strength is calculated from the area defined by this value.
     // Currently equal to the support_points_interface_radius parameter above
     float spot_radius;
-    // direction of the fall of the object (z part is neglected)
-    Vec2f direction;
 };
 
 using SupportPoints = std::vector<SupportPoint>;
