@@ -117,11 +117,6 @@ struct SupportPoint
     SupportPointCause cause; // reason why this support point was generated. Used for the user alerts
     // position is in unscaled coords. The z coordinate is aligned with the layers bottom_z coordiantes
     Vec3f position;
-    // force that destabilizes the object to the point of falling/breaking. g*mm/s^2 units
-    // It is valid only for global_object_support. For local extrusion support points, the force is -EPSILON
-    // values gathered from large XL model: Min : 0 | Max : 18713800 | Average : 1361186 | Median : 329103
-    // For reference 18713800 is weight of 1.8 Kg object, 329103 is weight of 0.03 Kg
-    // The final sliced object weight was approx 0.5 Kg
     // Expected spot size. The support point strength is calculated from the area defined by this value.
     // Currently equal to the support_points_interface_radius parameter above
     float spot_radius;
