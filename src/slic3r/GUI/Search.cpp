@@ -575,6 +575,12 @@ SearchDialog::SearchDialog(OptionsSearcher* searcher)
     topSizer->SetSizeHints(this);
 }
 
+SearchDialog::~SearchDialog()
+{
+    if (search_list_model)
+        search_list_model->DecRef();
+}
+
 void SearchDialog::Popup(wxPoint position /*= wxDefaultPosition*/)
 {
     const std::string& line = searcher->search_string();
