@@ -2624,7 +2624,7 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
 
     if (volume_extruded_filament != 0.)
         m_used_filaments.increase_caches(volume_extruded_filament, m_extruder_id, area_filament_cross_section * m_parking_position,
-                                        area_filament_cross_section * m_extra_loading_move);
+                                         area_filament_cross_section * m_extra_loading_move);
 
     const EMoveType type = move_type(delta_pos);
     if (type == EMoveType::Extrude) {
@@ -2638,9 +2638,16 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
         if (m_forced_height > 0.0f)
+            // use height coming from the gcode tags
             m_height = m_forced_height;
-        else if (m_layer_id == 0)
-            m_height = m_first_layer_height + m_z_offset;
+        else if (m_layer_id == 0) { // first layer
+            if (m_end_position[Z] > 0.0f)
+                // use the current (clamped) z, if greater than zero  
+                m_height = std::min<float>(m_end_position[Z], 2.0f);
+            else
+                // use the first layer height  
+                m_height = m_first_layer_height + m_z_offset;
+        }
         else if (origin == G1DiscretizationOrigin::G1) {
             if (m_end_position[Z] > m_extruded_last_z + EPSILON && delta_pos[Z] == 0.0)
                 m_height = m_end_position[Z] - m_extruded_last_z;
@@ -2648,9 +2655,6 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
 
         if (m_height == 0.0f)
             m_height = DEFAULT_TOOLPATH_HEIGHT;
-
-        if (m_end_position[Z] == 0.0f || (m_extrusion_role == GCodeExtrusionRole::Custom && m_layer_id == 0))
-            m_end_position[Z] = m_height;
 
         if (origin == G1DiscretizationOrigin::G1)
             m_extruded_last_z = m_end_position[Z];
@@ -2661,6 +2665,7 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
 #endif // ENABLE_GCODE_VIEWER_DATA_CHECKING
 
         if (m_forced_width > 0.0f)
+            // use width coming from the gcode tags
             m_width = m_forced_width;
         else if (m_extrusion_role == GCodeExtrusionRole::ExternalPerimeter)
             // cross section: rectangle
