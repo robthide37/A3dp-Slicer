@@ -1647,22 +1647,17 @@ std::optional<float> Emboss::calc_up(const Transform3d &tr, double up_limit)
     Vec3d normal = tr_linear.col(2);
     // scaled matrix has base with different size
     normal.normalize();
-    Vec3d suggested = suggest_up(normal);
+    Vec3d suggested = suggest_up(normal, up_limit);
     assert(is_approx(suggested.squaredNorm(), 1.));
 
     Vec3d up = tr_linear.col(1); // tr * UnitY()
-    up.normalize();
-    
-    double dot = suggested.dot(up);
-    if (dot >= 1. || dot <= -1.)
-        return {}; // zero angle
-
+    up.normalize();    
     Matrix3d m;
     m.row(0) = up;
     m.row(1) = suggested;
     m.row(2) = normal;
     double det = m.determinant();
-
+    double dot = suggested.dot(up);
     return -atan2(det, dot);
 }
 
