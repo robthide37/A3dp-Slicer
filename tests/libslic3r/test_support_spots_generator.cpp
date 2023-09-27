@@ -95,3 +95,71 @@ TEST_CASE("Moments calculation for rotated axis.", "[SupportSpotsGenerator]") {
 
     CHECK(moment_calculated_then_rotated == Approx(moment_rotated_polygon));
 }
+
+struct ObjectPartFixture {
+    const Polyline polyline{
+        Point{scaled(Vec2f{0, 0})},
+        Point{scaled(Vec2f{1, 0})},
+    };
+    const float width = 0.1f;
+    bool connected_to_bed = true;
+    coordf_t print_head_z = 0.2;
+    coordf_t layer_height = 0.2;
+    ExtrusionAttributes attributes;
+    ExtrusionEntityCollection collection;
+    std::vector<const ExtrusionEntityCollection*> extrusions{};
+    Polygon expected_polygon{
+        Point{scaled(Vec2f{0, -width / 2})},
+        Point{scaled(Vec2f{1, -width / 2})},
+        Point{scaled(Vec2f{1, width / 2})},
+        Point{scaled(Vec2f{0, width / 2})}
+    };
+
+    ObjectPartFixture() {
+        attributes.width = width;
+        const ExtrusionPath path{polyline, attributes};
+        collection.append(path);
+        extrusions.push_back(&collection);
+    }
+};
+
+TEST_CASE_METHOD(ObjectPartFixture, "Constructing ObjectPart using extrusion collections", "[SupportSpotsGenerator]") {
+    ObjectPart part{
+        extrusions,
+        connected_to_bed,
+        print_head_z,
+        layer_height,
+        std::nullopt
+    };
+
+    Integrals expected{{expected_polygon}};
+
+    CHECK(part.connected_to_bed == true);
+    Vec3f volume_centroid{part.volume_centroid_accumulator / part.volume};
+    CHECK(volume_centroid.x() == Approx(0.5));
+    CHECK(volume_centroid.y() == Approx(0));
+    CHECK(volume_centroid.z() == Approx(layer_height / 2));
+    CHECK(part.sticking_area == Approx(expected.area));
+    CHECK(part.sticking_centroid_accumulator.x() == Approx(expected.x_i.x()));
+    CHECK(part.sticking_centroid_accumulator.y() == Approx(expected.x_i.y()));
+    CHECK(part.sticking_second_moment_of_area_accumulator.x() == Approx(expected.x_i_squared.x()));
+    CHECK(part.sticking_second_moment_of_area_accumulator.y() == Approx(expected.x_i_squared.y()));
+    CHECK(part.sticking_second_moment_of_area_covariance_accumulator == Approx(expected.xy).margin(1e-6));
+    CHECK(part.volume == Approx(layer_height * width));
+}
+
+TEST_CASE_METHOD(ObjectPartFixture, "Constructing ObjectPart with brim", "[SupportSpotsGenerator]") {
+    float brim_width = 1;
+    Polygons brim = get_brim(ExPolygon{expected_polygon}, BrimType::btOuterOnly, brim_width);
+
+    ObjectPart part{
+        extrusions,
+        connected_to_bed,
+        print_head_z,
+        layer_height,
+        brim
+    };
+
+    CHECK(part.sticking_area == Approx((1 + 2*brim_width) * (width + 2*brim_width)));
+}
+

@@ -55,43 +55,26 @@
 #include "libslic3r/Color.hpp"
 #endif
 
-namespace Slic3r {
+namespace Slic3r::SupportSpotsGenerator {
 
-class ExtrusionLine
+ExtrusionLine::ExtrusionLine() : a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0), origin_entity(nullptr) {}
+ExtrusionLine::ExtrusionLine(const Vec2f &a, const Vec2f &b, float len, const ExtrusionEntity *origin_entity)
+    : a(a), b(b), len(len), origin_entity(origin_entity)
+{}
+
+ExtrusionLine::ExtrusionLine(const Vec2f &a, const Vec2f &b)
+    : a(a), b(b), len((a-b).norm()), origin_entity(nullptr)
+{}
+
+bool ExtrusionLine::is_external_perimeter() const
 {
-public:
-    ExtrusionLine() : a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0), origin_entity(nullptr) {}
-    ExtrusionLine(const Vec2f &a, const Vec2f &b, float len, const ExtrusionEntity *origin_entity)
-        : a(a), b(b), len(len), origin_entity(origin_entity)
-    {}
-
-    ExtrusionLine(const Vec2f &a, const Vec2f &b)
-        : a(a), b(b), len((a-b).norm()), origin_entity(nullptr)
-    {}
-
-    bool is_external_perimeter() const
-    {
-        assert(origin_entity != nullptr);
-        return origin_entity->role().is_external_perimeter();
-    }
-
-    Vec2f                  a;
-    Vec2f                  b;
-    float                  len;
-    const ExtrusionEntity *origin_entity;
-
-    std::optional<SupportSpotsGenerator::SupportPointCause> support_point_generated = {};
-    float form_quality            = 1.0f;
-    float curled_up_height        = 0.0f;
-
-    static const constexpr int Dim = 2;
-    using Scalar                   = Vec2f::Scalar;
-};
+    assert(origin_entity != nullptr);
+    return origin_entity->role().is_external_perimeter();
+}
 
 auto get_a(ExtrusionLine &&l) { return l.a; }
 auto get_b(ExtrusionLine &&l) { return l.b; }
 
-namespace SupportSpotsGenerator {
 
 using LD = AABBTreeLines::LinesDistancer<ExtrusionLine>;
 
@@ -151,33 +134,25 @@ public:
     }
 };
 
-struct SliceConnection
+void SliceConnection::add(const SliceConnection &other)
 {
-    float area{};
-    Vec3f centroid_accumulator              = Vec3f::Zero();
-    Vec2f second_moment_of_area_accumulator = Vec2f::Zero();
-    float second_moment_of_area_covariance_accumulator{};
+    this->area += other.area;
+    this->centroid_accumulator += other.centroid_accumulator;
+    this->second_moment_of_area_accumulator += other.second_moment_of_area_accumulator;
+    this->second_moment_of_area_covariance_accumulator += other.second_moment_of_area_covariance_accumulator;
+}
 
-    void add(const SliceConnection &other)
-    {
-        this->area += other.area;
-        this->centroid_accumulator += other.centroid_accumulator;
-        this->second_moment_of_area_accumulator += other.second_moment_of_area_accumulator;
-        this->second_moment_of_area_covariance_accumulator += other.second_moment_of_area_covariance_accumulator;
-    }
-
-    void print_info(const std::string &tag) const
-    {
-        Vec3f centroid   = centroid_accumulator / area;
-        Vec2f variance   = (second_moment_of_area_accumulator / area - centroid.head<2>().cwiseProduct(centroid.head<2>()));
-        float covariance = second_moment_of_area_covariance_accumulator / area - centroid.x() * centroid.y();
-        std::cout << tag << std::endl;
-        std::cout << "area: " << area << std::endl;
-        std::cout << "centroid: " << centroid.x() << " " << centroid.y() << " " << centroid.z() << std::endl;
-        std::cout << "variance: " << variance.x() << " " << variance.y() << std::endl;
-        std::cout << "covariance: " << covariance << std::endl;
-    }
-};
+void SliceConnection::print_info(const std::string &tag) const
+{
+    Vec3f centroid   = centroid_accumulator / area;
+    Vec2f variance   = (second_moment_of_area_accumulator / area - centroid.head<2>().cwiseProduct(centroid.head<2>()));
+    float covariance = second_moment_of_area_covariance_accumulator / area - centroid.x() * centroid.y();
+    std::cout << tag << std::endl;
+    std::cout << "area: " << area << std::endl;
+    std::cout << "centroid: " << centroid.x() << " " << centroid.y() << " " << centroid.z() << std::endl;
+    std::cout << "variance: " << variance.x() << " " << variance.y() << std::endl;
+    std::cout << "covariance: " << covariance << std::endl;
+}
 
 Integrals::Integrals (const Polygons& polygons) {
     for (const Polygon &polygon : polygons) {
@@ -266,29 +241,6 @@ float get_flow_width(const LayerRegion *region, ExtrusionRole role)
     if (role == ExtrusionRole::TopSolidInfill) return region->flow(FlowRole::frTopSolidInfill).width();
     // default
     return region->flow(FlowRole::frPerimeter).width();
-}
-
-std::vector<ExtrusionLine> to_short_lines(const ExtrusionEntity *e, float length_limit)
-{
-    assert(!e->is_collection());
-    Polyline                   pl = e->as_polyline();
-    std::vector<ExtrusionLine> lines;
-    lines.reserve(pl.points.size() * 1.5f);
-    for (int point_idx = 0; point_idx < int(pl.points.size()) - 1; ++point_idx) {
-        Vec2f start        = unscaled(pl.points[point_idx]).cast<float>();
-        Vec2f next         = unscaled(pl.points[point_idx + 1]).cast<float>();
-        Vec2f v            = next - start; // vector from next to current
-        float dist_to_next = v.norm();
-        v.normalize();
-        int   lines_count = int(std::ceil(dist_to_next / length_limit));
-        float step_size   = dist_to_next / lines_count;
-        for (int i = 0; i < lines_count; ++i) {
-            Vec2f a(start + v * (i * step_size));
-            Vec2f b(start + v * ((i + 1) * step_size));
-            lines.emplace_back(a, b, (a-b).norm(), e);
-        }
-    }
-    return lines;
 }
 
 float estimate_curled_up_height(
@@ -502,293 +454,272 @@ float compute_second_moment(
     return moment_at_0_0 - area * distance;
 }
 
-class ObjectPart
+ObjectPart::ObjectPart(
+    const std::vector<const ExtrusionEntityCollection*>& extrusion_collections,
+    const bool connected_to_bed,
+    const coordf_t print_head_z,
+    const coordf_t layer_height,
+    const std::optional<Polygons>& brim
+) {
+    if (connected_to_bed) {
+        this->connected_to_bed = true;
+    }
+
+    const auto bottom_z = print_head_z - layer_height;
+    const auto center_z = print_head_z - layer_height / 2;
+
+    for (const ExtrusionEntityCollection* collection : extrusion_collections) {
+        if (collection->empty()) {
+            continue;
+        }
+
+        const Polygons polygons{collection->polygons_covered_by_width()};
+
+        const Integrals integrals{polygons};
+        const float volume = integrals.area * layer_height;
+        this->volume += volume;
+        this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume;
+
+        if (this->connected_to_bed) {
+            this->sticking_area += integrals.area;
+            this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
+            this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
+            this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+        }
+    }
+
+    if (brim) {
+        Integrals integrals{*brim};
+        this->sticking_area += integrals.area;
+        this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
+        this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
+        this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+    }
+}
+
+void ObjectPart::add(const ObjectPart &other)
 {
-public:
-    float volume{};
-    Vec3f volume_centroid_accumulator = Vec3f::Zero();
-    float sticking_area{};
-    Vec3f sticking_centroid_accumulator              = Vec3f::Zero();
-    Vec2f sticking_second_moment_of_area_accumulator = Vec2f::Zero();
-    float sticking_second_moment_of_area_covariance_accumulator{};
-    bool  connected_to_bed = false;
+    this->connected_to_bed = this->connected_to_bed || other.connected_to_bed;
+    this->volume_centroid_accumulator += other.volume_centroid_accumulator;
+    this->volume += other.volume;
+    this->sticking_area += other.sticking_area;
+    this->sticking_centroid_accumulator += other.sticking_centroid_accumulator;
+    this->sticking_second_moment_of_area_accumulator += other.sticking_second_moment_of_area_accumulator;
+    this->sticking_second_moment_of_area_covariance_accumulator += other.sticking_second_moment_of_area_covariance_accumulator;
+}
 
-    ObjectPart() = default;
-
-    void add(const ObjectPart &other)
-    {
-        this->connected_to_bed = this->connected_to_bed || other.connected_to_bed;
-        this->volume_centroid_accumulator += other.volume_centroid_accumulator;
-        this->volume += other.volume;
-        this->sticking_area += other.sticking_area;
-        this->sticking_centroid_accumulator += other.sticking_centroid_accumulator;
-        this->sticking_second_moment_of_area_accumulator += other.sticking_second_moment_of_area_accumulator;
-        this->sticking_second_moment_of_area_covariance_accumulator += other.sticking_second_moment_of_area_covariance_accumulator;
-    }
-
-    void add_support_point(const Vec3f &position, float sticking_area)
-    {
-        this->sticking_area += sticking_area;
-        this->sticking_centroid_accumulator += sticking_area * position;
-        this->sticking_second_moment_of_area_accumulator += sticking_area * position.head<2>().cwiseProduct(position.head<2>());
-        this->sticking_second_moment_of_area_covariance_accumulator += sticking_area * position.x() * position.y();
-    }
-
-
-    float compute_elastic_section_modulus(
-        const Vec2f &line_dir,
-        const Vec3f &extreme_point,
-        const Integrals& integrals
-    ) const {
-        float second_moment_of_area = compute_second_moment(integrals, Vec2f{-line_dir.y(), line_dir.x()});
-
-        if (second_moment_of_area < EPSILON) { return 0.0f; }
-
-        Vec2f centroid                = integrals.x_i / integrals.area;
-        float extreme_fiber_dist      = line_alg::distance_to(Linef(centroid.head<2>().cast<double>(),
-                                                                    (centroid.head<2>() + Vec2f(line_dir.y(), -line_dir.x())).cast<double>()),
-                                                              extreme_point.head<2>().cast<double>());
-
-        float elastic_section_modulus = second_moment_of_area / extreme_fiber_dist;
-
-#ifdef DETAILED_DEBUG_LOGS
-        BOOST_LOG_TRIVIAL(debug) << "extreme_fiber_dist: " << extreme_fiber_dist;
-        BOOST_LOG_TRIVIAL(debug) << "elastic_section_modulus: " << elastic_section_modulus;
-#endif
-
-        return elastic_section_modulus;
-    }
-
-    std::tuple<float, SupportPointCause> is_stable_while_extruding(const SliceConnection &connection,
-                                    const ExtrusionLine   &extruded_line,
-                                    const Vec3f           &extreme_point,
-                                    float                  layer_z,
-                                    const Params          &params) const
-    {
-        // Note that exteme point is calculated for the current layer, while it should
-        // be computed for the first layer. The shape of the first layer however changes a lot,
-        // during support points additions (for organic supports it is not even clear how)
-        // and during merging. Using the current layer is heuristics and also small optimization,
-        // as the AABB tree for it is calculated anyways. This heuristic should usually be
-        // on the safe side.
-        Vec2f        line_dir      = (extruded_line.b - extruded_line.a).normalized();
-        const Vec3f &mass_centroid = this->volume_centroid_accumulator / this->volume;
-        float        mass          = this->volume * params.filament_density;
-        float        weight        = mass * params.gravity_constant;
-
-        float movement_force = params.max_acceleration * mass;
-
-        float extruder_conflict_force = params.standard_extruder_conflict_force +
-                                        std::min(extruded_line.curled_up_height, 1.0f) * params.malformations_additive_conflict_extruder_force;
-
-        // section for bed calculations
-        {
-            if (this->sticking_area < EPSILON) return {1.0f, SupportPointCause::UnstableFloatingPart};
-
-            Integrals integrals;
-            integrals.area = this->sticking_area;
-            integrals.x_i = this->sticking_centroid_accumulator.head<2>();
-            integrals.x_i_squared = this->sticking_second_moment_of_area_accumulator;
-            integrals.xy = this->sticking_second_moment_of_area_covariance_accumulator;
-
-            Vec3f bed_centroid     = this->sticking_centroid_accumulator / this->sticking_area;
-            float bed_yield_torque = -compute_elastic_section_modulus(line_dir, extreme_point, integrals) * params.get_bed_adhesion_yield_strength();
-
-            Vec2f bed_weight_arm             = (mass_centroid.head<2>() - bed_centroid.head<2>());
-            float bed_weight_arm_len         = bed_weight_arm.norm();
-
-            float bed_weight_dir_xy_variance = compute_second_moment(integrals, {-bed_weight_arm.y(), bed_weight_arm.x()}) / this->sticking_area;
-            float bed_weight_sign            = bed_weight_arm_len < 2.0f * sqrt(bed_weight_dir_xy_variance) ? -1.0f : 1.0f;
-            float bed_weight_torque          = bed_weight_sign * bed_weight_arm_len * weight;
-
-            float bed_movement_arm    = std::max(0.0f, mass_centroid.z() - bed_centroid.z());
-            float bed_movement_torque = movement_force * bed_movement_arm;
-
-            float bed_conflict_torque_arm      = layer_z - bed_centroid.z();
-            float bed_extruder_conflict_torque = extruder_conflict_force * bed_conflict_torque_arm;
-
-            float bed_total_torque = bed_movement_torque + bed_extruder_conflict_torque + bed_weight_torque + bed_yield_torque;
-
-#ifdef DETAILED_DEBUG_LOGS
-            BOOST_LOG_TRIVIAL(debug) << "bed_centroid: " << bed_centroid.x() << "  " << bed_centroid.y() << "  " << bed_centroid.z();
-            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_yield_torque: " << bed_yield_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_arm: " << bed_weight_arm_len;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_torque: " << bed_weight_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_arm: " << bed_movement_arm;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_torque: " << bed_movement_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_conflict_torque_arm: " << bed_conflict_torque_arm;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.curled_up_height: " << extruded_line.curled_up_height;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.form_quality: " << extruded_line.form_quality;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: extruder_conflict_force: " << extruder_conflict_force;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: bed_extruder_conflict_torque: " << bed_extruder_conflict_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: total_torque: " << bed_total_torque << "   layer_z: " << layer_z;
-#endif
-
-            if (bed_total_torque > 0) {
-                return {bed_total_torque / bed_conflict_torque_arm,
-                        (this->connected_to_bed ? SupportPointCause::SeparationFromBed : SupportPointCause::UnstableFloatingPart)};
-            }
-        }
-
-        // section for weak connection calculations
-        {
-            if (connection.area < EPSILON) return {1.0f, SupportPointCause::UnstableFloatingPart};
-
-            Vec3f conn_centroid = connection.centroid_accumulator / connection.area;
-
-            if (layer_z - conn_centroid.z() < 3.0f) { return {-1.0f, SupportPointCause::WeakObjectPart}; }
-
-            Integrals integrals;
-            integrals.area = connection.area;
-            integrals.x_i = connection.centroid_accumulator.head<2>();
-            integrals.x_i_squared = connection.second_moment_of_area_accumulator;
-            integrals.xy = connection.second_moment_of_area_covariance_accumulator;
-
-            float conn_yield_torque = compute_elastic_section_modulus(line_dir, extreme_point, integrals) * params.material_yield_strength;
-
-            float conn_weight_arm    = (conn_centroid.head<2>() - mass_centroid.head<2>()).norm();
-            if (layer_z - conn_centroid.z() < 30.0) {
-                conn_weight_arm = 0.0f; // Given that we do not have very good info about the weight distribution between the connection and current layer,
-                // do not consider the weight until quite far away from the weak connection segment
-            }
-            float conn_weight_torque = conn_weight_arm * weight * (1.0f - conn_centroid.z() / layer_z) * (1.0f - conn_centroid.z() / layer_z);
-
-            float conn_movement_arm    = std::max(0.0f, mass_centroid.z() - conn_centroid.z());
-            float conn_movement_torque = movement_force * conn_movement_arm;
-
-            float conn_conflict_torque_arm      = layer_z - conn_centroid.z();
-            float conn_extruder_conflict_torque = extruder_conflict_force * conn_conflict_torque_arm;
-
-            float conn_total_torque = conn_movement_torque + conn_extruder_conflict_torque + conn_weight_torque - conn_yield_torque;
-
-#ifdef DETAILED_DEBUG_LOGS
-            BOOST_LOG_TRIVIAL(debug) << "conn_centroid: " << conn_centroid.x() << "  " << conn_centroid.y() << "  " << conn_centroid.z();
-            BOOST_LOG_TRIVIAL(debug) << "SSG: conn_yield_torque: " << conn_yield_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: conn_weight_arm: " << conn_weight_arm;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: conn_weight_torque: " << conn_weight_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: conn_movement_arm: " << conn_movement_arm;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: conn_movement_torque: " << conn_movement_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: conn_conflict_torque_arm: " << conn_conflict_torque_arm;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: conn_extruder_conflict_torque: " << conn_extruder_conflict_torque;
-            BOOST_LOG_TRIVIAL(debug) << "SSG: total_torque: " << conn_total_torque << "   layer_z: " << layer_z;
-#endif
-
-            return {conn_total_torque / conn_conflict_torque_arm, SupportPointCause::WeakObjectPart};
-        }
-    }
-};
-
-// return new object part and actual area covered by extrusions
-std::tuple<ObjectPart, float> build_object_part_from_slice(const size_t &slice_idx, const Layer *layer, const Params& params)
+void ObjectPart::add_support_point(const Vec3f &position, float sticking_area)
 {
-    ObjectPart new_object_part;
-    float      area_covered_by_extrusions = 0;
-    const LayerSlice& slice = layer->lslices_ex.at(slice_idx);
+    this->sticking_area += sticking_area;
+    this->sticking_centroid_accumulator += sticking_area * position;
+    this->sticking_second_moment_of_area_accumulator += sticking_area * position.head<2>().cwiseProduct(position.head<2>());
+    this->sticking_second_moment_of_area_covariance_accumulator += sticking_area * position.x() * position.y();
+}
 
-    auto add_extrusions_to_object = [&new_object_part, &area_covered_by_extrusions, &params](const ExtrusionEntity *e,
-                                                                                             const LayerRegion     *region) {
-        float                      flow_width = get_flow_width(region, e->role());
-        const Layer               *l          = region->layer();
-        float                      slice_z    = l->slice_z;
-        float                      height     = l->height;
-        std::vector<ExtrusionLine> lines      = to_short_lines(e, 5.0);
-        for (const ExtrusionLine &line : lines) {
-            float volume = line.len * height * flow_width * PI / 4.0f;
-            area_covered_by_extrusions += line.len * flow_width;
-            new_object_part.volume += volume;
-            new_object_part.volume_centroid_accumulator += to_3d(Vec2f((line.a + line.b) / 2.0f), slice_z) * volume;
 
-            if (int(l->id()) == params.raft_layers_count) { // layer attached on bed/raft
-                new_object_part.connected_to_bed = true;
-                float sticking_area              = line.len * flow_width;
-                new_object_part.sticking_area += sticking_area;
-                Vec2f middle = Vec2f((line.a + line.b) / 2.0f);
-                new_object_part.sticking_centroid_accumulator += sticking_area * to_3d(middle, slice_z);
-                // Bottom infill lines can be quite long, and algined, so the middle approximaton used above does not work
-                Vec2f dir            = (line.b - line.a).normalized();
-                float segment_length = flow_width; // segments of size flow_width
-                for (float segment_middle_dist = std::min(line.len, segment_length * 0.5f); segment_middle_dist < line.len;
-                     segment_middle_dist += segment_length) {
-                    Vec2f segment_middle = line.a + segment_middle_dist * dir;
-                    new_object_part.sticking_second_moment_of_area_accumulator += segment_length * flow_width *
-                                                                                  segment_middle.cwiseProduct(segment_middle);
-                    new_object_part.sticking_second_moment_of_area_covariance_accumulator += segment_length * flow_width *
-                                                                                             segment_middle.x() * segment_middle.y();
-                }
-            }
+float ObjectPart::compute_elastic_section_modulus(
+    const Vec2f &line_dir,
+    const Vec3f &extreme_point,
+    const Integrals& integrals
+) const {
+    float second_moment_of_area = compute_second_moment(integrals, Vec2f{-line_dir.y(), line_dir.x()});
+
+    if (second_moment_of_area < EPSILON) { return 0.0f; }
+
+    Vec2f centroid                = integrals.x_i / integrals.area;
+    float extreme_fiber_dist      = line_alg::distance_to(Linef(centroid.head<2>().cast<double>(),
+                                                                (centroid.head<2>() + Vec2f(line_dir.y(), -line_dir.x())).cast<double>()),
+                                                          extreme_point.head<2>().cast<double>());
+
+    float elastic_section_modulus = second_moment_of_area / extreme_fiber_dist;
+
+#ifdef DETAILED_DEBUG_LOGS
+    BOOST_LOG_TRIVIAL(debug) << "extreme_fiber_dist: " << extreme_fiber_dist;
+    BOOST_LOG_TRIVIAL(debug) << "elastic_section_modulus: " << elastic_section_modulus;
+#endif
+
+    return elastic_section_modulus;
+}
+
+std::tuple<float, SupportPointCause> ObjectPart::is_stable_while_extruding(const SliceConnection &connection,
+                                const ExtrusionLine   &extruded_line,
+                                const Vec3f           &extreme_point,
+                                float                  layer_z,
+                                const Params          &params) const
+{
+    // Note that exteme point is calculated for the current layer, while it should
+    // be computed for the first layer. The shape of the first layer however changes a lot,
+    // during support points additions (for organic supports it is not even clear how)
+    // and during merging. Using the current layer is heuristics and also small optimization,
+    // as the AABB tree for it is calculated anyways. This heuristic should usually be
+    // on the safe side.
+    Vec2f        line_dir      = (extruded_line.b - extruded_line.a).normalized();
+    const Vec3f &mass_centroid = this->volume_centroid_accumulator / this->volume;
+    float        mass          = this->volume * params.filament_density;
+    float        weight        = mass * params.gravity_constant;
+
+    float movement_force = params.max_acceleration * mass;
+
+    float extruder_conflict_force = params.standard_extruder_conflict_force +
+                                    std::min(extruded_line.curled_up_height, 1.0f) * params.malformations_additive_conflict_extruder_force;
+
+    // section for bed calculations
+    {
+        if (this->sticking_area < EPSILON) return {1.0f, SupportPointCause::UnstableFloatingPart};
+
+        Integrals integrals;
+        integrals.area = this->sticking_area;
+        integrals.x_i = this->sticking_centroid_accumulator.head<2>();
+        integrals.x_i_squared = this->sticking_second_moment_of_area_accumulator;
+        integrals.xy = this->sticking_second_moment_of_area_covariance_accumulator;
+
+        Vec3f bed_centroid     = this->sticking_centroid_accumulator / this->sticking_area;
+        float bed_yield_torque = -compute_elastic_section_modulus(line_dir, extreme_point, integrals) * params.get_bed_adhesion_yield_strength();
+
+        Vec2f bed_weight_arm             = (mass_centroid.head<2>() - bed_centroid.head<2>());
+        float bed_weight_arm_len         = bed_weight_arm.norm();
+
+        float bed_weight_dir_xy_variance = compute_second_moment(integrals, {-bed_weight_arm.y(), bed_weight_arm.x()}) / this->sticking_area;
+        float bed_weight_sign            = bed_weight_arm_len < 2.0f * sqrt(bed_weight_dir_xy_variance) ? -1.0f : 1.0f;
+        float bed_weight_torque          = bed_weight_sign * bed_weight_arm_len * weight;
+
+        float bed_movement_arm    = std::max(0.0f, mass_centroid.z() - bed_centroid.z());
+        float bed_movement_torque = movement_force * bed_movement_arm;
+
+        float bed_conflict_torque_arm      = layer_z - bed_centroid.z();
+        float bed_extruder_conflict_torque = extruder_conflict_force * bed_conflict_torque_arm;
+
+        float bed_total_torque = bed_movement_torque + bed_extruder_conflict_torque + bed_weight_torque + bed_yield_torque;
+
+#ifdef DETAILED_DEBUG_LOGS
+        BOOST_LOG_TRIVIAL(debug) << "bed_centroid: " << bed_centroid.x() << "  " << bed_centroid.y() << "  " << bed_centroid.z();
+        BOOST_LOG_TRIVIAL(debug) << "SSG: bed_yield_torque: " << bed_yield_torque;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_arm: " << bed_weight_arm_len;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: bed_weight_torque: " << bed_weight_torque;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_arm: " << bed_movement_arm;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: bed_movement_torque: " << bed_movement_torque;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: bed_conflict_torque_arm: " << bed_conflict_torque_arm;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.curled_up_height: " << extruded_line.curled_up_height;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: extruded_line.form_quality: " << extruded_line.form_quality;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: extruder_conflict_force: " << extruder_conflict_force;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: bed_extruder_conflict_torque: " << bed_extruder_conflict_torque;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: total_torque: " << bed_total_torque << "   layer_z: " << layer_z;
+#endif
+
+        if (bed_total_torque > 0) {
+            return {bed_total_torque / bed_conflict_torque_arm,
+                    (this->connected_to_bed ? SupportPointCause::SeparationFromBed : SupportPointCause::UnstableFloatingPart)};
         }
-    };
+    }
+
+    // section for weak connection calculations
+    {
+        if (connection.area < EPSILON) return {1.0f, SupportPointCause::UnstableFloatingPart};
+
+        Vec3f conn_centroid = connection.centroid_accumulator / connection.area;
+
+        if (layer_z - conn_centroid.z() < 3.0f) { return {-1.0f, SupportPointCause::WeakObjectPart}; }
+
+        Integrals integrals;
+        integrals.area = connection.area;
+        integrals.x_i = connection.centroid_accumulator.head<2>();
+        integrals.x_i_squared = connection.second_moment_of_area_accumulator;
+        integrals.xy = connection.second_moment_of_area_covariance_accumulator;
+
+        float conn_yield_torque = compute_elastic_section_modulus(line_dir, extreme_point, integrals) * params.material_yield_strength;
+
+        float conn_weight_arm    = (conn_centroid.head<2>() - mass_centroid.head<2>()).norm();
+        if (layer_z - conn_centroid.z() < 30.0) {
+            conn_weight_arm = 0.0f; // Given that we do not have very good info about the weight distribution between the connection and current layer,
+            // do not consider the weight until quite far away from the weak connection segment
+        }
+        float conn_weight_torque = conn_weight_arm * weight * (1.0f - conn_centroid.z() / layer_z) * (1.0f - conn_centroid.z() / layer_z);
+
+        float conn_movement_arm    = std::max(0.0f, mass_centroid.z() - conn_centroid.z());
+        float conn_movement_torque = movement_force * conn_movement_arm;
+
+        float conn_conflict_torque_arm      = layer_z - conn_centroid.z();
+        float conn_extruder_conflict_torque = extruder_conflict_force * conn_conflict_torque_arm;
+
+        float conn_total_torque = conn_movement_torque + conn_extruder_conflict_torque + conn_weight_torque - conn_yield_torque;
+
+#ifdef DETAILED_DEBUG_LOGS
+        BOOST_LOG_TRIVIAL(debug) << "conn_centroid: " << conn_centroid.x() << "  " << conn_centroid.y() << "  " << conn_centroid.z();
+        BOOST_LOG_TRIVIAL(debug) << "SSG: conn_yield_torque: " << conn_yield_torque;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: conn_weight_arm: " << conn_weight_arm;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: conn_weight_torque: " << conn_weight_torque;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: conn_movement_arm: " << conn_movement_arm;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: conn_movement_torque: " << conn_movement_torque;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: conn_conflict_torque_arm: " << conn_conflict_torque_arm;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: conn_extruder_conflict_torque: " << conn_extruder_conflict_torque;
+        BOOST_LOG_TRIVIAL(debug) << "SSG: total_torque: " << conn_total_torque << "   layer_z: " << layer_z;
+#endif
+
+        return {conn_total_torque / conn_conflict_torque_arm, SupportPointCause::WeakObjectPart};
+    }
+}
+
+std::vector<const ExtrusionEntityCollection*> gather_extrusions(const LayerSlice& slice, const Layer* layer) {
+    // TODO reserve might be good, benchmark
+    std::vector<const ExtrusionEntityCollection*> result;
 
     for (const auto &island : slice.islands) {
         const LayerRegion *perimeter_region = layer->get_region(island.perimeters.region());
         for (size_t perimeter_idx : island.perimeters) {
-            for (const ExtrusionEntity *perimeter :
-                 static_cast<const ExtrusionEntityCollection *>(perimeter_region->perimeters().entities[perimeter_idx])->entities) {
-                add_extrusions_to_object(perimeter, perimeter_region);
-            }
+            auto collection = static_cast<const ExtrusionEntityCollection *>(
+                perimeter_region->perimeters().entities[perimeter_idx]
+            );
+            result.push_back(collection);
         }
         for (const LayerExtrusionRange &fill_range : island.fills) {
             const LayerRegion *fill_region = layer->get_region(fill_range.region());
             for (size_t fill_idx : fill_range) {
-                for (const ExtrusionEntity *fill :
-                     static_cast<const ExtrusionEntityCollection *>(fill_region->fills().entities[fill_idx])->entities) {
-                    add_extrusions_to_object(fill, fill_region);
-                }
+                auto collection = static_cast<const ExtrusionEntityCollection *>(
+                   fill_region->fills().entities[fill_idx]
+                );
+                result.push_back(collection);
             }
         }
-        for (size_t thin_fill_idx : island.thin_fills) {
-            add_extrusions_to_object(perimeter_region->thin_fills().entities[thin_fill_idx], perimeter_region);
+        const ExtrusionEntityCollection& collection = perimeter_region->thin_fills();
+        result.push_back(&collection);
+    }
+    return result;
+}
+
+bool has_brim(const Layer* layer, const Params& params){
+    return
+        int(layer->id()) == params.raft_layers_count
+        && params.raft_layers_count == 0
+        && params.brim_type != BrimType::btNoBrim
+        && params.brim_width > 0.0;
+}
+
+
+Polygons get_brim(const ExPolygon& slice_polygon, const BrimType brim_type, const float brim_width) {
+    // TODO: The algorithm here should take into account that multiple slices may
+    // have coliding Brim areas and the final brim area is smaller,
+    // thus has lower adhesion. For now this effect will be neglected.
+    ExPolygons brim;
+    if (brim_type == BrimType::btOuterAndInner || brim_type == BrimType::btOuterOnly) {
+        Polygon brim_hole = slice_polygon.contour;
+        brim_hole.reverse();
+        Polygons c = expand(slice_polygon.contour, scale_(brim_width)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
+        if (!c.empty()) {
+            brim.push_back(ExPolygon{c.front(), brim_hole});
         }
     }
-
-    //  BRIM HANDLING
-    if (int(layer->id()) == params.raft_layers_count && params.raft_layers_count == 0 && params.brim_type != BrimType::btNoBrim &&
-        params.brim_width > 0.0) {
-        // TODO: The algorithm here should take into account that multiple slices may have coliding Brim areas and the final brim area is
-        // smaller,
-        //  thus has lower adhesion. For now this effect will be neglected.
-        ExPolygon  slice_poly = layer->lslices[slice_idx];
-        ExPolygons brim;
-        if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btOuterOnly) {
-            Polygon brim_hole = slice_poly.contour;
-            brim_hole.reverse();
-            Polygons c = expand(slice_poly.contour, scale_(params.brim_width)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
-            if (!c.empty()) {
-                brim.push_back(ExPolygon{c.front(), brim_hole});
-            }
-        }
-        if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btInnerOnly) {
-            Polygons brim_contours = slice_poly.holes;
-            polygons_reverse(brim_contours);
-            for (const Polygon &brim_contour : brim_contours) {
-                Polygons brim_holes = shrink({brim_contour}, scale_(params.brim_width));
-                polygons_reverse(brim_holes);
-                ExPolygon inner_brim{brim_contour};
-                inner_brim.holes = brim_holes;
-                brim.push_back(inner_brim);
-            }
-        }
-
-        for (const Polygon &poly : to_polygons(brim)) {
-            Vec2f p0 = unscaled(poly.first_point()).cast<float>();
-            for (size_t i = 2; i < poly.points.size(); i++) {
-                Vec2f p1 = unscaled(poly.points[i - 1]).cast<float>();
-                Vec2f p2 = unscaled(poly.points[i]).cast<float>();
-
-                float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
-
-                auto [area, first_moment_of_area, second_moment_area,
-                      second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
-                new_object_part.sticking_area += sign * area;
-                new_object_part.sticking_centroid_accumulator += sign * Vec3f(first_moment_of_area.x(), first_moment_of_area.y(),
-                                                                              layer->print_z * area);
-                new_object_part.sticking_second_moment_of_area_accumulator += sign * second_moment_area;
-                new_object_part.sticking_second_moment_of_area_covariance_accumulator += sign * second_moment_of_area_covariance;
-            }
+    if (brim_type == BrimType::btOuterAndInner || brim_type == BrimType::btInnerOnly) {
+        Polygons brim_contours = slice_polygon.holes;
+        polygons_reverse(brim_contours);
+        for (const Polygon &brim_contour : brim_contours) {
+            Polygons brim_holes = shrink({brim_contour}, scale_(brim_width));
+            polygons_reverse(brim_holes);
+            ExPolygon inner_brim{brim_contour};
+            inner_brim.holes = brim_holes;
+            brim.push_back(inner_brim);
         }
     }
-
-    return {new_object_part, area_covered_by_extrusions};
+    return to_polygons(brim);
 }
 
 class ActiveObjectParts
@@ -862,7 +793,22 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject     
 
         for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
             const LayerSlice &slice             = layer->lslices_ex.at(slice_idx);
-            auto [new_part, covered_area]              = build_object_part_from_slice(slice_idx, layer, params);
+            const std::vector<const ExtrusionEntityCollection*> extrusion_collections{gather_extrusions(slice, layer)};
+            const bool connected_to_bed = int(layer->id()) == params.raft_layers_count;
+
+            const std::optional<Polygons> brim{
+                 has_brim(layer, params) ?
+                 std::optional{get_brim(layer->lslices[slice_idx], params.brim_type, params.brim_width)} :
+                 std::nullopt
+            };
+            ObjectPart new_part{
+                extrusion_collections,
+                connected_to_bed,
+                layer->print_z,
+                layer->height,
+                brim
+            };
+
             const SliceConnection &connection_to_below = precomputed_slices_connections[layer_idx][slice_idx];
 
 #ifdef DETAILED_DEBUG_LOGS
@@ -1369,4 +1315,3 @@ std::vector<std::pair<SupportPointCause, bool>> gather_issues(const SupportPoint
 }
 
 } // namespace SupportSpotsGenerator
-} // namespace Slic3r
