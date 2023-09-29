@@ -500,6 +500,7 @@ set(SLIC3R_SOURCES
     Arachne/SkeletalTrapezoidationJoint.hpp
     Arachne/WallToolPaths.hpp
     Arachne/WallToolPaths.cpp
+    StaticMap.hpp
 )
 
 add_library(libslic3r STATIC ${SLIC3R_SOURCES})
