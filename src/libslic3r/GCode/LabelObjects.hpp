@@ -1,6 +1,9 @@
 #ifndef slic3r_GCode_LabelObjects_hpp_
 #define slic3r_GCode_LabelObjects_hpp_
 
+#include <string>
+#include <unordered_map>
+
 namespace Slic3r {
 
 enum GCodeFlavor : unsigned char;
