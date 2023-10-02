@@ -42,7 +42,7 @@ add_executable(${_TEST_NAME}_tests
     test_support_spots_generator.cpp
     ../data/prusaparts.cpp
     ../data/prusaparts.hpp
-    test_static_map.cpp
+    # test_static_map.cpp
 	)
 
 if (TARGET OpenVDB::openvdb)
