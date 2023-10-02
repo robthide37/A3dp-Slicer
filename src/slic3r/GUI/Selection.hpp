@@ -114,6 +114,9 @@ private:
         ObjectIdxsToInstanceIdxsMap content;
         // List of ids of the volumes which are sinking when starting dragging
         std::vector<unsigned int> sinking_volumes;
+#if ENABLE_CGAL_BOUNDING_SPHERE
+        Vec3d rotation_pivot;
+#endif // ENABLE_CGAL_BOUNDING_SPHERE
     };
 
     // Volumes owned by GLCanvas3D.
@@ -149,6 +152,10 @@ private:
     // Bounding box aligned to the axis of the currently selected reference system (World/Object/Part)
     // and transform to place and orient it in world coordinates
     std::optional<std::pair<BoundingBoxf3, Transform3d>> m_bounding_box_in_current_reference_system;
+
+#if ENABLE_CGAL_BOUNDING_SPHERE
+    std::optional<std::pair<Vec3d, double>> m_bounding_sphere;
+#endif // ENABLE_CGAL_BOUNDING_SPHERE
 
 #if ENABLE_RENDER_SELECTION_CENTER
     GLModel m_vbo_sphere;
@@ -295,6 +302,11 @@ public:
     // Returns the screen space bounding box
     BoundingBoxf get_screen_space_bounding_box();
 
+#if ENABLE_CGAL_BOUNDING_SPHERE
+    // Returns the bounding sphere
+    const std::pair<Vec3d, double> get_bounding_sphere() const;
+#endif // ENABLE_CGAL_BOUNDING_SPHERE
+
     void setup_cache();
 
     void translate(const Vec3d& displacement, TransformationType transformation_type);
@@ -360,6 +372,9 @@ private:
         m_full_unscaled_instance_bounding_box.reset(); m_full_scaled_instance_bounding_box.reset();
         m_full_unscaled_instance_local_bounding_box.reset();
         m_bounding_box_in_current_reference_system.reset();
+#if ENABLE_CGAL_BOUNDING_SPHERE
+        m_bounding_sphere.reset();
+#endif // ENABLE_CGAL_BOUNDING_SPHERE
     }
     void render_synchronized_volumes();
     void render_bounding_box(const BoundingBoxf3& box, const Transform3d& trafo, const ColorRGB& color);

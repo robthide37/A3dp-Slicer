@@ -204,10 +204,20 @@ void GLGizmoRotate::init_data_from_selection(const Selection& selection)
     const auto [box, box_trafo] = m_force_local_coordinate ?
         selection.get_bounding_box_in_reference_system(ECoordinatesType::Local) : selection.get_bounding_box_in_current_reference_system();
     m_bounding_box = box;
+#if ENABLE_CGAL_BOUNDING_SPHERE
+    const std::pair<Vec3d, double> sphere = selection.get_bounding_sphere();
+    m_center = sphere.first;
+    m_radius = Offset + sphere.second;
+#else
     m_center = box_trafo.translation();
+#endif // ENABLE_CGAL_BOUNDING_SPHERE
     m_orient_matrix = box_trafo;
 
+#if ENABLE_CGAL_BOUNDING_SPHERE
+    m_orient_matrix.translation() = m_center;
+#else
     m_radius = Offset + m_bounding_box.radius();
+#endif // ENABLE_CGAL_BOUNDING_SPHERE
     m_snap_coarse_in_radius = m_radius / 3.0f;
     m_snap_coarse_out_radius = 2.0f * m_snap_coarse_in_radius;
     m_snap_fine_in_radius = m_radius;
