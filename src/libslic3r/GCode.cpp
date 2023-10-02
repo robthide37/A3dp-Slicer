@@ -2641,6 +2641,8 @@ static inline bool validate_smooth_path(const GCode::SmoothPath &smooth_path, bo
 }
 #endif //NDEBUG
 
+static constexpr const double min_gcode_segment_length = 0.002;
+
 std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed)
 {
     // Extrude all loops CCW.
@@ -2659,7 +2661,7 @@ std::string GCodeGenerator::extrude_loop(const ExtrusionLoop &loop_src, const GC
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
     // we discard it in that case.
     if (m_enable_loop_clipping)
-        clip_end(smooth_path, scale_(EXTRUDER_CONFIG(nozzle_diameter)) * LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER);
+        clip_end(smooth_path, scaled<double>(EXTRUDER_CONFIG(nozzle_diameter)) * LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER, scaled<double>(min_gcode_segment_length));
 
     if (smooth_path.empty())
         return {};
@@ -2704,7 +2706,7 @@ std::string GCodeGenerator::extrude_skirt(
     // if polyline was shorter than the clipping distance we'd get a null polyline, so
     // we discard it in that case.
     if (m_enable_loop_clipping)
-        clip_end(smooth_path, scale_(EXTRUDER_CONFIG(nozzle_diameter)) * LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER);
+        clip_end(smooth_path, scale_(EXTRUDER_CONFIG(nozzle_diameter)) * LOOP_CLIPPING_LENGTH_OVER_NOZZLE_DIAMETER, scaled<double>(min_gcode_segment_length));
 
     if (smooth_path.empty())
         return {};
@@ -3065,12 +3067,14 @@ std::string GCodeGenerator::_extrude(
         comment = description;
         comment += description_bridge;
     }
-    Vec2d prev = this->point_to_gcode_quantized(path.front().point);
+    Vec2d prev_exact = this->point_to_gcode(path.front().point);
+    Vec2d prev = GCodeFormatter::quantize(prev_exact);
     auto  it   = path.begin();
     auto  end  = path.end();
     const bool emit_radius = m_config.arc_fitting == ArcFittingType::EmitRadius;
     for (++ it; it != end; ++ it) {
-        Vec2d p = this->point_to_gcode_quantized(it->point);
+        Vec2d p_exact = this->point_to_gcode(it->point);
+        Vec2d p = GCodeFormatter::quantize(p_exact);
         assert(p != prev);
         if (p != prev) {
             // Center of the radius to be emitted into the G-code: Either by radius or by center offset.
@@ -3083,11 +3087,12 @@ std::string GCodeGenerator::_extrude(
                 radius = unscaled<double>(it->radius);
                 if (emit_radius) {
                     // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
+                    //FIXME rather re-fit the arc to improve accuracy!
                     radius = GCodeFormatter::quantize_xyzf(radius);
                 } else {
                     // Calculate quantized IJ circle center offset.
                     ij = GCodeFormatter::quantize(Vec2d(
-                            Geometry::ArcWelder::arc_center(prev.cast<double>(), p.cast<double>(), double(radius), it->ccw())
+                            Geometry::ArcWelder::arc_center(prev_exact.cast<double>(), p_exact.cast<double>(), double(radius), it->ccw())
                             - prev));
                     if (ij == Vec2d::Zero())
                         // Don't extrude a degenerated circle.
@@ -3112,6 +3117,7 @@ std::string GCodeGenerator::_extrude(
                     m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE, comment);
             }
             prev = p;
+            prev_exact = p_exact;
         }
     }
 

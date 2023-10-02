@@ -323,6 +323,54 @@ SCENARIO("Circle Fit, TaubinFit with Newton's method", "[Geometry]") {
     }
 }
 
+SCENARIO("Circle Fit, least squares by decomposition or by solving normal equation", "[Geometry]") {
+    auto test_circle_fit = [](const Geometry::Circled &circle, const Vec2d &center, const double radius) {
+        THEN("A center point matches.") {
+            REQUIRE(is_approx(circle.center, center));
+        }
+        THEN("Radius matches") {
+            REQUIRE(is_approx(circle.radius, radius));
+        }
+    };
+
+    GIVEN("A vector of Vec2ds arranged in a half-circle with approximately the same distance R from some point") {
+        const Vec2d  expected_center(-6., 0.);
+        const double expected_radius = 6.;
+        Vec2ds sample{Vec2d(6.0, 0), Vec2d(5.1961524, 3), Vec2d(3 ,5.1961524), Vec2d(0, 6.0), Vec2d(3, 5.1961524), Vec2d(-5.1961524, 3), Vec2d(-6.0, 0)};
+        std::transform(sample.begin(), sample.end(), sample.begin(), [expected_center] (const Vec2d &a) { return a + expected_center; });
+
+        WHEN("Circle fit is called on the entire array, least squares SVD") {
+            test_circle_fit(Geometry::circle_linear_least_squares_svd(sample), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the first four points, least squares SVD") {
+            test_circle_fit(Geometry::circle_linear_least_squares_svd(Vec2ds(sample.cbegin(), sample.cbegin() + 4)), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the middle four points, least squares SVD") {
+            test_circle_fit(Geometry::circle_linear_least_squares_svd(Vec2ds(sample.cbegin() + 2, sample.cbegin() + 6)), expected_center, expected_radius);
+        }
+
+        WHEN("Circle fit is called on the entire array, least squares QR decomposition") {
+            test_circle_fit(Geometry::circle_linear_least_squares_qr(sample), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the first four points, least squares QR decomposition") {
+            test_circle_fit(Geometry::circle_linear_least_squares_qr(Vec2ds(sample.cbegin(), sample.cbegin() + 4)), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the middle four points, least squares QR decomposition") {
+            test_circle_fit(Geometry::circle_linear_least_squares_qr(Vec2ds(sample.cbegin() + 2, sample.cbegin() + 6)), expected_center, expected_radius);
+        }
+
+        WHEN("Circle fit is called on the entire array, least squares by normal equations") {
+            test_circle_fit(Geometry::circle_linear_least_squares_normal(sample), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the first four points, least squares by normal equations") {
+            test_circle_fit(Geometry::circle_linear_least_squares_normal(Vec2ds(sample.cbegin(), sample.cbegin() + 4)), expected_center, expected_radius);
+        }
+        WHEN("Circle fit is called on the middle four points, least squares by normal equations") {
+            test_circle_fit(Geometry::circle_linear_least_squares_normal(Vec2ds(sample.cbegin() + 2, sample.cbegin() + 6)), expected_center, expected_radius);
+        }
+    }
+}
+
 TEST_CASE("smallest_enclosing_circle_welzl", "[Geometry]") {
     // Some random points in plane.
     Points pts { 

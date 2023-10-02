@@ -53,7 +53,11 @@
 #ifdef DEBUG_FILES
 #include <boost/nowide/cstdio.hpp>
 #include "libslic3r/Color.hpp"
+constexpr bool debug_files = true;
+#else
+constexpr bool debug_files = false;
 #endif
+
 
 namespace Slic3r::SupportSpotsGenerator {
 
@@ -71,10 +75,6 @@ bool ExtrusionLine::is_external_perimeter() const
     assert(origin_entity != nullptr);
     return origin_entity->role().is_external_perimeter();
 }
-
-auto get_a(ExtrusionLine &&l) { return l.a; }
-auto get_b(ExtrusionLine &&l) { return l.b; }
-
 
 using LD = AABBTreeLines::LinesDistancer<ExtrusionLine>;
 
@@ -761,6 +761,284 @@ public:
     }
 };
 
+// Function that is used when new support point is generated. It will update the ObjectPart stability, weakest conneciton info,
+// and the support presence grid and add the point to the issues.
+void reckon_new_support_point(ObjectPart        &part,
+                              SliceConnection   &weakest_conn,
+                              SupportPoints     &supp_points,
+                              SupportGridFilter &supports_presence_grid,
+                              const SupportPoint& support_point,
+                              bool               is_global = false)
+{
+    // if position is taken and point is for global stability (force > 0) or we are too close to the bed, do not add
+    // This allows local support points (e.g. bridging) to be generated densely
+    if ((supports_presence_grid.position_taken(support_point.position) && is_global)) {
+        return;
+    }
+
+    float area = support_point.spot_radius * support_point.spot_radius * float(PI);
+    // add the stability effect of the point only if the spot is not taken, so that the densely created local support points do
+    // not add unrealistic amount of stability to the object (due to overlaping of local support points)
+    if (!(supports_presence_grid.position_taken(support_point.position))) {
+        part.add_support_point(support_point.position, area);
+    }
+
+    supp_points.push_back(support_point);
+    supports_presence_grid.take_position(support_point.position);
+
+    // The support point also increases the stability of the weakest connection of the object, which should be reflected
+    if (weakest_conn.area > EPSILON) { // Do not add it to the weakest connection if it is not valid - does not exist
+        weakest_conn.area += area;
+        weakest_conn.centroid_accumulator += support_point.position * area;
+        weakest_conn.second_moment_of_area_accumulator += area *
+                                                          support_point.position.head<2>().cwiseProduct(support_point.position.head<2>());
+        weakest_conn.second_moment_of_area_covariance_accumulator += area * support_point.position.x() * support_point.position.y();
+    }
+}
+
+struct LocalSupports {
+    std::vector<tbb::concurrent_vector<ExtrusionLine>> unstable_lines_per_slice;
+    std::vector<tbb::concurrent_vector<ExtrusionLine>> ext_perim_lines_per_slice;
+};
+
+struct EnitityToCheck
+{
+    const ExtrusionEntity *e;
+    const LayerRegion     *region;
+    size_t                 slice_idx;
+};
+
+// TODO DRY: Very similar to gather extrusions.
+std::vector<EnitityToCheck> gather_entities_to_check(const Layer* layer) {
+    auto get_flat_entities = [](const ExtrusionEntity *e) {
+        std::vector<const ExtrusionEntity *> entities;
+        std::vector<const ExtrusionEntity *> queue{e};
+        while (!queue.empty()) {
+            const ExtrusionEntity *next = queue.back();
+            queue.pop_back();
+            if (next->is_collection()) {
+                for (const ExtrusionEntity *e : static_cast<const ExtrusionEntityCollection *>(next)->entities) {
+                    queue.push_back(e);
+                }
+            } else {
+                entities.push_back(next);
+            }
+        }
+        return entities;
+    };
+
+    std::vector<EnitityToCheck> entities_to_check;
+    for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
+        const LayerSlice &slice = layer->lslices_ex.at(slice_idx);
+        for (const auto &island : slice.islands) {
+            for (const LayerExtrusionRange &fill_range : island.fills) {
+                const LayerRegion *fill_region = layer->get_region(fill_range.region());
+                for (size_t fill_idx : fill_range) {
+                    for (const ExtrusionEntity *e : get_flat_entities(fill_region->fills().entities[fill_idx])) {
+                        if (e->role() == ExtrusionRole::BridgeInfill) {
+                            entities_to_check.push_back({e, fill_region, slice_idx});
+                        }
+                    }
+                }
+            }
+
+            const LayerRegion *perimeter_region = layer->get_region(island.perimeters.region());
+            for (size_t perimeter_idx : island.perimeters) {
+                for (const ExtrusionEntity *e : get_flat_entities(perimeter_region->perimeters().entities[perimeter_idx])) {
+                    entities_to_check.push_back({e, perimeter_region, slice_idx});
+                }
+            }
+        }
+    }
+    return entities_to_check;
+}
+
+LocalSupports compute_local_supports(
+    const std::vector<EnitityToCheck>& entities_to_check,
+    const std::optional<Linesf>& previous_layer_boundary,
+    const LD& prev_layer_ext_perim_lines,
+    size_t slices_count,
+    const Params& params
+) {
+    std::vector<tbb::concurrent_vector<ExtrusionLine>> unstable_lines_per_slice(slices_count);
+    std::vector<tbb::concurrent_vector<ExtrusionLine>> ext_perim_lines_per_slice(slices_count);
+
+    AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary_distancer =
+        (previous_layer_boundary ? AABBTreeLines::LinesDistancer<Linef>{*previous_layer_boundary} : AABBTreeLines::LinesDistancer<Linef>{});
+
+    if constexpr (debug_files) {
+        for (const auto &e_to_check : entities_to_check) {
+            for (const auto &line : check_extrusion_entity_stability(e_to_check.e, e_to_check.region, prev_layer_ext_perim_lines,
+                                                                     prev_layer_boundary_distancer, params)) {
+                if (line.support_point_generated.has_value()) {
+                    unstable_lines_per_slice[e_to_check.slice_idx].push_back(line);
+                }
+                if (line.is_external_perimeter()) {
+                    ext_perim_lines_per_slice[e_to_check.slice_idx].push_back(line);
+                }
+            }
+        }
+    } else {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, entities_to_check.size()),
+                          [&entities_to_check, &prev_layer_ext_perim_lines, &prev_layer_boundary_distancer, &unstable_lines_per_slice,
+                           &ext_perim_lines_per_slice, &params](tbb::blocked_range<size_t> r) {
+                              for (size_t entity_idx = r.begin(); entity_idx < r.end(); ++entity_idx) {
+                                  const auto &e_to_check = entities_to_check[entity_idx];
+                                  for (const auto &line :
+                                       check_extrusion_entity_stability(e_to_check.e, e_to_check.region, prev_layer_ext_perim_lines,
+                                                                        prev_layer_boundary_distancer, params)) {
+                                      if (line.support_point_generated.has_value()) {
+                                          unstable_lines_per_slice[e_to_check.slice_idx].push_back(line);
+                                      }
+                                      if (line.is_external_perimeter()) {
+                                          ext_perim_lines_per_slice[e_to_check.slice_idx].push_back(line);
+                                      }
+                                  }
+                              }
+                          });
+    }
+    return {unstable_lines_per_slice, ext_perim_lines_per_slice};
+}
+
+struct SliceMappings
+{
+    std::unordered_map<size_t, size_t>          index_to_object_part_mapping;
+    std::unordered_map<size_t, SliceConnection> index_to_weakest_connection;
+};
+
+std::optional<PartialObject> to_partial_object(const ObjectPart& part) {
+    if (part.volume > EPSILON) {
+        return PartialObject{part.volume_centroid_accumulator / part.volume, part.volume,
+                                     part.connected_to_bed};
+    }
+    return {};
+}
+
+SliceMappings update_active_object_parts(const Layer                        *layer,
+                                         const Params                       &params,
+                                         const std::vector<SliceConnection> &precomputed_slice_connections,
+                                         const SliceMappings                &previous_slice_mappings,
+                                         ActiveObjectParts                  &active_object_parts,
+                                         PartialObjects                     &partial_objects)
+{
+    SliceMappings new_slice_mappings;
+
+    for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
+        const LayerSlice &slice             = layer->lslices_ex.at(slice_idx);
+        const std::vector<const ExtrusionEntityCollection*> extrusion_collections{gather_extrusions(slice, layer)};
+        const bool connected_to_bed = int(layer->id()) == params.raft_layers_count;
+
+        const std::optional<Polygons> brim{
+             has_brim(layer, params) ?
+             std::optional{get_brim(layer->lslices[slice_idx], params.brim_type, params.brim_width)} :
+             std::nullopt
+        };
+        ObjectPart new_part{
+            extrusion_collections,
+            connected_to_bed,
+            layer->print_z,
+            layer->height,
+            brim
+        };
+
+        const SliceConnection &connection_to_below = precomputed_slice_connections[slice_idx];
+
+#ifdef DETAILED_DEBUG_LOGS
+        std::cout << "SLICE IDX: " << slice_idx << std::endl;
+        for (const auto &link : slice.overlaps_below) {
+            std::cout << "connected to slice below: " << link.slice_idx << "  by area : " << link.area << std::endl;
+        }
+        connection_to_below.print_info("CONNECTION TO BELOW");
+#endif
+
+        if (connection_to_below.area < EPSILON) { // new object part emerging
+            size_t part_id = active_object_parts.insert(new_part);
+            new_slice_mappings.index_to_object_part_mapping.emplace(slice_idx, part_id);
+            new_slice_mappings.index_to_weakest_connection.emplace(slice_idx, connection_to_below);
+        } else {
+            size_t          final_part_id{};
+            SliceConnection transfered_weakest_connection{};
+            // MERGE parts
+            {
+                std::unordered_set<size_t> parts_ids;
+                for (const auto &link : slice.overlaps_below) {
+                    size_t part_id = active_object_parts.get_flat_id(previous_slice_mappings.index_to_object_part_mapping.at(link.slice_idx));
+                    parts_ids.insert(part_id);
+                    transfered_weakest_connection.add(previous_slice_mappings.index_to_weakest_connection.at(link.slice_idx));
+                }
+
+                final_part_id = *parts_ids.begin();
+                for (size_t part_id : parts_ids) {
+                    if (final_part_id != part_id) {
+                        auto object_part = active_object_parts.access(part_id);
+                        if (auto object = to_partial_object(object_part)) {
+                            partial_objects.push_back(std::move(*object));
+                        }
+                        active_object_parts.merge(part_id, final_part_id);
+                    }
+                }
+            }
+            const float bottom_z = layer->bottom_z();
+            auto estimate_conn_strength = [bottom_z](const SliceConnection &conn) {
+                if (conn.area < EPSILON) { // connection is empty, does not exists. Return max strength so that it is not picked as the
+                                           // weakest connection.
+                    return INFINITY;
+                }
+                Vec3f centroid         = conn.centroid_accumulator / conn.area;
+                Vec2f variance         = (conn.second_moment_of_area_accumulator / conn.area -
+                                  centroid.head<2>().cwiseProduct(centroid.head<2>()));
+                float xy_variance      = variance.x() + variance.y();
+                float arm_len_estimate = std::max(1.0f, bottom_z - (conn.centroid_accumulator.z() / conn.area));
+                return conn.area * sqrt(xy_variance) / arm_len_estimate;
+            };
+
+#ifdef DETAILED_DEBUG_LOGS
+            connection_to_below.print_info("new_weakest_connection");
+            transfered_weakest_connection.print_info("transfered_weakest_connection");
+#endif
+
+            if (estimate_conn_strength(transfered_weakest_connection) > estimate_conn_strength(connection_to_below)) {
+                transfered_weakest_connection = connection_to_below;
+            }
+            new_slice_mappings.index_to_weakest_connection.emplace(slice_idx, transfered_weakest_connection);
+            new_slice_mappings.index_to_object_part_mapping.emplace(slice_idx, final_part_id);
+            ObjectPart &part = active_object_parts.access(final_part_id);
+            part.add(new_part);
+        }
+    }
+    return new_slice_mappings;
+}
+
+void reckon_global_supports(const tbb::concurrent_vector<ExtrusionLine> &external_perimeter_lines,
+                            const coordf_t                               layer_bottom_z,
+                            const Params                                &params,
+                            ObjectPart                                  &part,
+                            SliceConnection                             &weakest_connection,
+                            SupportPoints                               &supp_points,
+                            SupportGridFilter                           &supports_presence_grid)
+{
+    LD    current_slice_lines_distancer({external_perimeter_lines.begin(), external_perimeter_lines.end()});
+    float unchecked_dist = params.min_distance_between_support_points + 1.0f;
+
+    for (const ExtrusionLine &line : external_perimeter_lines) {
+        if ((unchecked_dist + line.len < params.min_distance_between_support_points &&
+             line.curled_up_height < params.curling_tolerance_limit) ||
+            line.len < EPSILON) {
+            unchecked_dist += line.len;
+        } else {
+            unchecked_dist                   = line.len;
+            Vec2f pivot_site_search_point    = Vec2f(line.b + (line.b - line.a).normalized() * 300.0f);
+            auto [dist, nidx, nearest_point] = current_slice_lines_distancer.distance_from_lines_extra<false>(pivot_site_search_point);
+            Vec3f position                   = to_3d(nearest_point, layer_bottom_z);
+            auto [force, cause]              = part.is_stable_while_extruding(weakest_connection, line, position, layer_bottom_z, params);
+            if (force > 0) {
+                SupportPoint support_point{cause, position, params.support_points_interface_radius};
+                reckon_new_support_point(part, weakest_connection, supp_points, supports_presence_grid, support_point, true);
+            }
+        }
+    }
+}
+
 std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject                 *po,
                                                           const PrecomputedSliceConnections &precomputed_slices_connections,
                                                           const PrintTryCancel              &cancel_func,
@@ -772,257 +1050,55 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject     
     PartialObjects    partial_objects{};
     LD                prev_layer_ext_perim_lines;
 
-    std::unordered_map<size_t, size_t>          prev_slice_idx_to_object_part_mapping;
-    std::unordered_map<size_t, size_t>          next_slice_idx_to_object_part_mapping;
-    std::unordered_map<size_t, SliceConnection> prev_slice_idx_to_weakest_connection;
-    std::unordered_map<size_t, SliceConnection> next_slice_idx_to_weakest_connection;
+    SliceMappings slice_mappings;
 
-    auto remember_partial_object = [&active_object_parts, &partial_objects](size_t object_part_id) {
-        auto object_part = active_object_parts.access(object_part_id);
-        if (object_part.volume > EPSILON) {
-            partial_objects.emplace_back(object_part.volume_centroid_accumulator / object_part.volume, object_part.volume,
-                                         object_part.connected_to_bed);
-        }
-    };
 
     for (size_t layer_idx = 0; layer_idx < po->layer_count(); ++layer_idx) {
         cancel_func();
         const Layer *layer                 = po->get_layer(layer_idx);
         float        bottom_z              = layer->bottom_z();
-        auto create_support_point_position = [bottom_z](const Vec2f &layer_pos) { return Vec3f{layer_pos.x(), layer_pos.y(), bottom_z}; };
 
-        for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
-            const LayerSlice &slice             = layer->lslices_ex.at(slice_idx);
-            const std::vector<const ExtrusionEntityCollection*> extrusion_collections{gather_extrusions(slice, layer)};
-            const bool connected_to_bed = int(layer->id()) == params.raft_layers_count;
+        slice_mappings = update_active_object_parts(layer, params, precomputed_slices_connections[layer_idx], slice_mappings, active_object_parts, partial_objects);
 
-            const std::optional<Polygons> brim{
-                 has_brim(layer, params) ?
-                 std::optional{get_brim(layer->lslices[slice_idx], params.brim_type, params.brim_width)} :
-                 std::nullopt
-            };
-            ObjectPart new_part{
-                extrusion_collections,
-                connected_to_bed,
-                layer->print_z,
-                layer->height,
-                brim
-            };
+        std::optional<Linesf> prev_layer_boundary = layer->lower_layer != nullptr ?
+                                                        std::optional{to_unscaled_linesf(layer->lower_layer->lslices)} :
+                                                        std::nullopt;
 
-            const SliceConnection &connection_to_below = precomputed_slices_connections[layer_idx][slice_idx];
-
-#ifdef DETAILED_DEBUG_LOGS
-            std::cout << "SLICE IDX: " << slice_idx << std::endl;
-            for (const auto &link : slice.overlaps_below) {
-                std::cout << "connected to slice below: " << link.slice_idx << "  by area : " << link.area << std::endl;
-            }
-            connection_to_below.print_info("CONNECTION TO BELOW");
-#endif
-
-            if (connection_to_below.area < EPSILON) { // new object part emerging
-                size_t part_id = active_object_parts.insert(new_part);
-                next_slice_idx_to_object_part_mapping.emplace(slice_idx, part_id);
-                next_slice_idx_to_weakest_connection.emplace(slice_idx, connection_to_below);
-            } else {
-                size_t          final_part_id{};
-                SliceConnection transfered_weakest_connection{};
-                // MERGE parts
-                {
-                    std::unordered_set<size_t> parts_ids;
-                    for (const auto &link : slice.overlaps_below) {
-                        size_t part_id = active_object_parts.get_flat_id(prev_slice_idx_to_object_part_mapping.at(link.slice_idx));
-                        parts_ids.insert(part_id);
-                        transfered_weakest_connection.add(prev_slice_idx_to_weakest_connection.at(link.slice_idx));
-                    }
-
-                    final_part_id = *parts_ids.begin();
-                    for (size_t part_id : parts_ids) {
-                        if (final_part_id != part_id) {
-                            remember_partial_object(part_id);
-                            active_object_parts.merge(part_id, final_part_id);
-                        }
-                    }
-                }
-                auto estimate_conn_strength = [bottom_z](const SliceConnection &conn) {
-                    if (conn.area < EPSILON) { // connection is empty, does not exists. Return max strength so that it is not picked as the
-                                               // weakest connection.
-                        return INFINITY;
-                    }
-                    Vec3f centroid         = conn.centroid_accumulator / conn.area;
-                    Vec2f variance         = (conn.second_moment_of_area_accumulator / conn.area -
-                                      centroid.head<2>().cwiseProduct(centroid.head<2>()));
-                    float xy_variance      = variance.x() + variance.y();
-                    float arm_len_estimate = std::max(1.0f, bottom_z - (conn.centroid_accumulator.z() / conn.area));
-                    return conn.area * sqrt(xy_variance) / arm_len_estimate;
-                };
-
-#ifdef DETAILED_DEBUG_LOGS
-                connection_to_below.print_info("new_weakest_connection");
-                transfered_weakest_connection.print_info("transfered_weakest_connection");
-#endif
-
-                if (estimate_conn_strength(transfered_weakest_connection) > estimate_conn_strength(connection_to_below)) {
-                    transfered_weakest_connection = connection_to_below;
-                }
-                next_slice_idx_to_weakest_connection.emplace(slice_idx, transfered_weakest_connection);
-                next_slice_idx_to_object_part_mapping.emplace(slice_idx, final_part_id);
-                ObjectPart &part = active_object_parts.access(final_part_id);
-                part.add(new_part);
-            }
-        }
-
-        prev_slice_idx_to_object_part_mapping = next_slice_idx_to_object_part_mapping;
-        next_slice_idx_to_object_part_mapping.clear();
-        prev_slice_idx_to_weakest_connection = next_slice_idx_to_weakest_connection;
-        next_slice_idx_to_weakest_connection.clear();
-
-        auto get_flat_entities = [](const ExtrusionEntity *e) {
-            std::vector<const ExtrusionEntity *> entities;
-            std::vector<const ExtrusionEntity *> queue{e};
-            while (!queue.empty()) {
-                const ExtrusionEntity *next = queue.back();
-                queue.pop_back();
-                if (next->is_collection()) {
-                    for (const ExtrusionEntity *e : static_cast<const ExtrusionEntityCollection *>(next)->entities) {
-                        queue.push_back(e);
-                    }
-                } else {
-                    entities.push_back(next);
-                }
-            }
-            return entities;
-        };
-
-        struct EnitityToCheck
-        {
-            const ExtrusionEntity *e;
-            const LayerRegion     *region;
-            size_t                 slice_idx;
-        };
-        std::vector<EnitityToCheck> entities_to_check;
-        for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
-            const LayerSlice &slice = layer->lslices_ex.at(slice_idx);
-            for (const auto &island : slice.islands) {
-                for (const LayerExtrusionRange &fill_range : island.fills) {
-                    const LayerRegion *fill_region = layer->get_region(fill_range.region());
-                    for (size_t fill_idx : fill_range) {
-                        for (const ExtrusionEntity *e : get_flat_entities(fill_region->fills().entities[fill_idx])) {
-                            if (e->role() == ExtrusionRole::BridgeInfill) {
-                                entities_to_check.push_back({e, fill_region, slice_idx});
-                            }
-                        }
-                    }
-                }
-
-                const LayerRegion *perimeter_region = layer->get_region(island.perimeters.region());
-                for (size_t perimeter_idx : island.perimeters) {
-                    for (const ExtrusionEntity *e : get_flat_entities(perimeter_region->perimeters().entities[perimeter_idx])) {
-                        entities_to_check.push_back({e, perimeter_region, slice_idx});
-                    }
-                }
-            }
-        }
-
-        AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary = layer->lower_layer != nullptr ?
-                                                                       AABBTreeLines::LinesDistancer<Linef>{
-                                                                           to_unscaled_linesf(layer->lower_layer->lslices)} :
-                                                                       AABBTreeLines::LinesDistancer<Linef>{};
-
-        std::vector<tbb::concurrent_vector<ExtrusionLine>> unstable_lines_per_slice(layer->lslices_ex.size());
-        std::vector<tbb::concurrent_vector<ExtrusionLine>> ext_perim_lines_per_slice(layer->lslices_ex.size());
-
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, entities_to_check.size()),
-                          [&entities_to_check, &prev_layer_ext_perim_lines, &prev_layer_boundary, &unstable_lines_per_slice,
-                           &ext_perim_lines_per_slice, &params](tbb::blocked_range<size_t> r) {
-                              for (size_t entity_idx = r.begin(); entity_idx < r.end(); ++entity_idx) {
-                                  const auto &e_to_check = entities_to_check[entity_idx];
-                                  for (const auto &line :
-                                       check_extrusion_entity_stability(e_to_check.e, e_to_check.region, prev_layer_ext_perim_lines,
-                                                                        prev_layer_boundary, params)) {
-                                      if (line.support_point_generated.has_value()) {
-                                          unstable_lines_per_slice[e_to_check.slice_idx].push_back(line);
-                                      }
-                                      if (line.is_external_perimeter()) {
-                                          ext_perim_lines_per_slice[e_to_check.slice_idx].push_back(line);
-                                      }
-                                  }
-                              }
-                          });
+        LocalSupports local_supports{
+            compute_local_supports(gather_entities_to_check(layer), prev_layer_boundary, prev_layer_ext_perim_lines, layer->lslices_ex.size(), params)};
 
         std::vector<ExtrusionLine> current_layer_ext_perims_lines{};
         current_layer_ext_perims_lines.reserve(prev_layer_ext_perim_lines.get_lines().size());
         // All object parts updated, and for each slice we have coresponding weakest connection.
         // We can now check each slice and its corresponding weakest connection and object part for stability.
         for (size_t slice_idx = 0; slice_idx < layer->lslices_ex.size(); ++slice_idx) {
-            ObjectPart                &part         = active_object_parts.access(prev_slice_idx_to_object_part_mapping[slice_idx]);
-            SliceConnection           &weakest_conn = prev_slice_idx_to_weakest_connection[slice_idx];
+            ObjectPart                &part         = active_object_parts.access(slice_mappings.index_to_object_part_mapping[slice_idx]);
+            SliceConnection           &weakest_conn = slice_mappings.index_to_weakest_connection[slice_idx];
 
-#ifdef DETAILED_DEBUG_LOGS
-            weakest_conn.print_info("weakest connection info: ");
-#endif
-            // Function that is used when new support point is generated. It will update the ObjectPart stability, weakest conneciton info,
-            // and the support presence grid and add the point to the issues.
-            auto reckon_new_support_point = [&part, &weakest_conn, &supp_points, &supports_presence_grid, &params,
-                                             &layer_idx](SupportPointCause cause, const Vec3f &support_point, float force,
-                                                         const Vec2f &dir) {
-                // if position is taken and point is for global stability (force > 0) or we are too close to the bed, do not add
-                // This allows local support points (e.g. bridging) to be generated densely
-                if ((supports_presence_grid.position_taken(support_point) && force > 0) || layer_idx <= 1) {
-                    return;
-                }
-
-                float area = params.support_points_interface_radius * params.support_points_interface_radius * float(PI);
-                // add the stability effect of the point only if the spot is not taken, so that the densely created local support points do
-                // not add unrealistic amount of stability to the object (due to overlaping of local support points)
-                if (!(supports_presence_grid.position_taken(support_point))) {
-                    part.add_support_point(support_point, area);
-                }
-
-                float radius = params.support_points_interface_radius;
-                supp_points.emplace_back(cause, support_point, force, radius, dir);
-                supports_presence_grid.take_position(support_point);
-
-                // The support point also increases the stability of the weakest connection of the object, which should be reflected
-                if (weakest_conn.area > EPSILON) { // Do not add it to the weakest connection if it is not valid - does not exist
-                    weakest_conn.area += area;
-                    weakest_conn.centroid_accumulator += support_point * area;
-                    weakest_conn.second_moment_of_area_accumulator += area * support_point.head<2>().cwiseProduct(support_point.head<2>());
-                    weakest_conn.second_moment_of_area_covariance_accumulator += area * support_point.x() * support_point.y();
-                }
-            };
-
-            for (const auto &l : unstable_lines_per_slice[slice_idx]) {
-                assert(l.support_point_generated.has_value());
-                reckon_new_support_point(*l.support_point_generated, create_support_point_position(l.b), float(-EPSILON), Vec2f::Zero());
-            }
-
-            LD    current_slice_lines_distancer({ext_perim_lines_per_slice[slice_idx].begin(), ext_perim_lines_per_slice[slice_idx].end()});
-            float unchecked_dist = params.min_distance_between_support_points + 1.0f;
-
-            for (const ExtrusionLine &line : current_slice_lines_distancer.get_lines()) {
-                if ((unchecked_dist + line.len < params.min_distance_between_support_points && line.curled_up_height < params.curling_tolerance_limit) ||
-                    line.len < EPSILON) {
-                    unchecked_dist += line.len;
-                } else {
-                    unchecked_dist                = line.len;
-                    Vec2f pivot_site_search_point = Vec2f(line.b + (line.b - line.a).normalized() * 300.0f);
-                    auto [dist, nidx,
-                          nearest_point]          = current_slice_lines_distancer.distance_from_lines_extra<false>(pivot_site_search_point);
-                    Vec3f support_point           = create_support_point_position(nearest_point);
-                    auto [force, cause]           = part.is_stable_while_extruding(weakest_conn, line, support_point, bottom_z, params);
-                    if (force > 0) {
-                        reckon_new_support_point(cause, support_point, force, (line.b - line.a).normalized());
-                    }
+            if (layer_idx > 1) {
+                for (const auto &l : local_supports.unstable_lines_per_slice[slice_idx]) {
+                    assert(l.support_point_generated.has_value());
+                    SupportPoint support_point{*l.support_point_generated, to_3d(l.b, bottom_z),
+                                               params.support_points_interface_radius};
+                    reckon_new_support_point(part, weakest_conn, supp_points, supports_presence_grid, support_point);
                 }
             }
-            current_layer_ext_perims_lines.insert(current_layer_ext_perims_lines.end(), current_slice_lines_distancer.get_lines().begin(),
-                                                  current_slice_lines_distancer.get_lines().end());
+
+            const tbb::concurrent_vector<ExtrusionLine> &external_perimeter_lines = local_supports.ext_perim_lines_per_slice[slice_idx];
+            if (layer_idx > 1) {
+                reckon_global_supports(external_perimeter_lines, bottom_z, params, part, weakest_conn, supp_points, supports_presence_grid);
+            }
+
+            current_layer_ext_perims_lines.insert(current_layer_ext_perims_lines.end(), external_perimeter_lines.begin(), external_perimeter_lines.end());
         } // slice iterations
         prev_layer_ext_perim_lines = LD(current_layer_ext_perims_lines);
     } // layer iterations
 
-    for (const auto& active_obj_pair : prev_slice_idx_to_object_part_mapping) {
-        remember_partial_object(active_obj_pair.second);
+    for (const auto& active_obj_pair : slice_mappings.index_to_object_part_mapping) {
+        auto object_part = active_object_parts.access(active_obj_pair.second);
+        if (auto object = to_partial_object(object_part)) {
+            partial_objects.push_back(std::move(*object));
+        }
     }
 
     return {supp_points, partial_objects};

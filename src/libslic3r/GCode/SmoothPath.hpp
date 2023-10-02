@@ -29,7 +29,9 @@ std::optional<Point> sample_path_point_at_distance_from_start(const SmoothPath &
 std::optional<Point> sample_path_point_at_distance_from_end(const SmoothPath &path, double distance);
 
 // Clip end of a smooth path, for seam hiding.
-double clip_end(SmoothPath &path, double distance);
+// When clipping the end of a path, don't create segments shorter than min_point_distance_threshold, 
+// rather discard such a degenerate segment.
+double clip_end(SmoothPath &path, double distance, double min_point_distance_threshold);
 
 class SmoothPathCache
 {

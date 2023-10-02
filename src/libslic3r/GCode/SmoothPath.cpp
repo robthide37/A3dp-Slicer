@@ -102,7 +102,10 @@ std::optional<Point> sample_path_point_at_distance_from_end(const SmoothPath &pa
     return {};
 }
 
-double clip_end(SmoothPath &path, double distance)
+// Clip length of a smooth path, for seam hiding.
+// When clipping the end of a path, don't create segments shorter than min_point_distance_threshold, 
+// rather discard such a degenerate segment.
+double clip_end(SmoothPath &path, double distance, double min_point_distance_threshold)
 {
     while (! path.empty() && distance > 0) {
         Geometry::ArcWelder::Path &p = path.back().path;
@@ -111,9 +114,18 @@ double clip_end(SmoothPath &path, double distance)
             path.pop_back();
         } else {
             // Trailing path was trimmed and it is valid.
-            assert(path.back().path.size() > 1);
+            Geometry::ArcWelder::Path &last_path = path.back().path;
+            assert(last_path.size() > 1);
             assert(distance == 0);
             // Distance to go is zero.
+            // Remove the last segment if its length is shorter than min_point_distance_threshold.
+            const Geometry::ArcWelder::Segment &prev_segment = last_path[last_path.size() - 2];
+            const Geometry::ArcWelder::Segment &last_segment = last_path.back();
+            if (Geometry::ArcWelder::segment_length<double>(prev_segment, last_segment) < min_point_distance_threshold) {
+                last_path.pop_back();
+                if (last_path.size() < 2)
+                    path.pop_back();
+            }
             return 0;
         }
     }
