@@ -258,8 +258,14 @@ public:
 // e.g.: auto map = make_staticmap<const char*, int>({ {"one", 1}, {"two", 2}})
 // will work, and only the key and value type needs to be specified. No need
 // to state the number of elements, that is deduced automatically.
-template<class K, class V, size_t N, class Cmp = DefaultCmp<K, V>>
-constexpr auto make_staticmap(const SMapEl<K, V> (&arr) [N], Cmp cmp = {})
+template<class K, class V, size_t N>
+constexpr auto make_staticmap(const SMapEl<K, V> (&arr) [N])
+{
+    return StaticMap<K, V, N>{static_set_detail ::to_array(arr), DefaultCmp<K, V>{}};
+}
+
+template<class K, class V, size_t N, class Cmp>
+constexpr auto make_staticmap(const SMapEl<K, V> (&arr) [N], Cmp cmp)
 {
     return StaticMap<K, V, N, Cmp>{static_set_detail ::to_array(arr), cmp};
 }

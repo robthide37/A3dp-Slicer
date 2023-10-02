@@ -61,7 +61,7 @@ TEST_CASE("StaticMap should derive it's type using make_staticmap", "[StaticMap]
     for (auto &[k, v] : ciManyMap) {
         auto val = query(ciManyMap, k);
         REQUIRE(val.has_value());
-        REQUIRE(val.value() == v);
+        REQUIRE(*val == v);
     }
 }
 
