@@ -240,11 +240,11 @@ TEST_CASE("least squares arc fitting, interpolating end points", "[ArcWelder]") 
     using namespace Slic3r::Geometry;
 
     // Generate bunch of random arches.
-    const coord_t          max_coordinate = scaled<coord_t>(sqrt(250. - 1.));
-    const double           min_radius     = scaled<double>(0.01);
-    const double           max_radius     = scaled<double>(250.);
-//    const double           deviation      = scaled<double>(0.5);
-    const double           deviation      = scaled<double>(0.1);
+    const coord_t                 max_coordinate = scaled<coord_t>(sqrt(250. - 1.));
+    static constexpr const double min_radius     = scaled<double>(0.01);
+    static constexpr const double max_radius     = scaled<double>(250.);
+//  static constexpr const double deviation      = scaled<double>(0.5);
+    static constexpr const double deviation      = scaled<double>(0.1);
     // Seeded with a fixed seed, to be repeatable.
     std::mt19937                            rng(867092346);
     std::uniform_int_distribution<int32_t>  coord_sampler(0, int32_t(max_coordinate));
