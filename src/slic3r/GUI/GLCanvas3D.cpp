@@ -3617,20 +3617,19 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
 
 //#if defined(__WXMSW__) || defined(__linux__)
 //        // On Windows and Linux needs focus in order to catch key events
-        // Set focus in order to remove it from object list
         if (m_canvas != nullptr) {
-            // Only set focus, if the top level window of this canvas is active
-            // and ObjectList has a focus
-            auto p = dynamic_cast<wxWindow*>(evt.GetEventObject());
-            while (p->GetParent())
-                p = p->GetParent();
-#ifdef __WIN32__
-            wxWindow* const obj_list = wxGetApp().obj_list()->GetMainWindow();
-#else
-            wxWindow* const obj_list = wxGetApp().obj_list();
-#endif
-            if (obj_list == p->FindFocus())
-                m_canvas->SetFocus();
+
+            // Set focus in order to remove it from sidebar but not from TextControl (in ManipulationPanel f.e.)
+            if (!m_canvas->HasFocus()) {
+                wxTopLevelWindow* tlw = find_toplevel_parent(m_canvas);
+                // Only set focus, if the top level window of this canvas is active
+                if (tlw->IsActive()) {
+                    auto* text_ctrl = dynamic_cast<wxTextCtrl*>(tlw->FindFocus());
+                    if (text_ctrl == nullptr)
+                        m_canvas->SetFocus();
+                }
+            }
+
             m_mouse.position = pos.cast<double>();
             m_tooltip_enabled = false;
             // 1) forces a frame render to ensure that m_hover_volume_idxs is updated even when the user right clicks while
