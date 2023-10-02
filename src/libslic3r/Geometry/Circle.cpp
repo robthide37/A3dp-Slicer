@@ -147,7 +147,7 @@ Circled circle_ransac(const Vec2ds& input, size_t iterations, double* min_error)
 }
 
 template<typename Solver>
-Circled circle_least_squares_by_solver(const Vec2ds &input, Solver solver)
+Circled circle_linear_least_squares_by_solver(const Vec2ds &input, Solver solver)
 {
     Circled out;
     if (input.size() < 3) {
@@ -172,21 +172,21 @@ Circled circle_least_squares_by_solver(const Vec2ds &input, Solver solver)
     return out;
 }
 
-Circled circle_least_squares_svd(const Vec2ds &input)
+Circled circle_linear_least_squares_svd(const Vec2ds &input)
 {
-    return circle_least_squares_by_solver(input, 
+    return circle_linear_least_squares_by_solver(input, 
         [](const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic /* 3 */> &A, const Eigen::VectorXd &b)
         { return A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b).eval(); });
 }
 
-Circled circle_least_squares_qr(const Vec2ds &input)
+Circled circle_linear_least_squares_qr(const Vec2ds &input)
 {
-    return circle_least_squares_by_solver(input, 
+    return circle_linear_least_squares_by_solver(input, 
         [](const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> &A, const Eigen::VectorXd &b)
         { return A.colPivHouseholderQr().solve(b).eval(); });
 }
 
-Circled circle_least_squares_normal(const Vec2ds &input)
+Circled circle_linear_least_squares_normal(const Vec2ds &input)
 {
     Circled out;
     if (input.size() < 3) {
