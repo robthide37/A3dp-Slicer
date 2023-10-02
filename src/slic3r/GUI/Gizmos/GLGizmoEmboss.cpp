@@ -397,7 +397,13 @@ ModelVolumePtrs prepare_volumes_to_slice(const ModelVolume &mv)
     }
     return result;
 }
+
+TransformationType get_transformation_type(const Selection &selection)
+{
+    assert(selection.is_single_full_object() || selection.is_single_volume());
+    return selection.is_single_volume() ? TransformationType::Local_Relative_Joint : TransformationType::Instance_Relative_Joint; // object
 }
+} // namespace
 
 bool GLGizmoEmboss::do_mirror(size_t axis)
 { 
@@ -411,32 +417,47 @@ bool GLGizmoEmboss::do_mirror(size_t axis)
     if (m_parent.get_gizmos_manager().get_current_type() != GLGizmosManager::Emboss)
         return false;
 
-    const TextConfiguration &tc= *m_volume->text_configuration;
-    if(tc.style.prop.per_glyph){ 
+    const std::optional<TextConfiguration> &tc = m_volume->text_configuration;
+    assert(tc.has_value());
+    bool is_per_glyph = tc.has_value()? tc->style.prop.per_glyph : false;
+        
+    const std::optional<EmbossShape> &es = m_volume->emboss_shape;
+    assert(es.has_value());
+    bool use_surface = es.has_value()? es->projection.use_surface : false;
+    if (!use_surface && !is_per_glyph) {
+        // do normal mirror with fix matrix
+        Selection &selection = m_parent.get_selection();
+        selection.setup_cache();
+
+        auto selection_mirror_fnc = [&selection, &axis]() { selection.mirror((Axis) axis, get_transformation_type(selection)); };
+        selection_transform(selection, selection_mirror_fnc, m_volume);
+
+        m_parent.do_mirror(L("Set Mirror"));
+        wxGetApp().obj_manipul()->UpdateAndShow(true);
+        return true;
+    }
+
+    Vec3d scale = Vec3d::Ones();
+    scale[axis] = -1.;
+
+    Transform3d tr = m_volume->get_matrix();
+    if (es.has_value()) {
+        const std::optional<Transform3d> &fix_tr = es->fix_3mf_tr;
+        if (fix_tr.has_value())
+            tr = tr * (fix_tr->inverse());
+    }
+
+    // mirror
+    tr = tr * Eigen::Scaling(scale);
+
+    if (is_per_glyph) { 
         // init textlines before mirroring on mirrored text volume transformation
-        Transform3d tr = m_volume->get_matrix();
-        if (m_volume->emboss_shape.has_value()) {
-            const std::optional<Transform3d> &fix_tr = m_volume->emboss_shape->fix_3mf_tr;
-            if (fix_tr.has_value())
-                tr = tr * (fix_tr->inverse());
-        }
-
-        // mirror
-        Vec3d scale = Vec3d::Ones();
-        scale[axis] = -1.;
-        tr = tr * Eigen::Scaling(scale);
-
-        // collect volumes in object
         ModelVolumePtrs volumes = prepare_volumes_to_slice(*m_volume);
         m_text_lines.init(tr, volumes, m_style_manager, m_text_lines.get_lines().size());
     }
 
-    // mirror
-    Transform3d tr = m_volume->get_matrix();
-    Vec3d scale = Vec3d::Ones();
-    scale[axis] = -1.;
-    tr = tr * Eigen::Scaling(scale);
     m_volume->set_transformation(tr); 
+    // setting to volume is not visible for user(not GLVolume)    
     // NOTE: Staff around volume transformation change is done in job finish
     return process();
 }
@@ -476,16 +497,6 @@ bool GLGizmoEmboss::init_create(ModelVolumeType volume_type)
     m_text = _u8L("Embossed text");
     return true;
 }
-
-namespace {
-TransformationType get_transformation_type(const Selection &selection)
-{
-    assert(selection.is_single_full_object() || selection.is_single_volume());
-    return selection.is_single_volume() ? 
-        TransformationType::Local_Relative_Joint :
-        TransformationType::Instance_Relative_Joint; // object
-}
-} // namespace
 
 bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
