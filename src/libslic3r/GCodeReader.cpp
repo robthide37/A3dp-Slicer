@@ -237,20 +237,22 @@ const char* GCodeReader::axis_pos(const char *raw_str, char axis)
 
 bool GCodeReader::GCodeLine::has(char axis) const
 {
-    return this->axis_pos(axis);
-}
-
-const char* GCodeReader::GCodeLine::axis_pos(char axis) const
-{ 
     return GCodeReader::axis_pos(this->raw().c_str(), axis);
 }
 
-static bool GCodeReader::GCodeLine::has_value(const char *axis_pos, float &value)
+std::string_view GCodeReader::GCodeLine::axis_pos(char axis) const
+{ 
+    const std::string &s = this->raw();
+    const char *c = GCodeReader::axis_pos(this->raw().c_str(), axis);
+    return c ? std::string_view{ c, s.size() - (c - s.data()) } : std::string_view();
+}
+
+bool GCodeReader::GCodeLine::has_value(std::string_view axis_pos, float &value)
 {
-    if (const char *c = axis_pos; c) {
+    if (const char *c = axis_pos.data(); c) {
         // Try to parse the numeric value.
         double v = 0.;
-        const char *end = m_raw.c_str() + m_raw.size();
+        const char *end = axis_pos.data() + axis_pos.size();
         auto [pend, ec] = fast_float::from_chars(++ c, end, v);
         if (pend != c && is_end_of_word(*pend)) {
             // The axis value has been parsed correctly.
@@ -267,9 +269,9 @@ bool GCodeReader::GCodeLine::has_value(char axis, float &value) const
     return this->has_value(this->axis_pos(axis), value);
 }
 
-static bool GCodeReader::GCodeLine::has_value(const char *axis_pos, int &value)
+bool GCodeReader::GCodeLine::has_value(std::string_view axis_pos, int &value)
 {
-    if (const char *c = axis_pos; c) {
+    if (const char *c = axis_pos.data(); c) {
         // Try to parse the numeric value.
         char   *pend = nullptr;
         long    v = strtol(++ c, &pend, 10);

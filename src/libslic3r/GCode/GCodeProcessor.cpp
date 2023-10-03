@@ -2887,15 +2887,15 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
 void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise)
 {
     enum class EFitting { None, IJ, R };
-    const char *axis_pos_I = nullptr;
-    const char *axis_pos_J = nullptr;
+    std::string_view axis_pos_I;
+    std::string_view axis_pos_J;
     EFitting fitting = EFitting::None;
     if (line.has('R')) {
         fitting = EFitting::R;
     } else {
         axis_pos_I = line.axis_pos('I');
         axis_pos_J = line.axis_pos('J');
-        if (axis_pos_I || axis_pos_J)
+        if (! axis_pos_I.empty() || ! axis_pos_J.empty())
             fitting = EFitting::IJ;
     }
 
@@ -2931,9 +2931,9 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
     }
     else {
         assert(fitting == EFitting::IJ);
-        if (axis_pos_I && ! line.has_value(axis_pos_I, rel_center.x()))
+        if (! axis_pos_I.empty() && ! line.has_value(axis_pos_I, rel_center.x()))
             return;
-        if (axis_pos_J && ! line.has_value(axis_pos_J, rel_center.y()))
+        if (! axis_pos_J.empty() && ! line.has_value(axis_pos_J, rel_center.y()))
             return;
     }
 
