@@ -544,7 +544,7 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, s
 
     auto resize_range = [&](Range& range, size_t lines_count) {
         const size_t half_lines_count = lines_count / 2;
-        range.min = (curr_line_id >= half_lines_count) ? curr_line_id - half_lines_count : 1;
+        range.min = (curr_line_id > half_lines_count) ? curr_line_id - half_lines_count : 1;
         range.max = *range.min + lines_count - 1;
         size_t lines_ends_count = 0;
         for (const auto& le : m_lines_ends) {
