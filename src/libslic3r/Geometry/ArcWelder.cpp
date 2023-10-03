@@ -264,44 +264,47 @@ static std::optional<Circle> try_create_circle(const Points::const_iterator begi
             // of all points on the polyline to be fitted.
             Vec2i64 first_point = begin->cast<int64_t>();
             Vec2i64 last_point  = std::prev(end)->cast<int64_t>();
-            Vec2i64 c = (first_point.cast<int64_t>() + last_point.cast<int64_t>()) / 2;
             Vec2i64 v = last_point - first_point;
-            Vec2i64 prev_point = first_point;
-            int     prev_side = sign(v.dot(prev_point - c));
-            assert(prev_side != 0);
-            Point   point_on_bisector;
-#ifndef NDEBUG
-            point_on_bisector = { std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max() };
-#endif // NDEBUG
-            for (auto it = std::next(begin); it != end; ++ it) {
-                Vec2i64 this_point = it->cast<int64_t>();
-                int64_t d         = v.dot(this_point - c);
-                int     this_side = sign(d);
-                int     sideness  = this_side * prev_side;
-                if (sideness < 0) {
-                    // Calculate the intersection point.
-                    Vec2d vd = v.cast<double>();
-                    Vec2d p = c.cast<double>() + vd * double(d) / vd.squaredNorm();
-                    point_on_bisector = p.cast<coord_t>();
-                    break;
-                } 
-                if (sideness == 0) {
-                    // this_point is on the bisector.
-                    assert(prev_side != 0);
-                    assert(this_side == 0);
-                    point_on_bisector = this_point.cast<coord_t>();
-                    break;
+            Vec2d   vd = v.cast<double>();
+            double  ld = v.squaredNorm();
+            if (ld > sqr(scaled<double>(0.0015))) {
+                Vec2i64 c = (first_point.cast<int64_t>() + last_point.cast<int64_t>()) / 2;
+                Vec2i64 prev_point = first_point;
+                int     prev_side = sign(v.dot(prev_point - c));
+                assert(prev_side != 0);
+                Point   point_on_bisector;
+    #ifndef NDEBUG
+                point_on_bisector = { std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max() };
+    #endif // NDEBUG
+                for (auto it = std::next(begin); it != end; ++ it) {
+                    Vec2i64 this_point = it->cast<int64_t>();
+                    int64_t d         = v.dot(this_point - c);
+                    int     this_side = sign(d);
+                    int     sideness  = this_side * prev_side;
+                    if (sideness < 0) {
+                        // Calculate the intersection point.
+                        Vec2d p = c.cast<double>() + vd * double(d) / ld;
+                        point_on_bisector = p.cast<coord_t>();
+                        break;
+                    } 
+                    if (sideness == 0) {
+                        // this_point is on the bisector.
+                        assert(prev_side != 0);
+                        assert(this_side == 0);
+                        point_on_bisector = this_point.cast<coord_t>();
+                        break;
+                    }
+                    prev_point = this_point;
+                    prev_side  = this_side;
                 }
-                prev_point = this_point;
-                prev_side  = this_side;
+                // point_on_bisector must be set
+                assert(point_on_bisector.x() != std::numeric_limits<coord_t>::max() && point_on_bisector.y() != std::numeric_limits<coord_t>::max());
+                circle = try_create_circle(*begin, point_on_bisector, *std::prev(end), max_radius);
+                if (// Use twice the tolerance for fitting the initial circle.
+                    // Early exit if such approximation is grossly inaccurate, thus the tolerance could not be achieved.
+                    circle && ! circle_approximation_sufficient(*circle, begin, end, tolerance * 2))
+                    circle.reset();
             }
-            // point_on_bisector must be set
-            assert(point_on_bisector.x() != std::numeric_limits<coord_t>::max() && point_on_bisector.y() != std::numeric_limits<coord_t>::max());
-            circle = try_create_circle(*begin, point_on_bisector, *std::prev(end), max_radius);
-            if (// Use twice the tolerance for fitting the initial circle.
-                // Early exit if such approximation is grossly inaccurate, thus the tolerance could not be achieved.
-                circle && ! circle_approximation_sufficient(*circle, begin, end, tolerance * 2))
-                circle.reset();
         }
         if (circle) {
             // Fit the arc between the end points by least squares.
@@ -320,13 +323,16 @@ static std::optional<Circle> try_create_circle(const Points::const_iterator begi
             std::optional<Vec2d> opt_center = ArcWelder::arc_fit_center_gauss_newton_ls(first_point, last_point,
                 circle->center.cast<double>(), fpts.begin(), fpts.end(), 5);
             if (opt_center) {
-                circle->center = opt_center->cast<coord_t>();
-                circle->radius = (circle->radius > 0 ? 1.f : -1.f) * (*opt_center - first_point).norm();
-                if (circle_approximation_sufficient(*circle, begin, end, tolerance)) {
-                    out = circle;
-                } else {
-                    //FIXME One may consider adjusting the arc to fit the worst offender as a last effort,
-                    // however Vojtech is not sure whether it is worth it.
+                // Fitted radius must not be excessively large. If so, it is better to fit with a line segment.
+                if (const double r2 = (*opt_center - first_point).squaredNorm(); r2 < max_radius * max_radius) {
+                    circle->center = opt_center->cast<coord_t>();
+                    circle->radius = (circle->radius > 0 ? 1.f : -1.f) * sqrt(r2);
+                    if (circle_approximation_sufficient(*circle, begin, end, tolerance)) {
+                        out = circle;
+                    } else {
+                        //FIXME One may consider adjusting the arc to fit the worst offender as a last effort,
+                        // however Vojtech is not sure whether it is worth it.
+                    }
                 }
             }
         }
