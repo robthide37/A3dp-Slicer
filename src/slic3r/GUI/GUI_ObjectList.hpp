@@ -41,7 +41,7 @@ typedef std::pair<coordf_t, coordf_t>               t_layer_height_range;
 typedef std::map<t_layer_height_range, ModelConfig> t_layer_config_ranges;
 
 // Manifold mesh may contain self-intersections, so we want to always allow fixing the mesh.
-#define FIX_THROUGH_NETFABB_ALWAYS 1
+#define FIX_THROUGH_WINSDK_ALWAYS 1
 
 namespace GUI {
 
@@ -385,7 +385,7 @@ public:
     void instances_to_separated_objects(const int obj_idx);
     void split_instances();
     void rename_item();
-    void fix_through_netfabb();
+    void fix_through_winsdk();
     void simplify();
     void update_item_error_icon(const int obj_idx, int vol_idx) const ;
 

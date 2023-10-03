@@ -162,19 +162,19 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
     // Add "Name" label with warning icon
     auto sizer = new wxBoxSizer(wxHORIZONTAL);
 
-    m_fix_throught_netfab_bitmap = new wxStaticBitmap(parent, wxID_ANY, wxNullBitmap);
+    m_fix_by_winsdk_bitmap = new wxStaticBitmap(parent, wxID_ANY, wxNullBitmap);
     if (is_windows10())
-        m_fix_throught_netfab_bitmap->Bind(wxEVT_CONTEXT_MENU, [this](wxCommandEvent& e)
+        m_fix_by_winsdk_bitmap->Bind(wxEVT_CONTEXT_MENU, [this](wxCommandEvent& e)
             {
                 // if object/sub-object has no errors
-                if (m_fix_throught_netfab_bitmap->GetBitmap().GetRefData() == wxNullBitmap.GetRefData())
+                if (m_fix_by_winsdk_bitmap->GetBitmap().GetRefData() == wxNullBitmap.GetRefData())
                     return;
 
-                wxGetApp().obj_list()->fix_through_netfabb();
+                wxGetApp().obj_list()->fix_through_winsdk();
                 update_warning_icon_state(wxGetApp().obj_list()->get_mesh_errors_info());
             });
 
-    sizer->Add(m_fix_throught_netfab_bitmap);
+    sizer->Add(m_fix_by_winsdk_bitmap);
 
     auto name_label = new wxStaticText(m_parent, wxID_ANY, _L("Name")+":");
     set_font_and_background_style(name_label, wxGetApp().normal_font());
@@ -895,9 +895,9 @@ void ObjectManipulation::update_warning_icon_state(const MeshErrorsInfo& warning
         !warning_icon_name.empty())
         m_manifold_warning_bmp = ScalableBitmap(m_parent, warning_icon_name);
     const wxString& tooltip = warning.tooltip;
-    m_fix_throught_netfab_bitmap->SetBitmap(tooltip.IsEmpty() ? wxNullBitmap : m_manifold_warning_bmp.bmp());
-    m_fix_throught_netfab_bitmap->SetMinSize(tooltip.IsEmpty() ? wxSize(0,0) : m_manifold_warning_bmp.GetSize());
-    m_fix_throught_netfab_bitmap->SetToolTip(tooltip);
+    m_fix_by_winsdk_bitmap->SetBitmap(tooltip.IsEmpty() ? wxNullBitmap : m_manifold_warning_bmp.bmp());
+    m_fix_by_winsdk_bitmap->SetMinSize(tooltip.IsEmpty() ? wxSize(0,0) : m_manifold_warning_bmp.GetSize());
+    m_fix_by_winsdk_bitmap->SetToolTip(tooltip);
 }
 
 wxString ObjectManipulation::coordinate_type_str(ECoordinatesType type)
@@ -1171,9 +1171,9 @@ void ObjectManipulation::msw_rescale()
     msw_rescale_word_local_combo(m_word_local_combo);
     m_word_local_combo_sizer->SetMinSize(wxSize(-1, m_word_local_combo->GetBestHeight(-1)));
 
-    const wxString& tooltip = m_fix_throught_netfab_bitmap->GetToolTipText();
-    m_fix_throught_netfab_bitmap->SetBitmap(tooltip.IsEmpty() ? wxNullBitmap : m_manifold_warning_bmp.bmp());
-    m_fix_throught_netfab_bitmap->SetMinSize(tooltip.IsEmpty() ? wxSize(0, 0) : m_manifold_warning_bmp.GetSize());
+    const wxString& tooltip = m_fix_by_winsdk_bitmap->GetToolTipText();
+    m_fix_by_winsdk_bitmap->SetBitmap(tooltip.IsEmpty() ? wxNullBitmap : m_manifold_warning_bmp.bmp());
+    m_fix_by_winsdk_bitmap->SetMinSize(tooltip.IsEmpty() ? wxSize(0, 0) : m_manifold_warning_bmp.GetSize());
 
     // rescale label-heights
     // Text trick to grid sizer layout:

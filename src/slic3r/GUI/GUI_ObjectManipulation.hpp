@@ -152,7 +152,7 @@ private:
     choice_ctrl*    m_word_local_combo { nullptr };
 
     ScalableBitmap  m_manifold_warning_bmp;
-    wxStaticBitmap* m_fix_throught_netfab_bitmap{ nullptr };
+    wxStaticBitmap* m_fix_by_winsdk_bitmap{ nullptr };
     wxStaticBitmap* m_mirror_warning_bitmap{ nullptr };
 
     // Currently focused editor (nullptr if none)

@@ -819,7 +819,7 @@ using MyMesh = Slic3r::MeshBoolean::cgal2::CGALMesh;
 
 // Second Idea
 // Store original its inside of text configuration[optional]
-// Cause problem with next editation of object -> cut, simplify, Netfabb, Hollow, ...(transform original vertices)
+// Cause problem with next editation of object -> cut, simplify, repair by WinSDK, Hollow, ...(transform original vertices)
 TEST_CASE("Emboss extrude cut", "[Emboss-Cut]")
 {
     std::string font_path = get_font_filepath();
