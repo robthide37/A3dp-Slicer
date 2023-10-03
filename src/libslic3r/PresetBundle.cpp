@@ -657,10 +657,11 @@ void PresetBundle::load_selections(AppConfig &config, const PresetPreferences& p
         auto printer_technology = printers.get_selected_preset().printer_technology();
         if (printer_technology == ptFFF && ! preferred_selection.filament.empty()) {
             const std::string& preferred_preset_name = get_preset_name_by_alias(Preset::Type::TYPE_FILAMENT, preferred_selection.filament, 0);
-            if (auto it = filaments.find_preset_internal(preferred_preset_name); 
-                it != filaments.end() && it->is_visible && it->is_compatible) {
-                filaments.select_preset_by_name_strict(preferred_preset_name);
-                this->extruders_filaments.front().select_filament(filaments.get_selected_preset_name());
+            ExtruderFilaments& extruder_frst = this->extruders_filaments.front();
+            if (auto it = extruder_frst.find_filament_internal(preferred_preset_name);
+                it != extruder_frst.end() && it->preset->is_visible && it->is_compatible) {
+                if (extruder_frst.select_filament(preferred_preset_name))
+                    filaments.select_preset_by_name_strict(preferred_preset_name);
             }
         } else if (printer_technology == ptSLA && ! preferred_selection.sla_material.empty()) {
             const std::string& preferred_preset_name = get_preset_name_by_alias(Preset::Type::TYPE_SLA_MATERIAL, preferred_selection.sla_material);

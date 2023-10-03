@@ -2,8 +2,7 @@
 ///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
-///|/
-#include "libslic3r/libslic3r.h"
+///|/#include "libslic3r/libslic3r.h"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/LocalesUtils.hpp"
@@ -2888,7 +2887,17 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
 void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise)
 {
     enum class EFitting { None, IJ, R };
-    const EFitting fitting = line.has('R') ? EFitting::R : (line.has('I') && line.has('J')) ? EFitting::IJ : EFitting::None;
+    std::string_view axis_pos_I;
+    std::string_view axis_pos_J;
+    EFitting fitting = EFitting::None;
+    if (line.has('R')) {
+        fitting = EFitting::R;
+    } else {
+        axis_pos_I = line.axis_pos('I');
+        axis_pos_J = line.axis_pos('J');
+        if (! axis_pos_I.empty() || ! axis_pos_J.empty())
+            fitting = EFitting::IJ;
+    }
 
     if (fitting == EFitting::None)
         return;
@@ -2921,7 +2930,10 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         rel_center.y() = c.y() - m_start_position[Y];
     }
     else {
-        if (!line.has_value('I', rel_center.x()) || !line.has_value('J', rel_center.y()))
+        assert(fitting == EFitting::IJ);
+        if (! axis_pos_I.empty() && ! line.has_value(axis_pos_I, rel_center.x()))
+            return;
+        if (! axis_pos_J.empty() && ! line.has_value(axis_pos_J, rel_center.y()))
             return;
     }
 
