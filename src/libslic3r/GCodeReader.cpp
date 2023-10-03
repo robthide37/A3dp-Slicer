@@ -237,42 +237,54 @@ const char* GCodeReader::axis_pos(const char *raw_str, char axis)
 
 bool GCodeReader::GCodeLine::has(char axis) const
 {
-    const char *c = axis_pos(m_raw.c_str(), axis);
-    return c != nullptr;
+    return this->axis_pos(axis);
+}
+
+const char* GCodeReader::GCodeLine::axis_pos(char axis) const
+{ 
+    return GCodeReader::axis_pos(this->raw().c_str(), axis);
+}
+
+static bool GCodeReader::GCodeLine::has_value(const char *axis_pos, float &value)
+{
+    if (const char *c = axis_pos; c) {
+        // Try to parse the numeric value.
+        double v = 0.;
+        const char *end = m_raw.c_str() + m_raw.size();
+        auto [pend, ec] = fast_float::from_chars(++ c, end, v);
+        if (pend != c && is_end_of_word(*pend)) {
+            // The axis value has been parsed correctly.
+            value = float(v);
+            return true;
+        }
+    }
+    return false;
 }
 
 bool GCodeReader::GCodeLine::has_value(char axis, float &value) const
 {
     assert(is_decimal_separator_point());
-    const char *c = axis_pos(m_raw.c_str(), axis);
-    if (c == nullptr)
-        return false;
-    // Try to parse the numeric value.
-    double v = 0.;
-    const char* end = m_raw.c_str() + m_raw.size();
-    auto [pend, ec] = fast_float::from_chars(++c, end, v);
-    if (pend != c && is_end_of_word(*pend)) {
-        // The axis value has been parsed correctly.
-        value = float(v);
-        return true;
+    return this->has_value(this->axis_pos(axis), value);
+}
+
+static bool GCodeReader::GCodeLine::has_value(const char *axis_pos, int &value)
+{
+    if (const char *c = axis_pos; c) {
+        // Try to parse the numeric value.
+        char   *pend = nullptr;
+        long    v = strtol(++ c, &pend, 10);
+        if (pend != nullptr && is_end_of_word(*pend)) {
+            // The axis value has been parsed correctly.
+            value = int(v);
+            return true;
+        }
     }
     return false;
 }
 
 bool GCodeReader::GCodeLine::has_value(char axis, int &value) const
 {
-    const char *c = axis_pos(m_raw.c_str(), axis);
-    if (c == nullptr)
-        return false;
-    // Try to parse the numeric value.
-    char   *pend = nullptr;
-    long    v = strtol(++ c, &pend, 10);
-    if (pend != nullptr && is_end_of_word(*pend)) {
-        // The axis value has been parsed correctly.
-        value = int(v);
-        return true;
-    }
-    return false;
+    return this->has_value(this->axis_pos(axis), value);
 }
 
 void GCodeReader::GCodeLine::set(const GCodeReader &reader, const Axis axis, const float new_value, const int decimal_digits)
