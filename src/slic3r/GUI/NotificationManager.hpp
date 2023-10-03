@@ -119,8 +119,8 @@ enum class NotificationType
 	SimplifySuggestion,
 	// Change of text will change font to similar one on.
 	UnknownFont,
-	// information about netfabb is finished repairing model (blocking proccess)
-	NetfabbFinished,
+	// information that repairing model finished (blocking proccess)
+	RepairFinished,
 	// Short meesage to fill space between start and finish of export
 	ExportOngoing,
 	// Progressbar of download from prusaslicer:// url

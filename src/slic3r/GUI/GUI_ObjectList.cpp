@@ -483,7 +483,7 @@ MeshErrorsInfo ObjectList::get_mesh_errors_info(const int obj_idx, const int vol
         *sidebar_info = stats.manifold() ? auto_repaired_info : (remaining_info + (stats.repaired() ? ("\n" + auto_repaired_info) : ""));
 
     if (is_windows10() && !sidebar_info)
-        tooltip += "\n" + _L("Right button click the icon to fix STL through Netfabb");
+        tooltip += "\n" + _L("Right button click the icon to fix STL by Windows repair algorithm");
 
     return { tooltip, get_warning_icon_name(stats) };
 }
@@ -1002,7 +1002,7 @@ void ObjectList::list_manipulation(const wxPoint& mouse_pos, bool evt_context_me
         {
             if (is_windows10() && m_objects_model->HasWarningIcon(item) &&
                 mouse_pos.x > 2 * wxGetApp().em_unit() && mouse_pos.x < 4 * wxGetApp().em_unit())
-                fix_through_netfabb();
+                fix_through_winsdk();
             else if (evt_context_menu)
                 show_context_menu(evt_context_menu); // show context menu for "Name" column too
         }
@@ -4567,7 +4567,7 @@ void ObjectList::rename_item()
         update_name_in_model(item);
 }
 
-void ObjectList::fix_through_netfabb() 
+void ObjectList::fix_through_winsdk() 
 {
     // Do not fix anything when a gizmo is open. There might be issues with updates
     // and what is worse, the snapshot time would refer to the internal stack.
@@ -4587,21 +4587,21 @@ void ObjectList::fix_through_netfabb()
     // clear selections from the non-broken models if any exists
     // and than fill names of models to repairing 
     if (vol_idxs.empty()) {
-#if !FIX_THROUGH_NETFABB_ALWAYS
+#if !FIX_THROUGH_WINSDK_ALWAYS
         for (int i = int(obj_idxs.size())-1; i >= 0; --i)
                 if (object(obj_idxs[i])->get_repaired_errors_count() == 0)
                     obj_idxs.erase(obj_idxs.begin()+i);
-#endif // FIX_THROUGH_NETFABB_ALWAYS
+#endif // FIX_THROUGH_WINSDK_ALWAYS
         for (int obj_idx : obj_idxs)
             model_names.push_back(object(obj_idx)->name);
     }
     else {
         ModelObject* obj = object(obj_idxs.front());
-#if !FIX_THROUGH_NETFABB_ALWAYS
+#if !FIX_THROUGH_WINSDK_ALWAYS
         for (int i = int(vol_idxs.size()) - 1; i >= 0; --i)
             if (obj->get_repaired_errors_count(vol_idxs[i]) == 0)
                 vol_idxs.erase(vol_idxs.begin() + i);
-#endif // FIX_THROUGH_NETFABB_ALWAYS
+#endif // FIX_THROUGH_WINSDK_ALWAYS
         for (int vol_idx : vol_idxs)
             model_names.push_back(obj->volumes[vol_idx]->name);
     }
@@ -4645,19 +4645,19 @@ void ObjectList::fix_through_netfabb()
         return true;
     };
 
-    Plater::TakeSnapshot snapshot(plater, _L("Fix through NetFabb"));
+    Plater::TakeSnapshot snapshot(plater, _L("Fix by Windows repair algorithm"));
 
     // Open a progress dialog.
-    wxProgressDialog progress_dlg(_L("Fixing through NetFabb"), "", 100, find_toplevel_parent(plater),
+    wxProgressDialog progress_dlg(_L("Fixing by Windows repair algorithm"), "", 100, find_toplevel_parent(plater),
                                     wxPD_AUTO_HIDE | wxPD_APP_MODAL | wxPD_CAN_ABORT);
     int model_idx{ 0 };
     if (vol_idxs.empty()) {
         int vol_idx{ -1 };
         for (int obj_idx : obj_idxs) {
-#if !FIX_THROUGH_NETFABB_ALWAYS
+#if !FIX_THROUGH_WINSDK_ALWAYS
             if (object(obj_idx)->get_repaired_errors_count(vol_idx) == 0)
                 continue;
-#endif // FIX_THROUGH_NETFABB_ALWAYS
+#endif // FIX_THROUGH_WINSDK_ALWAYS
             if (!fix_and_update_progress(obj_idx, vol_idx, model_idx, progress_dlg, succes_models, failed_models))
                 break;
             model_idx++;
@@ -4690,7 +4690,7 @@ void ObjectList::fix_through_netfabb()
     }
     if (msg.IsEmpty())
         msg = _L("Repairing was canceled");
-    plater->get_notification_manager()->push_notification(NotificationType::NetfabbFinished, NotificationManager::NotificationLevel::PrintInfoShortNotificationLevel, boost::nowide::narrow(msg));
+    plater->get_notification_manager()->push_notification(NotificationType::RepairFinished, NotificationManager::NotificationLevel::PrintInfoShortNotificationLevel, boost::nowide::narrow(msg));
 }
 
 void ObjectList::simplify()
