@@ -151,6 +151,7 @@ class Integrals{
      * @param polygons List of polygons specifing the domain.
      */
     explicit Integrals(const Polygons& polygons);
+    explicit Integrals(const Polylines& polylines, const std::vector<float>& widths);
 
     // TODO refactor and delete the default constructor
     Integrals() = default;
@@ -159,6 +160,9 @@ class Integrals{
     Vec2f x_i{Vec2f::Zero()};
     Vec2f x_i_squared{Vec2f::Zero()};
     float xy{};
+
+private:
+    void add(const Integrals& other);
 };
 
 float compute_second_moment(

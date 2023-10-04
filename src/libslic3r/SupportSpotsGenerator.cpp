@@ -174,6 +174,32 @@ Integrals::Integrals (const Polygons& polygons) {
     }
 }
 
+Integrals::Integrals(const Polylines& polylines, const std::vector<float>& widths) {
+    assert(extrusion_lines.size() == widths.size());
+    for (size_t i = 0; i < polylines.size(); ++i) {
+        Lines polyline{polylines[i].lines()};
+        float width{widths[i]};
+        for (const Line& line : polyline) {
+            Vec2f line_direction = unscaled(line.vector()).cast<float>();
+            Vec2f normal{line_direction.y(), -line_direction.x()};
+            normal.normalize();
+
+            Vec2f line_a = unscaled(line.a).cast<float>();
+            Vec2f line_b = unscaled(line.b).cast<float>();
+            Vec2crd a = scaled(Vec2f{line_a + normal * width/2});
+            Vec2crd b = scaled(Vec2f{line_b + normal * width/2});
+            Vec2crd c = scaled(Vec2f{line_b - normal * width/2});
+            Vec2crd d = scaled(Vec2f{line_a - normal * width/2});
+
+            const Polygon ractangle({a, b, c, d});
+            Integrals integrals{{ractangle}};
+            this->area += integrals.area;
+            this->x_i += integrals.x_i;
+            this->x_i_squared += integrals.x_i_squared;
+            this->xy += integrals.xy;
+        }
+    }
+}
 
 SliceConnection estimate_slice_connection(size_t slice_idx, const Layer *layer)
 {
@@ -473,18 +499,43 @@ ObjectPart::ObjectPart(
             continue;
         }
 
-        const Polygons polygons{collection->polygons_covered_by_width()};
+        for (const ExtrusionEntity* entity: collection->flatten()) {
+            Polylines polylines;
+            std::vector<float> widths;
 
-        const Integrals integrals{polygons};
-        const float volume = integrals.area * layer_height;
-        this->volume += volume;
-        this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume;
+            const auto* path = dynamic_cast<const ExtrusionPath*>(entity);
+            if (path !=nullptr) {
+                polylines.push_back(path->as_polyline());
+                widths.push_back(path->width());
+            }
 
-        if (this->connected_to_bed) {
-            this->sticking_area += integrals.area;
-            this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
-            this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
-            this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+            const auto* loop = dynamic_cast<const ExtrusionLoop*>(entity);
+            if (loop !=nullptr) {
+                for (const ExtrusionPath& path : loop->paths) {
+                    polylines.push_back(path.as_polyline());
+                    widths.push_back(path.width());
+                }
+            }
+
+            const auto* multi_path = dynamic_cast<const ExtrusionMultiPath*>(entity);
+            if (multi_path !=nullptr) {
+                for (const ExtrusionPath& path : multi_path->paths) {
+                    polylines.push_back(path.as_polyline());
+                    widths.push_back(path.width());
+                }
+            }
+
+            const Integrals integrals{polylines, widths};
+            const float volume = integrals.area * layer_height;
+            this->volume += volume;
+            this->volume_centroid_accumulator += to_3d(integrals.x_i, center_z * integrals.area) / integrals.area * volume;
+
+            if (this->connected_to_bed) {
+                this->sticking_area += integrals.area;
+                this->sticking_centroid_accumulator += to_3d(integrals.x_i, bottom_z * integrals.area);
+                this->sticking_second_moment_of_area_accumulator += integrals.x_i_squared;
+                this->sticking_second_moment_of_area_covariance_accumulator += integrals.xy;
+            }
         }
     }
 
