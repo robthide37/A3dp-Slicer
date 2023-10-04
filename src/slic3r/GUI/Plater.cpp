@@ -5531,6 +5531,33 @@ void Plater::reload_gcode_from_disk()
     load_gcode(filename);
 }
 
+static std::string rename_file(const std::string& filename, const std::string& extension)
+{
+    const boost::filesystem::path src_path(filename);
+    std::string src_stem = src_path.stem().string();
+    int value = 0;
+    if (src_stem.back() == ')') {
+        const size_t pos = src_stem.find_last_of('(');
+        if (pos != std::string::npos) {
+            const std::string value_str = src_stem.substr(pos + 1, src_stem.length() - pos);
+            try
+            {
+                value = std::stoi(value_str);
+                src_stem = src_stem.substr(0, pos);
+            }
+            catch (...)
+            {
+                // do nothing
+            }
+        }
+    }
+
+    boost::filesystem::path dst_path(filename);
+    dst_path.remove_filename();
+    dst_path /= src_stem + "(" + std::to_string(value + 1) + ")" + extension;
+    return dst_path.string();
+}
+
 void Plater::convert_gcode_to_ascii()
 {
     // Ask user for a gcode file name.
@@ -5549,7 +5576,19 @@ void Plater::convert_gcode_to_ascii()
 
     // Set out filename
     boost::filesystem::path path(into_u8(input_file));
-    const std::string output_file = path.replace_extension("gcode").string();
+    std::string output_file = path.replace_extension("gcode").string();
+
+    if (input_file == output_file) {
+        output_file = rename_file(output_file, ".gcode");
+        wxString msg = _L("You are trying to convert to ascii a binary file whose extension is '.gcode'.");
+        msg += "\n" + _L("The exported file will be renamed as:");
+        msg += "\n\n" + output_file;
+        msg += "\n\n" + _L("Continue with export ?");
+        MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
+        if (msg_dlg.ShowModal() != wxID_YES)
+            return;
+    }
+
     if (boost::filesystem::exists(output_file)) {
         MessageDialog msg_dlg(this, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), output_file), _L("Notice"), wxYES_NO);
         if (msg_dlg.ShowModal() != wxID_YES)
@@ -5601,7 +5640,19 @@ void Plater::convert_gcode_to_binary()
 
     // Set out filename
     boost::filesystem::path path(into_u8(input_file));
-    const std::string output_file = path.replace_extension("bgcode").string();
+    std::string output_file = path.replace_extension("bgcode").string();
+
+    if (input_file == output_file) {
+        output_file = rename_file(output_file, ".bgcode");
+        wxString msg = _L("You are trying to convert to binary an ascii file whose extension is '.bgcode'.");
+        msg += "\n" + _L("The exported file will be renamed as:");
+        msg += "\n\n" + output_file;
+        msg += "\n\n" + _L("Continue with export ?");
+        MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
+        if (msg_dlg.ShowModal() != wxID_YES)
+            return;
+    }
+
     if (boost::filesystem::exists(output_file)) {
         MessageDialog msg_dlg(this, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), output_file), _L("Notice"), wxYES_NO);
         if (msg_dlg.ShowModal() != wxID_YES)
