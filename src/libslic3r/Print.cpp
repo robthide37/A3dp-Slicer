@@ -1013,11 +1013,11 @@ void Print::process()
 
     if (this->has_wipe_tower()) {
         // These values have to be updated here, not during wipe tower generation.
-        // When the wipe tower is moved, it is not regenerated.
+        // When the wipe tower is moved/rotated, it is not regenerated.
         m_wipe_tower_data.position = { m_config.wipe_tower_x, m_config.wipe_tower_y };
         m_wipe_tower_data.rotation_angle = m_config.wipe_tower_rotation_angle;
     }
-    auto conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(m_objects, m_wipe_tower_data);
+    auto conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(objects(), m_wipe_tower_data);
 
     m_conflict_result = conflictRes;
     if (conflictRes.has_value())

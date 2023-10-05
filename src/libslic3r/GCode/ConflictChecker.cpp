@@ -3,7 +3,6 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
-#include "libslic3r.h"
 #include "ConflictChecker.hpp"
 
 #include <tbb/parallel_for.h>
@@ -255,14 +254,14 @@ ExtrusionPaths getExtrusionPathsFromLayer(LayerRegionPtrs layerRegionPtrs)
     return paths;
 }
 
-ExtrusionPaths getExtrusionPathsFromSupportLayer(SupportLayer *supportLayer)
+ExtrusionPaths getExtrusionPathsFromSupportLayer(const SupportLayer *supportLayer)
 {
     ExtrusionPaths paths;
     getExtrusionPathsFromEntity(&supportLayer->support_fills, paths);
     return paths;
 }
 
-std::pair<std::vector<ExtrusionPaths>, std::vector<ExtrusionPaths>> getAllLayersExtrusionPathsFromObject(PrintObject *obj)
+std::pair<std::vector<ExtrusionPaths>, std::vector<ExtrusionPaths>> getAllLayersExtrusionPathsFromObject(const PrintObject *obj)
 {
     std::vector<ExtrusionPaths> objPaths, supportPaths;
 
@@ -293,7 +292,7 @@ ConflictComputeOpt ConflictChecker::find_inter_of_lines(const LineWithIDs &lines
     return {};
 }
 
-ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectPtrs                      objs,
+ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(SpanOfConstPtrs<PrintObject> objs,
                                                                     const WipeTowerData& wipe_tower_data) // find the first intersection point of lines in different objects
 {
     if (objs.empty() || (objs.size() == 1 && objs.front()->instances().size() == 1)) { return {}; }
@@ -309,7 +308,7 @@ ConflictResultOpt ConflictChecker::find_inter_of_lines_in_diff_objs(PrintObjectP
         std::vector<ExtrusionPaths> wtpaths = getFakeExtrusionPathsFromWipeTower(wipe_tower_data);
         conflictQueue.emplace_back_bucket(std::move(wtpaths), &wtptr, Points{Point(plate_origin)});
     }
-    for (PrintObject *obj : objs) {
+    for (const PrintObject *obj : objs) {
         std::pair<std::vector<ExtrusionPaths>, std::vector<ExtrusionPaths>> layers = getAllLayersExtrusionPathsFromObject(obj);
 
         Points instances_shifts;
