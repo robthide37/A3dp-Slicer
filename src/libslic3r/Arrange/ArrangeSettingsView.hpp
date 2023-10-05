@@ -77,21 +77,6 @@ public:
         return STR[v];
     }
 
-    static constexpr std::optional<GeometryHandling> to_geometry_handling(std::string_view str)
-    {
-        return get_enumval(str, GeometryHandlingLabels);
-    }
-
-    static constexpr std::optional<ArrangeStrategy> to_arrange_strategy(std::string_view str)
-    {
-        return get_enumval(str, ArrangeStrategyLabels);
-    }
-
-    static constexpr std::optional<XLPivots> to_xl_pivots(std::string_view str)
-    {
-        return get_enumval(str, XLPivotsLabels);
-    }
-
 private:
 
     template<class EnumType, size_t N>
@@ -109,6 +94,25 @@ private:
 
         return ret;
     }
+
+public:
+
+    static constexpr std::optional<GeometryHandling> to_geometry_handling(std::string_view str)
+    {
+        return get_enumval(str, GeometryHandlingLabels);
+    }
+
+    static constexpr std::optional<ArrangeStrategy> to_arrange_strategy(std::string_view str)
+    {
+        return get_enumval(str, ArrangeStrategyLabels);
+    }
+
+    static constexpr std::optional<XLPivots> to_xl_pivots(std::string_view str)
+    {
+        return get_enumval(str, XLPivotsLabels);
+    }
+
+private:
 
     static constexpr const auto GeometryHandlingLabels = make_staticmap<std::string_view, GeometryHandling>({
         {"convex"sv, ghConvex},
