@@ -1324,9 +1324,9 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
                 // Ignore this field, it is not presented to the user, therefore showing a "modified" flag for this parameter does not help.
                 // Also the length of this field may differ, which may lead to a crash if the block below is used.
             } else if (opt_key == "thumbnails") {
-                // "thumbnails" can not containes a extentions in old config but are valid and use PNG extention by default
+                // "thumbnails" can not contain extensions in old config but they are valid and use PNG extension by default
                 // So, check if "thumbnails" is really changed
-                // We will compare full thumnails instead of exactly config values
+                // We will compare full thumbnails instead of exactly config values
                 auto [thumbnails, er]         = GCodeThumbnails::make_and_check_thumbnail_list(config_this);
                 auto [thumbnails_new, er_new] = GCodeThumbnails::make_and_check_thumbnail_list(config_other);
                 if (thumbnails != thumbnails_new || er != er_new)
@@ -1343,6 +1343,12 @@ inline t_config_option_keys deep_diff(const ConfigBase &config_this, const Confi
                 case coFloatsOrPercents:    add_correct_opts_to_diff<ConfigOptionFloatsOrPercents   >(opt_key, diff, config_other, config_this);  break;
                 default:        diff.emplace_back(opt_key);     break;
                 }
+                // "nozzle_diameter" is a vector option which contain info about diameter for each nozzle
+                // But in the same time size of this vector indicates about count of extruders,
+                // So, we need to add it to the diff if its size is changed.
+                if (opt_key == "nozzle_diameter" && 
+                    static_cast<const ConfigOptionFloats*>(this_opt)->size() != static_cast<const ConfigOptionFloats*>(other_opt)->size())
+                    diff.emplace_back(opt_key);
             }
         }
     }
