@@ -124,7 +124,7 @@ using ConflictObjName = std::optional<std::pair<std::string, std::string>>;
 
 struct ConflictChecker
 {
-    static ConflictResultOpt  find_inter_of_lines_in_diff_objs(PrintObjectPtrs objs, std::optional<const FakeWipeTower *> wtdptr);
+    static ConflictResultOpt  find_inter_of_lines_in_diff_objs(PrintObjectPtrs objs, const WipeTowerData& wtd);
     static ConflictComputeOpt find_inter_of_lines(const LineWithIDs &lines);
     static ConflictComputeOpt line_intersect(const LineWithID &l1, const LineWithID &l2);
 };

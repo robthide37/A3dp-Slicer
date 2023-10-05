@@ -439,38 +439,7 @@ private:
     FillLightning::GeneratorPtr m_lightning_generator;
 };
 
-struct FakeWipeTower
-{
-    // generate fake extrusion
-    Vec2f pos;
-    float width;
-    float height;
-    float layer_height;
-    float depth;
-    std::vector<std::pair<float, float>> z_and_depth_pairs;
-    float brim_width;
-    float rotation_angle;
-    float cone_angle;
-    Vec2d plate_origin;
 
-    void set_fake_extrusion_data(const Vec2f& p, float w, float h, float lh, float d, const std::vector<std::pair<float, float>>& zad, float bd, float ra, float ca, const Vec2d& o)
-    {
-        pos = p;
-        width = w;
-        height = h;
-        layer_height = lh;
-        depth = d;
-        z_and_depth_pairs = zad;
-        brim_width = bd;
-        rotation_angle = ra;
-        cone_angle = ca;
-        plate_origin = o;
-    }
-
-    void set_pos_and_rotation(const Vec2f& p, float rotation) { pos = p; rotation_angle = rotation; }
-
-    std::vector<ExtrusionPaths> getFakeExtrusionPathsFromWipeTower() const;
-};
 
 struct WipeTowerData
 {
@@ -491,6 +460,13 @@ struct WipeTowerData
     float                                                 brim_width;
     float                                                 height;
 
+    // Data needed to generate fake extrusions for conflict checking.
+    float                                                 width;
+    float                                                 first_layer_height;
+    float                                                 cone_angle;
+    Vec2d                                                 position;
+    float                                                 rotation_angle;
+
     void clear() {
         priming.reset(nullptr);
         tool_changes.clear();
@@ -499,6 +475,11 @@ struct WipeTowerData
         number_of_toolchanges = -1;
         depth = 0.f;
         brim_width = 0.f;
+        width = 0.f;
+        first_layer_height = 0.f;
+        cone_angle = 0.f;
+        position = Vec2d::Zero();
+        rotation_angle = 0.f;
     }
 
 private:
@@ -740,7 +721,6 @@ private:
     friend class PrintObject;
 
     ConflictResultOpt m_conflict_result;
-    FakeWipeTower     m_fake_wipe_tower;
 };
 
 } /* slic3r_Print_hpp_ */
