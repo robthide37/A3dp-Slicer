@@ -89,7 +89,7 @@ private:
         std::optional<EnumType> ret;
 
         if (auto v = query(emap, str); v.has_value()) {
-            ret = v.value();
+            ret = *v;
         }
 
         return ret;
