@@ -42,7 +42,10 @@ public:
     static constexpr std::string_view get_label(GeometryHandling v)
     {
         constexpr auto STR = std::array{
-            "convex"sv, "balanced"sv, "advanced"sv, "undefined"sv
+            "0"sv, // convex
+            "1"sv, // balanced
+            "2"sv, // advanced
+            "-1"sv, // undefined
         };
 
         return STR[v];
@@ -51,7 +54,9 @@ public:
     static constexpr std::string_view get_label(ArrangeStrategy v)
     {
         constexpr auto STR = std::array{
-            "auto"sv, "pulltocenter"sv, "undefined"sv
+            "0"sv, // auto
+            "1"sv, // pulltocenter
+            "-1"sv, // undefined
         };
 
         return STR[v];
@@ -59,13 +64,15 @@ public:
 
     static constexpr std::string_view get_label(XLPivots v)
     {
-        constexpr auto STR = std::array{"center"sv,
-                                        "rearleft"sv,
-                                        "frontleft"sv,
-                                        "frontright"sv,
-                                        "rearright"sv,
-                                        "random"sv,
-                                        "undefined"sv};
+        constexpr auto STR = std::array{
+            "0"sv, // center
+            "1"sv, // rearleft
+            "2"sv, // frontleft
+            "3"sv, // frontright
+            "4"sv, // rearright
+            "5"sv, // random
+            "-1"sv, // undefined
+        };
 
         return STR[v];
     }
