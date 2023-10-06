@@ -3349,8 +3349,6 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
                     GLCanvas3D::ContoursList contours;
                     contours.contours = background_process.fff_print()->get_sequential_print_clearance_contours();
                     canvas->set_sequential_print_clearance_contours(contours, true);
-                    canvas->set_as_dirty();
-                    canvas->request_extra_frame();
                 }
             }
         }
@@ -3365,8 +3363,6 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
                     GLCanvas3D::ContoursList contours;
                     contours.contours = background_process.fff_print()->get_sequential_print_clearance_contours();
                     canvas->set_sequential_print_clearance_contours(contours, true);
-                    canvas->set_as_dirty();
-                    canvas->request_extra_frame();
                 }
             }
             std::vector<std::string> warnings;

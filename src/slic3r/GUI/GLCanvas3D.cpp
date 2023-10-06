@@ -981,7 +981,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-    if (!m_evaluating)
+    if (!m_evaluating && !m_dragging)
         m_fill.render();
 
 #if ENABLE_GL_CORE_PROFILE
@@ -3733,6 +3733,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                         if (!evt.CmdDown())
                             m_mouse.drag.start_position_3D = m_mouse.scene_position;
                         m_sequential_print_clearance_first_displacement = true;
+                        m_sequential_print_clearance.start_dragging();
                     }
                 }
             }
@@ -3857,6 +3858,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         else if (m_mouse.drag.move_volume_idx != -1 && m_mouse.dragging) {
             do_move(L("Move Object"));
             wxGetApp().obj_manipul()->set_dirty();
+            m_sequential_print_clearance.stop_dragging();
             // Let the plater know that the dragging finished, so a delayed refresh
             // of the scene with the background processing data should be performed.
             post_event(SimpleEvent(EVT_GLCANVAS_MOUSE_DRAGGING_FINISHED));
