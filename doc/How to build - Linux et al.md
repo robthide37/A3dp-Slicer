@@ -40,6 +40,7 @@ git clone https://www.github.com/prusa3d/PrusaSlicer
 cd PrusaSlicer
 ```
 This will download the source code into a new directory and `cd` into it. You can now optionally select a tag/branch/commit to build using `git checkout`. Otherwise, `master` branch will be built.
+The path to the build directory must not contain spaces - this scenario is not supported by the build scripts.
 
 
 #### 2. Building dependencies

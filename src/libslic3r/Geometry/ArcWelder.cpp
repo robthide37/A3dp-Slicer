@@ -34,6 +34,7 @@
 #include <numeric>
 #include <random>
 #include <boost/log/trivial.hpp>
+#include <boost/container/small_vector.hpp>
 
 namespace Slic3r { namespace Geometry { namespace ArcWelder {
 
@@ -309,7 +310,7 @@ static std::optional<Circle> try_create_circle(const Points::const_iterator begi
         if (circle) {
             // Fit the arc between the end points by least squares.
             // Optimize over all points along the path and the centers of the segments.
-            std::vector<Vec2d> fpts;
+            boost::container::small_vector<Vec2d, 16> fpts;
             Vec2d first_point = begin->cast<double>();
             Vec2d last_point  = std::prev(end)->cast<double>();
             Vec2d prev_point  = first_point;            

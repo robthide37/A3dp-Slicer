@@ -20,6 +20,14 @@ struct Progress: Slic3r::ProgressIndicator {
 
 using TestClasses = std::tuple< Slic3r::GUI::UIThreadWorker, Slic3r::GUI::BoostThreadWorker >;
 
+TEMPLATE_LIST_TEST_CASE("Empty worker should not block when queried for idle", "[Jobs]", TestClasses) {
+    TestType worker{std::make_unique<Progress>()};
+
+    worker.wait_for_idle();
+
+    REQUIRE(worker.is_idle());
+}
+
 TEMPLATE_LIST_TEST_CASE("Empty worker should not do anything", "[Jobs]", TestClasses) {
     TestType worker{std::make_unique<Progress>()};
 
@@ -51,6 +59,10 @@ TEMPLATE_LIST_TEST_CASE("State should not be idle while running a job", "[Jobs]"
 
     worker.wait_for_idle();
 
+    // To avoid stalling the job, in case the wait_for_idle is called before
+    // the job goes into blocking wait
+    worker.process_events();
+
     REQUIRE(worker.is_idle());
 }
 
@@ -67,12 +79,13 @@ TEMPLATE_LIST_TEST_CASE("Status messages should be received by the main thread d
     });
 
     worker.wait_for_idle();
+    worker.process_events();
 
     REQUIRE(pri->pr == 100);
     REQUIRE(pri->statustxt == "Running");
 }
 
-TEMPLATE_LIST_TEST_CASE("Cancellation should be recognized be the worker", "[Jobs]", TestClasses) {
+TEMPLATE_LIST_TEST_CASE("Cancellation should be recognized by the worker", "[Jobs]", TestClasses) {
     using namespace Slic3r;
     using namespace Slic3r::GUI;
 
@@ -85,7 +98,8 @@ TEMPLATE_LIST_TEST_CASE("Cancellation should be recognized be the worker", "[Job
             for (int s = 0; s <= 100; ++s) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 ctl.update_status(s, "Running");
-                if (ctl.was_canceled()) break;
+                if (ctl.was_canceled())
+                    break;
             }
         },
         [](bool cancelled, std::exception_ptr &) { // finalize
@@ -96,6 +110,7 @@ TEMPLATE_LIST_TEST_CASE("Cancellation should be recognized be the worker", "[Job
     worker.cancel();
 
     worker.wait_for_current_job();
+    worker.process_events();
 
     REQUIRE(pri->pr != 100);
 }
@@ -133,6 +148,7 @@ TEMPLATE_LIST_TEST_CASE("cancel_all should remove all pending jobs", "[Jobs]", T
     // during the first job's execution.
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     worker.cancel_all();
+    worker.process_events();
 
     REQUIRE(jobres[0] == true);
     REQUIRE(jobres[1] == false);
@@ -161,5 +177,7 @@ TEMPLATE_LIST_TEST_CASE("Exception should be properly forwarded to finalize()", 
         });
 
     worker.wait_for_idle();
+    worker.process_events();
+
     REQUIRE(worker.is_idle());
 }
