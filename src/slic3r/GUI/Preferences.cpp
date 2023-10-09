@@ -609,6 +609,7 @@ void PreferencesDialog::build()
 
 		activate_options_tab(m_optgroup_render);
 #endif // ENABLE_ENVIRONMENT_MAP
+	}
 
 #ifdef _WIN32
 		// Add "Dark Mode" tab
@@ -638,7 +639,6 @@ void PreferencesDialog::build()
 
 		activate_options_tab(m_optgroup_dark_mode);
 #endif //_WIN32
-	}
 
 	// update alignment of the controls for all tabs
 	update_ctrls_alignment();
