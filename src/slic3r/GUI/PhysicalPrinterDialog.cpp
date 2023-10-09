@@ -558,10 +558,13 @@ void PhysicalPrinterDialog::update_host_type(bool printer_change)
                 || boost::starts_with(model, "XL")
                 );
     };
-    // allowed models are: all MK3/S and MK2.5/S
+    // allowed models are: all MK3/S and MK2.5/S. 
+    // Since 2.6.2 also MINI, which makes list of supported printers same for both services.
+    // Lets keep these 2 functions separated for now.
     auto model_supports_prusaconnect = [](const std::string& model) {
         return model.size() >= 2 &&
                 ((boost::starts_with(model, "MK") && model[2] > '2' && model[2] <= '9')
+                || boost::starts_with(model, "MINI")
                 || boost::starts_with(model, "MK2.5")
                 || boost::starts_with(model, "XL")
                 );
