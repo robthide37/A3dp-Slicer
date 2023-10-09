@@ -314,7 +314,7 @@ void Http::priv::set_put_body(const fs::path &path)
 	boost::system::error_code ec;
 	boost::uintmax_t filesize = file_size(path, ec);
 	if (!ec) {
-        putFile = std::make_unique<fs::ifstream>(path);
+        putFile = std::make_unique<fs::ifstream>(path, std::ios::binary);
         ::curl_easy_setopt(curl, CURLOPT_READDATA, (void *) (putFile.get()));
 		::curl_easy_setopt(curl, CURLOPT_INFILESIZE, filesize);
 	}
