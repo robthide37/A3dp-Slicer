@@ -20,6 +20,14 @@ struct Progress: Slic3r::ProgressIndicator {
 
 using TestClasses = std::tuple< Slic3r::GUI::UIThreadWorker, Slic3r::GUI::BoostThreadWorker >;
 
+TEMPLATE_LIST_TEST_CASE("Empty worker should not block when queried for idle", "[Jobs]", TestClasses) {
+    TestType worker{std::make_unique<Progress>()};
+
+    worker.wait_for_idle();
+
+    REQUIRE(worker.is_idle());
+}
+
 TEMPLATE_LIST_TEST_CASE("Empty worker should not do anything", "[Jobs]", TestClasses) {
     TestType worker{std::make_unique<Progress>()};
 
