@@ -179,6 +179,8 @@ private:
     std::vector<std::string>    merge_presets(PresetBundle &&other);
     // Update renamed_from and alias maps of system profiles.
     void 						update_system_maps();
+    // Update alias maps
+    void 						update_alias_maps();
 
     // Set the is_visible flag for filaments and sla materials,
     // apply defaults based on enabled printers when no filaments/materials are installed.

@@ -408,6 +408,11 @@ void PresetBundle::update_system_maps()
     this->sla_materials.update_map_system_profile_renamed();
     this->printers     .update_map_system_profile_renamed();
 
+    update_alias_maps();
+}
+
+void PresetBundle::update_alias_maps()
+{
     this->prints       .update_map_alias_to_profile_name();
     this->sla_prints   .update_map_alias_to_profile_name();
     this->filaments    .update_map_alias_to_profile_name();
@@ -1116,6 +1121,8 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
         else
             this->physical_printers.unselect_printer();
     }
+
+    update_alias_maps();
 }
 
 // Load the active configuration of a config bundle from a boost property_tree. This is a private method called from load_config_file.
@@ -1194,6 +1201,7 @@ ConfigSubstitutions PresetBundle::load_config_file_config_bundle(
         this->extruders_filaments[i].select_filament(load_one(this->filaments, tmp_bundle.filaments, tmp_bundle.extruders_filaments[i].get_selected_preset_name(), false));
 
     this->update_compatible(PresetSelectCompatibleType::Never);
+    update_alias_maps();
 
     sort_remove_duplicates(config_substitutions);
     return config_substitutions;
@@ -1682,6 +1690,8 @@ std::pair<PresetsConfigSubstitutions, size_t> PresetBundle::load_configbundle(
             this->extruders_filaments[i].select_filament(filaments.find_preset(active_filaments[i], true)->name);
         this->update_compatible(PresetSelectCompatibleType::Never);
     }
+
+    update_alias_maps();
 
     return std::make_pair(std::move(substitutions), presets_loaded + ph_printers_loaded);
 }
