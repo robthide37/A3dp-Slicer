@@ -3533,9 +3533,9 @@ void draw_font_preview(FaceName &face, const std::string& text, Facenames &faces
             // Not finished preview
             if (is_visible) {
                 // when not canceled still loading
-                state_text = (face.cancel->load())? 
-                    _u8L(" No symbol"):
-                    _u8L(" ... Loading");                
+                state_text = (face.cancel->load()) ?
+                    " " + _u8L("No symbol"):
+                    " ... " + _u8L("Loading");
             } else {
                 // not finished and not visible cancel job
                 face.is_created = nullptr;
@@ -3585,7 +3585,7 @@ void draw_font_preview(FaceName &face, const std::string& text, Facenames &faces
         queue_job(worker, std::move(job));
     } else {
         // cant start new thread at this moment so wait in queue
-        state_text = _u8L(" ... In queue");
+        state_text = " ... " + _u8L("In queue");
     }
 
     if (!state_text.empty()) {

@@ -1649,7 +1649,7 @@ void GLGizmoSVG::draw_size()
             }
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", "Width of SVG.");
+            ImGui::SetTooltip("%s", _u8L("Width of SVG.").c_str());
 
         ImGui::SameLine(second_offset);
         ImGui::SetNextItemWidth(input_width);
@@ -1662,7 +1662,7 @@ void GLGizmoSVG::draw_size()
             }
         }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", "Height of SVG.");    
+            ImGui::SetTooltip("%s", _u8L("Height of SVG.").c_str());
     }
 
     // Lock on ratio m_keep_ratio
