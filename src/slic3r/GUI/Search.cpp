@@ -487,7 +487,11 @@ SearchDialog::SearchDialog(OptionsSearcher* searcher)
     searcher(searcher)
 {
     SetFont(GUI::wxGetApp().normal_font());
+#if _WIN32
     GUI::wxGetApp().UpdateDarkUI(this);
+#elif __WXGTK__
+    SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+#endif
 
     default_string = _L("Enter a search term");
     int border = 10;

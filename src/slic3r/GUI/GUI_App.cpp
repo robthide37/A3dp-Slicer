@@ -1326,7 +1326,7 @@ bool GUI_App::on_init_inner()
     if (!delayed_error_load_presets.empty())
         show_error(nullptr, delayed_error_load_presets);
 
-    mainframe = new MainFrame(app_config->has("font_size") ? atoi(app_config->get("font_size").c_str()) : -1);
+    mainframe = new MainFrame(app_config->has("font_pt_size") ? atoi(app_config->get("font_pt_size").c_str()) : -1);
     // hide settings tabs after first Layout
     if (is_editor())
         mainframe->select_tab(size_t(0));
@@ -1761,9 +1761,21 @@ bool GUI_App::suppress_round_corners() const
     return true;// app_config->get("suppress_round_corners") == "1";
 }
 
-wxSize GUI_App::get_min_size() const
+wxSize GUI_App::get_min_size(wxWindow* display_win) const
 {
-    return wxSize(76*m_em_unit, 49 * m_em_unit);
+    wxSize min_size(76*m_em_unit, 49 * m_em_unit);
+
+    const wxDisplay display = wxDisplay(display_win);
+    wxRect display_rect = display.GetGeometry();
+    display_rect.width  *= 0.75;
+    display_rect.height *= 0.75;
+
+    if (min_size.x > display_rect.GetWidth())
+        min_size.x = display_rect.GetWidth();
+    if (min_size.y > display_rect.GetHeight())
+        min_size.y = display_rect.GetHeight();
+
+    return min_size;
 }
 
 float GUI_App::toolbar_icon_scale(const bool is_limited/* = false*/) const
@@ -1838,7 +1850,7 @@ void GUI_App::recreate_GUI(const wxString& msg_name)
     dlg.Update(10, _L("Recreating") + dots);
 
     MainFrame *old_main_frame = mainframe;
-    mainframe = new MainFrame(app_config->has("font_size") ? atoi(app_config->get("font_size").c_str()) : -1);
+    mainframe = new MainFrame(app_config->has("font_pt_size") ? atoi(app_config->get("font_pt_size").c_str()) : -1);
     if (is_editor())
         // hide settings tabs after first Layout
         mainframe->select_tab(size_t(0));

@@ -8,7 +8,8 @@ BitmapToggleButton::BitmapToggleButton(wxWindow* parent, const wxString& label, 
         wxBitmapToggleButton::Create(parent, id, wxNullBitmap, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxBU_EXACTFIT);
     else {
 #ifdef __linux__
-        wxSize def_size = wxSize(parent->GetTextExtent(label).GetX() + 20, 20);
+        wxSize label_size = parent->GetTextExtent(label);
+        wxSize def_size = wxSize(label_size.GetX() + 20, label_size.GetY());
 #else
         wxSize def_size = wxDefaultSize;
 #endif
@@ -38,14 +39,7 @@ BitmapToggleButton::BitmapToggleButton(wxWindow* parent, const wxString& label, 
 
 void BitmapToggleButton::update_size()
 {
-#ifdef __linux__
-    wxSize bmp_sz = GetBitmap().GetSize();
-    wxSize sz = GetSize();
-	if (GetLabel().IsEmpty())
-        SetSize(bmp_sz);
-    else
-        SetSize(sz.x, bmp_sz.y);
-#else
+#ifndef __WXGTK__
     wxSize best_sz = GetBestSize();
     SetSize(best_sz);
 #endif

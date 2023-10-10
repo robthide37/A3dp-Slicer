@@ -10,10 +10,10 @@
 #include <wx/gdicmn.h>
 
 #include "libslic3r/Preset.hpp"
+#include "Widgets/TextInput.hpp"
 #include "GUI_Utils.hpp"
 
 class wxString;
-class wxTextCtrl;
 class wxStaticText;
 class ScalableButton;
 class wxBoxSizer;
@@ -67,7 +67,7 @@ class PhysicalPrinterDialog : public DPIDialog
     wxString            m_default_name;
     DynamicPrintConfig* m_config            { nullptr };
 
-    wxTextCtrl*         m_printer_name      { nullptr };
+    ::TextInput*        m_printer_name      { nullptr };
     std::vector<PresetForPrinter*> m_presets;
 
     ConfigOptionsGroup* m_optgroup          { nullptr };

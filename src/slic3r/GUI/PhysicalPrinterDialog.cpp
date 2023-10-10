@@ -184,7 +184,7 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
     m_add_preset_btn->SetToolTip(_L("Add preset for this printer device")); 
     m_add_preset_btn->Bind(wxEVT_BUTTON, &PhysicalPrinterDialog::AddPreset, this);
 
-    m_printer_name    = new wxTextCtrl(this, wxID_ANY, printer_name, wxDefaultPosition, wxDefaultSize);
+    m_printer_name    = new ::TextInput(this,printer_name);
     wxGetApp().UpdateDarkUI(m_printer_name);
     m_printer_name->Bind(wxEVT_TEXT, [this](wxEvent&) { this->update_full_printer_names(); });
 
@@ -242,7 +242,7 @@ PhysicalPrinterDialog::PhysicalPrinterDialog(wxWindow* parent, wxString printer_
 
     if (new_printer) {
         m_printer_name->SetFocus();
-        m_printer_name->SelectAll();
+        m_printer_name->GetTextCtrl()->SelectAll();
     }
 
     this->Fit();
@@ -508,7 +508,7 @@ void PhysicalPrinterDialog::update(bool printer_change)
             supports_multiple_printers = opt && opt->value == htRepetier;
             if (opt->value == htPrusaConnect) { // automatically show default prusaconnect address
                 if (Field* printhost_field = m_optgroup->get_field("print_host"); printhost_field) {
-                    if (wxTextCtrl* temp = dynamic_cast<wxTextCtrl*>(printhost_field->getWindow()); temp && temp->GetValue().IsEmpty()) {
+                    if (text_ctrl* temp = dynamic_cast<text_ctrl*>(printhost_field->getWindow()); temp && temp->GetValue().IsEmpty()) {
                         temp->SetValue(L"https://connect.prusa3d.com");
                     }
                 }
@@ -674,7 +674,7 @@ void PhysicalPrinterDialog::update_full_printer_names()
             InfoDialog(this, format_wxstr("%1%: \"%2%\" ", _L("Unexpected character"),  str), 
                        _L("The following characters are not allowed in the name") + ": " + unusable_symbols).ShowModal();
             m_printer_name->SetValue(printer_name);
-            m_printer_name->SetInsertionPointEnd();
+            m_printer_name->GetTextCtrl()->SetInsertionPointEnd();
             return;
         }
     }

@@ -66,12 +66,24 @@ namespace GUI {
 
 PreferencesDialog::PreferencesDialog(wxWindow* parent) :
     DPIDialog(parent, wxID_ANY, _L("Preferences"), wxDefaultPosition, 
-              wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+              wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
 #ifdef __WXOSX__
     isOSX = true;
 #endif
 	build();
+
+    wxSize sz = GetSize();
+    sz.x += em_unit();
+
+    const size_t pages_cnt = tabs->GetPageCount();
+    for (size_t tab_id = 0; tab_id < pages_cnt; tab_id++) {
+        wxSizer* tab_sizer = tabs->GetPage(tab_id)->GetSizer();
+        wxScrolledWindow* scrolled = static_cast<wxScrolledWindow*>(tab_sizer->GetItem(size_t(0))->GetWindow());
+        scrolled->SetScrollRate(0, 5);
+    }
+
+    SetSize(sz);
 
 	m_highlighter.set_timer_owner(this, 0);
 }
@@ -133,14 +145,22 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 static std::shared_ptr<ConfigOptionsGroup>create_options_tab(const wxString& title, wxBookCtrlBase* tabs)
 {
 	wxPanel* tab = new wxPanel(tabs, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL);
+
 	tabs->AddPage(tab, _(title));
 	tab->SetFont(wxGetApp().normal_font());
 
+	auto scrolled = new wxScrolledWindow(tab);
+
+	// Sizer in the scrolled area
+	auto* scrolled_sizer = new wxBoxSizer(wxVERTICAL);
+	scrolled->SetSizer(scrolled_sizer);
+
 	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+	sizer->Add(scrolled, 1, wxEXPAND);
 	sizer->SetSizeHints(tab);
 	tab->SetSizer(sizer);
 
-	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>(tab);
+	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>(scrolled);
 	optgroup->label_width = 40;
 	optgroup->set_config_category_and_type(title, int(Preset::TYPE_PREFERENCES));
 	return optgroup;
@@ -722,7 +742,7 @@ void PreferencesDialog::accept(wxEvent&)
 #endif // __linux__
 	}
 
-	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled", "font_size", "suppress_round_corners" };
+	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled", "font_pt_size", "suppress_round_corners" };
 
 	for (const std::string& option : options_to_recreate_GUI) {
 		if (m_values.find(option) != m_values.end()) {
@@ -903,7 +923,7 @@ void PreferencesDialog::refresh_og(std::shared_ptr<ConfigOptionsGroup> og)
 {
 	og->parent()->Layout();
 	tabs->Layout();
-	this->layout();
+//	this->layout();
 }
 
 void PreferencesDialog::create_icon_size_slider()
@@ -1081,7 +1101,7 @@ void PreferencesDialog::create_settings_font_widget()
 	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
 	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
 
-	const std::string opt_key = "font_size";
+	const std::string opt_key = "font_pt_size";
 	m_blinkers[opt_key] = new BlinkingBitmap(parent);
 
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxHORIZONTAL);
