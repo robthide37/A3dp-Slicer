@@ -62,6 +62,7 @@ src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp
 src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp
 src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
 src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
+src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
 src/slic3r/GUI/Gizmos/GLGizmosManager.cpp
 src/slic3r/GUI/GLCanvas3D.cpp
 src/slic3r/GUI/GUI.cpp

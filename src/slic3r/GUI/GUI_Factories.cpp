@@ -177,9 +177,9 @@ static const constexpr std::array<std::pair<const char *, const char *>, 3> TEXT
 }};
 // Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
 static const constexpr std::array<std::pair<const char *, const char *>, 3> SVG_VOLUME_ICONS{{
-    {L("Add svg part"),     "svg_part"},     // ~ModelVolumeType::MODEL_PART
-    {L("Add negative svg"), "svg_negative"}, // ~ModelVolumeType::NEGATIVE_VOLUME
-    {L("Add svg modifier"), "svg_modifier"}, // ~ModelVolumeType::PARAMETER_MODIFIER
+    {L("Add SVG part"),     "svg_part"},     // ~ModelVolumeType::MODEL_PART
+    {L("Add negative SVG"), "svg_negative"}, // ~ModelVolumeType::NEGATIVE_VOLUME
+    {L("Add SVG modifier"), "svg_modifier"}, // ~ModelVolumeType::PARAMETER_MODIFIER
 }};
 
 static Plater* plater()
@@ -566,7 +566,7 @@ void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, 
 }
 
 void MenuFactory::append_menu_item_add_svg(wxMenu *menu, ModelVolumeType type, bool is_submenu_item /* = true*/){
-    append_menu_itemm_add_(_L("Svg"), GLGizmosManager::Svg, menu, type, is_submenu_item);
+    append_menu_itemm_add_(_L("SVG"), GLGizmosManager::Svg, menu, type, is_submenu_item);
 }
 
 void MenuFactory::append_menu_items_add_volume(MenuType menu_type)
@@ -1056,7 +1056,7 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
 
 void MenuFactory::append_menu_item_edit_svg(wxMenu *menu)
 {
-    wxString name = _L("Edit svg");
+    wxString name = _L("Edit SVG");
     auto can_edit_svg = []() {
         if (plater() == nullptr)
             return false;        
