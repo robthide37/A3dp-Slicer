@@ -1290,6 +1290,8 @@ bool GUI_App::on_init_inner()
 #ifdef __WXMSW__ 
         if (app_config->get_bool("associate_gcode"))
             associate_gcode_files();
+        if (app_config->get_bool("associate_bgcode"))
+            associate_bgcode_files();
 #endif // __WXMSW__
     }
     
@@ -2583,6 +2585,8 @@ void GUI_App::open_preferences(const std::string& highlight_option /*= std::stri
     else {
         if (app_config->get_bool("associate_gcode"))
             associate_gcode_files();
+        if (app_config->get_bool("associate_bgcode"))
+            associate_bgcode_files();
     }
 #endif // _WIN32
 
@@ -3369,6 +3373,11 @@ void GUI_App::associate_stl_files()
 void GUI_App::associate_gcode_files()
 {
     associate_file_type(L".gcode", L"PrusaSlicer.GCodeViewer.1", L"PrusaSlicerGCodeViewer", true);
+}
+
+void GUI_App::associate_bgcode_files()
+{
+    associate_file_type(L".bgcode", L"PrusaSlicer.GCodeViewer.1", L"PrusaSlicerGCodeViewer", true);
 }
 #endif // __WXMSW__
 
