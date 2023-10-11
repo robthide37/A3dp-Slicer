@@ -53,11 +53,6 @@ ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, const NSVGLinePa
         }
     }
 
-    // heal shapes
-    if (param.max_heal_iteration > 0)
-        for (auto &[id, expoly] : result)
-            Slic3r::Emboss::heal_shape(expoly, param.max_heal_iteration);
-
     // SVG is used as centered
     // Do not disturb user by settings of pivot position
     center(result);
@@ -366,11 +361,12 @@ ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shap
     if (fill.empty())
         return {};
 
-    ClipperLib::PolyFillType fill_type = ClipperLib::pftNonZero;
     // if (shape->fillRule == NSVGfillRule::NSVG_FILLRULE_NONZERO)
+    bool is_non_zero = true;
     if (shape.fillRule == NSVGfillRule::NSVG_FILLRULE_EVENODD)
-        fill_type = ClipperLib::pftEvenOdd;
-    return union_ex(fill, fill_type);
+        is_non_zero = false;
+
+    return Emboss::heal_polygons(fill, is_non_zero);
 }
 
 struct DashesParam{
@@ -518,7 +514,7 @@ ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &sh
         polygons_append(result, offset(lines_path.polylines, stroke_width / 2, join_type, mitter, end_type));    
     }
 
-    return union_ex(result, ClipperLib::pftNonZero);
+    return Emboss::heal_polygons(result);
 }
 
 } // namespace

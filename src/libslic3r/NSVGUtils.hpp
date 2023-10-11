@@ -32,9 +32,6 @@ struct NSVGLineParams
     // NOTE: Every point coor from image(float) is multiplied by scale and rounded to integer --> Slic3r::Point
     double scale = 1. / SCALING_FACTOR;
 
-    // count of iteration to heal shape
-    unsigned max_heal_iteration = 10;
-
     // Flag wether y is negative, when true than y coor is multiplied by -1
     bool is_y_negative = true;
 

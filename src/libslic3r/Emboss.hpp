@@ -166,9 +166,9 @@ namespace Emboss
     /// Fix duplicit points and self intersections in polygons.
     /// Also try to reduce amount of points and remove useless polygon parts
     /// </summary>
-    /// <param name="precision">Define wanted precision of shape after heal</param>
+    /// <param name="is_non_zero">Fill type ClipperLib::pftNonZero for overlapping otherwise </param>
     /// <returns>Healed shapes</returns>
-    ExPolygons heal_shape(const Polygons &shape);
+    ExPolygons heal_polygons(const Polygons &shape, bool is_non_zero = true);
 
     /// <summary>
     /// NOTE: call Slic3r::union_ex before this call
@@ -182,7 +182,7 @@ namespace Emboss
     /// <param name="max_iteration">Heal could create another issue,
     /// After healing it is checked again until shape is good or maximal count of iteration</param>
     /// <returns>True when shapes is good otherwise False</returns>
-    bool heal_shape(ExPolygons &shape, unsigned max_iteration = 10);
+    bool heal_expolygons(ExPolygons &shape, unsigned max_iteration = 10);
 
     /// <summary>
     /// Divide line segments in place near to point
@@ -467,6 +467,8 @@ void translate(ExPolygonsWithIds &e, const Point &p);
 BoundingBox get_extents(const ExPolygonsWithIds &e);
 void center(ExPolygonsWithIds &e);
 ExPolygons union_ex(const ExPolygonsWithIds &shapes);
-
+// delta .. safe offset before union (use as boolean close)
+// NOTE: remove unprintable spaces between neighbor curves (made by linearization of curve)
+ExPolygons union_with_delta(const ExPolygonsWithIds &shapes, float delta);
 } // namespace Slic3r
 #endif // slic3r_Emboss_hpp_

@@ -92,17 +92,17 @@ struct SpikeDesc
     /// </summary>
     /// <param name="bevel_size">Size of spike width after cut of the tip, has to be grater than 2.5</param>
     /// <param name="pixel_spike_length">When spike has same or more pixels with width less than 1 pixel</param>
-    SpikeDesc(double bevel_size, double pixel_spike_length = 6)
-    {
+    SpikeDesc(double bevel_size, double pixel_spike_length = 6):         
         // create min angle given by spike_length
         // Use it as minimal height of 1 pixel base spike
-        double angle  = 2. * atan2(pixel_spike_length, .5); // [rad]
-        cos_angle = std::fabs(cos(angle));
+        cos_angle(std::fabs(std::cos(
+            /*angle*/ 2. * std::atan2(pixel_spike_length, .5)
+        ))),
 
         // When remove spike this angle is set.
         // Value must be grater than min_angle
-        half_bevel = bevel_size / 2;
-    }
+        half_bevel(bevel_size / 2)
+    {}
 };
 
 // return TRUE when remove point. It could create polygon with 2 points.
@@ -120,6 +120,8 @@ void remove_spikes(ExPolygons &expolygons, const SpikeDesc &spike_desc);
 
 };
 
+// spike ... very sharp corner - when not removed cause iteration of heal process
+// index ... index of duplicit point in polygon
 bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &spike_desc) {
 
     std::optional<Point> add;
@@ -205,7 +207,8 @@ bool priv::remove_when_spike(Polygon &polygon, size_t index, const SpikeDesc &sp
 }
 
 void priv::remove_spikes_in_duplicates(ExPolygons &expolygons, const Points &duplicates) { 
-
+    if (duplicates.empty())
+        return;
     auto check = [](Polygon &polygon, const Point &d) -> bool {
         double spike_bevel = 1 / SHAPE_SCALE;
         double spike_length = 5.;
@@ -486,16 +489,20 @@ bool priv::remove_self_intersections(ExPolygons &shape, unsigned max_iteration) 
     return false;
 }
 
-ExPolygons Emboss::heal_shape(const Polygons &shape)
+ExPolygons Emboss::heal_polygons(const Polygons &shape, bool is_non_zero)
 {
+    const double clean_distance = 1.415; // little grater than sqrt(2)
+    ClipperLib::PolyFillType fill_type = is_non_zero ? 
+        ClipperLib::pftNonZero : ClipperLib::pftEvenOdd;
+
     // When edit this code check that font 'ALIENATE.TTF' and glyph 'i' still work
     // fix of self intersections
     // http://www.angusj.com/delphi/clipper/documentation/Docs/Units/ClipperLib/Functions/SimplifyPolygon.htm
-    ClipperLib::Paths paths = ClipperLib::SimplifyPolygons(ClipperUtils::PolygonsProvider(shape), ClipperLib::pftNonZero);
-    const double clean_distance = 1.415; // little grater than sqrt(2)
+    ClipperLib::Paths paths = ClipperLib::SimplifyPolygons(ClipperUtils::PolygonsProvider(shape), fill_type);
     ClipperLib::CleanPolygons(paths, clean_distance);
     Polygons polygons = to_polygons(paths);
-    polygons.erase(std::remove_if(polygons.begin(), polygons.end(), [](const Polygon &p) { return p.size() < 3; }), polygons.end());
+    polygons.erase(std::remove_if(polygons.begin(), polygons.end(), 
+        [](const Polygon &p) { return p.size() < 3; }), polygons.end());
                 
     // Do not remove all duplicates but do it better way
     // Overlap all duplicit points by rectangle 3x3
@@ -508,12 +515,11 @@ ExPolygons Emboss::heal_shape(const Polygons &shape)
             polygons.push_back(rect_3x3);
         }
     }
+    ExPolygons res = Slic3r::union_ex(polygons, fill_type);        
 
-    // TrueTypeFonts use non zero winding number
-    // https://docs.microsoft.com/en-us/typography/opentype/spec/ttch01
-    // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM01/Chap1.html
-    ExPolygons res = Slic3r::union_ex(polygons, ClipperLib::pftNonZero);        
-    heal_shape(res);
+
+    const unsigned int max_iteration = 10;
+    bool is_healed = heal_expolygons(res, max_iteration);
     return res;
 }
 
@@ -527,52 +533,105 @@ void priv::visualize_heal(const std::string &svg_filepath, const ExPolygons &exp
     svg.draw(expolygons);
     
     Points duplicits = collect_duplicates(pts);
-    svg.draw(duplicits, "black", 7 / SHAPE_SCALE);
+    int black_size = std::max(bb.size().x(), bb.size().y()) / 20;
+    svg.draw(duplicits, "black", black_size);
 
     Pointfs intersections_f = intersection_points(expolygons);
     Points intersections;
     intersections.reserve(intersections_f.size());
     std::transform(intersections_f.begin(), intersections_f.end(), std::back_inserter(intersections),
                    [](const Vec2d &p) { return p.cast<int>(); });
-    svg.draw(intersections, "red", 8 / SHAPE_SCALE);
+    svg.draw(intersections, "red", black_size * 1.2);
 }
 
-bool Emboss::heal_shape(ExPolygons &shape, unsigned max_iteration)
+bool Emboss::heal_expolygons(ExPolygons &shape, unsigned max_iteration)
 {
     return priv::heal_dupl_inter(shape, max_iteration);  
 }
 
 #ifndef HEAL_WITH_CLOSING
+namespace {
+
+Points get_unique_intersections(const ExPolygons &shape)
+{
+    Pointfs intersections_f = intersection_points(shape);
+    Points  intersections; // result
+    if (intersections_f.empty())
+        return intersections;
+
+    // convert intersections into Points
+    intersections.reserve(intersections_f.size());
+    std::transform(intersections_f.begin(), intersections_f.end(), std::back_inserter(intersections),
+                   [](const Vec2d &p) { return Point(std::floor(p.x()), std::floor(p.y())); });
+
+    // intersections should be unique poits
+    std::sort(intersections.begin(), intersections.end());
+    auto it = std::unique(intersections.begin(), intersections.end());
+    intersections.erase(it, intersections.end());
+    return intersections;
+}
+
+Polygons get_holes_with_points(const Polygons &holes, const Points &points)
+{
+    Polygons result;
+    for (const Slic3r::Polygon &hole : holes)
+        for (const Point &p : points)
+            for (const Point &h : hole)
+                if (p == h) {
+                    result.push_back(hole);
+                    break;
+                }
+    return result;
+}
+
+/// <summary>
+/// Fill holes which create duplicits or intersections
+/// When healing hole creates trouble in shape again try to heal by an union instead of diff_ex
+/// </summary>
+/// <param name="holes">Holes which was substracted from shape previous</param>
+/// <param name="duplicates">Current duplicates in shape</param>
+/// <param name="intersections">Current intersections in shape</param>
+/// <param name="shape">Partialy healed shape[could be modified]</param>
+/// <returns>True when modify shape otherwise False</returns>
+bool fill_trouble_holes(const Polygons &holes, const Points &duplicates, const Points &intersections, ExPolygons &shape)
+{
+    if (holes.empty())
+        return false;
+    if (duplicates.empty() && intersections.empty())
+        return false;
+
+    Polygons fill = get_holes_with_points(holes, duplicates);
+    append(fill, get_holes_with_points(holes, intersections));
+    if (fill.empty())
+        return false;
+
+    shape = union_ex(shape, fill);
+    return true;
+}
+
+} // namespace
+
 bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
 {    
     if (shape.empty()) return true;
 
     // create loop permanent memory
     Polygons holes;
-    Points intersections;
     while (--max_iteration) {
         remove_same_neighbor(shape);
-        Pointfs intersections_f = intersection_points(shape);
-
-        // convert intersections into Points
-        assert(intersections.empty());
-        intersections.reserve(intersections_f.size());
-        std::transform(intersections_f.begin(), intersections_f.end(), std::back_inserter(intersections),
-                       [](const Vec2d &p) { return Point(std::floor(p.x()), std::floor(p.y())); });
-
-        // intersections should be unique poits
-        std::sort(intersections.begin(), intersections.end());
-        auto it = std::unique(intersections.begin(), intersections.end());
-        intersections.erase(it, intersections.end());
-
         Points duplicates = collect_duplicates(to_points(shape));
-        // duplicates are already uniqua and sorted
-
+        Points intersections = get_unique_intersections(shape);
+                
         // Check whether shape is already healed
         if (intersections.empty() && duplicates.empty())
             return true;
 
-        assert(holes.empty());
+        if (fill_trouble_holes(holes, duplicates, intersections, shape)) {
+            holes.clear();
+            continue;
+        }
+
+        holes.clear();
         holes.reserve(intersections.size() + duplicates.size());
 
         remove_spikes_in_duplicates(shape, duplicates);
@@ -591,11 +650,8 @@ bool priv::heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
             holes.push_back(hole);
         }
 
-        shape = Slic3r::diff_ex(shape, holes, ApplySafetyOffset::Yes);
-
-        // prepare for next loop
-        holes.clear();
-        intersections.clear();
+        shape = Slic3r::diff_ex(shape, holes, ApplySafetyOffset::No);
+        // ApplySafetyOffset::Yes is incompatible with function fill_trouble_holes
     }
 
     //priv::visualize_heal("C:/data/temp/heal.svg", shape);
@@ -736,8 +792,12 @@ std::optional<Glyph> priv::get_glyph(const stbtt_fontinfo &font_info, int unicod
         std::reverse(pts.begin(), pts.end());
         glyph_polygons.emplace_back(pts);
     }
-    if (!glyph_polygons.empty())
-        glyph.shape = Emboss::heal_shape(glyph_polygons);
+    if (!glyph_polygons.empty()) {
+        // TrueTypeFonts use non zero winding number
+        // https://docs.microsoft.com/en-us/typography/opentype/spec/ttch01
+        // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM01/Chap1.html
+        glyph.shape = Emboss::heal_polygons(glyph_polygons);
+    }
     return glyph;
 }
 
@@ -1238,7 +1298,22 @@ ExPolygons Slic3r::union_ex(const ExPolygonsWithIds &shapes)
         expolygons_append(result, shape.expoly);
     }
     result = union_ex(result);
-    heal_shape(result);
+    bool is_healed = heal_expolygons(result);
+    return result;
+}
+
+ExPolygons Slic3r::union_with_delta(const ExPolygonsWithIds &shapes, float delta)
+{
+    // unify to one expolygons
+    ExPolygons expolygons;
+    for (const ExPolygonsWithId &shape : shapes) {
+        if (shape.expoly.empty())
+            continue;
+        expolygons_append(expolygons, offset_ex(shape.expoly, delta));
+    }
+    ExPolygons result = union_ex(expolygons);
+    result            = offset_ex(result, -delta);
+    bool is_healed    = heal_expolygons(result);
     return result;
 }
 

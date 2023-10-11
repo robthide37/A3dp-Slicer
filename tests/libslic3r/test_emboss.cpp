@@ -203,7 +203,7 @@ ExPolygons heal_and_check(const Polygons &polygons)
     Points  polygons_points    = to_points(polygons);
     Points  duplicits_prev     = collect_duplicates(polygons_points);
 
-    ExPolygons shape = Emboss::heal_shape(polygons);
+    ExPolygons shape = Emboss::heal_polygons(polygons);
 
     // Is default shape for unhealabled shape?
     bool is_default_shape = 
@@ -284,6 +284,30 @@ TEST_CASE("Heal of 'm' in Allura_Script.ttf", "[Emboss]")
 {
     Polygons polygons = load_polygons("contour_Allura_Script.ttf_glyph_m.svg");
     auto a = heal_and_check(polygons);
+}
+
+#include "libslic3r/NSVGUtils.hpp"
+TEST_CASE("Heal of svg contour overlap", "[Emboss]") {
+
+    std::string svg_file = "contour_neighbor.svg";
+    auto image = nsvgParseFromFile(TEST_DATA_DIR PATH_SEPARATOR + svg_file, "mm");
+    NSVGLineParams param(1e10);
+    ExPolygonsWithIds shapes = create_shape_with_ids(*image, param);
+    Polygons polygons;
+    for (ExPolygonsWithId &shape : shapes)
+        polygons.push_back(shape.expoly.front().contour);
+    auto a = heal_and_check(polygons);
+}
+
+// Input contour is extracted from case above "contour_neighbor.svg" with trouble shooted scale
+TEST_CASE("Heal of overlaping contour", "[Emboss]"){
+    // Extracted from svg:
+    Points contour{{2228926, 1543620}, {745002, 2065101},   {745002, 2065094},   {744990, 2065094},   {684487, 1466338},
+                   {510999, 908378},   {236555, 403250},    {-126813, -37014},   {-567074, -400382},  {-1072201, -674822},
+                   {-567074, -400378}, {-126813, -37010},   {236555, 403250},    {510999, 908382},    {684487, 1466346},
+                   {744990, 2065105},  {-2219648, 2073234}, {-2228926, -908814}, {-1646879, -2073235}};
+    ExPolygons shapes = {ExPolygon{contour}};
+    CHECK(Emboss::heal_expolygons(shapes));
 }
 
 TEST_CASE("Heal of points close to line", "[Emboss]")

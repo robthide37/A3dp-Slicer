@@ -792,7 +792,8 @@ bool check(const UpdateSurfaceVolumeData &input, bool is_main_thread)
 template<typename Fnc> 
 ExPolygons create_shape(DataBase &input, Fnc was_canceled) {
     const EmbossShape &es = input.create_shape();
-    return union_ex(es.shapes_with_ids);
+    float delta = 50.f;
+    return union_with_delta(es.shapes_with_ids, delta);
 }
 
 //#define STORE_SAMPLING
