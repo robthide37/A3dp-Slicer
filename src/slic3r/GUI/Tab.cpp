@@ -4547,6 +4547,7 @@ void SubstitutionManager::init(DynamicPrintConfig* config, wxWindow* parent, wxF
     m_em = em_unit(parent);
 
     m_substitutions = m_config->option<ConfigOptionStrings>("gcode_substitutions")->values;
+    m_chb_match_single_lines.clear();
 }
 
 void SubstitutionManager::validate_length()
