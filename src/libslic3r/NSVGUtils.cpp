@@ -18,7 +18,7 @@ struct LinesPath{
     Polygons polygons;
     Polylines polylines; };
 LinesPath linearize_path(NSVGpath *first_path, const NSVGLineParams &param);
-ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape);
+ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param);
 ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param);
 } // namespace
 
@@ -45,7 +45,7 @@ ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, const NSVGLinePa
 
         if (is_fill_used) {
             unsigned unique_id = static_cast<unsigned>(2 * shape_id);
-            result.push_back({unique_id, fill_to_expolygons(lines_path, shape)});
+            result.push_back({unique_id, fill_to_expolygons(lines_path, shape, param)});
         }        
         if (is_stroke_used) {
             unsigned unique_id = static_cast<unsigned>(2 * shape_id + 1);
@@ -352,7 +352,7 @@ LinesPath linearize_path(NSVGpath *first_path, const NSVGLineParams &param)
     return result;
 }
 
-ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape)
+ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param)
 {
     Polygons fill = lines_path.polygons; // copy
 
@@ -366,7 +366,7 @@ ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shap
     if (shape.fillRule == NSVGfillRule::NSVG_FILLRULE_EVENODD)
         is_non_zero = false;
 
-    return Emboss::heal_polygons(fill, is_non_zero);
+    return Emboss::heal_polygons(fill, is_non_zero, param.max_heal_iteration).first;
 }
 
 struct DashesParam{
@@ -514,7 +514,8 @@ ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &sh
         polygons_append(result, offset(lines_path.polylines, stroke_width / 2, join_type, mitter, end_type));    
     }
 
-    return Emboss::heal_polygons(result);
+    bool is_non_zero = true;
+    return Emboss::heal_polygons(result, is_non_zero, param.max_heal_iteration).first;
 }
 
 } // namespace

@@ -167,8 +167,9 @@ namespace Emboss
     /// Also try to reduce amount of points and remove useless polygon parts
     /// </summary>
     /// <param name="is_non_zero">Fill type ClipperLib::pftNonZero for overlapping otherwise </param>
-    /// <returns>Healed shapes</returns>
-    ExPolygons heal_polygons(const Polygons &shape, bool is_non_zero = true);
+    /// <param name="max_iteration">Look at heal_expolygon()::max_iteration</param>
+    /// <returns>Healed shapes with flag is fully healed</returns>
+    std::pair<ExPolygons, bool> heal_polygons(const Polygons &shape, bool is_non_zero = true, unsigned max_iteration = 10);
 
     /// <summary>
     /// NOTE: call Slic3r::union_ex before this call
