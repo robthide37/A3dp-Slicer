@@ -5,6 +5,10 @@
 #include "IntersectionPoints.hpp"
 
 //#define USE_CGAL_SWEEP_LINE
+#define USE_AABB_TREE
+//#define USE_AABB_TREE_FLOAT
+//#define USE_LINE_TO_LINE
+
 #ifdef USE_CGAL_SWEEP_LINE
 
 #include <CGAL/Cartesian.h>
@@ -109,8 +113,64 @@ Slic3r::Pointfs Slic3r::intersection_points(const ExPolygons &expolygons)
 // use bounding boxes
 #include <libslic3r/BoundingBox.hpp>
 
-namespace priv {
-//FIXME O(n^2) complexity!
+#include <libslic3r/AABBTreeLines.hpp>
+namespace{  
+#ifdef USE_AABB_TREE
+// NOTE: it is about 18% slower than USE_LINE_TO_LINE on 'contour_ALIENATO.TTF_glyph_i'
+using namespace Slic3r;
+Pointfs compute_intersections(const Lines &lines)
+{
+    if (lines.size() < 3)
+        return {};    
+
+    auto tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
+    Pointfs result;
+    for (size_t li = 0; li < lines.size()-1; ++li) {
+        const Line &l = lines[li];
+        auto intersections = AABBTreeLines::get_intersections_with_line<false, Point, Line>(lines, tree, l);
+        for (const auto &[p, node_index] : intersections) {
+            if (node_index - 1 <= li)
+                continue;
+            if (p == l.a || p == l.b)
+                continue;
+            result.push_back(p.cast<double>());
+        }
+    }
+    return result;
+}
+#endif // USE_AABB_TREE
+
+#ifdef USE_AABB_TREE_FLOAT
+// NOTE: It is slower than int tree, but has floating point for intersection
+using namespace Slic3r;
+Pointfs compute_intersections(const Lines &lines)
+{
+    if (lines.size() < 3)
+        return {};
+    Linesf input;
+    input.reserve(lines.size());
+    for (const Line &line : lines)
+        input.emplace_back(line.a.cast<double>(), line.b.cast<double>());
+
+    auto    tree = AABBTreeLines::build_aabb_tree_over_indexed_lines(input);
+    Pointfs result;
+    for (size_t li = 0; li < lines.size() - 1; ++li) {
+        const Linef &l             = input[li];
+        auto         intersections = AABBTreeLines::get_intersections_with_line<false, Vec2d, Linef>(input, tree, l);
+        for (const auto &[p, node_index] : intersections) {
+            if (node_index - 1 <= li)
+                continue;
+            if (p == l.a || p == l.b)
+                continue;
+            result.push_back(p.cast<double>());
+        }
+    }
+    return result;
+}
+#endif // USE_AABB_TREE_FLOAT
+
+#ifdef USE_LINE_TO_LINE
+// FIXME O(n^2) complexity!
 Slic3r::Pointfs compute_intersections(const Slic3r::Lines &lines)
 {
     using namespace Slic3r;
@@ -123,53 +183,51 @@ Slic3r::Pointfs compute_intersections(const Slic3r::Lines &lines)
     Pointfs pts;
     Point   i;
     for (size_t li = 0; li < lines.size(); ++li) {
-        const Line  &l = lines[li];
-        const Point &a = l.a;
-        const Point &b = l.b;
-        Point min(std::min(a.x(), b.x()), std::min(a.y(), b.y()));
-        Point max(std::max(a.x(), b.x()), std::max(a.y(), b.y()));
-        BoundingBox  bb(min, max);
+        const Line  &l  = lines[li];
+        const Point &a  = l.a;
+        const Point &b  = l.b;
+        BoundingBox  bb({a, b});
         for (size_t li_ = li + 1; li_ < lines.size(); ++li_) {
             const Line  &l_ = lines[li_];
             const Point &a_ = l_.a;
             const Point &b_ = l_.b;
-            if (a == b_ || b == a_ || a == a_ || b == b_) continue;
-            Point min_(std::min(a_.x(), b_.x()), std::min(a_.y(), b_.y()));
-            Point max_(std::max(a_.x(), b_.x()), std::max(a_.y(), b_.y()));
-            BoundingBox bb_(min_, max_);
+            // NOTE: Be Carefull - Not only neighbor has same point
+            if (a == b_ || b == a_ || a == a_ || b == b_)
+                continue;
+            BoundingBox bb_({a_, b_});
             // intersect of BB compare min max
-            if (bb.overlap(bb_) &&
-                l.intersection(l_, &i))
+            if (bb.overlap(bb_) && l.intersection(l_, &i))
                 pts.push_back(i.cast<double>());
         }
     }
     return pts;
 }
-} // namespace priv
+#endif // USE_LINE_TO_LINE
+} // namespace
 
 Slic3r::Pointfs Slic3r::intersection_points(const Lines &lines)
 {
-    return priv::compute_intersections(lines);
+    return compute_intersections(lines);
 }
 
 Slic3r::Pointfs Slic3r::intersection_points(const Polygon &polygon)
 {
-    return priv::compute_intersections(to_lines(polygon));
+    return compute_intersections(to_lines(polygon));
 }
 
 Slic3r::Pointfs Slic3r::intersection_points(const Polygons &polygons)
 {
-    return priv::compute_intersections(to_lines(polygons));
+    return compute_intersections(to_lines(polygons));
 }
 
 Slic3r::Pointfs Slic3r::intersection_points(const ExPolygon &expolygon)
 {
-    return priv::compute_intersections(to_lines(expolygon));
+    return compute_intersections(to_lines(expolygon));
 }
 
 Slic3r::Pointfs Slic3r::intersection_points(const ExPolygons &expolygons)
 {
-    return priv::compute_intersections(to_lines(expolygons));
+    return compute_intersections(to_lines(expolygons));
 }
 
 #endif // USE_CGAL_SWEEP_LINE
