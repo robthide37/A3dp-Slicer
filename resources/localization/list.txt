@@ -44,7 +44,6 @@ src/slic3r/GUI/GCodeViewer.cpp
 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp
 src/slic3r/GUI/Gizmos/GLGizmoCut.hpp
 src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp
-src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
 src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp
 src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
 src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
