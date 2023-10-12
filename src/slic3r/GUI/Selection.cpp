@@ -928,9 +928,12 @@ const std::pair<Vec3d, double> Selection::get_bounding_sphere() const
         std::vector<Point> points;
         if (m_valid) {
             for (unsigned int i : m_list) {
-                const TriangleMesh* hull = (*m_volumes)[i]->convex_hull();
-                const Transform3d& matrix = (*m_volumes)[i]->world_matrix();
-                for (const Vec3f& v : hull->its.vertices) {
+                const GLVolume& volume = *(*m_volumes)[i];
+                const TriangleMesh* hull = volume.convex_hull();
+                const indexed_triangle_set& its = (hull != nullptr) ?
+                    hull->its : m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh().its;
+                const Transform3d& matrix = volume.world_matrix();
+                for (const Vec3f& v : its.vertices) {
                     const Vec3d vv = matrix * v.cast<double>();
                     points.push_back(Point(vv.x(), vv.y(), vv.z()));
                 }
