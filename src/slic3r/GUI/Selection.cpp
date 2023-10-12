@@ -923,7 +923,6 @@ const std::pair<Vec3d, double> Selection::get_bounding_sphere() const
         using Traits = CGAL::Min_sphere_of_points_d_traits_3<K, float>;
         using Min_sphere = CGAL::Min_sphere_of_spheres_d<Traits>;
         using Point = K::Point_3;
-        using Sphere = Traits::Sphere;
 
         std::vector<Point> points;
         if (m_valid) {
