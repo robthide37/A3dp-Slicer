@@ -5575,21 +5575,32 @@ void Plater::convert_gcode_to_ascii()
     }
 
     // Set out filename
-    boost::filesystem::path path(into_u8(input_file));
-    std::string output_file = path.replace_extension("gcode").string();
+    const boost::filesystem::path input_path(into_u8(input_file));
+    boost::filesystem::path output_path(into_u8(input_file));
+    std::string output_file = output_path.replace_extension("gcode").string();
 
     if (input_file == output_file) {
-        output_file = rename_file(output_file, ".gcode");
-        wxString msg = _L("You are trying to convert to ascii a binary file whose extension is '.gcode'.");
-        msg += "\n" + _L("The exported file will be renamed as:");
-        msg += "\n\n" + output_file;
-        msg += "\n\n" + _L("Continue with export ?");
-        MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
-        if (msg_dlg.ShowModal() != wxID_YES)
+        using namespace bgcode::core;
+        EResult res = is_valid_binary_gcode(*in_file.f);
+        if (res == EResult::InvalidMagicNumber) {
+            MessageDialog msg_dlg(this, _L("The selected file is already in ascii format."), _L("Warning"), wxOK);
+            msg_dlg.ShowModal();
             return;
+        }
+        else {
+            output_file = rename_file(output_file, ".gcode");
+            wxString msg = _L("You are trying to convert to ascii a binary file whose extension is '.gcode'.");
+            msg += "\n" + _L("The exported file will be renamed as:");
+            msg += "\n\n" + output_file;
+            msg += "\n\n" + _L("Continue with export ?");
+            MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
+            if (msg_dlg.ShowModal() != wxID_YES)
+                return;
+        }
     }
 
-    if (boost::filesystem::exists(output_file)) {
+    const bool exists = boost::filesystem::exists(output_file);
+    if (exists) {
         MessageDialog msg_dlg(this, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), output_file), _L("Notice"), wxYES_NO);
         if (msg_dlg.ShowModal() != wxID_YES)
             return;
@@ -5608,7 +5619,12 @@ void Plater::convert_gcode_to_ascii()
         wxBusyCursor busy;
         using namespace bgcode::core;
         EResult res = bgcode::convert::from_binary_to_ascii(*in_file.f, *out_file.f, true);
-        if (res != EResult::Success) {
+        if (res == EResult::InvalidMagicNumber) {
+            in_file.close();
+            out_file.close();
+            boost::filesystem::copy_file(input_path, output_path, boost::filesystem::copy_option::overwrite_if_exists);
+        }
+        else if (res != EResult::Success) {
             MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting G-code file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
             out_file.close();
@@ -5617,7 +5633,7 @@ void Plater::convert_gcode_to_ascii()
         }
     }
 
-    MessageDialog msg_dlg(this, Slic3r::GUI::format_wxstr("%1%\n%2%", _L("Successfully created G-code ASCII file"), output_file),
+    MessageDialog msg_dlg(this, Slic3r::GUI::format_wxstr("%1%\n%2%", _L("Successfully created G-code ascii file"), output_file),
                           _L("Convert G-code file to ASCII format"), wxICON_ERROR | wxOK);
     msg_dlg.ShowModal();
 }
@@ -5639,21 +5655,32 @@ void Plater::convert_gcode_to_binary()
     }
 
     // Set out filename
-    boost::filesystem::path path(into_u8(input_file));
-    std::string output_file = path.replace_extension("bgcode").string();
+    const boost::filesystem::path input_path(into_u8(input_file));
+    boost::filesystem::path output_path(into_u8(input_file));
+    std::string output_file = output_path.replace_extension("bgcode").string();
 
     if (input_file == output_file) {
-        output_file = rename_file(output_file, ".bgcode");
-        wxString msg = _L("You are trying to convert to binary an ascii file whose extension is '.bgcode'.");
-        msg += "\n" + _L("The exported file will be renamed as:");
-        msg += "\n\n" + output_file;
-        msg += "\n\n" + _L("Continue with export ?");
-        MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
-        if (msg_dlg.ShowModal() != wxID_YES)
+        using namespace bgcode::core;
+        EResult res = is_valid_binary_gcode(*in_file.f);
+        if (res == EResult::Success) {
+            MessageDialog msg_dlg(this, _L("The selected file is already in binary format."), _L("Warning"), wxOK);
+            msg_dlg.ShowModal();
             return;
+        }
+        else {
+            output_file = rename_file(output_file, ".bgcode");
+            wxString msg = _L("You are trying to convert to binary an ascii file whose extension is '.bgcode'.");
+            msg += "\n" + _L("The exported file will be renamed as:");
+            msg += "\n\n" + output_file;
+            msg += "\n\n" + _L("Continue with export ?");
+            MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
+            if (msg_dlg.ShowModal() != wxID_YES)
+                return;
+        }
     }
 
-    if (boost::filesystem::exists(output_file)) {
+    const bool exists = boost::filesystem::exists(output_file);
+    if (exists) {
         MessageDialog msg_dlg(this, GUI::format_wxstr(_L("File %1% already exists. Do you wish to overwrite it?"), output_file), _L("Notice"), wxYES_NO);
         if (msg_dlg.ShowModal() != wxID_YES)
             return;
@@ -5672,8 +5699,13 @@ void Plater::convert_gcode_to_binary()
         wxBusyCursor busy;
         using namespace bgcode::core;
         const bgcode::binarize::BinarizerConfig& binarizer_config = GCodeProcessor::get_binarizer_config();
-        EResult res = bgcode::convert::from_ascii_to_binary(*in_file.f, *out_file.f, binarizer_config);
-        if (res != EResult::Success) {
+        const EResult res = bgcode::convert::from_ascii_to_binary(*in_file.f, *out_file.f, binarizer_config);
+        if (res == EResult::AlreadyBinarized) {
+            in_file.close();
+            out_file.close();
+            boost::filesystem::copy_file(input_path, output_path, boost::filesystem::copy_option::overwrite_if_exists);
+        }
+        else if (res != EResult::Success) {
             MessageDialog msg_dlg(this, _L(std::string(translate_result(res))), _L("Error converting G-code file"), wxICON_INFORMATION | wxOK);
             msg_dlg.ShowModal();
             out_file.close();
