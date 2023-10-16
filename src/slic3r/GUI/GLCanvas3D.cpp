@@ -1642,7 +1642,6 @@ void GLCanvas3D::set_config(const DynamicPrintConfig* config)
     m_config = config;
     m_layers_editing.set_config(config);
 
-
     if (config) {
         PrinterTechnology ptech = current_printer_technology();
 
@@ -1663,7 +1662,14 @@ void GLCanvas3D::set_config(const DynamicPrintConfig* config)
         double objdst = min_object_distance(*config);
         double min_obj_dst = slot == ArrangeSettingsDb_AppCfg::slotFFFSeqPrint ? objdst : 0.;
         m_arrange_settings_db.set_distance_from_obj_range(slot, min_obj_dst, 100.);
-        m_arrange_settings_db.get_defaults(slot).d_obj = objdst;
+        
+        if (std::abs(m_arrange_settings_db.get_defaults(slot).d_obj - objdst) > EPSILON) {
+            m_arrange_settings_db.get_defaults(slot).d_obj = objdst;
+
+            // Defaults have changed, so let's sync with the app config and fill
+            // in the missing values with the new defaults.
+            m_arrange_settings_db.sync();
+        }
     }
 }
 
