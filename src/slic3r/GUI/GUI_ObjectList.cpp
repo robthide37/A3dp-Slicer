@@ -4267,7 +4267,8 @@ void ObjectList::change_part_type()
         types.emplace_back(ModelVolumeType::PARAMETER_MODIFIER);
     }
 
-    if (!volume->text_configuration.has_value()) {
+    // is not embossed(SVG or Text)
+    if (!volume->emboss_shape.has_value()) {
         for (const wxString&        name    : { _L("Support Blocker"),          _L("Support Enforcer") })
             names.Add(name);
         for (const ModelVolumeType  type_id : { ModelVolumeType::SUPPORT_BLOCKER, ModelVolumeType::SUPPORT_ENFORCER })
