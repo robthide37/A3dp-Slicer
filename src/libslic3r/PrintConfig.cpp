@@ -447,15 +447,6 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<ArcFittingType>(ArcFittingType::Disabled));
 
-    def = this->add("arc_fitting_tolerance", coFloatOrPercent);
-    def->label = L("Arc fitting tolerance");
-    def->sidetext = L("mm or %");
-    def->tooltip = L("When using the arc_fitting option, allow the curve to deviate certain % from the collection of straight paths.\n"
-                     "Can be either a mm value or a percentage of the current extrusion width.");
-    def->mode = comAdvanced;
-    def->min = 0;
-    def->set_default_value(new ConfigOptionFloatOrPercent(5, true));
-
     // Maximum extruder temperature, bumped to 1500 to support printing of glass.
     const int max_temp = 1500;
     def = this->add("avoid_crossing_curled_overhangs", coBool);

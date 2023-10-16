@@ -1677,7 +1677,6 @@ void TabPrint::build()
         optgroup->append_single_option_line("resolution");
         optgroup->append_single_option_line("gcode_resolution");
         optgroup->append_single_option_line("arc_fitting");
-        optgroup->append_single_option_line("arc_fitting_tolerance");
         optgroup->append_single_option_line("xy_size_compensation");
         optgroup->append_single_option_line("elefant_foot_compensation", "elephant-foot-compensation_114487");
 
