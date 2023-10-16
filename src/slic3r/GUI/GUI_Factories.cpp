@@ -1080,7 +1080,7 @@ void MenuFactory::append_menu_item_edit_svg(wxMenu *menu)
             return;
     }
 
-    wxString description = _L("Ability to change SVG source file, projection, size, ...");
+    wxString description = _L("Change SVG source file, projection, size, ...");
     std::string icon = "cog";
     auto open_svg = [](const wxCommandEvent &) {
         GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
