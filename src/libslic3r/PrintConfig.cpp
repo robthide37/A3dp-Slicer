@@ -1523,7 +1523,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("gcode_binary", coBool);
     def->label = L("Export as binary G-code");
-    def->tooltip = L("Exports G-code in binary format.");
+    def->tooltip = L("Export G-code in binary format.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(0));
 
@@ -5132,7 +5132,7 @@ OtherSlicingStatesConfigDef::OtherSlicingStatesConfigDef()
 
     def = this->add("is_extruder_used", coBools);
     def->label = L("Is extruder used?");
-    def->tooltip = L("Vector of bools stating whether a given extruder is used in the print.");
+    def->tooltip = L("Vector of booleans stating whether a given extruder is used in the print.");
 }
 
 PrintStatisticsConfigDef::PrintStatisticsConfigDef()
@@ -5220,7 +5220,7 @@ ObjectsInfoConfigDef::ObjectsInfoConfigDef()
     def->label = L("Scale per object");
     def->tooltip = L("Contains a string with the information about what scaling was applied to the individual objects. "
                      "Indexing of the objects is zero-based (first object has index 0).\n"
-                     "Example: 'x:100% y:50% z:100'.");
+                     "Example: 'x:100% y:50% z:100%'.");
 
     def = this->add("input_filename_base", coString);
     def->label = L("Input filename without extension");
@@ -5341,11 +5341,11 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
     def->tooltip = L("Zero-based index of the current layer (i.e. first layer is number 0).");
 
     def = this->add("layer_z", coFloat);
-    def->label = L("Layer z");
+    def->label = L("Layer Z");
     def->tooltip = L("Height of the current layer above the print bed, measured to the top of the layer.");
 
     def = this->add("max_layer_z", coFloat);
-    def->label = L("Maximal layer z");
+    def->label = L("Maximal layer Z");
     def->tooltip = L("Height of the last layer above the print bed.");
 
     def = this->add("filament_extruder_id", coInt);
@@ -5361,7 +5361,7 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
     def->tooltip = L("Index of the extruder that is being loaded. The index is zero based (first extruder has index 0).");
 
     def = this->add("toolchange_z", coFloat);
-    def->label = L("Toolchange z");
+    def->label = L("Toolchange Z");
     def->tooltip = L("Height above the print bed when the toolchange takes place. Usually the same as layer_z, but can be different.");
 }
 
