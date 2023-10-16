@@ -101,6 +101,7 @@ enum ConfigMenuIDs {
     ConfigMenuLanguage,
     ConfigMenuFlashFirmware,
     ConfigMenuCnt,
+    ConfigMenuWifiConfigFile
 };
 
 class Tab;

@@ -201,6 +201,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/FirmwareDialog.hpp
     GUI/PrintHostDialogs.cpp
     GUI/PrintHostDialogs.hpp
+    GUI/WifiConfigDialog.cpp
+    GUI/WifiConfigDialog.hpp
     GUI/Jobs/Job.hpp
     GUI/Jobs/Worker.hpp
     GUI/Jobs/BoostThreadWorker.hpp
@@ -304,6 +306,8 @@ set(SLIC3R_GUI_SOURCES
     Utils/WinRegistry.hpp
     Utils/WxFontUtils.cpp
     Utils/WxFontUtils.hpp
+    Utils/WifiScanner.hpp
+    Utils/WifiScanner.cpp
 )
 
 find_package(NanoSVG REQUIRED)
@@ -313,6 +317,8 @@ if (APPLE)
             Utils/RetinaHelperImpl.mm
             Utils/MacDarkMode.mm
             Utils/MacUtils.mm
+            Utils/WifiScannerMac.h
+            Utils/WifiScannerMac.mm
             GUI/RemovableDriveManagerMM.mm
             GUI/RemovableDriveManagerMM.h
             GUI/Mouse3DHandlerMac.mm
@@ -320,6 +326,7 @@ if (APPLE)
             GUI/InstanceCheckMac.h
         )
     FIND_LIBRARY(DISKARBITRATION_LIBRARY DiskArbitration)
+    FIND_LIBRARY(COREWLAN_LIBRARY CoreWLAN)
 endif ()
 
 add_library(libslic3r_gui STATIC ${SLIC3R_GUI_SOURCES})
@@ -339,7 +346,7 @@ if (MSVC)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(libslic3r_gui ${DBUS_LIBRARIES}) 
 elseif (APPLE)
-    target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY})
+    target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY} ${COREWLAN_LIBRARY})
 endif()
 
 if (SLIC3R_STATIC)

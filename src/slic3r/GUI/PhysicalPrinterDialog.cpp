@@ -838,5 +838,4 @@ void PhysicalPrinterDialog::DeletePreset(PresetForPrinter* preset_for_printer)
 
     update_host_type(true);
 }
-
 }}    // namespace Slic3r::GUI
