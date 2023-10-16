@@ -175,6 +175,8 @@ void AppConfig::set_defaults()
 #ifdef _WIN32
         if (get("associate_gcode").empty())
             set("associate_gcode", "0");
+        if (get("associate_bgcode").empty())
+            set("associate_bgcode", "0");
 #endif // _WIN32
     }
 

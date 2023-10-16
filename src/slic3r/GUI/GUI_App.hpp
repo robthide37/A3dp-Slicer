@@ -368,6 +368,7 @@ public:
     void            associate_3mf_files();
     void            associate_stl_files();
     void            associate_gcode_files();
+    void            associate_bgcode_files();
 #endif // __WXMSW__
 
 

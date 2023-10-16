@@ -29,6 +29,10 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/log/trivial.hpp>
 
+#include <CGAL/Simple_cartesian.h>
+#include <CGAL/Min_sphere_of_spheres_d.h>
+#include <CGAL/Min_sphere_of_points_d_traits_3.h>
+
 static const Slic3r::ColorRGBA UNIFORM_SCALE_COLOR     = Slic3r::ColorRGBA::ORANGE();
 static const Slic3r::ColorRGBA SOLID_PLANE_COLOR       = Slic3r::ColorRGBA::ORANGE();
 static const Slic3r::ColorRGBA TRANSPARENT_PLANE_COLOR = { 0.8f, 0.8f, 0.8f, 0.5f };
@@ -906,6 +910,41 @@ BoundingBoxf Selection::get_screen_space_bounding_box()
     return ss_box;
 }
 
+const std::pair<Vec3d, double> Selection::get_bounding_sphere() const
+{
+    if (!m_bounding_sphere.has_value()) {
+        std::optional<std::pair<Vec3d, double>>* sphere = const_cast<std::optional<std::pair<Vec3d, double>>*>(&m_bounding_sphere);
+        *sphere = { Vec3d::Zero(), 0.0 };
+
+        using K = CGAL::Simple_cartesian<float>;
+        using Traits = CGAL::Min_sphere_of_points_d_traits_3<K, float>;
+        using Min_sphere = CGAL::Min_sphere_of_spheres_d<Traits>;
+        using Point = K::Point_3;
+
+        std::vector<Point> points;
+        if (m_valid) {
+            for (unsigned int i : m_list) {
+                const GLVolume& volume = *(*m_volumes)[i];
+                const TriangleMesh* hull = volume.convex_hull();
+                const indexed_triangle_set& its = (hull != nullptr) ?
+                    hull->its : m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh().its;
+                const Transform3d& matrix = volume.world_matrix();
+                for (const Vec3f& v : its.vertices) {
+                    const Vec3d vv = matrix * v.cast<double>();
+                    points.push_back(Point(vv.x(), vv.y(), vv.z()));
+                }
+            }
+
+            Min_sphere ms(points.begin(), points.end());
+            const float* center_x = ms.center_cartesian_begin();
+            (*sphere)->first = { *center_x, *(center_x + 1), *(center_x + 2) };
+            (*sphere)->second = ms.radius();
+        }
+    }
+
+    return *m_bounding_sphere;
+}
+
 void Selection::setup_cache()
 {
     if (!m_valid)
@@ -993,15 +1032,15 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 rotation_matrix = inst_matrix_no_offset.inverse() * inst_rotation_matrix * rotation_matrix * inst_rotation_matrix.inverse() * inst_matrix_no_offset;
 
                 // rotate around selection center
-                const Vec3d inst_pivot = inst_trafo.get_matrix_no_offset().inverse() * (m_cache.dragging_center - inst_trafo.get_offset());
+                const Vec3d inst_pivot = inst_trafo.get_matrix_no_offset().inverse() * (m_cache.rotation_pivot - inst_trafo.get_offset());
                 rotation_matrix = Geometry::translation_transform(inst_pivot) * rotation_matrix * Geometry::translation_transform(-inst_pivot);
             }
-            transform_instance_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
+            transform_instance_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.rotation_pivot);
         }
         else {
             if (!is_single_volume_or_modifier()) {
                 assert(transformation_type.world());
-                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
+                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.rotation_pivot);
             }
             else {
                 if (transformation_type.instance()) {
@@ -1027,7 +1066,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                             vol_rotation_matrix.inverse() * inst_scale_matrix * vol_matrix_no_offset;
                     }
                 }
-                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
+                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.rotation_pivot);
             }
         }
     }
@@ -1550,10 +1589,7 @@ void Selection::erase()
         ensure_not_below_bed();
     }
 
-    GLCanvas3D* canvas = wxGetApp().plater()->canvas3D();
-    canvas->set_sequential_clearance_as_evaluating();
-    canvas->set_as_dirty();
-    canvas->request_extra_frame();
+    wxGetApp().plater()->canvas3D()->set_sequential_clearance_as_evaluating();
 }
 
 void Selection::render(float scale_factor)
@@ -2039,6 +2075,7 @@ void Selection::set_caches()
             m_cache.sinking_volumes.push_back(i);
     }
     m_cache.dragging_center = get_bounding_box().center();
+    m_cache.rotation_pivot = get_bounding_sphere().first;
 }
 
 void Selection::do_add_volume(unsigned int volume_idx)

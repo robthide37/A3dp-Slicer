@@ -367,6 +367,10 @@ void PreferencesDialog::build()
 			L("Associate .gcode files to PrusaSlicer G-code Viewer"),
 			L("If enabled, sets PrusaSlicer G-code Viewer as default application to open .gcode files."),
 			app_config->get_bool("associate_gcode"));
+		append_bool_option(m_optgroup_general, "associate_bgcode",
+			L("Associate .bgcode files to PrusaSlicer G-code Viewer"),
+			L("If enabled, sets PrusaSlicer G-code Viewer as default application to open .bgcode files."),
+			app_config->get_bool("associate_bgcode"));
 	}
 #endif // _WIN32
 

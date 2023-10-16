@@ -167,6 +167,7 @@ wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_MOVED, Vec3dEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_ROTATED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_RESET_SKEW, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_SCALED, SimpleEvent);
+wxDECLARE_EVENT(EVT_GLCANVAS_INSTANCE_MIRRORED, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3dEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, Event<bool>);
 wxDECLARE_EVENT(EVT_GLCANVAS_UPDATE_GEOMETRY, Vec3dsEvent<2>);
@@ -618,6 +619,7 @@ private:
         // list of transforms used to render the contours
         std::vector<std::pair<size_t, Transform3d>> m_instances;
         bool m_evaluating{ false };
+        bool m_dragging{ false };
 
         std::vector<std::pair<Pointf3s, Transform3d>> m_hulls_2d_cache;
 
@@ -626,6 +628,10 @@ private:
         void update_instances_trafos(const std::vector<Transform3d>& trafos);
         void render();
         bool empty() const { return m_contours.empty(); }
+
+        void start_dragging() { m_dragging = true; }
+        bool is_dragging() const { return m_dragging; }
+        void stop_dragging() { m_dragging = false; }
 
         friend class GLCanvas3D;
     };
@@ -965,11 +971,18 @@ public:
 
     void reset_sequential_print_clearance() {
         m_sequential_print_clearance.m_evaluating = false;
-        m_sequential_print_clearance.set_contours(ContoursList(), false);
+        if (m_sequential_print_clearance.is_dragging())
+            m_sequential_print_clearance_first_displacement = true;
+        else
+            m_sequential_print_clearance.set_contours(ContoursList(), false);
+        set_as_dirty();
+        request_extra_frame();
     }
 
     void set_sequential_print_clearance_contours(const ContoursList& contours, bool generate_fill) {
         m_sequential_print_clearance.set_contours(contours, generate_fill);
+        set_as_dirty();
+        request_extra_frame();
     }
 
     bool is_sequential_print_clearance_empty() const {
@@ -981,7 +994,11 @@ public:
     }
 
     void update_sequential_clearance(bool force_contours_generation);
-    void set_sequential_clearance_as_evaluating() { m_sequential_print_clearance.m_evaluating = true; }
+    void set_sequential_clearance_as_evaluating() {
+        m_sequential_print_clearance.m_evaluating = true;
+        set_as_dirty();
+        request_extra_frame();
+    }
 
     const Print* fff_print() const;
     const SLAPrint* sla_print() const;

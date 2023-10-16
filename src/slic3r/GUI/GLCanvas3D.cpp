@@ -981,7 +981,7 @@ void GLCanvas3D::SequentialPrintClearance::render()
     glsafe(::glEnable(GL_BLEND));
     glsafe(::glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
-    if (!m_evaluating)
+    if (!m_evaluating && !m_dragging)
         m_fill.render();
 
 #if ENABLE_GL_CORE_PROFILE
@@ -1029,6 +1029,7 @@ wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_MOVED, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_ROTATED, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_RESET_SKEW, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_SCALED, SimpleEvent);
+wxDEFINE_EVENT(EVT_GLCANVAS_INSTANCE_MIRRORED, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_FORCE_UPDATE, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_WIPETOWER_MOVED, Vec3dEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_WIPETOWER_ROTATED, Vec3dEvent);
@@ -3732,6 +3733,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
                         if (!evt.CmdDown())
                             m_mouse.drag.start_position_3D = m_mouse.scene_position;
                         m_sequential_print_clearance_first_displacement = true;
+                        m_sequential_print_clearance.start_dragging();
                     }
                 }
             }
@@ -3856,6 +3858,7 @@ void GLCanvas3D::on_mouse(wxMouseEvent& evt)
         else if (m_mouse.drag.move_volume_idx != -1 && m_mouse.dragging) {
             do_move(L("Move Object"));
             wxGetApp().obj_manipul()->set_dirty();
+            m_sequential_print_clearance.stop_dragging();
             // Let the plater know that the dragging finished, so a delayed refresh
             // of the scene with the background processing data should be performed.
             post_event(SimpleEvent(EVT_GLCANVAS_MOUSE_DRAGGING_FINISHED));
@@ -4328,7 +4331,7 @@ void GLCanvas3D::do_mirror(const std::string& snapshot_type)
     for (int id : obj_idx_for_update_info_items)
         wxGetApp().obj_list()->update_info_items(static_cast<size_t>(id));
 
-    post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
+    post_event(SimpleEvent(EVT_GLCANVAS_INSTANCE_MIRRORED));
 
     m_dirty = true;
 }

@@ -2171,6 +2171,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_ROTATED, [this](SimpleEvent&) { update(); });
         view3D_canvas->Bind(EVT_GLCANVAS_RESET_SKEW, [this](SimpleEvent&) { update(); });
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_SCALED, [this](SimpleEvent&) { update(); });
+        view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_MIRRORED, [this](SimpleEvent&) { update(); });
         view3D_canvas->Bind(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, [this](Event<bool>& evt) { this->sidebar->enable_buttons(evt.data); });
         view3D_canvas->Bind(EVT_GLCANVAS_UPDATE_GEOMETRY, &priv::on_update_geometry, this);
         view3D_canvas->Bind(EVT_GLCANVAS_MOUSE_DRAGGING_STARTED, &priv::on_3dcanvas_mouse_dragging_started, this);
@@ -3386,8 +3387,6 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
                     GLCanvas3D::ContoursList contours;
                     contours.contours = background_process.fff_print()->get_sequential_print_clearance_contours();
                     canvas->set_sequential_print_clearance_contours(contours, true);
-                    canvas->set_as_dirty();
-                    canvas->request_extra_frame();
                 }
             }
         }
@@ -3402,8 +3401,6 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
                     GLCanvas3D::ContoursList contours;
                     contours.contours = background_process.fff_print()->get_sequential_print_clearance_contours();
                     canvas->set_sequential_print_clearance_contours(contours, true);
-                    canvas->set_as_dirty();
-                    canvas->request_extra_frame();
                 }
             }
             std::vector<std::string> warnings;
