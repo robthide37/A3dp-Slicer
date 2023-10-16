@@ -1038,22 +1038,22 @@ std::vector<std::string> create_shape_warnings(const NSVGimage &image, float sca
     size_t shape_index = 0;
     for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next, ++shape_index) {
         if (!(shape->flags & NSVG_FLAGS_VISIBLE)){
-            add_warning(shape_index * 2, GUI::format(_L("Shape(%1%) is marked as invisible "), shape->id));
+            add_warning(shape_index * 2, GUI::format(_L("Shape is marked as invisible (%1%)"), shape->id));
             continue;
         }
 
         std::string fill_warning = create_fill_warning(*shape);
         if (!fill_warning.empty())
-            add_warning(shape_index * 2, GUI::format(_L("Fill of shape(%1%) contain unsupported: %2% "), shape->id, fill_warning));
+            add_warning(shape_index * 2, GUI::format(_L("Fill of shape (%1%) contains unsupported: %2% "), shape->id, fill_warning));
         
         float minimal_width_in_mm = 1e-3f;
         if (shape->strokeWidth <= minimal_width_in_mm * scale) {
-            add_warning(shape_index * 2, GUI::format(_L("Stroke of shape(%1%) is too thin (minimal width is %2% mm)"), shape->id, minimal_width_in_mm));
+            add_warning(shape_index * 2, GUI::format(_L("Stroke of shape (%1%) is too thin (minimal width is %2% mm)"), shape->id, minimal_width_in_mm));
             continue;
         }
         std::string stroke_warning = create_stroke_warning(*shape);
         if (!stroke_warning.empty())
-            add_warning(shape_index * 2 + 1, GUI::format(_L("Stroke of shape(%1%) contain unsupported: %2% "), shape->id, stroke_warning));
+            add_warning(shape_index * 2 + 1, GUI::format(_L("Stroke of shape (%1%) contains unsupported: %2% "), shape->id, stroke_warning));
     }
     return result;
 }
@@ -1338,7 +1338,8 @@ void GLGizmoSVG::draw_preview(){
                     count_of_points += count_points(expoly);
                 }
             }
-            std::string tooltip = GUI::format(_L("SVG contain %1% shapes which creates %2% polygons with %3% line segments"),
+            // TRN: All the three placeholders are numbers
+            std::string tooltip = GUI::format(_L("SVG contains %1% shapes which create %2% polygons with %3% line segments"),
                 count_of_shapes, count_of_expolygons, count_of_points);
             ImGui::SetTooltip("%s", tooltip.c_str());
         }
@@ -1392,7 +1393,7 @@ void GLGizmoSVG::draw_filename(){
 
     is_hovered |= ImGui::IsItemHovered();
     if (is_hovered) {
-        std::string tooltip = GUI::format(_L("SVG file path is \"%1%\" "), es.svg_file.path);
+        std::string tooltip = GUI::format(_L("SVG file path is \"%1%\""), es.svg_file.path);
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
 
@@ -1409,7 +1410,7 @@ void GLGizmoSVG::draw_filename(){
                 file_changed = true;
             }
         } else if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Re-load SVG file from disk.").c_str());
+            ImGui::SetTooltip("%s", _u8L("Reload SVG file from disk.").c_str());
     }
 
     ImGuiComboFlags flags = ImGuiComboFlags_PopupAlignLeft | ImGuiComboFlags_NoPreview;
@@ -1444,7 +1445,7 @@ void GLGizmoSVG::draw_filename(){
                 m_volume_shape.svg_file.path.clear();
                 m_filename_preview.clear();
             } else if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s", _u8L("Don't save local path to SVG file.\n Also disable option to reload from disk.").c_str());
+                ImGui::SetTooltip("%s", _u8L("Do NOT save local path to 3MF file.\n Also disables 'reload from disk' option.").c_str());
             }
         }
         
@@ -1468,11 +1469,13 @@ void GLGizmoSVG::draw_filename(){
                 
         draw(get_icon(m_icons, IconType::bake));
         ImGui::SameLine();
+        // TRN: An menu option to convert the SVG into an unmodifiable model part.
         if (ImGui::Selectable(_u8L("Bake").c_str())) {
             m_volume->emboss_shape.reset();
             close();
         } else if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("%s", _u8L("Bake into model uneditable part and protect yours ©opyright of svg").c_str());
+            // TRN: Tooltip for the menu item.
+            ImGui::SetTooltip("%s", _u8L("Bake into model as uneditable part").c_str());
         }
 
         draw(get_icon(m_icons, IconType::save));
@@ -1481,7 +1484,7 @@ void GLGizmoSVG::draw_filename(){
             wxWindow *parent = nullptr;
             GUI::FileType file_type  = FT_SVG;
             wxString wildcard = file_wildcards(file_type);
-            wxString dlg_title = _L("Export SVG file:");
+            wxString dlg_title = _L("Save SVG file");
             const EmbossShape::SvgFile& svg = m_volume_shape.svg_file;
             wxString dlg_file = from_u8(get_file_name(((!svg.path.empty()) ? svg.path : svg.path_in_3mf))) + ".svg";
             wxFileDialog dlg(parent, dlg_title, last_used_directory, dlg_file, wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
@@ -1584,7 +1587,8 @@ void GLGizmoSVG::draw_size()
         size_t count_points = 0;
         for (const auto &s : m_volume_shape.shapes_with_ids)
             count_points += Slic3r::count_points(s.expoly);
-        ImGui::SetTooltip("%s", GUI::format(_L("Scale also change amout of curve samples(%1%)"), count_points).c_str());
+        // TRN: The placeholder contains a number.
+        ImGui::SetTooltip("%s", GUI::format(_L("Scale also changes amount of curve samples (%1%)"), count_points).c_str());
     }
 
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
@@ -1672,10 +1676,7 @@ void GLGizmoSVG::draw_size()
     if (button(icon, icon_hover, icon))
         m_keep_ratio = !m_keep_ratio;    
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", (m_keep_ratio ?
-            _u8L("Free set of width and height value."):
-            _u8L("Keep same ratio of width to height.")
-        ).c_str());
+        ImGui::SetTooltip("%s", _u8L("Lock/unlock the aspect ratio of the SVG.").c_str());
     
 
     // reset button
@@ -1684,7 +1685,7 @@ void GLGizmoSVG::draw_size()
         if (reset_button(m_icons)) {
             new_relative_scale = Vec3d(1./m_scale_width.value_or(1.f), 1./m_scale_height.value_or(1.f), 1.);
         } else if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Reset scale to loaded one from the SVG").c_str());
+            ImGui::SetTooltip("%s", _u8L("Reset scale").c_str());
     }
 
     if (new_relative_scale.has_value()){
@@ -1743,7 +1744,7 @@ void GLGizmoSVG::draw_distance()
     ImGui::SetNextItemWidth(m_gui_cfg->input_width);
 
     bool use_inch = wxGetApp().app_config->get_bool("use_inches");
-    const wxString move_tooltip = _L("Distance of the center of the text to the model surface.");
+    const wxString move_tooltip = _L("Distance of the center of the SVG to the model surface.");
     bool is_moved = false;
     if (use_inch) {
         std::optional<float> distance_inch;
@@ -1769,7 +1770,7 @@ void GLGizmoSVG::draw_distance()
             m_distance.reset();
             is_moved = true;
         } else if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Reset distance to zero value").c_str());
+            ImGui::SetTooltip("%s", _u8L("Reset distance").c_str());
     }
 
     if (is_moved)
@@ -1815,7 +1816,7 @@ void GLGizmoSVG::draw_rotation()
             if (m_volume->emboss_shape->projection.use_surface)
                 process();
         } else if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", _u8L("Reset rotation to zero value").c_str());
+            ImGui::SetTooltip("%s", _u8L("Reset rotation").c_str());
     }
 
     // Keep up - lock button icon
@@ -1826,10 +1827,7 @@ void GLGizmoSVG::draw_rotation()
         if (button(icon, icon_hover, icon))
             m_keep_up = !m_keep_up;    
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", (m_keep_up?
-                _u8L("Free angle when dragging above the object's surface."):
-                _u8L("Keep same rotation angle when dragging above the object's surface.")
-            ).c_str());
+            ImGui::SetTooltip("%s", _u8L("Lock/unlock rotation angle when dragging above the surface.").c_str());
     }
 }
 
@@ -1841,14 +1839,14 @@ void GLGizmoSVG::draw_mirroring()
     if(clickable(get_icon(m_icons, IconType::reflection_x), get_icon(m_icons, IconType::reflection_x_hover))){
         axis = Axis::X;
     } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", _u8L("Reflect by 2d Y axis").c_str());
+        ImGui::SetTooltip("%s", _u8L("Mirror vertically").c_str());
     }
 
     ImGui::SameLine();
     if (clickable(get_icon(m_icons, IconType::reflection_y), get_icon(m_icons, IconType::reflection_y_hover))) {
         axis = Axis::Y;
     } else if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", _u8L("Reflect by 2d X axis").c_str());
+        ImGui::SetTooltip("%s", _u8L("Mirror horizontally").c_str());
     }
 
     if (axis != Axis::UNKNOWN_AXIS){
@@ -1918,6 +1916,7 @@ void GLGizmoSVG::draw_model_type()
     if (m_volume != nullptr && new_type.has_value() && !is_last_solid_part) {
         GUI_App &app    = wxGetApp();
         Plater * plater = app.plater();
+        // TRN: This is the name of the action that shows in undo/redo stack (changing part type from SVG to something else).
         Plater::TakeSnapshot snapshot(plater, _L("Change SVG Type"), UndoRedo::SnapshotType::GizmoAction);
         m_volume->set_type(*new_type);
 
@@ -2111,17 +2110,17 @@ EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance
     }
     
     if (!boost::filesystem::exists(shape.svg_file.path)) {
-        show_error(nullptr, GUI::format(_u8L("File(%1%) does NOT exists."), shape.svg_file.path));
+        show_error(nullptr, GUI::format(_u8L("File does NOT exist (%1%)."), shape.svg_file.path));
         return {};
     }
 
     if (!boost::algorithm::iends_with(shape.svg_file.path, ".svg")){
-        show_error(nullptr, GUI::format(_u8L("File has to end with \".svg\" but you select: %1%"), shape.svg_file.path));
+        show_error(nullptr, GUI::format(_u8L("Filename has to end with \".svg\" but you selected %1%"), shape.svg_file.path));
         return {};
     }
 
     if(init_image(shape.svg_file) == nullptr) {
-        show_error(nullptr, GUI::format(_u8L("Nano SVG parser can't load from file(%1%)."), shape.svg_file.path));
+        show_error(nullptr, GUI::format(_u8L("Nano SVG parser can't load from file (%1%)."), shape.svg_file.path));
         return {};
     }
 
@@ -2131,7 +2130,7 @@ EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance
 
     // Must contain some shapes !!!
     if (shape.shapes_with_ids.empty()) {
-        show_error(nullptr, GUI::format(_u8L("SVG file(%1%) do NOT contain path to be able embossed."), shape.svg_file.path));
+        show_error(nullptr, GUI::format(_u8L("SVG file does NOT contain a single path to be embossed (%1%)."), shape.svg_file.path));
         return {};
     }
     return shape;

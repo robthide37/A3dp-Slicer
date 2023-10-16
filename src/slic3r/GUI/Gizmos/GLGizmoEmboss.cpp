@@ -3671,7 +3671,7 @@ GuiCfg create_gui_configuration()
 
     // TRN - Input label. Be short as possible
     // Keep vector from bottom to top of text aligned with printer Y axis
-    tr.keep_up = _u8L("Keep Up");
+    tr.keep_up = _u8L("Keep up");
 
     // TRN - Input label. Be short as possible. 
     // Some Font file contain multiple fonts inside and
