@@ -92,7 +92,8 @@ public:
     // Called by Win32 Volume arrived / detached callback.
 	void 		volumes_changed();
 #endif // _WIN32
-
+	// returns copy of m_current_drives (protected by mutex)
+	std::vector<DriveData> get_drive_list();
 private:
 	bool 			 		m_initialized { false };
 	wxEvtHandler*			m_callback_evt_handler { nullptr };

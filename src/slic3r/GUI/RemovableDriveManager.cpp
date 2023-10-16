@@ -1095,4 +1095,11 @@ void RemovableDriveManager::eject_thread_finish()
 }
 #endif // __APPLE__
 
+std::vector<DriveData> RemovableDriveManager::get_drive_list()
+{
+	{
+		std::lock_guard<std::mutex> guard(m_drives_mutex);
+		return m_current_drives;
+	}
+}
 }} // namespace Slic3r::GUI
