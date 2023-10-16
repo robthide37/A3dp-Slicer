@@ -83,6 +83,7 @@ CopyrightsDialog::CopyrightsDialog()
     m_html->Bind(wxEVT_HTML_LINK_CLICKED, &CopyrightsDialog::onLinkClicked, this);
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxCLOSE);
+    wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
     wxGetApp().UpdateDlgDarkUI(this, true);
     this->SetEscapeId(wxID_CLOSE);
     this->Bind(wxEVT_BUTTON, &CopyrightsDialog::onCloseDialog, this, wxID_CLOSE);
@@ -309,16 +310,19 @@ AboutDialog::AboutDialog()
 
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxCLOSE);
+    wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
 
     m_copy_rights_btn_id = NewControlId();
     auto copy_rights_btn = new wxButton(this, m_copy_rights_btn_id, _L("Portions copyright")+dots);
     buttons->Insert(0, copy_rights_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
     copy_rights_btn->Bind(wxEVT_BUTTON, &AboutDialog::onCopyrightBtn, this);
+    wxGetApp().SetWindowVariantForButton(copy_rights_btn);
 
     m_copy_version_btn_id = NewControlId();
     auto copy_version_btn = new wxButton(this, m_copy_version_btn_id, _L("Copy Version Info"));
     buttons->Insert(1, copy_version_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
     copy_version_btn->Bind(wxEVT_BUTTON, &AboutDialog::onCopyToClipboard, this);
+    wxGetApp().SetWindowVariantForButton(copy_version_btn);
 
     wxGetApp().UpdateDlgDarkUI(this, true);
     

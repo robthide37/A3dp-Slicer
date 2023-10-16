@@ -423,6 +423,10 @@ PrinterPicker::PrinterPicker(wxWindow *parent, const VendorProfile &vendor, wxSt
         title_sizer->Add(sel_all, 0, wxRIGHT, BTN_SPACING);
         title_sizer->Add(sel_none);
 
+        wxGetApp().SetWindowVariantForButton(sel_all_std);
+        wxGetApp().SetWindowVariantForButton(sel_all);
+        wxGetApp().SetWindowVariantForButton(sel_none);
+
         wxGetApp().UpdateDarkUI(sel_all_std);
         wxGetApp().UpdateDarkUI(sel_all);
         wxGetApp().UpdateDarkUI(sel_none);
@@ -748,6 +752,9 @@ PageMaterials::PageMaterials(ConfigWizard *parent, Materials *materials, wxStrin
     wxGetApp().UpdateDarkUI(sel_all);
     wxGetApp().UpdateDarkUI(sel_none);
 
+    wxGetApp().SetWindowVariantForButton(sel_all);
+    wxGetApp().SetWindowVariantForButton(sel_none);
+
     grid->Add(new wxBoxSizer(wxHORIZONTAL));
     grid->Add(new wxBoxSizer(wxHORIZONTAL));
     grid->Add(new wxBoxSizer(wxHORIZONTAL));
@@ -861,9 +868,7 @@ void PageMaterials::set_compatible_printers_html_window(const std::vector<std::s
                 "</style>"
                 "<body bgcolor= %s>"
                 "<font color=%s>"
-                "<font size=\"3\">"
                 "%s<br /><br />%s"
-                "</font>"
                 "</font>"
                 "</body>"
                 "</html>"
@@ -886,7 +891,6 @@ void PageMaterials::set_compatible_printers_html_window(const std::vector<std::s
                 "</style>"
                 "<body bgcolor= %s>"
                 "<font color=%s>"
-                "<font size=\"3\">"
                 "%s<br /><br />%s"
                 "<table>"
                 "<tr>"
@@ -907,15 +911,13 @@ void PageMaterials::set_compatible_printers_html_window(const std::vector<std::s
                 "</tr>"
                 "</table>"
                 "</font>"
-                "</font>"
                 "</body>"
                 "</html>"
             );
         }
     }
-       
    
-    wxFont font = get_default_font_for_dpi(this, get_dpi_for_window(this));
+    wxFont font = wxGetApp().normal_font();// get_default_font_for_dpi(this, get_dpi_for_window(this));
     const int fs = font.GetPointSize();
     int size[] = { fs,fs,fs,fs,fs,fs,fs };
     html_window->SetFonts(font.GetFaceName(), font.GetFaceName(), size);
@@ -1421,6 +1423,7 @@ Worker::Worker(wxWindow* parent)
     this->Add(m_input_path, 1, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 
     auto* button_path = new wxButton(m_parent, wxID_ANY, _L("Browse"));
+    wxGetApp().SetWindowVariantForButton(button_path);
     this->Add(button_path, 0, wxEXPAND | wxTOP | wxLEFT, 5);
     button_path->Bind(wxEVT_BUTTON, [this](wxCommandEvent& event) {
         boost::filesystem::path chosen_dest(boost::nowide::narrow(m_input_path->GetValue()));
@@ -3350,6 +3353,12 @@ ConfigWizard::ConfigWizard(wxWindow *parent)
     wxGetApp().UpdateDarkUI(p->btn_next);
     wxGetApp().UpdateDarkUI(p->btn_finish);
     wxGetApp().UpdateDarkUI(p->btn_cancel);
+
+    wxGetApp().SetWindowVariantForButton(p->btn_sel_all);
+    wxGetApp().SetWindowVariantForButton(p->btn_prev);
+    wxGetApp().SetWindowVariantForButton(p->btn_next);
+    wxGetApp().SetWindowVariantForButton(p->btn_finish);
+    wxGetApp().SetWindowVariantForButton(p->btn_cancel);
 
     const auto prusa_it = p->bundles.find("PrusaResearch");
     wxCHECK_RET(prusa_it != p->bundles.cend(), "Vendor PrusaResearch not found");

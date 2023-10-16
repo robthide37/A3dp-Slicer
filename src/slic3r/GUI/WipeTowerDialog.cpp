@@ -42,7 +42,10 @@ RammingDialog::RammingDialog(wxWindow* parent,const std::string& parameters)
 
     auto main_sizer = new wxBoxSizer(wxVERTICAL);
     main_sizer->Add(m_panel_ramming, 1, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
-    main_sizer->Add(CreateButtonSizer(wxOK | wxCANCEL), 0, wxALIGN_CENTER_HORIZONTAL | wxTOP | wxBOTTOM, 10);
+    auto buttons = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
+    Slic3r::GUI::wxGetApp().SetWindowVariantForButton(buttons->GetAffirmativeButton());
+    Slic3r::GUI::wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
+    main_sizer->Add(buttons, 0, wxALIGN_CENTER_HORIZONTAL | wxTOP | wxBOTTOM, 10);
     SetSizer(main_sizer);
     main_sizer->SetSizeHints(this);
 
@@ -181,6 +184,7 @@ WipingDialog::WipingDialog(wxWindow* parent, const std::vector<float>& matrix, c
     update_ui(this);
     auto widget_button = new wxButton(this,wxID_ANY,"-",wxPoint(0,0),wxDefaultSize);
     update_ui(widget_button);
+    Slic3r::GUI::wxGetApp().SetWindowVariantForButton(widget_button);
     m_panel_wiping  = new WipingPanel(this,matrix,extruders, extruder_colours, widget_button);
 
     auto main_sizer = new wxBoxSizer(wxVERTICAL);
@@ -191,7 +195,10 @@ WipingDialog::WipingDialog(wxWindow* parent, const std::vector<float>& matrix, c
 
     main_sizer->Add(m_panel_wiping, 0, wxEXPAND | wxALL, 5);
 	main_sizer->Add(widget_button, 0, wxALIGN_CENTER_HORIZONTAL | wxCENTER | wxBOTTOM, 5);
-    main_sizer->Add(CreateButtonSizer(wxOK | wxCANCEL), 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 10);
+    auto buttons = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
+    Slic3r::GUI::wxGetApp().SetWindowVariantForButton(buttons->GetAffirmativeButton());
+    Slic3r::GUI::wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
+    main_sizer->Add(buttons, 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 10);
     SetSizer(main_sizer);
     main_sizer->SetSizeHints(this);
 

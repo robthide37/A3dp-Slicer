@@ -511,7 +511,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
 
     auto wiping_dialog_btn = [this](wxWindow* parent) {
         m_wiping_dialog_button = new wxButton(parent, wxID_ANY, _L("Purging volumes") + dots, wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
-        m_wiping_dialog_button->SetFont(wxGetApp().normal_font());
+        wxGetApp().SetWindowVariantForButton(m_wiping_dialog_button);
         wxGetApp().UpdateDarkUI(m_wiping_dialog_button, true);
 
         auto sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -939,6 +939,7 @@ Sidebar::Sidebar(Plater *parent)
 #endif //__APPLE__
         ScalableBitmap bmp = ScalableBitmap(this, icon_name, bmp_px_cnt);
         *btn = new ScalableButton(this, wxID_ANY, bmp, "", wxBU_EXACTFIT);
+        wxGetApp().SetWindowVariantForButton((*btn));
 
 #ifdef _WIN32
         (*btn)->Bind(wxEVT_ENTER_WINDOW, [tooltip, btn, this](wxMouseEvent& event) {
@@ -970,6 +971,7 @@ Sidebar::Sidebar(Plater *parent)
     auto init_btn = [this](wxButton **btn, wxString label, const int button_height) {
         *btn = new wxButton(this, wxID_ANY, label, wxDefaultPosition,
                             wxSize(-1, button_height), wxBU_EXACTFIT);
+        wxGetApp().SetWindowVariantForButton((*btn));
         (*btn)->SetFont(wxGetApp().bold_font());
         wxGetApp().UpdateDarkUI((*btn), true);
     };
@@ -979,7 +981,7 @@ Sidebar::Sidebar(Plater *parent)
 
     enable_buttons(false);
 
-    auto *btns_sizer = new wxBoxSizer(wxVERTICAL);
+    auto *btns_sizer = new wxBoxSizer(wxHORIZONTAL);
 
     auto* complect_btns_sizer = new wxBoxSizer(wxHORIZONTAL);
     complect_btns_sizer->Add(p->btn_export_gcode, 1, wxEXPAND);
@@ -988,8 +990,8 @@ Sidebar::Sidebar(Plater *parent)
 //    complect_btns_sizer->Add(p->btn_eject_device);
 	
 
-    btns_sizer->Add(p->btn_reslice, 0, wxEXPAND | wxTOP, margin_5);
-    btns_sizer->Add(complect_btns_sizer, 0, wxEXPAND | wxTOP, margin_5);
+    btns_sizer->Add(p->btn_reslice, 1, wxEXPAND | wxTOP | wxBOTTOM, margin_5);
+    btns_sizer->Add(complect_btns_sizer, 1, wxEXPAND | wxTOP | wxBOTTOM, margin_5);
 
     auto *sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(p->scrolled, 1, wxEXPAND);
@@ -5301,7 +5303,7 @@ void Sidebar::set_btn_label(const ActionButtonType btn_type, const wxString& lab
 // Plater / Public
 
 Plater::Plater(wxWindow *parent, MainFrame *main_frame)
-    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxGetApp().get_min_size())
+    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxGetApp().get_min_size(parent))
     , p(new priv(this, main_frame))
 {
     // Initialization performed in the private c-tor

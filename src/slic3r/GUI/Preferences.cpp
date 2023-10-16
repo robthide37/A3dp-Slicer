@@ -687,6 +687,8 @@ void PreferencesDialog::build()
 	sizer->Add(tabs, 1, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 
 	auto buttons = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
+	wxGetApp().SetWindowVariantForButton(buttons->GetAffirmativeButton());
+	wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
 	this->Bind(wxEVT_BUTTON, &PreferencesDialog::accept, this, wxID_OK);
 	this->Bind(wxEVT_BUTTON, &PreferencesDialog::revert, this, wxID_CANCEL);
 
