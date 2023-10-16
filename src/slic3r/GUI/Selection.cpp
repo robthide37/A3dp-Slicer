@@ -29,11 +29,9 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/log/trivial.hpp>
 
-#if ENABLE_CGAL_BOUNDING_SPHERE
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/Min_sphere_of_spheres_d.h>
 #include <CGAL/Min_sphere_of_points_d_traits_3.h>
-#endif // ENABLE_CGAL_BOUNDING_SPHERE
 
 static const Slic3r::ColorRGBA UNIFORM_SCALE_COLOR     = Slic3r::ColorRGBA::ORANGE();
 static const Slic3r::ColorRGBA SOLID_PLANE_COLOR       = Slic3r::ColorRGBA::ORANGE();
@@ -912,7 +910,6 @@ BoundingBoxf Selection::get_screen_space_bounding_box()
     return ss_box;
 }
 
-#if ENABLE_CGAL_BOUNDING_SPHERE
 const std::pair<Vec3d, double> Selection::get_bounding_sphere() const
 {
     if (!m_bounding_sphere.has_value()) {
@@ -947,7 +944,6 @@ const std::pair<Vec3d, double> Selection::get_bounding_sphere() const
 
     return *m_bounding_sphere;
 }
-#endif // ENABLE_CGAL_BOUNDING_SPHERE
 
 void Selection::setup_cache()
 {
@@ -1036,27 +1032,15 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 rotation_matrix = inst_matrix_no_offset.inverse() * inst_rotation_matrix * rotation_matrix * inst_rotation_matrix.inverse() * inst_matrix_no_offset;
 
                 // rotate around selection center
-#if ENABLE_CGAL_BOUNDING_SPHERE
                 const Vec3d inst_pivot = inst_trafo.get_matrix_no_offset().inverse() * (m_cache.rotation_pivot - inst_trafo.get_offset());
-#else
-                const Vec3d inst_pivot = inst_trafo.get_matrix_no_offset().inverse() * (m_cache.dragging_center - inst_trafo.get_offset());
-#endif // ENABLE_CGAL_BOUNDING_SPHERE
                 rotation_matrix = Geometry::translation_transform(inst_pivot) * rotation_matrix * Geometry::translation_transform(-inst_pivot);
             }
-#if ENABLE_CGAL_BOUNDING_SPHERE
             transform_instance_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.rotation_pivot);
-#else
-            transform_instance_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
-#endif // ENABLE_CGAL_BOUNDING_SPHERE
         }
         else {
             if (!is_single_volume_or_modifier()) {
                 assert(transformation_type.world());
-#if ENABLE_CGAL_BOUNDING_SPHERE
                 transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.rotation_pivot);
-#else
-                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
-#endif // ENABLE_CGAL_BOUNDING_SPHERE
             }
             else {
                 if (transformation_type.instance()) {
@@ -1082,11 +1066,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                             vol_rotation_matrix.inverse() * inst_scale_matrix * vol_matrix_no_offset;
                     }
                 }
-#if ENABLE_CGAL_BOUNDING_SPHERE
                 transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.rotation_pivot);
-#else
-                transform_volume_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.dragging_center);
-#endif // ENABLE_CGAL_BOUNDING_SPHERE
             }
         }
     }
@@ -2095,10 +2075,7 @@ void Selection::set_caches()
             m_cache.sinking_volumes.push_back(i);
     }
     m_cache.dragging_center = get_bounding_box().center();
-#if ENABLE_CGAL_BOUNDING_SPHERE
     m_cache.rotation_pivot = get_bounding_sphere().first;
-//    m_cache.dragging_center = m_cache.rotation_pivot;
-#endif // ENABLE_CGAL_BOUNDING_SPHERE
 }
 
 void Selection::do_add_volume(unsigned int volume_idx)
