@@ -1431,8 +1431,8 @@ void GLGizmoSVG::draw_preview(){
                     count_of_points += count_points(expoly);
                 }
             }
-            // TRN: All the three placeholders are numbers
-            std::string tooltip = GUI::format(_L("SVG contains %1% shapes which create %2% polygons with %3% line segments"),
+            // Do not translate it is only for debug
+            std::string tooltip = GUI::format("%1% shapes, which create %2% polygons with %3% line segments",
                 count_of_shapes, count_of_expolygons, count_of_points);
             ImGui::SetTooltip("%s", tooltip.c_str());
         }
