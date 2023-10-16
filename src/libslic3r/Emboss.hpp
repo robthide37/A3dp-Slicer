@@ -18,6 +18,13 @@
 
 namespace Slic3r {
 
+// Extend expolygons with information whether it was successfull healed
+struct HealedExPolygons{
+    ExPolygons expolygons;
+    bool is_healed;
+    operator ExPolygons&() { return expolygons; }
+};
+
 /// <summary>
 /// class with only static function add ability to engraved OR raised
 /// text OR polygons onto model surface
@@ -153,7 +160,7 @@ namespace Emboss
     /// <param name="font_prop">User defined property of the font</param>
     /// <param name="was_canceled">Way to interupt processing</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    ExPolygons        text2shapes (FontFileWithCache &font, const char *text,         const FontProp &font_prop, const std::function<bool()> &was_canceled = []() {return false;});
+    HealedExPolygons  text2shapes (FontFileWithCache &font, const char *text,         const FontProp &font_prop, const std::function<bool()> &was_canceled = []() {return false;});
     ExPolygonsWithIds text2vshapes(FontFileWithCache &font, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled = []() {return false;});
 
     const unsigned ENTER_UNICODE = static_cast<unsigned>('\n');
@@ -169,7 +176,7 @@ namespace Emboss
     /// <param name="is_non_zero">Fill type ClipperLib::pftNonZero for overlapping otherwise </param>
     /// <param name="max_iteration">Look at heal_expolygon()::max_iteration</param>
     /// <returns>Healed shapes with flag is fully healed</returns>
-    std::pair<ExPolygons, bool> heal_polygons(const Polygons &shape, bool is_non_zero = true, unsigned max_iteration = 10);
+    HealedExPolygons heal_polygons(const Polygons &shape, bool is_non_zero = true, unsigned max_iteration = 10);
 
     /// <summary>
     /// NOTE: call Slic3r::union_ex before this call
@@ -467,9 +474,9 @@ namespace Emboss
 void translate(ExPolygonsWithIds &e, const Point &p);
 BoundingBox get_extents(const ExPolygonsWithIds &e);
 void center(ExPolygonsWithIds &e);
-ExPolygons union_ex(const ExPolygonsWithIds &shapes);
+HealedExPolygons union_ex(const ExPolygonsWithIds &shapes, unsigned max_heal_iteration);
 // delta .. safe offset before union (use as boolean close)
 // NOTE: remove unprintable spaces between neighbor curves (made by linearization of curve)
-ExPolygons union_with_delta(const ExPolygonsWithIds &shapes, float delta);
+HealedExPolygons union_with_delta(const ExPolygonsWithIds &shapes, float delta, unsigned max_heal_iteration);
 } // namespace Slic3r
 #endif // slic3r_Emboss_hpp_

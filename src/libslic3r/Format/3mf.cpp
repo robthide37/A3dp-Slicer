@@ -181,6 +181,7 @@ static constexpr const char *FONT_WEIGHT_ATTR    = "weight";
 // Store / load of EmbossShape
 static constexpr const char *SHAPE_TAG = "slic3rpe:shape";
 static constexpr const char *SHAPE_SCALE_ATTR   = "scale";
+static constexpr const char *UNHEALED_ATTR = "unhealed";
 static constexpr const char *SVG_FILE_PATH_ATTR = "filepath";
 static constexpr const char *SVG_FILE_PATH_IN_3MF_ATTR = "filepath3mf";
 
@@ -3855,12 +3856,15 @@ void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume 
     
     stream << SHAPE_SCALE_ATTR << "=\"" << es.scale << "\" ";
 
+    if (!es.is_healed)
+        stream << UNHEALED_ATTR << "=\"" << 1 << "\" ";
+
     // projection
     const EmbossProjection &p = es.projection;
     stream << DEPTH_ATTR << "=\"" << p.depth << "\" ";
     if (p.use_surface)
         stream << USE_SURFACE_ATTR << "=\"" << 1 << "\" ";
-        
+    
     // FIX of baked transformation
     Transform3d fix = create_fix(es.fix_3mf_tr, volume);
     stream << TRANSFORM_ATTR << "=\"";
@@ -3872,6 +3876,8 @@ void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume 
 
 std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned int num_attributes) {    
     double scale = get_attribute_value_float(attributes, num_attributes, SHAPE_SCALE_ATTR);
+    int unhealed = get_attribute_value_int(attributes, num_attributes, UNHEALED_ATTR);
+    bool is_healed = unhealed != 1;
 
     EmbossProjection projection;
     projection.depth = get_attribute_value_float(attributes, num_attributes, DEPTH_ATTR);
@@ -3893,7 +3899,7 @@ std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned i
     ExPolygonsWithIds shapes; // TODO: need to implement 
 
     EmbossShape::SvgFile svg{file_path, file_path_3mf};
-    return EmbossShape{shapes, scale, std::move(projection), std::move(fix_tr_mat), std::move(svg)};
+    return EmbossShape{shapes, scale, std::move(projection), std::move(fix_tr_mat), std::move(svg), is_healed};
 }
 
 

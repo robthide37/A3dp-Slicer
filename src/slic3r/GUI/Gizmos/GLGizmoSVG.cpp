@@ -777,8 +777,57 @@ void wu_draw_line(Linef line,
     }
 }
 
+template<unsigned int N> // N .. count of channels per pixel
+void draw_side_outline(const ExPolygons &shape, const std::array<unsigned char, N> &color, std::vector<unsigned char> &data, size_t data_width, double scale)
+{
+    int count_lines = data.size() / (N * data_width);
+    size_t data_line  = N * data_width;
+    auto get_offset  = [count_lines, data_line](int x, int y) {
+        // NOTE: y has opposit direction in texture
+        return (count_lines - y - 1) * data_line + x * N;
+    };
+
+    // overlap color
+    auto draw = [&data, data_width, count_lines, get_offset, &color](int x, int y, float brightess) {
+        if (x < 0 || y < 0 || x >= data_width || y >= count_lines)
+            return; // out of image
+        size_t offset = get_offset(x, y);
+        bool change_color = false;
+        for (size_t i = 0; i < N - 1; ++i) {
+            if(data[offset + i] != color[i]){
+                data[offset + i] = color[i];        
+                change_color = true;
+            }
+        }
+
+        unsigned char &alpha = data[offset + N - 1];
+        if (alpha == 0 || change_color){
+            alpha = static_cast<unsigned char>(std::round(brightess * 255));
+        } else if (alpha != 255){
+            alpha = static_cast<unsigned char>(std::min(255, int(alpha) + static_cast<int>(std::round(brightess * 255))));
+        }
+    };
+
+    BoundingBox bb_unscaled = get_extents(shape);
+    Linesf lines = to_linesf(shape);
+    BoundingBoxf bb(bb_unscaled.min.cast<double>(), bb_unscaled.max.cast<double>());
+
+    // scale lines to pixels
+    if (!is_approx(scale, 1.)) {
+        for (Linef &line : lines) {
+            line.a *= scale;
+            line.b *= scale;
+        }
+        bb.min *= scale;
+        bb.max *= scale;
+    }
+
+    for (const Linef &line : lines)
+        wu_draw_line_side(line, draw);
+}
+
 /// <summary>
-/// Draw filled ExPolygon into data 
+/// Draw filled ExPolygon into data
 /// line by line inspired by: http://alienryderflex.com/polygon_fill/
 /// </summary>
 /// <typeparam name="N">Count channels for one pixel(RGBA = 4)</typeparam>
@@ -809,7 +858,6 @@ void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& co
         bb.min *= scale;
         bb.max *= scale;
     }
-    auto tree = Slic3r::AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
 
     int count_lines = data.size() / (N * data_width);
     size_t data_line = N * data_width;
@@ -839,8 +887,11 @@ void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& co
             alpha = static_cast<unsigned char>(std::min(255, int(alpha) + static_cast<int>(std::round(brightess * 255))));
         }
     };
-    for (const Linef& line: lines) wu_draw_line_side(line, draw);
+
+    for (const Linef& line: lines) 
+        wu_draw_line_side(line, draw);
     
+    auto tree = Slic3r::AABBTreeLines::build_aabb_tree_over_indexed_lines(lines);
 
     // range for intersection line
     double x1 = bb.min.x() - 1.f;
@@ -883,7 +934,7 @@ void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& co
 }
 
 // init texture by draw expolygons into texture
-bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, unsigned max_size_px){
+bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, unsigned max_size_px, const std::vector<std::string>& shape_warnings){
     BoundingBox bb = get_extents(shapes_with_ids);
     Point  bb_size   = bb.size();
     double bb_width  = bb_size.x(); // [in mm]
@@ -914,12 +965,35 @@ bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, un
     shape = union_ex(shape);
 
     // align to texture
-    for (ExPolygon& expolygon: shape)
-        expolygon.translate(-bb.min);
-
+    translate(shape, -bb.min);
+    size_t texture_width = static_cast<size_t>(texture.width);
     unsigned char alpha = 255; // without transparency
-    std::array<unsigned char, 4> color{201, 201, 201, alpha};
-    draw_filled<4>(shape, color, data, (size_t)texture.width, scale);
+    std::array<unsigned char, 4> color_shape{201, 201, 201, alpha}; // from degin by @JosefZachar
+    std::array<unsigned char, 4> color_error{237, 28, 36, alpha}; // from icon: resources/icons/flag_red.svg
+    std::array<unsigned char, 4> color_warning{237, 107, 33, alpha}; // icons orange
+    // draw unhealedable shape
+    for (const ExPolygonsWithId &shapes_with_id : shapes_with_ids)
+        if (!shapes_with_id.is_healed) {
+            ExPolygons bad_shape = shapes_with_id.expoly; // copy
+            translate(bad_shape, -bb.min); // align to texture
+            draw_side_outline<4>(bad_shape, color_error, data, texture_width, scale);
+        }
+    // Draw shape with warning
+    if (!shape_warnings.empty()) {
+        for (const ExPolygonsWithId &shapes_with_id : shapes_with_ids){
+            assert(shapes_with_id.id < shape_warnings.size());
+            if (shapes_with_id.id >= shape_warnings.size())
+                continue;
+            if (shape_warnings[shapes_with_id.id].empty())
+                continue; // no warnings for shape
+            ExPolygons warn_shape = shapes_with_id.expoly; // copy
+            translate(warn_shape, -bb.min); // align to texture
+            draw_side_outline<4>(warn_shape, color_warning, data, texture_width, scale);
+        }
+    }
+
+    // Draw rest of shape
+    draw_filled<4>(shape, color_shape, data, texture_width, scale);
 
     // sends data to gpu 
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
@@ -1027,13 +1101,32 @@ std::string create_stroke_warning(const NSVGshape &shape) {
 /// <param name="image">Input svg loaded to shapes</param>
 /// <returns>Vector of warnings with same size as EmbossShape::shapes_with_ids
 /// or Empty when no warnings -> for fast checking that every thing is all right(more common case) </returns>
-std::vector<std::string> create_shape_warnings(const NSVGimage &image, float scale){
+std::vector<std::string> create_shape_warnings(const EmbossShape &shape, float scale){
+    assert(shape.svg_file.image != nullptr);
+    if (shape.svg_file.image == nullptr)
+        return {std::string{"Uninitialized SVG image"}};
+
+    const NSVGimage &image = *shape.svg_file.image;
     std::vector<std::string> result;
     auto add_warning = [&result, &image](size_t index, const std::string &message) {
         if (result.empty())
             result = std::vector<std::string>(get_shapes_count(image) * 2);
-        result[index] = message;
+        std::string &res = result[index];
+        if (res.empty())
+            res = message;
+        else
+            res += '\n' + message;
     };
+
+    if (!shape.is_healed) {
+        for (const ExPolygonsWithId &i : shape.shapes_with_ids)
+            if (!i.is_healed)
+                add_warning(i.id, _u8L("Path can't be healed from selfintersection and multiple points."));
+
+        // This waning is not connected to NSVGshape. It is about union of paths, but Zero index is shown first
+        size_t index = 0;
+        add_warning(index, _u8L("Final shape constains selfintersection or multiple points with same coordinate"));
+    }
 
     size_t shape_index = 0;
     for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next, ++shape_index) {
@@ -1114,8 +1207,8 @@ void GLGizmoSVG::set_volume_by_selection()
 
     m_volume = volume;
     m_volume_id = volume->id();
-    m_volume_shape = *volume->emboss_shape; // copy
-    m_shape_warnings = create_shape_warnings(image, get_scale_for_tolerance());
+    m_volume_shape = es; // copy
+    m_shape_warnings = create_shape_warnings(es, get_scale_for_tolerance());
 
     // Calculate current angle of up vector
     m_angle    = calculate_angle(selection);
@@ -1303,7 +1396,7 @@ void GLGizmoSVG::draw_preview(){
     // drag&drop is out of rendering scope so texture must be created on this place
     if (m_texture.id == 0) {
         const ExPolygonsWithIds &shapes = m_volume->emboss_shape->shapes_with_ids;
-        init_texture(m_texture, shapes, m_gui_cfg->texture_max_size_px);
+        init_texture(m_texture, shapes, m_gui_cfg->texture_max_size_px, m_shape_warnings);
     }
 
     //::draw(m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
@@ -1535,8 +1628,8 @@ void GLGizmoSVG::draw_filename(){
         EmbossShape es_ = select_shape(m_volume_shape.svg_file.path, tes_tol);
         m_volume_shape.svg_file = std::move(es_.svg_file);
         m_volume_shape.shapes_with_ids = std::move(es_.shapes_with_ids);
-        m_shape_warnings = create_shape_warnings(*m_volume_shape.svg_file.image, scale);
-        init_texture(m_texture, m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px);
+        m_shape_warnings = create_shape_warnings(m_volume_shape, scale);
+        init_texture(m_texture, m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px, m_shape_warnings);
         process();
     }
 }

@@ -30,6 +30,7 @@ const double ASCENT_CENTER = 1/3.; // 0.5 is above small letter
 // every glyph's shape point is divided by SHAPE_SCALE - increase precission of fixed point value
 // stored in fonts (to be able represents curve by sequence of lines)
 static constexpr double SHAPE_SCALE = 0.001; // SCALING_FACTOR promile is fine enough
+static unsigned MAX_HEAL_ITERATION_OF_TEXT = 10;
 
 using namespace Slic3r;
 using namespace Emboss;
@@ -432,7 +433,7 @@ bool Emboss::divide_segments_for_close_point(ExPolygons &expolygons, double dist
     return true;
 }
 
-std::pair<ExPolygons, bool> Emboss::heal_polygons(const Polygons &shape, bool is_non_zero, unsigned int max_iteration)
+HealedExPolygons Emboss::heal_polygons(const Polygons &shape, bool is_non_zero, unsigned int max_iteration)
 {
     const double clean_distance = 1.415; // little grater than sqrt(2)
     ClipperLib::PolyFillType fill_type = is_non_zero ? 
@@ -621,7 +622,7 @@ bool heal_dupl_inter(ExPolygons &shape, unsigned max_iteration)
         if (fill_trouble_holes(holes, duplicate_points, intersection_points, shape)) {
             holes.clear(); 
             continue;
-        }
+        } 
 
         holes.clear();
         holes.reserve(intersections.size() + duplicate_points.size());
@@ -785,7 +786,7 @@ std::optional<Glyph> get_glyph(const stbtt_fontinfo &font_info, int unicode_lett
         // https://docs.microsoft.com/en-us/typography/opentype/spec/ttch01
         // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM01/Chap1.html
         bool is_non_zero = true;
-        glyph.shape = Emboss::heal_polygons(glyph_polygons, is_non_zero, max_iteration).first;
+        glyph.shape = Emboss::heal_polygons(glyph_polygons, is_non_zero, max_iteration);
     }
     return glyph;
 }
@@ -1279,7 +1280,7 @@ const int CANCEL_CHECK = 10;
 } // namespace
 
 /// Union shape defined by glyphs
-ExPolygons Slic3r::union_ex(const ExPolygonsWithIds &shapes)
+HealedExPolygons Slic3r::union_ex(const ExPolygonsWithIds &shapes, unsigned max_heal_iteration)
 {
     // unify to one expolygon
     ExPolygons result;
@@ -1289,11 +1290,12 @@ ExPolygons Slic3r::union_ex(const ExPolygonsWithIds &shapes)
         expolygons_append(result, shape.expoly);
     }
     result = union_ex(result);
-    bool is_healed = heal_expolygons(result);
-    return result;
+
+    bool is_healed = heal_expolygons(result, max_heal_iteration);
+    return {result, is_healed};
 }
 
-ExPolygons Slic3r::union_with_delta(const ExPolygonsWithIds &shapes, float delta)
+HealedExPolygons Slic3r::union_with_delta(const ExPolygonsWithIds &shapes, float delta, unsigned max_heal_iteration)
 {
     // unify to one expolygons
     ExPolygons expolygons;
@@ -1303,22 +1305,22 @@ ExPolygons Slic3r::union_with_delta(const ExPolygonsWithIds &shapes, float delta
         expolygons_append(expolygons, offset_ex(shape.expoly, delta));
     }
     ExPolygons result = union_ex(expolygons);
-    result            = offset_ex(result, -delta);
-    bool is_healed    = heal_expolygons(result);
-    return result;
+    result         = offset_ex(result, -delta);
+    bool is_healed = heal_expolygons(result, max_heal_iteration);
+    return {result, is_healed};
 }
 
-void Slic3r::translate(ExPolygonsWithIds &e, const Point &p)
+void Slic3r::translate(ExPolygonsWithIds &expolygons_with_ids, const Point &p)
 {
-    for (auto &[id, expoly] : e)
-        translate(expoly, p);
+    for (ExPolygonsWithId &expolygons_with_id : expolygons_with_ids)
+        translate(expolygons_with_id.expoly, p);
 }
 
-BoundingBox Slic3r::get_extents(const ExPolygonsWithIds &e)
+BoundingBox Slic3r::get_extents(const ExPolygonsWithIds &expolygons_with_ids)
 {
     BoundingBox bb;
-    for (auto &[id, expoly] : e)
-        bb.merge(get_extents(expoly));
+    for (const ExPolygonsWithId &expolygons_with_id : expolygons_with_ids)        
+        bb.merge(get_extents(expolygons_with_id.expoly));
     return bb;
 }
 
@@ -1328,11 +1330,13 @@ void Slic3r::center(ExPolygonsWithIds &e)
     translate(e, -bb.center());
 }
 
-ExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache, const char *text, const FontProp &font_prop, const std::function<bool()>& was_canceled)
+HealedExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache, const char *text, const FontProp &font_prop, const std::function<bool()>& was_canceled)
 {
     std::wstring text_w = boost::nowide::widen(text);
     ExPolygonsWithIds vshapes = text2vshapes(font_with_cache, text_w, font_prop, was_canceled);
-    return union_ex(vshapes);
+
+    float delta = static_cast<float>(1. / SHAPE_SCALE);
+    return union_with_delta(vshapes, delta, MAX_HEAL_ITERATION_OF_TEXT);
 }
 
 namespace {

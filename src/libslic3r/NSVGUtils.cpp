@@ -18,8 +18,8 @@ struct LinesPath{
     Polygons polygons;
     Polylines polylines; };
 LinesPath linearize_path(NSVGpath *first_path, const NSVGLineParams &param);
-ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param);
-ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param);
+HealedExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param);
+HealedExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param);
 } // namespace
 
 namespace Slic3r {
@@ -45,11 +45,13 @@ ExPolygonsWithIds create_shape_with_ids(const NSVGimage &image, const NSVGLinePa
 
         if (is_fill_used) {
             unsigned unique_id = static_cast<unsigned>(2 * shape_id);
-            result.push_back({unique_id, fill_to_expolygons(lines_path, shape, param)});
+            HealedExPolygons expoly = fill_to_expolygons(lines_path, shape, param);
+            result.push_back({unique_id, expoly.expolygons, expoly.is_healed});
         }        
         if (is_stroke_used) {
             unsigned unique_id = static_cast<unsigned>(2 * shape_id + 1);
-            result.push_back({unique_id, stroke_to_expolygons(lines_path, shape, param)});
+            HealedExPolygons expoly = stroke_to_expolygons(lines_path, shape, param);
+            result.push_back({unique_id, expoly.expolygons, expoly.is_healed});
         }
     }
 
@@ -352,7 +354,7 @@ LinesPath linearize_path(NSVGpath *first_path, const NSVGLineParams &param)
     return result;
 }
 
-ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param)
+HealedExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param)
 {
     Polygons fill = lines_path.polygons; // copy
 
@@ -366,7 +368,7 @@ ExPolygons fill_to_expolygons(const LinesPath &lines_path, const NSVGshape &shap
     if (shape.fillRule == NSVGfillRule::NSVG_FILLRULE_EVENODD)
         is_non_zero = false;
 
-    return Emboss::heal_polygons(fill, is_non_zero, param.max_heal_iteration).first;
+    return Emboss::heal_polygons(fill, is_non_zero, param.max_heal_iteration);
 }
 
 struct DashesParam{
@@ -475,7 +477,7 @@ Polylines to_dashes(const Polyline &polyline, const DashesParam& param)
     return dashes;
 }
 
-ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param)
+HealedExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &shape, const NSVGLineParams &param)
 {
     // convert stroke to polygon
     ClipperLib::JoinType join_type = ClipperLib::JoinType::jtSquare;
@@ -515,7 +517,7 @@ ExPolygons stroke_to_expolygons(const LinesPath &lines_path, const NSVGshape &sh
     }
 
     bool is_non_zero = true;
-    return Emboss::heal_polygons(result, is_non_zero, param.max_heal_iteration).first;
+    return Emboss::heal_polygons(result, is_non_zero, param.max_heal_iteration);
 }
 
 } // namespace
