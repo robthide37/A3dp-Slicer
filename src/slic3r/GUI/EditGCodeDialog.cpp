@@ -159,15 +159,15 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
 
     // Add slicing states placeholders
 
-    wxDataViewItem slicing_state = m_params_list->AppendGroup(_L("[Global] Slicing State"), "re_slice");
+    wxDataViewItem slicing_state = m_params_list->AppendGroup(_L("[Global] Slicing state"), "re_slice");
     if (!cgp_ro_slicing_states_config_def.empty()) {
-        wxDataViewItem read_only = m_params_list->AppendSubGroup(slicing_state, _L("Read Only"), "lock_closed");
+        wxDataViewItem read_only = m_params_list->AppendSubGroup(slicing_state, _L("Read only"), "lock_closed");
         for (const auto& [opt_key, def]: cgp_ro_slicing_states_config_def.options)
             m_params_list->AppendParam(read_only, get_type(opt_key, def), opt_key);
     }
 
     if (!cgp_rw_slicing_states_config_def.empty()) {
-        wxDataViewItem read_write = m_params_list->AppendSubGroup(slicing_state, _L("Read Write"), "lock_open");
+        wxDataViewItem read_write = m_params_list->AppendSubGroup(slicing_state, _L("Read write"), "lock_open");
         for (const auto& [opt_key, def] : cgp_rw_slicing_states_config_def.options)
             m_params_list->AppendParam(read_write, get_type(opt_key, def), opt_key);
     }
@@ -175,7 +175,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
     // add other universal params, which are related to slicing state
 
     if (!cgp_other_slicing_states_config_def.empty()) {
-        slicing_state = m_params_list->AppendGroup(_L("Slicing State"), "re_slice");
+        slicing_state = m_params_list->AppendGroup(_L("Slicing state"), "re_slice");
         for (const auto& [opt_key, def] : cgp_other_slicing_states_config_def.options)
             m_params_list->AppendParam(slicing_state, get_type(opt_key, def), opt_key);
     }
@@ -186,7 +186,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
         // Add print statistics subgroup
 
         if (!cgp_print_statistics_config_def.empty()) {
-            wxDataViewItem statistics = m_params_list->AppendGroup(_L("Print Statistics"), "info");
+            wxDataViewItem statistics = m_params_list->AppendGroup(_L("Print statistics"), "info");
             for (const auto& [opt_key, def] : cgp_print_statistics_config_def.options)
                 m_params_list->AppendParam(statistics, get_type(opt_key, def), opt_key);
         }
@@ -194,7 +194,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
         // Add objects info subgroup
 
         if (!cgp_objects_info_config_def.empty()) {
-            wxDataViewItem objects_info = m_params_list->AppendGroup(_L("Objects Info"), "advanced_plus");
+            wxDataViewItem objects_info = m_params_list->AppendGroup(_L("Objects info"), "advanced_plus");
             for (const auto& [opt_key, def] : cgp_objects_info_config_def.options)
                 m_params_list->AppendParam(objects_info, get_type(opt_key, def), opt_key);
         }
