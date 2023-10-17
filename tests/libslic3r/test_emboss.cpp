@@ -195,15 +195,17 @@ TEST_CASE("Visualize glyph from font", "[Emboss]")
 #endif // VISUALIZE
 
 #include "test_utils.hpp"
-#include "nanosvg/nanosvg.h"    // load SVG file
-#include "libslic3r/NSVGUtils.hpp"
+#include <nanosvg/nanosvg.h>    // load SVG file
+#include <libslic3r/NSVGUtils.hpp>
+#include <libslic3r/IntersectionPoints.hpp>
 ExPolygons heal_and_check(const Polygons &polygons)
 {
-    Pointfs intersections_prev = intersection_points(polygons);
+    IntersectionsLines intersections_prev = get_intersections(polygons);
     Points  polygons_points    = to_points(polygons);
     Points  duplicits_prev     = collect_duplicates(polygons_points);
 
-    ExPolygons shape = Emboss::heal_polygons(polygons);
+    auto [shape, success] = Emboss::heal_polygons(polygons);
+    CHECK(success);
 
     // Is default shape for unhealabled shape?
     bool is_default_shape = 
@@ -213,7 +215,7 @@ ExPolygons heal_and_check(const Polygons &polygons)
         shape.front().holes.front().points.size() == 4 ;
     CHECK(!is_default_shape);
 
-    Pointfs intersections = intersection_points(shape);
+    IntersectionsLines intersections = get_intersections(shape);
     Points  shape_points  = to_points(shape);
     Points  duplicits     = collect_duplicates(shape_points);
     //{
