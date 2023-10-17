@@ -3071,7 +3071,6 @@ std::string GCodeGenerator::_extrude(
     Vec2d prev = GCodeFormatter::quantize(prev_exact);
     auto  it   = path.begin();
     auto  end  = path.end();
-    const bool emit_radius = m_config.arc_fitting == ArcFittingType::EmitRadius;
     for (++ it; it != end; ++ it) {
         Vec2d p_exact = this->point_to_gcode(it->point);
         Vec2d p = GCodeFormatter::quantize(p_exact);
@@ -3082,14 +3081,9 @@ std::string GCodeGenerator::_extrude(
             Vec2d  ij;
             if (it->radius != 0) {
                 // Extrude an arc.
-                assert(m_config.arc_fitting == ArcFittingType::EmitCenter ||
-                       m_config.arc_fitting == ArcFittingType::EmitRadius);
+                assert(m_config.arc_fitting == ArcFittingType::EmitCenter);
                 radius = unscaled<double>(it->radius);
-                if (emit_radius) {
-                    // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
-                    //FIXME rather re-fit the arc to improve accuracy!
-                    radius = GCodeFormatter::quantize_xyzf(radius);
-                } else {
+                {
                     // Calculate quantized IJ circle center offset.
                     ij = GCodeFormatter::quantize(Vec2d(
                             Geometry::ArcWelder::arc_center(prev_exact.cast<double>(), p_exact.cast<double>(), double(radius), it->ccw())
@@ -3112,9 +3106,7 @@ std::string GCodeGenerator::_extrude(
                 path_length += line_length;
                 const double dE = e_per_mm * line_length;
                 assert(dE > 0);
-                gcode += emit_radius ?
-                    m_writer.extrude_to_xy_G2G3R(p, radius, it->ccw(), dE, comment) :
-                    m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE, comment);
+                gcode += m_writer.extrude_to_xy_G2G3IJ(p, ij, it->ccw(), dE, comment);
             }
             prev = p;
             prev_exact = p_exact;

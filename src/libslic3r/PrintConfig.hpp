@@ -49,8 +49,7 @@ namespace Slic3r {
 
 enum class ArcFittingType {
     Disabled,
-    EmitCenter,
-    EmitRadius,
+    EmitCenter
 };
 
 enum GCodeFlavor : unsigned char {

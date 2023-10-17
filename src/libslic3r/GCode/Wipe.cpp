@@ -116,16 +116,15 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             retract_length -= dE;
             return done;
         };
-        const bool emit_radius = gcodegen.config().arc_fitting == ArcFittingType::EmitRadius;
-        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, emit_radius, &wipe_linear](
+        auto         wipe_arc = [&gcode, &gcodegen, &retract_length, xy_to_e, &wipe_linear](
             const Vec2d &prev_quantized, Vec2d &p, double radius_in, const bool ccw) {
             Vec2d  p_quantized = GCodeFormatter::quantize(p);
             if (p_quantized == prev_quantized) {
                 p = p_quantized;
                 return false;
             }
-            // Only quantize radius if emitting it directly into G-code. Otherwise use the exact radius for calculating the IJ values.
-            double radius = emit_radius ? GCodeFormatter::quantize_xyzf(radius_in) : radius_in;
+            // Use the exact radius for calculating the IJ values, no quantization.
+            double radius = radius_in;
             if (radius == 0)
                 // Degenerated arc after quantization. Process it as if it was a line segment.
                 return wipe_linear(prev_quantized, p);
@@ -151,9 +150,7 @@ std::string Wipe::wipe(GCodeGenerator &gcodegen, bool toolchange)
             } else
                 p = p_quantized;
             assert(dE > 0);
-            if (emit_radius) {
-                gcode += gcodegen.writer().extrude_to_xy_G2G3R(p, radius, ccw, -dE, wipe_retract_comment);
-            } else {
+            {
                 // Calculate quantized IJ circle center offset.
                 Vec2d ij = GCodeFormatter::quantize(Vec2d(center - prev_quantized));
                 if (ij == Vec2d::Zero())
