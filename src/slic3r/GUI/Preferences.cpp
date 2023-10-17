@@ -1094,6 +1094,17 @@ void PreferencesDialog::create_settings_mode_color_widget()
 	append_preferences_option_to_searcher(m_optgroup_gui, opt_key, title);
 }
 
+static int get_max_font_pt_size()
+{
+    const unsigned disp_count = wxDisplay::GetCount();
+    for (int i = 0; i < disp_count; i++) {
+        const wxRect display_rect = wxDisplay(i).GetGeometry();
+        if (display_rect.width >= 2560 && display_rect.height >= 1440)
+            return 20;
+    }
+    return 15;
+}
+
 void PreferencesDialog::create_settings_font_widget()
 {
 	wxWindow* parent = m_optgroup_other->parent();
@@ -1114,7 +1125,7 @@ void PreferencesDialog::create_settings_font_widget()
 #ifdef _WIN32
 		| wxBORDER_SIMPLE
 #endif 
-	, 8, 20);
+	, 8, get_max_font_pt_size());
 	wxGetApp().UpdateDarkUI(size_sc);
 
 	auto apply_font = [this, font_example, opt_key, stb_sizer](const int val, const wxFont& font) {

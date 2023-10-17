@@ -1528,8 +1528,9 @@ void PointCtrl::BUILD()
 	y_textctrl->SetFont(Slic3r::GUI::wxGetApp().normal_font());
 	if (!wxOSX) y_textctrl->SetBackgroundStyle(wxBG_STYLE_PAINT);
 
-	auto static_text_x = new wxStaticText(m_parent, wxID_ANY, "x : ");
-	auto static_text_y = new wxStaticText(m_parent, wxID_ANY, "   y : ");
+    wxSize label_sz = wxSize(int(field_size.x / 2), field_size.y);
+	auto static_text_x = new wxStaticText(m_parent, wxID_ANY, "x : ", wxDefaultPosition, label_sz, wxALIGN_RIGHT);
+    auto static_text_y = new wxStaticText(m_parent, wxID_ANY, "y : ", wxDefaultPosition, label_sz, wxALIGN_RIGHT);
 	static_text_x->SetFont(Slic3r::GUI::wxGetApp().normal_font());
 	static_text_x->SetBackgroundStyle(wxBG_STYLE_PAINT);
 	static_text_y->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -1540,9 +1541,9 @@ void PointCtrl::BUILD()
 	wxGetApp().UpdateDarkUI(static_text_x, false, true);
 	wxGetApp().UpdateDarkUI(static_text_y, false, true);
 
-	temp->Add(static_text_x, 0, wxALIGN_CENTER_VERTICAL, 0);
+	temp->Add(static_text_x);
 	temp->Add(x_textctrl);
-	temp->Add(static_text_y, 0, wxALIGN_CENTER_VERTICAL, 0);
+	temp->Add(static_text_y);
 	temp->Add(y_textctrl);
 
     x_textctrl->Bind(wxEVT_TEXT_ENTER, ([this](wxCommandEvent e) { propagate_value(x_textctrl); }), x_textctrl->GetId());
