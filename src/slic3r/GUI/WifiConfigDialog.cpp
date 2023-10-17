@@ -36,6 +36,7 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     m_ssid_combo->SetToolTip(_L("On some versions of MacOS, this only loads SSID of connencted network."));
 #endif // __APPLE__
     rescan_networks(false);
+    // TRN Text of button to rescan visible networks in Wifi Config dialog.
     wxButton* ssid_button = new wxButton(panel, wxID_ANY, _(L("Rescan")));
     ssid_sizer->Add(m_ssid_combo, 1, wxALIGN_CENTER_VERTICAL, 10);
     ssid_sizer->Add(ssid_button, 0);
@@ -46,6 +47,7 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     m_pass_textctrl = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize);
     pass_sizer->Add(m_pass_textctrl, 1, wxALIGN_CENTER_VERTICAL, 10);
 #if __APPLE__
+    // TRN Text of button to retrieve password from keychain in Wifi Config dialog. Only on Mac.
     wxButton* pass_button = new wxButton(panel, wxID_ANY, _(L("Retrieve")));
     pass_sizer->Add(pass_button, 0);
     pass_button->Bind(wxEVT_BUTTON, &WifiConfigDialog::on_retrieve_password, this);
@@ -57,11 +59,13 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     // TRN description of Combo Box with path to USB drive.
     wxStaticText* drive_label = new wxStaticText(panel, wxID_ANY, GUI::format_wxstr("%1%:", _L("Drive")));
     m_drive_combo = new wxComboBox(panel, wxID_ANY);
-    rescan_drives();
+    rescan_drives(preffered_drive);
+    // TRN Text of button to rescan connect usb drives in Wifi Config dialog.
     wxButton* drive_button = new wxButton(panel, wxID_ANY, _(L("Rescan")));
     drive_sizer->Add(m_drive_combo, 1, wxALIGN_CENTER_VERTICAL, 10);
     drive_sizer->Add(drive_button, 0);
 
+    // TRN Text of button to write config file in Wifi Config dialog.
     wxButton* ok_button = new wxButton(panel, wxID_OK, _L("Write"));
     wxButton* cancel_button = new wxButton(panel, wxID_CANCEL);
 
