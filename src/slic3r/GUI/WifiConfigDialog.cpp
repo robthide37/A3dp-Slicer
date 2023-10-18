@@ -17,7 +17,7 @@ namespace Slic3r {
 namespace GUI {
 
 WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, RemovableDriveManager* removable_manager)
-     : DPIDialog(parent, wxID_ANY, _L("Physical Printer Instalation"), wxDefaultPosition, wxDefaultSize/*wxSize(25 * wxGetApp().em_unit(), 20 * wxGetApp().em_unit())*/, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
+     : DPIDialog(parent, wxID_ANY, _L("Wi-Fi Configuration File Generator"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
      , m_wifi_scanner(new WifiScanner())
      , out_file_path(file_path)
      , m_removable_manager(removable_manager)
