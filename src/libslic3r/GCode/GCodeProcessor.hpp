@@ -277,6 +277,7 @@ namespace Slic3r {
             EMoveType move_type{ EMoveType::Noop };
             GCodeExtrusionRole role{ GCodeExtrusionRole::None };
             unsigned int g1_line_id{ 0 };
+            unsigned int remaining_internal_g1_lines;
             unsigned int layer_id{ 0 };
             float distance{ 0.0f }; // mm
             float acceleration{ 0.0f }; // mm/s^2
@@ -317,6 +318,7 @@ namespace Slic3r {
             struct G1LinesCacheItem
             {
                 unsigned int id;
+                unsigned int remaining_internal_g1_lines;
                 float elapsed_time;
             };
 
@@ -710,7 +712,8 @@ namespace Slic3r {
             G2G3,
         };
         void process_G1(const std::array<std::optional<double>, 4>& axes = { std::nullopt, std::nullopt, std::nullopt, std::nullopt },
-            std::optional<double> feedrate = std::nullopt, G1DiscretizationOrigin origin = G1DiscretizationOrigin::G1);
+            const std::optional<double>& feedrate = std::nullopt, G1DiscretizationOrigin origin = G1DiscretizationOrigin::G1,
+            const std::optional<unsigned int>& remaining_internal_g1_lines = std::nullopt);
 
         // Arc Move
         void process_G2_G3(const GCodeReader::GCodeLine& line, bool clockwise);

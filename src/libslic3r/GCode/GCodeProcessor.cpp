@@ -344,7 +344,7 @@ void GCodeProcessor::TimeMachine::calculate_time(size_t keep_last_n_blocks, floa
             }
         }
         layers_time[block.layer_id - 1] += block_time;
-        g1_times_cache.push_back({ block.g1_line_id, time });
+        g1_times_cache.push_back({ block.g1_line_id, block.remaining_internal_g1_lines, time });
         // update times for remaining time to printer stop placeholders
         auto it_stop_time = std::lower_bound(stop_times.begin(), stop_times.end(), block.g1_line_id,
             [](const StopTime& t, unsigned int value) { return t.g1_line_id < value; });
@@ -2557,7 +2557,8 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
     process_G1(g1_axes, g1_feedrate);
 }
 
-void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes, std::optional<double> feedrate, G1DiscretizationOrigin origin)
+void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes, const std::optional<double>& feedrate,
+    G1DiscretizationOrigin origin, const std::optional<unsigned int>& remaining_internal_g1_lines)
 {
     const float filament_diameter = (static_cast<size_t>(m_extruder_id) < m_result.filament_diameters.size()) ? m_result.filament_diameters[m_extruder_id] : m_result.filament_diameters.back();
     const float filament_radius = 0.5f * filament_diameter;
@@ -2713,6 +2714,7 @@ void GCodeProcessor::process_G1(const std::array<std::optional<double>, 4>& axes
         block.role = m_extrusion_role;
         block.distance = distance;
         block.g1_line_id = m_g1_line_id;
+        block.remaining_internal_g1_lines = remaining_internal_g1_lines.has_value() ? *remaining_internal_g1_lines : 0;
         block.layer_id = std::max<unsigned int>(1, m_layer_id);
 
         // calculates block cruise feedrate
@@ -3031,16 +3033,17 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         return ret;
     };
 
-    auto internal_only_g1_line = [this](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate, const std::optional<float>& extrusion) {
-        std::array<std::optional<double>, 4> g1_axes = { target[X], target[Y], std::nullopt, std::nullopt };
-        std::optional<double> g1_feedrate = std::nullopt;
-        if (has_z)
-            g1_axes[Z] = target[Z];
-        if (feedrate.has_value())
-            g1_feedrate = (double)*feedrate;
-        if (extrusion.has_value())
-            g1_axes[E] = target[E];
-        process_G1(g1_axes, g1_feedrate, G1DiscretizationOrigin::G2G3);
+    auto internal_only_g1_line = [this](const AxisCoords& target, bool has_z, const std::optional<float>& feedrate,
+        const std::optional<float>& extrusion, const std::optional<unsigned int>& remaining_internal_g1_lines = std::nullopt) {
+          std::array<std::optional<double>, 4> g1_axes = { target[X], target[Y], std::nullopt, std::nullopt };
+          std::optional<double> g1_feedrate = std::nullopt;
+          if (has_z)
+              g1_axes[Z] = target[Z];
+          if (extrusion.has_value())
+              g1_axes[E] = target[E];
+          if (feedrate.has_value())
+              g1_feedrate = (double)*feedrate;
+          process_G1(g1_axes, g1_feedrate, G1DiscretizationOrigin::G2G3, remaining_internal_g1_lines);
     };
 
     // calculate arc segments
@@ -3103,7 +3106,8 @@ void GCodeProcessor::process_G2_G3(const GCodeReader::GCodeLine& line, bool cloc
         arc_target[E] += extruder_per_segment;
 
         m_start_position = m_end_position; // this is required because we are skipping the call to process_gcode_line()
-        internal_only_g1_line(adjust_target(arc_target, prev_target), z_per_segment != 0.0, (i == 1) ? feedrate : std::nullopt, extrusion);
+        internal_only_g1_line(adjust_target(arc_target, prev_target), z_per_segment != 0.0, (i == 1) ? feedrate : std::nullopt,
+            extrusion, segments - i);
         prev_target = arc_target;
     }
 
@@ -3839,7 +3843,7 @@ void GCodeProcessor::post_process()
         // used to update m_result.moves[].gcode_id
         std::vector<std::pair<size_t, size_t>> m_gcode_lines_map;
 
-        size_t m_curr_g1_id{ 0 };
+        size_t m_times_cache_id{ 0 };
         size_t m_out_file_pos{ 0 };
 
         bgcode::binarize::Binarizer& m_binarizer;
@@ -3852,21 +3856,44 @@ void GCodeProcessor::post_process()
         : m_binarizer(binarizer), m_write_type(type), m_machine(machine) {}
 #endif // NDEBUG
 
-        void update(size_t lines_counter, size_t g1_lines_counter) {
+        // return: number of internal G1 lines (from G2/G3 splitting) processed
+        unsigned int update(const std::string& line, size_t lines_counter, size_t g1_lines_counter) {
+            unsigned int ret = 0;
             m_gcode_lines_map.push_back({ lines_counter, 0 });
 
-            if (g1_lines_counter == 0)
-                return;
+            if (GCodeReader::GCodeLine::cmd_is(line, "G0") ||
+                GCodeReader::GCodeLine::cmd_is(line, "G1") ||
+                GCodeReader::GCodeLine::cmd_is(line, "G2") ||
+                GCodeReader::GCodeLine::cmd_is(line, "G3") ||
+                GCodeReader::GCodeLine::cmd_is(line, "G28"))
+                ++g1_lines_counter;
+            else
+                return ret;
 
-            auto init_it = m_machine.g1_times_cache.begin() + m_curr_g1_id;
+            auto init_it = m_machine.g1_times_cache.begin() + m_times_cache_id;
             auto it = init_it;
-            while (it != m_machine.g1_times_cache.end() && it->id < g1_lines_counter + 1) {
+            while (it != m_machine.g1_times_cache.end() && it->id < g1_lines_counter) {
                 ++it;
-                ++m_curr_g1_id;
+                ++m_times_cache_id;
             }
 
-            if ((it != m_machine.g1_times_cache.end() && it != init_it) || m_curr_g1_id == 0)
+            if (it->id > g1_lines_counter)
+                return ret;
+
+            // search for internal G1 lines
+            if (GCodeReader::GCodeLine::cmd_is(line, "G2") || GCodeReader::GCodeLine::cmd_is(line, "G3")) {
+                while (it != m_machine.g1_times_cache.end() && it->remaining_internal_g1_lines > 0) {
+                    ++it;
+                    ++m_times_cache_id;
+                    ++g1_lines_counter;
+                    ++ret;
+                }
+            }
+
+            if (it != m_machine.g1_times_cache.end() && it->id == g1_lines_counter)
                 m_time = it->elapsed_time;
+
+            return ret;
         }
 
         // add the given gcode line to the cache
@@ -4203,7 +4230,7 @@ void GCodeProcessor::post_process()
         }
     };
 
-    // add lines XXX to exported gcode
+    // add lines M104 to exported gcode
     auto process_line_T = [this, &export_lines](const std::string& gcode_line, const size_t g1_lines_counter, const ExportLines::Backtrace& backtrace) {
         const std::string cmd = GCodeReader::GCodeLine::extract_cmd(gcode_line);
         if (cmd.size() >= 2) {
@@ -4281,9 +4308,8 @@ void GCodeProcessor::post_process()
                 gcode_line.insert(gcode_line.end(), it, it_end);
                 if (eol) {
                     ++line_id;
-                    export_lines.update(line_id, g1_lines_counter);
-
                     gcode_line += "\n";
+                    const unsigned int internal_g1_lines_counter = export_lines.update(gcode_line, line_id, g1_lines_counter);
                     // replace placeholder lines
                     bool processed = process_placeholders(gcode_line);
                     if (processed)
@@ -4291,11 +4317,24 @@ void GCodeProcessor::post_process()
                     if (!processed)
                         processed = process_used_filament(gcode_line);
                     if (!processed && !is_temporary_decoration(gcode_line)) {
-                        if (GCodeReader::GCodeLine::cmd_is(gcode_line, "G1"))
+                        if (GCodeReader::GCodeLine::cmd_is(gcode_line, "G0") || GCodeReader::GCodeLine::cmd_is(gcode_line, "G1")) {
+                            export_lines.append_line(gcode_line);
                             // add lines M73 where needed
                             process_line_G1(g1_lines_counter++);
+                            gcode_line.clear();
+                        }
+                        else if (GCodeReader::GCodeLine::cmd_is(gcode_line, "G2") || GCodeReader::GCodeLine::cmd_is(gcode_line, "G3")) {
+                            export_lines.append_line(gcode_line);
+                            // add lines M73 where needed
+                            process_line_G1(g1_lines_counter + internal_g1_lines_counter);
+                            g1_lines_counter += (1 + internal_g1_lines_counter);
+                            gcode_line.clear();
+                        }
+                        else if (GCodeReader::GCodeLine::cmd_is(gcode_line, "G28")) {
+                            ++g1_lines_counter;
+                        }
                         else if (m_result.backtrace_enabled && GCodeReader::GCodeLine::cmd_starts_with(gcode_line, "T")) {
-                            // add lines XXX where needed
+                            // add lines M104 where needed
                             process_line_T(gcode_line, g1_lines_counter, backtrace_T);
                             max_backtrace_time = std::max(max_backtrace_time, backtrace_T.time);
                         }
