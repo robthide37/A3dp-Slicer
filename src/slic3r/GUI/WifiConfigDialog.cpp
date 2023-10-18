@@ -17,7 +17,7 @@ namespace Slic3r {
 namespace GUI {
 
 WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, RemovableDriveManager* removable_manager)
-     : DPIDialog(parent, wxID_ANY, _L("Physical Printer Instalation"), wxDefaultPosition, wxDefaultSize/*wxSize(25 * wxGetApp().em_unit(), 20 * wxGetApp().em_unit())*/, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
+     : DPIDialog(parent, wxID_ANY, _L("Wi-Fi Configuration File Generator"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
      , m_wifi_scanner(new WifiScanner())
      , out_file_path(file_path)
      , m_removable_manager(removable_manager)
@@ -28,6 +28,15 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     wxBoxSizer* vsizer = new wxBoxSizer(wxVERTICAL);
     panel->SetSizer(vsizer);
 
+    // TRN Wifi config dialog explanation line 1.
+    wxStaticText* explain_label1 = new wxStaticText(panel, wxID_ANY, _L("Generate a file to be loaded by a Prusa printer to configure its Wi-Fi connection."));
+    // TRN Wifi config dialog explanation line 2.
+    wxStaticText* explain_label2 = new wxStaticText(panel, wxID_ANY, _L("Write this file on a USB flash drive. Its name will be prusa_printer_settings.ini."));
+    // TRN Wifi config dialog explanation line 3.
+    wxStaticText* explain_label3 = new wxStaticText(panel, wxID_ANY, _L("Your Prusa Printer should load this file automatically."));
+    // TRN Wifi config dialog explanation line 4.
+    wxStaticText* explain_label4 = new wxStaticText(panel, wxID_ANY, _L("Note: This file will contains SSID and password in plain text."));
+
     auto* ssid_sizer = new wxBoxSizer(wxHORIZONTAL);
     // TRN SSID of WiFi network.
     wxStaticText* ssid_label = new wxStaticText(panel, wxID_ANY, GUI::format_wxstr("%1%:", _L("SSID")));
@@ -36,6 +45,7 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     m_ssid_combo->SetToolTip(_L("On some versions of MacOS, this only loads SSID of connencted network."));
 #endif // __APPLE__
     rescan_networks(false);
+    // TRN Text of button to rescan visible networks in Wifi Config dialog.
     wxButton* ssid_button = new wxButton(panel, wxID_ANY, _(L("Rescan")));
     ssid_sizer->Add(m_ssid_combo, 1, wxALIGN_CENTER_VERTICAL, 10);
     ssid_sizer->Add(ssid_button, 0);
@@ -46,6 +56,7 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     m_pass_textctrl = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize);
     pass_sizer->Add(m_pass_textctrl, 1, wxALIGN_CENTER_VERTICAL, 10);
 #if __APPLE__
+    // TRN Text of button to retrieve password from keychain in Wifi Config dialog. Only on Mac.
     wxButton* pass_button = new wxButton(panel, wxID_ANY, _(L("Retrieve")));
     pass_sizer->Add(pass_button, 0);
     pass_button->Bind(wxEVT_BUTTON, &WifiConfigDialog::on_retrieve_password, this);
@@ -58,10 +69,12 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     wxStaticText* drive_label = new wxStaticText(panel, wxID_ANY, GUI::format_wxstr("%1%:", _L("Drive")));
     m_drive_combo = new wxComboBox(panel, wxID_ANY);
     rescan_drives();
+    // TRN Text of button to rescan connect usb drives in Wifi Config dialog.
     wxButton* drive_button = new wxButton(panel, wxID_ANY, _(L("Rescan")));
     drive_sizer->Add(m_drive_combo, 1, wxALIGN_CENTER_VERTICAL, 10);
     drive_sizer->Add(drive_button, 0);
 
+    // TRN Text of button to write config file in Wifi Config dialog.
     wxButton* ok_button = new wxButton(panel, wxID_OK, _L("Write"));
     wxButton* cancel_button = new wxButton(panel, wxID_CANCEL);
 
@@ -77,6 +90,10 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     grid->Add(drive_label, 0, wxALIGN_CENTER_VERTICAL);
     grid->Add(drive_sizer, 0, wxEXPAND);
 
+    vsizer->Add(explain_label1, 0, wxALIGN_CENTER_VERTICAL);
+    vsizer->Add(explain_label2, 0, wxALIGN_CENTER_VERTICAL);
+    vsizer->Add(explain_label3, 0, wxALIGN_CENTER_VERTICAL);
+    vsizer->Add(explain_label4, 0, wxALIGN_CENTER_VERTICAL);
     vsizer->Add(grid, 0, wxEXPAND | wxTOP | wxBOTTOM, 15);
 
     wxBoxSizer* buttons_sizer = new wxBoxSizer(wxHORIZONTAL);

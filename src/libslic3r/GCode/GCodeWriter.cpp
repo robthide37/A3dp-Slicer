@@ -302,22 +302,6 @@ std::string GCodeWriter::travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij
     return w.string();
 }
 
-std::string GCodeWriter::travel_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, const std::string_view comment)
-{
-    assert(std::abs(point.x()) < 1200.);
-    assert(std::abs(point.y()) < 1200.);
-    assert(std::abs(radius) >= 0.001);
-    assert(std::abs(radius) < 1800.);
-
-    m_pos.head<2>() = point.head<2>();
-
-    GCodeG2G3Formatter w(ccw);
-    w.emit_xy(point);
-    w.emit_radius(radius);
-    w.emit_comment(this->config.gcode_comments, comment);
-    return w.string();
-}
-
 std::string GCodeWriter::travel_to_xyz(const Vec3d &point, const std::string_view comment)
 {
     // FIXME: This function was not being used when travel_speed_z was separated (bd6badf).
@@ -426,25 +410,6 @@ std::string GCodeWriter::extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &i
     GCodeG2G3Formatter w(ccw);
     w.emit_xy(point);
     w.emit_ij(ij);
-    w.emit_e(m_extrusion_axis, m_extruder->extrude(dE).second);
-    w.emit_comment(this->config.gcode_comments, comment);
-    return w.string();
-}
-
-std::string GCodeWriter::extrude_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, double dE, const std::string_view comment)
-{
-    assert(dE != 0);
-    assert(std::abs(dE) < 1000.0);
-    assert(std::abs(point.x()) < 1200.);
-    assert(std::abs(point.y()) < 1200.);
-    assert(std::abs(radius) >= 0.001);
-    assert(std::abs(radius) < 1800.);
-
-    m_pos.head<2>() = point.head<2>();
-
-    GCodeG2G3Formatter w(ccw);
-    w.emit_xy(point);
-    w.emit_radius(radius);
     w.emit_e(m_extrusion_axis, m_extruder->extrude(dE).second);
     w.emit_comment(this->config.gcode_comments, comment);
     return w.string();
