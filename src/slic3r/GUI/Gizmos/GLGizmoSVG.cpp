@@ -2202,12 +2202,14 @@ EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance
         shape.svg_file.path = filepath; // copy
     }
     
-    if (!boost::filesystem::exists(shape.svg_file.path)) {
+
+    boost::filesystem::path path(shape.svg_file.path);
+    if (!boost::filesystem::exists(path)) {
         show_error(nullptr, GUI::format(_u8L("File does NOT exist (%1%)."), shape.svg_file.path));
         return {};
     }
 
-    if (!boost::algorithm::iends_with(shape.svg_file.path, ".svg")){
+    if (!boost::algorithm::iends_with(shape.svg_file.path, ".svg")) {
         show_error(nullptr, GUI::format(_u8L("Filename has to end with \".svg\" but you selected %1%"), shape.svg_file.path));
         return {};
     }

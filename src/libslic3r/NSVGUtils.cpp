@@ -6,6 +6,7 @@
 #include <array>
 #include <charconv> // to_chars
 
+#include <boost/nowide/iostream.hpp>
 #include "ClipperUtils.hpp"
 #include "Emboss.hpp" // heal for shape
 
@@ -100,7 +101,7 @@ NSVGimage_ptr nsvgParseFromFile(const std::string &filename, const char *units, 
 
 std::unique_ptr<std::string> read_from_disk(const std::string &path)
 {
-    std::ifstream fs{path};
+    boost::nowide::ifstream fs{path};
     if (!fs.is_open())
         return nullptr;
     std::stringstream ss;

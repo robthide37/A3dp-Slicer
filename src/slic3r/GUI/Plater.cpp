@@ -1645,7 +1645,7 @@ private:
 namespace {
 bool emboss_svg(Plater& plater, const wxString &svg_file, const Vec2d& mouse_drop_position)
 {
-    std::string svg_file_str = svg_file.ToStdString();
+    std::string svg_file_str = into_u8(svg_file);
     GLCanvas3D* canvas = plater.canvas3D();
     if (canvas == nullptr)
         return false;
