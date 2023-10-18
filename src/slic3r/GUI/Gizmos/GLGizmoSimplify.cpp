@@ -41,7 +41,7 @@ static void call_after_if_active(std::function<void()> fn, GUI_App* app = &wxGet
     });
 }
 
-static std::set<ObjectID> get_volume_ids(const Selection &selection)
+static std::set<ObjectID> get_selected_volume_ids(const Selection &selection)
 {
     const Selection::IndicesList &volume_ids = selection.get_volume_idxs();
     const ModelObjectPtrs &model_objects     = selection.get_model()->objects;
@@ -68,20 +68,6 @@ static std::set<ObjectID> get_volume_ids(const Selection &selection)
     return result;
 }
 
-// return ModelVolume from selection by object id
-static ModelVolume *get_volume(const ObjectID &id, const Selection &selection) {
-    const Selection::IndicesList &volume_ids = selection.get_volume_idxs();
-    const ModelObjectPtrs &model_objects     = selection.get_model()->objects;
-    for (auto volume_id : volume_ids) {
-        const GLVolume *selected_volume = selection.get_volume(volume_id);
-        const GLVolume::CompositeID &cid = selected_volume->composite_id;
-        ModelObject *obj    = model_objects[cid.object_id];
-        ModelVolume *volume = obj->volumes[cid.volume_id];
-        if (id == volume->id()) return volume;
-    }
-    return nullptr;
-}
-
 static std::string create_volumes_name(const std::set<ObjectID>& ids, const Selection &selection){
     assert(!ids.empty());
     std::string name;
@@ -92,7 +78,7 @@ static std::string create_volumes_name(const std::set<ObjectID>& ids, const Sele
         else
             name += " + ";
 
-        const ModelVolume *volume = get_volume(id, selection);
+        const ModelVolume *volume = get_selected_volume(id, selection);
         assert(volume != nullptr);
         name += volume->name;
     }
@@ -185,7 +171,7 @@ void GLGizmoSimplify::on_render_input_window(float x, float y, float bottom_limi
 {
     create_gui_cfg();
     const Selection &selection = m_parent.get_selection();
-    auto act_volume_ids = get_volume_ids(selection);
+    auto act_volume_ids = get_selected_volume_ids(selection);
     if (act_volume_ids.empty()) {
         stop_worker_thread_request();
         close();
@@ -474,7 +460,7 @@ void GLGizmoSimplify::process()
     const Selection& selection = m_parent.get_selection();
     State::Data its;
     for (const auto &id : m_volume_ids) {
-        const ModelVolume *volume = get_volume(id, selection);
+        const ModelVolume *volume = get_selected_volume(id, selection);
         its[id] = std::make_unique<indexed_triangle_set>(volume->mesh().its); // copy
     }
     
@@ -552,7 +538,7 @@ void GLGizmoSimplify::apply_simplify() {
     for (const auto &item: m_state.result) {
         const ObjectID &id = item.first;
         const indexed_triangle_set &its = *item.second;
-        ModelVolume *volume = get_volume(id, selection);
+        ModelVolume *volume = get_selected_volume(id, selection);
         assert(volume != nullptr);
         ModelObject *obj = volume->get_object();
 
@@ -728,7 +714,7 @@ void GLGizmoSimplify::on_render()
     const Selection &             selection  = m_parent.get_selection();
     
     // Check that the GLVolume still belongs to the ModelObject we work on.
-    if (m_volume_ids != get_volume_ids(selection)) return;
+    if (m_volume_ids != get_selected_volume_ids(selection)) return;
 
     const ModelObjectPtrs &model_objects = selection.get_model()->objects;
     const Selection::IndicesList &volume_idxs = selection.get_volume_idxs();

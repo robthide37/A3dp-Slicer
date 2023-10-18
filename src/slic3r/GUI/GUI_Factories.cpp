@@ -18,6 +18,7 @@
 #include "Selection.hpp"
 #include "format.hpp"
 #include "Gizmos/GLGizmoEmboss.hpp"
+#include "Gizmos/GLGizmoSVG.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include "slic3r/Utils/FixModelByWin10.hpp"
@@ -173,6 +174,12 @@ static const constexpr std::array<std::pair<const char *, const char *>, 3> TEXT
         {L("Add text"),             "add_text_part"},        // ~ModelVolumeType::MODEL_PART
         {L("Add negative text"),    "add_text_negative" },   // ~ModelVolumeType::NEGATIVE_VOLUME
         {L("Add text modifier"),    "add_text_modifier"},    // ~ModelVolumeType::PARAMETER_MODIFIER
+}};
+// Note: id accords to type of the sub-object (adding volume), so sequence of the menu items is important
+static const constexpr std::array<std::pair<const char *, const char *>, 3> SVG_VOLUME_ICONS{{
+    {L("Add SVG part"),     "svg_part"},     // ~ModelVolumeType::MODEL_PART
+    {L("Add negative SVG"), "svg_negative"}, // ~ModelVolumeType::NEGATIVE_VOLUME
+    {L("Add SVG modifier"), "svg_modifier"}, // ~ModelVolumeType::PARAMETER_MODIFIER
 }};
 
 static Plater* plater()
@@ -445,7 +452,7 @@ std::vector<wxBitmapBundle*> MenuFactory::get_volume_bitmaps()
 {
     std::vector<wxBitmapBundle*> volume_bmps;
     volume_bmps.reserve(ADD_VOLUME_MENU_ITEMS.size());
-    for (auto item : ADD_VOLUME_MENU_ITEMS)
+    for (const auto& item : ADD_VOLUME_MENU_ITEMS)
         volume_bmps.push_back(get_bmp_bundle(item.second));
     return volume_bmps;
 }
@@ -454,7 +461,16 @@ std::vector<wxBitmapBundle*> MenuFactory::get_text_volume_bitmaps()
 {
     std::vector<wxBitmapBundle*> volume_bmps;
     volume_bmps.reserve(TEXT_VOLUME_ICONS.size());
-    for (auto item : TEXT_VOLUME_ICONS)
+    for (const auto& item : TEXT_VOLUME_ICONS)
+        volume_bmps.push_back(get_bmp_bundle(item.second));
+    return volume_bmps;
+}
+
+std::vector<wxBitmapBundle*> MenuFactory::get_svg_volume_bitmaps()
+{
+    std::vector<wxBitmapBundle *> volume_bmps;
+    volume_bmps.reserve(SVG_VOLUME_ICONS.size());
+    for (const auto &item : SVG_VOLUME_ICONS)
         volume_bmps.push_back(get_bmp_bundle(item.second));
     return volume_bmps;
 }
@@ -491,6 +507,7 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
         }
 
     append_menu_item_add_text(sub_menu, type);
+    append_menu_item_add_svg(sub_menu, type);
 
     if (mode >= comAdvanced) {
         sub_menu->AppendSeparator();
@@ -501,40 +518,55 @@ wxMenu* MenuFactory::append_submenu_add_generic(wxMenu* menu, ModelVolumeType ty
     return sub_menu;
 }
 
-void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, bool is_submenu_item/* = true*/)
-{
-    auto add_text = [type](wxCommandEvent& evt) {
-        GLCanvas3D* canvas = plater()->canvas3D();
-        GLGizmosManager& mng = canvas->get_gizmos_manager();
-        GLGizmoBase* gizmo = mng.get_gizmo(GLGizmosManager::Emboss);
-        GLGizmoEmboss* emboss = dynamic_cast<GLGizmoEmboss *>(gizmo);
-        assert(emboss != nullptr);
-        if (emboss == nullptr) return;
-        
+static void append_menu_itemm_add_(const wxString& name, GLGizmosManager::EType gizmo_type, wxMenu *menu, ModelVolumeType type, bool is_submenu_item) {
+    auto add_ = [type, gizmo_type](const wxCommandEvent & /*unnamed*/) {
+        const GLCanvas3D *canvas = plater()->canvas3D();
+        const GLGizmosManager &mng = canvas->get_gizmos_manager();
+        GLGizmoBase *gizmo_base = mng.get_gizmo(gizmo_type);
+
         ModelVolumeType volume_type = type;
         // no selected object means create new object
         if (volume_type == ModelVolumeType::INVALID)
             volume_type = ModelVolumeType::MODEL_PART;
 
         auto screen_position = canvas->get_popup_menu_position();
-        if (screen_position.has_value()) {
-            emboss->create_volume(volume_type, *screen_position);
-        } else {
-            emboss->create_volume(volume_type);
-        }
+        if (gizmo_type == GLGizmosManager::Emboss) {
+            auto emboss = dynamic_cast<GLGizmoEmboss *>(gizmo_base);
+            assert(emboss != nullptr);
+            if (emboss == nullptr) return;
+            if (screen_position.has_value()) {
+                emboss->create_volume(volume_type, *screen_position);
+            } else {
+                emboss->create_volume(volume_type);
+            }
+        } else if (gizmo_type == GLGizmosManager::Svg) {
+            auto svg = dynamic_cast<GLGizmoSVG *>(gizmo_base);
+            assert(svg != nullptr);
+            if (svg == nullptr) return;
+            if (screen_position.has_value()) {
+                svg->create_volume(volume_type, *screen_position);
+            } else {
+                svg->create_volume(volume_type);
+            }
+        }        
     };
 
-    if (   type == ModelVolumeType::MODEL_PART
-        || type == ModelVolumeType::NEGATIVE_VOLUME
-        || type == ModelVolumeType::PARAMETER_MODIFIER
-        || type == ModelVolumeType::INVALID // cannot use gizmo without selected object
-        ) {
-        wxString item_name = is_submenu_item ? "" : _(ADD_VOLUME_MENU_ITEMS[int(type)].first) + ": ";
-        item_name += _L("Text");
+    if (type == ModelVolumeType::MODEL_PART || type == ModelVolumeType::NEGATIVE_VOLUME || type == ModelVolumeType::PARAMETER_MODIFIER ||
+        type == ModelVolumeType::INVALID // cannot use gizmo without selected object
+    ) {
+        wxString item_name = wxString(is_submenu_item ? "" : _(ADD_VOLUME_MENU_ITEMS[int(type)].first) + ": ") + name;
         menu->AppendSeparator();
         const std::string icon_name = is_submenu_item ? "" : ADD_VOLUME_MENU_ITEMS[int(type)].second;
-        append_menu_item(menu, wxID_ANY, item_name, "", add_text, icon_name, menu);
+        append_menu_item(menu, wxID_ANY, item_name, "", add_, icon_name, menu);
     }
+}
+
+void MenuFactory::append_menu_item_add_text(wxMenu* menu, ModelVolumeType type, bool is_submenu_item/* = true*/){
+    append_menu_itemm_add_(_L("Text"), GLGizmosManager::Emboss, menu, type, is_submenu_item);
+}
+
+void MenuFactory::append_menu_item_add_svg(wxMenu *menu, ModelVolumeType type, bool is_submenu_item /* = true*/){
+    append_menu_itemm_add_(_L("SVG"), GLGizmosManager::Svg, menu, type, is_submenu_item);
 }
 
 void MenuFactory::append_menu_items_add_volume(MenuType menu_type)
@@ -989,15 +1021,18 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
     wxString name        = _L("Edit text");
 
     auto can_edit_text = []() {
-        if (plater() != nullptr) {
-            const Selection& sel = plater()->get_selection();
-            if (sel.volumes_count() == 1) {
-                const GLVolume* gl_vol = sel.get_first_volume();
-                const ModelVolume* vol = plater()->model().objects[gl_vol->object_idx()]->volumes[gl_vol->volume_idx()];
-                return vol->text_configuration.has_value();
-            }
-        }
-        return false;
+        if (plater() == nullptr)
+            return false;        
+        const Selection& selection = plater()->get_selection();
+        if (selection.volumes_count() != 1)
+            return false;
+        const GLVolume* gl_volume = selection.get_first_volume();
+        if (gl_volume == nullptr)
+            return false;
+        const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+        if (volume == nullptr)
+            return false;
+        return volume->is_text();        
     };
 
     if (menu != &m_text_part_menu) {
@@ -1009,7 +1044,7 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
     }
 
     wxString description = _L("Ability to change text, font, size, ...");
-    std::string icon = "";
+    std::string icon = "cog";
     auto open_emboss = [](const wxCommandEvent &) {
         GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
         if (mng.get_current_type() == GLGizmosManager::Emboss)
@@ -1017,6 +1052,43 @@ void MenuFactory::append_menu_item_edit_text(wxMenu *menu)
         mng.open_gizmo(GLGizmosManager::Emboss);
     };
     append_menu_item(menu, wxID_ANY, name, description, open_emboss, icon, nullptr, can_edit_text, m_parent);
+}
+
+void MenuFactory::append_menu_item_edit_svg(wxMenu *menu)
+{
+    wxString name = _L("Edit SVG");
+    auto can_edit_svg = []() {
+        if (plater() == nullptr)
+            return false;        
+        const Selection& selection = plater()->get_selection();
+        if (selection.volumes_count() != 1)
+            return false;
+        const GLVolume* gl_volume = selection.get_first_volume();
+        if (gl_volume == nullptr)
+            return false;
+        const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+        if (volume == nullptr)
+            return false;
+        return volume->is_svg();        
+    };
+
+    if (menu != &m_svg_part_menu) {
+        const int menu_item_id = menu->FindItem(name);
+        if (menu_item_id != wxNOT_FOUND)
+            menu->Destroy(menu_item_id);
+        if (!can_edit_svg())
+            return;
+    }
+
+    wxString description = _L("Change SVG source file, projection, size, ...");
+    std::string icon = "cog";
+    auto open_svg = [](const wxCommandEvent &) {
+        GLGizmosManager &mng = plater()->canvas3D()->get_gizmos_manager();
+        if (mng.get_current_type() == GLGizmosManager::Svg)
+            mng.open_gizmo(GLGizmosManager::Svg); // close() and reopen - move to be visible
+        mng.open_gizmo(GLGizmosManager::Svg);
+    };
+    append_menu_item(menu, wxID_ANY, name, description, open_svg, icon, nullptr, can_edit_svg, m_parent);
 }
 
 MenuFactory::MenuFactory()
@@ -1118,8 +1190,20 @@ void MenuFactory::create_text_part_menu()
 {
     wxMenu* menu = &m_text_part_menu;
 
-    append_menu_item_delete(menu);
     append_menu_item_edit_text(menu);
+    append_menu_item_delete(menu);
+    append_menu_item_fix_through_winsdk(menu);
+    append_menu_item_simplify(menu);
+
+    append_immutable_part_menu_items(menu);
+}
+
+void MenuFactory::create_svg_part_menu()
+{
+    wxMenu* menu = &m_svg_part_menu;
+
+    append_menu_item_edit_svg(menu);
+    append_menu_item_delete(menu);
     append_menu_item_fix_through_winsdk(menu);
     append_menu_item_simplify(menu);
 
@@ -1143,6 +1227,7 @@ void MenuFactory::init(wxWindow* parent)
     create_common_object_menu(&m_sla_object_menu);
     create_part_menu();
     create_text_part_menu();
+    create_svg_part_menu();
     create_instance_menu();
 }
 
@@ -1165,6 +1250,7 @@ wxMenu* MenuFactory::object_menu()
     update_menu_items_instance_manipulation(mtObjectFFF);
     append_menu_item_invalidate_cut_info(&m_object_menu);
     append_menu_item_edit_text(&m_object_menu);
+    append_menu_item_edit_svg(&m_object_menu);
 
     return &m_object_menu;
 }
@@ -1176,6 +1262,7 @@ wxMenu* MenuFactory::sla_object_menu()
     update_menu_items_instance_manipulation(mtObjectSLA);
     append_menu_item_invalidate_cut_info(&m_sla_object_menu);
     append_menu_item_edit_text(&m_sla_object_menu);
+    append_menu_item_edit_svg(&m_object_menu);
 
     return &m_sla_object_menu;
 }
@@ -1194,6 +1281,12 @@ wxMenu* MenuFactory::text_part_menu()
     append_mutable_part_menu_items(&m_text_part_menu);
 
     return &m_text_part_menu;
+}
+
+wxMenu *MenuFactory::svg_part_menu()
+{
+    append_mutable_part_menu_items(&m_svg_part_menu);
+    return &m_svg_part_menu;
 }
 
 wxMenu* MenuFactory::instance_menu()

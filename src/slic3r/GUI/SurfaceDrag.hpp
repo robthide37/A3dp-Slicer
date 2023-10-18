@@ -5,9 +5,11 @@
 #include "libslic3r/Point.hpp" // Vec2d, Transform3d
 #include "slic3r/Utils/RaycastManager.hpp"
 #include "wx/event.h" // wxMouseEvent
+#include <functional>
 
 namespace Slic3r {
 class GLVolume;
+class ModelVolume;
 } // namespace Slic3r
 
 namespace Slic3r::GUI {
@@ -37,12 +39,19 @@ struct SurfaceDrag
     // initial rotation in Z axis of volume
     std::optional<float> start_angle;
 
+    // initial Z distance from surface
+    std::optional<float> start_distance;
+
     // Flag whether coordinate hit some volume
     bool exist_hit = true;
 
     //  hold screen coor offset of cursor from object center without SLA shift
     Vec2d mouse_offset_without_sla_shift;
 };
+
+// Limit direction of up vector on model
+// Between side and top surface
+constexpr double up_limit = 0.9;
 
 /// <summary>
 /// Mouse event handler, when move(drag&drop) volume over model surface
@@ -72,6 +81,16 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
 std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastManager &raycast_manager);
 
 /// <summary>
+/// Calculate distance by ray to surface of object in emboss direction
+/// </summary>
+/// <param name="gl_volume">Define embossed volume</param>
+/// <param name="raycaster">Way to cast rays to object</param>
+/// <param name="canvas">Contain model</param>
+/// <returns>Calculated distance from surface</returns>
+std::optional<float> calc_distance(const GLVolume &gl_volume, RaycastManager &raycaster, GLCanvas3D &canvas);
+std::optional<float> calc_distance(const GLVolume &gl_volume, const RaycastManager &raycaster, const RaycastManager::ISkip *condition);
+
+/// <summary>
 /// Get transformation to world
 /// - use fix after store to 3mf when exists
 /// </summary>
@@ -88,6 +107,38 @@ Transform3d world_matrix_fixed(const GLVolume &gl_volume, const ModelObjectPtrs&
 /// <param name="selection">Selected volume</param>
 /// <returns>Fixed Transformation of selected volume in selection</returns>
 Transform3d world_matrix_fixed(const Selection &selection);
+
+/// <summary>
+/// Wrap function around selection transformation to apply fix transformation
+/// Fix transformation is needed because of (store/load) volume (to/from) 3mf
+/// </summary>
+/// <param name="selection">Selected gl volume will be modified</param>
+/// <param name="selection_transformation_fnc">Function modified Selection transformation</param>
+/// <param name="volume">Same as selected GLVolume, volume may(or may not) contain fix matrix,
+///  when nullptr it is gathered from selection</param>
+void selection_transform(Selection &selection, const std::function<void()>& selection_transformation_fnc, const ModelVolume *volume = nullptr);
+
+/// <summary>
+/// Apply camera direction for emboss direction
+/// </summary>
+/// <param name="camera">Define view vector</param>
+/// <param name="canvas">Containe Selected ModelVolume to modify orientation</param>
+/// <returns>True when apply change otherwise false</returns>
+bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas);
+
+/// <summary>
+/// Rotation around z Axis(emboss direction)
+/// </summary>
+/// <param name="canvas">Selected volume for rotation</param>
+/// <param name="relative_angle">Relative angle to rotate around emboss direction</param>
+void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle);
+
+/// <summary>
+/// Translation along local z Axis (emboss direction)
+/// </summary>
+/// <param name="canvas">Selected volume for translate</param>
+/// <param name="relative_move">Relative move along emboss direction</param>
+void do_local_z_move(GLCanvas3D &canvas, double relative_move);
 
 } // namespace Slic3r::GUI
 #endif // slic3r_SurfaceDrag_hpp_

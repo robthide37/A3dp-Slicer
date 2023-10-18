@@ -1040,7 +1040,11 @@ void ObjectList::show_context_menu(const bool evt_context_menu)
                 get_selected_item_indexes(obj_idx, vol_idx, item);
                 if (obj_idx < 0 || vol_idx < 0)
                     return;
-                menu = object(obj_idx)->volumes[vol_idx]->text_configuration.has_value() ? plater->text_part_menu() : plater->part_menu();
+                const ModelVolume *volume = object(obj_idx)->volumes[vol_idx];
+
+                menu = volume->is_text() ? plater->text_part_menu() : 
+                       volume->is_svg() ? plater->svg_part_menu() : 
+                    plater->part_menu();
             }
             else
                 menu = type & itInstance             ? plater->instance_menu() :
@@ -1779,12 +1783,7 @@ void ObjectList::load_shape_object_from_gallery(const wxArrayString& input_files
         wxGetApp().mainframe->update_title();
 }
 
-void ObjectList::load_mesh_object(
-    const TriangleMesh &     mesh,
-    const std::string &      name,
-    bool                     center,
-    const TextConfiguration *text_config /* = nullptr*/,
-    const Transform3d *      transformation /* = nullptr*/)
+void ObjectList::load_mesh_object(const TriangleMesh &mesh, const std::string &name, bool center)
 {   
     PlaterAfterLoadAutoArrange plater_after_load_auto_arrange;
     // Add mesh to model as a new object
@@ -1794,7 +1793,6 @@ void ObjectList::load_mesh_object(
     check_model_ids_validity(model);
 #endif /* _DEBUG */
     
-    std::vector<size_t> object_idxs;
     ModelObject* new_object = model.add_object();
     new_object->name = name;
     new_object->add_instance(); // each object should have at list one instance
@@ -1802,31 +1800,24 @@ void ObjectList::load_mesh_object(
     ModelVolume* new_volume = new_object->add_volume(mesh);
     new_object->sort_volumes(wxGetApp().app_config->get_bool("order_volumes"));
     new_volume->name = name;
-    if (text_config)
-        new_volume->text_configuration = *text_config;
+
     // set a default extruder value, since user can't add it manually
     new_volume->config.set_key_value("extruder", new ConfigOptionInt(0));
     new_object->invalidate_bounding_box();
-    if (transformation) {
-        assert(!center);
-        Slic3r::Geometry::Transformation tr(*transformation);
-        new_object->instances[0]->set_transformation(tr);
-    } else {
-        auto bb = mesh.bounding_box();
-        new_object->translate(-bb.center());
-        new_object->instances[0]->set_offset(
-            center ? to_3d(wxGetApp().plater()->build_volume().bounding_volume2d().center(), -new_object->origin_translation.z()) :
-        bb.center());
-    }
+    
+    auto bb = mesh.bounding_box();
+    new_object->translate(-bb.center());
+    new_object->instances[0]->set_offset(
+        center ? to_3d(wxGetApp().plater()->build_volume().bounding_volume2d().center(), -new_object->origin_translation.z()) :
+    bb.center());
 
     new_object->ensure_on_bed();
 
-    object_idxs.push_back(model.objects.size() - 1);
 #ifdef _DEBUG
     check_model_ids_validity(model);
 #endif /* _DEBUG */
-    
-    paste_objects_into_list(object_idxs);
+
+    paste_objects_into_list({model.objects.size() - 1});
 
 #ifdef _DEBUG
     check_model_ids_validity(model);
@@ -2999,6 +2990,7 @@ wxDataViewItemArray ObjectList::add_volumes_to_object_in_list(size_t obj_idx, st
                 volume_idx,
                 volume->type(),
                 volume->is_text(),
+                volume->is_svg(),
                 get_warning_icon_name(volume->mesh().stats()),
                 extruder2str(volume->config.has("extruder") ? volume->config.extruder() : 0));
             add_settings_item(vol_item, &volume->config.get());
@@ -4275,7 +4267,8 @@ void ObjectList::change_part_type()
         types.emplace_back(ModelVolumeType::PARAMETER_MODIFIER);
     }
 
-    if (!volume->text_configuration.has_value()) {
+    // is not embossed(SVG or Text)
+    if (!volume->emboss_shape.has_value()) {
         for (const wxString&        name    : { _L("Support Blocker"),          _L("Support Enforcer") })
             names.Add(name);
         for (const ModelVolumeType  type_id : { ModelVolumeType::SUPPORT_BLOCKER, ModelVolumeType::SUPPORT_ENFORCER })

@@ -44,7 +44,6 @@ src/slic3r/GUI/GCodeViewer.cpp
 src/slic3r/GUI/Gizmos/GLGizmoCut.cpp
 src/slic3r/GUI/Gizmos/GLGizmoCut.hpp
 src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp
-src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
 src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp
 src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
 src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
@@ -62,6 +61,7 @@ src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp
 src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp
 src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
 src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
+src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
 src/slic3r/GUI/Gizmos/GLGizmosManager.cpp
 src/slic3r/GUI/GLCanvas3D.cpp
 src/slic3r/GUI/GUI.cpp

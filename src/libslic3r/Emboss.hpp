@@ -12,10 +12,18 @@
 #include <admesh/stl.h> // indexed_triangle_set
 #include "Polygon.hpp"
 #include "ExPolygon.hpp"
+#include "EmbossShape.hpp" // ExPolygonsWithIds
 #include "BoundingBox.hpp"
 #include "TextConfiguration.hpp"
 
 namespace Slic3r {
+
+// Extend expolygons with information whether it was successfull healed
+struct HealedExPolygons{
+    ExPolygons expolygons;
+    bool is_healed;
+    operator ExPolygons&() { return expolygons; }
+};
 
 /// <summary>
 /// class with only static function add ability to engraved OR raised
@@ -23,10 +31,6 @@ namespace Slic3r {
 /// </summary>
 namespace Emboss
 {    
-    // every glyph's shape point is divided by SHAPE_SCALE - increase precission of fixed point value
-    // stored in fonts (to be able represents curve by sequence of lines)
-    static constexpr double SHAPE_SCALE = 0.001; // SCALING_FACTOR promile is fine enough
-
     /// <summary>
     /// Collect fonts registred inside OS
     /// </summary>
@@ -156,20 +160,23 @@ namespace Emboss
     /// <param name="font_prop">User defined property of the font</param>
     /// <param name="was_canceled">Way to interupt processing</param>
     /// <returns>Inner polygon cw(outer ccw)</returns>
-    ExPolygons              text2shapes (FontFileWithCache &font, const char *text,         const FontProp &font_prop, const std::function<bool()> &was_canceled = []() {return false;});
-    std::vector<ExPolygons> text2vshapes(FontFileWithCache &font, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled = []() {return false;});
+    HealedExPolygons  text2shapes (FontFileWithCache &font, const char *text,         const FontProp &font_prop, const std::function<bool()> &was_canceled = []() {return false;});
+    ExPolygonsWithIds text2vshapes(FontFileWithCache &font, const std::wstring& text, const FontProp &font_prop, const std::function<bool()>& was_canceled = []() {return false;});
 
+    const unsigned ENTER_UNICODE = static_cast<unsigned>('\n');
     /// Sum of character '\n'
     unsigned get_count_lines(const std::wstring &ws);
     unsigned get_count_lines(const std::string &text);
+    unsigned get_count_lines(const ExPolygonsWithIds &shape);
 
     /// <summary>
     /// Fix duplicit points and self intersections in polygons.
     /// Also try to reduce amount of points and remove useless polygon parts
     /// </summary>
-    /// <param name="precision">Define wanted precision of shape after heal</param>
-    /// <returns>Healed shapes</returns>
-    ExPolygons heal_shape(const Polygons &shape);
+    /// <param name="is_non_zero">Fill type ClipperLib::pftNonZero for overlapping otherwise </param>
+    /// <param name="max_iteration">Look at heal_expolygon()::max_iteration</param>
+    /// <returns>Healed shapes with flag is fully healed</returns>
+    HealedExPolygons heal_polygons(const Polygons &shape, bool is_non_zero = true, unsigned max_iteration = 10);
 
     /// <summary>
     /// NOTE: call Slic3r::union_ex before this call
@@ -183,7 +190,7 @@ namespace Emboss
     /// <param name="max_iteration">Heal could create another issue,
     /// After healing it is checked again until shape is good or maximal count of iteration</param>
     /// <returns>True when shapes is good otherwise False</returns>
-    bool heal_shape(ExPolygons &shape, unsigned max_iteration = 10);
+    bool heal_expolygons(ExPolygons &shape, unsigned max_iteration = 10);
 
     /// <summary>
     /// Divide line segments in place near to point
@@ -199,10 +206,9 @@ namespace Emboss
     /// <summary>
     /// Use data from font property to modify transformation
     /// </summary>
-    /// <param name="font_prop">Z-move as surface distance(FontProp::distance)
-    /// Z-rotation as angle to Y axis(FontProp::angle)</param>
+    /// <param name="angle">Z-rotation as angle to Y axis</param>
+    /// <param name="distance">Z-move as surface distance</param>
     /// <param name="transformation">In / Out transformation to modify by property</param>
-    void apply_transformation(const FontProp &font_prop, Transform3d &transformation);
     void apply_transformation(const std::optional<float> &angle, const std::optional<float> &distance, Transform3d &transformation);
 
     /// <summary>
@@ -230,7 +236,7 @@ namespace Emboss
     /// <param name="fp">Property of font</param>
     /// <param name="ff">Font data</param>
     /// <returns>Conversion to mm</returns>
-    double get_shape_scale(const FontProp &fp, const FontFile &ff);
+    double get_text_shape_scale(const FontProp &fp, const FontFile &ff);
 
     /// <summary>
     /// getter of font info by collection defined in prop
@@ -245,7 +251,7 @@ namespace Emboss
     /// </summary>
     /// <param name="font">Infos for collections</param>
     /// <param name="prop">Collection index + Additional line gap</param>
-    /// <returns>Line height with spacing in ExPolygon size</returns>
+    /// <returns>Line height with spacing in scaled font points (same as ExPolygons)</returns>
     int get_line_height(const FontFile &font, const FontProp &prop);
 
     /// <summary>
@@ -338,7 +344,7 @@ namespace Emboss
     class ProjectZ : public IProjection
     {
     public:
-        ProjectZ(double depth) : m_depth(depth) {}
+        explicit ProjectZ(double depth) : m_depth(depth) {}
         // Inherited via IProject
         std::pair<Vec3d, Vec3d> create_front_back(const Point &p) const override;
         Vec3d project(const Vec3d &point) const override;
@@ -462,5 +468,15 @@ namespace Emboss
     std::vector<double> calculate_angles(int32_t distance, const PolygonPoints& polygon_points, const Polygon &polygon);
 
 } // namespace Emboss
+
+///////////////////////
+// Move to ExPolygonsWithIds Utils
+void translate(ExPolygonsWithIds &e, const Point &p);
+BoundingBox get_extents(const ExPolygonsWithIds &e);
+void center(ExPolygonsWithIds &e);
+HealedExPolygons union_ex(const ExPolygonsWithIds &shapes, unsigned max_heal_iteration);
+// delta .. safe offset before union (use as boolean close)
+// NOTE: remove unprintable spaces between neighbor curves (made by linearization of curve)
+HealedExPolygons union_with_delta(const ExPolygonsWithIds &shapes, float delta, unsigned max_heal_iteration);
 } // namespace Slic3r
 #endif // slic3r_Emboss_hpp_
