@@ -2574,6 +2574,21 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
 
                 if (load_config) {
                     if (!config.empty()) {
+                        const auto* post_process = config.opt<ConfigOptionStrings>("post_process");
+                        if (post_process != nullptr && !post_process->values.empty()) {
+                            wxString msg = type_3mf ? _L("The selected 3MF file contains a post-processing script") :
+                                _L("The selected AMF file contains a post-processing script");
+                            msg += "\n" + _L("Please review the script carefully before running it.");
+                            wxString text;
+                            for (const auto& s : post_process->values) {
+                                text += s;
+                            }
+
+                            InfoDialog msg_dlg(nullptr, msg, text, true, wxOK | wxICON_WARNING);
+                            msg_dlg.set_caption(wxString(SLIC3R_APP_NAME " - ") + _L("Attention!"));
+                            msg_dlg.ShowModal();
+                        }
+
                         Preset::normalize(config);
                         PresetBundle* preset_bundle = wxGetApp().preset_bundle;
                         preset_bundle->load_config_model(filename.string(), std::move(config));

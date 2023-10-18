@@ -320,6 +320,8 @@ public:
 	InfoDialog&operator=(const InfoDialog&) = delete;
 	virtual ~InfoDialog() = default;
 
+	void set_caption(const wxString& caption) { this->SetTitle(caption); }
+
 private:
 	wxString msg;
 };
