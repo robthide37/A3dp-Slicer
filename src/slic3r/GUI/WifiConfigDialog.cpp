@@ -59,7 +59,7 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     // TRN description of Combo Box with path to USB drive.
     wxStaticText* drive_label = new wxStaticText(panel, wxID_ANY, GUI::format_wxstr("%1%:", _L("Drive")));
     m_drive_combo = new wxComboBox(panel, wxID_ANY);
-    rescan_drives(preffered_drive);
+    rescan_drives();
     // TRN Text of button to rescan connect usb drives in Wifi Config dialog.
     wxButton* drive_button = new wxButton(panel, wxID_ANY, _(L("Rescan")));
     drive_sizer->Add(m_drive_combo, 1, wxALIGN_CENTER_VERTICAL, 10);
