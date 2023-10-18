@@ -51,6 +51,8 @@
 #include "OptionsGroup.hpp"
 #include "libslic3r/Preset.hpp"
 
+class CheckBox;
+
 namespace Slic3r {
 namespace GUI {
 
@@ -71,7 +73,7 @@ class SubstitutionManager
 	std::function<void()> m_cb_hide_delete_all_btn{ nullptr };
 
 	std::vector<std::string>	m_substitutions;
-	std::vector<wxCheckBox*>	m_chb_match_single_lines;
+	std::vector<wxWindow*>		m_chb_match_single_lines;
 
 	void validate_length();
 	bool is_compatible_with_ui();
@@ -202,7 +204,7 @@ protected:
 
    	struct PresetDependencies {
 		Preset::Type type	  = Preset::TYPE_INVALID;
-		wxCheckBox 	*checkbox = nullptr;
+		wxWindow 	*checkbox = nullptr;
 		ScalableButton 	*btn  = nullptr;
 		std::string  key_list; // "compatible_printers"
 		std::string  key_condition;
@@ -473,7 +475,7 @@ class TabFilament : public Tab
     void            create_extruder_combobox();
 	void 			update_volumetric_flow_preset_hints();
 
-    std::map<std::string, wxCheckBox*> m_overrides_options;
+    std::map<std::string, wxWindow*> m_overrides_options;
 public:
 	TabFilament(wxBookCtrlBase* parent) :
 		Tab(parent, _(L("Filament Settings")), Slic3r::Preset::TYPE_FILAMENT) {}

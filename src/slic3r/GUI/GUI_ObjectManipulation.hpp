@@ -13,6 +13,9 @@
 #include "libslic3r/Point.hpp"
 #include <float.h>
 
+#include "Widgets/ComboBox.hpp"
+#include "Widgets/TextInput.hpp"
+
 #ifdef __WXOSX__
 class wxBitmapComboBox;
 #else
@@ -21,15 +24,17 @@ class wxComboBox;
 class wxStaticText;
 class LockButton;
 class wxStaticBitmap;
-class wxCheckBox;
 
 namespace Slic3r {
-namespace GUI {
+    namespace GUI {
 
 #ifdef _WIN32
-class BitmapComboBox;
+        class BitmapComboBox;
 #endif
 
+#if 1
+        using choice_ctrl = ::ComboBox;
+#else
 #ifdef __WXOSX__
     static_assert(wxMAJOR_VERSION >= 3, "Use of wxBitmapComboBox on Manipulation panel requires wxWidgets 3.0 and newer");
     using choice_ctrl = wxBitmapComboBox;
@@ -40,11 +45,12 @@ class BitmapComboBox;
     using choice_ctrl = wxComboBox;
 #endif
 #endif // __WXOSX__
+#endif
 
 class Selection;
 
 class ObjectManipulation;
-class ManipulationEditor : public wxTextCtrl
+class ManipulationEditor : public ::TextInput
 {
     std::string         m_opt_key;
     int                 m_axis;
@@ -128,7 +134,7 @@ private:
     ScalableButton* m_reset_skew_button{ nullptr };
     ScalableButton* m_drop_to_bed_button{ nullptr };
 
-    wxCheckBox*     m_check_inch {nullptr};
+    wxWindow*       m_check_inch {nullptr};
 
     std::array<ScalableButton*, 3> m_mirror_buttons;
 

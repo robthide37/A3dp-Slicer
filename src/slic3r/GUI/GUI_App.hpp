@@ -214,6 +214,7 @@ public:
     void            UpdateDVCDarkUI(wxDataViewCtrl* dvc, bool highlited = false);
     // update color mode for panel including all static texts controls
     void            UpdateAllStaticTextDarkUI(wxWindow* parent);
+    void            SetWindowVariantForButton(wxButton* btn);
     void            init_fonts();
 	void            update_fonts(const MainFrame *main_frame = nullptr);
     void            set_label_clr_modified(const wxColour& clr);
@@ -248,7 +249,9 @@ public:
     const wxFont&   link_font()             { return m_link_font; }
     int             em_unit() const         { return m_em_unit; }
     bool            tabs_as_menu() const;
-    wxSize          get_min_size() const;
+    bool            suppress_round_corners() const;
+    wxSize          get_min_size(wxWindow* display_win) const;
+    int             get_max_font_pt_size();
     float           toolbar_icon_scale(const bool is_limited = false) const;
     void            set_auto_toolbar_icon_scale(float scale) const;
     void            check_printer_presets();

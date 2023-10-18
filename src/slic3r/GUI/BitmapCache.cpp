@@ -414,6 +414,8 @@ wxBitmapBundle* BitmapCache::from_svg(const std::string& bitmap_name, unsigned t
     if (!new_color.empty())
         replaces["\"#ED6B21\""] = "\"" + new_color + "\"";
 
+    replaces["\"#ButtonBG\""] = dark_mode ? "\"#4E4E4E\"" : "\"#828282\"";
+
     std::string str;
     nsvgGetDataFromFileWithReplace(Slic3r::var(bitmap_name + ".svg").c_str(), str, replaces);
     if (str.empty())

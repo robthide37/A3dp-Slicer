@@ -686,7 +686,8 @@ wxCoord OG_CustomCtrl::CtrlLine::draw_mode_bmp(wxDC& dc, wxCoord v_pos)
         return ctrl->m_h_gap;
 
     ConfigOptionMode mode = og_line.get_options()[0].opt.mode;
-    wxBitmapBundle* bmp = get_bmp_bundle("mode", wxOSX ? 10 : 12, wxGetApp().get_mode_btn_color(mode));
+    int pix_cnt = wxOSX ? 10 : 12;
+    wxBitmapBundle* bmp = get_bmp_bundle("mode", pix_cnt, pix_cnt, wxGetApp().get_mode_btn_color(mode));
     wxCoord y_draw = v_pos + lround((height - get_bitmap_size(bmp, ctrl).GetHeight()) / 2);
 
     if (og_line.get_options().front().opt.gui_type != ConfigOptionDef::GUIType::legend)

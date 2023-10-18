@@ -25,6 +25,8 @@
 #include <boost/algorithm/string.hpp>
 #include "slic3r/Utils/FixModelByWin10.hpp"
 
+#include "Widgets/CheckBox.hpp"
+
 // For special mirroring in manipulation gizmo
 #include "Gizmos/GLGizmosManager.hpp"
 #include "Gizmos/GLGizmoEmboss.hpp"
@@ -77,7 +79,7 @@ static choice_ctrl* create_word_local_combo(wxWindow *parent)
     wxSize size(15 * wxGetApp().em_unit(), -1);
 
     choice_ctrl* temp = nullptr;
-#ifdef __WXOSX__
+#if 0//def __WXOSX__
     /* wxBitmapComboBox with wxCB_READONLY style return NULL for GetTextCtrl(),
      * so ToolTip doesn't shown.
      * Next workaround helps to solve this problem
@@ -86,7 +88,7 @@ static choice_ctrl* create_word_local_combo(wxWindow *parent)
     temp->SetTextCtrlStyle(wxTE_READONLY);
 	temp->Create(parent, wxID_ANY, wxString(""), wxDefaultPosition, size, 0, nullptr);
 #else
-	temp = new choice_ctrl(parent, wxID_ANY, wxString(""), wxDefaultPosition, size, 0, nullptr, wxCB_READONLY | wxBORDER_SIMPLE);
+	temp = new choice_ctrl(parent, wxID_ANY, wxString(""), wxDefaultPosition, size, 0, nullptr, wxCB_READONLY/* | wxBORDER_SIMPLE*/);
 #endif //__WXOSX__
 
     temp->SetFont(Slic3r::GUI::wxGetApp().normal_font());
@@ -137,7 +139,7 @@ void msw_rescale_word_local_combo(choice_ctrl* combo)
 static void set_font_and_background_style(wxWindow* win, const wxFont& font)
 {
     win->SetFont(font);
-    win->SetBackgroundStyle(wxBG_STYLE_PAINT);
+    if (!wxOSX) win->SetBackgroundStyle(wxBG_STYLE_PAINT);
 }
 
 static const wxString axes_color_text[] = { "#990000", "#009900", "#000099" };
@@ -495,16 +497,16 @@ ObjectManipulation::ObjectManipulation(wxWindow* parent) :
         });
     m_main_grid_sizer->Add(m_reset_skew_button);
 
-    m_check_inch = new wxCheckBox(parent, wxID_ANY, _L("Inches"));
+    m_check_inch = CheckBox::GetNewWin(parent, _L("Inches"));
     m_check_inch->SetFont(wxGetApp().normal_font());
 
-    m_check_inch->SetValue(m_imperial_units);
+    CheckBox::SetValue(m_check_inch, m_imperial_units);
     m_check_inch->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
-        wxGetApp().app_config->set("use_inches", m_check_inch->GetValue() ? "1" : "0");
+        wxGetApp().app_config->set("use_inches", CheckBox::GetValue(m_check_inch) ? "1" : "0");
         wxGetApp().sidebar().update_ui_from_settings();
     });
 
-    m_main_grid_sizer->Add(m_check_inch, 1, wxEXPAND);
+    m_main_grid_sizer->Add(m_check_inch);
 
     m_og->activate();
     m_og->sizer->Clear(true);
@@ -533,7 +535,7 @@ void ObjectManipulation::Show(const bool show)
         const Selection& selection = wxGetApp().plater()->canvas3D()->get_selection();
         bool show_world_local_combo = wxGetApp().get_mode() != comSimple && (selection.is_single_full_instance() || selection.is_single_volume_or_modifier());
         if (selection.is_single_volume_or_modifier() && m_word_local_combo->GetCount() < 3) {
-#ifdef __linux__
+#if 0//def __linux__
             m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Local), 2);
 #else
             m_word_local_combo->Insert(coordinate_type_str(ECoordinatesType::Local), wxNullBitmap, 2);
@@ -615,7 +617,7 @@ void ObjectManipulation::update_ui_from_settings()
             update(3/*meSize*/,     m_new_size);
         }
     }
-    m_check_inch->SetValue(m_imperial_units);
+    CheckBox::SetValue(m_check_inch, m_imperial_units);
 
     if (m_use_colors != wxGetApp().app_config->get_bool("color_mapinulation_panel")) {
         m_use_colors  = wxGetApp().app_config->get_bool("color_mapinulation_panel");
@@ -1199,6 +1201,8 @@ void ObjectManipulation::sys_color_changed()
     wxGetApp().UpdateDarkUI(m_word_local_combo);
     wxGetApp().UpdateDarkUI(m_check_inch);
 #endif
+
+    CheckBox::SysColorChanged(m_check_inch);
     for (ManipulationEditor* editor : m_editors)
         editor->sys_color_changed(this);
 
@@ -1227,19 +1231,12 @@ static const char axes[] = { 'x', 'y', 'z' };
 ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
                                        const std::string& opt_key,
                                        int axis) :
-    wxTextCtrl(parent->parent(), wxID_ANY, wxEmptyString, wxDefaultPosition,
-        wxSize((wxOSX ? 5 : 6)*int(wxGetApp().em_unit()), wxDefaultCoord), wxTE_PROCESS_ENTER
-#ifdef _WIN32
-        | wxBORDER_SIMPLE
-#endif 
-    ),
+    ::TextInput(parent->parent(), "", "", "", wxDefaultPosition,
+        wxSize(int(5.8 * wxGetApp().em_unit()), wxDefaultCoord), wxTE_PROCESS_ENTER),
     m_opt_key(opt_key),
     m_axis(axis)
 {
     set_font_and_background_style(this, wxGetApp().normal_font());
-#ifdef __WXOSX__
-    this->OSXDisableAllSmartSubstitutions();
-#endif // __WXOSX__
     if (parent->use_colors()) {
         this->SetBackgroundColour(wxColour(axes_color_back[axis]));
         this->SetForegroundColour(*wxBLACK);
@@ -1295,8 +1292,7 @@ ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
 
 void ManipulationEditor::msw_rescale()
 {
-    const int em = wxGetApp().em_unit();
-    SetMinSize(wxSize(5 * em, wxDefaultCoord));
+    SetCtrlSize(wxSize(int(5.8 * wxGetApp().em_unit()), wxDefaultCoord));
 }
 
 void ManipulationEditor::sys_color_changed(ObjectManipulation* parent)

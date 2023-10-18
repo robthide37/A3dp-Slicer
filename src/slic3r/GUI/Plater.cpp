@@ -141,6 +141,8 @@
 #include "libslic3r/CustomGCode.hpp"
 #include "libslic3r/Platform.hpp"
 
+#include "Widgets/CheckBox.hpp"
+
 using boost::optional;
 namespace fs = boost::filesystem;
 using Slic3r::_3DScene;
@@ -509,7 +511,7 @@ FreqChangedParams::FreqChangedParams(wxWindow* parent) :
 
     auto wiping_dialog_btn = [this](wxWindow* parent) {
         m_wiping_dialog_button = new wxButton(parent, wxID_ANY, _L("Purging volumes") + dots, wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
-        m_wiping_dialog_button->SetFont(wxGetApp().normal_font());
+        wxGetApp().SetWindowVariantForButton(m_wiping_dialog_button);
         wxGetApp().UpdateDarkUI(m_wiping_dialog_button, true);
 
         auto sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -787,6 +789,7 @@ void Sidebar::priv::hide_rich_tip(wxButton* btn)
 Sidebar::Sidebar(Plater *parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(42 * wxGetApp().em_unit(), -1)), p(new priv(parent))
 {
+    SetFont(wxGetApp().normal_font());
     p->scrolled = new wxScrolledWindow(this);
 //    p->scrolled->SetScrollbars(0, 100, 1, 2); // ys_DELETE_after_testing. pixelsPerUnitY = 100 from https://github.com/prusa3d/PrusaSlicer/commit/8f019e5fa992eac2c9a1e84311c990a943f80b01, 
     // but this cause the bad layout of the sidebar, when all infoboxes appear.
@@ -794,13 +797,12 @@ Sidebar::Sidebar(Plater *parent)
     // But if we set this value to 5, layout will be better
     p->scrolled->SetScrollRate(0, 5);
 
-    SetFont(wxGetApp().normal_font());
 #ifndef __APPLE__
 #ifdef _WIN32
     wxGetApp().UpdateDarkUI(this);
     wxGetApp().UpdateDarkUI(p->scrolled);
 #else
-    SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+//    SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
 #endif
 #endif
 
@@ -937,6 +939,7 @@ Sidebar::Sidebar(Plater *parent)
 #endif //__APPLE__
         ScalableBitmap bmp = ScalableBitmap(this, icon_name, bmp_px_cnt);
         *btn = new ScalableButton(this, wxID_ANY, bmp, "", wxBU_EXACTFIT);
+        wxGetApp().SetWindowVariantForButton((*btn));
 
 #ifdef _WIN32
         (*btn)->Bind(wxEVT_ENTER_WINDOW, [tooltip, btn, this](wxMouseEvent& event) {
@@ -968,6 +971,7 @@ Sidebar::Sidebar(Plater *parent)
     auto init_btn = [this](wxButton **btn, wxString label, const int button_height) {
         *btn = new wxButton(this, wxID_ANY, label, wxDefaultPosition,
                             wxSize(-1, button_height), wxBU_EXACTFIT);
+        wxGetApp().SetWindowVariantForButton((*btn));
         (*btn)->SetFont(wxGetApp().bold_font());
         wxGetApp().UpdateDarkUI((*btn), true);
     };
@@ -977,7 +981,7 @@ Sidebar::Sidebar(Plater *parent)
 
     enable_buttons(false);
 
-    auto *btns_sizer = new wxBoxSizer(wxVERTICAL);
+    auto *btns_sizer = new wxBoxSizer(wxHORIZONTAL);
 
     auto* complect_btns_sizer = new wxBoxSizer(wxHORIZONTAL);
     complect_btns_sizer->Add(p->btn_export_gcode, 1, wxEXPAND);
@@ -986,8 +990,8 @@ Sidebar::Sidebar(Plater *parent)
 //    complect_btns_sizer->Add(p->btn_eject_device);
 	
 
-    btns_sizer->Add(p->btn_reslice, 0, wxEXPAND | wxTOP, margin_5);
-    btns_sizer->Add(complect_btns_sizer, 0, wxEXPAND | wxTOP, margin_5);
+    btns_sizer->Add(p->btn_reslice, 1, wxEXPAND | wxTOP | wxBOTTOM, margin_5);
+    btns_sizer->Add(complect_btns_sizer, 1, wxEXPAND | wxTOP | wxBOTTOM, margin_5);
 
     auto *sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(p->scrolled, 1, wxEXPAND);
@@ -2090,8 +2094,6 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     , collapse_toolbar(GLToolbar::Normal, "Collapse")
     , m_project_filename(wxEmptyString)
 {
-    this->q->SetFont(Slic3r::GUI::wxGetApp().normal_font());
-
     background_process.set_fff_print(&fff_print);
     background_process.set_sla_print(&sla_print);
     background_process.set_gcode_result(&gcode_result);
@@ -4470,7 +4472,10 @@ void Plater::priv::on_action_layersediting(SimpleEvent&)
 
 void Plater::priv::on_object_select(SimpleEvent& evt)
 {
-    wxGetApp().obj_list()->update_selections();
+    if (auto obj_list = wxGetApp().obj_list())
+        obj_list->update_selections();
+    else
+        return;
     selection_changed();
 }
 
@@ -5298,7 +5303,7 @@ void Sidebar::set_btn_label(const ActionButtonType btn_type, const wxString& lab
 // Plater / Public
 
 Plater::Plater(wxWindow *parent, MainFrame *main_frame)
-    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxGetApp().get_min_size())
+    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxGetApp().get_min_size(parent))
     , p(new priv(this, main_frame))
 {
     // Initialization performed in the private c-tor
@@ -6112,7 +6117,7 @@ ProjectDropDialog::ProjectDropDialog(const std::string& filename)
     main_sizer->Add(stb_sizer, 1, wxEXPAND | wxRIGHT | wxLEFT, 10);
 
     wxBoxSizer* bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxCheckBox* check = new wxCheckBox(this, wxID_ANY, _L("Don't show again"));
+    ::CheckBox* check = new ::CheckBox(this, _L("Don't show again"));
     check->Bind(wxEVT_CHECKBOX, [](wxCommandEvent& evt) {
         wxGetApp().app_config->set("show_drop_project_dialog", evt.IsChecked() ? "0" : "1");
         });

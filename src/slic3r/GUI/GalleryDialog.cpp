@@ -98,10 +98,12 @@ GalleryDialog::GalleryDialog(wxWindow* parent) :
 #endif
 
     wxStdDialogButtonSizer* buttons = this->CreateStdDialogButtonSizer(wxOK | wxCLOSE);
-    m_ok_btn = static_cast<wxButton*>(FindWindowById(wxID_OK, this));
+    wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
+    m_ok_btn = buttons->GetAffirmativeButton();
+    wxGetApp().SetWindowVariantForButton(m_ok_btn);
     m_ok_btn->Bind(wxEVT_UPDATE_UI, [this](wxUpdateUIEvent& evt) { evt.Enable(!m_selected_items.empty()); });
 
-    static_cast<wxButton*>(FindWindowById(wxID_CLOSE, this))->Bind(wxEVT_BUTTON, [this](wxCommandEvent&){ this->EndModal(wxID_CLOSE); });
+    buttons->GetCancelButton()->Bind(wxEVT_BUTTON, [this](wxCommandEvent&){ this->EndModal(wxID_CLOSE); });
     this->SetEscapeId(wxID_CLOSE);
     auto add_btn = [this, buttons]( size_t pos, int& ID, wxString title, wxString tooltip,
                                     void (GalleryDialog::* method)(wxEvent&), 
@@ -109,6 +111,7 @@ GalleryDialog::GalleryDialog(wxWindow* parent) :
         ID = NewControlId();
         wxButton* btn = new wxButton(this, ID, title);
         btn->SetToolTip(tooltip);
+        wxGetApp().SetWindowVariantForButton(btn);
         btn->Bind(wxEVT_UPDATE_UI, [enable_fn](wxUpdateUIEvent& evt) { evt.Enable(enable_fn()); });
         buttons->Insert(pos, btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, BORDER_W);
         this->Bind(wxEVT_BUTTON, method, this, ID);

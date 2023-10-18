@@ -213,7 +213,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_S
     sizer->SetSizeHints(this);
     Fit();
 
-    const wxSize min_size = wxGetApp().get_min_size(); //wxSize(76*wxGetApp().em_unit(), 49*wxGetApp().em_unit());
+    const wxSize min_size = wxGetApp().get_min_size(this);
 #ifdef __APPLE__
     // Using SetMinSize() on Mac messes up the window position in some cases
     // cf. https://groups.google.com/forum/#!topic/wx-users/yUKPBBfXWO0
@@ -732,7 +732,7 @@ void MainFrame::init_tabpanel()
 #ifdef _MSW_DARK_MODE
     if (wxGetApp().tabs_as_menu()) {
         m_tabpanel = new wxSimplebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
-        wxGetApp().UpdateDarkUI(m_tabpanel);
+//        wxGetApp().UpdateDarkUI(m_tabpanel);
     }
     else
         m_tabpanel = new Notebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME, true);
@@ -740,9 +740,9 @@ void MainFrame::init_tabpanel()
     m_tabpanel = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
 #endif
 
-#ifndef __WXOSX__ // Don't call SetFont under OSX to avoid name cutting in ObjectList
+    wxGetApp().UpdateDarkUI(m_tabpanel);
+
     m_tabpanel->SetFont(Slic3r::GUI::wxGetApp().normal_font());
-#endif
     m_tabpanel->Hide();
     m_settings_dialog.set_tabpanel(m_tabpanel);
 
@@ -1107,7 +1107,6 @@ void MainFrame::on_sys_color_changed()
     wxGetApp().update_ui_colours_from_appconfig();
 #ifdef __WXMSW__
     wxGetApp().UpdateDarkUI(m_tabpanel);
- //   m_statusbar->update_dark_ui();
 #ifdef _MSW_DARK_MODE
     // update common mode sizer
     if (!wxGetApp().tabs_as_menu())
@@ -2303,16 +2302,6 @@ SettingsDialog::SettingsDialog(MainFrame* mainframe)
 {
     if (wxGetApp().is_gcode_viewer())
         return;
-
-#if defined(__WXMSW__)
-    // ys_FIXME! temporary workaround for correct font scaling
-    // Because of from wxWidgets 3.1.3 auto rescaling is implemented for the Fonts,
-    // From the very beginning set dialog font to the wxSYS_DEFAULT_GUI_FONT
-    this->SetFont(wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT));
-#else
-    this->SetFont(wxGetApp().normal_font());
-    this->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-#endif // __WXMSW__
 
     // Load the icon either from the exe, or from the ico file.
 #if _WIN32

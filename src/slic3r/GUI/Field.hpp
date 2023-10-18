@@ -25,6 +25,10 @@
 
 #include "GUI.hpp"
 #include "wxExtensions.hpp"
+#include "Widgets/CheckBox.hpp"
+#include "Widgets/SwitchButton.hpp"
+#include "Widgets/SpinInput.hpp"
+#include "Widgets/TextInput.hpp"
 
 #ifdef __WXMSW__
 #define wxMSW true
@@ -294,6 +298,8 @@ inline bool is_window_field(const t_field& obj) { return !is_bad_field(obj) && o
 /// Covenience function to determine whether this field is a valid sizer field.
 inline bool is_sizer_field(const t_field& obj) { return !is_bad_field(obj) && obj->getSizer() != nullptr; }
 
+using text_ctrl = ::TextInput; //wxTextCtrl
+
 class TextCtrl : public Field {
     using Field::Field;
 #ifdef __WXGTK__
@@ -314,7 +320,7 @@ public:
 
     void	set_value(const std::string& value, bool change_event = false) {
 		m_disable_change_event = !change_event;
-        dynamic_cast<wxTextCtrl*>(window)->SetValue(wxString(value));
+        dynamic_cast<text_ctrl*>(window)->SetValue(wxString(value));
 		m_disable_change_event = false;
     }
 	void	set_value(const boost::any& value, bool change_event = false) override;
@@ -338,24 +344,31 @@ public:
 	CheckBox(wxWindow* parent, const ConfigOptionDef& opt, const t_config_option_key& id) : Field(parent, opt, id) {}
 	~CheckBox() {}
 
+	static wxWindow*	GetNewWin(wxWindow* parent, const wxString& label = wxEmptyString);
+	static void			SetValue(wxWindow* win, bool value);
+	static bool			GetValue(wxWindow* win);
+	static void			Rescale(wxWindow* win);
+	static void			SysColorChanged(wxWindow* win);
+
 	wxWindow*		window{ nullptr };
 	void			BUILD() override;
 
-	void			set_value(const bool value, bool change_event = false) {
-		m_disable_change_event = !change_event;
-		dynamic_cast<wxCheckBox*>(window)->SetValue(value);
-		m_disable_change_event = false;
-	}
+	void			set_value(const bool value, bool change_event = false);
 	void			set_value(const boost::any& value, bool change_event = false) override;
     void            set_last_meaningful_value() override;
 	void            set_na_value() override;
 	boost::any&		get_value() override;
 
     void            msw_rescale() override;
+	void            sys_color_changed() override;
 
-	void			enable() override { dynamic_cast<wxCheckBox*>(window)->Enable(); }
-	void			disable() override { dynamic_cast<wxCheckBox*>(window)->Disable(); }
+	void			enable() override;
+	void			disable() override;
 	wxWindow*		getWindow() override { return window; }
+
+private:
+	void SetValue(bool value);
+	bool GetValue();
 };
 
 class SpinCtrl : public Field {
@@ -377,20 +390,32 @@ public:
 /*
     void			set_value(const std::string& value, bool change_event = false) {
 		m_disable_change_event = !change_event;
-		dynamic_cast<wxSpinCtrl*>(window)->SetValue(value);
+		dynamic_cast<::SpinInput*>(window)->SetValue(value);
 		m_disable_change_event = false;
     }
+    void			set_value(const boost::any& value, bool change_event = false) override {
+		m_disable_change_event = !change_event;
+		tmp_value = boost::any_cast<int>(value);
+        m_value = value;
+		dynamic_cast<::SpinInput*>(window)->SetValue(tmp_value);
+		m_disable_change_event = false;
+	}
 */
     void            set_value(const boost::any& value, bool change_event = false) override;
     void            set_last_meaningful_value() override;
     void            set_na_value() override;
 
 	boost::any&		get_value() override;
-
+/*
+	boost::any&		get_value() override {
+		int value = static_cast<::SpinInput*>(window)->GetValue();
+		return m_value = value;
+	}
+*/
     void            msw_rescale() override;
 
-	void			enable() override { dynamic_cast<wxSpinCtrl*>(window)->Enable(); }
-	void			disable() override { dynamic_cast<wxSpinCtrl*>(window)->Disable(); }
+	void			enable()  override { dynamic_cast<::SpinInput*>(window)->Enable(); }
+	void			disable() override { dynamic_cast<::SpinInput*>(window)->Disable(); }
 	wxWindow*		getWindow() override { return window; }
 };
 
@@ -466,13 +491,13 @@ public:
 	~PointCtrl();
 
 	wxSizer*		sizer{ nullptr };
-	wxTextCtrl*		x_textctrl{ nullptr };
-	wxTextCtrl*		y_textctrl{ nullptr };
+	text_ctrl*		x_textctrl{ nullptr };
+	text_ctrl*		y_textctrl{ nullptr };
 
 	void			BUILD()  override;
-	bool			value_was_changed(wxTextCtrl* win);
+	bool			value_was_changed(text_ctrl* win);
     // Propagate value from field to the OptionGroupe and Config after kill_focus/ENTER
-    void            propagate_value(wxTextCtrl* win);
+    void            propagate_value(text_ctrl* win);
 	void			set_value(const Vec2d& value, bool change_event = false);
 	void			set_value(const boost::any& value, bool change_event = false) override;
 	boost::any&		get_value() override;

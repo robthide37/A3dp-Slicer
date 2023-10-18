@@ -21,6 +21,8 @@
 #include "GLCanvas3D.hpp"
 #include "ConfigWizard.hpp"
 
+#include "Widgets/SpinInput.hpp"
+
 #include <boost/dll/runtime_symbol_info.hpp>
 
 #ifdef WIN32
@@ -64,12 +66,24 @@ namespace GUI {
 
 PreferencesDialog::PreferencesDialog(wxWindow* parent) :
     DPIDialog(parent, wxID_ANY, _L("Preferences"), wxDefaultPosition, 
-              wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+              wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
 #ifdef __WXOSX__
     isOSX = true;
 #endif
 	build();
+
+    wxSize sz = GetSize();
+    sz.x += em_unit();
+
+    const size_t pages_cnt = tabs->GetPageCount();
+    for (size_t tab_id = 0; tab_id < pages_cnt; tab_id++) {
+        wxSizer* tab_sizer = tabs->GetPage(tab_id)->GetSizer();
+        wxScrolledWindow* scrolled = static_cast<wxScrolledWindow*>(tab_sizer->GetItem(size_t(0))->GetWindow());
+        scrolled->SetScrollRate(0, 5);
+    }
+
+    SetSize(sz);
 
 	m_highlighter.set_timer_owner(this, 0);
 }
@@ -131,14 +145,22 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 static std::shared_ptr<ConfigOptionsGroup>create_options_tab(const wxString& title, wxBookCtrlBase* tabs)
 {
 	wxPanel* tab = new wxPanel(tabs, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL);
+
 	tabs->AddPage(tab, _(title));
 	tab->SetFont(wxGetApp().normal_font());
 
+	auto scrolled = new wxScrolledWindow(tab);
+
+	// Sizer in the scrolled area
+	auto* scrolled_sizer = new wxBoxSizer(wxVERTICAL);
+	scrolled->SetSizer(scrolled_sizer);
+
 	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+	sizer->Add(scrolled, 1, wxEXPAND);
 	sizer->SetSizeHints(tab);
 	tab->SetSizer(sizer);
 
-	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>(tab);
+	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>(scrolled);
 	optgroup->label_width = 40;
 	optgroup->set_config_category_and_type(title, int(Preset::TYPE_PREFERENCES));
 	return optgroup;
@@ -150,6 +172,8 @@ static void activate_options_tab(std::shared_ptr<ConfigOptionsGroup> optgroup)
 	optgroup->update_visibility(comSimple);
 	wxBoxSizer* sizer = static_cast<wxBoxSizer*>(static_cast<wxPanel*>(optgroup->parent())->GetSizer());
 	sizer->Add(optgroup->sizer, 0, wxEXPAND | wxALL, 10);
+
+	optgroup->parent()->Layout();
 
 	// apply sercher
 	wxGetApp().sidebar().get_searcher().append_preferences_options(optgroup->get_lines());
@@ -212,7 +236,7 @@ void PreferencesDialog::build()
 #ifdef _WIN32
 	wxGetApp().UpdateDarkUI(this);
 #else
-	SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+	//SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
 #endif
 	const wxFont& font = wxGetApp().normal_font();
 	SetFont(font);
@@ -223,7 +247,12 @@ void PreferencesDialog::build()
 	tabs = new Notebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME | wxNB_DEFAULT);
 #else
     tabs = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL  |wxNB_NOPAGETHEME | wxNB_DEFAULT );
-	tabs->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+#ifdef __linux__
+	tabs->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
+		e.Skip();
+		CallAfter([this]() { tabs->GetCurrentPage()->Layout(); });
+    });
+#endif
 #endif
 
 	// Add "General" tab
@@ -526,7 +555,14 @@ void PreferencesDialog::build()
 #endif
 
 		m_optgroup_gui->append_separator();
+/*
+		append_bool_option(m_optgroup_gui, "suppress_round_corners",
+			L("Suppress round corners for controls (experimental)"),
+			L("If enabled, Settings Tabs will be placed as menu items. If disabled, old UI will be used."),
+			app_config->get("suppress_round_corners") == "1");
 
+		m_optgroup_gui->append_separator();
+*/
 		append_bool_option(m_optgroup_gui, "show_hints",
 			L("Show \"Tip of the day\" notification after start"),
 			L("If enabled, useful hints are displayed at startup."),
@@ -593,7 +629,7 @@ void PreferencesDialog::build()
 		activate_options_tab(m_optgroup_other);
 
 		create_downloader_path_sizer();
-//		create_settings_font_widget();
+		create_settings_font_widget();
 
 #if ENABLE_ENVIRONMENT_MAP
 		// Add "Render" tab
@@ -651,6 +687,8 @@ void PreferencesDialog::build()
 	sizer->Add(tabs, 1, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 
 	auto buttons = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
+	wxGetApp().SetWindowVariantForButton(buttons->GetAffirmativeButton());
+	wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
 	this->Bind(wxEVT_BUTTON, &PreferencesDialog::accept, this, wxID_OK);
 	this->Bind(wxEVT_BUTTON, &PreferencesDialog::revert, this, wxID_CANCEL);
 
@@ -706,7 +744,7 @@ void PreferencesDialog::accept(wxEvent&)
 #endif // __linux__
 	}
 
-	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled", "font_size" };
+	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled", "font_pt_size", "suppress_round_corners" };
 
 	for (const std::string& option : options_to_recreate_GUI) {
 		if (m_values.find(option) != m_values.end()) {
@@ -887,7 +925,7 @@ void PreferencesDialog::refresh_og(std::shared_ptr<ConfigOptionsGroup> og)
 {
 	og->parent()->Layout();
 	tabs->Layout();
-	this->layout();
+//	this->layout();
 }
 
 void PreferencesDialog::create_icon_size_slider()
@@ -1065,24 +1103,29 @@ void PreferencesDialog::create_settings_font_widget()
 	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
 	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
 
-	const std::string opt_key = "font_size";
+	const std::string opt_key = "font_pt_size";
 	m_blinkers[opt_key] = new BlinkingBitmap(parent);
 
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxHORIZONTAL);
 
 	wxStaticText* font_example = new wxStaticText(parent, wxID_ANY, "Application text");
     int val = wxGetApp().normal_font().GetPointSize();
-	wxSpinCtrl* size_sc = new wxSpinCtrl(parent, wxID_ANY, format_wxstr("%1%", val), wxDefaultPosition, wxSize(15*em_unit(), -1), wxTE_PROCESS_ENTER | wxSP_ARROW_KEYS
+	SpinInput* size_sc = new SpinInput(parent, format_wxstr("%1%", val), "", wxDefaultPosition, wxSize(15 * em_unit(), -1), wxTE_PROCESS_ENTER | wxSP_ARROW_KEYS
 #ifdef _WIN32
 		| wxBORDER_SIMPLE
 #endif 
-	, 8, 20);
+	, 8, wxGetApp().get_max_font_pt_size());
 	wxGetApp().UpdateDarkUI(size_sc);
 
-	auto apply_font = [this, font_example, opt_key](const int val, const wxFont& font) {
+	auto apply_font = [this, font_example, opt_key, stb_sizer](const int val, const wxFont& font) {
 		font_example->SetFont(font);
 		m_values[opt_key] = format("%1%", val);
+		stb_sizer->Layout();
+#ifdef __linux__
+		CallAfter([this]() { refresh_og(m_optgroup_other); });
+#else
 		refresh_og(m_optgroup_other);
+#endif
 	};
 
 	auto change_value = [size_sc, apply_font](wxCommandEvent& evt) {

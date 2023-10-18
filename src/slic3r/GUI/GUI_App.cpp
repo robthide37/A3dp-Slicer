@@ -1093,6 +1093,16 @@ bool GUI_App::OnInit()
     }
 }
 
+static int get_app_font_pt_size(const AppConfig* app_config)
+{
+    if (!app_config->has("font_pt_size"))
+        return -1;
+    const int font_pt_size     = atoi(app_config->get("font_pt_size").c_str());
+    const int max_font_pt_size = wxGetApp().get_max_font_pt_size();
+
+    return (font_pt_size > max_font_pt_size) ? max_font_pt_size : font_pt_size;
+}
+
 bool GUI_App::on_init_inner()
 {
     // Set initialization of image handlers before any UI actions - See GH issue #7469
@@ -1326,7 +1336,7 @@ bool GUI_App::on_init_inner()
     if (!delayed_error_load_presets.empty())
         show_error(nullptr, delayed_error_load_presets);
 
-    mainframe = new MainFrame(app_config->has("font_size") ? atoi(app_config->get("font_size").c_str()) : -1);
+    mainframe = new MainFrame(get_app_font_pt_size(app_config));
     // hide settings tabs after first Layout
     if (is_editor())
         mainframe->select_tab(size_t(0));
@@ -1649,6 +1659,30 @@ void GUI_App::UpdateAllStaticTextDarkUI(wxWindow* parent)
 #endif
 }
 
+void GUI_App::SetWindowVariantForButton(wxButton* btn)
+{
+#ifdef __APPLE__
+    // This is a limit imposed by OSX. The way the native button widget is drawn only allows it to be stretched horizontally,
+    // and the vertical size is fixed. (see https://stackoverflow.com/questions/29083891/wxpython-button-size-being-ignored-on-osx)
+    // But standard height is possible to change using SetWindowVariant method (see https://docs.wxwidgets.org/3.0/window_8h.html#a879bccd2c987fedf06030a8abcbba8ac)
+    if (m_normal_font.GetPointSize() > 15) {
+        btn->SetWindowVariant(wxWINDOW_VARIANT_LARGE);
+        btn->SetFont(m_normal_font);
+    }
+#endif
+}
+
+int GUI_App::get_max_font_pt_size()
+{
+    const unsigned disp_count = wxDisplay::GetCount();
+    for (int i = 0; i < disp_count; i++) {
+        const wxRect display_rect = wxDisplay(i).GetGeometry();
+        if (display_rect.width >= 2560 && display_rect.height >= 1440)
+            return 20;
+    }
+    return 15;
+}
+
 void GUI_App::init_fonts()
 {
     m_small_font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
@@ -1756,9 +1790,26 @@ bool GUI_App::tabs_as_menu() const
     return app_config->get_bool("tabs_as_menu"); // || dark_mode();
 }
 
-wxSize GUI_App::get_min_size() const
+bool GUI_App::suppress_round_corners() const
 {
-    return wxSize(76*m_em_unit, 49 * m_em_unit);
+    return true;// app_config->get("suppress_round_corners") == "1";
+}
+
+wxSize GUI_App::get_min_size(wxWindow* display_win) const
+{
+    wxSize min_size(76*m_em_unit, 49 * m_em_unit);
+
+    const wxDisplay display = wxDisplay(display_win);
+    wxRect display_rect = display.GetGeometry();
+    display_rect.width  *= 0.75;
+    display_rect.height *= 0.75;
+
+    if (min_size.x > display_rect.GetWidth())
+        min_size.x = display_rect.GetWidth();
+    if (min_size.y > display_rect.GetHeight())
+        min_size.y = display_rect.GetHeight();
+
+    return min_size;
 }
 
 float GUI_App::toolbar_icon_scale(const bool is_limited/* = false*/) const
@@ -1833,7 +1884,7 @@ void GUI_App::recreate_GUI(const wxString& msg_name)
     dlg.Update(10, _L("Recreating") + dots);
 
     MainFrame *old_main_frame = mainframe;
-    mainframe = new MainFrame(app_config->has("font_size") ? atoi(app_config->get("font_size").c_str()) : -1);
+    mainframe = new MainFrame(get_app_font_pt_size(app_config));
     if (is_editor())
         // hide settings tabs after first Layout
         mainframe->select_tab(size_t(0));
@@ -2124,6 +2175,9 @@ int GUI_App::GetSingleChoiceIndex(const wxString& message,
 #ifdef _WIN32
     wxSingleChoiceDialog dialog(nullptr, message, caption, choices);
     wxGetApp().UpdateDlgDarkUI(&dialog);
+    auto children = dialog.GetChildren();
+    for (auto child : children)
+        child->SetFont(normal_font());
 
     dialog.SetSelection(initialSelection);
     return dialog.ShowModal() == wxID_OK ? dialog.GetSelection() : -1;
@@ -2955,7 +3009,8 @@ ObjectSettings* GUI_App::obj_settings()
 
 ObjectList* GUI_App::obj_list()
 {
-    return sidebar().obj_list();
+    // If this method is called before plater_ has been initialized, return nullptr (to avoid a crash)
+    return plater_ ? sidebar().obj_list() : nullptr;
 }
 
 ObjectLayers* GUI_App::obj_layers()
