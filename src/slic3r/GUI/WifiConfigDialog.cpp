@@ -28,6 +28,15 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     wxBoxSizer* vsizer = new wxBoxSizer(wxVERTICAL);
     panel->SetSizer(vsizer);
 
+    // TRN Wifi config dialog explanation line 1.
+    wxStaticText* explain_label1 = new wxStaticText(panel, wxID_ANY, _L("Generate a file to be loaded by a Prusa printer to configure its Wi-Fi connection."));
+    // TRN Wifi config dialog explanation line 2.
+    wxStaticText* explain_label2 = new wxStaticText(panel, wxID_ANY, _L("Write this file on a USB flash drive. Its name will be prusa_printer_settings.ini."));
+    // TRN Wifi config dialog explanation line 3.
+    wxStaticText* explain_label3 = new wxStaticText(panel, wxID_ANY, _L("Your Prusa Printer should load this file automatically."));
+    // TRN Wifi config dialog explanation line 4.
+    wxStaticText* explain_label4 = new wxStaticText(panel, wxID_ANY, _L("Note: This file will contains SSID and password in plain text."));
+
     auto* ssid_sizer = new wxBoxSizer(wxHORIZONTAL);
     // TRN SSID of WiFi network.
     wxStaticText* ssid_label = new wxStaticText(panel, wxID_ANY, GUI::format_wxstr("%1%:", _L("SSID")));
@@ -81,6 +90,10 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     grid->Add(drive_label, 0, wxALIGN_CENTER_VERTICAL);
     grid->Add(drive_sizer, 0, wxEXPAND);
 
+    vsizer->Add(explain_label1, 0, wxALIGN_CENTER_VERTICAL);
+    vsizer->Add(explain_label2, 0, wxALIGN_CENTER_VERTICAL);
+    vsizer->Add(explain_label3, 0, wxALIGN_CENTER_VERTICAL);
+    vsizer->Add(explain_label4, 0, wxALIGN_CENTER_VERTICAL);
     vsizer->Add(grid, 0, wxEXPAND | wxTOP | wxBOTTOM, 15);
 
     wxBoxSizer* buttons_sizer = new wxBoxSizer(wxHORIZONTAL);
