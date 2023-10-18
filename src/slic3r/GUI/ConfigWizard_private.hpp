@@ -32,6 +32,7 @@
 #include "SavePresetDialog.hpp"
 #include "wxExtensions.hpp"
 
+#include "Widgets/SpinInput.hpp"
 
 namespace fs = boost::filesystem;
 
@@ -510,8 +511,8 @@ struct PageDiameters: ConfigWizardPage
 
 struct PageTemperatures: ConfigWizardPage
 {
-    wxSpinCtrlDouble *spin_extr;
-    wxSpinCtrlDouble *spin_bed;
+    ::SpinInputDouble *spin_extr;
+    ::SpinInputDouble *spin_bed;
 
     PageTemperatures(ConfigWizard *parent);
     virtual void apply_custom_config(DynamicPrintConfig &config);

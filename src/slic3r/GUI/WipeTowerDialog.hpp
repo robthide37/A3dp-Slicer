@@ -26,7 +26,7 @@ private:
     ::SpinInput* m_widget_volume = nullptr;
     ::SpinInput* m_widget_ramming_line_width_multiplicator = nullptr;
     ::SpinInput* m_widget_ramming_step_multiplicator = nullptr;
-    wxSpinCtrlDouble* m_widget_time = nullptr;
+    ::SpinInputDouble* m_widget_time = nullptr;
     int m_ramming_step_multiplicator;
     int m_ramming_line_width_multiplicator;
       

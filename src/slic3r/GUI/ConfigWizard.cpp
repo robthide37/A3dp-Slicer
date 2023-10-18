@@ -1981,7 +1981,7 @@ void PageDiameters::apply_custom_config(DynamicPrintConfig &config)
     set_extrusion_width("solid_infill_extrusion_width",       0.45);
 }
 
-class SpinCtrlDouble: public wxSpinCtrlDouble
+class SpinCtrlDouble: public ::SpinInputDouble
 {
 public:
     SpinCtrlDouble(wxWindow* parent)
@@ -1991,10 +1991,7 @@ public:
 #else
         long style = wxSP_ARROW_KEYS;
 #endif
-        Create(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, style);
-#ifdef _WIN32
-        wxGetApp().UpdateDarkUI(this->GetText());
-#endif
+        Create(parent, "", wxEmptyString, wxDefaultPosition, wxSize(6* wxGetApp().em_unit(), -1), style);
         this->Refresh();
     }
     ~SpinCtrlDouble() {}
