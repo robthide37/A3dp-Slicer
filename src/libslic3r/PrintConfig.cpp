@@ -59,8 +59,7 @@ static t_config_enum_names enum_names_from_keys_map(const t_config_enum_values &
 
 static const t_config_enum_values s_keys_map_ArcFittingType {
     { "disabled",       int(ArcFittingType::Disabled) },
-    { "emit_center",    int(ArcFittingType::EmitCenter) },
-    { "emit_radius",    int(ArcFittingType::EmitRadius) }
+    { "emit_center",    int(ArcFittingType::EmitCenter) }
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(ArcFittingType)
 
@@ -441,20 +440,10 @@ void PrintConfigDef::init_fff_params()
                      "G-code resolution will be used as the fitting tolerance.");
     def->set_enum<ArcFittingType>({
         { "disabled",       "Disabled" },
-        { "emit_center",    "Enabled: G2/3 I J" },
-        { "emit_radius",    "Enabled: G2/3 R" }
+        { "emit_center",    "Enabled: G2/3 I J" }
     });
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionEnum<ArcFittingType>(ArcFittingType::Disabled));
-
-    def = this->add("arc_fitting_tolerance", coFloatOrPercent);
-    def->label = L("Arc fitting tolerance");
-    def->sidetext = L("mm or %");
-    def->tooltip = L("When using the arc_fitting option, allow the curve to deviate certain % from the collection of straight paths.\n"
-                     "Can be either a mm value or a percentage of the current extrusion width.");
-    def->mode = comAdvanced;
-    def->min = 0;
-    def->set_default_value(new ConfigOptionFloatOrPercent(5, true));
 
     // Maximum extruder temperature, bumped to 1500 to support printing of glass.
     const int max_temp = 1500;

@@ -375,6 +375,7 @@ double arc_fit_max_deviation(const Point &start_point, const Point &end_point, c
     const Points::const_iterator begin, const Points::const_iterator end);
 
 // 1.2m diameter, maximum given by coord_t
+static_assert(sizeof(coord_t) == 4);
 static constexpr const double default_scaled_max_radius = scaled<double>(600.);
 // 0.05mm
 static constexpr const double default_scaled_resolution = scaled<double>(0.05);

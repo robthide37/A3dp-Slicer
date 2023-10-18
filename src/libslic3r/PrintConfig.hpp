@@ -49,8 +49,7 @@ namespace Slic3r {
 
 enum class ArcFittingType {
     Disabled,
-    EmitCenter,
-    EmitRadius,
+    EmitCenter
 };
 
 enum GCodeFlavor : unsigned char {
@@ -701,7 +700,6 @@ PRINT_CONFIG_CLASS_DEFINE(
     GCodeConfig,
 
     ((ConfigOptionEnum<ArcFittingType>, arc_fitting))
-    ((ConfigOptionFloatOrPercent,      arc_fitting_tolerance))
     ((ConfigOptionBool,                autoemit_temperature_commands))
     ((ConfigOptionString,              before_layer_gcode))
     ((ConfigOptionString,              between_objects_gcode))

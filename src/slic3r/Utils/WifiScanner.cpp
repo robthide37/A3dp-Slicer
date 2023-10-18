@@ -144,7 +144,6 @@ void fill_wifi_map(Slic3r::WifiSsidPskMap& wifi_map, std::string& connected_ssid
                     wxString xml(xmlstr);
                     boost::property_tree::ptree pt;
                     std::stringstream ss(boost::nowide::narrow(xml));
-                    BOOST_LOG_TRIVIAL(error) << ss.str();
                     boost::property_tree::read_xml(ss, pt);
                     std::string password;
                     std::string psk_protected;

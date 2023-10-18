@@ -69,13 +69,11 @@ public:
     std::string set_speed(double F, const std::string_view comment = {}, const std::string_view cooling_marker = {}) const;
     std::string travel_to_xy(const Vec2d &point, const std::string_view comment = {});
     std::string travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment = {});
-    std::string travel_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, const std::string_view comment = {});
     std::string travel_to_xyz(const Vec3d &point, const std::string_view comment = {});
     std::string travel_to_z(double z, const std::string_view comment = {});
     bool        will_move_z(double z) const;
     std::string extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment = {});
     std::string extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, double dE, const std::string_view comment);
-    std::string extrude_to_xy_G2G3R(const Vec2d &point, const double radius, const bool ccw, double dE, const std::string_view comment);
 //    std::string extrude_to_xyz(const Vec3d &point, double dE, const std::string_view comment = {});
     std::string retract(bool before_wipe = false);
     std::string retract_for_toolchange(bool before_wipe = false);
@@ -193,12 +191,6 @@ public:
             this->emit_axis('I', point.x(), XYZF_EXPORT_DIGITS);
         if (point.y() != 0)
             this->emit_axis('J', point.y(), XYZF_EXPORT_DIGITS);
-    }
-
-    // Positive radius means a smaller arc, 
-    // negative radius means a larger arc.
-    void emit_radius(const double radius) {
-        this->emit_axis('R', radius, XYZF_EXPORT_DIGITS);
     }
 
     void emit_e(const std::string_view axis, double v) {
