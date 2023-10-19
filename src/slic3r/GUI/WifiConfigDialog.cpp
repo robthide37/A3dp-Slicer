@@ -42,7 +42,7 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     wxStaticText* ssid_label = new wxStaticText(panel, wxID_ANY, GUI::format_wxstr("%1%:", _L("SSID")));
     m_ssid_combo = new wxComboBox(panel, wxID_ANY);
 #if __APPLE__
-    m_ssid_combo->SetToolTip(_L("On some versions of MacOS, this only loads SSID of connencted network."));
+    m_ssid_combo->SetToolTip(_L("On some versions of MacOS, this only loads SSID of connected network."));
 #endif // __APPLE__
     rescan_networks(false);
     // TRN Text of button to rescan visible networks in Wifi Config dialog.
@@ -230,7 +230,7 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
    
     wxString ssid = m_ssid_combo->GetValue();
     wxString pass = m_pass_textctrl->GetValue();
-    wxString data = GUI::format(
+    std::string data = GUI::format(
         "[wifi]\n"
         "ssid=%1%\n"
         "psk=%2%\n"
