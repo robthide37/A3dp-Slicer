@@ -5,6 +5,7 @@
 #include "ExtraRenderers.hpp"
 #include "wxExtensions.hpp"
 #include "GUI.hpp"
+#include "GUI_App.hpp"
 #include "I18N.hpp"
 #include "BitmapComboBox.hpp"
 #include "Plater.hpp"
@@ -330,6 +331,10 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
         labelRect.GetTopLeft(), wxSize(labelRect.GetWidth(), -1), 
         0, nullptr , wxCB_READONLY);
 
+#ifdef _WIN32
+    Slic3r::GUI::wxGetApp().UpdateDarkUI(c_editor);
+#endif
+
     int def_id = get_default_extruder_idx ? get_default_extruder_idx() : 0;
     c_editor->Append(_L("default"), def_id < 0 ? wxNullBitmap : *icons[def_id]);
     for (size_t i = 0; i < icons.size(); i++)
@@ -356,7 +361,11 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
 
 bool BitmapChoiceRenderer::GetValueFromEditorCtrl(wxWindow* ctrl, wxVariant& value)
 {
+#ifdef _WIN32
+    Slic3r::GUI::BitmapComboBox* c = static_cast<Slic3r::GUI::BitmapComboBox*>(ctrl);
+#else
     wxBitmapComboBox* c = static_cast<wxBitmapComboBox*>(ctrl);
+#endif
     int selection = c->GetSelection();
     if (selection < 0)
         return false;
