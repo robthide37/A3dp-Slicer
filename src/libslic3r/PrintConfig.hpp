@@ -69,7 +69,7 @@ enum PrintHostType {
 };
 
 enum AuthorizationType {
-    atUserPassword, atKeyPassword
+    atKeyPassword, atUserPassword
 };
 
 enum class FuzzySkinType {
