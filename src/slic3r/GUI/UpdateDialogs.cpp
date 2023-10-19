@@ -306,7 +306,7 @@ MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, bool force_
 		}
 
 		if (! update.new_printers.empty()) {
-			flex->Add(new wxStaticText(this, wxID_ANY, _L_PLURAL("New printer:", "New printers:", update.new_printers.find(',') == std::string::npos ? 1 : 2)), 0, wxALIGN_RIGHT);
+			flex->Add(new wxStaticText(this, wxID_ANY, _L_PLURAL("New printer", "New printers", update.new_printers.find(',') == std::string::npos ? 1 : 2) + ":"), 0, wxALIGN_RIGHT);
 			auto* update_printer = new wxStaticText(this, wxID_ANY, from_u8(update.new_printers));
 			update_printer->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
 			flex->Add(update_printer);
@@ -373,7 +373,7 @@ MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
 		}
 
 		if (!update.new_printers.empty()) {
-			versions->Add(new wxStaticText(this, wxID_ANY, _L_PLURAL("New printer:", "New printers:", update.new_printers.find(',') == std::string::npos ? 1 : 2))/*, 0, wxALIGN_RIGHT*/);
+			versions->Add(new wxStaticText(this, wxID_ANY, _L_PLURAL("New printer", "New printers", update.new_printers.find(',') == std::string::npos ? 1 : 2)+":")/*, 0, wxALIGN_RIGHT*/);
 			auto* update_printer = new wxStaticText(this, wxID_ANY, from_u8(update.new_printers));
 			update_printer->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
 			versions->Add(update_printer);
