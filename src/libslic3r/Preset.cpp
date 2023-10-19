@@ -2330,6 +2330,15 @@ namespace PresetUtils {
         }
         return true;
     }
+    bool compare_vendor_profile_printers(const VendorProfile& vp_old, const VendorProfile& vp_new, std::vector<std::string>& new_printers)
+    {
+        for (const VendorProfile::PrinterModel& model : vp_new.models)
+        {
+            if (std::find_if(vp_old.models.begin(), vp_old.models.end(), [model](const VendorProfile::PrinterModel& pm) { return pm.id == model.id; }) == vp_old.models.end())
+                new_printers.push_back(model.name);
+        }
+        return new_printers.empty();
+    }
 } // namespace PresetUtils
 
 } // namespace Slic3r

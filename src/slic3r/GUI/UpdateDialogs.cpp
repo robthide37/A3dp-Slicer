@@ -305,6 +305,13 @@ MsgUpdateConfig::MsgUpdateConfig(const std::vector<Update> &updates, bool force_
 			flex->Add(update_comment);
 		}
 
+		if (! update.new_printers.empty()) {
+			flex->Add(new wxStaticText(this, wxID_ANY, _L_PLURAL("New printer:", "New printers:", update.new_printers.find(',') == std::string::npos ? 1 : 2)), 0, wxALIGN_RIGHT);
+			auto* update_printer = new wxStaticText(this, wxID_ANY, from_u8(update.new_printers));
+			update_printer->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
+			flex->Add(update_printer);
+		}
+
 		versions->Add(flex);
 
 		if (! update.changelog_url.empty() && update.version.prerelease() == nullptr) {
@@ -363,6 +370,13 @@ MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates) :
 			auto* update_comment = new wxStaticText(this, wxID_ANY, from_u8(update.comment));
 			update_comment->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
 			versions->Add(update_comment);
+		}
+
+		if (!update.new_printers.empty()) {
+			versions->Add(new wxStaticText(this, wxID_ANY, _L_PLURAL("New printer:", "New printers:", update.new_printers.find(',') == std::string::npos ? 1 : 2))/*, 0, wxALIGN_RIGHT*/);
+			auto* update_printer = new wxStaticText(this, wxID_ANY, from_u8(update.new_printers));
+			update_printer->Wrap(CONTENT_WIDTH * wxGetApp().em_unit());
+			versions->Add(update_printer);
 		}
 
 		if (!update.changelog_url.empty() && update.version.prerelease() == nullptr) {
