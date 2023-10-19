@@ -2173,9 +2173,7 @@ std::string choose_svg_file()
     if (input_files.size() != 1)
         BOOST_LOG_TRIVIAL(warning) << "SVG file dialog result contain multiple files but only first is used.";
 
-    auto &input_file = input_files.front();
-    std::string path = std::string(input_file.c_str());
-
+    std::string path = into_u8(input_files.front());
     if (!boost::filesystem::exists(path)) {
         BOOST_LOG_TRIVIAL(warning) << "SVG file dialog return invalid path.";
         return {};
