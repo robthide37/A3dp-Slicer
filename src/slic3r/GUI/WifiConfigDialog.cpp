@@ -230,7 +230,7 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
    
     wxString ssid = m_ssid_combo->GetValue();
     wxString pass = m_pass_textctrl->GetValue();
-    wxString data = GUI::format(
+    std::string data = GUI::format(
         "[wifi]\n"
         "ssid=%1%\n"
         "psk=%2%\n"
