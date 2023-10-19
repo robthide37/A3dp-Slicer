@@ -1540,7 +1540,8 @@ void GLGizmoSVG::draw_filename(){
                 m_volume_shape.svg_file.path.clear();
                 m_filename_preview.clear();
             } else if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("%s", _u8L("Do NOT save local path to 3MF file.\n Also disables 'reload from disk' option.").c_str());
+                ImGui::SetTooltip("%s", _u8L("Do NOT save local path to 3MF file.\n"
+                                             "Also disables 'reload from disk' option.").c_str());
             }
         }
         

@@ -7017,7 +7017,7 @@ void publish(Model &model) {
 
     if (exist_new){
         MessageDialog dialog(nullptr,
-                             _L("Are you sure you want to store original SVGs with their local paths into the 3MF file?\n "
+                             _L("Are you sure you want to store original SVGs with their local paths into the 3MF file?\n"
                                 "If you hit 'NO', all SVGs in the project will not be editable any more."),
                              _L("Private protection"), wxYES_NO | wxICON_QUESTION);
         if (dialog.ShowModal() == wxID_NO){
