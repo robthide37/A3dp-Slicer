@@ -5583,16 +5583,16 @@ void Plater::convert_gcode_to_ascii()
         using namespace bgcode::core;
         EResult res = is_valid_binary_gcode(*in_file.f);
         if (res == EResult::InvalidMagicNumber) {
-            MessageDialog msg_dlg(this, _L("The selected file is already in ascii format."), _L("Warning"), wxOK);
+            MessageDialog msg_dlg(this, _L("The selected file is already in ASCII format."), _L("Warning"), wxOK);
             msg_dlg.ShowModal();
             return;
         }
         else {
             output_file = rename_file(output_file, ".gcode");
-            wxString msg = _L("You are trying to convert to ascii a binary file whose extension is '.gcode'.");
+            wxString msg = _L("You are trying to convert to ASCII a binary file whose extension is '.gcode'.");
             msg += "\n" + _L("The exported file will be renamed as:");
             msg += "\n\n" + output_file;
-            msg += "\n\n" + _L("Continue with export ?");
+            msg += "\n\n" + _L("Continue with export?");
             MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
             if (msg_dlg.ShowModal() != wxID_YES)
                 return;
@@ -5633,7 +5633,7 @@ void Plater::convert_gcode_to_ascii()
         }
     }
 
-    MessageDialog msg_dlg(this, Slic3r::GUI::format_wxstr("%1%\n%2%", _L("Successfully created G-code ascii file"), output_file),
+    MessageDialog msg_dlg(this, Slic3r::GUI::format_wxstr("%1%\n%2%", _L("Successfully created G-code ASCII file"), output_file),
                           _L("Convert G-code file to ASCII format"), wxICON_ERROR | wxOK);
     msg_dlg.ShowModal();
 }
@@ -5669,10 +5669,10 @@ void Plater::convert_gcode_to_binary()
         }
         else {
             output_file = rename_file(output_file, ".bgcode");
-            wxString msg = _L("You are trying to convert to binary an ascii file whose extension is '.bgcode'.");
+            wxString msg = _L("You are trying to convert to binary an ASCII file whose extension is '.bgcode'.");
             msg += "\n" + _L("The exported file will be renamed as:");
             msg += "\n\n" + output_file;
-            msg += "\n\n" + _L("Continue with export ?");
+            msg += "\n\n" + _L("Continue with export?");
             MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
             if (msg_dlg.ShowModal() != wxID_YES)
                 return;

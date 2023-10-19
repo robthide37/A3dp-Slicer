@@ -111,6 +111,7 @@ src/slic3r/GUI/Tab.cpp
 src/slic3r/GUI/Tab.hpp
 src/slic3r/GUI/UnsavedChangesDialog.cpp
 src/slic3r/GUI/UpdateDialogs.cpp
+src/slic3r/GUI/WifiConfigDialog.cpp
 src/slic3r/GUI/WipeTowerDialog.cpp
 src/slic3r/GUI/wxExtensions.cpp
 src/slic3r/Utils/AppUpdater.cpp
