@@ -159,7 +159,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
 
     // Add slicing states placeholders
 
-    wxDataViewItem slicing_state = m_params_list->AppendGroup(_L("[Global] Slicing state"), "re_slice");
+    wxDataViewItem slicing_state = m_params_list->AppendGroup(_L("[Global] Slicing state"), "custom-gcode_slicing-state_global");
     if (!cgp_ro_slicing_states_config_def.empty()) {
         wxDataViewItem read_only = m_params_list->AppendSubGroup(slicing_state, _L("Read only"), "lock_closed");
         for (const auto& [opt_key, def]: cgp_ro_slicing_states_config_def.options)
@@ -175,7 +175,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
     // add other universal params, which are related to slicing state
 
     if (!cgp_other_slicing_states_config_def.empty()) {
-        slicing_state = m_params_list->AppendGroup(_L("Slicing state"), "re_slice");
+        slicing_state = m_params_list->AppendGroup(_L("Slicing state"), "custom-gcode_slicing-state");
         for (const auto& [opt_key, def] : cgp_other_slicing_states_config_def.options)
             m_params_list->AppendParam(slicing_state, get_type(opt_key, def), opt_key);
     }
@@ -186,7 +186,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
         // Add print statistics subgroup
 
         if (!cgp_print_statistics_config_def.empty()) {
-            wxDataViewItem statistics = m_params_list->AppendGroup(_L("Print statistics"), "info");
+            wxDataViewItem statistics = m_params_list->AppendGroup(_L("Print statistics"), "custom-gcode_stats");
             for (const auto& [opt_key, def] : cgp_print_statistics_config_def.options)
                 m_params_list->AppendParam(statistics, get_type(opt_key, def), opt_key);
         }
@@ -194,7 +194,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
         // Add objects info subgroup
 
         if (!cgp_objects_info_config_def.empty()) {
-            wxDataViewItem objects_info = m_params_list->AppendGroup(_L("Objects info"), "advanced_plus");
+            wxDataViewItem objects_info = m_params_list->AppendGroup(_L("Objects info"), "custom-gcode_object-info");
             for (const auto& [opt_key, def] : cgp_objects_info_config_def.options)
                 m_params_list->AppendParam(objects_info, get_type(opt_key, def), opt_key);
         }
@@ -202,7 +202,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
         // Add  dimensions subgroup
 
         if (!cgp_dimensions_config_def.empty()) {
-            wxDataViewItem dimensions = m_params_list->AppendGroup(_L("Dimensions"), "measure");
+            wxDataViewItem dimensions = m_params_list->AppendGroup(_L("Dimensions"), "custom-gcode_measure");
             for (const auto& [opt_key, def] : cgp_dimensions_config_def.options)
                 m_params_list->AppendParam(dimensions, get_type(opt_key, def), opt_key);
         }
@@ -220,7 +220,7 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
 
     if (!specific_params.empty()) {
         // TRN: The argument is the name of currently edited custom gcode. The string starts a section of placeholders only available in this gcode.
-        wxDataViewItem group = m_params_list->AppendGroup(format_wxstr(_L("Specific for %1%"), custom_gcode_name), "add_gcode");
+        wxDataViewItem group = m_params_list->AppendGroup(format_wxstr(_L("Specific for %1%"), custom_gcode_name), "custom-gcode_gcode");
         for (const auto& opt_key : specific_params)
             if (custom_gcode_specific_config_def.has(opt_key)) {
                 auto def = custom_gcode_specific_config_def.get(opt_key);
@@ -389,9 +389,9 @@ void EditGCodeDialog::on_sys_color_changed()
 
 const std::map<ParamType, std::string> ParamsInfo {
 //    Type                      BitmapName
-    { ParamType::Scalar,        "scalar_param"          },
-    { ParamType::Vector,        "vector_param"          },
-    { ParamType::FilamentVector,"vector_filament_param" },
+    { ParamType::Scalar,        "custom-gcode_single"          },
+    { ParamType::Vector,        "custom-gcode_vector"          },
+    { ParamType::FilamentVector,"custom-gcode_vector-index" },
 };
 
 static void make_bold(wxString& str)
