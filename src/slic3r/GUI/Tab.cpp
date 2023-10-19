@@ -1947,23 +1947,22 @@ void TabFilament::create_line_with_near_label_widget(ConfigOptionsGroupShp optgr
     else
         line = optgroup->create_single_option_line(optgroup->get_option(opt_key));
 
+    line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
+        wxWindow* check_box = CheckBox::GetNewWin(parent);
+        wxGetApp().UpdateDarkUI(check_box);
 
-        line.near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), opt_key, opt_index](wxWindow* parent) {
-            wxWindow* check_box = CheckBox::GetNewWin(parent);
-            wxGetApp().UpdateDarkUI(check_box);
-
-            check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
-                const bool is_checked = evt.IsChecked();
-                if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
-                    if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
-                        field->toggle(is_checked);
-                        if (is_checked)
-                            field->set_last_meaningful_value();
-                        else
-                            field->set_na_value();
-                    }
+        check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, opt_key, opt_index](wxCommandEvent& evt) {
+            const bool is_checked = evt.IsChecked();
+            if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
+                if (Field *field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
+                    field->toggle(is_checked);
+                    if (is_checked)
+                        field->set_last_meaningful_value();
+                    else
+                        field->set_na_value();
                 }
-            });
+            }
+        });
 
         m_overrides_options[opt_key] = check_box;
         return check_box;

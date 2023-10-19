@@ -52,7 +52,7 @@ void StateHandler::update_binds()
     int diff = bind_states ^ bind_states_;
     State       states[] = {Enabled, Checked, Focused, Hovered, Pressed};
     wxEventType events[] = {EVT_ENABLE_CHANGED, wxEVT_CHECKBOX, wxEVT_SET_FOCUS, wxEVT_ENTER_WINDOW, wxEVT_LEFT_DOWN};
-    wxEventType events2[] = {{0}, {0}, wxEVT_KILL_FOCUS, wxEVT_LEAVE_WINDOW, wxEVT_LEFT_UP};
+    wxEventType events2[] = {0, 0, wxEVT_KILL_FOCUS, wxEVT_LEAVE_WINDOW, wxEVT_LEFT_UP};
     for (int i = 0; i < 5; ++i) {
         int s = states[i];
         if (diff & s) {
@@ -82,7 +82,7 @@ void StateHandler::changed(wxEvent &event)
 {
     event.Skip();
     wxEventType events[] = {EVT_ENABLE_CHANGED, wxEVT_CHECKBOX, wxEVT_SET_FOCUS, wxEVT_ENTER_WINDOW, wxEVT_LEFT_DOWN};
-    wxEventType events2[] = {{0}, {0}, wxEVT_KILL_FOCUS, wxEVT_LEAVE_WINDOW, wxEVT_LEFT_UP};
+    wxEventType events2[] = { 0, 0, wxEVT_KILL_FOCUS, wxEVT_LEAVE_WINDOW, wxEVT_LEFT_UP};
     int old = states_;
     // some events are from another window (ex: text_ctrl of TextInput), save state in states2_ to avoid conflicts
     for (int i = 0; i < 5; ++i) {

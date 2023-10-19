@@ -899,8 +899,9 @@ void SpinCtrl::BUILD() {
     if (!wxOSX) temp->SetBackgroundStyle(wxBG_STYLE_PAINT);
 	wxGetApp().UpdateDarkUI(temp);
 
-    if (m_opt.height < 0 && parent_is_custom_ctrl)
+    if (m_opt.height < 0 && parent_is_custom_ctrl) {
         opt_height = (double)temp->GetSize().GetHeight() / m_em_unit;
+    }
 
 	temp->Bind(wxEVT_KILL_FOCUS, ([this](wxEvent& e)
 	{

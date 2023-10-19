@@ -22,7 +22,7 @@ void StateColor::append(unsigned long color, int states)
 {
     if ((color & 0xff000000) == 0)
         color |= 0xff000000;
-    wxColour cl; cl.SetRGBA(color & 0xff00ff00 | ((color & 0xff) << 16) | ((color >> 16) & 0xff));
+    wxColour cl; cl.SetRGBA((color & 0xff00ff00) | ((color & 0xff) << 16) | ((color >> 16) & 0xff));
     append(cl, states);
 }
 
@@ -49,7 +49,7 @@ wxColour StateColor::defaultColor() {
 wxColour StateColor::colorForStates(int states)
 {
     bool focused = takeFocusedAsHovered_ && (states & Focused);
-    for (int i = 0; i < statesList_.size(); ++i) {
+    for (size_t i = 0; i < statesList_.size(); ++i) {
         int s = statesList_[i];
         int on = s & 0xffff;
         int off = s >> 16;
@@ -69,18 +69,18 @@ wxColour StateColor::colorForStates(int states)
 
 int StateColor::colorIndexForStates(int states)
 {
-    for (int i = 0; i < statesList_.size(); ++i) {
+    for (size_t i = 0; i < statesList_.size(); ++i) {
         int s   = statesList_[i];
         int on  = s & 0xffff;
         int off = s >> 16;
-        if ((on & states) == on && (off & ~states) == off) { return i; }
+        if ((on & states) == on && (off & ~states) == off) { return int(i); }
     }
     return -1;
 }
 
 bool StateColor::setColorForStates(wxColour const &color, int states)
 {
-    for (int i = 0; i < statesList_.size(); ++i) {
+    for (size_t i = 0; i < statesList_.size(); ++i) {
         if (statesList_[i] == states) {
             colors_[i] = color;
             return true;
