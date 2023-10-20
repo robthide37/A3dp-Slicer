@@ -2,6 +2,7 @@
 ///|/
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
+#include <numeric>
 #include "Emboss.hpp"
 #include <stdio.h>
 #include <cstdlib>
@@ -562,7 +563,7 @@ Duplicates collect_duplicit_indices(const ExPolygons &expoly)
 
     // initialize original index locations
     std::vector<uint32_t> idx(pts.size());
-    iota(idx.begin(), idx.end(), 0);
+    std::iota(idx.begin(), idx.end(), 0);
     std::sort(idx.begin(), idx.end(), 
         [&pts](uint32_t i1, uint32_t i2) { return pts[i1] < pts[i2]; });
 
