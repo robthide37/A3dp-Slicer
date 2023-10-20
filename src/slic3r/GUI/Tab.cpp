@@ -2435,6 +2435,7 @@ void TabFilament::msw_rescale()
 
 void TabFilament::sys_color_changed()
 {
+    wxGetApp().UpdateDarkUI(m_extruders_cb);
     m_extruders_cb->Clear();
     update_extruder_combobox();
 
