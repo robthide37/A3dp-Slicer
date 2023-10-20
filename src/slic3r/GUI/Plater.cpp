@@ -2619,11 +2619,11 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                             // TRN The placeholder is either "3MF" or "AMF"
                             wxString msg = GUI::format_wxstr(_L("The selected %1% file contains a post-processing script.\n"
                                 "Please review the script carefully before exporting G-code."), type_3mf ? "3MF" : "AMF" );
-                            wxString text;
-                            for (const auto& s : post_process->values)
+                            std::string text;
+                            for (const std::string& s : post_process->values)
                                 text += s;
 
-                            InfoDialog msg_dlg(nullptr, msg, text, true, wxOK | wxICON_WARNING);
+                            InfoDialog msg_dlg(nullptr, msg, from_u8(text), true, wxOK | wxICON_WARNING);
                             msg_dlg.set_caption(wxString(SLIC3R_APP_NAME " - ") + _L("Attention!"));
                             msg_dlg.ShowModal();
                         }

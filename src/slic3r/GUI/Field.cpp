@@ -1283,8 +1283,8 @@ void Choice::set_values(const std::vector<std::string>& values)
 	auto value = ww->GetValue();
 	ww->Clear();
 	ww->Append("");
-	for (const auto &el : values)
-		ww->Append(wxString(el));
+	for (const std::string& el : values)
+		ww->Append(from_u8(el));
 	ww->SetValue(value);
 
 	m_disable_change_event = false;

@@ -1929,12 +1929,12 @@ void MainFrame::load_config_file()
         const auto* post_process = config.opt<ConfigOptionStrings>("post_process");
         if (post_process != nullptr && !post_process->values.empty()) {
             const wxString msg = _L("The selected config file contains a post-processing script.\nPlease review the script carefully before exporting G-code.");
-            wxString text;
-            for (const auto& s : post_process->values) {
+            std::string text;
+            for (const std::string& s : post_process->values) {
                 text += s;
             }
 
-            InfoDialog msg_dlg(nullptr, msg, text, true, wxOK | wxICON_WARNING);
+            InfoDialog msg_dlg(nullptr, msg, from_u8(text), true, wxOK | wxICON_WARNING);
             msg_dlg.set_caption(wxString(SLIC3R_APP_NAME " - ") + _L("Attention!"));
             msg_dlg.ShowModal();
         }
