@@ -18,7 +18,10 @@
 namespace Slic3r {
 namespace GUI {
 
+const char* WIFI_CONFIGFILE_NAME = "prusa_printer_settings.ini";
+
 WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, RemovableDriveManager* removable_manager)
+    // TRN: This is the dialog title.
      : DPIDialog(parent, wxID_ANY, _L("Wi-Fi Configuration File Generator"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
      , m_wifi_scanner(new WifiScanner())
      , out_file_path(file_path)
@@ -33,14 +36,14 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     // TRN Wifi config dialog explanation line 1.
     wxStaticText* explain_label1 = new wxStaticText(panel, wxID_ANY, _L("Generate a file to be loaded by a Prusa printer to configure its Wi-Fi connection."));
     // TRN Wifi config dialog explanation line 2.
-    wxStaticText* explain_label2 = new wxStaticText(panel, wxID_ANY, _L("Write this file on a USB flash drive. Its name will be prusa_printer_settings.ini."));
+    wxStaticText* explain_label2 = new wxStaticText(panel, wxID_ANY, GUI::format_wxstr(_L("Write this file on the USB flash drive. Its name will be %1%."), WIFI_CONFIGFILE_NAME));
     // TRN Wifi config dialog explanation line 3.
     wxStaticText* explain_label3 = new wxStaticText(panel, wxID_ANY, _L("Your Prusa Printer should load this file automatically."));
     // TRN Wifi config dialog explanation line 4.
-    wxStaticText* explain_label4 = new wxStaticText(panel, wxID_ANY, _L("Note: This file will contains SSID and password in plain text."));
+    wxStaticText* explain_label4 = new wxStaticText(panel, wxID_ANY, _L("Note: This file will contain the SSID and password in plain text."));
 
     auto* ssid_sizer = new wxBoxSizer(wxHORIZONTAL);
-    // TRN SSID of WiFi network.
+    // TRN SSID of WiFi network. It is a standard abbreviation which should probably not change in most languages.
     wxStaticText* ssid_label = new wxStaticText(panel, wxID_ANY, GUI::format_wxstr("%1%:", _L("SSID")));
     m_ssid_combo = new ::ComboBox(panel, wxID_ANY);
 #if __APPLE__
@@ -212,7 +215,7 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
         return;
     }
 
-    boost::filesystem::path file_path = boost::filesystem::path(selected_path) / "prusa_printer_settings.ini";
+    boost::filesystem::path file_path = boost::filesystem::path(selected_path) / WIFI_CONFIGFILE_NAME;
 
     bool path_on_removable_media = m_removable_manager->set_and_verify_last_save_path(file_path.string());
     if (!path_on_removable_media) {

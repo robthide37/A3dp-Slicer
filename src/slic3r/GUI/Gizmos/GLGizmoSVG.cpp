@@ -1136,8 +1136,10 @@ std::vector<std::string> create_shape_warnings(const EmbossShape &shape, float s
         }
 
         std::string fill_warning = create_fill_warning(*shape);
-        if (!fill_warning.empty())
+        if (!fill_warning.empty()) {
+            // TRN: The first placeholder is shape identifier, the second one is text describing the problem.
             add_warning(shape_index * 2, GUI::format(_L("Fill of shape (%1%) contains unsupported: %2% "), shape->id, fill_warning));
+        }
         
         float minimal_width_in_mm = 1e-3f;
         if (shape->strokeWidth <= minimal_width_in_mm * scale) {

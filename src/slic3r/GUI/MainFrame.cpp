@@ -1928,7 +1928,7 @@ void MainFrame::load_config_file()
         DynamicPrintConfig config = wxGetApp().preset_bundle->full_config();
         const auto* post_process = config.opt<ConfigOptionStrings>("post_process");
         if (post_process != nullptr && !post_process->values.empty()) {
-            const wxString msg = _L("The selected config file contains a post-processing script") + "\n" + _L("Please review the script carefully before running it.");
+            const wxString msg = _L("The selected config file contains a post-processing script.\nPlease review the script carefully before exporting G-code.");
             wxString text;
             for (const auto& s : post_process->values) {
                 text += s;
