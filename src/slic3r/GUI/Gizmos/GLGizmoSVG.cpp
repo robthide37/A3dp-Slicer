@@ -1125,30 +1125,30 @@ std::vector<std::string> create_shape_warnings(const EmbossShape &shape, float s
 
         // This waning is not connected to NSVGshape. It is about union of paths, but Zero index is shown first
         size_t index = 0;
-        add_warning(index, _u8L("Final shape constains selfintersection or multiple points with same coordinate"));
+        add_warning(index, _u8L("Final shape constains selfintersection or multiple points with same coordinate."));
     }
 
     size_t shape_index = 0;
     for (NSVGshape *shape = image.shapes; shape != NULL; shape = shape->next, ++shape_index) {
         if (!(shape->flags & NSVG_FLAGS_VISIBLE)){
-            add_warning(shape_index * 2, GUI::format(_L("Shape is marked as invisible (%1%)"), shape->id));
+            add_warning(shape_index * 2, GUI::format(_L("Shape is marked as invisible (%1%)."), shape->id));
             continue;
         }
 
         std::string fill_warning = create_fill_warning(*shape);
         if (!fill_warning.empty()) {
             // TRN: The first placeholder is shape identifier, the second one is text describing the problem.
-            add_warning(shape_index * 2, GUI::format(_L("Fill of shape (%1%) contains unsupported: %2% "), shape->id, fill_warning));
+            add_warning(shape_index * 2, GUI::format(_L("Fill of shape (%1%) contains unsupported: %2%."), shape->id, fill_warning));
         }
         
         float minimal_width_in_mm = 1e-3f;
         if (shape->strokeWidth <= minimal_width_in_mm * scale) {
-            add_warning(shape_index * 2, GUI::format(_L("Stroke of shape (%1%) is too thin (minimal width is %2% mm)"), shape->id, minimal_width_in_mm));
+            add_warning(shape_index * 2, GUI::format(_L("Stroke of shape (%1%) is too thin (minimal width is %2% mm)."), shape->id, minimal_width_in_mm));
             continue;
         }
         std::string stroke_warning = create_stroke_warning(*shape);
         if (!stroke_warning.empty())
-            add_warning(shape_index * 2 + 1, GUI::format(_L("Stroke of shape (%1%) contains unsupported: %2% "), shape->id, stroke_warning));
+            add_warning(shape_index * 2 + 1, GUI::format(_L("Stroke of shape (%1%) contains unsupported: %2%."), shape->id, stroke_warning));
     }
     return result;
 }
