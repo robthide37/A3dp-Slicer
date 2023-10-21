@@ -62,7 +62,7 @@ bool GLGizmoMmuSegmentation::on_is_activable() const
     return GLGizmoPainterBase::on_is_activable() && wxGetApp().extruders_edited_cnt() > 1;
 }
 
-static std::vector<ColorRGBA> get_extruders_colors()
+std::vector<ColorRGBA> get_extruders_colors()
 {
     std::vector<std::string> colors = Slic3r::GUI::wxGetApp().plater()->get_extruder_colors_from_plater_config();
     std::vector<ColorRGBA> ret;
@@ -543,8 +543,8 @@ void GLGizmoMmuSegmentation::init_model_triangle_selectors()
         // This mesh does not account for the possible Z up SLA offset.
         const TriangleMesh *mesh = &mv->mesh();
 
-        int extruder_idx = (mv->extruder_id() > 0) ? mv->extruder_id() - 1 : 0;
-        m_triangle_selectors.emplace_back(std::make_unique<TriangleSelectorMmGui>(*mesh, m_modified_extruders_colors, m_original_extruders_colors[size_t(extruder_idx)]));
+        size_t extruder_idx = get_extruder_color_idx(*mv);
+        m_triangle_selectors.emplace_back(std::make_unique<TriangleSelectorMmGui>(*mesh, m_modified_extruders_colors, m_original_extruders_colors[extruder_idx]));
         // Reset of TriangleSelector is done inside TriangleSelectorMmGUI's constructor, so we don't need it to perform it again in deserialize().
         m_triangle_selectors.back()->deserialize(mv->mmu_segmentation_facets.get_data(), false);
         m_triangle_selectors.back()->request_update_render_data();

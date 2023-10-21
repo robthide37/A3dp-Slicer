@@ -80,6 +80,7 @@
 #include "DoubleSlider.hpp"
 
 #include <imgui/imgui_internal.h>
+#include <slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp>
 
 static constexpr const float TRACKBALLSIZE = 0.8f;
 
@@ -4901,7 +4902,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
 
     camera.apply_projection(volumes_box, near_z, far_z);
 
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+    GLShaderProgram* shader = wxGetApp().get_shader("mm_gouraud");
     if (shader == nullptr)
         return;
 
@@ -4912,11 +4913,12 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     glsafe(::glEnable(GL_DEPTH_TEST));
 
     shader->start_using();
-    shader->set_uniform("emission_factor", 0.0f);
 
     const Transform3d& projection_matrix = camera.get_projection_matrix();
 
-    for (GLVolume* vol : visible_volumes) {
+    const ModelObjectPtrs &model_objects    = GUI::wxGetApp().model().objects;
+    std::vector<ColorRGBA> extruders_colors = get_extruders_colors();
+    for (GLVolume *vol : visible_volumes) {
         vol->model.set_color((vol->printable && !vol->is_outside) ? vol->color : ColorRGBA::GRAY());
         // the volume may have been deactivated by an active gizmo
         const bool is_active = vol->is_active;
@@ -4925,8 +4927,15 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
         shader->set_uniform("projection_matrix", projection_matrix);
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-        shader->set_uniform("view_normal_matrix", view_normal_matrix); 
-        vol->render();
+        shader->set_uniform("view_normal_matrix", view_normal_matrix);
+
+        const ModelVolume    &model_volume = *model_objects[vol->object_idx()]->volumes[vol->volume_idx()];
+        const size_t          extruder_idx = get_extruder_color_idx(model_volume);
+        TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
+        ts.deserialize(model_volume.mmu_segmentation_facets.get_data(), true);
+        ts.request_update_render_data();
+        ts.render(nullptr, model_matrix);
+
         vol->is_active = is_active;
     }
 
