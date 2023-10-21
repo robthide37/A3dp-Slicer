@@ -592,13 +592,8 @@ void TriangleSelectorMmGui::render(ImGuiWrapper* imgui, const Transform3d& matri
     auto *shader = wxGetApp().get_current_shader();
     if (!shader)
         return;
+
     assert(shader->get_name() == "mm_gouraud");
-    const Camera& camera = wxGetApp().plater()->get_camera();
-    const Transform3d& view_matrix = camera.get_view_matrix();
-    shader->set_uniform("view_model_matrix", view_matrix * matrix);
-    shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-    const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
-    shader->set_uniform("view_normal_matrix", view_normal_matrix);
 
     for (size_t color_idx = 0; color_idx < m_gizmo_scene.triangle_indices.size(); ++color_idx) {
         if (m_gizmo_scene.has_VBOs(color_idx)) {
