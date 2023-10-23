@@ -211,6 +211,10 @@ void DropDown::SetTransparentBG(wxDC& dc, wxWindow* win)
 #endif //__WXMSW__
 }
 
+constexpr int slider_width  = 12;
+constexpr int slider_step   = 5;
+constexpr int items_padding = 2;
+
 /*
  * Here we do the actual rendering. I put it in a separate
  * method so that it can work no matter what type of DC
@@ -243,11 +247,17 @@ void DropDown::render(wxDC &dc)
 
     // draw hover rectangle
     wxRect rcContent = {{0, offset.y}, rowSize};
+    const int text_size = int(texts.size());
+
+    const bool has_bar = rowSize.y * text_size > size.y;
+    if (has_bar)
+        rcContent.width -= slider_width;
+
     if (hover_item >= 0 && (states & StateColor::Hovered)) {
         rcContent.y += rowSize.y * hover_item;
         if (rcContent.GetBottom() > 0 && rcContent.y < size.y) {
             if (selection == hover_item)
-                dc.SetBrush(wxBrush(selector_background_color.colorForStates(states | StateColor::Checked)));
+                dc.SetBrush(wxBrush(selector_background_color.colorForStates(StateColor::Disabled)));
             dc.SetPen(wxPen(selector_border_color.colorForStates(states)));
             rcContent.Deflate(4, 1);
             dc.DrawRectangle(rcContent);
@@ -259,7 +269,7 @@ void DropDown::render(wxDC &dc)
     if (selection >= 0 && (selection != hover_item || (states & StateColor::Hovered) == 0)) {
         rcContent.y += rowSize.y * selection;
         if (rcContent.GetBottom() > 0 && rcContent.y < size.y) {
-            dc.SetBrush(wxBrush(selector_background_color.colorForStates(states | StateColor::Checked)));
+            dc.SetBrush(wxBrush(selector_background_color.colorForStates(StateColor::Disabled)));
             dc.SetPen(wxPen(selector_background_color.colorForStates(states)));
             rcContent.Deflate(4, 1);
             dc.DrawRectangle(rcContent);
@@ -274,15 +284,13 @@ void DropDown::render(wxDC &dc)
     }
 
     // draw position bar
-    const int text_size = int(texts.size());
-    if (rowSize.y * text_size > size.y) {
+    if (has_bar) {
         int    height = rowSize.y * text_size;
-        wxRect rect = {size.x - 6, -offset.y * size.y / height, 4,
-                       size.y * size.y / height};
+        wxRect rect = {size.x - slider_width - 2, -offset.y * size.y / height + 2, slider_width,
+                       size.y * size.y / height - 3};
         dc.SetPen(wxPen(border_color.defaultColor()));
-        dc.SetBrush(wxBrush(*wxLIGHT_GREY));
+        dc.SetBrush(wxBrush(selector_background_color.colorForStates(states | StateColor::Checked)));
         dc.DrawRoundedRectangle(rect, 2);
-        rcContent.width -= 6;
     }
 
     // draw check icon
@@ -373,7 +381,7 @@ void DropDown::messureSize()
     }
     if (iconSize.x > 0) szContent.x += iconSize.x + (text_off ? 0 : 5);
     if (iconSize.y > szContent.y) szContent.y = iconSize.y;
-    szContent.y += 10;
+    szContent.y += items_padding;
     if (texts.size() > 15) szContent.x += 6;
     if (GetParent()) {
         auto x = GetParent()->GetSize().x;
@@ -432,6 +440,13 @@ void DropDown::mouseDown(wxMouseEvent& event)
         return;
     // force calc hover item again
     mouseMove(event);
+
+    const wxSize size = GetSize();
+    const int height = rowSize.y * int(texts.size());
+    const wxRect rect = { size.x - slider_width, -offset.y * size.y / height, slider_width - 2,
+                      size.y * size.y / height };
+    slider_grabbed = rect.Contains(event.GetPosition());
+
     pressedDown = true;
     CaptureMouse();
     dragStart   = event.GetPosition();
@@ -442,6 +457,7 @@ void DropDown::mouseReleased(wxMouseEvent& event)
     if (pressedDown) {
         dragStart = wxPoint();
         pressedDown = false;
+        slider_grabbed = false;
         if (HasCapture())
             ReleaseMouse();
         if (hover_item >= 0) { // not moved
@@ -462,7 +478,10 @@ void DropDown::mouseMove(wxMouseEvent &event)
     wxPoint pt  = event.GetPosition();
     int text_size = int(texts.size());
     if (pressedDown) {
-        wxPoint pt2 = offset + pt - dragStart;
+        const int height = rowSize.y * text_size;
+        const int y_step = slider_grabbed ? -height / GetSize().y : 1;
+
+        wxPoint pt2 = offset + (pt - dragStart)*y_step;
         dragStart = pt;
         if (pt2.y > 0)
             pt2.y = 0;
@@ -477,7 +496,7 @@ void DropDown::mouseMove(wxMouseEvent &event)
     }
     if (!pressedDown || hover_item >= 0) {
         int hover = (pt.y - offset.y) / rowSize.y;
-        if (hover >= text_size) hover = -1;
+        if (hover >= text_size || slider_grabbed) hover = -1;
         if (hover == hover_item) return;
         hover_item = hover;
         if (hover >= 0)
@@ -489,7 +508,7 @@ void DropDown::mouseMove(wxMouseEvent &event)
 void DropDown::mouseWheelMoved(wxMouseEvent &event)
 {
     auto delta = event.GetWheelRotation() > 0 ? rowSize.y : -rowSize.y;
-    wxPoint pt2 = offset + wxPoint{0, delta};
+    wxPoint pt2 = offset + wxPoint{0, slider_step * delta};
     int text_size = int(texts.size());
     if (pt2.y > 0)
         pt2.y = 0;

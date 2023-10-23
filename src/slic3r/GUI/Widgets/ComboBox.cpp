@@ -131,7 +131,14 @@ bool ComboBox::SetBackgroundColour(const wxColour& colour)
     TextInput::SetBackgroundColour(colour);
 
     drop.SetBackgroundColour(colour);
-    drop.SetSelectorBackgroundColor(background_color);
+    StateColor selector_colors( std::make_pair(clr_background_focused,          (int)StateColor::Checked),
+        Slic3r::GUI::wxGetApp().dark_mode() ?
+                                std::make_pair(clr_background_disabled_dark,    (int)StateColor::Disabled) :
+                                std::make_pair(clr_background_disabled_light,   (int)StateColor::Disabled),
+        Slic3r::GUI::wxGetApp().dark_mode() ?
+                                std::make_pair(clr_background_normal_dark,      (int)StateColor::Normal) :
+                                std::make_pair(clr_background_normal_light,     (int)StateColor::Normal));
+    drop.SetSelectorBackgroundColor(selector_colors);
 
     return true;
 }
@@ -286,8 +293,6 @@ void ComboBox::keyDown(wxKeyEvent& event)
     switch (key_code) {
 #ifndef __WXOSX__
         case WXK_RETURN:
-#endif
-        case WXK_SPACE:
             if (drop_down) {
                 drop.DismissAndNotify();
             } else if (drop.HasDismissLongTime()) {
@@ -298,6 +303,7 @@ void ComboBox::keyDown(wxKeyEvent& event)
                 GetEventHandler()->ProcessEvent(e);
             }
             break;
+#endif
         case WXK_UP:
         case WXK_DOWN:
         case WXK_LEFT:
