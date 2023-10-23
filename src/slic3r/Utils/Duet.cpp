@@ -29,10 +29,28 @@
 #include "slic3r/GUI/format.hpp"
 #include "Http.hpp"
 
+#include <curl/curl.h>
+
 namespace fs = boost::filesystem;
 namespace pt = boost::property_tree;
 
 namespace Slic3r {
+namespace {
+std::string escape_string(const std::string& unescaped)
+{
+	std::string ret_val;
+	CURL* curl = curl_easy_init();
+	if (curl) {
+		char* decoded = curl_easy_escape(curl, unescaped.c_str(), unescaped.size());
+		if (decoded) {
+			ret_val = std::string(decoded);
+			curl_free(decoded);
+		}
+		curl_easy_cleanup(curl);
+	}
+	return ret_val;
+}
+}
 
 Duet::Duet(DynamicPrintConfig *config) :
 	host(config->opt_string("print_host")),
@@ -222,11 +240,11 @@ std::string Duet::get_connect_url(const bool dsfUrl) const
 	if (dsfUrl)	{
 		return (boost::format("%1%machine/connect?password=%2%")
 			% get_base_url()
-			% (password.empty() ? "reprap" : password)).str();
+			% (password.empty() ? "reprap" : escape_string(password))).str();
 	} else {
 		return (boost::format("%1%rr_connect?password=%2%&%3%")
 				% get_base_url()
-				% (password.empty() ? "reprap" : password)
+				% (password.empty() ? "reprap" : escape_string(password))
 				% timestamp_str()).str();
 	}
 }
