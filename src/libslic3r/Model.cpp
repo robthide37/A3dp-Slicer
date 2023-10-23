@@ -27,6 +27,7 @@
 #include "Format/STL.hpp"
 #include "Format/3mf.hpp"
 #include "Format/STEP.hpp"
+#include "Format/SVG.hpp"
 
 #include <float.h>
 
@@ -137,8 +138,10 @@ Model Model::read_from_file(const std::string& input_file, DynamicPrintConfig* c
     else if (boost::algorithm::iends_with(input_file, ".3mf") || boost::algorithm::iends_with(input_file, ".zip"))
         //FIXME options & LoadAttribute::CheckVersion ? 
         result = load_3mf(input_file.c_str(), *config, *config_substitutions, &model, false);
+    else if (boost::algorithm::iends_with(input_file, ".svg"))
+        result = load_svg(input_file, model);
     else
-        throw Slic3r::RuntimeError("Unknown file format. Input file must have .stl, .obj, .amf(.xml), .prusa or .step/.stp extension.");
+        throw Slic3r::RuntimeError("Unknown file format. Input file must have .stl, .obj, .step/.stp, .svg, .amf(.xml) or extension .3mf(.zip).");
 
     if (! result)
         throw Slic3r::RuntimeError("Loading of a model file failed.");
@@ -2314,6 +2317,19 @@ void check_model_ids_equal(const Model &model1, const Model &model2)
 #endif /* NDEBUG */
 
 }
+
+#include "NSVGUtils.hpp"
+namespace {
+using namespace Slic3r;
+
+bool load_svg(const std::string &input_file, Model &output_model)
+{
+    NSVGimage_ptr nsvg_image_ptr = nsvgParseFromFile(input_file);
+    double tesselation_tolerance = 1e-4;
+    NSVGLineParams params(tesselation_tolerance);
+    ExPolygonsWithIds shapes = create_shape_with_ids(*nsvg_image_ptr, params);
+}
+} // namespace
 
 #if 0
 CEREAL_REGISTER_TYPE(Slic3r::ModelObject)
