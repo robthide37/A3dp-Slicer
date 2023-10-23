@@ -1680,7 +1680,7 @@ void GUI_App::SetWindowVariantForButton(wxButton* btn)
 int GUI_App::get_max_font_pt_size()
 {
     const unsigned disp_count = wxDisplay::GetCount();
-    for (int i = 0; i < disp_count; i++) {
+    for (unsigned i = 0; i < disp_count; i++) {
         const wxRect display_rect = wxDisplay(i).GetGeometry();
         if (display_rect.width >= 2560 && display_rect.height >= 1440)
             return 20;

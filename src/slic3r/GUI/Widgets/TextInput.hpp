@@ -37,9 +37,7 @@ public:
               const wxSize & size  = wxDefaultSize,
               long           style = 0);
 
-    void SetCornerRadius(double radius);
-
-    void SetLabel(const wxString& label);
+    void SetLabel(const wxString& label) wxOVERRIDE;
 
     void SetIcon(const wxBitmapBundle& icon);
 
@@ -76,8 +74,7 @@ public:
 protected:
     virtual void OnEdit() {}
 
-    virtual void DoSetSize(
-        int x, int y, int width, int height, int sizeFlags = wxSIZE_AUTO);
+    void DoSetSize(int x, int y, int width, int height, int sizeFlags = wxSIZE_AUTO) wxOVERRIDE;
 
     void DoSetToolTipText(wxString const &tip) override;
 

@@ -302,7 +302,7 @@ void DropDown::render(wxDC &dc)
     }
     // draw texts & icons
     dc.SetTextForeground(text_color.colorForStates(states));
-    for (int i = 0; i < texts.size(); ++i) {
+    for (size_t i = 0; i < texts.size(); ++i) {
         if (rcContent.GetBottom() < 0) {
             rcContent.y += rowSize.y;
             continue;
@@ -460,13 +460,14 @@ void DropDown::mouseCaptureLost(wxMouseCaptureLostEvent &event)
 void DropDown::mouseMove(wxMouseEvent &event)
 {
     wxPoint pt  = event.GetPosition();
+    int text_size = int(texts.size());
     if (pressedDown) {
         wxPoint pt2 = offset + pt - dragStart;
         dragStart = pt;
         if (pt2.y > 0)
             pt2.y = 0;
-        else if (pt2.y + rowSize.y * texts.size() < GetSize().y)
-            pt2.y = GetSize().y - rowSize.y * texts.size();
+        else if (pt2.y + rowSize.y * text_size < GetSize().y)
+            pt2.y = GetSize().y - rowSize.y * text_size;
         if (pt2.y != offset.y) {
             offset = pt2;
             hover_item = -1; // moved
@@ -476,7 +477,7 @@ void DropDown::mouseMove(wxMouseEvent &event)
     }
     if (!pressedDown || hover_item >= 0) {
         int hover = (pt.y - offset.y) / rowSize.y;
-        if (hover >= (int) texts.size()) hover = -1;
+        if (hover >= text_size) hover = -1;
         if (hover == hover_item) return;
         hover_item = hover;
         if (hover >= 0)
@@ -489,17 +490,18 @@ void DropDown::mouseWheelMoved(wxMouseEvent &event)
 {
     auto delta = event.GetWheelRotation() > 0 ? rowSize.y : -rowSize.y;
     wxPoint pt2 = offset + wxPoint{0, delta};
+    int text_size = int(texts.size());
     if (pt2.y > 0)
         pt2.y = 0;
-    else if (pt2.y + rowSize.y * texts.size() < GetSize().y)
-        pt2.y = GetSize().y - rowSize.y * texts.size();
+    else if (pt2.y + rowSize.y * text_size < GetSize().y)
+        pt2.y = GetSize().y - rowSize.y * text_size;
     if (pt2.y != offset.y) {
         offset = pt2;
     } else {
         return;
     }
     int hover = (event.GetPosition().y - offset.y) / rowSize.y;
-    if (hover >= (int) texts.size()) hover = -1;
+    if (hover >= text_size) hover = -1;
     if (hover != hover_item) {
         hover_item = hover;
         if (hover >= 0) SetToolTip(texts[hover]);

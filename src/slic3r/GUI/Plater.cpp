@@ -2616,15 +2616,14 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
                     if (!config.empty()) {
                         const auto* post_process = config.opt<ConfigOptionStrings>("post_process");
                         if (post_process != nullptr && !post_process->values.empty()) {
-                            wxString msg = type_3mf ? _L("The selected 3MF file contains a post-processing script") :
-                                _L("The selected AMF file contains a post-processing script");
-                            msg += "\n" + _L("Please review the script carefully before running it.");
-                            wxString text;
-                            for (const auto& s : post_process->values) {
+                            // TRN The placeholder is either "3MF" or "AMF"
+                            wxString msg = GUI::format_wxstr(_L("The selected %1% file contains a post-processing script.\n"
+                                "Please review the script carefully before exporting G-code."), type_3mf ? "3MF" : "AMF" );
+                            std::string text;
+                            for (const std::string& s : post_process->values)
                                 text += s;
-                            }
 
-                            InfoDialog msg_dlg(nullptr, msg, text, true, wxOK | wxICON_WARNING);
+                            InfoDialog msg_dlg(nullptr, msg, from_u8(text), true, wxOK | wxICON_WARNING);
                             msg_dlg.set_caption(wxString(SLIC3R_APP_NAME " - ") + _L("Attention!"));
                             msg_dlg.ShowModal();
                         }
@@ -5589,10 +5588,8 @@ void Plater::convert_gcode_to_ascii()
         }
         else {
             output_file = rename_file(output_file, ".gcode");
-            wxString msg = _L("You are trying to convert to ASCII a binary file whose extension is '.gcode'.");
-            msg += "\n" + _L("The exported file will be renamed as:");
-            msg += "\n\n" + output_file;
-            msg += "\n\n" + _L("Continue with export?");
+            wxString msg = GUI::format_wxstr("The converted binary G-code file has '.gcode' extension.\n"
+                "The exported file will be renamed to:\n\n%1%\n\nDo you want to continue?", output_file);
             MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
             if (msg_dlg.ShowModal() != wxID_YES)
                 return;
@@ -5669,10 +5666,8 @@ void Plater::convert_gcode_to_binary()
         }
         else {
             output_file = rename_file(output_file, ".bgcode");
-            wxString msg = _L("You are trying to convert to binary an ASCII file whose extension is '.bgcode'.");
-            msg += "\n" + _L("The exported file will be renamed as:");
-            msg += "\n\n" + output_file;
-            msg += "\n\n" + _L("Continue with export?");
+            wxString msg = GUI::format_wxstr("The converted ASCII G-code file has '.bgcode' extension.\n"
+                "The exported file will be renamed to:\n\n%1%\n\nDo you want to continue?", output_file);
             MessageDialog msg_dlg(this, msg, _L("Warning"), wxYES_NO);
             if (msg_dlg.ShowModal() != wxID_YES)
                 return;

@@ -297,7 +297,7 @@ void SpinInput::Create(wxWindow *parent,
     text_ctrl->Bind(wxEVT_TEXT, &SpinInput::onText, this);
     text_ctrl->Bind(wxEVT_TEXT_ENTER, &SpinInput::onTextEnter, this);
     text_ctrl->Bind(wxEVT_KEY_DOWN, &SpinInput::keyPressed, this);
-    text_ctrl->Bind(wxEVT_RIGHT_DOWN, [this](auto &e) {}); // disable context menu
+    text_ctrl->Bind(wxEVT_RIGHT_DOWN, [](auto &e) {}); // disable context menu
     button_inc = create_button(ButtonId::btnIncrease);
     button_dec = create_button(ButtonId::btnDecrease);
     delta      = 0;
@@ -403,7 +403,7 @@ void SpinInput::onTextEnter(wxCommandEvent &event)
 
 void SpinInput::mouseWheelMoved(wxMouseEvent &event)
 {
-    auto delta = (event.GetWheelRotation() < 0 == event.IsWheelInverted()) ? 1 : -1;
+    auto delta = ((event.GetWheelRotation() < 0) == event.IsWheelInverted()) ? 1 : -1;
     SetValue(val + delta);
     sendSpinEvent();
     text_ctrl->SetFocus();
@@ -473,7 +473,7 @@ void SpinInputDouble::Create(wxWindow *parent,
     text_ctrl->Bind(wxEVT_TEXT,         &SpinInputDouble::onText, this);
     text_ctrl->Bind(wxEVT_TEXT_ENTER,   &SpinInputDouble::onTextEnter, this);
     text_ctrl->Bind(wxEVT_KEY_DOWN,     &SpinInputDouble::keyPressed, this);
-    text_ctrl->Bind(wxEVT_RIGHT_DOWN, [this](auto &e) {}); // disable context menu
+    text_ctrl->Bind(wxEVT_RIGHT_DOWN, [](auto &e) {}); // disable context menu
     button_inc = create_button(ButtonId::btnIncrease);
     button_dec = create_button(ButtonId::btnDecrease);
     delta      = 0;
@@ -600,7 +600,7 @@ void SpinInputDouble::onTextEnter(wxCommandEvent &event)
 
 void SpinInputDouble::mouseWheelMoved(wxMouseEvent &event)
 {
-    auto delta = (event.GetWheelRotation() < 0 == event.IsWheelInverted()) ? inc : -inc;
+    auto delta = ((event.GetWheelRotation() < 0) == event.IsWheelInverted()) ? inc : -inc;
     SetValue(val + delta);
     sendSpinEvent();
     text_ctrl->SetFocus();

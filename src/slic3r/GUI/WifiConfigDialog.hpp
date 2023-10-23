@@ -10,6 +10,9 @@
 #include <wx/combobox.h>
 #include <wx/textctrl.h>
 
+#include "Widgets/ComboBox.hpp"
+#include "Widgets/TextInput.hpp"
+
 namespace Slic3r {
 namespace GUI {
 
@@ -20,9 +23,9 @@ public:
     WifiConfigDialog(wxWindow* parent, std::string& file_path, RemovableDriveManager* removable_manager);
     ~WifiConfigDialog();
 private:
-    wxComboBox* m_ssid_combo {nullptr};
-    wxTextCtrl* m_pass_textctrl {nullptr};
-    wxComboBox* m_drive_combo {nullptr};
+    ::ComboBox* m_ssid_combo {nullptr};
+    ::TextInput* m_pass_textctrl {nullptr};
+    ::ComboBox* m_drive_combo {nullptr};
 
     void on_ok(wxCommandEvent& e);
     void on_combo(wxCommandEvent& e);

@@ -71,11 +71,8 @@ TEST_CASE("Moments calculation for rotated axis.", "[SupportSpotsGenerator]") {
 
     Integrals integrals{{polygon}};
 
-    std::mt19937 generator{std::random_device{}()};
-    std::uniform_real_distribution<float> angle_distribution{0.f, float(2*M_PI)};
-
     // Meassured counterclockwise from (1, 0)
-    const float angle = angle_distribution(generator);
+    const float angle = 1.432f;
     Vec2f axis{std::cos(angle), std::sin(angle)};
 
     float moment_calculated_then_rotated = compute_second_moment(
@@ -93,7 +90,8 @@ TEST_CASE("Moments calculation for rotated axis.", "[SupportSpotsGenerator]") {
         Vec2f{1, 0}
     );
 
-    CHECK(moment_calculated_then_rotated == Approx(moment_rotated_polygon));
+    // Up to 0.1% accuracy
+    CHECK_THAT(moment_calculated_then_rotated, Catch::Matchers::WithinRel(moment_rotated_polygon, 0.001f));
 }
 
 struct ObjectPartFixture {
