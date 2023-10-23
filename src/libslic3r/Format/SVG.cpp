@@ -46,15 +46,19 @@ namespace Slic3r {
 bool load_svg(const std::string &input_file, Model &output_model)
 {
     EmbossShape::SvgFile svg_file{input_file};
-    NSVGimage* image = init_image(svg_file);
-    if (image == nullptr)
-        return false; // Can not load svg file
+    const NSVGimage* image = init_image(svg_file);
+    if (image == nullptr) {
+        BOOST_LOG_TRIVIAL(error) << "SVG file(\"" << input_file << "\") couldn't be parsed by nano svg.";
+        return false; 
+    }
 
     double tesselation_tolerance = 1e10;
     NSVGLineParams params(tesselation_tolerance);
     ExPolygonsWithIds shapes = create_shape_with_ids(*image, params);
-    if (shapes.empty())
+    if (shapes.empty()) {
+        BOOST_LOG_TRIVIAL(error) << "SVG file(\"" << input_file << "\") do not contain embossedabled shape.";
         return false; // No shapes in svg
+    }
 
     double depth_in_mm = 10.; // in mm
     bool use_surface = false;
@@ -70,7 +74,7 @@ bool load_svg(const std::string &input_file, Model &output_model)
     unsigned max_heal_iteration = 10;
     HealedExPolygons union_shape = union_with_delta(emboss_shape.shapes_with_ids, delta, max_heal_iteration);
     if (!union_shape.is_healed)
-        return false; // Can not heal union shape
+        BOOST_LOG_TRIVIAL(warning) << "SVG file(\"" << input_file << "\") couldn't be fully healed.";
 
     // create projection
     double scale = emboss_shape.scale;
@@ -85,10 +89,12 @@ bool load_svg(const std::string &input_file, Model &output_model)
 
     // add mesh to model
     ModelObject *object = output_model.add_object();
+    assert(object != nullptr);
     if (object == nullptr)
         return false;
     object->name = get_file_name(input_file);
     ModelVolume* volume = object->add_volume(std::move(triangl_mesh));
+    assert(volume != nullptr);
     if (volume == nullptr) {
         output_model.delete_object(object);
         return false;
