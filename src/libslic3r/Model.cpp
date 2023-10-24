@@ -2318,19 +2318,6 @@ void check_model_ids_equal(const Model &model1, const Model &model2)
 
 }
 
-#include "NSVGUtils.hpp"
-namespace {
-using namespace Slic3r;
-
-bool load_svg(const std::string &input_file, Model &output_model)
-{
-    NSVGimage_ptr nsvg_image_ptr = nsvgParseFromFile(input_file);
-    double tesselation_tolerance = 1e-4;
-    NSVGLineParams params(tesselation_tolerance);
-    ExPolygonsWithIds shapes = create_shape_with_ids(*nsvg_image_ptr, params);
-}
-} // namespace
-
 #if 0
 CEREAL_REGISTER_TYPE(Slic3r::ModelObject)
 CEREAL_REGISTER_TYPE(Slic3r::ModelVolume)
