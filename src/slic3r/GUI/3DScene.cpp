@@ -221,6 +221,10 @@ const std::array<ColorRGBA, 4> GLVolume::MODEL_COLOR = { {
     { 0.5f, 1.0f, 0.5f, 1.0f },
     { 0.5f, 0.5f, 1.0f, 1.0f }
 } };
+const ColorRGBA GLVolume::NEGATIVE_VOLUME_COLOR     = { 0.2f, 0.2f, 0.2f, 0.5f };
+const ColorRGBA GLVolume::PARAMETER_MODIFIER_COLOR  = { 1.0, 1.0f, 0.2f, 0.5f };
+const ColorRGBA GLVolume::SUPPORT_BLOCKER_COLOR     = { 1.0f, 0.2f, 0.2f, 0.5f };
+const ColorRGBA GLVolume::SUPPORT_ENFORCER_COLOR    = { 0.2f, 0.2f, 1.0f, 0.5f };
 
 GLVolume::GLVolume(float r, float g, float b, float a)
     : m_sla_shift_z(0.0)
@@ -264,12 +268,15 @@ void GLVolume::set_render_color(bool force_transparent)
         }
     }
     else {
-        if (hover == HS_Select)
-            set_render_color(HOVER_SELECT_COLOR);
-        else if (hover == HS_Deselect)
+        if (hover == HS_Deselect)
             set_render_color(HOVER_DESELECT_COLOR);
-        else if (selected)
-            set_render_color(outside ? SELECTED_OUTSIDE_COLOR : SELECTED_COLOR);
+        else if (hover == HS_Select || selected) {
+            const ColorRGBA rc = outside ? SELECTED_OUTSIDE_COLOR : SELECTED_COLOR;
+            if (color == NEGATIVE_VOLUME_COLOR || color == PARAMETER_MODIFIER_COLOR || color == SUPPORT_BLOCKER_COLOR || color == SUPPORT_ENFORCER_COLOR)
+                set_render_color(ColorRGBA(rc.r() * color.r(), rc.g() * color.g(), rc.b() * color.b(), rc.a() * color.a()));
+            else
+                set_render_color(rc);
+        }
         else if (disabled)
             set_render_color(DISABLED_COLOR);
         else if (outside && shader_outside_printer_detection_enabled)
@@ -289,16 +296,13 @@ ColorRGBA color_from_model_volume(const ModelVolume& model_volume)
 {
     ColorRGBA color;
     if (model_volume.is_negative_volume())
-        color = { 0.2f, 0.2f, 0.2f, 1.0f };
+        color = GLVolume::NEGATIVE_VOLUME_COLOR;
     else if (model_volume.is_modifier())
-        color = { 1.0, 1.0f, 0.2f, 1.0f };
+        color = GLVolume::PARAMETER_MODIFIER_COLOR;
     else if (model_volume.is_support_blocker())
-        color = { 1.0f, 0.2f, 0.2f, 1.0f };
+        color = GLVolume::SUPPORT_BLOCKER_COLOR;
     else if (model_volume.is_support_enforcer())
-        color = { 0.2f, 0.2f, 1.0f, 1.0f };
-
-    if (!model_volume.is_model_part())
-        color.a(0.5f);
+        color = GLVolume::SUPPORT_ENFORCER_COLOR;
 
     return color;
 }
