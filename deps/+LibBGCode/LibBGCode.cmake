@@ -1,15 +1,15 @@
 set(LibBGCode_SOURCE_DIR "" CACHE PATH "Optionally specify local LibBGCode source directory")
 
 set(_source_dir_line
-    URL https://github.com/prusa3d/libbgcode/archive/50bedae2ae0c7fc83dd350a8be99ddc8f1749005.zip
-	URL_HASH SHA256=3958c93a325d6d7ed1c97aabb37cc09a08f8e981e3a7917312d568071e462162
+    URL https://github.com/prusa3d/libbgcode/archive/6aae90bdd2b5d65a3cd053906a2ae1e6b16cc045.zip
+	URL_HASH SHA256=d693887a77c986a96fee43924ee65de05565eb7e8c98fa02d6a156148d6d6597
 )
 
 if (LibBGCode_SOURCE_DIR)
     set(_source_dir_line "SOURCE_DIR;${LibBGCode_SOURCE_DIR};BUILD_ALWAYS;ON")
 endif ()
 
-prusaslicer_add_cmake_project(LibBGCode_deps
+add_cmake_project(LibBGCode_deps
     ${_source_dir_line}
     SOURCE_SUBDIR deps
     DEPENDS dep_Boost ${ZLIB_PKG}
@@ -21,14 +21,12 @@ prusaslicer_add_cmake_project(LibBGCode_deps
         -DDESTDIR=${DESTDIR}
 )
 
-prusaslicer_add_cmake_project(LibBGCode
+add_cmake_project(LibBGCode
     ${_source_dir_line}
-    DEPENDS dep_LibBGCode_deps
     CMAKE_ARGS
         -DLibBGCode_BUILD_TESTS:BOOL=OFF
         -DLibBGCode_BUILD_CMD_TOOL:BOOL=OFF
 )
 
-if (MSVC)
-    add_debug_dep(dep_LibBGCode)
-endif ()
+set(DEP_LibBGCode_Deps_DEPENDS ZLIB Boost)
+set(DEP_LibBGCode_DEPENDS LibBGCode_deps)
