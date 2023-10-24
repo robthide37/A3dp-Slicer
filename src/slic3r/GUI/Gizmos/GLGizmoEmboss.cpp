@@ -2952,7 +2952,6 @@ void GLGizmoEmboss::draw_advanced()
         process();
     }
 
-    /*
     if (ImGui::Button(_u8L("Set text to face camera").c_str())) {
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam = wxGetApp().plater()->get_camera();
@@ -2966,7 +2965,6 @@ void GLGizmoEmboss::draw_advanced()
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
     }
-    */
 
     //ImGui::SameLine(); if (ImGui::Button("Re-emboss")) GLGizmoEmboss::re_emboss(*m_volume);    
 
@@ -3717,9 +3715,9 @@ GuiCfg create_gui_configuration()
         + 2 * (cfg.icon_width + space);
     cfg.minimal_window_size = ImVec2(window_width, window_height);
 
-    // 9 = useSurface, charGap, lineGap, bold, italic, surfDist, rotation, keepUp
+    // 9 = useSurface, charGap, lineGap, bold, italic, surfDist, rotation, keepUp, textFaceToCamera
     // 4 = 1px for fix each edit image of drag float 
-    float advance_height = input_height * 9 + 9;
+    float advance_height = input_height * 10 + 9;
     cfg.minimal_window_size_with_advance =
         ImVec2(cfg.minimal_window_size.x,
                cfg.minimal_window_size.y + advance_height);

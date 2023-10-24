@@ -1349,14 +1349,12 @@ void GLGizmoSVG::draw_window()
     draw_rotation();
     draw_mirroring();
 
-    /* 
     if (ImGui::Button(_u8L("Face the camera").c_str())) {
         const Camera &cam = wxGetApp().plater()->get_camera();
         if (face_selected_volume_to_camera(cam, m_parent) && 
             m_volume->emboss_shape->projection.use_surface)
             process();
     }
-    */
 
     ImGui::Unindent(m_gui_cfg->icon_width);  
 
@@ -2144,7 +2142,7 @@ GuiCfg create_gui_configuration() {
         cfg.texture_max_size_px + 2 * style.FramePadding.y +  // preview (-- not sure with padding -> fix retina height)
         line_height_with_spacing + // filename
         separator_height + // separator - orange line
-        input_height * 6 + // depth + size + use_surface + FromSurface + Rotation + Mirror 
+        input_height * 7 + // depth + size + use_surface + FromSurface + Rotation + Mirror + FaceTheCamera
         2 * style.WindowPadding.y;
     cfg.window_size_for_object = ImVec2(std::max(window_input_width, window_image_width), window_height);
     float change_type_height = separator_height + line_height_with_spacing + input_height;
