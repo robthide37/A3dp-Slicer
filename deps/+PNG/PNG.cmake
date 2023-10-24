@@ -8,6 +8,8 @@ endif ()
 add_cmake_project(PNG 
     URL https://github.com/glennrp/libpng/archive/refs/tags/v1.6.40.zip
     URL_HASH SHA256=ab3f88779f0661bbb07c60e778fda782216bff70355d86848fbf6a327084563a
+    PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/genout.cmake.in scripts/genout.cmake.in 
+    # SOURCE_DIR /home/quarky/Workspace/prusa3d/PrusaSlicer/prusaslicer-src-master/deps/build-default/dep_PNG-prefix/src/dep_PNG/
     CMAKE_ARGS
         -DPNG_SHARED=OFF
         -DPNG_STATIC=ON
