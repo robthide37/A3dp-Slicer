@@ -27,16 +27,6 @@ constexpr Slic3r::MinMax<double> surface_distance_sq{1e-4, 10.}; // [in mm]
 /// <returns>Position</returns>
 Vec2d mouse_position(const wxMouseEvent &mouse_event);
 
-/// <summary>
-/// Start dragging
-/// </summary>
-/// <param name="mouse_pos"></param>
-/// <param name="camera"></param>
-/// <param name="surface_drag"></param>
-/// <param name="canvas"></param>
-/// <param name="raycast_manager"></param>
-/// <param name="up_limit"></param>
-/// <returns>True on success start otherwise false</returns>
 bool start_dragging(const Vec2d                 &mouse_pos,
                     const Camera                &camera,
                     std::optional<SurfaceDrag>  &surface_drag,
@@ -44,22 +34,24 @@ bool start_dragging(const Vec2d                 &mouse_pos,
                     RaycastManager              &raycast_manager,
                     const std::optional<double> &up_limit);
 
-/// <summary>
-/// During dragging
-/// </summary>
-/// <param name="mouse_pos"></param>
-/// <param name="camera"></param>
-/// <param name="surface_drag"></param>
-/// <param name="canvas"></param>
-/// <param name="raycast_manager"></param>
-/// <param name="up_limit"></param>
-/// <returns></returns>
 bool dragging(const Vec2d                 &mouse_pos,
               const Camera                &camera,
               SurfaceDrag                 &surface_drag, // need to write whether exist hit
               GLCanvas3D                  &canvas,
               const RaycastManager        &raycast_manager,
               const std::optional<double> &up_limit);
+
+Transform3d get_volume_transformation(
+    Transform3d world, // from volume
+    const Vec3d& world_dir, // wanted new direction
+    const Vec3d& world_position, // wanted new position
+    const std::optional<Transform3d>& fix, // [optional] fix matrix
+    // Invers transformation of text volume instance
+    // Help convert world transformation to instance space 
+    const Transform3d& instance_inv,
+    // initial rotation in Z axis
+    std::optional<float> current_angle = {},    
+    const std::optional<double> &up_limit = {}); 
 }
 
 namespace Slic3r::GUI {
@@ -308,14 +300,10 @@ void selection_transform(Selection &selection, const std::function<void()> &sele
 
 bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, const std::optional<double>& wanted_up_limit)
 {
-    const Selection &selection = canvas.get_selection();
-    if (selection.is_empty())
-        return false;
-
     GLVolume *gl_volume_ptr = get_selected_gl_volume(canvas);
     if (gl_volume_ptr == nullptr)
         return false;
-    const GLVolume &gl_volume = *gl_volume_ptr;
+    GLVolume &gl_volume = *gl_volume_ptr;
 
     const ModelObjectPtrs &objects = canvas.get_model()->objects;
     const ModelObject *object_ptr = get_model_object(gl_volume, objects);
@@ -330,64 +318,37 @@ bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, co
         return false;
     const ModelInstance &instance = *instance_ptr;
 
-    const ModelVolume *volume_ptr = get_model_volume(gl_volume, object);
+    ModelVolume *volume_ptr = get_model_volume(gl_volume, object);
     assert(volume_ptr != nullptr);
     if (volume_ptr == nullptr)
         return false;
-    const ModelVolume &volume = *volume_ptr;
+    ModelVolume &volume = *volume_ptr;
 
-    const Vec3d &cam_dir = camera.get_dir_forward();
-
-    // camera direction transformed into volume coordinate system
-    Transform3d to_world = world_matrix_fixed(gl_volume, objects);
-    Vec3d cam_dir_tr = to_world.inverse().linear() * cam_dir;
-    cam_dir_tr.normalize();
-
-    Vec3d emboss_dir(0., 0., -1.);
-
-    // check wether cam_dir is already used
-    if (is_approx(cam_dir_tr, emboss_dir))
-        return false;
-
-    assert(selection.get_volume_idxs().size() == 1);
-    if (selection.get_volume_idxs().size() != 1)
-        return false;
-
-    Transform3d vol_rot;
-    Transform3d vol_tr = gl_volume.get_volume_transformation().get_matrix();
-    // check whether cam_dir is opposit to emboss dir
-    if (is_approx(cam_dir_tr, -emboss_dir)) {
-        // rotate 180 DEG by y
-        vol_rot = Eigen::AngleAxis(M_PI_2, Vec3d(0., 1., 0.));
-    } else {
-        // calc params for rotation
-        Vec3d axe = emboss_dir.cross(cam_dir_tr);
-        axe.normalize();
-        double angle = std::acos(emboss_dir.dot(cam_dir_tr));
-        vol_rot      = Eigen::AngleAxis(angle, axe);
+    // Calculate new volume transformation
+    Transform3d volume_tr = volume.get_matrix();
+    std::optional<Transform3d> fix;
+    if (volume.emboss_shape.has_value()) {
+        fix = volume.emboss_shape->fix_3mf_tr;
+        if (fix.has_value())
+            volume_tr = volume_tr * fix->inverse();
     }
 
-    Vec3d offset     = vol_tr * Vec3d::Zero();
-    Vec3d offset_inv = vol_rot.inverse() * offset;
-    Transform3d res  = vol_tr * Eigen::Translation<double, 3>(-offset) * vol_rot * Eigen::Translation<double, 3>(offset_inv);
+    Transform3d instance_tr     = instance.get_matrix();
+    Transform3d instance_tr_inv = instance_tr.inverse();
+    Transform3d world_tr        = instance_tr * volume_tr; // without sla !!!
+    std::optional<float> current_angle;
+    if (wanted_up_limit.has_value())
+        current_angle = Emboss::calc_up(world_tr, *wanted_up_limit);
+
+    Vec3d world_position = gl_volume.world_matrix()*Vec3d::Zero();
+    Vec3d wanted_direction = -camera.get_dir_forward();
     
-    // Transform3d res = vol_tr * vol_rot;
-
-    // Need modifiable gl volume
-    GLVolume *gl_volume_ptr_ = canvas.get_selection().get_volume(*selection.get_volume_idxs().begin());
-    assert(gl_volume_ptr_ != nullptr);
-    if (gl_volume_ptr_ == nullptr)
-        return false;
-
-    // Need modifiable model volume
-    ModelVolume *model_volume_ptr_ = get_model_volume(gl_volume, objects);
-    assert(model_volume_ptr_ != nullptr);
-    if (model_volume_ptr_ == nullptr)
-        return false;
+    Transform3d new_volume_tr = get_volume_transformation(world_tr, wanted_direction, world_position,
+        fix, instance_tr_inv, current_angle, wanted_up_limit);
 
     // write result transformation
-    gl_volume_ptr_->set_volume_transformation(Geometry::Transformation(res));    
-    model_volume_ptr_->set_transformation(res);
+    gl_volume.set_volume_transformation(Geometry::Transformation(new_volume_tr));    
+    volume.set_transformation(new_volume_tr);
     return true;
 }
 
@@ -570,8 +531,8 @@ Transform3d get_volume_transformation(
     // Help convert world transformation to instance space 
     const Transform3d& instance_inv,
     // initial rotation in Z axis
-    std::optional<float> current_angle = {},    
-    const std::optional<double> &up_limit = {}) 
+    std::optional<float> current_angle,    
+    const std::optional<double> &up_limit) 
 {
     auto world_linear = world.linear();
     // Calculate offset: transformation to wanted position
