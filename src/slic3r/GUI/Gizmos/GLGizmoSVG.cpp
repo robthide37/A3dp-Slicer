@@ -279,38 +279,13 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
     return used;
 }
 
-namespace{
-std::optional<float> calculate_angle(const Selection& selection)
-{
-    const GLVolume *gl_volume = selection.get_first_volume();
-    assert(gl_volume != nullptr);
-    if (gl_volume == nullptr)
-        return {};
-
-    Transform3d to_world = gl_volume->world_matrix();
-    const ModelVolume* volume = get_model_volume(*gl_volume, selection.get_model()->objects);
-    assert(volume != nullptr);
-    assert(volume->emboss_shape.has_value());
-    if (volume == nullptr || 
-        !volume->emboss_shape.has_value() ||
-        !volume->emboss_shape->fix_3mf_tr)        
-        return calc_up(to_world, Slic3r::GUI::up_limit);
-
-    // exist fix matrix and must be applied before calculation
-    to_world = to_world * volume->emboss_shape->fix_3mf_tr->inverse();
-    return calc_up(to_world, Slic3r::GUI::up_limit);
-}
-}
-
 bool GLGizmoSVG::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 {
     // exist selected volume?
     if (m_volume == nullptr)
         return false;
 
-    std::optional<double> up_limit;
-    if (m_keep_up)
-        up_limit = Slic3r::GUI::up_limit;
+    auto up_limit = m_keep_up ? std::optional<double>(UP_LIMIT) : std::optional<double>{};
     const Camera &camera = wxGetApp().plater()->get_camera();
 
     bool was_dragging = m_surface_drag.has_value();
@@ -346,7 +321,7 @@ bool GLGizmoSVG::on_mouse_for_translate(const wxMouseEvent &mouse_event)
 
         // Recalculate angle for GUI
         if (!m_keep_up)
-            m_angle = calculate_angle(m_parent.get_selection());
+            m_angle = calc_angle(m_parent.get_selection());
     }
     return res;
 }
@@ -1213,7 +1188,7 @@ void GLGizmoSVG::set_volume_by_selection()
     m_shape_warnings = create_shape_warnings(es, get_scale_for_tolerance());
 
     // Calculate current angle of up vector
-    m_angle    = calculate_angle(selection);
+    m_angle    = calc_angle(selection);
     m_distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
     
     m_shape_bb = get_extents(m_volume_shape.shapes_with_ids);
@@ -1351,9 +1326,22 @@ void GLGizmoSVG::draw_window()
 
     if (ImGui::Button(_u8L("Face the camera").c_str())) {
         const Camera &cam = wxGetApp().plater()->get_camera();
-        if (face_selected_volume_to_camera(cam, m_parent) && 
-            m_volume->emboss_shape->projection.use_surface)
-            process();
+        auto wanted_up_limit = (m_keep_up) ? std::optional<double>(UP_LIMIT) : std::optional<double>{};
+        if (face_selected_volume_to_camera(cam, m_parent, wanted_up_limit)) {
+            if (!m_keep_up) {
+                m_angle = calc_angle(m_parent.get_selection());
+            } else {
+                // after set face to camera, angle should be the same
+                assert(is_approx(m_angle, calc_angle(m_parent.get_selection())));
+            }
+
+            if (m_volume->emboss_shape->projection.use_surface) {
+                process();
+            } else {
+                // Check outside bed
+                m_parent.requires_check_outside_state();
+            }
+        }
     }
 
     ImGui::Unindent(m_gui_cfg->icon_width);  
@@ -1895,7 +1883,7 @@ void GLGizmoSVG::draw_rotation()
         do_local_z_rotate(m_parent, diff_angle);
 
         // calc angle after rotation
-        m_angle = calculate_angle(m_parent.get_selection());
+        m_angle = calc_angle(m_parent.get_selection());
         
         // recalculate for surface cut
         if (m_volume->emboss_shape->projection.use_surface)

@@ -544,12 +544,9 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     if (m_volume == nullptr)
         return false;
     
-    std::optional<double> wanted_up_limit;
-    if (m_keep_up)
-        wanted_up_limit = up_limit;
     const Camera &camera = wxGetApp().plater()->get_camera();
     bool was_dragging = m_surface_drag.has_value();
-    bool res = on_mouse_surface_drag(mouse_event, camera, m_surface_drag, m_parent, m_raycast_manager, up_limit);
+    bool res = on_mouse_surface_drag(mouse_event, camera, m_surface_drag, m_parent, m_raycast_manager, UP_LIMIT);
     bool is_dragging = m_surface_drag.has_value();
 
     // End with surface dragging?
@@ -569,13 +566,14 @@ bool GLGizmoEmboss::on_mouse_for_translate(const wxMouseEvent &mouse_event)
         calculate_scale();
 
         // Recalculate angle for GUI
-        if (!m_keep_up) { 
-            const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
+        if (!m_keep_up) {
+            const Selection &selection = m_parent.get_selection();
+            const GLVolume *gl_volume = get_selected_gl_volume(selection);
             assert(gl_volume != nullptr);
             assert(m_style_manager.is_active_font());
             if (gl_volume == nullptr || !m_style_manager.is_active_font())
                 return res;
-            m_style_manager.get_style().angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
+            m_style_manager.get_style().angle = calc_angle(selection);
         }
 
         volume_transformation_changing();
@@ -994,11 +992,12 @@ void GLGizmoEmboss::on_stop_dragging()
     m_parent.do_rotate(L("Text-Rotate"));
 
     // Re-Calculate current angle of up vector
-    const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
+    const Selection &selection = m_parent.get_selection();
+    const GLVolume *gl_volume = get_selected_gl_volume(selection);
     assert(m_style_manager.is_active_font());
     assert(gl_volume != nullptr);
     if (m_style_manager.is_active_font() && gl_volume != nullptr) 
-        m_style_manager.get_style().angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
+        m_style_manager.get_style().angle = calc_angle(selection);
 
     m_rotate_start_angle.reset();
 
@@ -1235,7 +1234,7 @@ void GLGizmoEmboss::set_volume_by_selection()
 
     StyleManager::Style style_{style};  // copy  
     style_.projection = volume->emboss_shape->projection;
-    style_.angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
+    style_.angle = calc_angle(selection);
     style_.distance = calc_distance(*gl_volume, m_raycast_manager, m_parent);
         
     if (auto it = std::find_if(styles.begin(), styles.end(), has_same_name);
@@ -1283,7 +1282,7 @@ void GLGizmoEmboss::set_volume_by_selection()
     // Calculate current angle of up vector
     assert(m_style_manager.is_active_font());
     if (m_style_manager.is_active_font()) 
-        m_style_manager.get_style().angle = calc_up(gl_volume->world_matrix(), up_limit);    
+        m_style_manager.get_style().angle = calc_angle(selection);
 
     // calculate scale for height and depth inside of scaled object instance
     calculate_scale();    
@@ -2890,11 +2889,12 @@ void GLGizmoEmboss::draw_advanced()
         do_local_z_rotate(m_parent, diff_angle);
         
         // calc angle after rotation
-        const GLVolume *gl_volume = get_selected_gl_volume(m_parent.get_selection());
+        const Selection &selection = m_parent.get_selection();
+        const GLVolume *gl_volume = get_selected_gl_volume(selection);
         assert(gl_volume != nullptr);
         assert(m_style_manager.is_active_font());
         if (m_style_manager.is_active_font() && gl_volume != nullptr) 
-            m_style_manager.get_style().angle = calc_up(gl_volume->world_matrix(), Slic3r::GUI::up_limit);
+            m_style_manager.get_style().angle = calc_angle(selection);
         
         if (font_prop.per_glyph)
             reinit_text_lines(m_text_lines.get_lines().size());
@@ -2955,13 +2955,27 @@ void GLGizmoEmboss::draw_advanced()
     if (ImGui::Button(_u8L("Set text to face camera").c_str())) {
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam = wxGetApp().plater()->get_camera();
-        FontProp& fp = m_style_manager.get_font_prop();
-        if (face_selected_volume_to_camera(cam, m_parent) && 
-            (use_surface || fp.per_glyph)) {
-            if (fp.per_glyph)
-                reinit_text_lines();
-            process();
-        }
+
+        auto wanted_up_limit = (m_keep_up) ? std::optional<double>(UP_LIMIT) : std::optional<double>{};
+        if (face_selected_volume_to_camera(cam, m_parent, wanted_up_limit)) {
+            if (!m_keep_up) {
+                // update current style
+                m_style_manager.get_style().angle = calc_angle(m_parent.get_selection());
+            } else {
+                // after set face to camera, angle should be the same
+                assert(is_approx(m_style_manager.get_style().angle, calc_angle(m_parent.get_selection())));
+            }
+
+            FontProp &fp = m_style_manager.get_font_prop();
+            if (use_surface || fp.per_glyph) {
+                if (fp.per_glyph)
+                    reinit_text_lines();
+                process();
+            } else {
+                // Check outside bed
+                m_parent.requires_check_outside_state();
+            }
+        } 
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
     }

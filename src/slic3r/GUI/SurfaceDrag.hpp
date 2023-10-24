@@ -51,7 +51,7 @@ struct SurfaceDrag
 
 // Limit direction of up vector on model
 // Between side and top surface
-constexpr double up_limit = 0.9;
+constexpr double UP_LIMIT = 0.9;
 
 /// <summary>
 /// Mouse event handler, when move(drag&drop) volume over model surface
@@ -70,7 +70,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
                            std::optional<SurfaceDrag> &surface_drag,
                            GLCanvas3D                 &canvas,
                            RaycastManager             &raycast_manager,
-                           std::optional<double>       up_limit = {});
+                           const std::optional<double>&up_limit = {});
 
 /// <summary>
 /// Calculate translation of volume onto surface of model
@@ -89,6 +89,13 @@ std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastMana
 /// <returns>Calculated distance from surface</returns>
 std::optional<float> calc_distance(const GLVolume &gl_volume, RaycastManager &raycaster, GLCanvas3D &canvas);
 std::optional<float> calc_distance(const GLVolume &gl_volume, const RaycastManager &raycaster, const RaycastManager::ISkip *condition);
+
+/// <summary>
+/// Calculate up vector angle
+/// </summary>
+/// <param name="selection">Calculation of angle is for selected one volume</param>
+/// <returns></returns>
+std::optional<float> calc_angle(const Selection &selection);
 
 /// <summary>
 /// Get transformation to world
@@ -123,8 +130,9 @@ void selection_transform(Selection &selection, const std::function<void()>& sele
 /// </summary>
 /// <param name="camera">Define view vector</param>
 /// <param name="canvas">Containe Selected ModelVolume to modify orientation</param>
+/// <param name="wanted_up_limit">[Optional]Limit for direction of up vector</param>
 /// <returns>True when apply change otherwise false</returns>
-bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas);
+bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, const std::optional<double> &wanted_up_limit = {});
 
 /// <summary>
 /// Rotation around z Axis(emboss direction)

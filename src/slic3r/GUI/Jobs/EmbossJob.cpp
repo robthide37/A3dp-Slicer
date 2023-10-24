@@ -1561,7 +1561,7 @@ bool start_create_volume_on_surface_job(CreateVolumeParams &input, DataBasePtr d
         return on_bad_state(std::move(data), object);
 
     // Create result volume transformation
-    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal, Slic3r::GUI::up_limit);
+    Transform3d surface_trmat = create_transformation_onto_surface(hit->position, hit->normal, UP_LIMIT);
     apply_transformation(input.angle, input.distance, surface_trmat);
     Transform3d transform  = instance->get_matrix().inverse() * surface_trmat;
     auto        gizmo_type = static_cast<GLGizmosManager::EType>(input.gizmo);
