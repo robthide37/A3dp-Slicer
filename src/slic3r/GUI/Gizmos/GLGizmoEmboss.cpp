@@ -397,12 +397,6 @@ ModelVolumePtrs prepare_volumes_to_slice(const ModelVolume &mv)
     }
     return result;
 }
-
-TransformationType get_transformation_type(const Selection &selection)
-{
-    assert(selection.is_single_full_object() || selection.is_single_volume());
-    return selection.is_single_volume() ? TransformationType::Local_Relative_Joint : TransformationType::Instance_Relative_Joint; // object
-}
 } // namespace
 
 bool GLGizmoEmboss::do_mirror(size_t axis)
@@ -429,7 +423,7 @@ bool GLGizmoEmboss::do_mirror(size_t axis)
         Selection &selection = m_parent.get_selection();
         selection.setup_cache();
 
-        auto selection_mirror_fnc = [&selection, &axis]() { selection.mirror((Axis) axis, get_transformation_type(selection)); };
+        auto selection_mirror_fnc = [&selection, &axis]() { selection.mirror((Axis) axis, get_drag_transformation_type(selection)); };
         selection_transform(selection, selection_mirror_fnc, m_volume);
 
         m_parent.do_mirror(L("Set Mirror"));
@@ -518,7 +512,7 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 
         // temporary rotation
         Selection& selection = m_parent.get_selection();
-        selection.rotate(Vec3d(0., 0., angle), get_transformation_type(selection));
+        selection.rotate(Vec3d(0., 0., angle), get_drag_transformation_type(selection));
 
         angle += *m_rotate_start_angle;
         // move to range <-M_PI, M_PI>

@@ -232,16 +232,6 @@ bool GLGizmoSVG::is_svg_object(const ModelVolume &volume) {
     return true;
 }
 
-namespace {
-TransformationType get_transformation_type(const Selection &selection)
-{
-    assert(selection.is_single_full_object() || selection.is_single_volume());
-    return selection.is_single_volume() ? 
-        TransformationType::Local_Relative_Independent :
-        TransformationType::Instance_Relative_Independent; // object
-}
-} // namespace
-
 bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 {
     if (mouse_event.Moving()) return false;
@@ -265,7 +255,7 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
 
         Selection &selection = m_parent.get_selection();
         auto selection_rotate_fnc = [z_rotation, &selection]() { 
-            selection.rotate(Vec3d(0., 0., z_rotation), get_transformation_type(selection));
+            selection.rotate(Vec3d(0., 0., z_rotation), get_drag_transformation_type(selection));
         };
         selection_transform(selection, selection_rotate_fnc, m_volume);
         
@@ -1808,7 +1798,7 @@ void GLGizmoSVG::draw_size()
         selection.setup_cache();
 
         auto selection_scale_fnc = [&selection, rel_scale = *new_relative_scale]() {
-            selection.scale(rel_scale, get_transformation_type(selection));
+            selection.scale(rel_scale, get_drag_transformation_type(selection));
         };        
         selection_transform(selection, selection_scale_fnc, m_volume);
 
@@ -1969,7 +1959,7 @@ void GLGizmoSVG::draw_mirroring()
         selection.setup_cache();
 
         auto selection_mirror_fnc = [&selection, &axis](){
-            selection.mirror(axis, get_transformation_type(selection));
+            selection.mirror(axis, get_drag_transformation_type(selection));
         };
         selection_transform(selection, selection_mirror_fnc, m_volume);
 

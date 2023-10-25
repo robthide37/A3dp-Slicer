@@ -379,8 +379,9 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
     assert(!selection.is_empty());
     if(selection.is_empty()) return;
 
-    assert(selection.is_single_full_object() || selection.is_single_volume());
-    if (!selection.is_single_full_object() && !selection.is_single_volume()) return;
+    bool is_single_volume = selection.volumes_count() == 1;
+    assert(is_single_volume);
+    if (!is_single_volume) return;
 
     // Fix angle for mirrored volume
     bool is_mirrored = false;
@@ -391,7 +392,6 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
             if (instance != nullptr)
                 is_mirrored = has_reflection(instance->get_matrix());
         } else {
-            // selection.is_single_volume()
             const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
             if (volume != nullptr)
                 is_mirrored = has_reflection(volume->get_matrix());
@@ -404,9 +404,9 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
     selection.setup_cache();
 
     auto selection_rotate_fnc = [&selection, &relative_angle](){
-        TransformationType transformation_type = selection.is_single_volume() ? 
-            TransformationType::Local_Relative_Independent : 
-            TransformationType::Instance_Relative_Independent;
+        TransformationType transformation_type = selection.is_single_full_object() ? 
+            TransformationType::Instance_Relative_Independent:
+            TransformationType::Local_Relative_Independent;
         selection.rotate(Vec3d(0., 0., relative_angle), transformation_type);    
     };
     selection_transform(selection, selection_rotate_fnc);
@@ -438,6 +438,13 @@ void do_local_z_move(GLCanvas3D &canvas, double relative_move) {
     canvas.do_move(snapshot_name);
 }
 
+TransformationType get_drag_transformation_type(const Selection &selection)
+{
+    assert(selection.volumes_count() == 1);
+    return selection.is_single_full_object() ? 
+        TransformationType::Instance_Relative_Joint : 
+        TransformationType::Local_Relative_Joint;
+}
 } // namespace Slic3r::GUI
 
 // private implementation

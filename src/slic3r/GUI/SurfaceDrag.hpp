@@ -15,6 +15,7 @@ class ModelVolume;
 namespace Slic3r::GUI {
 class GLCanvas3D;
 class Selection;
+class TransformationType;
 struct Camera;
 
 // Data for drag&drop over surface with mouse
@@ -147,6 +148,13 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle);
 /// <param name="canvas">Selected volume for translate</param>
 /// <param name="relative_move">Relative move along emboss direction</param>
 void do_local_z_move(GLCanvas3D &canvas, double relative_move);
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="selection"></param>
+/// <returns></returns>
+TransformationType get_drag_transformation_type(const Selection &selection);
 
 } // namespace Slic3r::GUI
 #endif // slic3r_SurfaceDrag_hpp_

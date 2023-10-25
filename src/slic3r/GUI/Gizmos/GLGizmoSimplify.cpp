@@ -175,7 +175,7 @@ void GLGizmoSimplify::on_render_input_window(float x, float y, float bottom_limi
     if (act_volume_ids.empty()) {
         stop_worker_thread_request();
         close();
-        if (! m_parent.get_selection().is_single_volume()) {
+        if (m_parent.get_selection().volumes_count() != 1) {
             MessageDialog msg((wxWindow*)wxGetApp().mainframe,
                 _L("Simplification is currently only allowed when a single part is selected"),
                 _L("Error"));
