@@ -298,7 +298,7 @@ void selection_transform(Selection &selection, const std::function<void()> &sele
     selection.setup_cache();
 }
 
-bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, const std::optional<double>& wanted_up_limit)
+bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, const std::optional<double> &wanted_up_limit)
 {
     GLVolume *gl_volume_ptr = get_selected_gl_volume(canvas);
     if (gl_volume_ptr == nullptr)
@@ -306,17 +306,17 @@ bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, co
     GLVolume &gl_volume = *gl_volume_ptr;
 
     const ModelObjectPtrs &objects = canvas.get_model()->objects;
-    const ModelObject *object_ptr = get_model_object(gl_volume, objects);
+    ModelObject *object_ptr = get_model_object(gl_volume, objects);
     assert(object_ptr != nullptr);
     if (object_ptr == nullptr)
         return false;
-    const ModelObject &object = *object_ptr;
+    ModelObject &object = *object_ptr;
 
-    const ModelInstance *instance_ptr = get_model_instance(gl_volume, object);
+    ModelInstance *instance_ptr = get_model_instance(gl_volume, object);
     assert(instance_ptr != nullptr);
     if (instance_ptr == nullptr)
         return false;
-    const ModelInstance &instance = *instance_ptr;
+    ModelInstance &instance = *instance_ptr;
 
     ModelVolume *volume_ptr = get_model_volume(gl_volume, object);
     assert(volume_ptr != nullptr);
@@ -346,9 +346,29 @@ bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, co
     Transform3d new_volume_tr = get_volume_transformation(world_tr, wanted_direction, world_position,
         fix, instance_tr_inv, current_angle, wanted_up_limit);
 
-    // write result transformation
-    gl_volume.set_volume_transformation(Geometry::Transformation(new_volume_tr));    
-    volume.set_transformation(new_volume_tr);
+    if (canvas.get_selection().is_single_full_object()) {
+        // transform instance instead of volume
+        Transform3d new_instance_tr = instance_tr * new_volume_tr * volume.get_matrix().inverse();
+        instance.set_transformation(Geometry::Transformation(new_instance_tr));
+        gl_volume.set_instance_transformation(new_instance_tr);
+    } else {
+        // write result transformation
+        gl_volume.set_volume_transformation(Geometry::Transformation(new_volume_tr));
+        volume.set_transformation(new_volume_tr);
+    }
+
+    if (volume.type() == ModelVolumeType::MODEL_PART)
+        object.ensure_on_bed();
+
+    //int obj_idx = -1;
+    //for (int i = 0; i < objects.size(); i++)
+    //    if (objects[i]->id() == object.id()) {
+    //        obj_idx = i;
+    //        break;
+    //    }
+    // object change !!!
+    // Plater::changed_object(obj_idx);    
+
     return true;
 }
 

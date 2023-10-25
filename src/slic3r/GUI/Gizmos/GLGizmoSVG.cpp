@@ -326,6 +326,50 @@ bool GLGizmoSVG::on_mouse_for_translate(const wxMouseEvent &mouse_event)
     return res;
 }
 
+void GLGizmoSVG::volume_transformation_changed()
+{
+    if (m_volume == nullptr || 
+        !m_volume->emboss_shape.has_value()) {
+        assert(false);
+        return;
+    }
+
+    if (!m_keep_up) {
+        // update current style
+        m_angle = calc_angle(m_parent.get_selection());
+    } else {
+        // angle should be the same
+        assert(is_approx(m_angle, calc_angle(m_parent.get_selection())));
+    }
+
+    // Update surface by new position
+    if (m_volume->emboss_shape->projection.use_surface) {
+        process();
+    } else {
+        // inform slicing process that model changed
+        // SLA supports, processing
+        // ensure on bed
+        const ModelObjectPtrs objects = m_parent.get_model()->objects;
+        ModelObject *object = m_volume->get_object();
+        object->invalidate_bounding_box(); 
+        object->ensure_on_bed();
+
+        int obj_idx = -1;
+        for (int i = 0; i < objects.size(); i++)
+            if (objects[i]->id() == object->id()) {
+                obj_idx = i;
+                break;
+            }
+        wxGetApp().plater()->changed_object(obj_idx);
+
+        // Check outside bed
+        m_parent.requires_check_outside_state();
+    }
+
+    // Show correct value of height & depth inside of inputs
+    calculate_scale();
+}
+
 bool GLGizmoSVG::on_mouse(const wxMouseEvent &mouse_event)
 {
     // not selected volume
@@ -546,9 +590,9 @@ void GLGizmoSVG::on_stop_dragging()
     m_rotate_gizmo.set_angle(PI/2);
 
     // apply rotation
-    m_parent.do_rotate(L("Text-Rotate"));
-
+    m_parent.do_rotate(L("SVG-Rotate"));
     m_rotate_start_angle.reset();
+    volume_transformation_changed();
 
     // recalculate for surface cut
     if (m_volume != nullptr && 
@@ -1327,21 +1371,8 @@ void GLGizmoSVG::draw_window()
     if (ImGui::Button(_u8L("Face the camera").c_str())) {
         const Camera &cam = wxGetApp().plater()->get_camera();
         auto wanted_up_limit = (m_keep_up) ? std::optional<double>(UP_LIMIT) : std::optional<double>{};
-        if (face_selected_volume_to_camera(cam, m_parent, wanted_up_limit)) {
-            if (!m_keep_up) {
-                m_angle = calc_angle(m_parent.get_selection());
-            } else {
-                // after set face to camera, angle should be the same
-                assert(is_approx(m_angle, calc_angle(m_parent.get_selection())));
-            }
-
-            if (m_volume->emboss_shape->projection.use_surface) {
-                process();
-            } else {
-                // Check outside bed
-                m_parent.requires_check_outside_state();
-            }
-        }
+        if (face_selected_volume_to_camera(cam, m_parent, wanted_up_limit))
+            volume_transformation_changed();
     }
 
     ImGui::Unindent(m_gui_cfg->icon_width);  

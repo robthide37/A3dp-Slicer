@@ -692,10 +692,20 @@ void GLGizmoEmboss::volume_transformation_changed()
 {
     if (m_volume == nullptr || 
         !m_volume->text_configuration.has_value() ||
-        !m_volume->emboss_shape.has_value()) {
+        !m_volume->emboss_shape.has_value() ||
+        !m_style_manager.is_active_font()) {
         assert(false);
         return;
     }
+
+    if (!m_keep_up) {
+        // Re-Calculate current angle of up vector
+        m_style_manager.get_style().angle = calc_angle(m_parent.get_selection());
+    } else {
+        // angle should be the same
+        assert(is_approx(m_style_manager.get_style().angle, calc_angle(m_parent.get_selection())));
+    }
+
     const TextConfiguration &tc = *m_volume->text_configuration;
     const EmbossShape &es = *m_volume->emboss_shape;
 
@@ -708,6 +718,26 @@ void GLGizmoEmboss::volume_transformation_changed()
     // Update surface by new position
     if (use_surface || per_glyph)
         process();
+    else {
+        // inform slicing process that model changed
+        // SLA supports, processing
+        // ensure on bed
+        const ModelObjectPtrs objects = m_parent.get_model()->objects;
+        ModelObject *object = m_volume->get_object();
+        object->invalidate_bounding_box();
+        object->ensure_on_bed();
+
+        int obj_idx = -1;
+        for (int i = 0; i < objects.size(); i++)
+            if (objects[i]->id() == object->id()) {
+                obj_idx = i;
+                break;
+            }
+        wxGetApp().plater()->changed_object(obj_idx);
+
+        // Check outside bed
+        m_parent.requires_check_outside_state();
+    }
 
     // Show correct value of height & depth inside of inputs
     calculate_scale();
@@ -990,17 +1020,7 @@ void GLGizmoEmboss::on_stop_dragging()
 
     // apply rotation
     m_parent.do_rotate(L("Text-Rotate"));
-
-    // Re-Calculate current angle of up vector
-    const Selection &selection = m_parent.get_selection();
-    const GLVolume *gl_volume = get_selected_gl_volume(selection);
-    assert(m_style_manager.is_active_font());
-    assert(gl_volume != nullptr);
-    if (m_style_manager.is_active_font() && gl_volume != nullptr) 
-        m_style_manager.get_style().angle = calc_angle(selection);
-
     m_rotate_start_angle.reset();
-
     volume_transformation_changed();
 }
 void GLGizmoEmboss::on_dragging(const UpdateData &data) { m_rotate_gizmo.dragging(data); }
@@ -2955,27 +2975,9 @@ void GLGizmoEmboss::draw_advanced()
     if (ImGui::Button(_u8L("Set text to face camera").c_str())) {
         assert(get_selected_volume(m_parent.get_selection()) == m_volume);
         const Camera &cam = wxGetApp().plater()->get_camera();
-
-        auto wanted_up_limit = (m_keep_up) ? std::optional<double>(UP_LIMIT) : std::optional<double>{};
-        if (face_selected_volume_to_camera(cam, m_parent, wanted_up_limit)) {
-            if (!m_keep_up) {
-                // update current style
-                m_style_manager.get_style().angle = calc_angle(m_parent.get_selection());
-            } else {
-                // after set face to camera, angle should be the same
-                assert(is_approx(m_style_manager.get_style().angle, calc_angle(m_parent.get_selection())));
-            }
-
-            FontProp &fp = m_style_manager.get_font_prop();
-            if (use_surface || fp.per_glyph) {
-                if (fp.per_glyph)
-                    reinit_text_lines();
-                process();
-            } else {
-                // Check outside bed
-                m_parent.requires_check_outside_state();
-            }
-        } 
+        auto wanted_up_limit = m_keep_up ? std::optional<double>(UP_LIMIT) : std::optional<double>{};
+        if (face_selected_volume_to_camera(cam, m_parent, wanted_up_limit))
+            volume_transformation_changed();
     } else if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", _u8L("Orient the text towards the camera.").c_str());
     }
