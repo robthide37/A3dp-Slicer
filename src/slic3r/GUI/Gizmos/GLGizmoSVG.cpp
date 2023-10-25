@@ -895,13 +895,13 @@ void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& co
         size_t offset = get_offset(x, y);
         if (data[offset + N - 1] != 0)
             return; // already setted by line
-        for (int i = 0; i < N; ++i)
+        for (unsigned i = 0; i < N; ++i)
             data[offset + i] = color[i];
     };
 
     // anti aliased drawing of lines
-    auto draw = [&data, data_width, count_lines, get_offset, &color](int x, int y, float brightess) {
-        if (x < 0 || y < 0 || x >= data_width || y >= count_lines)
+    auto draw = [&data, width = static_cast<int>(data_width), count_lines, get_offset, &color](int x, int y, float brightess) {
+        if (x < 0 || y < 0 || x >= width || y >= count_lines)
             return; // out of image
         size_t offset = get_offset(x, y);
         unsigned char &alpha = data[offset + N - 1];
