@@ -20,7 +20,7 @@ class RemovableDriveManager;
 class WifiConfigDialog : public DPIDialog
 {
 public:
-    WifiConfigDialog(wxWindow* parent, std::string& file_path, RemovableDriveManager* removable_manager);
+    WifiConfigDialog(wxWindow* parent, std::string& file_path, RemovableDriveManager* removable_manager, const wxString& preffered_drive );
     ~WifiConfigDialog();
 private:
     ::ComboBox* m_ssid_combo {nullptr};
@@ -32,7 +32,7 @@ private:
     void on_rescan_drives(wxCommandEvent& e);
     void on_rescan_networks(wxCommandEvent& e);
     void on_retrieve_password(wxCommandEvent& e);
-    void rescan_drives();
+    void rescan_drives(const wxString& preffered_drive);
     void rescan_networks(bool select);
     void fill_password();
     // reference to string that is filled after ShowModal is called from owner

@@ -2611,12 +2611,15 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
             break;
         case ConfigMenuWifiConfigFile:
         {
+            open_wifi_config_dialog();
+            /*
             std::string file_path;
             WifiConfigDialog dialog(mainframe, file_path, removable_drive_manager());
             if (dialog.ShowModal() == wxID_OK)
             {
                 plater_->get_notification_manager()->push_exporting_finished_notification(file_path, boost::filesystem::path(file_path).parent_path().string(), true);
             }
+            */
         }
         break;
         default:
@@ -3569,6 +3572,20 @@ void GUI_App::start_download(std::string url)
         } 
     m_downloader->init(dest_folder);
     m_downloader->start_download(url);
+}
+
+void GUI_App::open_wifi_config_dialog(const wxString& drive_path/* = {}*/)
+{
+    if(m_wifi_config_dialog_shown)
+        return;
+    m_wifi_config_dialog_shown = true;
+    std::string file_path;
+    WifiConfigDialog dialog(mainframe, file_path, removable_drive_manager(), drive_path);
+    if (dialog.ShowModal() == wxID_OK)
+    {
+        plater_->get_notification_manager()->push_exporting_finished_notification(file_path, boost::filesystem::path(file_path).parent_path().string(), true);
+    }
+    m_wifi_config_dialog_shown = false;
 }
 
 } // GUI
