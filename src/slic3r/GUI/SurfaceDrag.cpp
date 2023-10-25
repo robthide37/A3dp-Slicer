@@ -359,16 +359,6 @@ bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, co
 
     if (volume.type() == ModelVolumeType::MODEL_PART)
         object.ensure_on_bed();
-
-    //int obj_idx = -1;
-    //for (int i = 0; i < objects.size(); i++)
-    //    if (objects[i]->id() == object.id()) {
-    //        obj_idx = i;
-    //        break;
-    //    }
-    // object change !!!
-    // Plater::changed_object(obj_idx);    
-
     return true;
 }
 

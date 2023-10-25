@@ -339,21 +339,7 @@ void GLGizmoSVG::volume_transformation_changed()
         // inform slicing process that model changed
         // SLA supports, processing
         // ensure on bed
-        const ModelObjectPtrs objects = m_parent.get_model()->objects;
-        ModelObject *object = m_volume->get_object();
-        object->invalidate_bounding_box(); 
-        object->ensure_on_bed();
-
-        int obj_idx = -1;
-        for (int i = 0; i < objects.size(); i++)
-            if (objects[i]->id() == object->id()) {
-                obj_idx = i;
-                break;
-            }
-        wxGetApp().plater()->changed_object(obj_idx);
-
-        // Check outside bed
-        m_parent.requires_check_outside_state();
+        wxGetApp().plater()->changed_object(*m_volume->get_object());
     }
 
     // Show correct value of height & depth inside of inputs
@@ -716,6 +702,7 @@ void wu_draw_line_side(Linef line,
     }
 }
 
+#ifdef MORE_DRAWING
 // Wu's line algorithm - https://en.wikipedia.org/wiki/Xiaolin_Wu's_line_algorithm
 void wu_draw_line(Linef line,
                 const std::function<void(int x, int y, float brightess)>& plot) {
@@ -785,6 +772,36 @@ void wu_draw_line(Linef line,
         }
     }
 }
+
+void draw(const ExPolygonsWithIds &shapes_with_ids, unsigned max_size)
+{
+    ImVec2 actual_pos = ImGui::GetCursorPos();
+    // draw shapes
+    BoundingBox bb;
+    for (const ExPolygonsWithId &shape : shapes_with_ids)
+        bb.merge(get_extents(shape.expoly));
+
+    Point  bb_size    = bb.size();
+    double scale      = max_size / (double) std::max(bb_size.x(), bb_size.y());
+    ImVec2 win_offset = ImGui::GetWindowPos();
+    Point  offset(win_offset.x + actual_pos.x, win_offset.y + actual_pos.y);
+    offset += bb_size / 2 * scale;
+    auto draw_polygon = [&scale, offset](Slic3r::Polygon p) {
+        p.scale(scale, -scale); // Y mirror
+        p.translate(offset);
+        ImGuiWrapper::draw(p);
+    };
+
+    for (const ExPolygonsWithId &shape : shapes_with_ids) {
+        for (const ExPolygon &expoly : shape.expoly) {
+            draw_polygon(expoly.contour);
+            for (const Slic3r::Polygon &hole : expoly.holes)
+                draw_polygon(hole);
+        }
+    }
+}
+
+#endif // MORE_DRAWING
 
 template<unsigned int N> // N .. count of channels per pixel
 void draw_side_outline(const ExPolygons &shape, const std::array<unsigned char, N> &color, std::vector<unsigned char> &data, size_t data_width, double scale)
@@ -878,7 +895,7 @@ void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& co
         size_t offset = get_offset(x, y);
         if (data[offset + N - 1] != 0)
             return; // already setted by line
-        for (size_t i = 0; i < N; ++i)
+        for (int i = 0; i < N; ++i)
             data[offset + i] = color[i];
     };
 
@@ -1371,35 +1388,6 @@ void GLGizmoSVG::draw_window()
         ImGui::Separator();
         draw_model_type();
     }
-}
-namespace {
-void draw(const ExPolygonsWithIds& shapes_with_ids, unsigned max_size)
-{
-    ImVec2 actual_pos = ImGui::GetCursorPos();
-    // draw shapes
-    BoundingBox bb;
-    for (const ExPolygonsWithId &shape : shapes_with_ids)
-        bb.merge(get_extents(shape.expoly));
-
-    Point  bb_size    = bb.size();
-    double scale      = max_size / (double) std::max(bb_size.x(), bb_size.y());
-    ImVec2 win_offset = ImGui::GetWindowPos();
-    Point  offset(win_offset.x + actual_pos.x, win_offset.y + actual_pos.y);
-    offset += bb_size / 2 * scale;
-    auto draw_polygon = [&scale, offset](Slic3r::Polygon p) {
-        p.scale(scale, -scale); // Y mirror
-        p.translate(offset);
-        ImGuiWrapper::draw(p);
-    };
-
-    for (const ExPolygonsWithId &shape : shapes_with_ids) {
-        for (const ExPolygon &expoly : shape.expoly) {
-            draw_polygon(expoly.contour);
-            for (const Slic3r::Polygon &hole : expoly.holes)
-                draw_polygon(hole);
-        }
-    }
-}
 }
 
 void GLGizmoSVG::draw_preview(){

@@ -12,6 +12,7 @@
 #include <libslic3r/Format/OBJ.hpp> // load_obj for default mesh
 #include <libslic3r/CutSurface.hpp> // use surface cuts
 #include <libslic3r/BuildVolume.hpp> // create object
+#include <libslic3r/SLA/ReprojectPointsOnMesh.hpp>
 
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
@@ -419,8 +420,6 @@ void UpdateJob::update_volume(ModelVolume *volume, TriangleMesh &&mesh, const Da
     volume->set_mesh(std::move(mesh));
     volume->set_new_unique_id();
     volume->calculate_convex_hull();
-    ModelObject *object = volume->get_object();
-    object->invalidate_bounding_box();
 
     // write data from base into volume
     base.write(*volume);
@@ -434,17 +433,15 @@ void UpdateJob::update_volume(ModelVolume *volume, TriangleMesh &&mesh, const Da
             update_name_in_list(*obj_list, *volume);
     }
 
-    // Get object id to set object as changed
-    Plater* plater = app.plater();
-    ModelObjectPtrs objects = plater->model().objects;
-    int obj_idx = -1;
-    for (int i = 0; i < objects.size(); ++i)
-        if (objects[i]->id() == object->id()) {
-            obj_idx = i;
-            break;
-        }    
-    assert(obj_idx >= 0);
-    plater->changed_object(obj_idx);
+    ModelObject *object = volume->get_object();
+    assert(object != nullptr);
+    if (object == nullptr)
+        return;
+
+    Plater *plater = app.plater();
+    if (plater->printer_technology() == ptSLA)
+        sla::reproject_points_and_holes(object);
+    plater->changed_object(*object);
 }
 
 /////////////////

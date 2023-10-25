@@ -716,21 +716,7 @@ void GLGizmoEmboss::volume_transformation_changed()
         // inform slicing process that model changed
         // SLA supports, processing
         // ensure on bed
-        const ModelObjectPtrs objects = m_parent.get_model()->objects;
-        ModelObject *object = m_volume->get_object();
-        object->invalidate_bounding_box();
-        object->ensure_on_bed();
-
-        int obj_idx = -1;
-        for (int i = 0; i < objects.size(); i++)
-            if (objects[i]->id() == object->id()) {
-                obj_idx = i;
-                break;
-            }
-        wxGetApp().plater()->changed_object(obj_idx);
-
-        // Check outside bed
-        m_parent.requires_check_outside_state();
+        wxGetApp().plater()->changed_object(*m_volume->get_object());
     }
 
     // Show correct value of height & depth inside of inputs
