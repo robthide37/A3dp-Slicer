@@ -7808,7 +7808,8 @@ void Plater::clear_before_change_mesh(int obj_idx, const std::string &notificati
 void Plater::changed_mesh(int obj_idx)
 {
     ModelObject* mo = model().objects[obj_idx];
-    sla::reproject_points_and_holes(mo);
+    if (p->printer_technology == ptSLA)
+        sla::reproject_points_and_holes(mo);
     update();
     p->object_list_changed();
     p->schedule_background_process();

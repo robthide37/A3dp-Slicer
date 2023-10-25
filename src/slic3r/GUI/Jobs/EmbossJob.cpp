@@ -419,7 +419,8 @@ void UpdateJob::update_volume(ModelVolume *volume, TriangleMesh &&mesh, const Da
     volume->set_mesh(std::move(mesh));
     volume->set_new_unique_id();
     volume->calculate_convex_hull();
-    volume->get_object()->invalidate_bounding_box();
+    ModelObject *object = volume->get_object();
+    object->invalidate_bounding_box();
 
     // write data from base into volume
     base.write(*volume);
@@ -433,20 +434,17 @@ void UpdateJob::update_volume(ModelVolume *volume, TriangleMesh &&mesh, const Da
             update_name_in_list(*obj_list, *volume);
     }
 
-    // When text is object.
-    // When text positive volume is lowest part of object than modification of text
-    // have to move object on bed.
-    if (volume->type() == ModelVolumeType::MODEL_PART)
-        volume->get_object()->ensure_on_bed();
-
-    // redraw scene
-    GLCanvas3D *canvas = app.plater()->canvas3D();
-
-    bool refresh_immediately = false;
-    canvas->reload_scene(refresh_immediately);
-
-    // Change buttons "Export G-code" into "Slice now"
-    canvas->post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
+    // Get object id to set object as changed
+    Plater* plater = app.plater();
+    ModelObjectPtrs objects = plater->model().objects;
+    int obj_idx = -1;
+    for (int i = 0; i < objects.size(); ++i)
+        if (objects[i]->id() == object->id()) {
+            obj_idx = i;
+            break;
+        }    
+    assert(obj_idx >= 0);
+    plater->changed_object(obj_idx);
 }
 
 /////////////////
