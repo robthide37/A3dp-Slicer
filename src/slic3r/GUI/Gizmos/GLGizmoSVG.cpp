@@ -764,7 +764,7 @@ void draw_side_outline(const ExPolygons &shape, const std::array<unsigned char, 
 
     // overlap color
     auto draw = [&data, data_width, count_lines, get_offset, &color](int x, int y, float brightess) {
-        if (x < 0 || y < 0 || x >= data_width || y >= count_lines)
+        if (x < 0 || y < 0 || static_cast<size_t>(x) >= data_width || y >= count_lines)
             return; // out of image
         size_t offset = get_offset(x, y);
         bool change_color = false;
