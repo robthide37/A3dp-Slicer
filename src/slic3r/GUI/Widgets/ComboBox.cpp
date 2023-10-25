@@ -186,14 +186,9 @@ int ComboBox::Insert(const wxString& item,
 int ComboBox::Insert(const wxString& item, const wxBitmapBundle& bitmap,
     unsigned int pos, void* clientData)
 {
-    const int n = wxItemContainer::Insert(item, pos);
-    if (n != wxNOT_FOUND) {
-        texts.insert(texts.begin() + n, item);
-        icons.insert(icons.begin() + n, bitmap);
-        datas.insert(datas.begin() + n, clientData);
-        types.insert(types.begin() + n, wxClientData_None);
-        drop.Invalidate();
-    }
+    const int n = wxItemContainer::Insert(item, pos, clientData);
+    if (n != wxNOT_FOUND)
+        icons[n] = bitmap;
     return n;
 }
 
@@ -213,7 +208,9 @@ void ComboBox::DoDeleteOneItem(unsigned int pos)
     icons.erase(icons.begin() + pos);
     datas.erase(datas.begin() + pos);
     types.erase(types.begin() + pos);
+    const int selection = drop.GetSelection();
     drop.Invalidate(true);
+    drop.SetSelection(selection);
 }
 
 unsigned int ComboBox::GetCount() const { return texts.size(); }
@@ -249,7 +246,9 @@ int ComboBox::DoInsertItems(const wxArrayStringsAdapter &items,
         types.insert(types.begin() + pos, type);
         ++pos;
     }
+    const int selection = drop.GetSelection();
     drop.Invalidate(true);
+    drop.SetSelection(selection);
     return int(pos) - 1;
 }
 
