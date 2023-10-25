@@ -25,7 +25,6 @@
         {
             "name": "mac_universal_x86",
             "inherits": "default",
-            "generator": "Ninja",
             "binaryDir": "${sourceDir}/build-x86_64",
             "condition": {
                 "type": "equals",
@@ -39,7 +38,6 @@
         {
             "name": "mac_universal_arm",
             "inherits": "default",
-            "generator": "Ninja",
             "binaryDir": "${sourceDir}/build-arm64",
             "condition": {
                 "type": "equals",

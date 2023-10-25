@@ -21,10 +21,20 @@ else ()
     set(_gmp_ccflags "${CMAKE_CXX_FLAGS_${_buildtype_upper}} -fPIC -DPIC -Wall -Wmissing-prototypes -Wpointer-arith -pedantic -fomit-frame-pointer -fno-common")
     set(_gmp_build_tgt "${CMAKE_SYSTEM_PROCESSOR}")
 
+    set(_cross_compile_arg "")
     if (APPLE)
-        if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm")
+        if (CMAKE_OSX_ARCHITECTURES)
+            set(_gmp_build_tgt ${CMAKE_OSX_ARCHITECTURES})
+            set(_gmp_ccflags "${_gmp_ccflags} -arch ${CMAKE_OSX_ARCHITECTURES}")
+        endif ()
+        if (${_gmp_build_tgt} MATCHES "arm")
             set(_gmp_build_tgt aarch64)
         endif()
+
+        if (CMAKE_OSX_ARCHITECTURES)
+            set(_cross_compile_arg --host=${_gmp_build_tgt}-apple-darwin21)
+        endif ()
+
         set(_gmp_ccflags "${_gmp_ccflags} -mmacosx-version-min=${DEP_OSX_TARGET}")
         set(_gmp_build_tgt "--build=${_gmp_build_tgt}-apple-darwin")
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -37,7 +47,6 @@ else ()
         set(_gmp_build_tgt "") # let it guess
     endif()
 
-    set(_cross_compile_arg "")
     if (CMAKE_CROSSCOMPILING)
         # TOOLCHAIN_PREFIX should be defined in the toolchain file
         set(_cross_compile_arg --host=${TOOLCHAIN_PREFIX})
