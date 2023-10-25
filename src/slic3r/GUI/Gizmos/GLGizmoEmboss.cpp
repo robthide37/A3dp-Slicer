@@ -1424,7 +1424,7 @@ void GLGizmoEmboss::draw_window()
     draw_style_list();
 
     // Do not select volume type, when it is text object
-    if (m_volume->get_object()->volumes.size() != 1) {
+    if (!m_volume->is_the_only_one_part()) {
         ImGui::Separator();
         draw_model_type();
     }
