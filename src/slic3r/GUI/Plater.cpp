@@ -6743,9 +6743,36 @@ void Plater::export_gcode(bool prefer_removable)
         );
         if (dlg.ShowModal() == wxID_OK) {
             output_path = into_path(dlg.GetPath());
-            while (has_illegal_filename_characters(output_path.filename().string())) {
-                show_error(this, _L("The provided file name is not valid.") + "\n" +
-                    _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"");
+
+            auto check_for_error = [this](const boost::filesystem::path& path, wxString& err_out) -> bool {
+                const std::string filename = path.filename().string();
+                const std::string ext      = boost::algorithm::to_lower_copy(path.extension().string());
+                if (has_illegal_filename_characters(filename)) {
+                    err_out = _L("The provided file name is not valid.") + "\n" +
+                              _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"";
+                    return true;
+                }
+                if (printer_technology() == ptFFF) {
+                    const bool binary_output = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary");
+                    const bool binary_extension = (ext == ".bgcode" || ext == ".bgc");
+                    const bool ascii_extension  = (ext == ".gcode" || ext == ".g" || ext == ".gco");
+                    if (binary_output && ascii_extension) {
+                        // TRN The placeholder is the file extension the user has selected.
+                        err_out = format_wxstr(_L("Cannot save binary G-code with %1% extension.\n\nUse a different extension or disable binary G-code export in Print Settings."), ext);
+                        return true;
+                    }
+                    if (! binary_output && binary_extension) {
+                        // TRN The placeholder is the file extension the user has selected.
+                        err_out = format_wxstr(_L("Cannot save ASCII G-code with %1% extension.\n\nUse a different extension or enable binary G-code export in Print Settings."), ext);
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            wxString error_str;
+            while (check_for_error(output_path, error_str)) {
+                show_error(this, error_str);
                 dlg.SetFilename(from_path(output_path.filename()));
                 if (dlg.ShowModal() == wxID_OK)
                     output_path = into_path(dlg.GetPath());
