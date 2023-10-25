@@ -7,10 +7,8 @@ else()
 endif()
 
 add_cmake_project(Blosc
-    URL https://github.com/tamasmeszaros/c-blosc/archive/refs/heads/v1.17.0_tm_universal.zip #https://github.com/tamasmeszaros/c-blosc/archive/refs/heads/v1.17.0_tm.zip
-    #URL_HASH SHA256=dcb48bf43a672fa3de6a4b1de2c4c238709dad5893d1e097b8374ad84b1fc3b3
-    # Patching upstream does not work this way with git version 2.28 installed on mac worker
-    # PATCH_COMMAND  ${GIT_EXECUTABLE} apply --ignore-space-change --whitespace=fix ${CMAKE_CURRENT_LIST_DIR}/blosc-mods.patch
+    URL https://github.com/Blosc/c-blosc/archive/8724c06e3da90f10986a253814af18ca081d8de0.zip
+    URL_HASH SHA256=53986fd04210b3d94124b7967c857f9766353e576a69595a9393999e0712c035
     CMAKE_ARGS
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         -DBUILD_SHARED=${_build_shared} 
