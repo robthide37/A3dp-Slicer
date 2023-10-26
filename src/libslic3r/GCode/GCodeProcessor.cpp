@@ -1054,7 +1054,7 @@ void GCodeProcessor::process_file(const std::string& filename, std::function<voi
         throw Slic3r::RuntimeError(format("Error opening file %1%", filename));
 
     using namespace bgcode::core;
-    std::vector<uint8_t> cs_buffer(65536);
+    std::vector<std::byte> cs_buffer(65536);
     const bool is_binary = is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == EResult::Success;
     fclose(file);
 
@@ -1168,7 +1168,7 @@ void GCodeProcessor::process_binary_file(const std::string& filename, std::funct
 
     // read file metadata block, if present
     BlockHeader block_header;
-    std::vector<uint8_t> cs_buffer(65536);
+    std::vector<std::byte> cs_buffer(65536);
     res = read_next_block_header(*file.f, file_header, block_header, cs_buffer.data(), cs_buffer.size());
     if (res != EResult::Success)
         throw Slic3r::RuntimeError(format("Error reading file %1%: %2%", filename, std::string(translate_result(res))));
