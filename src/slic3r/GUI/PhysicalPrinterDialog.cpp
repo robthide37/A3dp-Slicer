@@ -491,7 +491,7 @@ void PhysicalPrinterDialog::update(bool printer_change)
         // hide PrusaConnect address
         Field* printhost_field = m_optgroup->get_field("print_host");
         text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;
-        if (printhost_win && !printhost_win->GetValue().IsEmpty())
+        if (printhost_win && printhost_win->GetValue() == L"https://connect.prusa3d.com")
             printhost_win->SetValue(wxString());
 
         if (opt->value == htPrusaLink) { // PrusaConnect does NOT allow http digest
