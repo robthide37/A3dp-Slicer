@@ -2,10 +2,50 @@
     "version": 3,
     "configurePresets": [
         {
+            "name": "windows-only",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "DEP_DEBUG": true
+            },
+            "environment": {
+                "PLATFORM": "WINDOWS"
+            }
+        },
+        {
+            "name": "linux-only",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "environment": {
+                "PLATFORM": "LINUX"
+            }
+        },
+        {
+            "name": "mac-only",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "environment": {
+                "PLATFORM": "MAC"
+            }
+        },
+        {
           "name": "default",
           "displayName": "Default Config",
           "description": "Default build for any desktop OS",
           "binaryDir": "${sourceDir}/build-default",
+          "inherits": ["windows-only", "linux-only"],
           "cacheVariables": {
             "CMAKE_BUILD_TYPE": "Release",
             "DEP_WX_GTK3": true,
