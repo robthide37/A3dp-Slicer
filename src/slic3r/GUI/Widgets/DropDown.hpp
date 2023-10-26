@@ -41,6 +41,7 @@ class DropDown : public wxPopupTransientWindow
     ScalableBitmap check_bitmap;
 
     bool pressedDown = false;
+    bool slider_grabbed = false;
     boost::posix_time::ptime dismissTime;
     wxPoint                  offset; // x not used
     wxPoint                  dragStart;

@@ -7,6 +7,7 @@
 #include <charconv> // to_chars
 
 #include <boost/nowide/iostream.hpp>
+#include <boost/nowide/fstream.hpp>
 #include "ClipperUtils.hpp"
 #include "Emboss.hpp" // heal for shape
 
