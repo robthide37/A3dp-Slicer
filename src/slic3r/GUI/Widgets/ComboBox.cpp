@@ -61,7 +61,10 @@ ComboBox::ComboBox(wxWindow *      parent,
     for (int i = 0; i < n; ++i) Append(choices[i]);
 }
 
-int ComboBox::GetSelection() const { return drop.GetSelection(); }
+int ComboBox::GetSelection() const
+{
+    return drop.GetSelection();
+}
 
 void ComboBox::SetSelection(int n)
 {
@@ -233,6 +236,11 @@ wxBitmap ComboBox::GetItemBitmap(unsigned int n)
     return icons[n].GetBitmapFor(m_parent);
 }
 
+void ComboBox::OnKeyDown(wxKeyEvent &event)
+{
+    keyDown(event);
+}
+
 int ComboBox::DoInsertItems(const wxArrayStringsAdapter &items,
                             unsigned int                 pos,
                             void **                      clientData,
@@ -290,10 +298,15 @@ void ComboBox::keyDown(wxKeyEvent& event)
 {
     int key_code = event.GetKeyCode();
     switch (key_code) {
-#ifndef __WXOSX__
         case WXK_RETURN:
             if (drop_down) {
                 drop.DismissAndNotify();
+
+                wxCommandEvent e(wxEVT_COMBOBOX);
+                e.SetEventObject(this);
+                e.SetId(GetId());
+                e.SetInt(GetSelection());
+                GetEventHandler()->ProcessEvent(e);
             } else if (drop.HasDismissLongTime()) {
                 drop.autoPosition();
                 drop_down = true;
@@ -302,7 +315,6 @@ void ComboBox::keyDown(wxKeyEvent& event)
                 GetEventHandler()->ProcessEvent(e);
             }
             break;
-#endif
         case WXK_UP:
         case WXK_DOWN:
         case WXK_LEFT:
@@ -314,20 +326,22 @@ void ComboBox::keyDown(wxKeyEvent& event)
             } else {
                 break;
             }
-            {
-                wxCommandEvent e(wxEVT_COMBOBOX);
-                e.SetEventObject(this);
-                e.SetId(GetId());
-                e.SetInt(GetSelection());
-                GetEventHandler()->ProcessEvent(e);
-            }
             break;
         case WXK_TAB:
             HandleAsNavigationKey(event);
             break;
-        default:
+        default: {
+            if (drop.IsShown() && HasFlag(wxCB_READONLY)) {
+                for (size_t n = 0; n < texts.size(); n++) {
+                    if (texts[n].StartsWith(wxString(static_cast<char>(key_code)))) {
+                        SetSelection(int(n));
+                        break;
+                    }
+                }
+            }
             event.Skip();
             break;
+        }
     }
 }
 

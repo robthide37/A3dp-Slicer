@@ -66,6 +66,8 @@ public:
 
     wxBitmap GetItemBitmap(unsigned int n);
 
+    void     OnKeyDown(wxKeyEvent& event);
+
 protected:
     virtual int  DoInsertItems(const wxArrayStringsAdapter &items,
                                unsigned int                 pos,

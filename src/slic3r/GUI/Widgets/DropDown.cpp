@@ -1,4 +1,5 @@
 #include "DropDown.hpp"
+#include "ComboBox.hpp"
 #include "../GUI_App.hpp"
 #include "../OptionsGroup.hpp"
 
@@ -60,10 +61,60 @@ DropDown::DropDown(wxWindow *             parent,
     Create(parent, style);
 }
 
+#ifdef __WXGTK__
+static gint gtk_popup_key_press (GtkWidget *widget, GdkEvent *gdk_event, wxPopupWindow* win )
+{
+    // Ignore events sent out before we connected to the signal
+    if (win->m_time >= ((GdkEventKey*)gdk_event)->time)
+        return FALSE;
+
+    GtkWidget *child = gtk_get_event_widget (gdk_event);
+
+    /*  We don't ask for button press events on the grab widget, so
+     *  if an event is reported directly to the grab widget, it must
+     *  be on a window outside the application (and thus we remove
+     *  the popup window). Otherwise, we check if the widget is a child
+     *  of the grab widget, and only remove the popup window if it
+     *  is not. */
+    if (child != widget) {
+        while (child) {
+            if (child == widget)
+                return FALSE;
+            child = gtk_widget_get_parent(child);
+        }
+    }
+
+    gchar* keyval = gdk_keyval_name(((GdkEventKey*)gdk_event)->keyval);
+    const long keyCode = strcmp(keyval, "Up") == 0     ? WXK_UP     :
+                         strcmp(keyval, "Down") == 0   ? WXK_DOWN   :
+                         strcmp(keyval, "Left") == 0   ? WXK_LEFT   :
+                         strcmp(keyval, "Right") == 0  ? WXK_RIGHT  :
+                         strcmp(keyval, "Return") == 0 ? WXK_RETURN : WXK_NONE;
+
+    if (keyCode != WXK_NONE) {
+        wxKeyEvent event( wxEVT_KEY_DOWN, win->GetId());
+        event.m_keyCode = keyCode;
+        event.SetEventObject( win );
+        (void)win->HandleWindowEvent( event );
+    }
+
+    return TRUE;
+}
+#endif
+
 void DropDown::Create(wxWindow *     parent,
          long           style)
 {
     wxPopupTransientWindow::Create(parent);
+#ifdef __WXGTK__
+    g_signal_connect (m_widget, "key_press_event", G_CALLBACK (gtk_popup_key_press), this);
+
+    Bind(wxEVT_KEY_DOWN, [parent](wxKeyEvent &e) {
+        if (ComboBox* cb = dynamic_cast<ComboBox*>(parent))
+            cb->OnKeyDown(e);
+    });
+#endif
+
     if (!wxOSX) SetBackgroundStyle(wxBG_STYLE_PAINT);
     state_handler.attach({&border_color, &text_color, &selector_border_color, &selector_background_color});
     state_handler.update_binds();
@@ -95,6 +146,8 @@ void DropDown::SetSelection(int n)
         n = -1;
     if (selection == n) return;
     selection = n;
+    if (IsShown())
+        autoPosition();
     paintNow();
 }
 
@@ -212,7 +265,11 @@ void DropDown::SetTransparentBG(wxDC& dc, wxWindow* win)
 }
 
 constexpr int slider_width  = 12;
+#ifdef __WXOSX__
+constexpr int slider_step   = 1;
+#else
 constexpr int slider_step   = 5;
+#endif
 constexpr int items_padding = 2;
 
 /*
@@ -423,13 +480,13 @@ void DropDown::autoPosition()
             if (use_content_width && texts.size() <= 15) size.x += 6;
             size.y = drect.GetBottom() - GetPosition().y - 10;
             wxWindow::SetSize(size);
-            if (selection >= 0) {
-                if (offset.y + rowSize.y * (selection + 1) > size.y)
-                    offset.y = size.y - rowSize.y * (selection + 1);
-                else if (offset.y + rowSize.y * selection < 0)
-                    offset.y = -rowSize.y * selection;
-            }
         }
+    }
+    if (selection >= 0) {
+        if (offset.y + rowSize.y * (selection + 1) > size.y)
+            offset.y = size.y - rowSize.y * (selection + 3);
+        else if (offset.y + rowSize.y * selection < 0)
+            offset.y = -rowSize.y * selection;
     }
 }
 
@@ -461,6 +518,10 @@ void DropDown::mouseReleased(wxMouseEvent& event)
         if (HasCapture())
             ReleaseMouse();
         if (hover_item >= 0) { // not moved
+#ifdef __WXOSX__
+            // To avoid cases, when some dialog appears after item selection, but DropDown is still shown
+            Hide();
+#endif
             sendDropDownEvent();
             DismissAndNotify();
         }
@@ -507,6 +568,8 @@ void DropDown::mouseMove(wxMouseEvent &event)
 
 void DropDown::mouseWheelMoved(wxMouseEvent &event)
 {
+    if (event.GetWheelRotation() == 0)
+        return;
     auto delta = event.GetWheelRotation() > 0 ? rowSize.y : -rowSize.y;
     wxPoint pt2 = offset + wxPoint{0, slider_step * delta};
     int text_size = int(texts.size());
