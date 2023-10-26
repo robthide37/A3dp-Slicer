@@ -2,6 +2,15 @@
     "version": 3,
     "configurePresets": [
         {
+            "name": "linux-only",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
             "name": "windows-only",
             "hidden": true,
             "condition": {
@@ -11,21 +20,6 @@
             },
             "cacheVariables": {
                 "DEP_DEBUG": true
-            },
-            "environment": {
-                "PLATFORM": "WINDOWS"
-            }
-        },
-        {
-            "name": "linux-only",
-            "hidden": true,
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            },
-            "environment": {
-                "PLATFORM": "LINUX"
             }
         },
         {
@@ -35,9 +29,6 @@
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Darwin"
-            },
-            "environment": {
-                "PLATFORM": "MAC"
             }
         },
         {
@@ -45,7 +36,11 @@
           "displayName": "Default Config",
           "description": "Default build for any desktop OS",
           "binaryDir": "${sourceDir}/build-default",
-          "inherits": ["windows-only", "linux-only"],
+          "inherits": ["mac-only", "windows-only", "linux-only"],
+          "condition": {
+            "type": "const",
+            "value": true
+          },
           "cacheVariables": {
             "CMAKE_BUILD_TYPE": "Release",
             "DEP_WX_GTK3": true,
