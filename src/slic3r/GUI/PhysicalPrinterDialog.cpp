@@ -439,7 +439,7 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
     Field* printhost_field = m_optgroup->get_field("print_host");
     if (printhost_field)
     {
-        wxTextCtrl* temp = dynamic_cast<wxTextCtrl*>(printhost_field->getWindow());
+        text_ctrl* temp = dynamic_cast<text_ctrl*>(printhost_field->getWindow());
         if (temp)
             temp->Bind(wxEVT_TEXT, ([printhost_field, temp](wxEvent& e)
             {
@@ -489,11 +489,11 @@ void PhysicalPrinterDialog::update(bool printer_change)
         m_optgroup->show_field("host_type");
 
         // hide PrusaConnect address
-        if (Field* printhost_field = m_optgroup->get_field("print_host"); printhost_field) {
-            if (wxTextCtrl* temp = dynamic_cast<wxTextCtrl*>(printhost_field->getWindow()); temp && temp->GetValue() == L"https://connect.prusa3d.com") {
-                temp->SetValue(wxString());
-            }
-        }
+        Field* printhost_field = m_optgroup->get_field("print_host");
+        text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;
+        if (printhost_win && !printhost_win->GetValue().IsEmpty())
+            printhost_win->SetValue(wxString());
+
         if (opt->value == htPrusaLink) { // PrusaConnect does NOT allow http digest
             m_optgroup->show_field("printhost_authorization_type");
             AuthorizationType auth_type = m_config->option<ConfigOptionEnum<AuthorizationType>>("printhost_authorization_type")->value;
@@ -506,15 +506,11 @@ void PhysicalPrinterDialog::update(bool printer_change)
             for (const std::string& opt_key : std::vector<std::string>{ "printhost_user", "printhost_password" })
                 m_optgroup->hide_field(opt_key);
             supports_multiple_printers = opt && opt->value == htRepetier;
-            if (opt->value == htPrusaConnect) { // automatically show default prusaconnect address
-                if (Field* printhost_field = m_optgroup->get_field("print_host"); printhost_field) {
-                    if (text_ctrl* temp = dynamic_cast<text_ctrl*>(printhost_field->getWindow()); temp && temp->GetValue().IsEmpty()) {
-                        temp->SetValue(L"https://connect.prusa3d.com");
-                    }
-                }
+            if (opt->value == htPrusaConnect && printhost_win && printhost_win->GetValue().IsEmpty()) {
+                // automatically show default prusaconnect address
+                printhost_win->SetValue(L"https://connect.prusa3d.com");
             }
         }
-        
     }
     else {
         m_optgroup->set_value("host_type", int(PrintHostType::htOctoPrint), false);

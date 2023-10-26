@@ -78,6 +78,11 @@ void TextInput::Create(wxWindow *     parent,
         e.SetId(GetId());
         ProcessEventLocally(e);
     });
+    text_ctrl->Bind(wxEVT_TEXT, [this](auto &e) {
+        OnEdit();
+        e.SetId(GetId());
+        ProcessEventLocally(e);
+    });
     text_ctrl->Bind(wxEVT_RIGHT_DOWN, [](auto &e) {}); // disable context menu
 
     if (!icon.IsEmpty()) {
