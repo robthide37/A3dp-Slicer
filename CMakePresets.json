@@ -25,6 +25,20 @@
                 "PrusaSlicer_DEPS_PRESET": "no-occt",
                 "PrusaSlicer_DEPS_OUTPUT_QUIET": false
             }
+        },
+        {
+            "name": "shareddeps",
+            "displayName": "Shared dependencies",
+            "description": "Building with dynamically linked dependencies from the system",
+            "binaryDir": "${sourceDir}/shareddeps",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "SLIC3R_STATIC": false,
+                "SLIC3R_GTK": "3",
+                "SLIC3R_ENC_CHECK": false,
+                "SLIC3R_PCH": true,
+                "PrusaSlicer_BUILD_DEPS": false
+            }
         }
     ]
 }
