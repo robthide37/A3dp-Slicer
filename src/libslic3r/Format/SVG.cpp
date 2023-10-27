@@ -70,11 +70,8 @@ bool load_svg(const std::string &input_file, Model &output_model)
     emboss_shape.svg_file = std::move(svg_file);
 
     // unify to one expolygons
-    double delta = 1e-3; // in mm
-    unsigned max_heal_iteration = 10;
-    HealedExPolygons union_shape = union_with_delta(emboss_shape.shapes_with_ids, delta, max_heal_iteration);
-    if (!union_shape.is_healed)
-        BOOST_LOG_TRIVIAL(warning) << "SVG file(\"" << input_file << "\") couldn't be fully healed.";
+    // EmbossJob.cpp --> ExPolygons create_shape(DataBase &input, Fnc was_canceled) {
+    ExPolygons union_shape = union_with_delta(emboss_shape, Emboss::UNION_DELTA, Emboss::UNION_MAX_ITERATIN);
 
     // create projection
     double scale = emboss_shape.scale;
@@ -84,7 +81,7 @@ bool load_svg(const std::string &input_file, Model &output_model)
     Emboss::ProjectTransform project(std::move(projectZ), tr);
 
     // convert 2d shape to 3d triangles
-    indexed_triangle_set its = Emboss::polygons2model(union_shape.expolygons, project);
+    indexed_triangle_set its = Emboss::polygons2model(union_shape, project);
     TriangleMesh triangl_mesh(std::move(its));
 
     // add mesh to model

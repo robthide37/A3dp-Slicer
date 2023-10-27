@@ -907,6 +907,19 @@ void draw_filled(const ExPolygons &shape, const std::array<unsigned char, N>& co
     }  
 }
 
+/// Union shape defined by glyphs
+ExPolygons union_ex(const ExPolygonsWithIds &shapes)
+{
+    // unify to one expolygon
+    ExPolygons result;
+    for (const ExPolygonsWithId &shape : shapes) {
+        if (shape.expoly.empty())
+            continue;
+        expolygons_append(result, shape.expoly);
+    }
+    return union_ex(result);
+}
+
 // init texture by draw expolygons into texture
 bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, unsigned max_size_px, const std::vector<std::string>& shape_warnings){
     BoundingBox bb = get_extents(shapes_with_ids);
@@ -933,10 +946,7 @@ bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, un
     std::vector<unsigned char> data(n_pixels * channels_count, {0});
 
     // Union All shapes
-    ExPolygons shape;
-    for (const ExPolygonsWithId &shapes_with_id : shapes_with_ids)
-        expolygons_append(shape, shapes_with_id.expoly);
-    shape = union_ex(shape);
+    ExPolygons shape = union_ex(shapes_with_ids);
 
     // align to texture
     translate(shape, -bb.min);

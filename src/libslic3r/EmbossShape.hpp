@@ -74,6 +74,7 @@ struct EmbossShape
 {
     // shapes to to emboss separately over surface
     ExPolygonsWithIds shapes_with_ids;
+    ExPolygons final_shape; // When not set it is calculated from ExPolygonsWithIds
 
     // scale of shape, multiplier to get 3d point in mm from integer shape
     double scale = SCALING_FACTOR;
