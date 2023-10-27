@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-20 17:33+0200\n"
+"POT-Creation-Date: 2023-10-27 09:21+0200\n"
 "PO-Revision-Date: 2023-08-24 20:11+0200\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -447,26 +447,26 @@ msgstr "Material SLA"
 msgid "printer"
 msgstr "impressora"
 
-#: src/libslic3r/Print.cpp:513
+#: src/libslic3r/Print.cpp:517
 msgid "All objects are outside of the print volume."
 msgstr "Tots els objectes són fora del volum d'impressió."
 
-#: src/libslic3r/Print.cpp:516
+#: src/libslic3r/Print.cpp:520
 msgid "The supplied settings will cause an empty print."
 msgstr "La configuració subministrada provocarà una impressió buida."
 
-#: src/libslic3r/Print.cpp:520
+#: src/libslic3r/Print.cpp:524
 msgid "Some objects are too close; your extruder will collide with them."
 msgstr "Alguns objectes estan massa a prop; L'extrusor xocarà amb ells."
 
-#: src/libslic3r/Print.cpp:522
+#: src/libslic3r/Print.cpp:526
 msgid ""
 "Some objects are too tall and cannot be printed without extruder collisions."
 msgstr ""
 "Alguns objectes són massa alts i no es poden imprimir sense col·lisions "
 "d'extrusora."
 
-#: src/libslic3r/Print.cpp:528
+#: src/libslic3r/Print.cpp:532
 msgid ""
 "Avoid crossing perimeters option and avoid crossing curled overhangs option "
 "cannot be both enabled together."
@@ -474,7 +474,7 @@ msgstr ""
 "Evitar l'opció de creuar perímetres i evitar creuar voladissos arrissats no "
 "es poden habilitar tots dos junts."
 
-#: src/libslic3r/Print.cpp:537
+#: src/libslic3r/Print.cpp:541
 msgid ""
 "Only a single object may be printed at a time in Spiral Vase mode. Either "
 "remove all but the last object, or enable sequential mode by "
@@ -484,7 +484,7 @@ msgstr ""
 "tots menys l'últim objecte o habiliteu el mode seqüencial per "
 "\"complete_objects\"."
 
-#: src/libslic3r/Print.cpp:541
+#: src/libslic3r/Print.cpp:545
 msgid ""
 "The Spiral Vase option can only be used when printing single material "
 "objects."
@@ -492,7 +492,7 @@ msgstr ""
 "L'opció gaso en espiral sols pot ser usada per imprimir objectes d'un sol "
 "material."
 
-#: src/libslic3r/Print.cpp:545
+#: src/libslic3r/Print.cpp:549
 msgid ""
 "Machine limits cannot be emitted to G-Code when Klipper firmware flavor is "
 "used. Change the value of machine_limits_usage."
@@ -500,12 +500,12 @@ msgstr ""
 "Els límits de màquina no es poden establir a G-Code quan s'utilitza el tipus "
 "de firmware Klipper. Canvieu el valor de machine_limits_usage."
 
-#: src/libslic3r/Print.cpp:572
+#: src/libslic3r/Print.cpp:576
 #, boost-format
 msgid "The object %1% exceeds the maximum build volume height."
 msgstr "L'objecte %1% supera l'alçada màxima de volum de construcció."
 
-#: src/libslic3r/Print.cpp:573
+#: src/libslic3r/Print.cpp:577
 #, boost-format
 msgid ""
 "While the object %1% itself fits the build volume, its last layer exceeds "
@@ -514,7 +514,7 @@ msgstr ""
 "Tot i que l'objecte %1% s'adapta al volum de construcció, la seva última "
 "capa supera l'alçada màxima del volum de construcció."
 
-#: src/libslic3r/Print.cpp:574
+#: src/libslic3r/Print.cpp:578
 msgid ""
 "You might want to reduce the size of your model or change current print "
 "settings and retry."
@@ -522,11 +522,11 @@ msgstr ""
 "És possible que vulgueu reduir la mida del model o canviar la configuració "
 "d'impressió actual i tornar-ho a provar."
 
-#: src/libslic3r/Print.cpp:590
+#: src/libslic3r/Print.cpp:594
 msgid "Variable layer height is not supported with Organic supports."
 msgstr "L'alçada de la capa variable no és compatible amb suports orgànics."
 
-#: src/libslic3r/Print.cpp:603
+#: src/libslic3r/Print.cpp:607
 msgid ""
 "The wipe tower is only supported if all extruders have the same nozzle "
 "diameter and use filaments of the same diameter."
@@ -534,7 +534,7 @@ msgstr ""
 "La torre de neteja només és compatible si tots els extrusors tenen el mateix "
 "diàmetre de nozzle i usen filament del mateix diàmetre."
 
-#: src/libslic3r/Print.cpp:610
+#: src/libslic3r/Print.cpp:614
 msgid ""
 "The Wipe Tower is currently only supported for the Marlin, Klipper, RepRap/"
 "Sprinter, RepRapFirmware and Repetier G-code flavors."
@@ -542,7 +542,7 @@ msgstr ""
 "Actualment, la Torre de Neteja només és compatible amb els tipus de codi "
 "Marlin, Klipper, RepRap/Sprinter, RepRapFirmware i Repetier G-code."
 
-#: src/libslic3r/Print.cpp:612
+#: src/libslic3r/Print.cpp:616
 msgid ""
 "The Wipe Tower is currently only supported with the relative extruder "
 "addressing (use_relative_e_distances=1)."
@@ -550,7 +550,7 @@ msgstr ""
 "Actualment,Torre de Neteja només és compatible amb l'encaminament relatiu de "
 "l'extrusor (use_relative_e_distances=1)."
 
-#: src/libslic3r/Print.cpp:614
+#: src/libslic3r/Print.cpp:618
 msgid ""
 "Ooze prevention is only supported with the wipe tower when "
 "'single_extruder_multi_material' is off."
@@ -558,14 +558,14 @@ msgstr ""
 "La prevenció de degoteig només és compatible amb la torre de neteja quan "
 "'single_extruder_multi_material' està deshabilitat."
 
-#: src/libslic3r/Print.cpp:616
+#: src/libslic3r/Print.cpp:620
 msgid ""
 "The Wipe Tower currently does not support volumetric E (use_volumetric_e=0)."
 msgstr ""
 "La Torre de Neteja actualment no és compatible amb E volumètric "
 "(use_volumetric_e=0)."
 
-#: src/libslic3r/Print.cpp:618
+#: src/libslic3r/Print.cpp:622
 msgid ""
 "The Wipe Tower is currently not supported for multimaterial sequential "
 "prints."
@@ -573,7 +573,7 @@ msgstr ""
 "La Torre de Neteja no es permet ara per a impressions seqüencials "
 "multimaterial."
 
-#: src/libslic3r/Print.cpp:628
+#: src/libslic3r/Print.cpp:632
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they have equal "
 "layer heights"
@@ -581,7 +581,7 @@ msgstr ""
 "La torre de neteja només és compatible amb diversos objectes si tenen "
 "alçades de capes iguals"
 
-#: src/libslic3r/Print.cpp:630
+#: src/libslic3r/Print.cpp:634
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are printed "
 "over an equal number of raft layers"
@@ -589,7 +589,7 @@ msgstr ""
 "La torre de neteja només es permet per a diversos objectes si s'imprimeixen "
 "sobre un nombre igual de capes de bassa"
 
-#: src/libslic3r/Print.cpp:633
+#: src/libslic3r/Print.cpp:637
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are printed "
 "with the same support_material_contact_distance"
@@ -597,7 +597,7 @@ msgstr ""
 "La torre de neteja només és compatible amb diversos objectes si "
 "s'imprimeixen amb la mateixa support_material_contact_distance"
 
-#: src/libslic3r/Print.cpp:635
+#: src/libslic3r/Print.cpp:639
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are sliced "
 "equally."
@@ -605,7 +605,7 @@ msgstr ""
 "La torre de neteja només és compatible amb diversos objectes si es tallen "
 "igual."
 
-#: src/libslic3r/Print.cpp:660
+#: src/libslic3r/Print.cpp:664
 msgid ""
 "The Wipe tower is only supported if all objects have the same variable layer "
 "height"
@@ -613,23 +613,23 @@ msgstr ""
 "La Torre de Neteja només és compatible si tots els objectes tenen la mateixa "
 "alçada de capa variable"
 
-#: src/libslic3r/Print.cpp:684
+#: src/libslic3r/Print.cpp:688
 msgid ""
 "One or more object were assigned an extruder that the printer does not have."
 msgstr "Un o més objectes han estat assignats a un extrusor inexistent."
 
-#: src/libslic3r/Print.cpp:697
+#: src/libslic3r/Print.cpp:701
 #, boost-format
 msgid "%1%=%2% mm is too low to be printable at a layer height %3% mm"
 msgstr "%1%=%2% mm és massa baix per ser imprès a una alçada de capa de %3% mm"
 
-#: src/libslic3r/Print.cpp:700
+#: src/libslic3r/Print.cpp:704
 #, boost-format
 msgid "Excessive %1%=%2% mm to be printable with a nozzle diameter %3% mm"
 msgstr ""
 "%1%=%2% mm excessius per ser imprimible amb un nozzle de diàmetre de %3% mm"
 
-#: src/libslic3r/Print.cpp:711
+#: src/libslic3r/Print.cpp:715
 msgid ""
 "Printing with multiple extruders of differing nozzle diameters. If support "
 "is to be printed with the current extruder (support_material_extruder == 0 "
@@ -641,7 +641,7 @@ msgstr ""
 "o support_material_interface_extruder == 0), tots els nozzles han de ser del "
 "mateix diàmetre."
 
-#: src/libslic3r/Print.cpp:719
+#: src/libslic3r/Print.cpp:723
 msgid ""
 "For the Wipe Tower to work with the soluble supports, the support layers "
 "need to be synchronized with the object layers."
@@ -649,7 +649,7 @@ msgstr ""
 "Perquè la torre de neteja funcioni amb suports solubles, les capes de "
 "suports necessiten estar sincronitzades amb les capes de l'objecte."
 
-#: src/libslic3r/Print.cpp:723 src/slic3r/GUI/ConfigManipulation.cpp:142
+#: src/libslic3r/Print.cpp:727 src/slic3r/GUI/ConfigManipulation.cpp:142
 msgid ""
 "The Wipe Tower currently supports the non-soluble supports only if they are "
 "printed with the current extruder without triggering a tool change. (both "
@@ -661,34 +661,34 @@ msgstr ""
 "support_material_extruder com support_material_interface_extruder s'han de "
 "configurar a 0)."
 
-#: src/libslic3r/Print.cpp:732
+#: src/libslic3r/Print.cpp:736
 msgid ""
 "Organic support tree tip diameter must not be smaller than support material "
 "extrusion width."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:734
+#: src/libslic3r/Print.cpp:738
 msgid ""
 "Organic support branch diameter must not be smaller than 2x support material "
 "extrusion width."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:736
+#: src/libslic3r/Print.cpp:740
 msgid ""
 "Organic support branch diameter must not be smaller than support tree tip "
 "diameter."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:770
+#: src/libslic3r/Print.cpp:774
 msgid "First layer height can't be greater than nozzle diameter"
 msgstr ""
 "L'alçada de primera capa no pot ser més gran que el diàmetre del nozzle"
 
-#: src/libslic3r/Print.cpp:775
+#: src/libslic3r/Print.cpp:779
 msgid "Layer height can't be greater than nozzle diameter"
 msgstr "L'alçada de la capa no pot ser més gran que diàmetre del nozzle"
 
-#: src/libslic3r/Print.cpp:796
+#: src/libslic3r/Print.cpp:800
 msgid ""
 "Relative extruder addressing requires resetting the extruder position at "
 "each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to "
@@ -698,7 +698,7 @@ msgstr ""
 "l'extrusor a cada capa per evitar la pèrdua de precisió de coma flotant. "
 "Afegiu \"G92 E0\" a layer_gcode."
 
-#: src/libslic3r/Print.cpp:798
+#: src/libslic3r/Print.cpp:802
 msgid ""
 "\"G92 E0\" was found in before_layer_gcode, which is incompatible with "
 "absolute extruder addressing."
@@ -706,7 +706,7 @@ msgstr ""
 "\"G92 E0\" s'ha trobat a before_layer_gcode, el qual és incompatible amb "
 "l'adreçament absolut d'extrusor."
 
-#: src/libslic3r/Print.cpp:800
+#: src/libslic3r/Print.cpp:804
 msgid ""
 "\"G92 E0\" was found in layer_gcode, which is incompatible with absolute "
 "extruder addressing."
@@ -714,75 +714,75 @@ msgstr ""
 "\"G92 E0\" s'ha trobat a layer_gcode, el qual és incompatible amb "
 "l'adreçament absolut d'extrusor."
 
-#: src/libslic3r/Print.cpp:980
+#: src/libslic3r/Print.cpp:984
 msgid "Generating skirt and brim"
 msgstr "Generant faldilla i bassa"
 
-#: src/libslic3r/Print.cpp:1041
+#: src/libslic3r/Print.cpp:1045
 msgid "Exporting G-code"
 msgstr "S'està exportant el codi G"
 
-#: src/libslic3r/Print.cpp:1045
+#: src/libslic3r/Print.cpp:1049
 msgid "Generating G-code"
 msgstr "S'està generant el codi G"
 
-#: src/libslic3r/Print.cpp:1271
+#: src/libslic3r/Print.cpp:1275
 msgid "Alert if supports needed"
 msgstr "Avisa quan es necessitin suports"
 
 #. TRN Alert when support is needed. Describes that the model has long bridging extrusions which may print badly
-#: src/libslic3r/Print.cpp:1277
+#: src/libslic3r/Print.cpp:1281
 msgid "Long bridging extrusions"
 msgstr "Extrusions de pont llarg"
 
 #. TRN Alert when support is needed. Describes bridge anchors/turns in the air, which will definitely print badly
-#: src/libslic3r/Print.cpp:1279
+#: src/libslic3r/Print.cpp:1283
 msgid "Floating bridge anchors"
 msgstr "Ancoratges de pont flotants"
 
 #. TRN Alert when support is needed. Describes that the print has large overhang area which will print badly or not print at all.
-#: src/libslic3r/Print.cpp:1283
+#: src/libslic3r/Print.cpp:1287
 msgid "Collapsing overhang"
 msgstr "Voladís col·lapsat"
 
 #. TRN Alert when support is needed. Describes extrusions that are not supported enough and come out curled or loose.
-#: src/libslic3r/Print.cpp:1286
+#: src/libslic3r/Print.cpp:1290
 msgid "Loose extrusions"
 msgstr "Extrusions soltes"
 
 #. TRN Alert when support is needed. Describes that the print has low bed adhesion and may became loose.
-#: src/libslic3r/Print.cpp:1290
+#: src/libslic3r/Print.cpp:1294
 msgid "Low bed adhesion"
 msgstr "Adhesió de llit baix"
 
 #. TRN Alert when support is needed. Describes that the object has part that is not connected to the bed and will not print at all without supports.
-#: src/libslic3r/Print.cpp:1292
+#: src/libslic3r/Print.cpp:1296
 msgid "Floating object part"
 msgstr "Part de l'objecte flotant"
 
 #. TRN Alert when support is needed. Describes that the object has thin part that may brake during printing
-#: src/libslic3r/Print.cpp:1294
+#: src/libslic3r/Print.cpp:1298
 msgid "Thin fragile part"
 msgstr "Part fina fràgil"
 
 #. TRN this translation rule is used to translate lists of uknown size on single line. The first argument is element of the list,
 #. the second argument may be element or rest of the list. For most languages, this does not need translation, but some use different
 #. separator than comma and some use blank space in front of the separator.
-#: src/libslic3r/Print.cpp:1303
+#: src/libslic3r/Print.cpp:1307
 #, boost-format
 msgid "%1%, %2%"
 msgstr "%1%, %2%"
 
-#: src/libslic3r/Print.cpp:1402
+#: src/libslic3r/Print.cpp:1406
 msgid "Consider enabling supports."
 msgstr "Considereu habilitar suports."
 
-#: src/libslic3r/Print.cpp:1404
+#: src/libslic3r/Print.cpp:1408
 msgid "Also consider enabling brim."
 msgstr "També considereu habilitar brim."
 
 #. TRN Alert message for detected print issues. first argument is a list of detected issues.
-#: src/libslic3r/Print.cpp:1408
+#: src/libslic3r/Print.cpp:1412
 #, boost-format
 msgid ""
 "Detected print stability issues:\n"
@@ -9721,7 +9721,7 @@ msgid "Left click"
 msgstr "Clic esquerre"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1180
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3529
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3558
 msgid "Add connector"
 msgstr "Afegeix un connector"
 
@@ -9894,15 +9894,15 @@ msgstr "El pla de tall amb solc no és vàlid"
 msgid "Connector"
 msgstr "Connector"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3285
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3311
 msgid "Cut by Plane"
 msgstr "Tallar pel Plànol"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3499
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3528
 msgid "Cut by line"
 msgstr "Tall per línia"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3556
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3585
 msgid "Delete connector"
 msgstr "Suprimeix el connector"
 
@@ -13442,26 +13442,26 @@ msgstr ""
 msgid "Filling bed"
 msgstr "Omplint base"
 
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:344
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:345
 msgid "Add Emboss text object"
 msgstr "Afegir objecte de text en relleu"
 
 #. TRN: This is the name of the action appearing in undo/redo stack.
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1034
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1035
 msgid "Text/SVG attribute change"
 msgstr ""
 
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1087
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1088
 msgid "Add Emboss text Volume"
 msgstr "Afegeix Volum de text en relleu"
 
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1293
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1361
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1294
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1362
 msgid "Font doesn't have any shape for given text."
 msgstr "El tipus de lletra no té cap forma per al text donat."
 
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1347
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1366
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1348
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1367
 msgid "There is no valid surface for text projection."
 msgstr "No hi ha cap superfície vàlida per a la projecció de text."
 
@@ -16643,9 +16643,8 @@ msgstr ""
 "tallat sembli un logotip o un signe."
 
 #: src/slic3r/GUI/Preferences.cpp:552
-msgid "Set settings tabs as menu items (experimental)"
-msgstr ""
-"Defineix les pestanyes de configuració com a elements de menú (experimental)"
+msgid "Set settings tabs as menu items"
+msgstr "Defineix les pestanyes de configuració com a elements de menú"
 
 #: src/slic3r/GUI/Preferences.cpp:553
 msgid ""
@@ -16717,8 +16716,8 @@ msgid "If enabled, renders object using the environment map."
 msgstr "Si està activat, renderitza l'objecte usant el mapa de l'entorn."
 
 #: src/slic3r/GUI/Preferences.cpp:656
-msgid "Dark mode (experimental)"
-msgstr "Mode fosc (experimental)"
+msgid "Dark mode"
+msgstr "Mode fosc"
 
 #: src/slic3r/GUI/Preferences.cpp:666
 msgid "Enable dark mode"
@@ -18938,7 +18937,7 @@ msgstr ""
 
 #. TRN Wifi config dialog explanation line 3.
 #: src/slic3r/GUI/WifiConfigDialog.cpp:41
-msgid "Your Prusa Printer should load this file automatically."
+msgid "Your Prusa printer should load this file automatically."
 msgstr ""
 
 #. TRN Wifi config dialog explanation line 4.
