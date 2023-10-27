@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-10-20 17:33+0200\n"
+"POT-Creation-Date: 2023-10-27 09:21+0200\n"
 "PO-Revision-Date: 2021-04-04 22:15+0900\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -421,30 +421,30 @@ msgstr "SLA 재료"
 msgid "printer"
 msgstr "프린터"
 
-#: src/libslic3r/Print.cpp:513
+#: src/libslic3r/Print.cpp:517
 msgid "All objects are outside of the print volume."
 msgstr "모든 개체가 인쇄 볼륨 외부에 있습니다."
 
-#: src/libslic3r/Print.cpp:516
+#: src/libslic3r/Print.cpp:520
 msgid "The supplied settings will cause an empty print."
 msgstr "제공된 설정으로 인해 빈 인쇄가 발생합니다."
 
-#: src/libslic3r/Print.cpp:520
+#: src/libslic3r/Print.cpp:524
 msgid "Some objects are too close; your extruder will collide with them."
 msgstr "일부 개체가 너무 가깝습니다. 귀하의 압출기가 그들과 충돌합니다."
 
-#: src/libslic3r/Print.cpp:522
+#: src/libslic3r/Print.cpp:526
 msgid ""
 "Some objects are too tall and cannot be printed without extruder collisions."
 msgstr "일부 개체는 너무 크고 익스트루더 충돌없이 인쇄 할 수 없습니다."
 
-#: src/libslic3r/Print.cpp:528
+#: src/libslic3r/Print.cpp:532
 msgid ""
 "Avoid crossing perimeters option and avoid crossing curled overhangs option "
 "cannot be both enabled together."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:537
+#: src/libslic3r/Print.cpp:541
 msgid ""
 "Only a single object may be printed at a time in Spiral Vase mode. Either "
 "remove all but the last object, or enable sequential mode by "
@@ -454,7 +454,7 @@ msgstr ""
 "를 제외한 모든 개체를 제거하거나 \"complete_objects\"하여 순차 모드를 사용하"
 "도록 설정합니다."
 
-#: src/libslic3r/Print.cpp:541
+#: src/libslic3r/Print.cpp:545
 msgid ""
 "The Spiral Vase option can only be used when printing single material "
 "objects."
@@ -462,35 +462,35 @@ msgstr ""
 "나선형 꽃병 옵션(Spiral Vase)은 단일 재료 객체를 인쇄 할 때만 사용할 수 있습"
 "니다."
 
-#: src/libslic3r/Print.cpp:545
+#: src/libslic3r/Print.cpp:549
 msgid ""
 "Machine limits cannot be emitted to G-Code when Klipper firmware flavor is "
 "used. Change the value of machine_limits_usage."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:572
+#: src/libslic3r/Print.cpp:576
 #, boost-format
 msgid "The object %1% exceeds the maximum build volume height."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:573
+#: src/libslic3r/Print.cpp:577
 #, boost-format
 msgid ""
 "While the object %1% itself fits the build volume, its last layer exceeds "
 "the maximum build volume height."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:574
+#: src/libslic3r/Print.cpp:578
 msgid ""
 "You might want to reduce the size of your model or change current print "
 "settings and retry."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:590
+#: src/libslic3r/Print.cpp:594
 msgid "Variable layer height is not supported with Organic supports."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:603
+#: src/libslic3r/Print.cpp:607
 msgid ""
 "The wipe tower is only supported if all extruders have the same nozzle "
 "diameter and use filaments of the same diameter."
@@ -498,13 +498,13 @@ msgstr ""
 "와이프 타워는 모든 압출기직경이 동일하고 동일한 직경의 필라멘트를 사용하는 경"
 "우에만 지원됩니다."
 
-#: src/libslic3r/Print.cpp:610
+#: src/libslic3r/Print.cpp:614
 msgid ""
 "The Wipe Tower is currently only supported for the Marlin, Klipper, RepRap/"
 "Sprinter, RepRapFirmware and Repetier G-code flavors."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:612
+#: src/libslic3r/Print.cpp:616
 msgid ""
 "The Wipe Tower is currently only supported with the relative extruder "
 "addressing (use_relative_e_distances=1)."
@@ -512,31 +512,31 @@ msgstr ""
 "와이프 타워는 현재 상대적 압출기 어드레싱 (use_relative_e_distances=1)에서만 "
 "지원됩니다."
 
-#: src/libslic3r/Print.cpp:614
+#: src/libslic3r/Print.cpp:618
 msgid ""
 "Ooze prevention is only supported with the wipe tower when "
 "'single_extruder_multi_material' is off."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:616
+#: src/libslic3r/Print.cpp:620
 msgid ""
 "The Wipe Tower currently does not support volumetric E (use_volumetric_e=0)."
 msgstr "와이프 타워는 현재 볼륨 E(use_volumetric_e=0)를 지원하지 않습니다."
 
-#: src/libslic3r/Print.cpp:618
+#: src/libslic3r/Print.cpp:622
 msgid ""
 "The Wipe Tower is currently not supported for multimaterial sequential "
 "prints."
 msgstr "와이프 타워는 현재 다중 재료 순차 인쇄에 대해 지원되지 않습니다."
 
-#: src/libslic3r/Print.cpp:628
+#: src/libslic3r/Print.cpp:632
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they have equal "
 "layer heights"
 msgstr ""
 "와이프 타워는 레이어 높이가 동일한 경우에만 여러 개체에 대해서만 지원됩니다."
 
-#: src/libslic3r/Print.cpp:630
+#: src/libslic3r/Print.cpp:634
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are printed "
 "over an equal number of raft layers"
@@ -544,7 +544,7 @@ msgstr ""
 "와이프 타워는 같은 수의 라프트 레이어 위에 인쇄 된 경우 여러 객체에 대해서만 "
 "지원됩니다"
 
-#: src/libslic3r/Print.cpp:633
+#: src/libslic3r/Print.cpp:637
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are printed "
 "with the same support_material_contact_distance"
@@ -552,14 +552,14 @@ msgstr ""
 "와이프 타워는 동일한 support_material_contact_distance로 인쇄 된 경우 여러 객"
 "체에 대해서만 지원됩니다"
 
-#: src/libslic3r/Print.cpp:635
+#: src/libslic3r/Print.cpp:639
 msgid ""
 "The Wipe Tower is only supported for multiple objects if they are sliced "
 "equally."
 msgstr ""
 "와이프 타워는 똑같이 슬라이스 된 경우 여러 오브젝트에 대해서만 지원됩니다."
 
-#: src/libslic3r/Print.cpp:660
+#: src/libslic3r/Print.cpp:664
 msgid ""
 "The Wipe tower is only supported if all objects have the same variable layer "
 "height"
@@ -567,22 +567,22 @@ msgstr ""
 "지우기 타워는 모든 오브젝트가 동일한 가변 레이어 높이를 갖는 경우에만 지원됩"
 "니다."
 
-#: src/libslic3r/Print.cpp:684
+#: src/libslic3r/Print.cpp:688
 msgid ""
 "One or more object were assigned an extruder that the printer does not have."
 msgstr "하나 이상의 개체에 프린터에없는 압출기가 지정되었습니다."
 
-#: src/libslic3r/Print.cpp:697
+#: src/libslic3r/Print.cpp:701
 #, boost-format
 msgid "%1%=%2% mm is too low to be printable at a layer height %3% mm"
 msgstr "%1%=%2% mm가 너무 낮아 레이어 높이%3% mm에서 인쇄할 수 없습니다."
 
-#: src/libslic3r/Print.cpp:700
+#: src/libslic3r/Print.cpp:704
 #, boost-format
 msgid "Excessive %1%=%2% mm to be printable with a nozzle diameter %3% mm"
 msgstr "노즐 직경 %3% mm로 인쇄할 수 있는 과도한 %1%=%2% mm"
 
-#: src/libslic3r/Print.cpp:711
+#: src/libslic3r/Print.cpp:715
 msgid ""
 "Printing with multiple extruders of differing nozzle diameters. If support "
 "is to be printed with the current extruder (support_material_extruder == 0 "
@@ -593,7 +593,7 @@ msgstr ""
 "(support_material_extruder == 0 or support_material_interface_extruder == 0)"
 "로 인쇄되는 경우 모든 노즐은 동일한 지름이어야합니다."
 
-#: src/libslic3r/Print.cpp:719
+#: src/libslic3r/Print.cpp:723
 msgid ""
 "For the Wipe Tower to work with the soluble supports, the support layers "
 "need to be synchronized with the object layers."
@@ -601,7 +601,7 @@ msgstr ""
 "와이프 타워가 가용성 지지체와 함께 작동 하려면 서포트 레이어를 오브젝트 레이"
 "어와 동기화 해야 합니다."
 
-#: src/libslic3r/Print.cpp:723 src/slic3r/GUI/ConfigManipulation.cpp:142
+#: src/libslic3r/Print.cpp:727 src/slic3r/GUI/ConfigManipulation.cpp:142
 msgid ""
 "The Wipe Tower currently supports the non-soluble supports only if they are "
 "printed with the current extruder without triggering a tool change. (both "
@@ -612,120 +612,120 @@ msgstr ""
 "에만 비가용성 서포트를 지원 합니다. (support_material_extruder과 "
 "support_material_interface_extruder 모두 0으로 설정 해야 합니다.)"
 
-#: src/libslic3r/Print.cpp:732
+#: src/libslic3r/Print.cpp:736
 msgid ""
 "Organic support tree tip diameter must not be smaller than support material "
 "extrusion width."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:734
+#: src/libslic3r/Print.cpp:738
 msgid ""
 "Organic support branch diameter must not be smaller than 2x support material "
 "extrusion width."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:736
+#: src/libslic3r/Print.cpp:740
 msgid ""
 "Organic support branch diameter must not be smaller than support tree tip "
 "diameter."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:770
+#: src/libslic3r/Print.cpp:774
 msgid "First layer height can't be greater than nozzle diameter"
 msgstr "첫번째 레이어의 높이는 노즐 직경보다 클 수 없습니다"
 
-#: src/libslic3r/Print.cpp:775
+#: src/libslic3r/Print.cpp:779
 msgid "Layer height can't be greater than nozzle diameter"
 msgstr "레이어 높이는 노즐 직경보다 클 수 없습니다"
 
-#: src/libslic3r/Print.cpp:796
+#: src/libslic3r/Print.cpp:800
 msgid ""
 "Relative extruder addressing requires resetting the extruder position at "
 "each layer to prevent loss of floating point accuracy. Add \"G92 E0\" to "
 "layer_gcode."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:798
+#: src/libslic3r/Print.cpp:802
 msgid ""
 "\"G92 E0\" was found in before_layer_gcode, which is incompatible with "
 "absolute extruder addressing."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:800
+#: src/libslic3r/Print.cpp:804
 msgid ""
 "\"G92 E0\" was found in layer_gcode, which is incompatible with absolute "
 "extruder addressing."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:980
+#: src/libslic3r/Print.cpp:984
 msgid "Generating skirt and brim"
 msgstr ""
 
-#: src/libslic3r/Print.cpp:1041
+#: src/libslic3r/Print.cpp:1045
 msgid "Exporting G-code"
 msgstr "G코드 내보내기"
 
-#: src/libslic3r/Print.cpp:1045
+#: src/libslic3r/Print.cpp:1049
 msgid "Generating G-code"
 msgstr "G 코드 생성"
 
-#: src/libslic3r/Print.cpp:1271
+#: src/libslic3r/Print.cpp:1275
 msgid "Alert if supports needed"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the model has long bridging extrusions which may print badly
-#: src/libslic3r/Print.cpp:1277
+#: src/libslic3r/Print.cpp:1281
 msgid "Long bridging extrusions"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes bridge anchors/turns in the air, which will definitely print badly
-#: src/libslic3r/Print.cpp:1279
+#: src/libslic3r/Print.cpp:1283
 msgid "Floating bridge anchors"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the print has large overhang area which will print badly or not print at all.
-#: src/libslic3r/Print.cpp:1283
+#: src/libslic3r/Print.cpp:1287
 msgid "Collapsing overhang"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes extrusions that are not supported enough and come out curled or loose.
-#: src/libslic3r/Print.cpp:1286
+#: src/libslic3r/Print.cpp:1290
 msgid "Loose extrusions"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the print has low bed adhesion and may became loose.
-#: src/libslic3r/Print.cpp:1290
+#: src/libslic3r/Print.cpp:1294
 msgid "Low bed adhesion"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the object has part that is not connected to the bed and will not print at all without supports.
-#: src/libslic3r/Print.cpp:1292
+#: src/libslic3r/Print.cpp:1296
 msgid "Floating object part"
 msgstr ""
 
 #. TRN Alert when support is needed. Describes that the object has thin part that may brake during printing
-#: src/libslic3r/Print.cpp:1294
+#: src/libslic3r/Print.cpp:1298
 msgid "Thin fragile part"
 msgstr ""
 
 #. TRN this translation rule is used to translate lists of uknown size on single line. The first argument is element of the list,
 #. the second argument may be element or rest of the list. For most languages, this does not need translation, but some use different
 #. separator than comma and some use blank space in front of the separator.
-#: src/libslic3r/Print.cpp:1303
+#: src/libslic3r/Print.cpp:1307
 #, boost-format
 msgid "%1%, %2%"
 msgstr ""
 
-#: src/libslic3r/Print.cpp:1402
+#: src/libslic3r/Print.cpp:1406
 msgid "Consider enabling supports."
 msgstr ""
 
-#: src/libslic3r/Print.cpp:1404
+#: src/libslic3r/Print.cpp:1408
 msgid "Also consider enabling brim."
 msgstr ""
 
 #. TRN Alert message for detected print issues. first argument is a list of detected issues.
-#: src/libslic3r/Print.cpp:1408
+#: src/libslic3r/Print.cpp:1412
 #, boost-format
 msgid ""
 "Detected print stability issues:\n"
@@ -9077,7 +9077,7 @@ msgid "Left click"
 msgstr "왼쪽 클릭"
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:1180
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3529
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3558
 msgid "Add connector"
 msgstr ""
 
@@ -9249,15 +9249,15 @@ msgstr ""
 msgid "Connector"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3285
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3311
 msgid "Cut by Plane"
 msgstr "평면으로 절단"
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3499
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3528
 msgid "Cut by line"
 msgstr ""
 
-#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3556
+#: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:3585
 msgid "Delete connector"
 msgstr ""
 
@@ -12662,26 +12662,26 @@ msgstr ""
 msgid "Filling bed"
 msgstr ""
 
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:344
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:345
 msgid "Add Emboss text object"
 msgstr ""
 
 #. TRN: This is the name of the action appearing in undo/redo stack.
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1034
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1035
 msgid "Text/SVG attribute change"
 msgstr ""
 
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1087
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1088
 msgid "Add Emboss text Volume"
 msgstr ""
 
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1293
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1361
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1294
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1362
 msgid "Font doesn't have any shape for given text."
 msgstr ""
 
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1347
-#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1366
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1348
+#: src/slic3r/GUI/Jobs/EmbossJob.cpp:1367
 msgid "There is no valid surface for text projection."
 msgstr ""
 
@@ -15687,7 +15687,7 @@ msgid ""
 msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:552
-msgid "Set settings tabs as menu items (experimental)"
+msgid "Set settings tabs as menu items"
 msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:553
@@ -15755,7 +15755,7 @@ msgid "If enabled, renders object using the environment map."
 msgstr "활성화된 경우 환경 맵을 사용하여 개체를 렌더링합니다."
 
 #: src/slic3r/GUI/Preferences.cpp:656
-msgid "Dark mode (experimental)"
+msgid "Dark mode"
 msgstr ""
 
 #: src/slic3r/GUI/Preferences.cpp:666
@@ -17827,7 +17827,7 @@ msgstr ""
 
 #. TRN Wifi config dialog explanation line 3.
 #: src/slic3r/GUI/WifiConfigDialog.cpp:41
-msgid "Your Prusa Printer should load this file automatically."
+msgid "Your Prusa printer should load this file automatically."
 msgstr ""
 
 #. TRN Wifi config dialog explanation line 4.

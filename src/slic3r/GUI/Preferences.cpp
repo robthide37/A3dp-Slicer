@@ -549,7 +549,7 @@ void PreferencesDialog::build()
 
 #ifdef _MSW_DARK_MODE
 		append_bool_option(m_optgroup_gui, "tabs_as_menu",
-			L("Set settings tabs as menu items (experimental)"),
+			L("Set settings tabs as menu items"),
 			L("If enabled, Settings Tabs will be placed as menu items. If disabled, old UI will be used."),
 			app_config->get_bool("tabs_as_menu"));
 #endif
@@ -653,7 +653,7 @@ void PreferencesDialog::build()
 
 #ifdef _WIN32
 		// Add "Dark Mode" tab
-		m_optgroup_dark_mode = create_options_tab(_L("Dark mode (experimental)"), tabs);
+		m_optgroup_dark_mode = create_options_tab(_L("Dark mode"), tabs);
 		m_optgroup_dark_mode->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
 			if (auto it = m_values.find(opt_key); it != m_values.end()) {
 				m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
