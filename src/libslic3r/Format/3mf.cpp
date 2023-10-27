@@ -3899,7 +3899,7 @@ std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned i
     ExPolygonsWithIds shapes; // TODO: need to implement 
 
     EmbossShape::SvgFile svg{file_path, file_path_3mf};
-    return EmbossShape{shapes, scale, std::move(projection), std::move(fix_tr_mat), std::move(svg), is_healed};
+    return EmbossShape{shapes, {}, scale, std::move(projection), std::move(fix_tr_mat), std::move(svg), is_healed};
 }
 
 

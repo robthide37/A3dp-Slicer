@@ -421,7 +421,10 @@ HealedExPolygons Emboss::heal_polygons(const Polygons &shape, bool is_non_zero, 
     Polygons polygons = to_polygons(paths);
     polygons.erase(std::remove_if(polygons.begin(), polygons.end(), 
         [](const Polygon &p) { return p.size() < 3; }), polygons.end());
-                
+    
+    if (polygons.empty())
+        return {{}, false};
+
     // Do not remove all duplicates but do it better way
     // Overlap all duplicit points by rectangle 3x3
     Points duplicits = collect_duplicates(to_points(polygons));
@@ -1241,23 +1244,8 @@ ExPolygons letter2shapes(
 const int CANCEL_CHECK = 10;
 } // namespace
 
-/// Union shape defined by glyphs
-HealedExPolygons Slic3r::union_ex(const ExPolygonsWithIds &shapes, unsigned max_heal_iteration)
-{
-    // unify to one expolygon
-    ExPolygons result;
-    for (const ExPolygonsWithId &shape : shapes) {
-        if (shape.expoly.empty())
-            continue;
-        expolygons_append(result, shape.expoly);
-    }
-    result = union_ex(result);
-
-    bool is_healed = heal_expolygons(result, max_heal_iteration);
-    return {result, is_healed};
-}
-
-HealedExPolygons Slic3r::union_with_delta(const ExPolygonsWithIds &shapes, float delta, unsigned max_heal_iteration)
+namespace {
+HealedExPolygons union_with_delta(const ExPolygonsWithIds &shapes, float delta, unsigned max_heal_iteration)
 {
     // unify to one expolygons
     ExPolygons expolygons;
@@ -1267,9 +1255,25 @@ HealedExPolygons Slic3r::union_with_delta(const ExPolygonsWithIds &shapes, float
         expolygons_append(expolygons, offset_ex(shape.expoly, delta));
     }
     ExPolygons result = union_ex(expolygons);
-    result         = offset_ex(result, -delta);
-    bool is_healed = heal_expolygons(result, max_heal_iteration);
+    result            = offset_ex(result, -delta);
+    bool is_healed    = heal_expolygons(result, max_heal_iteration);
     return {result, is_healed};
+}
+} // namespace
+
+ExPolygons Slic3r::union_with_delta(EmbossShape &shape, float delta, unsigned max_heal_iteration) 
+{
+    if (!shape.final_shape.empty())
+        return shape.final_shape;
+
+    HealedExPolygons result = ::union_with_delta(shape.shapes_with_ids, delta, max_heal_iteration);
+    shape.is_healed = result.is_healed;
+    for (const ExPolygonsWithId &e : shape.shapes_with_ids)
+        if (!e.is_healed)
+            shape.is_healed = false;
+    shape.final_shape = std::move(result.expolygons); // cached
+
+    return shape.final_shape;
 }
 
 void Slic3r::translate(ExPolygonsWithIds &expolygons_with_ids, const Point &p)
@@ -1298,7 +1302,7 @@ HealedExPolygons Emboss::text2shapes(FontFileWithCache &font_with_cache, const c
     ExPolygonsWithIds vshapes = text2vshapes(font_with_cache, text_w, font_prop, was_canceled);
 
     float delta = static_cast<float>(1. / SHAPE_SCALE);
-    return union_with_delta(vshapes, delta, MAX_HEAL_ITERATION_OF_TEXT);
+    return ::union_with_delta(vshapes, delta, MAX_HEAL_ITERATION_OF_TEXT);
 }
 
 namespace {

@@ -788,14 +788,10 @@ bool check(const UpdateSurfaceVolumeData &input, bool is_main_thread)
 template<typename Fnc> 
 ExPolygons create_shape(DataBase &input, Fnc was_canceled) {
     EmbossShape &es = input.create_shape();
-    float delta = 50.f;
-    unsigned max_heal_iteration = 10;    
-    HealedExPolygons result = union_with_delta(es.shapes_with_ids, delta, max_heal_iteration);
-    es.is_healed = result.is_healed;
-    for (const ExPolygonsWithId &e : es.shapes_with_ids)
-        if (!e.is_healed)
-            es.is_healed = false;
-    return result.expolygons;
+    // TODO: improve to use real size of volume
+    // ... need world matrix for volume
+    // ... printer resolution will be fine too
+    return union_with_delta(es, UNION_DELTA, UNION_MAX_ITERATIN);
 }
 
 //#define STORE_SAMPLING
