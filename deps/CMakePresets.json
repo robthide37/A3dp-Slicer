@@ -2,41 +2,10 @@
     "version": 3,
     "configurePresets": [
         {
-            "name": "linux-only",
-            "hidden": true,
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            }
-        },
-        {
-            "name": "windows-only",
-            "hidden": true,
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            },
-            "cacheVariables": {
-                "DEP_DEBUG": true
-            }
-        },
-        {
-            "name": "mac-only",
-            "hidden": true,
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Darwin"
-            }
-        },
-        {
           "name": "default",
           "displayName": "Default Config",
           "description": "Default build for any desktop OS",
           "binaryDir": "${sourceDir}/build-default",
-          "inherits": ["mac-only", "windows-only", "linux-only"],
           "condition": {
             "type": "const",
             "value": true

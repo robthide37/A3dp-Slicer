@@ -45,7 +45,7 @@ endif ()
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/modules)
 
 if (MSVC)
-  option(DEP_DEBUG "Build in debug version of packages automatically" OFF)
+  option(DEP_DEBUG "Build in debug version of packages automatically" ON)
 endif ()
 
 if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
@@ -259,7 +259,7 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
       -DCMAKE_DEBUG_POSTFIX=d
       #TODO: forward per-package selector variables
       -DDEP_MESSAGES_WRITTEN=ON
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_d 
     OUTPUT_QUIET
   )
 
@@ -270,7 +270,7 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   foreach(pkgtgt ${_build_list_filt})
     add_custom_target(${pkgtgt}_debug
       COMMAND ${CMAKE_COMMAND} --build . --target ${pkgtgt}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_d
       USES_TERMINAL
     )
   endforeach()
@@ -279,7 +279,7 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   string(JOIN " " _build_list_filt_targets "${_build_list_filt}")
   add_custom_target(deps_debug ALL 
     COMMAND ${CMAKE_COMMAND} --build . --target ${_build_list_filt_targets}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_d
     USES_TERMINAL
   )
 
