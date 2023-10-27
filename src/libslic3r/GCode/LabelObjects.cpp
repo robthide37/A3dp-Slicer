@@ -147,11 +147,12 @@ std::string LabelObjects::start_object(const PrintInstance& print_instance, Incl
         out += std::string("; printing object ") + label.name + "\n";
     else if (m_label_objects_style == LabelObjectsStyle::Firmware) {
         if (m_flavor == GCodeFlavor::gcfMarlinFirmware || m_flavor == GCodeFlavor::gcfMarlinLegacy || m_flavor == GCodeFlavor::gcfRepRapFirmware) {
-            out += std::string("M486 S") + std::to_string(label.unique_id) + "\n";
+            out += std::string("M486 S") + std::to_string(label.unique_id);
             if (include_name == IncludeName::Yes) {
-                out += std::string("M486 A");
-                out += (m_flavor == GCodeFlavor::gcfRepRapFirmware ? (std::string("\"") + label.name + "\"") : label.name) + "\n";
+                out += (m_flavor == GCodeFlavor::gcfRepRapFirmware ? " A" : "\nM486 A");
+                out += (m_flavor == GCodeFlavor::gcfRepRapFirmware ? (std::string("\"") + label.name + "\"") : label.name);
             }
+            out += "\n";
         } else if (m_flavor == gcfKlipper)
             out += "EXCLUDE_OBJECT_START NAME=" + label.name + "\n";
         else {
