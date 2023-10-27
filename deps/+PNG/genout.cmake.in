@@ -90,7 +90,7 @@ if ("${INPUTEXT}" STREQUAL ".c" AND "${OUTPUTEXT}" STREQUAL ".out")
 
   #file(REMOVE "${OUTPUT}.tf1")
   #file(RENAME "${OUTPUT}.tf2" "${OUTPUT}")
-  file(COPY_FILE "${OUTPUT}.tf2" "${OUTPUT}")
+  configure_file("${OUTPUT}.tf2" "${OUTPUT}" COPYONLY)
 else()
   message(FATAL_ERROR "Unsupported conversion: ${INPUTEXT} to ${OUTPUTEXT}")
 endif()
