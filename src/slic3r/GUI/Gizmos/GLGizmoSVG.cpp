@@ -1757,7 +1757,7 @@ void GLGizmoSVG::draw_size()
     
 
     // reset button
-    bool can_reset = m_scale_width.has_value() || m_scale_height.has_value() || m_scale_depth.has_value();
+    bool can_reset = m_scale_width.has_value() || m_scale_height.has_value();
     if (can_reset) {
         if (reset_button(m_icons)) {
             new_relative_scale = Vec3d(1./m_scale_width.value_or(1.f), 1./m_scale_height.value_or(1.f), 1.);
