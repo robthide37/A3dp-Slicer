@@ -353,12 +353,14 @@ bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, co
         gl_volume.set_instance_transformation(new_instance_tr);
     } else {
         // write result transformation
-        gl_volume.set_volume_transformation(Geometry::Transformation(new_volume_tr));
+        gl_volume.set_volume_transformation(new_volume_tr);
         volume.set_transformation(new_volume_tr);
     }
 
-    if (volume.type() == ModelVolumeType::MODEL_PART)
+    if (volume.type() == ModelVolumeType::MODEL_PART) {
+        object.invalidate_bounding_box();
         object.ensure_on_bed();
+    }
     return true;
 }
 
