@@ -11,8 +11,8 @@ if (APPLE AND CMAKE_OSX_ARCHITECTURES)
 endif ()
 
 add_cmake_project(Boost
-    URL "https://github.com/boostorg/boost/releases/download/boost-1.82.0/boost-1.82.0.zip"
-    URL_HASH SHA256=200f9292b5ef957ab551a648834239f502df165cb7bff18432702fb7ae98accb
+    URL "https://github.com/boostorg/boost/releases/download/boost-1.83.0/boost-1.83.0.zip"
+    URL_HASH SHA256=9effa3d7f9d92b8e33e2b41d82f4358f97ff7c588d5918720339f2b254d914c6
     LIST_SEPARATOR |
     CMAKE_ARGS
         -DBOOST_EXCLUDE_LIBRARIES:STRING=contract|fiber|numpy|stacktrace|wave|test

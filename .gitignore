@@ -21,3 +21,4 @@ deps/build-linux/*
 **/.DS_Store
 **/.idea/
 .pkg_cache
+CMakeUserPresets.json

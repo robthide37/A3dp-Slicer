@@ -246,7 +246,7 @@ if (DEP_DEBUG AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   endforeach()
 
   # Create a subdirectory for the Debug build within the current binary dir:
-  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/DebugBuild)
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/_d)
   execute_process(
     COMMAND ${CMAKE_COMMAND} ${CMAKE_CURRENT_SOURCE_DIR} -G${CMAKE_GENERATOR} 
       -DCMAKE_BUILD_TYPE=Debug

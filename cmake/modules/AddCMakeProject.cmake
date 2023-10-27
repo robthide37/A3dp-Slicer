@@ -50,12 +50,13 @@ function(add_cmake_project projectname)
             set(_verbose_switch "-v:d")
         endif ()
     endif ()
-
+    
     ExternalProject_Add(
         dep_${projectname}
         EXCLUDE_FROM_ALL    ON  # Not built by default, dep_${projectname} needs to be added to ALL target
         INSTALL_DIR         ${${PROJECT_NAME}_DEP_INSTALL_PREFIX}
         DOWNLOAD_DIR        ${${PROJECT_NAME}_DEP_DOWNLOAD_DIR}/${projectname}
+        BINARY_DIR          ${CMAKE_CURRENT_BINARY_DIR}/builds/${projectname}
         CMAKE_ARGS
             -DCMAKE_INSTALL_PREFIX:STRING=${${PROJECT_NAME}_DEP_INSTALL_PREFIX}
             -DCMAKE_MODULE_PATH:STRING=${CMAKE_MODULE_PATH}
