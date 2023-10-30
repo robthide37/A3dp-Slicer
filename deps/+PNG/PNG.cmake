@@ -5,18 +5,16 @@ else ()
     set(_disable_neon_extension "")
 endif ()
 
-set(_patch_cmd PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/genout.cmake.in scripts/genout.cmake.in)
+set(_patch_cmd PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/CMakeLists.txt.patched CMakeLists.txt)
 
 if (APPLE)
     set(_patch_cmd ${_patch_cmd} && ${PATCH_CMD} ${CMAKE_CURRENT_LIST_DIR}/PNG.patch)
 endif ()
 
 add_cmake_project(PNG 
-    URL https://github.com/glennrp/libpng/archive/refs/tags/v1.6.40.zip
-    URL_HASH SHA256=ab3f88779f0661bbb07c60e778fda782216bff70355d86848fbf6a327084563a
-    #PATCH_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/genout.cmake.in scripts/genout.cmake.in 
+    URL https://github.com/glennrp/libpng/archive/refs/tags/v1.6.35.zip
+    URL_HASH SHA256=3d22d46c566b1761a0e15ea397589b3a5f36ac09b7c785382e6470156c04247f
     PATCH_COMMAND "${_patch_cmd}"
-    # SOURCE_DIR /home/quarky/Workspace/prusa3d/PrusaSlicer/prusaslicer-src-master/deps/build-default/dep_PNG-prefix/src/dep_PNG/
     CMAKE_ARGS
         -DPNG_SHARED=OFF
         -DPNG_STATIC=ON
