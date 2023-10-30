@@ -372,11 +372,11 @@ elseif (APPLE)
     target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY} ${COREWLAN_LIBRARY})
 endif()
 
-if (SLIC3R_STATIC)
+#if (SLIC3R_STATIC)
     # FIXME: This was previously exported by wx-config but the wxWidgets
     # cmake build forgets this and the build fails in debug mode (or on raspberry release)
-    target_compile_definitions(libslic3r_gui PUBLIC -DwxDEBUG_LEVEL=0)
-endif()
+#    target_compile_definitions(libslic3r_gui PUBLIC -DwxDEBUG_LEVEL=0)
+#endif()
 
 if (SLIC3R_PCH AND NOT SLIC3R_SYNTAXONLY)
     add_precompiled_header(libslic3r_gui pchheader.hpp FORCEINCLUDE)

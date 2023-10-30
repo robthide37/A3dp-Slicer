@@ -756,7 +756,7 @@ ConfigSubstitutions ConfigBase::load(const std::string& filename, ForwardCompati
         if (file == nullptr)
             throw Slic3r::RuntimeError(format("Error opening file %1%", filename));
 
-        std::vector<uint8_t> cs_buffer(65536);
+        std::vector<std::byte> cs_buffer(65536);
         using namespace bgcode::core;
         file_type = (is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == EResult::Success) ? EFileType::BinaryGCode : EFileType::AsciiGCode;
         fclose(file);
@@ -1094,7 +1094,7 @@ ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& f
 
     using namespace bgcode::core;
     using namespace bgcode::binarize;
-    std::vector<uint8_t> cs_buffer(65536);
+    std::vector<std::byte> cs_buffer(65536);
     EResult res = is_valid_binary_gcode(*file.f, true, cs_buffer.data(), cs_buffer.size());
     if (res != EResult::Success)
         throw Slic3r::RuntimeError(format("File %1% does not contain a valid binary gcode\nError: %2%", filename,
