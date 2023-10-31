@@ -1340,6 +1340,8 @@ void GLGizmoSVG::draw_window()
         return;
     }
 
+    assert(m_volume->emboss_shape->svg_file.file_data != nullptr);
+
     draw_preview();
     draw_filename();
 
@@ -1517,7 +1519,8 @@ void GLGizmoSVG::draw_filename(){
                 // set .svg_file.path_in_3mf to remember file name
                 m_volume->emboss_shape->svg_file.path.clear();
                 m_volume_shape.svg_file.path.clear();
-                m_filename_preview.clear();
+                // TRN - Preview of filename after clear local filepath.
+                m_filename_preview = _u8L("No-name SVG");
             } else if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", _u8L("Do NOT save local path to 3MF file.\n"
                                              "Also disables 'reload from disk' option.").c_str());

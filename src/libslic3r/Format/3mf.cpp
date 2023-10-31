@@ -3841,9 +3841,18 @@ bool to_xml(std::stringstream &stream, const EmbossShape::SvgFile &svg, const Mo
         stream << SVG_FILE_PATH_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(svg.path) << "\" ";
     stream << SVG_FILE_PATH_IN_3MF_ATTR << "=\"" << xml_escape_double_quotes_attribute_value(svg.path_in_3mf) << "\" ";
 
-    const std::string &file_data = *svg.file_data; 
+    std::shared_ptr<std::string> file_data = svg.file_data;
+    assert(file_data != nullptr); 
+    if (file_data == nullptr && !svg.path.empty())
+        file_data = read_from_disk(svg.path);
+    if (file_data == nullptr) {
+        BOOST_LOG_TRIVIAL(warning) << "Can't write svg file no filedata";
+        return false;
+    }
+    const std::string &file_data_str = *file_data; 
+
     return mz_zip_writer_add_mem(&archive, svg.path_in_3mf.c_str(), 
-        (const void *) file_data.c_str(), file_data.size(), MZ_DEFAULT_COMPRESSION);
+        (const void *) file_data_str.c_str(), file_data_str.size(), MZ_DEFAULT_COMPRESSION);
 }
 
 } // namespace
