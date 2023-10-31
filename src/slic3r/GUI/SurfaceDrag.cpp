@@ -52,6 +52,10 @@ Transform3d get_volume_transformation(
     // initial rotation in Z axis
     std::optional<float> current_angle = {},    
     const std::optional<double> &up_limit = {}); 
+
+// distinguish between transformation of volume inside object 
+// and object(single full instance with one volume)
+bool is_embossed_object(const Selection &selection);
 }
 
 namespace Slic3r::GUI {
@@ -346,7 +350,7 @@ bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, co
     Transform3d new_volume_tr = get_volume_transformation(world_tr, wanted_direction, world_position,
         fix, instance_tr_inv, current_angle, wanted_up_limit);
 
-    if (canvas.get_selection().is_single_full_object()) {
+    if (is_embossed_object(canvas.get_selection())) {
         // transform instance instead of volume
         Transform3d new_instance_tr = instance_tr * new_volume_tr * volume.get_matrix().inverse();
         instance.set_transformation(Geometry::Transformation(new_instance_tr));
@@ -379,7 +383,7 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
     bool is_mirrored = false;
     const GLVolume* gl_volume = selection.get_first_volume();
     if (gl_volume != nullptr) {
-        if (selection.is_single_full_object()) {
+        if (is_embossed_object(selection)) {
             const ModelInstance *instance = get_model_instance(*gl_volume, selection.get_model()->objects);
             if (instance != nullptr)
                 is_mirrored = has_reflection(instance->get_matrix());
@@ -392,14 +396,9 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
     if (is_mirrored)
         relative_angle *= -1;
 
-
     selection.setup_cache();
-
     auto selection_rotate_fnc = [&selection, &relative_angle](){
-        TransformationType transformation_type = selection.is_single_full_object() ? 
-            TransformationType::Instance_Relative_Independent:
-            TransformationType::Local_Relative_Independent;
-        selection.rotate(Vec3d(0., 0., relative_angle), transformation_type);    
+        selection.rotate(Vec3d(0., 0., relative_angle), get_drag_transformation_type(selection));
     };
     selection_transform(selection, selection_rotate_fnc);
 
@@ -432,8 +431,7 @@ void do_local_z_move(GLCanvas3D &canvas, double relative_move) {
 
 TransformationType get_drag_transformation_type(const Selection &selection)
 {
-    assert(selection.volumes_count() == 1);
-    return selection.is_single_full_object() ? 
+    return is_embossed_object(selection) ?
         TransformationType::Instance_Relative_Joint : 
         TransformationType::Local_Relative_Joint;
 }
@@ -641,6 +639,12 @@ bool dragging(const Vec2d                 &mouse_pos,
 
     canvas.set_as_dirty();
     return true;
+}
+
+bool is_embossed_object(const Selection &selection)
+{
+    assert(selection.volumes_count() == 1);
+    return selection.is_single_full_object() || selection.is_single_full_instance();
 }
 
 } // namespace

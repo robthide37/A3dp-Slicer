@@ -378,16 +378,14 @@ std::string GLGizmoSVG::on_get_name() const { return _u8L("SVG"); }
 
 void GLGizmoSVG::on_render() {
     // no volume selected
+    const Selection &selection = m_parent.get_selection();
     if (m_volume == nullptr ||
-        get_model_volume(m_volume_id, m_parent.get_selection().get_model()->objects) == nullptr)
+        get_model_volume(m_volume_id, selection.get_model()->objects) == nullptr)
         return;
 
-    Selection &selection = m_parent.get_selection();
-    if (selection.is_empty()) return;
+    if (!selection.volumes_count() != 1)
+        return;
 
-    // prevent get local coordinate system on multi volumes
-    if (!selection.is_single_volume_or_modifier() && 
-        !selection.is_single_volume_instance()) return;
     bool is_surface_dragging = m_surface_drag.has_value();
     bool is_parent_dragging = m_parent.is_mouse_dragging();
     // Do NOT render rotation grabbers when dragging object
