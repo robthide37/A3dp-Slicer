@@ -1106,6 +1106,9 @@ static int get_app_font_pt_size(const AppConfig* app_config)
 
 bool GUI_App::on_init_inner()
 {
+    // TODO: remove this when all asserts are gone.
+    wxDisableAsserts();
+
     // Set initialization of image handlers before any UI actions - See GH issue #7469
     wxInitAllImageHandlers();
 
