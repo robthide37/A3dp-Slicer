@@ -50,8 +50,9 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     m_ssid_combo->SetToolTip(_L("On some versions of MacOS, this only loads SSID of connected network."));
 #endif // __APPLE__
     rescan_networks(false);
+    m_ssid_button_id = NewControlId();
     // TRN Text of button to rescan visible networks in Wifi Config dialog.
-    wxButton* ssid_button = new wxButton(panel, wxID_ANY, _(L("Rescan")));
+    wxButton* ssid_button = new wxButton(panel, m_ssid_button_id, _(L("Rescan")));
     ssid_sizer->Add(m_ssid_combo, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
     ssid_sizer->Add(ssid_button, 0);
 
@@ -61,8 +62,9 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     m_pass_textctrl = new ::TextInput(panel, "", "", "", wxDefaultPosition, wxDefaultSize);
     pass_sizer->Add(m_pass_textctrl, 1, wxALIGN_CENTER_VERTICAL, 10);
 #if __APPLE__
+    m_pass_button_id = NewControlId();
     // TRN Text of button to retrieve password from keychain in Wifi Config dialog. Only on Mac.
-    wxButton* pass_button = new wxButton(panel, wxID_ANY, _(L("Retrieve")));
+    wxButton* pass_button = new wxButton(panel, m_pass_button_id, _(L("Retrieve")));
     pass_sizer->Add(pass_button, 0);
     pass_button->Bind(wxEVT_BUTTON, &WifiConfigDialog::on_retrieve_password, this);
 #endif // __APPLE__
@@ -74,8 +76,9 @@ WifiConfigDialog::WifiConfigDialog(wxWindow* parent, std::string& file_path, Rem
     wxStaticText* drive_label = new wxStaticText(panel, wxID_ANY, GUI::format_wxstr("%1%:", _L("Drive")));
     m_drive_combo = new ::ComboBox(panel, wxID_ANY);
     rescan_drives(preffered_drive);
+    m_drive_button_id = NewControlId();
     // TRN Text of button to rescan connect usb drives in Wifi Config dialog.
-    wxButton* drive_button = new wxButton(panel, wxID_ANY, _(L("Rescan")));
+    wxButton* drive_button = new wxButton(panel, m_drive_button_id, _(L("Rescan")));
     drive_sizer->Add(m_drive_combo, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10);
     drive_sizer->Add(drive_button, 0);
 
@@ -274,6 +277,7 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
         data += "\n";
     }
 
+    m_used_path = boost::nowide::widen(file_path.string());
     FILE* file;
     file = fopen(file_path.string().c_str(), "w");
     if (file == NULL) {
@@ -292,8 +296,8 @@ void WifiConfigDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     SetFont(wxGetApp().normal_font());
 
-    //const int em = em_unit();
-    //msw_buttons_rescale(this, em, { wxID_OK, wxID_CANCEL });
+    const int em = em_unit();
+    msw_buttons_rescale(this, em, { wxID_OK, wxID_CANCEL, m_ssid_button_id, m_pass_button_id, m_drive_button_id });
 
     Fit();
     Refresh();

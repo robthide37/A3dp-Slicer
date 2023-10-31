@@ -2611,7 +2611,7 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
             break;
         case ConfigMenuWifiConfigFile:
         {
-            open_wifi_config_dialog();
+            open_wifi_config_dialog(true);
             /*
             std::string file_path;
             WifiConfigDialog dialog(mainframe, file_path, removable_drive_manager());
@@ -3574,17 +3574,35 @@ void GUI_App::start_download(std::string url)
     m_downloader->start_download(url);
 }
 
-void GUI_App::open_wifi_config_dialog(const wxString& drive_path/* = {}*/)
+void GUI_App::open_wifi_config_dialog(bool forced, const wxString& drive_path/* = {}*/)
 {
     if(m_wifi_config_dialog_shown)
         return;
+
+    if (!forced && m_wifi_config_dialog_was_declined) {
+
+        // dialog was already declined this run, show only notification
+        notification_manager()->push_notification(NotificationType::WifiConfigFileDetected
+            , NotificationManager::NotificationLevel::ImportantNotificationLevel
+            // TRN Text of notification when Slicer starts and usb stick with printer settings ini file is present 
+            , _u8L("Printer configuration file detected on removable media.")
+            // TRN Text of hypertext of notification when Slicer starts and usb stick with printer settings ini file is present 
+            , _u8L("Write Wi-Fi credetials."), [drive_path](wxEvtHandler* evt_hndlr) {
+                wxGetApp().open_wifi_config_dialog(true, drive_path);
+                return true; });
+        return;
+    }
+    
     m_wifi_config_dialog_shown = true;
     std::string file_path;
     WifiConfigDialog dialog(mainframe, file_path, removable_drive_manager(), drive_path);
-    if (dialog.ShowModal() == wxID_OK)
-    {
+    if (dialog.ShowModal() == wxID_OK) {
+        //wxString used_path = dialog.get_used_path();
+        //if(std::find(m_wifi_config_dialog_used_paths.begin(), m_wifi_config_dialog_used_paths.end(), used_path) == m_wifi_config_dialog_used_paths.end()) 
+        //    m_wifi_config_dialog_used_paths.emplace_back(std::move(used_path));
         plater_->get_notification_manager()->push_exporting_finished_notification(file_path, boost::filesystem::path(file_path).parent_path().string(), true);
-    }
+    } else 
+        m_wifi_config_dialog_was_declined = true;
     m_wifi_config_dialog_shown = false;
 }
 

@@ -379,7 +379,7 @@ public:
     // URL download - PrusaSlicer gets system call to open prusaslicer:// URL which should contain address of download
     void            start_download(std::string url);
 
-    void            open_wifi_config_dialog(const wxString& drive_path = {});
+    void            open_wifi_config_dialog(bool forced, const wxString& drive_path = {});
     bool            get_wifi_config_dialog_shown() const { return m_wifi_config_dialog_shown; }
 private:
     bool            on_init_inner();
@@ -402,8 +402,9 @@ private:
     // inititate read of version file online in separate thread
     void            app_version_check(bool from_user);
 
-    bool            m_datadir_redefined { false }; 
-    bool            m_wifi_config_dialog_shown { false };
+    bool                    m_datadir_redefined { false }; 
+    bool                    m_wifi_config_dialog_shown { false };
+    bool                    m_wifi_config_dialog_was_declined { false };
 };
 
 DECLARE_APP(GUI_App)
