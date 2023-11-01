@@ -42,6 +42,8 @@ wxDECLARE_EVENT(EVT_REMOVABLE_DRIVE_EJECTED, RemovableDriveEjectEvent);
 using RemovableDrivesChangedEvent = SimpleEvent;
 wxDECLARE_EVENT(EVT_REMOVABLE_DRIVES_CHANGED, RemovableDrivesChangedEvent);
 
+wxDECLARE_EVENT(EVT_REMOVABLE_DRIVE_ADDED, wxCommandEvent);
+
 #if __APPLE__
 	// Callbacks on device plug / unplug work reliably on OSX.
 	#define REMOVABLE_DRIVE_MANAGER_OS_CALLBACKS
@@ -98,7 +100,7 @@ private:
 	bool 			 		m_initialized { false };
 	wxEvtHandler*			m_callback_evt_handler { nullptr };
 
-
+	bool					m_first_update{ true };
 #ifndef REMOVABLE_DRIVE_MANAGER_OS_CALLBACKS
 	// Worker thread, worker thread synchronization and callbacks to the UI thread.
 	void 					thread_proc();

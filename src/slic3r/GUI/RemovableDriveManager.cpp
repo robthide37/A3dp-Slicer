@@ -44,6 +44,8 @@ namespace GUI {
 
 wxDEFINE_EVENT(EVT_REMOVABLE_DRIVE_EJECTED, RemovableDriveEjectEvent);
 wxDEFINE_EVENT(EVT_REMOVABLE_DRIVES_CHANGED, RemovableDrivesChangedEvent);
+wxDEFINE_EVENT(EVT_REMOVABLE_DRIVE_ADDED, wxCommandEvent);
+
 
 #if _WIN32
 std::vector<DriveData> RemovableDriveManager::search_for_removable_drives() const
@@ -1036,11 +1038,28 @@ void RemovableDriveManager::update()
 		std::scoped_lock<std::mutex> lock(m_drives_mutex);
 		std::sort(current_drives.begin(), current_drives.end());
 		if (current_drives != m_current_drives) {
+			// event for writing / ejecting functions
 			assert(m_callback_evt_handler);
 			if (m_callback_evt_handler)
 				wxPostEvent(m_callback_evt_handler, RemovableDrivesChangedEvent(EVT_REMOVABLE_DRIVES_CHANGED));
+			
+			// event for printer config file
+			std::vector<DriveData> new_drives;
+			std::set_difference(current_drives.begin(), current_drives.end(), m_current_drives.begin(), m_current_drives.end(),
+				std::inserter(new_drives, new_drives.begin()));
+			
+			for (const DriveData& data : new_drives) { 
+				if (data.path.empty())
+					continue;
+				wxCommandEvent* evt = new wxCommandEvent(EVT_REMOVABLE_DRIVE_ADDED);
+				evt->SetString(boost::nowide::widen(data.path));
+				evt->SetInt((int)m_first_update);
+				m_callback_evt_handler->QueueEvent(evt);
+			}
+			
 		}
 		m_current_drives = std::move(current_drives);
+		m_first_update = false;
 	} else {
 		// Acquiring the m_iniside_update lock failed, therefore another update is running.
 		// Just block until the other instance of update() finishes.
