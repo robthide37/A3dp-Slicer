@@ -110,16 +110,19 @@ struct EmbossShape
             // Note: image is only cache it is not neccessary to store
 
             // Store file data as plain string
-            ar(path, path_in_3mf, *file_data);
+            assert(file_data != nullptr);
+            ar(path, path_in_3mf, (file_data != nullptr) ? *file_data : std::string(""));
         }
         template<class Archive> void load(Archive &ar) {
             // for restore shared pointer on file data
             std::string file_data_str;
             ar(path, path_in_3mf, file_data_str);
-            file_data = std::make_unique<std::string>(file_data_str);
+            if (!file_data_str.empty())
+                file_data = std::make_unique<std::string>(file_data_str);
         }
-    };    
-    SvgFile svg_file;
+    };
+    // When embossing shape is made by svg file this is source data
+    std::optional<SvgFile> svg_file;
 
     // flag whether during cration of union expolygon final shape was fully correct
     // correct mean without selfintersection and duplicate(double) points
@@ -128,6 +131,7 @@ struct EmbossShape
     // undo / redo stack recovery
     template<class Archive> void save(Archive &ar) const
     {
+        // final_shape is not neccessary to store - it is only cache
         ar(shapes_with_ids, scale, projection, is_healed, svg_file);
         cereal::save(ar, fix_3mf_tr);
     }

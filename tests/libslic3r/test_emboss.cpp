@@ -567,10 +567,17 @@ TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
     emboss.projection.depth       = 5.;
     emboss.projection.use_surface = true;
     emboss.fix_3mf_tr  = Transform3d::Identity();
-    emboss.svg_file.path = "Everything starts somewhere, though many physicists disagree.\
+    emboss.svg_file = EmbossShape::SvgFile{};
+    emboss.svg_file->path = "Everything starts somewhere, though many physicists disagree.\
  But people have always been dimly aware of the problem with the start of things.\
  They wonder how the snowplough driver gets to work,\
  or how the makers of dictionaries look up the spelling of words.";
+    emboss.svg_file->path_in_3mf = "Všechno někde začíná, i když mnoho fyziků nesouhlasí.\
+ Ale lidé si vždy jen matně uvědomovali problém se začátkem věcí.\
+ Zajímalo je, jak se řidič sněžného pluhu dostane do práce\
+ nebo jak tvůrci slovníků vyhledávají pravopis slov.";
+    emboss.svg_file->file_data = std::make_unique<std::string>("cite: Terry Pratchett");
+
     std::stringstream ss; // any stream can be used
     {
         cereal::BinaryOutputArchive oarchive(ss); // Create an output archive
@@ -586,6 +593,8 @@ TEST_CASE("UndoRedo EmbossShape serialization", "[Emboss]")
     CHECK(emboss.scale == emboss_loaded.scale);
     CHECK(emboss.projection.depth == emboss_loaded.projection.depth);
     CHECK(emboss.projection.use_surface == emboss_loaded.projection.use_surface);
+    CHECK(emboss.svg_file->path == emboss_loaded.svg_file->path);
+    CHECK(emboss.svg_file->path_in_3mf == emboss_loaded.svg_file->path_in_3mf);
 }
 
 

@@ -7003,7 +7003,11 @@ void publish(Model &model) {
             if (volume->text_configuration.has_value())
                 continue; // text dosen't have svg path
 
-            SvgFile* svg = &volume->emboss_shape->svg_file;                
+            assert(volume->emboss_shape->svg_file.has_value());
+            if (!volume->emboss_shape->svg_file.has_value())
+                continue;
+
+            SvgFile* svg = &(*volume->emboss_shape->svg_file);
             if (svg->path_in_3mf.empty())
                 exist_new = true;
             svgfiles.push_back(svg);

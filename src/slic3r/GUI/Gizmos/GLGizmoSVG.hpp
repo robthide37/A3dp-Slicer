@@ -123,6 +123,7 @@ private:
     void draw_distance();
     void draw_rotation();
     void draw_mirroring();
+    void draw_face_the_camera();
     void draw_model_type();
 
     // process mouse event

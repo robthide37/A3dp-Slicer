@@ -1404,8 +1404,11 @@ namespace Slic3r {
             std::optional<EmbossShape> &es = volume->emboss_shape;
             if (!es.has_value())
                 continue;
-            if (filename.compare(es->svg_file.path_in_3mf) == 0)
-                es->svg_file.file_data = m_path_to_emboss_shape_files[filename];
+            std::optional<EmbossShape::SvgFile> &svg = es->svg_file;
+            if (!svg.has_value())
+                continue;
+            if (filename.compare(svg->path_in_3mf) == 0)
+                svg->file_data = m_path_to_emboss_shape_files[filename];
         }
     }
 
@@ -2040,16 +2043,19 @@ namespace Slic3r {
             return false;
 
         // Fill svg file content into shape_configuration
-        EmbossShape::SvgFile &svg = volume.shape_configuration->svg_file;
-        const std::string &path = svg.path_in_3mf;
-        if (path.empty()) // do not contain svg file
-            return true; 
+        std::optional<EmbossShape::SvgFile> &svg = volume.shape_configuration->svg_file;
+        if (!svg.has_value())
+            return true; // do not contain svg file
+
+        const std::string &path = svg->path_in_3mf;
+        if (path.empty()) 
+            return true; // do not contain svg file
 
         auto it = m_path_to_emboss_shape_files.find(path);
         if (it == m_path_to_emboss_shape_files.end())
             return true; // svg file is not loaded yet
 
-        svg.file_data = it->second;
+        svg->file_data = it->second;
         return true;
     }
 
@@ -3860,8 +3866,9 @@ bool to_xml(std::stringstream &stream, const EmbossShape::SvgFile &svg, const Mo
 void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume &volume, mz_zip_archive &archive)
 {
     stream << "   <" << SHAPE_TAG << " ";
-    if(!to_xml(stream, es.svg_file, volume, archive))
-        BOOST_LOG_TRIVIAL(warning) << "Can't write svg file defiden embossed shape into 3mf";
+    if (es.svg_file.has_value())
+        if(!to_xml(stream, *es.svg_file, volume, archive))
+            BOOST_LOG_TRIVIAL(warning) << "Can't write svg file defiden embossed shape into 3mf";
     
     stream << SHAPE_SCALE_ATTR << "=\"" << es.scale << "\" ";
 

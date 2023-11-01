@@ -1110,11 +1110,12 @@ std::string create_stroke_warning(const NSVGshape &shape) {
 /// <returns>Vector of warnings with same size as EmbossShape::shapes_with_ids
 /// or Empty when no warnings -> for fast checking that every thing is all right(more common case) </returns>
 std::vector<std::string> create_shape_warnings(const EmbossShape &shape, float scale){
-    assert(shape.svg_file.image != nullptr);
-    if (shape.svg_file.image == nullptr)
+    const std::shared_ptr<NSVGimage>& image_ptr = shape.svg_file->image;
+    assert(image_ptr != nullptr);
+    if (image_ptr == nullptr)
         return {std::string{"Uninitialized SVG image"}};
 
-    const NSVGimage &image = *shape.svg_file.image;
+    const NSVGimage &image = *image_ptr;
     std::vector<std::string> result;
     auto add_warning = [&result, &image](size_t index, const std::string &message) {
         if (result.empty())
@@ -1199,7 +1200,7 @@ void GLGizmoSVG::set_volume_by_selection()
     calculate_scale(); // must be before calculation of tesselation
 
     EmbossShape &es = *volume->emboss_shape;
-    EmbossShape::SvgFile &svg_file = es.svg_file;
+    EmbossShape::SvgFile &svg_file = *es.svg_file;
     if (svg_file.image == nullptr) {
         if (init_image(svg_file) == nullptr)
             return reset_volume();
@@ -1340,7 +1341,17 @@ void GLGizmoSVG::draw_window()
         return;
     }
 
-    assert(m_volume->emboss_shape->svg_file.file_data != nullptr);
+    assert(m_volume->emboss_shape->svg_file.has_value());
+    if (!m_volume->emboss_shape->svg_file.has_value()){
+        ImGui::Text("Missing svg file in embossed shape");
+        return;
+    }
+
+    assert(m_volume->emboss_shape->svg_file->file_data != nullptr);
+    if (m_volume->emboss_shape->svg_file->file_data == nullptr){
+        ImGui::Text("Missing data of svg file");
+        return;
+    }
 
     draw_preview();
     draw_filename();
@@ -1358,13 +1369,7 @@ void GLGizmoSVG::draw_window()
     draw_distance();
     draw_rotation();
     draw_mirroring();
-
-    if (ImGui::Button(_u8L("Face the camera").c_str())) {
-        const Camera &cam = wxGetApp().plater()->get_camera();
-        auto wanted_up_limit = (m_keep_up) ? std::optional<double>(UP_LIMIT) : std::optional<double>{};
-        if (face_selected_volume_to_camera(cam, m_parent, wanted_up_limit))
-            volume_transformation_changed();
-    }
+    draw_face_the_camera();
 
     ImGui::Unindent(m_gui_cfg->icon_width);  
 
@@ -1372,6 +1377,20 @@ void GLGizmoSVG::draw_window()
         ImGui::Separator();
         draw_model_type();
     }
+}
+
+void GLGizmoSVG::draw_face_the_camera(){
+    // multi instance has to have same rotation only world z rotation is allowed
+    bool disabled = m_parent.get_selection().is_single_full_instance();
+    m_imgui->disabled_begin(disabled);
+
+    if (ImGui::Button(_u8L("Face the camera").c_str())) {
+        const Camera &cam = wxGetApp().plater()->get_camera();
+        auto wanted_up_limit = (m_keep_up) ? std::optional<double>(UP_LIMIT) : std::optional<double>{};
+        if (face_selected_volume_to_camera(cam, m_parent, wanted_up_limit))
+            volume_transformation_changed();
+    }        
+    m_imgui->disabled_end();
 }
 
 void GLGizmoSVG::draw_preview(){
@@ -1427,12 +1446,13 @@ void GLGizmoSVG::draw_preview(){
 
 void GLGizmoSVG::draw_filename(){
     const EmbossShape &es = *m_volume->emboss_shape;
+    const EmbossShape::SvgFile &svg = *es.svg_file;
     if (m_filename_preview.empty()){
         // create filename preview
-        if (!es.svg_file.path.empty()) {
-            m_filename_preview = get_file_name(es.svg_file.path);
-        } else if (!es.svg_file.path_in_3mf.empty()) {
-            m_filename_preview = get_file_name(es.svg_file.path_in_3mf);
+        if (!svg.path.empty()) {
+            m_filename_preview = get_file_name(svg.path);
+        } else if (!svg.path_in_3mf.empty()) {
+            m_filename_preview = get_file_name(svg.path_in_3mf);
         }
 
         if (m_filename_preview.empty()){
@@ -1469,19 +1489,19 @@ void GLGizmoSVG::draw_filename(){
 
     is_hovered |= ImGui::IsItemHovered();
     if (is_hovered) {
-        std::string tooltip = GUI::format(_L("SVG file path is \"%1%\""), es.svg_file.path);
+        std::string tooltip = GUI::format(_L("SVG file path is \"%1%\""), svg.path);
         ImGui::SetTooltip("%s", tooltip.c_str());
     }
 
     bool file_changed = false;
 
     // Re-Load button
-    bool can_reload = !m_volume_shape.svg_file.path.empty();
+    bool can_reload = !m_volume_shape.svg_file->path.empty();
     if (can_reload) {
         ImGui::SameLine();
         if (clickable(get_icon(m_icons, IconType::refresh), get_icon(m_icons, IconType::refresh_hover))) {
-            if (!boost::filesystem::exists(m_volume_shape.svg_file.path)) {
-                m_volume_shape.svg_file.path.clear();
+            if (!boost::filesystem::exists(m_volume_shape.svg_file->path)) {
+                m_volume_shape.svg_file->path.clear();
             } else {
                 file_changed = true;
             }
@@ -1501,14 +1521,14 @@ void GLGizmoSVG::draw_filename(){
             if (!new_path.empty()) {
                 file_changed = true;
                 m_volume_shape.svg_file = {}; // clear data
-                m_volume_shape.svg_file.path = new_path;
+                m_volume_shape.svg_file->path = new_path;
             }
         } else if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("%s", _u8L("Change to another .svg file").c_str());
         }
 
         std::string forget_path = _u8L("Forget the file path");
-        if (m_volume->emboss_shape->svg_file.path.empty()){
+        if (m_volume->emboss_shape->svg_file->path.empty()){
             draw(get_icon(m_icons, IconType::bake_inactive));
             ImGui::SameLine();
             m_imgui->text_colored(ImGuiWrapper::COL_GREY_DARK, forget_path.c_str());
@@ -1517,8 +1537,8 @@ void GLGizmoSVG::draw_filename(){
             ImGui::SameLine();
             if (ImGui::Selectable(forget_path.c_str())) {
                 // set .svg_file.path_in_3mf to remember file name
-                m_volume->emboss_shape->svg_file.path.clear();
-                m_volume_shape.svg_file.path.clear();
+                m_volume->emboss_shape->svg_file->path.clear();
+                m_volume_shape.svg_file->path.clear();
                 // TRN - Preview of filename after clear local filepath.
                 m_filename_preview = _u8L("No-name SVG");
             } else if (ImGui::IsItemHovered()) {
@@ -1563,7 +1583,7 @@ void GLGizmoSVG::draw_filename(){
             GUI::FileType file_type  = FT_SVG;
             wxString wildcard = file_wildcards(file_type);
             wxString dlg_title = _L("Save SVG file");
-            const EmbossShape::SvgFile& svg = m_volume_shape.svg_file;
+            const EmbossShape::SvgFile& svg = *m_volume_shape.svg_file;
             wxString dlg_file = from_u8(get_file_name(((!svg.path.empty()) ? svg.path : svg.path_in_3mf))) + ".svg";
             wxFileDialog dlg(parent, dlg_title, last_used_directory, dlg_file, wildcard, wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
             if (dlg.ShowModal() == wxID_OK ){
@@ -1578,8 +1598,8 @@ void GLGizmoSVG::draw_filename(){
 
                     // change source file
                     m_filename_preview.clear();
-                    m_volume_shape.svg_file.path = path;
-                    m_volume_shape.svg_file.path_in_3mf.clear(); // possible change name
+                    m_volume_shape.svg_file->path = path;
+                    m_volume_shape.svg_file->path_in_3mf.clear(); // possible change name
                     m_volume->emboss_shape->svg_file = m_volume_shape.svg_file; // copy - write changes into volume
                 } else {
                     BOOST_LOG_TRIVIAL(error) << "Opening file: \"" << path << "\" Failed";
@@ -1613,7 +1633,7 @@ void GLGizmoSVG::draw_filename(){
     if (file_changed) {
         float scale = get_scale_for_tolerance();
         double tes_tol = get_tesselation_tolerance(scale);
-        EmbossShape es_ = select_shape(m_volume_shape.svg_file.path, tes_tol);
+        EmbossShape es_ = select_shape(m_volume_shape.svg_file->path, tes_tol);
         m_volume_shape.svg_file = std::move(es_.svg_file);
         m_volume_shape.shapes_with_ids = std::move(es_.shapes_with_ids);
         m_shape_warnings = create_shape_warnings(m_volume_shape, scale);
@@ -1780,11 +1800,12 @@ void GLGizmoSVG::draw_size()
         // should be the almost same
         calculate_scale();
                 
-        NSVGimage *img = m_volume_shape.svg_file.image.get();
+        NSVGimage *img = m_volume_shape.svg_file->image.get();
         assert(img != NULL);
         if (img != NULL){
             NSVGLineParams params{get_tesselation_tolerance(get_scale_for_tolerance())};
             m_volume_shape.shapes_with_ids = create_shape_with_ids(*img, params);
+            m_volume_shape.final_shape.clear();
             process();        
         }
     }
@@ -2054,7 +2075,7 @@ std::string get_file_name(const std::string &file_path)
 
 std::string volume_name(const EmbossShape &shape)
 {
-    std::string file_name = get_file_name(shape.svg_file.path);
+    std::string file_name = get_file_name(shape.svg_file->path);
     if (!file_name.empty())
         return file_name;
     return "SVG shape";
@@ -2175,42 +2196,44 @@ EmbossShape select_shape(std::string_view filepath, double tesselation_tolerance
     EmbossShape shape;
     shape.projection.depth       = 10.;
     shape.projection.use_surface = false;
-
+    
+    EmbossShape::SvgFile svg;
     if (filepath.empty()) {
         // When empty open file dialog
-        shape.svg_file.path = choose_svg_file();
-        if (shape.svg_file.path.empty())            
+        svg.path = choose_svg_file();
+        if (svg.path.empty())            
             return {}; // file was not selected
     } else {
-        shape.svg_file.path = filepath; // copy
+        svg.path = filepath; // copy
     }
     
 
-    boost::filesystem::path path(shape.svg_file.path);
+    boost::filesystem::path path(svg.path);
     if (!boost::filesystem::exists(path)) {
-        show_error(nullptr, GUI::format(_u8L("File does NOT exist (%1%)."), shape.svg_file.path));
+        show_error(nullptr, GUI::format(_u8L("File does NOT exist (%1%)."), svg.path));
         return {};
     }
 
-    if (!boost::algorithm::iends_with(shape.svg_file.path, ".svg")) {
-        show_error(nullptr, GUI::format(_u8L("Filename has to end with \".svg\" but you selected %1%"), shape.svg_file.path));
+    if (!boost::algorithm::iends_with(svg.path, ".svg")) {
+        show_error(nullptr, GUI::format(_u8L("Filename has to end with \".svg\" but you selected %1%"), svg.path));
         return {};
     }
 
-    if(init_image(shape.svg_file) == nullptr) {
-        show_error(nullptr, GUI::format(_u8L("Nano SVG parser can't load from file (%1%)."), shape.svg_file.path));
+    if(init_image(svg) == nullptr) {
+        show_error(nullptr, GUI::format(_u8L("Nano SVG parser can't load from file (%1%)."), svg.path));
         return {};
     }
 
     // Set default and unchanging scale
     NSVGLineParams params{tesselation_tolerance};
-    shape.shapes_with_ids = create_shape_with_ids(*shape.svg_file.image, params);
+    shape.shapes_with_ids = create_shape_with_ids(*svg.image, params);
 
     // Must contain some shapes !!!
     if (shape.shapes_with_ids.empty()) {
-        show_error(nullptr, GUI::format(_u8L("SVG file does NOT contain a single path to be embossed (%1%)."), shape.svg_file.path));
+        show_error(nullptr, GUI::format(_u8L("SVG file does NOT contain a single path to be embossed (%1%)."), svg.path));
         return {};
     }
+    shape.svg_file = std::move(svg);
     return shape;
 }
 
