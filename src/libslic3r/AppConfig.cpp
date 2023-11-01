@@ -210,6 +210,9 @@ void AppConfig::set_defaults()
     if (get("allow_ip_resolve").empty())
         set("allow_ip_resolve", "1");
 
+    if (get("wifi_config_dialog_declined").empty())
+        set("wifi_config_dialog_declined", "0");
+
 #ifdef _WIN32
     if (get("use_legacy_3DConnexion").empty())
         set("use_legacy_3DConnexion", "0");

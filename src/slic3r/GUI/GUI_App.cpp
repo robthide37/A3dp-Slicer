@@ -2611,12 +2611,15 @@ void GUI_App::add_config_menu(wxMenuBar *menu)
             break;
         case ConfigMenuWifiConfigFile:
         {
+            open_wifi_config_dialog(true);
+            /*
             std::string file_path;
             WifiConfigDialog dialog(mainframe, file_path, removable_drive_manager());
             if (dialog.ShowModal() == wxID_OK)
             {
                 plater_->get_notification_manager()->push_exporting_finished_notification(file_path, boost::filesystem::path(file_path).parent_path().string(), true);
             }
+            */
         }
         break;
         default:
@@ -3569,6 +3572,39 @@ void GUI_App::start_download(std::string url)
         } 
     m_downloader->init(dest_folder);
     m_downloader->start_download(url);
+}
+
+void GUI_App::open_wifi_config_dialog(bool forced, const wxString& drive_path/* = {}*/)
+{
+    if(m_wifi_config_dialog_shown)
+        return;
+
+    bool dialog_was_declined = app_config->get_bool("wifi_config_dialog_declined");
+
+    if (!forced && dialog_was_declined) {
+
+        // dialog was already declined this run, show only notification
+        notification_manager()->push_notification(NotificationType::WifiConfigFileDetected
+            , NotificationManager::NotificationLevel::ImportantNotificationLevel
+            // TRN Text of notification when Slicer starts and usb stick with printer settings ini file is present 
+            , _u8L("Printer configuration file detected on removable media.")
+            // TRN Text of hypertext of notification when Slicer starts and usb stick with printer settings ini file is present 
+            , _u8L("Write Wi-Fi credetials."), [drive_path](wxEvtHandler* evt_hndlr) {
+                wxGetApp().open_wifi_config_dialog(true, drive_path);
+                return true; });
+        return;
+    }
+    
+    m_wifi_config_dialog_shown = true;
+    std::string file_path;
+    WifiConfigDialog dialog(mainframe, file_path, removable_drive_manager(), drive_path);
+    if (dialog.ShowModal() == wxID_OK) {
+        plater_->get_notification_manager()->push_exporting_finished_notification(file_path, boost::filesystem::path(file_path).parent_path().string(), true);
+        app_config->set("wifi_config_dialog_declined", "0");
+    } else {
+        app_config->set("wifi_config_dialog_declined", "1");
+    }
+    m_wifi_config_dialog_shown = false;
 }
 
 } // GUI
