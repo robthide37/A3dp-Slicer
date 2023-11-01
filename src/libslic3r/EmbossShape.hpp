@@ -105,6 +105,19 @@ struct EmbossShape
 
         // Loaded string data from file
         std::shared_ptr<std::string> file_data = nullptr;
+
+        template<class Archive> void save(Archive &ar) const {
+            // Note: image is only cache it is not neccessary to store
+
+            // Store file data as plain string
+            ar(path, path_in_3mf, *file_data);
+        }
+        template<class Archive> void load(Archive &ar) {
+            // for restore shared pointer on file data
+            std::string file_data_str;
+            ar(path, path_in_3mf, file_data_str);
+            file_data = std::make_unique<std::string>(file_data_str);
+        }
     };    
     SvgFile svg_file;
 
@@ -115,12 +128,12 @@ struct EmbossShape
     // undo / redo stack recovery
     template<class Archive> void save(Archive &ar) const
     {
-        ar(shapes_with_ids, scale, projection, svg_file.path, svg_file.path_in_3mf);
+        ar(shapes_with_ids, scale, projection, is_healed, svg_file);
         cereal::save(ar, fix_3mf_tr);
     }
     template<class Archive> void load(Archive &ar)
     {
-        ar(shapes_with_ids, scale, projection, svg_file.path, svg_file.path_in_3mf);
+        ar(shapes_with_ids, scale, projection, is_healed, svg_file);
         cereal::load(ar, fix_3mf_tr);
     }
 };
@@ -129,7 +142,7 @@ struct EmbossShape
 
 // Serialization through the Cereal library
 namespace cereal {
-template<class Archive> void serialize(Archive &ar, Slic3r::ExPolygonsWithId &o) { ar(o.id, o.expoly); }
+template<class Archive> void serialize(Archive &ar, Slic3r::ExPolygonsWithId &o) { ar(o.id, o.expoly, o.is_healed); }
 }; // namespace cereal
 
 #endif // slic3r_EmbossShape_hpp_
