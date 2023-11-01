@@ -25,6 +25,7 @@
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
+#include "Plater.hpp"
 #include "MsgDialog.hpp"
 #include "I18N.hpp"
 #include "MainFrame.hpp"
@@ -105,11 +106,43 @@ PrintHostSendDialog::PrintHostSendDialog(const fs::path &path, PrintHostPostUplo
         m_valid_suffix = recent_path.substr(extension_start);
     // .gcode suffix control
     auto validate_path = [this](const wxString &path) -> bool {
-        if (! path.Lower().EndsWith(m_valid_suffix.Lower())) {
-            MessageDialog msg_wingow(this, wxString::Format(_L("Upload filename doesn't end with \"%s\". Do you wish to continue?"), m_valid_suffix), wxString(SLIC3R_APP_NAME), wxYES | wxNO);
-            if (msg_wingow.ShowModal() == wxID_NO)
+
+        if (wxGetApp().plater()->printer_technology() == ptFFF) {
+            const std::string ext              = boost::algorithm::to_lower_copy(into_path(path).extension().string());
+            const bool        binary_output    = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary");
+            const bool        binary_extension = (ext == ".bgcode" || ext == ".bgc");
+            const bool        ascii_extension  = (ext == ".gcode" || ext == ".g" || ext == ".gco");
+            wxString err_out;
+            if (binary_output && ascii_extension) {
+                // TRN The placeholder %1% is the file extension the user has selected.
+                err_out = format_wxstr(_L("Cannot upload binary G-code with %1% extension.\n\n"
+                                           "Use <a href=%2%>a different extension</a> or disable <a href=%3%>binary G-code export</a> "
+                                           "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
+            }
+            if (!binary_output && binary_extension) {
+                // TRN The placeholder %1% is the file extension the user has selected.
+                err_out = format_wxstr(_L("Cannot upload ASCII G-code with %1% extension.\n\n"
+                                           "Use <a href=%2%>a different extension</a> or enable <a href=%3%>binary G-code export</a> "
+                                           "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
+            }
+            if (!err_out.IsEmpty()) {
+                ErrorDialog(this, err_out, t_kill_focus([](const std::string& key) -> void { wxGetApp().sidebar().jump_to_option(key); })).ShowModal();
                 return false;
+            }
+            
+            if (!m_valid_suffix.IsEmpty()) {
+                if (binary_output && m_valid_suffix != ".bgcode" && m_valid_suffix != ".bgc")
+                    m_valid_suffix = ".bgcode";
+                else if (!binary_output && m_valid_suffix != ".gcode" && m_valid_suffix != ".gco")
+                    m_valid_suffix = ".gcode";
+            }
         }
+
+        if (!path.Lower().EndsWith(m_valid_suffix.Lower())) {
+            MessageDialog msg_wingow(this, wxString::Format(_L("Upload filename doesn't end with \"%s\". Do you wish to continue?"), m_valid_suffix), wxString(SLIC3R_APP_NAME), wxYES | wxNO);
+            return msg_wingow.ShowModal() == wxID_YES;
+        }
+
         return true;
     };
 
