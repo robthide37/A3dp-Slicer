@@ -166,6 +166,7 @@ void WifiConfigDialog::rescan_drives(const wxString& preffered_drive)
 {
     assert(m_drive_combo && m_removable_manager);
     m_drive_combo->Clear();
+    m_drive_combo->GetTextCtrl()->Clear();
     std::vector<DriveData> ddata = m_removable_manager->get_drive_list();
     for (const auto& data : ddata) {
         wxString item = boost::nowide::widen(data.path);
@@ -190,6 +191,7 @@ void WifiConfigDialog::rescan_networks(bool select)
     std::string current = m_wifi_scanner->get_current_ssid();
     const auto& map = m_wifi_scanner->get_map();
     m_ssid_combo->Clear();
+    m_ssid_combo->GetTextCtrl()->Clear();
     for (const auto pair : map) {
         m_ssid_combo->Append(pair.first);
         // select ssid of current network (if connected)
@@ -231,17 +233,13 @@ void WifiConfigDialog::on_ok(wxCommandEvent& e)
         return;
     }
 
-#if 0 // older variant of rewriting previous ini file
-    if (boost::filesystem::exists(file_path))
-    {
+    if (boost::filesystem::exists(file_path)) {
         wxString msg_text = GUI::format_wxstr("%1% already exists. Do you want to rewrite it?", file_path.string());
         WarningDialog dialog(m_parent, msg_text, _L("Warning"), wxYES | wxNO);
-        if (dialog.ShowModal() == wxID_NO)
-        {
+        if (dialog.ShowModal() == wxID_NO) {
             return;
         }
     }
-#endif
 
     std::string data;
     namespace pt = boost::property_tree;
