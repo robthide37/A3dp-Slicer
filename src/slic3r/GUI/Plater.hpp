@@ -102,6 +102,8 @@ public:
     void search();
     void jump_to_option(size_t selected);
     void jump_to_option(const std::string& opt_key, Preset::Type type, const std::wstring& category);
+    // jump to option which is represented by composite key : "opt_key;tab_name"
+    void jump_to_option(const std::string& composite_key);
 
     ObjectManipulation*     obj_manipul();
     ObjectList*             obj_list();

@@ -1243,6 +1243,29 @@ void Sidebar::search()
     p->searcher.search();
 }
 
+void Sidebar::jump_to_option(const std::string& composite_key)
+{
+    const auto        separator_pos = composite_key.find(";");
+    const std::string opt_key       = composite_key.substr(0, separator_pos);
+    const std::string tab_name      = composite_key.substr(separator_pos + 1, composite_key.length());
+
+    for (Tab* tab : wxGetApp().tabs_list) {
+        if (tab->name() == tab_name) {
+            check_and_update_searcher(true);
+
+            // Regularly searcher is sorted in respect to the options labels,
+            // so resort searcher before get an option
+            p->searcher.sort_options_by_key();
+            const Search::Option& opt = p->searcher.get_option(opt_key, tab->type());
+            tab->activate_option(opt_key, boost::nowide::narrow(opt.category));
+
+            // Revert sort of searcher back
+            p->searcher.sort_options_by_label();
+            break;
+        }
+    }
+}
+
 void Sidebar::jump_to_option(const std::string& opt_key, Preset::Type type, const std::wstring& category)
 {
     //const Search::Option& opt = p->searcher.get_option(opt_key, type);
@@ -6757,13 +6780,17 @@ void Plater::export_gcode(bool prefer_removable)
                     const bool binary_extension = (ext == ".bgcode" || ext == ".bgc");
                     const bool ascii_extension  = (ext == ".gcode" || ext == ".g" || ext == ".gco");
                     if (binary_output && ascii_extension) {
-                        // TRN The placeholder is the file extension the user has selected.
-                        err_out = format_wxstr(_L("Cannot save binary G-code with %1% extension.\n\nUse a different extension or disable binary G-code export in Print Settings."), ext);
+                        // TRN The placeholder %1% is the file extension the user has selected.
+                        err_out = format_wxstr(_L("Cannot save binary G-code with %1% extension.\n\n"
+                                                "Use <a href=%2%>a different extension</a> or disable <a href=%3%>binary G-code export</a> "
+                                                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
                         return true;
                     }
                     if (! binary_output && binary_extension) {
-                        // TRN The placeholder is the file extension the user has selected.
-                        err_out = format_wxstr(_L("Cannot save ASCII G-code with %1% extension.\n\nUse a different extension or enable binary G-code export in Print Settings."), ext);
+                        // TRN The placeholder %1% is the file extension the user has selected.
+                        err_out = format_wxstr(_L("Cannot save ASCII G-code with %1% extension.\n\n"
+                                                "Use <a href=%2%>a different extension</a> or enable <a href=%3%>binary G-code export</a> "
+                                                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
                         return true;
                     }
                 }
@@ -6771,6 +6798,12 @@ void Plater::export_gcode(bool prefer_removable)
             };
 
             wxString error_str;
+#if 1 // #ysFIXME > clear code after testing
+            if (check_for_error(output_path, error_str)) {
+                ErrorDialog(this, error_str, [this](const std::string& key) -> void { sidebar().jump_to_option(key); }).ShowModal();
+                output_path.clear();
+            }
+#else
             while (check_for_error(output_path, error_str)) {
                 show_error(this, error_str);
                 dlg.SetFilename(from_path(output_path.filename()));
@@ -6781,6 +6814,7 @@ void Plater::export_gcode(bool prefer_removable)
                     break;
                 }
             }
+#endif
         }
     }
 
