@@ -3579,7 +3579,9 @@ void GUI_App::open_wifi_config_dialog(bool forced, const wxString& drive_path/* 
     if(m_wifi_config_dialog_shown)
         return;
 
-    if (!forced && m_wifi_config_dialog_was_declined) {
+    bool dialog_was_declined = app_config->get_bool("wifi_config_dialog_declined");
+
+    if (!forced && dialog_was_declined) {
 
         // dialog was already declined this run, show only notification
         notification_manager()->push_notification(NotificationType::WifiConfigFileDetected
@@ -3597,12 +3599,11 @@ void GUI_App::open_wifi_config_dialog(bool forced, const wxString& drive_path/* 
     std::string file_path;
     WifiConfigDialog dialog(mainframe, file_path, removable_drive_manager(), drive_path);
     if (dialog.ShowModal() == wxID_OK) {
-        //wxString used_path = dialog.get_used_path();
-        //if(std::find(m_wifi_config_dialog_used_paths.begin(), m_wifi_config_dialog_used_paths.end(), used_path) == m_wifi_config_dialog_used_paths.end()) 
-        //    m_wifi_config_dialog_used_paths.emplace_back(std::move(used_path));
         plater_->get_notification_manager()->push_exporting_finished_notification(file_path, boost::filesystem::path(file_path).parent_path().string(), true);
-    } else 
-        m_wifi_config_dialog_was_declined = true;
+        app_config->set("wifi_config_dialog_declined", "0");
+    } else {
+        app_config->set("wifi_config_dialog_declined", "1");
+    }
     m_wifi_config_dialog_shown = false;
 }
 
