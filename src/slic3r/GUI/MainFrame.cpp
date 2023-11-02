@@ -1744,7 +1744,7 @@ void MainFrame::quick_slice(const int qs)
 
     // select input file
     if (!(qs & qsReslice)) {
-        wxFileDialog dlg(this, _L("Choose a file to slice (STL/OBJ/AMF/3MF/PRUSA):"),
+        wxFileDialog dlg(this, _L("Choose a file to slice (STL/OBJ/AMF/3MF/SVG):"),
             wxGetApp().app_config->get_last_dir(), "",
             file_wildcards(FT_MODEL), wxFD_OPEN | wxFD_FILE_MUST_EXIST);
         if (dlg.ShowModal() != wxID_OK)
