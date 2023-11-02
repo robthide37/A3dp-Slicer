@@ -4,13 +4,18 @@
 ///|/
 #include "SurfaceDrag.hpp"
 
-#include "libslic3r/Model.hpp" // ModelVolume
-#include "GLCanvas3D.hpp"
+#include <libslic3r/Model.hpp> // ModelVolume
+#include <libslic3r/Emboss.hpp>
+
 #include "slic3r/Utils/RaycastManager.hpp"
-#include "slic3r/GUI/Camera.hpp"
-#include "slic3r/GUI/CameraUtils.hpp"
-#include "slic3r/GUI/I18N.hpp"
-#include "libslic3r/Emboss.hpp"
+
+#include "GLCanvas3D.hpp"
+#include "Camera.hpp"
+#include "CameraUtils.hpp"
+#include "I18N.hpp"
+#include "GUI_App.hpp"
+#include "GUI_ObjectManipulation.hpp"
+
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
@@ -83,6 +88,7 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
     if (surface_drag.has_value() && !mouse_event.Dragging()) {
         // write transformation from UI into model
         canvas.do_move(L("Move over surface"));
+        wxGetApp().obj_manipul()->set_dirty();
 
         // allow moving with object again
         canvas.enable_moving(true);
@@ -275,31 +281,39 @@ Transform3d world_matrix_fixed(const Selection &selection)
 void selection_transform(Selection &selection, const std::function<void()> &selection_transformation_fnc, const ModelVolume *volume)
 {
     GLVolume *gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
-    if (gl_volume == nullptr)
-        return selection_transformation_fnc();
+    auto get_fix = [&selection, &volume, &gl_volume]() -> const Transform3d * {
+        if (gl_volume == nullptr)
+            return nullptr;
 
-    if (volume == nullptr) {
-        volume = get_model_volume(*gl_volume, selection.get_model()->objects);
-        if (volume == nullptr)
-            return selection_transformation_fnc();
+        if (volume == nullptr) {
+            volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+            if (volume == nullptr)
+                return nullptr;
+        }
+        const std::optional<EmbossShape> &es = volume->emboss_shape;
+        if (!volume->emboss_shape.has_value())
+            return nullptr;
+        if (!es->fix_3mf_tr.has_value())
+            return nullptr;
+        return &(*es->fix_3mf_tr);
+    };
+    
+    if (const Transform3d *fix = get_fix(); fix != nullptr) {
+        Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
+        gl_volume->set_volume_transformation(volume_tr * fix->inverse());
+        selection.setup_cache();
+
+        selection_transformation_fnc();
+
+        volume_tr = gl_volume->get_volume_transformation().get_matrix();
+        gl_volume->set_volume_transformation(volume_tr * (*fix));
+        selection.setup_cache();
+    } else {
+        selection_transformation_fnc();
     }
 
-    if (!volume->emboss_shape.has_value())
-        return selection_transformation_fnc();
-
-    const std::optional<Transform3d> &fix_tr = volume->emboss_shape->fix_3mf_tr;
-    if (!fix_tr.has_value())
-        return selection_transformation_fnc();
-
-    Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
-    gl_volume->set_volume_transformation(volume_tr * fix_tr->inverse());
-    selection.setup_cache();
-
-    selection_transformation_fnc();
-
-    volume_tr = gl_volume->get_volume_transformation().get_matrix();
-    gl_volume->set_volume_transformation(volume_tr * (*fix_tr));
-    selection.setup_cache();
+    if (selection.is_single_full_instance())
+        selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
 }
 
 bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, const std::optional<double> &wanted_up_limit)
@@ -345,26 +359,37 @@ bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, co
         current_angle = Emboss::calc_up(world_tr, *wanted_up_limit);
 
     Vec3d world_position = gl_volume.world_matrix()*Vec3d::Zero();
-    Vec3d wanted_direction = -camera.get_dir_forward();
+
+    assert(camera.get_type() == Camera::EType::Perspective || 
+           camera.get_type() == Camera::EType::Ortho);
+    Vec3d wanted_direction = (camera.get_type() == Camera::EType::Perspective) ?
+        Vec3d(camera.get_position() - world_position) : 
+        (-camera.get_dir_forward());
     
     Transform3d new_volume_tr = get_volume_transformation(world_tr, wanted_direction, world_position,
         fix, instance_tr_inv, current_angle, wanted_up_limit);
 
-    if (is_embossed_object(canvas.get_selection())) {
+    Selection &selection = canvas.get_selection();
+    if (is_embossed_object(selection)) {
         // transform instance instead of volume
-        Transform3d new_instance_tr = instance_tr * new_volume_tr * volume.get_matrix().inverse();
-        instance.set_transformation(Geometry::Transformation(new_instance_tr));
+        Transform3d new_instance_tr = instance_tr * new_volume_tr * volume.get_matrix().inverse();        
         gl_volume.set_instance_transformation(new_instance_tr);
+        
+        // set same transformation to other instances when instance is embossed object
+        if (selection.is_single_full_instance()) 
+            selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
     } else {
         // write result transformation
         gl_volume.set_volume_transformation(new_volume_tr);
-        volume.set_transformation(new_volume_tr);
     }
 
     if (volume.type() == ModelVolumeType::MODEL_PART) {
         object.invalidate_bounding_box();
         object.ensure_on_bed();
     }
+
+    canvas.do_rotate(L("Face the camera"));
+    wxGetApp().obj_manipul()->set_dirty();
     return true;
 }
 
@@ -638,6 +663,8 @@ bool dragging(const Vec2d                 &mouse_pos,
     }
 
     canvas.set_as_dirty();
+    // Show current position in manipulation panel
+    wxGetApp().obj_manipul()->set_dirty();
     return true;
 }
 

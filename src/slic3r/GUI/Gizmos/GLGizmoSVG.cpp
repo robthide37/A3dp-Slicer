@@ -377,13 +377,10 @@ bool GLGizmoSVG::on_init()
 std::string GLGizmoSVG::on_get_name() const { return _u8L("SVG"); }
 
 void GLGizmoSVG::on_render() {
-    // no volume selected
-    const Selection &selection = m_parent.get_selection();
-    if (m_volume == nullptr ||
-        get_model_volume(m_volume_id, selection.get_model()->objects) == nullptr)
-        return;
-
-    if (selection.volumes_count() != 1)
+    if (const Selection &selection = m_parent.get_selection(); 
+        selection.volumes_count() != 1 || // only one selected volume
+        m_volume == nullptr || // already selected volume in gizmo
+        get_model_volume(m_volume_id, selection.get_model()->objects) == nullptr) // still exist model
         return;
 
     bool is_surface_dragging = m_surface_drag.has_value();
@@ -1380,17 +1377,12 @@ void GLGizmoSVG::draw_window()
 }
 
 void GLGizmoSVG::draw_face_the_camera(){
-    // multi instance has to have same rotation only world z rotation is allowed
-    bool disabled = m_parent.get_selection().is_single_full_instance();
-    m_imgui->disabled_begin(disabled);
-
     if (ImGui::Button(_u8L("Face the camera").c_str())) {
         const Camera &cam = wxGetApp().plater()->get_camera();
         auto wanted_up_limit = (m_keep_up) ? std::optional<double>(UP_LIMIT) : std::optional<double>{};
         if (face_selected_volume_to_camera(cam, m_parent, wanted_up_limit))
             volume_transformation_changed();
-    }        
-    m_imgui->disabled_end();
+    }
 }
 
 void GLGizmoSVG::draw_preview(){
