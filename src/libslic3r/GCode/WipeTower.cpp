@@ -793,12 +793,13 @@ WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool)
 		.set_initial_tool(m_current_tool)
         .set_y_shift(m_y_shift + (tool!=(unsigned int)(-1) && (m_current_shape == SHAPE_REVERSED) ? m_layer_info->depth - m_layer_info->toolchanges_depth(): 0.f))
 		.append(";--------------------\n"
-				"; CP TOOLCHANGE START\n")
-		.comment_with_value(" toolchange #", m_num_tool_changes + 1); // the number is zero-based
+				"; CP TOOLCHANGE START\n");
 
-    if (tool != (unsigned)(-1))
+    if (tool != (unsigned)(-1)) {
+        writer.comment_with_value(" toolchange #", m_num_tool_changes + 1); // the number is zero-based
         writer.append(std::string("; material : " + (m_current_tool < m_filpar.size() ? m_filpar[m_current_tool].material : "(NONE)") + " -> " + m_filpar[tool].material + "\n").c_str())
               .append(";--------------------\n");
+    }
 
     writer.speed_override_backup();
 	writer.speed_override(100);
