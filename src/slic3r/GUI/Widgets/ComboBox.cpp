@@ -315,18 +315,38 @@ void ComboBox::keyDown(wxKeyEvent& event)
                 GetEventHandler()->ProcessEvent(e);
             }
             break;
-        case WXK_UP:
-        case WXK_DOWN:
-        case WXK_LEFT:
-        case WXK_RIGHT:
-            if ((event.GetKeyCode() == WXK_UP || event.GetKeyCode() == WXK_LEFT) && GetSelection() > 0) {
+        case WXK_UP: {
+            if (GetSelection() > 0)
                 SetSelection(GetSelection() - 1);
-            } else if ((event.GetKeyCode() == WXK_DOWN || event.GetKeyCode() == WXK_RIGHT) && GetSelection() + 1 < int(texts.size())) {
+            break;
+        }
+        case WXK_DOWN: {
+            if (GetSelection() + 1 < int(texts.size()))
                 SetSelection(GetSelection() + 1);
-            } else {
+            break;
+        }
+        case WXK_LEFT: {
+            if (HasFlag(wxCB_READONLY)) {
+                if(GetSelection() > 0)
+                    SetSelection(GetSelection() - 1);
                 break;
             }
+            const auto pos = GetTextCtrl()->GetInsertionPoint();
+            if(pos > 0)
+                GetTextCtrl()->SetInsertionPoint(pos - 1);
             break;
+        }
+        case WXK_RIGHT: {
+            if (HasFlag(wxCB_READONLY)) {
+                if (GetSelection() + 1 < int(texts.size()))
+                    SetSelection(GetSelection() + 1);
+                break;
+            }
+            const size_t pos = size_t(GetTextCtrl()->GetInsertionPoint());
+            if (pos < GetLabel().Length())
+                GetTextCtrl()->SetInsertionPoint(pos + 1);
+            break;
+        }
         case WXK_TAB:
             HandleAsNavigationKey(event);
             break;
