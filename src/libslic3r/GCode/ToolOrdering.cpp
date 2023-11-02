@@ -479,6 +479,9 @@ void ToolOrdering::fill_wipe_tower_partitions(const PrintConfig &config, coordf_
 
 bool ToolOrdering::insert_wipe_tower_extruder()
 {
+    if (!m_print_config_ptr->wipe_tower)
+        return false;
+
     // In case that wipe_tower_extruder is set to non-zero, we must make sure that the extruder will be in the list.
     bool changed = false;
     if (m_print_config_ptr->wipe_tower_extruder != 0) {
