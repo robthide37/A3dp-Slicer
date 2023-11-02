@@ -180,7 +180,7 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
         gcode_out += line + "\n";
 
         // If this was a toolchange command, we should change current extruder offset
-        if (line == "[toolchange_gcode]") {
+        if (line == "[toolchange_gcode_from_wipe_tower_generator]") {
             extruder_offset = m_extruder_offsets[tcr.new_tool].cast<float>();
 
             // If the extruder offset changed, add an extra move so everything is continuous
