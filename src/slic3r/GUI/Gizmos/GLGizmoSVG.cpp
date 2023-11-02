@@ -383,7 +383,7 @@ void GLGizmoSVG::on_render() {
         get_model_volume(m_volume_id, selection.get_model()->objects) == nullptr)
         return;
 
-    if (!selection.volumes_count() != 1)
+    if (selection.volumes_count() != 1)
         return;
 
     bool is_surface_dragging = m_surface_drag.has_value();
