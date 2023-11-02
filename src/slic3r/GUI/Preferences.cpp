@@ -74,15 +74,19 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent) :
 	build();
 
     wxSize sz = GetSize();
-    sz.x += em_unit();
+    bool is_scrollbar_shown = false;
 
     const size_t pages_cnt = tabs->GetPageCount();
     for (size_t tab_id = 0; tab_id < pages_cnt; tab_id++) {
         wxSizer* tab_sizer = tabs->GetPage(tab_id)->GetSizer();
         wxScrolledWindow* scrolled = static_cast<wxScrolledWindow*>(tab_sizer->GetItem(size_t(0))->GetWindow());
         scrolled->SetScrollRate(0, 5);
+
+        is_scrollbar_shown |= scrolled->GetScrollLines(wxVERTICAL) > 0;
     }
 
+    if (is_scrollbar_shown)
+        sz.x += 2*em_unit();
     SetSize(sz);
 
 	m_highlighter.set_timer_owner(this, 0);

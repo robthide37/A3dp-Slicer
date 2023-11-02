@@ -720,6 +720,7 @@ namespace DoExport {
         const FullPrintConfig        &config,
         const std::vector<Extruder>  &extruders,
         unsigned int                 initial_extruder_id,
+        int                          total_toolchanges,
         PrintStatistics              &print_statistics,
         bool                         export_binary_data,
         bgcode::binarize::BinaryData &binary_data)
@@ -727,7 +728,7 @@ namespace DoExport {
         std::string filament_stats_string_out;
 
         print_statistics.clear();
-        print_statistics.total_toolchanges = std::max(0, wipe_tower_data.number_of_toolchanges);
+        print_statistics.total_toolchanges = total_toolchanges;
         print_statistics.initial_extruder_id = initial_extruder_id;
         std::vector<std::string> filament_types;
         if (! extruders.empty()) {
@@ -1161,7 +1162,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
     // For the start / end G-code to do the priming and final filament pull in case there is no wipe tower provided.
     this->placeholder_parser().set("has_wipe_tower", has_wipe_tower);
     this->placeholder_parser().set("has_single_extruder_multi_material_priming", has_wipe_tower && print.config().single_extruder_multi_material_priming);
-    this->placeholder_parser().set("total_toolchanges", std::max(0, print.wipe_tower_data().number_of_toolchanges)); // Check for negative toolchanges (single extruder mode) and set to 0 (no tool change).
+    this->placeholder_parser().set("total_toolchanges", tool_ordering.toolchanges_count());
     {
         BoundingBoxf bbox(print.config().bed_shape.values);
         assert(bbox.defined);
@@ -1389,6 +1390,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         this->config(),
         m_writer.extruders(),
         initial_extruder_id,
+        tool_ordering.toolchanges_count(),
         // Modifies
         print.m_print_statistics,
         export_to_binary_gcode,

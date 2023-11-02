@@ -109,7 +109,7 @@ std::string LabelObjects::all_objects_header() const
 
     out += "\n";
     for (const auto& [print_instance, label] : label_data_sorted) {
-        if (m_flavor == gcfKlipper)  {
+        if (m_label_objects_style == LabelObjectsStyle::Firmware && m_flavor == gcfKlipper)  {
             char buffer[64];
             out += "EXCLUDE_OBJECT_DEFINE NAME=" + label.name;
             Polygon outline = instance_outline(print_instance);

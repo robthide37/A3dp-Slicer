@@ -61,7 +61,10 @@ ComboBox::ComboBox(wxWindow *      parent,
     for (int i = 0; i < n; ++i) Append(choices[i]);
 }
 
-int ComboBox::GetSelection() const { return drop.GetSelection(); }
+int ComboBox::GetSelection() const
+{
+    return drop.GetSelection();
+}
 
 void ComboBox::SetSelection(int n)
 {
@@ -233,6 +236,11 @@ wxBitmap ComboBox::GetItemBitmap(unsigned int n)
     return icons[n].GetBitmapFor(m_parent);
 }
 
+void ComboBox::OnKeyDown(wxKeyEvent &event)
+{
+    keyDown(event);
+}
+
 int ComboBox::DoInsertItems(const wxArrayStringsAdapter &items,
                             unsigned int                 pos,
                             void **                      clientData,
@@ -290,10 +298,15 @@ void ComboBox::keyDown(wxKeyEvent& event)
 {
     int key_code = event.GetKeyCode();
     switch (key_code) {
-#ifndef __WXOSX__
         case WXK_RETURN:
             if (drop_down) {
                 drop.DismissAndNotify();
+
+                wxCommandEvent e(wxEVT_COMBOBOX);
+                e.SetEventObject(this);
+                e.SetId(GetId());
+                e.SetInt(GetSelection());
+                GetEventHandler()->ProcessEvent(e);
             } else if (drop.HasDismissLongTime()) {
                 drop.autoPosition();
                 drop_down = true;
@@ -302,32 +315,53 @@ void ComboBox::keyDown(wxKeyEvent& event)
                 GetEventHandler()->ProcessEvent(e);
             }
             break;
-#endif
-        case WXK_UP:
-        case WXK_DOWN:
-        case WXK_LEFT:
-        case WXK_RIGHT:
-            if ((event.GetKeyCode() == WXK_UP || event.GetKeyCode() == WXK_LEFT) && GetSelection() > 0) {
+        case WXK_UP: {
+            if (GetSelection() > 0)
                 SetSelection(GetSelection() - 1);
-            } else if ((event.GetKeyCode() == WXK_DOWN || event.GetKeyCode() == WXK_RIGHT) && GetSelection() + 1 < int(texts.size())) {
+            break;
+        }
+        case WXK_DOWN: {
+            if (GetSelection() + 1 < int(texts.size()))
                 SetSelection(GetSelection() + 1);
-            } else {
+            break;
+        }
+        case WXK_LEFT: {
+            if (HasFlag(wxCB_READONLY)) {
+                if(GetSelection() > 0)
+                    SetSelection(GetSelection() - 1);
                 break;
             }
-            {
-                wxCommandEvent e(wxEVT_COMBOBOX);
-                e.SetEventObject(this);
-                e.SetId(GetId());
-                e.SetInt(GetSelection());
-                GetEventHandler()->ProcessEvent(e);
-            }
+            const auto pos = GetTextCtrl()->GetInsertionPoint();
+            if(pos > 0)
+                GetTextCtrl()->SetInsertionPoint(pos - 1);
             break;
+        }
+        case WXK_RIGHT: {
+            if (HasFlag(wxCB_READONLY)) {
+                if (GetSelection() + 1 < int(texts.size()))
+                    SetSelection(GetSelection() + 1);
+                break;
+            }
+            const size_t pos = size_t(GetTextCtrl()->GetInsertionPoint());
+            if (pos < GetLabel().Length())
+                GetTextCtrl()->SetInsertionPoint(pos + 1);
+            break;
+        }
         case WXK_TAB:
             HandleAsNavigationKey(event);
             break;
-        default:
+        default: {
+            if (drop.IsShown() && HasFlag(wxCB_READONLY)) {
+                for (size_t n = 0; n < texts.size(); n++) {
+                    if (texts[n].StartsWith(wxString(static_cast<char>(key_code)))) {
+                        SetSelection(int(n));
+                        break;
+                    }
+                }
+            }
             event.Skip();
             break;
+        }
     }
 }
 
