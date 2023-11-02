@@ -408,15 +408,15 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle)
     bool is_mirrored = false;
     const GLVolume* gl_volume = selection.get_first_volume();
     if (gl_volume != nullptr) {
+        const ModelInstance *instance = get_model_instance(*gl_volume, selection.get_model()->objects);
+        bool is_instance_mirrored = (instance != nullptr)? has_reflection(instance->get_matrix()) : false;
         if (is_embossed_object(selection)) {
-            const ModelInstance *instance = get_model_instance(*gl_volume, selection.get_model()->objects);
-            if (instance != nullptr)
-                is_mirrored = has_reflection(instance->get_matrix());
+                is_mirrored = is_instance_mirrored;
         } else {
             const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
             if (volume != nullptr)
-                is_mirrored = has_reflection(volume->get_matrix());
-        }    
+                is_mirrored = is_instance_mirrored != has_reflection(volume->get_matrix());
+        }
     }
     if (is_mirrored)
         relative_angle *= -1;
@@ -548,8 +548,11 @@ bool start_dragging(const Vec2d                &mouse_pos,
     Transform3d instance_tr_inv = instance_tr.inverse();
     Transform3d world_tr        = instance_tr * volume_tr;
     std::optional<float> start_angle;
-    if (up_limit.has_value())
+    if (up_limit.has_value()) {
         start_angle = Emboss::calc_up(world_tr, *up_limit);
+        if (start_angle.has_value() && has_reflection(world_tr))
+            start_angle = -(*start_angle);
+    }
 
     std::optional<float> start_distance;
     if (!volume->emboss_shape->projection.use_surface)

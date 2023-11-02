@@ -246,8 +246,14 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
         angle -= PI / 2; // Grabber is upward
 
         double new_angle = angle + *m_rotate_start_angle;
+
+        bool is_volume_mirrored = has_reflection(m_volume->get_matrix());
+        bool is_instance_mirrored = has_reflection(m_parent.get_selection().get_first_volume()->get_instance_transformation().get_matrix());
+        if (is_volume_mirrored != is_instance_mirrored)
+            new_angle = -angle + *m_rotate_start_angle;
+
         // move to range <-M_PI, M_PI>
-        Geometry::to_range_pi_pi(new_angle);      
+        Geometry::to_range_pi_pi(new_angle);
 
         double z_rotation = m_volume->emboss_shape->fix_3mf_tr.has_value()? 
             (new_angle - m_angle.value_or(0.f)) : // relative angle
@@ -1885,7 +1891,7 @@ void GLGizmoSVG::draw_rotation()
         Geometry::to_range_pi_pi(angle_rad);                
 
         double diff_angle = angle_rad - angle;
-
+        
         do_local_z_rotate(m_parent, diff_angle);
 
         // calc angle after rotation
@@ -1947,9 +1953,14 @@ void GLGizmoSVG::draw_mirroring()
             selection.mirror(axis, get_drag_transformation_type(selection));
         };
         selection_transform(selection, selection_mirror_fnc, m_volume);
-
         m_parent.do_mirror(L("Set Mirror"));
-        wxGetApp().obj_manipul()->UpdateAndShow(true);
+
+        // Mirror is ignoring keep up !!
+        if (m_keep_up)
+            m_angle = calc_angle(selection);
+
+        volume_transformation_changed();
+
 
         if (m_volume_shape.projection.use_surface)
             process();
