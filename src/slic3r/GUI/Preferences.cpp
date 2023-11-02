@@ -87,6 +87,11 @@ PreferencesDialog::PreferencesDialog(wxWindow* parent) :
 
     if (is_scrollbar_shown)
         sz.x += 2*em_unit();
+#ifdef __WXGTK__
+    // To correct Layout of wxScrolledWindow we need at least small change of size
+    else
+        sz.x += 1;
+#endif
     SetSize(sz);
 
 	m_highlighter.set_timer_owner(this, 0);
