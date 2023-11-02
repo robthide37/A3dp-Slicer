@@ -3872,7 +3872,7 @@ void to_xml(std::stringstream &stream, const EmbossShape &es, const ModelVolume 
     
     stream << SHAPE_SCALE_ATTR << "=\"" << es.scale << "\" ";
 
-    if (!es.is_healed)
+    if (!es.final_shape.is_healed)
         stream << UNHEALED_ATTR << "=\"" << 1 << "\" ";
 
     // projection
@@ -3912,10 +3912,17 @@ std::optional<EmbossShape> read_emboss_shape(const char **attributes, unsigned i
 
     std::string file_path = get_attribute_value_string(attributes, num_attributes, SVG_FILE_PATH_ATTR);
     std::string file_path_3mf = get_attribute_value_string(attributes, num_attributes, SVG_FILE_PATH_IN_3MF_ATTR);
-    ExPolygonsWithIds shapes; // TODO: need to implement 
+
+    // MayBe: store also shapes to not store svg
+    // But be carefull curve will be lost -> scale will not change sampling
+    // shapes could be loaded from SVG
+    ExPolygonsWithIds shapes; 
+    // final shape could be calculated from shapes
+    HealedExPolygons final_shape;
+    final_shape.is_healed = is_healed;
 
     EmbossShape::SvgFile svg{file_path, file_path_3mf};
-    return EmbossShape{shapes, {}, scale, std::move(projection), std::move(fix_tr_mat), std::move(svg), is_healed};
+    return EmbossShape{std::move(shapes), std::move(final_shape), scale, std::move(projection), std::move(fix_tr_mat), std::move(svg)};
 }
 
 

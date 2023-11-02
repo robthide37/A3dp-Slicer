@@ -1127,7 +1127,7 @@ std::vector<std::string> create_shape_warnings(const EmbossShape &shape, float s
             res += '\n' + message;
     };
 
-    if (!shape.is_healed) {
+    if (!shape.final_shape.is_healed) {
         for (const ExPolygonsWithId &i : shape.shapes_with_ids)
             if (!i.is_healed)
                 add_warning(i.id, _u8L("Path can't be healed from selfintersection and multiple points."));
@@ -1455,12 +1455,11 @@ void GLGizmoSVG::draw_filename(){
             m_filename_preview = get_file_name(svg.path_in_3mf);
         }
 
-        if (m_filename_preview.empty()){
-            assert(false);
-            m_filename_preview = "unknown";
-        } else {        
-            m_filename_preview = ImGuiWrapper::trunc(m_filename_preview, m_gui_cfg->input_width);
-        }
+        if (m_filename_preview.empty())
+            // TRN - Preview of filename after clear local filepath.
+            m_filename_preview = _u8L("Without filename");
+        
+        m_filename_preview = ImGuiWrapper::trunc(m_filename_preview, m_gui_cfg->input_width);
     }
 
     if (!m_shape_warnings.empty()){
@@ -1539,8 +1538,7 @@ void GLGizmoSVG::draw_filename(){
                 // set .svg_file.path_in_3mf to remember file name
                 m_volume->emboss_shape->svg_file->path.clear();
                 m_volume_shape.svg_file->path.clear();
-                // TRN - Preview of filename after clear local filepath.
-                m_filename_preview = _u8L("No-name SVG");
+                m_filename_preview.clear();
             } else if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", _u8L("Do NOT save local path to 3MF file.\n"
                                              "Also disables 'reload from disk' option.").c_str());
@@ -1636,6 +1634,7 @@ void GLGizmoSVG::draw_filename(){
         EmbossShape es_ = select_shape(m_volume_shape.svg_file->path, tes_tol);
         m_volume_shape.svg_file = std::move(es_.svg_file);
         m_volume_shape.shapes_with_ids = std::move(es_.shapes_with_ids);
+        m_volume_shape.final_shape = {}; // clear cache
         m_shape_warnings = create_shape_warnings(m_volume_shape, scale);
         init_texture(m_texture, m_volume_shape.shapes_with_ids, m_gui_cfg->texture_max_size_px, m_shape_warnings);
         process();
@@ -1805,7 +1804,7 @@ void GLGizmoSVG::draw_size()
         if (img != NULL){
             NSVGLineParams params{get_tesselation_tolerance(get_scale_for_tolerance())};
             m_volume_shape.shapes_with_ids = create_shape_with_ids(*img, params);
-            m_volume_shape.final_shape.clear();
+            m_volume_shape.final_shape = {}; // reset cache for final shape
             process();        
         }
     }

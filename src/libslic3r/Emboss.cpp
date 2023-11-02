@@ -1263,17 +1263,14 @@ HealedExPolygons union_with_delta(const ExPolygonsWithIds &shapes, float delta, 
 
 ExPolygons Slic3r::union_with_delta(EmbossShape &shape, float delta, unsigned max_heal_iteration) 
 {
-    if (!shape.final_shape.empty())
+    if (!shape.final_shape.expolygons.empty())
         return shape.final_shape;
 
-    HealedExPolygons result = ::union_with_delta(shape.shapes_with_ids, delta, max_heal_iteration);
-    shape.is_healed = result.is_healed;
+    shape.final_shape = ::union_with_delta(shape.shapes_with_ids, delta, max_heal_iteration);
     for (const ExPolygonsWithId &e : shape.shapes_with_ids)
         if (!e.is_healed)
-            shape.is_healed = false;
-    shape.final_shape = std::move(result.expolygons); // cached
-
-    return shape.final_shape;
+            shape.final_shape.is_healed = false;
+    return shape.final_shape.expolygons;
 }
 
 void Slic3r::translate(ExPolygonsWithIds &expolygons_with_ids, const Point &p)

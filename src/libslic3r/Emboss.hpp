@@ -18,13 +18,6 @@
 
 namespace Slic3r {
 
-// Extend expolygons with information whether it was successfull healed
-struct HealedExPolygons{
-    ExPolygons expolygons;
-    bool is_healed;
-    operator ExPolygons&() { return expolygons; }
-};
-
 /// <summary>
 /// class with only static function add ability to engraved OR raised
 /// text OR polygons onto model surface
