@@ -1243,6 +1243,29 @@ void Sidebar::search()
     p->searcher.search();
 }
 
+void Sidebar::jump_to_option(const std::string& composite_key)
+{
+    const auto        separator_pos = composite_key.find(";");
+    const std::string opt_key       = composite_key.substr(0, separator_pos);
+    const std::string tab_name      = composite_key.substr(separator_pos + 1, composite_key.length());
+
+    for (Tab* tab : wxGetApp().tabs_list) {
+        if (tab->name() == tab_name) {
+            check_and_update_searcher(true);
+
+            // Regularly searcher is sorted in respect to the options labels,
+            // so resort searcher before get an option
+            p->searcher.sort_options_by_key();
+            const Search::Option& opt = p->searcher.get_option(opt_key, tab->type());
+            tab->activate_option(opt_key, boost::nowide::narrow(opt.category));
+
+            // Revert sort of searcher back
+            p->searcher.sort_options_by_label();
+            break;
+        }
+    }
+}
+
 void Sidebar::jump_to_option(const std::string& opt_key, Preset::Type type, const std::wstring& category)
 {
     //const Search::Option& opt = p->searcher.get_option(opt_key, type);
@@ -6688,6 +6711,32 @@ void Plater::apply_cut_object_to_model(size_t obj_idx, const ModelObjectPtrs& ne
     w.wait_for_idle();
 }
 
+
+
+wxString check_binary_vs_ascii_gcode_extension(PrinterTechnology pt, const std::string& ext, bool binary_output)
+{
+    wxString err_out;
+    if (pt == ptFFF) {
+        const bool binary_extension = (ext == ".bgcode" || ext == ".bgc");
+        const bool ascii_extension = (ext == ".gcode" || ext == ".g" || ext == ".gco");
+        if (binary_output && ascii_extension) {
+            // TRN The placeholder %1% is the file extension the user has selected.
+            err_out = format_wxstr(_L("Cannot save binary G-code with %1% extension.\n\n"
+                "Use <a href=%2%>a different extension</a> or disable <a href=%3%>binary G-code export</a> "
+                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
+        }
+        if (!binary_output && binary_extension) {
+            // TRN The placeholder %1% is the file extension the user has selected.
+            err_out = format_wxstr(_L("Cannot save ASCII G-code with %1% extension.\n\n"
+                "Use <a href=%2%>a different extension</a> or enable <a href=%3%>binary G-code export</a> "
+                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
+        }
+    }
+    return err_out;
+}
+
+
+
 void Plater::export_gcode(bool prefer_removable)
 {
     if (p->model.objects.empty())
@@ -6743,9 +6792,28 @@ void Plater::export_gcode(bool prefer_removable)
         );
         if (dlg.ShowModal() == wxID_OK) {
             output_path = into_path(dlg.GetPath());
-            while (has_illegal_filename_characters(output_path.filename().string())) {
-                show_error(this, _L("The provided file name is not valid.") + "\n" +
-                    _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"");
+
+            auto check_for_error = [this](const boost::filesystem::path& path, wxString& err_out) -> bool {
+                const std::string filename = path.filename().string();
+                const std::string ext      = boost::algorithm::to_lower_copy(path.extension().string());
+                if (has_illegal_filename_characters(filename)) {
+                    err_out = _L("The provided file name is not valid.") + "\n" +
+                              _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"";
+                    return true;
+                }
+                err_out = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"));
+                return !err_out.IsEmpty();
+            };
+
+            wxString error_str;
+#if 1 // #ysFIXME > clear code after testing
+            if (check_for_error(output_path, error_str)) {
+                ErrorDialog(this, error_str, [this](const std::string& key) -> void { sidebar().jump_to_option(key); }).ShowModal();
+                output_path.clear();
+            }
+#else
+            while (check_for_error(output_path, error_str)) {
+                show_error(this, error_str);
                 dlg.SetFilename(from_path(output_path.filename()));
                 if (dlg.ShowModal() == wxID_OK)
                     output_path = into_path(dlg.GetPath());
@@ -6754,6 +6822,7 @@ void Plater::export_gcode(bool prefer_removable)
                     break;
                 }
             }
+#endif
         }
     }
 
@@ -7300,6 +7369,17 @@ void Plater::send_gcode()
 
     PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups, storage_paths, storage_names);
     if (dlg.ShowModal() == wxID_OK) {
+
+        {
+            const std::string ext = boost::algorithm::to_lower_copy(dlg.filename().extension().string());
+            const bool binary_output = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary");
+            const wxString error_str = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, binary_output);
+            if (! error_str.IsEmpty()) {
+                ErrorDialog(this, error_str, t_kill_focus([](const std::string& key) -> void { wxGetApp().sidebar().jump_to_option(key); })).ShowModal();
+                return;
+            }
+        }
+
         upload_job.upload_data.upload_path = dlg.filename();
         upload_job.upload_data.post_action = dlg.post_action();
         upload_job.upload_data.group       = dlg.group();
