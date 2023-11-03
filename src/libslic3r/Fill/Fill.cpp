@@ -543,19 +543,19 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 		        	flow_mm3_per_mm = new_flow.mm3_per_mm();
 		        	flow_width      = new_flow.width();
 		        }
-                auto fill_begin = uint32_t(layerm.fills().size());
-                // Save into layer.
-                if (ExtrusionEntityCollection *eec = nullptr; params.use_arachne) {
+		        // Save into layer.
+				ExtrusionEntityCollection* eec = nullptr;
+				auto fill_begin = uint32_t(layerm.fills().size());
+		        layerm.m_fills.entities.push_back(eec = new ExtrusionEntityCollection());
+		        // Only concentric fills are not sorted.
+		        eec->no_sort = f->no_sort();
+                if (params.use_arachne) {
                     for (const ThickPolyline &thick_polyline : thick_polylines) {
                         Flow new_flow = surface_fill.params.flow.with_spacing(float(f->spacing));
 
                         ExtrusionMultiPath multi_path = PerimeterGenerator::thick_polyline_to_multi_path(thick_polyline, surface_fill.params.extrusion_role, new_flow, scaled<float>(0.05), float(SCALED_EPSILON));
                         // Append paths to collection.
                         if (!multi_path.empty()) {
-                            layerm.m_fills.entities.push_back(eec = new ExtrusionEntityCollection());
-                            // Only concentric fills are not sorted.
-                            eec->no_sort = f->no_sort();
-
                             if (multi_path.paths.front().first_point() == multi_path.paths.back().last_point())
                                 eec->entities.emplace_back(new ExtrusionLoop(std::move(multi_path.paths)));
                             else
@@ -565,10 +565,6 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 
                     thick_polylines.clear();
                 } else {
-                    layerm.m_fills.entities.push_back(eec = new ExtrusionEntityCollection());
-                    // Only concentric fills are not sorted.
-                    eec->no_sort = f->no_sort();
-
                     extrusion_entities_append_paths(
                         eec->entities, std::move(polylines),
 						ExtrusionAttributes{ surface_fill.params.extrusion_role,
