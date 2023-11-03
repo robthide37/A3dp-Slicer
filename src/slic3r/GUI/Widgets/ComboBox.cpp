@@ -202,6 +202,8 @@ void ComboBox::DoClear()
     datas.clear();
     types.clear();
     drop.Invalidate(true);
+    if (GetTextCtrl()->IsShown() || text_off)
+        GetTextCtrl()->Clear();
 }
 
 void ComboBox::DoDeleteOneItem(unsigned int pos)

@@ -1573,14 +1573,15 @@ void TabPrint::build()
         optgroup->append_single_option_line("support_material_synchronize_layers", category_path + "synchronize-with-object-layers");
 
         optgroup = page->new_optgroup(L("Organic supports"));
-        optgroup->append_single_option_line("support_tree_angle", category_path + "tree_angle");
-        optgroup->append_single_option_line("support_tree_angle_slow", category_path + "tree_angle_slow");
-        optgroup->append_single_option_line("support_tree_branch_diameter", category_path + "tree_branch_diameter");
-        optgroup->append_single_option_line("support_tree_branch_diameter_angle", category_path + "tree_branch_diameter_angle");
-        optgroup->append_single_option_line("support_tree_branch_diameter_double_wall", category_path + "tree_branch_diameter_double_wall");
-        optgroup->append_single_option_line("support_tree_tip_diameter", category_path + "tree_tip_diameter");
-        optgroup->append_single_option_line("support_tree_branch_distance", category_path + "tree_branch_distance");
-        optgroup->append_single_option_line("support_tree_top_rate", category_path + "tree_top_rate");
+        const std::string path = "organic-supports_480131#organic-supports-settings";
+        optgroup->append_single_option_line("support_tree_angle", path);
+        optgroup->append_single_option_line("support_tree_angle_slow", path);
+        optgroup->append_single_option_line("support_tree_branch_diameter", path);
+        optgroup->append_single_option_line("support_tree_branch_diameter_angle", path);
+        optgroup->append_single_option_line("support_tree_branch_diameter_double_wall", path);
+        optgroup->append_single_option_line("support_tree_tip_diameter", path);
+        optgroup->append_single_option_line("support_tree_branch_distance", path);
+        optgroup->append_single_option_line("support_tree_top_rate", path);
 
     page = add_options_page(L("Speed"), "time");
         optgroup = page->new_optgroup(L("Speed for print moves"));
