@@ -239,39 +239,9 @@ bool GLGizmoSVG::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
     bool used = use_grabbers(mouse_event);
     if (!m_dragging) return used;
 
-    if (mouse_event.Dragging()) {
-        if (!m_rotate_start_angle.has_value())
-            m_rotate_start_angle = m_angle.value_or(0.f);
-        double angle = m_rotate_gizmo.get_angle();
-        angle -= PI / 2; // Grabber is upward
-
-        double new_angle = angle + *m_rotate_start_angle;
-
-        bool is_volume_mirrored = has_reflection(m_volume->get_matrix());
-        bool is_instance_mirrored = has_reflection(m_parent.get_selection().get_first_volume()->get_instance_transformation().get_matrix());
-        if (is_volume_mirrored != is_instance_mirrored)
-            new_angle = -angle + *m_rotate_start_angle;
-
-        // move to range <-M_PI, M_PI>
-        Geometry::to_range_pi_pi(new_angle);
-
-        double z_rotation = m_volume->emboss_shape->fix_3mf_tr.has_value()? 
-            (new_angle - m_angle.value_or(0.f)) : // relative angle
-            angle; // relativity is keep by selection cache
-
-        Selection &selection = m_parent.get_selection();
-        auto selection_rotate_fnc = [z_rotation, &selection]() { 
-            selection.rotate(Vec3d(0., 0., z_rotation), get_drag_transformation_type(selection));
-        };
-        selection_transform(selection, selection_rotate_fnc, m_volume);
-        
-        // propagate angle into property
-        m_angle = static_cast<float>(new_angle);
-
-        // do not store zero
-        if (is_approx(*m_angle, 0.f))
-            m_angle.reset();
-    }
+    if (mouse_event.Dragging())
+        dragging_rotate_gizmo(m_rotate_gizmo.get_angle(), m_angle, m_rotate_start_angle, m_parent.get_selection());
+    
     return used;
 }
 
@@ -1790,7 +1760,7 @@ void GLGizmoSVG::draw_size()
         auto selection_scale_fnc = [&selection, rel_scale = *new_relative_scale]() {
             selection.scale(rel_scale, get_drag_transformation_type(selection));
         };        
-        selection_transform(selection, selection_scale_fnc, m_volume);
+        selection_transform(selection, selection_scale_fnc);
 
         m_parent.do_scale(L("Resize"));
         wxGetApp().obj_manipul()->set_dirty();
@@ -1952,7 +1922,7 @@ void GLGizmoSVG::draw_mirroring()
         auto selection_mirror_fnc = [&selection, &axis](){
             selection.mirror(axis, get_drag_transformation_type(selection));
         };
-        selection_transform(selection, selection_mirror_fnc, m_volume);
+        selection_transform(selection, selection_mirror_fnc);
         m_parent.do_mirror(L("Set Mirror"));
 
         // Mirror is ignoring keep up !!

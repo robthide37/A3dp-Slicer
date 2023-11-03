@@ -424,7 +424,7 @@ bool GLGizmoEmboss::do_mirror(size_t axis)
         selection.setup_cache();
 
         auto selection_mirror_fnc = [&selection, &axis]() { selection.mirror((Axis) axis, get_drag_transformation_type(selection)); };
-        selection_transform(selection, selection_mirror_fnc, m_volume);
+        selection_transform(selection, selection_mirror_fnc);
 
         m_parent.do_mirror(L("Set Mirror"));
         wxGetApp().obj_manipul()->UpdateAndShow(true);
@@ -500,34 +500,13 @@ bool GLGizmoEmboss::on_mouse_for_rotation(const wxMouseEvent &mouse_event)
     if (!m_dragging) return used;
 
     if (mouse_event.Dragging()) {
-        if (!m_rotate_start_angle.has_value()) {
-            // when m_rotate_start_angle is not set mean it is not Dragging
-            // when angle_opt is not set than angle is Zero
-            const std::optional<float> &angle_opt = m_style_manager.get_style().angle;
-            m_rotate_start_angle = angle_opt.value_or(0.f);
-        }
-
-        double angle = m_rotate_gizmo.get_angle();
-        angle -= PI / 2; // Grabber is upward
-
-        // temporary rotation
-        Selection& selection = m_parent.get_selection();
-        selection.rotate(Vec3d(0., 0., angle), get_drag_transformation_type(selection));
-
-        angle += *m_rotate_start_angle;
-        // move to range <-M_PI, M_PI>
-        Geometry::to_range_pi_pi(angle);
-
-        // set into activ style
+        // check that style is activ
         assert(m_style_manager.is_active_font());
-        if (m_style_manager.is_active_font()) {
-            std::optional<float> angle_opt;
-            if (!is_approx(angle, 0.))
-                angle_opt = angle;
-            m_style_manager.get_style().angle = angle_opt;
-        }
+        if (!m_style_manager.is_active_font())
+            return used;
 
-        volume_transformation_changing();
+        std::optional<float> &angle_opt = m_style_manager.get_style().angle;
+        dragging_rotate_gizmo(m_rotate_gizmo.get_angle(), angle_opt, m_rotate_start_angle, m_parent.get_selection());
     }
     return used;
 }

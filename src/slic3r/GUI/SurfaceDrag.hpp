@@ -122,9 +122,7 @@ Transform3d world_matrix_fixed(const Selection &selection);
 /// </summary>
 /// <param name="selection">Selected gl volume will be modified</param>
 /// <param name="selection_transformation_fnc">Function modified Selection transformation</param>
-/// <param name="volume">Same as selected GLVolume, volume may(or may not) contain fix matrix,
-///  when nullptr it is gathered from selection</param>
-void selection_transform(Selection &selection, const std::function<void()>& selection_transformation_fnc, const ModelVolume *volume = nullptr);
+void selection_transform(Selection &selection, const std::function<void()>& selection_transformation_fnc);
 
 /// <summary>
 /// Apply camera direction for emboss direction
@@ -150,11 +148,22 @@ void do_local_z_rotate(GLCanvas3D &canvas, double relative_angle);
 void do_local_z_move(GLCanvas3D &canvas, double relative_move);
 
 /// <summary>
-/// 
+/// Distiguish between object and volume
+/// Differ in possible transformation type
 /// </summary>
-/// <param name="selection"></param>
-/// <returns></returns>
+/// <param name="selection">Contain selected volume/object</param>
+/// <returns>Transformation to use</returns>
 TransformationType get_drag_transformation_type(const Selection &selection);
+
+/// <summary>
+/// On dragging rotate gizmo func
+/// Transform GLVolume from selection
+/// </summary>
+/// <param name="gizmo_angle">GLGizmoRotate::get_angle()</param>
+/// <param name="current_angle">In/Out current angle visible in UI</param>
+/// <param name="start_angle">Cache for start dragging angle</param>
+/// <param name="selection">Selected only Actual embossed volume</param>
+void dragging_rotate_gizmo(double gizmo_angle, std::optional<float>& current_angle, std::optional<float> &start_angle, Selection &selection);
 
 } // namespace Slic3r::GUI
 #endif // slic3r_SurfaceDrag_hpp_

@@ -61,6 +61,14 @@ Transform3d get_volume_transformation(
 // distinguish between transformation of volume inside object 
 // and object(single full instance with one volume)
 bool is_embossed_object(const Selection &selection);
+
+/// <summary>
+/// Get fix transformation for selected volume
+/// Fix after store to 3mf
+/// </summary>
+/// <param name="selection">Select only wanted volume</param>
+/// <returns>Pointer on fix transformation from ModelVolume when exists otherwise nullptr</returns>
+const Transform3d *get_fix_transformation(const Selection &selection);
 }
 
 namespace Slic3r::GUI {
@@ -278,27 +286,11 @@ Transform3d world_matrix_fixed(const Selection &selection)
     return world_matrix_fixed(*gl_volume, selection.get_model()->objects);
 }
 
-void selection_transform(Selection &selection, const std::function<void()> &selection_transformation_fnc, const ModelVolume *volume)
-{
-    GLVolume *gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
-    auto get_fix = [&selection, &volume, &gl_volume]() -> const Transform3d * {
-        if (gl_volume == nullptr)
-            return nullptr;
-
-        if (volume == nullptr) {
-            volume = get_model_volume(*gl_volume, selection.get_model()->objects);
-            if (volume == nullptr)
-                return nullptr;
-        }
-        const std::optional<EmbossShape> &es = volume->emboss_shape;
-        if (!volume->emboss_shape.has_value())
-            return nullptr;
-        if (!es->fix_3mf_tr.has_value())
-            return nullptr;
-        return &(*es->fix_3mf_tr);
-    };
-    
-    if (const Transform3d *fix = get_fix(); fix != nullptr) {
+void selection_transform(Selection &selection, const std::function<void()> &selection_transformation_fnc)
+{   
+    if (const Transform3d *fix = get_fix_transformation(selection); fix != nullptr) {        
+        // NOTE: need editable gl volume .. can't use selection.get_first_volume()
+        GLVolume *gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
         Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
         gl_volume->set_volume_transformation(volume_tr * fix->inverse());
         selection.setup_cache();
@@ -460,6 +452,47 @@ TransformationType get_drag_transformation_type(const Selection &selection)
         TransformationType::Instance_Relative_Joint : 
         TransformationType::Local_Relative_Joint;
 }
+
+void dragging_rotate_gizmo(double gizmo_angle, std::optional<float>& current_angle, std::optional<float> &start_angle, Selection &selection)
+{
+    if (!start_angle.has_value())
+        // create cache for initial angle
+        start_angle = current_angle.value_or(0.f);
+
+    gizmo_angle -= PI / 2; // Grabber is upward
+
+    double new_angle = gizmo_angle + *start_angle;
+
+    const GLVolume *gl_volume = selection.get_first_volume();
+    assert(gl_volume != nullptr);
+    if (gl_volume == nullptr)
+        return;
+
+    bool is_volume_mirrored   = has_reflection(gl_volume->get_volume_transformation().get_matrix());
+    bool is_instance_mirrored = has_reflection(gl_volume->get_instance_transformation().get_matrix());
+    if (is_volume_mirrored != is_instance_mirrored)
+        new_angle = -gizmo_angle + *start_angle;
+
+    // move to range <-M_PI, M_PI>
+    Geometry::to_range_pi_pi(new_angle);
+
+    const Transform3d* fix = get_fix_transformation(selection);
+    double z_rotation = (fix!=nullptr) ? (new_angle - current_angle.value_or(0.f)) : // relative angle
+                                         gizmo_angle; // relativity is keep by selection cache
+
+    auto selection_rotate_fnc = [z_rotation, &selection]() {
+        selection.rotate(Vec3d(0., 0., z_rotation), get_drag_transformation_type(selection));
+    };
+    selection_transform(selection, selection_rotate_fnc);
+
+    // propagate angle into property
+    current_angle = static_cast<float>(new_angle);
+
+    // do not store zero
+    if (is_approx(*current_angle, 0.f))
+        current_angle.reset();
+}
+
 } // namespace Slic3r::GUI
 
 // private implementation
@@ -675,6 +708,25 @@ bool is_embossed_object(const Selection &selection)
 {
     assert(selection.volumes_count() == 1);
     return selection.is_single_full_object() || selection.is_single_full_instance();
+}
+
+const Transform3d *get_fix_transformation(const Selection &selection) {
+    const GLVolume *gl_volume = get_selected_gl_volume(selection);
+    assert(gl_volume != nullptr);
+    if (gl_volume == nullptr)
+        return nullptr;
+
+    const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+    assert(volume != nullptr);
+    if (volume == nullptr)
+        return nullptr;
+
+    const std::optional<EmbossShape> &es = volume->emboss_shape;
+    if (!volume->emboss_shape.has_value())
+        return nullptr;
+    if (!es->fix_3mf_tr.has_value())
+        return nullptr;
+    return &(*es->fix_3mf_tr);
 }
 
 } // namespace
