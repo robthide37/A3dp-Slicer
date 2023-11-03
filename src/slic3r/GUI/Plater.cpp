@@ -6711,6 +6711,32 @@ void Plater::apply_cut_object_to_model(size_t obj_idx, const ModelObjectPtrs& ne
     w.wait_for_idle();
 }
 
+
+
+wxString check_binary_vs_ascii_gcode_extension(PrinterTechnology pt, const std::string& ext, bool binary_output)
+{
+    wxString err_out;
+    if (pt == ptFFF) {
+        const bool binary_extension = (ext == ".bgcode" || ext == ".bgc");
+        const bool ascii_extension = (ext == ".gcode" || ext == ".g" || ext == ".gco");
+        if (binary_output && ascii_extension) {
+            // TRN The placeholder %1% is the file extension the user has selected.
+            err_out = format_wxstr(_L("Cannot save binary G-code with %1% extension.\n\n"
+                "Use <a href=%2%>a different extension</a> or disable <a href=%3%>binary G-code export</a> "
+                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
+        }
+        if (!binary_output && binary_extension) {
+            // TRN The placeholder %1% is the file extension the user has selected.
+            err_out = format_wxstr(_L("Cannot save ASCII G-code with %1% extension.\n\n"
+                "Use <a href=%2%>a different extension</a> or enable <a href=%3%>binary G-code export</a> "
+                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
+        }
+    }
+    return err_out;
+}
+
+
+
 void Plater::export_gcode(bool prefer_removable)
 {
     if (p->model.objects.empty())
@@ -6775,26 +6801,8 @@ void Plater::export_gcode(bool prefer_removable)
                               _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"";
                     return true;
                 }
-                if (printer_technology() == ptFFF) {
-                    const bool binary_output = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary");
-                    const bool binary_extension = (ext == ".bgcode" || ext == ".bgc");
-                    const bool ascii_extension  = (ext == ".gcode" || ext == ".g" || ext == ".gco");
-                    if (binary_output && ascii_extension) {
-                        // TRN The placeholder %1% is the file extension the user has selected.
-                        err_out = format_wxstr(_L("Cannot save binary G-code with %1% extension.\n\n"
-                                                "Use <a href=%2%>a different extension</a> or disable <a href=%3%>binary G-code export</a> "
-                                                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
-                        return true;
-                    }
-                    if (! binary_output && binary_extension) {
-                        // TRN The placeholder %1% is the file extension the user has selected.
-                        err_out = format_wxstr(_L("Cannot save ASCII G-code with %1% extension.\n\n"
-                                                "Use <a href=%2%>a different extension</a> or enable <a href=%3%>binary G-code export</a> "
-                                                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
-                        return true;
-                    }
-                }
-                return false;
+                err_out = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"));
+                return !err_out.IsEmpty();
             };
 
             wxString error_str;
@@ -7361,6 +7369,17 @@ void Plater::send_gcode()
 
     PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups, storage_paths, storage_names);
     if (dlg.ShowModal() == wxID_OK) {
+
+        {
+            const std::string ext = boost::algorithm::to_lower_copy(dlg.filename().extension().string());
+            const bool binary_output = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary");
+            const wxString error_str = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, binary_output);
+            if (! error_str.IsEmpty()) {
+                ErrorDialog(this, error_str, t_kill_focus([](const std::string& key) -> void { wxGetApp().sidebar().jump_to_option(key); })).ShowModal();
+                return;
+            }
+        }
+
         upload_job.upload_data.upload_path = dlg.filename();
         upload_job.upload_data.post_action = dlg.post_action();
         upload_job.upload_data.group       = dlg.group();
