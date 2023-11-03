@@ -286,7 +286,7 @@ void SpinInput::Create(wxWindow *parent,
     state_handler.attach({&label_color, &text_color});
     state_handler.update_binds();
 
-    text_ctrl = new wxTextCtrl(this, wxID_ANY, text, {20, 4}, wxDefaultSize, style | wxBORDER_NONE | wxTE_PROCESS_ENTER, wxTextValidator(wxFILTER_DIGITS));
+    text_ctrl = new wxTextCtrl(this, wxID_ANY, text, {20, 4}, wxDefaultSize, style | wxBORDER_NONE | wxTE_PROCESS_ENTER, wxTextValidator(wxFILTER_NUMERIC));
 #ifdef __WXOSX__
     text_ctrl->OSXDisableAllSmartSubstitutions();
 #endif // __WXOSX__
@@ -462,7 +462,7 @@ void SpinInputDouble::Create(wxWindow *parent,
     state_handler.attach({&label_color, &text_color});
     state_handler.update_binds();
 
-    text_ctrl = new wxTextCtrl(this, wxID_ANY, text, {20, 4}, wxDefaultSize, style | wxBORDER_NONE | wxTE_PROCESS_ENTER, wxTextValidator(wxFILTER_DIGITS));
+    text_ctrl = new wxTextCtrl(this, wxID_ANY, text, {20, 4}, wxDefaultSize, style | wxBORDER_NONE | wxTE_PROCESS_ENTER, wxTextValidator(wxFILTER_NUMERIC));
 #ifdef __WXOSX__
     text_ctrl->OSXDisableAllSmartSubstitutions();
 #endif // __WXOSX__
