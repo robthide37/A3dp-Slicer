@@ -436,11 +436,15 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
 
     m_optgroup->activate();
 
+    const auto opt = m_config->option<ConfigOptionEnum<PrintHostType>>("host_type");
+    m_last_host_type = opt->value;
+    m_opened_as_connect = (m_last_host_type == htPrusaConnect);
+
     Field* printhost_field = m_optgroup->get_field("print_host");
     if (printhost_field)
     {
-        wxTextCtrl* temp = dynamic_cast<wxTextCtrl*>(printhost_field->getWindow());
-        if (temp)
+        text_ctrl* temp = dynamic_cast<text_ctrl*>(printhost_field->getWindow());
+        if (temp) {
             temp->Bind(wxEVT_TEXT, ([printhost_field, temp](wxEvent& e)
             {
 #ifndef __WXGTK__
@@ -457,6 +461,7 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
                 if (field)
                     field->propagate_value();
             }), temp->GetId());
+        }
     }
 
     // Always fill in the "printhost_port" combo box from the config and select it.
@@ -488,12 +493,6 @@ void PhysicalPrinterDialog::update(bool printer_change)
         const auto opt = m_config->option<ConfigOptionEnum<PrintHostType>>("host_type");
         m_optgroup->show_field("host_type");
 
-        // hide PrusaConnect address
-        if (Field* printhost_field = m_optgroup->get_field("print_host"); printhost_field) {
-            if (wxTextCtrl* temp = dynamic_cast<wxTextCtrl*>(printhost_field->getWindow()); temp && temp->GetValue() == L"https://connect.prusa3d.com") {
-                temp->SetValue(wxString());
-            }
-        }
         if (opt->value == htPrusaLink) { // PrusaConnect does NOT allow http digest
             m_optgroup->show_field("printhost_authorization_type");
             AuthorizationType auth_type = m_config->option<ConfigOptionEnum<AuthorizationType>>("printhost_authorization_type")->value;
@@ -506,15 +505,30 @@ void PhysicalPrinterDialog::update(bool printer_change)
             for (const std::string& opt_key : std::vector<std::string>{ "printhost_user", "printhost_password" })
                 m_optgroup->hide_field(opt_key);
             supports_multiple_printers = opt && opt->value == htRepetier;
-            if (opt->value == htPrusaConnect) { // automatically show default prusaconnect address
-                if (Field* printhost_field = m_optgroup->get_field("print_host"); printhost_field) {
-                    if (text_ctrl* temp = dynamic_cast<text_ctrl*>(printhost_field->getWindow()); temp && temp->GetValue().IsEmpty()) {
-                        temp->SetValue(L"https://connect.prusa3d.com");
-                    }
-                }
+        }
+        // Hide Browse and Test buttons for Connect
+        if (opt->value == htPrusaConnect) {
+            m_printhost_browse_btn->Hide();
+            // hide show hostname and PrusaConnect address
+            Field* printhost_field = m_optgroup->get_field("print_host");
+            text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;
+            if (!m_opened_as_connect && printhost_win && m_last_host_type != htPrusaConnect){
+                m_stored_host = printhost_win->GetValue();
+                printhost_win->SetValue(L"https://connect.prusa3d.com");
+            }
+        } else {
+            m_printhost_browse_btn->Show();
+            // hide PrusaConnect address and show hostname
+            Field* printhost_field = m_optgroup->get_field("print_host");
+            text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;
+            if (!m_opened_as_connect && printhost_win && m_last_host_type == htPrusaConnect) {
+                wxString temp_host = printhost_win->GetValue();
+                printhost_win->SetValue(m_stored_host);
+                m_stored_host = temp_host;
             }
         }
         
+        m_last_host_type = opt->value;
     }
     else {
         m_optgroup->set_value("host_type", int(PrintHostType::htOctoPrint), false);
@@ -730,6 +744,20 @@ void PhysicalPrinterDialog::OnOK(wxEvent& event)
         warning_catcher(this, _L("You have to enter a printer name."));
         return;
     }
+
+    Field* printhost_field = m_optgroup->get_field("print_host");
+    text_ctrl* printhost_win = printhost_field ? dynamic_cast<text_ctrl*>(printhost_field->getWindow()) : nullptr;
+    const auto opt = m_config->option<ConfigOptionEnum<PrintHostType>>("host_type");
+    if (opt->value == htPrusaConnect) {
+        if (printhost_win && printhost_win->GetValue() != L"https://connect.prusa3d.com"){
+            InfoDialog msg(this, _L("Warning"), _L("URL of PrusaConnect is different than https://connect.prusa3d.com. Do you wish to continue?"), true, wxYES_NO);
+            if(msg.ShowModal() != wxID_YES){
+                printhost_win->SetValue(L"https://connect.prusa3d.com");
+                return;
+            }
+        }
+    }
+    
 
     PhysicalPrinterCollection& printers = wxGetApp().preset_bundle->physical_printers;
     const PhysicalPrinter* existing = printers.find_printer(into_u8(printer_name), false);
