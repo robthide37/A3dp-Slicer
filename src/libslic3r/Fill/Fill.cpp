@@ -543,12 +543,11 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 		        	flow_mm3_per_mm = new_flow.mm3_per_mm();
 		        	flow_width      = new_flow.width();
 		        }
-		        // Save into layer.
-				ExtrusionEntityCollection* eec = nullptr;
-				auto fill_begin = uint32_t(layerm.fills().size());
-		        layerm.m_fills.entities.push_back(eec = new ExtrusionEntityCollection());
-		        // Only concentric fills are not sorted.
-		        eec->no_sort = f->no_sort();
+                // Save into layer.
+                ExtrusionEntityCollection *eec        = new ExtrusionEntityCollection();
+                auto                       fill_begin = uint32_t(layerm.fills().size());
+                // Only concentric fills are not sorted.
+                eec->no_sort = f->no_sort();
                 if (params.use_arachne) {
                     for (const ThickPolyline &thick_polyline : thick_polylines) {
                         Flow new_flow = surface_fill.params.flow.with_spacing(float(f->spacing));
@@ -563,6 +562,11 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
                         }
                     }
 
+                    if (!eec->empty())
+                        layerm.m_fills.entities.push_back(eec);
+                    else
+                        delete eec;
+
                     thick_polylines.clear();
                 } else {
                     extrusion_entities_append_paths(
@@ -570,6 +574,7 @@ void Layer::make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive:
 						ExtrusionAttributes{ surface_fill.params.extrusion_role,
 							ExtrusionFlow{ flow_mm3_per_mm, float(flow_width), surface_fill.params.flow.height() } 
 						});
+                    layerm.m_fills.entities.push_back(eec);
                 }
                 insert_fills_into_islands(*this, uint32_t(surface_fill.region_id), fill_begin, uint32_t(layerm.fills().size()));
 		    }
