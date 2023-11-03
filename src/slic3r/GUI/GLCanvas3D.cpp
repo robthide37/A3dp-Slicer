@@ -4917,6 +4917,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     const Transform3d& projection_matrix = camera.get_projection_matrix();
 
     const ModelObjectPtrs &model_objects    = GUI::wxGetApp().model().objects;
+    const int              extruders_count  = wxGetApp().extruders_edited_cnt();
     std::vector<ColorRGBA> extruders_colors = get_extruders_colors();
     for (GLVolume *vol : visible_volumes) {
         vol->model.set_color((vol->printable && !vol->is_outside) ? vol->color : ColorRGBA::GRAY());
@@ -4930,7 +4931,7 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
 
         const ModelVolume    &model_volume = *model_objects[vol->object_idx()]->volumes[vol->volume_idx()];
-        const size_t          extruder_idx = get_extruder_color_idx(model_volume);
+        const size_t          extruder_idx = get_extruder_color_idx(model_volume, extruders_count);
         TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
         ts.deserialize(model_volume.mmu_segmentation_facets.get_data(), true);
         ts.request_update_render_data();

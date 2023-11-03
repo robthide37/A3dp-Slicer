@@ -156,9 +156,12 @@ private:
 
 std::vector<ColorRGBA> get_extruders_colors();
 
-inline size_t get_extruder_color_idx(const ModelVolume &model_volume)
+inline size_t get_extruder_color_idx(const ModelVolume &model_volume, const int extruders_count)
 {
-    return (model_volume.extruder_id() > 0) ? model_volume.extruder_id() - 1 : 0;
+    if (const int extruder_id = model_volume.extruder_id(); extruder_id <= 0 || extruder_id > extruders_count)
+        return 0;
+    else
+        return extruder_id - 1;
 }
 
 } // namespace Slic3r
