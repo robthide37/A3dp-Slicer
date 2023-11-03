@@ -79,7 +79,6 @@ void TextInput::Create(wxWindow *     parent,
         ProcessEventLocally(e);
     });
     text_ctrl->Bind(wxEVT_TEXT, [this](auto &e) {
-        OnEdit();
         e.SetId(GetId());
         ProcessEventLocally(e);
     });

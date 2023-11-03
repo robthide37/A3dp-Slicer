@@ -66,7 +66,6 @@ class PhysicalPrinterDialog : public DPIDialog
     PhysicalPrinter     m_printer;
     wxString            m_default_name;
     DynamicPrintConfig* m_config            { nullptr };
-
     ::TextInput*        m_printer_name      { nullptr };
     std::vector<PresetForPrinter*> m_presets;
 
@@ -79,6 +78,10 @@ class PhysicalPrinterDialog : public DPIDialog
     ScalableButton*     m_printhost_port_browse_btn     {nullptr};
 
     wxBoxSizer*         m_presets_sizer                 {nullptr};
+
+    wxString            m_stored_host;
+    PrintHostType       m_last_host_type;
+    bool                m_opened_as_connect {false};
 
     void build_printhost_settings(ConfigOptionsGroup* optgroup);
     void OnOK(wxEvent& event);
