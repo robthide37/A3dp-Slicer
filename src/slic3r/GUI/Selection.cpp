@@ -1010,6 +1010,8 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
 
     assert(transformation_type.relative() || (transformation_type.absolute() && transformation_type.local()));
 
+    bool requires_general_synchronization = false;
+
     for (unsigned int i : m_list) {
         Transform3d rotation_matrix = Geometry::rotation_transform(rotation);
         GLVolume& v = *(*m_volumes)[i];
@@ -1034,6 +1036,20 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
                 // rotate around selection center
                 const Vec3d inst_pivot = inst_trafo.get_matrix_no_offset().inverse() * (m_cache.rotation_pivot - inst_trafo.get_offset());
                 rotation_matrix = Geometry::translation_transform(inst_pivot) * rotation_matrix * Geometry::translation_transform(-inst_pivot);
+
+                // Detects if the rotation is equivalent to a world rotation around the Z axis
+                // If not, force for a full synchronization of unselected instances
+                if (!requires_general_synchronization) {
+                    const Geometry::Transformation& vol_trafo = volume_data.get_volume_transform();
+                    const Transform3d old_world_rotation_matrix = (inst_trafo * vol_trafo).get_rotation_matrix();
+                    const Transform3d new_world_rotation_matrix = (inst_trafo * Geometry::Transformation(rotation_matrix) * vol_trafo).get_rotation_matrix();
+                    if (std::abs((old_world_rotation_matrix * Vec3d::UnitX()).z() - (new_world_rotation_matrix * Vec3d::UnitX()).z()) > EPSILON)
+                        requires_general_synchronization = true;
+                    else if (std::abs((old_world_rotation_matrix * Vec3d::UnitY()).z() - (new_world_rotation_matrix * Vec3d::UnitY()).z()) > EPSILON)
+                        requires_general_synchronization = true;
+                    else if (std::abs((old_world_rotation_matrix * Vec3d::UnitZ()).z() - (new_world_rotation_matrix * Vec3d::UnitZ()).z()) > EPSILON)
+                        requires_general_synchronization = true;
+                }
             }
             transform_instance_relative(v, volume_data, transformation_type, rotation_matrix, m_cache.rotation_pivot);
         }
@@ -1075,7 +1091,11 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
     if (m_mode == Instance) {
         int rot_axis_max = 0;
         rotation.cwiseAbs().maxCoeff(&rot_axis_max);
-        synchronize_unselected_instances((rot_axis_max == 2) && !transformation_type.instance() ? SyncRotationType::NONE : SyncRotationType::GENERAL);
+        const SyncRotationType type = (transformation_type.instance() && requires_general_synchronization) ||
+                                      (!transformation_type.instance() && rot_axis_max != 2) ||
+                                      rotation.isApprox(Vec3d::Zero()) ?
+            SyncRotationType::GENERAL : SyncRotationType::NONE;
+        synchronize_unselected_instances(type);
     }
     else if (m_mode == Volume)
         synchronize_unselected_volumes();
