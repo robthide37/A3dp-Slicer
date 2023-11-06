@@ -135,6 +135,39 @@ Points3 generate_elevated_travel(
     const std::function<double(double)>& elevation
 );
 
+/**
+ * Generates a regular polygon - all angles are the same (e.g. typical hexagon).
+ *
+ * @param centroid Central point.
+ * @param start_point The polygon point are ordered. This is the first point.
+ * @param points_count Amount of nodes of the polygon (e.g. 6 for haxagon).
+ *
+ * Distance between centroid and start point sets the scale of the polygon.
+ */
+Polygon generate_regular_polygon(
+    const Point& centroid,
+    const Point& start_point,
+    const unsigned points_count
+);
+
+class Bed {
+  private:
+    Polygon inner_offset;
+    static Polygon get_inner_offset(const std::vector<Vec2d>& shape, const double padding);
+
+  public:
+    /**
+     * Bed shape with inner padding.
+     */
+    Bed(const std::vector<Vec2d>& shape, const double padding);
+
+    Vec2d centroid;
+
+    /**
+     * Returns true if the point is within the bed shape including inner padding.
+     */
+    bool contains_within_padding(const Vec2d& point) const;
+};
 }
 class GCodeGenerator {
 
@@ -302,7 +335,12 @@ private:
     bool            last_pos_defined() const { return m_last_pos_defined; }
     void            set_extruders(const std::vector<unsigned int> &extruder_ids);
     std::string     preamble();
-    std::string     change_layer(coordf_t print_z);
+    std::optional<std::string> get_helical_layer_change_gcode(
+        const coordf_t previous_layer_z,
+        const coordf_t print_z,
+        const std::string& comment
+    );
+    std::string     change_layer(coordf_t previous_layer_z, coordf_t print_z);
     std::string     extrude_entity(const ExtrusionEntityReference &entity, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
     std::string     extrude_loop(const ExtrusionLoop &loop, const GCode::SmoothPathCache &smooth_path_cache, const std::string_view description, double speed = -1.);
     std::string     extrude_skirt(const ExtrusionLoop &loop_src, const ExtrusionFlow &extrusion_flow_override,

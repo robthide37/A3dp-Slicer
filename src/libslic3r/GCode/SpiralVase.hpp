@@ -27,8 +27,12 @@ public:
     	m_enabled 		   = en;
     }
 
+    bool is_enabled() const {
+        return m_enabled;
+    }
+
     std::string process_layer(const std::string &gcode);
-    
+
 private:
     const PrintConfig  &m_config;
     GCodeReader 		m_reader;

@@ -2172,6 +2172,7 @@ LayerResult GCodeGenerator::process_layer(
         + float_to_string_decimal_point(height) + "\n";
 
     // update caches
+    const coordf_t previous_layer_z{m_last_layer_z};
     m_last_layer_z = static_cast<float>(print_z);
     m_max_layer_z  = std::max(m_max_layer_z, m_last_layer_z);
     m_last_height = height;
@@ -2186,7 +2187,7 @@ LayerResult GCodeGenerator::process_layer(
             print.config().before_layer_gcode.value, m_writer.extruder()->id(), &config)
             + "\n";
     }
-    gcode += this->change_layer(print_z);  // this will increase m_layer_index
+    gcode += this->change_layer(previous_layer_z, print_z);  // this will increase m_layer_index
     m_layer = &layer;
     m_object_layer_over_raft = false;
     if (! print.config().layer_gcode.value.empty()) {
@@ -2608,22 +2609,143 @@ std::string GCodeGenerator::preamble()
     return gcode;
 }
 
+namespace GCode::Impl {
+Polygon generate_regular_polygon(
+    const Point& centroid,
+    const Point& start_point,
+    const unsigned points_count
+) {
+    Points points;
+    points.reserve(points_count);
+    const double part_angle{2*M_PI / points_count};
+    for (unsigned i = 0; i < points_count; ++i) {
+        const double current_angle{i * part_angle};
+        points.emplace_back(scaled(std::cos(current_angle)), scaled(std::sin(current_angle)));
+    }
+
+    Polygon regular_polygon{points};
+    const Vec2d current_vector{unscaled(regular_polygon.points.front())};
+    const Vec2d expected_vector{unscaled(start_point) - unscaled(centroid)};
+
+    const double current_scale = current_vector.norm();
+    const double expected_scale = expected_vector.norm();
+    regular_polygon.scale(expected_scale / current_scale);
+
+    regular_polygon.rotate(angle(current_vector, expected_vector));
+
+    regular_polygon.translate(centroid);
+
+    return regular_polygon;
+}
+
+Bed::Bed(const std::vector<Vec2d>& shape, const double padding):
+    inner_offset(get_inner_offset(shape, padding)),
+    centroid(unscaled(inner_offset.centroid()))
+{}
+
+bool Bed::contains_within_padding(const Vec2d& point) const {
+    return inner_offset.contains(scaled(point));
+}
+
+Polygon Bed::get_inner_offset(const std::vector<Vec2d>& shape, const double padding) {
+    Points shape_scaled;
+    shape_scaled.reserve(shape.size());
+    using std::begin, std::end, std::back_inserter, std::transform;
+    transform(begin(shape), end(shape), back_inserter(shape_scaled), [](const Vec2d& point){
+        return scaled(point);
+    });
+    return shrink({Polygon{shape_scaled}}, scaled(padding)).front();
+}
+}
+
+std::optional<std::string> GCodeGenerator::get_helical_layer_change_gcode(
+    const coordf_t previous_layer_z,
+    const coordf_t print_z,
+    const std::string& comment
+) {
+
+    if (!this->last_pos_defined()) {
+        return std::nullopt;
+    }
+
+    const double circle_radius{2};
+    const unsigned n_gon_points_count{16};
+
+    const Point n_gon_start_point{this->last_pos()};
+
+    static GCode::Impl::Bed bed{
+        this->m_config.bed_shape.values,
+        circle_radius
+    };
+    if (!bed.contains_within_padding(this->point_to_gcode(n_gon_start_point))) {
+        return std::nullopt;
+    }
+
+    const Point n_gon_centeroid{
+        n_gon_start_point
+        + scaled(Vec2d{
+            (bed.centroid - unscaled(n_gon_start_point)).normalized()
+            * circle_radius
+        })
+    };
+
+    const Polygon n_gon{GCode::Impl::generate_regular_polygon(
+        n_gon_centeroid,
+        n_gon_start_point,
+        n_gon_points_count
+    )};
+
+    const double n_gon_circumference = unscaled(n_gon.length());
+
+    const double z_change{print_z - previous_layer_z};
+    Points3 helix{GCode::Impl::generate_elevated_travel(
+        n_gon.points,
+        {},
+        previous_layer_z,
+        [&](const double distance){
+            return distance / n_gon_circumference * z_change;
+        }
+    )};
+
+    helix.emplace_back(to_3d(this->last_pos(), scaled(print_z)));
+
+    return this->generate_travel_gcode(helix, comment);
+}
+
 // called by GCodeGenerator::process_layer()
-std::string GCodeGenerator::change_layer(coordf_t print_z)
+std::string GCodeGenerator::change_layer(coordf_t previous_layer_z, coordf_t print_z)
 {
     std::string gcode;
     if (m_layer_count > 0)
         // Increment a progress bar indicator.
         gcode += m_writer.update_progress(++ m_layer_index, m_layer_count);
-    coordf_t z = print_z + m_config.z_offset.value;  // in unscaled coordinates
+
     if (EXTRUDER_CONFIG(retract_layer_change))
         gcode += this->retract_and_wipe();
 
-    {
-        std::ostringstream comment;
-        comment << "move to next layer (" << m_layer_index << ")";
-        gcode += m_writer.travel_to_z(z, comment.str());
-    }
+    const std::string comment{"move to next layer (" + std::to_string(m_layer_index) + ")"};
+
+    bool helical_layer_change{
+        (!this->m_spiral_vase || !this->m_spiral_vase->is_enabled())
+        && print_z > previous_layer_z
+        && EXTRUDER_CONFIG(travel_lift_before_obstacle)
+        && EXTRUDER_CONFIG(travel_slope) > 0 && EXTRUDER_CONFIG(travel_slope) < 90
+    };
+
+    const std::optional<std::string> helix_gcode{
+        helical_layer_change ?
+        this->get_helical_layer_change_gcode(
+            m_config.z_offset.value + previous_layer_z,
+            m_config.z_offset.value + print_z,
+            comment
+        ) :
+        std::nullopt
+    };
+    gcode += (
+        helix_gcode ?
+        *helix_gcode :
+        m_writer.travel_to_z(m_config.z_offset.value + print_z, comment)
+    );
 
     // forget last wiping path as wiping after raising Z is pointless
     m_wipe.reset_path();
