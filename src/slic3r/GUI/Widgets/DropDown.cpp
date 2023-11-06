@@ -291,9 +291,11 @@ void DropDown::render(wxDC &dc)
     // if (GetWindowStyle() & wxBORDER_NONE)
     //    dc.SetPen(wxNullPen);
 
+    const bool is_retina = wxOSX && dc.GetContentScaleFactor() > 1.0;
+
     wxRect rc(0, 0, size.x, size.y);
-    if (wxOSX && dc.GetContentScaleFactor() > 1.0)
-        // On Retina displays all controls are cut on 1px
+    // On Retina displays all controls are cut on 1px
+    if (is_retina)
         rc.x = rc.y = 1;
 
     // draw background
@@ -329,8 +331,12 @@ void DropDown::render(wxDC &dc)
             dc.SetBrush(wxBrush(selector_background_color.colorForStates(StateColor::Disabled)));
             dc.SetPen(wxPen(selector_background_color.colorForStates(states)));
             rcContent.Deflate(4, 1);
+            if (is_retina)
+                rc.y += 1;
             dc.DrawRectangle(rcContent);
             rcContent.Inflate(4, 1);
+            if (is_retina)
+                rc.y -= 1;
         }
         rcContent.y = offset.y;
     }
