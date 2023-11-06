@@ -1018,7 +1018,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
         if (m_mode == Instance && !is_wipe_tower()) {
             assert(is_from_fully_selected_instance(i));
             if (transformation_type.instance()) {
-               // ensure that the instance rotates as a rigid body
+                // ensure that the instance rotates as a rigid body
                 Transform3d inst_rotation_matrix = inst_trafo.get_rotation_matrix();
                 if (inst_trafo.is_left_handed()) {
                     Geometry::TransformationSVD inst_svd(inst_trafo);
@@ -1075,7 +1075,7 @@ void Selection::rotate(const Vec3d& rotation, TransformationType transformation_
     if (m_mode == Instance) {
         int rot_axis_max = 0;
         rotation.cwiseAbs().maxCoeff(&rot_axis_max);
-        synchronize_unselected_instances((rot_axis_max == 2) ? SyncRotationType::NONE : SyncRotationType::GENERAL);
+        synchronize_unselected_instances((rot_axis_max == 2) && !transformation_type.instance() ? SyncRotationType::NONE : SyncRotationType::GENERAL);
     }
     else if (m_mode == Volume)
         synchronize_unselected_volumes();
