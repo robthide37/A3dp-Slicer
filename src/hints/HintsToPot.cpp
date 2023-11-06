@@ -6,6 +6,7 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/filesystem.hpp>
 
 bool write_to_pot(boost::filesystem::path path, const std::vector<std::pair<std::string, std::string>>& data)
 {

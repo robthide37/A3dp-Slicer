@@ -13,6 +13,7 @@
 #include <boost/log/trivial.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
+#include <boost/nowide/convert.hpp>
 
 #include <wx/frame.h>
 #include <wx/event.h>

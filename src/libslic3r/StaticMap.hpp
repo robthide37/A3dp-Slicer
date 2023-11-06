@@ -4,6 +4,9 @@
 #include <optional>
 #include <array>
 #include <string_view>
+#include <functional>
+#include <stdexcept>
+
 
 namespace Slic3r {
 

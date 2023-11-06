@@ -32,6 +32,7 @@
 #include <chrono> // measure enumeration of fonts
 #include <sstream> // save for svg
 #include <array>
+#include <fstream>
 
 using namespace Slic3r;
 using namespace Slic3r::Emboss;

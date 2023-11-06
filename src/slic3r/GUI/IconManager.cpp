@@ -1,4 +1,5 @@
 #include "IconManager.hpp"
+#include <boost/algorithm/string/predicate.hpp>
 #include <cmath>
 #include <numeric>
 #include <boost/log/trivial.hpp>
