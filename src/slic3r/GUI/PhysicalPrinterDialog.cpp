@@ -750,7 +750,7 @@ void PhysicalPrinterDialog::OnOK(wxEvent& event)
     const auto opt = m_config->option<ConfigOptionEnum<PrintHostType>>("host_type");
     if (opt->value == htPrusaConnect) {
         if (printhost_win && printhost_win->GetValue() != L"https://connect.prusa3d.com"){
-            InfoDialog msg(this, _L("Warning"), _L("URL of PrusaConnect is different than https://connect.prusa3d.com. Do you wish to continue?"), true, wxYES_NO);
+            InfoDialog msg(this, _L("Warning"), _L("URL of PrusaConnect is different from https://connect.prusa3d.com. Do you want to continue?"), true, wxYES_NO);
             if(msg.ShowModal() != wxID_YES){
                 printhost_win->SetValue(L"https://connect.prusa3d.com");
                 return;

@@ -3589,7 +3589,7 @@ void GUI_App::open_wifi_config_dialog(bool forced, const wxString& drive_path/* 
             // TRN Text of notification when Slicer starts and usb stick with printer settings ini file is present 
             , _u8L("Printer configuration file detected on removable media.")
             // TRN Text of hypertext of notification when Slicer starts and usb stick with printer settings ini file is present 
-            , _u8L("Write Wi-Fi credetials."), [drive_path](wxEvtHandler* evt_hndlr) {
+            , _u8L("Write Wi-Fi credentials."), [drive_path](wxEvtHandler* evt_hndlr) {
                 wxGetApp().open_wifi_config_dialog(true, drive_path);
                 return true; });
         return;

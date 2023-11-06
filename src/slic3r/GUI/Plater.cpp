@@ -2318,7 +2318,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
                     // TRN Text of notification when Slicer starts and usb stick with printer settings ini file is present 
                     , _u8L("Printer configuration file detected on removable media.")
                     // TRN Text of hypertext of notification when Slicer starts and usb stick with printer settings ini file is present 
-                    , _u8L("Write Wi-Fi credetials."), [evt/*, CONFIG_FILE_NAME*/](wxEvtHandler* evt_hndlr){
+                    , _u8L("Write Wi-Fi credentials."), [evt/*, CONFIG_FILE_NAME*/](wxEvtHandler* evt_hndlr){
                         wxGetApp().open_wifi_config_dialog(true, evt.GetString());
                         return true;});
             }

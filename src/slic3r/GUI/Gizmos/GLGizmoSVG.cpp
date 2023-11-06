@@ -537,6 +537,7 @@ void GLGizmoSVG::on_stop_dragging()
     m_rotate_gizmo.set_angle(PI/2);
 
     // apply rotation
+    // TRN This is an item label in the undo-redo stack.
     m_parent.do_rotate(L("SVG-Rotate"));
     m_rotate_start_angle.reset();
     volume_transformation_changed();
@@ -1425,7 +1426,7 @@ void GLGizmoSVG::draw_filename(){
 
         if (m_filename_preview.empty())
             // TRN - Preview of filename after clear local filepath.
-            m_filename_preview = _u8L("Without filename");
+            m_filename_preview = _u8L("Unknown filename");
         
         m_filename_preview = ImGuiWrapper::trunc(m_filename_preview, m_gui_cfg->input_width);
     }
