@@ -136,6 +136,31 @@ Points3 generate_elevated_travel(
 );
 
 /**
+ * @brief Takes a list o polygons and builds a AABBTree over all unscaled lines.
+ *
+ * @param polygons A list of polygons.
+ * @return AABB Tree over all lines of the polygons.
+ *
+ * Unscales the lines in the process!
+ */
+AABBTreeLines::LinesDistancer<Linef> get_expolygons_distancer(const ExPolygons& polygons);
+
+/**
+ * @brief Given a AABB tree over lines find intersection with xy_path closest to the xy_path start.
+ *
+ * @param xy_path A path in 2D.
+ * @param distancer AABB Tree over lines.
+ * @return Distance to the first intersection if there is one.
+ *
+ * **Ignores intersection with xy_path starting point.**
+ */
+std::optional<double> get_first_crossed_line_distance(
+    tcb::span<const Line> xy_path,
+    const AABBTreeLines::LinesDistancer<Linef>& distancer
+);
+
+
+/**
  * Generates a regular polygon - all angles are the same (e.g. typical hexagon).
  *
  * @param centroid Central point.
@@ -169,6 +194,7 @@ class Bed {
     bool contains_within_padding(const Vec2d& point) const;
 };
 }
+
 class GCodeGenerator {
 
 public:        
@@ -405,6 +431,7 @@ private:
     std::string     retract_and_wipe(bool toolchange = false);
     std::string     unretract() { return m_writer.unretract(); }
     std::string     set_extruder(unsigned int extruder_id, double print_z);
+    bool line_distancer_is_required(const std::vector<unsigned int>& extruder_ids);
 
     // Cache for custom seam enforcers/blockers for each layer.
     SeamPlacer                          m_seam_placer;
@@ -473,6 +500,7 @@ private:
     // In non-sequential mode, all its copies will be printed.
     const Layer*                        m_layer;
     // m_layer is an object layer and it is being printed over raft surface.
+    std::optional<AABBTreeLines::LinesDistancer<Linef>> m_previous_layer_distancer;
     bool                                m_object_layer_over_raft;
     double                              m_volumetric_speed;
     // Support for the extrusion role markers. Which marker is active?

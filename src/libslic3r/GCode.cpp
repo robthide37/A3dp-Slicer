@@ -21,6 +21,7 @@
 ///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
 ///|/
 #include "Config.hpp"
+#include "Geometry/Circle.hpp"
 #include "libslic3r.h"
 #include "GCode/ExtrusionProcessor.hpp"
 #include "I18N.hpp"
@@ -2089,6 +2090,21 @@ namespace Skirt {
 
 } // namespace Skirt
 
+bool GCodeGenerator::line_distancer_is_required(const std::vector<unsigned int>& extruder_ids) {
+    for (const unsigned id : extruder_ids) {
+        const double travel_slope{this->m_config.travel_slope.get_at(id)};
+        if (
+            this->m_config.travel_lift_before_obstacle.get_at(id)
+            && this->m_config.travel_max_lift.get_at(id) > 0
+            && travel_slope > 0
+            && travel_slope < 90
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // In sequential mode, process_layer is called once per each object and its copy,
 // therefore layers will contain a single entry and single_object_instance_idx will point to the copy of the object.
 // In non-sequential mode, process_layer is called per each print_z height with all object and support layers accumulated.
@@ -2189,6 +2205,9 @@ LayerResult GCodeGenerator::process_layer(
     }
     gcode += this->change_layer(previous_layer_z, print_z);  // this will increase m_layer_index
     m_layer = &layer;
+    if (this->line_distancer_is_required(layer_tools.extruders) && this->m_layer != nullptr && this->m_layer->lower_layer != nullptr) {
+        this->m_previous_layer_distancer = GCode::Impl::get_expolygons_distancer(m_layer->lower_layer->lslices);
+    }
     m_object_layer_over_raft = false;
     if (! print.config().layer_gcode.value.empty()) {
         DynamicConfig config;
@@ -3382,11 +3401,28 @@ std::optional<double> get_first_crossed_line_distance(
     return {};
 }
 
+std::optional<double> get_obstacle_adjusted_slope_end(
+    const Lines& xy_path,
+    const std::optional<AABBTreeLines::LinesDistancer<Linef>>& previous_layer_distancer
+) {
+    if (!previous_layer_distancer) {
+        return std::nullopt;
+    }
+    std::optional<double> first_obstacle_distance = get_first_crossed_line_distance(
+        xy_path, *previous_layer_distancer
+    );
+    if (!first_obstacle_distance) {
+        return std::nullopt;
+    }
+    return *first_obstacle_distance;
+}
+
 ElevatedTravelParams get_elevated_traval_params(
+    const Lines& xy_path,
     const FullPrintConfig& config,
-    const unsigned extruder_id
-)
-{
+    const unsigned extruder_id,
+    const std::optional<AABBTreeLines::LinesDistancer<Linef>>& previous_layer_distancer
+) {
     ElevatedTravelParams elevation_params{};
     if (!config.travel_ramping_lift.get_at(extruder_id)) {
         elevation_params.slope_end = 0;
@@ -3404,6 +3440,15 @@ ElevatedTravelParams get_elevated_traval_params(
         elevation_params.slope_end = elevation_params.lift_height / std::tan(slope_rad);
     }
 
+    std::optional<double> obstacle_adjusted_slope_end{get_obstacle_adjusted_slope_end(
+        xy_path,
+        previous_layer_distancer
+    )};
+
+    if (obstacle_adjusted_slope_end && obstacle_adjusted_slope_end < elevation_params.slope_end) {
+        elevation_params.slope_end = *obstacle_adjusted_slope_end;
+    }
+
     return elevation_params;
 }
 
@@ -3411,7 +3456,8 @@ Points3 generate_travel_to_extrusion(
     const Polyline& xy_path,
     const FullPrintConfig& config,
     const unsigned extruder_id,
-    const double initial_elevation
+    const double initial_elevation,
+    const std::optional<AABBTreeLines::LinesDistancer<Linef>>& previous_layer_distancer
 ) {
     const double upper_limit = config.retract_lift_below.get_at(extruder_id);
     const double lower_limit = config.retract_lift_above.get_at(extruder_id);
@@ -3423,8 +3469,10 @@ Points3 generate_travel_to_extrusion(
     }
 
     ElevatedTravelParams elevation_params{get_elevated_traval_params(
+        xy_path.lines(),
         config,
-        extruder_id
+        extruder_id,
+        previous_layer_distancer
     )};
 
     const std::vector<double> ensure_points_at_distances{elevation_params.slope_end};
@@ -3600,7 +3648,8 @@ std::string GCodeGenerator::travel_to(const Point &point, ExtrusionRole role, st
             xy_path,
             this->m_config,
             extruder_id,
-            initial_elevation
+            initial_elevation,
+            this->m_previous_layer_distancer
         )
     );
 
@@ -3747,7 +3796,6 @@ Point GCodeGenerator::gcode_to_point(const Vec2d &point) const
         // This function may be called at the very start from toolchange G-code when the extruder is not assigned yet.
         pt += m_config.extruder_offset.get_at(extruder->id());
     return scaled<coord_t>(pt);
-        
 }
 
 }   // namespace Slic3r

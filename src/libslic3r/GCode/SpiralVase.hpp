@@ -14,6 +14,7 @@
 
 namespace Slic3r {
 
+
 class SpiralVase {
 public:
     SpiralVase(const PrintConfig &config) : m_config(config)

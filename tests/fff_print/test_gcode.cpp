@@ -140,6 +140,55 @@ TEST_CASE("Generate elevated travel", "[GCode]") {
     });
 }
 
+TEST_CASE("Get first crossed line distance", "[GCode]") {
+    // A 2x2 square at 0, 0, with 1x1 square hole in its center.
+    ExPolygon square_with_hole{
+        {
+            scaled(Vec2f{-1, -1}),
+            scaled(Vec2f{1, -1}),
+            scaled(Vec2f{1, 1}),
+            scaled(Vec2f{-1, 1})
+        },
+        {
+            scaled(Vec2f{-0.5, -0.5}),
+            scaled(Vec2f{0.5, -0.5}),
+            scaled(Vec2f{0.5, 0.5}),
+            scaled(Vec2f{-0.5, 0.5})
+        }
+    };
+    // A 2x2 square above the previous square at (0, 3).
+    ExPolygon square_above{
+        {
+            scaled(Vec2f{-1, 2}),
+            scaled(Vec2f{1, 2}),
+            scaled(Vec2f{1, 4}),
+            scaled(Vec2f{-1, 4})
+        }
+    };
+
+    // Bottom-up travel intersecting the squares.
+    Lines travel{Polyline{
+        scaled(Vec2f{0, -2}),
+        scaled(Vec2f{0, -0.7}),
+        scaled(Vec2f{0, 0}),
+        scaled(Vec2f{0, 1}),
+        scaled(Vec2f{0, 1.3}),
+        scaled(Vec2f{0, 2.4}),
+        scaled(Vec2f{0, 4.5}),
+        scaled(Vec2f{0, 5}),
+    }.lines()};
+
+    // Try different cases by skipping lines in the travel.
+    AABBTreeLines::LinesDistancer<Linef> distancer = get_expolygons_distancer({square_with_hole, square_above});
+    CHECK(*get_first_crossed_line_distance(travel, distancer) == Approx(1));
+    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(1), distancer) == Approx(0.2));
+    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(2), distancer) == Approx(0.5));
+    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(3), distancer) == Approx(1.0)); //Edge case
+    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(4), distancer) == Approx(0.7));
+    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(5), distancer) == Approx(1.6));
+    CHECK_FALSE(get_first_crossed_line_distance(tcb::span{travel}.subspan(6), distancer));
+}
+
 TEST_CASE("Generate regular polygon", "[GCode]") {
     const unsigned points_count{32};
     const Point centroid{scaled(Vec2d{5, -2})};
