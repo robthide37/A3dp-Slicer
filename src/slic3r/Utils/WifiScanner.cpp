@@ -416,14 +416,16 @@ void WifiScanner::scan()
     
     for ( const std::string& ssid : ssids)
     {
-        m_map[boost::nowide::widen(ssid)] = {};
+        if (!ssid.empty())
+            m_map[boost::nowide::widen(ssid)] = {};
     }
     if (m_map.empty()) {
         try
         {
             // Second implementation calling "airport" system command
             get_connected_ssid(m_current_ssid);
-            m_map[m_current_ssid] = std::string();
+            if (!m_current_ssid.empty())
+                m_map[m_current_ssid] = std::string();
         }
         catch (const std::exception&)
         {
