@@ -40,6 +40,7 @@
 #include "GCode/GCodeProcessor.hpp"
 #include "EdgeGrid.hpp"
 #include "GCode/ThumbnailData.hpp"
+#include "tcbspan/span.hpp"
 
 #include <memory>
 #include <map>
@@ -88,6 +89,53 @@ struct LayerResult {
     static LayerResult make_nop_layer_result() { return {"", std::numeric_limits<coord_t>::max(), false, false, true}; }
 };
 
+namespace GCode::Impl {
+struct DistancedPoint {
+    Point point;
+    double distance_from_start;
+};
+
+/**
+ * @brief Takes a path described as a list of points and adds points to it.
+ *
+ * @param xy_path A list of points describing a path in xy.
+ * @param sorted_distances A sorted list of distances along the path.
+ * @return Sliced path.
+ *
+ * The algorithm travels along the path segments and adds points to
+ * the segments in such a way that the points have specified distances
+ * from the xy_path start. **Any distances over the xy_path end will
+ * be simply ignored.**
+ *
+ * Example usage - simplified for clarity:
+ * @code
+ * std::vector<double> distances{0.5, 1.5};
+ * std::vector<Points> xy_path{{0, 0}, {1, 0}};
+ * // produces
+ * {{0, 0}, {0, 0.5}, {1, 0}}
+ * // notice that 1.5 is omitted
+ * @endcode
+ */
+std::vector<DistancedPoint> slice_xy_path(tcb::span<const Point> xy_path, tcb::span<const double> sorted_distances);
+
+/**
+ * @brief Take xy_path and genrate a travel acording to elevation.
+ *
+ * @param xy_path A list of points describing a path in xy.
+ * @param ensure_points_at_distances See slice_xy_path sorted_distances.
+ * @param elevation  A function taking current distance in mm as input and returning elevation in mm as output.
+ *
+ * **Be aweare** that the elevation function operates in mm, while xy_path and returned travel are in
+ * scaled coordinates.
+ */
+Points3 generate_elevated_travel(
+    const tcb::span<const Point> xy_path,
+    const std::vector<double>& ensure_points_at_distances,
+    const double initial_elevation,
+    const std::function<double(double)>& elevation
+);
+
+}
 class GCodeGenerator {
 
 public:        
@@ -303,11 +351,21 @@ private:
         const bool                print_wipe_extrusions);
 
     std::string     extrude_support(const ExtrusionEntityReferences &support_fills, const GCode::SmoothPathCache &smooth_path_cache);
-
+    std::string generate_travel_gcode(
+        const Points3& travel,
+        const std::string& comment
+    );
+    Polyline generate_travel_xy_path(
+        const Point& start,
+        const Point& end,
+        const bool needs_retraction,
+        bool& could_be_wipe_disabled
+    );
     std::string     travel_to(const Point &point, ExtrusionRole role, std::string comment);
     bool            needs_retraction(const Polyline &travel, ExtrusionRole role = ExtrusionRole::None);
-    std::string     retract(bool toolchange = false);
-    std::string     unretract() { return m_writer.unlift() + m_writer.unretract(); }
+
+    std::string     retract_and_wipe(bool toolchange = false);
+    std::string     unretract() { return m_writer.unretract(); }
     std::string     set_extruder(unsigned int extruder_id, double print_z);
 
     // Cache for custom seam enforcers/blockers for each layer.
@@ -336,8 +394,8 @@ private:
         // Input/output from/to custom G-code block, for returning position, retraction etc.
         DynamicConfig                       output_config;
         ConfigOptionFloats                 *opt_position { nullptr };
-        ConfigOptionFloat                  *opt_zhop { nullptr };
         ConfigOptionFloats                 *opt_e_position { nullptr };
+        ConfigOptionFloat                  *opt_zhop { nullptr };
         ConfigOptionFloats                 *opt_e_retracted { nullptr };
         ConfigOptionFloats                 *opt_e_restart_extra { nullptr };
         ConfigOptionFloats                 *opt_extruded_volume { nullptr };

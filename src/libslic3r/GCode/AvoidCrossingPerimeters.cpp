@@ -742,7 +742,7 @@ static bool need_wipe(const GCodeGenerator           &gcodegen,
                       const Polyline                 &result_travel,
                       const size_t                    intersection_count)
 {
-    bool z_lift_enabled = gcodegen.config().retract_lift.get_at(gcodegen.writer().extruder()->id()) > 0.;
+    bool z_lift_enabled = gcodegen.config().travel_max_lift.get_at(gcodegen.writer().extruder()->id()) > 0.;
     bool wipe_needed    = false;
 
     // If the original unmodified path doesn't have any intersection with boundary, then it is entirely inside the object otherwise is entirely

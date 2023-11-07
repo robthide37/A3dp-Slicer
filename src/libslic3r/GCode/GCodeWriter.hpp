@@ -30,8 +30,7 @@ public:
         multiple_extruders(false), m_extrusion_axis("E"), m_extruder(nullptr),
         m_single_extruder_multi_material(false),
         m_last_acceleration(0), m_max_acceleration(0),
-        m_last_bed_temperature(0), m_last_bed_temperature_reached(true), 
-        m_lifted(0)
+        m_last_bed_temperature(0), m_last_bed_temperature_reached(true)
         {}
     Extruder*            extruder()             { return m_extruder; }
     const Extruder*      extruder()     const   { return m_extruder; }
@@ -70,23 +69,21 @@ public:
     std::string travel_to_xy(const Vec2d &point, const std::string_view comment = {});
     std::string travel_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, const std::string_view comment = {});
     std::string travel_to_xyz(const Vec3d &point, const std::string_view comment = {});
+    std::string get_travel_to_z_gcode(double z, const std::string_view comment);
     std::string travel_to_z(double z, const std::string_view comment = {});
-    bool        will_move_z(double z) const;
     std::string extrude_to_xy(const Vec2d &point, double dE, const std::string_view comment = {});
     std::string extrude_to_xy_G2G3IJ(const Vec2d &point, const Vec2d &ij, const bool ccw, double dE, const std::string_view comment);
 //    std::string extrude_to_xyz(const Vec3d &point, double dE, const std::string_view comment = {});
     std::string retract(bool before_wipe = false);
     std::string retract_for_toolchange(bool before_wipe = false);
     std::string unretract();
-    std::string lift();
-    std::string unlift();
 
     // Current position of the printer, in G-code coordinates.
     // Z coordinate of current position contains zhop. If zhop is applied (this->zhop() > 0),
     // then the print_z = this->get_position().z() - this->zhop().
     Vec3d       get_position() const { return m_pos; }
-    // Current Z hop value.
-    double      get_zhop() const { return m_lifted; }
+    // Zhop value is obsolete. This is for backwards compability.
+    double      get_zhop() const { return 0; }
     // Update position of the print head based on the final position returned by a custom G-code block.
     // The new position Z coordinate contains the Z-hop.
     // GCodeWriter expects the custom script to NOT change print_z, only Z-hop, thus the print_z is maintained
@@ -117,7 +114,6 @@ private:
 
     unsigned int    m_last_bed_temperature;
     bool            m_last_bed_temperature_reached;
-    double          m_lifted;
     Vec3d           m_pos = Vec3d::Zero();
 
     enum class Acceleration {
@@ -125,7 +121,6 @@ private:
         Print
     };
 
-    std::string _travel_to_z(double z, const std::string_view comment);
     std::string _retract(double length, double restart_extra, const std::string_view comment);
     std::string set_acceleration_internal(Acceleration type, unsigned int acceleration);
 };

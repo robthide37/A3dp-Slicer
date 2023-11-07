@@ -537,6 +537,7 @@ WipeTower::WipeTower(const PrintConfig& config, const PrintRegionConfig& default
     m_no_sparse_layers(config.wipe_tower_no_sparse_layers),
     m_gcode_flavor(config.gcode_flavor),
     m_travel_speed(config.travel_speed),
+    m_travel_speed_z(config.travel_speed_z),
     m_infill_speed(default_region_config.infill_speed),
     m_perimeter_speed(default_region_config.perimeter_speed),
     m_current_tool(initial_tool),
@@ -1018,7 +1019,11 @@ void WipeTower::toolchange_Change(
     writer.feedrate(m_travel_speed * 60.f) // see https://github.com/prusa3d/PrusaSlicer/issues/5483
           .append(std::string("G1 X") + Slic3r::float_to_string_decimal_point(current_pos.x())
                              +  " Y"  + Slic3r::float_to_string_decimal_point(current_pos.y())
-                             + never_skip_tag() + "\n");
+                             + never_skip_tag() + "\n"
+    );
+    writer.feedrate(m_travel_speed_z * 60.f)
+          .append("G1 Z" + Slic3r::float_to_string_decimal_point(this->m_z_pos) + "\n");
+
     writer.append("[deretraction_from_wipe_tower_generator]");
 
     // The toolchange Tn command will be inserted later, only in case that the user does

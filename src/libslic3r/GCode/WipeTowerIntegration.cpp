@@ -41,9 +41,9 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
 
     std::string tcr_rotated_gcode = post_process_wipe_tower_moves(tcr, wipe_tower_offset, wipe_tower_rotation);
 
-    gcode += gcodegen.writer().unlift(); // Make sure there is no z-hop (in most cases, there isn't).
-
     double current_z = gcodegen.writer().get_position().z();
+    gcode += gcodegen.writer().travel_to_z(current_z);
+
     if (z == -1.) // in case no specific z was provided, print at current_z pos
         z = current_z;
 
@@ -57,7 +57,7 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
                                          || is_ramming
                                          || will_go_down);       // don't dig into the print
     if (should_travel_to_tower) {
-        gcode += gcodegen.retract();
+        gcode += gcodegen.retract_and_wipe();
         gcodegen.m_avoid_crossing_perimeters.use_external_mp_once();
         gcode += gcodegen.travel_to(
             wipe_tower_point_to_object_point(gcodegen, start_pos),
@@ -150,12 +150,15 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
             }
             std::ostringstream line_out;
             std::istringstream line_str(line);
+            std::optional<float> z{};
             line_str >> std::noskipws;  // don't skip whitespace
             char ch = 0;
             line_str >> ch >> ch; // read the "G1"
             while (line_str >> ch) {
                 if (ch == 'X' || ch == 'Y')
                     line_str >> (ch == 'X' ? pos.x() : pos.y());
+                else if (ch == 'Z')
+                    line_str >> *z;
                 else
                     line_out << ch;
             }
@@ -171,6 +174,8 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
                     oss << " X" << transformed_pos.x() - extruder_offset.x();
                 if (transformed_pos.y() != old_pos.y() || never_skip)
                     oss << " Y" << transformed_pos.y() - extruder_offset.y();
+                if (z)
+                    oss << " Z" << *z;
                 if (! line.empty())
                     oss << " ";
                 line = oss.str() + line;
@@ -243,7 +248,10 @@ std::string WipeTowerIntegration::finalize(GCodeGenerator &gcodegen)
 {
     std::string gcode;
     if (std::abs(gcodegen.writer().get_position().z() - m_final_purge.print_z) > EPSILON)
-        gcode += gcodegen.change_layer(m_final_purge.print_z);
+        gcode += gcodegen.generate_travel_gcode(
+            {{gcodegen.last_pos().x(), gcodegen.last_pos().y(), scaled(m_final_purge.print_z)}},
+            "move to safe place for purging"
+        );
     gcode += append_tcr(gcodegen, m_final_purge, -1);
     return gcode;
 }

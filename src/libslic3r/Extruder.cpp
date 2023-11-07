@@ -141,11 +141,6 @@ double Extruder::retract_length() const
     return m_config->retract_length.get_at(m_id);
 }
 
-double Extruder::retract_lift() const
-{
-    return m_config->retract_lift.get_at(m_id);
-}
-
 int Extruder::retract_speed() const
 {
     return int(floor(m_config->retract_speed.get_at(m_id)+0.5));
