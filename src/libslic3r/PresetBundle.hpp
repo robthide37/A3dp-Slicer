@@ -83,6 +83,8 @@ public:
     };
     ObsoletePresets             obsolete_presets;
 
+    std::set<std::string>       tmp_installed_presets;
+
     bool                        has_defauls_only() const 
         { return prints.has_defaults_only() && filaments.has_defaults_only() && printers.has_defaults_only(); }
 

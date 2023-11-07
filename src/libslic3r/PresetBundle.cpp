@@ -958,6 +958,8 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
 {
     PrinterTechnology printer_technology = Preset::printer_technology(config);
 
+    tmp_installed_presets.clear();
+
     // The "compatible_printers" field should not have been exported into a config.ini or a G-code anyway, 
     // but some of the alpha versions of Slic3r did.
     {
@@ -1006,19 +1008,23 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
     // 2) If the loading succeeded, split and load the config into print / filament / printer settings.
     // First load the print and printer presets.
 
+    std::set<std::string>& tmp_installed_presets_ref = tmp_installed_presets;
 	auto load_preset = 
 		[&config, &inherits, &inherits_values, 
          &compatible_printers_condition, &compatible_printers_condition_values, 
          &compatible_prints_condition, &compatible_prints_condition_values, 
-         is_external, &name, &name_or_path]
+         is_external, &name, &name_or_path, &tmp_installed_presets_ref]
 		(PresetCollection &presets, size_t idx, const std::string &key) {
 		// Split the "compatible_printers_condition" and "inherits" values one by one from a single vector to the print & printer profiles.
 		inherits = inherits_values[idx];
 		compatible_printers_condition = compatible_printers_condition_values[idx];
         if (idx > 0 && idx - 1 < compatible_prints_condition_values.size())
             compatible_prints_condition = compatible_prints_condition_values[idx - 1];
-		if (is_external)
-			presets.load_external_preset(name_or_path, name, config.opt_string(key, true), config);
+		if (is_external) {
+			ExternalPreset ext_preset = presets.load_external_preset(name_or_path, name, config.opt_string(key, true), config);
+			if (ext_preset.is_installed)
+				tmp_installed_presets_ref.emplace(ext_preset.preset->name);
+		}
 		else
 			presets.load_preset(presets.path_from_name(name), name, config).save();
 	};
@@ -1040,8 +1046,12 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
             compatible_printers_condition = compatible_printers_condition_values[1];
 			compatible_prints_condition   = compatible_prints_condition_values.front();
 			Preset                *loaded = nullptr;
-            if (is_external)
-                loaded = this->filaments.load_external_preset(name_or_path, name, old_filament_profile_names->values.front(), config).first;
+            if (is_external) {
+                ExternalPreset ext_preset = this->filaments.load_external_preset(name_or_path, name, old_filament_profile_names->values.front(), config);
+                loaded = ext_preset.preset;
+                if (ext_preset.is_installed)
+                    tmp_installed_presets.emplace(ext_preset.preset->name);
+            }
             else {
                 // called from Config Wizard.
 				loaded= &this->filaments.load_preset(this->filaments.path_from_name(name), name, config);
@@ -1075,13 +1085,15 @@ void PresetBundle::load_config_file_config(const std::string &name_or_path, bool
                 cfg.opt_string("compatible_prints_condition",   true) = compatible_prints_condition_values[i];
                 cfg.opt_string("inherits", true)                      = inherits_values[i + 1];
                 // Load all filament presets, but only select the first one in the preset dialog.
-                auto [loaded, modified] = this->filaments.load_external_preset(name_or_path, name,
+                auto [loaded, modified, installed] = this->filaments.load_external_preset(name_or_path, name,
                     (i < int(old_filament_profile_names->values.size())) ? old_filament_profile_names->values[i] : "",
                     std::move(cfg),
                     any_modified ? PresetCollection::LoadAndSelect::Never : 
                                    PresetCollection::LoadAndSelect::OnlyIfModified);
                 any_modified |= modified;
                 extr_names[i] = loaded->name;
+                if (installed)
+                    tmp_installed_presets.emplace(loaded->name);
             }
 
             // Check if some preset was selected after loading from config file.

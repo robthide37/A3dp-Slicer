@@ -197,7 +197,7 @@ public:
     std::vector<size_t> load_files(const std::vector<std::string>& input_files, bool load_model = true, bool load_config = true, bool imperial_units = false);
     // to be called on drag and drop
     bool load_files(const wxArrayString& filenames, bool delete_after_load = false);
-    void check_selected_presets_visibility(PrinterTechnology loaded_printer_technology);
+    void notify_about_installed_presets();
 
     bool preview_zip_archive(const boost::filesystem::path& input_file);
 

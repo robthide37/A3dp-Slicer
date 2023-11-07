@@ -781,7 +781,7 @@ static bool profile_print_params_same(const DynamicPrintConfig &cfg_old, const D
 // and select it, losing previous modifications.
 // Only a single profile could be edited at at the same time, which introduces complexity when loading
 // filament profiles for multi-extruder printers.
-std::pair<Preset*, bool> PresetCollection::load_external_preset(
+ExternalPreset PresetCollection::load_external_preset(
     // Path to the profile source file (a G-code, an AMF or 3MF file, a config file)
     const std::string           &path,
     // Name of the profile, derived from the source file name.
@@ -804,7 +804,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
         const Preset &edited = this->get_edited_preset();
         if ((edited.name == original_name || edited.name == inherits) && profile_print_params_same(edited.config, cfg))
             // Just point to that already selected and edited profile.
-            return std::make_pair(&(*this->find_preset_internal(edited.name)), false);
+            return ExternalPreset(&(*this->find_preset_internal(edited.name)), false);
     }
     // Is there a preset already loaded with the name stored inside the config?
     std::deque<Preset>::iterator it       = this->find_preset_internal(original_name);
@@ -818,7 +818,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
         // The preset exists and is visible and it matches the values stored inside config.
         if (select == LoadAndSelect::Always)
             this->select_preset(it - m_presets.begin());
-        return std::make_pair(&(*it), false);
+        return ExternalPreset(&(*it), false);
     }
     if (! found && select != LoadAndSelect::Never && ! inherits.empty()) {
         // Try to use a system profile as a base to select the system profile
@@ -830,14 +830,18 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
             // The system preset exists and it matches the values stored inside config.
             if (select == LoadAndSelect::Always)
                 this->select_preset(it - m_presets.begin());
-            return std::make_pair(&(*it), false);
+            return ExternalPreset(&(*it), false);
         }
     }
     if (found) {
         if (select != LoadAndSelect::Never) {
+            const size_t idx = it - m_presets.begin();
+            // The newly selected preset can be activated AND have to be make as visible.
+            bool is_installed = !m_presets[idx].is_visible;
+
             // Select the existing preset and override it with new values, so that
             // the differences will be shown in the preset editor against the referenced profile.
-            this->select_preset(it - m_presets.begin());
+            this->select_preset(idx);
 
             // update dirty state only if it's needed
             if (!profile_print_params_same(it->config, cfg)) {
@@ -855,7 +859,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
                 //update_saved_preset_from_current_preset();
                 assert(this->get_edited_preset().is_dirty);
             }
-            return std::make_pair(&(*it), this->get_edited_preset().is_dirty);
+            return ExternalPreset(&(*it), this->get_edited_preset().is_dirty, is_installed);
         }
         if (inherits.empty()) {
             // Update the "inherits" field.
@@ -886,7 +890,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
             // The preset exists and it matches the values stored inside config.
             if (select == LoadAndSelect::Always)
                 this->select_preset(it - m_presets.begin());
-            return std::make_pair(&(*it), false);
+            return ExternalPreset(&(*it), false);
         }
         // Form another profile name.
     }
@@ -896,7 +900,7 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
     if (this->m_idx_selected != size_t(-1) && &this->get_selected_preset() == &preset)
         this->get_edited_preset().is_external = true;
 
-    return std::make_pair(&preset, false);
+    return ExternalPreset(&preset, false);
 }
 
 Preset& PresetCollection::load_preset(const std::string &path, const std::string &name, DynamicPrintConfig &&config, bool select)
