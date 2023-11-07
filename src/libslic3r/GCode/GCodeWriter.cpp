@@ -436,7 +436,7 @@ std::string GCodeWriter::retract(bool before_wipe)
     assert(factor >= 0. && factor <= 1. + EPSILON);
     return this->_retract(
         factor * m_extruder->retract_length(),
-        factor * m_extruder->retract_restart_extra(),
+        m_extruder->retract_restart_extra(),
         "retract"
     );
 }
@@ -447,7 +447,7 @@ std::string GCodeWriter::retract_for_toolchange(bool before_wipe)
     assert(factor >= 0. && factor <= 1. + EPSILON);
     return this->_retract(
         factor * m_extruder->retract_length_toolchange(),
-        factor * m_extruder->retract_restart_extra_toolchange(),
+        m_extruder->retract_restart_extra_toolchange(),
         "retract for toolchange"
     );
 }
