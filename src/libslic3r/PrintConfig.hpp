@@ -747,7 +747,7 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloat,               max_volumetric_extrusion_rate_slope_negative))
     ((ConfigOptionBools,               travel_ramping_lift))
     ((ConfigOptionFloats,              travel_max_lift))
-    ((ConfigOptionPercents,            travel_slope))
+    ((ConfigOptionFloats,              travel_slope))
     ((ConfigOptionBools,               travel_lift_before_obstacle))
     ((ConfigOptionPercents,            retract_before_wipe))
     ((ConfigOptionFloats,              retract_length))

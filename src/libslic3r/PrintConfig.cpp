@@ -2333,15 +2333,15 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloats { 10. });
 
-    def = this->add("travel_slope", coPercents);
+    def = this->add("travel_slope", coFloats);
     def->label = L("Ramping slope angle");
     def->tooltip = L("During travel there is a part of the travel that is sloped upwards. "
                      "This number indicates the slope of the travel as mm raised per mm traveled in percent.");
     def->sidetext = L("°");
     def->min = 0;
-    def->max_literal = 1000;
+    def->max_literal = 90;
     def->mode = comAdvanced;
-    def->set_default_value(new ConfigOptionPercents{0.0});
+    def->set_default_value(new ConfigOptionFloats{0.0});
 
     def = this->add("travel_ramping_lift", coBools);
     def->label = L("Use ramping lift");
