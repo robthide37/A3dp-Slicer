@@ -2747,7 +2747,7 @@ std::string GCodeGenerator::change_layer(coordf_t previous_layer_z, coordf_t pri
     bool helical_layer_change{
         (!this->m_spiral_vase || !this->m_spiral_vase->is_enabled())
         && print_z > previous_layer_z
-        && EXTRUDER_CONFIG(travel_lift_before_obstacle)
+        && EXTRUDER_CONFIG(travel_ramping_lift)
         && EXTRUDER_CONFIG(travel_slope) > 0 && EXTRUDER_CONFIG(travel_slope) < 90
     };
 
