@@ -2339,7 +2339,7 @@ void PrintConfigDef::init_fff_params()
                      "This number indicates the slope of the travel as mm raised per mm traveled in percent.");
     def->sidetext = L("°");
     def->min = 0;
-    def->max_literal = 90;
+    def->max = 90;
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionFloats{0.0});
 
