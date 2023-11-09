@@ -157,8 +157,11 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
             while (line_str >> ch) {
                 if (ch == 'X' || ch == 'Y')
                     line_str >> (ch == 'X' ? pos.x() : pos.y());
-                else if (ch == 'Z')
-                    line_str >> *z;
+                else if (ch == 'Z') {
+                    float z_value;
+                    line_str >> z_value;
+                    z = z_value;
+                }
                 else
                     line_out << ch;
             }
