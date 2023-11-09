@@ -529,7 +529,8 @@ void GLGizmoMmuSegmentation::update_model_object() const
 
 void GLGizmoMmuSegmentation::init_model_triangle_selectors()
 {
-    const ModelObject *mo = m_c->selection_info()->model_object();
+    const int          extruders_count = wxGetApp().extruders_edited_cnt();
+    const ModelObject *mo              = m_c->selection_info()->model_object();
     m_triangle_selectors.clear();
 
     // Don't continue when extruders colors are not initialized
@@ -543,7 +544,7 @@ void GLGizmoMmuSegmentation::init_model_triangle_selectors()
         // This mesh does not account for the possible Z up SLA offset.
         const TriangleMesh *mesh = &mv->mesh();
 
-        size_t extruder_idx = get_extruder_color_idx(*mv);
+        size_t extruder_idx = get_extruder_color_idx(*mv, extruders_count);
         m_triangle_selectors.emplace_back(std::make_unique<TriangleSelectorMmGui>(*mesh, m_modified_extruders_colors, m_original_extruders_colors[extruder_idx]));
         // Reset of TriangleSelector is done inside TriangleSelectorMmGUI's constructor, so we don't need it to perform it again in deserialize().
         m_triangle_selectors.back()->deserialize(mv->mmu_segmentation_facets.get_data(), false);
