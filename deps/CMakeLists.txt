@@ -29,6 +29,7 @@ project(PrusaSlicer_deps)
 # Redefine BUILD_SHARED_LIBS with default being OFF
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static (experimental)" OFF)
 
+# List libraries to be excluded from build
 set(${PROJECT_NAME}_PACKAGE_EXCLUDES "" CACHE STRING "Exclude packages matching this regex pattern")
 
 # Support legacy parameter DESTDIR
@@ -151,7 +152,17 @@ set(SYSTEM_PROVIDED_PACKAGES OpenGL)
 if (UNIX)
     # On UNIX systems (including Apple) ZLIB should be available
     list(APPEND SYSTEM_PROVIDED_PACKAGES ZLIB)
+    if (APPLE)
+      # Deal with CURL on Apple (See issue #5984 on GH):
+      find_package(CURL QUIET)
+      if (NOT CURL_FOUND)
+        message(WARNING "No CURL dev package found in system, building static library. Mac SDK should include CURL from at least version 10.12. Check your SDK installation.")
+      else ()
+        list(APPEND SYSTEM_PROVIDED_PACKAGES CURL)
+      endif ()
+    endif ()
 endif ()
+
 
 list(APPEND SYSTEM_PROVIDED_PACKAGES ${${PROJECT_NAME}_PLATFORM_PACKAGES})
 list(REMOVE_DUPLICATES SYSTEM_PROVIDED_PACKAGES)
