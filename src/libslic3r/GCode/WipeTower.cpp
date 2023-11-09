@@ -1021,8 +1021,6 @@ void WipeTower::toolchange_Change(
                              +  " Y"  + Slic3r::float_to_string_decimal_point(current_pos.y())
                              + never_skip_tag() + "\n"
     );
-    writer.feedrate(m_travel_speed_z * 60.f)
-          .append("G1 Z" + Slic3r::float_to_string_decimal_point(this->m_z_pos) + "\n");
 
     writer.append("[deretraction_from_wipe_tower_generator]");
 

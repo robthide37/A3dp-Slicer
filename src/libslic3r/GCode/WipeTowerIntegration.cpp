@@ -82,7 +82,9 @@ std::string WipeTowerIntegration::append_tcr(GCodeGenerator &gcodegen, const Wip
             gcodegen.m_wipe.reset_path(); // We don't want wiping on the ramming lines.
         toolchange_gcode_str = gcodegen.set_extruder(new_extruder_id, tcr.print_z); // TODO: toolchange_z vs print_z
         if (gcodegen.config().wipe_tower)
-            deretraction_str = gcodegen.unretract();
+            deretraction_str += gcodegen.writer().get_travel_to_z_gcode(z, "restore layer Z");
+            deretraction_str += gcodegen.unretract();
+
     }
     assert(toolchange_gcode_str.empty() || toolchange_gcode_str.back() == '\n');
     assert(deretraction_str.empty() || deretraction_str.back() == '\n');
@@ -150,18 +152,12 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
             }
             std::ostringstream line_out;
             std::istringstream line_str(line);
-            std::optional<float> z{};
             line_str >> std::noskipws;  // don't skip whitespace
             char ch = 0;
             line_str >> ch >> ch; // read the "G1"
             while (line_str >> ch) {
                 if (ch == 'X' || ch == 'Y')
                     line_str >> (ch == 'X' ? pos.x() : pos.y());
-                else if (ch == 'Z') {
-                    float z_value;
-                    line_str >> z_value;
-                    z = z_value;
-                }
                 else
                     line_out << ch;
             }
@@ -177,8 +173,6 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
                     oss << " X" << transformed_pos.x() - extruder_offset.x();
                 if (transformed_pos.y() != old_pos.y() || never_skip)
                     oss << " Y" << transformed_pos.y() - extruder_offset.y();
-                if (z)
-                    oss << " Z" << *z;
                 if (! line.empty())
                     oss << " ";
                 line = oss.str() + line;
