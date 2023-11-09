@@ -2105,6 +2105,26 @@ bool GCodeGenerator::line_distancer_is_required(const std::vector<unsigned int>&
     return false;
 }
 
+namespace GCode::Impl {
+AABBTreeLines::LinesDistancer<Linef> get_previous_layer_distancer(
+    const GCodeGenerator::ObjectsLayerToPrint& objects_to_print,
+    const ExPolygons& slices
+) {
+    std::vector<Linef> lines;
+    for (const GCodeGenerator::ObjectLayerToPrint &object_to_print : objects_to_print) {
+        for (const PrintInstance& instance: object_to_print.object()->instances()) {
+            for (const ExPolygon& polygon : slices) {
+                for (const Line& line : polygon.lines()) {
+                    lines.emplace_back(unscaled(Point{line.a + instance.shift}), unscaled(Point{line.b + instance.shift}));
+                }
+            }
+
+        }
+    }
+    return AABBTreeLines::LinesDistancer{std::move(lines)};
+}
+}
+
 // In sequential mode, process_layer is called once per each object and its copy,
 // therefore layers will contain a single entry and single_object_instance_idx will point to the copy of the object.
 // In non-sequential mode, process_layer is called per each print_z height with all object and support layers accumulated.
@@ -2206,7 +2226,7 @@ LayerResult GCodeGenerator::process_layer(
     gcode += this->change_layer(previous_layer_z, print_z, result.spiral_vase_enable);  // this will increase m_layer_index
     m_layer = &layer;
     if (this->line_distancer_is_required(layer_tools.extruders) && this->m_layer != nullptr && this->m_layer->lower_layer != nullptr) {
-        this->m_previous_layer_distancer = GCode::Impl::get_expolygons_distancer(m_layer->lower_layer->lslices);
+        this->m_previous_layer_distancer = GCode::Impl::get_previous_layer_distancer(layers, layer.lower_layer->lslices);
     }
     m_object_layer_over_raft = false;
     if (! print.config().layer_gcode.value.empty()) {
@@ -3362,16 +3382,6 @@ Points3 generate_elevated_travel(
     return result;
 }
 
-AABBTreeLines::LinesDistancer<Linef> get_expolygons_distancer(const ExPolygons& polygons) {
-    std::vector<Linef> lines;
-    for (const ExPolygon& polygon : polygons) {
-        for (const Line& line : polygon.lines()) {
-            lines.emplace_back(unscaled(line.a), unscaled(line.b));
-        }
-    }
-
-    return AABBTreeLines::LinesDistancer{std::move(lines)};
-}
 
 std::optional<double> get_first_crossed_line_distance(
     tcb::span<const Line> xy_path,
@@ -3458,7 +3468,8 @@ Points3 generate_travel_to_extrusion(
     const FullPrintConfig& config,
     const unsigned extruder_id,
     const double initial_elevation,
-    const std::optional<AABBTreeLines::LinesDistancer<Linef>>& previous_layer_distancer
+    const std::optional<AABBTreeLines::LinesDistancer<Linef>>& previous_layer_distancer,
+    const Point& xy_path_coord_origin
 ) {
     const double upper_limit = config.retract_lift_below.get_at(extruder_id);
     const double lower_limit = config.retract_lift_above.get_at(extruder_id);
@@ -3469,8 +3480,13 @@ Points3 generate_travel_to_extrusion(
         return generate_flat_travel(xy_path.points, initial_elevation);
     }
 
+    Lines global_xy_path;
+    for (const Line& line : xy_path.lines()) {
+        global_xy_path.emplace_back(line.a + xy_path_coord_origin, line.b + xy_path_coord_origin);
+    }
+
     ElevatedTravelParams elevation_params{get_elevated_traval_params(
-        xy_path.lines(),
+        global_xy_path,
         config,
         extruder_id,
         previous_layer_distancer
@@ -3650,7 +3666,8 @@ std::string GCodeGenerator::travel_to(const Point &point, ExtrusionRole role, st
             this->m_config,
             extruder_id,
             initial_elevation,
-            this->m_previous_layer_distancer
+            this->m_previous_layer_distancer,
+            scaled(m_origin)
         )
     );
 

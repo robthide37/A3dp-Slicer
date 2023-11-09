@@ -136,16 +136,6 @@ Points3 generate_elevated_travel(
 );
 
 /**
- * @brief Takes a list o polygons and builds a AABBTree over all unscaled lines.
- *
- * @param polygons A list of polygons.
- * @return AABB Tree over all lines of the polygons.
- *
- * Unscales the lines in the process!
- */
-AABBTreeLines::LinesDistancer<Linef> get_expolygons_distancer(const ExPolygons& polygons);
-
-/**
  * @brief Given a AABB tree over lines find intersection with xy_path closest to the xy_path start.
  *
  * @param xy_path A path in 2D.
