@@ -1992,7 +1992,7 @@ std::vector<std::pair<std::string, std::vector<std::string>>> option_keys {
         "filament_travel_ramping_lift",
         "filament_travel_max_lift",
         "filament_travel_slope",
-        "filament_travel_lift_before_obstacle",
+        //"filament_travel_lift_before_obstacle",
         "filament_retract_lift_above",
         "filament_retract_lift_below"
     }},
@@ -3308,7 +3308,7 @@ void TabPrinter::build_extruder_pages(size_t n_before_extruders)
         optgroup->append_single_option_line("travel_ramping_lift", "", extruder_idx);
         optgroup->append_single_option_line("travel_max_lift", "", extruder_idx);
         optgroup->append_single_option_line("travel_slope", "", extruder_idx);
-        optgroup->append_single_option_line("travel_lift_before_obstacle", "", extruder_idx);
+        //optgroup->append_single_option_line("travel_lift_before_obstacle", "", extruder_idx);
 
         line = { L("Only lift"), "" };
         line.append_option(optgroup->get_option("retract_lift_above", extruder_idx));
@@ -3582,7 +3582,7 @@ void TabPrinter::toggle_options()
             load_config(new_conf);
         }
 
-        toggle_option("travel_lift_before_obstacle", ramping_lift, i);
+        //toggle_option("travel_lift_before_obstacle", ramping_lift, i);
 
         toggle_option("retract_length_toolchange", have_multiple_extruders, i);
 
