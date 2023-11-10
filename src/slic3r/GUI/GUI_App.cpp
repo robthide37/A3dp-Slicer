@@ -936,7 +936,7 @@ void GUI_App::init_app_config()
 //	SetAppDisplayName(SLIC3R_APP_NAME);
 
 	// Set the Slic3r data directory at the Slic3r XS module.
-	// Unix: ~/ .Slic3r
+	// Unix: ~/ .Slic3rP
 	// Windows : "C:\Users\username\AppData\Roaming\Slic3r" or "C:\Documents and Settings\username\Application Data\Slic3r"
 	// Mac : "~/Library/Application Support/Slic3r"
 

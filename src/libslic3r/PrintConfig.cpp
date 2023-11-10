@@ -2335,8 +2335,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("travel_slope", coFloats);
     def->label = L("Ramping slope angle");
-    def->tooltip = L("During travel there is a part of the travel that is sloped upwards. "
-                     "This number indicates the slope of the travel as mm raised per mm traveled in percent.");
+    def->tooltip = L("Slope of the ramp in the initial phase of the travel.");
     def->sidetext = L("°");
     def->min = 0;
     def->max = 90;
@@ -2346,6 +2345,7 @@ void PrintConfigDef::init_fff_params()
     def = this->add("travel_ramping_lift", coBools);
     def->label = L("Use ramping lift");
     def->tooltip = L("Generates a ramping lift instead of lifting the extruder directly upwards. "
+                     "The travel is split into two phases: the ramp and the standard horizontal travel. "
                      "This option helps reduce stringing.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBools{ false });
@@ -2362,15 +2362,14 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("travel_lift_before_obstacle", coBools);
     def->label = L("Steeper ramp before obstacles");
-    def->tooltip = L("If enabled, enables dynamic tuning of the 'travel slope end' parameter. "
-                     "If there is an obstacle in the travel path, the 'travel slope end' is set to the obstacle distance, "
-                     "effectively ensuring that the print head will travel in 'lift height' above the obstacle.");
+    def->tooltip = L("If enabled, PrusaSlicer detects obstacles along the travel path and makes the slope steeper "
+                     "in case an obstacle might be hit during the initial phase of the travel.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBools{false});
 
     def = this->add("retract_lift", coFloats);
     def->label = L("Lift height");
-    def->tooltip = L("TODO");
+    def->tooltip = L("Lift height applied before travel.");
     def->sidetext = L("mm");
     def->min = 0;
     def->max_literal = 1000;
