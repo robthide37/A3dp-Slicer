@@ -4902,7 +4902,8 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
 
     camera.apply_projection(volumes_box, near_z, far_z);
 
-    GLShaderProgram* shader = wxGetApp().get_shader("mm_gouraud");
+    const bool       is_sla = current_printer_technology() == ptSLA;
+    GLShaderProgram *shader = wxGetApp().get_shader(is_sla ? "gouraud" : "mm_gouraud");
     if (shader == nullptr)
         return;
 
@@ -4913,6 +4914,8 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     glsafe(::glEnable(GL_DEPTH_TEST));
 
     shader->start_using();
+    if (is_sla)
+        shader->set_uniform("emission_factor", 0.0f);
 
     const Transform3d& projection_matrix = camera.get_projection_matrix();
 
@@ -4930,12 +4933,16 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
 
-        const ModelVolume    &model_volume = *model_objects[vol->object_idx()]->volumes[vol->volume_idx()];
-        const size_t          extruder_idx = get_extruder_color_idx(model_volume, extruders_count);
-        TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
-        ts.deserialize(model_volume.mmu_segmentation_facets.get_data(), true);
-        ts.request_update_render_data();
-        ts.render(nullptr, model_matrix);
+        if (is_sla) {
+            vol->render();
+        } else {
+            const ModelVolume    &model_volume = *model_objects[vol->object_idx()]->volumes[vol->volume_idx()];
+            const size_t          extruder_idx = get_extruder_color_idx(model_volume, extruders_count);
+            TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
+            ts.deserialize(model_volume.mmu_segmentation_facets.get_data(), true);
+            ts.request_update_render_data();
+            ts.render(nullptr, model_matrix);
+        }
 
         vol->is_active = is_active;
     }
