@@ -3265,12 +3265,10 @@ std::string GCodeGenerator::_extrude(
     }
 
     if (m_enable_cooling_markers)
-        gcode += path_attr.role.is_bridge() ? ";_BRIDGE_FAN_END" : ";_EXTRUDE_END";
+        gcode += path_attr.role.is_bridge() ? ";_BRIDGE_FAN_END\n" : ";_EXTRUDE_END\n";
 
     if (dynamic_speed_and_fan_speed.second >= 0)
-        gcode += ";_RESET_FAN_SPEED";
-
-    gcode += "\n";
+        gcode += ";_RESET_FAN_SPEED\n";
 
     this->set_last_pos(path.back().point);
     return gcode;
