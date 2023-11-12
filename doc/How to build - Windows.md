@@ -2,7 +2,10 @@
 
 ### Install the tools
 
-Install Visual Studio Community 2019 from [visualstudio.microsoft.com/vs/](https://visualstudio.microsoft.com/vs/). Older versions are not supported as PrusaSlicer requires support for C++17.
+Install Visual Studio Community 2022 (preferred) or 2019 from [visualstudio.microsoft.com/vs/](https://visualstudio.microsoft.com/vs/).
+Older versions are not supported as PrusaSlicer requires support for C++17.
+Newer versions are not supported as they have not been fully tested and determined to be compatible.
+
 Select all workload options for C++ and make sure to launch Visual Studio after install (to ensure that the full setup completes).
 
 Install git for Windows from [gitforwindows.org](https://gitforwindows.org/)
