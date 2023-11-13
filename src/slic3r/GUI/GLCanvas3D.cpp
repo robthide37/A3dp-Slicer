@@ -4902,8 +4902,10 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
 
     camera.apply_projection(volumes_box, near_z, far_z);
 
-    const bool       is_sla = current_printer_technology() == ptSLA;
-    GLShaderProgram *shader = wxGetApp().get_shader(is_sla ? "gouraud" : "mm_gouraud");
+    const ModelObjectPtrs &model_objects     = GUI::wxGetApp().model().objects;
+    std::vector<ColorRGBA> extruders_colors  = get_extruders_colors();
+    const bool             render_as_painted = !model_objects.empty() && !extruders_colors.empty();
+    GLShaderProgram       *shader            = wxGetApp().get_shader(render_as_painted ? "mm_gouraud" : "gouraud_light");
     if (shader == nullptr)
         return;
 
@@ -4914,14 +4916,12 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
     glsafe(::glEnable(GL_DEPTH_TEST));
 
     shader->start_using();
-    if (is_sla)
+    if (!render_as_painted)
         shader->set_uniform("emission_factor", 0.0f);
 
     const Transform3d& projection_matrix = camera.get_projection_matrix();
 
-    const ModelObjectPtrs &model_objects    = GUI::wxGetApp().model().objects;
-    const int              extruders_count  = wxGetApp().extruders_edited_cnt();
-    std::vector<ColorRGBA> extruders_colors = get_extruders_colors();
+    const int extruders_count = wxGetApp().extruders_edited_cnt();
     for (GLVolume *vol : visible_volumes) {
         vol->model.set_color((vol->printable && !vol->is_outside) ? vol->color : ColorRGBA::GRAY());
         // the volume may have been deactivated by an active gizmo
@@ -4933,16 +4933,15 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
 
-        if (is_sla) {
-            vol->render();
-        } else {
+        if (render_as_painted && vol->object_idx() >= 0 && vol->volume_idx() >= 0) {
             const ModelVolume    &model_volume = *model_objects[vol->object_idx()]->volumes[vol->volume_idx()];
             const size_t          extruder_idx = get_extruder_color_idx(model_volume, extruders_count);
             TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
             ts.deserialize(model_volume.mmu_segmentation_facets.get_data(), true);
             ts.request_update_render_data();
             ts.render(nullptr, model_matrix);
-        }
+        } else
+            vol->render();
 
         vol->is_active = is_active;
     }
