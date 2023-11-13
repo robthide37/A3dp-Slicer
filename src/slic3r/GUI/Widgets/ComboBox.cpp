@@ -7,8 +7,8 @@
 
 BEGIN_EVENT_TABLE(ComboBox, TextInput)
 
-    EVT_LEFT_DOWN(ComboBox::mouseDown)
-//EVT_MOUSEWHEEL(ComboBox::mouseWheelMoved)
+EVT_LEFT_DOWN(ComboBox::mouseDown)
+EVT_MOUSEWHEEL(ComboBox::mouseWheelMoved)
 EVT_KEY_DOWN(ComboBox::keyDown)
 
 // catch paint events
