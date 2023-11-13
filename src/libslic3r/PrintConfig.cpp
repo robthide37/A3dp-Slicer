@@ -6325,12 +6325,12 @@ void PrintConfigDef::init_extruder_option_keys()
 {
     // ConfigOptionFloats, ConfigOptionPercents, ConfigOptionBools, ConfigOptionStrings
     m_extruder_option_keys = {
-        "extruder_colour",
-        "extruder_offset",
-        "extruder_fan_offset",
-        "extruder_temperature_offset",
         "default_filament_profile",
         "deretract_speed",
+        "extruder_colour",
+        "extruder_fan_offset",
+        "extruder_offset",
+        "extruder_temperature_offset",
         "max_layer_height",
         "min_layer_height",
         "nozzle_diameter",
@@ -6359,6 +6359,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "wipe_only_crossing",
         "wipe_speed",
     };
+    assert(std::is_sorted(m_extruder_option_keys.begin(), m_extruder_option_keys.end()));
 
     m_extruder_retract_keys = {
         "deretract_speed",
@@ -6370,9 +6371,12 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_lift_above",
         "retract_lift_before_travel",
         "retract_lift_below",
+        "retract_lift_first_layer",
+        "retract_lift_top",
         "retract_restart_extra",
         "retract_speed",
         "seam_gap",
+        "seam_gap_external",
         "wipe",
         "wipe_extra_perimeter",
         "wipe_inside_depth",
