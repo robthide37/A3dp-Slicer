@@ -58,6 +58,14 @@ ComboBox::ComboBox(wxWindow *      parent,
         wxCommandEvent e(wxEVT_COMBOBOX_CLOSEUP);
         GetEventHandler()->ProcessEvent(e);
     });
+
+#ifndef _WIN32
+    this->Bind(wxEVT_SYS_COLOUR_CHANGED, [this, parent](wxSysColourChangedEvent& event) {
+        event.Skip();
+        SetBackgroundColour(parent->GetBackgroundColour());
+        SetForegroundColour(parent->GetForegroundColour());
+    });
+#endif
     for (int i = 0; i < n; ++i) Append(choices[i]);
 }
 
