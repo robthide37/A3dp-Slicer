@@ -330,30 +330,6 @@ WipingPanel::WipingPanel(wxWindow* parent, const std::vector<float>& matrix, con
         ::SpinInput* spin_ctrl = new ::SpinInput(m_page_simple, "", wxEmptyString, wxDefaultPosition, wxSize(ITEM_WIDTH(), -1), style | wxALIGN_RIGHT, 0, 300, (int)initial);
         update_ui(spin_ctrl);
         vec.push_back(spin_ctrl);
-
-#ifdef __WXOSX__
-        // On OSX / Cocoa, wxSpinCtrl::GetValue() doesn't return the new value
-        // when it was changed from the text control, so the on_change callback
-        // gets the old one, and on_kill_focus resets the control to the old value.
-        // As a workaround, we get the new value from $event->GetString and store
-        // here temporarily so that we can return it from get_value()
-        spin_ctrl->Bind(wxEVT_TEXT, ([spin_ctrl](wxCommandEvent e)
-        {
-            long value;
-            const bool parsed = e.GetString().ToLong(&value);
-            int tmp_value = parsed && value >= INT_MIN && value <= INT_MAX ? (int)value : INT_MIN;
-
-            // Forcibly set the input value for SpinControl, since the value 
-            // inserted from the keyboard or clipboard is not updated under OSX
-            if (tmp_value != INT_MIN) {
-                spin_ctrl->SetValue(tmp_value);
-
-                // But in SetValue() is executed m_text_ctrl->SelectAll(), so
-                // discard this selection and set insertion point to the end of string
-                spin_ctrl->GetText()->SetInsertionPointEnd();
-            }
-        }), spin_ctrl->GetId());
-#endif
     };
 
 	for (unsigned int i=0;i<m_number_of_extruders;++i) {
