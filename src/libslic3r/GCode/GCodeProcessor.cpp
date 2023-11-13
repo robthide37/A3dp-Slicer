@@ -3606,6 +3606,7 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_line_id + 1 :
         ((type == EMoveType::Seam) ? m_last_line_id : m_line_id);
     assert(type != EMoveType::Noop);
+
     m_result.moves.emplace_back(
         m_last_line_id,
         type,
@@ -3629,7 +3630,8 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_fan_speed,
         m_extruder_temps[m_extruder_id],
         m_time_processor.machines[0].time, //time: set later
-        static_cast<float>(m_layer_id) //layer_duration: set later
+        static_cast<float>(m_layer_id), //layer_duration: set later
+        m_layer_id
     );
 
     // stores stop time placeholders for later use
