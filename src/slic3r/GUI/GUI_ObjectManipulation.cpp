@@ -1266,14 +1266,14 @@ ManipulationEditor::ManipulationEditor(ObjectManipulation* parent,
         e.Skip();
     }, this->GetId());
 
-    this->Bind(wxEVT_SET_FOCUS, [this, parent](wxFocusEvent& e)
+    this->GetTextCtrl()->Bind(wxEVT_SET_FOCUS, [this, parent](wxFocusEvent& e)
     {
         parent->set_focused_editor(this);
 
         // needed to show the visual hints in 3D scene
         wxGetApp().plater()->canvas3D()->handle_sidebar_focus_event(m_full_opt_name, true);
         e.Skip();
-    }, this->GetId());
+    });
 
     this->Bind(wxEVT_CHAR, ([this](wxKeyEvent& event)
     {
