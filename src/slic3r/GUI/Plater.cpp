@@ -6713,7 +6713,7 @@ void Plater::apply_cut_object_to_model(size_t obj_idx, const ModelObjectPtrs& ne
 
 
 
-wxString check_binary_vs_ascii_gcode_extension(PrinterTechnology pt, const std::string& ext, bool binary_output)
+static wxString check_binary_vs_ascii_gcode_extension(PrinterTechnology pt, const std::string& ext, bool binary_output)
 {
     wxString err_out;
     if (pt == ptFFF) {
@@ -6733,6 +6733,33 @@ wxString check_binary_vs_ascii_gcode_extension(PrinterTechnology pt, const std::
         }
     }
     return err_out;
+}
+
+
+
+// This function should be deleted when binary G-codes become more common. The dialog is there to make the
+// transition period easier for the users, because bgcode files are not recognized by older firmwares
+// without any error message.
+static void alert_when_exporting_binary_gcode(bool binary_output, const std::string& printer_notes)
+{
+    if (boost::algorithm::contains(printer_notes, "PRINTER_VENDOR_PRUSA3D")
+     && (boost::algorithm::contains(printer_notes, "PRINTER_MODEL_XL")
+      || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MINI")
+      || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MK4")))
+    {
+        AppConfig* app_config = wxGetApp().app_config;
+        wxWindow* parent = wxGetApp().mainframe;
+        const std::string option_key = "dont_warn_about_firmware_version_when_exporting_binary_gcode";
+
+        if (app_config->get(option_key) != "1") {
+            RichMessageDialog dialog(parent, _L("You are exporting binary G-code for a Prusa printer. Please, make sure that your printer "
+                "is running firmware version 5.1.0-alpha2 or later. Older firmwares are not able to handle binary G-codes."),
+                _L("Exporting binary G-code"), wxICON_WARNING | wxOK);
+            dialog.ShowCheckBox(_L("Don't show again"));
+            if (dialog.ShowModal() == wxID_OK && dialog.IsCheckBoxChecked())
+                app_config->set(option_key, "1");
+        }
+    }
 }
 
 
@@ -6823,6 +6850,9 @@ void Plater::export_gcode(bool prefer_removable)
                 }
             }
 #endif
+            alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"),
+                                              wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
+
         }
     }
 
@@ -7379,6 +7409,9 @@ void Plater::send_gcode()
                 return;
             }
         }
+
+        alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"),
+                                          wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
 
         upload_job.upload_data.upload_path = dlg.filename();
         upload_job.upload_data.post_action = dlg.post_action();
