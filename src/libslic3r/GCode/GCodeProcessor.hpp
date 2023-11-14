@@ -97,11 +97,11 @@ namespace Slic3r {
             MoveVertex() {}
             MoveVertex(uint32_t gcode_id, EMoveType type, ExtrusionRole extrusion_role, uint8_t extruder_id,
                 uint8_t cp_color_id, Vec3f position, float delta_extruder, float feedrate, float width, float height,
-                float mm3_per_mm, float fan_speed, float temperature, float time, float layer_duration) :
+                float mm3_per_mm, float fan_speed, float temperature, float time, float layer_duration, uint16_t layer_id) :
                 gcode_id(gcode_id), type(type), extrusion_role(extrusion_role), extruder_id(extruder_id), 
                 cp_color_id(cp_color_id), position(position), delta_extruder(delta_extruder), feedrate(feedrate), 
                 width(width), height(height), mm3_per_mm(mm3_per_mm), fan_speed(fan_speed), 
-                temperature(temperature), time(time), layer_duration(layer_duration) {
+                temperature(temperature), time(time), layer_duration(layer_duration), layer_id(layer_id) {
             }
 
             uint32_t gcode_id{ 0 };
@@ -119,6 +119,7 @@ namespace Slic3r {
             float temperature{ 0.0f }; // Celsius degrees
             float time{ 0.0f }; // s
             float layer_duration{ 0.0f }; // s (layer id before finalize)
+            uint16_t layer_id{ 0 };
 
             float volumetric_rate() const { return feedrate * mm3_per_mm; }
         };
@@ -562,6 +563,7 @@ namespace Slic3r {
         float m_first_layer_height; // mm
         bool m_processing_start_custom_gcode;
         unsigned int m_g1_line_id;
+        unsigned int m_last_layer_id;
         unsigned int m_layer_id;
         CpColor m_cp_color;
         float m_temperature;

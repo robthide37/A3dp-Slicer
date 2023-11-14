@@ -439,8 +439,11 @@ void AppConfig::set_defaults()
         if (get("default_action_delete_all").empty())
             set("default_action_delete_all", "1");
 
-        if (get("color_mapinulation_panel").empty())
-            set("color_mapinulation_panel", "0");
+        // change names, remove this if after 2024
+        if (get("color_manipulation_panel").empty() && !get("color_mapinulation_panel").empty())
+            set("color_manipulation_panel", get("color_mapinulation_panel"));
+        if (get("color_manipulation_panel").empty())
+            set("color_manipulation_panel", "0");
 
         if (get("order_volumes").empty())
             set("order_volumes", "1");
@@ -453,6 +456,12 @@ void AppConfig::set_defaults()
 
         if (get("hide_slice_tooltip").empty())
             set("hide_slice_tooltip", "0");
+
+        if (get("show_layer_height_doubleslider").empty())
+            set("show_layer_height_doubleslider", "1");
+
+        if (get("show_layer_time_doubleslider").empty())
+            set("show_layer_time_doubleslider", "0");
 
 	} else {
 #ifdef _WIN32

@@ -318,6 +318,8 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
     }
 }
 
+//note: printer options are toogled in TabPrinter::toggle_options()
+
 void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 {
     bool have_perimeters = config->opt_int("perimeters") > 0;

@@ -2124,11 +2124,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         size_t move_id = i - seams_count;
 
         if (move.type == EMoveType::Extrude) {
-            // layers zs
-            const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
-            const double z = static_cast<double>(move.position.z());
-            if (last_z == nullptr || z < *last_z - EPSILON || *last_z + EPSILON < z)
-                m_layers.append(z, { last_travel_s_id, move_id });
+            // detect new layers
+            if (m_layers.empty() || move.layer_id >= m_layers.size())
+                m_layers.append(static_cast<double>(move.position.z()), { last_travel_s_id, move_id });
             else
                 m_layers.get_endpoints().back().last = move_id;
             // extruder ids

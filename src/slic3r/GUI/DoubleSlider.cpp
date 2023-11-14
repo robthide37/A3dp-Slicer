@@ -782,14 +782,46 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
         if (label_type == ltHeight)
             return str;
         if (label_type == ltHeightWithLayer) {
-            size_t layer_number = m_is_wipe_tower ? get_layer_number(value, label_type) + 1 : (m_values.empty() ? value : value + 1);
-            if (layer_number >= m_values.size()) {
-                double layer_height = m_values.empty() ? m_label_koef : m_values[m_values.size() - 1] - (m_values.size() > 1 ? m_values[m_values.size() - 2] : 0);
-                return format_wxstr("\n%1%\n(%2%,\n%3%)", str, wxString::Format("%.*f", 2, layer_height), layer_number);
-            } else {
-                double layer_height = m_values.empty() ? m_label_koef : m_values[layer_number - 1] - (layer_number > 1 ? m_values[layer_number - 2] : 0);
-                return format_wxstr("%1%\n(%2%,\n%3%)", str, wxString::Format("%.*f", 2, layer_height), layer_number);
+            size_t layer_number = m_is_wipe_tower ? get_layer_number(value, label_type) /**/ + 1 : (m_values.empty() ? value : value /* + 1 */ );
+            bool show_lheight = GUI::wxGetApp().app_config->get("show_layer_height_doubleslider") == "1";
+            bool show_ltime = GUI::wxGetApp().app_config->get("show_layer_time_doubleslider") == "1";
+            int nb_lines = 2; // to move things down if the slider is on top
+            wxString comma = "\n(";
+            if (show_lheight) {
+                nb_lines++;
+                double layer_height = 0;
+                if (layer_number >= m_values.size()) {
+                    assert(layer_number == m_values.size());
+                    layer_height = m_values.empty() ? m_label_koef : m_values[m_values.size() - 1] - (m_values.size() > 1 ? m_values[m_values.size() - 2] : 0);
+                } else if (layer_number == 0) {
+                    layer_height = m_values.empty() ? m_label_koef : m_values[layer_number];
+                }else {
+                    layer_height = m_values.empty() ? m_label_koef : m_values[layer_number] - (layer_number > 1 ? m_values[layer_number - 1] : 0);
+                }
+                str = str + comma + wxString::Format("%.*f", 2, layer_height);
+                comma = ",\n";
             }
+            if (show_ltime && !m_layers_times.empty()) {
+                if (m_layers_times.size() +1 >= m_values.size()) {
+                    size_t layer_idx_time = layer_number;
+                    if (m_values.size() > m_layers_times.size()) {
+                        layer_idx_time--;
+                    }
+                    if (layer_idx_time < m_layers_times.size()) {
+                        nb_lines++;
+                        double previous_time = (layer_idx_time > 0 ? m_layers_times[layer_idx_time - 1] : 0);
+                        wxString layer_time_wstr = short_and_splitted_time(get_time_dhms(m_layers_times[layer_idx_time] - previous_time));
+                        str = str + comma + layer_time_wstr;
+                        comma = ",\n";
+                    }
+                }
+            }
+            int nb_step_down = layer_number - m_values.size() + nb_lines - 1;
+            while (nb_step_down > 0) {
+                str = "\n" + str;
+                nb_step_down--;
+            }
+            return format_wxstr("%1%%2%%3%)", str, comma, layer_number);
         }
     }
 

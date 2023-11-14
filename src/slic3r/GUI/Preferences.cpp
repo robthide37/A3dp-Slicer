@@ -527,8 +527,8 @@ void PreferencesDialog::build(size_t selected_tab)
 		def.type = coBool;
 		def.tooltip = L("If enabled, the axes names and axes values will be colorized according to the axes colors. "
 						"If disabled, old UI will be used.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("color_mapinulation_panel") == "1" });
-		option = Option(def, "color_mapinulation_panel");
+		def.set_default_value(new ConfigOptionBool{ app_config->get("color_manipulation_panel") == "1" });
+		option = Option(def, "color_manipulation_panel");
 		m_optgroups_gui.back()->append_single_option_line(option);
 
 		def.label = L("Order object volumes by types");
@@ -636,6 +636,20 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "hide_slice_tooltip");
 		m_optgroups_gui.back()->append_single_option_line(option);
 		m_values_need_restart.push_back("hide_slice_tooltip");
+
+		def.label = L("Show layer height on the scroll bar");
+		def.type = coBool;
+		def.tooltip = L("Add the layer height (first number in parentheses) next to a widget of the layer double-scrollbar.");
+		def.set_default_value(new ConfigOptionBool{ app_config->get("show_layer_height_doubleslider") == "1" });
+		option = Option(def, "show_layer_height_doubleslider");
+		m_optgroups_gui.back()->append_single_option_line(option);
+
+		def.label = L("Show layer time on the scroll bar");
+		def.type = coBool;
+		def.tooltip = L("Add the layer height (before the layer count in parentheses) next to a widget of the layer double-scrollbar.");
+		def.set_default_value(new ConfigOptionBool{ app_config->get("show_layer_time_doubleslider") == "1" });
+		option = Option(def, "show_layer_time_doubleslider");
+		m_optgroups_gui.back()->append_single_option_line(option);
 	}
 
 

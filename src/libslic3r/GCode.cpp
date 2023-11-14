@@ -5837,7 +5837,10 @@ Polyline GCode::travel_to(std::string &gcode, const Point &point, ExtrusionRole 
         }
 
         Point last_post_before_retract = this->last_pos();
-        gcode += this->retract();
+
+        bool no_lift_on_retract = travel.length() <= scale_(EXTRUDER_CONFIG_WITH_DEFAULT(retract_lift_before_travel, 0));
+        gcode += this->retract(false, no_lift_on_retract);
+
         // When "Wipe while retracting" is enabled, then extruder moves to another position, and travel from this position can cross perimeters.
         bool updated_first_pos = false;
         if (last_post_before_retract != this->last_pos() && can_avoid_cross_peri) {
@@ -6010,7 +6013,7 @@ bool GCode::can_cross_perimeter(const Polyline& travel, bool offset)
     return true;
 }
 
-std::string GCode::retract(bool toolchange)
+std::string GCode::retract(bool toolchange, bool inhibit_lift)
 {
     std::string gcode;
 
@@ -6033,24 +6036,25 @@ std::string GCode::retract(bool toolchange)
         length is honored in case wipe path was too short.  */
     gcode += toolchange ? m_writer.retract_for_toolchange() : m_writer.retract();
 
-    //check if need to lift
-    bool need_lift = !m_writer.tool_is_extruder() || toolchange 
-        || (BOOL_EXTRUDER_CONFIG(retract_lift_first_layer) && m_config.print_retract_lift.value != 0 && this->m_layer_index == 0) 
-        || this->m_writer.get_extra_lift() > 0;
-    bool last_fill_extusion_role_top_infill = (this->m_last_extrusion_role == ExtrusionRole::erTopSolidInfill || this->m_last_extrusion_role == ExtrusionRole::erIroning);
-    if(this->m_last_extrusion_role == ExtrusionRole::erGapFill)
-        last_fill_extusion_role_top_infill = (this->m_last_notgapfill_extrusion_role == ExtrusionRole::erTopSolidInfill || this->m_last_notgapfill_extrusion_role == ExtrusionRole::erIroning);
-    if (!need_lift && m_config.print_retract_lift.value != 0) {
-        if (EXTRUDER_CONFIG_WITH_DEFAULT(retract_lift_top, "") == "Not on top")
-            need_lift = !last_fill_extusion_role_top_infill;
-        else if (EXTRUDER_CONFIG_WITH_DEFAULT(retract_lift_top, "") == "Only on top")
-            need_lift = last_fill_extusion_role_top_infill;
-        else
-            need_lift = true;
+    if (!inhibit_lift) {
+        // check if need to lift
+        bool need_lift = !m_writer.tool_is_extruder() || toolchange
+            || (BOOL_EXTRUDER_CONFIG(retract_lift_first_layer) && m_config.print_retract_lift.value != 0 && this->m_layer_index == 0)
+            || this->m_writer.get_extra_lift() > 0;
+        bool last_fill_extusion_role_top_infill = (this->m_last_extrusion_role == ExtrusionRole::erTopSolidInfill || this->m_last_extrusion_role == ExtrusionRole::erIroning);
+        if (this->m_last_extrusion_role == ExtrusionRole::erGapFill)
+            last_fill_extusion_role_top_infill = (this->m_last_notgapfill_extrusion_role == ExtrusionRole::erTopSolidInfill || this->m_last_notgapfill_extrusion_role == ExtrusionRole::erIroning);
+        if (!need_lift && m_config.print_retract_lift.value != 0) {
+            if (EXTRUDER_CONFIG_WITH_DEFAULT(retract_lift_top, "") == "Not on top")
+                need_lift = !last_fill_extusion_role_top_infill;
+            else if (EXTRUDER_CONFIG_WITH_DEFAULT(retract_lift_top, "") == "Only on top")
+                need_lift = last_fill_extusion_role_top_infill;
+            else
+                need_lift = true;
+        }
+        if (need_lift)
+            gcode += m_writer.lift(this->m_layer_index);
     }
-    if (need_lift)
-        gcode += m_writer.lift(this->m_layer_index);
-
     return gcode;
 }
 

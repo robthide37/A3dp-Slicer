@@ -4324,6 +4324,16 @@ void PrintConfigDef::init_fff_params()
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionFloats { 2. });
 
+    def = this->add("retract_lift_before_travel", coFloats);
+    def->label = L("Minimum travel after z lift");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("Z lift is not triggered when travel moves are shorter than this length.");
+    def->sidetext = L("mm");
+    def->mode = comAdvancedE | comPrusa;
+    def->min = 0;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionFloats { 2. });
+
     def = this->add("retract_before_wipe", coPercents);
     def->label = L("Retract amount before wipe");
     def->category = OptionCategory::extruders;
@@ -6283,7 +6293,8 @@ void PrintConfigDef::init_fff_params()
     // Declare retract values for filament profile, overriding the printer's extruder profile.
     for (const char *opt_key : {
         // floats
-        "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", "deretract_speed", "retract_restart_extra", "retract_before_travel",
+        "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", 
+        "deretract_speed", "retract_restart_extra", "retract_before_travel", "retract_lift_before_travel",
         "wipe_extra_perimeter", "wipe_speed",
         "wipe_inside_depth", "wipe_inside_end", "wipe_inside_start",
         // bools
@@ -6314,12 +6325,12 @@ void PrintConfigDef::init_extruder_option_keys()
 {
     // ConfigOptionFloats, ConfigOptionPercents, ConfigOptionBools, ConfigOptionStrings
     m_extruder_option_keys = {
-        "extruder_colour",
-        "extruder_offset",
-        "extruder_fan_offset",
-        "extruder_temperature_offset",
         "default_filament_profile",
         "deretract_speed",
+        "extruder_colour",
+        "extruder_fan_offset",
+        "extruder_offset",
+        "extruder_temperature_offset",
         "max_layer_height",
         "min_layer_height",
         "nozzle_diameter",
@@ -6330,6 +6341,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_length_toolchange",
         "retract_lift",
         "retract_lift_above",
+        "retract_lift_before_travel",
         "retract_lift_below",
         "retract_lift_first_layer",
         "retract_lift_top",
@@ -6347,6 +6359,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "wipe_only_crossing",
         "wipe_speed",
     };
+    assert(std::is_sorted(m_extruder_option_keys.begin(), m_extruder_option_keys.end()));
 
     m_extruder_retract_keys = {
         "deretract_speed",
@@ -6356,10 +6369,14 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_length",
         "retract_lift",
         "retract_lift_above",
+        "retract_lift_before_travel",
         "retract_lift_below",
+        "retract_lift_first_layer",
+        "retract_lift_top",
         "retract_restart_extra",
         "retract_speed",
         "seam_gap",
+        "seam_gap_external",
         "wipe",
         "wipe_extra_perimeter",
         "wipe_inside_depth",
@@ -7748,6 +7765,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "remaining_times_type",
 "retract_lift_first_layer",
 "retract_lift_top",
+"retract_lift_before_travel",
 "seam_angle_cost",
 "seam_gap",
 "seam_gap_external",

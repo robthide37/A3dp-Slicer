@@ -2714,6 +2714,7 @@ PageShp TabFilament::create_filament_overrides_page()
                                         "filament_deretract_speed",
                                         "filament_retract_restart_extra",
                                         "filament_retract_before_travel",
+                                        "filament_retract_lift_before_travel",
                                         "filament_retract_layer_change",
                                         "filament_seam_gap",
                                         "filament_wipe",
@@ -2749,6 +2750,7 @@ void TabFilament::update_filament_overrides_page()
                                             "filament_deretract_speed",
                                             "filament_retract_restart_extra",
                                             "filament_retract_before_travel",
+                                            "filament_retract_lift_before_travel",
                                             "filament_retract_layer_change",
                                             "filament_seam_gap",
                                             "filament_wipe",
@@ -3390,28 +3392,25 @@ void TabPrinter::toggle_options()
         if (field)
             field->toggle(!use_firmware_retraction);
 
-        // user can customize travel length if we have retraction length or we"re using
-        // firmware retraction
-        field = get_field("retract_before_travel", i);
-        if (field)
-            field->toggle(have_retract_length || use_firmware_retraction);
+        // retraction only if have retraction length or we're using firmware retraction
+        bool retraction = (have_retract_length || use_firmware_retraction);
 
         // user can customize other retraction options if retraction is enabled
-        bool retraction = (have_retract_length || use_firmware_retraction);
-        std::vector<std::string> vec = { "retract_lift", "retract_layer_change" };
+        std::vector<std::string> vec = { "retract_lift", "retract_layer_change", "retract_before_travel" };
         for (auto el : vec) {
             field = get_field(el, i);
             if (field)
                 field->toggle(retraction);
         }
 
+        bool has_lift = retraction && m_config->opt_float("retract_lift", i) > 0;
         // retract lift above / below only applies if using retract lift
         vec.resize(0);
-        vec = { "retract_lift_above", "retract_lift_below", "retract_lift_top", "retract_lift_first_layer" };
+        vec = { "retract_lift_above", "retract_lift_below", "retract_lift_top", "retract_lift_first_layer", "retract_lift_before_travel"};
         for (auto el : vec) {
             field = get_field(el, i);
             if (field)
-                field->toggle(retraction && m_config->opt_float("retract_lift", i) > 0);
+                field->toggle(has_lift);
         }
 
         // some options only apply when not using firmware retraction
@@ -3424,6 +3423,7 @@ void TabPrinter::toggle_options()
         }
 
         bool wipe = m_config->opt_bool("wipe", i) && have_retract_length;
+        vec.resize(0);
         vec = { "retract_before_wipe", "wipe_only_crossing", "wipe_speed" };
         for (auto el : vec) {
             field = get_field(el, i);
