@@ -814,8 +814,8 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
 		it = this->find_preset_renamed(original_name);
 		found = it != m_presets.end();
     }
-    if (found && profile_print_params_same(it->config, cfg)) {
-        // The preset exists and it matches the values stored inside config.
+    if (found && profile_print_params_same(it->config, cfg) && it->is_visible) {
+        // The preset exists and is visible and it matches the values stored inside config.
         if (select == LoadAndSelect::Always)
             this->select_preset(it - m_presets.begin());
         return std::make_pair(&(*it), false);
@@ -838,19 +838,23 @@ std::pair<Preset*, bool> PresetCollection::load_external_preset(
             // Select the existing preset and override it with new values, so that
             // the differences will be shown in the preset editor against the referenced profile.
             this->select_preset(it - m_presets.begin());
-            // The source config may contain keys from many possible preset types. Just copy those that relate to this preset.
 
-            // Following keys are not used neither by the UI nor by the slicing core, therefore they are not important 
-            // Erase them from config appl to avoid redundant "dirty" parameter in loaded preset.
-            for (const char* key : { "print_settings_id", "filament_settings_id", "sla_print_settings_id", "sla_material_settings_id", "printer_settings_id",
-                                     "printer_model", "printer_variant", "default_print_profile", "default_filament_profile", "default_sla_print_profile", "default_sla_material_profile" })
-                keys.erase(std::remove(keys.begin(), keys.end(), key), keys.end());
+            // update dirty state only if it's needed
+            if (!profile_print_params_same(it->config, cfg)) {
+                // The source config may contain keys from many possible preset types. Just copy those that relate to this preset.
 
-            this->get_edited_preset().config.apply_only(combined_config, keys, true);
-            this->update_dirty();
-            // Don't save the newly loaded project as a "saved into project" state.
-            //update_saved_preset_from_current_preset();
-            assert(this->get_edited_preset().is_dirty);
+                // Following keys are not used neither by the UI nor by the slicing core, therefore they are not important 
+                // Erase them from config apply to avoid redundant "dirty" parameter in loaded preset.
+                for (const char* key : { "print_settings_id", "filament_settings_id", "sla_print_settings_id", "sla_material_settings_id", "printer_settings_id",
+                                         "printer_model", "printer_variant", "default_print_profile", "default_filament_profile", "default_sla_print_profile", "default_sla_material_profile" })
+                    keys.erase(std::remove(keys.begin(), keys.end(), key), keys.end());
+
+                this->get_edited_preset().config.apply_only(combined_config, keys, true);
+                this->update_dirty();
+                // Don't save the newly loaded project as a "saved into project" state.
+                //update_saved_preset_from_current_preset();
+                assert(this->get_edited_preset().is_dirty);
+            }
             return std::make_pair(&(*it), this->get_edited_preset().is_dirty);
         }
         if (inherits.empty()) {
