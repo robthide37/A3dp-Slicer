@@ -6742,7 +6742,7 @@ static wxString check_binary_vs_ascii_gcode_extension(PrinterTechnology pt, cons
 // without any error message.
 static void alert_when_exporting_binary_gcode(bool binary_output, const std::string& printer_notes)
 {
-    if (boost::algorithm::contains(printer_notes, "PRINTER_VENDOR_PRUSA3D")
+    if (binary_output
      && (boost::algorithm::contains(printer_notes, "PRINTER_MODEL_XL")
       || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MINI")
       || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MK4")))
