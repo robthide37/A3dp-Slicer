@@ -301,8 +301,10 @@ int RichMessageDialog::ShowModal()
 {
     if (m_checkBoxText.IsEmpty())
         m_checkBox->Hide();
-    else
+    else {
         m_checkBox->SetLabelText(m_checkBoxText);
+        m_checkBox->Update();
+    }
     Layout();
 
     return wxDialog::ShowModal();
