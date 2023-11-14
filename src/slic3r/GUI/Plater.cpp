@@ -6834,26 +6834,13 @@ void Plater::export_gcode(bool prefer_removable)
             };
 
             wxString error_str;
-#if 1 // #ysFIXME > clear code after testing
             if (check_for_error(output_path, error_str)) {
                 ErrorDialog(this, error_str, [this](const std::string& key) -> void { sidebar().jump_to_option(key); }).ShowModal();
                 output_path.clear();
+            } else {
+                alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"),
+                                                  wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
             }
-#else
-            while (check_for_error(output_path, error_str)) {
-                show_error(this, error_str);
-                dlg.SetFilename(from_path(output_path.filename()));
-                if (dlg.ShowModal() == wxID_OK)
-                    output_path = into_path(dlg.GetPath());
-                else {
-                    output_path.clear();
-                    break;
-                }
-            }
-#endif
-            alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"),
-                                              wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
-
         }
     }
 
