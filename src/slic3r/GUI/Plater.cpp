@@ -6745,7 +6745,8 @@ static void alert_when_exporting_binary_gcode(bool binary_output, const std::str
     if (binary_output
      && (boost::algorithm::contains(printer_notes, "PRINTER_MODEL_XL")
       || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MINI")
-      || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MK4")))
+      || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MK4")
+      || boost::algorithm::contains(printer_notes, "PRINTER_MODEL_MK3.9")))
     {
         AppConfig* app_config = wxGetApp().app_config;
         wxWindow* parent = wxGetApp().mainframe;
