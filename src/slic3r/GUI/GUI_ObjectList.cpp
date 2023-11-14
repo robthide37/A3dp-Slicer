@@ -2473,7 +2473,9 @@ bool ObjectList::has_selected_cut_object() const
 
     for (wxDataViewItem item : sels) {
         const int obj_idx = m_objects_model->GetObjectIdByItem(item);
-        if (obj_idx >= 0 && object(obj_idx)->is_cut())
+        // ys_FIXME: The obj_idx<size condition is a workaround for https://github.com/prusa3d/PrusaSlicer/issues/11186,
+        // but not the correct fix. The deleted item probably should not be in sels in the first place.
+        if (obj_idx >= 0 && obj_idx < int(m_objects->size()) && object(obj_idx)->is_cut())
             return true;
     }
 
