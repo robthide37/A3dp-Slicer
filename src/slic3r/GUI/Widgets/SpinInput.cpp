@@ -384,7 +384,7 @@ void SpinInput::onTextLostFocus(wxEvent &event)
     // pass to outer
     event.SetId(GetId());
     ProcessEventLocally(event);
-    e.Skip();
+    event.Skip();
 }
 
 void SpinInput::onTextEnter(wxCommandEvent &event)
@@ -581,7 +581,7 @@ void SpinInputDouble::onTextLostFocus(wxEvent &event)
     // pass to outer
     event.SetId(GetId());
     ProcessEventLocally(event);
-    e.Skip();
+    event.Skip();
 }
 
 void SpinInputDouble::onTextEnter(wxCommandEvent &event)
