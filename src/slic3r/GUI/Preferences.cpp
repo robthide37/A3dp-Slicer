@@ -137,6 +137,12 @@ void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::strin
 		for (const std::string& opt_key : {"suppress_hyperlinks", "downloader_url_registered"})
 			m_optgroup_other->set_value(opt_key, app_config->get_bool(opt_key));
 
+		for (const std::string& opt_key : { "default_action_on_close_application"
+										   ,"default_action_on_new_project"
+										   ,"default_action_on_select_preset" })
+			m_optgroup_general->set_value(opt_key, app_config->get(opt_key) == "none");
+		m_optgroup_general->set_value("default_action_on_dirty_project", app_config->get("default_action_on_dirty_project").empty());
+
 		// update colors for color pickers of the labels
 		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
 		update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
