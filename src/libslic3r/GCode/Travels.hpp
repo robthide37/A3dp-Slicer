@@ -1,3 +1,11 @@
+/**
+ * @file
+ * @brief Utility functions for travel gcode generation.
+ */
+
+#ifndef slic3r_GCode_Travels_hpp_
+#define slic3r_GCode_Travels_hpp_
+
 #include <vector>
 #include <tcbspan/span.hpp>
 #include <functional>
@@ -89,3 +97,5 @@ Points3 generate_travel_to_extrusion(
     const Point &xy_path_coord_origin
 );
 } // namespace Slic3r::GCode::Impl::Travels
+
+#endif // slic3r_GCode_Travels_hpp_
