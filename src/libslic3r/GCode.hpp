@@ -89,43 +89,6 @@ struct LayerResult {
     static LayerResult make_nop_layer_result() { return {"", std::numeric_limits<coord_t>::max(), false, false, true}; }
 };
 
-namespace GCode::Impl {
-
-/**
- * Generates a regular polygon - all angles are the same (e.g. typical hexagon).
- *
- * @param centroid Central point.
- * @param start_point The polygon point are ordered. This is the first point.
- * @param points_count Amount of nodes of the polygon (e.g. 6 for haxagon).
- *
- * Distance between centroid and start point sets the scale of the polygon.
- */
-Polygon generate_regular_polygon(
-    const Point& centroid,
-    const Point& start_point,
-    const unsigned points_count
-);
-
-class Bed {
-  private:
-    Polygon inner_offset;
-    static Polygon get_inner_offset(const std::vector<Vec2d>& shape, const double padding);
-
-  public:
-    /**
-     * Bed shape with inner padding.
-     */
-    Bed(const std::vector<Vec2d>& shape, const double padding);
-
-    Vec2d centroid;
-
-    /**
-     * Returns true if the point is within the bed shape including inner padding.
-     */
-    bool contains_within_padding(const Vec2d& point) const;
-};
-}
-
 class GCodeGenerator {
 
 public:        

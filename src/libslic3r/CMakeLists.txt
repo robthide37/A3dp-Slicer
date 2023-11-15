@@ -194,6 +194,8 @@ set(SLIC3R_SOURCES
     GCode/AvoidCrossingPerimeters.hpp
     GCode/Travels.cpp
     GCode/Travels.hpp
+    GCode/LayerChanges.cpp
+    GCode/LayerChanges.hpp
     GCode.cpp
     GCode.hpp
     GCodeReader.cpp
