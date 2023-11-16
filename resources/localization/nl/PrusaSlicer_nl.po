@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-11-10 15:30+0100\n"
+"POT-Creation-Date: 2023-11-16 13:19+0100\n"
 "PO-Revision-Date: 2022-09-27 15:39+0200\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -1793,8 +1793,8 @@ msgstr ""
 #: src/slic3r/GUI/GUI_ObjectList.cpp:588 src/slic3r/GUI/GUI_ObjectList.cpp:600
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1074
 #: src/slic3r/GUI/GUI_ObjectList.cpp:2062
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2942
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4817
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2944
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4819
 #: src/slic3r/GUI/ObjectDataViewModel.cpp:266
 msgid "default"
 msgstr "standaard"
@@ -2466,7 +2466,7 @@ msgstr "Type oneffen oppervlak."
 #: src/slic3r/GUI/FileArchiveDialog.cpp:272
 #: src/slic3r/GUI/FileArchiveDialog.cpp:290
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1999 src/slic3r/GUI/Plater.cpp:467
-#: src/slic3r/GUI/Plater.cpp:622 src/slic3r/GUI/Preferences.cpp:586
+#: src/slic3r/GUI/Plater.cpp:622 src/slic3r/GUI/Preferences.cpp:592
 msgid "None"
 msgstr "Geen"
 
@@ -5859,7 +5859,7 @@ msgid "Export the model(s) as STL."
 msgstr "Exporteer de modellen als .STL-bestand."
 
 #: src/libslic3r/PrintConfig.cpp:4872 src/slic3r/GUI/KBShortcutsDialog.cpp:101
-#: src/slic3r/GUI/Plater.cpp:979 src/slic3r/GUI/Plater.cpp:7860
+#: src/slic3r/GUI/Plater.cpp:979 src/slic3r/GUI/Plater.cpp:7881
 msgid "Export G-code"
 msgstr "Exporteer .gcode-bestand"
 
@@ -7051,8 +7051,8 @@ msgid "Reset defaults"
 msgstr ""
 
 #: src/slic3r/GUI/ArrangeSettingsDialogImgui.cpp:134
-#: src/slic3r/GUI/GLCanvas3D.cpp:5260 src/slic3r/GUI/KBShortcutsDialog.cpp:146
-#: src/slic3r/GUI/Plater.cpp:7787
+#: src/slic3r/GUI/GLCanvas3D.cpp:5266 src/slic3r/GUI/KBShortcutsDialog.cpp:146
+#: src/slic3r/GUI/Plater.cpp:7808
 msgid "Arrange"
 msgstr "Schikken"
 
@@ -7598,7 +7598,7 @@ msgstr "Standaard"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:415 src/slic3r/GUI/ConfigWizard.cpp:744
 #: src/slic3r/GUI/FileArchiveDialog.cpp:268
-#: src/slic3r/GUI/FileArchiveDialog.cpp:290 src/slic3r/GUI/Preferences.cpp:584
+#: src/slic3r/GUI/FileArchiveDialog.cpp:290 src/slic3r/GUI/Preferences.cpp:590
 #: src/slic3r/GUI/Tab.cpp:4562 src/slic3r/GUI/UnsavedChangesDialog.cpp:1164
 msgid "All"
 msgstr "Alles"
@@ -7772,7 +7772,7 @@ msgstr ""
 "nieuwe versie beschikbaar komt, wordt bij de volgende keer opstarten een "
 "melding getoond (nooit tijdens gebruik). Dit is slechts een melding."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1359 src/slic3r/GUI/Preferences.cpp:334
+#: src/slic3r/GUI/ConfigWizard.cpp:1359 src/slic3r/GUI/Preferences.cpp:340
 msgid "Update built-in Presets automatically"
 msgstr "Update ingebouwde presets automatisch"
 
@@ -7805,7 +7805,7 @@ msgstr ""
 "Daarnaast wordt een backup-opname van de hele configuratie gemaakt voor een "
 "update wordt toegepast."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1420 src/slic3r/GUI/Preferences.cpp:1183
+#: src/slic3r/GUI/ConfigWizard.cpp:1420 src/slic3r/GUI/Preferences.cpp:1189
 msgid "Download path"
 msgstr ""
 
@@ -7877,11 +7877,11 @@ msgstr ""
 msgid "Files association"
 msgstr "Bestandsassociatie"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1655 src/slic3r/GUI/Preferences.cpp:320
+#: src/slic3r/GUI/ConfigWizard.cpp:1655 src/slic3r/GUI/Preferences.cpp:326
 msgid "Associate .3mf files to PrusaSlicer"
 msgstr "Open .3MF-bestanden met PrusaSlicer"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1656 src/slic3r/GUI/Preferences.cpp:325
+#: src/slic3r/GUI/ConfigWizard.cpp:1656 src/slic3r/GUI/Preferences.cpp:331
 msgid "Associate .stl files to PrusaSlicer"
 msgstr "Open .STL-bestanden met PrusaSlicer"
 
@@ -8184,7 +8184,7 @@ msgid "Filament Profiles Selection"
 msgstr "Filament profielselectie"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:3395 src/slic3r/GUI/ConfigWizard.cpp:3398
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4282
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4284
 msgid "Type:"
 msgstr "Type:"
 
@@ -8274,7 +8274,7 @@ msgid "Perform"
 msgstr "Uitvoeren"
 
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:658
-#: src/slic3r/GUI/GLCanvas3D.cpp:5441 src/slic3r/GUI/KBShortcutsDialog.cpp:111
+#: src/slic3r/GUI/GLCanvas3D.cpp:5447 src/slic3r/GUI/KBShortcutsDialog.cpp:111
 #: src/slic3r/GUI/MainFrame.cpp:1454
 msgid "Undo"
 msgstr "Maak ongedaan"
@@ -8606,7 +8606,7 @@ msgstr ""
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:799 src/slic3r/GUI/Plater.cpp:5626
 #: src/slic3r/GUI/Plater.cpp:5634 src/slic3r/GUI/Plater.cpp:5704
 #: src/slic3r/GUI/Plater.cpp:5712 src/slic3r/GUI/WifiConfigDialog.cpp:239
-#: src/slic3r/GUI/WipeTowerDialog.cpp:69 src/slic3r/GUI/WipeTowerDialog.cpp:459
+#: src/slic3r/GUI/WipeTowerDialog.cpp:69 src/slic3r/GUI/WipeTowerDialog.cpp:435
 msgid "Warning"
 msgstr "Waarschuwing"
 
@@ -9055,8 +9055,8 @@ msgstr "Voeg toe"
 msgid "Add one or more custom shapes"
 msgstr "Voeg een of meer aangepaste vormen toe"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:122 src/slic3r/GUI/GalleryDialog.cpp:540
-#: src/slic3r/GUI/GLCanvas3D.cpp:5242 src/slic3r/GUI/GUI_Factories.cpp:480
+#: src/slic3r/GUI/GalleryDialog.cpp:122 src/slic3r/GUI/GalleryDialog.cpp:539
+#: src/slic3r/GUI/GLCanvas3D.cpp:5248 src/slic3r/GUI/GUI_Factories.cpp:480
 #: src/slic3r/GUI/Tab.cpp:4477
 msgid "Delete"
 msgstr "Verwijder"
@@ -9081,11 +9081,11 @@ msgstr "OK"
 msgid "Add selected shape(s) to the bed"
 msgstr "Voeg geselecteerd(e) object(en) toe aan bed"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:434
+#: src/slic3r/GUI/GalleryDialog.cpp:433
 msgid "Choose one or more files (STL, OBJ):"
 msgstr "Kies een of meer bestanden (STL, OBJ):"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:474
+#: src/slic3r/GUI/GalleryDialog.cpp:473
 #, boost-format
 msgid ""
 "It looks like selected %1%-file has an error or is destructed.\n"
@@ -9095,19 +9095,19 @@ msgstr ""
 "vernietigd.\n"
 "Het bestand kan niet geladen worden"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:485
+#: src/slic3r/GUI/GalleryDialog.cpp:484
 msgid "Choose one PNG file:"
 msgstr "Kies een PNG-bestand:"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:498
+#: src/slic3r/GUI/GalleryDialog.cpp:497
 msgid "Replacing of the PNG"
 msgstr "Herplaats de PNG"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:542
+#: src/slic3r/GUI/GalleryDialog.cpp:541
 msgid "Change thumbnail"
 msgstr "Verander miniatuur"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:583 src/slic3r/GUI/GalleryDialog.cpp:588
+#: src/slic3r/GUI/GalleryDialog.cpp:582 src/slic3r/GUI/GalleryDialog.cpp:587
 #, boost-format
 msgid "Loading of the \"%1%\""
 msgstr "Laden van de \"%1%\""
@@ -9453,8 +9453,8 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:252
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2719
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4067
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4259
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4069
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4261
 msgid "Part"
 msgstr "Onderdeel"
 
@@ -9834,7 +9834,7 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:1865
 #: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp:1966
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4249
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4251
 msgid "You can't change a type of the last solid part of the object."
 msgstr ""
 "U kunt het type van het laatste onderdeel van een object niet wijzigen."
@@ -9852,7 +9852,7 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:1878
 #: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp:1979
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4266
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4268
 msgid "Modifier"
 msgstr "Modificator"
 
@@ -11292,7 +11292,7 @@ msgstr ""
 "U bewerkt momenteel SLA-supportpunten. Pas de wijzigingen toe of negeer ze "
 "eerst."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:200 src/slic3r/GUI/GLCanvas3D.cpp:5388
+#: src/slic3r/GUI/GLCanvas3D.cpp:200 src/slic3r/GUI/GLCanvas3D.cpp:5394
 #: src/slic3r/GUI/ObjectDataViewModel.cpp:76
 msgid "Variable layer height"
 msgstr "Variabele laagdikte"
@@ -11397,23 +11397,23 @@ msgstr "Spiegel object"
 msgid "Move Object"
 msgstr "Verplaats object"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4511 src/slic3r/GUI/GLCanvas3D.cpp:5348
+#: src/slic3r/GUI/GLCanvas3D.cpp:4511 src/slic3r/GUI/GLCanvas3D.cpp:5354
 msgid "Switch to Settings"
 msgstr "Schakel over naar instellingen"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4512 src/slic3r/GUI/GLCanvas3D.cpp:5348
+#: src/slic3r/GUI/GLCanvas3D.cpp:4512 src/slic3r/GUI/GLCanvas3D.cpp:5354
 msgid "Print Settings Tab"
 msgstr "Printinstellingentab"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5349
+#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5355
 msgid "Filament Settings Tab"
 msgstr "Filamentinstellingentab"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5349
+#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5355
 msgid "Material Settings Tab"
 msgstr "Materiaalinstellingentab"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4514 src/slic3r/GUI/GLCanvas3D.cpp:5350
+#: src/slic3r/GUI/GLCanvas3D.cpp:4514 src/slic3r/GUI/GLCanvas3D.cpp:5356
 msgid "Printer Settings Tab"
 msgstr "Printerinstellingentab"
 
@@ -11439,7 +11439,7 @@ msgid_plural "Redo %1$d Actions"
 msgstr[0] "Doe %1$d actie opnieuw"
 msgstr[1] "Doe %1$d acties opnieuw"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4777 src/slic3r/GUI/GLCanvas3D.cpp:5366
+#: src/slic3r/GUI/GLCanvas3D.cpp:4777 src/slic3r/GUI/GLCanvas3D.cpp:5372
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:120 src/slic3r/GUI/Search.cpp:486
 msgid "Search"
 msgstr "Zoek"
@@ -11449,84 +11449,84 @@ msgstr "Zoek"
 msgid "Enter a search term"
 msgstr "Voer een zoekterm in"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5234
+#: src/slic3r/GUI/GLCanvas3D.cpp:5240
 msgid "Add..."
 msgstr "Voeg toe..."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5251 src/slic3r/GUI/KBShortcutsDialog.cpp:110
+#: src/slic3r/GUI/GLCanvas3D.cpp:5257 src/slic3r/GUI/KBShortcutsDialog.cpp:110
 #: src/slic3r/GUI/Plater.cpp:6430 src/slic3r/GUI/Tab.cpp:4911
 msgid "Delete all"
 msgstr "Verwijder alles"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5260 src/slic3r/GUI/KBShortcutsDialog.cpp:147
+#: src/slic3r/GUI/GLCanvas3D.cpp:5266 src/slic3r/GUI/KBShortcutsDialog.cpp:147
 msgid "Arrange selection"
 msgstr "Schik selectie"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5260
+#: src/slic3r/GUI/GLCanvas3D.cpp:5266
 msgid "Click right mouse button to show arrangement options"
 msgstr "Rechtermuisklik om schikopties te tonen"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5280
+#: src/slic3r/GUI/GLCanvas3D.cpp:5286
 msgid "Copy"
 msgstr "Kopieer"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5289
+#: src/slic3r/GUI/GLCanvas3D.cpp:5295
 msgid "Paste"
 msgstr "Plak"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5301 src/slic3r/GUI/GUI_Factories.cpp:1343
+#: src/slic3r/GUI/GLCanvas3D.cpp:5307 src/slic3r/GUI/GUI_Factories.cpp:1343
 #: src/slic3r/GUI/GUI_Factories.cpp:1367 src/slic3r/GUI/GUI_Factories.cpp:1378
 msgid "Add instance"
 msgstr "Voeg instantie toe"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5312 src/slic3r/GUI/GUI_Factories.cpp:1346
+#: src/slic3r/GUI/GLCanvas3D.cpp:5318 src/slic3r/GUI/GUI_Factories.cpp:1346
 msgid "Remove instance"
 msgstr "Verwijder instantie"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5325
+#: src/slic3r/GUI/GLCanvas3D.cpp:5331
 msgid "Split to objects"
 msgstr "Verdeel in objecten"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5335
+#: src/slic3r/GUI/GLCanvas3D.cpp:5341
 msgid "Split to parts"
 msgstr "Verdeel in onderdelen"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5441 src/slic3r/GUI/GLCanvas3D.cpp:5478
+#: src/slic3r/GUI/GLCanvas3D.cpp:5447 src/slic3r/GUI/GLCanvas3D.cpp:5484
 msgid "Click right mouse button to open/close History"
 msgstr "Rechtermuisklik om geschiedenis te openen/sluiten"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5463
+#: src/slic3r/GUI/GLCanvas3D.cpp:5469
 #, boost-format
 msgid "Next Undo action: %1%"
 msgstr "Volgende ongedaan maken: %1%"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5478 src/slic3r/GUI/KBShortcutsDialog.cpp:112
+#: src/slic3r/GUI/GLCanvas3D.cpp:5484 src/slic3r/GUI/KBShortcutsDialog.cpp:112
 #: src/slic3r/GUI/MainFrame.cpp:1457
 msgid "Redo"
 msgstr "Doe opnieuw"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5499
+#: src/slic3r/GUI/GLCanvas3D.cpp:5505
 #, boost-format
 msgid "Next Redo action: %1%"
 msgstr "Volgende opnieuw doen: %1%"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7416
+#: src/slic3r/GUI/GLCanvas3D.cpp:7422
 msgid "An object outside the print area was detected."
 msgstr "Er is een object buiten het printbereik gedetecteerd."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7417
+#: src/slic3r/GUI/GLCanvas3D.cpp:7423
 msgid "A toolpath outside the print area was detected."
 msgstr "Er is een toolpad buiten het printbereik gedetecteerd."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7418
+#: src/slic3r/GUI/GLCanvas3D.cpp:7424
 msgid "SLA supports outside the print area were detected."
 msgstr "Er zijn SLA-supports buiten het printbereik gedetecteerd."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7419
+#: src/slic3r/GUI/GLCanvas3D.cpp:7425
 msgid "Some objects are not visible during editing."
 msgstr "Sommige objecten zijn niet zichtbaar tijdens het bewerken."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7421
+#: src/slic3r/GUI/GLCanvas3D.cpp:7427
 msgid ""
 "An object outside the print area was detected.\n"
 "Resolve the current problem to continue slicing."
@@ -11535,18 +11535,18 @@ msgstr ""
 "Los het probleem op om door te gaan met slicen."
 
 #. TRN %3% is name of Object1, %4% is name of Object2
-#: src/slic3r/GUI/GLCanvas3D.cpp:7433
+#: src/slic3r/GUI/GLCanvas3D.cpp:7439
 #, boost-format
 msgid ""
 "Conflicts in G-code paths have been detected at layer %1%, z=%2$.2f mm. "
 "Please reposition the conflicting objects (%3% <-> %4%) further apart."
 msgstr ""
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7463
+#: src/slic3r/GUI/GLCanvas3D.cpp:7469
 msgid "Jump to"
 msgstr "Spring naar"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7466
+#: src/slic3r/GUI/GLCanvas3D.cpp:7472
 #: src/slic3r/GUI/NotificationManager.cpp:2105
 #: src/slic3r/GUI/NotificationManager.cpp:2112
 #: src/slic3r/GUI/NotificationManager.cpp:2128
@@ -11555,11 +11555,11 @@ msgstr "Spring naar"
 msgid "ERROR:"
 msgstr "Fout:"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7543
+#: src/slic3r/GUI/GLCanvas3D.cpp:7549
 msgid "Selection-Add from rectangle"
 msgstr "Selectie - Voeg toe van boxselectie"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7558
+#: src/slic3r/GUI/GLCanvas3D.cpp:7564
 msgid "Selection-Remove from rectangle"
 msgstr "Selectie - Verwijder van boxselectie"
 
@@ -11817,7 +11817,7 @@ msgstr "Zie Release-pagina."
 msgid "Preparing settings tabs"
 msgstr "Instellingentab voorbereiden"
 
-#: src/slic3r/GUI/GUI_App.cpp:1422 src/slic3r/GUI/Preferences.cpp:432
+#: src/slic3r/GUI/GUI_App.cpp:1422 src/slic3r/GUI/Preferences.cpp:438
 msgid "Restore window position on start"
 msgstr "Herstel vensterpositie na opstarten"
 
@@ -12072,7 +12072,7 @@ msgstr ""
 "Het veranderen van de taal zorgt dat het programma opnieuw opstart.\n"
 "U verliest de geladen inhoud zoals getoond in de modelweergave."
 
-#: src/slic3r/GUI/GUI_App.cpp:2599 src/slic3r/GUI/Preferences.cpp:765
+#: src/slic3r/GUI/GUI_App.cpp:2599 src/slic3r/GUI/Preferences.cpp:771
 #: src/slic3r/GUI/Selection.cpp:1489
 msgid "Do you want to proceed?"
 msgstr ""
@@ -12156,7 +12156,7 @@ msgstr "Open hyperlinks in de standaardbrowser?"
 msgid "PrusaSlicer: Open hyperlink"
 msgstr "PrusaSlicer: Open hyperlink"
 
-#: src/slic3r/GUI/GUI_App.cpp:3390 src/slic3r/GUI/Preferences.cpp:627
+#: src/slic3r/GUI/GUI_App.cpp:3390 src/slic3r/GUI/Preferences.cpp:633
 msgid "Suppress to open hyperlink in browser"
 msgstr "Hyperlinks openen in browser uitzetten"
 
@@ -12336,7 +12336,7 @@ msgid "Printable"
 msgstr "Printbaar"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:799 src/slic3r/GUI/GUI_ObjectList.cpp:2007
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2499
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2501
 msgid "Invalidate cut info"
 msgstr ""
 
@@ -12344,7 +12344,7 @@ msgstr ""
 msgid "Rename"
 msgstr "Hernoem"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:824 src/slic3r/GUI/GUI_ObjectList.cpp:4641
+#: src/slic3r/GUI/GUI_Factories.cpp:824 src/slic3r/GUI/GUI_ObjectList.cpp:4643
 msgid "Fix by Windows repair algorithm"
 msgstr ""
 
@@ -12621,7 +12621,7 @@ msgid "Rename Sub-object"
 msgstr "Hernoem subobject"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1343
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4519
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4521
 msgid "Instances to Separated Objects"
 msgstr "Zet instanties om in objecten"
 
@@ -12752,7 +12752,7 @@ msgid ""
 msgstr ""
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:2009
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2529
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2531
 msgid "Delete all connectors"
 msgstr ""
 
@@ -12805,58 +12805,58 @@ msgstr "Voeg alle delen samen tot een enkel object"
 msgid "Add Layers"
 msgstr "Voeg lagen toe"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2614
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2616
 msgid "Connectors information"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2624
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2689
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2626
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2691
 msgid "Object manipulation"
 msgstr "Object bewerken"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2634
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2636
 msgid "Group manipulation"
 msgstr "Groep bewerken"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2725
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2727
 msgid "Object Settings to modify"
 msgstr "Objectinstellingen om te bewerken"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2729
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2731
 msgid "Part Settings to modify"
 msgstr "Onderdeelinstellingen om te bewerken"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2734
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2736
 msgid "Layer range Settings to modify"
 msgstr "Laagbereikinstellingen om te bewerken"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2740
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2742
 msgid "Part manipulation"
 msgstr "Onderdeel bewerken"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2748
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2750
 msgid "Instance manipulation"
 msgstr "Instantie bewerken"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2756
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2758
 msgid "Height ranges"
 msgstr "Hoogtebereik"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2756
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2758
 msgid "Settings for height range"
 msgstr "Instellingen voor hoogtebereik"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3293
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3295
 msgid "Delete Selected"
 msgstr "Verwijder selectie"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3371
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3399
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3419
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3373
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3401
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3421
 msgid "Add Height Range"
 msgstr "Voeg hoogtebereik toe"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3465
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3467
 msgid ""
 "Cannot insert a new layer range after the current layer range.\n"
 "The next layer range is too thin to be split to two\n"
@@ -12866,7 +12866,7 @@ msgstr ""
 "Het volgende laagbereik is te dun om in tweeën te splitsen\n"
 "zonder over de minimale laagdikte heen te gaan."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3469
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3471
 msgid ""
 "Cannot insert a new layer range between the current and the next layer "
 "range.\n"
@@ -12878,7 +12878,7 @@ msgstr ""
 "Het gat tussen het huidige en volgende laagbereik is kleiner dan\n"
 "de minimum toegestane laagdikte."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3474
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3476
 msgid ""
 "Cannot insert a new layer range after the current layer range.\n"
 "Current layer range overlaps with the next layer range."
@@ -12886,82 +12886,82 @@ msgstr ""
 "Kan geen nieuw laagbereik toevoegen na het huidige laagbereik.\n"
 "Het huidige laagbereik overlapt met het volgende laagbereik."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3533
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3535
 msgid "Edit Height Range"
 msgstr "Bewerk hoogtebereik"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3915
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3917
 msgid "Selection-Remove from list"
 msgstr "Selectie - Verwijder van lijst"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3927
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3929
 msgid "Selection-Add from list"
 msgstr "Selectie - Voeg toe aan lijst"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4066
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4068
 msgid "Object or Instance"
 msgstr "Object of instantie"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4067
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4069
 msgid "Layer"
 msgstr "Laag"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4069
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4071
 msgid "Unsupported selection"
 msgstr "Niet-ondersteunde selectie"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4070
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4072
 #, c-format, boost-format
 msgid "You started your selection with %s Item."
 msgstr "De selectie is gestart met item %s."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4071
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4073
 #, c-format, boost-format
 msgid "In this mode you can select only other %s Items%s"
 msgstr "In deze modus kunt u alleen andere %s items %s selecteren"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4074
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4076
 msgid "of a current Object"
 msgstr "van het huidige object"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4079
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4154 src/slic3r/GUI/Plater.cpp:225
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4081
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4156 src/slic3r/GUI/Plater.cpp:225
 msgid "Info"
 msgstr "Info"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4259
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4261
 msgid "Negative Volume"
 msgstr "Negatief volume"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4272
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4274
 msgid "Support Blocker"
 msgstr "Supportblokkering"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4272
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4274
 msgid "Support Enforcer"
 msgstr "Supportforcering"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4282
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4284
 msgid "Select type of part"
 msgstr "Selecteer onderdeeltype"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4288
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4290
 msgid "Change Part Type"
 msgstr "Wijzig onderdeeltype"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4549
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4551
 msgid "Enter new name"
 msgstr "Voer nieuwe naam in"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4549
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4551
 msgid "Renaming"
 msgstr "Hernoemen"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4611
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4613
 msgid "Repairing model"
 msgstr "Model repareren"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4621
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4623
 msgid ""
 "Custom supports, seams and multimaterial painting were removed after "
 "repairing the mesh."
@@ -12969,51 +12969,51 @@ msgstr ""
 "Aangepaste supports, naden en multi-material schilderingen zijn verwijderd "
 "bij het repareren van de mesh."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4644
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4646
 msgid "Fixing by Windows repair algorithm"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4674
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4676
 msgid "The following model was repaired successfully"
 msgid_plural "The following models were repaired successfully"
 msgstr[0] "Het volgende model is succesvol gerepareerd"
 msgstr[1] "De volgende modellen zijn succesvol gerepareerd"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4680
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4682
 msgid "Folowing model repair failed"
 msgid_plural "Folowing models repair failed"
 msgstr[0] "Volgende model repareren mislukt"
 msgstr[1] "Volgende modellen repareren mislukt"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4685
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4687
 msgid "Repairing was canceled"
 msgstr "Repareren is stopgezet"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4802
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4804
 msgid "Change Extruders"
 msgstr "Wijzig extruders"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4928
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
 msgid "Set Printable group"
 msgstr "Stel printbare groep in"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4928
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
 msgid "Set Unprintable group"
 msgstr "Stel onprintbare groep in"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4932
 msgid "Set Printable"
 msgstr "Stel in op printbaar"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4932
 msgid "Set Unprintable"
 msgstr "Stel in op niet-printbaar"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4931
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4933
 msgid "Set Printable Instance"
 msgstr "Stel printbare instanties in"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4931
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4933
 msgid "Set Unprintable Instance"
 msgstr "Stel instantie in op niet-printbaar"
 
@@ -13187,7 +13187,7 @@ msgstr "Schikken voltooid."
 msgid "Could not arrange model objects! Some geometries may be invalid."
 msgstr "Kan modellen niet schikken. Sommige vormen kunnen ongeldig zijn."
 
-#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:363 src/slic3r/GUI/Plater.cpp:7810
+#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:363 src/slic3r/GUI/Plater.cpp:7831
 #, c-format, boost-format
 msgid ""
 "Arrangement ignored the following objects which can't fit into a single "
@@ -13394,7 +13394,7 @@ msgid "Load Config from ini/amf/3mf/gcode and merge"
 msgstr ""
 "Laad configuratie van .INI-, .AMF-, .3MF- of .gcode-bestanden en voeg samen"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:102 src/slic3r/GUI/Plater.cpp:7861
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:102 src/slic3r/GUI/Plater.cpp:7882
 msgid "Send G-code"
 msgstr "Stuur G-code"
 
@@ -13475,8 +13475,8 @@ msgstr "Toon/verberg objecten- of instantielabels"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:135
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:137 src/slic3r/GUI/Preferences.cpp:68
-#: src/slic3r/GUI/Preferences.cpp:207 src/slic3r/GUI/Preferences.cpp:230
-#: src/slic3r/GUI/Preferences.cpp:238
+#: src/slic3r/GUI/Preferences.cpp:213 src/slic3r/GUI/Preferences.cpp:236
+#: src/slic3r/GUI/Preferences.cpp:244
 msgid "Preferences"
 msgstr "Voorkeuren"
 
@@ -14656,7 +14656,7 @@ msgstr "%s heeft een waarschuwing"
 msgid "%s info"
 msgstr "%s info"
 
-#: src/slic3r/GUI/MsgDialog.cpp:315
+#: src/slic3r/GUI/MsgDialog.cpp:317
 #, c-format, boost-format
 msgid "%s information"
 msgstr "%s informatie"
@@ -15143,12 +15143,12 @@ msgstr "Onder het object"
 msgid "Around object"
 msgstr "Rondom het object"
 
-#: src/slic3r/GUI/Plater.cpp:959 src/slic3r/GUI/Plater.cpp:7861
+#: src/slic3r/GUI/Plater.cpp:959 src/slic3r/GUI/Plater.cpp:7882
 msgid "Send to printer"
 msgstr "Stuur naar printer"
 
 #: src/slic3r/GUI/Plater.cpp:980 src/slic3r/GUI/Plater.cpp:3514
-#: src/slic3r/GUI/Plater.cpp:7270
+#: src/slic3r/GUI/Plater.cpp:7288
 msgid "Slice now"
 msgstr "Slice nu"
 
@@ -15224,7 +15224,7 @@ msgstr "Opslaan"
 msgid "Discard"
 msgstr "Afwijzen"
 
-#: src/slic3r/GUI/Plater.cpp:1824 src/slic3r/GUI/Preferences.cpp:377
+#: src/slic3r/GUI/Plater.cpp:1824 src/slic3r/GUI/Preferences.cpp:383
 msgid "Ask for unsaved changes in project"
 msgstr "Vraag naar niet-opgeslagen wijzigingen in dit project"
 
@@ -15487,7 +15487,7 @@ msgstr ""
 msgid "Invalid data"
 msgstr "Ongeldige data"
 
-#: src/slic3r/GUI/Plater.cpp:3514 src/slic3r/GUI/Plater.cpp:7267
+#: src/slic3r/GUI/Plater.cpp:3514 src/slic3r/GUI/Plater.cpp:7285
 #: src/slic3r/GUI/Tab.cpp:1683 src/slic3r/GUI/Tab.cpp:5535
 msgid "Slicing"
 msgstr "Slicen"
@@ -15770,7 +15770,7 @@ msgstr ""
 msgid "Select an action to apply to the file"
 msgstr "Selecteer een commando om toe te passen op het bestand"
 
-#: src/slic3r/GUI/Plater.cpp:6239
+#: src/slic3r/GUI/Plater.cpp:6239 src/slic3r/GUI/Plater.cpp:6759
 msgid "Don't show again"
 msgstr "Laat niet meer zien"
 
@@ -15843,41 +15843,52 @@ msgid ""
 "code export</a> in Print Settings."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:6786
+#: src/slic3r/GUI/Plater.cpp:6756
+msgid ""
+"You are exporting binary G-code for a Prusa printer. Please, make sure that "
+"your printer is running firmware version 5.1.0-alpha2 or later. Older "
+"firmwares are not able to handle binary G-codes."
+msgstr ""
+
+#: src/slic3r/GUI/Plater.cpp:6758
+msgid "Exporting binary G-code"
+msgstr ""
+
+#: src/slic3r/GUI/Plater.cpp:6814
 msgid "Save G-code file as:"
 msgstr ".gcode-bestand opslaan als:"
 
-#: src/slic3r/GUI/Plater.cpp:6786
+#: src/slic3r/GUI/Plater.cpp:6814
 msgid "Save SL1 / SL1S file as:"
 msgstr "SL1 / SL1S bestand opslaan als:"
 
-#: src/slic3r/GUI/Plater.cpp:6800
+#: src/slic3r/GUI/Plater.cpp:6828
 msgid "The provided file name is not valid."
 msgstr "De gegeven naam is niet geldig."
 
-#: src/slic3r/GUI/Plater.cpp:6801
+#: src/slic3r/GUI/Plater.cpp:6829
 msgid "The following characters are not allowed by a FAT file system:"
 msgstr ""
 "De volgende karakters worden niet toegestaan in een FAT-bestandssysteem:"
 
-#: src/slic3r/GUI/Plater.cpp:6880
+#: src/slic3r/GUI/Plater.cpp:6898
 msgid ""
 "Unable to perform boolean operation on model meshes. Only positive parts "
 "will be exported."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7106
+#: src/slic3r/GUI/Plater.cpp:7124
 msgid ""
 "Are you sure you want to store original SVGs with their local paths into the "
 "3MF file?\n"
 "If you hit 'NO', all SVGs in the project will not be editable any more."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7108
+#: src/slic3r/GUI/Plater.cpp:7126
 msgid "Private protection"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7137
+#: src/slic3r/GUI/Plater.cpp:7155
 msgid ""
 "The plater is empty.\n"
 "Do you want to save the project?"
@@ -15885,42 +15896,42 @@ msgstr ""
 "Het bed is leeg.\n"
 "Wilt u toch het project opslaan?"
 
-#: src/slic3r/GUI/Plater.cpp:7137
+#: src/slic3r/GUI/Plater.cpp:7155
 msgid "Save project"
 msgstr "Project opslaan"
 
-#: src/slic3r/GUI/Plater.cpp:7185
+#: src/slic3r/GUI/Plater.cpp:7203
 msgid "Unable to save file"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7390
+#: src/slic3r/GUI/Plater.cpp:7411
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7390 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:7411 src/slic3r/GUI/PrintHostDialogs.cpp:136
 msgid "Upload and Print"
 msgstr "Upload en print"
 
-#: src/slic3r/GUI/Plater.cpp:7860
+#: src/slic3r/GUI/Plater.cpp:7881
 msgid "Export"
 msgstr "Exporteer"
 
-#: src/slic3r/GUI/Plater.cpp:8019
+#: src/slic3r/GUI/Plater.cpp:8040
 msgid "Paste From Clipboard"
 msgstr "Plak van klembord"
 
-#: src/slic3r/GUI/Preferences.cpp:268 src/slic3r/GUI/Tab.cpp:2640
+#: src/slic3r/GUI/Preferences.cpp:274 src/slic3r/GUI/Tab.cpp:2640
 #: src/slic3r/GUI/Tab.cpp:2944 src/slic3r/GUI/Tab.cpp:3062
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1303
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1852
 msgid "General"
 msgstr "Algemeen"
 
-#: src/slic3r/GUI/Preferences.cpp:286
+#: src/slic3r/GUI/Preferences.cpp:292
 msgid "Remember output directory"
 msgstr "Onthoud de opslaglocatie"
 
-#: src/slic3r/GUI/Preferences.cpp:287
+#: src/slic3r/GUI/Preferences.cpp:293
 msgid ""
 "If this is enabled, Slic3r will prompt the last output directory instead of "
 "the one containing the input files."
@@ -15928,11 +15939,11 @@ msgstr ""
 "Als dit aan staat zal PrusaSlicer de opslaglocatie gebruiken in plaats van "
 "de originele locatie."
 
-#: src/slic3r/GUI/Preferences.cpp:291
+#: src/slic3r/GUI/Preferences.cpp:297
 msgid "Auto-center parts"
 msgstr "Centreer onderdelen automatisch"
 
-#: src/slic3r/GUI/Preferences.cpp:292
+#: src/slic3r/GUI/Preferences.cpp:298
 msgid ""
 "If this is enabled, Slic3r will auto-center objects around the print bed "
 "center."
@@ -15940,11 +15951,11 @@ msgstr ""
 "Als dit aan staat zal PrusaSlicer objecten automatisch centreren in het "
 "midden."
 
-#: src/slic3r/GUI/Preferences.cpp:296
+#: src/slic3r/GUI/Preferences.cpp:302
 msgid "Background processing"
 msgstr "Slicen op de achtergrond"
 
-#: src/slic3r/GUI/Preferences.cpp:297
+#: src/slic3r/GUI/Preferences.cpp:303
 msgid ""
 "If this is enabled, Slic3r will pre-process objects as soon as they're "
 "loaded in order to save time when exporting G-code."
@@ -15952,11 +15963,11 @@ msgstr ""
 "Als dit aanstaat zal PrusaSlicer objecten op de achtergrond slicen om tijd "
 "te besparen bij het exporteren van de G-code."
 
-#: src/slic3r/GUI/Preferences.cpp:302
+#: src/slic3r/GUI/Preferences.cpp:308
 msgid "Alert when supports needed"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:303
+#: src/slic3r/GUI/Preferences.cpp:309
 msgid ""
 "If this is enabled, Slic3r will raise alerts when it detects issues in the "
 "sliced object, that can be resolved with supports (and brim). Examples of "
@@ -15964,11 +15975,11 @@ msgid ""
 "adhesion."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:313
+#: src/slic3r/GUI/Preferences.cpp:319
 msgid "Export sources full pathnames to 3mf and amf"
 msgstr "Exporteer de volledige padnamen naar .3MF- en .AMF-bestanden"
 
-#: src/slic3r/GUI/Preferences.cpp:314
+#: src/slic3r/GUI/Preferences.cpp:320
 msgid ""
 "If enabled, allows the Reload from disk command to automatically find and "
 "load the files when invoked."
@@ -15976,19 +15987,19 @@ msgstr ""
 "Als dit is ingeschakeld is het 'herladen van de schijf'-commando toegestaan "
 "om automatisch bestanden te vinden en laden als deze worden aangeroepen."
 
-#: src/slic3r/GUI/Preferences.cpp:321
+#: src/slic3r/GUI/Preferences.cpp:327
 msgid "If enabled, sets PrusaSlicer as default application to open .3mf files."
 msgstr ""
 "Als dit aanstaat wordt PrusaSlicer als standaardprogramma ingesteld om .3MF-"
 "bestanden te openen."
 
-#: src/slic3r/GUI/Preferences.cpp:326
+#: src/slic3r/GUI/Preferences.cpp:332
 msgid "If enabled, sets PrusaSlicer as default application to open .stl files."
 msgstr ""
 "Als dit aanstaat wordt PrusaSlicer als standaardprogramma ingesteld om .STL-"
 "bestanden te openen."
 
-#: src/slic3r/GUI/Preferences.cpp:335
+#: src/slic3r/GUI/Preferences.cpp:341
 msgid ""
 "If enabled, Slic3r downloads updates of built-in system presets in the "
 "background. These updates are downloaded into a separate temporary location. "
@@ -16000,11 +16011,11 @@ msgstr ""
 "locatie. Als een nieuwe preset beschikbaar komt, zal dit gemeld worden bij "
 "de eerstvolgende keer opstarten."
 
-#: src/slic3r/GUI/Preferences.cpp:340
+#: src/slic3r/GUI/Preferences.cpp:346
 msgid "Suppress \" - default - \" presets"
 msgstr "Verberg standaardpresets"
 
-#: src/slic3r/GUI/Preferences.cpp:341
+#: src/slic3r/GUI/Preferences.cpp:347
 msgid ""
 "Suppress \" - default - \" presets in the Print / Filament / Printer "
 "selections once there are any other valid presets available."
@@ -16012,21 +16023,21 @@ msgstr ""
 "Verberg standaardpresets bij de print-, filament- en printerpresets als er "
 "andere geldige presets beschikbaar zijn."
 
-#: src/slic3r/GUI/Preferences.cpp:345
+#: src/slic3r/GUI/Preferences.cpp:351
 msgid "Suppress \" Template \" filament presets"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:346
+#: src/slic3r/GUI/Preferences.cpp:352
 msgid ""
 "Suppress \" Template \" filament presets in configuration wizard and sidebar "
 "visibility."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:350
+#: src/slic3r/GUI/Preferences.cpp:356
 msgid "Show incompatible print and filament presets"
 msgstr "Toon niet compatibele print- en filamentpresets"
 
-#: src/slic3r/GUI/Preferences.cpp:351
+#: src/slic3r/GUI/Preferences.cpp:357
 msgid ""
 "When checked, the print and filament presets are shown in the preset editor "
 "even if they are marked as incompatible with the active printer"
@@ -16035,22 +16046,22 @@ msgstr ""
 "editor, zelfs als ze als niet compatibel met de actieve printer zijn "
 "gemarkeerd"
 
-#: src/slic3r/GUI/Preferences.cpp:358
+#: src/slic3r/GUI/Preferences.cpp:364
 msgid "Show load project dialog"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:359
+#: src/slic3r/GUI/Preferences.cpp:365
 msgid ""
 "When checked, whenever dragging and dropping a project file on the "
 "application or open it from a browser, shows a dialog asking to select the "
 "action to take on the file to load."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:365 src/slic3r/GUI/Preferences.cpp:369
+#: src/slic3r/GUI/Preferences.cpp:371 src/slic3r/GUI/Preferences.cpp:375
 msgid "Allow just a single PrusaSlicer instance"
 msgstr "Sta één PrusaSlicer-instantie toe"
 
-#: src/slic3r/GUI/Preferences.cpp:366
+#: src/slic3r/GUI/Preferences.cpp:372
 msgid ""
 "On OSX there is always only one instance of app running by default. However "
 "it is allowed to run multiple instances of same app from the command line. "
@@ -16061,7 +16072,7 @@ msgstr ""
 "commandoprompt. In zulke gevallen geldt deze instelling slechts voor één "
 "instantie."
 
-#: src/slic3r/GUI/Preferences.cpp:370
+#: src/slic3r/GUI/Preferences.cpp:376
 msgid ""
 "If this is enabled, when starting PrusaSlicer and another instance of the "
 "same PrusaSlicer is already running, that instance will be reactivated "
@@ -16070,7 +16081,7 @@ msgstr ""
 "Als dit is ingeschakeld zal PrusaSlicer een andere instantie van PrusaSlicer "
 "openen als die wordt gestart."
 
-#: src/slic3r/GUI/Preferences.cpp:378
+#: src/slic3r/GUI/Preferences.cpp:384
 msgid ""
 "Always ask for unsaved changes in project, when: \n"
 "- Closing PrusaSlicer,\n"
@@ -16080,7 +16091,7 @@ msgstr ""
 "- PrusaSlicer afgesloten wordt,\n"
 "- Een nieuw project wordt geladen of aangemaakt"
 
-#: src/slic3r/GUI/Preferences.cpp:386
+#: src/slic3r/GUI/Preferences.cpp:392
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:928
 msgid ""
 "Ask to save unsaved changes in presets when closing the application or when "
@@ -16089,7 +16100,7 @@ msgstr ""
 "Vraag om niet-opgeslagen wijziging op te slaan in presets bij het sluiten "
 "van het programma of het laden van een nieuw project"
 
-#: src/slic3r/GUI/Preferences.cpp:387
+#: src/slic3r/GUI/Preferences.cpp:393
 msgid ""
 "Always ask for unsaved changes in presets, when: \n"
 "- Closing PrusaSlicer while some presets are modified,\n"
@@ -16099,14 +16110,14 @@ msgstr ""
 "- PrusaSlicer afgesloten wordt terwijl presets zijn gewijzigd,\n"
 "- Een nieuw project wordt geladen terwijl sommige presets zijn gewijzigd"
 
-#: src/slic3r/GUI/Preferences.cpp:393
+#: src/slic3r/GUI/Preferences.cpp:399
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:927
 msgid "Ask for unsaved changes in presets when selecting new preset"
 msgstr ""
 "Vraag naar niet-opgeslagen wijzigingen in presets bij het selecteren van een "
 "nieuwe preset"
 
-#: src/slic3r/GUI/Preferences.cpp:394
+#: src/slic3r/GUI/Preferences.cpp:400
 msgid ""
 "Always ask for unsaved changes in presets when selecting new preset or "
 "resetting a preset"
@@ -16114,24 +16125,24 @@ msgstr ""
 "Vraag altijd naar niet-opgeslagen wijzigingen in presets bij het resetten "
 "van een preset of het selecteren van een nieuwe preset"
 
-#: src/slic3r/GUI/Preferences.cpp:398
+#: src/slic3r/GUI/Preferences.cpp:404
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:926
 msgid "Ask for unsaved changes in presets when creating new project"
 msgstr ""
 "Vraag naar niet-opgeslagen wijzigingen in presets bij het aanmaken van een "
 "nieuw project"
 
-#: src/slic3r/GUI/Preferences.cpp:399
+#: src/slic3r/GUI/Preferences.cpp:405
 msgid "Always ask for unsaved changes in presets when creating new project"
 msgstr ""
 "Vraag altijd naar niet-opgeslagen wijzigingen in presets bij het aanmaken "
 "van een new project"
 
-#: src/slic3r/GUI/Preferences.cpp:405
+#: src/slic3r/GUI/Preferences.cpp:411
 msgid "Associate .gcode files to PrusaSlicer G-code Viewer"
 msgstr "Open .gcode-bestanden met de PrusaSlicer G-code weergave"
 
-#: src/slic3r/GUI/Preferences.cpp:406
+#: src/slic3r/GUI/Preferences.cpp:412
 msgid ""
 "If enabled, sets PrusaSlicer G-code Viewer as default application to open ."
 "gcode files."
@@ -16139,21 +16150,21 @@ msgstr ""
 "Als dit aanstaat wordt PrusaSlicer G-code Viewer als standaardprogramma "
 "ingesteld om .gcode-bestanden te openen."
 
-#: src/slic3r/GUI/Preferences.cpp:409
+#: src/slic3r/GUI/Preferences.cpp:415
 msgid "Associate .bgcode files to PrusaSlicer G-code Viewer"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:410
+#: src/slic3r/GUI/Preferences.cpp:416
 msgid ""
 "If enabled, sets PrusaSlicer G-code Viewer as default application to open ."
 "bgcode files."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:417
+#: src/slic3r/GUI/Preferences.cpp:423
 msgid "Use Retina resolution for the 3D scene"
 msgstr "Gebruik hoge resolutie voor de modelweergave"
 
-#: src/slic3r/GUI/Preferences.cpp:418
+#: src/slic3r/GUI/Preferences.cpp:424
 msgid ""
 "If enabled, the 3D scene will be rendered in Retina resolution. If you are "
 "experiencing 3D performance problems, disabling this option may help."
@@ -16162,32 +16173,32 @@ msgstr ""
 "resolutie. Als u problemen ondervindt met de prestaties kan het uitschakelen "
 "van deze optie mogelijk helpen."
 
-#: src/slic3r/GUI/Preferences.cpp:427 src/slic3r/GUI/Preferences.cpp:428
+#: src/slic3r/GUI/Preferences.cpp:433 src/slic3r/GUI/Preferences.cpp:434
 msgid "Show splash screen"
 msgstr "Toon startscherm"
 
-#: src/slic3r/GUI/Preferences.cpp:433
+#: src/slic3r/GUI/Preferences.cpp:439
 msgid "If enabled, PrusaSlicer will be open at the position it was closed"
 msgstr ""
 "Als dit is ingeschakeld zal PrusaSlicer openen op de positie waarop die is "
 "afgesloten"
 
-#: src/slic3r/GUI/Preferences.cpp:438
+#: src/slic3r/GUI/Preferences.cpp:444
 msgid "Clear Undo / Redo stack on new project"
 msgstr "Leeg lijst met ongedaan maken / opnieuw doen bij nieuwe projecten"
 
-#: src/slic3r/GUI/Preferences.cpp:439
+#: src/slic3r/GUI/Preferences.cpp:445
 msgid ""
 "Clear Undo / Redo stack on new project or when an existing project is loaded."
 msgstr ""
 "Leeg lijst met ongedaan maken / opnieuw doen bij nieuwe projecten of wanneer "
 "een bestaand project is geladen."
 
-#: src/slic3r/GUI/Preferences.cpp:444
+#: src/slic3r/GUI/Preferences.cpp:450
 msgid "Enable support for legacy 3DConnexion devices"
 msgstr "Sta support voor oudere 3DConnexion-apparaten toe"
 
-#: src/slic3r/GUI/Preferences.cpp:445
+#: src/slic3r/GUI/Preferences.cpp:451
 msgid ""
 "If enabled, the legacy 3DConnexion devices settings dialog is available by "
 "pressing CTRL+M"
@@ -16195,59 +16206,59 @@ msgstr ""
 "Als dit aanstaat is de oudere 3DConnexion-apparaten-instellingenvenster "
 "beschikbaar door te drukken op CTRL+M"
 
-#: src/slic3r/GUI/Preferences.cpp:452
+#: src/slic3r/GUI/Preferences.cpp:458
 msgid "Camera"
 msgstr "Camera"
 
-#: src/slic3r/GUI/Preferences.cpp:462
+#: src/slic3r/GUI/Preferences.cpp:468
 msgid "Use perspective camera"
 msgstr "Gebruik perspectiefweergave"
 
-#: src/slic3r/GUI/Preferences.cpp:463
+#: src/slic3r/GUI/Preferences.cpp:469
 msgid ""
 "If enabled, use perspective camera. If not enabled, use orthographic camera."
 msgstr ""
 "Als dit is ingeschakeld zal de weergave op perspectief worden gezet. Anders "
 "wordt een orthografische weergave gebruikt."
 
-#: src/slic3r/GUI/Preferences.cpp:467
+#: src/slic3r/GUI/Preferences.cpp:473
 msgid "Use free camera"
 msgstr "Gebruik vrij beweegbare camera"
 
-#: src/slic3r/GUI/Preferences.cpp:468
+#: src/slic3r/GUI/Preferences.cpp:474
 msgid "If enabled, use free camera. If not enabled, use constrained camera."
 msgstr ""
 "Als dit is ingeschakeld wordt de vrij beweegbare camera gebruikt, anders een "
 "vaste camera."
 
-#: src/slic3r/GUI/Preferences.cpp:472
+#: src/slic3r/GUI/Preferences.cpp:478
 msgid "Reverse direction of zoom with mouse wheel"
 msgstr "Zoomrichting van scrollwieltje omkeren"
 
-#: src/slic3r/GUI/Preferences.cpp:473
+#: src/slic3r/GUI/Preferences.cpp:479
 msgid "If enabled, reverses the direction of zoom with mouse wheel"
 msgstr "Als dit aanstaat wordt de scrollrichting de andere kant op ingesteld"
 
-#: src/slic3r/GUI/Preferences.cpp:479
+#: src/slic3r/GUI/Preferences.cpp:485
 msgid "GUI"
 msgstr "GUI"
 
-#: src/slic3r/GUI/Preferences.cpp:519
+#: src/slic3r/GUI/Preferences.cpp:525
 msgid "Sequential slider applied only to top layer"
 msgstr "Opeenvolgende schuif alleen toegepast op toplaag"
 
-#: src/slic3r/GUI/Preferences.cpp:520
+#: src/slic3r/GUI/Preferences.cpp:526
 msgid ""
 "If enabled, changes made using the sequential slider, in preview, apply only "
 "to gcode top layer. If disabled, changes made using the sequential slider, "
 "in preview, apply to the whole gcode."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:526
+#: src/slic3r/GUI/Preferences.cpp:532
 msgid "Show sidebar collapse/expand button"
 msgstr "Toon zijbalk in-/uitklappen-knop"
 
-#: src/slic3r/GUI/Preferences.cpp:527
+#: src/slic3r/GUI/Preferences.cpp:533
 msgid ""
 "If enabled, the button for the collapse sidebar will be appeared in top "
 "right corner of the 3D Scene"
@@ -16255,11 +16266,11 @@ msgstr ""
 "Als dit is ingeschakeld zal de knop om de zijbalk in te klappen getoond "
 "worden in de rechterbovenhoek van de modelweergave"
 
-#: src/slic3r/GUI/Preferences.cpp:538
+#: src/slic3r/GUI/Preferences.cpp:544
 msgid "Use colors for axes values in Manipulation panel"
 msgstr "Gebruik kleuren voor waarden voor assen in het bewerkingsmenu"
 
-#: src/slic3r/GUI/Preferences.cpp:539
+#: src/slic3r/GUI/Preferences.cpp:545
 msgid ""
 "If enabled, the axes names and axes values will be colorized according to "
 "the axes colors. If disabled, old UI will be used."
@@ -16267,11 +16278,11 @@ msgstr ""
 "Als dit is ingeschakeld worden namen en waarden van assen gekleurd volgens "
 "de kleur van de as. Als dit uitstaat wordt de oude interface gebruikt."
 
-#: src/slic3r/GUI/Preferences.cpp:544
+#: src/slic3r/GUI/Preferences.cpp:550
 msgid "Order object volumes by types"
 msgstr "Sorteer objectvolumes op type"
 
-#: src/slic3r/GUI/Preferences.cpp:545
+#: src/slic3r/GUI/Preferences.cpp:551
 msgid ""
 "If enabled, volumes will be always ordered inside the object. Correct order "
 "is Model Part, Negative Volume, Modifier, Support Blocker and Support "
@@ -16283,29 +16294,29 @@ msgstr ""
 "Supportblokkering - Supportforcering. Als dit uitstaat kan u de onderdelen "
 "zelf schikken. Een van de modellen moet op de eerste plaats staan."
 
-#: src/slic3r/GUI/Preferences.cpp:550
+#: src/slic3r/GUI/Preferences.cpp:556
 msgid "Show non-manifold edges"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:551
+#: src/slic3r/GUI/Preferences.cpp:557
 msgid "If enabled, shows non-manifold edges."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:555
+#: src/slic3r/GUI/Preferences.cpp:561
 msgid "Allow automatically color change"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:556
+#: src/slic3r/GUI/Preferences.cpp:562
 msgid ""
 "If enabled, related notification will be shown, when sliced object looks "
 "like a logo or a sign."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:561
+#: src/slic3r/GUI/Preferences.cpp:567
 msgid "Set settings tabs as menu items"
 msgstr "Stel instellingentabs in als menu-onderdelen"
 
-#: src/slic3r/GUI/Preferences.cpp:562
+#: src/slic3r/GUI/Preferences.cpp:568
 msgid ""
 "If enabled, Settings Tabs will be placed as menu items. If disabled, old UI "
 "will be used."
@@ -16313,19 +16324,19 @@ msgstr ""
 "Als dit is ingeschakeld worden instellingentabs geplaatst als menu-"
 "onderdelen. Als dit uitstaat wordt de oude interface gebruikt."
 
-#: src/slic3r/GUI/Preferences.cpp:576
+#: src/slic3r/GUI/Preferences.cpp:582
 msgid "Show \"Tip of the day\" notification after start"
 msgstr "Toon \"Tip van de dag\" melding bij het starten"
 
-#: src/slic3r/GUI/Preferences.cpp:577
+#: src/slic3r/GUI/Preferences.cpp:583
 msgid "If enabled, useful hints are displayed at startup."
 msgstr "Als dit is ingeschakeld worden handige tips getoond bij het starten."
 
-#: src/slic3r/GUI/Preferences.cpp:581
+#: src/slic3r/GUI/Preferences.cpp:587
 msgid "Notify about new releases"
 msgstr "Notificaties over nieuwe versies"
 
-#: src/slic3r/GUI/Preferences.cpp:582
+#: src/slic3r/GUI/Preferences.cpp:588
 msgid ""
 "You will be notified about new release after startup acordingly: All = "
 "Regular release and alpha / beta releases. Release only = regular release."
@@ -16334,79 +16345,79 @@ msgstr ""
 "reguliere versies en alpha/beta-versies. Standaardversies = alleen reguliere "
 "versies."
 
-#: src/slic3r/GUI/Preferences.cpp:585
+#: src/slic3r/GUI/Preferences.cpp:591
 msgid "Release only"
 msgstr "Alleen standaardversies"
 
-#: src/slic3r/GUI/Preferences.cpp:592
+#: src/slic3r/GUI/Preferences.cpp:598
 msgid "Use custom size for toolbar icons"
 msgstr "Aangepaste pictogramgrootte in de modelweergave"
 
-#: src/slic3r/GUI/Preferences.cpp:593
+#: src/slic3r/GUI/Preferences.cpp:599
 msgid "If enabled, you can change size of toolbar icons manually."
 msgstr ""
 "Hiermee kan de grootte van werkbalkpictogrammen handmatig ingesteld worden."
 
-#: src/slic3r/GUI/Preferences.cpp:611 src/slic3r/GUI/Tab.cpp:1743
+#: src/slic3r/GUI/Preferences.cpp:617 src/slic3r/GUI/Tab.cpp:1743
 msgid "Other"
 msgstr "Overige"
 
-#: src/slic3r/GUI/Preferences.cpp:628
+#: src/slic3r/GUI/Preferences.cpp:634
 msgid "If enabled, PrusaSlicer will not open a hyperlinks in your browser."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:634
+#: src/slic3r/GUI/Preferences.cpp:640
 msgid "Allow downloads from Printables.com"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:635
+#: src/slic3r/GUI/Preferences.cpp:641
 msgid "If enabled, PrusaSlicer will be allowed to download from Printables.com"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:645
+#: src/slic3r/GUI/Preferences.cpp:651
 msgid "Render"
 msgstr "Render"
 
-#: src/slic3r/GUI/Preferences.cpp:655
+#: src/slic3r/GUI/Preferences.cpp:661
 msgid "Use environment map"
 msgstr "Gebruik omgevingskaart"
 
-#: src/slic3r/GUI/Preferences.cpp:656
+#: src/slic3r/GUI/Preferences.cpp:662
 msgid "If enabled, renders object using the environment map."
 msgstr ""
 "Als dit is ingeschakeld worden objecten gerenderd met de omgevingskaart."
 
-#: src/slic3r/GUI/Preferences.cpp:665
+#: src/slic3r/GUI/Preferences.cpp:671
 msgid "Dark mode"
 msgstr "Donkere modus"
 
-#: src/slic3r/GUI/Preferences.cpp:675
+#: src/slic3r/GUI/Preferences.cpp:681
 msgid "Enable dark mode"
 msgstr "Gebruik donkere modus"
 
-#: src/slic3r/GUI/Preferences.cpp:676
+#: src/slic3r/GUI/Preferences.cpp:682
 msgid ""
 "If enabled, UI will use Dark mode colors. If disabled, old UI will be used."
 msgstr ""
 "Als dit is ingeschakeld worden kleuren van de donkere modus gebruikt. De "
 "oude kleuren worden gebruikt als dit uit staat."
 
-#: src/slic3r/GUI/Preferences.cpp:683
+#: src/slic3r/GUI/Preferences.cpp:689
 msgid "Use system menu for application"
 msgstr "Gebruik systeemmenu voor programma"
 
-#: src/slic3r/GUI/Preferences.cpp:684
+#: src/slic3r/GUI/Preferences.cpp:690
 msgid ""
 "If enabled, application will use the standard Windows system menu,\n"
 "but on some combination of display scales it can look ugly. If disabled, old "
 "UI will be used."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:761
+#: src/slic3r/GUI/Preferences.cpp:767
 msgid "Changes for the critical options"
 msgstr "Aanpassingen voor de kritische opties"
 
-#: src/slic3r/GUI/Preferences.cpp:763
+#: src/slic3r/GUI/Preferences.cpp:769
 msgid ""
 "Changing some options will trigger application restart.\n"
 "You will lose the content of the plater."
@@ -16414,49 +16425,49 @@ msgstr ""
 "Sommige opties aanpassen kan een herstart veroorzaken.\n"
 "U kunt de inhoud van het bed kwijtraken."
 
-#: src/slic3r/GUI/Preferences.cpp:956
+#: src/slic3r/GUI/Preferences.cpp:962
 msgid "Icon size in a respect to the default size"
 msgstr "Pictogramgrootte vergeleken met de originele grootte"
 
-#: src/slic3r/GUI/Preferences.cpp:971
+#: src/slic3r/GUI/Preferences.cpp:977
 msgid "Select toolbar icon size in respect to the default one."
 msgstr "Selecteer werkbalk-pictogramgrootte in verhouding tot de originele."
 
-#: src/slic3r/GUI/Preferences.cpp:1006
+#: src/slic3r/GUI/Preferences.cpp:1012
 msgid "Layout Options"
 msgstr "Layout-opties"
 
-#: src/slic3r/GUI/Preferences.cpp:1015
+#: src/slic3r/GUI/Preferences.cpp:1021
 msgid "Old regular layout with the tab bar"
 msgstr "Oude standaardlayout met de tabbladen"
 
-#: src/slic3r/GUI/Preferences.cpp:1016
+#: src/slic3r/GUI/Preferences.cpp:1022
 msgid "New layout, access via settings button in the top menu"
 msgstr ""
 "Nieuwe layout, krijg toegang tot de instellingen via de instellingenknop in "
 "het topmenu"
 
-#: src/slic3r/GUI/Preferences.cpp:1017
+#: src/slic3r/GUI/Preferences.cpp:1023
 msgid "Settings in non-modal window"
 msgstr "Instelling voor niet-modaal venster"
 
-#: src/slic3r/GUI/Preferences.cpp:1059
+#: src/slic3r/GUI/Preferences.cpp:1065
 msgid "Text colors"
 msgstr "Tekstkleuren"
 
-#: src/slic3r/GUI/Preferences.cpp:1083
+#: src/slic3r/GUI/Preferences.cpp:1089
 msgid "Mode markers"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:1111
+#: src/slic3r/GUI/Preferences.cpp:1117
 msgid "Application font size"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:1151
+#: src/slic3r/GUI/Preferences.cpp:1157
 msgid "Revert font to default"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:1163
+#: src/slic3r/GUI/Preferences.cpp:1169
 msgid "Font size"
 msgstr ""
 
@@ -18661,11 +18672,11 @@ msgstr "ontladen"
 msgid "loaded"
 msgstr "geladen"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:369
+#: src/slic3r/GUI/WipeTowerDialog.cpp:345
 msgid "Tool #"
 msgstr "Tool #"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:378
+#: src/slic3r/GUI/WipeTowerDialog.cpp:354
 msgid ""
 "Total purging volume is calculated by summing two values below, depending on "
 "which tools are loaded/unloaded."
@@ -18673,15 +18684,15 @@ msgstr ""
 "Totaal afveegvolume dat de som is van de twee onderstaande waarden, "
 "afhankelijk van welke tools zijn geladen/ontladen."
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:379
+#: src/slic3r/GUI/WipeTowerDialog.cpp:355
 msgid "Volume to purge (mm³) when the filament is being"
 msgstr "Afveegvolume (mm³) als het filament wordt gebruikt"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:393
+#: src/slic3r/GUI/WipeTowerDialog.cpp:369
 msgid "From"
 msgstr "Van"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:458
+#: src/slic3r/GUI/WipeTowerDialog.cpp:434
 msgid ""
 "Switching to simple settings will discard changes done in the advanced "
 "mode!\n"
@@ -18693,11 +18704,11 @@ msgstr ""
 "\n"
 "Weet u zeker dat u wilt doorgaan?"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:470
+#: src/slic3r/GUI/WipeTowerDialog.cpp:446
 msgid "Show simplified settings"
 msgstr "Toon eenvoudige instellingen"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:470
+#: src/slic3r/GUI/WipeTowerDialog.cpp:446
 msgid "Show advanced settings"
 msgstr "Toon geavanceerde instellingen"
 

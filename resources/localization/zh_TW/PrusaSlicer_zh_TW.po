@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Slic3rPE\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-11-10 15:30+0100\n"
+"POT-Creation-Date: 2023-11-16 13:19+0100\n"
 "PO-Revision-Date: 2022-12-06 17:21+0800\n"
 "Last-Translator: BiseChen <bise.chen@gmail.com>\n"
 "Language-Team: \n"
@@ -1700,8 +1700,8 @@ msgstr ""
 #: src/slic3r/GUI/GUI_ObjectList.cpp:588 src/slic3r/GUI/GUI_ObjectList.cpp:600
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1074
 #: src/slic3r/GUI/GUI_ObjectList.cpp:2062
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2942
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4817
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2944
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4819
 #: src/slic3r/GUI/ObjectDataViewModel.cpp:266
 msgid "default"
 msgstr "預設"
@@ -2323,7 +2323,7 @@ msgstr "模糊表面的類型。"
 #: src/slic3r/GUI/FileArchiveDialog.cpp:272
 #: src/slic3r/GUI/FileArchiveDialog.cpp:290
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1999 src/slic3r/GUI/Plater.cpp:467
-#: src/slic3r/GUI/Plater.cpp:622 src/slic3r/GUI/Preferences.cpp:586
+#: src/slic3r/GUI/Plater.cpp:622 src/slic3r/GUI/Preferences.cpp:592
 msgid "None"
 msgstr "無"
 
@@ -5535,7 +5535,7 @@ msgid "Export the model(s) as STL."
 msgstr "將模型匯出爲 STL 檔案。"
 
 #: src/libslic3r/PrintConfig.cpp:4872 src/slic3r/GUI/KBShortcutsDialog.cpp:101
-#: src/slic3r/GUI/Plater.cpp:979 src/slic3r/GUI/Plater.cpp:7860
+#: src/slic3r/GUI/Plater.cpp:979 src/slic3r/GUI/Plater.cpp:7881
 msgid "Export G-code"
 msgstr "匯出G-code"
 
@@ -6686,8 +6686,8 @@ msgid "Reset defaults"
 msgstr ""
 
 #: src/slic3r/GUI/ArrangeSettingsDialogImgui.cpp:134
-#: src/slic3r/GUI/GLCanvas3D.cpp:5260 src/slic3r/GUI/KBShortcutsDialog.cpp:146
-#: src/slic3r/GUI/Plater.cpp:7787
+#: src/slic3r/GUI/GLCanvas3D.cpp:5266 src/slic3r/GUI/KBShortcutsDialog.cpp:146
+#: src/slic3r/GUI/Plater.cpp:7808
 msgid "Arrange"
 msgstr "佈局"
 
@@ -7209,7 +7209,7 @@ msgstr "標準"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:415 src/slic3r/GUI/ConfigWizard.cpp:744
 #: src/slic3r/GUI/FileArchiveDialog.cpp:268
-#: src/slic3r/GUI/FileArchiveDialog.cpp:290 src/slic3r/GUI/Preferences.cpp:584
+#: src/slic3r/GUI/FileArchiveDialog.cpp:290 src/slic3r/GUI/Preferences.cpp:590
 #: src/slic3r/GUI/Tab.cpp:4562 src/slic3r/GUI/UnsavedChangesDialog.cpp:1164
 msgid "All"
 msgstr "全部"
@@ -7375,7 +7375,7 @@ msgstr ""
 "程式啟動時會顯示通知（但不會在使用期間顯示）。 這只是一個通知機制，並不會自動"
 "安裝。"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1359 src/slic3r/GUI/Preferences.cpp:334
+#: src/slic3r/GUI/ConfigWizard.cpp:1359 src/slic3r/GUI/Preferences.cpp:340
 msgid "Update built-in Presets automatically"
 msgstr "自動更新內建預設"
 
@@ -7402,7 +7402,7 @@ msgid ""
 "an update is applied."
 msgstr "此外，在套用更新之前，也會建立一個完整的設定快照備份。"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1420 src/slic3r/GUI/Preferences.cpp:1183
+#: src/slic3r/GUI/ConfigWizard.cpp:1420 src/slic3r/GUI/Preferences.cpp:1189
 msgid "Download path"
 msgstr ""
 
@@ -7470,11 +7470,11 @@ msgstr ""
 msgid "Files association"
 msgstr "檔案關聯"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1655 src/slic3r/GUI/Preferences.cpp:320
+#: src/slic3r/GUI/ConfigWizard.cpp:1655 src/slic3r/GUI/Preferences.cpp:326
 msgid "Associate .3mf files to PrusaSlicer"
 msgstr "將 .3mf 檔案關聯至 PrusaSlicer"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1656 src/slic3r/GUI/Preferences.cpp:325
+#: src/slic3r/GUI/ConfigWizard.cpp:1656 src/slic3r/GUI/Preferences.cpp:331
 msgid "Associate .stl files to PrusaSlicer"
 msgstr "將 .stl 檔案關聯至 PrusaSlicer"
 
@@ -7763,7 +7763,7 @@ msgid "Filament Profiles Selection"
 msgstr "線材設定檔選擇"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:3395 src/slic3r/GUI/ConfigWizard.cpp:3398
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4282
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4284
 msgid "Type:"
 msgstr "類型："
 
@@ -7848,7 +7848,7 @@ msgid "Perform"
 msgstr "實行"
 
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:658
-#: src/slic3r/GUI/GLCanvas3D.cpp:5441 src/slic3r/GUI/KBShortcutsDialog.cpp:111
+#: src/slic3r/GUI/GLCanvas3D.cpp:5447 src/slic3r/GUI/KBShortcutsDialog.cpp:111
 #: src/slic3r/GUI/MainFrame.cpp:1454
 msgid "Undo"
 msgstr "取消"
@@ -8172,7 +8172,7 @@ msgstr ""
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:799 src/slic3r/GUI/Plater.cpp:5626
 #: src/slic3r/GUI/Plater.cpp:5634 src/slic3r/GUI/Plater.cpp:5704
 #: src/slic3r/GUI/Plater.cpp:5712 src/slic3r/GUI/WifiConfigDialog.cpp:239
-#: src/slic3r/GUI/WipeTowerDialog.cpp:69 src/slic3r/GUI/WipeTowerDialog.cpp:459
+#: src/slic3r/GUI/WipeTowerDialog.cpp:69 src/slic3r/GUI/WipeTowerDialog.cpp:435
 msgid "Warning"
 msgstr "警告"
 
@@ -8605,8 +8605,8 @@ msgstr "添加"
 msgid "Add one or more custom shapes"
 msgstr "添加一個或多個自定義形狀"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:122 src/slic3r/GUI/GalleryDialog.cpp:540
-#: src/slic3r/GUI/GLCanvas3D.cpp:5242 src/slic3r/GUI/GUI_Factories.cpp:480
+#: src/slic3r/GUI/GalleryDialog.cpp:122 src/slic3r/GUI/GalleryDialog.cpp:539
+#: src/slic3r/GUI/GLCanvas3D.cpp:5248 src/slic3r/GUI/GUI_Factories.cpp:480
 #: src/slic3r/GUI/Tab.cpp:4477
 msgid "Delete"
 msgstr "刪除"
@@ -8629,11 +8629,11 @@ msgstr "確認"
 msgid "Add selected shape(s) to the bed"
 msgstr "將選定的形狀添加到載台上"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:434
+#: src/slic3r/GUI/GalleryDialog.cpp:433
 msgid "Choose one or more files (STL, OBJ):"
 msgstr "選擇一個或多個檔案（STL、OBJ）："
 
-#: src/slic3r/GUI/GalleryDialog.cpp:474
+#: src/slic3r/GUI/GalleryDialog.cpp:473
 #, boost-format
 msgid ""
 "It looks like selected %1%-file has an error or is destructed.\n"
@@ -8642,19 +8642,19 @@ msgstr ""
 "所選 %1% 檔案似乎有錯誤或已損壞。\n"
 "我們無法匯入此檔案"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:485
+#: src/slic3r/GUI/GalleryDialog.cpp:484
 msgid "Choose one PNG file:"
 msgstr "選擇一個 PNG 檔案："
 
-#: src/slic3r/GUI/GalleryDialog.cpp:498
+#: src/slic3r/GUI/GalleryDialog.cpp:497
 msgid "Replacing of the PNG"
 msgstr "取代PNG"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:542
+#: src/slic3r/GUI/GalleryDialog.cpp:541
 msgid "Change thumbnail"
 msgstr "變更縮圖"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:583 src/slic3r/GUI/GalleryDialog.cpp:588
+#: src/slic3r/GUI/GalleryDialog.cpp:582 src/slic3r/GUI/GalleryDialog.cpp:587
 #, boost-format
 msgid "Loading of the \"%1%\""
 msgstr "匯入\"%1%\""
@@ -9000,8 +9000,8 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:252
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2719
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4067
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4259
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4069
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4261
 msgid "Part"
 msgstr "零件"
 
@@ -9379,7 +9379,7 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:1865
 #: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp:1966
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4249
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4251
 msgid "You can't change a type of the last solid part of the object."
 msgstr "您無法變更模型最後一個實體部分的類型。"
 
@@ -9396,7 +9396,7 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:1878
 #: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp:1979
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4266
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4268
 msgid "Modifier"
 msgstr "修改器"
 
@@ -10817,7 +10817,7 @@ msgid ""
 "changes first."
 msgstr "您當前正在編輯 SLA 支持點。請先套用或放棄您的變更。"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:200 src/slic3r/GUI/GLCanvas3D.cpp:5388
+#: src/slic3r/GUI/GLCanvas3D.cpp:200 src/slic3r/GUI/GLCanvas3D.cpp:5394
 #: src/slic3r/GUI/ObjectDataViewModel.cpp:76
 msgid "Variable layer height"
 msgstr "可變層高"
@@ -10922,23 +10922,23 @@ msgstr "鏡像模型"
 msgid "Move Object"
 msgstr "移動模型"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4511 src/slic3r/GUI/GLCanvas3D.cpp:5348
+#: src/slic3r/GUI/GLCanvas3D.cpp:4511 src/slic3r/GUI/GLCanvas3D.cpp:5354
 msgid "Switch to Settings"
 msgstr "切換到設定"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4512 src/slic3r/GUI/GLCanvas3D.cpp:5348
+#: src/slic3r/GUI/GLCanvas3D.cpp:4512 src/slic3r/GUI/GLCanvas3D.cpp:5354
 msgid "Print Settings Tab"
 msgstr "打印設定分頁"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5349
+#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5355
 msgid "Filament Settings Tab"
 msgstr "線材設定分頁"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5349
+#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5355
 msgid "Material Settings Tab"
 msgstr "材料設定分頁"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4514 src/slic3r/GUI/GLCanvas3D.cpp:5350
+#: src/slic3r/GUI/GLCanvas3D.cpp:4514 src/slic3r/GUI/GLCanvas3D.cpp:5356
 msgid "Printer Settings Tab"
 msgstr "打印機設定分頁"
 
@@ -10962,7 +10962,7 @@ msgid "Redo %1$d Action"
 msgid_plural "Redo %1$d Actions"
 msgstr[0] "重做 %1$d 操作"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4777 src/slic3r/GUI/GLCanvas3D.cpp:5366
+#: src/slic3r/GUI/GLCanvas3D.cpp:4777 src/slic3r/GUI/GLCanvas3D.cpp:5372
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:120 src/slic3r/GUI/Search.cpp:486
 msgid "Search"
 msgstr "搜尋"
@@ -10972,84 +10972,84 @@ msgstr "搜尋"
 msgid "Enter a search term"
 msgstr "請輸入搜尋字串"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5234
+#: src/slic3r/GUI/GLCanvas3D.cpp:5240
 msgid "Add..."
 msgstr "增加..."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5251 src/slic3r/GUI/KBShortcutsDialog.cpp:110
+#: src/slic3r/GUI/GLCanvas3D.cpp:5257 src/slic3r/GUI/KBShortcutsDialog.cpp:110
 #: src/slic3r/GUI/Plater.cpp:6430 src/slic3r/GUI/Tab.cpp:4911
 msgid "Delete all"
 msgstr "全部刪除"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5260 src/slic3r/GUI/KBShortcutsDialog.cpp:147
+#: src/slic3r/GUI/GLCanvas3D.cpp:5266 src/slic3r/GUI/KBShortcutsDialog.cpp:147
 msgid "Arrange selection"
 msgstr "佈局選擇"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5260
+#: src/slic3r/GUI/GLCanvas3D.cpp:5266
 msgid "Click right mouse button to show arrangement options"
 msgstr "單擊滑鼠右鍵以顯示佈局選項"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5280
+#: src/slic3r/GUI/GLCanvas3D.cpp:5286
 msgid "Copy"
 msgstr "複製"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5289
+#: src/slic3r/GUI/GLCanvas3D.cpp:5295
 msgid "Paste"
 msgstr "貼上"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5301 src/slic3r/GUI/GUI_Factories.cpp:1343
+#: src/slic3r/GUI/GLCanvas3D.cpp:5307 src/slic3r/GUI/GUI_Factories.cpp:1343
 #: src/slic3r/GUI/GUI_Factories.cpp:1367 src/slic3r/GUI/GUI_Factories.cpp:1378
 msgid "Add instance"
 msgstr "添加實例"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5312 src/slic3r/GUI/GUI_Factories.cpp:1346
+#: src/slic3r/GUI/GLCanvas3D.cpp:5318 src/slic3r/GUI/GUI_Factories.cpp:1346
 msgid "Remove instance"
 msgstr "刪除實例"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5325
+#: src/slic3r/GUI/GLCanvas3D.cpp:5331
 msgid "Split to objects"
 msgstr "拆開為模型"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5335
+#: src/slic3r/GUI/GLCanvas3D.cpp:5341
 msgid "Split to parts"
 msgstr "拆開為零件"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5441 src/slic3r/GUI/GLCanvas3D.cpp:5478
+#: src/slic3r/GUI/GLCanvas3D.cpp:5447 src/slic3r/GUI/GLCanvas3D.cpp:5484
 msgid "Click right mouse button to open/close History"
 msgstr "點擊滑鼠右鍵打開/關閉歷史記錄"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5463
+#: src/slic3r/GUI/GLCanvas3D.cpp:5469
 #, boost-format
 msgid "Next Undo action: %1%"
 msgstr "下一個取消操作：%1%"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5478 src/slic3r/GUI/KBShortcutsDialog.cpp:112
+#: src/slic3r/GUI/GLCanvas3D.cpp:5484 src/slic3r/GUI/KBShortcutsDialog.cpp:112
 #: src/slic3r/GUI/MainFrame.cpp:1457
 msgid "Redo"
 msgstr "重做"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5499
+#: src/slic3r/GUI/GLCanvas3D.cpp:5505
 #, boost-format
 msgid "Next Redo action: %1%"
 msgstr "下一個重做操作：%1%"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7416
+#: src/slic3r/GUI/GLCanvas3D.cpp:7422
 msgid "An object outside the print area was detected."
 msgstr "偵測到打印區域外的模型。"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7417
+#: src/slic3r/GUI/GLCanvas3D.cpp:7423
 msgid "A toolpath outside the print area was detected."
 msgstr "偵測到打印區域外的工具路徑。"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7418
+#: src/slic3r/GUI/GLCanvas3D.cpp:7424
 msgid "SLA supports outside the print area were detected."
 msgstr "偵測到打印區域外的 SLA 支撐材。"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7419
+#: src/slic3r/GUI/GLCanvas3D.cpp:7425
 msgid "Some objects are not visible during editing."
 msgstr "某些模型在編輯區不可見。"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7421
+#: src/slic3r/GUI/GLCanvas3D.cpp:7427
 msgid ""
 "An object outside the print area was detected.\n"
 "Resolve the current problem to continue slicing."
@@ -11058,18 +11058,18 @@ msgstr ""
 "請先解決當前問題再繼續切片。"
 
 #. TRN %3% is name of Object1, %4% is name of Object2
-#: src/slic3r/GUI/GLCanvas3D.cpp:7433
+#: src/slic3r/GUI/GLCanvas3D.cpp:7439
 #, boost-format
 msgid ""
 "Conflicts in G-code paths have been detected at layer %1%, z=%2$.2f mm. "
 "Please reposition the conflicting objects (%3% <-> %4%) further apart."
 msgstr ""
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7463
+#: src/slic3r/GUI/GLCanvas3D.cpp:7469
 msgid "Jump to"
 msgstr "跳至"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7466
+#: src/slic3r/GUI/GLCanvas3D.cpp:7472
 #: src/slic3r/GUI/NotificationManager.cpp:2105
 #: src/slic3r/GUI/NotificationManager.cpp:2112
 #: src/slic3r/GUI/NotificationManager.cpp:2128
@@ -11078,11 +11078,11 @@ msgstr "跳至"
 msgid "ERROR:"
 msgstr "錯誤："
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7543
+#: src/slic3r/GUI/GLCanvas3D.cpp:7549
 msgid "Selection-Add from rectangle"
 msgstr "選擇 - 從矩形中添加"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7558
+#: src/slic3r/GUI/GLCanvas3D.cpp:7564
 msgid "Selection-Remove from rectangle"
 msgstr "選擇 - 從矩形中刪除"
 
@@ -11321,7 +11321,7 @@ msgstr "請參閱發佈頁面。"
 msgid "Preparing settings tabs"
 msgstr "準備設定分頁"
 
-#: src/slic3r/GUI/GUI_App.cpp:1422 src/slic3r/GUI/Preferences.cpp:432
+#: src/slic3r/GUI/GUI_App.cpp:1422 src/slic3r/GUI/Preferences.cpp:438
 msgid "Restore window position on start"
 msgstr "啟動時恢復視窗位置"
 
@@ -11569,7 +11569,7 @@ msgstr ""
 "切換語言將觸發套用程式重啟。\n"
 "若您不先儲存的話將失去未儲存的內容。"
 
-#: src/slic3r/GUI/GUI_App.cpp:2599 src/slic3r/GUI/Preferences.cpp:765
+#: src/slic3r/GUI/GUI_App.cpp:2599 src/slic3r/GUI/Preferences.cpp:771
 #: src/slic3r/GUI/Selection.cpp:1489
 msgid "Do you want to proceed?"
 msgstr "您想繼續嗎？"
@@ -11651,7 +11651,7 @@ msgstr "在預設瀏覽器中打開超連結？"
 msgid "PrusaSlicer: Open hyperlink"
 msgstr "PrusaSlicer：打開超連結"
 
-#: src/slic3r/GUI/GUI_App.cpp:3390 src/slic3r/GUI/Preferences.cpp:627
+#: src/slic3r/GUI/GUI_App.cpp:3390 src/slic3r/GUI/Preferences.cpp:633
 msgid "Suppress to open hyperlink in browser"
 msgstr "禁止在瀏覽器中打開超連結"
 
@@ -11831,7 +11831,7 @@ msgid "Printable"
 msgstr "可打印"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:799 src/slic3r/GUI/GUI_ObjectList.cpp:2007
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2499
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2501
 msgid "Invalidate cut info"
 msgstr ""
 
@@ -11839,7 +11839,7 @@ msgstr ""
 msgid "Rename"
 msgstr "重新命名"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:824 src/slic3r/GUI/GUI_ObjectList.cpp:4641
+#: src/slic3r/GUI/GUI_Factories.cpp:824 src/slic3r/GUI/GUI_ObjectList.cpp:4643
 msgid "Fix by Windows repair algorithm"
 msgstr ""
 
@@ -12108,7 +12108,7 @@ msgid "Rename Sub-object"
 msgstr "重命名子模型"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1343
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4519
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4521
 msgid "Instances to Separated Objects"
 msgstr "分離模型的實例"
 
@@ -12239,7 +12239,7 @@ msgid ""
 msgstr ""
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:2009
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2529
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2531
 msgid "Delete all connectors"
 msgstr ""
 
@@ -12290,58 +12290,58 @@ msgstr "將所有零件合併為一個模型"
 msgid "Add Layers"
 msgstr "新增打印層"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2614
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2616
 msgid "Connectors information"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2624
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2689
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2626
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2691
 msgid "Object manipulation"
 msgstr "模型操作"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2634
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2636
 msgid "Group manipulation"
 msgstr "群組操作"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2725
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2727
 msgid "Object Settings to modify"
 msgstr "要修改的模型設定"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2729
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2731
 msgid "Part Settings to modify"
 msgstr "要修改的模型設定"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2734
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2736
 msgid "Layer range Settings to modify"
 msgstr "打印層範圍設定修改"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2740
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2742
 msgid "Part manipulation"
 msgstr "零件操作"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2748
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2750
 msgid "Instance manipulation"
 msgstr "實例操作"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2756
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2758
 msgid "Height ranges"
 msgstr "高度範圍"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2756
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2758
 msgid "Settings for height range"
 msgstr "高度範圍設定"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3293
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3295
 msgid "Delete Selected"
 msgstr "刪除所選"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3371
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3399
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3419
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3373
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3401
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3421
 msgid "Add Height Range"
 msgstr "添加高度範圍"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3465
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3467
 msgid ""
 "Cannot insert a new layer range after the current layer range.\n"
 "The next layer range is too thin to be split to two\n"
@@ -12351,7 +12351,7 @@ msgstr ""
 "下一層範圍太薄，不能一分為二\n"
 "因為不能違反最小層高。"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3469
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3471
 msgid ""
 "Cannot insert a new layer range between the current and the next layer "
 "range.\n"
@@ -12362,7 +12362,7 @@ msgstr ""
 "當前打印層範圍和下一個打印層範圍之間的差距\n"
 "因為比允許的最小層高更薄。"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3474
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3476
 msgid ""
 "Cannot insert a new layer range after the current layer range.\n"
 "Current layer range overlaps with the next layer range."
@@ -12370,130 +12370,130 @@ msgstr ""
 "無法在當前打印層範圍後插入新的打印層範圍。\n"
 "因為當前打印層範圍與下一個打印層範圍重疊。"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3533
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3535
 msgid "Edit Height Range"
 msgstr "編輯高度範圍"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3915
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3917
 msgid "Selection-Remove from list"
 msgstr "選擇-從列表中移除"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3927
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3929
 msgid "Selection-Add from list"
 msgstr "選擇-從列表中添加"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4066
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4068
 msgid "Object or Instance"
 msgstr "模型或實例"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4067
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4069
 msgid "Layer"
 msgstr "層"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4069
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4071
 msgid "Unsupported selection"
 msgstr "不被支援的選擇"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4070
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4072
 #, c-format, boost-format
 msgid "You started your selection with %s Item."
 msgstr "您從 %s 項開始選擇。"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4071
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4073
 #, c-format, boost-format
 msgid "In this mode you can select only other %s Items%s"
 msgstr "在此模式下，您只能選擇其他 %s 項%s"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4074
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4076
 msgid "of a current Object"
 msgstr "當前模型的"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4079
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4154 src/slic3r/GUI/Plater.cpp:225
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4081
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4156 src/slic3r/GUI/Plater.cpp:225
 msgid "Info"
 msgstr "資訊"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4259
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4261
 msgid "Negative Volume"
 msgstr "挖孔模型"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4272
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4274
 msgid "Support Blocker"
 msgstr "支撐阻斷器"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4272
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4274
 msgid "Support Enforcer"
 msgstr "執行支撐"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4282
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4284
 msgid "Select type of part"
 msgstr "選擇零件類型"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4288
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4290
 msgid "Change Part Type"
 msgstr "變更零件類型"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4549
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4551
 msgid "Enter new name"
 msgstr "輸入新名稱"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4549
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4551
 msgid "Renaming"
 msgstr "重新命名"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4611
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4613
 msgid "Repairing model"
 msgstr "修復模型"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4621
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4623
 msgid ""
 "Custom supports, seams and multimaterial painting were removed after "
 "repairing the mesh."
 msgstr "修復網格後，移除了自定義支撐、接縫和多材料繪製。"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4644
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4646
 msgid "Fixing by Windows repair algorithm"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4674
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4676
 msgid "The following model was repaired successfully"
 msgid_plural "The following models were repaired successfully"
 msgstr[0] "以下模型修復完成"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4680
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4682
 msgid "Folowing model repair failed"
 msgid_plural "Folowing models repair failed"
 msgstr[0] "以下模型修復失敗"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4685
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4687
 msgid "Repairing was canceled"
 msgstr "已取消修復"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4802
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4804
 msgid "Change Extruders"
 msgstr "取代擠出機"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4928
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
 msgid "Set Printable group"
 msgstr "設定可打印群組"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4928
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
 msgid "Set Unprintable group"
 msgstr "設定不可打印群組"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4932
 msgid "Set Printable"
 msgstr "設定為可打印"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4932
 msgid "Set Unprintable"
 msgstr "設定為不可打印"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4931
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4933
 msgid "Set Printable Instance"
 msgstr "設定為可打印實例"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4931
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4933
 msgid "Set Unprintable Instance"
 msgstr "設定為不可打印實例"
 
@@ -12667,7 +12667,7 @@ msgstr "佈局完成。"
 msgid "Could not arrange model objects! Some geometries may be invalid."
 msgstr "無法安排模型模型！某些幾何圖形可能無效。"
 
-#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:363 src/slic3r/GUI/Plater.cpp:7810
+#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:363 src/slic3r/GUI/Plater.cpp:7831
 #, c-format, boost-format
 msgid ""
 "Arrangement ignored the following objects which can't fit into a single "
@@ -12869,7 +12869,7 @@ msgstr "從 ini/amf/3mf/gcode 匯入設定"
 msgid "Load Config from ini/amf/3mf/gcode and merge"
 msgstr "從 ini/amf/3mf/gcode 匯入設定並合併"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:102 src/slic3r/GUI/Plater.cpp:7861
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:102 src/slic3r/GUI/Plater.cpp:7882
 msgid "Send G-code"
 msgstr "發送 G-code"
 
@@ -12950,8 +12950,8 @@ msgstr "顯示/隱藏模型/實例標籤"
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:135
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:137 src/slic3r/GUI/Preferences.cpp:68
-#: src/slic3r/GUI/Preferences.cpp:207 src/slic3r/GUI/Preferences.cpp:230
-#: src/slic3r/GUI/Preferences.cpp:238
+#: src/slic3r/GUI/Preferences.cpp:213 src/slic3r/GUI/Preferences.cpp:236
+#: src/slic3r/GUI/Preferences.cpp:244
 msgid "Preferences"
 msgstr "偏好設定"
 
@@ -14116,7 +14116,7 @@ msgstr "%s 有警告"
 msgid "%s info"
 msgstr "%s 資訊"
 
-#: src/slic3r/GUI/MsgDialog.cpp:315
+#: src/slic3r/GUI/MsgDialog.cpp:317
 #, c-format, boost-format
 msgid "%s information"
 msgstr "%s 相關資訊"
@@ -14581,12 +14581,12 @@ msgstr "下面的模型"
 msgid "Around object"
 msgstr "圍繞模型"
 
-#: src/slic3r/GUI/Plater.cpp:959 src/slic3r/GUI/Plater.cpp:7861
+#: src/slic3r/GUI/Plater.cpp:959 src/slic3r/GUI/Plater.cpp:7882
 msgid "Send to printer"
 msgstr "傳送到打印機"
 
 #: src/slic3r/GUI/Plater.cpp:980 src/slic3r/GUI/Plater.cpp:3514
-#: src/slic3r/GUI/Plater.cpp:7270
+#: src/slic3r/GUI/Plater.cpp:7288
 msgid "Slice now"
 msgstr "立刻切片"
 
@@ -14660,7 +14660,7 @@ msgstr "儲存"
 msgid "Discard"
 msgstr "捨棄"
 
-#: src/slic3r/GUI/Plater.cpp:1824 src/slic3r/GUI/Preferences.cpp:377
+#: src/slic3r/GUI/Plater.cpp:1824 src/slic3r/GUI/Preferences.cpp:383
 msgid "Ask for unsaved changes in project"
 msgstr "是否詢問項目中未儲存的變更"
 
@@ -14894,7 +14894,7 @@ msgstr ""
 msgid "Invalid data"
 msgstr "無效的資料"
 
-#: src/slic3r/GUI/Plater.cpp:3514 src/slic3r/GUI/Plater.cpp:7267
+#: src/slic3r/GUI/Plater.cpp:3514 src/slic3r/GUI/Plater.cpp:7285
 #: src/slic3r/GUI/Tab.cpp:1683 src/slic3r/GUI/Tab.cpp:5535
 msgid "Slicing"
 msgstr "切片"
@@ -15171,7 +15171,7 @@ msgstr ""
 msgid "Select an action to apply to the file"
 msgstr "選擇要應用於檔案的操作"
 
-#: src/slic3r/GUI/Plater.cpp:6239
+#: src/slic3r/GUI/Plater.cpp:6239 src/slic3r/GUI/Plater.cpp:6759
 msgid "Don't show again"
 msgstr "不要再顯示"
 
@@ -15244,40 +15244,51 @@ msgid ""
 "code export</a> in Print Settings."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:6786
+#: src/slic3r/GUI/Plater.cpp:6756
+msgid ""
+"You are exporting binary G-code for a Prusa printer. Please, make sure that "
+"your printer is running firmware version 5.1.0-alpha2 or later. Older "
+"firmwares are not able to handle binary G-codes."
+msgstr ""
+
+#: src/slic3r/GUI/Plater.cpp:6758
+msgid "Exporting binary G-code"
+msgstr ""
+
+#: src/slic3r/GUI/Plater.cpp:6814
 msgid "Save G-code file as:"
 msgstr "將 G-code檔另存為:"
 
-#: src/slic3r/GUI/Plater.cpp:6786
+#: src/slic3r/GUI/Plater.cpp:6814
 msgid "Save SL1 / SL1S file as:"
 msgstr "將 SL1 / SL1S 檔案另存為："
 
-#: src/slic3r/GUI/Plater.cpp:6800
+#: src/slic3r/GUI/Plater.cpp:6828
 msgid "The provided file name is not valid."
 msgstr "所提供的檔案名稱無效。"
 
-#: src/slic3r/GUI/Plater.cpp:6801
+#: src/slic3r/GUI/Plater.cpp:6829
 msgid "The following characters are not allowed by a FAT file system:"
 msgstr "FAT 檔案系統不允許使用以下字元："
 
-#: src/slic3r/GUI/Plater.cpp:6880
+#: src/slic3r/GUI/Plater.cpp:6898
 msgid ""
 "Unable to perform boolean operation on model meshes. Only positive parts "
 "will be exported."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7106
+#: src/slic3r/GUI/Plater.cpp:7124
 msgid ""
 "Are you sure you want to store original SVGs with their local paths into the "
 "3MF file?\n"
 "If you hit 'NO', all SVGs in the project will not be editable any more."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7108
+#: src/slic3r/GUI/Plater.cpp:7126
 msgid "Private protection"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7137
+#: src/slic3r/GUI/Plater.cpp:7155
 msgid ""
 "The plater is empty.\n"
 "Do you want to save the project?"
@@ -15285,42 +15296,42 @@ msgstr ""
 "載台是空的。\n"
 "您要儲存項目嗎？"
 
-#: src/slic3r/GUI/Plater.cpp:7137
+#: src/slic3r/GUI/Plater.cpp:7155
 msgid "Save project"
 msgstr "儲存項目"
 
-#: src/slic3r/GUI/Plater.cpp:7185
+#: src/slic3r/GUI/Plater.cpp:7203
 msgid "Unable to save file"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7390
+#: src/slic3r/GUI/Plater.cpp:7411
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7390 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:7411 src/slic3r/GUI/PrintHostDialogs.cpp:136
 msgid "Upload and Print"
 msgstr "上傳和打印"
 
-#: src/slic3r/GUI/Plater.cpp:7860
+#: src/slic3r/GUI/Plater.cpp:7881
 msgid "Export"
 msgstr "匯出"
 
-#: src/slic3r/GUI/Plater.cpp:8019
+#: src/slic3r/GUI/Plater.cpp:8040
 msgid "Paste From Clipboard"
 msgstr "從剪貼簿貼上"
 
-#: src/slic3r/GUI/Preferences.cpp:268 src/slic3r/GUI/Tab.cpp:2640
+#: src/slic3r/GUI/Preferences.cpp:274 src/slic3r/GUI/Tab.cpp:2640
 #: src/slic3r/GUI/Tab.cpp:2944 src/slic3r/GUI/Tab.cpp:3062
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1303
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1852
 msgid "General"
 msgstr "一般"
 
-#: src/slic3r/GUI/Preferences.cpp:286
+#: src/slic3r/GUI/Preferences.cpp:292
 msgid "Remember output directory"
 msgstr "記住輸出目錄"
 
-#: src/slic3r/GUI/Preferences.cpp:287
+#: src/slic3r/GUI/Preferences.cpp:293
 msgid ""
 "If this is enabled, Slic3r will prompt the last output directory instead of "
 "the one containing the input files."
@@ -15328,21 +15339,21 @@ msgstr ""
 "如果啟用這個，PrusaSlicer 將提示最後一次輸出目錄而不是原來輸入這個檔案的目"
 "錄。"
 
-#: src/slic3r/GUI/Preferences.cpp:291
+#: src/slic3r/GUI/Preferences.cpp:297
 msgid "Auto-center parts"
 msgstr "自動置中零件"
 
-#: src/slic3r/GUI/Preferences.cpp:292
+#: src/slic3r/GUI/Preferences.cpp:298
 msgid ""
 "If this is enabled, Slic3r will auto-center objects around the print bed "
 "center."
 msgstr "如果啟用這個，PrusaSlicer 將以載台中心自動置中模型。"
 
-#: src/slic3r/GUI/Preferences.cpp:296
+#: src/slic3r/GUI/Preferences.cpp:302
 msgid "Background processing"
 msgstr "背景處理"
 
-#: src/slic3r/GUI/Preferences.cpp:297
+#: src/slic3r/GUI/Preferences.cpp:303
 msgid ""
 "If this is enabled, Slic3r will pre-process objects as soon as they're "
 "loaded in order to save time when exporting G-code."
@@ -15350,11 +15361,11 @@ msgstr ""
 "如果啟用此功能，PrusaSlicer 將在匯入模型後立即對其進行預先處理，以便在匯出 G-"
 "code 時節省時間。"
 
-#: src/slic3r/GUI/Preferences.cpp:302
+#: src/slic3r/GUI/Preferences.cpp:308
 msgid "Alert when supports needed"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:303
+#: src/slic3r/GUI/Preferences.cpp:309
 msgid ""
 "If this is enabled, Slic3r will raise alerts when it detects issues in the "
 "sliced object, that can be resolved with supports (and brim). Examples of "
@@ -15362,25 +15373,25 @@ msgid ""
 "adhesion."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:313
+#: src/slic3r/GUI/Preferences.cpp:319
 msgid "Export sources full pathnames to 3mf and amf"
 msgstr "將來源完整路徑名稱匯出到 3mf 和 amf"
 
-#: src/slic3r/GUI/Preferences.cpp:314
+#: src/slic3r/GUI/Preferences.cpp:320
 msgid ""
 "If enabled, allows the Reload from disk command to automatically find and "
 "load the files when invoked."
 msgstr "如果啟用這個，則允許從磁碟機重新匯入命令在調用時自動查詢並匯入檔案。"
 
-#: src/slic3r/GUI/Preferences.cpp:321
+#: src/slic3r/GUI/Preferences.cpp:327
 msgid "If enabled, sets PrusaSlicer as default application to open .3mf files."
 msgstr "如果啟用，PrusaSlicer 將成為打開.3mf檔的預設應用程式。"
 
-#: src/slic3r/GUI/Preferences.cpp:326
+#: src/slic3r/GUI/Preferences.cpp:332
 msgid "If enabled, sets PrusaSlicer as default application to open .stl files."
 msgstr "如果啟用，PrusaSlicer 將成為打開stl檔的預設應用程式。"
 
-#: src/slic3r/GUI/Preferences.cpp:335
+#: src/slic3r/GUI/Preferences.cpp:341
 msgid ""
 "If enabled, Slic3r downloads updates of built-in system presets in the "
 "background. These updates are downloaded into a separate temporary location. "
@@ -15390,32 +15401,32 @@ msgstr ""
 "如果啟用，PrusaSlicer 會在背景下載系統預設的更新。這些更新被下載到一個臨時位"
 "置。當新的版本可用時，它會在應用程式啟動時提供您使用。"
 
-#: src/slic3r/GUI/Preferences.cpp:340
+#: src/slic3r/GUI/Preferences.cpp:346
 msgid "Suppress \" - default - \" presets"
 msgstr "停用 \"-預設-\" 指定"
 
-#: src/slic3r/GUI/Preferences.cpp:341
+#: src/slic3r/GUI/Preferences.cpp:347
 msgid ""
 "Suppress \" - default - \" presets in the Print / Filament / Printer "
 "selections once there are any other valid presets available."
 msgstr ""
 "一旦有任何可用的有效預設，請在打印/線材/打印機選擇中 停用 \"-預設-\" 指定。"
 
-#: src/slic3r/GUI/Preferences.cpp:345
+#: src/slic3r/GUI/Preferences.cpp:351
 msgid "Suppress \" Template \" filament presets"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:346
+#: src/slic3r/GUI/Preferences.cpp:352
 msgid ""
 "Suppress \" Template \" filament presets in configuration wizard and sidebar "
 "visibility."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:350
+#: src/slic3r/GUI/Preferences.cpp:356
 msgid "Show incompatible print and filament presets"
 msgstr "顯示不相容的打印和線材預設"
 
-#: src/slic3r/GUI/Preferences.cpp:351
+#: src/slic3r/GUI/Preferences.cpp:357
 msgid ""
 "When checked, the print and filament presets are shown in the preset editor "
 "even if they are marked as incompatible with the active printer"
@@ -15423,22 +15434,22 @@ msgstr ""
 "選中後，打印和線材預設會顯示在預設編輯器中，即使它們被標記為與當前打印機不相"
 "容"
 
-#: src/slic3r/GUI/Preferences.cpp:358
+#: src/slic3r/GUI/Preferences.cpp:364
 msgid "Show load project dialog"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:359
+#: src/slic3r/GUI/Preferences.cpp:365
 msgid ""
 "When checked, whenever dragging and dropping a project file on the "
 "application or open it from a browser, shows a dialog asking to select the "
 "action to take on the file to load."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:365 src/slic3r/GUI/Preferences.cpp:369
+#: src/slic3r/GUI/Preferences.cpp:371 src/slic3r/GUI/Preferences.cpp:375
 msgid "Allow just a single PrusaSlicer instance"
 msgstr "只允許一個 PrusaSlicer 執行實例"
 
-#: src/slic3r/GUI/Preferences.cpp:366
+#: src/slic3r/GUI/Preferences.cpp:372
 msgid ""
 "On OSX there is always only one instance of app running by default. However "
 "it is allowed to run multiple instances of same app from the command line. "
@@ -15447,7 +15458,7 @@ msgstr ""
 "在 OSX 上，預設情況下總是只有一個應用程式實例在運行。但是卻允許從命令視窗執行"
 "同一應用程式的多個實例。當您設定了這個設定後將只允許一個實例執行。"
 
-#: src/slic3r/GUI/Preferences.cpp:370
+#: src/slic3r/GUI/Preferences.cpp:376
 msgid ""
 "If this is enabled, when starting PrusaSlicer and another instance of the "
 "same PrusaSlicer is already running, that instance will be reactivated "
@@ -15456,7 +15467,7 @@ msgstr ""
 "如果啟用了此功能，則當啟動了 PrusaSlicer 且同一 PrusaSlicer 的另一個實例已在"
 "執行時，該實例將被重新啟動。"
 
-#: src/slic3r/GUI/Preferences.cpp:378
+#: src/slic3r/GUI/Preferences.cpp:384
 msgid ""
 "Always ask for unsaved changes in project, when: \n"
 "- Closing PrusaSlicer,\n"
@@ -15466,14 +15477,14 @@ msgstr ""
 "- 關閉 PrusaSlicer，\n"
 "- 匯入或建立新項目"
 
-#: src/slic3r/GUI/Preferences.cpp:386
+#: src/slic3r/GUI/Preferences.cpp:392
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:928
 msgid ""
 "Ask to save unsaved changes in presets when closing the application or when "
 "loading a new project"
 msgstr "關閉應用程式或匯入新項目時要求儲存未儲存的預設變更"
 
-#: src/slic3r/GUI/Preferences.cpp:387
+#: src/slic3r/GUI/Preferences.cpp:393
 msgid ""
 "Always ask for unsaved changes in presets, when: \n"
 "- Closing PrusaSlicer while some presets are modified,\n"
@@ -15483,31 +15494,31 @@ msgstr ""
 "- 在修改某些預設時關閉 PrusaSlicer，\n"
 "- 在修改某些預設時匯入新項目"
 
-#: src/slic3r/GUI/Preferences.cpp:393
+#: src/slic3r/GUI/Preferences.cpp:399
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:927
 msgid "Ask for unsaved changes in presets when selecting new preset"
 msgstr "選擇新預設時詢問預設中未儲存的變更"
 
-#: src/slic3r/GUI/Preferences.cpp:394
+#: src/slic3r/GUI/Preferences.cpp:400
 msgid ""
 "Always ask for unsaved changes in presets when selecting new preset or "
 "resetting a preset"
 msgstr "選擇新預設或重置預設時，始終詢問未儲存的預設變更"
 
-#: src/slic3r/GUI/Preferences.cpp:398
+#: src/slic3r/GUI/Preferences.cpp:404
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:926
 msgid "Ask for unsaved changes in presets when creating new project"
 msgstr "建立新項目時詢問預設中未儲存的變更"
 
-#: src/slic3r/GUI/Preferences.cpp:399
+#: src/slic3r/GUI/Preferences.cpp:405
 msgid "Always ask for unsaved changes in presets when creating new project"
 msgstr "建立新項目時始終詢問未儲存的預設變更"
 
-#: src/slic3r/GUI/Preferences.cpp:405
+#: src/slic3r/GUI/Preferences.cpp:411
 msgid "Associate .gcode files to PrusaSlicer G-code Viewer"
 msgstr "將 .gcode 檔案關聯到 PrusaSlicer 的 G-code 檢視器"
 
-#: src/slic3r/GUI/Preferences.cpp:406
+#: src/slic3r/GUI/Preferences.cpp:412
 msgid ""
 "If enabled, sets PrusaSlicer G-code Viewer as default application to open ."
 "gcode files."
@@ -15515,21 +15526,21 @@ msgstr ""
 "如果啟用，將以 PrusaSlicer 的 G-code 檢視器設定為打開 .gcode 檔案的預設應用程"
 "式。"
 
-#: src/slic3r/GUI/Preferences.cpp:409
+#: src/slic3r/GUI/Preferences.cpp:415
 msgid "Associate .bgcode files to PrusaSlicer G-code Viewer"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:410
+#: src/slic3r/GUI/Preferences.cpp:416
 msgid ""
 "If enabled, sets PrusaSlicer G-code Viewer as default application to open ."
 "bgcode files."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:417
+#: src/slic3r/GUI/Preferences.cpp:423
 msgid "Use Retina resolution for the 3D scene"
 msgstr "對 3D 場景使用 Retina 解析度"
 
-#: src/slic3r/GUI/Preferences.cpp:418
+#: src/slic3r/GUI/Preferences.cpp:424
 msgid ""
 "If enabled, the 3D scene will be rendered in Retina resolution. If you are "
 "experiencing 3D performance problems, disabling this option may help."
@@ -15537,71 +15548,71 @@ msgstr ""
 "如果啟用此功能，3D 場景將以 Retina 解析度呈現。如果您遇到 3D 性能問題，禁用此"
 "選項可能會有所幫助。"
 
-#: src/slic3r/GUI/Preferences.cpp:427 src/slic3r/GUI/Preferences.cpp:428
+#: src/slic3r/GUI/Preferences.cpp:433 src/slic3r/GUI/Preferences.cpp:434
 msgid "Show splash screen"
 msgstr "顯示啟動畫面"
 
-#: src/slic3r/GUI/Preferences.cpp:433
+#: src/slic3r/GUI/Preferences.cpp:439
 msgid "If enabled, PrusaSlicer will be open at the position it was closed"
 msgstr "如果啟用，PrusaSlicer 將在上一次關閉時的位置打開"
 
-#: src/slic3r/GUI/Preferences.cpp:438
+#: src/slic3r/GUI/Preferences.cpp:444
 msgid "Clear Undo / Redo stack on new project"
 msgstr "清除新項目上的取消/重做堆疊"
 
-#: src/slic3r/GUI/Preferences.cpp:439
+#: src/slic3r/GUI/Preferences.cpp:445
 msgid ""
 "Clear Undo / Redo stack on new project or when an existing project is loaded."
 msgstr "清除新項目或匯入現有項目時的取消/重做堆疊。"
 
-#: src/slic3r/GUI/Preferences.cpp:444
+#: src/slic3r/GUI/Preferences.cpp:450
 msgid "Enable support for legacy 3DConnexion devices"
 msgstr "啟用傳統 3DConnexion 設備的支援"
 
-#: src/slic3r/GUI/Preferences.cpp:445
+#: src/slic3r/GUI/Preferences.cpp:451
 msgid ""
 "If enabled, the legacy 3DConnexion devices settings dialog is available by "
 "pressing CTRL+M"
 msgstr "如果啟用這個，則按下 CTRL+M 可以打開舊版 3DConnexion 設備的設定對話框"
 
-#: src/slic3r/GUI/Preferences.cpp:452
+#: src/slic3r/GUI/Preferences.cpp:458
 msgid "Camera"
 msgstr "相機"
 
-#: src/slic3r/GUI/Preferences.cpp:462
+#: src/slic3r/GUI/Preferences.cpp:468
 msgid "Use perspective camera"
 msgstr "使用透視相機"
 
-#: src/slic3r/GUI/Preferences.cpp:463
+#: src/slic3r/GUI/Preferences.cpp:469
 msgid ""
 "If enabled, use perspective camera. If not enabled, use orthographic camera."
 msgstr "如果啟用，則使用透視相機。若未啟用，則使用正交相機。"
 
-#: src/slic3r/GUI/Preferences.cpp:467
+#: src/slic3r/GUI/Preferences.cpp:473
 msgid "Use free camera"
 msgstr "使用自由相機"
 
-#: src/slic3r/GUI/Preferences.cpp:468
+#: src/slic3r/GUI/Preferences.cpp:474
 msgid "If enabled, use free camera. If not enabled, use constrained camera."
 msgstr "如果啟用，則使用自由相機。若未啟用，則使用受限相機。"
 
-#: src/slic3r/GUI/Preferences.cpp:472
+#: src/slic3r/GUI/Preferences.cpp:478
 msgid "Reverse direction of zoom with mouse wheel"
 msgstr "使用滑鼠滾輪反向縮放"
 
-#: src/slic3r/GUI/Preferences.cpp:473
+#: src/slic3r/GUI/Preferences.cpp:479
 msgid "If enabled, reverses the direction of zoom with mouse wheel"
 msgstr "如果啟用，則滑鼠滾輪反向縮放"
 
-#: src/slic3r/GUI/Preferences.cpp:479
+#: src/slic3r/GUI/Preferences.cpp:485
 msgid "GUI"
 msgstr "GUI"
 
-#: src/slic3r/GUI/Preferences.cpp:519
+#: src/slic3r/GUI/Preferences.cpp:525
 msgid "Sequential slider applied only to top layer"
 msgstr "順序滑塊僅應用於頂層"
 
-#: src/slic3r/GUI/Preferences.cpp:520
+#: src/slic3r/GUI/Preferences.cpp:526
 msgid ""
 "If enabled, changes made using the sequential slider, in preview, apply only "
 "to gcode top layer. If disabled, changes made using the sequential slider, "
@@ -15610,32 +15621,32 @@ msgstr ""
 "如果啟用，在預覽中使用順序滑塊所做的變更僅適用於 gcode 頂層。如果禁用，在預覽"
 "中使用順序滑塊所做的變更將應用於整個 gcode。"
 
-#: src/slic3r/GUI/Preferences.cpp:526
+#: src/slic3r/GUI/Preferences.cpp:532
 msgid "Show sidebar collapse/expand button"
 msgstr "顯示側邊欄折疊/展開按鈕"
 
-#: src/slic3r/GUI/Preferences.cpp:527
+#: src/slic3r/GUI/Preferences.cpp:533
 msgid ""
 "If enabled, the button for the collapse sidebar will be appeared in top "
 "right corner of the 3D Scene"
 msgstr "如果啟用，折疊側邊欄的按鈕將出現在 3D 場景的右上角"
 
-#: src/slic3r/GUI/Preferences.cpp:538
+#: src/slic3r/GUI/Preferences.cpp:544
 msgid "Use colors for axes values in Manipulation panel"
 msgstr "在操作面板中使用顏色於軸值欄位"
 
-#: src/slic3r/GUI/Preferences.cpp:539
+#: src/slic3r/GUI/Preferences.cpp:545
 msgid ""
 "If enabled, the axes names and axes values will be colorized according to "
 "the axes colors. If disabled, old UI will be used."
 msgstr ""
 "如果啟用這個，軸值的欄位將根據軸顏色進行上色。如果禁用，將使用舊的 UI。"
 
-#: src/slic3r/GUI/Preferences.cpp:544
+#: src/slic3r/GUI/Preferences.cpp:550
 msgid "Order object volumes by types"
 msgstr "按類型排列模型體積"
 
-#: src/slic3r/GUI/Preferences.cpp:545
+#: src/slic3r/GUI/Preferences.cpp:551
 msgid ""
 "If enabled, volumes will be always ordered inside the object. Correct order "
 "is Model Part, Negative Volume, Modifier, Support Blocker and Support "
@@ -15646,48 +15657,48 @@ msgstr ""
 "改器、支撐阻斷器和支撐執行器。如果禁用，您可以重新排列模型零件、挖空模型和修"
 "改器。但是其中一個模型零件必須放在第一位。"
 
-#: src/slic3r/GUI/Preferences.cpp:550
+#: src/slic3r/GUI/Preferences.cpp:556
 msgid "Show non-manifold edges"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:551
+#: src/slic3r/GUI/Preferences.cpp:557
 msgid "If enabled, shows non-manifold edges."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:555
+#: src/slic3r/GUI/Preferences.cpp:561
 msgid "Allow automatically color change"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:556
+#: src/slic3r/GUI/Preferences.cpp:562
 msgid ""
 "If enabled, related notification will be shown, when sliced object looks "
 "like a logo or a sign."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:561
+#: src/slic3r/GUI/Preferences.cpp:567
 msgid "Set settings tabs as menu items"
 msgstr "將設定分頁設定為選單項目"
 
-#: src/slic3r/GUI/Preferences.cpp:562
+#: src/slic3r/GUI/Preferences.cpp:568
 msgid ""
 "If enabled, Settings Tabs will be placed as menu items. If disabled, old UI "
 "will be used."
 msgstr ""
 "如果啟用此選項，設定分頁將作成選單項目放在選單旁邊。如果禁用，將使用舊的 UI。"
 
-#: src/slic3r/GUI/Preferences.cpp:576
+#: src/slic3r/GUI/Preferences.cpp:582
 msgid "Show \"Tip of the day\" notification after start"
 msgstr "啟動後顯示“每日提示”的通知畫面"
 
-#: src/slic3r/GUI/Preferences.cpp:577
+#: src/slic3r/GUI/Preferences.cpp:583
 msgid "If enabled, useful hints are displayed at startup."
 msgstr "如果啟用，對於軟體使用會有幫助的提示將在啟動時顯示。"
 
-#: src/slic3r/GUI/Preferences.cpp:581
+#: src/slic3r/GUI/Preferences.cpp:587
 msgid "Notify about new releases"
 msgstr "通知新的版本發佈"
 
-#: src/slic3r/GUI/Preferences.cpp:582
+#: src/slic3r/GUI/Preferences.cpp:588
 msgid ""
 "You will be notified about new release after startup acordingly: All = "
 "Regular release and alpha / beta releases. Release only = regular release."
@@ -15695,75 +15706,75 @@ msgstr ""
 "啟用此選項後，您將在啟動後收到有關新版本的通知：全部 = 定期發佈版本和 "
 "alpha / beta 版本。僅發佈版 = 定期發佈。"
 
-#: src/slic3r/GUI/Preferences.cpp:585
+#: src/slic3r/GUI/Preferences.cpp:591
 msgid "Release only"
 msgstr "僅發佈版"
 
-#: src/slic3r/GUI/Preferences.cpp:592
+#: src/slic3r/GUI/Preferences.cpp:598
 msgid "Use custom size for toolbar icons"
 msgstr "讓工具欄圖示使用自定義大小"
 
-#: src/slic3r/GUI/Preferences.cpp:593
+#: src/slic3r/GUI/Preferences.cpp:599
 msgid "If enabled, you can change size of toolbar icons manually."
 msgstr "如果啟用，您可以手動變更工具欄圖示的大小。"
 
-#: src/slic3r/GUI/Preferences.cpp:611 src/slic3r/GUI/Tab.cpp:1743
+#: src/slic3r/GUI/Preferences.cpp:617 src/slic3r/GUI/Tab.cpp:1743
 msgid "Other"
 msgstr "其他"
 
-#: src/slic3r/GUI/Preferences.cpp:628
+#: src/slic3r/GUI/Preferences.cpp:634
 msgid "If enabled, PrusaSlicer will not open a hyperlinks in your browser."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:634
+#: src/slic3r/GUI/Preferences.cpp:640
 msgid "Allow downloads from Printables.com"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:635
+#: src/slic3r/GUI/Preferences.cpp:641
 msgid "If enabled, PrusaSlicer will be allowed to download from Printables.com"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:645
+#: src/slic3r/GUI/Preferences.cpp:651
 msgid "Render"
 msgstr "算繪"
 
-#: src/slic3r/GUI/Preferences.cpp:655
+#: src/slic3r/GUI/Preferences.cpp:661
 msgid "Use environment map"
 msgstr "使用環境貼圖"
 
-#: src/slic3r/GUI/Preferences.cpp:656
+#: src/slic3r/GUI/Preferences.cpp:662
 msgid "If enabled, renders object using the environment map."
 msgstr "如果啟用，則使用環境貼圖算繪模型。"
 
-#: src/slic3r/GUI/Preferences.cpp:665
+#: src/slic3r/GUI/Preferences.cpp:671
 msgid "Dark mode"
 msgstr "深色模式"
 
-#: src/slic3r/GUI/Preferences.cpp:675
+#: src/slic3r/GUI/Preferences.cpp:681
 msgid "Enable dark mode"
 msgstr "啟用深色模式"
 
-#: src/slic3r/GUI/Preferences.cpp:676
+#: src/slic3r/GUI/Preferences.cpp:682
 msgid ""
 "If enabled, UI will use Dark mode colors. If disabled, old UI will be used."
 msgstr "如果啟用，UI 將使用深色模式顏色。如果禁用，將使用舊的 UI。"
 
-#: src/slic3r/GUI/Preferences.cpp:683
+#: src/slic3r/GUI/Preferences.cpp:689
 msgid "Use system menu for application"
 msgstr "以系統選單的模式來使用"
 
-#: src/slic3r/GUI/Preferences.cpp:684
+#: src/slic3r/GUI/Preferences.cpp:690
 msgid ""
 "If enabled, application will use the standard Windows system menu,\n"
 "but on some combination of display scales it can look ugly. If disabled, old "
 "UI will be used."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:761
+#: src/slic3r/GUI/Preferences.cpp:767
 msgid "Changes for the critical options"
 msgstr "關鍵選項的變更"
 
-#: src/slic3r/GUI/Preferences.cpp:763
+#: src/slic3r/GUI/Preferences.cpp:769
 msgid ""
 "Changing some options will trigger application restart.\n"
 "You will lose the content of the plater."
@@ -15771,47 +15782,47 @@ msgstr ""
 "變更某些選項將觸發應用程式重啟。\n"
 "您將遺失載台上面的內容。"
 
-#: src/slic3r/GUI/Preferences.cpp:956
+#: src/slic3r/GUI/Preferences.cpp:962
 msgid "Icon size in a respect to the default size"
 msgstr "相對於預設大小的圖示大小"
 
-#: src/slic3r/GUI/Preferences.cpp:971
+#: src/slic3r/GUI/Preferences.cpp:977
 msgid "Select toolbar icon size in respect to the default one."
 msgstr "選擇相對於預設圖示的工具欄圖示大小。"
 
-#: src/slic3r/GUI/Preferences.cpp:1006
+#: src/slic3r/GUI/Preferences.cpp:1012
 msgid "Layout Options"
 msgstr "佈局選項"
 
-#: src/slic3r/GUI/Preferences.cpp:1015
+#: src/slic3r/GUI/Preferences.cpp:1021
 msgid "Old regular layout with the tab bar"
 msgstr "帶標籤欄的舊款佈局"
 
-#: src/slic3r/GUI/Preferences.cpp:1016
+#: src/slic3r/GUI/Preferences.cpp:1022
 msgid "New layout, access via settings button in the top menu"
 msgstr "新式佈局，經由視窗頂部選單中的設定按鈕存取"
 
-#: src/slic3r/GUI/Preferences.cpp:1017
+#: src/slic3r/GUI/Preferences.cpp:1023
 msgid "Settings in non-modal window"
 msgstr "非模態視窗中的設定"
 
-#: src/slic3r/GUI/Preferences.cpp:1059
+#: src/slic3r/GUI/Preferences.cpp:1065
 msgid "Text colors"
 msgstr "文字顏色"
 
-#: src/slic3r/GUI/Preferences.cpp:1083
+#: src/slic3r/GUI/Preferences.cpp:1089
 msgid "Mode markers"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:1111
+#: src/slic3r/GUI/Preferences.cpp:1117
 msgid "Application font size"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:1151
+#: src/slic3r/GUI/Preferences.cpp:1157
 msgid "Revert font to default"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:1163
+#: src/slic3r/GUI/Preferences.cpp:1169
 msgid "Font size"
 msgstr ""
 
@@ -17901,25 +17912,25 @@ msgstr "卸載"
 msgid "loaded"
 msgstr "加載"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:369
+#: src/slic3r/GUI/WipeTowerDialog.cpp:345
 msgid "Tool #"
 msgstr "工具 ＃"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:378
+#: src/slic3r/GUI/WipeTowerDialog.cpp:354
 msgid ""
 "Total purging volume is calculated by summing two values below, depending on "
 "which tools are loaded/unloaded."
 msgstr "根據加載/卸載的工具，經由將以下兩個值相加來計算總清洗量。"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:379
+#: src/slic3r/GUI/WipeTowerDialog.cpp:355
 msgid "Volume to purge (mm³) when the filament is being"
 msgstr "線材清洗時的清洗量 (mm³)"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:393
+#: src/slic3r/GUI/WipeTowerDialog.cpp:369
 msgid "From"
 msgstr "從"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:458
+#: src/slic3r/GUI/WipeTowerDialog.cpp:434
 msgid ""
 "Switching to simple settings will discard changes done in the advanced "
 "mode!\n"
@@ -17930,11 +17941,11 @@ msgstr ""
 "\n"
 "你想繼續嗎？"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:470
+#: src/slic3r/GUI/WipeTowerDialog.cpp:446
 msgid "Show simplified settings"
 msgstr "顯示簡化設定"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:470
+#: src/slic3r/GUI/WipeTowerDialog.cpp:446
 msgid "Show advanced settings"
 msgstr "顯示進階設定"
 

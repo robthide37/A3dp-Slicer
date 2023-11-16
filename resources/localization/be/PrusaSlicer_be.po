@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2023-11-10 15:30+0100\n"
+"POT-Creation-Date: 2023-11-16 13:19+0100\n"
 "PO-Revision-Date: 2023-01-23 10:02+0300\n"
 "Last-Translator: Дзмітры К <dzmitry@lidacity.by>\n"
 "Language-Team: \n"
@@ -1806,8 +1806,8 @@ msgstr ""
 #: src/slic3r/GUI/GUI_ObjectList.cpp:588 src/slic3r/GUI/GUI_ObjectList.cpp:600
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1074
 #: src/slic3r/GUI/GUI_ObjectList.cpp:2062
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2942
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4817
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2944
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4819
 #: src/slic3r/GUI/ObjectDataViewModel.cpp:266
 msgid "default"
 msgstr "першапачаткова"
@@ -2481,7 +2481,7 @@ msgstr "Друкаваць невыразную абалонку."
 #: src/slic3r/GUI/FileArchiveDialog.cpp:272
 #: src/slic3r/GUI/FileArchiveDialog.cpp:290
 #: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp:1999 src/slic3r/GUI/Plater.cpp:467
-#: src/slic3r/GUI/Plater.cpp:622 src/slic3r/GUI/Preferences.cpp:586
+#: src/slic3r/GUI/Plater.cpp:622 src/slic3r/GUI/Preferences.cpp:592
 msgid "None"
 msgstr "Адключана"
 
@@ -5858,7 +5858,7 @@ msgid "Export the model(s) as STL."
 msgstr "Экспартаваць мадэль(і) у фармат STL."
 
 #: src/libslic3r/PrintConfig.cpp:4872 src/slic3r/GUI/KBShortcutsDialog.cpp:101
-#: src/slic3r/GUI/Plater.cpp:979 src/slic3r/GUI/Plater.cpp:7860
+#: src/slic3r/GUI/Plater.cpp:979 src/slic3r/GUI/Plater.cpp:7881
 msgid "Export G-code"
 msgstr "Экспарт у G-код"
 
@@ -7048,8 +7048,8 @@ msgid "Reset defaults"
 msgstr ""
 
 #: src/slic3r/GUI/ArrangeSettingsDialogImgui.cpp:134
-#: src/slic3r/GUI/GLCanvas3D.cpp:5260 src/slic3r/GUI/KBShortcutsDialog.cpp:146
-#: src/slic3r/GUI/Plater.cpp:7787
+#: src/slic3r/GUI/GLCanvas3D.cpp:5266 src/slic3r/GUI/KBShortcutsDialog.cpp:146
+#: src/slic3r/GUI/Plater.cpp:7808
 msgid "Arrange"
 msgstr "Упарадкаваць"
 
@@ -7590,7 +7590,7 @@ msgstr "Стандартныя"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:415 src/slic3r/GUI/ConfigWizard.cpp:744
 #: src/slic3r/GUI/FileArchiveDialog.cpp:268
-#: src/slic3r/GUI/FileArchiveDialog.cpp:290 src/slic3r/GUI/Preferences.cpp:584
+#: src/slic3r/GUI/FileArchiveDialog.cpp:290 src/slic3r/GUI/Preferences.cpp:590
 #: src/slic3r/GUI/Tab.cpp:4562 src/slic3r/GUI/UnsavedChangesDialog.cpp:1164
 msgid "All"
 msgstr "Усе"
@@ -7765,7 +7765,7 @@ msgstr ""
 "ў час працы праграмы). Гэта толькі паведамленне, аўтаматычная ўсталёўка не "
 "выконваецца."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1359 src/slic3r/GUI/Preferences.cpp:334
+#: src/slic3r/GUI/ConfigWizard.cpp:1359 src/slic3r/GUI/Preferences.cpp:340
 msgid "Update built-in Presets automatically"
 msgstr "Абнаўляць убудаваныя Профілі аўтаматычна"
 
@@ -7796,7 +7796,7 @@ msgid ""
 "an update is applied."
 msgstr "Дадаткова, перад абнаўленнем, ствараецца рэзервовая копія наладкі."
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1420 src/slic3r/GUI/Preferences.cpp:1183
+#: src/slic3r/GUI/ConfigWizard.cpp:1420 src/slic3r/GUI/Preferences.cpp:1189
 msgid "Download path"
 msgstr ""
 
@@ -7867,11 +7867,11 @@ msgstr ""
 msgid "Files association"
 msgstr "Асацыяцыя файлаў"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1655 src/slic3r/GUI/Preferences.cpp:320
+#: src/slic3r/GUI/ConfigWizard.cpp:1655 src/slic3r/GUI/Preferences.cpp:326
 msgid "Associate .3mf files to PrusaSlicer"
 msgstr "Асацыяваць файлы .3mf з PrusaSlicer"
 
-#: src/slic3r/GUI/ConfigWizard.cpp:1656 src/slic3r/GUI/Preferences.cpp:325
+#: src/slic3r/GUI/ConfigWizard.cpp:1656 src/slic3r/GUI/Preferences.cpp:331
 msgid "Associate .stl files to PrusaSlicer"
 msgstr "Асацыяваць файлы .stl з PrusaSlicer"
 
@@ -8176,7 +8176,7 @@ msgid "Filament Profiles Selection"
 msgstr "Выбар профіляў філаменту"
 
 #: src/slic3r/GUI/ConfigWizard.cpp:3395 src/slic3r/GUI/ConfigWizard.cpp:3398
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4282
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4284
 msgid "Type:"
 msgstr "Тып:"
 
@@ -8269,7 +8269,7 @@ msgid "Perform"
 msgstr "Выканаць"
 
 #: src/slic3r/GUI/DesktopIntegrationDialog.cpp:658
-#: src/slic3r/GUI/GLCanvas3D.cpp:5441 src/slic3r/GUI/KBShortcutsDialog.cpp:111
+#: src/slic3r/GUI/GLCanvas3D.cpp:5447 src/slic3r/GUI/KBShortcutsDialog.cpp:111
 #: src/slic3r/GUI/MainFrame.cpp:1454
 msgid "Undo"
 msgstr "Адкаціць"
@@ -8595,7 +8595,7 @@ msgstr ""
 #: src/slic3r/GUI/PhysicalPrinterDialog.cpp:799 src/slic3r/GUI/Plater.cpp:5626
 #: src/slic3r/GUI/Plater.cpp:5634 src/slic3r/GUI/Plater.cpp:5704
 #: src/slic3r/GUI/Plater.cpp:5712 src/slic3r/GUI/WifiConfigDialog.cpp:239
-#: src/slic3r/GUI/WipeTowerDialog.cpp:69 src/slic3r/GUI/WipeTowerDialog.cpp:459
+#: src/slic3r/GUI/WipeTowerDialog.cpp:69 src/slic3r/GUI/WipeTowerDialog.cpp:435
 msgid "Warning"
 msgstr "Папярэджанне"
 
@@ -9048,8 +9048,8 @@ msgstr "Дадаць"
 msgid "Add one or more custom shapes"
 msgstr "Дадаць адну ці некалькі карыстальніцкіх фігур"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:122 src/slic3r/GUI/GalleryDialog.cpp:540
-#: src/slic3r/GUI/GLCanvas3D.cpp:5242 src/slic3r/GUI/GUI_Factories.cpp:480
+#: src/slic3r/GUI/GalleryDialog.cpp:122 src/slic3r/GUI/GalleryDialog.cpp:539
+#: src/slic3r/GUI/GLCanvas3D.cpp:5248 src/slic3r/GUI/GUI_Factories.cpp:480
 #: src/slic3r/GUI/Tab.cpp:4477
 msgid "Delete"
 msgstr "Выдаліць"
@@ -9074,11 +9074,11 @@ msgstr "OK"
 msgid "Add selected shape(s) to the bed"
 msgstr "Дадаць абраную фігуру(-ы) на стол"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:434
+#: src/slic3r/GUI/GalleryDialog.cpp:433
 msgid "Choose one or more files (STL, OBJ):"
 msgstr "Абраць адзін ці некалькі файлаў (STL, OBJ):"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:474
+#: src/slic3r/GUI/GalleryDialog.cpp:473
 #, boost-format
 msgid ""
 "It looks like selected %1%-file has an error or is destructed.\n"
@@ -9087,19 +9087,19 @@ msgstr ""
 "Здаецца, што абраны %1% файл утрымлівае памылку ці знішчаны.\n"
 "Загрузка файла немагчыма"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:485
+#: src/slic3r/GUI/GalleryDialog.cpp:484
 msgid "Choose one PNG file:"
 msgstr "Абраць адзін *.png файл:"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:498
+#: src/slic3r/GUI/GalleryDialog.cpp:497
 msgid "Replacing of the PNG"
 msgstr "Замена PNG"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:542
+#: src/slic3r/GUI/GalleryDialog.cpp:541
 msgid "Change thumbnail"
 msgstr "Змяніць мініяцюру"
 
-#: src/slic3r/GUI/GalleryDialog.cpp:583 src/slic3r/GUI/GalleryDialog.cpp:588
+#: src/slic3r/GUI/GalleryDialog.cpp:582 src/slic3r/GUI/GalleryDialog.cpp:587
 #, boost-format
 msgid "Loading of the \"%1%\""
 msgstr "Загрузка \"%1%\""
@@ -9445,8 +9445,8 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:252
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:2719
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4067
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4259
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4069
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4261
 msgid "Part"
 msgstr "Частка"
 
@@ -9828,7 +9828,7 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:1865
 #: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp:1966
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4249
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4251
 msgid "You can't change a type of the last solid part of the object."
 msgstr "Вы не можаце змяніць тып апошняй суцэльнай часткі мадэлі."
 
@@ -9845,7 +9845,7 @@ msgstr ""
 
 #: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp:1878
 #: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp:1979
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4266
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4268
 msgid "Modifier"
 msgstr "Мадыфікатар"
 
@@ -11278,7 +11278,7 @@ msgstr ""
 "Вы мяняеце кропкі SLA падтрымкі. Калі ласка, спачатку ўжыеце альбо адмовіцца "
 "ад зменаў."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:200 src/slic3r/GUI/GLCanvas3D.cpp:5388
+#: src/slic3r/GUI/GLCanvas3D.cpp:200 src/slic3r/GUI/GLCanvas3D.cpp:5394
 #: src/slic3r/GUI/ObjectDataViewModel.cpp:76
 msgid "Variable layer height"
 msgstr "Пераменная вышыня пластоў"
@@ -11383,23 +11383,23 @@ msgstr "Люстраваць Мадэль"
 msgid "Move Object"
 msgstr "Рух Мадэлі"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4511 src/slic3r/GUI/GLCanvas3D.cpp:5348
+#: src/slic3r/GUI/GLCanvas3D.cpp:4511 src/slic3r/GUI/GLCanvas3D.cpp:5354
 msgid "Switch to Settings"
 msgstr "Пераключэнне налады"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4512 src/slic3r/GUI/GLCanvas3D.cpp:5348
+#: src/slic3r/GUI/GLCanvas3D.cpp:4512 src/slic3r/GUI/GLCanvas3D.cpp:5354
 msgid "Print Settings Tab"
 msgstr "Налады друку"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5349
+#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5355
 msgid "Filament Settings Tab"
 msgstr "Налады філаменту"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5349
+#: src/slic3r/GUI/GLCanvas3D.cpp:4513 src/slic3r/GUI/GLCanvas3D.cpp:5355
 msgid "Material Settings Tab"
 msgstr "Налады матэрыялу"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4514 src/slic3r/GUI/GLCanvas3D.cpp:5350
+#: src/slic3r/GUI/GLCanvas3D.cpp:4514 src/slic3r/GUI/GLCanvas3D.cpp:5356
 msgid "Printer Settings Tab"
 msgstr "Налады друкаркі"
 
@@ -11427,7 +11427,7 @@ msgstr[0] "Зрабіць нанова %1$d дзею"
 msgstr[1] "Зрабіць нанова %1$d дзеі"
 msgstr[2] "Зрабіць нанова %1$d дзеяў"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:4777 src/slic3r/GUI/GLCanvas3D.cpp:5366
+#: src/slic3r/GUI/GLCanvas3D.cpp:4777 src/slic3r/GUI/GLCanvas3D.cpp:5372
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:120 src/slic3r/GUI/Search.cpp:486
 msgid "Search"
 msgstr "Пошук"
@@ -11437,84 +11437,84 @@ msgstr "Пошук"
 msgid "Enter a search term"
 msgstr "Увясці пошукавы запыт"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5234
+#: src/slic3r/GUI/GLCanvas3D.cpp:5240
 msgid "Add..."
 msgstr "Дадаць..."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5251 src/slic3r/GUI/KBShortcutsDialog.cpp:110
+#: src/slic3r/GUI/GLCanvas3D.cpp:5257 src/slic3r/GUI/KBShortcutsDialog.cpp:110
 #: src/slic3r/GUI/Plater.cpp:6430 src/slic3r/GUI/Tab.cpp:4911
 msgid "Delete all"
 msgstr "Выдаліць усе"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5260 src/slic3r/GUI/KBShortcutsDialog.cpp:147
+#: src/slic3r/GUI/GLCanvas3D.cpp:5266 src/slic3r/GUI/KBShortcutsDialog.cpp:147
 msgid "Arrange selection"
 msgstr "Упарадкаваць абраныя"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5260
+#: src/slic3r/GUI/GLCanvas3D.cpp:5266
 msgid "Click right mouse button to show arrangement options"
 msgstr "Пстрыкніце правую кнопку мышы, каб адлюстраваць налады ўпарадкавання"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5280
+#: src/slic3r/GUI/GLCanvas3D.cpp:5286
 msgid "Copy"
 msgstr "Капіраваць"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5289
+#: src/slic3r/GUI/GLCanvas3D.cpp:5295
 msgid "Paste"
 msgstr "Уставіць"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5301 src/slic3r/GUI/GUI_Factories.cpp:1343
+#: src/slic3r/GUI/GLCanvas3D.cpp:5307 src/slic3r/GUI/GUI_Factories.cpp:1343
 #: src/slic3r/GUI/GUI_Factories.cpp:1367 src/slic3r/GUI/GUI_Factories.cpp:1378
 msgid "Add instance"
 msgstr "Дадаць асобнік"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5312 src/slic3r/GUI/GUI_Factories.cpp:1346
+#: src/slic3r/GUI/GLCanvas3D.cpp:5318 src/slic3r/GUI/GUI_Factories.cpp:1346
 msgid "Remove instance"
 msgstr "Выдаліць асобнік"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5325
+#: src/slic3r/GUI/GLCanvas3D.cpp:5331
 msgid "Split to objects"
 msgstr "Падзяліць на мадэлі"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5335
+#: src/slic3r/GUI/GLCanvas3D.cpp:5341
 msgid "Split to parts"
 msgstr "Падзяліць на часткі"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5441 src/slic3r/GUI/GLCanvas3D.cpp:5478
+#: src/slic3r/GUI/GLCanvas3D.cpp:5447 src/slic3r/GUI/GLCanvas3D.cpp:5484
 msgid "Click right mouse button to open/close History"
 msgstr "Псктрыкнуць правую кнопку мышы, каб адлюстраваць/схаваць Гісторы дзей"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5463
+#: src/slic3r/GUI/GLCanvas3D.cpp:5469
 #, boost-format
 msgid "Next Undo action: %1%"
 msgstr "Наступная дзея Адкату: %1%"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5478 src/slic3r/GUI/KBShortcutsDialog.cpp:112
+#: src/slic3r/GUI/GLCanvas3D.cpp:5484 src/slic3r/GUI/KBShortcutsDialog.cpp:112
 #: src/slic3r/GUI/MainFrame.cpp:1457
 msgid "Redo"
 msgstr "Зрабіць нанова"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:5499
+#: src/slic3r/GUI/GLCanvas3D.cpp:5505
 #, boost-format
 msgid "Next Redo action: %1%"
 msgstr "Наступная дзея Зрабіць нанова: %1%"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7416
+#: src/slic3r/GUI/GLCanvas3D.cpp:7422
 msgid "An object outside the print area was detected."
 msgstr "Знойдзена мадэль па-за межамі вобласці друку."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7417
+#: src/slic3r/GUI/GLCanvas3D.cpp:7423
 msgid "A toolpath outside the print area was detected."
 msgstr "Выяўлена траекторыя руху інструмента за межамі вобласці друку."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7418
+#: src/slic3r/GUI/GLCanvas3D.cpp:7424
 msgid "SLA supports outside the print area were detected."
 msgstr "Выяўлены SLA падтрымкі за межамі вобласці друку."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7419
+#: src/slic3r/GUI/GLCanvas3D.cpp:7425
 msgid "Some objects are not visible during editing."
 msgstr "Некаторыя мадэлі не бачныя падчас змены."
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7421
+#: src/slic3r/GUI/GLCanvas3D.cpp:7427
 msgid ""
 "An object outside the print area was detected.\n"
 "Resolve the current problem to continue slicing."
@@ -11523,18 +11523,18 @@ msgstr ""
 "Ухіліце бягучую праблему, каб працягнуць нарэзку."
 
 #. TRN %3% is name of Object1, %4% is name of Object2
-#: src/slic3r/GUI/GLCanvas3D.cpp:7433
+#: src/slic3r/GUI/GLCanvas3D.cpp:7439
 #, boost-format
 msgid ""
 "Conflicts in G-code paths have been detected at layer %1%, z=%2$.2f mm. "
 "Please reposition the conflicting objects (%3% <-> %4%) further apart."
 msgstr ""
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7463
+#: src/slic3r/GUI/GLCanvas3D.cpp:7469
 msgid "Jump to"
 msgstr "Перайсці да"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7466
+#: src/slic3r/GUI/GLCanvas3D.cpp:7472
 #: src/slic3r/GUI/NotificationManager.cpp:2105
 #: src/slic3r/GUI/NotificationManager.cpp:2112
 #: src/slic3r/GUI/NotificationManager.cpp:2128
@@ -11543,11 +11543,11 @@ msgstr "Перайсці да"
 msgid "ERROR:"
 msgstr "ПАМЫЛКА:"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7543
+#: src/slic3r/GUI/GLCanvas3D.cpp:7549
 msgid "Selection-Add from rectangle"
 msgstr "Абраць-Дадаць з прамавугольніка"
 
-#: src/slic3r/GUI/GLCanvas3D.cpp:7558
+#: src/slic3r/GUI/GLCanvas3D.cpp:7564
 msgid "Selection-Remove from rectangle"
 msgstr "Абраць-Выдаліць з прамавугольніка"
 
@@ -11804,7 +11804,7 @@ msgstr "Глядзіце Старонку новых выпускаў."
 msgid "Preparing settings tabs"
 msgstr "Падрыхтоўка наладаў"
 
-#: src/slic3r/GUI/GUI_App.cpp:1422 src/slic3r/GUI/Preferences.cpp:432
+#: src/slic3r/GUI/GUI_App.cpp:1422 src/slic3r/GUI/Preferences.cpp:438
 msgid "Restore window position on start"
 msgstr "Аднавіць становішча акна пры запуску"
 
@@ -12060,7 +12060,7 @@ msgstr ""
 "Змена мову прывядзе да перазапуску праграмы.\n"
 "Вы страціце змест стала."
 
-#: src/slic3r/GUI/GUI_App.cpp:2599 src/slic3r/GUI/Preferences.cpp:765
+#: src/slic3r/GUI/GUI_App.cpp:2599 src/slic3r/GUI/Preferences.cpp:771
 #: src/slic3r/GUI/Selection.cpp:1489
 msgid "Do you want to proceed?"
 msgstr "Ці жадаеце вы працягнуць?"
@@ -12142,7 +12142,7 @@ msgstr "Адчыніць спасылак у Інтэрнэт-аглядальн
 msgid "PrusaSlicer: Open hyperlink"
 msgstr "PrusaSlicer: Адчыніць спасылак"
 
-#: src/slic3r/GUI/GUI_App.cpp:3390 src/slic3r/GUI/Preferences.cpp:627
+#: src/slic3r/GUI/GUI_App.cpp:3390 src/slic3r/GUI/Preferences.cpp:633
 msgid "Suppress to open hyperlink in browser"
 msgstr "Забараніць адкрыццё спасылак у Інтэрнэт-аглядальніку"
 
@@ -12322,7 +12322,7 @@ msgid "Printable"
 msgstr "Для друку"
 
 #: src/slic3r/GUI/GUI_Factories.cpp:799 src/slic3r/GUI/GUI_ObjectList.cpp:2007
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2499
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2501
 msgid "Invalidate cut info"
 msgstr ""
 
@@ -12330,7 +12330,7 @@ msgstr ""
 msgid "Rename"
 msgstr "Пераназваць"
 
-#: src/slic3r/GUI/GUI_Factories.cpp:824 src/slic3r/GUI/GUI_ObjectList.cpp:4641
+#: src/slic3r/GUI/GUI_Factories.cpp:824 src/slic3r/GUI/GUI_ObjectList.cpp:4643
 msgid "Fix by Windows repair algorithm"
 msgstr ""
 
@@ -12614,7 +12614,7 @@ msgid "Rename Sub-object"
 msgstr "Пераназваць Суб-мадэль"
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:1343
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4519
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4521
 msgid "Instances to Separated Objects"
 msgstr "Асобнікі як Асобная Мадэль"
 
@@ -12745,7 +12745,7 @@ msgid ""
 msgstr ""
 
 #: src/slic3r/GUI/GUI_ObjectList.cpp:2009
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2529
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2531
 msgid "Delete all connectors"
 msgstr ""
 
@@ -12798,58 +12798,58 @@ msgstr "Ад'яднаць ўсі часткі ў адну адзіную мад�
 msgid "Add Layers"
 msgstr "Даданне Пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2614
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2616
 msgid "Connectors information"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2624
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2689
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2626
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2691
 msgid "Object manipulation"
 msgstr "Маніпуляванне мадэлямі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2634
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2636
 msgid "Group manipulation"
 msgstr "Групавое маніпуляванне"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2725
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2727
 msgid "Object Settings to modify"
 msgstr "Налады мадэлі для зменаў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2729
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2731
 msgid "Part Settings to modify"
 msgstr "Налады частак для зменаў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2734
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2736
 msgid "Layer range Settings to modify"
 msgstr "Налады дыяпазона Пластоў для змены"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2740
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2742
 msgid "Part manipulation"
 msgstr "Маніпуляванне частак"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2748
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2750
 msgid "Instance manipulation"
 msgstr "Маніпуляванне асобнікамі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2756
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2758
 msgid "Height ranges"
 msgstr "Дыяпазон вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:2756
+#: src/slic3r/GUI/GUI_ObjectList.cpp:2758
 msgid "Settings for height range"
 msgstr "Налады для дыяпазона вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3293
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3295
 msgid "Delete Selected"
 msgstr "Выдаленне абранага"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3371
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3399
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3419
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3373
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3401
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3421
 msgid "Add Height Range"
 msgstr "Дадаць дыяпазон вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3465
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3467
 msgid ""
 "Cannot insert a new layer range after the current layer range.\n"
 "The next layer range is too thin to be split to two\n"
@@ -12860,7 +12860,7 @@ msgstr ""
 "пласта\n"
 "без парушэння найменьшай вышыні пласта."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3469
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3471
 msgid ""
 "Cannot insert a new layer range between the current and the next layer "
 "range.\n"
@@ -12872,7 +12872,7 @@ msgstr ""
 "Прагал паміж бягучым і наступным дыяпазонамі пластоў\n"
 "найменьш, чым дапушчальная вышыня пласта."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3474
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3476
 msgid ""
 "Cannot insert a new layer range after the current layer range.\n"
 "Current layer range overlaps with the next layer range."
@@ -12880,82 +12880,82 @@ msgstr ""
 "Немагчыма ўставіць новы дыяпазон пластоў пасля бягучага дыяпазона пластоў.\n"
 "Дыяпазон бягучага пласта перакрываецца з дыяпазонам наступнага пласта."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3533
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3535
 msgid "Edit Height Range"
 msgstr "Змена дыяпазона вышыні пластоў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3915
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3917
 msgid "Selection-Remove from list"
 msgstr "Выбар-Выдаленне з спіса"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:3927
+#: src/slic3r/GUI/GUI_ObjectList.cpp:3929
 msgid "Selection-Add from list"
 msgstr "Выбар-Даданне з спіса"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4066
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4068
 msgid "Object or Instance"
 msgstr "Мадэль альбо Асобнік"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4067
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4069
 msgid "Layer"
 msgstr "Пласты"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4069
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4071
 msgid "Unsupported selection"
 msgstr "Непадтрыманы выбар"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4070
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4072
 #, c-format, boost-format
 msgid "You started your selection with %s Item."
 msgstr "Вы пачалі свой выбар з элемента %s."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4071
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4073
 #, c-format, boost-format
 msgid "In this mode you can select only other %s Items%s"
 msgstr "У гэтым рэжыме можна абраць только іншы %s Элемент %s"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4074
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4076
 msgid "of a current Object"
 msgstr "бягучай Мадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4079
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4154 src/slic3r/GUI/Plater.cpp:225
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4081
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4156 src/slic3r/GUI/Plater.cpp:225
 msgid "Info"
 msgstr "Даведка"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4259
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4261
 msgid "Negative Volume"
 msgstr "Аб'ём для Выключэння"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4272
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4274
 msgid "Support Blocker"
 msgstr "Блокоўшчык Падтрымкі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4272
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4274
 msgid "Support Enforcer"
 msgstr "Прымусовая Падтрымка"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4282
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4284
 msgid "Select type of part"
 msgstr "Выбар тыпа часткі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4288
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4290
 msgid "Change Part Type"
 msgstr "Змена Тыпа Часткі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4549
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4551
 msgid "Enter new name"
 msgstr "Увядзіце новае імя"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4549
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4551
 msgid "Renaming"
 msgstr "Пераназваць"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4611
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4613
 msgid "Repairing model"
 msgstr "Аднаўленне мадэлі"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4621
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4623
 msgid ""
 "Custom supports, seams and multimaterial painting were removed after "
 "repairing the mesh."
@@ -12963,53 +12963,53 @@ msgstr ""
 "Пасле аднаўлення сеткі былі выдаленыя карыстальніцкія падтрымкі, шво і "
 "шматматэрыяльная афарбоўка."
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4644
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4646
 msgid "Fixing by Windows repair algorithm"
 msgstr ""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4674
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4676
 msgid "The following model was repaired successfully"
 msgid_plural "The following models were repaired successfully"
 msgstr[0] "Наступная мадэль паспяхова адноўлена"
 msgstr[1] "Наступныя мадэлі паспяхова адноўленыя"
 msgstr[2] "Наступных мадэляў паспяхова адноўлена"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4680
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4682
 msgid "Folowing model repair failed"
 msgid_plural "Folowing models repair failed"
 msgstr[0] "Не атрымалася аднавіць мадэль"
 msgstr[1] "Не атрымалася аднавіць мадэлі"
 msgstr[2] "Не атрымалася аднавіць мадэляў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4685
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4687
 msgid "Repairing was canceled"
 msgstr "Аднаўленне было адменена"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4802
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4804
 msgid "Change Extruders"
 msgstr "Змена экструдараў"
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4928
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
 msgid "Set Printable group"
 msgstr "Ужыць групу \"Для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4928
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
 msgid "Set Unprintable group"
 msgstr "Ужыць групу \"Не для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4932
 msgid "Set Printable"
 msgstr "Ужыць \"Для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4930
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4932
 msgid "Set Unprintable"
 msgstr "Ужыць \"Не для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4931
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4933
 msgid "Set Printable Instance"
 msgstr "Ужыць \"Асобнік для друку\""
 
-#: src/slic3r/GUI/GUI_ObjectList.cpp:4931
+#: src/slic3r/GUI/GUI_ObjectList.cpp:4933
 msgid "Set Unprintable Instance"
 msgstr "Ужыць \"Асобнік не для друку\""
 
@@ -13185,7 +13185,7 @@ msgstr ""
 "Не атрымалася ўпарадкаваць часткі мадэлі! Некаторыя геаметрыі могуць быць "
 "недапушчальнымі."
 
-#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:363 src/slic3r/GUI/Plater.cpp:7810
+#: src/slic3r/GUI/Jobs/ArrangeJob.cpp:363 src/slic3r/GUI/Plater.cpp:7831
 #, c-format, boost-format
 msgid ""
 "Arrangement ignored the following objects which can't fit into a single "
@@ -13396,7 +13396,7 @@ msgstr "Загрузіць наладкі з ini/amf/3mf/g-кода"
 msgid "Load Config from ini/amf/3mf/gcode and merge"
 msgstr "Загрузіць наладкі з ini/amf/3mf/g-кода і аб'яднаць"
 
-#: src/slic3r/GUI/KBShortcutsDialog.cpp:102 src/slic3r/GUI/Plater.cpp:7861
+#: src/slic3r/GUI/KBShortcutsDialog.cpp:102 src/slic3r/GUI/Plater.cpp:7882
 msgid "Send G-code"
 msgstr "Адправіць G-код"
 
@@ -13477,8 +13477,8 @@ msgstr "Адлюстраваць/Схаваць пазнакі мадэлі/ас
 
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:135
 #: src/slic3r/GUI/KBShortcutsDialog.cpp:137 src/slic3r/GUI/Preferences.cpp:68
-#: src/slic3r/GUI/Preferences.cpp:207 src/slic3r/GUI/Preferences.cpp:230
-#: src/slic3r/GUI/Preferences.cpp:238
+#: src/slic3r/GUI/Preferences.cpp:213 src/slic3r/GUI/Preferences.cpp:236
+#: src/slic3r/GUI/Preferences.cpp:244
 msgid "Preferences"
 msgstr "Перавагі"
 
@@ -14660,7 +14660,7 @@ msgstr "%s утрымлівае папярэджанне"
 msgid "%s info"
 msgstr "Інфармацыя %s"
 
-#: src/slic3r/GUI/MsgDialog.cpp:315
+#: src/slic3r/GUI/MsgDialog.cpp:317
 #, c-format, boost-format
 msgid "%s information"
 msgstr "Інфармацыя %s"
@@ -15160,12 +15160,12 @@ msgstr "Пад мадэльлю"
 msgid "Around object"
 msgstr "Вакол мадэлі"
 
-#: src/slic3r/GUI/Plater.cpp:959 src/slic3r/GUI/Plater.cpp:7861
+#: src/slic3r/GUI/Plater.cpp:959 src/slic3r/GUI/Plater.cpp:7882
 msgid "Send to printer"
 msgstr "Адправіць на друкарку"
 
 #: src/slic3r/GUI/Plater.cpp:980 src/slic3r/GUI/Plater.cpp:3514
-#: src/slic3r/GUI/Plater.cpp:7270
+#: src/slic3r/GUI/Plater.cpp:7288
 msgid "Slice now"
 msgstr "Нарэзаць зараз"
 
@@ -15243,7 +15243,7 @@ msgstr "Захаваць"
 msgid "Discard"
 msgstr "Адмовіцца"
 
-#: src/slic3r/GUI/Plater.cpp:1824 src/slic3r/GUI/Preferences.cpp:377
+#: src/slic3r/GUI/Plater.cpp:1824 src/slic3r/GUI/Preferences.cpp:383
 msgid "Ask for unsaved changes in project"
 msgstr "Спытаць пра незахаваныя змены ў праекце"
 
@@ -15520,7 +15520,7 @@ msgstr ""
 msgid "Invalid data"
 msgstr "Памылковыя дадзеныя"
 
-#: src/slic3r/GUI/Plater.cpp:3514 src/slic3r/GUI/Plater.cpp:7267
+#: src/slic3r/GUI/Plater.cpp:3514 src/slic3r/GUI/Plater.cpp:7285
 #: src/slic3r/GUI/Tab.cpp:1683 src/slic3r/GUI/Tab.cpp:5535
 msgid "Slicing"
 msgstr "Нарэзка"
@@ -15802,7 +15802,7 @@ msgstr ""
 msgid "Select an action to apply to the file"
 msgstr "Абраць дзею для ўжывання да файла"
 
-#: src/slic3r/GUI/Plater.cpp:6239
+#: src/slic3r/GUI/Plater.cpp:6239 src/slic3r/GUI/Plater.cpp:6759
 msgid "Don't show again"
 msgstr "Больш не адлюстроўваць"
 
@@ -15875,40 +15875,51 @@ msgid ""
 "code export</a> in Print Settings."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:6786
+#: src/slic3r/GUI/Plater.cpp:6756
+msgid ""
+"You are exporting binary G-code for a Prusa printer. Please, make sure that "
+"your printer is running firmware version 5.1.0-alpha2 or later. Older "
+"firmwares are not able to handle binary G-codes."
+msgstr ""
+
+#: src/slic3r/GUI/Plater.cpp:6758
+msgid "Exporting binary G-code"
+msgstr ""
+
+#: src/slic3r/GUI/Plater.cpp:6814
 msgid "Save G-code file as:"
 msgstr "Захаваць файл G-кода як:"
 
-#: src/slic3r/GUI/Plater.cpp:6786
+#: src/slic3r/GUI/Plater.cpp:6814
 msgid "Save SL1 / SL1S file as:"
 msgstr "Захаваць SL1 / SL1S файл як:"
 
-#: src/slic3r/GUI/Plater.cpp:6800
+#: src/slic3r/GUI/Plater.cpp:6828
 msgid "The provided file name is not valid."
 msgstr "Названае імя файла недапушчальнае."
 
-#: src/slic3r/GUI/Plater.cpp:6801
+#: src/slic3r/GUI/Plater.cpp:6829
 msgid "The following characters are not allowed by a FAT file system:"
 msgstr "Файлавая сістэма FAT не дазваляе наступныя сімвалы:"
 
-#: src/slic3r/GUI/Plater.cpp:6880
+#: src/slic3r/GUI/Plater.cpp:6898
 msgid ""
 "Unable to perform boolean operation on model meshes. Only positive parts "
 "will be exported."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7106
+#: src/slic3r/GUI/Plater.cpp:7124
 msgid ""
 "Are you sure you want to store original SVGs with their local paths into the "
 "3MF file?\n"
 "If you hit 'NO', all SVGs in the project will not be editable any more."
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7108
+#: src/slic3r/GUI/Plater.cpp:7126
 msgid "Private protection"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7137
+#: src/slic3r/GUI/Plater.cpp:7155
 msgid ""
 "The plater is empty.\n"
 "Do you want to save the project?"
@@ -15916,42 +15927,42 @@ msgstr ""
 "На стале нічога няма.\n"
 "Ці жадаеце вы захаваць праект?"
 
-#: src/slic3r/GUI/Plater.cpp:7137
+#: src/slic3r/GUI/Plater.cpp:7155
 msgid "Save project"
 msgstr "Захаванне праекту"
 
-#: src/slic3r/GUI/Plater.cpp:7185
+#: src/slic3r/GUI/Plater.cpp:7203
 msgid "Unable to save file"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7390
+#: src/slic3r/GUI/Plater.cpp:7411
 msgid "Is the printer ready? Is the print sheet in place, empty and clean?"
 msgstr ""
 
-#: src/slic3r/GUI/Plater.cpp:7390 src/slic3r/GUI/PrintHostDialogs.cpp:136
+#: src/slic3r/GUI/Plater.cpp:7411 src/slic3r/GUI/PrintHostDialogs.cpp:136
 msgid "Upload and Print"
 msgstr "Загрузіць і Надрукаваць"
 
-#: src/slic3r/GUI/Plater.cpp:7860
+#: src/slic3r/GUI/Plater.cpp:7881
 msgid "Export"
 msgstr "Экспарт"
 
-#: src/slic3r/GUI/Plater.cpp:8019
+#: src/slic3r/GUI/Plater.cpp:8040
 msgid "Paste From Clipboard"
 msgstr "Устаўка з Буферу абмена"
 
-#: src/slic3r/GUI/Preferences.cpp:268 src/slic3r/GUI/Tab.cpp:2640
+#: src/slic3r/GUI/Preferences.cpp:274 src/slic3r/GUI/Tab.cpp:2640
 #: src/slic3r/GUI/Tab.cpp:2944 src/slic3r/GUI/Tab.cpp:3062
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1303
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:1852
 msgid "General"
 msgstr "Агульныя"
 
-#: src/slic3r/GUI/Preferences.cpp:286
+#: src/slic3r/GUI/Preferences.cpp:292
 msgid "Remember output directory"
 msgstr "Запомніць папку захавання"
 
-#: src/slic3r/GUI/Preferences.cpp:287
+#: src/slic3r/GUI/Preferences.cpp:293
 msgid ""
 "If this is enabled, Slic3r will prompt the last output directory instead of "
 "the one containing the input files."
@@ -15959,22 +15970,22 @@ msgstr ""
 "Калі ўключана, пры захаванні G-кода PrusaSlicer адкрые апошнюю ўжытую папку "
 "захавання замест таго, які ўтрымлівае зыходныя файлы."
 
-#: src/slic3r/GUI/Preferences.cpp:291
+#: src/slic3r/GUI/Preferences.cpp:297
 msgid "Auto-center parts"
 msgstr "Аўтацентроўка мадэляў"
 
-#: src/slic3r/GUI/Preferences.cpp:292
+#: src/slic3r/GUI/Preferences.cpp:298
 msgid ""
 "If this is enabled, Slic3r will auto-center objects around the print bed "
 "center."
 msgstr ""
 "Калі ўключана, PrusaSlicer будзе аўтаматычна цэнтраваць мадэлі на стале."
 
-#: src/slic3r/GUI/Preferences.cpp:296
+#: src/slic3r/GUI/Preferences.cpp:302
 msgid "Background processing"
 msgstr "Фонавая апрацоўка"
 
-#: src/slic3r/GUI/Preferences.cpp:297
+#: src/slic3r/GUI/Preferences.cpp:303
 msgid ""
 "If this is enabled, Slic3r will pre-process objects as soon as they're "
 "loaded in order to save time when exporting G-code."
@@ -15982,11 +15993,11 @@ msgstr ""
 "Калі ўключана, PrusaSlicer будзе папярэдне апрацоўваць мадэлі пры загрузцы, "
 "каб зэканоміць час пры экспарце G-кода."
 
-#: src/slic3r/GUI/Preferences.cpp:302
+#: src/slic3r/GUI/Preferences.cpp:308
 msgid "Alert when supports needed"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:303
+#: src/slic3r/GUI/Preferences.cpp:309
 msgid ""
 "If this is enabled, Slic3r will raise alerts when it detects issues in the "
 "sliced object, that can be resolved with supports (and brim). Examples of "
@@ -15994,11 +16005,11 @@ msgid ""
 "adhesion."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:313
+#: src/slic3r/GUI/Preferences.cpp:319
 msgid "Export sources full pathnames to 3mf and amf"
 msgstr "Пры экспарце захоўваць поўныя шляхі да крыніц 3mf і amf"
 
-#: src/slic3r/GUI/Preferences.cpp:314
+#: src/slic3r/GUI/Preferences.cpp:320
 msgid ""
 "If enabled, allows the Reload from disk command to automatically find and "
 "load the files when invoked."
@@ -16006,19 +16017,19 @@ msgstr ""
 "Калі ўключана, пры выкананні каманды \"Перазагрузіць з дыску\" праграма "
 "будзе аўтаматычна знаходзіць і загружаць файлы праекту."
 
-#: src/slic3r/GUI/Preferences.cpp:321
+#: src/slic3r/GUI/Preferences.cpp:327
 msgid "If enabled, sets PrusaSlicer as default application to open .3mf files."
 msgstr ""
 "Калі ўключана, усталёўвае PrusaSlicer у якасці першапачатковай праграмы для "
 "адкрыцця файлаў .3mf."
 
-#: src/slic3r/GUI/Preferences.cpp:326
+#: src/slic3r/GUI/Preferences.cpp:332
 msgid "If enabled, sets PrusaSlicer as default application to open .stl files."
 msgstr ""
 "Калі ўключана, усталёўвае PrusaSlicer у якасці першапачатковай праграммы для "
 "адкрыцця файлаў .stl."
 
-#: src/slic3r/GUI/Preferences.cpp:335
+#: src/slic3r/GUI/Preferences.cpp:341
 msgid ""
 "If enabled, Slic3r downloads updates of built-in system presets in the "
 "background. These updates are downloaded into a separate temporary location. "
@@ -16030,11 +16041,11 @@ msgstr ""
 "Калі новыя профілі становяцца даступнымі, яны прапануюцца пры запуске "
 "праграмы."
 
-#: src/slic3r/GUI/Preferences.cpp:340
+#: src/slic3r/GUI/Preferences.cpp:346
 msgid "Suppress \" - default - \" presets"
 msgstr "Душыць \" - першапачатковыя - \" профілі"
 
-#: src/slic3r/GUI/Preferences.cpp:341
+#: src/slic3r/GUI/Preferences.cpp:347
 msgid ""
 "Suppress \" - default - \" presets in the Print / Filament / Printer "
 "selections once there are any other valid presets available."
@@ -16042,21 +16053,21 @@ msgstr ""
 "Душыць \" - першапачатковыя - \" профілі ў наладах Друку / Філамента / "
 "Друкаркі, як толькі будуць даступныя любыя іншыя дапушчальныя профілі."
 
-#: src/slic3r/GUI/Preferences.cpp:345
+#: src/slic3r/GUI/Preferences.cpp:351
 msgid "Suppress \" Template \" filament presets"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:346
+#: src/slic3r/GUI/Preferences.cpp:352
 msgid ""
 "Suppress \" Template \" filament presets in configuration wizard and sidebar "
 "visibility."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:350
+#: src/slic3r/GUI/Preferences.cpp:356
 msgid "Show incompatible print and filament presets"
 msgstr "Адлюстроўваць несумяшчальныя профілі друку і філамента"
 
-#: src/slic3r/GUI/Preferences.cpp:351
+#: src/slic3r/GUI/Preferences.cpp:357
 msgid ""
 "When checked, the print and filament presets are shown in the preset editor "
 "even if they are marked as incompatible with the active printer"
@@ -16065,22 +16076,22 @@ msgstr ""
 "зменах профіляў, нават калі яны пазначаныя як несумяшчальныя з актыўнай "
 "друкаркай"
 
-#: src/slic3r/GUI/Preferences.cpp:358
+#: src/slic3r/GUI/Preferences.cpp:364
 msgid "Show load project dialog"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:359
+#: src/slic3r/GUI/Preferences.cpp:365
 msgid ""
 "When checked, whenever dragging and dropping a project file on the "
 "application or open it from a browser, shows a dialog asking to select the "
 "action to take on the file to load."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:365 src/slic3r/GUI/Preferences.cpp:369
+#: src/slic3r/GUI/Preferences.cpp:371 src/slic3r/GUI/Preferences.cpp:375
 msgid "Allow just a single PrusaSlicer instance"
 msgstr "Дазволіць толькі адзін асобнік PrusaSlicer"
 
-#: src/slic3r/GUI/Preferences.cpp:366
+#: src/slic3r/GUI/Preferences.cpp:372
 msgid ""
 "On OSX there is always only one instance of app running by default. However "
 "it is allowed to run multiple instances of same app from the command line. "
@@ -16090,7 +16101,7 @@ msgstr ""
 "дазволена запускаць некалькі асобнікаў аднай і той жа праграмы з каманднага "
 "радка. У такім выпадку гэтыя налады дазволяць ужываць толькі адзін асобнік."
 
-#: src/slic3r/GUI/Preferences.cpp:370
+#: src/slic3r/GUI/Preferences.cpp:376
 msgid ""
 "If this is enabled, when starting PrusaSlicer and another instance of the "
 "same PrusaSlicer is already running, that instance will be reactivated "
@@ -16099,7 +16110,7 @@ msgstr ""
 "Калі ўключана, то пры запуску PrusaSlicer і іншы асобнік PrusaSlicer ужо "
 "запушчаны, гэты асобнік будзе паўторна актываваны замест гэтага."
 
-#: src/slic3r/GUI/Preferences.cpp:378
+#: src/slic3r/GUI/Preferences.cpp:384
 msgid ""
 "Always ask for unsaved changes in project, when: \n"
 "- Closing PrusaSlicer,\n"
@@ -16109,7 +16120,7 @@ msgstr ""
 "- Зачыняецца PrusaSlicer,\n"
 "- Загрузка альбо стварэнне новага праекта"
 
-#: src/slic3r/GUI/Preferences.cpp:386
+#: src/slic3r/GUI/Preferences.cpp:392
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:928
 msgid ""
 "Ask to save unsaved changes in presets when closing the application or when "
@@ -16118,7 +16129,7 @@ msgstr ""
 "Запытаць, калі трэба захаваць незахаваных змены ў профілях пры закрыцці "
 "праграмы альбо пры загрузцы новага праекта"
 
-#: src/slic3r/GUI/Preferences.cpp:387
+#: src/slic3r/GUI/Preferences.cpp:393
 msgid ""
 "Always ask for unsaved changes in presets, when: \n"
 "- Closing PrusaSlicer while some presets are modified,\n"
@@ -16128,12 +16139,12 @@ msgstr ""
 "- Зачыняецца PrusaSlicer пры змене некаторых профіляў,\n"
 "- Загрузка новага праекта пры змене некаторых профіляў"
 
-#: src/slic3r/GUI/Preferences.cpp:393
+#: src/slic3r/GUI/Preferences.cpp:399
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:927
 msgid "Ask for unsaved changes in presets when selecting new preset"
 msgstr "Запытаць, пра незахаваныя змены ў профілях пры выбары новага профіля"
 
-#: src/slic3r/GUI/Preferences.cpp:394
+#: src/slic3r/GUI/Preferences.cpp:400
 msgid ""
 "Always ask for unsaved changes in presets when selecting new preset or "
 "resetting a preset"
@@ -16141,22 +16152,22 @@ msgstr ""
 "Заўсёды запытаць пра незахаваныя змены ў профілях пры выбары новага профіля "
 "альбо калі профіля будзе зкінуты"
 
-#: src/slic3r/GUI/Preferences.cpp:398
+#: src/slic3r/GUI/Preferences.cpp:404
 #: src/slic3r/GUI/UnsavedChangesDialog.cpp:926
 msgid "Ask for unsaved changes in presets when creating new project"
 msgstr "Запытаць пра незахаваныя змены ў профілях пры стварэнні новага праекта"
 
-#: src/slic3r/GUI/Preferences.cpp:399
+#: src/slic3r/GUI/Preferences.cpp:405
 msgid "Always ask for unsaved changes in presets when creating new project"
 msgstr ""
 "Заўсёды запытваць пра незахаваныя змены ў профілях пры стварэнні новага "
 "праекта"
 
-#: src/slic3r/GUI/Preferences.cpp:405
+#: src/slic3r/GUI/Preferences.cpp:411
 msgid "Associate .gcode files to PrusaSlicer G-code Viewer"
 msgstr "Звязаць файлы .gcode з Папярэднім праглядам G-code у PrusaSlicer"
 
-#: src/slic3r/GUI/Preferences.cpp:406
+#: src/slic3r/GUI/Preferences.cpp:412
 msgid ""
 "If enabled, sets PrusaSlicer G-code Viewer as default application to open ."
 "gcode files."
@@ -16164,21 +16175,21 @@ msgstr ""
 "Калі ўключана, усталёўвае Папярэдні прагляд G-code у PrusaSlicer як "
 "першапачатковую праграму для адкрыцця .gcode файлаў."
 
-#: src/slic3r/GUI/Preferences.cpp:409
+#: src/slic3r/GUI/Preferences.cpp:415
 msgid "Associate .bgcode files to PrusaSlicer G-code Viewer"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:410
+#: src/slic3r/GUI/Preferences.cpp:416
 msgid ""
 "If enabled, sets PrusaSlicer G-code Viewer as default application to open ."
 "bgcode files."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:417
+#: src/slic3r/GUI/Preferences.cpp:423
 msgid "Use Retina resolution for the 3D scene"
 msgstr "Ужываць Retina для акна 3D выгляду"
 
-#: src/slic3r/GUI/Preferences.cpp:418
+#: src/slic3r/GUI/Preferences.cpp:424
 msgid ""
 "If enabled, the 3D scene will be rendered in Retina resolution. If you are "
 "experiencing 3D performance problems, disabling this option may help."
@@ -16186,32 +16197,32 @@ msgstr ""
 "Калі ўключана, акно 3D выгляду будзе візуалізавана з Retina. Калі ў вас "
 "узніклі праблемы з прадукцыйнасцю 3D, адключэнне гэтай налады можа дапамагчы."
 
-#: src/slic3r/GUI/Preferences.cpp:427 src/slic3r/GUI/Preferences.cpp:428
+#: src/slic3r/GUI/Preferences.cpp:433 src/slic3r/GUI/Preferences.cpp:434
 msgid "Show splash screen"
 msgstr "Адклюстроўваць застаўку"
 
-#: src/slic3r/GUI/Preferences.cpp:433
+#: src/slic3r/GUI/Preferences.cpp:439
 msgid "If enabled, PrusaSlicer will be open at the position it was closed"
 msgstr ""
 "Калі ўключана, PrusaSlicer будзе адчынена ў тым жа становішчы, у якім ён быў "
 "зачынены"
 
-#: src/slic3r/GUI/Preferences.cpp:438
+#: src/slic3r/GUI/Preferences.cpp:444
 msgid "Clear Undo / Redo stack on new project"
 msgstr "Ачысціць стэк Адкаціць / Зрабіць нанова пры стварэнні новага праекту"
 
-#: src/slic3r/GUI/Preferences.cpp:439
+#: src/slic3r/GUI/Preferences.cpp:445
 msgid ""
 "Clear Undo / Redo stack on new project or when an existing project is loaded."
 msgstr ""
 "Ачысціць стэк Адкаціць / Зрабіць нанова пры стварэнні новага праекту альбо "
 "пры загрузцы існуючага праекту."
 
-#: src/slic3r/GUI/Preferences.cpp:444
+#: src/slic3r/GUI/Preferences.cpp:450
 msgid "Enable support for legacy 3DConnexion devices"
 msgstr "Уключыць падтрымку састарэлых прылад 3DConnexion"
 
-#: src/slic3r/GUI/Preferences.cpp:445
+#: src/slic3r/GUI/Preferences.cpp:451
 msgid ""
 "If enabled, the legacy 3DConnexion devices settings dialog is available by "
 "pressing CTRL+M"
@@ -16219,48 +16230,48 @@ msgstr ""
 "Калі ўключана, дыялагавае акно наладаў састарэлых прыладаў 3DConnexion будзе "
 "даступная пры націску CTRL+M"
 
-#: src/slic3r/GUI/Preferences.cpp:452
+#: src/slic3r/GUI/Preferences.cpp:458
 msgid "Camera"
 msgstr "Камера"
 
-#: src/slic3r/GUI/Preferences.cpp:462
+#: src/slic3r/GUI/Preferences.cpp:468
 msgid "Use perspective camera"
 msgstr "Ужываць выгляд у перспектыве"
 
-#: src/slic3r/GUI/Preferences.cpp:463
+#: src/slic3r/GUI/Preferences.cpp:469
 msgid ""
 "If enabled, use perspective camera. If not enabled, use orthographic camera."
 msgstr ""
 "Калі ўключана, ужываецца выгляд у перспектыве. Калі выключана, ужываецца "
 "артаганальны выгляд."
 
-#: src/slic3r/GUI/Preferences.cpp:467
+#: src/slic3r/GUI/Preferences.cpp:473
 msgid "Use free camera"
 msgstr "Ужываць вольную камеру"
 
-#: src/slic3r/GUI/Preferences.cpp:468
+#: src/slic3r/GUI/Preferences.cpp:474
 msgid "If enabled, use free camera. If not enabled, use constrained camera."
 msgstr ""
 "Калі ўключана, ужываць вольнае кручэнне камерай. Калі выключана, ужываецца "
 "абмежаванае вярчэнне камерай."
 
-#: src/slic3r/GUI/Preferences.cpp:472
+#: src/slic3r/GUI/Preferences.cpp:478
 msgid "Reverse direction of zoom with mouse wheel"
 msgstr "Адваротны кірунак маштабавання колам мышы"
 
-#: src/slic3r/GUI/Preferences.cpp:473
+#: src/slic3r/GUI/Preferences.cpp:479
 msgid "If enabled, reverses the direction of zoom with mouse wheel"
 msgstr "Калі ўключана, мяняецца накірунак маштабавання з дапамогай кола мышы"
 
-#: src/slic3r/GUI/Preferences.cpp:479
+#: src/slic3r/GUI/Preferences.cpp:485
 msgid "GUI"
 msgstr "Графічны інтэрфейс карыстальніка"
 
-#: src/slic3r/GUI/Preferences.cpp:519
+#: src/slic3r/GUI/Preferences.cpp:525
 msgid "Sequential slider applied only to top layer"
 msgstr "Паўзунок становішча інструмента ўжываецца толькі да верхняга пласта"
 
-#: src/slic3r/GUI/Preferences.cpp:520
+#: src/slic3r/GUI/Preferences.cpp:526
 msgid ""
 "If enabled, changes made using the sequential slider, in preview, apply only "
 "to gcode top layer. If disabled, changes made using the sequential slider, "
@@ -16272,11 +16283,11 @@ msgstr ""
 "паўзунка становішча інструмента, у акне папярэдняга прагляду нарэзкі, "
 "ужываюцца да ўсяго G-кода."
 
-#: src/slic3r/GUI/Preferences.cpp:526
+#: src/slic3r/GUI/Preferences.cpp:532
 msgid "Show sidebar collapse/expand button"
 msgstr "Адлюстраваць гузік згарнуць/разгарнуць бакавой панэлі"
 
-#: src/slic3r/GUI/Preferences.cpp:527
+#: src/slic3r/GUI/Preferences.cpp:533
 msgid ""
 "If enabled, the button for the collapse sidebar will be appeared in top "
 "right corner of the 3D Scene"
@@ -16284,11 +16295,11 @@ msgstr ""
 "Калі ўключана, у правым верхнім куту 3D-сцэны з'явіцца кнопка згортвання "
 "бакавой панэлі"
 
-#: src/slic3r/GUI/Preferences.cpp:538
+#: src/slic3r/GUI/Preferences.cpp:544
 msgid "Use colors for axes values in Manipulation panel"
 msgstr "Размалёўваць значэнні восі на панэлі маніпуляцыяў"
 
-#: src/slic3r/GUI/Preferences.cpp:539
+#: src/slic3r/GUI/Preferences.cpp:545
 msgid ""
 "If enabled, the axes names and axes values will be colorized according to "
 "the axes colors. If disabled, old UI will be used."
@@ -16297,11 +16308,11 @@ msgstr ""
 "з колерамі восі. Калі адключана, будзе ўжывацца стары карыстальніцкі "
 "інтэрфейс."
 
-#: src/slic3r/GUI/Preferences.cpp:544
+#: src/slic3r/GUI/Preferences.cpp:550
 msgid "Order object volumes by types"
 msgstr "Парадкаваць аб'ёмы мадэляў па тыпам"
 
-#: src/slic3r/GUI/Preferences.cpp:545
+#: src/slic3r/GUI/Preferences.cpp:551
 msgid ""
 "If enabled, volumes will be always ordered inside the object. Correct order "
 "is Model Part, Negative Volume, Modifier, Support Blocker and Support "
@@ -16314,29 +16325,29 @@ msgstr ""
 "адмоўных аб'ёмаў і мадыфікатараў. Але адна з частак мадэлі павінна быць на "
 "першым месцы."
 
-#: src/slic3r/GUI/Preferences.cpp:550
+#: src/slic3r/GUI/Preferences.cpp:556
 msgid "Show non-manifold edges"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:551
+#: src/slic3r/GUI/Preferences.cpp:557
 msgid "If enabled, shows non-manifold edges."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:555
+#: src/slic3r/GUI/Preferences.cpp:561
 msgid "Allow automatically color change"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:556
+#: src/slic3r/GUI/Preferences.cpp:562
 msgid ""
 "If enabled, related notification will be shown, when sliced object looks "
 "like a logo or a sign."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:561
+#: src/slic3r/GUI/Preferences.cpp:567
 msgid "Set settings tabs as menu items"
 msgstr "Ужыць налады як пункты меню"
 
-#: src/slic3r/GUI/Preferences.cpp:562
+#: src/slic3r/GUI/Preferences.cpp:568
 msgid ""
 "If enabled, Settings Tabs will be placed as menu items. If disabled, old UI "
 "will be used."
@@ -16344,20 +16355,20 @@ msgstr ""
 "Калі ўключана, укладкі Наладаў будуць размешчаны ў выглядзе пунктаў меню. "
 "Калі адключана, будзе ўжывацца стары карыстальніцкі інтэрфейс."
 
-#: src/slic3r/GUI/Preferences.cpp:576
+#: src/slic3r/GUI/Preferences.cpp:582
 msgid "Show \"Tip of the day\" notification after start"
 msgstr "Адлюстроўваць \"Карысную параду Дня\" пры запуске праграмы"
 
-#: src/slic3r/GUI/Preferences.cpp:577
+#: src/slic3r/GUI/Preferences.cpp:583
 msgid "If enabled, useful hints are displayed at startup."
 msgstr ""
 "Калі ўключана, будуць адлюстроўвацца карысныя падказкі пры запуске праграмы."
 
-#: src/slic3r/GUI/Preferences.cpp:581
+#: src/slic3r/GUI/Preferences.cpp:587
 msgid "Notify about new releases"
 msgstr "Апавяшчаць аб новых выпусках"
 
-#: src/slic3r/GUI/Preferences.cpp:582
+#: src/slic3r/GUI/Preferences.cpp:588
 msgid ""
 "You will be notified about new release after startup acordingly: All = "
 "Regular release and alpha / beta releases. Release only = regular release."
@@ -16365,79 +16376,79 @@ msgstr ""
 "Апавяшчэнне аб новых выпусках пасля запуску праграмы: Усе = апошні выпуск і "
 "альфа / бета выпускі. Толькі апошні выпуск = апошні выпуск."
 
-#: src/slic3r/GUI/Preferences.cpp:585
+#: src/slic3r/GUI/Preferences.cpp:591
 msgid "Release only"
 msgstr "Толькі апошні выпуск"
 
-#: src/slic3r/GUI/Preferences.cpp:592
+#: src/slic3r/GUI/Preferences.cpp:598
 msgid "Use custom size for toolbar icons"
 msgstr "Ужываць нестандартны памер гузікаў панэлі інструментаў"
 
-#: src/slic3r/GUI/Preferences.cpp:593
+#: src/slic3r/GUI/Preferences.cpp:599
 msgid "If enabled, you can change size of toolbar icons manually."
 msgstr ""
 "Калі ўключана, магчыма змяніць памер гузікаў панэлі інструментаў уручную."
 
-#: src/slic3r/GUI/Preferences.cpp:611 src/slic3r/GUI/Tab.cpp:1743
+#: src/slic3r/GUI/Preferences.cpp:617 src/slic3r/GUI/Tab.cpp:1743
 msgid "Other"
 msgstr "Іншае"
 
-#: src/slic3r/GUI/Preferences.cpp:628
+#: src/slic3r/GUI/Preferences.cpp:634
 msgid "If enabled, PrusaSlicer will not open a hyperlinks in your browser."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:634
+#: src/slic3r/GUI/Preferences.cpp:640
 msgid "Allow downloads from Printables.com"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:635
+#: src/slic3r/GUI/Preferences.cpp:641
 msgid "If enabled, PrusaSlicer will be allowed to download from Printables.com"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:645
+#: src/slic3r/GUI/Preferences.cpp:651
 msgid "Render"
 msgstr "Візуалізацыя"
 
-#: src/slic3r/GUI/Preferences.cpp:655
+#: src/slic3r/GUI/Preferences.cpp:661
 msgid "Use environment map"
 msgstr "Ужываць карты асяроддзя"
 
-#: src/slic3r/GUI/Preferences.cpp:656
+#: src/slic3r/GUI/Preferences.cpp:662
 msgid "If enabled, renders object using the environment map."
 msgstr ""
 "Калі ўключана, візуалізацыя мадэляў выконваецца з дапамогай карты асяроддзя."
 
-#: src/slic3r/GUI/Preferences.cpp:665
+#: src/slic3r/GUI/Preferences.cpp:671
 msgid "Dark mode"
 msgstr "Цёмная тэма"
 
-#: src/slic3r/GUI/Preferences.cpp:675
+#: src/slic3r/GUI/Preferences.cpp:681
 msgid "Enable dark mode"
 msgstr "Уключыць цёмную тэму"
 
-#: src/slic3r/GUI/Preferences.cpp:676
+#: src/slic3r/GUI/Preferences.cpp:682
 msgid ""
 "If enabled, UI will use Dark mode colors. If disabled, old UI will be used."
 msgstr ""
 "Калі ўключана, ужываецца цёмная тэма карыстальніцкага інтэрфейсу. Калі "
 "адключана - ужываецца стандартная тэма карыстальніцкага інтэрфейсу."
 
-#: src/slic3r/GUI/Preferences.cpp:683
+#: src/slic3r/GUI/Preferences.cpp:689
 msgid "Use system menu for application"
 msgstr "Ужыць стандартнае сістэмнае меню для праграмы"
 
-#: src/slic3r/GUI/Preferences.cpp:684
+#: src/slic3r/GUI/Preferences.cpp:690
 msgid ""
 "If enabled, application will use the standard Windows system menu,\n"
 "but on some combination of display scales it can look ugly. If disabled, old "
 "UI will be used."
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:761
+#: src/slic3r/GUI/Preferences.cpp:767
 msgid "Changes for the critical options"
 msgstr "Змена крытычных наладаў"
 
-#: src/slic3r/GUI/Preferences.cpp:763
+#: src/slic3r/GUI/Preferences.cpp:769
 msgid ""
 "Changing some options will trigger application restart.\n"
 "You will lose the content of the plater."
@@ -16445,49 +16456,49 @@ msgstr ""
 "Змена некаторых наладаў прывядзе да перазапуску праграмы.\n"
 "Вы страціце змест стала."
 
-#: src/slic3r/GUI/Preferences.cpp:956
+#: src/slic3r/GUI/Preferences.cpp:962
 msgid "Icon size in a respect to the default size"
 msgstr "Памер гузіка адносна першапачатковага памера"
 
-#: src/slic3r/GUI/Preferences.cpp:971
+#: src/slic3r/GUI/Preferences.cpp:977
 msgid "Select toolbar icon size in respect to the default one."
 msgstr ""
 "Выбар памера гузіка панэлі інструментаў у адносінах да першапачатковых "
 "значэнняў."
 
-#: src/slic3r/GUI/Preferences.cpp:1006
+#: src/slic3r/GUI/Preferences.cpp:1012
 msgid "Layout Options"
 msgstr "Налады знешняга выгляду"
 
-#: src/slic3r/GUI/Preferences.cpp:1015
+#: src/slic3r/GUI/Preferences.cpp:1021
 msgid "Old regular layout with the tab bar"
 msgstr "Стары звычайны знешні выгляд укладкамі на стале"
 
-#: src/slic3r/GUI/Preferences.cpp:1016
+#: src/slic3r/GUI/Preferences.cpp:1022
 msgid "New layout, access via settings button in the top menu"
 msgstr "Новы знешні выгляд, з кнопкой наладаў у верхнім меню"
 
-#: src/slic3r/GUI/Preferences.cpp:1017
+#: src/slic3r/GUI/Preferences.cpp:1023
 msgid "Settings in non-modal window"
 msgstr "Налады будуць адлюстроўвацца ў асобным акне"
 
-#: src/slic3r/GUI/Preferences.cpp:1059
+#: src/slic3r/GUI/Preferences.cpp:1065
 msgid "Text colors"
 msgstr "Колер тэксту"
 
-#: src/slic3r/GUI/Preferences.cpp:1083
+#: src/slic3r/GUI/Preferences.cpp:1089
 msgid "Mode markers"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:1111
+#: src/slic3r/GUI/Preferences.cpp:1117
 msgid "Application font size"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:1151
+#: src/slic3r/GUI/Preferences.cpp:1157
 msgid "Revert font to default"
 msgstr ""
 
-#: src/slic3r/GUI/Preferences.cpp:1163
+#: src/slic3r/GUI/Preferences.cpp:1169
 msgid "Font size"
 msgstr ""
 
@@ -18715,11 +18726,11 @@ msgstr "выгрузка"
 msgid "loaded"
 msgstr "загрузка"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:369
+#: src/slic3r/GUI/WipeTowerDialog.cpp:345
 msgid "Tool #"
 msgstr "Інструмент #"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:378
+#: src/slic3r/GUI/WipeTowerDialog.cpp:354
 msgid ""
 "Total purging volume is calculated by summing two values below, depending on "
 "which tools are loaded/unloaded."
@@ -18728,15 +18739,15 @@ msgstr ""
 "ніжэй значэнняў, у залежнасці ад таго, якме інструменты загружаныя/"
 "выгружаныя."
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:379
+#: src/slic3r/GUI/WipeTowerDialog.cpp:355
 msgid "Volume to purge (mm³) when the filament is being"
 msgstr "Аб'ём прадзьмуху (мм³) пры выдушванні філамента"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:393
+#: src/slic3r/GUI/WipeTowerDialog.cpp:369
 msgid "From"
 msgstr "З"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:458
+#: src/slic3r/GUI/WipeTowerDialog.cpp:434
 msgid ""
 "Switching to simple settings will discard changes done in the advanced "
 "mode!\n"
@@ -18748,11 +18759,11 @@ msgstr ""
 "\n"
 "Ці жадаеце вы працягнуць?"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:470
+#: src/slic3r/GUI/WipeTowerDialog.cpp:446
 msgid "Show simplified settings"
 msgstr "Адлюстраваць простыя налады"
 
-#: src/slic3r/GUI/WipeTowerDialog.cpp:470
+#: src/slic3r/GUI/WipeTowerDialog.cpp:446
 msgid "Show advanced settings"
 msgstr "Адлюстраваць пашыраныя налады"
 
