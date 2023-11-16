@@ -69,6 +69,8 @@ cmake .. -G "Visual Studio 16 2019" -DDESTDIR="c:\src\REPO_NAME-deps"
 msbuild /m ALL_BUILD.vcxproj // This took 13.5 minutes on my machine: core I7-7700K @ 4.2Ghz with 32GB main memory and 20min on a average laptop
 ```
 
+note: if you have visual studio 2022 installed alongside 2017/2019, you may have to comment/remove the lines 20->31 in `dep_Boost-prefix/src/dep_Boosttools/build/src/engine/vswhere_usability_wrapper.cmd` (after first failing to compile) to force it to ignore vs2022.
+
 ### Generate Visual Studio project file for Slic3r, referencing the precompiled dependencies.
 Go to the Windows Start Menu and Click on "Visual Studio 2019" folder, then select the ->"x64 Native Tools Command Prompt" to open a command window and run the following:
 ```

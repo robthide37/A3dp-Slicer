@@ -505,6 +505,10 @@ public:
     // To be called by the worker thread and its sub-threads (mostly launched on the TBB thread pool) regularly.
     //public to ebablet ot call it from brim code.
     void                   throw_if_canceled() const { if (m_cancel_status.load(std::memory_order_acquire)) throw CanceledException(); }
+
+    // Update "scale", "input_filename", "input_filename_base" placeholders from the current printable ModelObjects.
+    void update_object_placeholders(DynamicConfig &config, const std::string &default_ext) const;
+
 protected:
 	friend class PrintObjectBase;
     friend class BackgroundSlicingProcess;
@@ -522,8 +526,6 @@ protected:
 
     // To be called by this->output_filename() with the format string pulled from the configuration layer.
     std::string            output_filename(const std::string &format, const std::string &default_ext, const std::string &filename_base, const DynamicConfig *config_override = nullptr) const;
-    // Update "scale", "input_filename", "input_filename_base" placeholders from the current printable ModelObjects.
-    void                   update_object_placeholders(DynamicConfig &config, const std::string &default_ext) const;
 
 	Model                                   m_model;
 	DynamicPrintConfig						m_full_print_config;
