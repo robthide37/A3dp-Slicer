@@ -669,6 +669,28 @@ public:
     // Invalidates the step, and its depending steps in Print.
     //in public to invalidate gcode when the physical printer change. It's needed if we allow the gcode macro to read these values.
     bool                invalidate_step(PrintStep step);
+
+    // just a little wrapper to let the user know that this print can only be modified to emit warnings & update advancement status, change stats.
+    // TODO: have the status out of the printbase class and into another one, so we can have a const print & a mutable statusmonitor
+    class StatusMonitor
+    {
+    private:
+        Print& print;
+
+    public:
+        StatusMonitor(Print &print_mutable) : print(print_mutable) {}
+
+        // need this extra method because active_step_add_warning is protected and so need the friend status, and Gcode has it.
+        void active_step_add_warning(PrintStateBase::WarningLevel warning_level, const std::string &message, int message_id = 0)
+        {
+            print.active_step_add_warning(warning_level, message, message_id);
+        }
+        PrintStatistics &stats() { return print.m_print_statistics; }
+        bool             set_started(PrintStep step) { return print.set_started(step); }
+        PrintStateBase::TimeStamp set_done(PrintStep step) { return print.set_done(step); }
+        
+    };
+
 protected:
 private:
 
@@ -708,8 +730,6 @@ private:
     // tiem of last change, to see if the gui need to be updated
     std::time_t                             m_timestamp_last_change;
 
-    // To allow GCode to set the Print's GCodeExport step status.
-    friend class GCode;
     // Allow PrintObject to access m_mutex and m_cancel_callback.
     friend class PrintObject;
 };

@@ -41,7 +41,6 @@
 #include "PresetComboBoxes.hpp"
 #include <wx/wupdlock.h>
 
-#include <libslic3r/GCodeWriter.hpp>
 #include <libslic3r/Slicing.hpp>
 
 #include "GUI_App.hpp"
@@ -3362,11 +3361,6 @@ void TabPrinter::toggle_options()
     // Disable silent mode for non-marlin firmwares.
     field = get_field("silent_mode");
     if (field) field->toggle(is_marlin_flavor);
-
-    if (m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfKlipper)
-        GCodeWriter::PausePrintCode = "PAUSE";
-    else 
-        GCodeWriter::PausePrintCode = "M601";
 
     if (m_last_gcode_flavor != uint8_t(m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value)) {
         m_last_gcode_flavor = uint8_t(m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value);

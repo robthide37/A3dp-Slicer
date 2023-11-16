@@ -5044,21 +5044,23 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("color_change_gcode", coString);
     def->label = L("Color change G-code");
-    def->tooltip = L("This G-code will be used as a code for the color change");
+    def->tooltip = L("This G-code will be used as a code for the color change"
+                     " If empty, the default color change print command for the selected G-code flavor will be used (if any).");
     def->multiline = true;
     def->full_width = true;
     def->height = 12;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionString("M600"));
+    def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("pause_print_gcode", coString);
     def->label = L("Pause Print G-code");
-    def->tooltip = L("This G-code will be used as a code for the pause print");
+    def->tooltip = L("This G-code will be used as a code for the pause print."
+                    " If empty, the default pause print command for the selected G-code flavor will be used (if any).");
     def->multiline = true;
     def->full_width = true;
     def->height = 12;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionString("M601"));
+    def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("template_custom_gcode", coString);
     def->label = L("Custom G-code");

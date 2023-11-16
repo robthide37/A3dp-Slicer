@@ -1,13 +1,14 @@
 #include "libslic3r/libslic3r.h"
 #include "DoubleSlider.hpp"
-#include "libslic3r/GCode.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "I18N.hpp"
 #include "ExtruderSequenceDialog.hpp"
-#include "libslic3r/Print.hpp"
 #include "libslic3r/AppConfig.hpp"
+#include "libslic3r/GCode.hpp"
+#include "libslic3r/GCodeWriter.hpp"
+#include "libslic3r/Print.hpp"
 #include "GUI_Utils.hpp"
 #include "MsgDialog.hpp"
 #include "Tab.hpp"
@@ -51,10 +52,11 @@ wxDEFINE_EVENT(wxCUSTOMEVT_TICKSCHANGED, wxEvent);
 
 static std::string gcode(Type type)
 {
-    const PrintConfig& config = GUI::wxGetApp().plater()->fff_print().config();
+    const Print& print = GUI::wxGetApp().plater()->fff_print();
+    const PrintConfig &config = print.config();
     switch (type) {
-    case ColorChange: return config.color_change_gcode;
-    case PausePrint:  return config.pause_print_gcode;
+    case ColorChange: return Slic3r::GCodeWriter::get_default_color_change_gcode(config);
+    case PausePrint: return Slic3r::GCodeWriter::get_default_pause_gcode(config);
     case Template:    return config.template_custom_gcode;
     default:          return "";
     }
@@ -2014,7 +2016,7 @@ void Control::show_add_context_menu()
 {
     wxMenu menu;
 
-    if (m_mode == SingleExtruder) {
+    if (m_mode == SingleExtruder && !gcode(ColorChange).empty()) {
         append_menu_item(&menu, wxID_ANY, _L("Add color change") + " (" + gcode(ColorChange) + ")", "",
             [this](wxCommandEvent&) { add_code_as_tick(ColorChange); }, "colorchange_add_m", &menu);
 
