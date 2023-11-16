@@ -323,8 +323,8 @@ struct Materials
     Technology technology;
     // use vector for the presets to purpose of save of presets sorting in the bundle
     std::vector<const Preset*> presets;
-    // String is alias of material, size_t number of compatible printers counters
-    std::map<std::string, size_t> compatibility_counter;
+    // String is alias of material, set is set of compatible printers
+    std::map<std::string, std::set<const Preset*>> compatibility_counter;
     std::set<std::string> types;
     std::set<const Preset*> printers;
 
@@ -358,7 +358,7 @@ struct Materials
     size_t get_printer_counter(const Preset* preset) {
         for (auto it : compatibility_counter) {
             if (it.first == preset->alias)
-                return it.second;
+                return it.second.size();
         }
         return 0;
     }

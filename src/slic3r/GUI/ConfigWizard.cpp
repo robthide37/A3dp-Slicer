@@ -2603,7 +2603,7 @@ void ConfigWizard::priv::update_materials(Technology technology)
         }
         if (printer) {
             materials.add_printer(printer);
-            materials.compatibility_counter[preset.alias]++;
+            materials.compatibility_counter[preset.alias].insert(printer);
         }
     };
 
