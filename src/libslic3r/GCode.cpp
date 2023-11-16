@@ -776,8 +776,10 @@ namespace DoExport {
                 print_statistics.total_used_filament += used_filament;
                 print_statistics.total_extruded_volume += extruded_volume;
                 print_statistics.total_wipe_tower_filament += has_wipe_tower ? used_filament - extruder.used_filament() : 0.;
+                print_statistics.total_wipe_tower_filament_weight += has_wipe_tower ? (extruded_volume - extruder.extruded_volume()) * extruder.filament_density() * 0.001 : 0.;
                 print_statistics.total_wipe_tower_cost += has_wipe_tower ? (extruded_volume - extruder.extruded_volume())* extruder.filament_density() * 0.001 * extruder.filament_cost() * 0.001 : 0.;
             }
+
             if (!export_binary_data) {
                 filament_stats_string_out += out_filament_used_mm.first;
                 filament_stats_string_out += "\n" + out_filament_used_cm3.first;
@@ -1414,6 +1416,7 @@ void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, Thumbnail
         file.write("\n");
         file.write_format(PrintStatistics::TotalFilamentUsedGValueMask.c_str(), print.m_print_statistics.total_weight);
         file.write_format(PrintStatistics::TotalFilamentCostValueMask.c_str(), print.m_print_statistics.total_cost);
+        file.write_format(PrintStatistics::TotalFilamentUsedWipeTowerValueMask.c_str(), print.m_print_statistics.total_wipe_tower_filament_weight);
         if (print.m_print_statistics.total_toolchanges > 0)
             file.write_format("; total toolchanges = %i\n", print.m_print_statistics.total_toolchanges);
         file.write_format(";%s\n", GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Estimated_Printing_Time_Placeholder).c_str());

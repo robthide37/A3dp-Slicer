@@ -1621,6 +1621,11 @@ const std::string PrintStatistics::TotalFilamentCost          = "total filament 
 const std::string PrintStatistics::TotalFilamentCostMask      = "; total filament cost =";
 const std::string PrintStatistics::TotalFilamentCostValueMask = "; total filament cost = %.2lf\n";
 
+const std::string PrintStatistics::TotalFilamentUsedWipeTower     = "total filament used for wipe tower [g]";
+const std::string PrintStatistics::TotalFilamentUsedWipeTowerValueMask = "; total filament used for wipe tower [g] = %.2lf\n";
+
+
+
 DynamicConfig PrintStatistics::config() const
 {
     DynamicConfig config;
