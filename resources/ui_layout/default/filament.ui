@@ -36,24 +36,23 @@ group:Fan speed - default
 	end_line
 	setting:min_fan_speed
 	line:Perimeter fan speed
-		setting:label$:perimeter_fan_speed
+		setting:label_width$12:label$Internal:perimeter_fan_speed
 		setting:label_width$12:label$External:external_perimeter_fan_speed
-	end_line
-	setting:overhang_perimeter_fan_speed
-	setting:infill_fan_speed
+	line:Internal Infill fan speed
+		setting:label_width$12:label$Sparse:infill_fan_speed
 	line:Solid Infill fan speed
-		setting:label$:solid_infill_fan_speed
-		setting:label_width$12:label$Top:top_fan_speed
-	end_line
+		setting:label_width$12:label$Solid:solid_infill_fan_speed
+		setting:label_width$12:label$Top solid:top_fan_speed
 	line:Support Material fan speed
-		setting:label$:support_material_fan_speed
-		setting:label_width$12:label$Support Interface:support_material_interface_fan_speed
-	end_line
+		setting:label_width$12:label$Default:support_material_fan_speed
+		setting:label_width$12:label$Interface:support_material_interface_fan_speed
 	line:Bridges fan speed
-		setting:label$:bridge_fan_speed
-		setting:label_width$12:label$Infill bridges:bridge_internal_fan_speed
-	end_line
-	setting:gap_fill_fan_speed
+		setting:label_width$12:label$Bridges:bridge_fan_speed
+		setting:label_width$12:label$Internal bridges:bridge_internal_fan_speed
+	line:Overhangs Perimeter fan speed
+		setting:label_width$12:label$Overhangs:overhangs_fan_speed
+	line:Gap fill fan speed
+		setting:label_width$12:label$Gap fill:gap_fill_fan_speed
 group:Short layer time - began to increase base fan speed
 	setting:fan_below_layer_time
 	setting:label$Max fan speed:max_fan_speed

@@ -2664,7 +2664,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("gap_fill_extension", coFloatOrPercent);
     def->label = L("Extension");
-    def->full_label = L("Gapfill: extra extension");
+    def->full_label = L("Gap fill: extra extension");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Increase the length of all gapfills by this amount (may overextrude a little bit)\nCan be a % of the perimeter width");
     def->ratio_over = "perimeter_width";
@@ -2675,7 +2675,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent{ 0, false });
 
     def = this->add("gap_fill_fan_speed", coInts);
-    def->label = L("Gap Fill fan speed");
+    def->label = L("Gap fill fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during all gap fill Perimeter moves"
         "\nSet to 1 to disable fan."
@@ -2684,7 +2684,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min = -1;
     def->max = 100;
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionInts{ -1 });
 
@@ -3133,7 +3133,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min = -1;
     def->max = 100;
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionInts{ -1 });
 
@@ -3879,7 +3879,7 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
     def = this->add("overhangs_fan_speed", coInts);
-    def->label = L("Overhang Perimeter fan speed");
+    def->label = L("Overhangs Perimeter fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during all Overhang Perimeter moves"
         "\nSet to 1 to disable fan."
@@ -4107,7 +4107,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min = -1;
     def->max = 100;
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionInts{ -1 });
 
@@ -4938,7 +4938,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min = -1;
     def->max = 100;
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionInts{ -1 });
 
@@ -5315,7 +5315,7 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("%");
     def->min = -1;
     def->max = 100;
-    def->mode = comAdvancedE | comSuSi;
+    def->mode = comExpert | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionInts{ -1 });
 
@@ -5967,7 +5967,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::extruders;
     def->tooltip = L("This flag will wipe the nozzle a bit inward after extruding an external perimeter."
         " The wipe_extra_perimeter is executed first, then this move inward before the retraction wipe."
-        " Note that the retraction wipe will follow the exact external perimeter (center) line if this parameter is disabled, and will follow the inner side of the external periemter line if enabled");
+        " Note that the retraction wipe will follow the exact external perimeter (center) line if this parameter is disabled, and will follow the inner side of the external perimeter line if enabled");
     def->mode = comAdvancedE | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ true });
