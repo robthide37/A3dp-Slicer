@@ -121,7 +121,7 @@ brew update
 brew install cmake git gettext
 brew upgrade
 git clone https://github.com/supermerill/SuperSlicer/
-cd PrusaSlicer/deps
+cd SuperSlicer/deps
 mkdir build
 cd build
 cmake ..
