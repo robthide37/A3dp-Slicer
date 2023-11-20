@@ -222,9 +222,9 @@ std::string Wipe::wipe(GCode& gcodegen, bool toolchange)
         wipe_path.clip_end(wipe_path.length() - wipe_dist);
 
         // subdivide the retraction in segments
-            if (!wipe_path.empty()) {
-                // add tag for processor
-                gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
+        if (!wipe_path.empty()) {
+            // add tag for processor
+            gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_Start) + "\n";
             for (const Line& line : wipe_path.lines()) {
                 double segment_length = line.length();
                 /*  Reduce retraction length a bit to avoid effective retraction speed to be greater than the configured one
@@ -239,8 +239,8 @@ std::string Wipe::wipe(GCode& gcodegen, bool toolchange)
                     "wipe and retract"
                 );
             }
-                // add tag for processor
-                gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
+            // add tag for processor
+            gcode += ";" + GCodeProcessor::reserved_tag(GCodeProcessor::ETags::Wipe_End) + "\n";
 			gcodegen.set_last_pos(wipe_path.points.back());
         }
 
@@ -2333,7 +2333,11 @@ std::string GCode::placeholder_parser_process(const std::string &name, const std
             func_add_colour("filament_colour_int", config().filament_colour.values[current_extruder_id]);
             func_add_colour("extruder_colour_int", config().extruder_colour.values[current_extruder_id]);
         }
-        default_config.set_key_value("current_position", new ConfigOptionFloats({ unscaled(m_last_pos.x()), unscaled(m_last_pos.y()) }));
+
+        // should be the same as Vec2d gcode_pos = point_to_gcode(m_last_pos);
+        Vec3d gcode_pos = this->writer().get_position();
+        default_config.set_key_value("current_position", new ConfigOptionFloats( {gcode_pos.x(), gcode_pos.y(), gcode_pos.z()} ));
+        default_config.set_key_value("current_object_position", new ConfigOptionFloats( {m_origin.x(), m_origin.y()} ));
 
         std::string gcode = m_placeholder_parser.process(templ, current_extruder_id, &default_config, &m_placeholder_parser_context);
         if (!gcode.empty() && (m_config.gcode_comments || m_config.fan_speedup_time.value != 0 || m_config.fan_kickstart.value != 0 )) {
