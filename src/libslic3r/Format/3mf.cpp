@@ -3160,7 +3160,7 @@ namespace Slic3r {
                 } else {
                     for (const std::string& key : obj->config.keys()) {
                         std::string value = obj->config.opt_serialize(key);
-                        if (!value.empty() && key.find("pattern")==std::string::npos) {
+                        if (!value.empty()) {
                             stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << OBJECT_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
                         } else {
                             std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
@@ -3170,6 +3170,9 @@ namespace Slic3r {
                                 log << "\n";
                             }
                             if (obj->config.option(key) != nullptr && obj->config.option(key)->type() == ConfigOptionType::coEnum) {
+                                try{
+                                    log << "raw_int_value : " << obj->config.option(key)->getInt() << "\n";
+                                } catch (std::exception ex) {}
                                 log << "enum : " << obj->config.option(key)->getInt();
                                 log << "\n";
                                 const ConfigOptionDef* def = nullptr;
@@ -3269,12 +3272,15 @@ namespace Slic3r {
                                         stream << "  <" << METADATA_TAG << " " << TYPE_ATTR << "=\"" << VOLUME_TYPE << "\" " << KEY_ATTR << "=\"" << key << "\" " << VALUE_ATTR << "=\"" << value << "\"/>\n";
                                     } else {
                                         std::ofstream log("ERROR_FILE_TO_SEND_TO_MERILL_PLZZZZ.txt", std::ios_base::app);
-                                        log << "error in model, can't serialize " << key << ": '" << value << "' " << ((volume->config.option(key) != nullptr)?"exist":"doesn't exist") << "\n";
+                                        log << "error in volume, can't serialize " << key << ": '" << value << "' " << ((volume->config.option(key) != nullptr)?"exist":"doesn't exist") << "\n";
                                         if (volume->config.option(key) != nullptr) {
                                             log << "type : " << volume->config.option(key)->type();
                                             log << "\n";
                                         }
                                         if (volume->config.option(key) != nullptr && volume->config.option(key)->type() == ConfigOptionType::coEnum) {
+                                            try{
+                                                log << "raw_int_value : " << volume->config.option(key)->getInt() << "\n";
+                                            } catch (std::exception ex) {}
                                             log << "enum : " << volume->config.option(key)->getInt();
                                             log << "\n";
                                             const ConfigOptionDef* def = nullptr;
