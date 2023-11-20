@@ -6236,9 +6236,9 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Roundness margin");
     def->full_label = L("Polyhole detection margin");
     def->category = OptionCategory::slicing;
-    def->tooltip = L("Maximum defection of a point to the estimated radius of the circle."
+    def->tooltip = L("Maximum deflection of a point to the estimated radius of the circle."
         "\nAs cylinders are often exported as triangles of varying size, points may not be on the circle circumference."
-        " This setting allows you some leway to broaden the detection."
+        " This setting allows you some leeway to broaden the detection."
         "\nIn mm or in % of the radius.");
     def->sidetext = L("mm or %");
     def->max_literal = { 10, false};
