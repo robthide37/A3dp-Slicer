@@ -98,7 +98,7 @@ uint16_t GCodeWriter::first_mill() const {
     } else return m_millers.front().id();
 }
 bool GCodeWriter::tool_is_extruder() const {
-    return m_tool->id() < first_mill();
+    return m_tool && m_tool->id() < first_mill();
 }
 const Tool* GCodeWriter::get_tool(uint16_t id) const{
     for (const Extruder& e : m_extruders)
