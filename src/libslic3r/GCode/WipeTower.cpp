@@ -1490,6 +1490,11 @@ void WipeTower::save_on_last_wipe()
         // Which toolchange will finish_layer extrusions be subtracted from?
         int idx = first_toolchange_to_nonsoluble(m_layer_info->tool_changes);
 
+        if (idx == -1) {
+            // In this case, finish_layer will be called at the very beginning.
+            finish_layer().total_extrusion_length_in_plane();
+        }
+
         for (int i=0; i<int(m_layer_info->tool_changes.size()); ++i) {
             auto& toolchange = m_layer_info->tool_changes[i];
             tool_change(toolchange.new_tool);
@@ -1501,9 +1506,9 @@ void WipeTower::save_on_last_wipe()
                                       m_perimeter_width, m_layer_info->height)  - toolchange.first_wipe_line - length_to_save;
 
                 length_to_wipe = std::max(length_to_wipe,0.f);
-                float depth_to_wipe = m_perimeter_width * (std::floor(length_to_wipe/width) + ( length_to_wipe > 0.f ? 1.f : 0.f ) ) * m_extra_spacing;
+                float depth_to_wipe = m_perimeter_width * (std::floor(length_to_wipe/width) + ( length_to_wipe > 0.f ? 1.f : 0.f ) );
 
-                toolchange.required_depth = toolchange.ramming_depth + depth_to_wipe;
+                toolchange.required_depth = (toolchange.ramming_depth + depth_to_wipe) * m_extra_spacing;
             }
         }
     }
@@ -1569,9 +1574,9 @@ void WipeTower::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &
 
     m_old_temperature = -1; // reset last temperature written in the gcode
 
-    std::vector<WipeTower::ToolChangeResult> layer_result;
 	for (const WipeTower::WipeTowerInfo& layer : m_plan)
 	{
+        std::vector<WipeTower::ToolChangeResult> layer_result;
         set_layer(layer.z, layer.height, 0, false/*layer.z == m_plan.front().z*/, layer.z == m_plan.back().z);
         m_internal_rotation += 180.f;
 
