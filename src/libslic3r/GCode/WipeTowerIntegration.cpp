@@ -162,11 +162,12 @@ std::string WipeTowerIntegration::post_process_wipe_tower_moves(const WipeTower:
                     line_out << ch;
             }
 
+            line = line_out.str();
+            boost::trim(line); // Remove leading and trailing spaces.
+
             transformed_pos = Eigen::Rotation2Df(angle) * pos + translation;
 
-            if (transformed_pos != old_pos || never_skip) {
-                line = line_out.str();
-                boost::trim_left(line); // Remove leading spaces
+            if (transformed_pos != old_pos || never_skip || ! line.empty()) {
                 std::ostringstream oss;
                 oss << std::fixed << std::setprecision(3) << "G1";
                 if (transformed_pos.x() != old_pos.x() || never_skip)
