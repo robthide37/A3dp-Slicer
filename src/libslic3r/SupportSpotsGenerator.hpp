@@ -151,10 +151,16 @@ class Integrals{
      * @param polygons List of polygons specifing the domain.
      */
     explicit Integrals(const Polygons& polygons);
+    explicit Integrals(const Polygon& polygon);
+    /**
+     * Construct integral x_i int x_i^2 (i=1,2), xy and integral 1 (area) over
+     * a set of rectangles defined by a "thick" polyline.
+     */
     explicit Integrals(const Polylines& polylines, const std::vector<float>& widths);
 
     // TODO refactor and delete the default constructor
     Integrals() = default;
+    Integrals(float area, Vec2f x_i, Vec2f x_i_squared, float xy);
 
     float area{};
     Vec2f x_i{Vec2f::Zero()};
@@ -164,6 +170,8 @@ class Integrals{
 private:
     void add(const Integrals& other);
 };
+
+Integrals operator+(const Integrals& a, const Integrals& b);
 
 float compute_second_moment(
     const Integrals& integrals,

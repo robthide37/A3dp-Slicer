@@ -154,23 +154,34 @@ void SliceConnection::print_info(const std::string &tag) const
     std::cout << "covariance: " << covariance << std::endl;
 }
 
-Integrals::Integrals (const Polygons& polygons) {
+Integrals::Integrals(const Polygon &polygon)
+{
+    if (polygon.points.size() < 3) {
+        assert(false && "Polygon is expected to have non-zero area!");
+        *this = Integrals{};
+        return;
+    }
+    Vec2f p0 = unscaled(polygon.first_point()).cast<float>();
+    for (size_t i = 2; i < polygon.points.size(); i++) {
+        Vec2f p1 = unscaled(polygon.points[i - 1]).cast<float>();
+        Vec2f p2 = unscaled(polygon.points[i]).cast<float>();
+
+        float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
+
+        auto [area, first_moment_of_area, second_moment_area,
+              second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
+
+        this->area += sign * area;
+        this->x_i += sign * first_moment_of_area;
+        this->x_i_squared += sign * second_moment_area;
+        this->xy += sign * second_moment_of_area_covariance;
+    }
+}
+
+Integrals::Integrals(const Polygons &polygons)
+{
     for (const Polygon &polygon : polygons) {
-        Vec2f p0 = unscaled(polygon.first_point()).cast<float>();
-        for (size_t i = 2; i < polygon.points.size(); i++) {
-            Vec2f p1 = unscaled(polygon.points[i - 1]).cast<float>();
-            Vec2f p2 = unscaled(polygon.points[i]).cast<float>();
-
-            float sign = cross2(p1 - p0, p2 - p1) > 0 ? 1.0f : -1.0f;
-
-            auto [area, first_moment_of_area, second_moment_area,
-                  second_moment_of_area_covariance] = compute_moments_of_area_of_triangle(p0, p1, p2);
-
-            this->area += sign * area;
-            this->x_i += sign * first_moment_of_area;
-            this->x_i_squared += sign * second_moment_area;
-            this->xy += sign * second_moment_of_area_covariance;
-        }
+        *this = *this + Integrals{polygon};
     }
 }
 
@@ -192,13 +203,19 @@ Integrals::Integrals(const Polylines& polylines, const std::vector<float>& width
             Vec2crd d = scaled(Vec2f{line_a - normal * width/2});
 
             const Polygon ractangle({a, b, c, d});
-            Integrals integrals{{ractangle}};
-            this->area += integrals.area;
-            this->x_i += integrals.x_i;
-            this->x_i_squared += integrals.x_i_squared;
-            this->xy += integrals.xy;
+            Integrals integrals{ractangle};
+            *this = *this + integrals;
         }
     }
+}
+
+Integrals::Integrals(float area, Vec2f x_i, Vec2f x_i_squared, float xy)
+    : area(area), x_i(std::move(x_i)), x_i_squared(std::move(x_i_squared)), xy(xy)
+{}
+
+Integrals operator+(const Integrals &a, const Integrals &b)
+{
+    return Integrals{a.area + b.area, a.x_i + b.x_i, a.x_i_squared + b.x_i_squared, a.xy + b.xy};
 }
 
 SliceConnection estimate_slice_connection(size_t slice_idx, const Layer *layer)
@@ -503,26 +520,33 @@ ObjectPart::ObjectPart(
             Polylines polylines;
             std::vector<float> widths;
 
-            const auto* path = dynamic_cast<const ExtrusionPath*>(entity);
-            if (path !=nullptr) {
+            if (
+                const auto* path = dynamic_cast<const ExtrusionPath*>(entity);
+                path != nullptr
+            ) {
                 polylines.push_back(path->as_polyline());
                 widths.push_back(path->width());
-            }
-
-            const auto* loop = dynamic_cast<const ExtrusionLoop*>(entity);
-            if (loop !=nullptr) {
+            } else if (
+                const auto* loop = dynamic_cast<const ExtrusionLoop*>(entity);
+                loop != nullptr
+            ) {
                 for (const ExtrusionPath& path : loop->paths) {
                     polylines.push_back(path.as_polyline());
                     widths.push_back(path.width());
                 }
-            }
-
-            const auto* multi_path = dynamic_cast<const ExtrusionMultiPath*>(entity);
-            if (multi_path !=nullptr) {
+            } else if (
+                const auto* multi_path = dynamic_cast<const ExtrusionMultiPath*>(entity);
+                multi_path != nullptr
+            ) {
                 for (const ExtrusionPath& path : multi_path->paths) {
                     polylines.push_back(path.as_polyline());
                     widths.push_back(path.width());
                 }
+            } else {
+                throw std::runtime_error(
+                    "Failed to construct object part from extrusions!"
+                    " Unknown extrusion type."
+                );
             }
 
             const Integrals integrals{polylines, widths};
