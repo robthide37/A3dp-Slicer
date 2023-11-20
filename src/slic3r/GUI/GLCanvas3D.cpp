@@ -4904,26 +4904,41 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
 
     const ModelObjectPtrs &model_objects     = GUI::wxGetApp().model().objects;
     std::vector<ColorRGBA> extruders_colors  = get_extruders_colors();
-    const bool             render_as_painted = !model_objects.empty() && !extruders_colors.empty();
-    GLShaderProgram       *shader            = wxGetApp().get_shader(render_as_painted ? "mm_gouraud" : "gouraud_light");
-    if (shader == nullptr)
-        return;
 
     if (thumbnail_params.transparent_background)
         glsafe(::glClearColor(0.0f, 0.0f, 0.0f, 0.0f));
 
     glsafe(::glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
     glsafe(::glEnable(GL_DEPTH_TEST));
-
-    shader->start_using();
-    if (!render_as_painted)
-        shader->set_uniform("emission_factor", 0.0f);
+    glsafe(::glCullFace(GL_BACK));
 
     const Transform3d& projection_matrix = camera.get_projection_matrix();
 
     const int extruders_count = wxGetApp().extruders_edited_cnt();
     for (GLVolume *vol : visible_volumes) {
-        vol->model.set_color((vol->printable && !vol->is_outside) ? vol->color : ColorRGBA::GRAY());
+        const int obj_idx = vol->object_idx();
+        const int vol_idx = vol->volume_idx();
+        const bool render_as_painted = (obj_idx >= 0 && vol_idx >= 0) ?
+            !model_objects[obj_idx]->volumes[vol_idx]->mmu_segmentation_facets.empty() : false;
+        GLShaderProgram* shader = wxGetApp().get_shader(render_as_painted ? "mm_gouraud" : "gouraud_light");
+        if (shader == nullptr)
+            continue;
+
+        shader->start_using();
+        const std::array<float, 4> clp_data = { 0.0f, 0.0f, 1.0f, FLT_MAX };
+        const std::array<float, 2> z_range = { -FLT_MAX, FLT_MAX };
+        const bool is_left_handed = vol->is_left_handed();
+        if (render_as_painted) {
+            shader->set_uniform("volume_world_matrix", vol->world_matrix());
+            shader->set_uniform("volume_mirrored", is_left_handed);
+            shader->set_uniform("clipping_plane", clp_data);
+            shader->set_uniform("z_range", z_range);
+        }
+        else {
+            shader->set_uniform("emission_factor", 0.0f);
+            vol->model.set_color((vol->printable && !vol->is_outside) ? vol->color : ColorRGBA::GRAY());
+        }
+
         // the volume may have been deactivated by an active gizmo
         const bool is_active = vol->is_active;
         vol->is_active = true;
@@ -4933,20 +4948,28 @@ void GLCanvas3D::_render_thumbnail_internal(ThumbnailData& thumbnail_data, const
         const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
         shader->set_uniform("view_normal_matrix", view_normal_matrix);
 
-        if (render_as_painted && vol->object_idx() >= 0 && vol->volume_idx() >= 0) {
-            const ModelVolume    &model_volume = *model_objects[vol->object_idx()]->volumes[vol->volume_idx()];
-            const size_t          extruder_idx = get_extruder_color_idx(model_volume, extruders_count);
+        if (is_left_handed)
+            glsafe(::glFrontFace(GL_CW));
+
+        if (render_as_painted) {
+          const ModelVolume& model_volume = *model_objects[obj_idx]->volumes[vol_idx];
+            const size_t extruder_idx = get_extruder_color_idx(model_volume, extruders_count);
             TriangleSelectorMmGui ts(model_volume.mesh(), extruders_colors, extruders_colors[extruder_idx]);
             ts.deserialize(model_volume.mmu_segmentation_facets.get_data(), true);
             ts.request_update_render_data();
+
             ts.render(nullptr, model_matrix);
-        } else
+        }
+        else
             vol->render();
+
+        if (is_left_handed)
+            glsafe(::glFrontFace(GL_CCW));
+
+        shader->stop_using();
 
         vol->is_active = is_active;
     }
-
-    shader->stop_using();
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 
