@@ -183,6 +183,16 @@ msgstr[0] "%1% (%2$d シェル)"
 msgid "%1%=%2% mm is too low to be printable at a layer height %3% mm"
 msgstr "%1%=%2% mmはレイヤーの高さ%3% mmでプリントするには低すぎます"
 
+#. TRN placeholder 1 is path to file
+#: src/slic3r/GUI/WifiConfigDialog.cpp:238
+#, boost-format
+msgid ""
+"%1% already exists. Do you want to rewrite it?\n"
+"(Other items than Wi-Fi credentials will stay unchanged)"
+msgstr ""
+"%1% がすでに存在しています。書き換えますか？\n"
+"(Wi-Fi認証情報以外の項目は変更しません）"
+
 #: src/libslic3r/Utils.cpp:1035 src/slic3r/GUI/DoubleSlider.cpp:715
 #, boost-format
 msgid "%1%d"
@@ -3850,6 +3860,10 @@ msgstr "依存関係"
 msgid "Depth"
 msgstr "深さ"
 
+#: src/libslic3r/PrintConfig.cpp:2399
+msgid "Deretraction extra length"
+msgstr "追加長さからのリトラクション戻し"
+
 #: src/slic3r/GUI/GCodeViewer.cpp:4279
 msgid "Deretractions"
 msgstr "リトラクション戻し"
@@ -5241,6 +5255,10 @@ msgstr "GコードをSDカード/USBメモリーにエクスポートする"
 msgid "Exporting."
 msgstr "エクスポート中。"
 
+#: src/slic3r/GUI/Plater.cpp:6757
+msgid "Exporting binary G-code"
+msgstr "バイナリーGコードとしてエクスポート"
+
 #: src/slic3r/GUI/MainFrame.cpp:1817
 msgid "Exporting configuration bundle"
 msgstr "構成バンドルのエクスポート"
@@ -6386,6 +6404,16 @@ msgstr ""
 "囲むアウトライン)周回数を設定を超えて生成します。 マルチエクストルーダーの場"
 "合、この最小値は各エクストルーダーに適用されます。"
 
+#: src/libslic3r/PrintConfig.cpp:2347
+msgid ""
+"Generates a ramping lift instead of lifting the extruder directly upwards. "
+"The travel is split into two phases: the ramp and the standard horizontal "
+"travel. This option helps reduce stringing."
+msgstr ""
+"直接エクストルーダーを上に持ち上げるのではなく、傾斜しながらリフトを発生させ"
+"ます。移動はランプ移動と、標準的な水平移動の2段階に分けられます。このオプショ"
+"ンは、ストリンギングを低減するのに役立ちます。"
+
 #: src/libslic3r/PrintConfig.cpp:2734
 msgid "Generate support material"
 msgstr "サポート材の生成"
@@ -7027,6 +7055,15 @@ msgstr ""
 "有効にすると、プレビューでシーケンシャルスライダーを使用して行われた変更は、"
 "gcodeトップレイヤーにのみ適用されます。 無効にすると、プレビューでシーケン"
 "シャルスライダーを使用して行われた変更がgcode全体に適用されます。"
+
+#: src/libslic3r/PrintConfig.cpp:2365
+msgid ""
+"If enabled, PrusaSlicer detects obstacles along the travel path and makes "
+"the slope steeper in case an obstacle might be hit during the initial phase "
+"of the travel."
+msgstr ""
+"有効にすると、PrusaSlicerは移動経路に沿った障害物を検出し、移動の初期段階で障"
+"害物にぶつかる可能性がある場合に備えて傾斜リフトの角度を急にします。"
 
 #: src/slic3r/GUI/Preferences.cpp:635
 msgid "If enabled, PrusaSlicer will be allowed to download from Printables.com"
@@ -8349,6 +8386,14 @@ msgstr ""
 msgid "Licensed under GNU AGPLv3."
 msgstr "GNU AGPLv3 に基づいてライセンスされています。"
 
+#: src/libslic3r/PrintConfig.cpp:2371
+msgid "Lift height"
+msgstr "リフト高さ"
+
+#: src/libslic3r/PrintConfig.cpp:2372
+msgid "Lift height applied before travel."
+msgstr "移動前のリフト高さ"
+
 #: src/libslic3r/PrintConfig.cpp:4973
 msgid ""
 "Lift the object above the bed when it is partially below. Enabled by "
@@ -8911,6 +8956,14 @@ msgstr "Zの最大ジャーク"
 msgid "Maximum length of the infill anchor"
 msgstr "最長インフィルアンカー"
 
+#: src/libslic3r/PrintConfig.cpp:2355
+msgid ""
+"Maximum lift height of the ramping lift. It may not be reached if the next "
+"position is close to the old one."
+msgstr ""
+"傾斜リフトの最大リフト高さ。次のポジションが以前のポジションに近い場合、指定"
+"の数字に到達しない可能性があります。"
+
 #: src/libslic3r/PrintConfig.cpp:3601
 msgid ""
 "Maximum number of bridges that can be placed on a pillar. Bridges hold "
@@ -8918,6 +8971,10 @@ msgid ""
 msgstr ""
 "ピラー上に置くことができるブリッジの最大数。 ブリッジはサポートポイントのピン"
 "ヘッドを保持し、小さな枝としてピラーに接続します。"
+
+#: src/libslic3r/PrintConfig.cpp:2354
+msgid "Maximum ramping lift"
+msgstr "最大傾斜リフト"
 
 #: src/libslic3r/PrintConfig.cpp:1044
 msgid ""
@@ -10388,6 +10445,10 @@ msgid ""
 msgstr ""
 "ビルドプレート(ベッド)上からのみサポートを作成します。プリントしたモデル上か"
 "らはサポートを生成しません。"
+
+#: src/slic3r/GUI/Tab.cpp:3313
+msgid "Only lift"
+msgstr "リフトのみ"
 
 #: src/libslic3r/PrintConfig.cpp:2381
 msgid "Only lift Z above"
@@ -12266,6 +12327,10 @@ msgstr "ラミングパラメーター"
 msgid "Ramming settings"
 msgstr "ラミング設定"
 
+#: src/libslic3r/PrintConfig.cpp:2337
+msgid "Ramping slope angle"
+msgstr "斜面の傾斜角度"
+
 #: src/libslic3r/PrintConfig.cpp:2436
 #: src/slic3r/GUI/ArrangeSettingsDialogImgui.cpp:91
 msgid "Random"
@@ -12849,6 +12914,10 @@ msgstr "リトラクション"
 msgid ""
 "Retraction is not triggered when travel moves are shorter than this length."
 msgstr "移動がこの長さより短い場合、吸込み動作を行いません。"
+
+#: src/libslic3r/PrintConfig.cpp:2319
+msgid "Retraction length"
+msgstr "リトラクトの長さ"
 
 #: src/libslic3r/PrintConfig.cpp:2320
 msgid "Retraction Length"
@@ -14747,6 +14816,10 @@ msgstr "スライスの状態"
 msgid "Slicing supports"
 msgstr "サポートのスライス"
 
+#: src/libslic3r/PrintConfig.cpp:2338
+msgid "Slope of the ramp in the initial phase of the travel."
+msgstr "移動初期における斜面の傾斜"
+
 #: src/libslic3r/PrintConfig.cpp:3798 src/libslic3r/PrintConfig.cpp:4284
 msgid "Slow"
 msgstr "スロー"
@@ -15369,6 +15442,10 @@ msgstr "静音モード"
 #: src/slic3r/GUI/GCodeViewer.cpp:4181
 msgid "Stealth mode"
 msgstr "ステルスモード"
+
+#: src/libslic3r/PrintConfig.cpp:2364
+msgid "Steeper ramp before obstacles"
+msgstr "障害物手前の急な傾斜"
 
 #: src/slic3r/GUI/GUI_ObjectLayers.cpp:33
 msgid "Stop at height"
@@ -17982,6 +18059,10 @@ msgstr "変形"
 msgid "Travel"
 msgstr "移動"
 
+#: src/slic3r/GUI/Tab.cpp:3306
+msgid "Travel lift"
+msgstr "移動リフト"
+
 #: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp:215
 msgid "Triangle"
 msgstr "三角形"
@@ -18505,6 +18586,10 @@ msgstr "パースカメラを使用"
 #: src/libslic3r/PrintConfig.cpp:387 src/slic3r/GUI/ConfigSnapshotDialog.cpp:31
 msgid "User"
 msgstr "ユーザー"
+
+#: src/libslic3r/PrintConfig.cpp:2346
+msgid "Use ramping lift"
+msgstr "傾斜リフトを使う"
 
 #: src/libslic3r/PrintConfig.cpp:3224
 msgid "Use relative E distances"
@@ -19266,6 +19351,16 @@ msgstr ""
 #, boost-format
 msgid "You are currently running the latest released version %1%."
 msgstr "現在、最新のリリースバージョン %1%を実行しています"
+
+#: src/slic3r/GUI/Plater.cpp:6755
+msgid ""
+"You are exporting binary G-code for a Prusa printer. Please, make sure that "
+"your printer is running firmware version 5.1.0-alpha2 or later. Older "
+"firmwares are not able to handle binary G-codes."
+msgstr ""
+"Prusaプリンタ用のバイナリGコードをエクスポートしています。お使いのプリンタの"
+"ファームウェアバージョンが5.1.0-alpha2以降であることを確認してください。古い"
+"ファームウェアはバイナリGコードを扱うことができません。"
 
 #: src/slic3r/GUI/GUI_App.cpp:1019
 #, boost-format
