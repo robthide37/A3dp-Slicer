@@ -799,7 +799,7 @@ void PageMaterials::check_and_update_presets(bool force_reload_presets /*= false
     if (presets_loaded)
         return;
     wizard_p()->update_materials(materials->technology);
-    if (force_reload_presets)
+//    if (force_reload_presets)
         reload_presets();
 }
 
