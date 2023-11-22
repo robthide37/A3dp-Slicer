@@ -5396,13 +5396,19 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
         if (first_layer_over_raft_speed > 0)
             speed = std::min(first_layer_over_raft_speed, speed);
     }
+
+    // the first_layer_flow_ratio is added at the last time to take into account everything. So do the compute like it's here.
+    double path_mm3_per_mm = path.mm3_per_mm;
+    if (m_layer->bottom_z() < EPSILON)
+        path_mm3_per_mm *= this->config().first_layer_flow_ratio.get_abs_value(1);
     // cap speed with max_volumetric_speed anyway (even if user is not using autospeed)
-    if (m_config.max_volumetric_speed.value > 0 && path.mm3_per_mm > 0) {
-        speed = std::min(m_config.max_volumetric_speed.value / path.mm3_per_mm, speed);
+    if (m_config.max_volumetric_speed.value > 0 && path_mm3_per_mm > 0) {
+        speed = std::min(m_config.max_volumetric_speed.value / path_mm3_per_mm, speed);
     }
+    // filament cap (volumetric & raw speed)
     double filament_max_volumetric_speed = EXTRUDER_CONFIG_WITH_DEFAULT(filament_max_volumetric_speed, 0);
-    if (filament_max_volumetric_speed > 0) {
-        speed = std::min(filament_max_volumetric_speed / path.mm3_per_mm, speed);
+    if (filament_max_volumetric_speed > 0 && path_mm3_per_mm > 0) {
+        speed = std::min(filament_max_volumetric_speed / path_mm3_per_mm, speed);
     }
     double filament_max_speed = EXTRUDER_CONFIG_WITH_DEFAULT(filament_max_speed, 0);
     if (filament_max_speed > 0) {
