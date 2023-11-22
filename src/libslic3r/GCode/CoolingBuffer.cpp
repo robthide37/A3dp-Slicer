@@ -566,6 +566,10 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
         } else if (boost::starts_with(sline, ";_EXTRUDETYPE_") && sline.size() > 14) {
             //set the extrusiontype
             line.type |= CoolingLine::Type(sline[14] - 'A') | CoolingLine::Type::TYPE_EXTRUDE_START;
+            assert(CoolingLine::to_extrusion_role(uint32_t(line.type)) != 0);
+            if (CoolingLine::to_extrusion_role(uint32_t(line.type)) == 0) {
+                line.type |= ExtrusionRole::erCustom;
+            }
         } else if (boost::starts_with(sline, "G4 ")) {
             // Parse the wait time.
             line.type = CoolingLine::TYPE_G4;

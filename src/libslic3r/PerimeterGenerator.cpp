@@ -3415,14 +3415,14 @@ PerimeterGenerator::_traverse_and_join_loops(const PerimeterGeneratorLoop &loop,
             }
 
             //now add extrusionPAths to connect the two loops
-            ExtrusionPaths travel_path_begin;// (ExtrusionRole::erNone, 0, outer_start->width, outer_start->height);
+            ExtrusionPaths travel_path_begin;// (ExtrusionRole::erTravel, 0, outer_start->width, outer_start->height);
             //travel_path_begin.extruder_id = -1;
-            ExtrusionPaths travel_path_end;// (ExtrusionRole::erNone, 0, outer_end->width, outer_end->height);
+            ExtrusionPaths travel_path_end;// (ExtrusionRole::erTravel, 0, outer_end->width, outer_end->height);
             //travel_path_end.extruder_id = -1;
             double dist_travel = outer_start->polyline.back().distance_to(inner_start->polyline.front());
             if (dist_travel > max_width_extrusion*1.5 && this->config->fill_density.value > 0) {
                 travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height, false);
-                travel_path_begin.emplace_back(ExtrusionRole::erNone, 0, outer_start->width, outer_start->height, false);
+                travel_path_begin.emplace_back(ExtrusionRole::erTravel, 0, outer_start->width/10, outer_start->height, false);
                 travel_path_begin.emplace_back(ExtrusionRole::erPerimeter, outer_start->mm3_per_mm, outer_start->width, outer_start->height, false);
                 //travel_path_begin[0].extruder_id = -1;
                 //travel_path_begin[1].extruder_id = -1;
@@ -3459,7 +3459,7 @@ PerimeterGenerator::_traverse_and_join_loops(const PerimeterGeneratorLoop &loop,
             dist_travel = inner_end->polyline.back().distance_to(outer_end->polyline.front());
             if (dist_travel > max_width_extrusion*1.5 && this->config->fill_density.value > 0) {
                 travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height, false);
-                travel_path_end.emplace_back(ExtrusionRole::erNone, 0, outer_end->width, outer_end->height, false);
+                travel_path_end.emplace_back(ExtrusionRole::erTravel, 0, outer_end->width/10, outer_end->height, false);
                 travel_path_end.emplace_back(ExtrusionRole::erPerimeter, outer_end->mm3_per_mm, outer_end->width, outer_end->height, false);
                 //travel_path_end[0].extruder_id = -1;
                 //travel_path_end[1].extruder_id = -1;

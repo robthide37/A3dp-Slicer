@@ -248,6 +248,7 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
             for (const ExtrusionEntity *ee : layerm->fills.entities()) {
                 // fill represents infill extrusions of a single island.
                 const auto *fill = dynamic_cast<const ExtrusionEntityCollection*>(ee);
+                //FIXME: if first role is gapfill, please search deeper for another role
                 ExtrusionRole role = fill->entities().empty() ? erNone : fill->entities().front()->role();
                 if (is_solid_infill(role))
                     has_solid_infill = true;

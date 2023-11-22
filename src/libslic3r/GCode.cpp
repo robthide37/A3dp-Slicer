@@ -972,6 +972,7 @@ namespace DoExport {
             excluded.insert(erCustom);
             excluded.insert(erMixed);
             excluded.insert(erNone);
+            excluded.insert(erTravel);
             excluded.insert(erWipeTower);
             if (config->option("perimeter_speed") != nullptr && config->get_computed_value("perimeter_speed") != 0)
                 excluded.insert(erPerimeter);
@@ -1837,7 +1838,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                     file.write(this->retract());
                     std::string gcode;
                     //go to origin of the next object (it's 0,0 because we shifted the origin to it)
-                    Polyline polyline = this->travel_to(gcode, Point(0, 0), erNone);
+                    Polyline polyline = this->travel_to(gcode, Point(0, 0), erTravel);
                     this->write_travel_to(gcode, polyline, "move to origin position for next object");
                     file.write(gcode);
                     m_enable_cooling_markers = true;
@@ -1914,7 +1915,7 @@ void GCode::_do_export(Print& print_mod, GCodeOutputStream &file, ThumbnailsGene
                                 this->set_origin(unscale((*print_object_instance_sequential_active)->shift));
                                 std::string gcode;
                                 //go to origin of the next object (it's 0,0 because we shifted the origin to it)
-                                Polyline polyline = this->travel_to(gcode, Point(0, 0), erNone);
+                                Polyline polyline = this->travel_to(gcode, Point(0, 0), erTravel);
                                 this->write_travel_to(gcode, polyline, "move to origin position for next object");
                                 file.write(gcode);
                             }
@@ -5314,7 +5315,8 @@ double_t GCode::_compute_speed_mm_per_sec(const ExtrusionPath& path, double spee
             }
         } else if (path.role() == erIroning) {
             speed = m_config.get_computed_value("ironing_speed");
-        } else if (path.role() == erNone) {
+        } else if (path.role() == erNone || path.role() == erTravel) {
+            assert(path.role() != erNone);
             speed = m_config.get_computed_value("travel_speed");
         } else if (path.role() == erMilling) {
             speed = m_config.get_computed_value("milling_speed");
@@ -5435,6 +5437,7 @@ void GCode::cooldown_marker_init() {
         _cooldown_marker_speed[erMilling] = "";
         _cooldown_marker_speed[erCustom] = maybe_allow_speed_change;
         _cooldown_marker_speed[erMixed] = maybe_allow_speed_change;
+        _cooldown_marker_speed[erTravel] = maybe_allow_speed_change;
     }
 }
 
@@ -5582,11 +5585,13 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
                     }
                 }
                 goto externalPerimeter;
+            case erNone:
+                assert(false);
             case erMilling:
             case erCustom:
             case erMixed:
+            case erTravel:
             case erCount:
-            case erNone:
             default:
                 break;
         }
@@ -5783,6 +5788,8 @@ std::string GCode::_before_extrude(const ExtrusionPath &path, const std::string 
     }
 
     std::string comment;
+    assert(path.role() > ExtrusionRole::erNone);
+    assert(path.role() < ExtrusionRole::erCount);
     if (m_enable_cooling_markers) {
         // Send the current extrusion type to Coolingbuffer
         gcode += ";_EXTRUDETYPE_"; gcode += char('A' + path.role()); gcode += "\n";

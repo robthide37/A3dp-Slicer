@@ -329,6 +329,7 @@ std::string ExtrusionEntity::role_to_string(ExtrusionRole role)
         case erMilling                      : return L("Mill");
         case erCustom                       : return L("Custom");
         case erMixed                        : return L("Mixed");
+        case erTravel                       : return L("Travel");
         default                             : assert(false);
     }
 
