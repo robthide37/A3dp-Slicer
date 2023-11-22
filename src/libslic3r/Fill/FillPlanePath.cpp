@@ -34,28 +34,46 @@ void FillPlanePath::_fill_surface_single(
         coord_t(ceil(coordf_t(bounding_box.max.y()) / distance_between_lines)),
         params.resolution);
 
-    if (pts.size() >= 2) {
+    // doing intersection_pl(polylines, expolygon); on >200k points is too inneficient.
+    // new version: with a "is_inside" for each point, in parallel
+    //note: seems like there is no need to parallelize now, too quick.
+    Polylines all_poly;
+    for (size_t istart = 0; istart < pts.size(); istart += 1000) {
+        const size_t iend = istart + 1000 < pts.size() ? istart + 1001 : pts.size();
         // Convert points to a polyline, upscale.
         Polylines polylines(1, Polyline());
         Polyline &polyline = polylines.front();
-        polyline.points.reserve(pts.size());
-        for (const Vec2d &pt : pts)
-            polyline.points.emplace_back(
-                coord_t(floor(pt.x() * distance_between_lines + 0.5)),
-                coord_t(floor(pt.y() * distance_between_lines + 0.5)));
+        polyline.points.reserve(iend - istart);
+        //for (const Vec2d &pt : pts)
+        for(size_t ip = istart ; ip < iend; ++ip)
+            polyline.points.emplace_back(coord_t(floor(pts[ip].x() * distance_between_lines + 0.5)),
+                                         coord_t(floor(pts[ip].y() * distance_between_lines + 0.5)));
         polylines = intersection_pl(polylines, expolygon);
-        Polylines chained;
-        if (params.dont_connect() || params.density > 0.5 || polylines.size() <= 1)
-            chained = chain_polylines(std::move(polylines));
-        else
-            connect_infill(std::move(polylines), expolygon, chained, this->get_spacing(), params);
-        // paths must be repositioned and rotated back
-        for (Polyline &pl : chained) {
-            pl.translate(double(shift.x()), double(shift.y()));
-            pl.rotate(direction.first);
+        if (!polylines.empty()) {
+            assert(!polylines.front().empty());
+            if (!all_poly.empty() && polylines.front().front().coincides_with_epsilon(all_poly.back().back())) {
+                // it continue the last polyline, so just append to it
+                append(all_poly.back().points, std::move(polylines.front().points));
+                //append other polylines
+                if (polylines.size() > 1) {
+                    all_poly.insert(all_poly.end(), polylines.begin() + 1, polylines.end());
+                }
+            } else {
+                append(all_poly, std::move(polylines));
+            }
         }
-        append(polylines_out, std::move(chained));
     }
+    Polylines chained;
+    if (params.dont_connect() || params.density > 0.5 || all_poly.size() <= 1)
+        chained = chain_polylines(std::move(all_poly));
+    else
+        connect_infill(std::move(all_poly), expolygon, chained, this->get_spacing(), params);
+    // paths must be repositioned and rotated back
+    for (Polyline &pl : chained) {
+        pl.translate(double(shift.x()), double(shift.y()));
+        pl.rotate(direction.first);
+    }
+    append(polylines_out, std::move(chained));
 }
 
 // Follow an Archimedean spiral, in polar coordinates: r=a+b\theta
