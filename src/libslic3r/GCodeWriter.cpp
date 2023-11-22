@@ -793,7 +793,7 @@ std::string GCodeWriter::unlift()
     return gcode;
 }
 
-std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, uint8_t speed, uint8_t tool_fan_offset, bool is_fan_percentage)
+std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comments, uint8_t speed, uint8_t tool_fan_offset, bool is_fan_percentage, const std::string comment/*=""*/)
 {
 /*
     std::ostringstream gcode;
@@ -858,7 +858,8 @@ std::string GCodeWriter::set_fan(const GCodeFlavor gcode_flavor, bool gcode_comm
             }
             gcode << (fan_baseline * (fan_speed / 100.0));
         }
-        if (gcode_comments) gcode << " ; enable fan";
+        if (gcode_comments)
+            gcode << " ; " << (comment.empty() ? "enable fan" : comment);
         gcode << "\n";
     }
     return gcode.str();

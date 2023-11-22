@@ -17,7 +17,7 @@
 
 namespace Slic3r {
 
-CoolingBuffer::CoolingBuffer(GCode &gcodegen) : m_config(gcodegen.config()), m_toolchange_prefix(gcodegen.writer().toolchange_prefix()), m_current_extruder(0)
+CoolingBuffer::CoolingBuffer(GCode &gcodegen) : m_config(gcodegen.config()), m_current_extruder(0)
 {
     this->reset(gcodegen.writer().get_position());
 
@@ -543,8 +543,9 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                 }
             }
             active_speed_modifier = size_t(-1);
-        } else if (boost::starts_with(sline, m_toolchange_prefix) || boost::starts_with(sline, ";_TOOLCHANGE")) {
-            int prefix = boost::starts_with(sline, ";_TOOLCHANGE") ? 13 : m_toolchange_prefix.size();
+        } else if (boost::starts_with(sline, ";_TOOLCHANGE")) {
+            //not using m_toolchange_prefix anymore because there is no use case for it, there is always a _TOOLCHANGE for when a fan change is needed.
+            int prefix = 13;
             uint16_t new_extruder = (uint16_t)atoi(sline.c_str() + prefix);
             // Only change extruder in case the number is meaningful. User could provide an out-of-range index through custom gcodes - those shall be ignored.
             if (new_extruder < map_extruder_to_per_extruder_adjustment.size()) {
@@ -955,7 +956,9 @@ std::string CoolingBuffer::apply_layer_cooldown(
         }
         if (fan_speeds[0] != m_fan_speed) {
             m_fan_speed = fan_speeds[0];
-            new_gcode  += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed, EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage);
+            new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed,
+                                              EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
+                                              std::string("set fan for new extruder"));
         }
     };
     //set to know all fan modifiers that can be applied ( TYPE_BRIDGE_FAN_END, TYPE_TOP_FAN_START, TYPE_SUPP_INTER_FAN_START, TYPE_EXTERNAL_PERIMETER).
@@ -982,7 +985,9 @@ std::string CoolingBuffer::apply_layer_cooldown(
         } else if (line->type & CoolingLine::TYPE_STORE_FOR_WT) {
             stored_fan_speed = m_fan_speed;
         } else if (line->type & CoolingLine::TYPE_RESTORE_AFTER_WT) {
-            new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, stored_fan_speed, EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage);
+            new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, stored_fan_speed,
+                                              EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
+                                              "restore fan after wipe tower");
         } else if (line->type & CoolingLine::TYPE_EXTRUDE_START) {
             assert(CoolingLine::to_extrusion_role(uint32_t(line->type)) != 0);
             extrude_tree.push_back(CoolingLine::to_extrusion_role(uint32_t(line->type)));
@@ -1078,14 +1083,19 @@ std::string CoolingBuffer::apply_layer_cooldown(
             bool fan_set = false;
             for (size_t i = extrude_tree.size() - 1; i < extrude_tree.size(); --i) {
                 if (fan_control[extrude_tree[i]]) {
-                    new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, fan_speeds[extrude_tree[i]], EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage);
+                    new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments,
+                                                      fan_speeds[extrude_tree[i]],
+                                                      EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
+                                                      std::string("set fan for ") + ExtrusionEntity::role_to_string(extrude_tree[i]));
                     fan_set = true;
                     break;
                 }
             }
             if (!fan_set) {
                 //return to default
-                new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed, EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage);
+                new_gcode += GCodeWriter::set_fan(m_config.gcode_flavor, m_config.gcode_comments, m_fan_speed,
+                                                  EXTRUDER_CONFIG(extruder_fan_offset), m_config.fan_percentage,
+                                                  "set default fan");
             }
             fan_need_set = false;
         }
