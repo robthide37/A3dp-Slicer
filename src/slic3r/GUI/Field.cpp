@@ -1175,7 +1175,7 @@ void SpinCtrl::BUILD() {
 void SpinCtrl::propagate_value()
 {
     // check if value was really changed
-    if (boost::any_cast<int>(m_value) == tmp_value)
+    if (!m_value.empty() && boost::any_cast<int>(m_value) == tmp_value)
         return;
 
     if (tmp_value == UNDEF_VALUE) {

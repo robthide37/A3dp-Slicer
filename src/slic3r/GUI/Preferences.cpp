@@ -942,17 +942,17 @@ void PreferencesDialog::accept(wxEvent&)
 			title += " - " + _L("Changes for the critical options");
 			MessageDialog dialog(nullptr,
 				_L("Changing some options will trigger application restart.\n"
-				   "You will lose the content of the platter.") + "\n\n" +
+				   "You will lose the content of the plater.") + "\n\n" +
 				_L("Do you want to proceed?"),
 				title,
-				wxICON_QUESTION | wxYES | wxNO);
-			if (dialog.ShowModal() == wxID_YES) {
+				wxICON_QUESTION | wxYES | wxNO| wxCANCEL);
+            int answer = dialog.ShowModal();
+            if (answer == wxID_YES) {
 				m_recreate_GUI = true;
-			}
-			else {
+            } else if (answer == wxID_CANCEL) {
 				for (const std::string& option : m_values_need_restart)
 					m_values.erase(option);
-			}
+            }
 			break;
 		}
 	}
