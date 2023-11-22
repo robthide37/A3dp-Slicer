@@ -459,7 +459,6 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
             if (boost::contains(sline, ";_EXTRUDE_SET_SPEED") && ! wipe) {
                 line.type |= CoolingLine::TYPE_ADJUSTABLE;
                 active_speed_modifier = adjustment->lines.size();
-                std::cout << "TYPE_(not)_ADJUSTABLE!\n";
                 if (boost::contains(sline, ";_EXTRUDE_SET_SPEED_MAYBE"))
                     line.type |= CoolingLine::TYPE_ADJUSTABLE_MAYBE;
             }
@@ -556,8 +555,7 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
                     current_extruder = new_extruder;
                     adjustment       = &per_extruder_adjustments[map_extruder_to_per_extruder_adjustment[current_extruder]];
                 }
-            }
-            else {
+            } else {
                 // Only log the error in case of MM printer. Single extruder printers likely ignore any T anyway.
                 if (map_extruder_to_per_extruder_adjustment.size() > 1)
                     BOOST_LOG_TRIVIAL(error) << "CoolingBuffer encountered an invalid toolchange, maybe from a custom gcode: " << sline;
