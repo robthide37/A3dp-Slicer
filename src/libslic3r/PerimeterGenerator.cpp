@@ -1439,7 +1439,10 @@ ProcessSurfaceResult PerimeterGenerator::process_classic(int& loop_number, const
             for (PerimeterGeneratorLoop& loop : contours.front()) {
                 ExtrusionLoop extr_loop = this->_traverse_and_join_loops(loop, get_all_Childs(loop), loop.polygon.points.front());
                 //ExtrusionLoop extr_loop = this->_traverse_and_join_loops_old(loop, loop.polygon.points.front(), true);
-                extr_loop.paths.back().polyline.append(extr_loop.paths.front().polyline.front());
+                if (extr_loop.paths.back().polyline.back() != extr_loop.paths.front().polyline.front()) {
+                    extr_loop.paths.back().polyline.append(extr_loop.paths.front().polyline.front());
+                    assert(false);
+                }
                 peri_entities.append(extr_loop);
             }
 

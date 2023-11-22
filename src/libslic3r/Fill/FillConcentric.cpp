@@ -95,7 +95,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
 
     double min_gapfill_area = double(params.flow.scaled_width()) * double(params.flow.scaled_width());
     if (params.config != nullptr) min_gapfill_area = scale_d(params.config->gap_fill_min_area.get_abs_value(params.flow.width())) * double(params.flow.scaled_width());
-    // Perform offset.
+    // Perform offset. //FIXME: can miss gapfill outside of this first perimeter
     Slic3r::ExPolygons expp = offset_ex(surface->expolygon, double(scale_(0 - 0.5 * this->get_spacing())));
     // Create the infills for each of the regions.
     Polylines polylines_out;
@@ -117,9 +117,7 @@ FillConcentricWGapFill::fill_surface_extrusion(
         if (params.density > 0.9999f && !params.dont_adjust) {
             distance = scale_t(this->get_spacing());
         }
-
-        ExPolygons gaps;
-        std::vector< std::vector<Polygons>> bunch_2_shell_2_loops;
+        std::vector<std::vector<Polygons>> bunch_2_shell_2_loops;
         bunch_2_shell_2_loops.emplace_back(); // create a new bunch before a gap
         bunch_2_shell_2_loops.back().push_back(to_polygons(expolygon)); // add first shell
         std::vector<ExPolygons> bunch_2_gaps; // size = bunch_2_shell_2_loops.size() (-1)
@@ -129,39 +127,62 @@ FillConcentricWGapFill::fill_surface_extrusion(
             ExPolygons next_onion = offset2_ex(last, -(distance + scale_d(this->get_spacing()) / 2), +(scale_d(this->get_spacing()) / 2));
             ExPolygons new_gaps = diff_ex(
                 offset_ex(last, -0.5f * distance),
-                offset_ex(next_onion, 0.5f * distance + 10));  // 10 = safety offset         
+                offset_ex(next_onion, 0.5f * distance + 10));  // 10 = safety offset
+            //add next shell (into the last collection)
             bunch_2_shell_2_loops.back().push_back(to_polygons(next_onion));
+            //if there is some gaps, then we need to create a new collection for the next shells, so they will be peirnted after the gaps.
             if (!new_gaps.empty()) {
-                append(gaps, new_gaps);
+                if (first && !this->no_overlap_expolygons.empty()) {
+                    new_gaps = intersection_ex(new_gaps, this->no_overlap_expolygons);
+                }
                 bunch_2_gaps.push_back(std::move(new_gaps));
                 if (!bunch_2_shell_2_loops.back().empty() && bunch_2_shell_2_loops.back().back().empty()) {
                     bunch_2_shell_2_loops.back().pop_back();
                 }
-                //create a new collection for next bunch.
-                bunch_2_shell_2_loops.emplace_back();
+                //create a new collection for next bunch (if the loop don't stop here).
+                if (!next_onion.empty()) {
+                    bunch_2_shell_2_loops.emplace_back();
+                }
             }
+            // refresh before next iteration
             last = next_onion;
-            if (first && !this->no_overlap_expolygons.empty()) {
-                gaps = intersection_ex(gaps, this->no_overlap_expolygons);
-            }
             first = false;
         }
         if (!bunch_2_shell_2_loops.back().empty() && bunch_2_shell_2_loops.back().back().empty()) {
             bunch_2_shell_2_loops.back().pop_back();
         }
         if (bunch_2_shell_2_loops.back().empty()) {
-            assert(bunch_2_shell_2_loops.size() > bunch_2_gaps.size());
+            assert(bunch_2_shell_2_loops.size() >= bunch_2_gaps.size());
+            if (bunch_2_shell_2_loops.size() == bunch_2_gaps.size()) {
+                assert(bunch_2_gaps.size() > 1);
+                if (bunch_2_gaps.size() > 1) {
+                    // merge last two gaps (inside the last perimeter & after the last perimeter are both extruded
+                    // after the last perimeter)
+                    append(bunch_2_gaps[bunch_2_gaps.size() - 2], bunch_2_gaps.back());
+                    bunch_2_gaps.pop_back();
+                }
+            }
             bunch_2_shell_2_loops.pop_back();
             if (!bunch_2_shell_2_loops.empty() && !bunch_2_shell_2_loops.back().empty() && bunch_2_shell_2_loops.back().back().empty()) {
                 bunch_2_shell_2_loops.back().pop_back();
             }
         }
+        //check no empty shell
+        assert(!bunch_2_shell_2_loops.back().empty());
+        //check no empty gap
+        assert(std::find_if(bunch_2_gaps.begin(), bunch_2_gaps.end(), [](const auto &vec) { return vec.empty(); }) ==
+               bunch_2_gaps.end());
+        // check size there is 3 posibilities:
+        //   1) no gap: 1 shell
+        //   2) gap but not in the last to iteration: X xhells, x-1 gap
+        //   3) gap and there is some to print after the last shell: X shell, X gap
+        assert(bunch_2_shell_2_loops.size() == bunch_2_gaps.size() + 1 ||
+               bunch_2_shell_2_loops.size() == bunch_2_gaps.size());
 
         // generate paths from the outermost to the innermost, to avoid
         // adhesion problems of the first central tiny loops
         //note: useless if we don't apply no_sort flag
         //loops = union_pt_chained(loops, false);
-
 
         //get the role
         ExtrusionRole good_role = getRoleFromSurfaceType(params, surface);
