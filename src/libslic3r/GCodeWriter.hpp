@@ -16,7 +16,6 @@ protected:
     // override from region
     const PrintRegionConfig* m_region_config = nullptr;
 public:
-    static std::string PausePrintCode;
     bool multiple_extruders;
     
     GCodeWriter() : 
@@ -98,6 +97,9 @@ public:
     // Keeping the state is left to the CoolingBuffer, which runs asynchronously on another thread.
     std::string set_fan(uint8_t speed, uint16_t default_tool = 0);
     uint8_t get_fan() { return m_last_fan_speed; }
+
+    static std::string get_default_pause_gcode(const GCodeConfig &config);
+    static std::string get_default_color_change_gcode(const GCodeConfig &config);
 
 private:
 	// Extruders are sorted by their ID, so that binary search is possible.

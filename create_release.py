@@ -14,8 +14,8 @@ from datetime import date
 import tarfile
 import subprocess
 
-repo = "slic3r/slic3r"
-program_name = "Slic3r"
+repo = "robthide37/A3dp-Slicer"
+program_name = "A3dp-Slicer"
 path_7zip = r"C:\Program Files\7-Zip\7z.exe"
 github_auth_token = "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"
 
@@ -80,7 +80,7 @@ with urlopen("https://api.github.com/repos/"+repo+"/actions/artifacts") as f:
 			found_linux_appimage_gtk2 = True;
 			print("ask for: "+entry["archive_download_url"]);
 			resp = requests.get(entry["archive_download_url"], headers={'Authorization': 'token ' + github_auth_token,}, allow_redirects=True);
-			print("appimage: " +str(resp));
+			print("gtk2 appimage: " +str(resp));
 			z = zipfile.ZipFile(io.BytesIO(resp.content));
 			z.extractall(release_path);
 			os.rename(release_path+"/"+program_name+"_ubu64.AppImage", release_path+"/"+program_name+"-ubuntu_18.04-gtk2-" + version + ".AppImage");
@@ -88,7 +88,7 @@ with urlopen("https://api.github.com/repos/"+repo+"/actions/artifacts") as f:
 			found_linux_appimage_gtk3 = True;
 			print("ask for: "+entry["archive_download_url"]);
 			resp = requests.get(entry["archive_download_url"], headers={'Authorization': 'token ' + github_auth_token,}, allow_redirects=True);
-			print("appimage: " +str(resp));
+			print("gtk3 appimage: " +str(resp));
 			z = zipfile.ZipFile(io.BytesIO(resp.content));
 			z.extractall(release_path);
 			os.rename(release_path+"/"+program_name+"_ubu64.AppImage", release_path+"/"+program_name+"-ubuntu_18.04-" + version + ".AppImage");
@@ -96,7 +96,7 @@ with urlopen("https://api.github.com/repos/"+repo+"/actions/artifacts") as f:
 			found_linux = True;
 			print("ask for: "+entry["archive_download_url"]);
 			resp = requests.get(entry["archive_download_url"], headers={'Authorization': 'token ' + github_auth_token,}, allow_redirects=True);
-			print("appimage: " +str(resp));
+			print("gtk3 archive: " +str(resp));
 			z = zipfile.ZipFile(io.BytesIO(resp.content));
 			z.extractall(release_path);
 			base_path = release_path+"/"+program_name+"_" + version + "_linux64_" + date_str;

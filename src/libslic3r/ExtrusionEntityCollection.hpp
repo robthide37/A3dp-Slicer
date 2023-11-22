@@ -61,7 +61,11 @@ public:
         ExtrusionRole out = erNone;
         for (const ExtrusionEntity *ee : m_entities) {
             ExtrusionRole er = ee->role();
-            out = (out == erNone || out == er) ? er : erMixed;
+            if (out == erNone) {
+                out = er;
+            }else if (out != er) {
+                return erMixed;
+            }
         }
         return out;
     }

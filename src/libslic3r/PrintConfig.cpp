@@ -731,8 +731,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Bridges fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during bridges and overhangs. It won't slow down the fan if it's currently running at a higher speed."
-        "\nSet to -1 to disable this override."
-        "\nCan only be overriden by disable_fan_first_layers.");
+        "\nSet to -1 to disable this override (Bridge will use default fan speed)."
+        "\nCan be disabled by disable_fan_first_layers and increased by low layer time.");
     def->sidetext = L("%");
     def->min = -1;
     def->max = 100;
@@ -746,7 +746,7 @@ void PrintConfigDef::init_fff_params()
     def->tooltip = L("This fan speed is enforced during all infill bridges. It won't slow down the fan if it's currently running at a higher speed."
         "\nSet to 1 to follow default speed."
         "\nSet to -1 to disable this override (internal bridges will use Bridges fan speed)."
-        "\nCan only be overriden by disable_fan_first_layers.");
+        "\nCan be disabled by disable_fan_first_layers and increased by low layer time.");
     def->sidetext = L("%");
     def->min = -1;
     def->max = 100;
@@ -1434,7 +1434,7 @@ void PrintConfigDef::init_fff_params()
     def->label = L("But on first layer");
     def->full_label = L("Don't check crossings for retraction on first layer");
     def->category = OptionCategory::extruders;
-    def->tooltip = L("let the retraction happens on the first alyer even if the travel path does not exceed the upper layer's perimeters.");
+    def->tooltip = L("let the retraction happens on the first layer even if the travel path does not exceed the upper layer's perimeters.");
     def->mode = comExpert | comPrusa;
     def->set_default_value(new ConfigOptionBool(true));
 
@@ -1523,11 +1523,12 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("external_perimeter_fan_speed", coInts);
     def->label = L("External perimeter fan speed");
-    def->tooltip = L("When set to a non-zero value this fan speed is used only for external perimeters (visible ones). "
+    def->tooltip = L("When set to a non-zero value this fan speed is used only for external perimeters (visible ones) and thin walls."
                     "\nSet to 1 to disable the fan."
                     "\nSet to -1 to use the normal fan speed on external perimeters."
                     "External perimeters can benefit from higher fan speed to improve surface finish, "
-                    "while internal perimeters, infill, etc. benefit from lower fan speed to improve layer adhesion.");
+                    "while internal perimeters, infill, etc. benefit from lower fan speed to improve layer adhesion."
+                    "\nCan be disabled by disable_fan_first_layers, slowed down by full_fan_speed_layer and increased by low layer time.");
     def->sidetext = L("%");
     def->min = -1;
     def->max = 100;
@@ -2596,8 +2597,9 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::filament;
     def->tooltip = L("Fan speed will be ramped up linearly from zero at layer \"disable_fan_first_layers\" "
                    "to maximum at layer \"full_fan_speed_layer\". "
-                   "\"full_fan_speed_layer\" will be ignored if lower than \"disable_fan_first_layers\", in which case "
-                   "the fan will be running at maximum allowed speed at layer \"disable_fan_first_layers\" + 1.");
+                   "\"full_fan_speed_layer\" will be ignored if equal or lower than \"disable_fan_first_layers\", in which case "
+                   "the fan will be running at maximum allowed speed at layer \"disable_fan_first_layers\" + 1."
+                   "\nset 0 to disable");
     def->min = 0;
     def->max = 1000;
     def->mode = comExpert | comPrusa;
@@ -2672,7 +2674,7 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("gap_fill_extension", coFloatOrPercent);
     def->label = L("Extension");
-    def->full_label = L("Gapfill: extra extension");
+    def->full_label = L("Gap fill: extra extension");
     def->category = OptionCategory::perimeter;
     def->tooltip = L("Increase the length of all gapfills by this amount (may overextrude a little bit)\nCan be a % of the perimeter width");
     def->ratio_over = "perimeter_width";
@@ -2681,6 +2683,20 @@ void PrintConfigDef::init_fff_params()
     def->max_literal = { 50, true };
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent{ 0, false });
+
+    def = this->add("gap_fill_fan_speed", coInts);
+    def->label = L("Gap fill fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("This fan speed is enforced during all gap fill Perimeter moves"
+        "\nSet to 1 to disable fan."
+        "\nSet to -1 to disable this override (Gap Fill will use default fan speed)."
+        "\nCan be disabled by disable_fan_first_layers, slowed down by full_fan_speed_layer and increased by low layer time.");
+    def->sidetext = L("%");
+    def->min = -1;
+    def->max = 100;
+    def->mode = comExpert | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts{ -1 });
 
     def = this->add("gap_fill_flow_match_perimeter", coPercent);
     def->label = L("Cap with perimeter flow");
@@ -3116,6 +3132,20 @@ void PrintConfigDef::init_fff_params()
     def->can_phony = true;
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(100, true, false));
+
+    def = this->add("infill_fan_speed", coInts);
+    def->label = L("Internal Infill fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("This fan speed is enforced during all Internal Infill moves"
+        "\nSet to 1 to disable fan."
+        "\nSet to -1 to disable this override (Internal Infill will use default fan speed)."
+        "\nCan be disabled by disable_fan_first_layers, slowed down by full_fan_speed_layer and increased by low layer time.");
+    def->sidetext = L("%");
+    def->min = -1;
+    def->max = 100;
+    def->mode = comExpert | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts{ -1 });
 
     def = this->add("infill_first", coBool);
     def->label = L("Infill before perimeters");
@@ -3858,6 +3888,20 @@ void PrintConfigDef::init_fff_params()
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(0,false));
 
+    def = this->add("overhangs_fan_speed", coInts);
+    def->label = L("Overhangs Perimeter fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("This fan speed is enforced during all Overhang Perimeter moves"
+        "\nSet to 1 to disable fan."
+        "\nSet to -1 to disable this override (Overhang Perimeter use default fan speed)."
+        "\nCan be disabled by disable_fan_first_layers and increased by low layer time.");
+    def->sidetext = L("%");
+    def->min = -1;
+    def->max = 100;
+    def->mode = comAdvancedE | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts{ -1 });
+
     def = this->add("overhangs_speed", coFloatOrPercent);
     def->label = L("Overhangs");
     def->full_label = L("Overhangs speed");
@@ -3877,8 +3921,8 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::speed;
     def->tooltip = L("Set the speed of the full perimeters to the overhang speed, and also the next one(s) if any."
                 "\nSet to 0 to disable."
-                "\nSet to 1 to set the overhang speed to the full periemter if there is any overhang detected in the periemter."
-                "\nSet to more than 1 to also set the overhang speed to the next perimeter(s)."
+                "\nSet to 1 to set the overhang speed to the full perimeter if there is any overhang detected inside it."
+                "\nSet to more than 1 to also set the overhang speed to the next perimeter(s) (only in classic mode)."
                 );
     def->sidetext = L("perimeters");
     def->min = 0;
@@ -4062,6 +4106,20 @@ void PrintConfigDef::init_fff_params()
     def->sidetext = L("mm or %");
     def->mode = comExpert | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(false, 0));
+
+    def = this->add("perimeter_fan_speed", coInts);
+    def->label = L("Internal Perimeter fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("This fan speed is enforced during all Perimeter moves"
+        "\nSet to 1 to disable fan."
+        "\nSet to -1 to disable this override (Internal Perimeter use default fan speed)."
+        "\nCan be disabled by disable_fan_first_layers, slowed down by full_fan_speed_layer and increased by low layer time.");
+    def->sidetext = L("%");
+    def->min = -1;
+    def->max = 100;
+    def->mode = comExpert | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts{ -1 });
 
     def = this->add("perimeter_loop", coBool);
     def->label = L("Perimeters loop");
@@ -4493,6 +4551,16 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Minimum travel after retraction");
     def->category = OptionCategory::extruders;
     def->tooltip = L("Retraction is not triggered when travel moves are shorter than this length.");
+    def->sidetext = L("mm");
+    def->mode = comAdvancedE | comPrusa;
+    def->min = 0;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionFloats { 2. });
+
+    def = this->add("retract_lift_before_travel", coFloats);
+    def->label = L("Minimum travel after z lift");
+    def->category = OptionCategory::extruders;
+    def->tooltip = L("Z lift is not triggered when travel moves are shorter than this length.");
     def->sidetext = L("mm");
     def->mode = comAdvancedE | comPrusa;
     def->min = 0;
@@ -5035,6 +5103,20 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comSuSi;
     def->set_default_value(new ConfigOptionFloatOrPercent(100, true, false));
 
+    def = this->add("solid_infill_fan_speed", coInts);
+    def->label = L("Solid Infill fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("This fan speed is enforced during all Solid Infill moves"
+        "\nSet to 1 to disable fan."
+        "\nSet to -1 to disable this override (Solid Infill will use default fan speed)."
+        "\nCan be disabled by disable_fan_first_layers, slowed down by full_fan_speed_layer and increased by low layer time.");
+    def->sidetext = L("%");
+    def->min = -1;
+    def->max = 100;
+    def->mode = comExpert | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts{ -1 });
+
     def = this->add("solid_infill_speed", coFloatOrPercent);
     def->label = L("Solid");
     def->full_label = L("Solid infill speed");
@@ -5137,21 +5219,23 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("color_change_gcode", coString);
     def->label = L("Color change G-code");
-    def->tooltip = L("This G-code will be used as a code for the color change");
+    def->tooltip = L("This G-code will be used as a code for the color change"
+                     " If empty, the default color change print command for the selected G-code flavor will be used (if any).");
     def->multiline = true;
     def->full_width = true;
     def->height = 12;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionString("M600"));
+    def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("pause_print_gcode", coString);
     def->label = L("Pause Print G-code");
-    def->tooltip = L("This G-code will be used as a code for the pause print");
+    def->tooltip = L("This G-code will be used as a code for the pause print."
+                    " If empty, the default pause print command for the selected G-code flavor will be used (if any).");
     def->multiline = true;
     def->full_width = true;
     def->height = 12;
     def->mode = comExpert | comPrusa;
-    def->set_default_value(new ConfigOptionString("M601"));
+    def->set_default_value(new ConfigOptionString(""));
 
     def = this->add("template_custom_gcode", coString);
     def->label = L("Custom G-code");
@@ -5398,6 +5482,20 @@ void PrintConfigDef::init_fff_params()
     def->mode = comAdvancedE | comPrusa;
     def->set_default_value(new ConfigOptionFloatOrPercent(0, false));
 
+    def = this->add("support_material_fan_speed", coInts);
+    def->label = L("Support Material fan speed");
+    def->category = OptionCategory::cooling;
+    def->tooltip = L("This fan speed is enforced during all support moves"
+        "\nSet to 0 to disable fan."
+        "\nSet to -1 to disable this override (Support will use default fan speed)."
+        "\nCan be disabled by disable_fan_first_layers, slowed down by full_fan_speed_layer.");
+    def->sidetext = L("%");
+    def->min = -1;
+    def->max = 100;
+    def->mode = comExpert | comSuSi;
+    def->is_vector_extruder = true;
+    def->set_default_value(new ConfigOptionInts{ -1 });
+
     def = this->add("support_material_interface_angle", coFloat);
     def->label = L("Pattern angle");
     def->full_label = L("Support interface pattern angle");
@@ -5423,8 +5521,8 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Support interface fan speed");
     def->category = OptionCategory::cooling;
     def->tooltip = L("This fan speed is enforced during all support interfaces, to be able to weaken their bonding with a high fan speed."
-        "\nSet to 1 to disable the fan."
-        "\nSet to -1 to disable this override."
+        "\nSet to 0 to disable the fan."
+        "\nSet to -1 to disable this override (Support Interface will use Support)."
         "\nCan only be overriden by disable_fan_first_layers.");
     def->sidetext = L("%");
     def->min = -1;
@@ -5843,12 +5941,12 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionStrings(""));
 
     def = this->add("top_fan_speed", coInts);
-    def->label = L("Top fan speed");
+    def->label = L("Top Solid fan speed");
     def->category = OptionCategory::cooling;
-    def->tooltip = L("This fan speed is enforced during all top fills."
+    def->tooltip = L("This fan speed is enforced during all top fills (including ironing)."
         "\nSet to 1 to disable the fan."
-        "\nSet to -1 to disable this override."
-        "\nCan only be overriden by disable_fan_first_layers.");
+        "\nSet to -1 to disable this override (Top Solid Infill will use Solid Infill)."
+        "\nCan be disabled by disable_fan_first_layers, slowed down by full_fan_speed_layer.");
     def->sidetext = L("%");
     def->min = -1;
     def->max = 100;
@@ -6046,7 +6144,7 @@ void PrintConfigDef::init_fff_params()
     def->category = OptionCategory::extruders;
     def->tooltip = L("This flag will wipe the nozzle a bit inward after extruding an external perimeter."
         " The wipe_extra_perimeter is executed first, then this move inward before the retraction wipe."
-        " Note that the retraction wipe will follow the exact external perimeter (center) line if this parameter is disabled, and will follow the inner side of the external periemter line if enabled");
+        " Note that the retraction wipe will follow the exact external perimeter (center) line if this parameter is disabled, and will follow the inner side of the external perimeter line if enabled");
     def->mode = comAdvancedE | comSuSi;
     def->is_vector_extruder = true;
     def->set_default_value(new ConfigOptionBools{ true });
@@ -6313,9 +6411,9 @@ void PrintConfigDef::init_fff_params()
     def->label = L("Roundness margin");
     def->full_label = L("Polyhole detection margin");
     def->category = OptionCategory::slicing;
-    def->tooltip = L("Maximum defection of a point to the estimated radius of the circle."
+    def->tooltip = L("Maximum deflection of a point to the estimated radius of the circle."
         "\nAs cylinders are often exported as triangles of varying size, points may not be on the circle circumference."
-        " This setting allows you some leway to broaden the detection."
+        " This setting allows you some leeway to broaden the detection."
         "\nIn mm or in % of the radius.");
     def->sidetext = L("mm or %");
     def->max_literal = { 10, false};
@@ -6458,7 +6556,8 @@ void PrintConfigDef::init_fff_params()
     // Declare retract values for filament profile, overriding the printer's extruder profile.
     for (const char *opt_key : {
         // floats
-        "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", "deretract_speed", "retract_restart_extra", "retract_before_travel",
+        "retract_length", "retract_lift", "retract_lift_above", "retract_lift_below", "retract_speed", 
+        "deretract_speed", "retract_restart_extra", "retract_before_travel", "retract_lift_before_travel",
         "wipe_extra_perimeter", "wipe_speed",
         "wipe_inside_depth", "wipe_inside_end", "wipe_inside_start",
         // bools
@@ -6489,12 +6588,12 @@ void PrintConfigDef::init_extruder_option_keys()
 {
     // ConfigOptionFloats, ConfigOptionPercents, ConfigOptionBools, ConfigOptionStrings
     m_extruder_option_keys = {
-        "extruder_colour",
-        "extruder_offset",
-        "extruder_fan_offset",
-        "extruder_temperature_offset",
         "default_filament_profile",
         "deretract_speed",
+        "extruder_colour",
+        "extruder_fan_offset",
+        "extruder_offset",
+        "extruder_temperature_offset",
         "fan_name",
         "max_layer_height",
         "min_layer_height",
@@ -6506,6 +6605,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_length_toolchange",
         "retract_lift",
         "retract_lift_above",
+        "retract_lift_before_travel",
         "retract_lift_below",
         "retract_lift_first_layer",
         "retract_lift_top",
@@ -6523,6 +6623,7 @@ void PrintConfigDef::init_extruder_option_keys()
         "wipe_only_crossing",
         "wipe_speed",
     };
+    assert(std::is_sorted(m_extruder_option_keys.begin(), m_extruder_option_keys.end()));
 
     m_extruder_retract_keys = {
         "deretract_speed",
@@ -6532,10 +6633,14 @@ void PrintConfigDef::init_extruder_option_keys()
         "retract_length",
         "retract_lift",
         "retract_lift_above",
+        "retract_lift_before_travel",
         "retract_lift_below",
+        "retract_lift_first_layer",
+        "retract_lift_top",
         "retract_restart_extra",
         "retract_speed",
         "seam_gap",
+        "seam_gap_external",
         "wipe",
         "wipe_extra_perimeter",
         "wipe_inside_depth",
@@ -8002,6 +8107,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "first_layer_size_compensation_layers",
 "gap_fill_acceleration",
 "gap_fill_extension",
+"gap_fill_fan_speed",
 "gap_fill_flow_match_perimeter",
 "gap_fill_last",
 "gap_fill_infill",
@@ -8021,6 +8127,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "infill_dense_algo",
 "infill_dense",
 "infill_extrusion_spacing",
+"infill_fan_speed",
 "ironing_acceleration",
 "lift_min",
 "machine_max_acceleration_travel",
@@ -8056,6 +8163,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "only_one_perimeter_first_layer",
 "over_bridge_flow_ratio",
 "overhangs_acceleration",
+"overhangs_fan_speed",
 "overhangs_reverse_threshold",
 "overhangs_reverse",
 "overhangs_speed",
@@ -8063,6 +8171,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "overhangs_width_speed",
 "perimeter_bonding",
 "perimeter_extrusion_spacing",
+"perimeter_fan_speed",
 "perimeter_loop_seam",
 "perimeter_loop",
 "perimeter_overlap",
@@ -8078,6 +8187,7 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "remaining_times_type",
 "retract_lift_first_layer",
 "retract_lift_top",
+"retract_lift_before_travel",
 "seam_angle_cost",
 "seam_gap",
 "seam_gap_external",
@@ -8095,10 +8205,12 @@ std::unordered_set<std::string> prusa_export_to_remove_keys = {
 "solid_fill_pattern",
 "solid_infill_acceleration",
 "solid_infill_extrusion_spacing",
+"solid_infill_fan_speed",
 "start_gcode_manual",
 "support_material_angle_height",
 "support_material_acceleration",
 "support_material_contact_distance_type",
+"support_material_fan_speed",
 "support_material_interface_acceleration",
 "support_material_interface_angle",
 "support_material_interface_angle_increment",

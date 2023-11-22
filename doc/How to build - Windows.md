@@ -15,7 +15,7 @@ Clone the respository.  To place it in C:\src\REPO_NAME (use Slic3r, SuperSlicer
 ```
 c:> mkdir src
 c:> cd src
-c:\src> git clone https://github.com/prusa3d/REPO_NAME.git
+c:\src> git clone https://github.com/supermerill/SuperSlicer.git
 ```
 
 ### Run the automatic build script
@@ -30,7 +30,7 @@ c:\src\REPO_NAME>build_win.bat -d=..\REPO_NAME-deps -r=console
 The build script will run for a while (over an hour, depending on your machine) and automatically perform the following steps:
 1. Configure and build [deps](#compile-the-dependencies) as RelWithDebInfo with `c:\src\REPO_NAME-deps` as the destination directory
 2. Configure and build all [application targets](#compile-slic3r) as RelWithDebInfo
-3. Launch the resulting `prusa-slicer-console.exe` binary
+3. Launch the resulting `superslicer-console.exe` binary
 
 You can change the above command line options to do things like:
 * Change the destination for the dependencies by pointing `-d` to a different directory such as: `build_win.bat -d=s:\REPO_NAMEDeps`
@@ -68,6 +68,8 @@ cmake .. -G "Visual Studio 16 2019" -DDESTDIR="c:\src\REPO_NAME-deps"
 
 msbuild /m ALL_BUILD.vcxproj // This took 13.5 minutes on my machine: core I7-7700K @ 4.2Ghz with 32GB main memory and 20min on a average laptop
 ```
+
+note: if you have visual studio 2022 installed alongside 2017/2019, you may have to comment/remove the lines 20->31 in `dep_Boost-prefix/src/dep_Boosttools/build/src/engine/vswhere_usability_wrapper.cmd` (after first failing to compile) to force it to ignore vs2022.
 
 ### Generate Visual Studio project file for Slic3r, referencing the precompiled dependencies.
 Go to the Windows Start Menu and Click on "Visual Studio 2019" folder, then select the ->"x64 Native Tools Command Prompt" to open a command window and run the following:

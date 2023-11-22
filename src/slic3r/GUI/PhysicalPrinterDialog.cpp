@@ -324,6 +324,11 @@ void PhysicalPrinterDialog::build_printhost_settings(ConfigOptionsGroup* m_optgr
     m_optgroup->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
         if(opt_key == "printhost_client_cert_enabled")
             this->m_show_cert_fields = boost::any_cast<bool>(value);
+        if (!this->m_show_cert_fields && !m_config->opt_string("printhost_client_cert").empty()) {
+            change_opt_value(*m_config, "printhost_client_cert", std::string(""));
+            //change_opt_value(*m_config, "printhost_client_cert_password", "");
+            m_config->set_deserialize_strict("printhost_client_cert_password", "");
+        }
         if (opt_key == "host_type" || opt_key == "printhost_authorization_type" || opt_key == "printhost_client_cert_enabled")
             this->update();
         if (opt_key == "print_host")

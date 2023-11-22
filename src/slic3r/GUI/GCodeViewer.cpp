@@ -525,7 +525,8 @@ void GCodeViewer::SequentialView::render(float legend_height) const
 //    { 0.00f, 0.50f, 0.00f, 1.0f },   // erSupportMaterialInterface
 //    { 0.70f, 0.89f, 0.67f, 1.0f },   // erWipeTower
 //    { 0.37f, 0.82f, 0.58f, 1.0f },   // erCustom
-//    { 0.00f, 0.00f, 0.00f, 1.0f }    // erMixed
+//    { 0.00f, 0.00f, 0.00f, 1.0f },   // erMixed
+//    { 0.219f, 0.282f, 0.609f, 1.0f}  //erTravel
 //}};
 
 const std::vector<GCodeViewer::Color> GCodeViewer::Options_Colors {{
@@ -595,7 +596,7 @@ GCodeViewer::GCodeViewer()
     {
         this->Extrusion_Role_Colors.clear();
         this->Extrusion_Role_Colors.insert(this->Extrusion_Role_Colors.begin(), ExtrusionRole::erCount,{ 0.00f, 0.00f, 0.00f, 1.f });
-        this->Extrusion_Role_Colors[ExtrusionRole::erNone]              = { 0.75f, 0.75f, 0.75f, 1.f },
+        this->Extrusion_Role_Colors[ExtrusionRole::erNone]              = { 0.75f, 0.75f, 0.75f, 1.f }, // note: should never occur
         this->Extrusion_Role_Colors[ExtrusionRole::erPerimeter]         = { 1.00f, 0.90f, 0.30f, 1.f };
         this->Extrusion_Role_Colors[ExtrusionRole::erExternalPerimeter] = { 1.00f, 0.49f, 0.22f, 1.f };
         this->Extrusion_Role_Colors[ExtrusionRole::erOverhangPerimeter] = { 0.12f, 0.12f, 1.00f, 1.f };
@@ -614,6 +615,7 @@ GCodeViewer::GCodeViewer()
         this->Extrusion_Role_Colors[ExtrusionRole::erMilling]           = { 0.70f, 0.70f, 0.70f, 1.f };
         this->Extrusion_Role_Colors[ExtrusionRole::erCustom]            = { 0.37f, 0.82f, 0.58f, 1.f };
         this->Extrusion_Role_Colors[ExtrusionRole::erMixed]             = { 0.00f, 0.00f, 0.00f, 1.f };
+        this->Extrusion_Role_Colors[ExtrusionRole::erTravel]            = GCodeViewer::Travel_Colors.front();
 
 
         //try to load colors from ui file
@@ -637,10 +639,12 @@ GCodeViewer::GCodeViewer()
             }
         }
         catch (const std::ifstream::failure& err) {
-            trace(1, (std::string("The color file cannot be loaded. Reason: ") + err.what(), path_colors.string()));
+            BOOST_LOG_TRIVIAL(error) << "The color file cannot be loaded. Reason: " << err.what()
+                                     << ". File: " << path_colors.string();
         }
         catch (const std::runtime_error& err) {
-            trace(1, (std::string("Failed loading the color file. Reason: ") + err.what(), path_colors.string()));
+            BOOST_LOG_TRIVIAL(error) << "Failed loading the color file. Reason: " << err.what()
+                                     << ". File: " << path_colors.string();
         }
     }
 
@@ -2124,11 +2128,9 @@ void GCodeViewer::load_toolpaths(const GCodeProcessorResult& gcode_result)
         size_t move_id = i - seams_count;
 
         if (move.type == EMoveType::Extrude) {
-            // layers zs
-            const double* const last_z = m_layers.empty() ? nullptr : &m_layers.get_zs().back();
-            const double z = static_cast<double>(move.position.z());
-            if (last_z == nullptr || z < *last_z - EPSILON || *last_z + EPSILON < z)
-                m_layers.append(z, { last_travel_s_id, move_id });
+            // detect new layers
+            if (m_layers.empty() || move.layer_id >= m_layers.size())
+                m_layers.append(static_cast<double>(move.position.z()), { last_travel_s_id, move_id });
             else
                 m_layers.get_endpoints().back().last = move_id;
             // extruder ids

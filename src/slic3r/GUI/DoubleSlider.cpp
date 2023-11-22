@@ -1,13 +1,14 @@
 #include "libslic3r/libslic3r.h"
 #include "DoubleSlider.hpp"
-#include "libslic3r/GCode.hpp"
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "I18N.hpp"
 #include "ExtruderSequenceDialog.hpp"
-#include "libslic3r/Print.hpp"
 #include "libslic3r/AppConfig.hpp"
+#include "libslic3r/GCode.hpp"
+#include "libslic3r/GCodeWriter.hpp"
+#include "libslic3r/Print.hpp"
 #include "GUI_Utils.hpp"
 #include "MsgDialog.hpp"
 #include "Tab.hpp"
@@ -51,10 +52,11 @@ wxDEFINE_EVENT(wxCUSTOMEVT_TICKSCHANGED, wxEvent);
 
 static std::string gcode(Type type)
 {
-    const PrintConfig& config = GUI::wxGetApp().plater()->fff_print().config();
+    const Print& print = GUI::wxGetApp().plater()->fff_print();
+    const PrintConfig &config = print.config();
     switch (type) {
-    case ColorChange: return config.color_change_gcode;
-    case PausePrint:  return config.pause_print_gcode;
+    case ColorChange: return Slic3r::GCodeWriter::get_default_color_change_gcode(config);
+    case PausePrint: return Slic3r::GCodeWriter::get_default_pause_gcode(config);
     case Template:    return config.template_custom_gcode;
     default:          return "";
     }
@@ -782,10 +784,46 @@ wxString Control::get_label(int tick, LabelType label_type/* = ltHeightWithLayer
         if (label_type == ltHeight)
             return str;
         if (label_type == ltHeightWithLayer) {
-            size_t layer_number = m_is_wipe_tower ? get_layer_number(value, label_type) + 1 : (m_values.empty() ? value : value + 1);
-            layer_number = std::min(m_values.size() - 1, layer_number);
-            double layer_height = m_values.empty() ? m_label_koef : m_values[layer_number - 1] - (layer_number > 1 ? m_values[layer_number - 2] : 0);
-            return format_wxstr("%1%\n(%2%,\n%3%)", str, wxString::Format("%.*f", 2, layer_height), layer_number);
+            size_t layer_number = m_is_wipe_tower ? get_layer_number(value, label_type) /**/ + 1 : (m_values.empty() ? value : value /* + 1 */ );
+            bool show_lheight = GUI::wxGetApp().app_config->get("show_layer_height_doubleslider") == "1";
+            bool show_ltime = GUI::wxGetApp().app_config->get("show_layer_time_doubleslider") == "1";
+            int nb_lines = 2; // to move things down if the slider is on top
+            wxString comma = "\n(";
+            if (show_lheight) {
+                nb_lines++;
+                double layer_height = 0;
+                if (layer_number >= m_values.size()) {
+                    assert(layer_number == m_values.size());
+                    layer_height = m_values.empty() ? m_label_koef : m_values[m_values.size() - 1] - (m_values.size() > 1 ? m_values[m_values.size() - 2] : 0);
+                } else if (layer_number == 0) {
+                    layer_height = m_values.empty() ? m_label_koef : m_values[layer_number];
+                }else {
+                    layer_height = m_values.empty() ? m_label_koef : m_values[layer_number] - (layer_number > 1 ? m_values[layer_number - 1] : 0);
+                }
+                str = str + comma + wxString::Format("%.*f", 2, layer_height);
+                comma = ",\n";
+            }
+            if (show_ltime && !m_layers_times.empty()) {
+                if (m_layers_times.size() +1 >= m_values.size()) {
+                    size_t layer_idx_time = layer_number;
+                    if (m_values.size() > m_layers_times.size()) {
+                        layer_idx_time--;
+                    }
+                    if (layer_idx_time < m_layers_times.size()) {
+                        nb_lines++;
+                        double previous_time = (layer_idx_time > 0 ? m_layers_times[layer_idx_time - 1] : 0);
+                        wxString layer_time_wstr = short_and_splitted_time(get_time_dhms(m_layers_times[layer_idx_time] - previous_time));
+                        str = str + comma + layer_time_wstr;
+                        comma = ",\n";
+                    }
+                }
+            }
+            int nb_step_down = layer_number - m_values.size() + nb_lines - 1;
+            while (nb_step_down > 0) {
+                str = "\n" + str;
+                nb_step_down--;
+            }
+            return format_wxstr("%1%%2%%3%)", str, comma, layer_number);
         }
     }
 
@@ -1134,10 +1172,10 @@ void Control::draw_ruler(wxDC& dc)
                 }
             };
 
-        double short_tick = std::nan("");
+            double short_tick = std::nan("");
             int tick = 0;
             double value = 0.0;
-        size_t sequence = 0;
+            size_t sequence = 0;
 
             int prev_y_pos = -1;
             wxCoord label_height = dc.GetMultiLineTextExtent("0").y - 2;
@@ -1145,15 +1183,15 @@ void Control::draw_ruler(wxDC& dc)
 
             while (tick <= m_max_value) {
                 value += m_ruler.long_step;
-            if (value > m_ruler.max_values[sequence] && sequence < m_ruler.count()) {
+                if (value > m_ruler.max_values[sequence]) {
                     value = m_ruler.long_step;
                     for (; tick < values_size; tick++)
                         if (m_values[tick] < value)
                             break;
                     // short ticks from the last tick to the end of current sequence
-                assert(! std::isnan(short_tick));
+                    assert(! std::isnan(short_tick));
                     draw_short_ticks(dc, short_tick, tick);
-                    sequence++;
+                    if (sequence < m_ruler.count() - 1) sequence++;
                 }
                 short_tick = tick;
 
@@ -1178,9 +1216,9 @@ void Control::draw_ruler(wxDC& dc)
 
                 draw_short_ticks(dc, short_tick, tick);
 
-            if (value == m_ruler.max_values[sequence] && sequence < m_ruler.count()) {
+                if (value == m_ruler.max_values[sequence]) {
                     value = 0.0;
-                    sequence++;
+                    if (sequence < m_ruler.count() - 1) sequence++;
                     tick++;
                 }
             }
@@ -1978,7 +2016,7 @@ void Control::show_add_context_menu()
 {
     wxMenu menu;
 
-    if (m_mode == SingleExtruder) {
+    if (m_mode == SingleExtruder && !gcode(ColorChange).empty()) {
         append_menu_item(&menu, wxID_ANY, _L("Add color change") + " (" + gcode(ColorChange) + ")", "",
             [this](wxCommandEvent&) { add_code_as_tick(ColorChange); }, "colorchange_add_m", &menu);
 

@@ -2765,7 +2765,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             if (m_extrusion_role == erExternalPerimeter)
                 // cross section: rectangle
                 m_height = static_cast<float>(delta_pos[E] * (M_PI * sqr(1.05f * filament_radius)) / (delta_xyz * m_width));
-            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone)
+            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone || m_extrusion_role == erTravel)
                 // cross section: circle
                 m_height = static_cast<float>(m_result.filament_diameters[m_extruder_id] * std::sqrt(delta_pos[E] / delta_xyz));
             else
@@ -2802,7 +2802,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             if (m_extrusion_role == erExternalPerimeter)
                 // cross section: rectangle
                 m_width = static_cast<float>(delta_pos[E] * (M_PI * sqr(1.05f * filament_radius)) / (delta_xyz * m_height));
-            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone)
+            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone || m_extrusion_role == erTravel)
                 // cross section: circle
                 m_width = static_cast<float>(m_result.filament_diameters[m_extruder_id] * std::sqrt(delta_pos[E] / delta_xyz));
             else
@@ -3645,6 +3645,7 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_line_id + 1 :
         ((type == EMoveType::Seam) ? m_last_line_id : m_line_id);
     assert(type != EMoveType::Noop);
+
     m_result.moves.emplace_back(
         m_last_line_id,
         type,
@@ -3668,7 +3669,8 @@ void GCodeProcessor::store_move_vertex(EMoveType type)
         m_fan_speed,
         m_extruder_temps[m_extruder_id],
         m_time_processor.machines[0].time, //time: set later
-        static_cast<float>(m_layer_id) //layer_duration: set later
+        static_cast<float>(m_layer_id), //layer_duration: set later
+        m_layer_id
     );
 
     // stores stop time placeholders for later use

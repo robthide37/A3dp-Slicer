@@ -1682,7 +1682,7 @@ void MainFrame::init_menubar_as_editor()
 #else
         append_menu_item(fileMenu, wxID_ANY, _L("Save Project &as") + dots + "\tCtrl+Alt+S", _L("Save current project file as"),
 #endif // __APPLE__
-            [this](wxCommandEvent&) { save_project_as(); }, "save", nullptr,
+            [this](wxCommandEvent&) { save_project_as(); }, "save_as", nullptr,
             [this](){return m_plater != nullptr && can_save_as(); }, this);
 
         fileMenu->AppendSeparator();

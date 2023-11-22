@@ -41,7 +41,6 @@
 #include "PresetComboBoxes.hpp"
 #include <wx/wupdlock.h>
 
-#include <libslic3r/GCodeWriter.hpp>
 #include <libslic3r/Slicing.hpp>
 
 #include "GUI_App.hpp"
@@ -216,6 +215,7 @@ void Tab::create_preset_tab()
 
     add_scaled_button(panel, &m_btn_compare_preset, "compare");
     add_scaled_button(panel, &m_btn_save_preset, "save");
+    add_scaled_button(panel, &m_btn_save_preset_as, "save_as");
     add_scaled_button(panel, &m_btn_delete_preset, "cross");
     if (m_type == Preset::Type::TYPE_PRINTER)
         add_scaled_button(panel, &m_btn_edit_ph_printer, "cog");
@@ -229,8 +229,10 @@ void Tab::create_preset_tab()
     m_btn_compare_preset->SetToolTip(_L("Compare this preset with some another"));
     // TRN "Save current Settings"
     m_btn_save_preset->SetToolTip(from_u8((boost::format(_utf8(L("Save current %s"))) % m_title).str()));
+    m_btn_save_preset_as->SetToolTip(from_u8((boost::format(_utf8(L("Save current %s as new preset"))) % m_title).str()));
+
     m_btn_delete_preset->SetToolTip(_(L("Delete this preset")));
-    m_btn_delete_preset->Hide();
+    m_btn_delete_preset->Enable(false);
 
     add_scaled_button(panel, &m_question_btn, "question");
     m_question_btn->SetToolTip(_(L("Hover the cursor over buttons to find more information \n"
@@ -280,6 +282,8 @@ void Tab::create_preset_tab()
     m_hsizer->Add(m_presets_choice, 0, wxLEFT | wxRIGHT | wxTOP | wxALIGN_CENTER_VERTICAL, 3);
     m_hsizer->AddSpacer(int(4*scale_factor));
     m_hsizer->Add(m_btn_save_preset, 0, wxALIGN_CENTER_VERTICAL);
+    m_hsizer->AddSpacer(int(4 * scale_factor));
+    m_hsizer->Add(m_btn_save_preset_as, 0, wxALIGN_CENTER_VERTICAL);
     m_hsizer->AddSpacer(int(4 * scale_factor));
     m_hsizer->Add(m_btn_delete_preset, 0, wxALIGN_CENTER_VERTICAL);
     if (m_btn_edit_ph_printer) {
@@ -371,7 +375,10 @@ void Tab::create_preset_tab()
     m_hsizer->Add(m_page_view, 1, wxEXPAND | wxLEFT, 5);
 
     m_btn_compare_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { compare_preset(); }));
-    m_btn_save_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { save_preset(); }));
+    m_btn_save_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) {
+                                save_preset(this->get_presets()->get_selected_preset_name());
+                            }));
+    m_btn_save_preset_as->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { save_preset(); }));
     m_btn_delete_preset->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) { delete_preset(); }));
     m_btn_hide_incompatible_presets->Bind(wxEVT_BUTTON, ([this](wxCommandEvent e) {
         toggle_show_hide_incompatible();
@@ -962,6 +969,7 @@ void Tab::update_changed_tree_ui()
         cur_item = next_item;
     }
     update_undo_buttons();
+    update_btns_enabling();
 }
 
 void Tab::update_undo_buttons()
@@ -2743,6 +2751,7 @@ PageShp TabFilament::create_filament_overrides_page()
                                         "filament_deretract_speed",
                                         "filament_retract_restart_extra",
                                         "filament_retract_before_travel",
+                                        "filament_retract_lift_before_travel",
                                         "filament_retract_layer_change",
                                         "filament_seam_gap",
                                         "filament_wipe",
@@ -2778,6 +2787,7 @@ void TabFilament::update_filament_overrides_page()
                                             "filament_deretract_speed",
                                             "filament_retract_restart_extra",
                                             "filament_retract_before_travel",
+                                            "filament_retract_lift_before_travel",
                                             "filament_retract_layer_change",
                                             "filament_seam_gap",
                                             "filament_wipe",
@@ -3453,11 +3463,6 @@ void TabPrinter::toggle_options()
     field = get_field("silent_mode");
     if (field) field->toggle(is_marlin_flavor);
 
-    if (m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value == gcfKlipper)
-        GCodeWriter::PausePrintCode = "PAUSE";
-    else 
-        GCodeWriter::PausePrintCode = "M601";
-
     if (m_last_gcode_flavor != uint8_t(m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value)) {
         m_last_gcode_flavor = uint8_t(m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value);
         m_rebuild_kinematics_page = true;
@@ -3482,28 +3487,25 @@ void TabPrinter::toggle_options()
         if (field)
             field->toggle(!use_firmware_retraction);
 
-        // user can customize travel length if we have retraction length or we"re using
-        // firmware retraction
-        field = get_field("retract_before_travel", i);
-        if (field)
-            field->toggle(have_retract_length || use_firmware_retraction);
+        // retraction only if have retraction length or we're using firmware retraction
+        bool retraction = (have_retract_length || use_firmware_retraction);
 
         // user can customize other retraction options if retraction is enabled
-        bool retraction = (have_retract_length || use_firmware_retraction);
-        std::vector<std::string> vec = { "retract_lift", "retract_layer_change" };
+        std::vector<std::string> vec = { "retract_lift", "retract_layer_change", "retract_before_travel" };
         for (auto el : vec) {
             field = get_field(el, i);
             if (field)
                 field->toggle(retraction);
         }
 
+        bool has_lift = retraction && m_config->opt_float("retract_lift", i) > 0;
         // retract lift above / below only applies if using retract lift
         vec.resize(0);
-        vec = { "retract_lift_above", "retract_lift_below", "retract_lift_top", "retract_lift_first_layer" };
+        vec = { "retract_lift_above", "retract_lift_below", "retract_lift_top", "retract_lift_first_layer", "retract_lift_before_travel"};
         for (auto el : vec) {
             field = get_field(el, i);
             if (field)
-                field->toggle(retraction && m_config->opt_float("retract_lift", i) > 0);
+                field->toggle(has_lift);
         }
 
         // some options only apply when not using firmware retraction
@@ -3516,6 +3518,7 @@ void TabPrinter::toggle_options()
         }
 
         bool wipe = m_config->opt_bool("wipe", i) && have_retract_length;
+        vec.resize(0);
         vec = { "retract_before_wipe", "wipe_only_crossing", "wipe_speed" };
         for (auto el : vec) {
             field = get_field(el, i);
@@ -3844,10 +3847,11 @@ void Tab::rebuild_page_tree()
 
 void Tab::update_btns_enabling()
 {
-    // we can delete any preset from the physical printer
-    // and any user preset
-        const Preset& preset = m_presets->get_edited_preset();
-    m_btn_delete_preset->Show((m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection())
+    const Preset &preset = m_presets->get_edited_preset();
+    // we can save any preset taht is not default/system and is modified.
+    m_btn_save_preset->Enable(!preset.is_default && !preset.is_system && preset.is_dirty && !preset.name.empty());
+    // we can delete any preset from the physical printer and any user preset
+    m_btn_delete_preset->Enable((m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection())
                               || (!preset.is_default && !preset.is_system));
 
     if (m_btn_edit_ph_printer)
@@ -4257,8 +4261,7 @@ void Tab::save_preset(std::string name /*= ""*/, bool detach)
     // Update the selection boxes at the plater.
     on_presets_changed();
     // If current profile is saved, "delete preset" button have to be enabled
-    m_btn_delete_preset->Show();
-    m_btn_delete_preset->GetParent()->Layout();
+    update_btns_enabling();
 
     if (m_type == Preset::TYPE_PRINTER)
         static_cast<TabPrinter*>(this)->m_initial_extruders_count = static_cast<TabPrinter*>(this)->m_extruders_count;

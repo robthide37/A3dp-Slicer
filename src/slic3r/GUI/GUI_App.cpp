@@ -160,7 +160,7 @@ public:
             memDC.SelectObject(bitmap);
 
             memDC.SetFont(m_action_font);
-            ///            memDC.SetTextForeground(wxColour(237, 107, 33)); // ed6b21
+///            memDC.SetTextForeground(wxColour(237, 107, 33)); // ed6b21
             uint32_t color = Slic3r::GUI::wxGetApp().app_config->create_color(0.86f, 0.93f);
             memDC.SetTextForeground(wxColour(color & 0xFF, (color & 0xFF00) >> 8, (color & 0xFF0000) >> 16));
             memDC.DrawText(text, int(m_scale * 60), m_action_line_y_position);
@@ -280,7 +280,7 @@ private:
             version = _L("Version") + " " + std::string(SLIC3R_VERSION_FULL);
 
             // credits infornation
-            credits = _L("Slic3r contains sizable contributions from Prusa Research. Original work by Alessandro Ranellucci and the RepRap community.") + "\n\n" +
+            credits = _L("SuperSlicer is a skinned version of Slic3r, based on PrusaSlicer by Prusa and the original Slic3r by Alessandro Ranellucci & the RepRap community.") + "\n\n" +
                         title + " " + _L("is licensed under the") + " " + _L("GNU Affero General Public License, version 3") + ".\n\n" +
                         _L("Contributions by Vojtech Bubnik, Enrico Turri, Durand Remi, Oleksandra Iushchenko, Tamas Meszaros, Lukas Matena, Vojtech Kral, David Kocik and numerous others.");
 
@@ -1184,23 +1184,23 @@ bool GUI_App::on_init_inner()
             boost::filesystem::path splash_screen_path = (boost::filesystem::path(Slic3r::resources_dir()) / "splashscreen" / file_name);
             if (boost::filesystem::exists(splash_screen_path)) {
                 wxString path_str = wxString::FromUTF8((splash_screen_path).string().c_str());
-                // make a bitmap with dark grey banner on the left side
+        // make a bitmap with dark grey banner on the left side
                 bmp = SplashScreen::MakeBitmap(wxBitmap(path_str, wxBITMAP_TYPE_JPEG));
 
                 //get the artist name from metadata
-                int result;
-                void** ifdArray = nullptr;
-                ExifTagNodeInfo* tag;
+            int result;
+            void** ifdArray = nullptr;
+            ExifTagNodeInfo* tag;
                 ifdArray = exif_createIfdTableArray(path_str.c_str(), &result);
-                if (result > 0 && ifdArray) {
-                    tag = exif_getTagInfo(ifdArray, IFD_0TH, TAG_Artist);
-                    if (tag) {
-                        if (!tag->error) {
-                            artist = (_L("Artwork model by") + " " + wxString::FromUTF8((char*)tag->byteData));
-                        }
+            if (result > 0 && ifdArray) {
+                tag = exif_getTagInfo(ifdArray, IFD_0TH, TAG_Artist);
+                if (tag) {
+                    if (!tag->error) {
+                        artist = (_L("Artwork model by") + " " + wxString::FromUTF8((char*)tag->byteData));
                     }
                 }
             }
+        }
         }
 
         // Detect position (display) to show the splash screen
@@ -1222,16 +1222,16 @@ bool GUI_App::on_init_inner()
 
         // make a bitmap with dark grey banner on the left side
         scrn = new SplashScreen(bmp.IsOk() ? bmp : SplashScreen::MakeBitmap(create_scaled_bitmap(SLIC3R_APP_KEY, nullptr, 600)),
-                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos, artist);
+                                wxSPLASH_CENTRE_ON_SCREEN | wxSPLASH_TIMEOUT, 4000, splashscreen_pos, artist);
 
-            if (!default_splashscreen_pos)
-                // revert "restore_win_position" value if application wasn't crashed
-                get_app_config()->set("restore_win_position", "1");
+        if (!default_splashscreen_pos)
+            // revert "restore_win_position" value if application wasn't crashed
+            get_app_config()->set("restore_win_position", "1");
 #ifndef __linux__
-            wxYield();
+        wxYield();
 #endif
-            scrn->SetText(_L("Loading configuration") + dots);
-        }
+        scrn->SetText(_L("Loading configuration")+ dots);
+    }
 
     preset_bundle = new PresetBundle();
 

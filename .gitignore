@@ -18,5 +18,7 @@ local-lib
 build*
 deps/build*
 deps/deps-*
-**/.DS_Store
+
+# MacOS Ignores
+.DS_Store
 

@@ -29,8 +29,36 @@
 #define E_NUM(val) PRECISION(val, this->m_config.gcode_precision_e.value)
 namespace Slic3r {
 
+std::string GCodeWriter::get_default_pause_gcode(const GCodeConfig &config)
+{
+    if (config.pause_print_gcode.value.empty()) {
+        if (config.gcode_flavor.value == GCodeFlavor::gcfKlipper) {
+            return "PAUSE";
+        } else if (config.gcode_flavor.value == GCodeFlavor::gcfRepRap || config.gcode_flavor.value == GCodeFlavor::gcfMarlinLegacy /*prusa only*/) {
+            return "M601";
+        } else {
+            // no pause command for other firmware, for what i am aware. Please submit a pullrequest or issue if they change.
+            return "";
+        }
+    } else {
+        return config.pause_print_gcode.value;
+    }
+}
 
-std::string GCodeWriter::PausePrintCode = "M601";
+std::string GCodeWriter::get_default_color_change_gcode(const GCodeConfig &config)
+{
+    if (config.color_change_gcode.value.empty()) {
+        if (config.gcode_flavor.value == GCodeFlavor::gcfRepRap || config.gcode_flavor.value == GCodeFlavor::gcfMarlinLegacy ||
+            config.gcode_flavor.value == GCodeFlavor::gcfMarlinFirmware || config.gcode_flavor.value == GCodeFlavor::gcfSmoothie) {
+            return "M600";
+        } else {
+            // no pause command for other firmware, for what i am aware. Please submit a pullrequest or issue if they change.
+            return "";
+        }
+    } else {
+        return config.color_change_gcode.value;
+    }
+}
 
 void GCodeWriter::reset() {
     *this = GCodeWriter{};
@@ -74,7 +102,7 @@ uint16_t GCodeWriter::first_mill() const {
     } else return m_millers.front().id();
 }
 bool GCodeWriter::tool_is_extruder() const {
-    return m_tool->id() < first_mill();
+    return m_tool && m_tool->id() < first_mill();
 }
 const Tool* GCodeWriter::get_tool(uint16_t id) const{
     for (const Extruder& e : m_extruders)

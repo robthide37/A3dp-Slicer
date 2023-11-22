@@ -443,9 +443,9 @@ public:
     }
     void                    set_status(int percent, const std::string& message, const std::vector<std::string>& args, unsigned int flags = SlicingStatus::DEFAULT) const {
         //check if it need an update. Avoid doing a gui update each ms.
-        if ((flags & SlicingStatus::SECONDARY_STATE) != 0 && message != "") {
+        if ((flags & SlicingStatus::SECONDARY_STATE) != 0 && message != m_last_status_message) {
             std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
-            if ((static_cast<std::chrono::duration<double>>(current_time - PrintBase::m_last_status_update)).count() > 0.2 && PrintBase::m_last_status_percent != percent) {
+            if ((static_cast<std::chrono::duration<double>>(current_time - PrintBase::m_last_status_update)).count() > 0.002 && PrintBase::m_last_status_percent != percent) {
                 PrintBase::m_last_status_update = current_time;
                 PrintBase::m_last_status_percent = percent;
             } else {
@@ -455,6 +455,7 @@ public:
         } else {
             PrintBase::m_last_status_percent = -1;
         }
+        m_last_status_message = message;
         if ((flags & SlicingStatus::FlagBits::MAIN_STATE) == 0 && (flags & SlicingStatus::FlagBits::SECONDARY_STATE) == 0)
             flags = flags | SlicingStatus::FlagBits::MAIN_STATE;
         if (m_status_callback) {
@@ -505,6 +506,10 @@ public:
     // To be called by the worker thread and its sub-threads (mostly launched on the TBB thread pool) regularly.
     //public to ebablet ot call it from brim code.
     void                   throw_if_canceled() const { if (m_cancel_status.load(std::memory_order_acquire)) throw CanceledException(); }
+
+    // Update "scale", "input_filename", "input_filename_base" placeholders from the current printable ModelObjects.
+    void update_object_placeholders(DynamicConfig &config, const std::string &default_ext) const;
+
 protected:
 	friend class PrintObjectBase;
     friend class BackgroundSlicingProcess;
@@ -522,8 +527,6 @@ protected:
 
     // To be called by this->output_filename() with the format string pulled from the configuration layer.
     std::string            output_filename(const std::string &format, const std::string &default_ext, const std::string &filename_base, const DynamicConfig *config_override = nullptr) const;
-    // Update "scale", "input_filename", "input_filename_base" placeholders from the current printable ModelObjects.
-    void                   update_object_placeholders(DynamicConfig &config, const std::string &default_ext) const;
 
 	Model                                   m_model;
 	DynamicPrintConfig						m_full_print_config;
@@ -537,6 +540,7 @@ protected:
     inline static std::chrono::time_point<std::chrono::system_clock>
                                             m_last_status_update = {};
     inline static int                       m_last_status_percent = -1;
+    inline static std::string               m_last_status_message = "";
 
 private:
     std::atomic<CancelStatus>               m_cancel_status;
