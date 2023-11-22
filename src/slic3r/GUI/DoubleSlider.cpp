@@ -1172,10 +1172,10 @@ void Control::draw_ruler(wxDC& dc)
                 }
             };
 
-        double short_tick = std::nan("");
+            double short_tick = std::nan("");
             int tick = 0;
             double value = 0.0;
-        size_t sequence = 0;
+            size_t sequence = 0;
 
             int prev_y_pos = -1;
             wxCoord label_height = dc.GetMultiLineTextExtent("0").y - 2;
@@ -1183,15 +1183,15 @@ void Control::draw_ruler(wxDC& dc)
 
             while (tick <= m_max_value) {
                 value += m_ruler.long_step;
-            if (value > m_ruler.max_values[sequence] && sequence < m_ruler.count()) {
+                if (value > m_ruler.max_values[sequence]) {
                     value = m_ruler.long_step;
                     for (; tick < values_size; tick++)
                         if (m_values[tick] < value)
                             break;
                     // short ticks from the last tick to the end of current sequence
-                assert(! std::isnan(short_tick));
+                    assert(! std::isnan(short_tick));
                     draw_short_ticks(dc, short_tick, tick);
-                    sequence++;
+                    if (sequence < m_ruler.count() - 1) sequence++;
                 }
                 short_tick = tick;
 
@@ -1216,9 +1216,9 @@ void Control::draw_ruler(wxDC& dc)
 
                 draw_short_ticks(dc, short_tick, tick);
 
-            if (value == m_ruler.max_values[sequence] && sequence < m_ruler.count()) {
+                if (value == m_ruler.max_values[sequence]) {
                     value = 0.0;
-                    sequence++;
+                    if (sequence < m_ruler.count() - 1) sequence++;
                     tick++;
                 }
             }

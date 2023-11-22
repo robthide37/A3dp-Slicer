@@ -477,26 +477,34 @@ void PolylineOrArc::clip_last_point() {
         }
         m_fitting_result.back().end_point_index = this->points.size() - 1;
     }
+    while (!m_fitting_result.empty() && m_fitting_result.back().start_point_index >= m_fitting_result.back().end_point_index) {
+        m_fitting_result.pop_back();
+    }
     assert(this->m_fitting_result.empty() || this->m_fitting_result.back().end_point_index < this->points.size());
 }
 
 void PolylineOrArc::clip_first_point() {
     assert(!empty());
+    assert(points.size() > 2);
     this->points.erase(this->points.begin());
     if (!m_fitting_result.empty()) {
         if (m_fitting_result.front().path_type == Slic3r::Geometry::EMovePathType::Arc_move_ccw
             || m_fitting_result.front().path_type == Slic3r::Geometry::EMovePathType::Arc_move_cw) {
-            if (m_fitting_result.front().arc_data.clip_start(this->first_point()))
+            if (m_fitting_result.front().arc_data.clip_start(this->first_point())){
                 //BBS: succeed to clip arc, then update the last point
-                this->points.front() = m_fitting_result.front().arc_data.end_point;
-            else
+                this->points.front() = m_fitting_result.front().arc_data.start_point;
+            } else {
                 //BBS: Failed to clip arc, then back to linear move
                 m_fitting_result.front().path_type = Slic3r::Geometry::EMovePathType::Linear_move;
+            }
         }
         //move m_fitting_result indexes.
         for (auto& fit : m_fitting_result) {
             fit.start_point_index = fit.start_point_index == 0 ? 0 : fit.start_point_index - 1;
             --fit.end_point_index;
+        }
+        while (!m_fitting_result.empty() && m_fitting_result.front().start_point_index >= m_fitting_result.front().end_point_index) {
+            m_fitting_result.erase(m_fitting_result.begin());
         }
         assert(m_fitting_result.front().end_point_index == this->points.size() - 1);
     }

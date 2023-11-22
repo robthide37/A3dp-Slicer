@@ -2733,7 +2733,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             if (m_extrusion_role == erExternalPerimeter)
                 // cross section: rectangle
                 m_height = static_cast<float>(delta_pos[E] * (M_PI * sqr(1.05f * filament_radius)) / (delta_xyz * m_width));
-            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone)
+            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone || m_extrusion_role == erTravel)
                 // cross section: circle
                 m_height = static_cast<float>(m_result.filament_diameters[m_extruder_id] * std::sqrt(delta_pos[E] / delta_xyz));
             else
@@ -2770,7 +2770,7 @@ void GCodeProcessor::process_G1(const GCodeReader::GCodeLine& line)
             if (m_extrusion_role == erExternalPerimeter)
                 // cross section: rectangle
                 m_width = static_cast<float>(delta_pos[E] * (M_PI * sqr(1.05f * filament_radius)) / (delta_xyz * m_height));
-            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone)
+            else if (is_bridge(m_extrusion_role) || m_extrusion_role == erNone || m_extrusion_role == erTravel)
                 // cross section: circle
                 m_width = static_cast<float>(m_result.filament_diameters[m_extruder_id] * std::sqrt(delta_pos[E] / delta_xyz));
             else
