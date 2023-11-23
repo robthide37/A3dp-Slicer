@@ -492,9 +492,10 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, s
 
                         const size_t ref_id = (i == 0) ? 0 : i - 1;
                         const size_t first_line_id = (i == 0) ? *m_cache_range.min :
-                            (*m_cache_range.min - 1 >= cumulative_lines_counts[ref_id]) ? *m_cache_range.min - cumulative_lines_counts[ref_id] : 1;
-                        const size_t last_line_id = (*m_cache_range.max - 1 <= cumulative_lines_counts[i]) ?
-                            (i == 0) ? *m_cache_range.max : *m_cache_range.max - cumulative_lines_counts[ref_id] : m_lines_ends[i].size() - 1;
+                            (*m_cache_range.min > cumulative_lines_counts[ref_id]) ? *m_cache_range.min - cumulative_lines_counts[ref_id] : 1;
+                        const size_t last_line_id = (*m_cache_range.max <= cumulative_lines_counts[i]) ?
+                            (i == 0) ? *m_cache_range.max : *m_cache_range.max - cumulative_lines_counts[ref_id] : m_lines_ends[i].size();
+                        assert(last_line_id >= first_line_id);
 
                         for (size_t j = first_line_id; j <= last_line_id; ++j) {
                             const size_t begin = (j == 1) ? 0 : m_lines_ends[i][j - 2];
