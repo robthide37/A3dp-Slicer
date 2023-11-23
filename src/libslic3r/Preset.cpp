@@ -46,6 +46,8 @@
 #include "PlaceholderParser.hpp"
 #include "GCode/Thumbnails.hpp"
 
+#include "PresetBundle.hpp"
+
 using boost::property_tree::ptree;
 
 namespace Slic3r {
@@ -1788,7 +1790,8 @@ std::string PhysicalPrinter::get_preset_name(std::string name)
 // ***  PhysicalPrinterCollection  ***
 // -----------------------------------
 
-PhysicalPrinterCollection::PhysicalPrinterCollection( const std::vector<std::string>& keys)
+PhysicalPrinterCollection::PhysicalPrinterCollection( const std::vector<std::string>& keys, PresetBundle* preset_bundle)
+    :m_preset_bundle_owner(preset_bundle)
 {
     // Default config for a physical printer containing all key/value pairs of PhysicalPrinter::printer_options().
     for (const std::string &key : keys) {
@@ -1797,6 +1800,28 @@ PhysicalPrinterCollection::PhysicalPrinterCollection( const std::vector<std::str
         assert(opt->default_value);
         m_default_config.set_key_value(key, opt->default_value->clone());
     }
+}
+
+static void update_preset_names_if_were_renamed(std::set<std::string>& preset_names, const PrinterPresetCollection& printer_presets)
+{
+    std::set<std::string> new_names;
+
+    bool was_renamed{ false };
+    for (const std::string& preset_name : preset_names) {
+        const Preset* preset = printer_presets.find_preset(preset_name);
+        if (preset)
+            new_names.emplace(preset_name);
+        else {
+            if (const std::string* new_name = printer_presets.get_preset_name_renamed(preset_name)) {
+                BOOST_LOG_TRIVIAL(warning) << "Printer preset present " << preset_name << "was renamed to: " << *new_name << std::endl;
+                new_names.emplace(*new_name);
+                was_renamed = true;
+            }
+        }
+    }
+
+    if (was_renamed)
+        preset_names = new_names;
 }
 
 // Load all printers found in dir_path.
@@ -1817,10 +1842,15 @@ void PhysicalPrinterCollection::load_printers(
             std::string name = dir_entry.path().filename().string();
             // Remove the .ini suffix.
             name.erase(name.size() - 4);
-            if (this->find_printer(name, false)) {
+            if (PhysicalPrinter* found_printer = this->find_printer(name, false)) {
                 // This happens when there's is a preset (most likely legacy one) with the same name as a system preset
                 // that's already been loaded from a bundle.
                 BOOST_LOG_TRIVIAL(warning) << "Printer already present, not loading: " << name;
+
+                // But some of used printer_preset might have been renamed.
+                // Check it and replace with new name(s) if it's needed
+                update_preset_names_if_were_renamed(found_printer->preset_names, m_preset_bundle_owner->printers);
+
                 continue;
             }
             try {
@@ -1834,6 +1864,9 @@ void PhysicalPrinterCollection::load_printers(
                         substitutions.push_back({ name, Preset::TYPE_PHYSICAL_PRINTER, PresetConfigSubstitutions::Source::UserFile, printer.file, std::move(config_substitutions) });
                     printer.update_from_config(config);
                     printer.loaded = true;
+                    // Some of used printer_preset might have been renamed.
+                    // Check it and replace with new name(s) if it's needed
+                    update_preset_names_if_were_renamed(printer.preset_names, m_preset_bundle_owner->printers);
                 }
                 catch (const std::ifstream::failure& err) {
                     throw Slic3r::RuntimeError(std::string("The selected preset cannot be loaded: ") + printer.file + "\n\tReason: " + err.what());
@@ -1865,6 +1898,9 @@ void PhysicalPrinterCollection::load_printer(const std::string& path, const std:
     it->file = path;
     it->config = std::move(config);
     it->loaded = true;
+    // Some of used printer_preset might have been renamed.
+    // Check it and replace with new name(s) if it's needed
+    update_preset_names_if_were_renamed(it->preset_names, m_preset_bundle_owner->printers);
     if (select)
         this->select_printer(*it);
 
@@ -2120,6 +2156,10 @@ void PhysicalPrinterCollection::select_printer(const std::string& full_name)
         m_selected_preset = *it->preset_names.begin();
     else
         m_selected_preset = it->get_preset_name(full_name);
+
+    // Check if selected preset wasn't renamed and replace it with new name
+    if (const std::string* new_name = m_preset_bundle_owner->printers.get_preset_name_renamed(m_selected_preset))
+        m_selected_preset = *new_name;
 }
 
 void PhysicalPrinterCollection::select_printer(const std::string& printer_name, const std::string& preset_name)
