@@ -1169,7 +1169,7 @@ void TabPresetComboBox::update()
     if (m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection()) {
         std::string sel_preset_name = m_preset_bundle->physical_printers.get_selected_printer_preset_name();
         Preset* preset = m_collection->find_preset(sel_preset_name);
-        if (!preset)
+        if (!preset || m_collection->get_selected_preset_name() != sel_preset_name)
             m_preset_bundle->physical_printers.unselect_printer();
     }
 
