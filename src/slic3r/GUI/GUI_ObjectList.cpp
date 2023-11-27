@@ -4670,21 +4670,7 @@ void ObjectList::fix_through_winsdk()
     progress_dlg.Update(100, "");
 
     // Show info notification
-    wxString msg;
-    wxString bullet_suf = "\n   - ";
-    if (!succes_models.empty()) {
-        msg = _L_PLURAL("The following model was repaired successfully", "The following models were repaired successfully", succes_models.size()) + ":";
-        for (auto& model : succes_models)
-            msg += bullet_suf + from_u8(model);
-        msg += "\n\n";
-    }
-    if (!failed_models.empty()) {
-        msg += _L_PLURAL("Folowing model repair failed", "Folowing models repair failed", failed_models.size()) + ":\n";
-        for (auto& model : failed_models)
-            msg += bullet_suf + from_u8(model.first) + ": " + _(model.second);
-    }
-    if (msg.IsEmpty())
-        msg = _L("Repairing was canceled");
+    wxString msg = MenuFactory::get_repaire_result_message(succes_models, failed_models);
     plater->get_notification_manager()->push_notification(NotificationType::RepairFinished, NotificationManager::NotificationLevel::PrintInfoShortNotificationLevel, boost::nowide::narrow(msg));
 }
 
