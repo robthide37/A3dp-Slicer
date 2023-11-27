@@ -4787,7 +4787,7 @@ std::string GCode::extrude_entity(const ExtrusionEntity &entity, const std::stri
 }
 
 void GCode::use(const ExtrusionEntityCollection &collection) {
-    if (!collection.can_sort() || collection.role() == erMixed || collection.entities().size() <= 1) {
+    if (!collection.can_sort() /*|| collection.role() == erMixed*/ || collection.entities().size() <= 1) {
         for (const ExtrusionEntity* next_entity : collection.entities()) {
             next_entity->visit(*this);
         }
@@ -4912,10 +4912,15 @@ std::string GCode::extrude_perimeters(const Print &print, const std::vector<Obje
                 gcode += m_writer.set_temperature(m_config.print_temperature.value, false, m_writer.tool()->id());
             else if (m_layer != nullptr && m_layer->bottom_z() < EPSILON && m_config.first_layer_temperature.get_at(m_writer.tool()->id()) > 0)
                 gcode += m_writer.set_temperature(m_config.first_layer_temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
-            else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) // don't set it if disabled
-                gcode += m_writer.set_temperature(m_config.temperature.get_at(m_writer.tool()->id()), false, m_writer.tool()->id());
-            for (const ExtrusionEntity *ee : region.perimeters)
+            else if (m_config.temperature.get_at(m_writer.tool()->id()) > 0) { // don't set it if disabled
+                gcode += m_writer.set_temperature(m_config.temperature.get_at(m_writer.tool()->id()), false,
+                                                  m_writer.tool()->id());
+            }
+            ExtrusionEntitiesPtr extrusions{region.perimeters};
+            chain_and_reorder_extrusion_entities(extrusions, &m_last_pos);
+            for (const ExtrusionEntity *ee : extrusions) {
                 gcode += this->extrude_entity(*ee, "perimeter", -1.);
+            }
         }
     m_seam_perimeters = false;
     return gcode;
