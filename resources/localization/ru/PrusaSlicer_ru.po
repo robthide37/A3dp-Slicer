@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: PrusaSlicer 2.7.0\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2023-11-16 13:19+0100\n"
-"PO-Revision-Date: 2023-11-24 01:28+0700\n"
+"PO-Revision-Date: 2023-11-27 14:23+0700\n"
 "Last-Translator: Andylg <andylg@yandex.ru>\n"
 "Language-Team: \n"
 "Language: ru\n"
@@ -2669,7 +2669,10 @@ msgstr ""
 "OctoPrint = комментарии, которые будут использоваться плагином OctoPrint "
 "CancelObject.\n"
 "Firmware = G-код, специфичный для конкретной прошивки (будет выбран в "
-"зависимости от типа прошивки и может оказаться пустым)."
+"зависимости от типа прошивки и может оказаться пустым).\n"
+"\n"
+"Эта настройка не совместима с настройкой «Мультиматериальный одиночный "
+"экструдер» и «Очистка в модель» / «Очистка в заполнение модели»."
 
 #: src/libslic3r/PrintConfig.cpp:1500 src/libslic3r/PrintConfig.cpp:2494
 msgid "Disabled"
@@ -14403,7 +14406,7 @@ msgstr "Без названия"
 
 #: src/slic3r/GUI/MainFrame.cpp:721
 msgid "based on Slic3r"
-msgstr "созданная на остове Slic3r"
+msgstr "созданная на основе Slic3r"
 
 #: src/slic3r/GUI/MainFrame.cpp:1160 src/slic3r/GUI/MainFrame.cpp:1163
 #, c-format, boost-format
