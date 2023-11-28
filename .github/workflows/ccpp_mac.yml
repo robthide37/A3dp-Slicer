@@ -8,7 +8,7 @@ on:
       - nightly_master
       - debug_macos
       - dev
-
+      - supermerill-Main
 jobs:
   build:
 
