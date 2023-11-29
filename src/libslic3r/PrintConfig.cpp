@@ -4301,6 +4301,35 @@ void PrintConfigDef::init_sla_params()
     def->min = float(SCALING_FACTOR);
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionFloat(0.001));
+
+    // Declare retract values for material profile, overriding the print and printer profiles.
+    for (const char* opt_key : {
+        // float
+        "support_head_front_diameter", "branchingsupport_head_front_diameter", 
+        "support_head_penetration", "branchingsupport_head_penetration", 
+        "support_head_width", "branchingsupport_head_width",
+        "support_pillar_diameter", "branchingsupport_pillar_diameter",
+        "relative_correction_x", "relative_correction_y", "relative_correction_z", 
+        "elefant_foot_compensation",
+        // int
+        "support_points_density_relative"
+        }) {
+        auto it_opt = options.find(opt_key);
+        assert(it_opt != options.end());
+        def = this->add_nullable(std::string("material_") + opt_key, it_opt->second.type == coFloat ? coFloats : coInts);
+        def->label = it_opt->second.label;
+        def->full_label = it_opt->second.full_label;
+        def->tooltip = it_opt->second.tooltip;
+        def->sidetext = it_opt->second.sidetext;
+        def->min  = it_opt->second.min;
+        def->max  = it_opt->second.max;
+        def->mode = it_opt->second.mode;
+        switch (def->type) {
+        case coFloats: def->set_default_value(new ConfigOptionFloatsNullable{ it_opt->second.default_value->getFloat() }); break;
+        case coInts:   def->set_default_value(new ConfigOptionIntsNullable  { it_opt->second.default_value->getInt()   }); break;
+        default: assert(false);
+        }
+    }
 }
 
 // Ignore the following obsolete configuration keys:

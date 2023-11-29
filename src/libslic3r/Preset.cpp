@@ -606,7 +606,25 @@ static std::vector<std::string> s_Preset_sla_material_options {
     "material_print_speed",
     "default_sla_material_profile",
     "compatible_prints", "compatible_prints_condition",
-    "compatible_printers", "compatible_printers_condition", "inherits"
+    "compatible_printers", "compatible_printers_condition", "inherits",
+
+    // overriden options
+    "material_support_head_front_diameter",
+    "material_support_head_penetration",
+    "material_support_head_width",
+    "material_support_pillar_diameter",
+
+    "material_branchingsupport_head_front_diameter",
+    "material_branchingsupport_head_penetration",
+    "material_branchingsupport_head_width",
+    "material_branchingsupport_pillar_diameter",
+
+    "material_support_points_density_relative",
+
+    "material_relative_correction_x",
+    "material_relative_correction_y",
+    "material_relative_correction_z",
+    "material_elefant_foot_compensation"
 };
 
 static std::vector<std::string> s_Preset_sla_printer_options {

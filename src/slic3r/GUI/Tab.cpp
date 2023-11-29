@@ -687,7 +687,7 @@ void Tab::init_options_list()
     m_options_list.clear();
 
     for (const std::string& opt_key : m_config->keys())
-        emplace_option(opt_key, m_type != Preset::TYPE_FILAMENT && !PresetCollection::is_independent_from_extruder_number_option(opt_key));
+        emplace_option(opt_key, m_type != Preset::TYPE_FILAMENT && m_type != Preset::TYPE_SLA_MATERIAL && !PresetCollection::is_independent_from_extruder_number_option(opt_key));
 }
 
 template<class T>
@@ -1960,7 +1960,7 @@ void TabFilament::update_line_with_near_label_widget(ConfigOptionsGroupShp optgr
         field->toggle(is_checked);
 }
 
-std::vector<std::pair<std::string, std::vector<std::string>>> option_keys {
+std::vector<std::pair<std::string, std::vector<std::string>>> filament_overrides_option_keys {
     {"Travel lift", {
         "filament_retract_lift",
         "filament_travel_ramping_lift",
@@ -1992,7 +1992,7 @@ void TabFilament::add_filament_overrides_page()
 
     const int extruder_idx = 0; // #ys_FIXME
 
-    for (const auto&[title, keys] : option_keys) {
+    for (const auto&[title, keys] : filament_overrides_option_keys) {
         ConfigOptionsGroupShp optgroup = page->new_optgroup(L(title));
         for (const std::string& opt_key : keys) {
             create_line_with_near_label_widget(optgroup, opt_key, extruder_idx);
@@ -2038,7 +2038,7 @@ void TabFilament::update_filament_overrides_page()
         || m_config->opt_float("filament_retract_lift", extruder_idx) > 0
     );
 
-    for (const auto&[title, keys] : option_keys) {
+    for (const auto&[title, keys] : filament_overrides_option_keys) {
         std::optional<ConfigOptionsGroupShp> optgroup{get_option_group(page, title)};
         if (!optgroup) {
             continue;
@@ -5351,6 +5351,8 @@ void TabSLAMaterial::build()
 
     optgroup->append_line(line);
 
+    add_material_overrides_page();
+
     page = add_options_page(L("Notes"), "note");
     optgroup = page->new_optgroup(L("Notes"), 0);
     optgroup->label_width = 0;
@@ -5391,6 +5393,9 @@ void TabSLAMaterial::toggle_options()
     const Preset &current_printer = wxGetApp().preset_bundle->printers.get_edited_preset();
     std::string model = current_printer.config.opt_string("printer_model");
     m_config_manipulation.toggle_field("material_print_speed", model != "SL1");
+
+    if (m_active_page->title() == "Material Overrides")
+        update_material_overrides_page();
 }
 
 void TabSLAMaterial::update()
@@ -5412,13 +5417,14 @@ void TabSLAMaterial::update()
 
 static void add_options_into_line(ConfigOptionsGroupShp &optgroup,
                                   const std::vector<SamePair<std::string>> &prefixes,
-                                  const std::string &optkey)
+                                  const std::string &optkey,
+                                  const std::string &preprefix = std::string())
 {
-    auto opt = optgroup->get_option(prefixes.front().first + optkey);
+    auto opt = optgroup->get_option(preprefix + prefixes.front().first + optkey);
     Line line{ opt.opt.label, "" };
     line.full_width = 1;
     for (auto &prefix : prefixes) {
-        opt = optgroup->get_option(prefix.first + optkey);
+        opt = optgroup->get_option(preprefix + prefix.first + optkey);
         opt.opt.label = prefix.second;
         opt.opt.width = 12; // TODO
         line.append_option(opt);
@@ -5462,6 +5468,178 @@ void TabSLAPrint::build_sla_support_params(const std::vector<SamePair<std::strin
     add_options_into_line(optgroup, prefixes, "support_critical_angle");
     add_options_into_line(optgroup, prefixes, "support_max_bridge_length");
     add_options_into_line(optgroup, prefixes, "support_max_pillar_link_distance");
+}
+
+static std::vector<std::string> get_override_opt_kyes_for_line(const std::string& title, const std::string& key)
+{
+    const std::string preprefix = "material_";
+
+    std::vector<std::string> opt_keys;
+    opt_keys.reserve(3);
+
+    if (title == "Support head" || title == "Support pillar") {
+        for (auto& prefix : { "", "branching" })
+            opt_keys.push_back(preprefix + prefix + key);
+    }
+    else if (key == "relative_correction") {
+        for (auto& axis : { "x", "y", "z" })
+            opt_keys.push_back(preprefix + key + "_" + char(axis[0]));
+    }
+    else
+        opt_keys.push_back(preprefix + key);
+
+    return opt_keys;
+}
+
+void TabSLAMaterial::create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& key)
+{
+    if (optgroup->title == "Support head" || optgroup->title == "Support pillar")
+        add_options_into_line(optgroup, { {"", L("Default")}, {"branching", L("Branching")} }, key, "material_");
+    else {
+        const std::string opt_key = std::string("material_") + key;
+        if (key == "relative_correction") {
+            Line line = Line{ m_preset_bundle->printers.get_edited_preset().config.def()->get("relative_correction")->full_label, "" };
+            for (auto& axis : { "X", "Y", "Z" }) {
+                auto opt = optgroup->get_option(opt_key + "_" + char(std::tolower(axis[0])));
+                opt.opt.label = axis;
+                line.append_option(opt);
+            }
+            optgroup->append_line(line);
+        }
+        else
+            optgroup->append_single_option_line(opt_key);
+    }
+
+    Line* line = optgroup->get_last_line();
+    if (!line)
+        return;
+
+    line->near_label_widget = [this, optgroup_wk = ConfigOptionsGroupWkp(optgroup), key](wxWindow* parent) {
+        wxWindow* check_box = CheckBox::GetNewWin(parent);
+        wxGetApp().UpdateDarkUI(check_box);
+
+        check_box->Bind(wxEVT_CHECKBOX, [optgroup_wk, key](wxCommandEvent& evt) {
+            const bool is_checked = evt.IsChecked();
+            if (auto optgroup_sh = optgroup_wk.lock(); optgroup_sh) {
+                auto opt_keys = get_override_opt_kyes_for_line(optgroup_sh->title.ToStdString(), key);
+                for (const std::string& opt_key : opt_keys)
+                    if (Field* field = optgroup_sh->get_fieldc(opt_key, 0); field != nullptr) {
+                        field->toggle(is_checked);
+                        if (is_checked)
+                            field->set_last_meaningful_value();
+                        else
+                            field->set_na_value();
+                    }
+            }
+        });
+
+        m_overrides_options[key] = check_box;
+        return check_box;
+    };
+}
+
+std::vector<std::pair<std::string, std::vector<std::string>>> material_overrides_option_keys{
+    {"Support head", {
+        "support_head_front_diameter",
+        "support_head_penetration",
+        "support_head_width"
+    }},
+    {"Support pillar", {
+        "support_pillar_diameter",
+    }},
+    {"Automatic generation", {
+        "support_points_density_relative"
+    }},
+    {"Corrections", {
+        "relative_correction",
+        "elefant_foot_compensation"
+    }}
+};
+
+void TabSLAMaterial::add_material_overrides_page()
+{
+    PageShp page = add_options_page(L("Material Overrides"), "wrench");
+
+    for (const auto& [title, keys] : material_overrides_option_keys) {
+        ConfigOptionsGroupShp optgroup = page->new_optgroup(L(title));
+        for (const std::string& opt_key : keys) {
+            create_line_with_near_label_widget(optgroup, opt_key);
+        }
+    }
+}
+
+void TabSLAMaterial::update_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& key, bool is_checked/* = true*/)
+{
+    if (!m_overrides_options[key])
+        return;
+
+    const std::string preprefix = "material_";
+
+    std::vector<std::string> opt_keys;
+    opt_keys.reserve(3);
+
+    if (optgroup->title == "Support head" || optgroup->title == "Support pillar") {
+        for (auto& prefix : { "", "branching" }) {
+            std::string opt_key = preprefix + prefix + key;
+            is_checked &= !m_config->option(opt_key)->is_nil();
+            opt_keys.push_back(opt_key);
+        }
+    }
+    else if (key == "relative_correction") {
+        for (auto& axis : { "x", "y", "z" }) {
+            std::string opt_key = preprefix + key + "_" + char(axis[0]);
+            is_checked &= !m_config->option(opt_key)->is_nil();
+            opt_keys.push_back(opt_key);
+        }
+    }
+    else {
+        std::string opt_key = preprefix + key;
+        is_checked &= !m_config->option(opt_key)->is_nil();
+        opt_keys.push_back(opt_key);
+    }
+
+//    m_overrides_options[key]->Enable(is_checked);
+
+    CheckBox::SetValue(m_overrides_options[key], is_checked);
+
+    for (const std::string& opt_key : opt_keys) {
+        Field* field = optgroup->get_field(opt_key);
+        if (field != nullptr)
+            field->toggle(is_checked);
+    }
+}
+
+void TabSLAMaterial::update_material_overrides_page()
+{
+    if (!m_active_page || m_active_page->title() != "Material Overrides")
+        return;
+    Page* page = m_active_page;
+
+    for (const auto& [title, keys] : material_overrides_option_keys) {
+        std::optional<ConfigOptionsGroupShp> optgroup{ get_option_group(page, title) };
+        if (!optgroup) {
+            continue;
+        }
+
+        for (const std::string& key : keys) {
+            update_line_with_near_label_widget(*optgroup, key, false);
+            continue;
+
+            bool is_checked{ true };
+
+            const static std::string preprefix = "material_";
+            if (title == "Support head" || title == "Support pillar") {
+                for (auto& prefix : { "", "branching" })
+                    update_line_with_near_label_widget(*optgroup, preprefix + prefix + key, is_checked);
+            }
+            else if (key == "relative_correction") {
+                for (auto& axis : { "x", "y", "z" })
+                    update_line_with_near_label_widget(*optgroup, preprefix + key + "_" + char(axis[0]), is_checked);
+            }
+            else
+                update_line_with_near_label_widget(*optgroup, preprefix + key, is_checked);
+        }
+    }
 }
 
 void TabSLAPrint::build()

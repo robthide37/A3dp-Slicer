@@ -1289,7 +1289,7 @@ void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* pres
         m_tree->model->AddPreset(type, from_u8(presets->get_edited_preset().name), old_pt, from_u8(new_selected_preset));
 
         // Collect dirty options.
-        const bool deep_compare = type != Preset::TYPE_FILAMENT;
+        const bool deep_compare = type != Preset::TYPE_FILAMENT && type != Preset::TYPE_SLA_MATERIAL;
         auto dirty_options = presets->current_dirty_options(deep_compare);
 
         // process changes of extruders count
