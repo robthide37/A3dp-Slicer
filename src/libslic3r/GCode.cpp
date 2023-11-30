@@ -2203,7 +2203,7 @@ LayerResult GCodeGenerator::process_layer(
             print.config().before_layer_gcode.value, m_writer.extruder()->id(), &config)
             + "\n";
     }
-    gcode += this->change_layer(previous_layer_z, print_z);  // this will increase m_layer_index
+    gcode += this->change_layer(previous_layer_z, print_z, result.spiral_vase_enable);  // this will increase m_layer_index
     m_layer = &layer;
     if (this->line_distancer_is_required(layer_tools.extruders) && this->m_layer != nullptr && this->m_layer->lower_layer != nullptr) {
         this->m_previous_layer_distancer = GCode::Impl::get_expolygons_distancer(m_layer->lower_layer->lslices);
@@ -2732,8 +2732,11 @@ std::optional<std::string> GCodeGenerator::get_helical_layer_change_gcode(
 }
 
 // called by GCodeGenerator::process_layer()
-std::string GCodeGenerator::change_layer(coordf_t previous_layer_z, coordf_t print_z)
-{
+std::string GCodeGenerator::change_layer(
+    coordf_t previous_layer_z,
+    coordf_t print_z,
+    const bool spiral_vase_enabled
+) {
     std::string gcode;
     if (m_layer_count > 0)
         // Increment a progress bar indicator.
@@ -2745,7 +2748,7 @@ std::string GCodeGenerator::change_layer(coordf_t previous_layer_z, coordf_t pri
     const std::string comment{"move to next layer (" + std::to_string(m_layer_index) + ")"};
 
     bool helical_layer_change{
-        (!this->m_spiral_vase || !this->m_spiral_vase->is_enabled())
+        !spiral_vase_enabled
         && print_z > previous_layer_z
         && EXTRUDER_CONFIG(travel_ramping_lift)
         && EXTRUDER_CONFIG(travel_slope) > 0 && EXTRUDER_CONFIG(travel_slope) < 90
