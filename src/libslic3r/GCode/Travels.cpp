@@ -114,13 +114,12 @@ Points3 generate_elevated_travel(
     return result;
 }
 
-std::optional<double> get_first_crossed_line_distance(
+double get_first_crossed_line_distance(
     tcb::span<const Line> xy_path, const AABBTreeLines::LinesDistancer<Linef> &distancer
 ) {
     assert(!xy_path.empty());
-    if (xy_path.empty()) {
-        return {};
-    }
+    if (xy_path.empty())
+        return std::numeric_limits<double>::max();
 
     double traversed_distance = 0;
     for (const Line &line : xy_path) {
@@ -139,7 +138,7 @@ std::optional<double> get_first_crossed_line_distance(
         traversed_distance += (unscaled_line.a - unscaled_line.b).norm();
     }
 
-    return {};
+    return std::numeric_limits<double>::max();
 }
 
 struct SmoothingParams
@@ -222,15 +221,14 @@ ElevatedTravelParams get_elevated_traval_params(
         elevation_params.slope_end = elevation_params.lift_height / std::tan(slope_rad);
     }
 
-    std::optional<double> obstacle_adjusted_slope_end{
+    const double obstacle_adjusted_slope_end{
         previous_layer_distancer ?
-        get_first_crossed_line_distance(xy_path.lines(), *previous_layer_distancer) :
-        std::nullopt
+            get_first_crossed_line_distance(xy_path.lines(), *previous_layer_distancer) :
+            std::numeric_limits<double>::max()
     };
 
-    if (obstacle_adjusted_slope_end && obstacle_adjusted_slope_end < elevation_params.slope_end) {
-        elevation_params.slope_end = *obstacle_adjusted_slope_end;
-    }
+    if (obstacle_adjusted_slope_end < elevation_params.slope_end)
+        elevation_params.slope_end = obstacle_adjusted_slope_end;
 
     SmoothingParams smoothing_params{get_smoothing_params(
         elevation_params.lift_height, elevation_params.slope_end, extruder_id,

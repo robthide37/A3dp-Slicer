@@ -141,7 +141,7 @@ Points3 generate_elevated_travel(
  *
  * **Ignores intersection with xy_path starting point.**
  */
-std::optional<double> get_first_crossed_line_distance(
+double get_first_crossed_line_distance(
     tcb::span<const Line> xy_path, const AABBTreeLines::LinesDistancer<Linef> &distancer
 );
 

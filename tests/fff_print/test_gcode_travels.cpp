@@ -171,13 +171,13 @@ TEST_CASE("Get first crossed line distance", "[GCode]") {
     // Try different cases by skipping lines in the travel.
     AABBTreeLines::LinesDistancer<Linef> distancer{std::move(lines)};
 
-    CHECK(*get_first_crossed_line_distance(travel, distancer) == Approx(1));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(1), distancer) == Approx(0.2));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(2), distancer) == Approx(0.5));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(3), distancer) == Approx(1.0)); //Edge case
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(4), distancer) == Approx(0.7));
-    CHECK(*get_first_crossed_line_distance(tcb::span{travel}.subspan(5), distancer) == Approx(1.6));
-    CHECK_FALSE(get_first_crossed_line_distance(tcb::span{travel}.subspan(6), distancer));
+    CHECK(get_first_crossed_line_distance(travel, distancer) == Approx(1));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(1), distancer) == Approx(0.2));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(2), distancer) == Approx(0.5));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(3), distancer) == Approx(1.0)); //Edge case
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(4), distancer) == Approx(0.7));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(5), distancer) == Approx(1.6));
+    CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(6), distancer) == std::numeric_limits<double>::max());
 }
 
 
