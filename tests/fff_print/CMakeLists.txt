@@ -17,6 +17,7 @@ add_executable(${_TEST_NAME}_tests
 	test_gcode_layer_changes.cpp
 	test_gcodefindreplace.cpp
 	test_gcodewriter.cpp
+    test_retraction.cpp
 	test_model.cpp
 	test_multi.cpp
 	test_perimeters.cpp
