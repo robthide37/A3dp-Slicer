@@ -13,10 +13,16 @@
 
 #include <boost/math/special_functions/pow.hpp>
 
-#include "libslic3r/Line.hpp"
-#include "libslic3r/Point.hpp"
 #include "libslic3r/AABBTreeLines.hpp"
-#include "libslic3r/PrintConfig.hpp"
+
+// Forward declarations.
+namespace Slic3r {
+class Point;
+class Linef;
+class Polyline;
+class FullPrintConfig;
+
+} // namespace Slic3r
 
 namespace Slic3r::GCode::Impl::Travels {
 /**

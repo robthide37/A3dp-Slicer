@@ -1,5 +1,7 @@
 #include "Travels.hpp"
 
+#include "libslic3r/PrintConfig.hpp"
+
 namespace Slic3r::GCode::Impl::Travels {
 
 ElevatedTravelFormula::ElevatedTravelFormula(const ElevatedTravelParams &params)
