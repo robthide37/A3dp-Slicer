@@ -2422,10 +2422,10 @@ void GCodeGenerator::process_layer_single_object(
                 m_avoid_crossing_perimeters.init_layer(*m_layer);
             // When starting a new object, use the external motion planner for the first travel move.
             const Point &offset = print_object.instances()[print_instance.instance_id].shift;
-            std::pair<const PrintObject*, Point> this_object_copy(&print_object, offset);
-            if (m_last_obj_copy != this_object_copy)
+            GCode::PrintObjectInstance next_instance = {&print_object, int(print_instance.instance_id)};
+            if (m_current_instance != next_instance)
                 m_avoid_crossing_perimeters.use_external_mp_once();
-            m_last_obj_copy = this_object_copy;
+            m_current_instance = next_instance;
             this->set_origin(unscale(offset));
             gcode += m_label_objects.start_object(print_instance.print_object.instances()[print_instance.instance_id], GCode::LabelObjects::IncludeName::No);
         }

@@ -102,6 +102,15 @@ struct ObjectLayerToPrint
     coordf_t            print_z() const { return (object_layer != nullptr && support_layer != nullptr) ? 0.5 * (object_layer->print_z + support_layer->print_z) : this->layer()->print_z; }
 };
 
+struct PrintObjectInstance
+{
+    const PrintObject *print_object = nullptr;
+    int                instance_idx = -1;
+
+    bool operator==(const PrintObjectInstance &other) const {return print_object == other.print_object && instance_idx == other.instance_idx; }
+    bool operator!=(const PrintObjectInstance &other) const { return *this == other; }
+};
+
 } // namespace GCode
 
 class GCodeGenerator {
@@ -126,7 +135,7 @@ public:
         m_brim_done(false),
         m_second_layer_things_done(false),
         m_silent_time_estimator_enabled(false),
-        m_last_obj_copy(nullptr, Point(std::numeric_limits<coord_t>::max(), std::numeric_limits<coord_t>::max()))
+        m_current_instance({nullptr, -1})
         {}
     ~GCodeGenerator() = default;
 
@@ -445,8 +454,8 @@ private:
     bool                                m_brim_done;
     // Flag indicating whether the nozzle temperature changes from 1st to 2nd layer were performed.
     bool                                m_second_layer_things_done;
-    // Index of a last object copy extruded.
-    std::pair<const PrintObject*, Point> m_last_obj_copy;
+    // Pointer to currently exporting PrintObject and instance index.
+    GCode::PrintObjectInstance          m_current_instance;
 
     bool                                m_silent_time_estimator_enabled;
 
