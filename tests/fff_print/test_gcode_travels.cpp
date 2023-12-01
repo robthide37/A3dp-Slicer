@@ -1,6 +1,7 @@
 #include <catch2/catch.hpp>
 #include <libslic3r/GCode/Travels.hpp>
 #include <libslic3r/ExPolygon.hpp>
+#include <libslic3r/GCode.hpp>
 #include <boost/math/special_functions/pow.hpp>
 
 using namespace Slic3r;
@@ -162,14 +163,14 @@ TEST_CASE("Get first crossed line distance", "[GCode]") {
         scaled(Vec2f{0, 5}),
     }.lines()};
 
-    std::vector<Linef> lines;
+    std::vector<GCode::ObjectOrExtrusionLinef> lines;
     for (const ExPolygon& polygon : {square_with_hole, square_above}) {
         for (const Line& line : polygon.lines()) {
             lines.emplace_back(unscale(line.a), unscale(line.b));
         }
     }
     // Try different cases by skipping lines in the travel.
-    AABBTreeLines::LinesDistancer<Linef> distancer{std::move(lines)};
+    AABBTreeLines::LinesDistancer<GCode::ObjectOrExtrusionLinef> distancer{std::move(lines)};
 
     CHECK(get_first_crossed_line_distance(travel, distancer) == Approx(1));
     CHECK(get_first_crossed_line_distance(tcb::span{travel}.subspan(1), distancer) == Approx(0.2));

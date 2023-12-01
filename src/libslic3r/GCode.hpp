@@ -38,8 +38,9 @@
 #include "GCode/WipeTowerIntegration.hpp"
 #include "GCode/SeamPlacer.hpp"
 #include "GCode/GCodeProcessor.hpp"
-#include "EdgeGrid.hpp"
 #include "GCode/ThumbnailData.hpp"
+#include "GCode/Travels.hpp"
+#include "EdgeGrid.hpp"
 #include "tcbspan/span.hpp"
 
 #include <memory>
@@ -405,6 +406,7 @@ private:
     AvoidCrossingPerimeters             m_avoid_crossing_perimeters;
     JPSPathFinder                       m_avoid_crossing_curled_overhangs;
     RetractWhenCrossingPerimeters       m_retract_when_crossing_perimeters;
+    GCode::TravelObstacleTracker        m_travel_obstacle_tracker;
     bool                                m_enable_loop_clipping;
     // If enabled, the G-code generator will put following comments at the ends
     // of the G-code lines: _EXTRUDE_SET_SPEED, _WIPE, _BRIDGE_FAN_START, _BRIDGE_FAN_END
@@ -424,7 +426,6 @@ private:
     // In non-sequential mode, all its copies will be printed.
     const Layer*                        m_layer;
     // m_layer is an object layer and it is being printed over raft surface.
-    std::optional<AABBTreeLines::LinesDistancer<Linef>> m_previous_layer_distancer;
     bool                                m_object_layer_over_raft;
     double                              m_volumetric_speed;
     // Support for the extrusion role markers. Which marker is active?

@@ -1,6 +1,104 @@
 #include "Travels.hpp"
 
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Layer.hpp"
+#include "libslic3r/Print.hpp"
+
+#include "../GCode.hpp"
+
+namespace Slic3r::GCode {
+
+static Lines extrusion_entity_to_lines(const ExtrusionEntity &e_entity)
+{
+    if (const auto *path = dynamic_cast<const ExtrusionPath *>(&e_entity)) {
+        return to_lines(path->as_polyline());
+    } else if (const auto *multipath = dynamic_cast<const ExtrusionMultiPath *>(&e_entity)) {
+        return to_lines(multipath->as_polyline());
+    } else if (const auto *loop = dynamic_cast<const ExtrusionLoop *>(&e_entity)) {
+        return to_lines(loop->polygon());
+    } else {
+        throw Slic3r::InvalidArgument("Invalid argument supplied to TODO()");
+    }
+
+    return {};
+}
+
+AABBTreeLines::LinesDistancer<ObjectOrExtrusionLinef> get_previous_layer_distancer(
+    const GCodeGenerator::ObjectsLayerToPrint &objects_to_print, const ExPolygons &slices
+) {
+    std::vector<ObjectOrExtrusionLinef> lines;
+    for (const GCodeGenerator::ObjectLayerToPrint &object_to_print : objects_to_print) {
+        if (const PrintObject *object = object_to_print.object(); object) {
+            const size_t object_layer_idx = &object_to_print - &objects_to_print.front();
+            for (const PrintInstance &instance : object->instances()) {
+                const size_t instance_idx = &instance - &object->instances().front();
+                for (const ExPolygon &polygon : slices)
+                    for (const Line &line : polygon.lines())
+                        lines.emplace_back(unscaled(Point{line.a + instance.shift}), unscaled(Point{line.b + instance.shift}), object_layer_idx, instance_idx);
+            }
+        }
+    }
+
+    return AABBTreeLines::LinesDistancer{std::move(lines)};
+}
+
+std::pair<AABBTreeLines::LinesDistancer<ObjectOrExtrusionLinef>, size_t> get_current_layer_distancer(const ObjectsLayerToPrint &objects_to_print)
+{
+    std::vector<ObjectOrExtrusionLinef> lines;
+    size_t                              extrusion_entity_cnt = 0;
+    for (const ObjectLayerToPrint &object_to_print : objects_to_print) {
+        const size_t object_layer_idx = &object_to_print - &objects_to_print.front();
+        if (const Layer *layer = object_to_print.object_layer; layer) {
+            for (const PrintInstance &instance : layer->object()->instances()) {
+                const size_t instance_idx = &instance - &layer->object()->instances().front();
+                for (const LayerSlice &lslice : layer->lslices_ex) {
+                    for (const LayerIsland &island : lslice.islands) {
+                        const LayerRegion &layerm = *layer->get_region(island.perimeters.region());
+                        for (uint32_t perimeter_id : island.perimeters) {
+                            assert(dynamic_cast<const ExtrusionEntityCollection *>(layerm.perimeters().entities[perimeter_id]));
+                            const auto *eec = static_cast<const ExtrusionEntityCollection *>(layerm.perimeters().entities[perimeter_id]);
+                            for (const ExtrusionEntity *ee : *eec) {
+                                if (ee->role().is_external_perimeter()) {
+                                    for (const Line &line : extrusion_entity_to_lines(*ee))
+                                        lines.emplace_back(unscaled(Point{line.a + instance.shift}), unscaled(Point{line.b + instance.shift}), object_layer_idx, instance_idx, ee);
+                                }
+
+                                ++extrusion_entity_cnt;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return {AABBTreeLines::LinesDistancer{std::move(lines)}, extrusion_entity_cnt};
+}
+
+void TravelObstacleTracker::init_layer(const Layer &layer, const ObjectsLayerToPrint &objects_to_print)
+{
+    size_t extrusion_entity_cnt = 0;
+    m_extruded_extrusion.clear();
+
+    m_objects_to_print         = objects_to_print;
+    m_previous_layer_distancer = get_previous_layer_distancer(m_objects_to_print, layer.lower_layer->lslices);
+
+    std::tie(m_current_layer_distancer, extrusion_entity_cnt) = get_current_layer_distancer(m_objects_to_print);
+    m_extruded_extrusion.reserve(extrusion_entity_cnt);
+}
+
+void TravelObstacleTracker::mark_extruded(const ExtrusionEntity *extrusion_entity, size_t object_layer_idx, size_t instance_idx)
+{
+    if (extrusion_entity->role().is_external_perimeter())
+        this->m_extruded_extrusion.insert({int(object_layer_idx), int(instance_idx), extrusion_entity});
+}
+
+bool TravelObstacleTracker::is_extruded(const ObjectOrExtrusionLinef &line) const
+{
+    return m_extruded_extrusion.find({line.object_layer_idx, line.instance_idx, line.extrusion_entity}) != m_extruded_extrusion.end();
+}
+
+} // namespace Slic3r::GCode
 
 namespace Slic3r::GCode::Impl::Travels {
 
@@ -114,31 +212,84 @@ Points3 generate_elevated_travel(
     return result;
 }
 
+struct Intersection
+{
+    int  object_layer_idx = -1;
+    int  instance_idx     = -1;
+    bool is_inside        = false;
+
+    bool is_print_instance_equal(const ObjectOrExtrusionLinef &print_istance) {
+        return this->object_layer_idx == print_istance.object_layer_idx && this->instance_idx == print_istance.instance_idx;
+    }
+};
+
 double get_first_crossed_line_distance(
-    tcb::span<const Line> xy_path, const AABBTreeLines::LinesDistancer<Linef> &distancer
+    tcb::span<const Line> xy_path,
+    const AABBTreeLines::LinesDistancer<ObjectOrExtrusionLinef> &distancer,
+    const ObjectsLayerToPrint &objects_to_print,
+    const std::function<bool(const ObjectOrExtrusionLinef &)> &predicate,
+    const bool ignore_starting_object_intersection
 ) {
     assert(!xy_path.empty());
     if (xy_path.empty())
         return std::numeric_limits<double>::max();
 
+    const Point path_first_point = xy_path.front().a;
     double traversed_distance = 0;
+    bool skip_intersection = ignore_starting_object_intersection;
+    Intersection first_intersection;
+
     for (const Line &line : xy_path) {
-        const Linef unscaled_line = {unscaled(line.a), unscaled(line.b)};
-        auto intersections = distancer.intersections_with_line<true>(unscaled_line);
-        if (!intersections.empty()) {
-            const Vec2d intersection = intersections.front().first;
-            const double distance = traversed_distance + (unscaled_line.a - intersection).norm();
-            if (distance > EPSILON) {
-                return distance;
-            } else if (intersections.size() >= 2) { // Edge case
-                const Vec2d second_intersection = intersections[1].first;
-                return traversed_distance + (unscaled_line.a - second_intersection).norm();
-            }
+        const ObjectOrExtrusionLinef                    unscaled_line = {unscaled(line.a), unscaled(line.b)};
+        const std::vector<std::pair<Vec2d, size_t>>     intersections = distancer.intersections_with_line<true>(unscaled_line);
+
+        if (intersections.empty())
+            continue;
+
+        if (!objects_to_print.empty() && ignore_starting_object_intersection && first_intersection.object_layer_idx == -1) {
+            const ObjectOrExtrusionLinef &intersection_line = distancer.get_line(intersections.front().second);
+            const Point shift = objects_to_print[intersection_line.object_layer_idx].layer()->object()->instances()[intersection_line.instance_idx].shift;
+            const Point shifted_first_point = path_first_point - shift;
+            const bool contain_first_point = expolygons_contain(objects_to_print[intersection_line.object_layer_idx].layer()->lslices, shifted_first_point);
+
+            first_intersection = {intersection_line.object_layer_idx, intersection_line.instance_idx, contain_first_point};
         }
+
+        for (const auto &intersection : intersections) {
+            const ObjectOrExtrusionLinef &intersection_line = distancer.get_line(intersection.second);
+            const double distance = traversed_distance + (unscaled_line.a - intersection.first).norm();
+            if (distance <= EPSILON)
+                continue;
+
+            // There is only one external border for each object, so when we cross this border,
+            // we definitely know that we are outside the object.
+            if (skip_intersection && first_intersection.is_print_instance_equal(intersection_line) && first_intersection.is_inside) {
+                skip_intersection = false;
+                continue;
+            }
+
+            if (!predicate(intersection_line))
+                continue;
+
+            return distance;
+        }
+
         traversed_distance += (unscaled_line.a - unscaled_line.b).norm();
     }
 
     return std::numeric_limits<double>::max();
+}
+
+double get_obstacle_adjusted_slope_end(const Lines &xy_path, const GCode::TravelObstacleTracker &obstacle_tracker) {
+    const double previous_layer_crossed_line = get_first_crossed_line_distance(
+        xy_path, obstacle_tracker.previous_layer_distancer(), obstacle_tracker.objects_to_print()
+    );
+    const double current_layer_crossed_line = get_first_crossed_line_distance(
+        xy_path, obstacle_tracker.current_layer_distancer(), obstacle_tracker.objects_to_print(),
+        [&obstacle_tracker](const ObjectOrExtrusionLinef &line) { return obstacle_tracker.is_extruded(line); }
+    );
+
+    return std::min(previous_layer_crossed_line, current_layer_crossed_line);
 }
 
 struct SmoothingParams
@@ -201,7 +352,7 @@ ElevatedTravelParams get_elevated_traval_params(
     const Polyline& xy_path,
     const FullPrintConfig &config,
     const unsigned extruder_id,
-    const std::optional<AABBTreeLines::LinesDistancer<Linef>> &previous_layer_distancer
+    const GCode::TravelObstacleTracker &obstacle_tracker
 ) {
     ElevatedTravelParams elevation_params{};
     if (!config.travel_ramping_lift.get_at(extruder_id)) {
@@ -221,12 +372,7 @@ ElevatedTravelParams get_elevated_traval_params(
         elevation_params.slope_end = elevation_params.lift_height / std::tan(slope_rad);
     }
 
-    const double obstacle_adjusted_slope_end{
-        previous_layer_distancer ?
-            get_first_crossed_line_distance(xy_path.lines(), *previous_layer_distancer) :
-            std::numeric_limits<double>::max()
-    };
-
+    const double obstacle_adjusted_slope_end = get_obstacle_adjusted_slope_end(xy_path.lines(), obstacle_tracker);
     if (obstacle_adjusted_slope_end < elevation_params.slope_end)
         elevation_params.slope_end = obstacle_adjusted_slope_end;
 
@@ -263,7 +409,7 @@ Points3 generate_travel_to_extrusion(
     const FullPrintConfig &config,
     const unsigned extruder_id,
     const double initial_elevation,
-    const std::optional<AABBTreeLines::LinesDistancer<Linef>> &previous_layer_distancer,
+    const GCode::TravelObstacleTracker &obstacle_tracker,
     const Point &xy_path_coord_origin
 ) {
     const double upper_limit = config.retract_lift_below.get_at(extruder_id);
@@ -279,7 +425,7 @@ Points3 generate_travel_to_extrusion(
     }
 
     ElevatedTravelParams elevation_params{get_elevated_traval_params(
-        Polyline{std::move(global_xy_path)}, config, extruder_id, previous_layer_distancer
+        Polyline{std::move(global_xy_path)}, config, extruder_id, obstacle_tracker
     )};
 
     const std::vector<double> ensure_points_at_distances = linspace(

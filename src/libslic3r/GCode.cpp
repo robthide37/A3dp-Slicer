@@ -2060,26 +2060,6 @@ bool GCodeGenerator::line_distancer_is_required(const std::vector<unsigned int>&
     return false;
 }
 
-namespace GCode::Impl {
-AABBTreeLines::LinesDistancer<Linef> get_previous_layer_distancer(
-    const GCodeGenerator::ObjectsLayerToPrint& objects_to_print,
-    const ExPolygons& slices
-) {
-    std::vector<Linef> lines;
-    for (const GCodeGenerator::ObjectLayerToPrint &object_to_print : objects_to_print) {
-        for (const PrintInstance& instance: object_to_print.object()->instances()) {
-            for (const ExPolygon& polygon : slices) {
-                for (const Line& line : polygon.lines()) {
-                    lines.emplace_back(unscaled(Point{line.a + instance.shift}), unscaled(Point{line.b + instance.shift}));
-                }
-            }
-
-        }
-    }
-    return AABBTreeLines::LinesDistancer{std::move(lines)};
-}
-}
-
 std::string GCodeGenerator::get_layer_change_gcode(const Vec3d& from, const Vec3d& to, const unsigned extruder_id) {
     const Polyline xy_path{
         this->gcode_to_point(from.head<2>()),
@@ -2089,7 +2069,7 @@ std::string GCodeGenerator::get_layer_change_gcode(const Vec3d& from, const Vec3
     using namespace GCode::Impl::Travels;
 
     ElevatedTravelParams elevation_params{
-        get_elevated_traval_params(xy_path, this->m_config, extruder_id)};
+        get_elevated_traval_params(xy_path, this->m_config, extruder_id, this->m_travel_obstacle_tracker)};
 
     const double initial_elevation = from.z();
     const double z_change = to.z() - from.z();
@@ -2226,9 +2206,9 @@ LayerResult GCodeGenerator::process_layer(
     }
     gcode += this->change_layer(previous_layer_z, print_z); // this will increase m_layer_index
     m_layer = &layer;
-    if (this->line_distancer_is_required(layer_tools.extruders) && this->m_layer != nullptr && this->m_layer->lower_layer != nullptr) {
-        this->m_previous_layer_distancer = GCode::Impl::get_previous_layer_distancer(layers, layer.lower_layer->lslices);
-    }
+    if (this->line_distancer_is_required(layer_tools.extruders) && this->m_layer != nullptr && this->m_layer->lower_layer != nullptr)
+        m_travel_obstacle_tracker.init_layer(layer, layers);
+
     m_object_layer_over_raft = false;
     if (! print.config().layer_gcode.value.empty()) {
         DynamicConfig config;
@@ -2566,9 +2546,11 @@ void GCodeGenerator::process_layer_single_object(
                                 init_layer_delayed();
                                 m_config.apply(region.config());
                             }
-                            for (const ExtrusionEntity *ee : *eec)
+                            for (const ExtrusionEntity *ee : *eec) {
                                 // Don't reorder, don't flip.
-                                gcode += this->extrude_entity({ *ee, false }, smooth_path_cache, comment_perimeter, -1.);
+                                gcode += this->extrude_entity({*ee, false}, smooth_path_cache, comment_perimeter, -1.);
+                                m_travel_obstacle_tracker.mark_extruded(ee, print_instance.object_layer_to_print_id, print_instance.instance_id);
+                            }
                         }
                     }
                 };
@@ -3383,10 +3365,10 @@ std::string GCodeGenerator::travel_to(
         GCode::Impl::Travels::generate_flat_travel(xy_path.points, initial_elevation) :
         GCode::Impl::Travels::generate_travel_to_extrusion(
             xy_path,
-            this->m_config,
+            m_config,
             extruder_id,
             initial_elevation,
-            this->m_previous_layer_distancer,
+            m_travel_obstacle_tracker,
             scaled(m_origin)
         )
     );
