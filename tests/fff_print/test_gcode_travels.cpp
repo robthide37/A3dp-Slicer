@@ -16,8 +16,8 @@ struct ApproxEqualsPoints : public Catch::MatcherBase<Points> {
             const Point& point = points[i];
             const Point& expected_point = this->expected[i];
             if (
-                std::abs(point.x() - expected_point.x()) > this->tolerance
-                || std::abs(point.y() - expected_point.y()) > this->tolerance
+                std::abs(point.x() - expected_point.x()) > int(this->tolerance)
+                || std::abs(point.y() - expected_point.y()) > int(this->tolerance)
             ) {
                 return false;
             }
@@ -117,10 +117,10 @@ TEST_CASE("Generate elevated travel", "[GCode]") {
     Points3 result{generate_elevated_travel(xy_path, ensure_points_at_distances, 2.0, [](double x){return 1 + x;})};
 
     CHECK(result == Points3{
-        scaled(Vec3f{0, 0, 3.0}),
-        scaled(Vec3f{0.2, 0, 3.2}),
-        scaled(Vec3f{0.5, 0, 3.5}),
-        scaled(Vec3f{1, 0, 4.0})
+        scaled(Vec3f{ 0.f, 0.f,  3.f}),
+        scaled(Vec3f{0.2f, 0.f, 3.2f}),
+        scaled(Vec3f{0.5f, 0.f, 3.5f}),
+        scaled(Vec3f{ 1.f, 0.f,  4.f})
     });
 }
 
