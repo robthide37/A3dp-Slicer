@@ -89,6 +89,21 @@ struct LayerResult {
     static LayerResult make_nop_layer_result() { return {"", std::numeric_limits<coord_t>::max(), false, false, true}; }
 };
 
+namespace GCode {
+// Object and support extrusions of the same PrintObject at the same print_z.
+// public, so that it could be accessed by free helper functions from GCode.cpp
+struct ObjectLayerToPrint
+{
+    ObjectLayerToPrint() : object_layer(nullptr), support_layer(nullptr) {}
+    const Layer* 		object_layer;
+    const SupportLayer* support_layer;
+    const Layer* 		layer()   const { return (object_layer != nullptr) ? object_layer : support_layer; }
+    const PrintObject* 	object()  const { return (this->layer() != nullptr) ? this->layer()->object() : nullptr; }
+    coordf_t            print_z() const { return (object_layer != nullptr && support_layer != nullptr) ? 0.5 * (object_layer->print_z + support_layer->print_z) : this->layer()->print_z; }
+};
+
+} // namespace GCode
+
 class GCodeGenerator {
 
 public:        
@@ -171,18 +186,8 @@ public:
     // translate full config into a list of <key, value> items
     static void encode_full_config(const Print& print, std::vector<std::pair<std::string, std::string>>& config);
 
-    // Object and support extrusions of the same PrintObject at the same print_z.
-    // public, so that it could be accessed by free helper functions from GCode.cpp
-    struct ObjectLayerToPrint
-    {
-        ObjectLayerToPrint() : object_layer(nullptr), support_layer(nullptr) {}
-        const Layer* 		object_layer;
-        const SupportLayer* support_layer;
-        const Layer* 		layer()   const { return (object_layer != nullptr) ? object_layer : support_layer; }
-        const PrintObject* 	object()  const { return (this->layer() != nullptr) ? this->layer()->object() : nullptr; }
-        coordf_t            print_z() const { return (object_layer != nullptr && support_layer != nullptr) ? 0.5 * (object_layer->print_z + support_layer->print_z) : this->layer()->print_z; }
-    };
-    using ObjectsLayerToPrint = std::vector<ObjectLayerToPrint>;
+    using ObjectLayerToPrint  = GCode::ObjectLayerToPrint;
+    using ObjectsLayerToPrint = std::vector<GCode::ObjectLayerToPrint>;
 
     std::optional<Point> last_position;
 
