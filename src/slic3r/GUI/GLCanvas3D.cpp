@@ -3175,7 +3175,10 @@ void GLCanvas3D::on_key(wxKeyEvent& evt)
                     // m_canvas->HandleAsNavigationKey(evt);   // XXX: Doesn't work in some cases / on Linux
                     post_event(SimpleEvent(EVT_GLCANVAS_TAB));
                 }
-                else if (keyCode == WXK_TAB && evt.ShiftDown() && ! wxGetApp().is_gcode_viewer()) {
+                else if (! wxGetApp().is_gcode_viewer() && keyCode == WXK_TAB &&
+                    // Use strong condition for modifiers state to avoid cases when Shift can be combined with other modifiers
+                    // (see https://github.com/prusa3d/PrusaSlicer/issues/7799)
+                    evt.GetModifiers() == wxMOD_SHIFT) {
                     // Collapse side-panel with Shift+Tab
                     post_event(SimpleEvent(EVT_GLCANVAS_COLLAPSE_SIDEBAR));
                 }
