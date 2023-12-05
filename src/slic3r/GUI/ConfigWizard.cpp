@@ -3000,7 +3000,7 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
                 }
             }
         }
-        return pt;
+        return ptAny;
     };
     // Prusa printers are considered first, then 3rd party.
     if (preferred_pt = get_preferred_printer_technology("PrusaResearch", bundles.prusa_bundle());
