@@ -186,7 +186,7 @@ Integrals::Integrals(const Polygons &polygons)
 }
 
 Integrals::Integrals(const Polylines& polylines, const std::vector<float>& widths) {
-    assert(extrusion_lines.size() == widths.size());
+    assert(polylines.size() == widths.size());
     for (size_t i = 0; i < polylines.size(); ++i) {
         Lines polyline{polylines[i].lines()};
         float width{widths[i]};
