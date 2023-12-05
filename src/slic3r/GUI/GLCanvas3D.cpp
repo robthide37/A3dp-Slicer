@@ -90,7 +90,7 @@ static const Slic3r::ColorRGBA ERROR_BG_DARK_COLOR    = { 0.478f, 0.192f, 0.039f
 static const Slic3r::ColorRGBA ERROR_BG_LIGHT_COLOR   = { 0.753f, 0.192f, 0.039f, 1.0f };
 
 // Number of floats
-static constexpr const size_t MAX_VERTEX_BUFFER_SIZE     = 131072 * 6; // 3.15MB
+static constexpr const size_t MAX_VERTEX_BUFFER_SIZE = 131072 * 6; // 3.15MB
 
 #define SHOW_IMGUI_DEMO_WINDOW
 #ifdef SHOW_IMGUI_DEMO_WINDOW
@@ -6837,14 +6837,22 @@ void GLCanvas3D::_load_print_toolpaths(const BuildVolume &build_volume)
             _3DScene::extrusionentity_to_verts(print->brim(), print_zs[i], Point(0, 0), init_data);
         _3DScene::extrusionentity_to_verts(print->skirt(), print_zs[i], Point(0, 0), init_data);
         // Ensure that no volume grows over the limits. If the volume is too large, allocate a new one.
-        if (init_data.vertices_size_bytes() > MAX_VERTEX_BUFFER_SIZE) {
+        if (init_data.vertices_size_bytes() >= MAX_VERTEX_BUFFER_SIZE) {
             volume->model.init_from(std::move(init_data));
-            GLVolume &vol = *volume;
-            volume = m_volumes.new_toolpath_volume(vol.color);
+            volume->is_outside = !contains(build_volume, volume->model);
+            volume = m_volumes.new_toolpath_volume(volume->color);
+            init_data = GLModel::Geometry();
         }
     }
-    volume->model.init_from(std::move(init_data));
-    volume->is_outside = !contains(build_volume, volume->model);
+    init_data = GLModel::Geometry();
+    if (init_data.is_empty()) {
+        delete volume;
+        m_volumes.volumes.pop_back();
+    }
+    else {
+        volume->model.init_from(std::move(init_data));
+        volume->is_outside = !contains(build_volume, volume->model);
+    }
 }
 
 void GLCanvas3D::_load_print_object_toolpaths(const PrintObject& print_object, const BuildVolume& build_volume, const std::vector<std::string>& str_tool_colors, const std::vector<CustomGCode::Item>& color_print_values)
