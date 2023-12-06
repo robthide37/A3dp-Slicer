@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <map>
 #include <climits>
+#include <limits>
 #include <cstdio>
 #include <cstdlib>
 #include <functional>
@@ -320,7 +321,7 @@ typedef ConfigOption*       ConfigOptionPtr;
 typedef const ConfigOption* ConfigOptionConstPtr;
 
 // Value of a single valued option (bool, int, float, string, point, enum)
-template <class T>
+template <class T, bool NULLABLE = false>
 class ConfigOptionSingle : public ConfigOption {
 public:
     T value;
@@ -348,6 +349,49 @@ public:
     bool operator< (const T &rhs) const throw() { return this->value < rhs; }
 
     size_t hash() const throw() override { return std::hash<T>{}(this->value); }
+
+    // Is this option overridden by another option?
+    // An option overrides another option if it is not nil and not equal.
+    bool overriden_by(const ConfigOption *rhs) const override {
+        if (this->nullable())
+            throw ConfigurationError("Cannot override a nullable ConfigOption.");
+        if (rhs->type() != this->type())
+            throw ConfigurationError("ConfigOptionVector.overriden_by() applied to different types.");
+        auto rhs_vec = static_cast<const ConfigOptionSingle<T>*>(rhs);
+        if (! rhs->nullable())
+            // Overridding a non-nullable object with another non-nullable object.
+            return this->value != rhs_vec->value;
+
+        return false;
+    }
+    // Apply an override option, possibly a nullable one.
+    bool apply_override(const ConfigOption *rhs) override {
+        if (this->nullable())
+            throw ConfigurationError("Cannot override a nullable ConfigOption.");
+        if (rhs->type() != this->type())
+            throw ConfigurationError("ConfigOptionVector.apply_override() applied to different types.");
+        auto rhs_vec = static_cast<const ConfigOptionSingle<T>*>(rhs);
+        if (! rhs->nullable()) {
+            // Overridding a non-nullable object with another non-nullable object.
+            if (this->value != rhs_vec->value) {
+                this->value = rhs_vec->value;
+                return true;
+            }
+            return false;
+        }
+
+        return false;
+    }
+
+    bool nullable() const override { return NULLABLE; }
+
+    static T nil_value() { return std::numeric_limits<T>::min(); }
+
+    // A scalar is nil, or all values of a vector are nil.
+    bool is_nil() const override
+    {
+        return this->value == nil_value();
+    }
 
 private:
 	friend class cereal::access;
@@ -572,18 +616,19 @@ private:
 	template<class Archive> void serialize(Archive & ar) { ar(this->values); }
 };
 
-class ConfigOptionFloat : public ConfigOptionSingle<double>
+template<bool NULLABLE = false>
+class ConfigOptionFloatTempl : public ConfigOptionSingle<double, NULLABLE>
 {
 public:
-    ConfigOptionFloat() : ConfigOptionSingle<double>(0) {}
-    explicit ConfigOptionFloat(double _value) : ConfigOptionSingle<double>(_value) {}
+    ConfigOptionFloatTempl() : ConfigOptionSingle<double, NULLABLE>(0) {}
+    explicit ConfigOptionFloatTempl(double _value) : ConfigOptionSingle<double, NULLABLE>(_value) {}
 
     static ConfigOptionType static_type() { return coFloat; }
     ConfigOptionType        type()      const override { return static_type(); }
     double                  getFloat()  const override { return this->value; }
-    ConfigOption*           clone()     const override { return new ConfigOptionFloat(*this); }
-    bool                    operator==(const ConfigOptionFloat &rhs) const throw() { return this->value == rhs.value; }
-    bool                    operator< (const ConfigOptionFloat &rhs) const throw() { return this->value <  rhs.value; }
+    ConfigOption*           clone()     const override { return new ConfigOptionFloatTempl(*this); }
+    bool                    operator==(const ConfigOptionFloatTempl &rhs) const throw() { return this->value == rhs.value; }
+    bool                    operator< (const ConfigOptionFloatTempl &rhs) const throw() { return this->value <  rhs.value; }
     
     std::string serialize() const override
     {
@@ -600,7 +645,7 @@ public:
         return !iss.fail();
     }
 
-    ConfigOptionFloat& operator=(const ConfigOption *opt)
+    ConfigOptionFloatTempl& operator=(const ConfigOption *opt)
     {   
         this->set(opt);
         return *this;
@@ -734,6 +779,8 @@ private:
 	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionVector<double>>(this)); }
 };
 
+using ConfigOptionFloat = ConfigOptionFloatTempl<false>;
+using ConfigOptionFloatNullable  = ConfigOptionFloatTempl<true>;
 using ConfigOptionFloats 		 = ConfigOptionFloatsTempl<false>;
 using ConfigOptionFloatsNullable = ConfigOptionFloatsTempl<true>;
 

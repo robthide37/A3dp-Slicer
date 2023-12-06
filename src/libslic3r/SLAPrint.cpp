@@ -8,6 +8,7 @@
 #include "CSGMesh/CSGMeshCopy.hpp"
 #include "CSGMesh/PerformCSGMeshBooleans.hpp"
 #include "format.hpp"
+#include "StaticMap.hpp"
 
 #include "Format/SLAArchiveFormatRegistry.hpp"
 
@@ -201,6 +202,51 @@ std::vector<ObjectID> SLAPrint::print_object_ids() const
         out.emplace_back(print_object->id());
     return out;
 }
+
+static t_config_option_keys print_config_diffs(const SLAPrintObjectConfig     &current_config,
+                                               const DynamicPrintConfig &new_full_config,
+                                               DynamicPrintConfig       &material_overrides)
+{
+    using namespace std::string_view_literals;
+
+    static const constexpr StaticSet overriden_keys = {
+        "support_pillar_diameter"sv
+    };
+
+    static constexpr auto material_ow_prefix = "material_ow_";
+
+    t_config_option_keys           print_diff;
+    for (const t_config_option_key &opt_key : current_config.keys()) {
+        const ConfigOption *opt_old = current_config.option(opt_key);
+        assert(opt_old != nullptr);
+        const ConfigOption *opt_new = new_full_config.option(opt_key);
+        // assert(opt_new != nullptr);
+        if (opt_new == nullptr)
+            //FIXME This may happen when executing some test cases.
+            continue;
+        const ConfigOption *opt_new_override = std::binary_search(overriden_keys.begin(), overriden_keys.end(), opt_key) ? new_full_config.option(material_ow_prefix + opt_key) : nullptr;
+        if (opt_new_override != nullptr && ! opt_new_override->is_nil()) {
+            // An override is available at some of the material presets.
+            bool overriden = opt_new->overriden_by(opt_new_override);
+            if (overriden || *opt_old != *opt_new) {
+                auto opt_copy = opt_new->clone();
+                opt_copy->apply_override(opt_new_override);
+                bool changed = *opt_old != *opt_copy;
+                if (changed)
+                    print_diff.emplace_back(opt_key);
+                if (changed || overriden) {
+                    // overrides will be applied to the placeholder parser, which layers these parameters over full_print_config.
+                    material_overrides.set_key_value(opt_key, opt_copy);
+                } else
+                    delete opt_copy;
+            }
+        } else if (*opt_new != *opt_old)
+            print_diff.emplace_back(opt_key);
+    }
+
+    return print_diff;
+}
+
 
 SLAPrint::ApplyStatus SLAPrint::apply(const Model &model, DynamicPrintConfig config)
 {
@@ -737,66 +783,68 @@ void SLAPrint::process()
 
 bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_option_key> &opt_keys, bool &invalidate_all_model_objects)
 {
+    using namespace std::string_view_literals;
+
     if (opt_keys.empty())
         return false;
 
-    static std::unordered_set<std::string> steps_full = {
-        "initial_layer_height",
-        "material_correction",
-        "material_correction_x",
-        "material_correction_y",
-        "material_correction_z",
-        "material_print_speed",
-        "relative_correction",
-        "relative_correction_x",
-        "relative_correction_y",
-        "relative_correction_z",
-        "absolute_correction",
-        "elefant_foot_compensation",
-        "elefant_foot_min_width",
-        "gamma_correction"
+    static constexpr StaticSet steps_full = {
+        "initial_layer_height"sv,
+        "material_correction"sv,
+        "material_correction_x"sv,
+        "material_correction_y"sv,
+        "material_correction_z"sv,
+        "material_print_speed"sv,
+        "relative_correction"sv,
+        "relative_correction_x"sv,
+        "relative_correction_y"sv,
+        "relative_correction_z"sv,
+        "absolute_correction"sv,
+        "elefant_foot_compensation"sv,
+        "elefant_foot_min_width"sv,
+        "gamma_correction"sv
     };
 
     // Cache the plenty of parameters, which influence the final rasterization only,
     // or they are only notes not influencing the rasterization step.
-    static std::unordered_set<std::string> steps_rasterize = {
-        "min_exposure_time",
-        "max_exposure_time",
-        "exposure_time",
-        "min_initial_exposure_time",
-        "max_initial_exposure_time",
-        "initial_exposure_time",
-        "display_width",
-        "display_height",
-        "display_pixels_x",
-        "display_pixels_y",
-        "display_mirror_x",
-        "display_mirror_y",
-        "display_orientation",
-        "sla_archive_format",
-        "sla_output_precision"
+    static constexpr StaticSet steps_rasterize = {
+        "min_exposure_time"sv,
+        "max_exposure_time"sv,
+        "exposure_time"sv,
+        "min_initial_exposure_time"sv,
+        "max_initial_exposure_time"sv,
+        "initial_exposure_time"sv,
+        "display_width"sv,
+        "display_height"sv,
+        "display_pixels_x"sv,
+        "display_pixels_y"sv,
+        "display_mirror_x"sv,
+        "display_mirror_y"sv,
+        "display_orientation"sv,
+        "sla_archive_format"sv,
+        "sla_output_precision"sv
     };
 
-    static std::unordered_set<std::string> steps_ignore = {
-        "bed_shape",
-        "max_print_height",
-        "printer_technology",
-        "output_filename_format",
-        "fast_tilt_time",
-        "slow_tilt_time",
-        "high_viscosity_tilt_time",
-        "area_fill",
-        "bottle_cost",
-        "bottle_volume",
-        "bottle_weight",
-        "material_density"
+    static StaticSet steps_ignore = {
+        "bed_shape"sv,
+        "max_print_height"sv,
+        "printer_technology"sv,
+        "output_filename_format"sv,
+        "fast_tilt_time"sv,
+        "slow_tilt_time"sv,
+        "high_viscosity_tilt_time"sv,
+        "area_fill"sv,
+        "bottle_cost"sv,
+        "bottle_volume"sv,
+        "bottle_weight"sv,
+        "material_density"sv
     };
 
     std::vector<SLAPrintStep> steps;
     std::vector<SLAPrintObjectStep> osteps;
     bool invalidated = false;
 
-    for (const t_config_option_key &opt_key : opt_keys) {
+    for (std::string_view opt_key : opt_keys) {
         if (steps_rasterize.find(opt_key) != steps_rasterize.end()) {
             // These options only affect the final rasterization, or they are just notes without influence on the output,
             // so there is nothing to invalidate.
