@@ -572,8 +572,8 @@ void GCodeProcessor::apply_config(const PrintConfig& config)
 {
     m_parser.apply_config(config);
 
-    m_binarizer.set_enabled(config.gcode_binary);
-    m_result.is_binary_file = config.gcode_binary;
+    m_binarizer.set_enabled(config.binary_gcode);
+    m_result.is_binary_file = config.binary_gcode;
 
     m_producer = EProducer::PrusaSlicer;
     m_flavor = config.gcode_flavor;

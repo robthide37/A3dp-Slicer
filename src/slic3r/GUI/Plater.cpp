@@ -6797,7 +6797,7 @@ void Plater::export_gcode(bool prefer_removable)
                               _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"";
                     return true;
                 }
-                err_out = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"));
+                err_out = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode"));
                 return !err_out.IsEmpty();
             };
 
@@ -6806,7 +6806,7 @@ void Plater::export_gcode(bool prefer_removable)
                 ErrorDialog(this, error_str, [this](const std::string& key) -> void { sidebar().jump_to_option(key); }).ShowModal();
                 output_path.clear();
             } else {
-                alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"),
+                alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode"),
                                                   wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
             }
         }
@@ -7358,7 +7358,7 @@ void Plater::send_gcode()
 
         {
             const std::string ext = boost::algorithm::to_lower_copy(dlg.filename().extension().string());
-            const bool binary_output = wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary");
+            const bool binary_output = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode");
             const wxString error_str = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, binary_output);
             if (! error_str.IsEmpty()) {
                 ErrorDialog(this, error_str, t_kill_focus([](const std::string& key) -> void { wxGetApp().sidebar().jump_to_option(key); })).ShowModal();
@@ -7366,7 +7366,7 @@ void Plater::send_gcode()
             }
         }
 
-        alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->prints.get_edited_preset().config.opt_bool("gcode_binary"),
+        alert_when_exporting_binary_gcode(wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode"),
                                           wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
 
         upload_job.upload_data.upload_path = dlg.filename();
