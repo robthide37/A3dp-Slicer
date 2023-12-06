@@ -43,6 +43,11 @@ Polygon Bed::get_inner_offset(const std::vector<Vec2d> &shape, const double padd
     transform(begin(shape), end(shape), back_inserter(shape_scaled), [](const Vec2d &point) {
         return scaled(point);
     });
-    return shrink({Polygon{shape_scaled}}, scaled(padding)).front();
+    const Polygons inner_offset{shrink({Polygon{shape_scaled}}, scaled(padding))};
+    if (inner_offset.empty()) {
+        return Polygon{};
+    }
+    return inner_offset.front();
 }
+
 } // namespace Slic3r::GCode::Impl::LayerChanges

@@ -2666,21 +2666,18 @@ std::optional<std::string> GCodeGenerator::get_helical_layer_change_gcode(
 
     const Point n_gon_start_point{this->last_pos()};
 
-    static GCode::Impl::LayerChanges::Bed bed{
+    GCode::Impl::LayerChanges::Bed bed{
         this->m_config.bed_shape.values,
-        circle_radius
+        circle_radius * 2
     };
     if (!bed.contains_within_padding(this->point_to_gcode(n_gon_start_point))) {
         return std::nullopt;
     }
 
-    const Point n_gon_centeroid{
-        n_gon_start_point
-        + scaled(Vec2d{
-            (bed.centroid - unscaled(n_gon_start_point)).normalized()
-            * circle_radius
-        })
-    };
+    const Vec2crd n_gon_vector{scaled(Vec2d{
+        (bed.centroid - this->point_to_gcode(n_gon_start_point)).normalized() * circle_radius
+    })};
+    const Point n_gon_centeroid{n_gon_start_point + n_gon_vector};
 
     const Polygon n_gon{GCode::Impl::LayerChanges::generate_regular_polygon(
         n_gon_centeroid,
