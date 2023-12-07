@@ -5472,7 +5472,7 @@ void TabSLAPrint::build_sla_support_params(const std::vector<SamePair<std::strin
 
 static std::vector<std::string> get_override_opt_kyes_for_line(const std::string& title, const std::string& key)
 {
-    const std::string preprefix = "material_";
+    const std::string preprefix = "material_ow_";
 
     std::vector<std::string> opt_keys;
     opt_keys.reserve(3);
@@ -5494,9 +5494,9 @@ static std::vector<std::string> get_override_opt_kyes_for_line(const std::string
 void TabSLAMaterial::create_line_with_near_label_widget(ConfigOptionsGroupShp optgroup, const std::string& key)
 {
     if (optgroup->title == "Support head" || optgroup->title == "Support pillar")
-        add_options_into_line(optgroup, { {"", L("Default")}, {"branching", L("Branching")} }, key, "material_");
+        add_options_into_line(optgroup, { {"", L("Default")}, {"branching", L("Branching")} }, key, "material_ow_");
     else {
-        const std::string opt_key = std::string("material_") + key;
+        const std::string opt_key = std::string("material_ow_") + key;
         if (key == "relative_correction") {
             Line line = Line{ m_preset_bundle->printers.get_edited_preset().config.def()->get("relative_correction")->full_label, "" };
             for (auto& axis : { "X", "Y", "Z" }) {
@@ -5573,7 +5573,7 @@ void TabSLAMaterial::update_line_with_near_label_widget(ConfigOptionsGroupShp op
     if (!m_overrides_options[key])
         return;
 
-    const std::string preprefix = "material_";
+    const std::string preprefix = "material_ow_";
 
     std::vector<std::string> opt_keys;
     opt_keys.reserve(3);
@@ -5627,7 +5627,7 @@ void TabSLAMaterial::update_material_overrides_page()
 
             bool is_checked{ true };
 
-            const static std::string preprefix = "material_";
+            const static std::string preprefix = "material_ow_";
             if (title == "Support head" || title == "Support pillar") {
                 for (auto& prefix : { "", "branching" })
                     update_line_with_near_label_widget(*optgroup, preprefix + prefix + key, is_checked);

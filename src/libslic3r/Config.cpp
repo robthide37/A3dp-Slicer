@@ -266,6 +266,8 @@ ConfigOption* ConfigOptionDef::create_empty_option() const
 {
 	if (this->nullable) {
 	    switch (this->type) {
+        case coFloat:           return new ConfigOptionFloatNullable();
+        case coInt:             return new ConfigOptionIntNullable();
 	    case coFloats:          return new ConfigOptionFloatsNullable();
 	    case coInts:            return new ConfigOptionIntsNullable();
 	    case coPercents:        return new ConfigOptionPercentsNullable();
@@ -1433,6 +1435,9 @@ CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<std::string>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<Slic3r::Vec2d>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<Slic3r::Vec3d>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingle<bool>)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingleNullable<double>)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingleNullable<int>)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionSingleNullable<bool>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVectorBase)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<double>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<int>)
@@ -1440,9 +1445,11 @@ CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<std::string>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<Slic3r::Vec2d>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionVector<unsigned char>)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionFloat)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionFloatNullable)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionFloats)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionFloatsNullable)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionInt)
+CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionIntNullable)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionInts)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionIntsNullable)
 CEREAL_REGISTER_TYPE(Slic3r::ConfigOptionString)
@@ -1469,6 +1476,9 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionS
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<Slic3r::Vec2d>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<Slic3r::Vec3d>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingle<bool>) 
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingleNullable<double>)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingleNullable<int>)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionSingleNullable<bool>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOption, Slic3r::ConfigOptionVectorBase) 
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<double>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<int>)
@@ -1476,9 +1486,11 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::Con
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<Slic3r::Vec2d>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVectorBase, Slic3r::ConfigOptionVector<unsigned char>)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<double>, Slic3r::ConfigOptionFloat)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingleNullable<double>, Slic3r::ConfigOptionFloatNullable)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<double>, Slic3r::ConfigOptionFloats)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<double>, Slic3r::ConfigOptionFloatsNullable)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<int>, Slic3r::ConfigOptionInt)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingleNullable<int>, Slic3r::ConfigOptionIntNullable)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<int>, Slic3r::ConfigOptionInts)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionVector<int>, Slic3r::ConfigOptionIntsNullable)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(Slic3r::ConfigOptionSingle<std::string>, Slic3r::ConfigOptionString)

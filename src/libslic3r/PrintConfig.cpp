@@ -4316,7 +4316,7 @@ void PrintConfigDef::init_sla_params()
         }) {
         auto it_opt = options.find(opt_key);
         assert(it_opt != options.end());
-        def = this->add_nullable(std::string("material_") + opt_key, it_opt->second.type == coFloat ? coFloats : coInts);
+        def = this->add_nullable(std::string("material_ow_") + opt_key, it_opt->second.type);
         def->label = it_opt->second.label;
         def->full_label = it_opt->second.full_label;
         def->tooltip = it_opt->second.tooltip;
@@ -4325,8 +4325,8 @@ void PrintConfigDef::init_sla_params()
         def->max  = it_opt->second.max;
         def->mode = it_opt->second.mode;
         switch (def->type) {
-        case coFloats: def->set_default_value(new ConfigOptionFloatsNullable{ it_opt->second.default_value->getFloat() }); break;
-        case coInts:   def->set_default_value(new ConfigOptionIntsNullable  { it_opt->second.default_value->getInt()   }); break;
+        case coFloat: def->set_default_value(new ConfigOptionFloatNullable{ it_opt->second.default_value->getFloat() }); break;
+        case coInt:   def->set_default_value(new ConfigOptionIntNullable{ it_opt->second.default_value->getInt() }); break;
         default: assert(false);
         }
     }

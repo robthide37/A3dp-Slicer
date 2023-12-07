@@ -332,16 +332,16 @@ public:
     {
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Assigning an incompatible type");
-        assert(dynamic_cast<const ConfigOptionSingle<T>*>(rhs));
-        this->value = static_cast<const ConfigOptionSingle<T>*>(rhs)->value;
+        assert(dynamic_cast<const ConfigOptionSingle*>(rhs));
+        this->value = static_cast<const ConfigOptionSingle*>(rhs)->value;
     }
 
     bool operator==(const ConfigOption &rhs) const override
     {
         if (rhs.type() != this->type())
             throw ConfigurationError("ConfigOptionSingle: Comparing incompatible types");
-        assert(dynamic_cast<const ConfigOptionSingle<T>*>(&rhs));
-        return this->value == static_cast<const ConfigOptionSingle<T>*>(&rhs)->value;
+        assert(dynamic_cast<const ConfigOptionSingle*>(&rhs));
+        return this->value == static_cast<const ConfigOptionSingle*>(&rhs)->value;
     }
 
     bool operator==(const T &rhs) const throw() { return this->value == rhs; }
@@ -357,7 +357,7 @@ public:
             throw ConfigurationError("Cannot override a nullable ConfigOption.");
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionVector.overriden_by() applied to different types.");
-        auto rhs_vec = static_cast<const ConfigOptionSingle<T>*>(rhs);
+        auto rhs_vec = static_cast<const ConfigOptionSingle*>(rhs);
         if (! rhs->nullable())
             // Overridding a non-nullable object with another non-nullable object.
             return this->value != rhs_vec->value;
@@ -370,7 +370,7 @@ public:
             throw ConfigurationError("Cannot override a nullable ConfigOption.");
         if (rhs->type() != this->type())
             throw ConfigurationError("ConfigOptionVector.apply_override() applied to different types.");
-        auto rhs_vec = static_cast<const ConfigOptionSingle<T>*>(rhs);
+        auto rhs_vec = static_cast<const ConfigOptionSingle*>(rhs);
         if (! rhs->nullable()) {
             // Overridding a non-nullable object with another non-nullable object.
             if (this->value != rhs_vec->value) {
@@ -397,6 +397,9 @@ private:
 	friend class cereal::access;
 	template<class Archive> void serialize(Archive & ar) { ar(this->value); }
 };
+
+template<class T>
+using ConfigOptionSingleNullable = ConfigOptionSingle<T, true>;
 
 // Value of a vector valued option (bools, ints, floats, strings, points)
 class ConfigOptionVectorBase : public ConfigOption {
@@ -653,7 +656,7 @@ public:
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<double>>(this)); }
+    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<double, NULLABLE>>(this)); }
 };
 
 template<bool NULLABLE>
@@ -784,19 +787,20 @@ using ConfigOptionFloatNullable  = ConfigOptionFloatTempl<true>;
 using ConfigOptionFloats 		 = ConfigOptionFloatsTempl<false>;
 using ConfigOptionFloatsNullable = ConfigOptionFloatsTempl<true>;
 
-class ConfigOptionInt : public ConfigOptionSingle<int>
+template<bool NULLABLE = false>
+class ConfigOptionIntTempl : public ConfigOptionSingle<int, NULLABLE>
 {
 public:
-    ConfigOptionInt() : ConfigOptionSingle<int>(0) {}
-    explicit ConfigOptionInt(int value) : ConfigOptionSingle<int>(value) {}
-    explicit ConfigOptionInt(double _value) : ConfigOptionSingle<int>(int(floor(_value + 0.5))) {}
+    ConfigOptionIntTempl() : ConfigOptionSingle<int, NULLABLE>(0) {}
+    explicit ConfigOptionIntTempl(int value) : ConfigOptionSingle<int, NULLABLE>(value) {}
+    explicit ConfigOptionIntTempl(double _value) : ConfigOptionSingle<int, NULLABLE>(int(floor(_value + 0.5))) {}
     
     static ConfigOptionType static_type() { return coInt; }
     ConfigOptionType        type()   const override { return static_type(); }
     int                     getInt() const override { return this->value; }
     void                    setInt(int val) override { this->value = val; }
-    ConfigOption*           clone()  const override { return new ConfigOptionInt(*this); }
-    bool                    operator==(const ConfigOptionInt &rhs) const throw() { return this->value == rhs.value; }
+    ConfigOption*           clone()  const override { return new ConfigOptionIntTempl(*this); }
+    bool                    operator==(const ConfigOptionIntTempl &rhs) const throw() { return this->value == rhs.value; }
     
     std::string serialize() const override 
     {
@@ -813,7 +817,7 @@ public:
         return !iss.fail();
     }
 
-    ConfigOptionInt& operator=(const ConfigOption *opt) 
+    ConfigOptionIntTempl& operator=(const ConfigOption *opt)
     {   
         this->set(opt);
         return *this;
@@ -821,8 +825,11 @@ public:
 
 private:
 	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<int>>(this)); }
+    template<class Archive> void serialize(Archive &ar) { ar(cereal::base_class<ConfigOptionSingle<int, NULLABLE>>(this)); }
 };
+
+using ConfigOptionInt = ConfigOptionIntTempl<false>;
+using ConfigOptionIntNullable = ConfigOptionIntTempl<true>;
 
 template<bool NULLABLE>
 class ConfigOptionIntsTempl : public ConfigOptionVector<int>
@@ -1907,6 +1914,8 @@ public:
     template<class Archive> ConfigOption* load_option_from_archive(Archive &archive) const {
     	if (this->nullable) {
 		    switch (this->type) {
+            case coFloat:           { auto opt = new ConfigOptionFloatNullable();	archive(*opt); return opt; }
+            case coInt:             { auto opt = new ConfigOptionIntNullable();	    archive(*opt); return opt; }
 		    case coFloats:          { auto opt = new ConfigOptionFloatsNullable();	archive(*opt); return opt; }
 		    case coInts:            { auto opt = new ConfigOptionIntsNullable();	archive(*opt); return opt; }
 		    case coPercents:        { auto opt = new ConfigOptionPercentsNullable();archive(*opt); return opt; }
@@ -1939,6 +1948,8 @@ public:
     template<class Archive> ConfigOption* save_option_to_archive(Archive &archive, const ConfigOption *opt) const {
     	if (this->nullable) {
 		    switch (this->type) {
+            case coFloat:           archive(*static_cast<const ConfigOptionFloatNullable*>(opt));  break;
+            case coInt:             archive(*static_cast<const ConfigOptionIntNullable*>(opt));  break;
 		    case coFloats:          archive(*static_cast<const ConfigOptionFloatsNullable*>(opt));  break;
 		    case coInts:            archive(*static_cast<const ConfigOptionIntsNullable*>(opt));    break;
 		    case coPercents:        archive(*static_cast<const ConfigOptionPercentsNullable*>(opt));break;
