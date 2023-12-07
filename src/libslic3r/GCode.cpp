@@ -2751,15 +2751,17 @@ std::string GCodeGenerator::change_layer(
 
     const std::string comment{"move to next layer (" + std::to_string(m_layer_index) + ")"};
 
-    bool helical_layer_change{
+    bool do_helical_layer_change{
         !spiral_vase_enabled
         && print_z > previous_layer_z
+        && EXTRUDER_CONFIG(retract_layer_change)
+        && EXTRUDER_CONFIG(retract_length) > 0
         && EXTRUDER_CONFIG(travel_ramping_lift)
         && EXTRUDER_CONFIG(travel_slope) > 0 && EXTRUDER_CONFIG(travel_slope) < 90
     };
 
     const std::optional<std::string> helix_gcode{
-        helical_layer_change ?
+        do_helical_layer_change ?
         this->get_helical_layer_change_gcode(
             m_config.z_offset.value + previous_layer_z,
             m_config.z_offset.value + print_z,
