@@ -6694,14 +6694,14 @@ static wxString check_binary_vs_ascii_gcode_extension(PrinterTechnology pt, cons
         if (binary_output && ascii_extension) {
             // TRN The placeholder %1% is the file extension the user has selected.
             err_out = format_wxstr(_L("Cannot save binary G-code with %1% extension.\n\n"
-                "Use <a href=%2%>a different extension</a> or disable <a href=%3%>binary G-code export</a> "
-                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
+                "Use a different extension or disable <a href=%2%>binary G-code export</a> "
+                "in Printer Settings."), ext, "binary_gcode;printer");
         }
         if (!binary_output && binary_extension) {
             // TRN The placeholder %1% is the file extension the user has selected.
             err_out = format_wxstr(_L("Cannot save ASCII G-code with %1% extension.\n\n"
-                "Use <a href=%2%>a different extension</a> or enable <a href=%3%>binary G-code export</a> "
-                "in Print Settings."), ext, "output_filename_format;print", "gcode_binary;print");
+                "Use a different extension or enable <a href=%2%>binary G-code export</a> "
+                "in Printer Settings."), ext, "binary_gcode;printer");
         }
     }
     return err_out;
@@ -6725,9 +6725,14 @@ static void alert_when_exporting_binary_gcode(bool binary_output, const std::str
         const std::string option_key = "dont_warn_about_firmware_version_when_exporting_binary_gcode";
 
         if (app_config->get(option_key) != "1") {
-            RichMessageDialog dialog(parent, _L("You are exporting binary G-code for a Prusa printer. Please, make sure that your printer "
-                "is running firmware version 5.1.0-alpha2 or later. Older firmwares are not able to handle binary G-codes."),
-                _L("Exporting binary G-code"), wxICON_WARNING | wxOK);
+            const wxString url = "https://prusa.io/binary-gcode";
+            HtmlCapableRichMessageDialog dialog(parent,
+                format_wxstr(_L("You are exporting binary G-code for a Prusa printer. Exporting binary G-code allows faster upload. "
+                                "Ensure your printer runs firmware version 5.1.0 or later, as older versions do not support binary G-codes.\n\n"
+                                "To learn more about binary G-code, visit <a href=%1%>%1%</a>."),
+                             url),
+                _L("Warning"), wxOK,
+                [&url](const std::string&) { wxGetApp().open_browser_with_warning_dialog(url); });
             dialog.ShowCheckBox(_L("Don't show again"));
             if (dialog.ShowModal() == wxID_OK && dialog.IsCheckBoxChecked())
                 app_config->set(option_key, "1");

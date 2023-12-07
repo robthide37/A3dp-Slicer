@@ -106,42 +106,9 @@ public:
 
 wxString get_wraped_wxString(const wxString& text_in, size_t line_len = 80);
 
-#ifdef _WIN32
-// Generic static line, used intead of wxStaticLine
-class StaticLine: public wxTextCtrl
-{
-public:
-	StaticLine( wxWindow* parent,
-				wxWindowID id = wxID_ANY,
-				const wxPoint& pos = wxDefaultPosition,
-				const wxSize& size = wxDefaultSize,
-				long style = wxLI_HORIZONTAL,
-				const wxString& name = wxString::FromAscii(wxTextCtrlNameStr))
-	: wxTextCtrl(parent, id, wxEmptyString, pos, size!=wxDefaultSize ? size : (style == wxLI_HORIZONTAL ? wxSize(10, 1) : wxSize(1, 10)), wxSIMPLE_BORDER, wxDefaultValidator, name)
-	{
-		this->Enable(false);
-	}
-	~StaticLine() {}
-};
-
-// Generic message dialog, used intead of wxMessageDialog
-class MessageDialog : public MsgDialog
-{
-public:
-	// NOTE! Don't change a signature of contsrucor. It have to  be tha same as for wxMessageDialog
-	MessageDialog(	wxWindow *parent,
-		            const wxString& message,
-		            const wxString& caption = wxEmptyString,
-		            long style = wxOK);
-	MessageDialog(MessageDialog&&) = delete;
-	MessageDialog(const MessageDialog&) = delete;
-	MessageDialog &operator=(MessageDialog&&) = delete;
-	MessageDialog &operator=(const MessageDialog&) = delete;
-	virtual ~MessageDialog() = default;
-};
 
 // Generic rich message dialog, used intead of wxRichMessageDialog
-class RichMessageDialog : public MsgDialog
+class RichMessageDialogBase : public MsgDialog
 {
 	CheckBox*   m_checkBox{ nullptr };
 	wxString	m_checkBoxText;
@@ -149,15 +116,13 @@ class RichMessageDialog : public MsgDialog
 
 public:
 	// NOTE! Don't change a signature of contsrucor. It have to  be tha same as for wxRichMessageDialog
-	RichMessageDialog(	wxWindow *parent,
-						const wxString& message,
-						const wxString& caption = wxEmptyString,
-						long style = wxOK);
-	RichMessageDialog(RichMessageDialog&&) = delete;
-	RichMessageDialog(const RichMessageDialog&) = delete;
-	RichMessageDialog &operator=(RichMessageDialog&&) = delete;
-	RichMessageDialog &operator=(const RichMessageDialog&) = delete;
-	virtual ~RichMessageDialog() = default;
+	RichMessageDialogBase(wxWindow* parent, const wxString& message, const wxString& caption = wxEmptyString, long style = wxOK);
+	RichMessageDialogBase(wxWindow* parent, const HtmlContent& content, const wxString& caption = wxEmptyString, long style = wxOK);
+	RichMessageDialogBase(RichMessageDialogBase&&)                 = delete;
+	RichMessageDialogBase(const RichMessageDialogBase&)            = delete;
+	RichMessageDialogBase &operator=(RichMessageDialogBase&&)      = delete;
+	RichMessageDialogBase &operator=(const RichMessageDialogBase&) = delete;
+	virtual ~RichMessageDialogBase()                                = default;
 
 	int  ShowModal() override;
 
@@ -278,7 +243,47 @@ private:
 		m_ok,
 		m_cancel,
 		m_help;
+
+	HtmlContent m_content;
 };
+
+
+#ifdef _WIN32
+// Generic static line, used intead of wxStaticLine
+class StaticLine: public wxTextCtrl
+{
+public:
+	StaticLine( wxWindow* parent,
+				wxWindowID id = wxID_ANY,
+				const wxPoint& pos = wxDefaultPosition,
+				const wxSize& size = wxDefaultSize,
+				long style = wxLI_HORIZONTAL,
+				const wxString& name = wxString::FromAscii(wxTextCtrlNameStr))
+	: wxTextCtrl(parent, id, wxEmptyString, pos, size!=wxDefaultSize ? size : (style == wxLI_HORIZONTAL ? wxSize(10, 1) : wxSize(1, 10)), wxSIMPLE_BORDER, wxDefaultValidator, name)
+	{
+		this->Enable(false);
+	}
+	~StaticLine() {}
+};
+
+// Generic message dialog, used intead of wxMessageDialog
+class MessageDialog : public MsgDialog
+{
+public:
+	// NOTE! Don't change a signature of contsrucor. It have to  be tha same as for wxMessageDialog
+    MessageDialog(wxWindow *parent,
+		            const wxString& message,
+		            const wxString& caption = wxEmptyString,
+		            long style = wxOK);
+    MessageDialog(MessageDialog &&)                 = delete;
+    MessageDialog(const MessageDialog &)            = delete;
+    MessageDialog &operator=(MessageDialog &&)      = delete;
+    MessageDialog &operator=(const MessageDialog &) = delete;
+    virtual ~MessageDialog()                            = default;
+};
+
+using RichMessageDialog = RichMessageDialogBase; 
+
 #else
 // just a wrapper for wxStaticLine to use the same code on all platforms
 class StaticLine : public wxStaticLine
@@ -319,6 +324,16 @@ public:
 	~RichMessageDialog() {}
 };
 #endif
+
+class HtmlCapableRichMessageDialog : public RichMessageDialogBase
+{
+public:
+	HtmlCapableRichMessageDialog(wxWindow *parent, const wxString &msg, const wxString& caption, long style, const std::function<void(const std::string &)> &on_link_clicked);
+    ~HtmlCapableRichMessageDialog() {}
+
+private:
+    HtmlContent m_content;
+};
 
 // Generic info dialog, used for displaying exceptions
 class InfoDialog : public MsgDialog
