@@ -8,6 +8,7 @@
 #include <GL/glew.h>
 
 #include <algorithm>
+#include <wx/progdlg.h>
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
