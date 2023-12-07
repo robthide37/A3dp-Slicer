@@ -629,6 +629,11 @@ void PreferencesDialog::build()
 		};
 
 
+		append_bool_option(m_optgroup_other, "use_binary_gcode_when_supported", L("Use binary G-code when the printer supports it"),
+                    L("When checked and the 'Supports binary G-code' option is checked in Printer Settings, "
+                        "the G-code will be exported in binary format."),
+                    app_config->get_bool("use_binary_gcode_when_supported"));
+
 		append_bool_option(m_optgroup_other, "suppress_hyperlinks",
 			L("Suppress to open hyperlink in browser"),
 			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser."),
