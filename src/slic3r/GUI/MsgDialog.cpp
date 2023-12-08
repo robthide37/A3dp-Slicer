@@ -304,7 +304,12 @@ RichMessageDialogBase::RichMessageDialogBase(wxWindow* parent, const HtmlContent
     m_content = content; // We need a copy for the on_link_clicked lambda.
     add_msg_content(this, content_sizer, m_content);
 
+#ifdef _WIN32 // See comment in the header where m_checkBox is defined.
     m_checkBox = new ::CheckBox(this, m_checkBoxText);
+#else
+    m_checkBox = new wxCheckBox(this, wxID_ANY, m_checkBoxText);
+#endif
+
     wxGetApp().UpdateDarkUI(m_checkBox);
     m_checkBox->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { m_checkBoxValue = m_checkBox->GetValue(); });
 

@@ -110,7 +110,17 @@ wxString get_wraped_wxString(const wxString& text_in, size_t line_len = 80);
 // Generic rich message dialog, used intead of wxRichMessageDialog
 class RichMessageDialogBase : public MsgDialog
 {
+
+// Using CheckBox causes some weird sizer-related issues on Linux and macOS. To get around the problem before
+// we find a better fix, we will fallback to wxCheckBox in this dialog. This makes little difference for most dialogs,
+// We currently only use this class as a base for HtmlCapableRichMessageDialog on Linux and macOS. The normal
+// RichMessageDialog is just an alias for wxRichMessageDialog on these platforms.
+#ifdef _WIN32
 	CheckBox*   m_checkBox{ nullptr };
+#else
+	wxCheckBox* m_checkBox{ nullptr };
+#endif
+
 	wxString	m_checkBoxText;
 	bool		m_checkBoxValue{ false };
 
