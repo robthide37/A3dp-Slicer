@@ -6728,8 +6728,9 @@ static void alert_when_exporting_binary_gcode(bool binary_output, const std::str
         if (app_config->get(option_key) != "1") {
             const wxString url = "https://prusa.io/binary-gcode";
             HtmlCapableRichMessageDialog dialog(parent,
-                format_wxstr(_L("You are exporting binary G-code for a Prusa printer. Exporting binary G-code allows faster upload. "
-                                "Ensure your printer runs firmware version 5.1.0 or later, as older versions do not support binary G-codes.\n\n"
+                format_wxstr(_L("You are exporting binary G-code for a Prusa printer. "
+                                "Binary G-code enables significantly faster uploads. "
+                                "Ensure that your printer is running firmware version 5.1.0 or newer, as older versions do not support binary G-codes.\n\n"
                                 "To learn more about binary G-code, visit <a href=%1%>%1%</a>."),
                              url),
                 _L("Warning"), wxOK,

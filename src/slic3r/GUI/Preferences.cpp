@@ -630,8 +630,8 @@ void PreferencesDialog::build()
 
 
 		append_bool_option(m_optgroup_other, "use_binary_gcode_when_supported", L("Use binary G-code when the printer supports it"),
-                    L("When checked and the 'Supports binary G-code' option is checked in Printer Settings, "
-                        "the G-code will be exported in binary format."),
+                    L("If the 'Supports binary G-code' option is enabled in Printer Settings, "
+                      "checking this option will result in the export of G-code in binary format."),
                     app_config->get_bool("use_binary_gcode_when_supported"));
 
 		append_bool_option(m_optgroup_other, "suppress_hyperlinks",

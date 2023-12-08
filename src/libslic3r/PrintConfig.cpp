@@ -1787,7 +1787,8 @@ void PrintConfigDef::init_fff_params()
 
     def = this->add("binary_gcode", coBool);
     def->label = L("Supports binary G-code");
-    def->tooltip = L("The firmware supports binary G-code format (bgcode). This can be overridden in Preferences.");
+    def->tooltip = L("Enable, if the firmware supports binary G-code format (bgcode). "
+                     "To generate .bgcode files, make sure you have binary G-code enabled in Configuration->Preferences->Other.");
     def->mode = comExpert;
     def->set_default_value(new ConfigOptionBool(false));
 
