@@ -868,7 +868,7 @@ static inline GCode::SmoothPathCache smooth_path_interpolate_global(const Print&
 
 void GCodeGenerator::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
-    const bool export_to_binary_gcode = print.full_print_config().option<ConfigOptionBool>("gcode_binary")->value;
+    const bool export_to_binary_gcode = print.full_print_config().option<ConfigOptionBool>("binary_gcode")->value;
     // if exporting gcode in binary format: 
     // we generate here the data to be passed to the post-processor, who is responsible to export them to file 
     // 1) generate the thumbnails
