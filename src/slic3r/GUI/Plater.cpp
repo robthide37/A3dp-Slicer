@@ -3345,7 +3345,8 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 
     // Get the config ready. The binary gcode flag depends on Preferences, which the backend has no access to.
     DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config();
-    full_config.set("binary_gcode", bool(full_config.opt_bool("binary_gcode") & wxGetApp().app_config->get_bool("use_binary_gcode_when_supported")));
+    if (full_config.has("binary_gcode")) // needed for SLA
+        full_config.set("binary_gcode", bool(full_config.opt_bool("binary_gcode") & wxGetApp().app_config->get_bool("use_binary_gcode_when_supported")));
 
     // If the update_background_process() was not called by the timer, kill the timer,
     // so the update_restart_background_process() will not be called again in vain.
@@ -6806,9 +6807,11 @@ void Plater::export_gcode(bool prefer_removable)
                               _L("The following characters are not allowed by a FAT file system:") + " <>:/\\|?*\"";
                     return true;
                 }
-                bool supports_binary = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode");
-                bool uses_binary     = wxGetApp().app_config->get_bool("use_binary_gcode_when_supported");
-                err_out = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, supports_binary && uses_binary);
+                if (this->printer_technology() == ptFFF) {
+                    bool supports_binary = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode");
+                    bool uses_binary = wxGetApp().app_config->get_bool("use_binary_gcode_when_supported");
+                    err_out = check_binary_vs_ascii_gcode_extension(printer_technology(), ext, supports_binary && uses_binary);
+                }
                 return !err_out.IsEmpty();
             };
 
@@ -6816,7 +6819,7 @@ void Plater::export_gcode(bool prefer_removable)
             if (check_for_error(output_path, error_str)) {
                 ErrorDialog(this, error_str, [this](const std::string& key) -> void { sidebar().jump_to_option(key); }).ShowModal();
                 output_path.clear();
-            } else {
+            } else if (printer_technology() == ptFFF) {
                 bool supports_binary = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode");
                 bool uses_binary     = wxGetApp().app_config->get_bool("use_binary_gcode_when_supported");
                 alert_when_exporting_binary_gcode(supports_binary && uses_binary,
@@ -7369,7 +7372,7 @@ void Plater::send_gcode()
     PrintHostSendDialog dlg(default_output_file, upload_job.printhost->get_post_upload_actions(), groups, storage_paths, storage_names);
     if (dlg.ShowModal() == wxID_OK) {
 
-        {
+        if (printer_technology() == ptFFF) {
             const std::string ext = boost::algorithm::to_lower_copy(dlg.filename().extension().string());
             const bool        binary_output = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode") &&
                                        wxGetApp().app_config->get_bool("use_binary_gcode_when_supported");
@@ -7378,12 +7381,12 @@ void Plater::send_gcode()
                 ErrorDialog(this, error_str, t_kill_focus([](const std::string& key) -> void { wxGetApp().sidebar().jump_to_option(key); })).ShowModal();
                 return;
             }
-        }
 
-        bool supports_binary = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode");
-        bool uses_binary     = wxGetApp().app_config->get_bool("use_binary_gcode_when_supported");
-        alert_when_exporting_binary_gcode(supports_binary && uses_binary,
-                                          wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
+            bool supports_binary = wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_bool("binary_gcode");
+            bool uses_binary = wxGetApp().app_config->get_bool("use_binary_gcode_when_supported");
+            alert_when_exporting_binary_gcode(supports_binary && uses_binary,
+                wxGetApp().preset_bundle->printers.get_edited_preset().config.opt_string("printer_notes"));
+        }
 
         upload_job.upload_data.upload_path = dlg.filename();
         upload_job.upload_data.post_action = dlg.post_action();
