@@ -5623,24 +5623,6 @@ void TabSLAMaterial::update_material_overrides_page()
 
         for (const std::string& key : keys) {
             update_line_with_near_label_widget(*optgroup, key);
-            // // update_line_with_near_label_widget(*optgroup, key, false);
-
-            // const static std::string preprefix = "material_ow_";
-
-            // if (title == "Support head" || title == "Support pillar") {
-
-            //     for (auto& prefix : { "", "branching" }) {
-            //         update_line_with_near_label_widget(*optgroup, preprefix + prefix + key);
-            //     }
-            // }
-            // else if (key == "relative_correction") {
-            //     for (auto& axis : { "x", "y", "z" }) {
-            //         update_line_with_near_label_widget(*optgroup, preprefix + key + "_" + char(axis[0]));
-            //     }
-            // }
-            // else {
-            //     update_line_with_near_label_widget(*optgroup, preprefix + key);
-            // }
         }
     }
 }

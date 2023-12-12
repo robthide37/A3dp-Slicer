@@ -1125,6 +1125,12 @@ PRINT_CONFIG_CLASS_DEFINE(
     ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_penetration))
     ((ConfigOptionFloatNullable,               material_ow_support_head_width))
     ((ConfigOptionFloatNullable,               material_ow_branchingsupport_head_width))
+    ((ConfigOptionIntNullable,                 material_ow_support_points_density_relative))
+
+    ((ConfigOptionFloatNullable,               material_ow_elefant_foot_compensation))
+    ((ConfigOptionFloatNullable,               material_ow_relative_correction_x))
+    ((ConfigOptionFloatNullable,               material_ow_relative_correction_y))
+    ((ConfigOptionFloatNullable,               material_ow_relative_correction_z))
 )
 
 PRINT_CONFIG_CLASS_DEFINE(

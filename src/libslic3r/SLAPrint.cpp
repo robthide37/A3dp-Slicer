@@ -861,7 +861,9 @@ bool SLAPrint::invalidate_state_by_config_options(const std::vector<t_config_opt
         "material_ow_branchingsupport_head_width"sv,
         "material_ow_elefant_foot_compensation"sv,
         "material_ow_support_points_density_relative"sv,
-        "material_ow_relative_correction"sv
+        "material_ow_relative_correction_x"sv,
+        "material_ow_relative_correction_y"sv,
+        "material_ow_relative_correction_z"sv
     };
 
     std::vector<SLAPrintStep> steps;
@@ -947,7 +949,6 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
                opt_key == "support_points_density_relative"
             || opt_key == "support_enforcers_only"
             || opt_key == "support_points_minimal_distance"
-//            || opt_key == "material_ow_support_points_density_relative"
             ) {
             steps.emplace_back(slaposSupportPoints);
         } else if (
@@ -967,11 +968,6 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             || opt_key == "support_max_bridge_length"
             || opt_key == "support_max_pillar_link_distance"
             || opt_key == "support_base_safety_distance"
-//            || opt_key == "material_ow_support_pillar_diameter"
-//            || opt_key == "material_ow_support_head_front_diameter"
-//            || opt_key == "material_ow_support_head_penetration"
-//            || opt_key == "material_ow_support_head_width"
-
             || opt_key == "branchingsupport_head_front_diameter"
             || opt_key == "branchingsupport_head_penetration"
             || opt_key == "branchingsupport_head_width"
@@ -988,11 +984,6 @@ bool SLAPrintObject::invalidate_state_by_config_options(const std::vector<t_conf
             || opt_key == "branchingsupport_max_bridge_length"
             || opt_key == "branchingsupport_max_pillar_link_distance"
             || opt_key == "branchingsupport_base_safety_distance"
-//            || opt_key == "material_ow_branchingsupport_pillar_diameter"
-//            || opt_key == "material_ow_branchingsupport_head_front_diameter"
-//            || opt_key == "material_ow_branchingsupport_head_penetration"
-//            || opt_key == "material_ow_branchingsupport_head_width"
-
             || opt_key == "pad_object_gap"
             ) {
             steps.emplace_back(slaposSupportTree);
