@@ -7,8 +7,11 @@
 #include <boost/polygon/voronoi.hpp>
 
 #include <memory> // smart pointers
-#include <unordered_map>
 #include <utility> // pair
+
+#include <ankerl/unordered_dense.h>
+
+#include <Arachne/utils/VoronoiUtils.hpp>
 
 #include "utils/HalfEdgeGraph.hpp"
 #include "utils/PolygonsSegmentIndex.hpp"
@@ -79,7 +82,9 @@ class SkeletalTrapezoidation
     const BeadingStrategy& beading_strategy;
 
 public:
-    using Segment = PolygonsSegmentIndex;
+    using Segment  = PolygonsSegmentIndex;
+    using PointMap = ankerl::unordered_dense::map<Point, Point, PointHash>;
+    using NodeSet  = ankerl::unordered_dense::set<node_t*>;
 
     /*!
      * Construct a new trapezoidation problem to solve.
@@ -163,8 +168,8 @@ protected:
      * mapping each voronoi VD edge to the corresponding halfedge HE edge
      * In case the result segment is discretized, we map the VD edge to the *last* HE edge
      */
-    std::unordered_map<vd_t::edge_type*, edge_t*> vd_edge_to_he_edge;
-    std::unordered_map<vd_t::vertex_type*, node_t*> vd_node_to_he_node;
+    ankerl::unordered_dense::map<vd_t::edge_type*, edge_t*> vd_edge_to_he_edge;
+    ankerl::unordered_dense::map<vd_t::vertex_type*, node_t*> vd_node_to_he_node;
     node_t& makeNode(vd_t::vertex_type& vd_node, Point p); //!< Get the node which the VD node maps to, or create a new mapping if there wasn't any yet.
 
     /*!
@@ -203,7 +208,7 @@ protected:
      * \return A number of coordinates along the edge where the edge is broken
      * up into discrete pieces.
      */
-    std::vector<Point> discretize(const vd_t::edge_type& segment, const std::vector<Segment>& segments);
+    Points discretize(const vd_t::edge_type& segment, const std::vector<Segment>& segments);
 
     /*!
      * Compute the range of line segments that surround a cell of the skeletal
@@ -229,7 +234,7 @@ protected:
      * /return Whether the cell is inside of the polygon. If it's outside of the
      * polygon we should skip processing it altogether.
      */
-    bool computePointCellRange(vd_t::cell_type& cell, Point& start_source_point, Point& end_source_point, vd_t::edge_type*& starting_vd_edge, vd_t::edge_type*& ending_vd_edge, const std::vector<Segment>& segments);
+    static bool computePointCellRange(vd_t::cell_type& cell, Point& start_source_point, Point& end_source_point, vd_t::edge_type*& starting_vd_edge, vd_t::edge_type*& ending_vd_edge, const std::vector<Segment>& segments);
 
     /*!
      * Compute the range of line segments that surround a cell of the skeletal
@@ -255,7 +260,7 @@ protected:
      * /return Whether the cell is inside of the polygon. If it's outside of the
      * polygon we should skip processing it altogether.
      */
-    void computeSegmentCellRange(vd_t::cell_type& cell, Point& start_source_point, Point& end_source_point, vd_t::edge_type*& starting_vd_edge, vd_t::edge_type*& ending_vd_edge, const std::vector<Segment>& segments);
+    static void computeSegmentCellRange(vd_t::cell_type& cell, Point& start_source_point, Point& end_source_point, vd_t::edge_type*& starting_vd_edge, vd_t::edge_type*& ending_vd_edge, const std::vector<Segment>& segments);
 
     /*!
      * For VD cells associated with an input polygon vertex, we need to separate the node at the end and start of the cell into two
@@ -597,6 +602,8 @@ protected:
      * Genrate small segments for local maxima where the beading would only result in a single bead
      */
     void generateLocalMaximaSingleBeads();
+
+    friend bool detect_voronoi_edge_intersecting_input_segment(const Geometry::VoronoiDiagram &voronoi_diagram, const std::vector<VoronoiUtils::Segment> &segments);
 };
 
 } // namespace Slic3r::Arachne

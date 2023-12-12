@@ -1,14 +1,22 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966
+///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2014 Petr Ledvina @ledvinap
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
-#include "ExPolygonCollection.hpp"
+#include "ExPolygon.hpp"
 #include "ClipperUtils.hpp"
+#include "Exception.hpp"
 #include "Extruder.hpp"
 #include "Flow.hpp"
 #include <cmath>
 #include <limits>
 #include <sstream>
 
-#define L(s) (s)
+namespace Slic3r {
 
 namespace Slic3r {
 
@@ -26,16 +34,15 @@ void ExtrusionVisitorConst::use(const ExtrusionMultiPath &multipath) { default_u
 void ExtrusionVisitorConst::use(const ExtrusionMultiPath3D &multipath3D) { default_use(multipath3D); }
 void ExtrusionVisitorConst::use(const ExtrusionLoop &loop) { default_use(loop); }
 void ExtrusionVisitorConst::use(const ExtrusionEntityCollection &collection) { default_use(collection); }
-    
-void
-ExtrusionPath::intersect_expolygons(const ExPolygonCollection &collection, ExtrusionEntityCollection* retval) const
+
+void ExtrusionPath::intersect_expolygons(const ExPolygons &collection, ExtrusionEntityCollection* retval) const
 {
-    this->_inflate_collection(intersection_pl(Polylines{ this->polyline.as_polyline() }, collection.expolygons), retval);
+    this->_inflate_collection(intersection_pl(Polylines{ this->polyline.as_polyline() }, collection), retval);
 }
 
-void ExtrusionPath::subtract_expolygons(const ExPolygonCollection &collection, ExtrusionEntityCollection* retval) const
+void ExtrusionPath::subtract_expolygons(const ExPolygons &collection, ExtrusionEntityCollection* retval) const
 {
-    this->_inflate_collection(diff_pl(Polylines{ this->polyline.as_polyline() }, collection.expolygons), retval);
+    this->_inflate_collection(diff_pl(Polylines{ this->polyline.as_polyline() }, collection), retval);
 }
 
 void ExtrusionPath::clip_end(coordf_t distance)
@@ -65,13 +72,13 @@ void ExtrusionPath::_inflate_collection(const Polylines &polylines, ExtrusionEnt
 {
     ExtrusionEntitiesPtr to_add;
     for (const Polyline &polyline : polylines)
-        to_add.emplace_back(new ExtrusionPath(PolylineOrArc{ polyline }, *this));
+        to_add.push_back(new ExtrusionPath(PolylineOrArc{ polyline }, *this));
     collection->append(std::move(to_add));
 }
 
 void ExtrusionPath::polygons_covered_by_width(Polygons &out, const float scaled_epsilon) const
 {
-    polygons_append(out, offset(this->polyline.as_polyline(), double(scale_(this->width/2)) + scaled_epsilon));
+    polygons_append(out, offset(this->polyline.as_polyline(), double(scale_(m_attributes.width/2)) + scaled_epsilon));
 }
 
 void ExtrusionPath::polygons_covered_by_spacing(Polygons &out, const float spacing_ratio, const float scaled_epsilon) const
@@ -79,26 +86,30 @@ void ExtrusionPath::polygons_covered_by_spacing(Polygons &out, const float spaci
     // Instantiating the Flow class to get the line spacing.
     // Don't know the nozzle diameter, setting to zero. It shall not matter it shall be optimized out by the compiler.
     bool bridge = is_bridge(this->role()) || (this->width * 4 < this->height);
-    assert(! bridge || this->width == this->height);
+    assert(! bridge || m_attributes.width == m_attributes.height);
     //TODO: check BRIDGE_FLOW here
     auto flow = bridge 
-        ? Flow::bridging_flow(this->width, 0.f) 
-        : Flow::new_from_width(this->width, 0.f, this->height, spacing_ratio);
+        ? Flow::bridging_flow(m_attributes.width, 0.f) 
+        : Flow::new_from_width(m_attributes.width, 0.f, m_attributes.height, spacing_ratio);
     polygons_append(out, offset(this->polyline.as_polyline(), 0.5f * float(flow.scaled_spacing()) + scaled_epsilon));
 }
 
-bool ExtrusionLoop::make_clockwise()
+double ExtrusionLoop::area() const
 {
-    bool was_ccw = this->polygon().is_counter_clockwise();
-    if (was_ccw) this->reverse();
-    return was_ccw;
-}
-
-bool ExtrusionLoop::make_counter_clockwise()
-{
-    bool was_cw = this->polygon().is_clockwise();
-    if (was_cw) this->reverse();
-    return was_cw;
+    double a = 0;
+    for (const ExtrusionPath &path : this->paths) {
+        assert(path.size() >= 2);
+        if (path.size() >= 2) {
+            // Assumming that the last point of one path segment is repeated at the start of the following path segment.
+            auto it = path.polyline.points.begin();
+            Point prev = *it ++;
+            for (; it != path.polyline.points.end(); ++ it) {
+                a += cross2(prev.cast<double>(), it->cast<double>());
+                prev = *it;
+            }
+        }
+    }
+    return a * 0.5;
 }
 
 void ExtrusionLoop::reverse()
@@ -196,7 +207,7 @@ ExtrusionLoop::ClosestPathPoint ExtrusionLoop::get_closest_path_and_point(const 
             out.segment_idx = foot_pt_.first;
             min2            = d2;
             }
-        if (prefer_non_overhang && !is_bridge(path.role()) && d2 < min2_non_overhang) {
+        if (prefer_non_overhang && ! path.role().is_bridge() && d2 < min2_non_overhang) {
             best_non_overhang.foot_pt     = foot_pt_.second;
             best_non_overhang.path_idx    = &path - &this->paths.front();
             best_non_overhang.segment_idx = foot_pt_.first;
@@ -217,7 +228,7 @@ void ExtrusionLoop::split_at(const Point &point, bool prefer_non_overhang, const
         return;
     
     auto [path_idx, segment_idx, p] = get_closest_path_and_point(point, prefer_non_overhang);
-    
+
     // Snap p to start or end of segment_idx if closer than scaled_epsilon.
     {
         const Point *p1 = this->paths[path_idx].polyline.get_points().data() + segment_idx;
@@ -237,8 +248,8 @@ void ExtrusionLoop::split_at(const Point &point, bool prefer_non_overhang, const
     
     // now split path_idx in two parts
     const ExtrusionPath &path = this->paths[path_idx];
-    ExtrusionPath p1(path.role(), path.mm3_per_mm, path.width, path.height, can_reverse());
-    ExtrusionPath p2(path.role(), path.mm3_per_mm, path.width, path.height, can_reverse());
+    ExtrusionPath p1(path.attributes(), can_reverse());
+    ExtrusionPath p2(path.attributes(), can_reverse());
     path.polyline.split_at(p, &p1.polyline, &p2.polyline);
     
     if (this->paths.size() == 1) {
@@ -289,7 +300,7 @@ bool ExtrusionLoop::has_overhang_point(const Point &point) const
         if (pos != -1) {
             // point belongs to this path
             // we consider it overhang only if it's not an endpoint
-            return (is_bridge(path.role()) && pos > 0 && pos != (int)(path.polyline.size())-1);
+            return (path.role().is_bridge() && pos > 0 && pos != int(path.polyline.size())-1);
         }
     }
     return false;
@@ -307,77 +318,14 @@ void ExtrusionLoop::polygons_covered_by_spacing(Polygons &out, const float spaci
         path.polygons_covered_by_spacing(out, spacing_ratio, scaled_epsilon);
 }
 
-std::string ExtrusionEntity::role_to_string(ExtrusionRole role)
+double ExtrusionLoop::min_mm3_per_mm() const
 {
-    switch (role) {
-        case erNone                         : return L("Unknown");
-        case erPerimeter                    : return L("Internal perimeter");
-        case erExternalPerimeter            : return L("External perimeter");
-        case erOverhangPerimeter            : return L("Overhang perimeter");
-        case erInternalInfill               : return L("Internal infill");
-        case erSolidInfill                  : return L("Solid infill");
-        case erTopSolidInfill               : return L("Top solid infill");
-        case erIroning                      : return L("Ironing");
-        case erBridgeInfill                 : return L("Bridge infill");
-        case erInternalBridgeInfill         : return L("Internal bridge infill");
-        case erThinWall                     : return L("Thin wall");
-        case erGapFill                      : return L("Gap fill");
-        case erSkirt                        : return L("Skirt");
-        case erSupportMaterial              : return L("Support material");
-        case erSupportMaterialInterface     : return L("Support material interface");
-        case erWipeTower                    : return L("Wipe tower");
-        case erMilling                      : return L("Mill");
-        case erCustom                       : return L("Custom");
-        case erMixed                        : return L("Mixed");
-        case erTravel                       : return L("Travel");
-        default                             : assert(false);
-    }
-
-    return "";
+    double min_mm3_per_mm = std::numeric_limits<double>::max();
+    for (const ExtrusionPath &path : this->paths)
+        min_mm3_per_mm = std::min(min_mm3_per_mm, path.min_mm3_per_mm());
+    return min_mm3_per_mm;
 }
 
-
-ExtrusionRole ExtrusionEntity::string_to_role(const std::string_view role)
-{
-    if (role == L("Perimeter") || role == L("Internal perimeter"))
-        return erPerimeter;
-    else if (role == L("External perimeter"))
-        return erExternalPerimeter;
-    else if (role == L("Overhang perimeter"))
-        return erOverhangPerimeter;
-    else if (role == L("Internal infill"))
-        return erInternalInfill;
-    else if (role == L("Solid infill"))
-        return erSolidInfill;
-    else if (role == L("Top solid infill"))
-        return erTopSolidInfill;
-    else if (role == L("Ironing"))
-        return erIroning;
-    else if (role == L("Bridge infill"))
-        return erBridgeInfill;
-    else if (role == L("Internal bridge infill"))
-        return erInternalBridgeInfill;
-    else if (role == L("Thin wall"))
-        return erThinWall;
-    else if (role == L("Gap fill"))
-        return erGapFill;
-    else if (role == L("Skirt") || role == L("Skirt/Brim")) // "Skirt" is for backward compatibility with 2.3.1 and earlier
-        return erSkirt;
-    else if (role == L("Support material"))
-        return erSupportMaterial;
-    else if (role == L("Support material interface"))
-        return erSupportMaterialInterface;
-    else if (role == L("Wipe tower"))
-        return erWipeTower;
-    else if (role == L("Mill"))
-        return erMilling;
-    else if (role == L("Custom"))
-        return erCustom;
-    else if (role == L("Mixed"))
-        return erMixed;
-    else
-        return erNone;
-}
 void ExtrusionPrinter::use(const ExtrusionPath &path) { 
     ss << "ExtrusionPath:" << (uint16_t)path.role() << "{";
     for (int i = 0; i < path.polyline.size(); i++) {

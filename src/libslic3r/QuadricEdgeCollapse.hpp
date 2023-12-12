@@ -1,6 +1,15 @@
+///|/ Copyright (c) Prusa Research 2021 - 2022 Tomáš Mészáros @tamasmeszaros, Filip Sykala @Jony01
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
+#ifndef slic3r_quadric_edge_collapse_hpp_
+#define slic3r_quadric_edge_collapse_hpp_
+
 // paper: https://people.eecs.berkeley.edu/~jrs/meshpapers/GarlandHeckbert2.pdf
 // sum up: https://users.csc.calpoly.edu/~zwood/teaching/csc570/final06/jseeba/
 // inspiration: https://github.com/sp4cerat/Fast-Quadric-Mesh-Simplification
+#ifndef PRUSASLICER_QUADRIC_EDGE_COLLAPSE_HPP
+#define PRUSASLICER_QUADRIC_EDGE_COLLAPSE_HPP
 
 #include <cstdint>
 #include <functional>
@@ -26,3 +35,6 @@ void its_quadric_edge_collapse(
     std::function<void(int)>  statusfn        = nullptr);
 
 } // namespace Slic3r
+#endif // slic3r_quadric_edge_collapse_hpp_
+
+#endif // PRUSASLICER_QUADRIC_EDGE_COLLAPSE_HPP

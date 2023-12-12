@@ -1,19 +1,41 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral
+///|/
+///|/ ported from lib/Slic3r/GUI/Preferences.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2018 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2013 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Preferences.hpp"
 #include "OptionsGroup.hpp"
 #include "GUI_App.hpp"
 #include "Plater.hpp"
 #include "MsgDialog.hpp"
 #include "I18N.hpp"
+#include "format.hpp"
 #include "libslic3r/AppConfig.hpp"
 
 #include <wx/notebook.h>
 #include "Notebook.hpp"
 #include "ButtonsDescription.hpp"
 #include "OG_CustomCtrl.hpp"
+#include "GLCanvas3D.hpp"
+#include "ConfigWizard.hpp"
 #include "wxExtensions.hpp"
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
+
+#include "Widgets/SpinInput.hpp"
+
+#include <boost/dll/runtime_symbol_info.hpp>
+
+#ifdef WIN32
+#include <wx/msw/registry.h>
+#endif // WIN32
+#ifdef __linux__
+#include "DesktopIntegrationDialog.hpp"
+#endif //__linux__
 
 namespace Slic3r {
 
@@ -47,31 +69,121 @@ namespace Slic3r {
 
 namespace GUI {
 
-PreferencesDialog::PreferencesDialog(wxWindow* parent, int selected_tab, const std::string& highlight_opt_key) :
+PreferencesDialog::PreferencesDialog(wxWindow* parent) :
     DPIDialog(parent, wxID_ANY, _L("Preferences"), wxDefaultPosition, 
-              wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+              wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
 #ifdef __WXOSX__
     isOSX = true;
 #endif
-	build(selected_tab);
+	build();
+
+    wxSize sz = GetSize();
+    bool is_scrollbar_shown = false;
+
+    const size_t pages_cnt = tabs->GetPageCount();
+    for (size_t tab_id = 0; tab_id < pages_cnt; tab_id++) {
+        wxSizer* tab_sizer = tabs->GetPage(tab_id)->GetSizer();
+        wxScrolledWindow* scrolled = static_cast<wxScrolledWindow*>(tab_sizer->GetItem(size_t(0))->GetWindow());
+        scrolled->SetScrollRate(0, 5);
+
+        is_scrollbar_shown |= scrolled->GetScrollLines(wxVERTICAL) > 0;
+    }
+
+    if (is_scrollbar_shown)
+        sz.x += 2*em_unit();
+#ifdef __WXGTK__
+    // To correct Layout of wxScrolledWindow we need at least small change of size
+    else
+        sz.x += 1;
+#endif
+    SetSize(sz);
+
+	m_highlighter.set_timer_owner(this, 0);
+}
+
+static void update_color(wxColourPickerCtrl* color_pckr, const wxColour& color) 
+{
+	if (color_pckr->GetColour() != color) {
+		color_pckr->SetColour(color);
+		wxPostEvent(color_pckr, wxCommandEvent(wxEVT_COLOURPICKER_CHANGED));
+	}
+}
+
+void PreferencesDialog::show(const std::string& highlight_opt_key /*= std::string()*/, const std::string& tab_name/*= std::string()*/)
+{
+	int selected_tab = 0;
+	for ( ; selected_tab < int(tabs->GetPageCount()); selected_tab++)
+		if (tabs->GetPageText(selected_tab) == _(tab_name))
+			break;
+	if (selected_tab < int(tabs->GetPageCount()))
+		tabs->SetSelection(selected_tab);
+
 	if (!highlight_opt_key.empty())
 		init_highlighter(highlight_opt_key);
+
+	// cache input values for custom toolbar size
+	m_custom_toolbar_size		= atoi(get_app_config()->get("custom_toolbar_size").c_str());
+	m_use_custom_toolbar_size	= get_app_config()->get_bool("use_custom_toolbar_size");
+
+	// set Field for notify_release to its value
+	if (m_optgroup_gui && m_optgroup_gui->get_field("notify_release") != nullptr) {
+		boost::any val = s_keys_map_NotifyReleaseMode.at(wxGetApp().app_config->get("notify_release"));
+		m_optgroup_gui->get_field("notify_release")->set_value(val, false);
+	}
+	
+
+	if (wxGetApp().is_editor()) {
+		auto app_config = get_app_config();
+
+		downloader->set_path_name(app_config->get("url_downloader_dest"));
+		downloader->allow(!app_config->has("downloader_url_registered") || app_config->get_bool("downloader_url_registered"));
+
+		for (const std::string& opt_key : {"suppress_hyperlinks", "downloader_url_registered"})
+			m_optgroup_other->set_value(opt_key, app_config->get_bool(opt_key));
+
+		for (const std::string& opt_key : { "default_action_on_close_application"
+										   ,"default_action_on_new_project"
+										   ,"default_action_on_select_preset" })
+			m_optgroup_general->set_value(opt_key, app_config->get(opt_key) == "none");
+		m_optgroup_general->set_value("default_action_on_dirty_project", app_config->get("default_action_on_dirty_project").empty());
+
+		// update colors for color pickers of the labels
+		update_color(m_sys_colour, wxGetApp().get_label_clr_sys());
+		update_color(m_mod_colour, wxGetApp().get_label_clr_modified());
+
+		// update color pickers for mode palette
+		const auto palette = wxGetApp().get_mode_palette(); 
+		std::vector<wxColourPickerCtrl*> color_pickres = {m_mode_simple, m_mode_advanced, m_mode_expert};
+		for (size_t mode = 0; mode < color_pickres.size(); ++mode)
+			update_color(color_pickres[mode], palette[mode]);
+	}
+
+	this->ShowModal();
 }
 
 static std::shared_ptr<ConfigOptionsGroup>create_options_tab(const wxString& title, wxBookCtrlBase* tabs)
 {
 	wxPanel* tab = new wxPanel(tabs, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBK_LEFT | wxTAB_TRAVERSAL);
-	tabs->AddPage(tab, title);
+
+	tabs->AddPage(tab, _(title));
 	tab->SetFont(wxGetApp().normal_font());
 
+	auto scrolled = new wxScrolledWindow(tab);
+
+	// Sizer in the scrolled area
+	auto* scrolled_sizer = new wxBoxSizer(wxVERTICAL);
+	scrolled->SetSizer(scrolled_sizer);
+
 	wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
+	sizer->Add(scrolled, 1, wxEXPAND);
 	sizer->SetSizeHints(tab);
 	tab->SetSizer(sizer);
 
-	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>(tab);
+	std::shared_ptr<ConfigOptionsGroup> optgroup = std::make_shared<ConfigOptionsGroup>(scrolled);
 	optgroup->title_width = 40;
 	optgroup->label_width = 40;
+	optgroup->set_config_category_and_type(title, int(Preset::TYPE_PREFERENCES));
 	return optgroup;
 }
 
@@ -84,6 +196,10 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(cons
 	optgroup->label_width = 40;
 	optgroup->m_on_change = [this, tabs, optgroup](t_config_option_key opt_key, boost::any value) {
 		Field* field = optgroup->get_field(opt_key);
+		if (auto it = m_values.find(opt_key); it != m_values.end()) { //TODO: test that
+			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+			return;
+		}
 		//very special cases
 		if (opt_key == "default_action_on_close_application" || opt_key == "default_action_on_select_preset" || opt_key == "default_action_on_new_project")
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "none" : "discard";
@@ -122,12 +238,33 @@ std::shared_ptr<ConfigOptionsGroup> PreferencesDialog::create_options_group(cons
 			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 		}
 
+// GUI STUFF //TODO: tidy ip
+		if (opt_key == "notify_release") {
+			int val_int = boost::any_cast<int>(value);
+			for (const auto& item : s_keys_map_NotifyReleaseMode) {
+				if (item.second == val_int) {
+					m_values[opt_key] = item.first;
+					return;
+				}
+			}
+		}
 		if (opt_key == "use_custom_toolbar_size") {
 			m_icon_size_sizer->ShowItems(boost::any_cast<bool>(value));
-			m_optgroups_gui.front()->parent()->Layout();
-			tabs->Layout();
-			this->layout();
+			refresh_og(m_optgroup_gui);
+			get_app_config()->set("use_custom_toolbar_size", boost::any_cast<bool>(value) ? "1" : "0");
+			wxGetApp().plater()->get_current_canvas3D()->render();
+			return;
 		}
+		if (opt_key == "tabs_as_menu") {
+			bool disable_new_layout = boost::any_cast<bool>(value);
+			m_rb_new_settings_layout_mode->Show(!disable_new_layout);
+			if (disable_new_layout && m_rb_new_settings_layout_mode->GetValue()) {
+				m_rb_new_settings_layout_mode->SetValue(false);
+				m_rb_old_settings_layout_mode->SetValue(true);
+			}
+			refresh_og(m_optgroup_gui);
+		}
+
 	};
 	return optgroup;
 }
@@ -138,14 +275,71 @@ static void activate_options_tab(std::shared_ptr<ConfigOptionsGroup> optgroup, i
 	optgroup->update_visibility(comSimple);
 	wxBoxSizer* sizer = static_cast<wxBoxSizer*>(static_cast<wxPanel*>(optgroup->parent())->GetSizer());
 	sizer->Add(optgroup->sizer, 0, wxEXPAND | wxALL, padding);
+
+	optgroup->parent()->Layout();
+
+	// apply sercher
+	wxGetApp().sidebar().get_searcher().append_preferences_options(optgroup->get_lines());
 }
 
-void PreferencesDialog::build(size_t selected_tab)
+static void append_bool_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+								const std::string& opt_key,
+								const std::string& label,
+								const std::string& tooltip,
+								bool def_val,
+								ConfigOptionMode mode = comSimpleAE)
+{
+	ConfigOptionDef def = {opt_key, coBool};
+	def.label = label;
+	def.tooltip = tooltip;
+	def.mode = mode;
+	def.set_default_value(new ConfigOptionBool{ def_val });
+	Option option(def, opt_key);
+	optgroup->append_single_option_line(option);
+
+	// fill data to the Search Dialog
+	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
+}
+
+template<typename EnumType>
+static void append_enum_option( std::shared_ptr<ConfigOptionsGroup> optgroup,
+								const std::string& opt_key,
+								const std::string& label,
+								const std::string& tooltip,
+								const ConfigOption* def_val,
+								std::initializer_list<std::pair<std::string_view, std::string_view>> enum_values,
+								ConfigOptionMode mode = comSimple)
+{
+	ConfigOptionDef def = {opt_key, coEnum };
+	def.label = label;
+	def.tooltip = tooltip;
+	def.mode = mode;
+	def.set_enum<EnumType>(enum_values);
+
+	def.set_default_value(def_val);
+	Option option(def, opt_key);
+	optgroup->append_single_option_line(option);
+
+	// fill data to the Search Dialog
+	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
+}
+
+static void append_preferences_option_to_searcher(std::shared_ptr<ConfigOptionsGroup> optgroup,
+												const std::string& opt_key,
+												const wxString& label)
+{
+	// fill data to the Search Dialog
+	wxGetApp().sidebar().get_searcher().add_key(opt_key, Preset::TYPE_PREFERENCES, optgroup->config_category(), L("Preferences"));
+	// apply sercher
+	wxGetApp().sidebar().get_searcher().append_preferences_option(Line(opt_key, label, ""));
+}
+
+void PreferencesDialog::build()
 {
 #ifdef _WIN32
 	wxGetApp().UpdateDarkUI(this);
 #else
-	SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+	//SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
 #endif
 	const wxFont& font = wxGetApp().normal_font();
 	SetFont(font);
@@ -153,48 +347,50 @@ void PreferencesDialog::build(size_t selected_tab)
 	auto app_config = get_app_config();
 
 #ifdef _MSW_DARK_MODE
-	wxBookCtrlBase* tabs;
-//	if (wxGetApp().dark_mode())
 		tabs = new Notebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME | wxNB_DEFAULT);
-/*	else {
-		tabs = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME | wxNB_DEFAULT);
-		tabs->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
-	}*/
 #else
-    wxNotebook* tabs = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL  |wxNB_NOPAGETHEME | wxNB_DEFAULT );
-	tabs->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    tabs = new wxNotebook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxNB_TOP | wxTAB_TRAVERSAL  |wxNB_NOPAGETHEME | wxNB_DEFAULT );
+#ifdef __linux__
+	tabs->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
+		e.Skip();
+		CallAfter([this]() { tabs->GetCurrentPage()->Layout(); });
+    });
+#endif
 #endif
 
 	// Add "General" tab
 	m_optgroups_general.clear();
 	m_optgroups_general.emplace_back(create_options_tab(_L("General"), tabs));
 
-
 	bool is_editor = wxGetApp().is_editor();
 
-	ConfigOptionDef def;
-	Option option(def, "");
 
 	if (is_editor) {
+		append_bool_option(m_optgroup_general, "remember_output_path", 
+			L("Remember output directory"),
+			L("If this is enabled, Slic3r will prompt the last output directory instead of the one containing the input files."),
+			app_config->has("remember_output_path") ? app_config->get_bool("remember_output_path") : true);
 
         //activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Automation"), tabs, 0));
 
-        def.label = L("Auto-center parts");
-        def.type = coBool;
-        def.tooltip = L("If this is enabled, Slic3r will auto-center objects "
-            "around the print bed center.");
-        def.set_default_value(new ConfigOptionBool{ app_config->get("autocenter") == "1" });
-        option = Option(def, "autocenter");
-        m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "autocenter", 
+			L("Auto-center parts"),
+			L("If this is enabled, Slic3r will auto-center objects around the print bed center."),
+			app_config->get_bool("autocenter"));
 
-        def.label = L("Background processing");
-        def.type = coBool;
-        def.tooltip = L("If this is enabled, Slic3r will pre-process objects as soon "
-            "as they\'re loaded in order to save time when exporting G-code.");
-        def.set_default_value(new ConfigOptionBool{ app_config->get("background_processing") == "1" });
-        option = Option(def, "background_processing");
-        m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "background_processing", 
+			L("Background processing"),
+			L("If this is enabled, Slic3r will pre-process objects as soon "
+				"as they\'re loaded in order to save time when exporting G-code."),
+			app_config->get_bool("background_processing"));
+
+		append_bool_option(m_optgroups_general.back(), "alert_when_supports_needed", 
+			L("Alert when supports needed"),
+			L("If this is enabled, Slic3r will raise alerts when it detects "
+				"issues in the sliced object, that can be resolved with supports (and brim). "
+				"Examples of such issues are floating object parts, unsupported extrusions and low bed adhesion."),
+			app_config->get_bool("alert_when_supports_needed"));
 
 		//FIXME change it to enum, like the NotifyReleaseMode
 		def_combobox_auto_switch_preview.label = L("Switch to Preview when sliced");
@@ -220,6 +416,11 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def_combobox_auto_switch_preview, "auto_switch_preview");
 		m_optgroups_general.back()->append_single_option_line(option);
 
+		// Please keep in sync with ConfigWizard
+		append_bool_option(m_optgroups_general.back(), "export_sources_full_pathnames",
+			L("Export sources full pathnames to 3mf and amf"),
+			L("If enabled, allows the Reload from disk command to automatically find and load the files when invoked."),
+			app_config->get_bool("export_sources_full_pathnames"));
 
         activate_options_tab(m_optgroups_general.back(), 3);
         m_optgroups_general.emplace_back(create_options_group(_L("Presets and updates"), tabs, 0));
@@ -233,29 +434,28 @@ void PreferencesDialog::build(size_t selected_tab)
         m_optgroups_general.back()->append_single_option_line(option);
 */
         // Please keep in sync with ConfigWizard
-        def.label = L("Update built-in Presets automatically");
-        def.type = coBool;
-        def.tooltip = L("If enabled, Slic3r downloads updates of built-in system presets in the background. These updates are downloaded into a separate temporary location. When a new preset version becomes available it is offered at application startup.");
-        def.set_default_value(new ConfigOptionBool(app_config->get("preset_update") == "1"));
-        option = Option(def, "preset_update");
-        m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "preset_update",
+			L("Update built-in Presets automatically"),
+			L("If enabled, Slic3r downloads updates of built-in system presets in the background. These updates are downloaded "
+			  "into a separate temporary location. When a new preset version becomes available it is offered at application startup."),
+			app_config->get_bool("preset_update"));
 
-        def.label = L("Suppress \" - default - \" presets");
-        def.type = coBool;
-        def.tooltip = L("Suppress \" - default - \" presets in the Print / Filament / Printer "
-            "selections once there are any other valid presets available.");
-        def.set_default_value(new ConfigOptionBool{ app_config->get("no_defaults") == "1" });
-        option = Option(def, "no_defaults");
-        m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "no_defaults",
+			L("Suppress \" - default - \" presets"),
+			L("Suppress \" - default - \" presets in the Print / Filament / Printer selections once there are any other valid presets available."),
+			app_config->get_bool("no_defaults"));
 		m_values_need_restart.push_back("no_defaults");
 
-        def.label = L("Show incompatible print and filament presets");
-        def.type = coBool;
-        def.tooltip = L("When checked, the print and filament presets are shown in the preset editor "
-            "even if they are marked as incompatible with the active printer");
-        def.set_default_value(new ConfigOptionBool{ app_config->get("show_incompatible_presets") == "1" });
-        option = Option(def, "show_incompatible_presets");
-        m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "no_templates",
+			L("Suppress \" Template \" filament presets"),
+			L("Suppress \" Template \" filament presets in configuration wizard and sidebar visibility."),
+			app_config->get_bool("no_templates"));
+
+		append_bool_option(m_optgroup_general, "show_incompatible_presets",
+			L("Show incompatible print and filament presets"),
+			L("When checked, the print and filament presets are shown in the preset editor "
+			"even if they are marked as incompatible with the active printer"),
+			app_config->get_bool("show_incompatible_presets"));
 
         def.label = L("Main GUI always in expert mode");
         def.type = coBool;
@@ -309,7 +509,7 @@ void PreferencesDialog::build(size_t selected_tab)
 
         def.label = L("Show a Pop-up with the current material when exporting");
         def.type = coBool;
-        def.tooltip = L("If you constantly forgot to select the right filament/materail, check this option to have a really obtrusive reminder on each export.");
+        def.tooltip = L("If you constantly forgot to select the right filament/material, check this option to have a really obtrusive reminder on each export.");
         def.set_default_value(new ConfigOptionBool{ app_config->has("check_material_export") ? app_config->get("check_material_export") == "1" : false });
         option = Option(def, "check_material_export");
         m_optgroups_general.back()->append_single_option_line(option);
@@ -331,52 +531,41 @@ void PreferencesDialog::build(size_t selected_tab)
 		option = Option(def, "show_overwrite_dialog");
 		m_optgroups_general.back()->append_single_option_line(option);
 
-		
+		append_bool_option(m_optgroups_general.back(), "single_instance",
 #if __APPLE__
-		def.label = (boost::format(_u8L("Allow just a single %1% instance")) % SLIC3R_APP_NAME).str();
-		def.type = coBool;
-	def.tooltip = L("On OSX there is always only one instance of app running by default. However it is allowed to run multiple instances of same app from the command line. In such case this settings will allow only one instance.");
+			L("Allow just a single PrusaSlicer instance"),
+			L("On OSX there is always only one instance of app running by default. However it is allowed to run multiple instances "
+			  "of same app from the command line. In such case this settings will allow only one instance."),
 #else
-		def.label = (boost::format(_u8L("Allow just a single %1% instance")) % SLIC3R_APP_NAME).str();
-		def.type = coBool;
-		def.tooltip = L("If this is enabled, when starting Slic3r and another instance of the same Slic3r is already running, that instance will be reactivated instead.");
+			L("Allow just a single PrusaSlicer instance"),
+			L("If this is enabled, when starting PrusaSlicer and another instance of the same PrusaSlicer is already running, that instance will be reactivated instead."),
 #endif
-		def.set_default_value(new ConfigOptionBool{ app_config->has("single_instance") ? app_config->get("single_instance") == "1" : false });
-		option = Option(def, "single_instance");
-		m_optgroups_general.back()->append_single_option_line(option);
+		app_config->has("single_instance") ? app_config->get_bool("single_instance") : false );
 
 
-		def.label = L("Ask for unsaved changes in project");
-		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes in project, when: \n"
+		append_bool_option(m_optgroups_general.back(), "default_action_on_dirty_project",
+			L("Ask for unsaved changes in project"),
+			L("Always ask for unsaved changes in project, when: \n"
 						"- Closing Slic3r,\n"
-						"- Loading or creating a new project");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_dirty_project").empty() });
-		option = Option(def, "default_action_on_dirty_project");
-		m_optgroups_general.back()->append_single_option_line(option);
+						"- Loading or creating a new project"),
+			app_config->get("default_action_on_dirty_project").empty());
 
-		def.label = L("Ask to save unsaved changes in presets when closing the application or when loading a new project");
-		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes in presets, when: \n"
+		append_bool_option(m_optgroups_general.back(), "default_action_on_close_application",
+			L("Ask to save unsaved changes in presets when closing the application or when loading a new project"),
+			L("Always ask for unsaved changes in presets, when: \n"
 						"- Closing Slic3r while some presets are modified,\n"
-						"- Loading a new project while some presets are modified");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_close_application") == "none" });
-		option = Option(def, "default_action_on_close_application");
-		m_optgroups_general.back()->append_single_option_line(option);
+						"- Loading a new project while some presets are modified"),
+			app_config->get("default_action_on_close_application") == "none");
 
-		def.label = L("Ask for unsaved changes in presets when selecting new preset");
-		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes in presets when selecting new preset or resetting a preset");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_select_preset") == "none" });
-		option = Option(def, "default_action_on_select_preset");
-		m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "default_action_on_select_preset",
+			L("Ask for unsaved changes in presets when selecting new preset"),
+			L("Always ask for unsaved changes in presets when selecting new preset or resetting a preset"),
+			app_config->get("default_action_on_select_preset") == "none");
 
-		def.label = L("Ask for unsaved changes in presets when creating new project");
-		def.type = coBool;
-		def.tooltip = L("Always ask for unsaved changes in presets when creating new project");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("default_action_on_new_project") == "none" });
-		option = Option(def, "default_action_on_new_project");
-		m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "default_action_on_new_project",
+			L("Ask for unsaved changes in presets when creating new project"),
+			L("Always ask for unsaved changes in presets when creating new project"),
+			app_config->get("default_action_on_new_project") == "none");
 
 		def.label = L("Ask for 'new project' on 'Delete all'");
 		def.type = coBool;
@@ -395,23 +584,23 @@ void PreferencesDialog::build(size_t selected_tab)
 	}
 #ifdef _WIN32
 	else {
-		def.label = (boost::format(_u8L("Associate .gcode files to %1%")) % GCODEVIEWER_APP_NAME).str();
-		def.type = coBool;
-		def.tooltip = (boost::format(_u8L("If enabled, sets %1% as default application to open .gcode files.")) % GCODEVIEWER_APP_NAME).str();
-		def.set_default_value(new ConfigOptionBool(app_config->get("associate_gcode") == "1"));
-		option = Option(def, "associate_gcode");
-		m_optgroups_general.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_general.back(), "associate_gcode",
+			(boost::format(_u8L("Associate .gcode files to %1%")) % GCODEVIEWER_APP_NAME).str(),
+			(boost::format(_u8L("If enabled, sets %1% as default application to open .gcode files.")) % GCODEVIEWER_APP_NAME).str(),
+			app_config->get_bool("associate_gcode"));
+		append_bool_option(m_optgroups_general.back(), "associate_bgcode",
+			(boost::format(_u8L("Associate .bgcode files to %1%")) % GCODEVIEWER_APP_NAME).str(),
+			(boost::format(_u8L("If enabled, sets %1% as default application to open .bgcode files.")) % GCODEVIEWER_APP_NAME).str(),
+			app_config->get_bool("associate_bgcode"));
 	}
 #endif // _WIN32
 
 #if __APPLE__
-	def.label = L("Use Retina resolution for the 3D scene");
-	def.type = coBool;
-	def.tooltip = L("If enabled, the 3D scene will be rendered in Retina resolution. "
-	                "If you are experiencing 3D performance problems, disabling this option may help.");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("use_retina_opengl") == "1" });
-	option = Option (def, "use_retina_opengl");
-	m_optgroups_general.back()->append_single_option_line(option);
+	append_bool_option(m_optgroups_general.back(), "use_retina_opengl",
+		L("Use Retina resolution for the 3D scene"),
+		L("If enabled, the 3D scene will be rendered in Retina resolution. "
+	      "If you are experiencing 3D performance problems, disabling this option may help."),
+		app_config->get_bool("use_retina_opengl"));
 #endif
 
     if (is_editor) {
@@ -439,31 +628,29 @@ void PreferencesDialog::build(size_t selected_tab)
     activate_options_tab(m_optgroups_general.back(), m_optgroups_general.back()->parent()->GetSizer()->GetItemCount() > 1 ? 3 : 20);
 
 	// Add "Camera" tab
-	m_optgroup_camera = create_options_tab(_L("Camera"), tabs);
+	m_optgroup_camera = create_options_tab(L("Camera"), tabs);
 	m_optgroup_camera->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+		if (auto it = m_values.find(opt_key);it != m_values.end()) {
+			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+			return;
+		}
 		m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
 	};
 
-    def.label = L("Use perspective camera");
-    def.type = coBool;
-    def.tooltip = L("If enabled, use perspective camera. If not enabled, use orthographic camera.");
-    def.set_default_value(new ConfigOptionBool{ app_config->get("use_perspective_camera") == "1" });
-    option = Option(def, "use_perspective_camera");
-    m_optgroup_camera->append_single_option_line(option);
+	append_bool_option(m_optgroup_camera, "use_perspective_camera",
+		L("Use perspective camera"),
+		L("If enabled, use perspective camera. If not enabled, use orthographic camera."),
+		app_config->get_bool("use_perspective_camera"));
 
-	def.label = L("Use free camera");
-	def.type = coBool;
-	def.tooltip = L("If enabled, use free camera. If not enabled, use constrained camera.");
-	def.set_default_value(new ConfigOptionBool(app_config->get("use_free_camera") == "1"));
-	option = Option(def, "use_free_camera");
-	m_optgroup_camera->append_single_option_line(option);
+	append_bool_option(m_optgroup_camera, "use_free_camera",
+		L("Use free camera"),
+		L("If enabled, use free camera. If not enabled, use constrained camera."),
+		app_config->get_bool("use_free_camera"));
 
-	def.label = L("Reverse direction of zoom with mouse wheel");
-	def.type = coBool;
-	def.tooltip = L("If enabled, reverses the direction of zoom with mouse wheel");
-	def.set_default_value(new ConfigOptionBool(app_config->get("reverse_mouse_wheel_zoom") == "1"));
-	option = Option(def, "reverse_mouse_wheel_zoom");
-	m_optgroup_camera->append_single_option_line(option);
+	append_bool_option(m_optgroup_camera, "reverse_mouse_wheel_zoom",
+		L("Reverse direction of zoom with mouse wheel"),
+		L("If enabled, reverses the direction of zoom with mouse wheel"),
+		app_config->get_bool("reverse_mouse_wheel_zoom"));
 
 
 #if defined(_WIN32) || defined(__APPLE__)
@@ -486,31 +673,36 @@ void PreferencesDialog::build(size_t selected_tab)
 		//activate_options_tab(m_optgroups_general.back(), 3);
 	m_optgroups_gui.emplace_back(create_options_group(_L("Controls"), tabs, 2));
 
-
-	def.label = L("Sequential slider applied only to top layer");
-	def.type = coBool;
-	def.tooltip = L("If enabled, changes made using the sequential slider, in preview, apply only to gcode top layer. "
-					"If disabled, changes made using the sequential slider, in preview, apply to the whole gcode.");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("seq_top_layer_only") == "1" });
-	option = Option(def, "seq_top_layer_only");
-	m_optgroups_gui.back()->append_single_option_line(option);
+	append_bool_option(m_optgroups_gui.back(), "seq_top_layer_only",
+		L("Sequential slider applied only to top layer"),
+		L("If enabled, changes made using the sequential slider, in preview, apply only to gcode top layer. "
+		  "If disabled, changes made using the sequential slider, in preview, apply to the whole gcode."),
+		app_config->get_bool("seq_top_layer_only"));
 
 	if (is_editor) {
-		def.label = L("Show sidebar collapse/expand button");
-		def.type = coBool;
-		def.tooltip = L("If enabled, the button for the collapse sidebar will be appeared in top right corner of the 3D Scene");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("show_collapse_button") == "1" });
-		option = Option(def, "show_collapse_button");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_gui.back(), "show_collapse_button",
+			L("Show sidebar collapse/expand button"),
+			L("If enabled, the button for the collapse sidebar will be appeared in top right corner of the 3D Scene"),
+			app_config->get_bool("show_collapse_button"));
+/*
+		append_bool_option(m_optgroups_gui.back(), "suppress_hyperlinks",
+			L("Suppress to open hyperlink in browser"),
+			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser."),
+			//L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
+			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
+			app_config->get_bool("suppress_hyperlinks"));
+*/
+		append_bool_option(m_optgroups_gui.back(), "color_manipulation_panel",
+			L("Use colors for axes values in Manipulation panel"),
+			L("If enabled, the axes names and axes values will be colorized according to the axes colors. "
+			  "If disabled, old UI will be used."),
+			app_config->get_bool("color_manipulation_panel"));
 
-		def.label = L("Suppress to open hyperlink in browser");
-		def.type = coBool;
-		def.tooltip = L("If enabled, PrusaSlicer will not open hyperlinks in your browser.");
-		//def.tooltip = ("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
-		//	"If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("suppress_hyperlinks") == "1" });
-		option = Option(def, "suppress_hyperlinks");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		append_bool_option(m_optgroups_gui.back(), "order_volumes",
+			L("Order object volumes by types"),
+			L("If enabled, volumes will be always ordered inside the object. Correct order is Model Part, Negative Volume, Modifier, Support Blocker and Support Enforcer. "
+			  "If disabled, you can reorder Model Parts, Negative Volumes and Modifiers. But one of the model parts have to be on the first place."),
+			app_config->get_bool("order_volumes"));
 
 		def.label = L("Focusing platter on mouse over");
 		def.type = coBool;
@@ -523,67 +715,50 @@ void PreferencesDialog::build(size_t selected_tab)
 		activate_options_tab(m_optgroups_gui.back(), 3);
 		m_optgroups_gui.emplace_back(create_options_group(_L("Appearance"), tabs, 2));
 
-		def.label = L("Use colors for axes values in Manipulation panel");
-		def.type = coBool;
-		def.tooltip = L("If enabled, the axes names and axes values will be colorized according to the axes colors. "
-						"If disabled, old UI will be used.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("color_manipulation_panel") == "1" });
-		option = Option(def, "color_manipulation_panel");
-		m_optgroups_gui.back()->append_single_option_line(option);
 
-		def.label = L("Order object volumes by types");
-		def.type = coBool;
-		def.tooltip = L("If enabled, volumes will be always ordered inside the object. Correct order is Model Part, Negative Volume, Modifier, Support Blocker and Support Enforcer. "
-						"If disabled, you can reorder Model Parts, Negative Volumes and Modifiers. But one of the model parts have to be on the first place.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("order_volumes") == "1" });
-		option = Option(def, "order_volumes");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		append_bool_option(m_optgroup_gui, "allow_auto_color_change",
+			L("Allow automatically color change"),
+			L("If enabled, related notification will be shown, when sliced object looks like a logo or a sign."),
+			app_config->get_bool("allow_auto_color_change"));
 
 #ifdef _USE_CUSTOM_NOTEBOOK
-		def.label = L("Set settings tabs as menu items (experimental)");
-		def.type = coBool;
-		def.tooltip = L("If enabled, Settings Tabs will be placed as menu items. "
-			            "If disabled, old UI will be used.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("tabs_as_menu") == "1" });
-		option = Option(def, "tabs_as_menu");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		append_bool_option(m_optgroup_gui, "tabs_as_menu",
+			L("Set settings tabs as menu items"),
+			L("If enabled, Settings Tabs will be placed as menu items. If disabled, old UI will be used."),
+			app_config->get_bool("tabs_as_menu"));
 		m_values_need_restart.push_back("tabs_as_menu");
 #endif
 
 		m_optgroups_gui.back()->append_separator();
+/*
+		append_bool_option(m_optgroup_gui, "suppress_round_corners",
+			L("Suppress round corners for controls (experimental)"),
+			L("If enabled, Settings Tabs will be placed as menu items. If disabled, old UI will be used."),
+			app_config->get("suppress_round_corners") == "1");
+		m_values_need_restart.push_back("suppress_round_corners");
 
-		def.label = L("Show \"Tip of the day\" notification after start");
-		def.type = coBool;
-		def.tooltip = L("If enabled, useful hints are displayed at startup.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("show_hints") == "1" });
-		option = Option(def, "show_hints");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		m_optgroup_gui->append_separator();
+*/
+		append_bool_option(m_optgroup_gui, "show_hints",
+			L("Show \"Tip of the day\" notification after start"),
+			L("If enabled, useful hints are displayed at startup."),
+			app_config->get_bool("show_hints"));
 
-		ConfigOptionDef def_enum;
-		def_enum.label = L("Notify about new releases");
-		def_enum.type = coEnum;
-		def_enum.tooltip = L("You will be notified about new release after startup acordingly: All = Regular release and alpha / beta releases. Release only = regular release.");
-		def_enum.enum_keys_map = &ConfigOptionEnum<NotifyReleaseMode>::get_enum_values();
-		def_enum.enum_values.push_back("all");
-		def_enum.enum_values.push_back("release");
-		def_enum.enum_values.push_back("none");
-		def_enum.enum_labels.push_back(L("All"));
-		def_enum.enum_labels.push_back(L("Release only"));
-		def_enum.enum_labels.push_back(L("None"));
-		//def_enum.mode = comSimple;
-		def_enum.set_default_value(new ConfigOptionEnum<NotifyReleaseMode>(static_cast<NotifyReleaseMode>(s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release")))));
-		option = Option(def_enum, "notify_release");
-		m_optgroups_gui.back()->append_single_option_line(option);
+		append_enum_option<NotifyReleaseMode>(m_optgroup_gui, "notify_release",
+			L("Notify about new releases"),
+			L("You will be notified about new release after startup acordingly: All = Regular release and alpha / beta releases. Release only = regular release."),
+			new ConfigOptionEnum<NotifyReleaseMode>(static_cast<NotifyReleaseMode>(s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release")))),
+			{ { "all", L("All") },
+			  { "release", L("Release only") },
+			  { "none", L("None") }
+			});
 
 		m_optgroups_gui.back()->append_separator(); //seems it's not working
 
-		def.label = L("Use custom size for toolbar icons");
-		def.type = coBool;
-		def.tooltip = L("If enabled, you can change size of toolbar icons manually.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("use_custom_toolbar_size") == "1" });
-		option = Option(def, "use_custom_toolbar_size");
-		m_optgroups_gui.back()->append_single_option_line(option);
-
+		append_bool_option(m_optgroups_gui.back(), "use_custom_toolbar_size",
+			L("Use custom size for toolbar icons"),
+			L("If enabled, you can change size of toolbar icons manually."),
+			app_config->get_bool("use_custom_toolbar_size"));
 		create_icon_size_slider(m_optgroups_gui.back().get());
 		m_icon_size_sizer->ShowItems(app_config->get("use_custom_toolbar_size") == "1");
 
@@ -656,14 +831,14 @@ void PreferencesDialog::build(size_t selected_tab)
 
 	activate_options_tab(m_optgroups_gui.back(), 3);
 	if (is_editor) {
+
+	if (is_editor) {
 		// set Field for notify_release to its value to activate the object
 		boost::any val = s_keys_map_NotifyReleaseMode.at(app_config->get("notify_release"));
 		m_optgroups_gui.back()->get_field("notify_release")->set_value(val, false);
-	}
 
 	//create layout options
 	create_settings_mode_widget(tabs->GetPage(2));
-
 	//create ui_layout check
 	{
 		m_optgroups_gui.emplace_back(create_options_group(_L("Settings layout and colors"), tabs, 2));
@@ -748,23 +923,50 @@ void PreferencesDialog::build(size_t selected_tab)
     activate_options_tab(m_optgroups_gui.back(), 3);
 
 #if ENABLE_ENVIRONMENT_MAP
-	if (is_editor) {
 		// Add "Render" tab
-		m_optgroup_render = create_options_tab(_L("Render"), tabs);
-	m_optgroup_render->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
-		m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
-	};
+		m_optgroup_render = create_options_tab(L("Render"), tabs);
+		m_optgroup_render->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+			if (auto it = m_values.find(opt_key); it != m_values.end()) {
+				m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
+				return;
+			}
+			m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
+		};
 
-	def.label = L("Use environment map");
-	def.type = coBool;
-	def.tooltip = L("If enabled, renders object using the environment map.");
-	def.set_default_value(new ConfigOptionBool{ app_config->get("use_environment_map") == "1" });
-	option = Option(def, "use_environment_map");
-	m_optgroup_render->append_single_option_line(option);
+		append_bool_option(m_optgroup_render, "use_environment_map",
+			L("Use environment map"),
+			L("If enabled, renders object using the environment map."),
+			app_config->get_bool("use_environment_map"));
 
 		activate_options_tab(m_optgroup_render);
-	}
+
+		m_optgroup_other = create_options_tab(L("Other"), tabs);
+		m_optgroup_other->m_on_change = [this](t_config_option_key opt_key, boost::any value) {
+			if (opt_key == "suppress_hyperlinks")
+				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "";
+			else
+				m_values[opt_key] = boost::any_cast<bool>(value) ? "1" : "0";
+		};
+
+
+		append_bool_option(m_optgroup_other, "suppress_hyperlinks",
+			L("Suppress to open hyperlink in browser"),
+			L("If enabled, PrusaSlicer will not open a hyperlinks in your browser."),
+			//L("If enabled, the descriptions of configuration parameters in settings tabs wouldn't work as hyperlinks. "
+			//  "If disabled, the descriptions of configuration parameters in settings tabs will work as hyperlinks."),
+			app_config->get_bool("suppress_hyperlinks"));
+		
+		append_bool_option(m_optgroup_other, "downloader_url_registered",
+			L("Allow downloads from Printables.com"),
+			L("If enabled, PrusaSlicer will be allowed to download from Printables.com"),
+			app_config->get_bool("downloader_url_registered"));
+
+		activate_options_tab(m_optgroup_other);
+
+		create_downloader_path_sizer();
+		create_settings_font_widget();
 #endif // ENABLE_ENVIRONMENT_MAP
+	}
 
 	// Add "Colors" tab
 	m_optgroups_colors.clear();
@@ -781,28 +983,23 @@ void PreferencesDialog::build(size_t selected_tab)
 		// Add "Dark Mode" group
 		m_optgroups_colors.emplace_back(create_options_group(_L("Dark mode (experimental)"), tabs, 3));
 
-		def.label = L("Enable dark mode");
-		def.type = coBool;
-		def.tooltip = L("If enabled, UI will use Dark mode colors. "
-			"If disabled, old UI will be used.");
-		def.set_default_value(new ConfigOptionBool{ app_config->get("dark_color_mode") == "1" });
-		option = Option(def, "dark_color_mode");
-		m_optgroups_colors.back()->append_single_option_line(option);
+		append_bool_option(m_optgroup_dark_mode, "dark_color_mode",
+			L("Enable dark mode"),
+			L("If enabled, UI will use Dark mode colors. If disabled, old UI will be used."),
+			app_config->get_bool("dark_color_mode"));
 
 		if (wxPlatformInfo::Get().GetOSMajorVersion() >= 10) // Use system menu just for Window newer then Windows 10
 															 // Use menu with ownerdrawn items by default on systems older then Windows 10
 		{
-			def.label = L("Use system menu for application");
-			def.type = coBool;
-			def.tooltip = L("If enabled, application will use the standard Windows system menu,\n"
-				"but on some combination of display scales it can looks ugly. If disabled, old UI will be used.");
-			def.set_default_value(new ConfigOptionBool{ app_config->get("sys_menu_enabled") == "1" });
-			option = Option(def, "sys_menu_enabled");
-			m_optgroups_colors.back()->append_single_option_line(option);
+		append_bool_option(m_optgroup_dark_mode, "sys_menu_enabled",
+			L("Use system menu for application"),
+			L("If enabled, application will use the standard Windows system menu,\n"
+			"but on some combination of display scales it can look ugly. If disabled, old UI will be used."),
+			app_config->get_bool("sys_menu_enabled"));
+		m_values_need_restart.push_back("sys_menu_enabled");
 		}
 
 		activate_options_tab(m_optgroups_colors.back(), 3);
-	}
 #endif //_WIN32
 
 	m_optgroups_colors.emplace_back(create_options_group(_L("Gui Colors"), tabs, 3));
@@ -860,18 +1057,19 @@ void PreferencesDialog::build(size_t selected_tab)
 
 	//create text options
 	create_settings_text_color_widget(tabs->GetPage(3));
+	create_settings_mode_color_widget(tabs->GetPage(3));
 
 	// update alignment of the controls for all tabs
 	//update_ctrls_alignment();
-
-	if (selected_tab < tabs->GetPageCount())
-		tabs->SetSelection(selected_tab);
 
 	auto sizer = new wxBoxSizer(wxVERTICAL);
 	sizer->Add(tabs, 1, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 
 	auto buttons = CreateStdDialogButtonSizer(wxOK | wxCANCEL);
+	wxGetApp().SetWindowVariantForButton(buttons->GetAffirmativeButton());
+	wxGetApp().SetWindowVariantForButton(buttons->GetCancelButton());
 	this->Bind(wxEVT_BUTTON, &PreferencesDialog::accept, this, wxID_OK);
+	this->Bind(wxEVT_BUTTON, &PreferencesDialog::revert, this, wxID_CANCEL);
 
 	for (int id : {wxID_OK, wxID_CANCEL})
 		wxGetApp().UpdateDarkUI(static_cast<wxButton*>(FindWindowById(id, this)));
@@ -906,6 +1104,8 @@ std::vector<ConfigOptionsGroup*> PreferencesDialog::optgroups()
 			i--;
 		}
 	}
+	if (m_optgroup_other)
+		out.push_back(m_optgroup_other.get());
 	for (int i = 0; i < (int)m_optgroups_colors.size(); i++) {
 		if (m_optgroups_colors[i]) {
 			out.push_back(m_optgroups_colors[i].get());
@@ -931,10 +1131,18 @@ void PreferencesDialog::update_ctrls_alignment()
 
 void PreferencesDialog::accept(wxEvent&)
 {
-//	if (m_values.find("no_defaults") != m_values.end()
-//		warning_catcher(this, wxString::Format(_L("You need to restart %s to make the changes effective."), SLIC3R_APP_NAME));
+	if(wxGetApp().is_editor()) {
+		if (const auto it = m_values.find("downloader_url_registered"); it != m_values.end())
+			downloader->allow(it->second == "1");
+		if (!downloader->on_finish())
+			return;
+#ifdef __linux__
+		if( downloader->get_perform_registration_linux()) 
+			DesktopIntegrationDialog::perform_downloader_desktop_integration();
+#endif // __linux__
+	}
+//	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled", "font_pt_size", "suppress_round_corners" };
 
-//	std::vector<std::string> options_to_recreate_GUI = { "no_defaults", "tabs_as_menu", "sys_menu_enabled" };
 
 	for (const std::string& option : m_values_need_restart) {
 		if (m_values.find(option) != m_values.end()) {
@@ -975,19 +1183,6 @@ void PreferencesDialog::accept(wxEvent&)
 		}
 	}
 
-	for (const std::string& key : {	"default_action_on_close_application", 
-									"default_action_on_select_preset", 
-									"default_action_on_new_project" }) {
-	    auto it = m_values.find(key);
-		if (it != m_values.end() && it->second != "none" && app_config->get(key) != "none")
-			m_values.erase(it); // we shouldn't change value, if some of those parameters were selected, and then deselected
-	}
-	{
-	    auto it = m_values.find("default_action_on_dirty_project");
-		if (it != m_values.end() && !it->second.empty() && !app_config->get("default_action_on_dirty_project").empty())
-			m_values.erase(it); // we shouldn't change value, if this parameter was selected, and then deselected
-	}
-
 #if 0 //#ifdef _WIN32 // #ysDarkMSW - Allow it when we deside to support the sustem colors for application
 	if (m_values.find("always_dark_color_mode") != m_values.end())
 		wxGetApp().force_sys_colors_update();
@@ -1016,12 +1211,12 @@ void PreferencesDialog::accept(wxEvent&)
 	for (std::map<std::string, std::string>::iterator it = m_values.begin(); it != m_values.end(); ++it)
 		app_config->set(it->first, it->second);
 
-	app_config->save();
 	if (wxGetApp().is_editor()) {
 		wxGetApp().set_label_clr_sys(m_sys_colour->GetColour());
 		wxGetApp().set_label_clr_modified(m_mod_colour->GetColour());
 		wxGetApp().set_label_clr_default(m_def_colour->GetColour());
 		wxGetApp().set_label_clr_phony(m_phony_colour->GetColour());
+		wxGetApp().set_mode_palette(m_mode_palette);
 	}
 
 	EndModal(wxID_OK);
@@ -1034,21 +1229,100 @@ void PreferencesDialog::accept(wxEvent&)
 		wxGetApp().force_menu_update();
 #endif //_MSW_DARK_MODE
 #endif // _WIN32
-	if (m_settings_layout_changed)
-		;// application will be recreated after Preference dialog will be destroyed
-	else
-	// Nothify the UI to update itself from the ini file.
-    wxGetApp().update_ui_from_settings();
+
+	if (m_values.find("no_templates") != m_values.end())
+		wxGetApp().plater()->force_filament_cb_update();
+
+	wxGetApp().update_ui_from_settings();
+	clear_cache();
 }
 
-void PreferencesDialog::on_dpi_changed(const wxRect &suggested_rect)
+void PreferencesDialog::revert(wxEvent&)
+{
+	auto app_config = get_app_config();
+
+	if (m_custom_toolbar_size != atoi(app_config->get("custom_toolbar_size").c_str())) {
+		app_config->set("custom_toolbar_size", (boost::format("%d") % m_custom_toolbar_size).str());
+		m_icon_size_slider->SetValue(m_custom_toolbar_size);
+	}
+	if (m_use_custom_toolbar_size != (get_app_config()->get_bool("use_custom_toolbar_size"))) {
+		app_config->set("use_custom_toolbar_size", m_use_custom_toolbar_size ? "1" : "0");
+
+		m_optgroup_gui->set_value("use_custom_toolbar_size", m_use_custom_toolbar_size);
+		m_icon_size_sizer->ShowItems(m_use_custom_toolbar_size);
+		refresh_og(m_optgroup_gui);
+	}
+
+	for (auto value : m_values) {
+		const std::string& key = value.first;
+
+		if (key == "default_action_on_dirty_project") {
+			m_optgroup_general->set_value(key, app_config->get(key).empty());
+			continue;
+		}
+		if (key == "default_action_on_close_application" || key == "default_action_on_select_preset" || key == "default_action_on_new_project") {
+			m_optgroup_general->set_value(key, app_config->get(key) == "none");
+			continue;
+		}
+		if (key == "notify_release") {
+			m_optgroup_gui->set_value(key, s_keys_map_NotifyReleaseMode.at(app_config->get(key)));
+			continue;
+		}
+		if (key == "old_settings_layout_mode") {
+			m_rb_old_settings_layout_mode->SetValue(app_config->get_bool(key));
+			m_settings_layout_changed = false;
+			continue;
+		}
+		if (key == "new_settings_layout_mode") {
+			m_rb_new_settings_layout_mode->SetValue(app_config->get_bool(key));
+			m_settings_layout_changed = false;
+			continue;
+		}
+		if (key == "dlg_settings_layout_mode") {
+			m_rb_dlg_settings_layout_mode->SetValue(app_config->get_bool(key));
+			m_settings_layout_changed = false;
+			continue;
+		}
+
+		for (auto opt_group : { m_optgroup_general, m_optgroup_camera, m_optgroup_gui, m_optgroup_other
+#ifdef _WIN32
+			, m_optgroup_dark_mode
+#endif // _WIN32
+#if ENABLE_ENVIRONMENT_MAP
+			, m_optgroup_render
+#endif // ENABLE_ENVIRONMENT_MAP
+			}) {
+			if (opt_group->set_value(key, app_config->get_bool(key)))
+				break;
+		}
+		if (key == "tabs_as_menu") {
+			m_rb_new_settings_layout_mode->Show(!app_config->get_bool(key));
+			refresh_og(m_optgroup_gui);
+			continue;
+		}
+	}
+
+	clear_cache();
+	EndModal(wxID_CANCEL);
+}
+
+void PreferencesDialog::msw_rescale()
 {
 	for (ConfigOptionsGroup* og : this->optgroups())
 		og->msw_rescale();
 
+	update_ctrls_alignment();
+
     msw_buttons_rescale(this, em_unit(), { wxID_OK, wxID_CANCEL });
 
     layout();
+}
+
+void PreferencesDialog::on_sys_color_changed()
+{
+#ifdef _WIN32
+	wxGetApp().UpdateDlgDarkUI(this);
+#endif
 }
 
 void PreferencesDialog::layout()
@@ -1059,6 +1333,19 @@ void PreferencesDialog::layout()
     Fit();
 
     Refresh();
+}
+
+void PreferencesDialog::clear_cache()
+{
+	m_values.clear();
+	m_custom_toolbar_size = -1;
+}
+
+void PreferencesDialog::refresh_og(std::shared_ptr<ConfigOptionsGroup> og)
+{
+	og->parent()->Layout();
+	tabs->Layout();
+//	this->layout();
 }
 
 void PreferencesDialog::create_icon_size_slider(ConfigOptionsGroup* container)
@@ -1087,14 +1374,14 @@ void PreferencesDialog::create_icon_size_slider(ConfigOptionsGroup* container)
     if (!isOSX)
         style |= wxSL_LABELS | wxSL_AUTOTICKS;
 
-    auto slider = new wxSlider(parent, wxID_ANY, def_val, 30, 100, 
+    m_icon_size_slider = new wxSlider(parent, wxID_ANY, def_val, 30, 100, 
                                wxDefaultPosition, wxDefaultSize, style);
 
-    slider->SetTickFreq(10);
-    slider->SetPageSize(10);
-    slider->SetToolTip(_L("Select toolbar icon size in respect to the default one."));
+    m_icon_size_slider->SetTickFreq(10);
+    m_icon_size_slider->SetPageSize(10);
+    m_icon_size_slider->SetToolTip(_L("Select toolbar icon size in respect to the default one."));
 
-    m_icon_size_sizer->Add(slider, 1, wxEXPAND);
+    m_icon_size_sizer->Add(m_icon_size_slider, 1, wxEXPAND);
 
     wxStaticText* val_label{ nullptr };
     if (isOSX) {
@@ -1102,15 +1389,17 @@ void PreferencesDialog::create_icon_size_slider(ConfigOptionsGroup* container)
         m_icon_size_sizer->Add(val_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, em);
     }
 
-    slider->Bind(wxEVT_SLIDER, ([this, slider, val_label](wxCommandEvent e) {
-        auto val = slider->GetValue();
-        m_values["custom_toolbar_size"] = (boost::format("%d") % val).str();
+    m_icon_size_slider->Bind(wxEVT_SLIDER, ([this, val_label, app_config](wxCommandEvent e) {
+        auto val = m_icon_size_slider->GetValue();
+
+		app_config->set("custom_toolbar_size", (boost::format("%d") % val).str());
+		wxGetApp().plater()->get_current_canvas3D()->render();
 
         if (val_label)
             val_label->SetLabelText(wxString::Format("%d", val));
-    }), slider->GetId());
+    }), m_icon_size_slider->GetId());
 
-    for (wxWindow* win : std::vector<wxWindow*>{ slider, label, val_label }) {
+    for (wxWindow* win : std::vector<wxWindow*>{ m_icon_size_slider, label, val_label }) {
         if (!win) continue;         
         win->SetFont(wxGetApp().normal_font());
 
@@ -1126,42 +1415,14 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 #ifdef _USE_CUSTOM_NOTEBOOK
 	bool disable_new_layout = wxGetApp().tabs_as_menu();
 #endif
-	std::vector<wxString> choices = {  _L("Layout with the tab bar"),
-                                       _L("Legacy layout"),
-                                       _L("Access via settings button in the top menu"),
-                                       _L("Settings in non-modal window") };
+	wxWindow* parent = m_optgroup_gui->parent();
 
-    auto app_config = get_app_config();
-    int selection = app_config->get("tab_settings_layout_mode") == "1" ? 0 :
-                    app_config->get("old_settings_layout_mode") == "1" ? 1 :
-                    app_config->get("new_settings_layout_mode") == "1" ? 2 :
-                    app_config->get("dlg_settings_layout_mode") == "1" ? 3 :
-#ifndef WIN32
-        1;
-#else
-        0;
-#endif
-
-#ifdef _USE_CUSTOM_NOTEBOOK
-    if (disable_new_layout) {
-        choices = { _L("Layout with the tab bar"),
-                    _L("Legacy layout"),
-                    _L("Settings in non-modal window") };
-        selection = app_config->get("tab_settings_layout_mode") == "1" ? 0 :
-            app_config->get("old_settings_layout_mode") == "1" ? 1 :
-            app_config->get("dlg_settings_layout_mode") == "1" ? 2 : 1;
-    }
-#endif
-
-	wxWindow* parent = m_optgroups_gui.back()->parent();
-	wxGetApp().UpdateDarkUI(parent);
-
-    wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _L("Tab layout Options"));
+	wxString title = L("Layout Options");
+    wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
 	wxGetApp().UpdateDarkUI(stb);
 	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
-	stb->SetFont(wxGetApp().bold_font());
+	stb->SetFont(wxGetApp().normal_font());
 
-	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
 	wxString unstable_warning = _L("!! Can be unstable in some os distribution !!");
 	stb->SetToolTip(_L("Choose how the windows are selectable and displayed:")
 		+ "\n* " + _L(" Tab layout: all windows are in the application, all are selectable via a tab.")
@@ -1173,7 +1434,32 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
 		+ "\n* " + _L("Settings window: settings are displayed in their own window. You have to clic on settings gears to show the settings window.")
 	);
 
-	int id = 0;
+	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
+
+	auto app_config = get_app_config();
+	std::vector<wxString> choices = {  _L("Layout with the tab bar"),
+                                       _L("Legacy layout"),
+                                       _L("Access via settings button in the top menu"),
+                                       _L("Settings in non-modal window") };
+	int id = -1;
+	auto add_radio = [this, parent, stb_sizer, choices](wxRadioButton** rb, int id, bool select) {
+		*rb = new wxRadioButton(parent, wxID_ANY, choices[id], wxDefaultPosition, wxDefaultSize, id == 0 ? wxRB_GROUP : 0);
+		stb_sizer->Add(*rb);
+		(*rb)->SetValue(select);
+		(*rb)->Bind(wxEVT_RADIOBUTTON, [this, id](wxCommandEvent&) {
+			m_values["tab_settings_layout_mode"] = (id == 0) ? "1" : "0";
+			m_values["old_settings_layout_mode"] = (id == 1) ? "1" : "0";
+			m_values["new_settings_layout_mode"] = (id == 2) ? "1" : "0";
+			m_values["dlg_settings_layout_mode"] = (id == 3) ? "1" : "0";
+		});
+	};
+
+
+	add_radio(&m_rb_dlg_settings_layout_mode, ++id, app_config->get_bool("tab_settings_layout_mode"));
+	add_radio(&m_rb_old_settings_layout_mode, ++id, app_config->get_bool("old_settings_layout_mode"));
+	add_radio(&m_rb_new_settings_layout_mode, ++id, app_config->get_bool("new_settings_layout_mode"));
+	add_radio(&m_rb_dlg_settings_layout_mode, ++id, app_config->get_bool("dlg_settings_layout_mode"));
+/* //TODO: to merge	int id = 0;
 	for (const wxString& label : choices) {
 		wxRadioButton* btn = new wxRadioButton(parent, wxID_ANY, label, wxDefaultPosition, wxDefaultSize, id==0 ? wxRB_GROUP : 0);
 		stb_sizer->Add(btn);
@@ -1195,98 +1481,193 @@ void PreferencesDialog::create_settings_mode_widget(wxWindow* tab)
             m_values["dlg_settings_layout_mode"] = (id == test++) ? "1" : "0";
 		});
 		id++;
+	}*/
+#ifdef _USE_CUSTOM_NOTEBOOK
+	if (app_config->get_bool("tabs_as_menu")) {
+		m_rb_new_settings_layout_mode->Hide();
+		if (m_rb_new_settings_layout_mode->GetValue()) {
+			m_rb_new_settings_layout_mode->SetValue(false);
+			m_rb_old_settings_layout_mode->SetValue(true);
+
+
+		}
 	}
+#endif
+
+	std::string opt_key = "settings_layout_mode";
+	m_blinkers[opt_key] = new BlinkingBitmap(parent);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
+	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
 	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
-	wxBoxSizer* parent_sizer = static_cast<wxBoxSizer*>(tab->GetSizer());
-	parent_sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+	m_optgroups_gui.back()->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+
+	append_preferences_option_to_searcher(m_optgroups_gui.back(), opt_key, title);
 }
 
-void PreferencesDialog::create_settings_text_color_widget(wxWindow* tab)
+void PreferencesDialog::create_settings_text_color_widget()
+{
+	wxWindow* parent = m_optgroups_gui.back()->parent();
+	wxString title = L("Text colors");
+	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));	wxGetApp().UpdateDarkUI(stb);
+	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
+
+	std::string opt_key = "text_colors";
+	m_blinkers[opt_key] = new BlinkingBitmap(parent);
+
+	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
+	GUI_Descriptions::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_sys_colour, &m_mod_colour);
+
+	auto sizer = new wxBoxSizer(wxHORIZONTAL);
+	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
+	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
+
+	m_optgroups_gui.back()->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+
+	append_preferences_option_to_searcher(m_optgroups_gui.back(), opt_key, title);
+}
+
+
+void PreferencesDialog::create_settings_mode_color_widget()
 {
 	wxWindow* parent = tab;// m_optgroups_gui.back()->parent();
 
-	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _L("Text colors"));
+	wxString title = L("Mode markers");
+	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
 	wxGetApp().UpdateDarkUI(stb);
 	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
 	stb->SetFont(wxGetApp().normal_font());
 
-
-	//wxBoxSizer* sizer = static_cast<wxBoxSizer*>(static_cast<wxPanel*>(optgroup->parent())->GetSizer());
+	std::string opt_key = "mode_markers";
+	m_blinkers[opt_key] = new BlinkingBitmap(parent);
 	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxVERTICAL);
-	ButtonsDescription::FillSizerWithTextColorDescriptions(stb_sizer, parent, &m_def_colour, &m_sys_colour, &m_mod_colour, &m_phony_colour);
+
+    // Mode color markers description
+	m_mode_palette = wxGetApp().get_mode_palette();
+	GUI_Descriptions::FillSizerWithModeColorDescriptions(stb_sizer, parent, { &m_mode_simple, &m_mode_advanced, &m_mode_expert }, m_mode_palette);
 
 	auto sizer = new wxBoxSizer(wxHORIZONTAL);
+	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
 	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
-	wxBoxSizer* parent_sizer = static_cast<wxBoxSizer*>(tab->GetSizer());
-	parent_sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+
+	m_optgroups_gui.back()->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+	append_preferences_option_to_searcher(m_optgroups_gui.back(), opt_key, title);
+}
+
+void PreferencesDialog::create_settings_font_widget()
+{
+	wxWindow* parent = m_optgroup_other->parent();
+	wxGetApp().UpdateDarkUI(parent);
+
+	const wxString title = L("Application font size");
+	wxStaticBox* stb = new wxStaticBox(parent, wxID_ANY, _(title));
+	if (!wxOSX) stb->SetBackgroundStyle(wxBG_STYLE_PAINT);
+
+	const std::string opt_key = "font_pt_size";
+	m_blinkers[opt_key] = new BlinkingBitmap(parent);
+
+	m_values_need_restart.push_back("font_pt_size");
+
+	wxSizer* stb_sizer = new wxStaticBoxSizer(stb, wxHORIZONTAL);
+
+	wxStaticText* font_example = new wxStaticText(parent, wxID_ANY, "Application text");
+    int val = wxGetApp().normal_font().GetPointSize();
+	SpinInput* size_sc = new SpinInput(parent, format_wxstr("%1%", val), "", wxDefaultPosition, wxSize(15 * em_unit(), -1), wxTE_PROCESS_ENTER | wxSP_ARROW_KEYS
+#ifdef _WIN32
+		| wxBORDER_SIMPLE
+#endif 
+	, 8, wxGetApp().get_max_font_pt_size());
+	wxGetApp().UpdateDarkUI(size_sc);
+
+	auto apply_font = [this, font_example, opt_key, stb_sizer](const int val, const wxFont& font) {
+		font_example->SetFont(font);
+		m_values[opt_key] = format("%1%", val);
+		stb_sizer->Layout();
+#ifdef __linux__
+		CallAfter([this]() { refresh_og(m_optgroup_other); });
+#else
+		refresh_og(m_optgroup_other);
+#endif
+	};
+
+	auto change_value = [size_sc, apply_font](wxCommandEvent& evt) {
+		const int val = size_sc->GetValue();
+		wxFont font = wxGetApp().normal_font();
+		font.SetPointSize(val);
+
+		apply_font(val, font);
+	};
+    size_sc->Bind(wxEVT_SPINCTRL, change_value);
+	size_sc->Bind(wxEVT_TEXT_ENTER, change_value);
+
+	auto revert_btn = new ScalableButton(parent, wxID_ANY, "undo");
+	revert_btn->SetToolTip(_L("Revert font to default"));
+	revert_btn->Bind(wxEVT_BUTTON, [size_sc, apply_font](wxEvent& event) {
+		wxFont font = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT);
+		const int val = font.GetPointSize();
+	    size_sc->SetValue(val);
+		apply_font(val, font);
+		});
+	parent->Bind(wxEVT_UPDATE_UI, [size_sc](wxUpdateUIEvent& evt) {
+		const int def_size = wxSystemSettings::GetFont(wxSYS_DEFAULT_GUI_FONT).GetPointSize();
+		evt.Enable(def_size != size_sc->GetValue());
+	}, revert_btn->GetId());
+
+    stb_sizer->Add(new wxStaticText(parent, wxID_ANY, _L("Font size") + ":"), 0, wxALIGN_CENTER_VERTICAL | wxLEFT, em_unit());
+    stb_sizer->Add(size_sc, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxLEFT, em_unit());
+    stb_sizer->Add(revert_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, em_unit());
+	wxBoxSizer* font_sizer = new wxBoxSizer(wxVERTICAL);
+	font_sizer->Add(font_example, 1, wxALIGN_CENTER_HORIZONTAL);
+    stb_sizer->Add(font_sizer, 1, wxALIGN_CENTER_VERTICAL);
+
+	auto sizer = new wxBoxSizer(wxHORIZONTAL);
+	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
+	sizer->Add(stb_sizer, 1, wxALIGN_CENTER_VERTICAL);
+
+	m_optgroup_other->sizer->Add(sizer, 1, wxEXPAND | wxTOP, em_unit());
+
+	append_preferences_option_to_searcher(m_optgroup_other, opt_key, title);
+}
+
+void PreferencesDialog::create_downloader_path_sizer()
+{
+	wxWindow* parent = m_optgroup_other->parent();
+
+	wxString title = L("Download path");
+	std::string opt_key = "url_downloader_dest";
+	m_blinkers[opt_key] = new BlinkingBitmap(parent);
+
+	downloader = new DownloaderUtils::Worker(parent);
+
+	auto sizer = new wxBoxSizer(wxHORIZONTAL);
+	sizer->Add(m_blinkers[opt_key], 0, wxRIGHT, 2);
+	sizer->Add(downloader, 1, wxALIGN_CENTER_VERTICAL);
+
+	m_optgroup_other->sizer->Add(sizer, 0, wxEXPAND | wxTOP, em_unit());
+
+	append_preferences_option_to_searcher(m_optgroup_other, opt_key, title);
 }
 
 void PreferencesDialog::init_highlighter(const t_config_option_key& opt_key)
 {
-	m_highlighter.set_timer_owner(this, 0);
-	this->Bind(wxEVT_TIMER, [this](wxTimerEvent&)
-		{
-			m_highlighter.blink();
-		});
+	if (m_blinkers.find(opt_key) != m_blinkers.end())
+		if (BlinkingBitmap* blinker = m_blinkers.at(opt_key); blinker) {
+			m_highlighter.init(blinker);
+			return;
+	}
 
-	std::pair<OG_CustomCtrl*, bool*> ctrl = { nullptr, nullptr };
-	for (ConfigOptionsGroup* opt_group : this->optgroups()) {
-		ctrl = opt_group->get_custom_ctrl_with_blinking_ptr(opt_key, -1);
+	for (auto opt_group : { m_optgroups_general, m_optgroup_camera, m_optgroups_gui, m_optgroup_other, m_optgroups_color
+
+#if ENABLE_ENVIRONMENT_MAP
+		, m_optgroup_render
+#endif // ENABLE_ENVIRONMENT_MAP
+		}) {
+		std::pair<OG_CustomCtrl*, bool*> ctrl = opt_group->get_custom_ctrl_with_blinking_ptr(opt_key, -1);
 		if (ctrl.first && ctrl.second) {
 			m_highlighter.init(ctrl);
 			break;
 		}
 	}
-}
-
-void PreferencesDialog::PreferencesHighlighter::set_timer_owner(wxEvtHandler* owner, int timerid/* = wxID_ANY*/)
-{
-	m_timer.SetOwner(owner, timerid);
-}
-
-void PreferencesDialog::PreferencesHighlighter::init(std::pair<OG_CustomCtrl*, bool*> params)
-{
-	if (m_timer.IsRunning())
-		invalidate();
-	if (!params.first || !params.second)
-		return;
-
-	m_timer.Start(300, false);
-
-	m_custom_ctrl = params.first;
-	m_show_blink_ptr = params.second;
-
-	*m_show_blink_ptr = true;
-	m_custom_ctrl->Refresh();
-}
-
-void PreferencesDialog::PreferencesHighlighter::invalidate()
-{
-	m_timer.Stop();
-
-	if (m_custom_ctrl && m_show_blink_ptr) {
-		*m_show_blink_ptr = false;
-		m_custom_ctrl->Refresh();
-		m_show_blink_ptr = nullptr;
-		m_custom_ctrl = nullptr;
-	}
-
-	m_blink_counter = 0;
-}
-
-void PreferencesDialog::PreferencesHighlighter::blink()
-{
-	if (m_custom_ctrl && m_show_blink_ptr) {
-		*m_show_blink_ptr = !*m_show_blink_ptr;
-		m_custom_ctrl->Refresh();
-	}
-	else
-		return;
-
-	if ((++m_blink_counter) == 11)
-		invalidate();
 }
 
 } // GUI

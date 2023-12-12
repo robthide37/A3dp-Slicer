@@ -70,12 +70,14 @@
     #undef fclose
     #undef sleep
     #undef snprintf
+    #undef vsnprintf
     #undef strerror
     #undef test
     #undef times
     #undef accept
     #undef wait
     #undef abort
+    #undef pause
 
 	// Breaks compilation with Eigen matrices embedded into Slic3r::Point.
 	#undef malloc
@@ -84,6 +86,7 @@
 	#undef select
 
     // Because of TBB
+    #undef _WIN32_WINNT // To avoid compiler warnings
     #define _WIN32_WINNT 0x0502
 #endif /* _MSC_VER */
 #undef Zero

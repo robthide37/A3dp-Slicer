@@ -1,3 +1,8 @@
+///|/ Copyright (c) superslicer 2021 - 2023 Durand Rémi @supermerill
+///// Copyright (c) Prusa Research 2021 - 2022 Vojtěch Bubník @bubnikv
+///|/
+///|/ SuperSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include <boost/log/trivial.hpp>
 
 #include "MedialAxis.hpp"
@@ -881,11 +886,11 @@ MedialAxis::polyline_from_voronoi(const ExPolygon& voronoi_polygon, ThickPolylin
 void
 MedialAxis::process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* polyline, std::set<const VD::edge_type*>& edges, std::set<const VD::edge_type*>& valid_edges, std::map<const VD::edge_type*, std::pair<coordf_t, coordf_t> >& thickness)
 {
-    while (true) {
+    for (;;) {
         // Since rot_next() works on the edge starting point but we want
         // to find neighbors on the ending point, we just swap edge with
         // its twin.
-        const VD::edge_type* twin = edge->twin();
+        const VD::edge_type *twin = edge->twin();
 
         // count neighbors for this edge
         std::vector<const VD::edge_type*> neighbors;
@@ -910,11 +915,11 @@ MedialAxis::process_edge_neighbors(const VD::edge_type* edge, ThickPolyline* pol
             edge = neighbor;
         } else if (neighbors.size() == 0) {
             polyline->endpoints.second = true;
-            return;
         } else {
-            // T-shaped or star-shaped joint
-            return;
+            // T-shaped or star-shaped joint    
         }
+        // Stop chaining.
+        break;
     }
 }
 
@@ -3179,14 +3184,12 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
             if (wanted_width != current_flow.width()) {
                 current_flow = current_flow.with_width((float)wanted_width);
             }
-            path.polyline.append(line.a);
-            path.polyline.append(line.b);
             assert(!std::isnan(current_flow.mm3_per_mm()));
             assert(!std::isnan(current_flow.width()));
             assert(!std::isnan(current_flow.height()));
-            path.mm3_per_mm = current_flow.mm3_per_mm();
-            path.width = current_flow.width();
-            path.height = current_flow.height();
+			path = { ExtrusionAttributes{ role, current_flow }, false };
+            path.polyline.append(line.a);
+            path.polyline.append(line.b);
         } else {
             coord_t thickness_delta = scale_t(fabs(current_flow.width() - wanted_width));
             if (thickness_delta <= tolerance / 2) {
@@ -3196,18 +3199,15 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
             } else {
                 // we need to initialize a new line
                 paths.push_back(path);
-                path = ExtrusionPath(role, false);
                 if (wanted_width != current_flow.width()) {
                     current_flow = current_flow.with_width(wanted_width);
                 }
-                path.polyline.append(line.a);
-                path.polyline.append(line.b);
                 assert(!std::isnan(current_flow.mm3_per_mm()));
                 assert(!std::isnan(current_flow.width()));
                 assert(!std::isnan(current_flow.height()));
-                path.mm3_per_mm = current_flow.mm3_per_mm();
-                path.width = current_flow.width();
-                path.height = current_flow.height();
+				path = { ExtrusionAttributes{ role, current_flow }, false };
+                path.polyline.append(line.a);
+                path.polyline.append(line.b);
             }
         }
         assert(path.polyline.size() > 2 || path.first_point() != path.last_point());
@@ -3219,7 +3219,8 @@ unsafe_variable_width(const ThickPolyline& polyline, const ExtrusionRole role, c
 }
 
 ExtrusionEntitiesPtr
-    thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow& flow, const coord_t resolution_internal, bool can_reverse)
+    thin_variable_width(const ThickPolylines& polylines, const ExtrusionRole role, const Flow& flow, 
+    const coord_t resolution_internal, bool can_reverse, ExtrusionEntitiesPtr& coll)
 {
     assert(resolution_internal > SCALED_EPSILON);
 
@@ -3227,7 +3228,6 @@ ExtrusionEntitiesPtr
     // variable extrusion within a single move; this value shall only affect the amount
     // of segments, and any pruning shall be performed before we apply this tolerance
     const coord_t tolerance = flow.scaled_width() / 10;//scale_(0.05);
-    ExtrusionEntitiesPtr coll;
     for (const ThickPolyline& p : polylines) {
         ExtrusionMultiPath multi_paths = variable_width(p, role, flow, resolution_internal, tolerance, can_reverse);
         // Append paths to collection.

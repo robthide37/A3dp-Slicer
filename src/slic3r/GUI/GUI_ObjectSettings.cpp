@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Vojtěch Král @vojtechkral, Enrico Turri @enricoturri1966
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "GUI_ObjectSettings.hpp"
 #include "GUI_ObjectList.hpp"
 #include "GUI_Factories.hpp"
@@ -12,6 +16,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "I18N.hpp"
+#include "format.hpp"
 #include "ConfigManipulation.hpp"
 
 #include <wx/wupdlock.h>
@@ -99,10 +104,10 @@ bool ObjectSettings::update_settings_list()
             btn->SetToolTip(_(L("Remove parameter")));
 
             btn->SetBitmapFocus(m_bmp_delete_focus.bmp());
-            btn->SetBitmapHover(m_bmp_delete_focus.bmp());
+            btn->SetBitmapCurrent(m_bmp_delete_focus.bmp());
 
 			btn->Bind(wxEVT_BUTTON, [opt_key, config, this](wxEvent &event) {
-                wxGetApp().plater()->take_snapshot(from_u8((boost::format(_utf8(L("Delete Option %s"))) % opt_key).str()));
+                wxGetApp().plater()->take_snapshot(format_wxstr(_L("Delete Option %s"), opt_key));
 				config->erase(opt_key);
                 wxGetApp().obj_list()->changed_object();
                 wxTheApp->CallAfter([this]() {
@@ -133,7 +138,7 @@ bool ObjectSettings::update_settings_list()
                     return;
                 ctrl->SetBitmap_(m_bmp_delete);
                 ctrl->SetBitmapFocus(m_bmp_delete_focus.bmp()); 
-                ctrl->SetBitmapHover(m_bmp_delete_focus.bmp());
+                ctrl->SetBitmapCurrent(m_bmp_delete_focus.bmp());
             };
 
             const bool is_extruders_cat = cat.first == OptionCategory::extruders;
@@ -157,7 +162,7 @@ bool ObjectSettings::update_settings_list()
             for (auto& opt : cat.second)
                 optgroup->get_field(opt)->m_on_change = [optgroup](const std::string& opt_id, const boost::any& value) {
                     // first of all take a snapshot and then change value in configuration
-                    wxGetApp().plater()->take_snapshot(from_u8((boost::format(_utf8(L("Change Option %s"))) % opt_id).str()));
+                    wxGetApp().plater()->take_snapshot(format_wxstr(_L("Change Option %s"), opt_id));
                     optgroup->on_change_OG(opt_id, value);
                 };
 
@@ -270,15 +275,6 @@ void ObjectSettings::update_config_values(ModelConfig* config)
 void ObjectSettings::UpdateAndShow(const bool show)
 {
     OG_Settings::UpdateAndShow(show ? update_settings_list() : false);
-}
-
-void ObjectSettings::msw_rescale()
-{
-    m_bmp_delete.msw_rescale();
-    m_bmp_delete_focus.msw_rescale();
-
-    for (auto group : m_og_settings)
-        group->msw_rescale();
 }
 
 void ObjectSettings::sys_color_changed()

@@ -1,3 +1,8 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Lukáš Hejl @hejllukas
+///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "clipper/clipper_z.hpp"
 
 #include "ClipperUtils.hpp"
@@ -43,7 +48,7 @@ static void append_and_translate(Polygons &dst, const Polygons &src, const Print
         dst[dst_idx].translate(instance.shift.x(), instance.shift.y());
 }
 
-static float max_brim_width(const ConstPrintObjectPtrsAdaptor &objects)
+static float max_brim_width(const SpanOfConstPtrs<PrintObject> &objects)
 {
     assert(!objects.empty());
     return float(std::accumulate(objects.begin(), objects.end(), 0.,
@@ -57,7 +62,7 @@ static ExPolygons get_print_object_bottom_layer_expolygons(const PrintObject &pr
 {
     ExPolygons ex_polygons;
     for (LayerRegion *region : print_object.layers().front()->regions())
-        Slic3r::append(ex_polygons, closing_ex(region->slices.surfaces, float(SCALED_EPSILON)));
+        Slic3r::append(ex_polygons, closing_ex(region->slices().surfaces, float(SCALED_EPSILON)));
     return ex_polygons;
 }
 
@@ -336,7 +341,7 @@ static std::vector<InnerBrimExPolygons> inner_brim_area(const Print             
                 append(no_brim_area_object, diff_ex(offset(ex_poly.contour, no_brim_offset, ClipperLib::jtSquare), ex_poly_holes_reversed));
 
             if (brim_type == BrimType::btOuterOnly || brim_type == BrimType::btNoBrim)
-                append(no_brim_area_object, diff_ex(ExPolygon(ex_poly.contour), shrink_ex(ex_poly_holes_reversed, no_brim_offset, ClipperLib::jtSquare)));
+                append(no_brim_area_object, diff_ex(ex_poly.contour, shrink_ex(ex_poly_holes_reversed, no_brim_offset, ClipperLib::jtSquare)));
 
             append(holes_reversed_object, ex_poly_holes_reversed);
         }
@@ -494,8 +499,10 @@ static void make_inner_brim(const Print                   &print,
 
     loops = union_pt_chained_outside_in(loops);
     std::reverse(loops.begin(), loops.end());
-    extrusion_entities_append_loops(brim.entities, std::move(loops), erSkirt, float(flow.mm3_per_mm()),
-                                    float(flow.width()), float(print.skirt_first_layer_height()));
+    extrusion_entities_append_loops(brim.entities, std::move(loops), 
+        ExtrusionAttributes{
+            ExtrusionRole::Skirt,
+            ExtrusionFlow{ float(flow.mm3_per_mm()), float(flow.width()), float(print.skirt_first_layer_height()) } });
 }
 
 // Produce brim lines around those objects, that have the brim enabled.
@@ -568,7 +575,7 @@ ExtrusionEntityCollection make_brim(const Print &print, PrintTryCancel try_cance
     }
 #endif // BRIM_DEBUG_TO_SVG
 
-    const bool could_brim_intersects_skirt = std::any_of(print.objects().begin(), print.objects().end(), [&print](PrintObject *object) {
+    const bool could_brim_intersects_skirt = std::any_of(print.objects().begin(), print.objects().end(), [&print](const PrintObject *object) {
         const BrimType &bt = object->config().brim_type;
         return (bt == btOuterOnly || bt == btOuterAndInner) && print.config().skirt_distance.value < object->config().brim_width;
     });
@@ -645,7 +652,7 @@ ExtrusionEntityCollection make_brim(const Print &print, PrintTryCancel try_cance
 			// perform operation
 			ClipperLib_Z::PolyTree loops_trimmed_tree;
 			clipper.Execute(ClipperLib_Z::ctDifference, loops_trimmed_tree, ClipperLib_Z::pftNonZero, ClipperLib_Z::pftNonZero);
-			ClipperLib_Z::PolyTreeToPaths(loops_trimmed_tree, loops_trimmed);
+			ClipperLib_Z::PolyTreeToPaths(std::move(loops_trimmed_tree), loops_trimmed);
 		}
 
 		// Third, produce the extrusions, sorted by the source loop indices.
@@ -676,7 +683,9 @@ ExtrusionEntityCollection make_brim(const Print &print, PrintTryCancel try_cance
 				if (i + 1 == j && first_path.size() > 3 && first_path.front().x() == first_path.back().x() && first_path.front().y() == first_path.back().y()) {
 					auto *loop = new ExtrusionLoop();
                     brim.entities.emplace_back(loop);
-					loop->paths.emplace_back(erSkirt, float(flow.mm3_per_mm()), float(flow.width()), float(print.skirt_first_layer_height()));
+                    loop->paths.emplace_back(ExtrusionAttributes{
+                        ExtrusionRole::Skirt, 
+                        ExtrusionFlow{ float(flow.mm3_per_mm()), float(flow.width()), float(print.skirt_first_layer_height()) } });
 		            Points &points = loop->paths.front().polyline.points;
 		            points.reserve(first_path.size());
 		            for (const ClipperLib_Z::IntPoint &pt : first_path)
@@ -687,7 +696,9 @@ ExtrusionEntityCollection make_brim(const Print &print, PrintTryCancel try_cance
 			    	ExtrusionEntityCollection this_loop_trimmed;
 					this_loop_trimmed.entities.reserve(j - i);
 			    	for (; i < j; ++ i) {
-			            this_loop_trimmed.entities.emplace_back(new ExtrusionPath(erSkirt, float(flow.mm3_per_mm()), float(flow.width()), float(print.skirt_first_layer_height())));
+                        this_loop_trimmed.entities.emplace_back(new ExtrusionPath({
+                            ExtrusionRole::Skirt,
+                            ExtrusionFlow{ float(flow.mm3_per_mm()), float(flow.width()), float(print.skirt_first_layer_height()) } }));
 						const ClipperLib_Z::Path &path = *loops_trimmed_order[i].first;
 			            Points &points = dynamic_cast<ExtrusionPath*>(this_loop_trimmed.entities.back())->polyline.points;
 			            points.reserve(path.size());
@@ -703,7 +714,9 @@ ExtrusionEntityCollection make_brim(const Print &print, PrintTryCancel try_cance
 			}
 		}
     } else {
-        extrusion_entities_append_loops_and_paths(brim.entities, std::move(all_loops), erSkirt, float(flow.mm3_per_mm()), float(flow.width()), float(print.skirt_first_layer_height()));
+        extrusion_entities_append_loops_and_paths(brim.entities, std::move(all_loops), 
+            ExtrusionAttributes{ ExtrusionRole::Skirt,
+                ExtrusionFlow{ float(flow.mm3_per_mm()), float(flow.width()), float(print.skirt_first_layer_height()) } });
     }
 
     make_inner_brim(print, top_level_objects_with_brim, bottom_layers_expolygons, brim);

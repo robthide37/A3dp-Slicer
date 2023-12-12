@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2022 Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef EXECUTION_HPP
 #define EXECUTION_HPP
 
@@ -5,6 +9,7 @@
 #include <utility>
 #include <cstddef>
 #include <iterator>
+#include <algorithm>
 
 #include "libslic3r/libslic3r.h"
 
@@ -29,8 +34,8 @@ template<class EP> using AsTraits = Traits<remove_cvref_t<EP>>;
 
 // Each execution policy should declare two types of mutexes. A a spin lock and
 // a blocking mutex. These types should satisfy the BasicLockable concept.
-template<class EP> using SpinningMutex = typename Traits<EP>::SpinningMutex;
-template<class EP> using BlockingMutex = typename Traits<EP>::BlockingMutex;
+template<class EP> using SpinningMutex = typename AsTraits<EP>::SpinningMutex;
+template<class EP> using BlockingMutex = typename AsTraits<EP>::BlockingMutex;
 
 // Query the available threads for concurrency.
 template<class EP, class = ExecutionPolicyOnly<EP> >
@@ -44,7 +49,8 @@ size_t max_concurrency(const EP &ep)
 template<class EP, class It, class Fn, class = ExecutionPolicyOnly<EP>>
 void for_each(const EP &ep, It from, It to, Fn &&fn, size_t granularity = 1)
 {
-    AsTraits<EP>::for_each(ep, from, to, std::forward<Fn>(fn), granularity);
+    AsTraits<EP>::for_each(ep, from, to, std::forward<Fn>(fn),
+                           std::max(granularity, size_t(1)));
 }
 
 // A reduce operation with the execution policy passed as argument.
@@ -68,7 +74,7 @@ T reduce(const EP & ep,
     return AsTraits<EP>::reduce(ep, from, to, init,
                                 std::forward<MergeFn>(mergefn),
                                 std::forward<AccessFn>(accessfn),
-                                granularity);
+                                std::max(granularity, size_t(1)));
 }
 
 // An overload of reduce method to be used with iterators as 'from' and 'to'
@@ -87,7 +93,7 @@ T reduce(const EP &ep,
 {
     return reduce(
         ep, from, to, init, std::forward<MergeFn>(mergefn),
-        [](const auto &i) { return i; }, granularity);
+        [](const auto &i) { return i; }, std::max(granularity, size_t(1)));
 }
 
 template<class EP,
@@ -103,7 +109,8 @@ T accumulate(const EP & ep,
              size_t     granularity = 1)
 {
     return reduce(ep, from, to, init, std::plus<T>{},
-                  std::forward<AccessFn>(accessfn), granularity);
+                  std::forward<AccessFn>(accessfn),
+                  std::max(granularity, size_t(1)));
 }
 
 
@@ -119,7 +126,7 @@ T accumulate(const EP &ep,
 {
     return reduce(
         ep, from, to, init, std::plus<T>{}, [](const auto &i) { return i; },
-        granularity);
+        std::max(granularity, size_t(1)));
 }
 
 } // namespace execution_policy

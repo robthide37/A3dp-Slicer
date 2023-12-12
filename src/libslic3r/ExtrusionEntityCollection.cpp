@@ -1,3 +1,11 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas, Lukáš Matěna @lukasmatena
+///|/ Copyright (c) SuperSlicer 2023 Remi Durand @supermerill
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Maksim Derbasov @ntfshard
+///|/ Copyright (c) 2014 Petr Ledvina @ledvinap
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "ExtrusionEntityCollection.hpp"
 #include "ShortestPath.hpp"
 #include <algorithm>
@@ -6,9 +14,10 @@
 
 namespace Slic3r {
 
+#if 0
 void filter_by_extrusion_role_in_place(ExtrusionEntitiesPtr &extrusion_entities, ExtrusionRole role)
 {
-	if (role != erMixed) {
+	if (role != ExtrusionRole::Mixed) {
 		auto first  = extrusion_entities.begin();
 		auto last   = extrusion_entities.end();
         extrusion_entities.erase(
@@ -17,6 +26,7 @@ void filter_by_extrusion_role_in_place(ExtrusionEntitiesPtr &extrusion_entities,
             last);
 	}
 }
+#endif
 
 ExtrusionEntityCollection::ExtrusionEntityCollection(const ExtrusionPaths &paths)
     : m_no_sort(false), ExtrusionEntity(true)
@@ -81,42 +91,6 @@ void ExtrusionEntityCollection::remove(size_t i)
     this->m_entities.erase(this->m_entities.begin() + i);
 }
 
-ExtrusionEntityCollection ExtrusionEntityCollection::chained_path_from(const ExtrusionEntitiesPtr& extrusion_entities, const Point &start_near, ExtrusionRole role)
-//ExtrusionEntityCollection ExtrusionEntityCollection::chained_path_from(const Point &start_near, ExtrusionRole role)
-{
-    //ExtrusionEntityCollection out;
-    //if (this->no_sort) {
-    //    out = *this;
-    //} else {
-    //    if (role == erMixed)
-    //        out = *this;
-    //    else {
-    //        for (const ExtrusionEntity *ee : this->entities()) {
-    //            if (role != erMixed) {
-    //                // The caller wants only paths with a specific extrusion role.
-    //                auto role2 = ee->role();
-    //                if (role != role2) {
-    //                    // This extrusion entity does not match the role asked.
-    //                    assert(role2 != erMixed);
-    //                    continue;
-    //                }
-    //            }
-    //            out.entities().emplace_back(ee->clone());
-    //        }
-    //    }
-    //    chain_and_reorder_extrusion_entities(out.entities(), &start_near);
-    //}
-    //return out;
-    // Return a filtered copy of the collection.
-    ExtrusionEntityCollection out;
-    out.m_entities = filter_by_extrusion_role(extrusion_entities, role);
-    // Clone the extrusion entities.
-    for (ExtrusionEntity* &ptr : out.m_entities)
-        ptr = ptr->clone();
-    chain_and_reorder_extrusion_entities(out.m_entities, &start_near);
-    return out;
-}
-
 void ExtrusionEntityCollection::polygons_covered_by_width(Polygons &out, const float scaled_epsilon) const
 {
     for (const ExtrusionEntity *entity : this->entities())
@@ -151,9 +125,23 @@ ExtrusionEntityCollection ExtrusionEntityCollection::flatten(bool preserve_order
     return FlatenEntities(preserve_ordering).flatten(*this);
 
 }
-void
-FlatenEntities::use(const ExtrusionEntityCollection &coll) {
+
+void ExtrusionEntityCollection::flatten(bool preserve_ordering = false, ExtrusionEntityCollection& out) const
+{
     if ((!coll.can_sort() || !this->to_fill.can_sort()) && preserve_ordering) {
+        out.push_back(this->flatten(preserve_ordering))
+    }else{
+        FlatenEntities(preserve_ordering) flattener;
+        flattener.use(*this);
+        //tranfert owner of entities.
+        out.entities.insert(out.entities.begin(), flattener.get().entities.begin(), flattener.get().entities.end());
+        flattener.set().entities.clear();
+    }
+}
+
+void FlatenEntities::use(const ExtrusionEntityCollection &coll) {
+    if ((!coll.can_sort() || !this->to_fill.can_sort()) && preserve_ordering) {
+        ExtrusionEntityCollection copy{pattern.can_sort(), pattern.can_reverse()};
         FlatenEntities unsortable(coll, preserve_ordering);
         for (const ExtrusionEntity* entity : coll.entities()) {
             entity->visit(unsortable);
@@ -166,8 +154,7 @@ FlatenEntities::use(const ExtrusionEntityCollection &coll) {
     }
 }
 
-ExtrusionEntityCollection&&
-FlatenEntities::flatten(const ExtrusionEntityCollection &to_flatten) && {
+ExtrusionEntityCollection&& FlatenEntities::flatten(const ExtrusionEntityCollection &to_flatten) && {
     use(to_flatten);
     return std::move(to_fill);
 }

@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 Oleksandra Iushchenko @YuSanka, Lukáš Matěna @lukasmatena, David Kocík @kocikdav, Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_MsgDialog_hpp_
 #define slic3r_MsgDialog_hpp_
 
@@ -14,12 +18,20 @@
 #include <wx/window.h>
 
 class wxBoxSizer;
-class wxCheckBox;
+class CheckBox;
 class wxStaticBitmap;
 
 namespace Slic3r {
 
 namespace GUI {
+
+struct HtmlContent
+{
+	wxString                                msg{ wxEmptyString };
+	bool                                    is_monospaced_font{ false };
+	bool                                    is_marked_msg{ false };
+	std::function<void(const std::string&)> on_link_clicked{ nullptr };
+};
 
 // A message / query dialog with a bitmap on the left and any content on the right
 // with buttons underneath.
@@ -65,6 +77,7 @@ public:
 	// If monospaced_font is true, the error message is displayed using html <code><pre></pre></code> tags,
 	// so that the code formatting will be preserved. This is useful for reporting errors from the placeholder parser.
 	ErrorDialog(wxWindow *parent, const wxString &msg, bool courier_font);
+	ErrorDialog(wxWindow *parent, const wxString &msg, const std::function<void(const std::string&)>& on_link_clicked);
 	ErrorDialog(ErrorDialog &&) = delete;
 	ErrorDialog(const ErrorDialog &) = delete;
 	ErrorDialog &operator=(ErrorDialog &&) = delete;
@@ -72,7 +85,9 @@ public:
 	virtual ~ErrorDialog() = default;
 
 private:
-	wxString msg;
+	void create(const HtmlContent& content, int icon_width);
+
+	HtmlContent m_content;
 };
 
 
@@ -130,7 +145,7 @@ public:
 // Generic rich message dialog, used intead of wxRichMessageDialog
 class RichMessageDialog : public MsgDialog
 {
-	wxCheckBox* m_checkBox{ nullptr };
+	CheckBox*   m_checkBox{ nullptr };
 	wxString	m_checkBoxText;
 	bool		m_checkBoxValue{ false };
 
@@ -162,8 +177,8 @@ public:
 	// customization of the message box buttons
 	virtual bool SetYesNoLabels(const wxMD::ButtonLabel& yes, const wxMD::ButtonLabel& no)
 	{
-		DoSetCustomLabel(m_yes, yes);
-		DoSetCustomLabel(m_no, no);
+		DoSetCustomLabel(m_yes, yes, wxID_YES);
+		DoSetCustomLabel(m_no, no, wxID_NO);
 		return true;
 	}
 
@@ -171,29 +186,29 @@ public:
 		const wxMD::ButtonLabel& no,
 		const wxMD::ButtonLabel& cancel)
 	{
-		DoSetCustomLabel(m_yes, yes);
-		DoSetCustomLabel(m_no, no);
-		DoSetCustomLabel(m_cancel, cancel);
+		DoSetCustomLabel(m_yes, yes, wxID_YES);
+		DoSetCustomLabel(m_no, no, wxID_NO);
+		DoSetCustomLabel(m_cancel, cancel, wxID_CANCEL);
 		return true;
 	}
 
 	virtual bool SetOKLabel(const wxMD::ButtonLabel& ok)
 	{
-		DoSetCustomLabel(m_ok, ok);
+		DoSetCustomLabel(m_ok, ok, wxID_OK);
 		return true;
 }
 
 	virtual bool SetOKCancelLabels(const wxMD::ButtonLabel& ok,
 		const wxMD::ButtonLabel& cancel)
 	{
-		DoSetCustomLabel(m_ok, ok);
-		DoSetCustomLabel(m_cancel, cancel);
+		DoSetCustomLabel(m_ok, ok, wxID_OK);
+		DoSetCustomLabel(m_cancel, cancel, wxID_CANCEL);
 		return true;
 	}
 
 	virtual bool SetHelpLabel(const wxMD::ButtonLabel& help)
 	{
-		DoSetCustomLabel(m_help, help);
+		DoSetCustomLabel(m_help, help, wxID_HELP);
 		return true;
 	}
 	// test if any custom labels were set
@@ -232,9 +247,10 @@ protected:
 	// the value to var with possibly some transformation (e.g. Cocoa version
 	// currently uses this to remove any accelerators from the button strings
 	// while GTK+ one handles stock items specifically here)
-	void DoSetCustomLabel(wxString& var, const wxMD::ButtonLabel& label)
+	void DoSetCustomLabel(wxString& var, const wxMD::ButtonLabel& label, wxWindowID btn_id)
 	{
 		var = label.GetAsString();
+		SetButtonLabel(btn_id, var);
 	}
 
 	// these functions return the custom label or empty string and should be
@@ -318,6 +334,8 @@ public:
 	InfoDialog&operator=(InfoDialog&&) = delete;
 	InfoDialog&operator=(const InfoDialog&) = delete;
 	virtual ~InfoDialog() = default;
+
+	void set_caption(const wxString& caption) { this->SetTitle(caption); }
 
 private:
 	wxString msg;

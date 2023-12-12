@@ -1,9 +1,17 @@
+///|/ Copyright (c) Prusa Research 2020 - 2023 Tomáš Mészáros @tamasmeszaros, Lukáš Matěna @lukasmatena
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef SLA_SUPPORTPOINT_HPP
 #define SLA_SUPPORTPOINT_HPP
 
 #include <libslic3r/Point.hpp>
 
-namespace Slic3r { namespace sla {
+namespace Slic3r {
+
+class ModelObject;
+
+namespace sla {
 
 // An enum to keep track of where the current points on the ModelObject came from.
 enum class PointsStatus {
@@ -61,6 +69,9 @@ struct SupportPoint
 };
 
 using SupportPoints = std::vector<SupportPoint>;
+
+SupportPoints transformed_support_points(const ModelObject &mo,
+                                         const Transform3d &trafo);
 
 }} // namespace Slic3r::sla
 

@@ -1,3 +1,12 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Lukáš Hejl @hejllukas, Lukáš Matěna @lukasmatena
+///|/ Copyright (c) 2017 Eyal Soha
+///|/
+///|/ ported from lib/Slic3r/Fill/PlanePath.pm:
+///|/ Copyright (c) Prusa Research 2016 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) Slic3r 2011 - 2014 Alessandro Ranellucci @alranel
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -421,7 +430,7 @@ public:
 //        bool sticks_removed = 
         remove_sticks(polygons_src);
         //        if (sticks_removed) BOOST_LOG_TRIVIAL(error) << "Sticks removed!";
-        polygons_outer = aoffset1 == 0 ? polygons_src : offset(polygons_src, float(aoffset1), ClipperLib::jtMiter, miterLimit);
+        polygons_outer = aoffset1 == 0 ? to_polygons(polygons_src) : offset(polygons_src, float(aoffset1), ClipperLib::jtMiter, miterLimit);
         if (aoffset2 < 0)
             polygons_inner = shrink(polygons_outer, float(aoffset1 - aoffset2), ClipperLib::jtMiter, miterLimit);
         // Filter out contours with zero area or small area, contours with 2 points only.
@@ -2575,7 +2584,7 @@ static std::vector<MonotonicRegionLink> chain_monotonic_regions(
 
     // Probability (unnormalized) of traversing a link between two monotonic regions.
 	auto path_probability = [
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(__clang__)
         // clang complains when capturing constexpr constants.
         pheromone_alpha, pheromone_beta
 #endif // __APPLE__
@@ -3178,7 +3187,18 @@ Polylines FillMonotonic::fill_surface(const Surface *surface, const FillParams &
     params2.monotonic = true;
     Polylines polylines_out;
     if (!fill_surface_by_lines(surface, params2, 0.f, 0.f, polylines_out))
-        BOOST_LOG_TRIVIAL(error) << "FillMonotonous::fill_surface() failed to fill a region.";
+        BOOST_LOG_TRIVIAL(error) << "FillMonotonic::fill_surface() failed to fill a region.";
+    return polylines_out;
+}
+
+Polylines FillMonotonicLines::fill_surface(const Surface *surface, const FillParams &params)
+{
+    FillParams params2 = params;
+    params2.monotonic = true;
+    params2.anchor_length_max = 0.0f;
+    Polylines polylines_out;
+    if (! fill_surface_by_lines(surface, params2, 0.f, 0.f, polylines_out))
+        BOOST_LOG_TRIVIAL(error) << "FillMonotonicLines::fill_surface() failed to fill a region.";
     return polylines_out;
 }
 

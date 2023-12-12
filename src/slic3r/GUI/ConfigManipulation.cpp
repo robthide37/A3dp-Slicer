@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2019 - 2023 Lukáš Hejl @hejllukas, Vojtěch Bubník @bubnikv, Lukáš Matěna @lukasmatena, Oleksandra Iushchenko @YuSanka, Pavel Mikuš @Godrak, Tomáš Mészáros @tamasmeszaros
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 // #include "libslic3r/GCodeSender.hpp"
 #include "ConfigManipulation.hpp"
 #include "I18N.hpp"
@@ -7,6 +11,7 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "MsgDialog.hpp"
 
+#include <string>
 #include <wx/msgdlg.h>
 
 namespace Slic3r {
@@ -78,7 +83,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         && config->opt_int("support_material_enforce_layers") == 0
         && config->opt_enum<PerimeterGeneratorType>("perimeter_generator") == PerimeterGeneratorType::Classic
         && config->opt_bool("exact_last_layer_height") == false
-        && config->opt_bool("ensure_vertical_shell_thickness") == true
         && config->opt_bool("infill_dense") == false
         && config->opt_bool("extra_perimeters") == false
         && config->opt_bool("extra_perimeters_overhangs") == false
@@ -92,7 +96,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             "- 0% fill density\n"
             "- classic perimeter slicing\n"
             "- no support material\n"
-            "- Ensure vertical shell thickness enabled\n"
             "- disabled 'no solid infill over perimeters'\n"
             "- unchecked 'exact last layer height'\n"
             "- unchecked 'dense infill'\n"
@@ -121,8 +124,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 new_conf.set_key_value("support_material_enforce_layers", new ConfigOptionInt(0));
             else if (this->local_config->get().optptr("exact_last_layer_height"))
                 new_conf.set_key_value("exact_last_layer_height", new ConfigOptionBool(false));
-            else if (this->local_config->get().optptr("ensure_vertical_shell_thickness"))
-                new_conf.set_key_value("ensure_vertical_shell_thickness", new ConfigOptionBool(true));
             else if (this->local_config->get().optptr("infill_dense"))
                 new_conf.set_key_value("infill_dense", new ConfigOptionBool(false));
             else if (this->local_config->get().optptr("extra_perimeters"))
@@ -145,7 +146,6 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             new_conf.set_key_value("support_material", new ConfigOptionBool(false));
             new_conf.set_key_value("support_material_enforce_layers", new ConfigOptionInt(0));
             new_conf.set_key_value("exact_last_layer_height", new ConfigOptionBool(false));
-            new_conf.set_key_value("ensure_vertical_shell_thickness", new ConfigOptionBool(true));
             new_conf.set_key_value("infill_dense", new ConfigOptionBool(false));
             new_conf.set_key_value("extra_perimeters", new ConfigOptionBool(false));
             new_conf.set_key_value("extra_perimeters_overhangs", new ConfigOptionBool(false));
@@ -163,68 +163,73 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
             cb_value_change("fill_density", fill_density);
             if (!support)
                 cb_value_change("support_material", false);
-    }
-    }
-
-    if (config->opt_bool("wipe_tower") && config->opt_bool("support_material") &&
-        ((ConfigOptionEnumGeneric*)config->option("support_material_contact_distance_type"))->value != zdNone &&
-        (config->opt_int("support_material_extruder") != 0 || config->opt_int("support_material_interface_extruder") != 0)) {
-        wxString msg_text = _(L("The Wipe Tower currently supports the non-soluble supports only\n"
-            "if they are printed with the current extruder without triggering a tool change.\n"
-            "(both support_material_extruder and support_material_interface_extruder need to be set to 0)."));
-        if (is_global_config)
-            msg_text += "\n\n" + _(L("Shall I adjust those settings in order to enable the Wipe Tower?"));
-        MessageDialog dialog (m_msg_dlg_parent, msg_text, _(L("Wipe Tower")),
-            wxICON_WARNING | (is_global_config ? wxYES | wxNO : wxOK));
-        DynamicPrintConfig new_conf = *config;
-        auto answer = dialog.ShowModal();
-        if (!is_global_config) {
-            if (this->local_config->get().optptr("wipe_tower"))
-                new_conf.set_key_value("wipe_tower", new ConfigOptionBool(false));
-            else if (this->local_config->get().optptr("support_material_extruder"))
-                new_conf.set_key_value("support_material_extruder", new ConfigOptionInt(0));
-            else if (this->local_config->get().optptr("support_material_interface_extruder"))
-                new_conf.set_key_value("support_material_interface_extruder", new ConfigOptionInt(0));
-            else if (this->local_config->get().optptr("support_material_contact_distance_type"))
-                new_conf.set_key_value("support_material_contact_distance_type", new ConfigOptionEnum<SupportZDistanceType>(zdNone));
-            else if (this->local_config->get().optptr("support_material"))
-                new_conf.set_key_value("support_material", new ConfigOptionBool(false));
-            this->local_config->apply_only(new_conf, this->local_config->keys(), true);
-        } else if (answer == wxID_YES) {
-            new_conf.set_key_value("support_material_extruder", new ConfigOptionInt(0));
-            new_conf.set_key_value("support_material_interface_extruder", new ConfigOptionInt(0));
-        } else
-            new_conf.set_key_value("wipe_tower", new ConfigOptionBool(false));
-        apply(config, &new_conf);
-    }
-
-    if (config->opt_bool("wipe_tower") && config->opt_bool("support_material") &&
-        ((ConfigOptionEnumGeneric*)config->option("support_material_contact_distance_type"))->value == zdNone &&
-        !config->opt_bool("support_material_synchronize_layers")) {
-        wxString msg_text = _(L("For the Wipe Tower to work with the soluble supports, the support layers\n"
-            "need to be synchronized with the object layers."));
-        if (is_global_config)
-            msg_text += "\n\n" + _(L("Shall I synchronize support layers in order to enable the Wipe Tower?"));
-        MessageDialog dialog(m_msg_dlg_parent, msg_text, _(L("Wipe Tower")),
-            wxICON_WARNING | (is_global_config ? wxYES | wxNO : wxOK));
-        DynamicPrintConfig new_conf = *config;
-        auto answer = dialog.ShowModal();
-        if (!is_global_config) {
-            if (this->local_config->get().optptr("wipe_tower"))
-                new_conf.set_key_value("wipe_tower", new ConfigOptionBool(false));
-            else if (this->local_config->get().optptr("support_material_synchronize_layers"))
-                new_conf.set_key_value("support_material_synchronize_layers", new ConfigOptionBool(true));
-            else if (this->local_config->get().optptr("support_material_contact_distance_type"))
-                new_conf.set_key_value("support_material_contact_distance_type", new ConfigOptionEnum<SupportZDistanceType>(zdFilament));
-            else if (this->local_config->get().optptr("support_material"))
-                new_conf.set_key_value("support_material", new ConfigOptionBool(false));
-            this->local_config->apply_only(new_conf, this->local_config->keys(), true);
-        } else if (answer == wxID_YES) {
-            new_conf.set_key_value("support_material_synchronize_layers", new ConfigOptionBool(true));
-        } else {
-            new_conf.set_key_value("wipe_tower", new ConfigOptionBool(false));
         }
-        apply(config, &new_conf);
+    }
+
+    if (config->opt_bool("wipe_tower") && config->opt_bool("support_material") && 
+        // Organic supports are always synchronized with object layers as of now.
+        config->opt_enum<SupportMaterialStyle>("support_material_style") != smsOrganic) {
+        // soluble support
+        if (((ConfigOptionEnumGeneric*)config->option("support_material_contact_distance_type"))->value == zdNone) {
+            if (!config->opt_bool("support_material_synchronize_layers")) {
+                wxString msg_text = _(L("For the Wipe Tower to work with the soluble supports, the support layers\n"
+                                        "need to be synchronized with the object layers."));
+                if (is_global_config)
+                    msg_text += "\n\n" + _(L("Shall I synchronize support layers in order to enable the Wipe Tower?"));
+                MessageDialog dialog(m_msg_dlg_parent, msg_text, _(L("Wipe Tower")),
+                                       wxICON_WARNING | (is_global_config ? wxYES | wxNO : wxOK));
+                DynamicPrintConfig new_conf = *config;
+                auto answer = dialog.ShowModal();
+                if (!is_global_config) {
+                    if (this->local_config->get().optptr("wipe_tower"))
+                        new_conf.set_key_value("wipe_tower", new ConfigOptionBool(false));
+                    else if (this->local_config->get().optptr("support_material_synchronize_layers"))
+                        new_conf.set_key_value("support_material_synchronize_layers", new ConfigOptionBool(true));
+                    else if (this->local_config->get().optptr("support_material_contact_distance_type"))
+                        new_conf.set_key_value("support_material_contact_distance_type", new ConfigOptionEnum<SupportZDistanceType>(zdFilament));
+                    else if (this->local_config->get().optptr("support_material"))
+                        new_conf.set_key_value("support_material", new ConfigOptionBool(false));
+                    this->local_config->apply_only(new_conf, this->local_config->keys(), true);
+                        else if ( answer == wxID_YES) {
+                    new_conf.set_key_value("support_material_synchronize_layers", new ConfigOptionBool(true));
+                }
+                else
+                    new_conf.set_key_value("wipe_tower", new ConfigOptionBool(false));
+                apply(config, &new_conf);
+            }
+        } else {
+            // not-soluble support branch
+            if ((config->opt_int("support_material_extruder") != 0 || config->opt_int("support_material_interface_extruder") != 0)) {
+                wxString msg_text = _(L("The Wipe Tower currently supports the non-soluble supports only "
+                                        "if they are printed with the current extruder without triggering a tool change. "
+                                        "(both support_material_extruder and support_material_interface_extruder need to be set to 0)."));
+                if (is_global_config)
+                    msg_text += "\n\n" + _(L("Shall I adjust those settings in order to enable the Wipe Tower?"));
+                MessageDialog dialog (m_msg_dlg_parent, msg_text, _(L("Wipe Tower")),
+                                        wxICON_WARNING | (is_global_config ? wxYES | wxNO : wxOK));
+                DynamicPrintConfig new_conf = *config;
+                auto answer = dialog.ShowModal();
+                if (!is_global_config) {
+                    if (this->local_config->get().optptr("wipe_tower"))
+                        new_conf.set_key_value("wipe_tower", new ConfigOptionBool(false));
+                    else if (this->local_config->get().optptr("support_material_extruder"))
+                        new_conf.set_key_value("support_material_extruder", new ConfigOptionInt(0));
+                    else if (this->local_config->get().optptr("support_material_interface_extruder"))
+                        new_conf.set_key_value("support_material_interface_extruder", new ConfigOptionInt(0));
+                    else if (this->local_config->get().optptr("support_material_contact_distance_type"))
+                        new_conf.set_key_value("support_material_contact_distance_type", new ConfigOptionEnum<SupportZDistanceType>(zdNone));
+                    else if (this->local_config->get().optptr("support_material"))
+                        new_conf.set_key_value("support_material", new ConfigOptionBool(false));
+                    this->local_config->apply_only(new_conf, this->local_config->keys(), true);
+                } else if (answer == wxID_YES) {
+                    new_conf.set_key_value("support_material_extruder", new ConfigOptionInt(0));
+                    new_conf.set_key_value("support_material_interface_extruder", new ConfigOptionInt(0));
+                }
+                else
+                    new_conf.set_key_value("wipe_tower", new ConfigOptionBool(false));
+                apply(config, &new_conf);
+            }
+        }
     }
 
     if (config->opt_float("brim_width") > 0 && config->opt_float("brim_separation") >= config->opt_float("brim_width")) {
@@ -272,14 +277,14 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
                 }
             }
         }
-    } else {
+    }
+    else {
         m_support_material_overhangs_queried = false;
     }
 
     if (config->option<ConfigOptionPercent>("fill_density")->value == 100) {
-        std::string  fill_pattern = config->option<ConfigOptionEnum<InfillPattern>>("fill_pattern")->serialize();
-        const std::vector<std::string>& top_fill_pattern_values = config->def()->get("top_fill_pattern")->enum_values;
-        bool correct_100p_fill = std::find(top_fill_pattern_values.begin(), top_fill_pattern_values.end(), fill_pattern) != top_fill_pattern_values.end();
+        const int fill_pattern = config->option<ConfigOptionEnum<InfillPattern>>("fill_pattern")->value;
+        bool correct_100p_fill = config->option_def("top_fill_pattern")->enum_def->enum_to_index(fill_pattern).has_value();
         if (!correct_100p_fill) {
             const std::vector<std::string>& bottom_fill_pattern_values = config->def()->get("bottom_fill_pattern")->enum_values;
             correct_100p_fill = std::find(bottom_fill_pattern_values.begin(), bottom_fill_pattern_values.end(), fill_pattern) != bottom_fill_pattern_values.end();
@@ -290,13 +295,10 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
         }
         if (!correct_100p_fill) {
             // get fill_pattern name from enum_labels for using this one at dialog_msg
-            const ConfigOptionDef* fill_pattern_def = config->def()->get("fill_pattern");
+            const ConfigOptionDef *fill_pattern_def = config->option_def("fill_pattern");
             assert(fill_pattern_def != nullptr);
-            auto it_pattern = std::find(fill_pattern_def->enum_values.begin(), fill_pattern_def->enum_values.end(), fill_pattern);
-            assert(it_pattern != fill_pattern_def->enum_values.end());
-            if (it_pattern != fill_pattern_def->enum_values.end()) {
-                wxString msg_text = GUI::format_wxstr(_L("The %1% infill pattern is not supposed to work at 100%% density."),
-                    _(fill_pattern_def->enum_labels[it_pattern - fill_pattern_def->enum_values.begin()]));
+            if (auto label = fill_pattern_def->enum_def->enum_to_label(fill_pattern); label.has_value()) {
+                wxString msg_text = GUI::format_wxstr(_L("The %1% infill pattern is not supposed to work at 100%% density."), _(*label));
                 if (is_global_config) {
                     msg_text += "\n\n" + _L("Shall I switch to rectilinear fill pattern?");
                 MessageDialog dialog(m_msg_dlg_parent, msg_text, _L("Infill"),
@@ -323,10 +325,13 @@ void ConfigManipulation::update_print_fff_config(DynamicPrintConfig* config, con
 void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 {
     bool have_perimeters = config->opt_int("perimeters") > 0;
-    for (auto el : { "ensure_vertical_shell_thickness", "external_perimeter_speed", "extra_perimeters", "extra_perimeters_odd_layers",
+    for (auto el : {
+        "extra_perimeters", "extra_perimeters_odd_layers", "extra_perimeters_on_overhangs",
         "external_perimeters_first", "external_perimeter_extrusion_width", "external_perimeter_extrusion_spacing","external_perimeter_extrusion_change_odd_layers",
-        "overhangs","perimeter_speed",
-        "seam_position", "small_perimeter_speed", "small_perimeter_min_length", " small_perimeter_max_length", "spiral_vase",
+        "overhangs",
+        "seam_position","staggered_inner_seams",
+        "perimeter_speed", "external_perimeter_speed", "small_perimeter_speed", "enable_dynamic_overhang_speeds",
+        "small_perimeter_min_length", " small_perimeter_max_length", "spiral_vase",
         "perimeter_generator"})
         toggle_field(el, have_perimeters);
 
@@ -468,6 +473,14 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
     toggle_field("support_material_bottom_contact_distance", have_support_material && ! have_support_soluble);
     toggle_field("support_material_closing_radius", have_support_material && support_material_style == smsSnug);
 
+    const bool has_organic_supports = support_material_style == smsOrganic && 
+                                     (config->opt_bool("support_material") || 
+                                      config->opt_int("support_material_enforce_layers") > 0);
+    for (const std::string& key : { "support_tree_angle", "support_tree_angle_slow", "support_tree_branch_diameter",
+                                    "support_tree_branch_diameter_angle", "support_tree_branch_diameter_double_wall", 
+                                    "support_tree_tip_diameter", "support_tree_branch_distance", "support_tree_top_rate" })
+        toggle_field(key, has_organic_supports);
+
     for (auto el : { "support_material_contact_distance", "support_material_bottom_contact_distance" })
         toggle_field(el, have_support_material && !have_support_soluble);
 
@@ -522,9 +535,16 @@ void ConfigManipulation::toggle_print_fff_options(DynamicPrintConfig* config)
 
     bool have_wipe_tower = config->opt_bool("wipe_tower");
     for (auto el : { "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle", "wipe_tower_brim_width",
+                     "wipe_tower_cone_angle", "wipe_tower_extra_spacing",
                      "wipe_tower_bridging", "wipe_tower_brim", "wipe_tower_no_sparse_layers", "single_extruder_multi_material_priming",
                      "wipe_tower_speed", "wipe_tower_wipe_starting_speed" })
         toggle_field(el, have_wipe_tower);
+
+    bool have_non_zero_mmu_segmented_region_max_width = config->opt_float("mmu_segmented_region_max_width") > 0.;
+    toggle_field("mmu_segmented_region_interlocking_depth", have_non_zero_mmu_segmented_region_max_width);
+
+    toggle_field("avoid_crossing_curled_overhangs", !config->opt_bool("avoid_crossing_perimeters"));
+    toggle_field("avoid_crossing_perimeters", !config->opt_bool("avoid_crossing_curled_overhangs"));
 
     bool have_avoid_crossing_perimeters = config->opt_bool("avoid_crossing_perimeters");
     toggle_field("avoid_crossing_perimeters_max_detour", have_avoid_crossing_perimeters);
@@ -593,21 +613,47 @@ void ConfigManipulation::update_print_sla_config(DynamicPrintConfig* config, con
 void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
 {
     bool supports_en = config->opt_bool("supports_enable");
+    sla::SupportTreeType treetype = config->opt_enum<sla::SupportTreeType>("support_tree_type");
+    bool is_default_tree = treetype == sla::SupportTreeType::Default;
+    bool is_branching_tree = treetype == sla::SupportTreeType::Branching;
 
-    toggle_field("support_head_front_diameter", supports_en);
-    toggle_field("support_head_penetration", supports_en);
-    toggle_field("support_head_width", supports_en);
-    toggle_field("support_pillar_diameter", supports_en);
-    toggle_field("support_small_pillar_diameter_percent", supports_en);
-    toggle_field("support_max_bridges_on_pillar", supports_en);
-    toggle_field("support_pillar_connection_mode", supports_en);
-    toggle_field("support_buildplate_only", supports_en);
-    toggle_field("support_base_diameter", supports_en);
-    toggle_field("support_base_height", supports_en);
-    toggle_field("support_base_safety_distance", supports_en);
-    toggle_field("support_critical_angle", supports_en);
-    toggle_field("support_max_bridge_length", supports_en);
-    toggle_field("support_max_pillar_link_distance", supports_en);
+    toggle_field("support_tree_type", supports_en);
+
+    toggle_field("support_head_front_diameter", supports_en && is_default_tree);
+    toggle_field("support_head_penetration", supports_en && is_default_tree);
+    toggle_field("support_head_width", supports_en && is_default_tree);
+    toggle_field("support_pillar_diameter", supports_en && is_default_tree);
+    toggle_field("support_small_pillar_diameter_percent", supports_en && is_default_tree);
+    toggle_field("support_max_bridges_on_pillar", supports_en && is_default_tree);
+    toggle_field("support_pillar_connection_mode", supports_en && is_default_tree);
+    toggle_field("support_buildplate_only", supports_en && is_default_tree);
+    toggle_field("support_base_diameter", supports_en && is_default_tree);
+    toggle_field("support_base_height", supports_en && is_default_tree);
+    toggle_field("support_base_safety_distance", supports_en && is_default_tree);
+    toggle_field("support_critical_angle", supports_en && is_default_tree);
+    toggle_field("support_max_bridge_length", supports_en && is_default_tree);
+    toggle_field("support_enforcers_only", supports_en);
+    toggle_field("support_max_pillar_link_distance", supports_en && is_default_tree);
+    toggle_field("support_pillar_widening_factor", false);
+    toggle_field("support_max_weight_on_model", false);
+
+    toggle_field("branchingsupport_head_front_diameter", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_head_penetration", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_head_width", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_pillar_diameter", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_small_pillar_diameter_percent", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_bridges_on_pillar", false);
+    toggle_field("branchingsupport_pillar_connection_mode", false);
+    toggle_field("branchingsupport_buildplate_only", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_base_diameter", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_base_height", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_base_safety_distance", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_critical_angle", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_bridge_length", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_pillar_link_distance", false);
+    toggle_field("branchingsupport_pillar_widening_factor", supports_en && is_branching_tree);
+    toggle_field("branchingsupport_max_weight_on_model", supports_en && is_branching_tree);
+
     toggle_field("support_points_density_relative", supports_en);
     toggle_field("support_points_minimal_distance", supports_en);
 
@@ -624,7 +670,8 @@ void ConfigManipulation::toggle_print_sla_options(DynamicPrintConfig* config)
 
     bool zero_elev = config->opt_bool("pad_around_object") && pad_en;
 
-    toggle_field("support_object_elevation", supports_en && !zero_elev);
+    toggle_field("support_object_elevation", supports_en && is_default_tree && !zero_elev);
+    toggle_field("branchingsupport_object_elevation", supports_en && is_branching_tree && !zero_elev);
     toggle_field("pad_object_gap", zero_elev);
     toggle_field("pad_around_object_everywhere", zero_elev);
     toggle_field("pad_object_connector_stride", zero_elev);

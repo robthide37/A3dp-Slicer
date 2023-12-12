@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 David Kocík @kocikdav
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifdef __linux__
 #ifndef slic3r_DesktopIntegrationDialog_hpp_
 #define slic3r_DesktopIntegrationDialog_hpp_
@@ -26,9 +30,15 @@ public:
 	// Creates Desktop files and icons for both PrusaSlicer and GcodeViewer.
 	// Stores paths into App Config.
 	// Rewrites if files already existed.
+	// if perform_downloader:
+    // Creates Destktop files for PrusaSlicer downloader feature
+	// Regiters PrusaSlicer to start on prusaslicer:// URL
 	static void perform_desktop_integration();
 	// Deletes Desktop files and icons for both PrusaSlicer and GcodeViewer at paths stored in App Config.
 	static void undo_desktop_intgration();
+
+	static void perform_downloader_desktop_integration();
+	static void undo_downloader_registration();
 private:
 
 };

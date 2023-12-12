@@ -1,3 +1,9 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Vojtěch Bubník @bubnikv, Tomáš Mészáros @tamasmeszaros, Oleksandra Iushchenko @YuSanka, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2020 Manuel Coenen
+///|/ Copyright (c) 2018 Martin Loidl @LoidlM
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Http.hpp"
 
 #include <cstdlib>
@@ -177,6 +183,7 @@ struct Http::priv
 	void set_post_body(const fs::path &path);
 	void set_post_body(const std::string &body);
 	void set_put_body(const fs::path &path);
+	void set_range(const std::string& range);
 
 	std::string curl_error(CURLcode curlcode);
 	std::string body_size_error();
@@ -203,6 +210,7 @@ Http::priv::priv(const std::string &url)
 	::curl_easy_setopt(curl, CURLOPT_URL, url.c_str());   // curl makes a copy internally
 	::curl_easy_setopt(curl, CURLOPT_USERAGENT, SLIC3R_APP_NAME "/" SLIC3R_VERSION);
 	::curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, &error_buffer.front());
+	::curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 }
 
 Http::priv::~priv()
@@ -241,7 +249,6 @@ size_t Http::priv::writecb(void *data, size_t size, size_t nmemb, void *userp)
 	auto self = static_cast<priv*>(userp);
 	const char *cdata = static_cast<char*>(data);
 	const size_t realsize = size * nmemb;
-
 	const size_t limit = self->limit > 0 ? self->limit : DEFAULT_SIZE_LIMIT;
 	if (self->buffer.size() + realsize > limit) {
 		// This makes curl_easy_perform return CURLE_WRITE_ERROR
@@ -259,7 +266,7 @@ int Http::priv::xfercb(void *userp, curl_off_t dltotal, curl_off_t dlnow, curl_o
 	bool cb_cancel = false;
 
 	if (self->progressfn) {
-		Progress progress(dltotal, dlnow, ultotal, ulnow);
+		Progress progress(dltotal, dlnow, ultotal, ulnow, self->buffer);
 		self->progressfn(progress, cb_cancel);
 	}
 
@@ -341,10 +348,15 @@ void Http::priv::set_put_body(const fs::path &path)
 	boost::system::error_code ec;
 	boost::uintmax_t filesize = file_size(path, ec);
 	if (!ec) {
-        putFile = std::make_unique<fs::ifstream>(path);
+        putFile = std::make_unique<fs::ifstream>(path, std::ios::binary);
         ::curl_easy_setopt(curl, CURLOPT_READDATA, (void *) (putFile.get()));
 		::curl_easy_setopt(curl, CURLOPT_INFILESIZE, filesize);
 	}
+}
+
+void Http::priv::set_range(const std::string& range)
+{
+	::curl_easy_setopt(curl, CURLOPT_RANGE, range.c_str());
 }
 
 std::string Http::priv::curl_error(CURLcode curlcode)
@@ -404,7 +416,7 @@ void Http::priv::http_perform()
 		if (res == CURLE_ABORTED_BY_CALLBACK) {
 			if (cancel) {
 				// The abort comes from the request being cancelled programatically
-				Progress dummyprogress(0, 0, 0, 0);
+				Progress dummyprogress(0, 0, 0, 0, std::string());
 				bool cancel = true;
 				if (progressfn) { progressfn(dummyprogress, cancel); }
 			} else {
@@ -469,6 +481,12 @@ Http& Http::timeout_max(long timeout)
 Http& Http::size_limit(size_t sizeLimit)
 {
 	if (p) { p->limit = sizeLimit; }
+	return *this;
+}
+
+Http& Http::set_range(const std::string& range)
+{
+	if (p) { p->set_range(range); }
 	return *this;
 }
 

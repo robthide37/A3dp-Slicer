@@ -12,6 +12,8 @@ group:Temperature °C
 		setting:first_layer_temperature
 		setting:temperature
 	end_line
+	line:toggle$idle_temperature:toggle_default$30:Idle temperature
+		setting:idle_temperature
 	line:Bed
 		setting:first_layer_bed_temperature
 		setting:label:Other layers:bed_temperature
@@ -53,6 +55,15 @@ group:Fan speed - default
 		setting:label_width$12:label$Overhangs:overhangs_fan_speed
 	line:Gap fill fan speed
 		setting:label_width$12:label$Gap fill:gap_fill_fan_speed
+		
+group:Dynamic Overhangs fan speeds
+	line:Enable fan speed for a % overlap
+		setting:label$_:enable_dynamic_fan_speeds
+		setting:label$0% (bridge):overhang_fan_speed_0
+		setting:label$25%:overhang_fan_speed_1
+		setting:label$50%:overhang_fan_speed_2
+		setting:label$75%:overhang_fan_speed_3
+	end_line
 group:Short layer time - began to increase base fan speed
 	setting:fan_below_layer_time
 	setting:label$Max fan speed:max_fan_speed
@@ -93,23 +104,26 @@ group:Toolchange parameters with single extruder MM printers
 	setting:filament_cooling_final_speed
 	setting:filament_wipe_advanced_pigment
 	filament_ramming_parameters
-
+group:Toolchange parameters with multi extruder MM printers
+    setting:filament_multitool_ramming
+    setting:filament_multitool_ramming_volume
+    setting:filament_multitool_ramming_flow
 
 filament_overrides_page
 
 page:Custom G-code:cog
-group:no_title:validate_gcode:Start G-code
-	setting:full_width:height$35:start_filament_gcode
-group:no_title:validate_gcode:End G-code
-	setting:full_width:height$35:end_filament_gcode
+group:no_title:edit_gcode:validate_gcode:Start G-code
+	setting:is_gcode:full_width:height$35:start_filament_gcode
+group:no_title:edit_gcode:validate_gcode:End G-code
+	setting:is_gcode:full_width:height$35:end_filament_gcode
 
-page:Notes:note.png
+page:Notes:note
 group:label_width$0:Notes
 	setting:full_width:height$25:filament_notes
 group:label_width$0:Custom variables
 	setting:full_width:height$15:filament_custom_variables
 
-page:Dependencies:wrench.png
+page:Dependencies:wrench
 	group:Profile dependencies
 	setting:compatible_printers
 	setting:full_width:color:compatible_printers_condition

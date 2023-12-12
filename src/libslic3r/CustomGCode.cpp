@@ -1,7 +1,11 @@
+///|/ Copyright (c) Prusa Research 2020 - 2021 Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Oleksandra Iushchenko @YuSanka
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "CustomGCode.hpp"
 #include "Config.hpp"
 #include "GCode.hpp"
-#include "GCodeWriter.hpp"
+#include "GCode/GCodeWriter.hpp"
 
 namespace Slic3r {
 
@@ -41,7 +45,7 @@ extern void check_mode_for_custom_gcode_per_print_z(Info& info)
         return;
 
     bool is_single_extruder = true;
-    for (auto item : info.gcodes) 
+    for (const Item& item : info.gcodes)
     {
         if (item.type == ToolChange) {
             info.mode = MultiAsSingle;

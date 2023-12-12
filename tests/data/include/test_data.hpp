@@ -21,6 +21,7 @@ enum class TestMesh {
     V,
     _40x10,
     cube_20x20x20,
+    cube_2x20x10,
     sphere_50mm,
     bridge,
     bridge_with_hole,
@@ -79,6 +80,9 @@ std::string slice(std::initializer_list<TestMesh> meshes, const DynamicPrintConf
 std::string slice(std::initializer_list<TriangleMesh> meshes, const DynamicPrintConfig &config, bool comments = false);
 std::string slice(std::initializer_list<TestMesh> meshes, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false);
 std::string slice(std::initializer_list<TriangleMesh> meshes, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items, bool comments = false);
+
+bool contains(const std::string &data, const std::string &pattern);
+bool contains_regex(const std::string &data, const std::string &pattern);
 
 } } // namespace Slic3r::Test
 

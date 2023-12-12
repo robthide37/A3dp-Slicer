@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2021 - 2023 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "libslic3r/libslic3r.h"
 
 #include "ProjectDirtyStateManager.hpp"
@@ -6,6 +10,8 @@
 #include "MainFrame.hpp"
 #include "I18N.hpp"
 #include "Plater.hpp"
+
+#include "libslic3r/Model.hpp"
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -38,12 +44,22 @@ void ProjectDirtyStateManager::update_from_presets()
     app.mainframe->update_title();
 }
 
+void ProjectDirtyStateManager::update_from_preview()
+{
+    const bool is_dirty = m_initial_custom_gcode_per_print_z != wxGetApp().model().custom_gcode_per_print_z;
+    if (m_custom_gcode_per_print_z_dirty != is_dirty) {
+        m_custom_gcode_per_print_z_dirty = is_dirty;
+        wxGetApp().mainframe->update_title();
+    }
+}
+
 void ProjectDirtyStateManager::reset_after_save()
 {
     this->reset_initial_presets();
     m_plater_dirty  = false;
     m_presets_dirty = false;
     m_project_config_dirty = false;
+    m_custom_gcode_per_print_z_dirty = false;
     wxGetApp().mainframe->update_title();
 }
 
@@ -53,6 +69,7 @@ void ProjectDirtyStateManager::reset_initial_presets()
     for (const PresetCollection *preset_collection : app.get_active_preset_collections())
         m_initial_presets[preset_collection->type()] = preset_collection->get_selected_preset_name();
     m_initial_project_config = app.preset_bundle->project_config;
+    m_initial_custom_gcode_per_print_z = app.model().custom_gcode_per_print_z;
 }
 
 #if ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW

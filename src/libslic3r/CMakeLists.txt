@@ -1,3 +1,10 @@
+#/|/ Copyright (c) Prusa Research 2018 - 2023 Tomáš Mészáros @tamasmeszaros, Oleksandra Iushchenko @YuSanka, Enrico Turri @enricoturri1966, Vojtěch Bubník @bubnikv, Pavel Mikuš @Godrak, Lukáš Hejl @hejllukas, Lukáš Matěna @lukasmatena, Filip Sykala @Jony01, David Kocík @kocikdav, Vojtěch Král @vojtechkral
+#/|/ Copyright (c) BambuStudio 2023 manch1n @manch1n
+#/|/ Copyright (c) 2023 Mimoja @Mimoja
+#/|/ Copyright (c) 2022 ole00 @ole00
+#/|/
+#/|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+#/|/
 cmake_minimum_required(VERSION 3.13)
 project(libslic3r)
 
@@ -16,12 +23,26 @@ endif ()
 
 set(OpenVDBUtils_SOURCES "")
 if (TARGET OpenVDB::openvdb)
-    set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp)
+    set(OpenVDBUtils_SOURCES OpenVDBUtils.cpp OpenVDBUtils.hpp OpenVDBUtilsLegacy.hpp)
 endif()
 
-add_library(libslic3r STATIC
+find_package(LibBGCode REQUIRED COMPONENTS Convert)
+slic3r_remap_configs(LibBGCode::bgcode_core RelWithDebInfo Release)
+slic3r_remap_configs(LibBGCode::bgcode_binarize RelWithDebInfo Release)
+slic3r_remap_configs(LibBGCode::bgcode_convert RelWithDebInfo Release)
+
+set(SLIC3R_SOURCES
     pchheader.cpp
     pchheader.hpp
+    AStar.hpp
+    AABBTreeIndirect.hpp
+    AABBTreeLines.hpp
+    AABBMesh.hpp
+    AABBMesh.cpp
+    Algorithm/PathSorting.hpp
+    Algorithm/RegionExpansion.hpp
+    Algorithm/RegionExpansion.cpp
+    AnyPtr.hpp
     BoundingBox.cpp
     BoundingBox.hpp
     BridgeDetector.cpp
@@ -30,27 +51,44 @@ add_library(libslic3r STATIC
     Brim.hpp
     BuildVolume.cpp
     BuildVolume.hpp
+    BoostAdapter.hpp
     clipper.cpp
     clipper.hpp
     ClipperUtils.cpp
     ClipperUtils.hpp
+    ClipperZUtils.hpp
+    Color.cpp
+    Color.hpp
     Config.cpp
     Config.hpp
+    CSGMesh/CSGMesh.hpp
+    CSGMesh/SliceCSGMesh.hpp
+    CSGMesh/ModelToCSGMesh.hpp
+    CSGMesh/PerformCSGMeshBooleans.hpp
+    CSGMesh/VoxelizeCSGMesh.hpp
+    CSGMesh/TriangleMeshAdapter.hpp
+    CSGMesh/CSGMeshCopy.hpp
     EdgeGrid.cpp
     EdgeGrid.hpp
     ElephantFootCompensation.cpp
     ElephantFootCompensation.hpp
+    Emboss.cpp
+    Emboss.hpp
+    EmbossShape.hpp
     enum_bitmask.hpp
     ExPolygon.cpp
     ExPolygon.hpp
-    ExPolygonCollection.cpp
-    ExPolygonCollection.hpp
+    ExPolygonSerialize.hpp
+    ExPolygonsIndex.cpp
+    ExPolygonsIndex.hpp
     Extruder.cpp
     Extruder.hpp
     ExtrusionEntity.cpp
     ExtrusionEntity.hpp
     ExtrusionEntityCollection.cpp
     ExtrusionEntityCollection.hpp
+    ExtrusionRole.cpp
+    ExtrusionRole.hpp
     ExtrusionSimulator.cpp
     ExtrusionSimulator.hpp
     FileParserError.hpp
@@ -64,6 +102,8 @@ add_library(libslic3r STATIC
     Fill/FillBase.hpp
     Fill/FillConcentric.cpp
     Fill/FillConcentric.hpp
+    Fill/FillEnsuring.cpp
+    Fill/FillEnsuring.hpp
     Fill/FillHoneycomb.cpp
     Fill/FillHoneycomb.hpp
     Fill/FillGyroid.cpp
@@ -101,38 +141,64 @@ add_library(libslic3r STATIC
     Format/objparser.hpp
     Format/STL.cpp
     Format/STL.hpp
+    Format/SLAArchiveWriter.hpp
+    Format/SLAArchiveWriter.cpp
+    Format/SLAArchiveReader.hpp
+    Format/SLAArchiveReader.cpp
+    Format/ZipperArchiveImport.hpp
+    Format/ZipperArchiveImport.cpp
     Format/SL1.hpp
     Format/SL1.cpp
+    Format/SL1_SVG.hpp
+    Format/SL1_SVG.cpp
+    Format/AnycubicSLA.hpp
+    Format/AnycubicSLA.cpp
     Format/STEP.hpp
     Format/STEP.cpp
-    Format/SLAArchive.hpp
-    Format/SLAArchive.cpp
-    Format/CWS.hpp
-    Format/CWS.cpp
+    Format/SVG.hpp
+    Format/SVG.cpp
+    Format/SLAArchiveFormatRegistry.hpp
+    Format/SLAArchiveFormatRegistry.cpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp
     GCode/Thumbnails.hpp
+    GCode/ConflictChecker.cpp
+    GCode/ConflictChecker.hpp
     GCode/CoolingBuffer.cpp
     GCode/CoolingBuffer.hpp
+    GCode/ExtrusionProcessor.cpp
+    GCode/ExtrusionProcessor.hpp
     GCode/FanMover.cpp
     GCode/FanMover.hpp
     GCode/FindReplace.cpp
     GCode/FindReplace.hpp
+    GCode/LabelObjects.cpp
+    GCode/LabelObjects.hpp
+    GCode/GCodeWriter.cpp
+    GCode/GCodeWriter.hpp
     GCode/PostProcessor.cpp
     GCode/PostProcessor.hpp
     GCode/PressureEqualizer.cpp
     GCode/PressureEqualizer.hpp
     GCode/PrintExtents.cpp
     GCode/PrintExtents.hpp
+    GCode/RetractWhenCrossingPerimeters.cpp
+    GCode/RetractWhenCrossingPerimeters.hpp
     GCode/SpiralVase.cpp
     GCode/SpiralVase.hpp
     GCode/SeamPlacer.cpp
     GCode/SeamPlacer.hpp
+    GCode/SmoothPath.cpp
+    GCode/SmoothPath.hpp
     GCode/ToolOrdering.cpp
     GCode/ToolOrdering.hpp
+    GCode/Wipe.cpp
+    GCode/Wipe.hpp
     GCode/WipeTower.cpp
     GCode/WipeTower.hpp
+    GCode/WipeTowerIntegration.cpp
+    GCode/WipeTowerIntegration.hpp
     GCode/GCodeProcessor.cpp
     GCode/GCodeProcessor.hpp
     GCode/AvoidCrossingPerimeters.cpp
@@ -143,12 +209,10 @@ add_library(libslic3r STATIC
     GCodeReader.hpp
     # GCodeSender.cpp
     # GCodeSender.hpp
-    GCodeWriter.cpp
-    GCodeWriter.hpp
     Geometry.cpp
     Geometry.hpp
-	Geometry/ArcFitter.cpp
-	Geometry/ArcFitter.hpp
+    Geometry/ArcWelder.cpp
+    Geometry/ArcWelder.hpp
     Geometry/Bicubic.hpp
     Geometry/Circle.cpp
     Geometry/Circle.hpp
@@ -162,6 +226,8 @@ add_library(libslic3r STATIC
     Geometry/VoronoiOffset.hpp
     Geometry/VoronoiVisualUtils.hpp
     Int128.hpp
+    JumpPointSearch.cpp
+    JumpPointSearch.hpp
     KDTreeIndirect.hpp
     Layer.cpp
     Layer.hpp
@@ -176,6 +242,8 @@ add_library(libslic3r STATIC
     BlacklistedLibraryCheck.hpp
     LocalesUtils.cpp
     LocalesUtils.hpp
+    CutUtils.cpp
+    CutUtils.hpp
     Milling/MillingPostProcess.cpp
     Milling/MillingPostProcess.hpp
     Model.cpp
@@ -184,15 +252,69 @@ add_library(libslic3r STATIC
     ModelArrange.cpp
     MultiMaterialSegmentation.cpp
     MultiMaterialSegmentation.hpp
+    MeshNormals.hpp
+    MeshNormals.cpp
+    Measure.hpp
+    Measure.cpp
+    MeasureUtils.hpp
     CustomGCode.cpp
     CustomGCode.hpp
-    Arrange.hpp
-    Arrange.cpp
+    Arrange/Arrange.hpp
+    Arrange/ArrangeImpl.hpp
+    Arrange/Items/ArrangeItem.hpp
+    Arrange/Items/ArrangeItem.cpp
+    Arrange/Items/SimpleArrangeItem.hpp
+    Arrange/Items/SimpleArrangeItem.cpp
+    Arrange/Items/TrafoOnlyArrangeItem.hpp
+    Arrange/Items/MutableItemTraits.hpp
+    Arrange/Items/ArbitraryDataStore.hpp
+    Arrange/ArrangeSettingsView.hpp
+    Arrange/ArrangeSettingsDb_AppCfg.hpp
+    Arrange/ArrangeSettingsDb_AppCfg.cpp
+    Arrange/Scene.hpp
+    Arrange/Scene.cpp
+    Arrange/SceneBuilder.hpp
+    Arrange/SceneBuilder.cpp
+    Arrange/Tasks/ArrangeTask.hpp
+    Arrange/Tasks/ArrangeTaskImpl.hpp
+    Arrange/Tasks/FillBedTask.hpp
+    Arrange/Tasks/FillBedTaskImpl.hpp
+    Arrange/Tasks/MultiplySelectionTask.hpp
+    Arrange/Tasks/MultiplySelectionTaskImpl.hpp
+    Arrange/SegmentedRectangleBed.hpp
+    Arrange/Core/ArrangeItemTraits.hpp
+    Arrange/Core/DataStoreTraits.hpp
+    Arrange/Core/ArrangeBase.hpp
+    Arrange/Core/PackingContext.hpp
+    Arrange/Core/ArrangeFirstFit.hpp
+    Arrange/Core/Beds.hpp
+    Arrange/Core/Beds.cpp
+    Arrange/Core/NFP/NFP.hpp
+    Arrange/Core/NFP/NFP.cpp
+    Arrange/Core/NFP/NFPConcave_CGAL.hpp
+    Arrange/Core/NFP/NFPConcave_CGAL.cpp
+    Arrange/Core/NFP/NFPConcave_Tesselate.hpp
+    Arrange/Core/NFP/NFPConcave_Tesselate.cpp
+    Arrange/Core/NFP/EdgeCache.hpp
+    Arrange/Core/NFP/EdgeCache.cpp
+    Arrange/Core/NFP/CircularEdgeIterator.hpp
+    Arrange/Core/NFP/NFPArrangeItemTraits.hpp
+    Arrange/Core/NFP/PackStrategyNFP.hpp
+    Arrange/Core/NFP/RectangleOverfitPackingStrategy.hpp
+    Arrange/Core/NFP/Kernels/KernelTraits.hpp
+    Arrange/Core/NFP/Kernels/GravityKernel.hpp
+    Arrange/Core/NFP/Kernels/TMArrangeKernel.hpp
+    Arrange/Core/NFP/Kernels/CompactifyKernel.hpp
+    Arrange/Core/NFP/Kernels/RectangleOverfitKernelWrapper.hpp
+    Arrange/Core/NFP/Kernels/SVGDebugOutputKernelWrapper.hpp
+    Arrange/Core/NFP/Kernels/KernelUtils.hpp
     MultiPoint.cpp
     MultiPoint.hpp
     MutablePriorityQueue.hpp
     NormalUtils.cpp
     NormalUtils.hpp
+    NSVGUtils.cpp
+    NSVGUtils.hpp
     ObjectID.cpp
     ObjectID.hpp
     PerimeterGenerator.cpp
@@ -215,6 +337,8 @@ add_library(libslic3r STATIC
     Preset.hpp
     PresetBundle.cpp
     PresetBundle.hpp
+    PrincipalComponents2D.hpp
+    PrincipalComponents2D.cpp
     AppConfig.cpp
     AppConfig.hpp
     Print.cpp
@@ -227,6 +351,7 @@ add_library(libslic3r STATIC
     PrintObject.cpp
     PrintObjectSlice.cpp
     PrintRegion.cpp
+    PointGrid.hpp
     PNGReadWrite.hpp
     PNGReadWrite.cpp
     QuadricEdgeCollapse.cpp
@@ -248,34 +373,56 @@ add_library(libslic3r STATIC
     SlicingAdaptive.hpp
     Subdivide.cpp
     Subdivide.hpp
-    SupportMaterial.cpp
-    SupportMaterial.hpp
+    Support/SupportCommon.cpp
+    Support/SupportCommon.hpp
+    Support/SupportDebug.cpp
+    Support/SupportDebug.hpp
+    Support/SupportLayer.hpp
+    Support/SupportMaterial.cpp
+    Support/SupportMaterial.hpp
+    Support/SupportParameters.cpp
+    Support/SupportParameters.hpp
+    Support/OrganicSupport.cpp
+    Support/OrganicSupport.hpp
+    Support/TreeSupport.cpp
+    Support/TreeSupport.hpp
+    Support/TreeSupportCommon.cpp
+    Support/TreeSupportCommon.hpp
+    Support/TreeModelVolumes.cpp
+    Support/TreeModelVolumes.hpp
+    SupportSpotsGenerator.cpp
+    SupportSpotsGenerator.hpp
     Surface.cpp
     Surface.hpp
     SurfaceCollection.cpp
     SurfaceCollection.hpp
+    SurfaceMesh.hpp
     SVG.cpp
     SVG.hpp
     Technologies.hpp
     Tesselate.cpp
     Tesselate.hpp
+    TextConfiguration.hpp
     TriangleMesh.cpp
     TriangleMesh.hpp
     TriangleMeshSlicer.cpp
     TriangleMeshSlicer.hpp
     MeshSplitImpl.hpp
     TriangulateWall.hpp
-    TriangulateWall.cpp
     utils.cpp
     Utils.hpp
     Time.cpp
     Time.hpp
+    Timer.cpp
+    Timer.hpp
     Thread.cpp
     Thread.hpp
     TriangleSelector.cpp
     TriangleSelector.hpp
     TriangleSetSampling.cpp
     TriangleSetSampling.hpp
+    TriangleSelectorWrapper.cpp
+    TriangleSelectorWrapper.hpp
     MTUtils.hpp
     Zipper.hpp
     Zipper.cpp
@@ -296,16 +443,15 @@ add_library(libslic3r STATIC
     SLA/SupportTreeBuilder.hpp
     SLA/SupportTreeMesher.hpp
     SLA/SupportTreeMesher.cpp
-    SLA/SupportTreeBuildsteps.hpp
-    SLA/SupportTreeBuildsteps.cpp
+    SLA/SupportTreeUtils.hpp
+    SLA/SupportTreeUtilsLegacy.hpp
     SLA/SupportTreeBuilder.cpp
-    SLA/Concurrency.hpp
     SLA/SupportTree.hpp
     SLA/SupportTree.cpp
+    SLA/SupportTreeStrategies.hpp
 #    SLA/SupportTreeIGL.cpp
     SLA/Rotfinder.hpp
     SLA/Rotfinder.cpp
-    SLA/BoostAdapter.hpp
     SLA/SpatIndex.hpp
     SLA/SpatIndex.cpp
     SLA/RasterBase.hpp
@@ -321,11 +467,17 @@ add_library(libslic3r STATIC
     SLA/SupportPoint.hpp
     SLA/SupportPointGenerator.hpp
     SLA/SupportPointGenerator.cpp
-    SLA/IndexedMesh.hpp
-    SLA/IndexedMesh.cpp
     SLA/Clustering.hpp
     SLA/Clustering.cpp
     SLA/ReprojectPointsOnMesh.hpp
+    SLA/DefaultSupportTree.hpp
+    SLA/DefaultSupportTree.cpp
+    SLA/BranchingTreeSLA.hpp
+    SLA/BranchingTreeSLA.cpp
+    BranchingTree/BranchingTree.cpp
+    BranchingTree/BranchingTree.hpp
+    BranchingTree/PointCloud.cpp
+    BranchingTree/PointCloud.hpp
 
     Arachne/BeadingStrategy/BeadingStrategy.hpp
     Arachne/BeadingStrategy/BeadingStrategy.cpp
@@ -367,7 +519,20 @@ add_library(libslic3r STATIC
     Arachne/SkeletalTrapezoidationJoint.hpp
     Arachne/WallToolPaths.hpp
     Arachne/WallToolPaths.cpp
+    StaticMap.hpp
 )
+
+add_library(libslic3r STATIC ${SLIC3R_SOURCES})
+
+if (WIN32)
+    target_compile_definitions(libslic3r PUBLIC NOMINMAX)
+endif()
+
+foreach(_source IN ITEMS ${SLIC3R_SOURCES})
+    get_filename_component(_source_path "${_source}" PATH)
+    string(REPLACE "/" "\\" _group_path "${_source_path}")
+    source_group("${_group_path}" FILES "${_source}")
+endforeach()
 
 if (SLIC3R_STATIC)
     set(CGAL_Boost_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
@@ -379,8 +544,14 @@ cmake_policy(SET CMP0011 NEW)
 find_package(CGAL REQUIRED)
 cmake_policy(POP)
 
-add_library(libslic3r_cgal STATIC MeshBoolean.cpp MeshBoolean.hpp  TryCatchSignal.hpp
-    TryCatchSignal.cpp Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp)
+add_library(libslic3r_cgal STATIC 
+    CutSurface.hpp CutSurface.cpp
+    Geometry/VoronoiUtilsCgal.hpp Geometry/VoronoiUtilsCgal.cpp
+    IntersectionPoints.hpp IntersectionPoints.cpp
+    MeshBoolean.hpp MeshBoolean.cpp
+    TryCatchSignal.hpp TryCatchSignal.cpp
+    Triangulation.hpp Triangulation.cpp
+)
 target_include_directories(libslic3r_cgal PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 # Reset compile options of libslic3r_cgal. Despite it being linked privately, CGAL options
@@ -416,7 +587,7 @@ find_package(JPEG REQUIRED)
 target_link_libraries(libslic3r
     libnest2d
     admesh
-    cereal
+    libcereal
     libigl
     miniz
     boost_libs
@@ -427,12 +598,14 @@ target_link_libraries(libslic3r
     qhull
     semver
     TBB::tbb
+    TBB::tbbmalloc
     libslic3r_cgal
     ${CMAKE_DL_LIBS}
     PNG::PNG
     ZLIB::ZLIB
     JPEG::JPEG
     qoi
+    LibBGCode::bgcode_convert
     )
 
 if (APPLE)
@@ -448,14 +621,11 @@ if(WIN32)
     target_link_libraries(libslic3r Psapi.lib)
 endif()
 
-if(SLIC3R_PROFILE)
-    target_link_libraries(libslic3r Shiny)
-endif()
-
 if (APPLE)
     # This flag prevents the need for minimum SDK version 10.14
     # currently, PS targets v10.12
     target_compile_options(libslic3r PUBLIC "-fno-aligned-allocation")
+    target_compile_options(libslic3r_cgal PUBLIC "-fno-aligned-allocation")
 endif ()
 
 if (SLIC3R_PCH AND NOT SLIC3R_SYNTAXONLY)

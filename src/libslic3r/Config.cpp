@@ -1,3 +1,23 @@
+///|/ Copyright (c) Prusa Research 2016 - 2023 Vojtěch Bubník @bubnikv, Enrico Turri @enricoturri1966, Lukáš Matěna @lukasmatena, David Kocík @kocikdav, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral, Oleksandra Iushchenko @YuSanka
+///|/ Copyright (c) 2018 fredizzimo @fredizzimo
+///|/ Copyright (c) Slic3r 2013 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Maksim Derbasov @ntfshard
+///|/
+///|/ ported from lib/Slic3r/Config.pm:
+///|/ Copyright (c) Prusa Research 2016 - 2022 Vojtěch Bubník @bubnikv
+///|/ Copyright (c) 2017 Joseph Lenox @lordofhyphens
+///|/ Copyright (c) Slic3r 2011 - 2016 Alessandro Ranellucci @alranel
+///|/ Copyright (c) 2015 Alexander Rössler @machinekoder
+///|/ Copyright (c) 2012 Henrik Brix Andersen @henrikbrixandersen
+///|/ Copyright (c) 2012 Mark Hindess
+///|/ Copyright (c) 2012 Josh McCullough
+///|/ Copyright (c) 2011 - 2012 Michael Moon
+///|/ Copyright (c) 2012 Simon George
+///|/ Copyright (c) 2012 Johannes Reinhardt
+///|/ Copyright (c) 2011 Clarence Risher
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "Config.hpp"
 #include "Preset.hpp"
 #include "format.hpp"
@@ -18,11 +38,14 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/nowide/cenv.hpp>
+#include <boost/nowide/cstdio.hpp>
 #include <boost/nowide/iostream.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/format.hpp>
 #include <string.h>
+
+#include <LibBGCode/binarize/binarize.hpp>
 
 //FIXME for GCodeFlavor and gcfMarlin (for forward-compatibility conversion)
 // This is not nice, likely it would be better to pass the ConfigSubstitutionContext to handle_legacy().
@@ -309,7 +332,7 @@ ConfigOption* ConfigOptionDef::create_empty_option() const
 	//    case coPoint3s:         return new ConfigOptionPoint3s();
 	    case coBool:            return new ConfigOptionBool();
 	    case coBools:           return new ConfigOptionBools();
-	    case coEnum:            return new ConfigOptionEnumGeneric(this->enum_keys_map);
+	    case coEnum:            return new ConfigOptionEnumGeneric(this->enum_def->m_enum_keys_map);
 	    default:                throw ConfigurationError(std::string("Unknown option type for option ") + this->label);
 	    }
 	}
@@ -320,7 +343,7 @@ ConfigOption* ConfigOptionDef::create_default_option() const
     if (this->default_value)
         return (this->default_value->type() == coEnum) ?
             // Special case: For a DynamicConfig, convert a templated enum to a generic enum.
-            new ConfigOptionEnumGeneric(this->enum_keys_map, this->default_value->getInt()) :
+            new ConfigOptionEnumGeneric(this->enum_def->m_enum_keys_map, this->default_value->getInt()) :
             this->default_value->clone();
     return this->create_empty_option();
 }
@@ -344,10 +367,32 @@ ConfigOptionDef* ConfigDef::add_nullable(const t_config_option_key &opt_key, Con
 	return def;
 }
 
+void ConfigDef::finalize()
+{
+    // Validate & finalize open & closed enums.
+    for (std::pair<const t_config_option_key, ConfigOptionDef> &kvp : options) {
+        ConfigOptionDef& def = kvp.second;
+        if (def.type == coEnum) {
+            assert(def.enum_def);
+            assert(def.enum_def->is_valid_closed_enum());
+            assert(! def.is_gui_type_enum_open());
+            def.enum_def->finalize_closed_enum();
+        } else if (def.is_gui_type_enum_open()) {
+            assert(def.enum_def);
+            assert(def.enum_def->is_valid_open_enum());
+            assert(def.gui_type != ConfigOptionDef::GUIType::i_enum_open || def.type == coInt || def.type == coInts);
+            assert(def.gui_type != ConfigOptionDef::GUIType::f_enum_open || def.type == coFloat || def.type == coPercent || def.type == coFloatOrPercent);
+            assert(def.gui_type != ConfigOptionDef::GUIType::select_open || def.type == coString || def.type == coStrings);
+        } else {
+            assert(! def.enum_def);
+        }
+    }
+}
+
 std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, std::function<bool(const ConfigOptionDef &)> filter) const
 {
     // prepare a function for wrapping text
-    auto wrap = [](std::string text, size_t line_length) -> std::string {
+    auto wrap = [](const std::string& text, size_t line_length) -> std::string {
         std::istringstream words(text);
         std::ostringstream wrapped;
         std::string word;
@@ -419,8 +464,8 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
                 descr += " (";
                 if (!def.sidetext.empty()) {
                     descr += def.sidetext + ", ";
-                } else if (!def.enum_values.empty()) {
-                    descr += boost::algorithm::join(def.enum_values, ", ") + "; ";
+                } else if (def.enum_def && def.enum_def->has_values()) {
+                    descr += boost::algorithm::join(def.enum_def->values(), ", ") + "; ";
                 }
                 descr += "default: " + def.default_value->serialize() + ")";
             }
@@ -439,6 +484,42 @@ std::ostream& ConfigDef::print_cli_help(std::ostream& out, bool show_defaults, s
                 out << lines[i] << std::endl;
             }
         }
+    }
+    return out;
+}
+
+std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<int> values)
+{
+    std::string out;
+    int i = 0;
+    for (int v : values) {
+        if (i ++ > 0)
+            out += ", ";
+        out += std::to_string(v);
+    }
+    return out;
+}
+
+std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<float> values)
+{
+    std::string out;
+    int i = 0;
+    for (float v : values) {
+        if (i ++ > 0)
+            out += ", ";
+        out += float_to_string_decimal_point(double(v));
+    }
+    return out;
+}
+
+std::string ConfigBase::SetDeserializeItem::format(std::initializer_list<double> values)
+{
+    std::string out;
+    int i = 0;
+    for (float v : values) {
+        if (i ++ > 0)
+            out += ", ";
+        out += float_to_string_decimal_point(v);
     }
     return out;
 }
@@ -865,11 +946,37 @@ void ConfigBase::setenv_() const
     }
 }
 
-ConfigSubstitutions ConfigBase::load(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule)
+ConfigSubstitutions ConfigBase::load(const std::string& filename, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
-    return is_gcode_file(file) ? 
-        this->load_from_gcode_file(file, compatibility_rule) :
-        this->load_from_ini(file, compatibility_rule);
+    enum class EFileType
+    {
+        Ini,
+        AsciiGCode,
+        BinaryGCode
+    };
+
+    EFileType file_type;
+
+    if (is_gcode_file(filename)) {
+        FILE* file = boost::nowide::fopen(filename.c_str(), "rb");
+        if (file == nullptr)
+            throw Slic3r::RuntimeError(format("Error opening file %1%", filename));
+
+        std::vector<std::byte> cs_buffer(65536);
+        using namespace bgcode::core;
+        file_type = (is_valid_binary_gcode(*file, true, cs_buffer.data(), cs_buffer.size()) == EResult::Success) ? EFileType::BinaryGCode : EFileType::AsciiGCode;
+        fclose(file);
+    }
+    else 
+        file_type = EFileType::Ini;
+
+    switch (file_type)
+    {
+    case EFileType::Ini:         { return this->load_from_ini(filename, compatibility_rule); }
+    case EFileType::AsciiGCode:  { return this->load_from_gcode_file(filename, compatibility_rule);}
+    case EFileType::BinaryGCode: { return this->load_from_binary_gcode_file(filename, compatibility_rule);}
+    default:                     { throw Slic3r::RuntimeError(format("Invalid file %1%", filename)); }
+    }
 }
 
 ConfigSubstitutions ConfigBase::load_from_ini(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule)
@@ -950,6 +1057,9 @@ ConfigSubstitutions ConfigBase::load(const boost::property_tree::ptree &tree, Fo
             substitutions_ctxt.substitutions.emplace_back(optdef, v.second.get_value<std::string>(), ConfigOptionUniquePtr(optdef->default_value->clone()));
         }
     }
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    this->handle_legacy_composite();
     return std::move(substitutions_ctxt.substitutions);
 }
 
@@ -1015,6 +1125,10 @@ size_t ConfigBase::load_from_gcode_string_legacy(ConfigBase& config, const char*
         }
         end = start;
     }
+
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    config.handle_legacy_composite();
 
     return num_key_value_pairs;
 }
@@ -1086,10 +1200,10 @@ private:
 };
 
 // Load the config keys from the tail of a G-code file.
-ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule)
+ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &filename, ForwardCompatibilitySubstitutionRule compatibility_rule)
 {
     // Read a 64k block from the end of the G-code.
-    boost::nowide::ifstream ifs(file, std::ifstream::binary);
+    boost::nowide::ifstream ifs(filename, std::ifstream::binary);
     // Look for Slic3r-like header.
     // Look for the header across the whole file as the G-code may have been extended at the start by a post-processing script or the user.
     bool has_delimiters = false;
@@ -1151,7 +1265,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
                 break;
             }
         if (! end_found)
-            throw Slic3r::RuntimeError(format("Configuration block closing tag \"; (.+)r_config = end\" not found when reading %1%", file));
+            throw Slic3r::RuntimeError(format("Configuration block closing tag \"; (.+)r_config = end\" not found when reading %1%", filename));
         std::string key, value;
         while (reader.getline(line)) {
             if (boost::algorithm::ends_with(line, "r_config = begin")) {
@@ -1174,7 +1288,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
             }
         }
         if (! begin_found) 
-            throw Slic3r::RuntimeError(format("Configuration block opening tag \"; (.+)r_config = begin\" not found when reading %1%", file));
+            throw Slic3r::RuntimeError(format("Configuration block opening tag \"; (.+)r_config = begin\" not found when reading %1%", filename));
     }
     else
     {
@@ -1191,7 +1305,55 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
     }
 
     if (key_value_pairs < 80)
-        throw Slic3r::RuntimeError(format("Suspiciously low number of configuration values extracted from %1%: %2%", file, key_value_pairs));
+        throw Slic3r::RuntimeError(format("Suspiciously low number of configuration values extracted from %1%: %2%", filename, key_value_pairs));
+
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    this->handle_legacy_composite();
+    return std::move(substitutions_ctxt.substitutions);
+}
+
+ConfigSubstitutions ConfigBase::load_from_binary_gcode_file(const std::string& filename, ForwardCompatibilitySubstitutionRule compatibility_rule)
+{
+    ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
+
+    FilePtr file{ boost::nowide::fopen(filename.c_str(), "rb") };
+    if (file.f == nullptr)
+        throw Slic3r::RuntimeError(format("Error opening file %1%", filename));
+
+    using namespace bgcode::core;
+    using namespace bgcode::binarize;
+    std::vector<std::byte> cs_buffer(65536);
+    EResult res = is_valid_binary_gcode(*file.f, true, cs_buffer.data(), cs_buffer.size());
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("File %1% does not contain a valid binary gcode\nError: %2%", filename,
+            std::string(translate_result(res))));
+
+    FileHeader file_header;
+    res = read_header(*file.f, file_header, nullptr);
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
+
+    // searches for config block
+    BlockHeader block_header;
+    res = read_next_block_header(*file.f, file_header, block_header, EBlockType::SlicerMetadata, cs_buffer.data(), cs_buffer.size());
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
+    if ((EBlockType)block_header.type != EBlockType::SlicerMetadata)
+        throw Slic3r::RuntimeError(format("Unable to find slicer metadata block in file %1%", filename));
+    SlicerMetadataBlock slicer_metadata_block;
+    res = slicer_metadata_block.read_data(*file.f, file_header, block_header);
+    if (res != EResult::Success)
+        throw Slic3r::RuntimeError(format("Error while reading file %1%: %2%", filename, std::string(translate_result(res))));
+
+    // extracts data from block
+    for (const auto& [key, value] : slicer_metadata_block.raw_data) {
+        this->set_deserialize(key, value, substitutions_ctxt);
+    }
+
+    // Do legacy conversion on a completely loaded dictionary.
+    // Perform composite conversions, for example merging multiple keys into one key.
+    this->handle_legacy_composite();
     return std::move(substitutions_ctxt.substitutions);
 }
 
@@ -1350,7 +1512,7 @@ bool DynamicConfig::read_cli(int argc, const char* const argv[], t_config_option
         }
 
         const t_config_option_key &opt_key = it->second;
-        const ConfigOptionDef     &optdef  = this->def()->options.at(opt_key);
+        const ConfigOptionDef     &optdef  = *this->option_def(opt_key);
 
         // If the option type expects a value and it was not already provided,
         // look for it in the next token.

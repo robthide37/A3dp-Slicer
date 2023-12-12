@@ -1,7 +1,10 @@
 #logs
 page:Perimeters & Shell:shell
 group:Vertical shells
-	setting:width$6:perimeters
+	line:Periemters
+		setting:label$Count:width$6:perimeters
+		setting:perimeter_generator
+	end_line
 	setting:tags$Simple$Expert$SuSi:script:float:depends$perimeter_spacing$external_perimeter_spacing:label$Wall Thickness:tooltip$Change the perimeter extrusion widths to ensure that there is an exact number of perimeters for this wall thickness value. It won't put the perimeter width below the nozzle diameter, and up to double.\nNote that the value displayed is just a view of the current perimeter thickness, like the info text below. The number of perimeters used to compute this value is one loop, or the custom variable 'wall_thickness_lines' (advanced mode) if defined.\nIf the value is too low, it will revert the widths to the saved value.\nIf the value is set to 0, it will show 0.:s_wall_thickness
 	setting:spiral_vase
 	recommended_thin_wall_thickness_description
@@ -15,6 +18,7 @@ group:Horizontal shells
 		setting:bottom_solid_min_thickness
 	end_line
 	top_bottom_shell_thickness_explanation
+	setting:solid_over_perimeters
 	setting:enforce_full_fill_volume
 group:Infill
 	line:Sparse infill pattern
@@ -30,18 +34,15 @@ group:Quality
 		setting:label$Minimum width:sidetext_width$7:min_width_top_surface
 	end_line
 	line:Extra perimeters
-		setting:label_width$8:extra_perimeters_overhangs
+		setting:label_width$8:extra_perimeters_on_overhangs
 		setting:label_width$10:extra_perimeters_odd_layers
-	end_line
-	line:Ensure vertical shell thickness
-		setting:label$_:ensure_vertical_shell_thickness
-		setting:solid_over_perimeters
 	end_line
 	line:Avoid crossing perimeters
 		setting:label$_:avoid_crossing_perimeters
 		setting:label_width$12:label$Not on first layer:avoid_crossing_not_first_layer
 		setting:sidetext_width$15:avoid_crossing_perimeters_max_detour
 	end_line
+	setting: avoid_crossing_curled_overhangs
 	line:Overlapping external perimeter
 		setting:label$_:thin_perimeters
 		setting:label_width$12:label$Also for all perimeters:thin_perimeters_all
@@ -63,8 +64,22 @@ group:label_width$12:Overhangs
 		setting:sidetext_width$2:overhangs_reverse
 		setting:label_width$12:width$5:overhangs_reverse_threshold
 	end_line
-group:sidetext_width$5:Advanced
-	setting:width$25:no_perimeter_unsupported_algo
+group:sidetext_width$5:Seam
+	line:Algorithm
+		setting:tags$Simple$Advanced$Expert$Prusa$SuSi:script:enum$corners$Corners$nearest$Nearest$random$Scattered$allrandom$Random$aligned$Aligned$contiguous$Contiguous$rear$Rear$custom$Custom:depends$seam_position$seam_angle_cost$seam_travel_cost:label$Seam position:label_width$12:sidetext_width$0:tooltip$Position of perimeters' starting points. May use the angle & travel cost (with the fixed visilibity & ovehangs cost) to find the best place.\nCorners\. at least 100% angle cost and no more than 80% travel cost (default to 120-40).\nNearest\. no more than 100% angle cost and at least 100% travel cost (default to 80-100).\nScattered\. seam is placed at a random position on external perimeters.\nRandom\. seam is placed at a random position for all perimeters.\nAligned\. seams are grouped in the best place possible (minimum 6 layers per group).\nContiguous\. seam is placed over a seam from the previous layer (useful with enforcers as seeds).\nRear\. seam is placed at the far side (highest Y coordinates).\nCustom\. Other conbination of angle & travel cost than 'Corners' and 'Nearest', (default to 60-100).\nCustom & weight can be defined in Advanced or Expert mode.:s_seam_position:s_seam_position
+#		setting:tags$Expert:label_width$12:sidetext_width$0:seam_position
+		setting:tags$Advanced$Expert$SuSi:width$3:sidetext_width$0:seam_angle_cost
+		setting:tags$Advanced$Expert$SuSi:width$3:sidetext_width$0:seam_travel_cost
+		setting:tags$Expert$SuSi:sidetext_width$0:seam_visibility
+	end_line
+	staggered_inner_seams
+	line:Seam notch
+		setting:seam_notch_inner
+		setting:seam_notch_outer
+		setting:seam_notch_all
+		setting:seam_notch_angle
+	end_line
+group:sidetext_width$5:Gap Fill
 	line:Gap Fill
 		setting:label$_:gap_fill_enabled
 		setting:width$5:gap_fill_last
@@ -76,19 +91,8 @@ group:sidetext_width$5:Advanced
 		setting:width$5:sidetext_width$6:gap_fill_min_area
 		setting:width$5:gap_fill_min_length
 	end_line
-	line:Seam
-		setting:tags$Simple$Advanced$Expert$Prusa$SuSi:script:enum$corners$Corners$nearest$Nearest$random$Scattered$allrandom$Random$aligned$Aligned$contiguous$Contiguous$rear$Rear$custom$Custom:depends$seam_position$seam_angle_cost$seam_travel_cost:label$Seam position:label_width$12:sidetext_width$0:tooltip$Position of perimeters' starting points. May use the angle & travel cost (with the fixed visilibity & ovehangs cost) to find the best place.\nCorners\. at least 100% angle cost and no more than 80% travel cost (default to 120-40).\nNearest\. no more than 100% angle cost and at least 100% travel cost (default to 80-100).\nScattered\. seam is placed at a random position on external perimeters.\nRandom\. seam is placed at a random position for all perimeters.\nAligned\. seams are grouped in the best place possible (minimum 6 layers per group).\nContiguous\. seam is placed over a seam from the previous layer (useful with enforcers as seeds).\nRear\. seam is placed at the far side (highest Y coordinates).\nCustom\. Other conbination of angle & travel cost than 'Corners' and 'Nearest', (default to 60-100).\nCustom & weight can be defined in Advanced or Expert mode.:s_seam_position:s_seam_position
-#		setting:tags$Expert:label_width$12:sidetext_width$0:seam_position
-		setting:tags$Advanced$Expert$SuSi:width$3:sidetext_width$0:seam_angle_cost
-		setting:tags$Advanced$Expert$SuSi:width$3:sidetext_width$0:seam_travel_cost
-		setting:tags$Expert$SuSi:sidetext_width$0:seam_visibility
-	end_line
-	line:Seam notch
-		setting:seam_notch_inner
-		setting:seam_notch_outer
-		setting:seam_notch_all
-		setting:seam_notch_angle
-	end_line
+group:sidetext_width$5:Advanced
+	setting:width$25:no_perimeter_unsupported_algo
 	line:One-loop perimeters
 		setting:sidetext_width$0:label$_:perimeter_loop
 		setting:label_width$5:label$Seam:perimeter_loop_seam
@@ -108,7 +112,6 @@ group:External perimeter first
 	setting:external_perimeters_vase
 	setting:perimeter_bonding
 group:Arachne perimeter generator (variable width)
-	setting:perimeter_generator
 	line:Wall Transition
 		setting:label$Angle:wall_transition_angle
 		setting:label$Distance Margin:wall_transition_filter_deviation
@@ -156,7 +159,6 @@ group:Modifying slices
 	end_line
 group:Other
 	setting:slicing_mode
-	setting:clip_multipart_objects
 	setting:allow_empty_layers
 
 page:Infill:infill
@@ -305,6 +307,20 @@ group:Options for support material interface
 		setting:support_material_bottom_interface_layers
 	end_line
 	setting:support_material_interface_contact_loops
+	
+group:Organic supports"
+	line:tree angle
+		setting:support_tree_angle
+		setting:support_tree_angle_slow
+	end_line
+	line:branch diameter
+		setting:support_tree_branch_diameter
+		setting:support_tree_branch_diameter_angle
+		setting:support_tree_branch_diameter_double_wall
+	end_line
+    setting:support_tree_tip_diameter
+    setting:support_tree_branch_distance
+    setting:support_tree_top_rate
 
 page:Speed:time
 group:label_width$8:sidetext_width$7:Speed for print moves
@@ -337,6 +353,14 @@ group:Speed for non-print moves
 	line:Travel speed
 		setting:label$xy:travel_speed
 		setting:label$z:travel_speed_z
+	end_line
+group:Dynamic Overhang speeds
+	line:Enable speed for a % overlap
+		setting:label$_:enable_dynamic_overhang_speeds
+		setting:label$0% (bridge):overhang_speed_0
+		setting:label$25%:overhang_speed_1
+		setting:label$50%:overhang_speed_2
+		setting:label$75%:overhang_speed_3
 	end_line
 group:sidetext_width$7:Modifiers
 	line:First layer speed
@@ -458,6 +482,7 @@ group:Extruders
 	setting:solid_infill_extruder
 	setting:support_material_extruder
 	setting:support_material_interface_extruder
+	setting:wipe_tower_extruder
 group:Ooze prevention
 	setting:ooze_prevention
 	setting:standby_temperature_delta
@@ -467,15 +492,24 @@ group:Wipe tower
 		setting:label_width$3:width$5:sidetext$mm:wipe_tower_x
 		setting:label_width$3:width$5:sidetext$mm:wipe_tower_y
 	end_line
-	setting:wipe_tower_brim_width
-	setting:wipe_tower_width
-	setting:wipe_tower_rotation_angle
+	line:Width
+		setting:wipe_tower_width
+		setting:wipe_tower_brim_width
+	end_line
+	line:Angle
+		setting:wipe_tower_rotation_angle
+		setting:wipe_tower_cone_angle
+	end_line
 	setting:wipe_tower_bridging
+	setting:wipe_tower_extra_spacing
 	setting:wipe_tower_no_sparse_layers
 	setting:single_extruder_multi_material_priming
 group:Advanced
 	setting:interface_shells
-	setting:mmu_segmented_region_max_width
+	line:Segmented regions
+		setting:mmu_segmented_region_max_width
+		setting:mmu_segmented_region_interlocking_depth
+	end_line
 
 page:Output options:output+page_white
 group:Plater

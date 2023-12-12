@@ -1,5 +1,10 @@
+///|/ Copyright (c) Prusa Research 2018 - 2023 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv, David Kocík @kocikdav, Lukáš Matěna @lukasmatena, Enrico Turri @enricoturri1966, Tomáš Mészáros @tamasmeszaros, Vojtěch Král @vojtechkral
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #include "GUI_Utils.hpp"
 #include "GUI_App.hpp"
+#include "format.hpp"
 
 #include <algorithm>
 #include <boost/lexical_cast.hpp>
@@ -153,15 +158,6 @@ wxFont get_default_font_for_dpi(const wxWindow *window, int dpi)
 }
 
 bool check_dark_mode() {
-#if 0 //#ifdef _WIN32  // #ysDarkMSW - Allow it when we deside to support the sustem colors for application
-    wxRegKey rk(wxRegKey::HKCU,
-        "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize");
-    if (rk.Exists() && rk.HasValue("AppsUseLightTheme")) {
-        long value = -1;
-        rk.QueryValue("AppsUseLightTheme", &value);
-        return value <= 0;
-    }
-#endif
 #if wxCHECK_VERSION(3,1,3)
     return wxSystemSettings::GetAppearance().IsDark();
 #else
@@ -174,7 +170,7 @@ bool check_dark_mode() {
 #ifdef _WIN32
 void update_dark_ui(wxWindow* window) 
 {
-    bool is_dark = wxGetApp().app_config->get("dark_color_mode") == "1";// ? true : check_dark_mode();// #ysDarkMSW - Allow it when we deside to support the sustem colors for application
+    bool is_dark = wxGetApp().app_config->get_bool("dark_color_mode");// ? true : check_dark_mode();// #ysDarkMSW - Allow it when we deside to support the sustem colors for application
     window->SetBackgroundColour(is_dark ? wxColour(43,  43,  43)  : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
     window->SetForegroundColour(is_dark ? wxColour(250, 250, 250) : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT));
 }
@@ -309,8 +305,10 @@ TaskTimer::~TaskTimer()
 {
     std::chrono::milliseconds stop_timer = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch());
-    auto process_duration = std::chrono::milliseconds(stop_timer - start_timer).count();
-    std::string out = (boost::format("\n!!! %1% duration = %2% ms \n\n") % task_name % process_duration).str();
+    const auto timer_delta = stop_timer - start_timer;
+    const auto process_duration_ms = std::chrono::milliseconds(timer_delta).count();
+    const auto process_duration_s = std::chrono::duration_cast<std::chrono::duration<float>>(timer_delta).count();
+    std::string out = format("\n!   \"%1%\" duration = %2% s (%3% ms) \n", task_name, process_duration_s, process_duration_ms);
     printf("%s", out.c_str());
 #ifdef __WXMSW__
     std::wstring stemp = std::wstring(out.begin(), out.end());

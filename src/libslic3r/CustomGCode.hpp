@@ -1,3 +1,7 @@
+///|/ Copyright (c) Prusa Research 2020 - 2022 Oleksandra Iushchenko @YuSanka, Vojtěch Bubník @bubnikv
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_CustomGCode_hpp_
 #define slic3r_CustomGCode_hpp_
 
@@ -66,6 +70,8 @@ struct Info
 
     bool operator==(const Info& rhs) const
     {
+        if (rhs.gcodes.empty() && this->gcodes.empty())
+            return true; // don't respect to the comparison of the mode, when g_codes are empty
         return  (rhs.mode   == this->mode   ) &&
                 (rhs.gcodes == this->gcodes );
     }

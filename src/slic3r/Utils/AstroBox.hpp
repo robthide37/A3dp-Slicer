@@ -1,3 +1,9 @@
+///|/ Copyright (c) Prusa Research 2018 - 2022 David Kocík @kocikdav, Vojtěch Bubník @bubnikv, Vojtěch Král @vojtechkral
+///|/ Copyright (c) 2019 Spencer Owen @spuder
+///|/ Copyright (c) 2018 Martin Loidl @LoidlM
+///|/
+///|/ PrusaSlicer is released under the terms of the AGPLv3 or higher
+///|/
 #ifndef slic3r_AstroBox_hpp_
 #define slic3r_AstroBox_hpp_
 
@@ -22,7 +28,7 @@ public:
 
     bool test(wxString &curl_msg) const override;
     wxString get_test_failed_msg (wxString &msg) const override;
-    bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn) const override;
+    bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const override;
     bool has_auto_discovery() const override { return true; }
     bool can_test() const override { return true; }
     PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint; }

@@ -1,5 +1,3 @@
-#define NOMINMAX
-
 #include <catch2/catch.hpp>
 #include <test_utils.hpp>
 
@@ -20,17 +18,17 @@
 
 using namespace Slic3r;
 
-static double area(const sla::RasterBase::PixelDim &pxd)
+static double area(const sla::PixelDim &pxd)
 {
     return pxd.w_mm * pxd.h_mm;
 }
 
 static Slic3r::sla::RasterGrayscaleAA create_raster(
-    const sla::RasterBase::Resolution &res,
+    const sla::Resolution &res,
     double                             disp_w = 100.,
     double                             disp_h = 100.)
 {
-    sla::RasterBase::PixelDim pixdim{disp_w / res.width_px, disp_h / res.height_px};
+    sla::PixelDim pixdim{disp_w / res.width_px, disp_h / res.height_px};
     
     auto bb = BoundingBox({0, 0}, {scaled(disp_w), scaled(disp_h)});
     sla::RasterBase::Trafo trafo;
@@ -107,7 +105,7 @@ static void test_expolys(Rst &&             rst,
     svg.Close();
     
     double max_rel_err = 0.1;
-    sla::RasterBase::PixelDim pxd = rst.pixel_dimensions();
+    sla::PixelDim pxd = rst.pixel_dimensions();
     double max_abs_err = area(pxd) * scaled(1.) * scaled(1.);
     
     BoundingBox ref_bb;
@@ -175,7 +173,7 @@ TEST_CASE("Fully covered raster should result in a rectangle", "[MarchingSquares
 
 TEST_CASE("4x4 raster with one ring", "[MarchingSquares]") {
     
-    sla::RasterBase::PixelDim pixdim{1, 1};
+    sla::PixelDim pixdim{1, 1};
     
     // We need one additional row and column to detect edges
     sla::RasterGrayscaleAA rst{{4, 4}, pixdim, {}, agg::gamma_threshold(.5)};
@@ -205,7 +203,7 @@ TEST_CASE("4x4 raster with one ring", "[MarchingSquares]") {
 
 TEST_CASE("4x4 raster with two rings", "[MarchingSquares]") {
     
-    sla::RasterBase::PixelDim pixdim{1, 1};
+    sla::PixelDim pixdim{1, 1};
     
     // We need one additional row and column to detect edges
     sla::RasterGrayscaleAA rst{{5, 5}, pixdim, {}, agg::gamma_threshold(.5)};
@@ -321,13 +319,13 @@ static void recreate_object_from_rasters(const std::string &objname, float lh) {
     
     std::vector<ExPolygons> layers = slice_mesh_ex(mesh.its, grid(float(bb.min.z()) + lh, float(bb.max.z()), lh));
     
-    sla::RasterBase::Resolution res{2560, 1440};
+    sla::Resolution res{2560, 1440};
     double                      disp_w = 120.96;
     double                      disp_h = 68.04;
 
-#ifndef NDEBUG
-    size_t cntr = 0;
-#endif
+//#ifndef NDEBUG
+//    size_t cntr = 0;
+//#endif
     for (ExPolygons &layer : layers) {
         auto rst = create_raster(res, disp_w, disp_h);
         
@@ -335,11 +333,11 @@ static void recreate_object_from_rasters(const std::string &objname, float lh) {
             rst.draw(island);
         }
         
-#ifndef NDEBUG
-        std::fstream out(objname + std::to_string(cntr) + ".png", std::ios::out);
-        out << rst.encode(sla::PNGRasterEncoder{});
-        out.close();
-#endif
+//#ifndef NDEBUG
+//        std::fstream out(objname + std::to_string(cntr) + ".png", std::ios::out);
+//        out << rst.encode(sla::PNGRasterEncoder{});
+//        out.close();
+//#endif
         
         ExPolygons layer_ = sla::raster_to_polygons(rst);
 //        float delta = scaled(std::min(rst.pixel_dimensions().h_mm,
@@ -347,19 +345,19 @@ static void recreate_object_from_rasters(const std::string &objname, float lh) {
         
 //        layer_ = expolygons_simplify(layer_, delta);
 
-#ifndef NDEBUG
-        SVG svg(objname +  std::to_string(cntr) + ".svg", BoundingBox(Point{0, 0}, Point{scaled(disp_w), scaled(disp_h)}));
-        svg.draw(layer_);
-        svg.draw(layer, "green");
-        svg.Close();
-#endif
+//#ifndef NDEBUG
+//        SVG svg(objname +  std::to_string(cntr) + ".svg", BoundingBox(Point{0, 0}, Point{scaled(disp_w), scaled(disp_h)}));
+//        svg.draw(layer_);
+//        svg.draw(layer, "green");
+//        svg.Close();
+//#endif
         
         double layera = 0., layera_ = 0.;
         for (auto &p : layer) layera += p.area();
         for (auto &p : layer_) layera_ += p.area();
-#ifndef NDEBUG
-        std::cout << cntr++ << std::endl;
-#endif
+//#ifndef NDEBUG
+//        std::cout << cntr++ << std::endl;
+//#endif
         double diff = std::abs(layera_ - layera);
         REQUIRE((diff <= 0.1 * layera || diff < scaled<double>(1.) * scaled<double>(1.)));
         
